@@ -8,6 +8,7 @@ def hello_world():
 
 # . .venv/bin/activate
 # sudo vim /etc/systemd/system/MyTodo.service
+# sudo systemctl restart code-server@orangepi.service
 # sudo vim  /etc/caddy/Caddyfile
 # caddy reload --config=/etc/caddy/Caddyfile
 if __name__ == '__main__':
