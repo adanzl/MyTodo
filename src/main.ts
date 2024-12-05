@@ -60,6 +60,7 @@ app.component("ion-page", IonPage);
 console.log(`当前 Vue 版本是：${app.version}`);
 console.log(GConfig);
 // GConfig.init__();
+// https://ionicframework.com/docs/vue/pwa
 router.isReady().then(() => {
   app.mount("#app");
 });
