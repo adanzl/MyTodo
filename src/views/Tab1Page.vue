@@ -11,13 +11,23 @@
           <ion-title size="large">Tab 1</ion-title>
         </ion-toolbar>
       </ion-header>
-
-      <ExploreContainer name="Tab 1 page" />
+      <!-- <ion-datetime
+        ref="datetime"
+        hour-cycle="h23"
+        min="2024-12-01"
+        max="2024-12-07"
+        :show-default-title="true"
+      >
+        <ion-buttons slot="buttons">
+          <ion-button color="danger" @click="reset()">Reset</ion-button>
+        </ion-buttons>
+        <ion-label slot="title">ion-label</ion-label>
+      </ion-datetime> -->
+      <CalendarC name="calendar"></CalendarC>
       <ion-button @click="scrollToBottom()">
         <ion-icon slot="start" :icon="star"></ion-icon>Scroll
         <ion-icon slot="end" :icon="heart"></ion-icon>
       </ion-button>
-
       <ion-list :inset="true" lines="full" mode="ios">
         <ion-item>
           <ion-label>
@@ -46,11 +56,15 @@
 
 <script setup lang="ts">
 import { star, heart } from "ionicons/icons";
-import { IonHeader } from "@ionic/vue";
-import ExploreContainer from "@/components/ExploreContainer.vue";
+import { ref } from "vue";
 import GConfig from "@/components/GConfig.vue";
+import CalendarC from "@/components/CalendarC.vue"
+const datetime = ref(null);
 const scrollToBottom = () => {
   console.log("scroll to bottom", GConfig);
   GConfig.init();
+};
+const reset = () => {
+  datetime.value.$el.reset();
 };
 </script>

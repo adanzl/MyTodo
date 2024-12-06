@@ -43,6 +43,9 @@ import {
   IonTitle,
   IonButton,
   IonIcon,
+  IonDatetime,
+  IonButtons,
+  IonHeader,
 } from "@ionic/vue";
 
 const app = createApp(App).use(IonicVue).use(router);
@@ -56,9 +59,12 @@ app.component("ion-icon", IonIcon);
 app.component("ion-item", IonItem);
 app.component("ion-toolbar", IonToolbar);
 app.component("ion-page", IonPage);
+app.component("ion-datetime", IonDatetime);
+app.component("ion-buttons", IonButtons);
+app.component("ion-header", IonHeader);
 
 console.log(`当前 Vue 版本是：${app.version}`);
-console.log(GConfig);
+// console.log(GConfig);
 // GConfig.init__();
 // https://ionicframework.com/docs/vue/pwa
 router.isReady().then(() => {
