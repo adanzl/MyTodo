@@ -27,11 +27,11 @@ import "@ionic/vue/css/display.css";
 
 /* @import '@ionic/vue/css/palettes/dark.always.css'; */
 /* @import '@ionic/vue/css/palettes/dark.class.css'; */
-import "@ionic/vue/css/palettes/dark.system.css";
+// import "@ionic/vue/css/palettes/dark.system.css";
 
 /* Theme variables */
 import "./theme/variables.css";
-import GConfig from "@/components/GConfig.vue";
+// import GConfig from "@/components/GConfig.vue";
 import {
   IonContent,
   IonicVue,
@@ -46,6 +46,7 @@ import {
   IonDatetime,
   IonButtons,
   IonHeader,
+  IonChip,
 } from "@ionic/vue";
 
 const app = createApp(App).use(IonicVue).use(router);
@@ -62,6 +63,7 @@ app.component("ion-page", IonPage);
 app.component("ion-datetime", IonDatetime);
 app.component("ion-buttons", IonButtons);
 app.component("ion-header", IonHeader);
+app.component("ion-chip", IonChip);
 
 console.log(`当前 Vue 版本是：${app.version}`);
 // console.log(GConfig);
