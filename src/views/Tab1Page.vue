@@ -2,79 +2,58 @@
   <ion-page>
     <ion-header>
       <ion-toolbar>
-        <ion-title>Tab 1</ion-title>
+        <ion-buttons slot="start" class="ion-padding">
+          <ion-icon :icon="list"></ion-icon>
+        </ion-buttons>
+        <ion-title>
+          <span v-if="selectedDate">{{
+            selectedDate.dt.format("YY年MM月")
+          }}</span>
+        </ion-title>
+        <ion-buttons slot="end" class="ion-padding">
+          <ion-icon :icon="swapVertical"></ion-icon>
+        </ion-buttons>
       </ion-toolbar>
     </ion-header>
-    <ion-content :fullscreen="true" color="light">
+    <ion-content :fullscreen="true">
+      <!-- https://blog.csdn.net/weixin_41863239/article/details/82490886 -->
       <swiper
-        ref="swiperRef"
-        @slideChangeTransitionEnd="onSlideChange"
+        @slideNextTransitionEnd="onSlideChangeNext"
+        @slidePrevTransitionEnd="onSlideChangePre"
         @slidesUpdated="onSlideUpdate"
-        :slidesPerView="1"
-        :slidesPerGroup="1"
+        @swiper="setSwiperInstance"
         :centered-slides="true"
-        :modules="[EffectFade, IonicSlides, Keyboard]"
+        :autoHeight="true"
+        :modules="[IonicSlides, Keyboard]"
         :keyboard="true"
       >
-        <swiper-slide v-for="(slide, idx) in slideArr" :key="idx">
-          <ion-grid>
-            <ion-row justify-content-center>
-              <ion-col col-auto class="ion-text-left">
-                <ion-icon :icon="list"></ion-icon>
-              </ion-col>
-              <ion-col col-auto class="ion-text-center">
-                <div>{{ slide.year }} 年 {{ slide.month + 1 }} 月</div>
-              </ion-col>
-              <ion-col col-auto class="ion-text-right">
-                <ion-icon :icon="swapVertical"></ion-icon>
-              </ion-col>
-            </ion-row>
-
-            <ion-row>
-              <ion-col
-                class="calendar-header-col ion-text-center"
-                v-for="head in weekHead"
-                :key="head"
-              >
-                {{ head }}
-              </ion-col>
-            </ion-row>
-
-            <ion-row
-              class="calendar-row"
-              v-for="week in slide.weekArr"
-              :key="week"
-            >
-              <ion-col
-                class="calendar-col ion-text-center ion-no-padding"
-                @click="daySelect(slide, day)"
-                v-for="day in week"
-                :key="day"
-              >
-                <ion-chip
-                  :class="{
-                    vertical: true,
-                    transparent:
-                      selectedDate && day.dt.unix() !== selectedDate.dt.unix(),
-                    selected:
-                      selectedDate && day.dt.unix() === selectedDate.dt.unix(),
-                    gray: day.dt.month() !== slide.month,
-                  }"
-                >
-                  <span>
-                    <strong> {{ day.dt.date() }}</strong>
-                  </span>
-                  <span class="dot" v-if="day.events.length > 0"></span>
-                </ion-chip>
-              </ion-col>
-            </ion-row>
-          </ion-grid>
+        <swiper-slide>
+          <!-- <swiper-slide v-for="(slide, idx) in slideArr" :key="idx"> -->
+          <CalenderTab
+            :slide="slideArr[0]"
+            :daySelectCallback="daySelect"
+            :selectedDate="selectedDate"
+          ></CalenderTab>
+        </swiper-slide>
+        <swiper-slide>
+          <CalenderTab
+            :slide="slideArr[1]"
+            :daySelectCallback="daySelect"
+            :selectedDate="selectedDate"
+          ></CalenderTab>
+        </swiper-slide>
+        <swiper-slide>
+          <CalenderTab
+            :slide="slideArr[2]"
+            :daySelectCallback="daySelect"
+            :selectedDate="selectedDate"
+          ></CalenderTab>
         </swiper-slide>
       </swiper>
       <ion-button
         color="light"
         expand="full"
-        fill="outline"
+        fill="clear"
         size="small"
         @click="calendarFold()"
       >
@@ -85,31 +64,57 @@
         >
         </ion-icon>
       </ion-button>
-      <ion-list :inset="true" lines="full" mode="ios">
-        <ion-item>
-          <ion-label>
-            Multi-line text that should wrap when it is too long to fit on one
-            line.
-          </ion-label>
-        </ion-item>
+      <ion-content color="light">
+        <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
+          <ion-refresher-content></ion-refresher-content>
+        </ion-refresher>
+        <ion-list :inset="true" lines="full" mode="ios">
+          <ion-item>
+            <ion-label>
+              Multi-line text that should wrap when it is too long to fit on one
+              line.
+            </ion-label>
+          </ion-item>
 
-        <ion-item>
-          <ion-label class="ion-text-nowrap">
-            Multi-line text that should ellipsis when it is too long to fit on
-            one line.
-          </ion-label>
-        </ion-item>
+          <ion-item>
+            <ion-label class="ion-text-nowrap">
+              Multi-line text that should ellipsis when it is too long to fit on
+              one line.
+            </ion-label>
+          </ion-item>
 
-        <ion-item>
-          <ion-label>
-            <h1>H1 Heading</h1>
-            <p>Paragraph</p>
-          </ion-label>
-        </ion-item>
-      </ion-list>
+          <ion-item>
+            <ion-label>
+              <h1>H1 Heading</h1>
+              <p>Paragraph</p>
+            </ion-label>
+          </ion-item>
+        </ion-list>
+      </ion-content>
+      <ion-modal
+        id="pop-modal"
+        ref="modal"
+        trigger="open-dialog"
+        class="ion-padding"
+      >
+        <div class="wrapper ion-padding">
+          <h1>Dialog header</h1>
+          <ion-list lines="none">
+            <ion-item :button="true" :detail="false">
+              <ion-label>Item 1</ion-label>
+            </ion-item>
+            <ion-item :button="true" :detail="false">
+              <ion-label>Item 2</ion-label>
+            </ion-item>
+            <ion-item :button="true" :detail="false">
+              <ion-label>Item 3</ion-label>
+            </ion-item>
+          </ion-list>
+        </div>
+      </ion-modal>
     </ion-content>
     <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-      <ion-fab-button>
+      <ion-fab-button id="open-dialog">
         <ion-icon :icon="addCircleOutline" size="large"></ion-icon>
       </ion-fab-button>
     </ion-fab>
@@ -118,12 +123,12 @@
 
 <script setup lang="ts">
 import {
-  IonCol,
   IonFab,
   IonFabButton,
-  IonGrid,
-  IonRow,
   IonicSlides,
+  IonRefresher,
+  IonRefresherContent,
+  IonModal,
 } from "@ionic/vue";
 import dayjs from "dayjs";
 import {
@@ -133,20 +138,23 @@ import {
   list,
   swapVertical,
 } from "ionicons/icons";
-import { EffectFade, Keyboard } from "swiper/modules";
+import { Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
+import CalenderTab from "@/components/CalendarTab.vue";
 import { ref } from "vue";
+import axios from "axios";
 
 import "@ionic/vue/css/ionic-swiper.css";
 import "swiper/css";
 import "swiper/css/effect-fade";
-const slideArr = ref<any[]>([{}, {}, {}]);
-const swiperRef = ref();
+const slideArr = ref<any[]>([{}, {}, {}]); // 滑动数据
+const swiperRef = ref(); // 滑动对象
+const bFold = ref(false); // 日历折叠状态
+const selectedDate: any = ref(null); // 选中日期
 
 let currentDate = dayjs().startOf("day");
-const selectedDate: any = ref(null);
-const weekHead = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const createSlideData = (datetime: any) => {
+const createSlideData = (datetime: dayjs.Dayjs) => {
+  // console.log("createSlideData", datetime.format("YYYY-MM-DD"));
   const firstDayOfMonth = datetime.startOf("month");
   let _dt = firstDayOfMonth.startOf("week");
   const wArr = [];
@@ -158,9 +166,6 @@ const createSlideData = (datetime: any) => {
         events: [1],
       };
       week.push(dd);
-      if (selectedDate.value == null && _dt.unix() == currentDate.unix()) {
-        selectedDate.value = dd;
-      }
       _dt = _dt.add(1, "days");
     }
     wArr.push(week);
@@ -174,47 +179,160 @@ const createSlideData = (datetime: any) => {
 };
 
 const daySelect = (slide: any, day: any) => {
+  if (slide.month != day.dt.month()) {
+    if (slide.year * 100 + slide.month < day.dt.year() * 100 + day.dt.month()) {
+      swiperRef.value.slideNext();
+    } else {
+      swiperRef.value.slidePrev();
+    }
+  }
   console.log("daySelect", day);
   selectedDate.value = day;
 };
-let curIdx = 0;
+const chooseSelectedDate = () => {
+  // 处理选中日期
+  const mm = slideArr.value[curIdx];
+  const now = dayjs().startOf("day");
+  if (!selectedDate.value) {
+    outer: for (const week of mm.weekArr) {
+      for (const _dt of week) {
+        if (_dt.dt.unix() == now.unix()) {
+          selectedDate.value = _dt;
+          break outer;
+        }
+      }
+    }
+  }
+  if (!selectedDate.value) {
+    outer: for (const week of mm.weekArr) {
+      for (const _dt of week) {
+        if (_dt.dt.unix() == currentDate.unix()) {
+          selectedDate.value = _dt;
+          break outer;
+        }
+      }
+    }
+  }
+  if (selectedDate.value) {
+    console.log("ST ", selectedDate.value.dt.format("YYYY-MM-DD"));
+  }
+};
+
+
+const SLIDE_SIZE = 3;
+const onSlideChangeNext = (obj: any) => {
+  console.log("onSlideChangeNext", currentDate.format("YYYY-MM-DD"));
+  currentDate = currentDate.add(1, "months").startOf("month");
+  slideArr.value = [
+    createSlideData(currentDate.subtract(1, "months")),
+    createSlideData(currentDate),
+    createSlideData(currentDate.add(1, "months")),
+  ];
+  obj.slideTo(1, 0, false);
+  obj.update();
+  if (
+    selectedDate.value &&
+    selectedDate.value.dt.month() !== currentDate.month()
+  ) {
+    selectedDate.value = null; // 清空选中日期
+  }
+  chooseSelectedDate();
+};
+const onSlideChangePre = (obj: any) => {
+  console.log("onSlideChangePre", currentDate.format("YYYY-MM-DD"));
+  currentDate = currentDate.subtract(1, "months").startOf("month");
+
+  slideArr.value = [
+    createSlideData(currentDate.subtract(1, "months")),
+    createSlideData(currentDate),
+    createSlideData(currentDate.add(1, "months")),
+  ];
+  obj.slideTo(1, 0, false);
+  obj.update();
+  if (
+    selectedDate.value &&
+    selectedDate.value.dt.month() !== currentDate.month()
+  ) {
+    selectedDate.value = null; // 清空选中日期
+  }
+  chooseSelectedDate();
+};
+let curIdx = 1;
 const onSlideChange = (obj: any) => {
   const currentSlideIndex = obj.activeIndex;
   const previousSlideIndex = obj.previousIndex;
-
   if (currentSlideIndex < previousSlideIndex) {
     curIdx -= 1;
-    if (curIdx < 0) curIdx += 3;
-    console.log("<-", curIdx, slideArr.value);
-    currentDate = currentDate.subtract(1, "months");
-    slideArr.value[(curIdx - 1 + 3) % 3] = createSlideData(
-      currentDate.subtract(1, "months")
+    curIdx = (curIdx + SLIDE_SIZE) % SLIDE_SIZE;
+    console.log(
+      "onSlideChange <-",
+      curIdx,
+      (curIdx - 1 + SLIDE_SIZE) % SLIDE_SIZE,
+      slideArr.value
+    );
+    currentDate = currentDate.subtract(1, "months").startOf("month");
+    slideArr.value[(curIdx - 1 + SLIDE_SIZE) % SLIDE_SIZE] = createSlideData(
+      currentDate.subtract(1, "months").startOf("month")
     );
   } else if (currentSlideIndex > previousSlideIndex) {
     curIdx += 1;
-    console.log("->", curIdx, slideArr.value);
-    currentDate = currentDate.add(1, "months");
-    slideArr.value[(curIdx + 1 + 3) % 3] = createSlideData(
-      currentDate.add(1, "months")
+    curIdx = (curIdx + SLIDE_SIZE) % SLIDE_SIZE;
+    console.log(
+      "onSlideChange ->",
+      curIdx,
+      (curIdx + 1 + SLIDE_SIZE) % SLIDE_SIZE,
+      slideArr.value
     );
+    currentDate = currentDate.add(1, "months").startOf("month");
+    slideArr.value[(curIdx + 1 + SLIDE_SIZE) % SLIDE_SIZE] = createSlideData(
+      currentDate.add(1, "months").startOf("month")
+    );
+  } else {
+    return;
   }
-  console.log("Cur M:", currentDate.month());
+  console.log("onSlideChange", slideArr.value, obj.activeIndex);
+  if (
+    selectedDate.value &&
+    selectedDate.value.dt.month() !== currentDate.month()
+  ) {
+    selectedDate.value = null; // 清空选中日期
+  }
+  chooseSelectedDate();
 };
 
-const onSlideUpdate = (obj: any) => {
-  obj.params.loop = true;
+const onSlideUpdate = () => {};
+
+const setSwiperInstance = (swiper: any) => {
+  swiperRef.value = swiper;
+  swiper.slideTo(1, 0, false);
+  chooseSelectedDate();
 };
 
+const handleRefresh = (event: any) => {
+  console.log("handleRefresh", event);
+  axios
+    .get("https://3ft23fh89533.vicp.fun/api/getSave", { params: { id: 1 } })
+    .then((res) => {
+      console.log("handleRefresh", res);
+      event.target.complete();
+    })
+    .catch((err) => {
+      console.log("handleRefresh", err);
+      event.target.complete();
+    });
+};
+
+// 初始化数据
 slideArr.value = [
+  createSlideData(currentDate.subtract(1, "months")),
   createSlideData(currentDate),
   createSlideData(currentDate.add(1, "months")),
-  createSlideData(currentDate.subtract(1, "months")),
 ];
-// swiperRef.value.loop = true;
-console.log("M:", currentDate.month());
-const bFold = ref(false);
+
+
+// 日历折叠
 const calendarFold = () => {
-  console.log("calendarFold");
+  console.log("calendarFold ", bFold.value);
   bFold.value = !bFold.value;
 };
 </script>
@@ -240,5 +358,12 @@ ion-chip.selected {
 }
 .gray {
   --color: #b5b1b1 !important;
+}
+ion-modal#pop-modal {
+  --width: 100%;
+  --min-width: fit-content;
+  --height: fit-content;
+  --border-radius: 6px;
+  --box-shadow: 0 28px 48px rgba(0, 0, 0, 0.4);
 }
 </style>

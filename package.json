@@ -1,5 +1,5 @@
 {
-  "name": "MyTodo",
+  "name": "myTodo",
   "private": true,
   "version": "0.0.1",
   "type": "module",
@@ -20,6 +20,8 @@
     "@capacitor/status-bar": "6.0.2",
     "@ionic/vue": "^8.4.1",
     "@ionic/vue-router": "^8.4.1",
+    "@types/axios": "^0.9.36",
+    "axios": "^1.7.9",
     "date-fns": "4.1.0",
     "dayjs": "^1.11.13",
     "ionicons": "^7.0.0",
