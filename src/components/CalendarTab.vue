@@ -9,7 +9,7 @@
     <ion-row class="calendar-row" v-for="week in slide.weekArr" :key="week">
       <ion-col
         class="calendar-col ion-text-center ion-no-padding"
-        @click="daySelectCallback(slide, day)"
+        @click="daySelectCallback ? daySelectCallback(slide, day) : undefined"
         v-for="day in week"
         :key="day"
       >

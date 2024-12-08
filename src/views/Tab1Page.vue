@@ -100,13 +100,13 @@
         <div class="wrapper ion-padding">
           <h1>Dialog header</h1>
           <ion-list lines="none">
-            <ion-item :button="true" :detail="false">
+            <ion-item :button="true" :detail="false" aria-label="button">
               <ion-label>Item 1</ion-label>
             </ion-item>
-            <ion-item :button="true" :detail="false">
+            <ion-item :button="true" :detail="false" aria-label="button">
               <ion-label>Item 2</ion-label>
             </ion-item>
-            <ion-item :button="true" :detail="false">
+            <ion-item :button="true" :detail="false" aria-label="button">
               <ion-label>Item 3</ion-label>
             </ion-item>
           </ion-list>
@@ -191,7 +191,7 @@ const daySelect = (slide: any, day: any) => {
 };
 const chooseSelectedDate = () => {
   // 处理选中日期
-  const mm = slideArr.value[curIdx];
+  const mm = slideArr.value[1];
   const now = dayjs().startOf("day");
   if (!selectedDate.value) {
     outer: for (const week of mm.weekArr) {
@@ -218,8 +218,6 @@ const chooseSelectedDate = () => {
   }
 };
 
-
-const SLIDE_SIZE = 3;
 const onSlideChangeNext = (obj: any) => {
   console.log("onSlideChangeNext", currentDate.format("YYYY-MM-DD"));
   currentDate = currentDate.add(1, "months").startOf("month");
@@ -257,48 +255,6 @@ const onSlideChangePre = (obj: any) => {
   }
   chooseSelectedDate();
 };
-let curIdx = 1;
-const onSlideChange = (obj: any) => {
-  const currentSlideIndex = obj.activeIndex;
-  const previousSlideIndex = obj.previousIndex;
-  if (currentSlideIndex < previousSlideIndex) {
-    curIdx -= 1;
-    curIdx = (curIdx + SLIDE_SIZE) % SLIDE_SIZE;
-    console.log(
-      "onSlideChange <-",
-      curIdx,
-      (curIdx - 1 + SLIDE_SIZE) % SLIDE_SIZE,
-      slideArr.value
-    );
-    currentDate = currentDate.subtract(1, "months").startOf("month");
-    slideArr.value[(curIdx - 1 + SLIDE_SIZE) % SLIDE_SIZE] = createSlideData(
-      currentDate.subtract(1, "months").startOf("month")
-    );
-  } else if (currentSlideIndex > previousSlideIndex) {
-    curIdx += 1;
-    curIdx = (curIdx + SLIDE_SIZE) % SLIDE_SIZE;
-    console.log(
-      "onSlideChange ->",
-      curIdx,
-      (curIdx + 1 + SLIDE_SIZE) % SLIDE_SIZE,
-      slideArr.value
-    );
-    currentDate = currentDate.add(1, "months").startOf("month");
-    slideArr.value[(curIdx + 1 + SLIDE_SIZE) % SLIDE_SIZE] = createSlideData(
-      currentDate.add(1, "months").startOf("month")
-    );
-  } else {
-    return;
-  }
-  console.log("onSlideChange", slideArr.value, obj.activeIndex);
-  if (
-    selectedDate.value &&
-    selectedDate.value.dt.month() !== currentDate.month()
-  ) {
-    selectedDate.value = null; // 清空选中日期
-  }
-  chooseSelectedDate();
-};
 
 const onSlideUpdate = () => {};
 
@@ -328,7 +284,6 @@ slideArr.value = [
   createSlideData(currentDate),
   createSlideData(currentDate.add(1, "months")),
 ];
-
 
 // 日历折叠
 const calendarFold = () => {
