@@ -11,7 +11,7 @@
           }}</span>
         </ion-title>
         <ion-buttons slot="end" class="ion-padding">
-          <ion-icon :icon="swapVertical"></ion-icon>
+          <ion-icon :icon="swapVertical" @click="sortBtnClk"></ion-icon>
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
@@ -20,34 +20,21 @@
       <swiper
         @slideNextTransitionEnd="onSlideChangeNext"
         @slidePrevTransitionEnd="onSlideChangePre"
-        @slidesUpdated="onSlideUpdate"
         @swiper="setSwiperInstance"
         :centered-slides="true"
         :autoHeight="true"
         :modules="[IonicSlides, Keyboard]"
         :keyboard="true"
       >
-        <swiper-slide>
-          <!-- <swiper-slide v-for="(slide, idx) in slideArr" :key="idx"> -->
+        <swiper-slide v-for="(slide, idx) in slideArr" :key="idx">
           <CalenderTab
-            :slide="slideArr[0]"
+            :slide="slide"
             :daySelectCallback="daySelect"
             :selectedDate="selectedDate"
-          ></CalenderTab>
-        </swiper-slide>
-        <swiper-slide>
-          <CalenderTab
-            :slide="slideArr[1]"
-            :daySelectCallback="daySelect"
-            :selectedDate="selectedDate"
-          ></CalenderTab>
-        </swiper-slide>
-        <swiper-slide>
-          <CalenderTab
-            :slide="slideArr[2]"
-            :daySelectCallback="daySelect"
-            :selectedDate="selectedDate"
-          ></CalenderTab>
+            :minimal="bFold"
+            :swiperRef="swiperRef"
+          >
+          </CalenderTab>
         </swiper-slide>
       </swiper>
       <ion-button
@@ -141,7 +128,7 @@ import {
 import { Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
 import CalenderTab from "@/components/CalendarTab.vue";
-import { ref } from "vue";
+import { nextTick, ref } from "vue";
 import axios from "axios";
 
 import "@ionic/vue/css/ionic-swiper.css";
@@ -218,9 +205,7 @@ const chooseSelectedDate = () => {
   }
 };
 
-const onSlideChangeNext = (obj: any) => {
-  console.log("onSlideChangeNext", currentDate.format("YYYY-MM-DD"));
-  currentDate = currentDate.add(1, "months").startOf("month");
+const slideChange = (obj:any) => {
   slideArr.value = [
     createSlideData(currentDate.subtract(1, "months")),
     createSlideData(currentDate),
@@ -235,28 +220,21 @@ const onSlideChangeNext = (obj: any) => {
     selectedDate.value = null; // 清空选中日期
   }
   chooseSelectedDate();
+};
+const onSlideChangeNext = (obj: any) => {
+  console.log("onSlideChangeNext", currentDate.format("YYYY-MM-DD"));
+  currentDate = currentDate.add(1, "months").startOf("month");
+  slideChange(obj);
 };
 const onSlideChangePre = (obj: any) => {
   console.log("onSlideChangePre", currentDate.format("YYYY-MM-DD"));
   currentDate = currentDate.subtract(1, "months").startOf("month");
-
-  slideArr.value = [
-    createSlideData(currentDate.subtract(1, "months")),
-    createSlideData(currentDate),
-    createSlideData(currentDate.add(1, "months")),
-  ];
-  obj.slideTo(1, 0, false);
-  obj.update();
-  if (
-    selectedDate.value &&
-    selectedDate.value.dt.month() !== currentDate.month()
-  ) {
-    selectedDate.value = null; // 清空选中日期
-  }
-  chooseSelectedDate();
+  slideChange(obj);
 };
 
-const onSlideUpdate = () => {};
+const sortBtnClk = () => {
+  swiperRef?.value?.update();
+};
 
 const setSwiperInstance = (swiper: any) => {
   swiperRef.value = swiper;
@@ -287,8 +265,10 @@ slideArr.value = [
 
 // 日历折叠
 const calendarFold = () => {
-  console.log("calendarFold ", bFold.value);
   bFold.value = !bFold.value;
+  nextTick(() => {
+    swiperRef.value.update();
+  });
 };
 </script>
 <style>
