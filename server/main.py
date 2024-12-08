@@ -1,4 +1,5 @@
 from flask import Flask, json, request, jsonify
+from flask_cors import cross_origin
 import logging
 import db_mgr
 
@@ -15,6 +16,7 @@ def main():
 
 
 @app.route("/getSave", methods=['GET'])
+@cross_origin(origin='*')
 def get_save():
     id = request.args.get('id')
     log.info("===== [Get Save] " + id)
@@ -22,6 +24,7 @@ def get_save():
 
 
 @app.route("/setSave", methods=['POST'])
+@cross_origin(origin='*')
 def set_save():
     args = request.get_json()
     log.info("===== [Set Save] " + json.dumps(args))
@@ -36,5 +39,6 @@ def set_save():
 # sudo systemctl restart code-server@orangepi.service
 # sudo vim  /etc/caddy/Caddyfile
 # caddy reload --config=/etc/caddy/Caddyfile
+# sudo systemctl restart myTodo.service
 if __name__ == '__main__':
     app.run(debug=True, port=8888)  #开始运行flask应用程序，以调试模式运行
