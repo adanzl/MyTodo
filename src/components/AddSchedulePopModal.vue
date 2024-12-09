@@ -61,7 +61,10 @@
                 <ion-label> no time</ion-label>
               </ion-button>
             </ion-item>
-            <ion-item v-if="bShowScheduleDT">
+            <ion-item
+              ref="dtItem"
+              style="display: block; height: 0; overflow: hidden"
+            >
               <ion-datetime ref="scheduleDT">
                 <ion-buttons slot="buttons">
                   <ion-button color="primary">Clear</ion-button>
@@ -118,22 +121,23 @@
 </template>
 <script setup lang="ts">
 import {
+  IonDatetime,
   IonSegment,
   IonSegmentButton,
   IonSegmentContent,
   IonSegmentView,
   IonSelect,
   IonSelectOption,
-  IonDatetime,
+  createAnimation,
 } from "@ionic/vue";
 import {
-  bookmark,
-  colorPalette,
   airplane,
+  bookmark,
   calendar,
+  colorPalette,
   notifications,
-  repeat,
   power,
+  repeat,
 } from "ionicons/icons";
 import { ref } from "vue";
 const props = defineProps({
@@ -146,14 +150,35 @@ const cancel = () => {
   props.modal?.$el.dismiss(null, "cancel");
 };
 
-const btnScheduleDTClk = () => {
-  console.log("btnScheduleDTClk");
+const btnScheduleDTClk = async () => {
+  const hh = scheduleDT.value.$el.offsetHeight;
+  const kf = [
+    { offset: 0, height: hh + "px", top: "0" },
+    { offset: 0.5, height: hh * 0.5 + "px", top: "0" },
+    { offset: 1, height: "0", top: "0" },
+  ];
+
+  let animation = createAnimation()
+    .addElement(dtItem.value.$el)
+    .duration(300)
+    .keyframes(kf)
+    .beforeStyles({
+      "transform-origin": "top",
+      overflow: "hidden",
+      display: "block",
+      position: "relative",
+    });
+  if (!bShowScheduleDT.value) {
+    animation = animation.direction("reverse");
+  }
+  await animation.play();
   bShowScheduleDT.value = !bShowScheduleDT.value;
 };
 
 const scheduleTitle = ref("");
 const scheduleDT = ref();
 const bShowScheduleDT = ref(false);
+const dtItem = ref();
 </script>
 
 <style scoped>
