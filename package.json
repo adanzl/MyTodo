@@ -1,5 +1,5 @@
 {
-  "name": "myTodo",
+  "name": "my_todo",
   "private": true,
   "version": "0.0.1",
   "type": "module",
@@ -17,6 +17,7 @@
     "@capacitor/core": "6.2.0",
     "@capacitor/haptics": "6.0.2",
     "@capacitor/keyboard": "6.0.3",
+    "@capacitor/local-notifications": "6.1.1",
     "@capacitor/status-bar": "6.0.2",
     "@ionic/vue": "^8.4.1",
     "@ionic/vue-router": "^8.4.1",

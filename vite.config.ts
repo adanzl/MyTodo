@@ -8,7 +8,14 @@ import { defineConfig } from "vite";
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [vue(), VitePWA({ registerType: "autoUpdate" }), legacy()],
+  plugins: [
+    vue(),
+    VitePWA({
+      registerType: "autoUpdate",
+      manifest: { theme_color: "#BD34FE" },
+    }),
+    legacy(),
+  ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
