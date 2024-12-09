@@ -97,28 +97,28 @@
 </template>
 
 <script setup lang="ts">
+import AddSchedulePop from "@/components/AddSchedulePopModal.vue";
+import CalenderTab from "@/components/CalendarTab.vue";
 import {
   IonFab,
   IonFabButton,
   IonicSlides,
+  IonModal,
   IonRefresher,
   IonRefresherContent,
-  IonModal,
 } from "@ionic/vue";
+import axios from "axios";
 import dayjs from "dayjs";
 import {
   addCircleOutline,
-  chevronUp,
   chevronDown,
+  chevronUp,
   list,
   swapVertical,
 } from "ionicons/icons";
 import { Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
-import CalenderTab from "@/components/CalendarTab.vue";
-import AddSchedulePop from "@/components/AddSchedulePopModal.vue";
-import { nextTick, ref } from "vue";
-import axios from "axios";
+import { ref } from "vue";
 
 import "@ionic/vue/css/ionic-swiper.css";
 import "swiper/css";

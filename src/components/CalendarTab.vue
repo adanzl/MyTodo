@@ -82,8 +82,4 @@ watch(() => props.selectedDate, updateMinSlide, { deep: true });
 watch(() => props.minimal, onMinimalChange, { deep: true });
 
 const weekHead = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const onResize = () => {
-  console.log("onResize");
-  // props.swiperRef?.value?.update();
-};
 </script>

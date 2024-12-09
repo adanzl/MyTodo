@@ -11,12 +11,12 @@ import "@ionic/vue/css/structure.css";
 import "@ionic/vue/css/typography.css";
 
 /* Optional CSS utils that can be commented out */
-import "@ionic/vue/css/padding.css";
+import "@ionic/vue/css/display.css";
+import "@ionic/vue/css/flex-utils.css";
 import "@ionic/vue/css/float-elements.css";
+import "@ionic/vue/css/padding.css";
 import "@ionic/vue/css/text-alignment.css";
 import "@ionic/vue/css/text-transformation.css";
-import "@ionic/vue/css/flex-utils.css";
-import "@ionic/vue/css/display.css";
 
 /**
  * Ionic Dark Mode
@@ -33,27 +33,27 @@ import "@ionic/vue/css/display.css";
 import "./theme/variables.css";
 // import GConfig from "@/components/GConfig.vue";
 import {
+  IonButton,
+  IonButtons,
+  IonChip,
   IonContent,
+  IonDatetime,
+  IonFooter,
+  IonHeader,
+  IonIcon,
   IonicVue,
-  IonPage,
+  IonItem,
   IonLabel,
   IonList,
-  IonItem,
-  IonToolbar,
+  IonPage,
   IonTitle,
-  IonButton,
-  IonIcon,
-  IonDatetime,
-  IonButtons,
-  IonHeader,
-  IonChip,
-  IonFooter,
+  IonToolbar,
+  IonInput, 
 } from "@ionic/vue";
 
 const app = createApp(App).use(IonicVue).use(router);
 
 app.component("ion-content", IonContent);
-app.component("ion-header", IonHeader);
 app.component("ion-footer", IonFooter);
 app.component("ion-label", IonLabel);
 app.component("ion-button", IonButton);
@@ -67,6 +67,7 @@ app.component("ion-datetime", IonDatetime);
 app.component("ion-buttons", IonButtons);
 app.component("ion-header", IonHeader);
 app.component("ion-chip", IonChip);
+app.component("ion-input", IonInput);
 
 console.log(`当前 Vue 版本是：${app.version}`);
 // console.log(GConfig);
