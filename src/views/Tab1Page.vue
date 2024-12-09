@@ -5,13 +5,13 @@
         <ion-buttons slot="start" class="ion-padding">
           <ion-icon :icon="list"></ion-icon>
         </ion-buttons>
-        <ion-title>
+        <ion-title class="ion-text-center">
           <span v-if="selectedDate">{{
             selectedDate.dt.format("YY年MM月")
           }}</span>
         </ion-title>
         <ion-buttons slot="end" class="ion-padding">
-          <ion-icon :icon="swapVertical" @click="sortBtnClk"></ion-icon>
+          <ion-icon :icon="swapVertical" @click="btnSortClk"></ion-icon>
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
@@ -29,7 +29,7 @@
         <swiper-slide v-for="(slide, idx) in slideArr" :key="idx">
           <CalenderTab
             :slide="slide"
-            :daySelectCallback="daySelect"
+            :daySelectCallback="btnDaySelectClk"
             :selectedDate="selectedDate"
             :minimal="bFold"
             :swiperRef="swiperRef"
@@ -42,7 +42,7 @@
         expand="full"
         fill="clear"
         size="small"
-        @click="calendarFold()"
+        @click="btnCalendarFoldClk()"
       >
         <ion-icon
           :icon="bFold ? chevronDown : chevronUp"
@@ -83,21 +83,9 @@
         ref="modal"
         trigger="open-dialog"
         class="ion-padding"
+        aria-hidden="true"
       >
-        <div class="wrapper ion-padding">
-          <h1>Dialog header</h1>
-          <ion-list lines="none">
-            <ion-item :button="true" :detail="false" aria-label="button">
-              <ion-label>Item 1</ion-label>
-            </ion-item>
-            <ion-item :button="true" :detail="false" aria-label="button">
-              <ion-label>Item 2</ion-label>
-            </ion-item>
-            <ion-item :button="true" :detail="false" aria-label="button">
-              <ion-label>Item 3</ion-label>
-            </ion-item>
-          </ion-list>
-        </div>
+        <AddSchedulePop :modal="modal"></AddSchedulePop>
       </ion-modal>
     </ion-content>
     <ion-fab slot="fixed" vertical="bottom" horizontal="end">
@@ -128,6 +116,7 @@ import {
 import { Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
 import CalenderTab from "@/components/CalendarTab.vue";
+import AddSchedulePop from "@/components/AddSchedulePopModal.vue";
 import { nextTick, ref } from "vue";
 import axios from "axios";
 
@@ -138,6 +127,7 @@ const slideArr = ref<any[]>([{}, {}, {}]); // 滑动数据
 const swiperRef = ref(); // 滑动对象
 const bFold = ref(false); // 日历折叠状态
 const selectedDate: any = ref(null); // 选中日期
+const modal = ref(); // 弹窗对象
 
 let currentDate = dayjs().startOf("day");
 const createSlideData = (datetime: dayjs.Dayjs) => {
@@ -148,11 +138,11 @@ const createSlideData = (datetime: dayjs.Dayjs) => {
   do {
     const week = [];
     for (let i = 0; i < 7; i++) {
-      const dd = {
+      const dayData = {
         dt: _dt,
         events: [1],
       };
-      week.push(dd);
+      week.push(dayData);
       _dt = _dt.add(1, "days");
     }
     wArr.push(week);
@@ -161,11 +151,12 @@ const createSlideData = (datetime: dayjs.Dayjs) => {
     vid: datetime.year(),
     month: datetime.month(),
     year: datetime.year(),
+    firstDayOfMonth: firstDayOfMonth,
     weekArr: wArr,
-  };
+  }; // SlideData
 };
 
-const daySelect = (slide: any, day: any) => {
+const btnDaySelectClk = (slide: any, day: any) => {
   if (slide.month != day.dt.month()) {
     if (slide.year * 100 + slide.month < day.dt.year() * 100 + day.dt.month()) {
       swiperRef.value.slideNext();
@@ -205,7 +196,7 @@ const chooseSelectedDate = () => {
   }
 };
 
-const slideChange = (obj:any) => {
+const slideChange = (obj: any) => {
   slideArr.value = [
     createSlideData(currentDate.subtract(1, "months")),
     createSlideData(currentDate),
@@ -232,7 +223,7 @@ const onSlideChangePre = (obj: any) => {
   slideChange(obj);
 };
 
-const sortBtnClk = () => {
+const btnSortClk = () => {
   swiperRef?.value?.update();
 };
 
@@ -264,11 +255,11 @@ slideArr.value = [
 ];
 
 // 日历折叠
-const calendarFold = () => {
+const btnCalendarFoldClk = () => {
   bFold.value = !bFold.value;
-  nextTick(() => {
+  setTimeout(() => {
     swiperRef.value.update();
-  });
+  }, 100);
 };
 </script>
 <style>
@@ -284,9 +275,7 @@ const calendarFold = () => {
   background-color: #007bff;
   margin-top: 5px;
 }
-.transparent {
-  --background: transparent !important;
-}
+
 ion-chip.selected {
   --color: #fff !important;
   --background: #ff3609 !important;
@@ -297,8 +286,12 @@ ion-chip.selected {
 ion-modal#pop-modal {
   --width: 100%;
   --min-width: fit-content;
-  --height: fit-content;
+  --height: 80%;
+  --min-height: 50%;
   --border-radius: 6px;
   --box-shadow: 0 28px 48px rgba(0, 0, 0, 0.4);
+}
+.transparent {
+  --background: transparent !important;
 }
 </style>

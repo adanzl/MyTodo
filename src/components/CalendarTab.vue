@@ -1,5 +1,5 @@
 <template>
-  <ion-grid v-if="slide" @resize="onResize">
+  <ion-grid v-if="slide">
     <ion-row>
       <ion-col class="ion-text-center" v-for="head in weekHead" :key="head">
         {{ head }}
@@ -8,7 +8,7 @@
 
     <ion-row
       class="calendar-row"
-      v-for="week in minimal ? minSlide.weekArr : slide.weekArr"
+      v-for="week in minimal ? minSlide?.weekArr : slide?.weekArr"
       :key="week"
     >
       <ion-col
@@ -55,8 +55,10 @@ const props = defineProps({
 });
 const minSlide = ref<any>(null);
 const updateMinSlide = () => {
-  if (props.selectedDate && props.slide) {
-    const dt = props.selectedDate.dt;
+  if (props.slide) {
+    const dt = props.selectedDate
+      ? props.selectedDate.dt
+      : props.slide.firstDayOfMonth;
     const firstDayOfMonth = dt.startOf("month");
     const diff = dt.date() - firstDayOfMonth.date();
     const idx = Math.ceil((diff + firstDayOfMonth.day()) / 7);
@@ -70,7 +72,10 @@ const updateMinSlide = () => {
   }
 };
 const onMinimalChange = () => {
-  nextTick(() => {});
+  nextTick(() => {
+    // console.log("onMinimalChange ", minSlide.value, props);
+    // props.swiperRef?.value?.update();
+  });
 };
 watch(() => props.slide, updateMinSlide, { deep: true });
 watch(() => props.selectedDate, updateMinSlide, { deep: true });

@@ -47,11 +47,14 @@ import {
   IonButtons,
   IonHeader,
   IonChip,
+  IonFooter,
 } from "@ionic/vue";
 
 const app = createApp(App).use(IonicVue).use(router);
 
 app.component("ion-content", IonContent);
+app.component("ion-header", IonHeader);
+app.component("ion-footer", IonFooter);
 app.component("ion-label", IonLabel);
 app.component("ion-button", IonButton);
 app.component("ion-list", IonList);
@@ -69,6 +72,7 @@ console.log(`当前 Vue 版本是：${app.version}`);
 // console.log(GConfig);
 // GConfig.init__();
 // https://ionicframework.com/docs/vue/pwa
+// npm cache verify
 router.isReady().then(() => {
   app.mount("#app");
 });
