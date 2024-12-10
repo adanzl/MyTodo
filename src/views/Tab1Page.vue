@@ -55,25 +55,10 @@
         <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
           <ion-refresher-content></ion-refresher-content>
         </ion-refresher>
-        <ion-list :inset="true" lines="full" mode="ios">
-          <ion-item>
+        <ion-list :inset="true" lines="full" mode="ios" ref="curScheduleList">
+          <ion-item v-for="schedule in selectedDate?.events" :key="schedule">
             <ion-label>
-              Multi-line text that should wrap when it is too long to fit on one
-              line.
-            </ion-label>
-          </ion-item>
-
-          <ion-item>
-            <ion-label class="ion-text-nowrap">
-              Multi-line text that should ellipsis when it is too long to fit on
-              one line.
-            </ion-label>
-          </ion-item>
-
-          <ion-item>
-            <ion-label>
-              <h1>H1 Heading</h1>
-              <p>Paragraph</p>
+              {{ schedule.title }}
             </ion-label>
           </ion-item>
         </ion-list>
@@ -125,7 +110,6 @@ import {
   IonRefresher,
   IonRefresherContent,
 } from "@ionic/vue";
-import axios from "axios";
 import dayjs from "dayjs";
 import {
   addCircleOutline,
@@ -136,17 +120,19 @@ import {
 } from "ionicons/icons";
 import { Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 
 import "@ionic/vue/css/ionic-swiper.css";
 import "swiper/css";
 import "swiper/css/effect-fade";
-import { UserData } from "@/type/UserData.vue";
+import { UserData, ScheduleData } from "@/type/UserData.vue";
+import { getSave, setSave } from "@/components/NetUtil.vue";
 const userData = ref<UserData>({ id: 0, name: "leo", schedules: [] });
 const slideArr = ref<any[]>([{}, {}, {}]); // 滑动数据
+const curScheduleList = ref();
 const swiperRef = ref(); // 滑动对象
 const bFold = ref(false); // 日历折叠状态
-const selectedDate: any = ref(null); // 选中日期
+const selectedDate = ref<any>(null); // 选中日期
 const modal = ref(); // 弹窗对象
 const toastData = ref({
   isOpen: false,
@@ -163,10 +149,23 @@ const createSlideData = (datetime: dayjs.Dayjs) => {
   do {
     const week = [];
     for (let i = 0; i < 7; i++) {
-      const dayData = {
+      const dayData: { dt: any; events: ScheduleData[] } = {
         dt: _dt,
-        events: [1],
+        events: [],
       };
+      for (const schedule of userData.value.schedules) {
+        if (
+          schedule.startTs &&
+          schedule.startTs.unix() <= _dt.unix() &&
+          schedule.endTs &&
+          schedule.endTs.unix() >= _dt.unix()
+        ) {
+          dayData.events.push(schedule);
+        }
+      }
+      if (selectedDate.value?.dt.unix() == _dt.unix()) {
+        selectedDate.value = dayData;
+      }
       week.push(dayData);
       _dt = _dt.add(1, "days");
     }
@@ -195,6 +194,9 @@ const btnDaySelectClk = (slide: any, day: any) => {
 const chooseSelectedDate = () => {
   // 处理选中日期
   const mm = slideArr.value[1];
+  if (!mm.weekArr) {
+    return;
+  }
   const now = dayjs().startOf("day");
   if (!selectedDate.value) {
     outer: for (const week of mm.weekArr) {
@@ -251,11 +253,12 @@ const onSlideChangePre = (obj: any) => {
 };
 // 添加日程页面关闭回调
 const onAddModalDismiss = (event: any) => {
-  console.log("onAddModalDismiss", event);
   const scheduleData = event.detail.data;
   if (scheduleData && event.detail.role === "confirm") {
     // 处理数据
     userData.value.schedules.push(scheduleData);
+    updateScheduleData();
+    console.log(selectedDate.value);
   }
 };
 
@@ -265,6 +268,8 @@ const btnSortClk = () => {
 };
 // 左下测试按钮
 const btnTestClk = () => {
+  console.log(JSON.stringify(userData.value));
+  // 测试通知
   LocalNotifications.schedule({
     notifications: [
       {
@@ -279,6 +284,18 @@ const btnTestClk = () => {
       },
     ],
   });
+  //
+  setSave(
+    1,
+    "leo",
+    JSON.stringify(userData.value),
+    (res) => {
+      console.log("setSave", res);
+    },
+    (err) => {
+      console.log("setSave", err);
+    }
+  );
 };
 // 获取swiper对象
 const setSwiperInstance = (swiper: any) => {
@@ -289,29 +306,52 @@ const setSwiperInstance = (swiper: any) => {
 // 刷新页面事件
 const handleRefresh = (event: any) => {
   console.log("handleRefresh", event);
-  axios
-    .get("https://3ft23fh89533.vicp.fun/api/getSave", { params: { id: 1 } })
-    .then((res) => {
+  getSave(
+    1,
+    (res) => {
       console.log("handleRefresh", res);
       toastData.value.isOpen = true;
       toastData.value.text = JSON.stringify(res.data);
       event.target.complete();
-    })
-    .catch((err) => {
+    },
+    (err) => {
       console.log("handleRefresh", err);
       toastData.value.isOpen = true;
       toastData.value.text = JSON.stringify(err);
       event.target.complete();
-    });
+    }
+  );
 };
 
 // 初始化数据
-slideArr.value = [
-  createSlideData(currentDate.subtract(1, "months")),
-  createSlideData(currentDate),
-  createSlideData(currentDate.add(1, "months")),
-];
+const updateScheduleData = () => {
+  slideArr.value = [
+    createSlideData(currentDate.subtract(1, "months")),
+    createSlideData(currentDate),
+    createSlideData(currentDate.add(1, "months")),
+  ];
+};
 
+onMounted(() => {
+  // 获取数据
+  getSave(
+    1,
+    (res) => {
+      console.log("getSave", res.data);
+      userData.value = JSON.parse(res.data);
+      for(let i = 0; i < userData.value.schedules.length; i++) {
+        const schedule = userData.value.schedules[i];
+        schedule.startTs = dayjs(schedule.startTs);
+        schedule.endTs = dayjs(schedule.endTs);
+      }
+      updateScheduleData();
+      chooseSelectedDate();
+    },
+    (err) => {
+      console.log("getSave", err);
+    }
+  );
+});
 // 日历折叠按钮
 const btnCalendarFoldClk = () => {
   bFold.value = !bFold.value;

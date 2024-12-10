@@ -288,10 +288,10 @@ const onDtTabChange = (event: any) => {
 const onDtChange = (event: any) => {
   const dt = dayjs(event.detail.value);
   if (scheduleType.value == 0) {
-    curScheduleData.value.startTs = dt;
-    curScheduleData.value.endTs = dt;
+    curScheduleData.value.startTs = dt.startOf("day");
+    curScheduleData.value.endTs = dt.startOf("day");
   } else if (scheduleType.value == 1) {
-    curScheduleData.value.endTs = dt;
+    curScheduleData.value.endTs = dt.startOf("day");
   }
 };
 // 提醒类型切换
@@ -431,8 +431,8 @@ const curScheduleData = ref<ScheduleData>({
   id: undefined, // 任务id
   title: "", // 任务标题
   state: 0, // 任务状态
-  startTs: undefined, // 开始时间
-  endTs: undefined, // 结束时间
+  startTs: dayjs().startOf("day"), // 开始时间
+  endTs: dayjs().startOf("day"), // 结束时间
   reminder: 0, // 提醒类型
   repeat: 0, // 重复类型
   repeatEndTs: undefined, // 重复结束类型
