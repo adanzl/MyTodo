@@ -93,12 +93,19 @@
         <ion-icon :icon="addCircleOutline" size="large"></ion-icon>
       </ion-fab-button>
     </ion-fab>
+    <ion-fab slot="fixed" vertical="bottom" horizontal="start">
+      <ion-fab-button>
+        <ion-button @click="btnTestClk">xx</ion-button>
+      </ion-fab-button>
+    </ion-fab>
   </ion-page>
 </template>
 
 <script setup lang="ts">
 import AddSchedulePop from "@/components/AddSchedulePopModal.vue";
 import CalenderTab from "@/components/CalendarTab.vue";
+import { LocalNotifications } from "@capacitor/local-notifications";
+
 import {
   IonFab,
   IonFabButton,
@@ -227,6 +234,23 @@ const btnSortClk = () => {
   swiperRef?.value?.update();
 };
 
+const btnTestClk = () => {
+  LocalNotifications.schedule({
+    notifications: [
+      {
+        title: "On sale",
+        body: "Widgets are 10% off. Act fast!",
+        id: 1,
+        schedule: { at: new Date(Date.now() + 1000 * 5) },
+        sound: undefined,
+        attachments: undefined,
+        actionTypeId: "",
+        extra: null,
+      },
+    ],
+  });
+};
+
 const setSwiperInstance = (swiper: any) => {
   swiperRef.value = swiper;
   swiper.slideTo(1, 0, false);
@@ -286,12 +310,9 @@ ion-chip.selected {
 ion-modal#pop-modal {
   --width: 100%;
   --min-width: fit-content;
-  --height: 80%;
+  --height: 85%;
   --min-height: 50%;
   --border-radius: 6px;
   --box-shadow: 0 28px 48px rgba(0, 0, 0, 0.4);
-}
-.transparent {
-  --background: transparent !important;
 }
 </style>

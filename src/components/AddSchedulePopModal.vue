@@ -1,12 +1,9 @@
 <template>
   <div class="ion-padding" id="main">
     <ion-toolbar class="transparent">
-      <ion-buttons slot="start">
-        <ion-button @click="cancel()">Cancel</ion-button>
-      </ion-buttons>
       <ion-title>Add Schedule</ion-title>
     </ion-toolbar>
-    <ion-segment value="sType" @ionChange="handleChange">
+    <ion-segment value="sType" @ionChange="onTypeChange">
       <ion-segment-button value="sType" content-id="sType">
         <ion-label>Schedule</ion-label>
       </ion-segment-button>
@@ -22,7 +19,10 @@
         <ion-content id="main_bg" class="ion-margin-top">
           <ion-list :inset="true">
             <ion-item>
-              <ion-input placeholder="输入日程标题" :value="scheduleTitle">
+              <ion-input
+                placeholder="输入日程标题"
+                v-model="curScheduleData.title"
+              >
               </ion-input>
             </ion-item>
             <ion-item>
@@ -52,59 +52,109 @@
             </ion-item>
           </ion-list>
           <ion-list :inset="true">
-            <ion-item class="ion-text-center">
-              <ion-icon :icon="calendar"></ion-icon>
-              <ion-button size="medium" fill="full" @click="btnScheduleDTClk">
-                <ion-label>Start:</ion-label> <ion-label> No time</ion-label>
-                <ion-label> >></ion-label>
-                <ion-label>End:</ion-label>
-                <ion-label> no time</ion-label>
-              </ion-button>
-            </ion-item>
             <ion-item
-              ref="dtItem"
-              style="display: block; height: 0; overflow: hidden"
+              class="ion-text-center"
+              :button="true"
+              size="large"
+              @click="btnScheduleDTClk"
             >
-              <ion-datetime ref="scheduleDT">
-                <ion-buttons slot="buttons">
-                  <ion-button color="primary">Clear</ion-button>
-                  <ion-segment value="start" mode="ios" style="width: 130px">
-                    <ion-segment-button value="start" id="dtStart">
+              <ion-icon :icon="calendar" slot="start"></ion-icon>
+              <div
+                class="flex ion-justify-content-around ion-padding width-100"
+              >
+                <div class="ion-text-center">
+                  <ion-label>Start</ion-label>
+                  <ion-label color="tertiary" class="font-size-mini">{{
+                    curScheduleData.startTs
+                  }}</ion-label>
+                </div>
+                <div>
+                  <ion-label> >></ion-label>
+                </div>
+                <div class="ion-text-center">
+                  <ion-label>End</ion-label>
+                  <ion-label color="tertiary" class="font-size-mini">{{
+                    curScheduleData.endTs
+                  }}</ion-label>
+                </div>
+              </div>
+            </ion-item>
+            <ion-item ref="dtItem" class="height-0-block flex">
+              <div ref="scheduleDT">
+                <ion-buttons mode="ios" class="ion-justify-content-around">
+                  <ion-button @click="btnDatetimeClearClk">Clear </ion-button>
+                  <ion-segment
+                    value="0"
+                    mode="ios"
+                    style="width: 130px"
+                    @ionChange="onDtTabChange"
+                  >
+                    <ion-segment-button value="0" id="dtStart">
                       Start
                     </ion-segment-button>
-                    <ion-segment-button value="end" id="dtEnd">
+                    <ion-segment-button value="1" id="dtEnd">
                       End
                     </ion-segment-button>
                   </ion-segment>
-                  <ion-button color="primary">OK</ion-button>
+                  <ion-button @click="btnDatetimeOkClk">OK </ion-button>
                 </ion-buttons>
-              </ion-datetime>
+                <ion-datetime presentation="date" @ionChange="onDtChange">
+                </ion-datetime>
+              </div>
             </ion-item>
-            <ion-item>
-              <ion-icon :icon="notifications"></ion-icon>
-              <ion-label>Reminder</ion-label>
-            </ion-item>
-            <ion-item>
-              <ion-icon
-                :icon="repeat"
-                aria-hidden="true"
-                class="ion-margin-right"
-              >
+            <ion-item :button="true" :detail="true">
+              <ion-icon :icon="notifications" aria-hidden="true" slot="start">
               </ion-icon>
-              <ion-select value="0">
+              <ion-select
+                id="selectReminder"
+                v-model="curScheduleData.reminder"
+                @ionChange="onReminderChange"
+              >
+                <div slot="label">
+                  <ion-label>Reminder</ion-label>
+                </div>
+                <ion-select-option
+                  v-for="(op, idx) in reminderOptions"
+                  :key="idx"
+                  :value="op.value"
+                >
+                  {{ op.label }}
+                </ion-select-option>
+              </ion-select>
+            </ion-item>
+            <ion-item detail="true">
+              <ion-icon :icon="repeat" aria-hidden="true" slot="start">
+              </ion-icon>
+              <ion-select
+                v-model="curScheduleData.repeat"
+                @ion-change="onRepeatChange"
+              >
                 <div slot="label">
                   <ion-label>Repeat</ion-label>
                 </div>
-                <ion-select-option value="0">Every day</ion-select-option>
-                <ion-select-option value="1">Workday</ion-select-option>
-                <ion-select-option value="2">Every week</ion-select-option>
-                <ion-select-option value="3">Every Month</ion-select-option>
-                <ion-select-option value="4">Every Year</ion-select-option>
+                <ion-select-option
+                  v-for="(op, idx) in repeatOptions"
+                  :key="idx"
+                  :value="op.value"
+                >
+                  {{ op.label }}
+                </ion-select-option>
               </ion-select>
             </ion-item>
-            <ion-item>
-              <ion-icon :icon="power"></ion-icon>
-              <ion-label>End</ion-label>
+            <ion-item detail="true">
+              <ion-icon :icon="power" slot="start"></ion-icon>
+              <ion-select v-model="curScheduleData.repeatEnd">
+                <div slot="label">
+                  <ion-label>Repeat End</ion-label>
+                </div>
+                <ion-select-option
+                  v-for="(op, idx) in repeatOptions"
+                  :key="idx"
+                  :value="op.value"
+                >
+                  {{ op.label }}
+                </ion-select-option>
+              </ion-select>
             </ion-item>
           </ion-list>
         </ion-content>
@@ -115,7 +165,9 @@
       </ion-segment-content>
     </ion-segment-view>
     <ion-footer>
-      <ion-button expand="block" mode="ios" color="warning">Save</ion-button>
+      <ion-button expand="block" mode="ios" color="warning" @click="btnSaveClk">
+        Save
+      </ion-button>
     </ion-footer>
   </div>
 </template>
@@ -130,6 +182,7 @@ import {
   IonSelectOption,
   createAnimation,
 } from "@ionic/vue";
+import dayjs from "dayjs";
 import {
   airplane,
   bookmark,
@@ -140,18 +193,36 @@ import {
   repeat,
 } from "ionicons/icons";
 import { ref } from "vue";
-const props = defineProps({
+defineProps({
   modal: Object,
 });
-const handleChange = (event: any) => {
+const onTypeChange = (event: any) => {
+  // 日程类型
   console.log(event.detail.value);
 };
-const cancel = () => {
-  props.modal?.$el.dismiss(null, "cancel");
+
+const onDtTabChange = (event: any) => {
+  scheduleType.value = event.detail.value;
+};
+const onDtChange = (event: any) => {
+  const dt = dayjs(event.detail.value);
+  if (scheduleType.value == 0) {
+    curScheduleData.value.startTs = dt.format("YYYY-MM-DD");
+    curScheduleData.value.endTs = dt.format("YYYY-MM-DD");
+  } else if (scheduleType.value == 1) {
+    curScheduleData.value.endTs = dt.format("YYYY-MM-DD");
+  }
+};
+
+const onReminderChange = (event: any) => {
+  console.log("onReminderChange", event.detail);
+};
+const onRepeatChange = (event: any) => {
+  console.log("onRepeatChange", event.detail);
 };
 
 const btnScheduleDTClk = async () => {
-  const hh = scheduleDT.value.$el.offsetHeight;
+  const hh = scheduleDT.value.offsetHeight;
   const kf = [
     { offset: 0, height: hh + "px", top: "0" },
     { offset: 0.5, height: hh * 0.5 + "px", top: "0" },
@@ -175,10 +246,48 @@ const btnScheduleDTClk = async () => {
   bShowScheduleDT.value = !bShowScheduleDT.value;
 };
 
-const scheduleTitle = ref("");
+const btnDatetimeOkClk = () => {
+  btnScheduleDTClk();
+};
+const btnDatetimeClearClk = () => {
+  curScheduleData.value.startTs = "";
+  curScheduleData.value.endTs = "";
+  btnScheduleDTClk();
+};
+const btnSaveClk = () => {
+  console.log(curScheduleData.value);
+};
+
 const scheduleDT = ref();
 const bShowScheduleDT = ref(false);
 const dtItem = ref();
+const scheduleType = ref(0); // 0:start 1:end
+const repeatOptions = ref([
+  { value: 0, label: "None" },
+  { value: 1, label: "Workday" },
+  { value: 2, label: "Every day" },
+  { value: 3, label: "Every week" },
+  { value: 4, label: "Every month" },
+  { value: 5, label: "Every year" },
+]);
+const reminderOptions = ref([
+  { value: 0, label: "None" },
+  { value: 1, label: "On the day 9:00" },
+  { value: 2, label: "1 day early 9:00" },
+  { value: 3, label: "2 day early 9:00" },
+  { value: 4, label: "3 day early 9:00" },
+  { value: 5, label: "4 day early 9:00" },
+]);
+
+const curScheduleData = ref({
+  id: undefined,
+  title: "",
+  startTs: "",
+  endTs: "",
+  reminder: 0,
+  repeat: 0,
+  repeatEnd: 0,
+});
 </script>
 
 <style scoped>
@@ -186,15 +295,10 @@ const dtItem = ref();
   /* background-color: gray; */
   height: 75%;
 }
-ion-content#main_bg::part(background) {
-  background: rgb(244, 245, 231);
-}
-ion-content#main_bg::part(scroll) {
-  color: transparent;
-}
+
 #main {
-  /* background-color: rgb(253, 254, 244); */
   background: rgb(244, 245, 231);
+  /* background: transparent; */
   height: 100%;
 }
 ion-footer {
@@ -206,16 +310,12 @@ ion-footer {
   padding: 16px;
 }
 ion-list {
-  /* background-color: rgb(253, 254, 244); */
   background-color: transparent !important;
 }
 ion-segment-content {
-  /* justify-content: center; */
   height: 70%;
 }
-.transparent {
-  --background: transparent !important;
-}
+
 #dtStart,
 #dtEnd {
   font-size: min(0.8125rem, 39px);
@@ -224,5 +324,12 @@ ion-segment-content {
   min-height: 10px;
   min-width: 10px;
   --margin-top: 0px;
+}
+
+.font-size-mini {
+  font-size: 0.8rem;
+}
+ion-select::part(icon) {
+  opacity: 0;
 }
 </style>
