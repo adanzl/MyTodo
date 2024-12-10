@@ -84,6 +84,7 @@
         trigger="open-dialog"
         class="ion-padding"
         aria-hidden="true"
+        @ionModalWillDismiss="onAddModalDismiss"
       >
         <AddSchedulePop :modal="modal"></AddSchedulePop>
       </ion-modal>
@@ -140,6 +141,8 @@ import { ref } from "vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import "swiper/css";
 import "swiper/css/effect-fade";
+import { UserData } from "@/type/UserData.vue";
+const userData = ref<UserData>({ id: 0, name: "leo", schedules: [] });
 const slideArr = ref<any[]>([{}, {}, {}]); // 滑动数据
 const swiperRef = ref(); // 滑动对象
 const bFold = ref(false); // 日历折叠状态
@@ -177,7 +180,7 @@ const createSlideData = (datetime: dayjs.Dayjs) => {
     weekArr: wArr,
   }; // SlideData
 };
-
+// 点击日历某个日期
 const btnDaySelectClk = (slide: any, day: any) => {
   if (slide.month != day.dt.month()) {
     if (slide.year * 100 + slide.month < day.dt.year() * 100 + day.dt.month()) {
@@ -234,21 +237,33 @@ const slideChange = (obj: any) => {
   }
   chooseSelectedDate();
 };
+// 向右滑
 const onSlideChangeNext = (obj: any) => {
   console.log("onSlideChangeNext", currentDate.format("YYYY-MM-DD"));
   currentDate = currentDate.add(1, "months").startOf("month");
   slideChange(obj);
 };
+// 向左滑
 const onSlideChangePre = (obj: any) => {
   console.log("onSlideChangePre", currentDate.format("YYYY-MM-DD"));
   currentDate = currentDate.subtract(1, "months").startOf("month");
   slideChange(obj);
 };
+// 添加日程页面关闭回调
+const onAddModalDismiss = (event: any) => {
+  console.log("onAddModalDismiss", event);
+  const scheduleData = event.detail.data;
+  if (scheduleData && event.detail.role === "confirm") {
+    // 处理数据
+    userData.value.schedules.push(scheduleData);
+  }
+};
 
+// 排序按钮
 const btnSortClk = () => {
   swiperRef?.value?.update();
 };
-
+// 左下测试按钮
 const btnTestClk = () => {
   LocalNotifications.schedule({
     notifications: [
@@ -265,13 +280,13 @@ const btnTestClk = () => {
     ],
   });
 };
-
+// 获取swiper对象
 const setSwiperInstance = (swiper: any) => {
   swiperRef.value = swiper;
   swiper.slideTo(1, 0, false);
   chooseSelectedDate();
 };
-
+// 刷新页面事件
 const handleRefresh = (event: any) => {
   console.log("handleRefresh", event);
   axios
@@ -297,7 +312,7 @@ slideArr.value = [
   createSlideData(currentDate.add(1, "months")),
 ];
 
-// 日历折叠
+// 日历折叠按钮
 const btnCalendarFoldClk = () => {
   bFold.value = !bFold.value;
   setTimeout(() => {

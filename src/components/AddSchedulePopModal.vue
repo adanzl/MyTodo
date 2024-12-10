@@ -19,9 +19,12 @@
         <ion-content id="main_bg" class="ion-margin-top">
           <ion-list :inset="true">
             <ion-item>
+              <ion-checkbox slot="start" @ionChange="onTaskCheckboxChange">
+              </ion-checkbox>
               <ion-input
                 placeholder="输入日程标题"
                 v-model="curScheduleData.title"
+                :required="true"
               >
               </ion-input>
             </ion-item>
@@ -64,25 +67,27 @@
               >
                 <div class="ion-text-center">
                   <ion-label>Start</ion-label>
-                  <ion-label color="tertiary" class="font-size-mini">{{
-                    curScheduleData.startTs?.format("YYYY-MM-DD")
-                  }}</ion-label>
+                  <ion-label color="tertiary" class="font-size-mini">
+                    {{ curScheduleData.startTs?.format("YYYY-MM-DD") }}
+                  </ion-label>
                 </div>
                 <div>
                   <ion-label> >></ion-label>
                 </div>
                 <div class="ion-text-center">
                   <ion-label>End</ion-label>
-                  <ion-label color="tertiary" class="font-size-mini">{{
-                    curScheduleData.endTs?.format("YYYY-MM-DD")
-                  }}</ion-label>
+                  <ion-label color="tertiary" class="font-size-mini">
+                    {{ curScheduleData.endTs?.format("YYYY-MM-DD") }}
+                  </ion-label>
                 </div>
               </div>
             </ion-item>
             <ion-item ref="dtItem" class="height-0-block flex">
               <div ref="scheduleDT">
                 <ion-buttons mode="ios" class="ion-justify-content-around">
-                  <ion-button @click="btnDatetimeClearClk">Clear </ion-button>
+                  <ion-button @click="btnScheduleDatetimeClearClk"
+                    >Clear
+                  </ion-button>
                   <ion-segment
                     value="0"
                     mode="ios"
@@ -174,15 +179,41 @@
           <ion-list :inset="true">
             <ion-item lines="none">
               <ion-icon :icon="listOutline" slot="start"></ion-icon>
-              <ion-label>Sub-task</ion-label><span>0/8</span>
+              <ion-label>Sub-task</ion-label>
+              <span
+                >{{
+                  curScheduleData?.subTasks?.filter((t) => t.state === 1)
+                    .length
+                }}/{{ curScheduleData?.subTasks?.length }}</span
+              >
             </ion-item>
             <ion-item lines="none">
-              <ion-icon :icon="add" slot="start"></ion-icon>
+              <ion-icon :icon="add" slot="start" style="width: 22px"></ion-icon>
               <ion-input
+                v-model="addSubtaskInput"
                 placeholder="Add a subtask"
-                @ionChange="onSubtaskInputChange"
+                @ionChange="onSubtaskInputChange($event, undefined)"
               >
               </ion-input>
+            </ion-item>
+            <ion-item v-for="task in curScheduleData?.subTasks" :key="task">
+              <ion-checkbox
+                slot="start"
+                @ionChange="onSubtaskCheckboxChange($event, task)"
+              >
+              </ion-checkbox>
+              <ion-input
+                :value="task.name"
+                @ionChange="onSubtaskInputChange($event, task)"
+                :class="{ 'text-line-through': task.state === 1 }"
+              >
+              </ion-input>
+              <ion-icon
+                :icon="removeCircleOutline"
+                slot="end"
+                @click="btnSubtaskRemoveClk($event, task)"
+              >
+              </ion-icon>
             </ion-item>
           </ion-list>
         </ion-content>
@@ -198,9 +229,19 @@
       </ion-button>
     </ion-footer>
   </div>
+  <ion-toast
+    :is-open="toastData.isOpen"
+    :message="toastData.text"
+    :duration="toastData.duration"
+    @didDismiss="
+      () => {
+        toastData.isOpen = false;
+      }
+    "
+  ></ion-toast>
 </template>
 <script setup lang="ts">
-import { ScheduleData } from "@/type/UserData.vue";
+import { ScheduleData, SubTask } from "@/type/UserData.vue";
 import {
   IonDatetime,
   IonDatetimeButton,
@@ -212,6 +253,7 @@ import {
   IonSelect,
   IonSelectOption,
   createAnimation,
+  IonCheckbox,
 } from "@ionic/vue";
 import dayjs from "dayjs";
 import {
@@ -222,21 +264,27 @@ import {
   colorPalette,
   listOutline,
   notifications,
+  removeCircleOutline,
   power,
   repeat,
 } from "ionicons/icons";
 import { ref } from "vue";
-defineProps({
+const props = defineProps({
   modal: Object,
 });
+// 任务状态改变
+const onTaskCheckboxChange = (event: any) => {
+  curScheduleData.value.state = event.detail.checked ? 1 : 0;
+};
+// 日程类型切换
 const onTypeChange = (event: any) => {
-  // 日程类型
   console.log(event.detail.value);
 };
-
+// 日期类型切换，开始日期和结束日期
 const onDtTabChange = (event: any) => {
   scheduleType.value = event.detail.value;
 };
+// 日期选择
 const onDtChange = (event: any) => {
   const dt = dayjs(event.detail.value);
   if (scheduleType.value == 0) {
@@ -246,22 +294,45 @@ const onDtChange = (event: any) => {
     curScheduleData.value.endTs = dt;
   }
 };
-
+// 提醒类型切换
 const onReminderChange = (event: any) => {
   console.log("onReminderChange", event.detail);
 };
+// 重复类型切换
 const onRepeatChange = (event: any) => {
   console.log("onRepeatChange", event.detail);
 };
-
+// 重复结束日期改变
 const onRepeatEndDtChange = (event: any) => {
   curScheduleData.value.repeatEndTs = dayjs(event.detail.value);
 };
-
-const onSubtaskInputChange = (event: any) => {
-  console.log("onSubtaskInputChange", event.detail);
+// 子任务状态改变
+const onSubtaskCheckboxChange = (event: any, task?: SubTask) => {
+  if (task) {
+    task.state = event.detail.checked ? 1 : 0;
+  }
 };
-
+// 子任务名称改变
+const onSubtaskInputChange = (event: any, task?: SubTask) => {
+  // console.log("onSubtaskInputChange", event.detail.value, task);
+  if (task) {
+    if (event.detail.value) {
+      task.name = event.detail.value;
+    } else {
+      // todo 移除
+    }
+  } else {
+    if (event.detail.value) {
+      curScheduleData.value.subTasks?.unshift({
+        id: curScheduleData.value.subTasks.length,
+        name: event.detail.value,
+        state: 0,
+      });
+    }
+    addSubtaskInput.value = "";
+  }
+};
+// 开始结束日期按钮点击
 const btnScheduleDTClk = async () => {
   const hh = scheduleDT.value.offsetHeight;
   const kf = [
@@ -286,28 +357,45 @@ const btnScheduleDTClk = async () => {
   await animation.play();
   bShowScheduleDT.value = !bShowScheduleDT.value;
 };
-
+// 开始结束日期按钮点击
 const btnDatetimeOkClk = () => {
   btnScheduleDTClk();
 };
-
+// 重复结束日期选择确认点击
 const btnRepeatEndOkClk = () => {
   repeatEndTs.value.$el.confirm();
   repeatEndTsModal.value.$el.dismiss();
 };
+// 重复结束日期点击清除
 const btnRepeatEndClearClk = () => {
   repeatEndTs.value.$el.cancel();
   curScheduleData.value.repeatEndTs = undefined;
   repeatEndTsModal.value.$el.dismiss();
 };
-
-const btnDatetimeClearClk = () => {
+// 日程开始结束日期点击清除
+const btnScheduleDatetimeClearClk = () => {
   curScheduleData.value.startTs = undefined;
   curScheduleData.value.endTs = undefined;
   btnScheduleDTClk();
 };
+// 子任务移除点击
+const btnSubtaskRemoveClk = (event: any, task: SubTask) => {
+  for (let i = 0; i < curScheduleData.value.subTasks?.length; i++) {
+    if (curScheduleData.value.subTasks[i].id === task.id) {
+      curScheduleData.value.subTasks.splice(i, 1);
+      break;
+    }
+  }
+};
+// 保存按钮点击
 const btnSaveClk = () => {
-  console.log(curScheduleData.value);
+  console.log("btnSaveClk", curScheduleData.value);
+  if (!curScheduleData.value.title) {
+    toastData.value.text = "Title is empty";
+    toastData.value.isOpen = true;
+    return;
+  }
+  props.modal?.$el.dismiss(curScheduleData.value, "confirm");
 };
 
 const scheduleDT = ref();
@@ -316,6 +404,12 @@ const repeatEndTs = ref();
 const repeatEndTsModal = ref();
 const dtItem = ref();
 const scheduleType = ref(0); // 0:start 1:end
+const addSubtaskInput = ref();
+const toastData = ref({
+  isOpen: false,
+  duration: 3000,
+  text: "",
+});
 const repeatOptions = ref([
   { value: 0, label: "None" },
   { value: 1, label: "Workday" },
@@ -336,11 +430,13 @@ const reminderOptions = ref([
 const curScheduleData = ref<ScheduleData>({
   id: undefined, // 任务id
   title: "", // 任务标题
+  state: 0, // 任务状态
   startTs: undefined, // 开始时间
   endTs: undefined, // 结束时间
   reminder: 0, // 提醒类型
   repeat: 0, // 重复类型
   repeatEndTs: undefined, // 重复结束类型
+  subTasks: [], // 子任务
 });
 </script>
 

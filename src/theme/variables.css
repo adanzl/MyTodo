@@ -17,6 +17,9 @@ http://ionicframework.com/docs/theming/ */
   height: 0;
   overflow: hidden;
 }
+.text-line-through {
+  text-decoration: line-through;
+}
 
 ion-content::part(background) {
   background: rgb(244, 245, 231);
