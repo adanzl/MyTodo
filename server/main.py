@@ -1,4 +1,4 @@
-from flask import Flask, json, request, jsonify
+from flask import Flask, json, make_response, request, jsonify
 from flask_cors import CORS
 import logging
 import db_mgr
@@ -6,8 +6,22 @@ import db_mgr
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
-CORS(app, resources=r'/*', supports_credentials=True)
+CORS(app, supports_credentials=True)
 db_mgr.init_db()
+
+
+@app.after_request
+def af_request(resp):
+    """
+    #请求钩子，在所有的请求发生后执行，加入headers。
+    :param resp:
+    :return:
+    """
+    resp = make_response(resp)
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Methods'] = 'GET,POST'
+    resp.headers['Access-Control-Allow-Headers'] = 'x-requested-with,content-type'
+    return resp
 
 
 @app.route("/")
