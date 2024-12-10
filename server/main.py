@@ -6,7 +6,7 @@ import db_mgr
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources=r'/*', supports_credentials=True)
 db_mgr.init_db()
 
 
