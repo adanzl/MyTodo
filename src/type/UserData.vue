@@ -1,6 +1,11 @@
 <script lang="ts">
 import dayjs from "dayjs";
 
+export type SubTask = {
+  name: string;
+  statue: number;
+};
+
 // 日程计划数据
 export type ScheduleData = {
   id: number | undefined; // 任务id
@@ -10,6 +15,7 @@ export type ScheduleData = {
   reminder: number; // 提醒类型
   repeat: number; // 重复类型
   repeatEndTs?: dayjs.Dayjs; // 重复结束类型
+  subTasks?: SubTask[]; // 子任务列表
 };
 
 // 用户数据

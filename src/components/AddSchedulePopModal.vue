@@ -171,6 +171,20 @@
               </ion-modal>
             </ion-item>
           </ion-list>
+          <ion-list :inset="true">
+            <ion-item lines="none">
+              <ion-icon :icon="listOutline" slot="start"></ion-icon>
+              <ion-label>Sub-task</ion-label><span>0/8</span>
+            </ion-item>
+            <ion-item lines="none">
+              <ion-icon :icon="add" slot="start"></ion-icon>
+              <ion-input
+                placeholder="Add a subtask"
+                @ionChange="onSubtaskInputChange"
+              >
+              </ion-input>
+            </ion-item>
+          </ion-list>
         </ion-content>
       </ion-segment-content>
       <ion-segment-content id="tType">
@@ -201,10 +215,12 @@ import {
 } from "@ionic/vue";
 import dayjs from "dayjs";
 import {
+  add,
   airplane,
   bookmark,
   calendar,
   colorPalette,
+  listOutline,
   notifications,
   power,
   repeat,
@@ -240,6 +256,10 @@ const onRepeatChange = (event: any) => {
 
 const onRepeatEndDtChange = (event: any) => {
   curScheduleData.value.repeatEndTs = dayjs(event.detail.value);
+};
+
+const onSubtaskInputChange = (event: any) => {
+  console.log("onSubtaskInputChange", event.detail);
 };
 
 const btnScheduleDTClk = async () => {
