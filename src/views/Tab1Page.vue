@@ -87,6 +87,16 @@
       >
         <AddSchedulePop :modal="modal"></AddSchedulePop>
       </ion-modal>
+      <ion-toast
+        :is-open="toastData.isOpen"
+        :message="toastData.text"
+        :duration="toastData.duration"
+        @didDismiss="
+          () => {
+            toastData.isOpen = false;
+          }
+        "
+      ></ion-toast>
     </ion-content>
     <ion-fab slot="fixed" vertical="bottom" horizontal="end">
       <ion-fab-button id="open-dialog">
@@ -135,6 +145,11 @@ const swiperRef = ref(); // 滑动对象
 const bFold = ref(false); // 日历折叠状态
 const selectedDate: any = ref(null); // 选中日期
 const modal = ref(); // 弹窗对象
+const toastData = ref({
+  isOpen: false,
+  duration: 3000,
+  text: "",
+});
 
 let currentDate = dayjs().startOf("day");
 const createSlideData = (datetime: dayjs.Dayjs) => {
@@ -263,10 +278,14 @@ const handleRefresh = (event: any) => {
     .get("https://3ft23fh89533.vicp.fun/api/getSave", { params: { id: 1 } })
     .then((res) => {
       console.log("handleRefresh", res);
+      toastData.value.isOpen = true;
+      toastData.value.text = JSON.stringify(res.data);
       event.target.complete();
     })
     .catch((err) => {
       console.log("handleRefresh", err);
+      toastData.value.isOpen = true;
+      toastData.value.text = JSON.stringify(err);
       event.target.complete();
     });
 };

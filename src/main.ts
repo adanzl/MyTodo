@@ -48,7 +48,8 @@ import {
   IonPage,
   IonTitle,
   IonToolbar,
-  IonInput, 
+  IonInput,
+  IonToast, 
 } from "@ionic/vue";
 
 const app = createApp(App).use(IonicVue).use(router);
@@ -68,6 +69,7 @@ app.component("ion-buttons", IonButtons);
 app.component("ion-header", IonHeader);
 app.component("ion-chip", IonChip);
 app.component("ion-input", IonInput);
+app.component("ion-toast", IonToast);
 
 console.log(`当前 Vue 版本是：${app.version}`);
 // console.log(GConfig);

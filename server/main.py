@@ -1,12 +1,12 @@
 from flask import Flask, json, request, jsonify
-from flask_cors import cross_origin
+from flask_cors import CORS
 import logging
 import db_mgr
 
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
-
+CORS(app)
 db_mgr.init_db()
 
 
@@ -16,7 +16,6 @@ def main():
 
 
 @app.route("/getSave", methods=['GET'])
-@cross_origin(origin='*')
 def get_save():
     id = request.args.get('id')
     log.info("===== [Get Save] " + id)
@@ -24,7 +23,6 @@ def get_save():
 
 
 @app.route("/setSave", methods=['POST'])
-@cross_origin(origin='*')
 def set_save():
     args = request.get_json()
     log.info("===== [Set Save] " + json.dumps(args))
