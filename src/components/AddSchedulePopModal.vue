@@ -65,7 +65,7 @@
                 <div class="ion-text-center">
                   <ion-label>Start</ion-label>
                   <ion-label color="tertiary" class="font-size-mini">{{
-                    curScheduleData.startTs
+                    curScheduleData.startTs?.format("YYYY-MM-DD")
                   }}</ion-label>
                 </div>
                 <div>
@@ -74,7 +74,7 @@
                 <div class="ion-text-center">
                   <ion-label>End</ion-label>
                   <ion-label color="tertiary" class="font-size-mini">{{
-                    curScheduleData.endTs
+                    curScheduleData.endTs?.format("YYYY-MM-DD")
                   }}</ion-label>
                 </div>
               </div>
@@ -141,20 +141,34 @@
                 </ion-select-option>
               </ion-select>
             </ion-item>
-            <ion-item detail="true">
+            <ion-item detail="true" :button="true">
               <ion-icon :icon="power" slot="start"></ion-icon>
-              <ion-select v-model="curScheduleData.repeatEnd">
-                <div slot="label">
-                  <ion-label>Repeat End</ion-label>
-                </div>
-                <ion-select-option
-                  v-for="(op, idx) in repeatOptions"
-                  :key="idx"
-                  :value="op.value"
+              <ion-label>Repeat End</ion-label>
+              <ion-datetime-button
+                datetime="repeatEndTs"
+                :value="curScheduleData.repeatEndTs"
+              >
+                <div slot="time-target"></div>
+              </ion-datetime-button>
+              <ion-modal :keep-contents-mounted="true" ref="repeatEndTsModal">
+                <ion-datetime
+                  id="repeatEndTs"
+                  ref="repeatEndTs"
+                  presentation="date"
+                  @ionChange="onRepeatEndDtChange"
                 >
-                  {{ op.label }}
-                </ion-select-option>
-              </ion-select>
+                  <ion-buttons
+                    slot="buttons"
+                    mode="ios"
+                    class="ion-justify-content-around"
+                  >
+                    <ion-button color="warning" @click="btnRepeatEndClearClk"
+                      >Clear
+                    </ion-button>
+                    <ion-button @click="btnRepeatEndOkClk">OK</ion-button>
+                  </ion-buttons>
+                </ion-datetime>
+              </ion-modal>
             </ion-item>
           </ion-list>
         </ion-content>
@@ -172,8 +186,11 @@
   </div>
 </template>
 <script setup lang="ts">
+import { ScheduleData } from "@/type/UserData.vue";
 import {
   IonDatetime,
+  IonDatetimeButton,
+  IonModal,
   IonSegment,
   IonSegmentButton,
   IonSegmentContent,
@@ -207,10 +224,10 @@ const onDtTabChange = (event: any) => {
 const onDtChange = (event: any) => {
   const dt = dayjs(event.detail.value);
   if (scheduleType.value == 0) {
-    curScheduleData.value.startTs = dt.format("YYYY-MM-DD");
-    curScheduleData.value.endTs = dt.format("YYYY-MM-DD");
+    curScheduleData.value.startTs = dt;
+    curScheduleData.value.endTs = dt;
   } else if (scheduleType.value == 1) {
-    curScheduleData.value.endTs = dt.format("YYYY-MM-DD");
+    curScheduleData.value.endTs = dt;
   }
 };
 
@@ -219,6 +236,10 @@ const onReminderChange = (event: any) => {
 };
 const onRepeatChange = (event: any) => {
   console.log("onRepeatChange", event.detail);
+};
+
+const onRepeatEndDtChange = (event: any) => {
+  curScheduleData.value.repeatEndTs = dayjs(event.detail.value);
 };
 
 const btnScheduleDTClk = async () => {
@@ -249,9 +270,20 @@ const btnScheduleDTClk = async () => {
 const btnDatetimeOkClk = () => {
   btnScheduleDTClk();
 };
+
+const btnRepeatEndOkClk = () => {
+  repeatEndTs.value.$el.confirm();
+  repeatEndTsModal.value.$el.dismiss();
+};
+const btnRepeatEndClearClk = () => {
+  repeatEndTs.value.$el.cancel();
+  curScheduleData.value.repeatEndTs = undefined;
+  repeatEndTsModal.value.$el.dismiss();
+};
+
 const btnDatetimeClearClk = () => {
-  curScheduleData.value.startTs = "";
-  curScheduleData.value.endTs = "";
+  curScheduleData.value.startTs = undefined;
+  curScheduleData.value.endTs = undefined;
   btnScheduleDTClk();
 };
 const btnSaveClk = () => {
@@ -260,6 +292,8 @@ const btnSaveClk = () => {
 
 const scheduleDT = ref();
 const bShowScheduleDT = ref(false);
+const repeatEndTs = ref();
+const repeatEndTsModal = ref();
 const dtItem = ref();
 const scheduleType = ref(0); // 0:start 1:end
 const repeatOptions = ref([
@@ -279,14 +313,14 @@ const reminderOptions = ref([
   { value: 5, label: "4 day early 9:00" },
 ]);
 
-const curScheduleData = ref({
-  id: undefined,
-  title: "",
-  startTs: "",
-  endTs: "",
-  reminder: 0,
-  repeat: 0,
-  repeatEnd: 0,
+const curScheduleData = ref<ScheduleData>({
+  id: undefined, // 任务id
+  title: "", // 任务标题
+  startTs: undefined, // 开始时间
+  endTs: undefined, // 结束时间
+  reminder: 0, // 提醒类型
+  repeat: 0, // 重复类型
+  repeatEndTs: undefined, // 重复结束类型
 });
 </script>
 

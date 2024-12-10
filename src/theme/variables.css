@@ -18,10 +18,6 @@ http://ionicframework.com/docs/theming/ */
   overflow: hidden;
 }
 
-:root {
-    /* --ion-background-color: rgb(244, ]245, 231); */
-}
-
 ion-content::part(background) {
   background: rgb(244, 245, 231);
 }
