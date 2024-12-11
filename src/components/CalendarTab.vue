@@ -67,7 +67,7 @@ const updateMinSlide = () => {
     const firstDayOfMonth = dt.startOf("month");
     const diff = dt.date() - firstDayOfMonth.date();
     const idx = Math.ceil((diff + firstDayOfMonth.day()) / 7);
-    const wArr = props.slide.value?.weekArr.slice(idx - 1, idx);
+    const wArr = props.slide.weekArr.slice(idx - 1, idx);
 
     minSlide.value = {
       vid: dt.year(),
@@ -81,8 +81,8 @@ const updateMinSlide = () => {
 };
 const onMinimalChange = () => {
   nextTick(() => {
-    // console.log("onMinimalChange ", minSlide.value, props);
-    // props.swiperRef?.value?.update();
+    console.log("onMinimalChange ", minSlide.value, props);
+    props.swiperRef?.value?.update();
   });
 };
 watch(() => props.slide, updateMinSlide, { deep: true });

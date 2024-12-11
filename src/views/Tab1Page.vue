@@ -15,7 +15,7 @@
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
-    <ion-content >
+    <ion-content :scroll-y="false">
       <!-- https://blog.csdn.net/weixin_41863239/article/details/82490886 -->
       <swiper
         @slideNextTransitionEnd="onSlideChangeNext"
@@ -52,6 +52,11 @@
         </ion-icon>
       </ion-button>
       <ion-content color="light">
+        <div
+          id="eventMask"
+          @touchmove="onTouchMove"
+          @touchstart="onTouchStart"
+        ></div>
         <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
           <ion-refresher-content></ion-refresher-content>
         </ion-refresher>
@@ -323,6 +328,29 @@ const onSlideChangePre = (obj: any) => {
   currentDate = currentDate.subtract(1, "months").startOf("month");
   slideChange(obj);
 };
+
+let pTouch: any;
+let lstTs = 0;
+const onTouchStart = (event: any) => {
+  // console.log("onTouchStart", bMoving, event);
+  pTouch = event.touches[0];
+};
+const onTouchMove = (event: any) => {
+  // console.log("onTouchMove", bMoving, event);
+  const ds = dayjs().valueOf() - lstTs;
+  if (ds < 300) {
+    // console.log("too fast", ds);
+    return;
+  }
+  const d = event.touches[0].clientY - pTouch.clientY;
+  if (Math.abs(d) > 20) {
+    lstTs = dayjs().valueOf();
+    console.log("moving", d, lstTs);
+    if (d > 0 === bFold.value) {
+      btnCalendarFoldClk();
+    }
+  }
+};
 // 添加日程页面关闭回调
 const onAddModalDismiss = (event: any) => {
   const scheduleData = event.detail.data;
@@ -434,6 +462,7 @@ onMounted(() => {
     }
   );
 });
+
 // 日历折叠按钮
 const btnCalendarFoldClk = () => {
   bFold.value = !bFold.value;
@@ -473,5 +502,16 @@ ion-modal#pop-modal {
   --min-height: 50%;
   --border-radius: 6px;
   --box-shadow: 0 28px 48px rgba(0, 0, 0, 0.4);
+}
+
+#eventMask {
+  width: 100%;
+  height: 100%;
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+  /* background-color: rgba(0, 0, 0, 0.5); */
 }
 </style>
