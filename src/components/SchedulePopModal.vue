@@ -21,7 +21,11 @@
         <ion-content id="main_bg" class="ion-margin-top">
           <ion-list :inset="true">
             <ion-item>
-              <ion-checkbox slot="start" @ionChange="onTaskCheckboxChange">
+              <ion-checkbox
+                slot="start"
+                @ionChange="onTaskCheckboxChange"
+                :checked="curScheduleData.state === 1"
+              >
               </ion-checkbox>
               <ion-input
                 placeholder="输入日程标题"
@@ -205,6 +209,7 @@
             <ion-item v-for="task in curScheduleData?.subTasks" :key="task">
               <ion-checkbox
                 slot="start"
+                :checked="task.state === 1"
                 @ionChange="onSubtaskCheckboxChange($event, task)"
               >
               </ion-checkbox>

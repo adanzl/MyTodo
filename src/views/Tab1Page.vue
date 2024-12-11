@@ -172,45 +172,45 @@
 </template>
 
 <script setup lang="ts">
-import SchedulePop from "@/components/SchedulePopModal.vue";
 import CalenderTab from "@/components/CalendarTab.vue";
+import SchedulePop from "@/components/SchedulePopModal.vue";
 import { LocalNotifications } from "@capacitor/local-notifications";
 
 import {
+  IonAccordion,
+  IonAccordionGroup,
+  IonCheckbox,
   IonFab,
   IonFabButton,
   IonicSlides,
+  IonItemOption,
+  IonItemOptions,
+  IonItemSliding,
   IonModal,
   IonRefresher,
   IonRefresherContent,
-  IonCheckbox,
-  IonAccordion,
-  IonAccordionGroup,
-  IonItemSliding,
-  IonItemOption,
-  IonItemOptions,
 } from "@ionic/vue";
 import dayjs from "dayjs";
 import {
   addCircleOutline,
+  alarmOutline,
   chevronDown,
   chevronUp,
+  ellipseOutline,
   list,
+  listOutline,
   swapVertical,
   trashOutline,
-  alarmOutline,
-  listOutline,
-  ellipseOutline,
 } from "ionicons/icons";
 import { Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
-import { ref, onMounted } from "vue";
+import { onMounted, ref } from "vue";
 
+import { getSave, setSave } from "@/components/NetUtil.vue";
+import { ScheduleData, UserData } from "@/type/UserData.vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import "swiper/css";
 import "swiper/css/effect-fade";
-import { UserData, ScheduleData } from "@/type/UserData.vue";
-import { getSave, setSave } from "@/components/NetUtil.vue";
 
 export type SlideData = {
   vid: number;
@@ -219,7 +219,7 @@ export type SlideData = {
   firstDayOfMonth: dayjs.Dayjs;
   weekArr: any[];
 };
-const userData = ref<UserData>({ id: 0, name: "leo", schedules: [] });
+const userData = ref<UserData>({ id: 1, name: "leo", schedules: [] });
 const slideArr = ref<any[]>([{}, {}, {}]); // 滑动数据
 const curScheduleList = ref();
 const swiperRef = ref(); // 滑动对象
@@ -394,7 +394,7 @@ const onScheduleModalDismiss = (event: any) => {
         console.log("setSave", res);
       })
       .catch((err) => {
-        console.log("setSave", err);
+        console.error("setSave", err);
       });
   }
   isScheduleModalOpen.value = false;
@@ -502,21 +502,19 @@ const setSwiperInstance = (swiper: any) => {
 // 刷新页面事件
 const handleRefresh = (event: any) => {
   // console.log("handleRefresh", event);
-  getSave(
-    1,
-    (res) => {
+  getSave(1)
+    .then((res) => {
       console.log("handleRefresh", res);
       toastData.value.isOpen = true;
       toastData.value.text = "更新成功";
       event.target.complete();
-    },
-    (err) => {
+    })
+    .catch((err) => {
       console.log("handleRefresh", err);
       toastData.value.isOpen = true;
       toastData.value.text = JSON.stringify(err);
       event.target.complete();
-    }
-  );
+    });
 };
 
 // 初始化数据
@@ -530,9 +528,8 @@ const updateScheduleData = () => {
 
 onMounted(() => {
   // 获取数据
-  getSave(
-    1,
-    (res) => {
+  getSave(1)
+    .then((res: any) => {
       console.log("getSave", res.data);
       userData.value = JSON.parse(res.data);
       for (let i = 0; i < userData.value.schedules.length; i++) {
@@ -545,11 +542,11 @@ onMounted(() => {
       setTimeout(() => {
         swiperRef?.value?.update();
       }, 100);
-    },
-    (err) => {
-      console.log("getSave", err);
-    }
-  );
+    })
+    .catch((err) => {
+      toastData.value.isOpen = true;
+      toastData.value.text = JSON.stringify(err);
+    });
 });
 
 // 日历折叠按钮
