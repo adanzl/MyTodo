@@ -385,6 +385,17 @@ const onScheduleModalDismiss = (event: any) => {
       }
     }
     updateScheduleData();
+    setSave(
+      userData.value.id,
+      userData.value.name,
+      JSON.stringify(userData.value)
+    )
+      .then((res) => {
+        console.log("setSave", res);
+      })
+      .catch((err) => {
+        console.log("setSave", err);
+      });
   }
   isScheduleModalOpen.value = false;
 };
@@ -472,16 +483,16 @@ const btnTestClk = () => {
   });
   //
   setSave(
-    1,
-    "leo",
-    JSON.stringify(userData.value),
-    (res) => {
+    userData.value.id,
+    userData.value.name,
+    JSON.stringify(userData.value)
+  )
+    .then((res) => {
       console.log("setSave", res);
-    },
-    (err) => {
+    })
+    .catch((err) => {
       console.log("setSave", err);
-    }
-  );
+    });
 };
 // 获取swiper对象
 const setSwiperInstance = (swiper: any) => {
