@@ -15,14 +15,14 @@
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
-    <ion-content style="height: 50%;display: block; overflow: hidden;" >
+    <ion-content >
       <!-- https://blog.csdn.net/weixin_41863239/article/details/82490886 -->
       <swiper
         @slideNextTransitionEnd="onSlideChangeNext"
         @slidePrevTransitionEnd="onSlideChangePre"
         @swiper="setSwiperInstance"
-        :autoHeight="true"
         :centered-slides="true"
+        :autoHeight="true"
         :modules="[IonicSlides, Keyboard]"
         :keyboard="true"
       >
@@ -51,90 +51,91 @@
         >
         </ion-icon>
       </ion-button>
-    </ion-content>
-    <ion-content color="light">
-      <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
-        <ion-refresher-content></ion-refresher-content>
-      </ion-refresher>
-      <ion-accordion-group :multiple="true" :value="['schedule', 'goals']">
-        <ion-accordion value="schedule">
-          <ion-item slot="header" color="light">
-            <ion-label>{{ selectedDate?.dt.format("MM-DD") }}</ion-label>
-          </ion-item>
-          <div class="" slot="content">
-            <ion-list
-              :inset="true"
-              lines="full"
-              mode="ios"
-              ref="curScheduleList"
-            >
-              <ion-item-sliding
-                v-for="(schedule, idx) in selectedDate?.events"
-                :key="idx"
+      <ion-content color="light">
+        <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
+          <ion-refresher-content></ion-refresher-content>
+        </ion-refresher>
+        <ion-accordion-group :multiple="true" :value="['schedule', 'goals']">
+          <ion-accordion value="schedule">
+            <ion-item slot="header" color="light">
+              <ion-label>{{ selectedDate?.dt.format("MM-DD") }}</ion-label>
+            </ion-item>
+            <div class="" slot="content">
+              <ion-list
+                :inset="true"
+                lines="full"
+                mode="ios"
+                ref="curScheduleList"
               >
-                <ion-item :detail="true">
-                  <ion-checkbox
-                    slot="start"
-                    @ionChange="onScheduleCheckboxChange($event, schedule)"
-                  >
-                  </ion-checkbox>
-                  <ion-label
-                    :class="{ 'text-line-through': schedule.state === 1 }"
-                  >
-                    <h2>{{ schedule.title }}</h2>
-                    <p>
-                      {{ selectedDate?.dt.format("ddd") }}
-                      <ion-icon
-                        :icon="listOutline"
-                        style="position: relative; top: 3px"
-                      ></ion-icon>
-                      {{
-                        schedule?.subTasks?.filter((t) => t.state === 1).length
-                      }}/{{ schedule?.subTasks?.length }}
-                    </p>
-                  </ion-label>
-                </ion-item>
-                <ion-item-options side="end">
-                  <ion-item-option>
-                    <ion-icon :icon="alarmOutline"></ion-icon>
-                  </ion-item-option>
-                  <ion-item-option color="danger">
-                    <ion-icon :icon="trashOutline"></ion-icon>
-                  </ion-item-option>
-                </ion-item-options>
-              </ion-item-sliding>
-            </ion-list>
-          </div>
-        </ion-accordion>
-        <ion-accordion value="goals">
-          <ion-item slot="header" color="light">
-            <ion-label>Goals</ion-label>
-          </ion-item>
-          <div class="ion-padding" slot="content">Content</div>
-        </ion-accordion>
-      </ion-accordion-group>
+                <ion-item-sliding
+                  v-for="(schedule, idx) in selectedDate?.events"
+                  :key="idx"
+                >
+                  <ion-item :detail="true">
+                    <ion-checkbox
+                      slot="start"
+                      @ionChange="onScheduleCheckboxChange($event, schedule)"
+                    >
+                    </ion-checkbox>
+                    <ion-label
+                      :class="{ 'text-line-through': schedule.state === 1 }"
+                    >
+                      <h2>{{ schedule.title }}</h2>
+                      <p>
+                        {{ selectedDate?.dt.format("ddd") }}
+                        <ion-icon
+                          :icon="listOutline"
+                          style="position: relative; top: 3px"
+                        ></ion-icon>
+                        {{
+                          schedule?.subTasks?.filter((t) => t.state === 1)
+                            .length
+                        }}/{{ schedule?.subTasks?.length }}
+                      </p>
+                    </ion-label>
+                  </ion-item>
+                  <ion-item-options side="end">
+                    <ion-item-option>
+                      <ion-icon :icon="alarmOutline"></ion-icon>
+                    </ion-item-option>
+                    <ion-item-option color="danger">
+                      <ion-icon :icon="trashOutline"></ion-icon>
+                    </ion-item-option>
+                  </ion-item-options>
+                </ion-item-sliding>
+              </ion-list>
+            </div>
+          </ion-accordion>
+          <ion-accordion value="goals">
+            <ion-item slot="header" color="light">
+              <ion-label>Goals</ion-label>
+            </ion-item>
+            <div class="ion-padding" slot="content">Content</div>
+          </ion-accordion>
+        </ion-accordion-group>
+      </ion-content>
+      <ion-modal
+        id="pop-modal"
+        ref="modal"
+        trigger="open-dialog"
+        class="ion-padding"
+        aria-hidden="true"
+        @ionModalWillDismiss="onAddModalDismiss"
+      >
+        <SchedulePop :modal="modal"></SchedulePop>
+      </ion-modal>
+      <ion-toast
+        :is-open="toastData.isOpen"
+        :message="toastData.text"
+        :duration="toastData.duration"
+        @didDismiss="
+          () => {
+            toastData.isOpen = false;
+          }
+        "
+      >
+      </ion-toast>
     </ion-content>
-    <ion-modal
-      id="pop-modal"
-      ref="modal"
-      trigger="open-dialog"
-      class="ion-padding"
-      aria-hidden="true"
-      @ionModalWillDismiss="onAddModalDismiss"
-    >
-      <SchedulePop :modal="modal"></SchedulePop>
-    </ion-modal>
-    <ion-toast
-      :is-open="toastData.isOpen"
-      :message="toastData.text"
-      :duration="toastData.duration"
-      @didDismiss="
-        () => {
-          toastData.isOpen = false;
-        }
-      "
-    >
-    </ion-toast>
     <ion-fab slot="fixed" vertical="bottom" horizontal="end">
       <ion-fab-button id="open-dialog">
         <ion-icon :icon="addCircleOutline" size="large"></ion-icon>
