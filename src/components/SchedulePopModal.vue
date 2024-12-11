@@ -317,7 +317,7 @@ const onSubtaskInputChange = (event: any, task?: SubTask) => {
     if (event.detail.value) {
       task.name = event.detail.value;
     } else {
-      // todo 移除
+      // TODO 移除
     }
   } else {
     if (event.detail.value) {

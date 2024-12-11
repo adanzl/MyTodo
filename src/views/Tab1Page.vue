@@ -11,6 +11,11 @@
           }}</span>
         </ion-title>
         <ion-buttons slot="end" class="ion-padding">
+          <ion-icon
+            :icon="ellipseOutline"
+            @click="btnTodayClk"
+            style="margin-right: 16px"
+          ></ion-icon>
           <ion-icon :icon="swapVertical" @click="btnSortClk"></ion-icon>
         </ion-buttons>
       </ion-toolbar>
@@ -51,12 +56,16 @@
         >
         </ion-icon>
       </ion-button>
-      <ion-content color="light">
-        <div
+      <ion-content
+        color="light"
+        @touchmove="onTouchMove"
+        @touchstart="onTouchStart"
+      >
+        <!-- <div
           id="eventMask"
           @touchmove="onTouchMove"
           @touchstart="onTouchStart"
-        ></div>
+        ></div> -->
         <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
           <ion-refresher-content></ion-refresher-content>
         </ion-refresher>
@@ -76,7 +85,11 @@
                   v-for="(schedule, idx) in selectedDate?.events"
                   :key="idx"
                 >
-                  <ion-item :detail="true">
+                  <ion-item
+                    :detail="true"
+                    @click="btnScheduleClk($event, schedule)"
+                    :button="true"
+                  >
                     <ion-checkbox
                       slot="start"
                       @ionChange="onScheduleCheckboxChange($event, schedule)"
@@ -183,6 +196,7 @@ import {
   trashOutline,
   alarmOutline,
   listOutline,
+  ellipseOutline,
 } from "ionicons/icons";
 import { Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
@@ -362,15 +376,27 @@ const onAddModalDismiss = (event: any) => {
   }
 };
 // 日程状态改变
-const onScheduleCheckboxChange = (event: any, schedule: any) => {
+const onScheduleCheckboxChange = (event: any, schedule: ScheduleData) => {
   if (schedule) {
     schedule.state = event.detail.checked ? 1 : 0;
   }
 };
 
+// 日程按钮点击
+const btnScheduleClk = (event: any, schedule: ScheduleData) => {
+  console.log("btnScheduleClk", event, schedule);
+  // TODO
+};
 // 排序按钮
 const btnSortClk = () => {
   swiperRef?.value?.update();
+};
+// 返回今天按钮
+const btnTodayClk = () => {
+  currentDate = dayjs().startOf("day");
+  selectedDate.value = undefined;
+  updateScheduleData();
+  chooseSelectedDate();
 };
 // 左下测试按钮
 const btnTestClk = () => {
