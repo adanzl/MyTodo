@@ -4,7 +4,7 @@ import logging
 import db_mgr
 
 log = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(filename='app.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
 db_mgr.init_db()
