@@ -55,7 +55,7 @@ def set_save(id, user_name, data):
     except Exception as e:
         log.error(e)
         traceback.print_exc()
-        return 'error'
+        return 'error ' + str(e)
     finally:
         cur.close()
     return "ok"

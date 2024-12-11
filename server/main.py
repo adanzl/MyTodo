@@ -41,13 +41,13 @@ def set_save():
     args = request.get_json()
     log.info("===== [Set Save] " + json.dumps(args))
     id = args.get('id')
-    user_name = args.get('user_name')
+    user = args.get('user')
     data = json.dumps(args.get('data'))
-    return db_mgr.set_save(id, user_name, data)
+    return db_mgr.set_save(id, user, data)
 
 
 # . .venv/bin/activate
-# sudo vim /etc/systemd/system/MyTodo.service
+# sudo vim /etc/systemd/system/myTodo.service
 # sudo vim /etc/systemd/system/natapp.service
 # sudo vim /etc/caddy/Caddyfile
 # caddy reload --config=/etc/caddy/Caddyfile
