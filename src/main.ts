@@ -49,7 +49,8 @@ import {
   IonTitle,
   IonToolbar,
   IonInput,
-  IonToast, 
+  IonToast,
+  IonAlert,
 } from "@ionic/vue";
 
 const app = createApp(App).use(IonicVue).use(router);
@@ -70,6 +71,7 @@ app.component("ion-header", IonHeader);
 app.component("ion-chip", IonChip);
 app.component("ion-input", IonInput);
 app.component("ion-toast", IonToast);
+app.component("ion-alert", IonAlert);
 
 console.log(`当前 Vue 版本是：${app.version}`);
 // console.log(GConfig);

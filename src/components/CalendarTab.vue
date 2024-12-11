@@ -81,7 +81,7 @@ const updateMinSlide = () => {
 };
 const onMinimalChange = () => {
   nextTick(() => {
-    console.log("onMinimalChange ", minSlide.value, props);
+    // console.log("onMinimalChange ", minSlide.value, props);
     props.swiperRef?.value?.update();
   });
 };

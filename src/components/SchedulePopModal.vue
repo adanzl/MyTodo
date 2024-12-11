@@ -1,7 +1,9 @@
 <template>
   <div class="ion-padding" id="main">
     <ion-toolbar class="transparent">
-      <ion-title>Add Schedule</ion-title>
+      <ion-title>{{
+        (curScheduleData.id === undefined ? "Add" : "Editor") + " Schedule"
+      }}</ion-title>
     </ion-toolbar>
     <ion-segment value="sType" @ionChange="onTypeChange">
       <ion-segment-button value="sType" content-id="sType">
@@ -153,9 +155,13 @@
                 datetime="repeatEndTs"
                 :value="curScheduleData.repeatEndTs"
               >
-                <div slot="time-target"></div>
+                <ion-label
+                  slot="date-target"
+                  v-if="curScheduleData.repeatEndTs === undefined"
+                  >None</ion-label
+                >
               </ion-datetime-button>
-              <ion-modal :keep-contents-mounted="true" ref="repeatEndTsModal" aria-hidden="true">
+              <ion-modal :keep-contents-mounted="true" ref="repeatEndTsModal">
                 <ion-datetime
                   id="repeatEndTs"
                   ref="repeatEndTs"
@@ -181,8 +187,10 @@
               <ion-icon :icon="listOutline" slot="start"></ion-icon>
               <ion-label>Sub-task</ion-label>
               <span>
-                {{ curScheduleData?.subTasks?.filter((t) => t.state === 1)
-                .length }}/{{ curScheduleData?.subTasks?.length }}
+                {{
+                  curScheduleData?.subTasks?.filter((t: any) => t.state === 1)
+                    .length
+                }}/{{ curScheduleData?.subTasks?.length }}
               </span>
             </ion-item>
             <ion-item lines="none">
@@ -266,10 +274,33 @@ import {
   power,
   repeat,
 } from "ionicons/icons";
-import { ref } from "vue";
+import { ref, onMounted, defineEmits } from "vue";
 const props = defineProps({
   modal: Object,
+  value: {
+    type: Object as () => ScheduleData,
+    default: () => {
+      return {
+        id: undefined, // 任务id
+        title: "", // 任务标题
+        state: 0, // 任务状态
+        startTs: dayjs().startOf("day"), // 开始时间
+        endTs: dayjs().startOf("day"), // 结束时间
+        reminder: 0, // 提醒类型
+        repeat: 0, // 重复类型
+        repeatEndTs: undefined, // 重复结束类型
+        subTasks: [], // 子任务
+      } as ScheduleData;
+    },
+  },
 });
+
+const curScheduleData = ref<ScheduleData>({} as ScheduleData);
+
+onMounted(() => {
+  curScheduleData.value = props.value;
+});
+
 // 任务状态改变
 const onTaskCheckboxChange = (event: any) => {
   curScheduleData.value.state = event.detail.checked ? 1 : 0;
@@ -386,6 +417,7 @@ const btnSubtaskRemoveClk = (event: any, task: SubTask) => {
   }
 };
 // 保存按钮点击
+const emit = defineEmits(["update:value"]);
 const btnSaveClk = () => {
   console.log("btnSaveClk", curScheduleData.value);
   if (!curScheduleData.value.title) {
@@ -394,6 +426,8 @@ const btnSaveClk = () => {
     return;
   }
   props.modal?.$el.dismiss(curScheduleData.value, "confirm");
+
+  emit("update:value", curScheduleData.value);
 };
 
 const scheduleDT = ref();
@@ -425,17 +459,17 @@ const reminderOptions = ref([
   { value: 5, label: "4 day early 9:00" },
 ]);
 
-const curScheduleData = ref<ScheduleData>({
-  id: undefined, // 任务id
-  title: "", // 任务标题
-  state: 0, // 任务状态
-  startTs: dayjs().startOf("day"), // 开始时间
-  endTs: dayjs().startOf("day"), // 结束时间
-  reminder: 0, // 提醒类型
-  repeat: 0, // 重复类型
-  repeatEndTs: undefined, // 重复结束类型
-  subTasks: [], // 子任务
-});
+// const curScheduleData = ref<ScheduleData>({
+//   id: undefined, // 任务id
+//   title: "", // 任务标题
+//   state: 0, // 任务状态
+//   startTs: dayjs().startOf("day"), // 开始时间
+//   endTs: dayjs().startOf("day"), // 结束时间
+//   reminder: 0, // 提醒类型
+//   repeat: 0, // 重复类型
+//   repeatEndTs: undefined, // 重复结束类型
+//   subTasks: [], // 子任务
+// });
 </script>
 
 <style scoped>

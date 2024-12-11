@@ -61,11 +61,6 @@
         @touchmove="onTouchMove"
         @touchstart="onTouchStart"
       >
-        <!-- <div
-          id="eventMask"
-          @touchmove="onTouchMove"
-          @touchstart="onTouchStart"
-        ></div> -->
         <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
           <ion-refresher-content></ion-refresher-content>
         </ion-refresher>
@@ -85,11 +80,7 @@
                   v-for="(schedule, idx) in selectedDate?.events"
                   :key="idx"
                 >
-                  <ion-item
-                    :detail="true"
-                    @click="btnScheduleClk($event, schedule)"
-                    :button="true"
-                  >
+                  <ion-item :detail="true" :button="true">
                     <ion-checkbox
                       slot="start"
                       @ionChange="onScheduleCheckboxChange($event, schedule)"
@@ -97,6 +88,7 @@
                     </ion-checkbox>
                     <ion-label
                       :class="{ 'text-line-through': schedule.state === 1 }"
+                      @click="btnScheduleClk($event, schedule)"
                     >
                       <h2>{{ schedule.title }}</h2>
                       <p>
@@ -113,10 +105,13 @@
                     </ion-label>
                   </ion-item>
                   <ion-item-options side="end">
-                    <ion-item-option>
+                    <ion-item-option @click="btnScheduleAlarmClk">
                       <ion-icon :icon="alarmOutline"></ion-icon>
                     </ion-item-option>
-                    <ion-item-option color="danger">
+                    <ion-item-option
+                      color="danger"
+                      @click="btnScheduleRemoveClk($event, schedule)"
+                    >
                       <ion-icon :icon="trashOutline"></ion-icon>
                     </ion-item-option>
                   </ion-item-options>
@@ -134,14 +129,23 @@
       </ion-content>
       <ion-modal
         id="pop-modal"
-        ref="modal"
-        trigger="open-dialog"
+        ref="scheduleModal"
+        :is-open="isScheduleModalOpen"
         class="ion-padding"
-        aria-hidden="true"
-        @ionModalWillDismiss="onAddModalDismiss"
+        @willDismiss="onScheduleModalDismiss"
       >
-        <SchedulePop :modal="modal"></SchedulePop>
+        <SchedulePop
+          :modal="scheduleModal"
+          :value="scheduleModalData"
+        ></SchedulePop>
       </ion-modal>
+      <ion-alert
+        :is-open="scheduleDelConfirm.isOpen"
+        header="Confirm!"
+        :buttons="alertButtons"
+        :sub-header="scheduleDelConfirm.text"
+        @didDismiss="onDelSchedulerConfirm($event)"
+      ></ion-alert>
       <ion-toast
         :is-open="toastData.isOpen"
         :message="toastData.text"
@@ -155,7 +159,7 @@
       </ion-toast>
     </ion-content>
     <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-      <ion-fab-button id="open-dialog">
+      <ion-fab-button @click="btnAddScheduleClk">
         <ion-icon :icon="addCircleOutline" size="large"></ion-icon>
       </ion-fab-button>
     </ion-fab>
@@ -221,7 +225,9 @@ const curScheduleList = ref();
 const swiperRef = ref(); // 滑动对象
 const bFold = ref(false); // 日历折叠状态
 const selectedDate = ref<DayData>(); // 选中日期
-const modal = ref(); // 弹窗对象
+const scheduleModal = ref(); // 弹窗对象
+const scheduleModalData = ref<ScheduleData>();
+const isScheduleModalOpen = ref(false);
 const toastData = ref({
   isOpen: false,
   duration: 3000,
@@ -278,7 +284,6 @@ const btnDaySelectClk = (slide: SlideData, day: DayData) => {
       swiperRef.value.slidePrev();
     }
   }
-  console.log("daySelect", day);
   selectedDate.value = day;
 };
 const chooseSelectedDate = () => {
@@ -359,21 +364,64 @@ const onTouchMove = (event: any) => {
   const d = event.touches[0].clientY - pTouch.clientY;
   if (Math.abs(d) > 20) {
     lstTs = dayjs().valueOf();
-    console.log("moving", d, lstTs);
     if (d > 0 === bFold.value) {
       btnCalendarFoldClk();
     }
   }
 };
 // 添加日程页面关闭回调
-const onAddModalDismiss = (event: any) => {
+const onScheduleModalDismiss = (event: any) => {
   const scheduleData = event.detail.data;
   if (scheduleData && event.detail.role === "confirm") {
     // 处理数据
-    userData.value.schedules.push(scheduleData);
+    if (scheduleData.id === undefined) {
+      userData.value.schedules.push(scheduleData);
+    } else {
+      const idx = userData.value.schedules.findIndex(
+        (s) => s.id === scheduleData.id
+      );
+      if (idx !== -1) {
+        userData.value.schedules[idx] = scheduleData;
+      }
+    }
     updateScheduleData();
-    console.log(selectedDate.value);
   }
+  isScheduleModalOpen.value = false;
+};
+// 删除日程确认框
+const scheduleDelConfirm = ref<{ isOpen: boolean; data: any; text: string }>({
+  isOpen: false,
+  data: undefined,
+  text: "",
+});
+const alertButtons = [
+  {
+    text: "Cancel",
+    role: "cancel",
+  },
+  {
+    text: "OK",
+    role: "confirm",
+  },
+];
+const onDelSchedulerConfirm = (event: any) => {
+  // 处理数据
+  scheduleDelConfirm.value.isOpen = false;
+  if (event.detail.role === "confirm") {
+    const idx = userData.value.schedules.findIndex(
+      (s) => s.id === scheduleDelConfirm.value.data.id
+    );
+    if (idx !== -1) {
+      userData.value.schedules.splice(idx, 1);
+    }
+    updateScheduleData();
+  }
+};
+// 日程删除
+const btnScheduleRemoveClk = (event: any, schedule: ScheduleData) => {
+  scheduleDelConfirm.value.isOpen = true;
+  scheduleDelConfirm.value.data = schedule;
+  scheduleDelConfirm.value.text = "del " + schedule.title + "?";
 };
 // 日程状态改变
 const onScheduleCheckboxChange = (event: any, schedule: ScheduleData) => {
@@ -384,8 +432,14 @@ const onScheduleCheckboxChange = (event: any, schedule: ScheduleData) => {
 
 // 日程按钮点击
 const btnScheduleClk = (event: any, schedule: ScheduleData) => {
-  console.log("btnScheduleClk", event, schedule);
-  // TODO
+  // console.log("btnScheduleClk", event, schedule);
+  scheduleModalData.value = schedule;
+  isScheduleModalOpen.value = true;
+};
+// 添加日程按钮
+const btnAddScheduleClk = () => {
+  isScheduleModalOpen.value = true;
+  scheduleModalData.value = undefined;
 };
 // 排序按钮
 const btnSortClk = () => {
@@ -431,10 +485,8 @@ const btnTestClk = () => {
 };
 // 获取swiper对象
 const setSwiperInstance = (swiper: any) => {
-  console.log("setSwiperInstance", swiper);
   swiperRef.value = swiper;
   swiper.slideTo(1, 0, false);
-  // chooseSelectedDate();
 };
 // 刷新页面事件
 const handleRefresh = (event: any) => {
@@ -495,6 +547,11 @@ const btnCalendarFoldClk = () => {
   setTimeout(() => {
     swiperRef.value.update();
   }, 100);
+};
+
+// 日程专注按钮
+const btnScheduleAlarmClk = () => {
+  console.log("btnScheduleAlarmClk");
 };
 </script>
 <style>
