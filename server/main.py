@@ -48,9 +48,11 @@ def set_save():
 
 # . .venv/bin/activate
 # sudo vim /etc/systemd/system/MyTodo.service
-# sudo systemctl restart code-server@orangepi.service
-# sudo vim  /etc/caddy/Caddyfile
+# sudo vim /etc/systemd/system/natapp.service
+# sudo vim /etc/caddy/Caddyfile
 # caddy reload --config=/etc/caddy/Caddyfile
+# sudo systemctl restart code-server@orangepi.service
+# sudo systemctl daemon-reload
 # sudo systemctl restart myTodo.service
 if __name__ == '__main__':
     app.run(debug=True, port=8888)  #开始运行flask应用程序，以调试模式运行

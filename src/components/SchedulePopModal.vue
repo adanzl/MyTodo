@@ -155,7 +155,7 @@
               >
                 <div slot="time-target"></div>
               </ion-datetime-button>
-              <ion-modal :keep-contents-mounted="true" ref="repeatEndTsModal">
+              <ion-modal :keep-contents-mounted="true" ref="repeatEndTsModal" aria-hidden="true">
                 <ion-datetime
                   id="repeatEndTs"
                   ref="repeatEndTs"
@@ -180,12 +180,10 @@
             <ion-item lines="none">
               <ion-icon :icon="listOutline" slot="start"></ion-icon>
               <ion-label>Sub-task</ion-label>
-              <span
-                >{{
-                  curScheduleData?.subTasks?.filter((t) => t.state === 1)
-                    .length
-                }}/{{ curScheduleData?.subTasks?.length }}</span
-              >
+              <span>
+                {{ curScheduleData?.subTasks?.filter((t) => t.state === 1)
+                .length }}/{{ curScheduleData?.subTasks?.length }}
+              </span>
             </ion-item>
             <ion-item lines="none">
               <ion-icon :icon="add" slot="start" style="width: 22px"></ion-icon>

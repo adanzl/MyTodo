@@ -15,14 +15,14 @@
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
-    <ion-content :fullscreen="true">
+    <ion-content style="height: 50%;display: block; overflow: hidden;" >
       <!-- https://blog.csdn.net/weixin_41863239/article/details/82490886 -->
       <swiper
         @slideNextTransitionEnd="onSlideChangeNext"
         @slidePrevTransitionEnd="onSlideChangePre"
         @swiper="setSwiperInstance"
-        :centered-slides="true"
         :autoHeight="true"
+        :centered-slides="true"
         :modules="[IonicSlides, Keyboard]"
         :keyboard="true"
       >
@@ -51,39 +51,90 @@
         >
         </ion-icon>
       </ion-button>
-      <ion-content color="light">
-        <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
-          <ion-refresher-content></ion-refresher-content>
-        </ion-refresher>
-        <ion-list :inset="true" lines="full" mode="ios" ref="curScheduleList">
-          <ion-item v-for="schedule in selectedDate?.events" :key="schedule">
-            <ion-label>
-              {{ schedule.title }}
-            </ion-label>
-          </ion-item>
-        </ion-list>
-      </ion-content>
-      <ion-modal
-        id="pop-modal"
-        ref="modal"
-        trigger="open-dialog"
-        class="ion-padding"
-        aria-hidden="true"
-        @ionModalWillDismiss="onAddModalDismiss"
-      >
-        <AddSchedulePop :modal="modal"></AddSchedulePop>
-      </ion-modal>
-      <ion-toast
-        :is-open="toastData.isOpen"
-        :message="toastData.text"
-        :duration="toastData.duration"
-        @didDismiss="
-          () => {
-            toastData.isOpen = false;
-          }
-        "
-      ></ion-toast>
     </ion-content>
+    <ion-content color="light">
+      <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
+      <ion-accordion-group :multiple="true" :value="['schedule', 'goals']">
+        <ion-accordion value="schedule">
+          <ion-item slot="header" color="light">
+            <ion-label>{{ selectedDate?.dt.format("MM-DD") }}</ion-label>
+          </ion-item>
+          <div class="" slot="content">
+            <ion-list
+              :inset="true"
+              lines="full"
+              mode="ios"
+              ref="curScheduleList"
+            >
+              <ion-item-sliding
+                v-for="(schedule, idx) in selectedDate?.events"
+                :key="idx"
+              >
+                <ion-item :detail="true">
+                  <ion-checkbox
+                    slot="start"
+                    @ionChange="onScheduleCheckboxChange($event, schedule)"
+                  >
+                  </ion-checkbox>
+                  <ion-label
+                    :class="{ 'text-line-through': schedule.state === 1 }"
+                  >
+                    <h2>{{ schedule.title }}</h2>
+                    <p>
+                      {{ selectedDate?.dt.format("ddd") }}
+                      <ion-icon
+                        :icon="listOutline"
+                        style="position: relative; top: 3px"
+                      ></ion-icon>
+                      {{
+                        schedule?.subTasks?.filter((t) => t.state === 1).length
+                      }}/{{ schedule?.subTasks?.length }}
+                    </p>
+                  </ion-label>
+                </ion-item>
+                <ion-item-options side="end">
+                  <ion-item-option>
+                    <ion-icon :icon="alarmOutline"></ion-icon>
+                  </ion-item-option>
+                  <ion-item-option color="danger">
+                    <ion-icon :icon="trashOutline"></ion-icon>
+                  </ion-item-option>
+                </ion-item-options>
+              </ion-item-sliding>
+            </ion-list>
+          </div>
+        </ion-accordion>
+        <ion-accordion value="goals">
+          <ion-item slot="header" color="light">
+            <ion-label>Goals</ion-label>
+          </ion-item>
+          <div class="ion-padding" slot="content">Content</div>
+        </ion-accordion>
+      </ion-accordion-group>
+    </ion-content>
+    <ion-modal
+      id="pop-modal"
+      ref="modal"
+      trigger="open-dialog"
+      class="ion-padding"
+      aria-hidden="true"
+      @ionModalWillDismiss="onAddModalDismiss"
+    >
+      <SchedulePop :modal="modal"></SchedulePop>
+    </ion-modal>
+    <ion-toast
+      :is-open="toastData.isOpen"
+      :message="toastData.text"
+      :duration="toastData.duration"
+      @didDismiss="
+        () => {
+          toastData.isOpen = false;
+        }
+      "
+    >
+    </ion-toast>
     <ion-fab slot="fixed" vertical="bottom" horizontal="end">
       <ion-fab-button id="open-dialog">
         <ion-icon :icon="addCircleOutline" size="large"></ion-icon>
@@ -98,7 +149,7 @@
 </template>
 
 <script setup lang="ts">
-import AddSchedulePop from "@/components/AddSchedulePopModal.vue";
+import SchedulePop from "@/components/SchedulePopModal.vue";
 import CalenderTab from "@/components/CalendarTab.vue";
 import { LocalNotifications } from "@capacitor/local-notifications";
 
@@ -109,6 +160,12 @@ import {
   IonModal,
   IonRefresher,
   IonRefresherContent,
+  IonCheckbox,
+  IonAccordion,
+  IonAccordionGroup,
+  IonItemSliding,
+  IonItemOption,
+  IonItemOptions,
 } from "@ionic/vue";
 import dayjs from "dayjs";
 import {
@@ -117,6 +174,9 @@ import {
   chevronUp,
   list,
   swapVertical,
+  trashOutline,
+  alarmOutline,
+  listOutline,
 } from "ionicons/icons";
 import { Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
@@ -127,29 +187,39 @@ import "swiper/css";
 import "swiper/css/effect-fade";
 import { UserData, ScheduleData } from "@/type/UserData.vue";
 import { getSave, setSave } from "@/components/NetUtil.vue";
+
+export type SlideData = {
+  vid: number;
+  month: number;
+  year: number;
+  firstDayOfMonth: dayjs.Dayjs;
+  weekArr: any[];
+};
 const userData = ref<UserData>({ id: 0, name: "leo", schedules: [] });
 const slideArr = ref<any[]>([{}, {}, {}]); // 滑动数据
 const curScheduleList = ref();
 const swiperRef = ref(); // 滑动对象
 const bFold = ref(false); // 日历折叠状态
-const selectedDate = ref<any>(null); // 选中日期
+const selectedDate = ref<DayData>(); // 选中日期
 const modal = ref(); // 弹窗对象
 const toastData = ref({
   isOpen: false,
   duration: 3000,
   text: "",
 });
-
+type DayData = {
+  dt: dayjs.Dayjs;
+  events: ScheduleData[];
+};
 let currentDate = dayjs().startOf("day");
-const createSlideData = (datetime: dayjs.Dayjs) => {
-  // console.log("createSlideData", datetime.format("YYYY-MM-DD"));
+const createSlideData = (datetime: dayjs.Dayjs): SlideData => {
   const firstDayOfMonth = datetime.startOf("month");
   let _dt = firstDayOfMonth.startOf("week");
   const wArr = [];
   do {
     const week = [];
     for (let i = 0; i < 7; i++) {
-      const dayData: { dt: any; events: ScheduleData[] } = {
+      const dayData: DayData = {
         dt: _dt,
         events: [],
       };
@@ -180,7 +250,7 @@ const createSlideData = (datetime: dayjs.Dayjs) => {
   }; // SlideData
 };
 // 点击日历某个日期
-const btnDaySelectClk = (slide: any, day: any) => {
+const btnDaySelectClk = (slide: SlideData, day: DayData) => {
   if (slide.month != day.dt.month()) {
     if (slide.year * 100 + slide.month < day.dt.year() * 100 + day.dt.month()) {
       swiperRef.value.slideNext();
@@ -195,6 +265,7 @@ const chooseSelectedDate = () => {
   // 处理选中日期
   const mm = slideArr.value[1];
   if (!mm.weekArr) {
+    console.warn("no weekArr");
     return;
   }
   const now = dayjs().startOf("day");
@@ -235,7 +306,7 @@ const slideChange = (obj: any) => {
     selectedDate.value &&
     selectedDate.value.dt.month() !== currentDate.month()
   ) {
-    selectedDate.value = null; // 清空选中日期
+    selectedDate.value = undefined; // 清空选中日期
   }
   chooseSelectedDate();
 };
@@ -259,6 +330,12 @@ const onAddModalDismiss = (event: any) => {
     userData.value.schedules.push(scheduleData);
     updateScheduleData();
     console.log(selectedDate.value);
+  }
+};
+// 日程状态改变
+const onScheduleCheckboxChange = (event: any, schedule: any) => {
+  if (schedule) {
+    schedule.state = event.detail.checked ? 1 : 0;
   }
 };
 
@@ -299,19 +376,20 @@ const btnTestClk = () => {
 };
 // 获取swiper对象
 const setSwiperInstance = (swiper: any) => {
+  console.log("setSwiperInstance", swiper);
   swiperRef.value = swiper;
   swiper.slideTo(1, 0, false);
-  chooseSelectedDate();
+  // chooseSelectedDate();
 };
 // 刷新页面事件
 const handleRefresh = (event: any) => {
-  console.log("handleRefresh", event);
+  // console.log("handleRefresh", event);
   getSave(
     1,
     (res) => {
       console.log("handleRefresh", res);
       toastData.value.isOpen = true;
-      toastData.value.text = JSON.stringify(res.data);
+      toastData.value.text = "更新成功";
       event.target.complete();
     },
     (err) => {
@@ -339,13 +417,16 @@ onMounted(() => {
     (res) => {
       console.log("getSave", res.data);
       userData.value = JSON.parse(res.data);
-      for(let i = 0; i < userData.value.schedules.length; i++) {
+      for (let i = 0; i < userData.value.schedules.length; i++) {
         const schedule = userData.value.schedules[i];
         schedule.startTs = dayjs(schedule.startTs);
         schedule.endTs = dayjs(schedule.endTs);
       }
       updateScheduleData();
       chooseSelectedDate();
+      setTimeout(() => {
+        swiperRef?.value?.update();
+      }, 100);
     },
     (err) => {
       console.log("getSave", err);
@@ -365,6 +446,7 @@ const btnCalendarFoldClk = () => {
   display: flex;
   flex-direction: column;
 }
+
 .dot {
   display: inline-block;
   width: 5px;
@@ -378,9 +460,11 @@ ion-chip.selected {
   --color: #fff !important;
   --background: #ff3609 !important;
 }
+
 .gray {
   --color: #b5b1b1 !important;
 }
+
 ion-modal#pop-modal {
   --width: 100%;
   --min-width: fit-content;

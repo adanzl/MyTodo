@@ -1,14 +1,13 @@
 <template>
-  <ion-grid v-if="slide">
+  <ion-grid style="height: auto">
     <ion-row>
       <ion-col class="ion-text-center" v-for="head in weekHead" :key="head">
         {{ head }}
       </ion-col>
     </ion-row>
-
     <ion-row
       class="calendar-row"
-      v-for="week in minimal ? minSlide?.weekArr : slide?.weekArr"
+      v-for="week in minimal ? minSlide?.weekArr : slide.weekArr"
       :key="week"
     >
       <ion-col
@@ -20,8 +19,7 @@
         <ion-chip
           :class="{
             vertical: true,
-            transparent:
-              selectedDate && day.dt.unix() !== selectedDate.dt.unix(),
+            transparent: day.dt.unix() !== selectedDate.dt.unix(),
             selected: selectedDate && day.dt.unix() === selectedDate.dt.unix(),
             gray: day.dt.month() !== slide.month,
           }"
@@ -37,39 +35,49 @@
 </template>
 
 <script setup lang="ts">
+import { SlideData } from "@/views/Tab1Page.vue";
 import { IonCol, IonGrid, IonRow } from "@ionic/vue";
 import { defineProps, nextTick, ref, watch } from "vue";
 const props = defineProps({
   name: String,
-  slide: Object,
+  slide: {
+    type: Object,
+    default: null,
+  },
   daySelectCallback: {
     type: Function,
     default: () => {},
   },
-  selectedDate: Object,
+  selectedDate: {
+    type: Object,
+    default: null,
+  },
   swiperRef: Object,
   minimal: {
     type: Boolean,
     default: false,
   },
 });
-const minSlide = ref<any>(null);
+const minSlide = ref<SlideData>();
 const updateMinSlide = () => {
   if (props.slide) {
     const dt = props.selectedDate
       ? props.selectedDate.dt
-      : props.slide.firstDayOfMonth;
+      : props.slide.value?.firstDayOfMonth;
     const firstDayOfMonth = dt.startOf("month");
     const diff = dt.date() - firstDayOfMonth.date();
     const idx = Math.ceil((diff + firstDayOfMonth.day()) / 7);
+    const wArr = props.slide.value?.weekArr.slice(idx - 1, idx);
 
     minSlide.value = {
       vid: dt.year(),
       month: dt.month(),
       year: dt.year(),
-      weekArr: props.slide.weekArr.slice(idx - 1, idx),
+      firstDayOfMonth: firstDayOfMonth,
+      weekArr: wArr || [],
     };
   }
+  props.swiperRef?.emit("update");
 };
 const onMinimalChange = () => {
   nextTick(() => {
