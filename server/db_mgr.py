@@ -3,7 +3,6 @@ import sqlite3
 import traceback
 
 log = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
 
 DB_NAME = "data.db"
 TABLE_SAVE = "t_user_save"
