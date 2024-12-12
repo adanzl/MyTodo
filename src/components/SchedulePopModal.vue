@@ -24,7 +24,7 @@
               <ion-checkbox
                 slot="start"
                 @ionChange="onTaskCheckboxChange"
-                :checked="curScheduleData.state === 1"
+                :checked="curSave.state === 1"
               >
               </ion-checkbox>
               <ion-input
@@ -34,6 +34,7 @@
               >
               </ion-input>
             </ion-item>
+            <!-- 分组信息 -->
             <ion-item>
               <ion-select label-placement="floating" label="Group" value="work">
                 <ion-icon slot="start" :icon="bookmark" aria-hidden="true">
@@ -127,7 +128,7 @@
                 <ion-select-option
                   v-for="(op, idx) in reminderOptions"
                   :key="idx"
-                  :value="op.value"
+                  :value="op.id"
                 >
                   {{ op.label }}
                 </ion-select-option>
@@ -146,7 +147,7 @@
                 <ion-select-option
                   v-for="(op, idx) in repeatOptions"
                   :key="idx"
-                  :value="op.value"
+                  :value="op.id"
                 >
                   {{ op.label }}
                 </ion-select-option>
@@ -192,11 +193,13 @@
               <ion-label>Sub-task</ion-label>
               <span>
                 {{
-                  curScheduleData?.subTasks?.filter((t: any) => t.state === 1)
-                    .length
+                  curScheduleData?.subTasks?.filter((t: SubTask) =>
+                    subTaskChecked(t)
+                  ).length
                 }}/{{ curScheduleData?.subTasks?.length }}
               </span>
             </ion-item>
+            <!-- 子任务 -->
             <ion-item lines="none">
               <ion-icon :icon="add" slot="start" style="width: 22px"></ion-icon>
               <ion-input
@@ -209,14 +212,14 @@
             <ion-item v-for="task in curScheduleData?.subTasks" :key="task">
               <ion-checkbox
                 slot="start"
-                :checked="task.state === 1"
+                :checked="subTaskChecked(task)"
                 @ionChange="onSubtaskCheckboxChange($event, task)"
               >
               </ion-checkbox>
               <ion-input
                 :value="task.name"
                 @ionChange="onSubtaskInputChange($event, task)"
-                :class="{ 'text-line-through': task.state === 1 }"
+                :class="{ 'text-line-through': subTaskChecked(task) }"
               >
               </ion-input>
               <ion-icon
@@ -252,8 +255,11 @@
   ></ion-toast>
 </template>
 <script setup lang="ts">
-import { ScheduleData, SubTask } from "@/type/UserData.vue";
+import { ReminderOptions, RepeatOptions } from "@/type/ScheduleType.vue";
+import { ScheduleData, ScheduleSave, SubTask } from "@/type/UserData.vue";
 import {
+  createAnimation,
+  IonCheckbox,
   IonDatetime,
   IonDatetimeButton,
   IonModal,
@@ -263,8 +269,6 @@ import {
   IonSegmentView,
   IonSelect,
   IonSelectOption,
-  createAnimation,
-  IonCheckbox,
 } from "@ionic/vue";
 import dayjs from "dayjs";
 import {
@@ -275,18 +279,18 @@ import {
   colorPalette,
   listOutline,
   notifications,
-  removeCircleOutline,
   power,
+  removeCircleOutline,
   repeat,
 } from "ionicons/icons";
-import { ref, onMounted, defineEmits } from "vue";
+import { onMounted, ref } from "vue";
 const props = defineProps({
   modal: Object,
-  value: {
+  schedule: {
     type: Object as () => ScheduleData,
     default: () => {
       return {
-        id: undefined, // 任务id
+        id: -1, // 任务id
         title: "", // 任务标题
         state: 0, // 任务状态
         startTs: dayjs().startOf("day"), // 开始时间
@@ -298,17 +302,37 @@ const props = defineProps({
       } as ScheduleData;
     },
   },
+  save: {
+    type: Object as () => ScheduleSave,
+    default: () => {
+      return {
+        state: 0,
+        subTasks: new Map<number, number>(),
+      };
+    },
+  },
 });
 
 const curScheduleData = ref<ScheduleData>({} as ScheduleData);
+const curSave = ref<ScheduleSave>({} as ScheduleSave);
 
 onMounted(() => {
-  curScheduleData.value = props.value;
+  curScheduleData.value = props.schedule;
+  curSave.value = props.save;
+  // task 排序
+  curScheduleData.value.subTasks.sort((a: SubTask, b: SubTask) => {
+    const sa = curSave.value.subTasks?.get(a.id) || 0;
+    const sb = curSave.value.subTasks?.get(b.id) || 0;
+    if (sa === sb) {
+      return a.id - b.id;
+    }
+    return sa - sb;
+  });
 });
 
 // 任务状态改变
 const onTaskCheckboxChange = (event: any) => {
-  curScheduleData.value.state = event.detail.checked ? 1 : 0;
+  curSave.value.state = event.detail.checked ? 1 : 0;
 };
 // 日程类型切换
 const onTypeChange = (event: any) => {
@@ -343,8 +367,21 @@ const onRepeatEndDtChange = (event: any) => {
 // 子任务状态改变
 const onSubtaskCheckboxChange = (event: any, task?: SubTask) => {
   if (task) {
-    task.state = event.detail.checked ? 1 : 0;
+    curSave.value.subTasks.set(task.id, event.detail.checked ? 1 : 0);
   }
+  // task 排序
+  curScheduleData.value.subTasks.sort((a: SubTask, b: SubTask) => {
+    const sa = curSave.value.subTasks.get(a.id) || 0;
+    const sb = curSave.value.subTasks.get(b.id) || 0;
+    if (sa === sb) {
+      return a.id - b.id;
+    }
+    return sa - sb;
+  });
+};
+
+const subTaskChecked = (task: SubTask) => {
+  return (curSave.value.subTasks.get(task.id) || 0) === 1;
 };
 // 子任务名称改变
 const onSubtaskInputChange = (event: any, task?: SubTask) => {
@@ -353,14 +390,14 @@ const onSubtaskInputChange = (event: any, task?: SubTask) => {
     if (event.detail.value) {
       task.name = event.detail.value;
     } else {
-      // TODO 移除
+      // 移除
+      btnSubtaskRemoveClk(null, task);
     }
   } else {
     if (event.detail.value) {
       curScheduleData.value.subTasks?.unshift({
         id: curScheduleData.value.subTasks.length,
         name: event.detail.value,
-        state: 0,
       });
     }
     addSubtaskInput.value = "";
@@ -422,17 +459,17 @@ const btnSubtaskRemoveClk = (event: any, task: SubTask) => {
   }
 };
 // 保存按钮点击
-const emit = defineEmits(["update:value"]);
+const emit = defineEmits(["update:schedule", "update:save"]);
 const btnSaveClk = () => {
-  console.log("btnSaveClk", curScheduleData.value);
   if (!curScheduleData.value.title) {
     toastData.value.text = "Title is empty";
     toastData.value.isOpen = true;
     return;
   }
+  emit("update:schedule", curScheduleData.value);
+  emit("update:save", curSave.value);
   props.modal?.$el.dismiss(curScheduleData.value, "confirm");
 
-  emit("update:value", curScheduleData.value);
 };
 
 const scheduleDT = ref();
@@ -447,34 +484,8 @@ const toastData = ref({
   duration: 3000,
   text: "",
 });
-const repeatOptions = ref([
-  { value: 0, label: "None" },
-  { value: 1, label: "Workday" },
-  { value: 2, label: "Every day" },
-  { value: 3, label: "Every week" },
-  { value: 4, label: "Every month" },
-  { value: 5, label: "Every year" },
-]);
-const reminderOptions = ref([
-  { value: 0, label: "None" },
-  { value: 1, label: "On the day 9:00" },
-  { value: 2, label: "1 day early 9:00" },
-  { value: 3, label: "2 day early 9:00" },
-  { value: 4, label: "3 day early 9:00" },
-  { value: 5, label: "4 day early 9:00" },
-]);
-
-// const curScheduleData = ref<ScheduleData>({
-//   id: undefined, // 任务id
-//   title: "", // 任务标题
-//   state: 0, // 任务状态
-//   startTs: dayjs().startOf("day"), // 开始时间
-//   endTs: dayjs().startOf("day"), // 结束时间
-//   reminder: 0, // 提醒类型
-//   repeat: 0, // 重复类型
-//   repeatEndTs: undefined, // 重复结束类型
-//   subTasks: [], // 子任务
-// });
+const repeatOptions = ref(RepeatOptions);
+const reminderOptions = ref(ReminderOptions);
 </script>
 
 <style scoped>

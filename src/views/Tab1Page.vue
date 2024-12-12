@@ -9,6 +9,7 @@
           <span v-if="selectedDate">{{
             selectedDate.dt.format("YY年MM月")
           }}</span>
+          <div v-else>日历</div>
         </ion-title>
         <ion-buttons slot="end" class="ion-padding">
           <ion-icon
@@ -56,6 +57,7 @@
         >
         </ion-icon>
       </ion-button>
+      <!-- 日程列表 -->
       <ion-content
         color="light"
         @touchmove="onTouchMove"
@@ -76,6 +78,7 @@
                 mode="ios"
                 ref="curScheduleList"
               >
+                <!-- 日程条目 -->
                 <ion-item-sliding
                   v-for="(schedule, idx) in selectedDate?.events"
                   :key="idx"
@@ -83,11 +86,23 @@
                   <ion-item :detail="true" :button="true">
                     <ion-checkbox
                       slot="start"
-                      @ionChange="onScheduleCheckboxChange($event, schedule)"
+                      :checked="
+                        selectedDate?.save.get(schedule.id)?.state === 1
+                      "
+                      @ionChange="
+                        onScheduleCheckboxChange(
+                          $event,
+                          selectedDate,
+                          schedule.id
+                        )
+                      "
                     >
                     </ion-checkbox>
                     <ion-label
-                      :class="{ 'text-line-through': schedule.state === 1 }"
+                      :class="{
+                        'text-line-through':
+                          selectedDate?.save.get(schedule.id)?.state === 1,
+                      }"
                       @click="btnScheduleClk($event, schedule)"
                     >
                       <h2>{{ schedule.title }}</h2>
@@ -98,8 +113,12 @@
                           style="position: relative; top: 3px"
                         ></ion-icon>
                         {{
-                          schedule?.subTasks?.filter((t) => t.state === 1)
-                            .length
+                          schedule?.subTasks?.filter(
+                            (t) =>
+                              (selectedDate?.save
+                                .get(schedule.id)
+                                ?.subTasks.get(t.id) || 0) === 1
+                          ).length
                         }}/{{ schedule?.subTasks?.length }}
                       </p>
                     </ion-label>
@@ -136,7 +155,10 @@
       >
         <SchedulePop
           :modal="scheduleModal"
-          :value="scheduleModalData"
+          :schedule="scheduleModalData"
+          :save="scheduleSave"
+          @update:save="onUpdateScheduleSave"
+          @update:schedule="onUpdateScheduleData"
         ></SchedulePop>
       </ion-modal>
       <ion-alert
@@ -207,7 +229,7 @@ import { Swiper, SwiperSlide } from "swiper/vue";
 import { onMounted, ref } from "vue";
 
 import { getSave, setSave } from "@/components/NetUtil.vue";
-import { ScheduleData, UserData } from "@/type/UserData.vue";
+import { ScheduleData, ScheduleSave, UserData } from "@/type/UserData.vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import "swiper/css";
 import "swiper/css/effect-fade";
@@ -217,9 +239,14 @@ export type SlideData = {
   month: number;
   year: number;
   firstDayOfMonth: dayjs.Dayjs;
-  weekArr: any[];
+  weekArr: DayData[][];
 };
-const userData = ref<UserData>({ id: 1, name: "leo", schedules: [] });
+const userData = ref<UserData>({
+  id: 1,
+  name: "leo",
+  schedules: [],
+  save: new Map(),
+});
 const slideArr = ref<any[]>([{}, {}, {}]); // 滑动数据
 const curScheduleList = ref();
 const swiperRef = ref(); // 滑动对象
@@ -227,27 +254,31 @@ const bFold = ref(false); // 日历折叠状态
 const selectedDate = ref<DayData>(); // 选中日期
 const scheduleModal = ref(); // 弹窗对象
 const scheduleModalData = ref<ScheduleData>();
+const scheduleSave = ref<ScheduleSave>();
 const isScheduleModalOpen = ref(false);
 const toastData = ref({
   isOpen: false,
   duration: 3000,
   text: "",
 });
+//  一天的日程数据
 type DayData = {
   dt: dayjs.Dayjs;
-  events: ScheduleData[];
+  events: ScheduleData[]; // 当天可见日程
+  save: Map<number, ScheduleSave>; // 日程id->日程保存情况
 };
 let currentDate = dayjs().startOf("day");
 const createSlideData = (datetime: dayjs.Dayjs): SlideData => {
   const firstDayOfMonth = datetime.startOf("month");
   let _dt = firstDayOfMonth.startOf("week");
-  const wArr = [];
+  const wArr: DayData[][] = [];
   do {
-    const week = [];
+    const week: DayData[] = [];
     for (let i = 0; i < 7; i++) {
       const dayData: DayData = {
         dt: _dt,
         events: [],
+        save: new Map(),
       };
       for (const schedule of userData.value.schedules) {
         if (
@@ -257,6 +288,10 @@ const createSlideData = (datetime: dayjs.Dayjs): SlideData => {
           schedule.endTs.unix() >= _dt.unix()
         ) {
           dayData.events.push(schedule);
+        }
+        const save = userData.value.save?.get(_dt.format("YYYY-MM-DD"));
+        if (save) {
+          dayData.save = save;
         }
       }
       if (selectedDate.value?.dt.unix() == _dt.unix()) {
@@ -372,9 +407,17 @@ const onTouchMove = (event: any) => {
 // 添加日程页面关闭回调
 const onScheduleModalDismiss = (event: any) => {
   const scheduleData = event.detail.data;
+  // console.log("onScheduleModalDismiss", event, scheduleSave.value);
   if (scheduleData && event.detail.role === "confirm") {
     // 处理数据
+    // 日程变化
     if (scheduleData.id === undefined) {
+      // add id userData.value.schedules id的最大值=1
+      const id = userData.value.schedules.reduce(
+        (max, s) => (s.id! > max ? s.id! : max),
+        0
+      );
+      scheduleData.id = id;
       userData.value.schedules.push(scheduleData);
     } else {
       const idx = userData.value.schedules.findIndex(
@@ -384,6 +427,8 @@ const onScheduleModalDismiss = (event: any) => {
         userData.value.schedules[idx] = scheduleData;
       }
     }
+    // 存档变化 TODO
+    
     updateScheduleData();
     setSave(
       userData.value.id,
@@ -435,22 +480,43 @@ const btnScheduleRemoveClk = (event: any, schedule: ScheduleData) => {
   scheduleDelConfirm.value.text = "del " + schedule.title + "?";
 };
 // 日程状态改变
-const onScheduleCheckboxChange = (event: any, schedule: ScheduleData) => {
-  if (schedule) {
-    schedule.state = event.detail.checked ? 1 : 0;
+const onScheduleCheckboxChange = (
+  _event: any,
+  day: DayData | undefined,
+  scheduleId: number
+) => {
+  if (day) {
+    const preSave = day.save.get(scheduleId) || {
+      state: 0,
+      subTasks: new Map(),
+    };
+    preSave.state = _event.detail.checked ? 1 : 0;
+    day.save.set(scheduleId, preSave);
   }
+  // task 排序
+  // selectedDate.value?.events.sort((a: ScheduleData, b: ScheduleData) => {
+  //   if (a.state === b.state) {
+  //     return (a.id??0) - (b.id??0);
+  //   }
+  //   return a.state - b.state;
+  // });
 };
+
+const onUpdateScheduleSave = (d: any) => (scheduleSave.value = d);
+const onUpdateScheduleData = (d: any) => (scheduleModalData.value = d);
 
 // 日程按钮点击
 const btnScheduleClk = (event: any, schedule: ScheduleData) => {
-  // console.log("btnScheduleClk", event, schedule);
   scheduleModalData.value = schedule;
+  scheduleSave.value = selectedDate.value?.save.get(schedule.id);
   isScheduleModalOpen.value = true;
+  console.log("btnScheduleClk", schedule, scheduleSave.value);
 };
 // 添加日程按钮
 const btnAddScheduleClk = () => {
   isScheduleModalOpen.value = true;
   scheduleModalData.value = undefined;
+  scheduleSave.value = undefined;
 };
 // 排序按钮
 const btnSortClk = () => {
@@ -465,6 +531,7 @@ const btnTodayClk = () => {
 };
 // 左下测试按钮
 const btnTestClk = () => {
+  console.log(JSON.stringify(userData.value));
   console.log(JSON.stringify(userData.value));
   // 测试通知
   LocalNotifications.schedule({
@@ -482,17 +549,17 @@ const btnTestClk = () => {
     ],
   });
   //
-  setSave(
-    userData.value.id,
-    userData.value.name,
-    JSON.stringify(userData.value)
-  )
-    .then((res) => {
-      console.log("setSave", res);
-    })
-    .catch((err) => {
-      console.log("setSave", err);
-    });
+  // setSave(
+  //   userData.value.id,
+  //   userData.value.name,
+  //   JSON.stringify(userData.value)
+  // )
+  //   .then((res) => {
+  //     console.log("setSave", res);
+  //   })
+  //   .catch((err) => {
+  //     console.log("setSave", err);
+  //   });
 };
 // 获取swiper对象
 const setSwiperInstance = (swiper: any) => {
@@ -575,11 +642,6 @@ const btnScheduleAlarmClk = () => {
   border-radius: 50%;
   background-color: #007bff;
   margin-top: 5px;
-}
-
-ion-chip.selected {
-  --color: #fff !important;
-  --background: #ff3609 !important;
 }
 
 .gray {

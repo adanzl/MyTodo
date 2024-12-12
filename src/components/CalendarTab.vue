@@ -19,8 +19,9 @@
         <ion-chip
           :class="{
             vertical: true,
-            transparent: day.dt.unix() !== selectedDate.dt.unix(),
+            transparent: day.dt.unix() !== selectedDate.dt.unix() && day.dt.unix() !== dayjs().startOf('day').unix(),
             selected: selectedDate && day.dt.unix() === selectedDate.dt.unix(),
+            today: day.dt.unix() === dayjs().startOf('day').unix() &&  selectedDate && day.dt.unix() !== selectedDate.dt.unix(),
             gray: day.dt.month() !== slide.month,
           }"
         >
@@ -37,6 +38,7 @@
 <script setup lang="ts">
 import { SlideData } from "@/views/Tab1Page.vue";
 import { IonCol, IonGrid, IonRow } from "@ionic/vue";
+import dayjs from "dayjs";
 import { defineProps, nextTick, ref, watch } from "vue";
 const props = defineProps({
   name: String,
@@ -91,3 +93,13 @@ watch(() => props.minimal, onMinimalChange, { deep: true });
 
 const weekHead = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 </script>
+<style escaped lang="css">
+ion-chip.selected {
+  --color: #fff !important;
+  --background: #ff3609 !important;
+}
+ion-chip.today {
+  /* --color: #fff !important; */
+  --background: yellow !important;
+}
+</style>

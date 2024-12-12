@@ -25,10 +25,15 @@
               {{ schedule?.startTs?.format("YYYY-MM-DD") }} -
               {{ schedule?.endTs?.format("YYYY-MM-DD") }}
             </p>
-            <span v-for="(task, idx) in schedule.subTasks" :key="idx">{{
-              task.name
-            }}</span>
+            <p v-for="(task, idx) in schedule.subTasks" :key="idx">
+              {{ task.name }}
+            </p>
           </ion-label>
+        </ion-item>
+      </ion-list>
+      <ion-list>
+        <ion-item v-for="k in userData.save" :key="k">
+          {{ k }}- {{ userData.save.get(k) }}
         </ion-item>
       </ion-list>
       <ion-toast
@@ -59,7 +64,13 @@ import {
 import dayjs from "dayjs";
 import { onMounted, ref } from "vue";
 
-const userData = ref<UserData>({ id: 1, name: "leo", schedules: [] });
+const userData = ref<UserData>({
+  id: 1,
+  name: "leo",
+  schedules: [],
+  save: new Map(),
+});
+
 const toastData = ref({
   isOpen: false,
   duration: 3000,
