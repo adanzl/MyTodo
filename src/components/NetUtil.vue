@@ -19,7 +19,7 @@ export function getSave(id: number) {
 }
 
 export function setSave(id: number | undefined, user: string, data: string) {
-  console.log("setSave", data);
+  console.log(data);
   return new Promise((resolve, reject) => {
     if (id === undefined) {
       reject(new Error("id is undefined"));

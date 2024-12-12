@@ -229,7 +229,12 @@ import { Swiper, SwiperSlide } from "swiper/vue";
 import { onMounted, ref } from "vue";
 
 import { getSave, setSave } from "@/components/NetUtil.vue";
-import { ScheduleData, ScheduleSave, UserData } from "@/type/UserData.vue";
+import {
+  SAVE_TS,
+  ScheduleData,
+  ScheduleSave,
+  UserData,
+} from "@/type/UserData.vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import "swiper/css";
 import "swiper/css/effect-fade";
@@ -289,7 +294,7 @@ const createSlideData = (datetime: dayjs.Dayjs): SlideData => {
         ) {
           dayData.events.push(schedule);
         }
-        const save = userData.value.save?.get(_dt.format("YYYY-MM-DD"));
+        const save = userData.value.save?.get(SAVE_TS(_dt));
         if (save) {
           dayData.save = save;
         }
@@ -350,7 +355,7 @@ const chooseSelectedDate = () => {
     }
   }
   if (selectedDate.value) {
-    console.log("ST ", selectedDate.value.dt.format("YYYY-MM-DD"));
+    console.log("ST ", SAVE_TS(selectedDate.value.dt));
   }
 };
 
@@ -372,13 +377,13 @@ const slideChange = (obj: any) => {
 };
 // 向右滑
 const onSlideChangeNext = (obj: any) => {
-  console.log("onSlideChangeNext", currentDate.format("YYYY-MM-DD"));
+  console.log("onSlideChangeNext", SAVE_TS(currentDate));
   currentDate = currentDate.add(1, "months").startOf("month");
   slideChange(obj);
 };
 // 向左滑
 const onSlideChangePre = (obj: any) => {
-  console.log("onSlideChangePre", currentDate.format("YYYY-MM-DD"));
+  console.log("onSlideChangePre", SAVE_TS(currentDate));
   currentDate = currentDate.subtract(1, "months").startOf("month");
   slideChange(obj);
 };
@@ -427,8 +432,24 @@ const onScheduleModalDismiss = (event: any) => {
         userData.value.schedules[idx] = scheduleData;
       }
     }
-    // 存档变化 TODO
-    
+    // TODO 存档变化
+    if (selectedDate.value) {
+      if (userData.value.save == undefined) {
+        userData.value.save = new Map();
+      }
+      if (!userData.value.save.has(SAVE_TS(selectedDate.value.dt))) {
+        // userData.value.save
+        //   .get(SAVE_TS(selectedDate.value?.dt))
+        //   ?.set(scheduleData.id!, scheduleSave.value!);
+        userData.value.save.set(
+          SAVE_TS(selectedDate.value.dt),
+          new Map<number, ScheduleSave>()
+        );
+      }
+      console.log("save", scheduleSave.value);
+      const map = userData.value.save.get(SAVE_TS(selectedDate.value.dt));
+      map!.set(scheduleData.id!, scheduleSave.value!);
+    }
     updateScheduleData();
     setSave(
       userData.value.id,
@@ -599,6 +620,9 @@ onMounted(() => {
     .then((res: any) => {
       console.log("getSave", res.data);
       userData.value = JSON.parse(res.data);
+      if(userData.value.save){
+        userData.value.save = new Map(Object.entries(userData.value.save));
+      }
       for (let i = 0; i < userData.value.schedules.length; i++) {
         const schedule = userData.value.schedules[i];
         schedule.startTs = dayjs(schedule.startTs);
