@@ -13,6 +13,7 @@ export class ScheduleData {
   title?: string; // 任务标题
   startTs?: dayjs.Dayjs; // 开始时间
   endTs?: dayjs.Dayjs; // 结束时间
+  allDay: boolean = false; // 是否全天
   reminder: number = 0; // 提醒类型
   repeat: number = 0; // 重复类型
   repeatEndTs?: dayjs.Dayjs; // 重复结束类型

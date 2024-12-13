@@ -51,6 +51,8 @@ import {
   IonInput,
   IonToast,
   IonAlert,
+  IonBackdrop,
+  IonToggle,
 } from "@ionic/vue";
 
 const app = createApp(App).use(IonicVue).use(router);
@@ -72,6 +74,8 @@ app.component("ion-chip", IonChip);
 app.component("ion-input", IonInput);
 app.component("ion-toast", IonToast);
 app.component("ion-alert", IonAlert);
+app.component("ion-backdrop", IonBackdrop);
+app.component("ion-toggle", IonToggle);
 
 console.log(`当前 Vue 版本是：${app.version}`);
 // console.log(GConfig);

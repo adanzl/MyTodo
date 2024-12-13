@@ -1,9 +1,9 @@
 <template>
   <div class="ion-padding" id="main">
     <ion-toolbar class="transparent">
-      <ion-title>{{
-        (curScheduleData?.id === undefined ? "Add" : "Editor") + " Schedule"
-      }}</ion-title>
+      <ion-title
+        >{{ (curScheduleData?.id === -1 ? "Add" : "Editor") + " Schedule" }}
+      </ion-title>
     </ion-toolbar>
     <ion-segment value="sType" @ionChange="onTypeChange">
       <ion-segment-button value="sType" content-id="sType">
@@ -31,6 +31,11 @@
                 placeholder="输入日程标题"
                 :value="curScheduleData?.title"
                 :required="true"
+                @ionChange="
+                  ($event: any) => {
+                    curScheduleData.title = $event.detail.value;
+                  }
+                "
               >
               </ion-input>
             </ion-item>
@@ -73,7 +78,9 @@
                 class="flex ion-justify-content-around ion-padding width-100"
               >
                 <div class="ion-text-center">
-                  <ion-label>Start</ion-label>
+                  <ion-label>{{
+                    curScheduleData.startTs?.format("MM-DD,ddd")
+                  }}</ion-label>
                   <ion-label color="tertiary" class="font-size-mini">
                     {{ curScheduleData?.startTs?.format("YYYY-MM-DD") }}
                   </ion-label>
@@ -90,7 +97,7 @@
               </div>
             </ion-item>
             <ion-item ref="dtItem" class="height-0-block flex">
-              <div ref="scheduleDT">
+              <div ref="scheduleDT" style="width: 100%">
                 <ion-buttons mode="ios" class="ion-justify-content-around">
                   <ion-button @click="btnScheduleDatetimeClearClk">
                     Clear
@@ -110,8 +117,50 @@
                   </ion-segment>
                   <ion-button @click="btnDatetimeOkClk">OK </ion-button>
                 </ion-buttons>
-                <ion-datetime presentation="date" @ionChange="onDtChange">
+                <ion-datetime
+                  presentation="date"
+                  @ionChange="onDtChange"
+                  size="cover"
+                >
                 </ion-datetime>
+                <ion-item class="ion-no-padding">
+                  <ion-icon :icon="timeOutline" aria-hidden="true" slot="start">
+                  </ion-icon>
+                  <ion-label>Start time</ion-label>
+                  <ion-datetime-button
+                    datetime="dts"
+                    presentation="time"
+                  ></ion-datetime-button>
+                  <ion-modal
+                    class="m-ion-modal"
+                    mode="ios"
+                    :keep-contents-mounted="true"
+                    style="--width: 80%; padding: 10px"
+                  >
+                    <!-- <ion-backdrop :visible="true" ></ion-backdrop> -->
+                    <ion-item>
+                      <ion-title>Start time</ion-title>
+                    </ion-item>
+                    <ion-datetime
+                      id="dts"
+                      presentation="time"
+                      size="cover"
+                      mode="ios"
+                      hourCycle="h23"
+                    ></ion-datetime>
+                    <ion-item>
+                      <ion-toggle :checked="true">All day</ion-toggle>
+                    </ion-item>
+                    <ion-item>
+                      <ion-button size="large" fill="clear" style="width: 50%">
+                        Cancel
+                      </ion-button>
+                      <ion-button size="large" fill="clear" style="width: 50%">
+                        Done
+                      </ion-button>
+                    </ion-item>
+                  </ion-modal>
+                </ion-item>
               </div>
             </ion-item>
             <ion-item :button="true" :detail="true">
@@ -287,6 +336,7 @@ import {
   power,
   removeCircleOutline,
   repeat,
+  timeOutline,
 } from "ionicons/icons";
 import { onMounted, ref } from "vue";
 const props = defineProps({
@@ -299,7 +349,9 @@ const curScheduleData = ref<ScheduleData>(new ScheduleData());
 const curSave = ref<ScheduleSave>(new ScheduleSave());
 
 onMounted(() => {
-  curScheduleData.value = props.schedule! as ScheduleData;
+  if (props.schedule) {
+    curScheduleData.value = props.schedule! as ScheduleData;
+  }
   if (props.save) {
     curSave.value = props.save as ScheduleSave;
   }
@@ -329,11 +381,11 @@ const onDtTabChange = (event: any) => {
 // 日期选择
 const onDtChange = (event: any) => {
   const dt = dayjs(event.detail.value);
-  if (scheduleType.value === '0') {
+  if (scheduleType.value === "0") {
     curScheduleData.value!.startTs = dt.startOf("day");
     curScheduleData.value!.endTs = dt.startOf("day");
-    scheduleType.value = '1';
-  } else if (scheduleType.value === '1') {
+    scheduleType.value = "1";
+  } else if (scheduleType.value === "1") {
     curScheduleData.value!.endTs = dt.startOf("day");
   }
 };
@@ -462,7 +514,7 @@ const bShowScheduleDT = ref(false);
 const repeatEndTs = ref();
 const repeatEndTsModal = ref();
 const dtItem = ref();
-const scheduleType = ref('0'); // 0:start 1:end
+const scheduleType = ref("0"); // 0:start 1:end
 const addSubtaskInput = ref();
 const toastData = ref({
   isOpen: false,
@@ -494,6 +546,8 @@ ion-footer {
 }
 ion-list {
   background-color: transparent !important;
+  margin-left: 0px !important;
+  margin-right: 0px !important;
 }
 ion-segment-content {
   height: 70%;
@@ -514,5 +568,21 @@ ion-segment-content {
 }
 ion-select::part(icon) {
   opacity: 0;
+}
+ion-backdrop {
+  background: var(--ion-color-dark);
+  opacity: 0.3;
+}
+
+.m-ion-modal .ion-page {
+  --background: gray;
+  align-items: center;
+  justify-content: center !important;
+  flex-direction: row !important;
+  top: 100px !important;
+}
+.m-ion-modal ion-datetime {
+  width: 100%;
+  /* margin-left: 100px; */
 }
 </style>

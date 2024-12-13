@@ -83,10 +83,11 @@
                   v-for="(schedule, idx) in selectedDate?.events"
                   :key="idx"
                 >
-                  <ion-item :detail="true" :button="true">
+                  <ion-item :detail="true">
                     <ion-checkbox
+                      style="--size: 26px; padding-right: 5px;"
                       slot="start"
-                      :checked="selectedDate?.save[schedule.id]?.state === 1"
+                      :checked="scheduleChecked(schedule.id)"
                       @ionChange="
                         onScheduleCheckboxChange(
                           $event,
@@ -103,7 +104,9 @@
                       }"
                       @click="btnScheduleClk($event, schedule)"
                     >
-                      <h2>{{ schedule.title }}</h2>
+                      <h2>
+                        {{ scheduleChecked(schedule.id) }} {{ schedule.title }}
+                      </h2>
                       <p>
                         {{ selectedDate?.dt.format("ddd") }}
                         <ion-icon
@@ -224,7 +227,7 @@ import {
 } from "ionicons/icons";
 import { Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
-import { onMounted, ref } from "vue";
+import { nextTick, onMounted, ref } from "vue";
 
 import { getSave, setSave } from "@/components/NetUtil.vue";
 import {
@@ -292,9 +295,20 @@ const createSlideData = (datetime: dayjs.Dayjs): SlideData => {
         ) {
           dayData.events.push(schedule);
         }
+        // 处理repeat
+        
+        // 排序日程
         const save = userData.value.save[SAVE_TS(_dt)];
         if (save) {
           dayData.save = save;
+          dayData.events.sort((a: ScheduleData, b: ScheduleData) => {
+            const sa: number = save[a.id]?.state || 0;
+            const sb: number = save[b.id]?.state || 0;
+            if (sa === sb) {
+              return (a.id ?? 0) - (b.id ?? 0);
+            }
+            return sa - sb;
+          });
         }
       }
       if (selectedDate.value?.dt.unix() == _dt.unix()) {
@@ -387,6 +401,20 @@ const onSlideChangePre = (obj: any) => {
   slideChange(obj);
 };
 
+const doSaveUserData = () => {
+  setSave(
+    userData.value.id,
+    userData.value.name,
+    JSON.stringify(userData.value)
+  )
+    .then((res) => {
+      console.log("doSaveUserData", res);
+    })
+    .catch((err) => {
+      console.log("doSaveUserData", err);
+    });
+};
+
 let pTouch: any;
 let lstTs = 0;
 const onTouchStart = (event: any) => {
@@ -415,7 +443,7 @@ const onScheduleModalDismiss = (event: any) => {
   if (scheduleData && event.detail.role === "confirm") {
     // 处理数据
     // 日程变化
-    if (scheduleData.id === undefined) {
+    if (scheduleData.id === -1) {
       // add id userData.value.schedules id的最大值=1
       const id = userData.value.schedules.reduce(
         (max, s) => (s.id! > max ? s.id! : max),
@@ -440,17 +468,7 @@ const onScheduleModalDismiss = (event: any) => {
       map![scheduleData.id!] = scheduleSave.value!;
     }
     updateScheduleData();
-    setSave(
-      userData.value.id,
-      userData.value.name,
-      JSON.stringify(userData.value)
-    )
-      .then((res) => {
-        console.log("setSave", res);
-      })
-      .catch((err) => {
-        console.error("setSave", err);
-      });
+    doSaveUserData();
   }
   isScheduleModalOpen.value = false;
 };
@@ -481,6 +499,7 @@ const onDelSchedulerConfirm = (event: any) => {
       userData.value.schedules.splice(idx, 1);
     }
     updateScheduleData();
+    doSaveUserData();
   }
 };
 // 日程删除
@@ -489,6 +508,10 @@ const btnScheduleRemoveClk = (event: any, schedule: ScheduleData) => {
   scheduleDelConfirm.value.data = schedule;
   scheduleDelConfirm.value.text = "del " + schedule.title + "?";
 };
+// 日程显示状态
+const scheduleChecked = (scheduleId: number) => {
+  return selectedDate.value!.save[scheduleId]?.state === 1;
+};
 // 日程状态改变
 const onScheduleCheckboxChange = (
   _event: any,
@@ -496,20 +519,25 @@ const onScheduleCheckboxChange = (
   scheduleId: number
 ) => {
   if (day) {
+    // console.log("onScheduleCheckboxChange", day, scheduleId);
     const preSave = day.save[scheduleId] || {
       state: 0,
       subTasks: new Object(),
     };
     preSave.state = _event.detail.checked ? 1 : 0;
     day.save[scheduleId] = preSave;
+    nextTick(() => {
+      // schedule 排序 这玩意必须延后一帧，否则会导致checkbox状态错乱
+      day.events.sort((a: ScheduleData, b: ScheduleData) => {
+        const sa: number = day.save[a.id]?.state || 0;
+        const sb: number = day.save[b.id]?.state || 0;
+        if (sa === sb) {
+          return (a.id ?? 0) - (b.id ?? 0);
+        }
+        return sa - sb;
+      });
+    });
   }
-  // TODO task 排序
-  // selectedDate.value?.events.sort((a: ScheduleData, b: ScheduleData) => {
-  //   if (a.state === b.state) {
-  //     return (a.id??0) - (b.id??0);
-  //   }
-  //   return a.state - b.state;
-  // });
 };
 
 const onUpdateScheduleSave = (d: any) => (scheduleSave.value = d);
@@ -559,17 +587,7 @@ const btnTestClk = () => {
     ],
   });
   //
-  // setSave(
-  //   userData.value.id,
-  //   userData.value.name,
-  //   JSON.stringify(userData.value)
-  // )
-  //   .then((res) => {
-  //     console.log("setSave", res);
-  //   })
-  //   .catch((err) => {
-  //     console.log("setSave", err);
-  //   });
+  doSaveUserData();
 };
 // 获取swiper对象
 const setSwiperInstance = (swiper: any) => {

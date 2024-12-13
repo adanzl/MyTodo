@@ -23,7 +23,7 @@
         </ion-item>
         <ion-item v-for="(schedule, idx) in userData.schedules" :key="idx">
           <ion-label>
-            <h2>{{ schedule.title }}</h2>
+            <h2>[{{ schedule.id }}]  {{ schedule.title }}</h2>
             <p>
               range:
               {{ schedule?.startTs?.format("YYYY-MM-DD") }} -
