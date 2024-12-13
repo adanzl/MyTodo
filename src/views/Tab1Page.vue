@@ -86,9 +86,7 @@
                   <ion-item :detail="true" :button="true">
                     <ion-checkbox
                       slot="start"
-                      :checked="
-                        selectedDate?.save.get(schedule.id)?.state === 1
-                      "
+                      :checked="selectedDate?.save[schedule.id]?.state === 1"
                       @ionChange="
                         onScheduleCheckboxChange(
                           $event,
@@ -101,7 +99,7 @@
                     <ion-label
                       :class="{
                         'text-line-through':
-                          selectedDate?.save.get(schedule.id)?.state === 1,
+                          selectedDate?.save[schedule.id]?.state === 1,
                       }"
                       @click="btnScheduleClk($event, schedule)"
                     >
@@ -115,9 +113,9 @@
                         {{
                           schedule?.subTasks?.filter(
                             (t) =>
-                              (selectedDate?.save
-                                .get(schedule.id)
-                                ?.subTasks.get(t.id) || 0) === 1
+                              (selectedDate?.save[schedule.id]?.subTasks[
+                                t.id
+                              ] || 0) === 1
                           ).length
                         }}/{{ schedule?.subTasks?.length }}
                       </p>
@@ -238,7 +236,15 @@ import {
 import "@ionic/vue/css/ionic-swiper.css";
 import "swiper/css";
 import "swiper/css/effect-fade";
-
+//  一天的日程数据
+class DayData {
+  dt: dayjs.Dayjs = dayjs().startOf("day");
+  events: ScheduleData[] = []; // 当天可见日程
+  save: Record<number, ScheduleSave> = {}; // 日程id->日程保存情况
+  constructor(_dt: dayjs.Dayjs) {
+    this.dt = _dt;
+  }
+}
 export type SlideData = {
   vid: number;
   month: number;
@@ -250,7 +256,7 @@ const userData = ref<UserData>({
   id: 1,
   name: "leo",
   schedules: [],
-  save: new Map(),
+  save: {},
 });
 const slideArr = ref<any[]>([{}, {}, {}]); // 滑动数据
 const curScheduleList = ref();
@@ -266,13 +272,9 @@ const toastData = ref({
   duration: 3000,
   text: "",
 });
-//  一天的日程数据
-type DayData = {
-  dt: dayjs.Dayjs;
-  events: ScheduleData[]; // 当天可见日程
-  save: Map<number, ScheduleSave>; // 日程id->日程保存情况
-};
+
 let currentDate = dayjs().startOf("day");
+//  初始化日历
 const createSlideData = (datetime: dayjs.Dayjs): SlideData => {
   const firstDayOfMonth = datetime.startOf("month");
   let _dt = firstDayOfMonth.startOf("week");
@@ -280,11 +282,7 @@ const createSlideData = (datetime: dayjs.Dayjs): SlideData => {
   do {
     const week: DayData[] = [];
     for (let i = 0; i < 7; i++) {
-      const dayData: DayData = {
-        dt: _dt,
-        events: [],
-        save: new Map(),
-      };
+      const dayData = new DayData(_dt);
       for (const schedule of userData.value.schedules) {
         if (
           schedule.startTs &&
@@ -294,7 +292,7 @@ const createSlideData = (datetime: dayjs.Dayjs): SlideData => {
         ) {
           dayData.events.push(schedule);
         }
-        const save = userData.value.save?.get(SAVE_TS(_dt));
+        const save = userData.value.save[SAVE_TS(_dt)];
         if (save) {
           dayData.save = save;
         }
@@ -307,13 +305,14 @@ const createSlideData = (datetime: dayjs.Dayjs): SlideData => {
     }
     wArr.push(week);
   } while (_dt.month() == datetime.month());
+  // console.log("createSlideData", wArr);
   return {
     vid: datetime.year(),
     month: datetime.month(),
     year: datetime.year(),
     firstDayOfMonth: firstDayOfMonth,
     weekArr: wArr,
-  }; // SlideData
+  } as SlideData; // SlideData
 };
 // 点击日历某个日期
 const btnDaySelectClk = (slide: SlideData, day: DayData) => {
@@ -432,23 +431,13 @@ const onScheduleModalDismiss = (event: any) => {
         userData.value.schedules[idx] = scheduleData;
       }
     }
-    // TODO 存档变化
+    // 存档变化
     if (selectedDate.value) {
-      if (userData.value.save == undefined) {
-        userData.value.save = new Map();
+      if (!(SAVE_TS(selectedDate.value.dt) in userData.value.save)) {
+        userData.value.save[SAVE_TS(selectedDate.value.dt)] = {};
       }
-      if (!userData.value.save.has(SAVE_TS(selectedDate.value.dt))) {
-        // userData.value.save
-        //   .get(SAVE_TS(selectedDate.value?.dt))
-        //   ?.set(scheduleData.id!, scheduleSave.value!);
-        userData.value.save.set(
-          SAVE_TS(selectedDate.value.dt),
-          new Map<number, ScheduleSave>()
-        );
-      }
-      console.log("save", scheduleSave.value);
-      const map = userData.value.save.get(SAVE_TS(selectedDate.value.dt));
-      map!.set(scheduleData.id!, scheduleSave.value!);
+      const map = userData.value.save[SAVE_TS(selectedDate.value.dt)];
+      map![scheduleData.id!] = scheduleSave.value!;
     }
     updateScheduleData();
     setSave(
@@ -507,14 +496,14 @@ const onScheduleCheckboxChange = (
   scheduleId: number
 ) => {
   if (day) {
-    const preSave = day.save.get(scheduleId) || {
+    const preSave = day.save[scheduleId] || {
       state: 0,
-      subTasks: new Map(),
+      subTasks: new Object(),
     };
     preSave.state = _event.detail.checked ? 1 : 0;
-    day.save.set(scheduleId, preSave);
+    day.save[scheduleId] = preSave;
   }
-  // task 排序
+  // TODO task 排序
   // selectedDate.value?.events.sort((a: ScheduleData, b: ScheduleData) => {
   //   if (a.state === b.state) {
   //     return (a.id??0) - (b.id??0);
@@ -528,16 +517,17 @@ const onUpdateScheduleData = (d: any) => (scheduleModalData.value = d);
 
 // 日程按钮点击
 const btnScheduleClk = (event: any, schedule: ScheduleData) => {
-  scheduleModalData.value = schedule;
-  scheduleSave.value = selectedDate.value?.save.get(schedule.id);
+  scheduleModalData.value = schedule as ScheduleData;
+  scheduleSave.value = selectedDate.value?.save[schedule.id];
   isScheduleModalOpen.value = true;
-  console.log("btnScheduleClk", schedule, scheduleSave.value);
+  // console.log("btnScheduleClk", schedule, scheduleSave.value);
 };
 // 添加日程按钮
 const btnAddScheduleClk = () => {
-  isScheduleModalOpen.value = true;
+  // 清空数据
   scheduleModalData.value = undefined;
   scheduleSave.value = undefined;
+  isScheduleModalOpen.value = true;
 };
 // 排序按钮
 const btnSortClk = () => {
@@ -546,13 +536,12 @@ const btnSortClk = () => {
 // 返回今天按钮
 const btnTodayClk = () => {
   currentDate = dayjs().startOf("day");
-  selectedDate.value = undefined;
+  selectedDate.value = new DayData(dayjs().startOf("day"));
   updateScheduleData();
   chooseSelectedDate();
 };
 // 左下测试按钮
 const btnTestClk = () => {
-  console.log(JSON.stringify(userData.value));
   console.log(JSON.stringify(userData.value));
   // 测试通知
   LocalNotifications.schedule({
@@ -620,9 +609,6 @@ onMounted(() => {
     .then((res: any) => {
       console.log("getSave", res.data);
       userData.value = JSON.parse(res.data);
-      if(userData.value.save){
-        userData.value.save = new Map(Object.entries(userData.value.save));
-      }
       for (let i = 0; i < userData.value.schedules.length; i++) {
         const schedule = userData.value.schedules[i];
         schedule.startTs = dayjs(schedule.startTs);
