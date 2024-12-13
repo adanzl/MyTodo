@@ -18,7 +18,7 @@
         id="sType"
         style="height: 100%; background-color: gray !important"
       >
-        <ion-content id="main_bg" class="ion-margin-top">
+        <ion-content id="main_bg" class="ion-margin-top" ref="scheduleTab">
           <ion-list :inset="true">
             <ion-item>
               <ion-checkbox
@@ -89,7 +89,9 @@
                   <ion-label> >></ion-label>
                 </div>
                 <div class="ion-text-center">
-                  <ion-label>End</ion-label>
+                  <ion-label>{{
+                    curScheduleData.endTs?.format("MM-DD,ddd")
+                  }}</ion-label>
                   <ion-label color="tertiary" class="font-size-mini">
                     {{ curScheduleData?.endTs?.format("YYYY-MM-DD") }}
                   </ion-label>
@@ -121,12 +123,20 @@
                   presentation="date"
                   @ionChange="onDtChange"
                   size="cover"
+                  class="schedule-datetime-date"
                 >
                 </ion-datetime>
                 <ion-item class="ion-no-padding">
                   <ion-icon :icon="timeOutline" aria-hidden="true" slot="start">
                   </ion-icon>
-                  <ion-label>Start time</ion-label>
+                  <ion-label
+                    @click="
+                      () => {
+                        dtsShow = true;
+                      }
+                    "
+                    >Start time</ion-label
+                  >
                   <ion-datetime-button
                     datetime="dts"
                     presentation="time"
@@ -134,31 +144,47 @@
                   <ion-modal
                     class="m-ion-modal"
                     mode="ios"
+                    :isOpen="dtsShow"
                     :keep-contents-mounted="true"
-                    style="--width: 80%; padding: 10px"
+                    @willDismiss="
+                      () => {
+                        dtsShow = false;
+                      }
+                    "
                   >
-                    <!-- <ion-backdrop :visible="true" ></ion-backdrop> -->
-                    <ion-item>
-                      <ion-title>Start time</ion-title>
-                    </ion-item>
-                    <ion-datetime
-                      id="dts"
-                      presentation="time"
-                      size="cover"
-                      mode="ios"
-                      hourCycle="h23"
-                    ></ion-datetime>
-                    <ion-item>
-                      <ion-toggle :checked="true">All day</ion-toggle>
-                    </ion-item>
-                    <ion-item>
-                      <ion-button size="large" fill="clear" style="width: 50%">
-                        Cancel
-                      </ion-button>
-                      <ion-button size="large" fill="clear" style="width: 50%">
-                        Done
-                      </ion-button>
-                    </ion-item>
+                    <div class="wrapper">
+                      <ion-item>
+                        <ion-title>Start time</ion-title>
+                      </ion-item>
+                      <ion-datetime
+                        id="dts"
+                        presentation="time"
+                        size="cover"
+                        mode="ios"
+                        hourCycle="h23"
+                        class="schedule-datetime-time"
+                      >
+                      </ion-datetime>
+                      <ion-item>
+                        <ion-toggle :checked="true">All day</ion-toggle>
+                      </ion-item>
+                      <ion-item>
+                        <ion-button
+                          size="large"
+                          fill="clear"
+                          style="width: 50%"
+                        >
+                          Cancel
+                        </ion-button>
+                        <ion-button
+                          size="large"
+                          fill="clear"
+                          style="width: 50%"
+                        >
+                          Done
+                        </ion-button>
+                      </ion-item>
+                    </div>
                   </ion-modal>
                 </ion-item>
               </div>
@@ -347,6 +373,8 @@ const props = defineProps({
 
 const curScheduleData = ref<ScheduleData>(new ScheduleData());
 const curSave = ref<ScheduleSave>(new ScheduleSave());
+const dtsShow = ref(false); // 开始时间选择器标记
+const scheduleTab = ref();
 
 onMounted(() => {
   if (props.schedule) {
@@ -365,7 +393,6 @@ onMounted(() => {
     return sa - sb;
   });
 });
-
 // 任务状态改变
 const onTaskCheckboxChange = (event: any) => {
   curSave.value!.state = event.detail.checked ? 1 : 0;
@@ -462,6 +489,7 @@ const btnScheduleDTClk = async () => {
     });
   if (!bShowScheduleDT.value) {
     animation = animation.direction("reverse");
+    scheduleTab.value.$el.scrollToPoint(0, 130, 200);
   }
   await animation.play();
   bShowScheduleDT.value = !bShowScheduleDT.value;
@@ -528,7 +556,7 @@ const reminderOptions = ref(ReminderOptions);
 <style scoped>
 .main_content {
   /* background-color: gray; */
-  height: 75%;
+  height: 78%;
 }
 
 #main {
@@ -574,15 +602,26 @@ ion-backdrop {
   opacity: 0.3;
 }
 
-.m-ion-modal .ion-page {
-  --background: gray;
-  align-items: center;
-  justify-content: center !important;
-  flex-direction: row !important;
-  top: 100px !important;
+ion-modal .m-ion-modal {
+  align-items: end;
 }
-.m-ion-modal ion-datetime {
-  width: 100%;
+.m-ion-modal::part(content) {
+  --background: gray;
+  align-items: end;
+  height: auto;
+  width: 95%;
+  position: absolute;
+  bottom: var(--ion-safe-area-bottom);
+  --border-radius: 16px;
+}
+.schedule-datetime-time::part(wheel-item) {
+  min-width: 100px;
+  color: rgb(255, 66, 97);
+  align-items: center;
+  text-align: center;
   /* margin-left: 100px; */
+}
+.schedule-datetime-date::part(calendar-day) {
+  height: 20px;
 }
 </style>
