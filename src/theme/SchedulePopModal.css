@@ -1,0 +1,77 @@
+.main_content {
+    /* background-color: gray; */
+    height: 78%;
+}
+
+#main {
+    background: rgb(244, 245, 231);
+    /* background: transparent; */
+    height: 100%;
+}
+
+ion-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 16px;
+}
+
+ion-list {
+    background-color: transparent !important;
+    margin-left: 0px !important;
+    margin-right: 0px !important;
+}
+
+ion-segment-content {
+    height: 70%;
+}
+
+#dtStart,
+#dtEnd {
+    font-size: min(0.8125rem, 39px);
+    height: 32px;
+    width: 64px;
+    min-height: 10px;
+    min-width: 10px;
+    --margin-top: 0px;
+}
+
+.font-size-mini {
+    font-size: 0.8rem;
+}
+
+ion-select::part(icon) {
+    opacity: 0;
+}
+
+ion-backdrop {
+    background: var(--ion-color-dark);
+    opacity: 0.3;
+}
+
+ion-modal .m-ion-modal {
+    align-items: end;
+}
+
+.m-ion-modal::part(content) {
+    --background: gray;
+    align-items: end;
+    height: auto;
+    width: 95%;
+    position: absolute;
+    bottom: var(--ion-safe-area-bottom);
+    --border-radius: 16px;
+}
+
+.schedule-datetime-time::part(wheel-item) {
+    min-width: 100px;
+    color: rgb(255, 66, 97);
+    align-items: center;
+    text-align: center;
+    /* margin-left: 100px; */
+}
+
+.schedule-datetime-date::part(calendar-day) {
+    height: 20px;
+}

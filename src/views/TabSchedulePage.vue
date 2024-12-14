@@ -35,7 +35,7 @@
         <swiper-slide v-for="(slide, idx) in slideArr" :key="idx">
           <CalenderTab
             :slide="slide"
-            :daySelectCallback="btnDaySelectClk"
+            :daySelectCallback="onDaySelected"
             :selectedDate="selectedDate"
             :minimal="bFold"
             :swiperRef="swiperRef"
@@ -60,8 +60,8 @@
       <!-- 日程列表 -->
       <ion-content
         color="light"
-        @touchmove="onTouchMove"
-        @touchstart="onTouchStart"
+        @touchmove="onScheduleListTouchMove"
+        @touchstart="onScheduleListTouchStart"
       >
         <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
           <ion-refresher-content></ion-refresher-content>
@@ -85,7 +85,7 @@
                 >
                   <ion-item :detail="true">
                     <ion-checkbox
-                      style="--size: 26px; padding-right: 5px;"
+                      style="--size: 26px; padding-right: 5px"
                       slot="start"
                       :checked="scheduleChecked(schedule.id)"
                       @ionChange="
@@ -193,7 +193,8 @@
     </ion-fab>
   </ion-page>
 </template>
-
+<script lang="ts" src="../controller/TabSchedulePage.ts"></script>
+<!-- 
 <script setup lang="ts">
 import CalenderTab from "@/components/CalendarTab.vue";
 import SchedulePop from "@/components/SchedulePopModal.vue";
@@ -296,7 +297,7 @@ const createSlideData = (datetime: dayjs.Dayjs): SlideData => {
           dayData.events.push(schedule);
         }
         // 处理repeat
-        
+
         // 排序日程
         const save = userData.value.save[SAVE_TS(_dt)];
         if (save) {
@@ -656,43 +657,5 @@ const btnCalendarFoldClk = () => {
 const btnScheduleAlarmClk = () => {
   console.log("btnScheduleAlarmClk");
 };
-</script>
-<style>
-.vertical {
-  display: flex;
-  flex-direction: column;
-}
-
-.dot {
-  display: inline-block;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background-color: #007bff;
-  margin-top: 5px;
-}
-
-.gray {
-  --color: #b5b1b1 !important;
-}
-
-ion-modal#pop-modal {
-  --width: 100%;
-  --min-width: fit-content;
-  --height: 85%;
-  --min-height: 50%;
-  --border-radius: 6px;
-  --box-shadow: 0 28px 48px rgba(0, 0, 0, 0.4);
-}
-
-#eventMask {
-  width: 100%;
-  height: 100%;
-  display: block;
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 9999;
-  /* background-color: rgba(0, 0, 0, 0.5); */
-}
-</style>
+</script> -->
+<style lang="css" scoped src="../theme/TabSchedulePage.css"></style>

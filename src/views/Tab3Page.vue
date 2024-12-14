@@ -23,7 +23,7 @@
         </ion-item>
         <ion-item v-for="(schedule, idx) in userData.schedules" :key="idx">
           <ion-label>
-            <h2>[{{ schedule.id }}]  {{ schedule.title }}</h2>
+            <h2>[{{ schedule.id }}] {{ schedule.title }}</h2>
             <p>
               range:
               {{ schedule?.startTs?.format("YYYY-MM-DD") }} -
@@ -59,68 +59,4 @@
   </ion-page>
 </template>
 
-<script setup lang="ts">
-import { getSave } from "@/components/NetUtil.vue";
-import { SAVE_TS, UserData } from "@/type/UserData.vue";
-import {
-  IonContent,
-  IonHeader,
-  IonPage,
-  IonTitle,
-  IonToolbar,
-  IonRefresher,
-  IonRefresherContent,
-} from "@ionic/vue";
-import dayjs from "dayjs";
-import { onMounted, ref } from "vue";
-
-const userData = ref<UserData>(new UserData());
-
-const toastData = ref({
-  isOpen: false,
-  duration: 3000,
-  text: "",
-});
-onMounted(() => {
-  // 获取数据
-  getSave(1)
-    .then((res: any) => {
-      userData.value = JSON.parse(res.data);
-      for (let i = 0; i < userData.value.schedules.length; i++) {
-        const schedule = userData.value.schedules[i];
-        schedule.startTs = dayjs(schedule.startTs);
-        schedule.endTs = dayjs(schedule.endTs);
-        if (schedule.repeatEndTs) {
-          schedule.repeatEndTs = dayjs(schedule.repeatEndTs);
-        }
-      }
-    })
-    .catch((err) => {
-      toastData.value.isOpen = true;
-      toastData.value.text = JSON.stringify(err);
-    });
-});
-
-// 刷新页面事件
-const handleRefresh = (event: any) => {
-  getSave(1)
-    .then((res: any) => {
-      userData.value = JSON.parse(res.data);
-      for (let i = 0; i < userData.value.schedules.length; i++) {
-        const schedule = userData.value.schedules[i];
-        schedule.startTs = dayjs(schedule.startTs);
-        schedule.endTs = dayjs(schedule.endTs);
-        if (schedule.repeatEndTs) {
-          schedule.repeatEndTs = dayjs(schedule.repeatEndTs);
-        }
-      }
-      event.target.complete();
-    })
-    .catch((err) => {
-      console.log("handleRefresh", err);
-      toastData.value.isOpen = true;
-      toastData.value.text = JSON.stringify(err);
-      event.target.complete();
-    });
-};
-</script>
+<script lang="ts" src="../controller/Tab3Page.ts"></script>

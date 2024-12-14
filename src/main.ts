@@ -33,6 +33,8 @@ import "@ionic/vue/css/text-transformation.css";
 import "./theme/variables.css";
 // import GConfig from "@/components/GConfig.vue";
 import {
+  IonAlert,
+  IonBackdrop,
   IonButton,
   IonButtons,
   IonChip,
@@ -42,17 +44,16 @@ import {
   IonHeader,
   IonIcon,
   IonicVue,
+  IonInput,
   IonItem,
   IonLabel,
   IonList,
   IonPage,
   IonTitle,
-  IonToolbar,
-  IonInput,
   IonToast,
-  IonAlert,
-  IonBackdrop,
   IonToggle,
+  IonToolbar,
+  IonModal,
 } from "@ionic/vue";
 
 const app = createApp(App).use(IonicVue).use(router);
@@ -76,6 +77,7 @@ app.component("ion-toast", IonToast);
 app.component("ion-alert", IonAlert);
 app.component("ion-backdrop", IonBackdrop);
 app.component("ion-toggle", IonToggle);
+app.component("ion-modal", IonModal);
 
 console.log(`当前 Vue 版本是：${app.version}`);
 // console.log(GConfig);
