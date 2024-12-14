@@ -36,7 +36,7 @@
 </template>
 
 <script setup lang="ts">
-import { SlideData } from "@/views/Tab1Page.vue";
+import { SlideData } from "@/views/TabSchedulePage.vue";
 import { IonCol, IonGrid, IonRow } from "@ionic/vue";
 import dayjs from "dayjs";
 import { defineProps, nextTick, ref, watch } from "vue";
