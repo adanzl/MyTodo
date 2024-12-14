@@ -48,11 +48,28 @@ export default defineComponent({
   },
   emits: ["update:schedule", "update:save"],
   setup(props: any, ctx) {
-
+    // 当前日程
     const curScheduleData = ref<ScheduleData>(new ScheduleData());
+    // 日程存档
     const curSave = ref<ScheduleSave>(new ScheduleSave());
-    const dtsShow = ref(false); // 开始时间选择器标记
-    const scheduleTab = ref();
+    const dateShowFlag = ref(false); // 开始日期选择器显示标记
+    const scheduleTab = ref(); // 日程tab
+    const scheduleDTComponent = ref(); // 日期选择器组件
+    const dtComponentItem = ref(); // 日期选择器容器
+    const datetimeShowFlag = ref(false); // 开始时间选择器显示标记
+    const scheduleStartTsComponent = ref(curScheduleData.value.startTs); // 开始时间选择器组件值
+    const repeatEndTsComponent = ref(); // 重复结束日期选择器
+    const repeatEndTsModal = ref(); // 重复结束日期选择器modal
+    const scheduleType = ref("0"); // 日期类型 0:start 1:end
+    const addSubtaskInput = ref(); // 新增子任务输入框
+    // 提示框数据
+    const toastData = ref({
+      isOpen: false,
+      duration: 3000,
+      text: "",
+    });
+    const repeatOptions = ref(RepeatOptions); // 重复选项
+    const reminderOptions = ref(ReminderOptions); //  提醒选项
 
     onMounted(() => {
       if (props.schedule) {
@@ -72,6 +89,7 @@ export default defineComponent({
       });
     });
 
+    // ============ Tab1 ============
     // 任务状态改变
     const onTaskCheckboxChange = (event: any) => {
       curSave.value!.state = event.detail.checked ? 1 : 0;
@@ -80,6 +98,7 @@ export default defineComponent({
     const onTypeChange = (event: any) => {
       console.log(event.detail.value);
     };
+    // ============ Tab2 ============
     // 日期类型切换，开始日期和结束日期
     const onDtTabChange = (event: any) => {
       scheduleType.value = event.detail.value;
@@ -90,24 +109,78 @@ export default defineComponent({
       if (scheduleType.value === "0") {
         curScheduleData.value!.startTs = dt.startOf("day");
         curScheduleData.value!.endTs = dt.startOf("day");
-        scheduleType.value = "1";
+        // scheduleType.value = "1";
       } else if (scheduleType.value === "1") {
         curScheduleData.value!.endTs = dt.startOf("day");
       }
     };
+    // 开始-结束 日期按钮点击
+    const btnScheduleDTClk = async () => {
+      const hh = scheduleDTComponent.value.offsetHeight;
+      const kf = [
+        { offset: 0, height: hh + "px", top: "0" },
+        { offset: 0.5, height: hh * 0.5 + "px", top: "0" },
+        { offset: 1, height: "0", top: "0" },
+      ];
+
+      let animation = createAnimation().addElement(dtComponentItem.value.$el).duration(300).keyframes(kf).beforeStyles({
+        "transform-origin": "top",
+        overflow: "hidden",
+        display: "block",
+        position: "relative",
+      });
+      if (!dateShowFlag.value) {
+        animation = animation.direction("reverse");
+        scheduleTab.value.$el.scrollToPoint(0, 130, 200);
+      }
+      await animation.play();
+      dateShowFlag.value = !dateShowFlag.value;
+    };
+    // 开始-结束日期按钮点击
+    const btnDatetimeOkClk = () => {
+      btnScheduleDTClk();
+    };
+    // 日程开始结束日期点击清除
+    const btnScheduleDateClearClk = () => {
+      curScheduleData.value.startTs = dayjs();
+      curScheduleData.value.endTs = dayjs();
+      btnScheduleDTClk();
+    };
+    // 日程开始时间选择器确认
+    const btnScheduleDatetimeOkClk = () => {
+      datetimeShowFlag.value = false;
+      curScheduleData.value.startTs = scheduleStartTsComponent.value;
+    };
+    // 日程开始时间选择器AllDay切换
+    const onScheduleDatetimeAllDayChange = (event: any) => {
+      curScheduleData.value.allDay = event.detail.checked;
+    };
+    // ============ 提醒 ============
     // 提醒类型切换
     const onReminderChange = (event: any) => {
       curScheduleData.value!.reminder = event.detail.value;
     };
+    // =========== 重复 ============
     // 重复类型切换
     const onRepeatChange = (event: any) => {
-      // console.log("onRepeatChange", event.detail);
       curScheduleData.value!.repeat = event.detail.value;
     };
     // 重复结束日期改变
     const onRepeatEndDtChange = (event: any) => {
       curScheduleData.value!.repeatEndTs = dayjs(event.detail.value);
     };
+    // 重复结束日期选择确认点击
+    const btnRepeatEndOkClk = () => {
+      repeatEndTsComponent.value.$el.confirm();
+      repeatEndTsModal.value.$el.dismiss();
+    };
+    // 重复结束日期点击清除
+    const btnRepeatEndClearClk = () => {
+      repeatEndTsComponent.value.$el.cancel();
+      curScheduleData.value!.repeatEndTs = undefined;
+      repeatEndTsModal.value.$el.dismiss();
+    };
+    // ============ Tab3 ============
     // 子任务状态改变
     const onSubtaskCheckboxChange = (event: any, task?: SubTask) => {
       if (task) {
@@ -123,7 +196,6 @@ export default defineComponent({
         return sa - sb;
       });
     };
-
     const subTaskChecked = (task: SubTask) => {
       return (curSave.value!.subTasks[task.id] || 0) === 1;
     };
@@ -147,53 +219,7 @@ export default defineComponent({
         addSubtaskInput.value = "";
       }
     };
-    // 开始结束日期按钮点击
-    const btnScheduleDTClk = async () => {
-      const hh = scheduleDT.value.offsetHeight;
-      const kf = [
-        { offset: 0, height: hh + "px", top: "0" },
-        { offset: 0.5, height: hh * 0.5 + "px", top: "0" },
-        { offset: 1, height: "0", top: "0" },
-      ];
 
-      let animation = createAnimation()
-        .addElement(dtItem.value.$el)
-        .duration(300)
-        .keyframes(kf)
-        .beforeStyles({
-          "transform-origin": "top",
-          overflow: "hidden",
-          display: "block",
-          position: "relative",
-        });
-      if (!bShowScheduleDT.value) {
-        animation = animation.direction("reverse");
-        scheduleTab.value.$el.scrollToPoint(0, 130, 200);
-      }
-      await animation.play();
-      bShowScheduleDT.value = !bShowScheduleDT.value;
-    };
-    // 开始结束日期按钮点击
-    const btnDatetimeOkClk = () => {
-      btnScheduleDTClk();
-    };
-    // 重复结束日期选择确认点击
-    const btnRepeatEndOkClk = () => {
-      repeatEndTs.value.$el.confirm();
-      repeatEndTsModal.value.$el.dismiss();
-    };
-    // 重复结束日期点击清除
-    const btnRepeatEndClearClk = () => {
-      repeatEndTs.value.$el.cancel();
-      curScheduleData.value!.repeatEndTs = undefined;
-      repeatEndTsModal.value.$el.dismiss();
-    };
-    // 日程开始结束日期点击清除
-    const btnScheduleDatetimeClearClk = () => {
-      curScheduleData.value.startTs = undefined;
-      curScheduleData.value.endTs = undefined;
-      btnScheduleDTClk();
-    };
     // 子任务移除点击
     const btnSubtaskRemoveClk = (event: any, task: SubTask) => {
       for (let i = 0; i < curScheduleData.value.subTasks?.length; i++) {
@@ -203,6 +229,7 @@ export default defineComponent({
         }
       }
     };
+    // ============ 保存 ============
     // 保存按钮点击
     const btnSaveClk = () => {
       if (!curScheduleData.value.title) {
@@ -215,27 +242,14 @@ export default defineComponent({
       props.modal?.$el.dismiss(curScheduleData.value, "confirm");
     };
 
-    const scheduleDT = ref();
-    const bShowScheduleDT = ref(false);
-    const repeatEndTs = ref();
-    const repeatEndTsModal = ref();
-    const dtItem = ref();
-    const scheduleType = ref("0"); // 0:start 1:end
-    const addSubtaskInput = ref();
-    const toastData = ref({
-      isOpen: false,
-      duration: 3000,
-      text: "",
-    });
-    const repeatOptions = ref(RepeatOptions);
-    const reminderOptions = ref(ReminderOptions);
     return {
       curScheduleData,
-      scheduleDT,
-      bShowScheduleDT,
-      repeatEndTs,
+      scheduleDTComponent,
+      scheduleStartTsComponent,
+      dateShowFlag,
+      repeatEndTsComponent,
       repeatEndTsModal,
-      dtItem,
+      dtComponentItem,
       scheduleType,
       addSubtaskInput,
       toastData,
@@ -254,7 +268,7 @@ export default defineComponent({
       repeat,
       timeOutline,
       curSave,
-      dtsShow,
+      datetimeShowFlag,
       scheduleTab,
       onTaskCheckboxChange,
       onTypeChange,
@@ -270,9 +284,11 @@ export default defineComponent({
       btnDatetimeOkClk,
       btnRepeatEndOkClk,
       btnRepeatEndClearClk,
-      btnScheduleDatetimeClearClk,
       btnSubtaskRemoveClk,
       btnSaveClk,
+      btnScheduleDateClearClk,
+      btnScheduleDatetimeOkClk,
+      onScheduleDatetimeAllDayChange,
     };
   },
 });

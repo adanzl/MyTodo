@@ -70,8 +70,10 @@ ion-modal .m-ion-modal {
     align-items: center;
     text-align: center;
     /* margin-left: 100px; */
+    font-size: larger;
 }
 
 .schedule-datetime-date::part(calendar-day) {
-    height: 20px;
+    /* height: auto; */
+    color: #000;
 }
