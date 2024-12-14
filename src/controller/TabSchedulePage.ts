@@ -35,12 +35,7 @@ import { Swiper, SwiperSlide } from "swiper/vue";
 import { defineComponent, nextTick, onMounted, ref } from "vue";
 
 import { getSave, setSave } from "@/components/NetUtil.vue";
-import {
-  SAVE_TS,
-  ScheduleData,
-  ScheduleSave,
-  UserData,
-} from "@/type/UserData.vue";
+import { SAVE_TS, ScheduleData, ScheduleSave, UserData } from "@/type/UserData.vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import "swiper/css";
 import "swiper/css/effect-fade";
@@ -135,21 +130,43 @@ export default defineComponent({
     const createSlideData = (datetime: dayjs.Dayjs): SlideData => {
       const firstDayOfMonth = datetime.startOf("month");
       let _dt = firstDayOfMonth.startOf("week");
+
       const wArr: DayData[][] = [];
       do {
         const week: DayData[] = [];
         for (let i = 0; i < 7; i++) {
           const dayData = new DayData(_dt);
+          const ts = _dt.unix();
           for (const schedule of userData.value.schedules) {
-            if (
-              schedule.startTs &&
-              schedule.startTs.unix() <= _dt.unix() &&
-              schedule.endTs &&
-              schedule.endTs.unix() >= _dt.unix()
-            ) {
-              dayData.events.push(schedule);
+            if (schedule.startTs && schedule.startTs.startOf("day").unix() <= ts) {
+              if (schedule.startTs.startOf("day").unix() === ts) {
+                dayData.events.push(schedule);
+                continue;
+              }
+              // 处理repeat
+              if (schedule.repeatEndTs && schedule.repeatEndTs.unix() < ts) {
+                continue;
+              }
+              if (schedule.repeat == 1) {
+                // daily
+                dayData.events.push(schedule);
+              } else if (schedule.repeat == 2) {
+                // weekly
+                if (_dt.day() == schedule.startTs.day()) {
+                  dayData.events.push(schedule);
+                }
+              } else if (schedule.repeat == 3) {
+                // monthly
+                if (_dt.date() == schedule.startTs.date()) {
+                  dayData.events.push(schedule);
+                }
+              } else if (schedule.repeat == 4) {
+                // yearly
+                if (_dt.date() == schedule.startTs.date() && _dt.month() == schedule.startTs.month()) {
+                  dayData.events.push(schedule);
+                }
+              }
             }
-            // 处理repeat
 
             // 排序日程
             const save = userData.value.save[SAVE_TS(_dt)];
@@ -225,6 +242,7 @@ export default defineComponent({
             const schedule = userData.value.schedules[i];
             schedule.startTs = dayjs(schedule.startTs);
             schedule.endTs = dayjs(schedule.endTs);
+            schedule.repeatEndTs = dayjs(schedule.repeatEndTs);
           }
           updateScheduleData();
           chooseSelectedDate();
@@ -239,11 +257,7 @@ export default defineComponent({
     });
     // 保存存档
     const doSaveUserData = () => {
-      setSave(
-        userData.value.id,
-        userData.value.name,
-        JSON.stringify(userData.value)
-      )
+      setSave(userData.value.id, userData.value.name, JSON.stringify(userData.value))
         .then((res) => {
           console.log("doSaveUserData", res);
         })
@@ -293,10 +307,7 @@ export default defineComponent({
       ];
       obj.slideTo(1, 0, false);
       obj.update();
-      if (
-        selectedDate.value &&
-        selectedDate.value.dt.month() !== currentDate.month()
-      ) {
+      if (selectedDate.value && selectedDate.value.dt.month() !== currentDate.month()) {
         selectedDate.value = undefined; // 清空选中日期
       }
       chooseSelectedDate();
@@ -321,10 +332,7 @@ export default defineComponent({
     // 点击日历某个日期
     const onDaySelected = (slide: SlideData, day: DayData) => {
       if (slide.month != day.dt.month()) {
-        if (
-          slide.year * 100 + slide.month <
-          day.dt.year() * 100 + day.dt.month()
-        ) {
+        if (slide.year * 100 + slide.month < day.dt.year() * 100 + day.dt.month()) {
           swiperRef.value.slideNext();
         } else {
           swiperRef.value.slidePrev();
@@ -382,11 +390,7 @@ export default defineComponent({
       return selectedDate.value!.save[scheduleId]?.state === 1;
     };
     // 日程状态改变
-    const onScheduleCheckboxChange = (
-      _event: any,
-      day: DayData | undefined,
-      scheduleId: number
-    ) => {
+    const onScheduleCheckboxChange = (_event: any, day: DayData | undefined, scheduleId: number) => {
       if (day) {
         // console.log("onScheduleCheckboxChange", day, scheduleId);
         const preSave = day.save[scheduleId] || {
@@ -430,9 +434,7 @@ export default defineComponent({
       // 处理数据
       scheduleDelConfirm.value.isOpen = false;
       if (event.detail.role === "confirm") {
-        const idx = userData.value.schedules.findIndex(
-          (s) => s.id === scheduleDelConfirm.value.data.id
-        );
+        const idx = userData.value.schedules.findIndex((s) => s.id === scheduleDelConfirm.value.data.id);
         if (idx !== -1) {
           userData.value.schedules.splice(idx, 1);
         }
@@ -458,16 +460,11 @@ export default defineComponent({
         // 日程变化
         if (scheduleData.id === -1) {
           // add id userData.value.schedules id的最大值=1
-          const id = userData.value.schedules.reduce(
-            (max, s) => (s.id! > max ? s.id! : max),
-            0
-          );
+          const id = userData.value.schedules.reduce((max, s) => (s.id! > max ? s.id! : max), 0);
           scheduleData.id = id;
           userData.value.schedules.push(scheduleData);
         } else {
-          const idx = userData.value.schedules.findIndex(
-            (s) => s.id === scheduleData.id
-          );
+          const idx = userData.value.schedules.findIndex((s) => s.id === scheduleData.id);
           if (idx !== -1) {
             userData.value.schedules[idx] = scheduleData;
           }

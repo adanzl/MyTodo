@@ -182,13 +182,14 @@
             <ion-item detail="true" :button="true">
               <ion-icon :icon="power" slot="start"></ion-icon>
               <ion-label>Repeat End</ion-label>
-              <ion-datetime-button datetime="idRepeatEndTs" :value="curScheduleData?.repeatEndTs">
+              <ion-datetime-button datetime="idRepeatEndTs">
                 <ion-label slot="date-target" v-if="curScheduleData?.repeatEndTs === undefined">None</ion-label>
               </ion-datetime-button>
               <ion-modal :keep-contents-mounted="true" ref="repeatEndTsModal" mode="ios">
                 <ion-datetime
                   id="idRepeatEndTs"
                   ref="repeatEndTsComponent"
+                  :value="curScheduleData?.repeatEndTs?.format('YYYY-MM-DD')"
                   presentation="date"
                   @ionChange="onRepeatEndDtChange">
                   <ion-buttons slot="buttons" mode="ios" class="ion-justify-content-around">

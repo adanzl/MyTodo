@@ -5,26 +5,23 @@
         {{ head }}
       </ion-col>
     </ion-row>
-    <ion-row
-      class="calendar-row"
-      v-for="week in minimal ? minSlide?.weekArr : slide.weekArr"
-      :key="week"
-    >
+    <ion-row class="calendar-row" v-for="week in minimal ? minSlide?.weekArr : slide.weekArr" :key="week">
       <ion-col
-        class="calendar-col ion-text-center ion-no-padding"
+        class="ion-text-center ion-no-padding"
         @click="daySelectCallback(slide, day)"
         v-for="day in week"
-        :key="day"
-      >
+        :key="day">
         <ion-chip
           :class="{
             vertical: true,
             transparent: day.dt.unix() !== selectedDate.dt.unix() && day.dt.unix() !== dayjs().startOf('day').unix(),
             selected: selectedDate && day.dt.unix() === selectedDate.dt.unix(),
-            today: day.dt.unix() === dayjs().startOf('day').unix() &&  selectedDate && day.dt.unix() !== selectedDate.dt.unix(),
+            today:
+              day.dt.unix() === dayjs().startOf('day').unix() &&
+              selectedDate &&
+              day.dt.unix() !== selectedDate.dt.unix(),
             gray: day.dt.month() !== slide.month,
-          }"
-        >
+          }">
           <span>
             <strong> {{ day.dt.date() }}</strong>
           </span>
@@ -63,9 +60,7 @@ const props = defineProps({
 const minSlide = ref<SlideData>();
 const updateMinSlide = () => {
   if (props.slide) {
-    const dt = props.selectedDate
-      ? props.selectedDate.dt
-      : props.slide.value?.firstDayOfMonth;
+    const dt = props.selectedDate ? props.selectedDate.dt : props.slide.value?.firstDayOfMonth;
     const firstDayOfMonth = dt.startOf("month");
     const diff = dt.date() - firstDayOfMonth.date();
     const idx = Math.ceil((diff + firstDayOfMonth.day()) / 7);
@@ -101,5 +96,22 @@ ion-chip.selected {
 ion-chip.today {
   /* --color: #fff !important; */
   --background: yellow !important;
+}
+.dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background-color: #007bff;
+  margin-top: 5px;
+}
+
+.vertical {
+  display: flex;
+  flex-direction: column;
+}
+
+.gray {
+  --color: #b5b1b1 !important;
 }
 </style>

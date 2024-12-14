@@ -1,20 +1,3 @@
-.vertical {
-    display: flex;
-    flex-direction: column;
-}
-
-.dot {
-    display: inline-block;
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background-color: #007bff;
-    margin-top: 5px;
-}
-
-.gray {
-    --color: #b5b1b1 !important;
-}
 
 ion-modal#pop-modal {
     --width: 100%;
