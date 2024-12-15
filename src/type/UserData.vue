@@ -44,4 +44,11 @@ export const SAVE_TS = (dt?: dayjs.Dayjs): string => {
   if(dt ===undefined) return '';
   return dt.format("YYYY-MM-DD");
 };
+
+export default {
+  ScheduleData,
+  ScheduleSave,
+  UserData,
+  SAVE_TS,
+};
 </script>

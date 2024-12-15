@@ -61,7 +61,7 @@
                 <div class="ion-text-center">
                   <ion-label>{{ curScheduleData.startTs?.format("MM-DD,ddd") }}</ion-label>
                   <ion-label color="tertiary" class="font-size-mini">
-                    {{ curScheduleData.allDay ? "All Day" : curScheduleData?.startTs?.format("HH-mm") }}
+                    {{ curScheduleData.allDay ? "All Day" : curScheduleData?.startTs?.format("HH:mm") }}
                   </ion-label>
                 </div>
                 <div>
@@ -70,7 +70,7 @@
                 <div class="ion-text-center">
                   <ion-label>{{ curScheduleData.endTs?.format("MM-DD,ddd") }}</ion-label>
                   <ion-label color="tertiary" class="font-size-mini">
-                    {{ curScheduleData.allDay ? "All Day" : curScheduleData?.endTs?.format("HH-mm") }}
+                    {{ curScheduleData.allDay ? "All Day" : curScheduleData?.endTs?.format("HH:mm") }}
                   </ion-label>
                 </div>
               </div>

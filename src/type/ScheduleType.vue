@@ -25,4 +25,9 @@ export const RepeatOptions: RepeatType[] = [
   { id: 3, label: "Monthly", tag: "month" },
   { id: 4, label: "Yearly", tag: "year" },
 ];
+
+export default {
+  ReminderOptions,
+  RepeatOptions,
+};
 </script>

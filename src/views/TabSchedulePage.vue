@@ -6,17 +6,11 @@
           <ion-icon :icon="list"></ion-icon>
         </ion-buttons>
         <ion-title class="ion-text-center">
-          <span v-if="selectedDate">{{
-            selectedDate.dt.format("YY年MM月")
-          }}</span>
+          <span v-if="selectedDate">{{ selectedDate.dt.format("YY年MM月") }}</span>
           <div v-else>日历</div>
         </ion-title>
         <ion-buttons slot="end" class="ion-padding">
-          <ion-icon
-            :icon="ellipseOutline"
-            @click="btnTodayClk"
-            style="margin-right: 16px"
-          ></ion-icon>
+          <ion-icon :icon="ellipseOutline" @click="btnTodayClk" style="margin-right: 16px"></ion-icon>
           <ion-icon :icon="swapVertical" @click="btnSortClk"></ion-icon>
         </ion-buttons>
       </ion-toolbar>
@@ -30,39 +24,22 @@
         :centered-slides="true"
         :autoHeight="true"
         :modules="[IonicSlides, Keyboard]"
-        :keyboard="true"
-      >
+        :keyboard="true">
         <swiper-slide v-for="(slide, idx) in slideArr" :key="idx">
           <CalenderTab
             :slide="slide"
             :daySelectCallback="onDaySelected"
             :selectedDate="selectedDate"
             :minimal="bFold"
-            :swiperRef="swiperRef"
-          >
+            :swiperRef="swiperRef">
           </CalenderTab>
         </swiper-slide>
       </swiper>
-      <ion-button
-        color="light"
-        expand="full"
-        fill="clear"
-        size="small"
-        @click="btnCalendarFoldClk()"
-      >
-        <ion-icon
-          :icon="bFold ? chevronDown : chevronUp"
-          size="medium"
-          color="primary"
-        >
-        </ion-icon>
+      <ion-button color="light" expand="full" fill="clear" size="small" @click="btnCalendarFoldClk()">
+        <ion-icon :icon="bFold ? chevronDown : chevronUp" size="medium" color="primary"> </ion-icon>
       </ion-button>
       <!-- 日程列表 -->
-      <ion-content
-        color="light"
-        @touchmove="onScheduleListTouchMove"
-        @touchstart="onScheduleListTouchStart"
-      >
+      <ion-content color="light" @touchmove="onScheduleListTouchMove" @touchstart="onScheduleListTouchStart">
         <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
           <ion-refresher-content></ion-refresher-content>
         </ion-refresher>
@@ -72,53 +49,28 @@
               <ion-label>{{ selectedDate?.dt.format("MM-DD") }}</ion-label>
             </ion-item>
             <div class="" slot="content">
-              <ion-list
-                :inset="true"
-                lines="full"
-                mode="ios"
-                ref="curScheduleList"
-              >
+              <ion-list :inset="true" lines="full" mode="ios" ref="curScheduleList">
                 <!-- 日程条目 -->
-                <ion-item-sliding
-                  v-for="(schedule, idx) in selectedDate?.events"
-                  :key="idx"
-                >
+                <ion-item-sliding v-for="(schedule, idx) in selectedDate?.events" :key="idx">
                   <ion-item :detail="true">
                     <ion-checkbox
                       style="--size: 26px; padding-right: 5px"
                       slot="start"
                       :checked="scheduleChecked(schedule.id)"
-                      @ionChange="
-                        onScheduleCheckboxChange(
-                          $event,
-                          selectedDate,
-                          schedule.id
-                        )
-                      "
-                    >
+                      @ionChange="onScheduleCheckboxChange($event, selectedDate, schedule.id)">
                     </ion-checkbox>
                     <ion-label
                       :class="{
-                        'text-line-through':
-                          selectedDate?.save[schedule.id]?.state === 1,
+                        'text-line-through': selectedDate?.save[schedule.id]?.state === 1,
                       }"
-                      @click="btnScheduleClk($event, schedule)"
-                    >
-                      <h2>
-                        {{ scheduleChecked(schedule.id) }} {{ schedule.title }}
-                      </h2>
+                      @click="btnScheduleClk($event, schedule)">
+                      <h2> {{ schedule.title }}</h2>
                       <p>
                         {{ selectedDate?.dt.format("ddd") }}
-                        <ion-icon
-                          :icon="listOutline"
-                          style="position: relative; top: 3px"
-                        ></ion-icon>
+                        <ion-icon :icon="listOutline" style="position: relative; top: 3px"></ion-icon>
                         {{
                           schedule?.subTasks?.filter(
-                            (t) =>
-                              (selectedDate?.save[schedule.id]?.subTasks[
-                                t.id
-                              ] || 0) === 1
+                            (t) => (selectedDate?.save[schedule.id]?.subTasks[t.id] || 0) === 1
                           ).length
                         }}/{{ schedule?.subTasks?.length }}
                       </p>
@@ -128,10 +80,7 @@
                     <ion-item-option @click="btnScheduleAlarmClk">
                       <ion-icon :icon="alarmOutline"></ion-icon>
                     </ion-item-option>
-                    <ion-item-option
-                      color="danger"
-                      @click="btnScheduleRemoveClk($event, schedule)"
-                    >
+                    <ion-item-option color="danger" @click="btnScheduleRemoveClk($event, schedule)">
                       <ion-icon :icon="trashOutline"></ion-icon>
                     </ion-item-option>
                   </ion-item-options>
@@ -152,23 +101,20 @@
         ref="scheduleModal"
         :is-open="isScheduleModalOpen"
         class="ion-padding"
-        @willDismiss="onScheduleModalDismiss"
-      >
+        @willDismiss="onScheduleModalDismiss">
         <SchedulePop
           :modal="scheduleModal"
           :schedule="scheduleModalData"
           :save="scheduleSave"
           @update:save="onUpdateScheduleSave"
-          @update:schedule="onUpdateScheduleData"
-        ></SchedulePop>
+          @update:schedule="onUpdateScheduleData"></SchedulePop>
       </ion-modal>
       <ion-alert
         :is-open="scheduleDelConfirm.isOpen"
         header="Confirm!"
         :buttons="alertButtons"
         :sub-header="scheduleDelConfirm.text"
-        @didDismiss="onDelSchedulerConfirm($event)"
-      ></ion-alert>
+        @didDismiss="onDelSchedulerConfirm($event)"></ion-alert>
       <ion-toast
         :is-open="toastData.isOpen"
         :message="toastData.text"
@@ -177,8 +123,7 @@
           () => {
             toastData.isOpen = false;
           }
-        "
-      >
+        ">
       </ion-toast>
     </ion-content>
     <ion-fab slot="fixed" vertical="bottom" horizontal="end">
