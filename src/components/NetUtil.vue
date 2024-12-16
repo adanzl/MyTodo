@@ -3,8 +3,8 @@ import axios from "axios";
 // const URL = "https://3ft23fh89533.vicp.fun/api";
 // natapp.cn
 // 最新域名： cat /usr/env/natapp/log/natapp.log
-const URL = "http://8hc2x8.natappfree.cc/api";
-// const URL = "http://192.168.50.184:9527/api";
+// const URL = "http://8hc2x8.natappfree.cc/api";
+const URL = "http://192.168.50.184:9527/api";
 export function getSave(id: number) {
   return new Promise((resolve, reject) => {
     axios
