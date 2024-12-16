@@ -11,9 +11,10 @@ export class ScheduleData {
   // ===== 日程数据 =====
   id: number = -1; // 任务id
   title?: string; // 任务标题
+  color = 0; // 颜色id
   startTs?: dayjs.Dayjs; // 开始时间
   endTs?: dayjs.Dayjs; // 结束时间
-  allDay: boolean = false; // 是否全天
+  allDay: boolean = true; // 是否全天
   reminder: number = 0; // 提醒类型
   repeat: number = 0; // 重复类型
   repeatEndTs?: dayjs.Dayjs; // 重复结束类型
@@ -40,7 +41,7 @@ export class UserData {
   save: Record<string, Record<number, ScheduleSave>> = {};
 }
 
-export const SAVE_TS = (dt?: dayjs.Dayjs): string => {
+export const S_TS = (dt?: dayjs.Dayjs): string => {
   if(dt ===undefined) return '';
   return dt.format("YYYY-MM-DD");
 };
@@ -49,6 +50,6 @@ export default {
   ScheduleData,
   ScheduleSave,
   UserData,
-  SAVE_TS,
+  S_TS,
 };
 </script>

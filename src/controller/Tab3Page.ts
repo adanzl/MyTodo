@@ -1,9 +1,6 @@
 import { getSave } from "@/components/NetUtil.vue";
-import { SAVE_TS, UserData } from "@/type/UserData.vue";
-import {
-  IonRefresher,
-  IonRefresherContent,
-} from "@ionic/vue";
+import { S_TS, UserData } from "@/type/UserData.vue";
+import { IonRefresher, IonRefresherContent } from "@ionic/vue";
 import dayjs from "dayjs";
 import { defineComponent, onMounted, ref } from "vue";
 
@@ -38,13 +35,13 @@ export default defineComponent({
       userData,
       toastData,
       dayjs,
-      SAVE_TS,
+      S_TS,
     };
   },
   components: {
     IonRefresher,
     IonRefresherContent,
-    SAVE_TS,
+    S_TS,
   },
   data() {
     return {};

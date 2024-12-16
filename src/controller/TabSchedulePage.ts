@@ -35,7 +35,8 @@ import { Swiper, SwiperSlide } from "swiper/vue";
 import { defineComponent, nextTick, onMounted, ref } from "vue";
 
 import { getSave, setSave } from "@/components/NetUtil.vue";
-import { SAVE_TS, ScheduleData, ScheduleSave, UserData } from "@/type/UserData.vue";
+import { S_TS, ScheduleData, ScheduleSave, UserData } from "@/type/UserData.vue";
+import {  ColorOptions, getColorOptions } from "@/type/ScheduleType.vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import "swiper/css";
 import "swiper/css/effect-fade";
@@ -169,7 +170,7 @@ export default defineComponent({
             }
 
             // 排序日程
-            const save = userData.value.save[SAVE_TS(_dt)];
+            const save = userData.value.save[S_TS(_dt)];
             if (save) {
               dayData.save = save;
               dayData.events.sort((a: ScheduleData, b: ScheduleData) => {
@@ -228,7 +229,7 @@ export default defineComponent({
         }
       }
       if (selectedDate.value) {
-        console.log("ST ", SAVE_TS(selectedDate.value.dt));
+        console.log("ST ", S_TS(selectedDate.value.dt));
       }
     };
 
@@ -242,7 +243,7 @@ export default defineComponent({
             const schedule = userData.value.schedules[i];
             schedule.startTs = dayjs(schedule.startTs);
             schedule.endTs = dayjs(schedule.endTs);
-            schedule.repeatEndTs = dayjs(schedule.repeatEndTs);
+            schedule.repeatEndTs = schedule.repeatEndTs && dayjs(schedule.repeatEndTs);
           }
           updateScheduleData();
           chooseSelectedDate();
@@ -314,13 +315,11 @@ export default defineComponent({
     };
     // 向右滑
     const onSlideChangeNext = (obj: any) => {
-      //   console.log("onSlideChangeNext", SAVE_TS(currentDate));
       currentDate = currentDate.add(1, "months").startOf("month");
       slideChange(obj);
     };
     // 向左滑
     const onSlideChangePre = (obj: any) => {
-      //   console.log("onSlideChangePre", SAVE_TS(currentDate));
       currentDate = currentDate.subtract(1, "months").startOf("month");
       slideChange(obj);
     };
@@ -471,10 +470,10 @@ export default defineComponent({
         }
         // 存档变化
         if (selectedDate.value) {
-          if (!(SAVE_TS(selectedDate.value.dt) in userData.value.save)) {
-            userData.value.save[SAVE_TS(selectedDate.value.dt)] = {};
+          if (!(S_TS(selectedDate.value.dt) in userData.value.save)) {
+            userData.value.save[S_TS(selectedDate.value.dt)] = {};
           }
-          const map = userData.value.save[SAVE_TS(selectedDate.value.dt)];
+          const map = userData.value.save[S_TS(selectedDate.value.dt)];
           map![scheduleData.id!] = scheduleSave.value!;
         }
         updateScheduleData();
@@ -487,6 +486,8 @@ export default defineComponent({
 
     // ========== 日程弹窗结束 ===========
     return {
+      ColorOptions,
+      getColorOptions,
       addCircleOutline,
       alarmOutline,
       chevronDown,

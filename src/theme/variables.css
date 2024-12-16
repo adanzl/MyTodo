@@ -24,3 +24,13 @@ http://ionicframework.com/docs/theming/ */
 ion-content::part(background) {
   background: rgb(244, 245, 231);
 }
+
+.v-dot {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  margin-top: 0px;
+  position: relative;
+  top: 1px;
+}

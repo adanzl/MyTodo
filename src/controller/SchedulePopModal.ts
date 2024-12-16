@@ -1,4 +1,4 @@
-import { ReminderOptions, RepeatOptions } from "@/type/ScheduleType.vue";
+import { ColorOptions, ReminderOptions, RepeatOptions } from "@/type/ScheduleType.vue";
 import { ScheduleData, ScheduleSave, SubTask } from "@/type/UserData.vue";
 import {
   createAnimation,
@@ -70,6 +70,7 @@ export default defineComponent({
     });
     const repeatOptions = ref(RepeatOptions); // 重复选项
     const reminderOptions = ref(ReminderOptions); //  提醒选项
+    const colorOptions = ref(ColorOptions); // 颜色选项
 
     onMounted(() => {
       if (props.schedule) {
@@ -97,6 +98,10 @@ export default defineComponent({
     // 日程类型切换
     const onTypeChange = (event: any) => {
       console.log(event.detail.value);
+    };
+    // 颜色选择
+    const onColorChange = (event: any) => {
+      curScheduleData.value!.color = event.detail.value;
     };
     // ============ Tab2 ============
     // 日期类型切换，开始日期和结束日期
@@ -255,6 +260,7 @@ export default defineComponent({
       toastData,
       repeatOptions,
       reminderOptions,
+      colorOptions,
       dayjs,
       add,
       airplane,
@@ -278,6 +284,7 @@ export default defineComponent({
       onRepeatChange,
       onRepeatEndDtChange,
       onSubtaskCheckboxChange,
+      onColorChange,
       subTaskChecked,
       onSubtaskInputChange,
       btnScheduleDTClk,

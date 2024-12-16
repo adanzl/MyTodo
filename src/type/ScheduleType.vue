@@ -8,6 +8,11 @@ export interface RepeatType {
   label: string;
   tag: string;
 }
+export interface ColorType {
+  id: number;
+  label: string;
+  tag: string;
+}
 // 日程提醒类型
 export const ReminderOptions: RemindType[] = [
   { id: 0, label: "None" },
@@ -26,8 +31,28 @@ export const RepeatOptions: RepeatType[] = [
   { id: 4, label: "Yearly", tag: "year" },
 ];
 
+// 颜色类型
+export const ColorOptions: ColorType[] = [
+  { id: 0, label: "None", tag: "white" },
+  { id: 1, label: "Red", tag: "red" },
+  { id: 2, label: "Yellow", tag: "yellow" },
+  { id: 3, label: "Blue", tag: "blue" },
+  { id: 4, label: "Green", tag: "green" },
+];
+
+export const getColorOptions = (id: number): ColorType => {
+  for (const v of ColorOptions) {
+    if (v.id === id) {
+      return v;
+    }
+  }
+  return ColorOptions[0];
+};
+
 export default {
   ReminderOptions,
   RepeatOptions,
+  ColorOptions,
+  getColorOptions,
 };
 </script>

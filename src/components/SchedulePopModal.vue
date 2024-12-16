@@ -3,14 +3,14 @@
     <ion-toolbar class="transparent">
       <ion-title>{{ (curScheduleData?.id === -1 ? "Add" : "Editor") + " Schedule" }} </ion-title>
     </ion-toolbar>
-    <ion-segment value="sType" @ionChange="onTypeChange">
+    <!-- <ion-segment value="sType" @ionChange="onTypeChange">
       <ion-segment-button value="sType" content-id="sType">
         <ion-label>Schedule</ion-label>
       </ion-segment-button>
       <ion-segment-button value="tType" content-id="tType">
         <ion-label>Todo</ion-label>
       </ion-segment-button>
-    </ion-segment>
+    </ion-segment> -->
     <ion-segment-view class="main_content">
       <ion-segment-content id="sType" style="height: 100%; background-color: gray !important">
         <ion-content id="main_bg" class="ion-margin-top" ref="scheduleTab">
@@ -44,12 +44,17 @@
                 <ion-select-option value="2">III</ion-select-option>
                 <ion-select-option value="3">IV</ion-select-option>
               </ion-select>
-              <ion-select label-placement="stacked" label="Color" value="0">
+              <ion-select
+                label-placement="stacked"
+                label="Color"
+                :value="curScheduleData.color || 0"
+                @ionChange="onColorChange">
                 <ion-icon slot="start" :icon="colorPalette" aria-hidden="true"> </ion-icon>
-                <ion-select-option value="0">Red</ion-select-option>
-                <ion-select-option value="1">Yellow</ion-select-option>
-                <ion-select-option value="2">Blue</ion-select-option>
-                <ion-select-option value="3">White</ion-select-option>
+                <ion-select-option v-for="(colorOp, idx) in colorOptions" :key="idx" :value="colorOp.id">
+                  <!-- {{ colorOp.label }} -->
+                  <!-- <span :style="{ 'background-color': colorOp.tag }" class="v-dot"> a</span> -->
+                  <span :style="{ 'background-color': colorOp.tag }" class="v-dot"> {{ colorOp.tag }}</span>
+                </ion-select-option>
               </ion-select>
             </ion-item>
           </ion-list>
