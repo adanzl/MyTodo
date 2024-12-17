@@ -23,16 +23,21 @@
         </ion-item>
         <ion-item v-for="(schedule, idx) in userData.schedules" :key="idx">
           <ion-label>
-            <h2>[{{ schedule.id }}] {{ schedule.title }}</h2>
-            <p>Color:{{ schedule.color }}</p>
+            <h2>
+              <span
+                class="v-dot"
+                :style="{ 'background-color': getColorOptions(schedule.color).tag, 'margin-inline': '2px' }">
+              </span
+              >[{{ schedule.id }}] {{ schedule.title }}
+            </h2>
             <p>
               range:
-              {{ schedule?.startTs?.format("YYYY-MM-DD") }} -
-              {{ schedule?.endTs?.format("YYYY-MM-DD") }} AllDay: {{ schedule.allDay }}
+              {{ schedule?.startTs?.format("YYYY-MM-DD") }} - {{ schedule?.endTs?.format("YYYY-MM-DD") }} AllDay:
+              {{ schedule.allDay }}
             </p>
             <p>
-              Remind: {{ schedule.reminder }} | Repeat: {{ schedule.repeat }} |
-              RepeatEnd: {{ S_TS(schedule.repeatEndTs) }}
+              Remind: {{ schedule.reminder }} | Repeat: {{ schedule.repeat }} | RepeatEnd:
+              {{ S_TS(schedule.repeatEndTs) }}
             </p>
             <p v-for="(task, idx) in schedule.subTasks" :key="idx">
               {{ task.name }}
@@ -41,9 +46,7 @@
         </ion-item>
       </ion-list>
       <ion-list>
-        <ion-item v-for="(v, k) in userData.save" :key="k">
-          {{ k }} - {{ v }}
-        </ion-item>
+        <ion-item v-for="(v, k) in userData.save" :key="k"> {{ k }} - {{ v }} </ion-item>
       </ion-list>
       <ion-toast
         :is-open="toastData.isOpen"
@@ -53,8 +56,7 @@
           () => {
             toastData.isOpen = false;
           }
-        "
-      >
+        ">
       </ion-toast>
     </ion-content>
   </ion-page>

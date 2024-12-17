@@ -34,9 +34,9 @@ import { Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
 import { defineComponent, nextTick, onMounted, ref } from "vue";
 
-import { getSave, setSave } from "@/components/NetUtil.vue";
-import { S_TS, ScheduleData, ScheduleSave, UserData } from "@/type/UserData.vue";
-import {  ColorOptions, getColorOptions } from "@/type/ScheduleType.vue";
+import { getSave, setSave } from "@/modal/NetUtil";
+import { S_TS, ScheduleData, ScheduleSave, UserData } from "@/modal/UserData";
+import { ColorOptions, getColorOptions } from "@/modal/ScheduleType";
 import "@ionic/vue/css/ionic-swiper.css";
 import "swiper/css";
 import "swiper/css/effect-fade";
@@ -295,8 +295,6 @@ export default defineComponent({
           },
         ],
       });
-      //
-      doSaveUserData();
     };
 
     // ============ 日历开始 ============
@@ -414,9 +412,9 @@ export default defineComponent({
 
     // 日程按钮点击
     const btnScheduleClk = (event: any, schedule: ScheduleData) => {
+      isScheduleModalOpen.value = true;
       scheduleModalData.value = schedule as ScheduleData;
       scheduleSave.value = selectedDate.value?.save[schedule.id];
-      isScheduleModalOpen.value = true;
       // console.log("btnScheduleClk", schedule, scheduleSave.value);
     };
     // 日程专注按钮

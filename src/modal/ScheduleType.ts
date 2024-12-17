@@ -1,4 +1,3 @@
-<script lang="ts">
 export interface RemindType {
   id: number;
   label: string;
@@ -55,4 +54,3 @@ export default {
   ColorOptions,
   getColorOptions,
 };
-</script>

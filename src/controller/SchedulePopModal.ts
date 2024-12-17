@@ -1,5 +1,6 @@
-import { ColorOptions, ReminderOptions, RepeatOptions } from "@/type/ScheduleType.vue";
-import { ScheduleData, ScheduleSave, SubTask } from "@/type/UserData.vue";
+import ColorSelector from "@/components/ColorSelector.vue";
+import { ColorOptions, getColorOptions, ReminderOptions, RepeatOptions } from "@/modal/ScheduleType";
+import { ScheduleData, ScheduleSave, SubTask } from "@/modal/UserData";
 import {
   createAnimation,
   IonCheckbox,
@@ -26,7 +27,7 @@ import {
   repeat,
   timeOutline,
 } from "ionicons/icons";
-import { defineComponent, onMounted, ref } from "vue";
+import { defineComponent, onMounted, ref, watch } from "vue";
 
 export default defineComponent({
   components: {
@@ -40,6 +41,7 @@ export default defineComponent({
     IonSegmentView,
     IonSelect,
     IonSelectOption,
+    ColorSelector,
   },
   props: {
     modal: Object,
@@ -72,13 +74,7 @@ export default defineComponent({
     const reminderOptions = ref(ReminderOptions); //  提醒选项
     const colorOptions = ref(ColorOptions); // 颜色选项
 
-    onMounted(() => {
-      if (props.schedule) {
-        curScheduleData.value = props.schedule! as ScheduleData;
-      }
-      if (props.save) {
-        curSave.value = props.save as ScheduleSave;
-      }
+    const refreshUI = () => {
       // task 排序
       curScheduleData.value?.subTasks.sort((a: SubTask, b: SubTask) => {
         const sa = curSave.value.subTasks[a.id] || 0;
@@ -88,7 +84,24 @@ export default defineComponent({
         }
         return sa - sb;
       });
+    };
+
+    onMounted(() => {
     });
+    watch(
+      () => props.schedule,
+      () => {
+        if (props.schedule) curScheduleData.value = props.schedule! as ScheduleData;
+        refreshUI();
+      }
+    );
+    watch(
+      () => props.save,
+      () => {
+        if (props.save) curSave.value = props.save as ScheduleSave;
+        refreshUI();
+      }
+    );
 
     // ============ Tab1 ============
     // 任务状态改变
@@ -100,8 +113,8 @@ export default defineComponent({
       console.log(event.detail.value);
     };
     // 颜色选择
-    const onColorChange = (event: any) => {
-      curScheduleData.value!.color = event.detail.value;
+    const onColorChange = (nv: number) => {
+      curScheduleData.value!.color = nv;
     };
     // ============ Tab2 ============
     // 日期类型切换，开始日期和结束日期
@@ -276,6 +289,7 @@ export default defineComponent({
       curSave,
       datetimeShowFlag,
       scheduleTab,
+      getColorOptions,
       onTaskCheckboxChange,
       onTypeChange,
       onDtTabChange,

@@ -73,12 +73,12 @@
                             (t) => (selectedDate?.save[schedule.id]?.subTasks[t.id] || 0) === 1
                           ).length
                         }}/{{ schedule?.subTasks?.length }}
-                        <span
-                          class="v-dot"
-                          :style="{ 'background-color': getColorOptions(schedule.color).tag, 'margin-left': '10px' }">
-                        </span>
                       </p>
                     </ion-label>
+                    <span
+                      class="v-dot"
+                      :style="{ 'background-color': getColorOptions(schedule.color).tag, 'margin-left': '10px' }">
+                    </span>
                   </ion-item>
                   <ion-item-options side="end">
                     <ion-item-option @click="btnScheduleAlarmClk">
@@ -100,19 +100,17 @@
           </ion-accordion>
         </ion-accordion-group>
       </ion-content>
-      <ion-modal
+      <SchedulePop
         id="pop-modal"
         ref="scheduleModal"
         :is-open="isScheduleModalOpen"
-        class="ion-padding"
-        @willDismiss="onScheduleModalDismiss">
-        <SchedulePop
-          :modal="scheduleModal"
-          :schedule="scheduleModalData"
-          :save="scheduleSave"
-          @update:save="onUpdateScheduleSave"
-          @update:schedule="onUpdateScheduleData"></SchedulePop>
-      </ion-modal>
+        :modal="scheduleModal"
+        :schedule="scheduleModalData"
+        :save="scheduleSave"
+        @willDismiss="onScheduleModalDismiss"
+        @update:save="onUpdateScheduleSave"
+        @update:schedule="onUpdateScheduleData">
+      </SchedulePop>
       <ion-alert
         :is-open="scheduleDelConfirm.isOpen"
         header="Confirm!"
@@ -133,11 +131,6 @@
     <ion-fab slot="fixed" vertical="bottom" horizontal="end">
       <ion-fab-button @click="btnAddScheduleClk">
         <ion-icon :icon="addCircleOutline" size="large"></ion-icon>
-      </ion-fab-button>
-    </ion-fab>
-    <ion-fab slot="fixed" vertical="bottom" horizontal="start">
-      <ion-fab-button>
-        <ion-button @click="btnTestClk">xx</ion-button>
       </ion-fab-button>
     </ion-fab>
   </ion-page>

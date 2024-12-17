@@ -1,5 +1,6 @@
-import { getSave } from "@/components/NetUtil.vue";
-import { S_TS, UserData } from "@/type/UserData.vue";
+import { getSave } from "@/modal/NetUtil";
+import { getColorOptions } from "@/modal/ScheduleType";
+import { S_TS, UserData } from "@/modal/UserData";
 import { IonRefresher, IonRefresherContent } from "@ionic/vue";
 import dayjs from "dayjs";
 import { defineComponent, onMounted, ref } from "vue";
@@ -36,6 +37,7 @@ export default defineComponent({
       toastData,
       dayjs,
       S_TS,
+      getColorOptions,
     };
   },
   components: {

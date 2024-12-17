@@ -1,6 +1,6 @@
 .main_content {
-    /* background-color: gray; */
-    height: 78%;
+    background-color: gray;
+    /* height: 100%; */
 }
 
 #main {
@@ -10,22 +10,16 @@
 }
 
 ion-footer {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
     padding: 16px;
+    background: transparent;
 }
 
 ion-list {
-    background-color: transparent !important;
+    /* background-color: transparent !important; */
     margin-left: 0px !important;
     margin-right: 0px !important;
 }
 
-ion-segment-content {
-    height: 70%;
-}
 
 #dtStart,
 #dtEnd {

@@ -1,4 +1,3 @@
-<script lang="ts">
 import dayjs from "dayjs";
 
 export interface SubTask {
@@ -52,4 +51,3 @@ export default {
   UserData,
   S_TS,
 };
-</script>
