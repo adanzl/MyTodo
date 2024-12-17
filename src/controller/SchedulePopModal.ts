@@ -24,6 +24,7 @@ import {
   notifications,
   power,
   removeCircleOutline,
+  chevronBackOutline,
   repeat,
   timeOutline,
 } from "ionicons/icons";
@@ -103,6 +104,10 @@ export default defineComponent({
       }
     );
 
+    // 返回cancel
+    const btnCancelClk = () => {
+      props.modal?.$el.dismiss(curScheduleData.value, "cancel");
+    };
     // ============ Tab1 ============
     // 任务状态改变
     const onTaskCheckboxChange = (event: any) => {
@@ -267,6 +272,7 @@ export default defineComponent({
       dateShowFlag,
       repeatEndTsComponent,
       repeatEndTsModal,
+      chevronBackOutline,
       dtComponentItem,
       scheduleType,
       addSubtaskInput,
@@ -310,6 +316,7 @@ export default defineComponent({
       btnScheduleDateClearClk,
       btnScheduleDatetimeOkClk,
       onScheduleDatetimeAllDayChange,
+      btnCancelClk,
     };
   },
 });

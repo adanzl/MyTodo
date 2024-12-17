@@ -2,7 +2,7 @@
 ion-modal#pop-modal {
     --width: 100%;
     --min-width: fit-content;
-    --height: 85%;
+    --height: 100%;
     --min-height: 50%;
     --border-radius: 6px;
     --box-shadow: 0 28px 48px rgba(0, 0, 0, 0.4);

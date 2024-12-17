@@ -2,6 +2,10 @@
   <ion-modal>
     <ion-header>
       <ion-toolbar mode="ios" class="ion-padding">
+        <ion-icon slot="start"
+          :icon="chevronBackOutline"
+          style="width: 30px; height: 25px; position: absolute; top:15px"
+          @click="btnCancelClk"></ion-icon>
         <ion-title>
           <h1>{{ (curScheduleData?.id === -1 ? "Add" : "Edit") + " Schedule" }}</h1>
         </ion-title>
@@ -224,7 +228,7 @@
         </ion-item>
       </ion-list>
     </ion-content>
-    <ion-footer >
+    <ion-footer>
       <ion-button expand="block" mode="ios" color="warning" @click="btnSaveClk"> Save </ion-button>
     </ion-footer>
     <ion-toast
