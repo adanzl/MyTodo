@@ -18,3 +18,8 @@ ion-modal#pop-modal {
     z-index: 9999;
     /* background-color: rgba(0, 0, 0, 0.5); */
 }
+
+.scheduleItemLabel{
+    margin: 0px;
+    padding: 10px;
+}

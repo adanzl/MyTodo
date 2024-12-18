@@ -1,18 +1,18 @@
 <template>
-  <ion-modal>
+  <ion-modal show-backdrop="false" id="main" mode="ios">
     <ion-header>
-      <ion-toolbar mode="ios" class="ion-padding">
-        <ion-icon slot="start"
+      <ion-toolbar class="ion-padding">
+        <ion-icon
+          slot="start"
           :icon="chevronBackOutline"
-          style="width: 30px; height: 25px; position: absolute; top:15px"
+          style="width: 30px; height: 25px; position: absolute; top: 15px"
           @click="btnCancelClk"></ion-icon>
         <ion-title>
           <h1>{{ (curScheduleData?.id === -1 ? "Add" : "Edit") + " Schedule" }}</h1>
         </ion-title>
       </ion-toolbar>
     </ion-header>
-    <ion-content class="main_content ion-padding">
-      <!-- <ion-segment-content id="sType" style="height: 100%; background-color: gray !important"> -->
+    <ion-content class="main_content ion-padding" ref="scheduleTab">
       <ion-list :inset="true">
         <ion-item>
           <ion-checkbox slot="start" @ionChange="onTaskCheckboxChange" :checked="curSave?.state === 1"> </ion-checkbox>
@@ -35,13 +35,12 @@
             <ion-select-option value="work">Work</ion-select-option>
             <ion-select-option value="other">Other</ion-select-option>
           </ion-select>
-          <ion-select label-placement="stacked" label="Priority" value="0">
-            <ion-icon slot="start" :icon="airplane" aria-hidden="true"> </ion-icon>
-            <ion-select-option value="0">I</ion-select-option>
-            <ion-select-option value="1">II</ion-select-option>
-            <ion-select-option value="2">III</ion-select-option>
-            <ion-select-option value="3">IV</ion-select-option>
-          </ion-select>
+          <ion-item id="btnPriority">
+            <ion-label>Pri</ion-label>
+            <ion-icon :icon="icons.mdiRomanNums[getPriorityOptions(curScheduleData.priority).icon]" color="secondary" size="large"></ion-icon>
+          </ion-item>
+          <PrioritySelector trigger="btnPriority" @update:value="onPriorityChange" :value="curScheduleData.priority">
+          </PrioritySelector>
           <ion-item id="btnColor">
             <ion-icon slot="start" :icon="colorPalette" aria-hidden="true"> </ion-icon>
             <span :style="{ 'background-color': getColorOptions(curScheduleData.color).tag }" class="v-dot"></span>
@@ -74,9 +73,9 @@
         </ion-item>
         <ion-item ref="dtComponentItem" class="height-0-block flex">
           <div ref="scheduleDTComponent" style="width: 100%">
-            <ion-buttons mode="ios" class="ion-justify-content-around">
+            <ion-buttons class="ion-justify-content-around">
               <ion-button @click="btnScheduleDateClearClk"> Clear </ion-button>
-              <ion-segment v-model="scheduleType" mode="ios" style="width: 130px" @ionChange="onDtTabChange">
+              <ion-segment v-model="scheduleType" style="width: 130px" @ionChange="onDtTabChange">
                 <ion-segment-button value="0" id="dtStart"> Start </ion-segment-button>
                 <ion-segment-button value="1" id="dtEnd"> End </ion-segment-button>
               </ion-segment>
@@ -96,8 +95,7 @@
               <ion-label>Start time </ion-label>
               <label>{{ curScheduleData.allDay ? "All day" : curScheduleData.startTs?.format("HH:mm") }}</label>
               <ion-modal
-                class="m-ion-modal"
-                mode="ios"
+                class="start-time-modal"
                 :isOpen="datetimeShowFlag"
                 :keep-contents-mounted="true"
                 @willDismiss="
@@ -105,47 +103,44 @@
                     datetimeShowFlag = false;
                   }
                 ">
-                <div class="wrapper">
-                  <ion-item>
-                    <ion-title><h2>Start time</h2></ion-title>
-                  </ion-item>
-                  <ion-datetime
-                    id="dts"
-                    presentation="time"
-                    size="cover"
-                    mode="ios"
-                    :value="curScheduleData?.startTs?.format('YYYY-MM-DDTHH:mm')"
-                    hourCycle="h23"
-                    :disabled="curScheduleData?.allDay"
-                    @ionChange="
+                <ion-item>
+                  <ion-title><h2>Start time</h2></ion-title>
+                </ion-item>
+                <ion-datetime
+                  id="dts"
+                  presentation="time"
+                  size="cover"
+                  :value="curScheduleData?.startTs?.format('YYYY-MM-DDTHH:mm')"
+                  hourCycle="h23"
+                  :disabled="curScheduleData?.allDay"
+                  @ionChange="
                           (e:any) => {
                             scheduleStartTsComponent = dayjs(e.detail.value);
                           }
                         "
-                    class="schedule-datetime-time">
-                  </ion-datetime>
-                  <ion-item>
-                    <ion-toggle :checked="curScheduleData.allDay" @ionChange="onScheduleDatetimeAllDayChange">
-                      <h3>All day</h3>
-                    </ion-toggle>
-                  </ion-item>
-                  <ion-item>
-                    <ion-button
-                      size="large"
-                      fill="clear"
-                      style="width: 50%"
-                      @click="
-                        () => {
-                          datetimeShowFlag = false;
-                        }
-                      ">
-                      Cancel
-                    </ion-button>
-                    <ion-button size="large" fill="clear" style="width: 50%" @click="btnScheduleDatetimeOkClk">
-                      Done
-                    </ion-button>
-                  </ion-item>
-                </div>
+                  class="schedule-datetime-time">
+                </ion-datetime>
+                <ion-item>
+                  <ion-toggle :checked="curScheduleData.allDay" @ionChange="onScheduleDatetimeAllDayChange">
+                    <h3>All day</h3>
+                  </ion-toggle>
+                </ion-item>
+                <ion-item>
+                  <ion-button
+                    size="large"
+                    fill="clear"
+                    style="width: 50%"
+                    @click="
+                      () => {
+                        datetimeShowFlag = false;
+                      }
+                    ">
+                    Cancel
+                  </ion-button>
+                  <ion-button size="large" fill="clear" style="width: 50%" @click="btnScheduleDatetimeOkClk">
+                    Done
+                  </ion-button>
+                </ion-item>
               </ion-modal>
             </ion-item>
           </div>
@@ -171,7 +166,7 @@
             <div slot="label">
               <ion-label>Repeat</ion-label>
             </div>
-            <ion-select-option v-for="(op, idx) in repeatOptions" :key="idx" :value="op.id">
+            <ion-select-option v-for="(op, idx) in RepeatOptions" :key="idx" :value="op.id">
               {{ op.label }}
             </ion-select-option>
           </ion-select>
@@ -182,14 +177,14 @@
           <ion-datetime-button datetime="idRepeatEndTs">
             <ion-label slot="date-target" v-if="curScheduleData?.repeatEndTs === undefined">None</ion-label>
           </ion-datetime-button>
-          <ion-modal :keep-contents-mounted="true" ref="repeatEndTsModal" mode="ios">
+          <ion-modal :keep-contents-mounted="true" ref="repeatEndTsModal">
             <ion-datetime
               id="idRepeatEndTs"
               ref="repeatEndTsComponent"
               :value="curScheduleData?.repeatEndTs?.format('YYYY-MM-DD')"
               presentation="date"
               @ionChange="onRepeatEndDtChange">
-              <ion-buttons slot="buttons" mode="ios" class="ion-justify-content-around">
+              <ion-buttons slot="buttons" class="ion-justify-content-around">
                 <ion-button color="warning" @click="btnRepeatEndClearClk"> Clear </ion-button>
                 <ion-button @click="btnRepeatEndOkClk">OK</ion-button>
               </ion-buttons>
@@ -229,7 +224,9 @@
       </ion-list>
     </ion-content>
     <ion-footer>
-      <ion-button expand="block" mode="ios" color="warning" @click="btnSaveClk"> Save </ion-button>
+      <ion-toolbar class="transparent">
+        <ion-button expand="block" color="warning" @click="btnSaveClk"> Save </ion-button>
+      </ion-toolbar>
     </ion-footer>
     <ion-toast
       :is-open="toastData.isOpen"
@@ -244,5 +241,4 @@
   </ion-modal>
 </template>
 <script lang="ts" src="../controller/SchedulePopModal.ts"></script>
-
 <style scoped src="../theme/SchedulePopModal.css"></style>

@@ -1,6 +1,9 @@
 import ColorSelector from "@/components/ColorSelector.vue";
-import { ColorOptions, getColorOptions, ReminderOptions, RepeatOptions } from "@/modal/ScheduleType";
+import PrioritySelector from "@/components/PrioritySelector.vue";
+import { getColorOptions, ReminderOptions, getPriorityOptions, RepeatOptions } from "@/modal/ScheduleType";
 import { ScheduleData, ScheduleSave, SubTask } from "@/modal/UserData";
+import icons from "@/modal/Icons";
+
 import {
   createAnimation,
   IonCheckbox,
@@ -43,6 +46,7 @@ export default defineComponent({
     IonSelect,
     IonSelectOption,
     ColorSelector,
+    PrioritySelector,
   },
   props: {
     modal: Object,
@@ -71,9 +75,7 @@ export default defineComponent({
       duration: 3000,
       text: "",
     });
-    const repeatOptions = ref(RepeatOptions); // 重复选项
     const reminderOptions = ref(ReminderOptions); //  提醒选项
-    const colorOptions = ref(ColorOptions); // 颜色选项
 
     const refreshUI = () => {
       // task 排序
@@ -87,8 +89,7 @@ export default defineComponent({
       });
     };
 
-    onMounted(() => {
-    });
+    onMounted(() => {});
     watch(
       () => props.schedule,
       () => {
@@ -120,6 +121,10 @@ export default defineComponent({
     // 颜色选择
     const onColorChange = (nv: number) => {
       curScheduleData.value!.color = nv;
+    };
+    // 优先级选择
+    const onPriorityChange = (nv: number) => {
+      curScheduleData.value!.priority = nv;
     };
     // ============ Tab2 ============
     // 日期类型切换，开始日期和结束日期
@@ -266,6 +271,7 @@ export default defineComponent({
     };
 
     return {
+      icons,
       curScheduleData,
       scheduleDTComponent,
       scheduleStartTsComponent,
@@ -277,9 +283,7 @@ export default defineComponent({
       scheduleType,
       addSubtaskInput,
       toastData,
-      repeatOptions,
       reminderOptions,
-      colorOptions,
       dayjs,
       add,
       airplane,
@@ -296,11 +300,13 @@ export default defineComponent({
       datetimeShowFlag,
       scheduleTab,
       getColorOptions,
+      getPriorityOptions,
       onTaskCheckboxChange,
       onTypeChange,
       onDtTabChange,
       onDtChange,
       onReminderChange,
+      onPriorityChange,
       onRepeatChange,
       onRepeatEndDtChange,
       onSubtaskCheckboxChange,
@@ -317,6 +323,7 @@ export default defineComponent({
       btnScheduleDatetimeOkClk,
       onScheduleDatetimeAllDayChange,
       btnCancelClk,
+      RepeatOptions,
     };
   },
 });

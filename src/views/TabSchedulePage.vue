@@ -3,7 +3,7 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start" class="ion-padding">
-          <ion-icon :icon="list"></ion-icon>
+          <ion-icon color="default" :icon="list"></ion-icon>
         </ion-buttons>
         <ion-title class="ion-text-center">
           <span v-if="selectedDate">{{ selectedDate.dt.format("YY年MM月") }}</span>
@@ -63,6 +63,7 @@
                       :class="{
                         'text-line-through': selectedDate?.save[schedule.id]?.state === 1,
                       }"
+                      class="scheduleItemLabel"
                       @click="btnScheduleClk($event, schedule)">
                       <h2>{{ schedule.title }}</h2>
                       <p>
@@ -79,6 +80,7 @@
                       class="v-dot"
                       :style="{ 'background-color': getColorOptions(schedule.color).tag, 'margin-left': '10px' }">
                     </span>
+                    <ion-icon :icon="icons.mdiRomanNum1" color="secondary" size="large"></ion-icon>
                   </ion-item>
                   <ion-item-options side="end">
                     <ion-item-option @click="btnScheduleAlarmClk">
@@ -102,6 +104,7 @@
       </ion-content>
       <SchedulePop
         id="pop-modal"
+        aria-hidden="false"
         ref="scheduleModal"
         :is-open="isScheduleModalOpen"
         :modal="scheduleModal"

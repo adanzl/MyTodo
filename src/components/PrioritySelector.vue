@@ -1,14 +1,14 @@
 <template>
-  <ion-modal ref="modal" aria-hidden="true" id="colorSelector" mode="ios">
+  <ion-modal ref="modal" aria-hidden="true" id="prioritySelector" mode="ios">
     <ion-item>
-      <ion-title>Color</ion-title>
+      <ion-title>Priority</ion-title>
     </ion-item>
     <ion-content class="ion-padding">
       <ion-item>
         <ion-radio-group :value="valueRef" @ionChange="onSelectChange">
-          <ion-radio v-for="(op, idx) in ColorOptions" :key="idx" :value="op.id">
-            <span :style="{ 'background-color': op.tag }" class="v-dot"></span>
-            {{ op.label }}
+          <ion-radio v-for="(op, idx) in PriorityOptions" :key="idx" :value="op.id">
+            <span class="v-label">{{ " " }}</span>
+            <ion-icon :icon="icons.mdiRomanNums[op.icon]" color="secondary" size="large"></ion-icon>
           </ion-radio>
         </ion-radio-group>
       </ion-item>
@@ -24,7 +24,9 @@
 import { onMounted, ref, watch } from "vue";
 import { createTriggerController } from "@/modal/Overlay.ts";
 import { IonRadioGroup, IonRadio } from "@ionic/vue";
-import { ColorOptions } from "@/modal/ScheduleType";
+import { PriorityOptions } from "@/modal/ScheduleType";
+
+import icons from "@/modal/Icons";
 
 const props = defineProps({
   trigger: {
@@ -64,7 +66,6 @@ onMounted(() => {
     () => props.trigger,
     (newValue) => {
       if (newValue) {
-        // 当 trigger 属性变化时，添加点击监听器
         triggerController.addClickListener(modal.value!.$el!, newValue);
       }
     },
@@ -77,8 +78,6 @@ onMounted(() => {
 ion-modal {
   --height: 50%;
   --width: 95%;
-  /* --border-radius: 16px; */
-  /* --box-shadow: 0 28px 48px rgba(0, 0, 0, 0.4); */
   align-items: end;
 }
 ion-modal {

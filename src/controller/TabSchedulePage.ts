@@ -4,6 +4,7 @@ import { LocalNotifications } from "@capacitor/local-notifications";
 import "@ionic/vue/css/ionic-swiper.css";
 import "swiper/css";
 import "swiper/css/effect-fade";
+import icons from "@/modal/Icons";
 
 import {
   IonAccordion,
@@ -81,6 +82,9 @@ export default defineComponent({
       schedules: [],
       save: {},
     });
+    const icc = ref(
+      "data:image/svg+xml;utf8,<svg id='mdi-roman-numeral-4' class='ionicon' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 2'><path fill='currentColor' d='m12 7l2 10h2l2-10h-2l-1 5l-1-5zm-1 0v2h-1v6h1v2H7v-2h1V9H7V7z' />  </svg>"
+    );
     let currentDate = dayjs().startOf("day");
     let pTouch: any;
     let lstTs = 0;
@@ -415,6 +419,7 @@ export default defineComponent({
       isScheduleModalOpen.value = true;
       scheduleModalData.value = schedule as ScheduleData;
       scheduleSave.value = selectedDate.value?.save[schedule.id];
+      event.stopPropagation();
       // console.log("btnScheduleClk", schedule, scheduleSave.value);
     };
     // 日程专注按钮
@@ -484,6 +489,8 @@ export default defineComponent({
 
     // ========== 日程弹窗结束 ===========
     return {
+      icons,
+      icc,
       ColorOptions,
       getColorOptions,
       addCircleOutline,
