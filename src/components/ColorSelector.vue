@@ -6,9 +6,11 @@
     <ion-content class="ion-padding">
       <ion-item>
         <ion-radio-group :value="valueRef" @ionChange="onSelectChange">
-          <ion-radio v-for="(op, idx) in ColorOptions" :key="idx" :value="op.id">
-            <span :style="{ 'background-color': op.tag }" class="v-dot"></span>
-            {{ op.label }}
+          <ion-radio v-for="(op, idx) in ColorOptions" :key="idx" :value="op.id" class="option-item">
+            <ion-item lines="none" style="flex: 1">
+              <span :style="{ 'background-color': op.tag }" class="v-dot" slot="start"></span>
+              {{ op.label }}
+            </ion-item>
           </ion-radio>
         </ion-radio-group>
       </ion-item>
@@ -102,5 +104,9 @@ ion-radio {
 ion-modal::part(backdrop) {
   background-color: var(--ion-color-dark) !important;
   opacity: 0.3 !important;
+}
+.option-item::part(label) {
+  margin: 0;
+  width: 100%;
 }
 </style>
