@@ -55,3 +55,20 @@ ion-modal::part(backdrop) {
 .schedule-datetime-date::part(calendar-day) {
     text-align: center;
 }
+
+.group::part(native){
+    display: flex;
+    justify-content: center;
+}
+.group-tab{
+    display: flex;
+    /* background-color: blue; */
+    align-items: center;
+    width: 32%;
+    height: 100%;
+    font-size: 16px;
+    /* justify-content: space-around; */
+}
+.group-tab::part(native) {
+    padding: 0;
+}

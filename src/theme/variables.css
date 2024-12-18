@@ -10,7 +10,7 @@ http://ionicframework.com/docs/theming/ */
 }
 
 .flex {
-  display: flex;
+  display: flex !important;
 }
 
 .height-0-block {

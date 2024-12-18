@@ -28,26 +28,28 @@
           </ion-input>
         </ion-item>
         <!-- 分组信息 -->
-        <ion-item>
-          <ion-select label-placement="floating" label="Group" value="work">
-            <ion-icon slot="start" :icon="bookmark" aria-hidden="true"> </ion-icon>
-            <ion-select-option value="none">None</ion-select-option>
-            <ion-select-option value="work">Work</ion-select-option>
-            <ion-select-option value="other">Other</ion-select-option>
-          </ion-select>
-          <ion-item id="btnPriority" lines="none">
-            <ion-label>Pri</ion-label>
+        <ion-item class="group">
+          <ion-button id="btnGroup" class="group-tab" fill="none">
+            <ion-icon :icon="bookmark" aria-hidden="true"> </ion-icon>
+            <ion-select value="work">
+              <ion-select-option value="none">None</ion-select-option>
+              <ion-select-option value="work">Work</ion-select-option>
+              <ion-select-option value="other">Other</ion-select-option>
+            </ion-select>
+          </ion-button>
+          <ion-button id="btnPriority" class="group-tab" fill="none">
+            <ion-label><strong>Pri</strong></ion-label>
             <ion-icon
               :icon="icons.mdiRomanNums[getPriorityOptions(curScheduleData.priority).icon]"
               :style="{ color: getPriorityOptions(curScheduleData.priority).color }"
               size="large"></ion-icon>
-          </ion-item>
+          </ion-button>
           <PrioritySelector trigger="btnPriority" @update:value="onPriorityChange" :value="curScheduleData.priority">
           </PrioritySelector>
-          <ion-item id="btnColor">
+          <ion-button id="btnColor" class="group-tab" fill="none">
             <ion-icon slot="start" :icon="colorPalette" aria-hidden="true"> </ion-icon>
             <span :style="{ 'background-color': getColorOptions(curScheduleData.color).tag }" class="v-dot"></span>
-          </ion-item>
+          </ion-button>
           <ColorSelector trigger="btnColor" @update:value="onColorChange" :value="curScheduleData.color">
           </ColorSelector>
         </ion-item>
