@@ -1,5 +1,5 @@
 <template>
-  <ion-modal ref="modal" aria-hidden="true" id="prioritySelector" mode="ios">
+  <ion-modal ref="modal" aria-hidden="true" id="prioritySelector" mode="ios" @ionModalDidDismiss="onModalDismiss">
     <ion-item>
       <ion-title>Priority</ion-title>
     </ion-item>
@@ -7,8 +7,11 @@
       <ion-item>
         <ion-radio-group :value="valueRef" @ionChange="onSelectChange">
           <ion-radio v-for="(op, idx) in PriorityOptions" :key="idx" :value="op.id">
-            <span class="v-label">{{ " " }}</span>
-            <ion-icon :icon="icons.mdiRomanNums[op.icon]" color="secondary" size="large"></ion-icon>
+            <ion-item lines="none">
+              <ion-icon :icon="icons.mdiRomanNums[op.icon]" :style="{ color: op.color }" size="large" slot="start">
+              </ion-icon>
+              <span class="v-label">{{ op.label }} </span>
+            </ion-item>
           </ion-radio>
         </ion-radio-group>
       </ion-item>
@@ -72,6 +75,9 @@ onMounted(() => {
     { immediate: true } // 立即执行一次 watcher
   );
 });
+const onModalDismiss = () => {
+  valueRef.value = props.value;
+};
 </script>
 
 <style scoped>

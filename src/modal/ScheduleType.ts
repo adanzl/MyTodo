@@ -50,14 +50,20 @@ export const getColorOptions = (id: number): ColorType => {
   return ColorOptions[0];
 };
 
+export interface PriorityType {
+  id: number;
+  icon: number;
+  color: string;
+  label: string;
+}
 // 优先级类型
-export const PriorityOptions = [
-  { id: 0, icon: 0 },
-  { id: 1, icon: 1 },
-  { id: 2, icon: 2 },
-  { id: 3, icon: 3 },
+export const PriorityOptions: PriorityType[] = [
+  { id: 0, icon: 0, color: "#1a65eb !important", label: "Low" },
+  { id: 1, icon: 1, color: "#2dd55b !important", label: "Medium" },
+  { id: 2, icon: 2, color: "#ffc409 !important", label: "High" },
+  { id: 3, icon: 3, color: "#cb1a27 !important", label: "Critical" },
 ];
-export const getPriorityOptions = (id: number): { id: number; icon: number } => {
+export const getPriorityOptions = (id: number): PriorityType => {
   for (const v of PriorityOptions) {
     if (v.id === id) {
       return v;

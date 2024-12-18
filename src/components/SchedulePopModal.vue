@@ -35,9 +35,12 @@
             <ion-select-option value="work">Work</ion-select-option>
             <ion-select-option value="other">Other</ion-select-option>
           </ion-select>
-          <ion-item id="btnPriority">
+          <ion-item id="btnPriority" lines="none">
             <ion-label>Pri</ion-label>
-            <ion-icon :icon="icons.mdiRomanNums[getPriorityOptions(curScheduleData.priority).icon]" color="secondary" size="large"></ion-icon>
+            <ion-icon
+              :icon="icons.mdiRomanNums[getPriorityOptions(curScheduleData.priority).icon]"
+              :style="{ color: getPriorityOptions(curScheduleData.priority).color }"
+              size="large"></ion-icon>
           </ion-item>
           <PrioritySelector trigger="btnPriority" @update:value="onPriorityChange" :value="curScheduleData.priority">
           </PrioritySelector>

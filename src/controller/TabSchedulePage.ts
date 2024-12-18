@@ -37,7 +37,7 @@ import { defineComponent, nextTick, onMounted, ref } from "vue";
 
 import { getSave, setSave } from "@/modal/NetUtil";
 import { S_TS, ScheduleData, ScheduleSave, UserData } from "@/modal/UserData";
-import { ColorOptions, getColorOptions } from "@/modal/ScheduleType";
+import { ColorOptions, getColorOptions, getPriorityOptions } from "@/modal/ScheduleType";
 import "@ionic/vue/css/ionic-swiper.css";
 import "swiper/css";
 import "swiper/css/effect-fade";
@@ -82,9 +82,6 @@ export default defineComponent({
       schedules: [],
       save: {},
     });
-    const icc = ref(
-      "data:image/svg+xml;utf8,<svg id='mdi-roman-numeral-4' class='ionicon' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 2'><path fill='currentColor' d='m12 7l2 10h2l2-10h-2l-1 5l-1-5zm-1 0v2h-1v6h1v2H7v-2h1V9H7V7z' />  </svg>"
-    );
     let currentDate = dayjs().startOf("day");
     let pTouch: any;
     let lstTs = 0;
@@ -236,7 +233,9 @@ export default defineComponent({
         console.log("ST ", S_TS(selectedDate.value.dt));
       }
     };
-
+    const isToday = () => {
+      return dayjs().startOf("day").unix() == selectedDate.value?.dt.unix();
+    };
     onMounted(() => {
       // 获取数据
       getSave(1)
@@ -490,9 +489,9 @@ export default defineComponent({
     // ========== 日程弹窗结束 ===========
     return {
       icons,
-      icc,
       ColorOptions,
       getColorOptions,
+      getPriorityOptions,
       addCircleOutline,
       alarmOutline,
       chevronDown,
@@ -544,6 +543,7 @@ export default defineComponent({
       onDelSchedulerConfirm,
       btnAddScheduleClk,
       btnTestClk,
+      isToday,
     };
   },
   methods: {},

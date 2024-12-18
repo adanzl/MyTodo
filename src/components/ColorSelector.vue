@@ -1,5 +1,5 @@
 <template>
-  <ion-modal ref="modal" aria-hidden="true" id="colorSelector" mode="ios">
+  <ion-modal ref="modal" aria-hidden="true" id="colorSelector" mode="ios" @ionModalDidDismiss="onModalDismiss">
     <ion-item>
       <ion-title>Color</ion-title>
     </ion-item>
@@ -71,6 +71,9 @@ onMounted(() => {
     { immediate: true } // 立即执行一次 watcher
   );
 });
+const onModalDismiss = () => {
+  valueRef.value = props.value;
+};
 </script>
 
 <style scoped>

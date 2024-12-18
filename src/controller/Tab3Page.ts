@@ -1,5 +1,6 @@
+import icons from "@/modal/Icons";
 import { getSave } from "@/modal/NetUtil";
-import { getColorOptions } from "@/modal/ScheduleType";
+import { getColorOptions, getPriorityOptions } from "@/modal/ScheduleType";
 import { S_TS, UserData } from "@/modal/UserData";
 import { IonRefresher, IonRefresherContent } from "@ionic/vue";
 import dayjs from "dayjs";
@@ -38,6 +39,8 @@ export default defineComponent({
       dayjs,
       S_TS,
       getColorOptions,
+      getPriorityOptions,
+      icons,
     };
   },
   components: {

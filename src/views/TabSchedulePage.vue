@@ -3,15 +3,17 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start" class="ion-padding">
-          <ion-icon color="default" :icon="list"></ion-icon>
+          <ion-button><ion-icon color="default" :icon="list"></ion-icon></ion-button>
         </ion-buttons>
         <ion-title class="ion-text-center">
           <span v-if="selectedDate">{{ selectedDate.dt.format("YY年MM月") }}</span>
           <div v-else>日历</div>
         </ion-title>
         <ion-buttons slot="end" class="ion-padding">
-          <ion-icon :icon="ellipseOutline" @click="btnTodayClk" style="margin-right: 16px"></ion-icon>
-          <ion-icon :icon="swapVertical" @click="btnSortClk"></ion-icon>
+          <ion-button @click="btnTodayClk" v-if="!isToday()"> 今 </ion-button>
+          <ion-button @click="btnSortClk">
+            <ion-icon :icon="swapVertical" class="button-native"></ion-icon>
+          </ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
@@ -45,42 +47,47 @@
         </ion-refresher>
         <ion-accordion-group :multiple="true" :value="['schedule', 'goals']">
           <ion-accordion value="schedule">
-            <ion-item slot="header" color="light">
+            <ion-item slot="header" color="light" size="small">
               <ion-label>{{ selectedDate?.dt.format("MM-DD") }}</ion-label>
             </ion-item>
-            <div class="" slot="content">
-              <ion-list :inset="true" lines="full" mode="ios" ref="curScheduleList">
+            <div slot="content">
+              <ion-list :inset="true" lines="full" mode="ios" ref="curScheduleList" class="schedule-list">
                 <!-- 日程条目 -->
                 <ion-item-sliding v-for="(schedule, idx) in selectedDate?.events" :key="idx">
-                  <ion-item :detail="true">
+                  <ion-item>
                     <ion-checkbox
                       style="--size: 26px; padding-right: 5px"
                       slot="start"
                       :checked="scheduleChecked(schedule.id)"
                       @ionChange="onScheduleCheckboxChange($event, selectedDate, schedule.id)">
                     </ion-checkbox>
-                    <ion-label
-                      :class="{
-                        'text-line-through': selectedDate?.save[schedule.id]?.state === 1,
-                      }"
-                      class="scheduleItemLabel"
-                      @click="btnScheduleClk($event, schedule)">
-                      <h2>{{ schedule.title }}</h2>
-                      <p>
-                        {{ selectedDate?.dt.format("ddd") }}
-                        <ion-icon :icon="listOutline" style="position: relative; top: 3px"></ion-icon>
-                        {{
-                          schedule?.subTasks?.filter(
-                            (t) => (selectedDate?.save[schedule.id]?.subTasks[t.id] || 0) === 1
-                          ).length
-                        }}/{{ schedule?.subTasks?.length }}
-                      </p>
-                    </ion-label>
-                    <span
-                      class="v-dot"
-                      :style="{ 'background-color': getColorOptions(schedule.color).tag, 'margin-left': '10px' }">
-                    </span>
-                    <ion-icon :icon="icons.mdiRomanNum1" color="secondary" size="large"></ion-icon>
+                    <div @click="btnScheduleClk($event, schedule)" class="scheduleItem">
+                      <ion-label
+                        :class="{
+                          'text-line-through': selectedDate?.save[schedule.id]?.state === 1,
+                        }"
+                        class="scheduleItemLabel">
+                        <h2>{{ schedule.title }}</h2>
+                        <p>
+                          {{ selectedDate?.dt.format("ddd") }}
+                          <ion-icon :icon="listOutline" style="position: relative; top: 3px"></ion-icon>
+                          {{
+                            schedule?.subTasks?.filter(
+                              (t) => (selectedDate?.save[schedule.id]?.subTasks[t.id] || 0) === 1
+                            ).length
+                          }}/{{ schedule?.subTasks?.length }}
+                        </p>
+                      </ion-label>
+                      <span
+                        class="v-dot"
+                        :style="{ 'background-color': getColorOptions(schedule.color).tag, 'margin-left': '10px' }">
+                      </span>
+                      <ion-icon
+                        :icon="icons.mdiRomanNums[getPriorityOptions(schedule.priority).icon]"
+                        :style="{ color: getPriorityOptions(schedule.priority).color }"
+                        style="font-size: 2rem">
+                      </ion-icon>
+                    </div>
                   </ion-item>
                   <ion-item-options side="end">
                     <ion-item-option @click="btnScheduleAlarmClk">
