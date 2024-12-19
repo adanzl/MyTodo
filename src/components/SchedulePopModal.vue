@@ -15,7 +15,8 @@
     <ion-content class="main_content ion-padding" ref="scheduleTab">
       <ion-list :inset="true">
         <ion-item>
-          <ion-checkbox slot="start" @ionChange="onTaskCheckboxChange" :checked="curSave?.state === 1"> </ion-checkbox>
+          <ion-checkbox slot="start" @ionChange="onTaskCheckboxChange" :checked="curSave?.state === 1">
+          </ion-checkbox>
           <ion-input
             placeholder="输入日程标题"
             :value="curScheduleData?.title"

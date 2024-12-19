@@ -244,8 +244,8 @@ export default defineComponent({
       // 获取数据
       getSave(1)
         .then((res: any) => {
-          console.log("getSave", res.data);
           userData.value = JSON.parse(res.data);
+          console.log("getSave", userData.value);
           for (let i = 0; i < userData.value.schedules.length; i++) {
             const schedule = userData.value.schedules[i];
             schedule.startTs = dayjs(schedule.startTs);
@@ -487,8 +487,6 @@ export default defineComponent({
       }
       isScheduleModalOpen.value = false;
     };
-    const onUpdateScheduleSave = (d: any) => (scheduleSave.value = d);
-    const onUpdateScheduleData = (d: any) => (scheduleModalData.value = d);
 
     // ========== 日程弹窗结束 ===========
     return {
@@ -543,8 +541,6 @@ export default defineComponent({
       btnScheduleAlarmClk,
       btnScheduleRemoveClk,
       onScheduleModalDismiss,
-      onUpdateScheduleSave,
-      onUpdateScheduleData,
       onDelSchedulerConfirm,
       btnAddScheduleClk,
       btnTestClk,

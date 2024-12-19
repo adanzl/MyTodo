@@ -37,6 +37,21 @@ ion-modal#pop-modal {
     margin: 0 16px 0 16px;
 }
 
+.schedule-lb-sub {
+    width: 50px;
+    margin-left: 6px;
+    margin-bottom: 2px;
+}
+.schedule-lb-group {
+    white-space: nowrap;
+    width: 50px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline;
+    margin-bottom: 2px;
+    margin-left: 2px;
+}
+
 ion-item[slot='header'] ion-label {
     margin: 0;
 }

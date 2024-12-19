@@ -1,7 +1,13 @@
 import ColorSelector from "@/components/ColorSelector.vue";
 import PrioritySelector from "@/components/PrioritySelector.vue";
 import GroupSelector from "@/components/GroupSelector.vue";
-import { getColorOptions, ReminderOptions, getPriorityOptions, RepeatOptions, getGroupOptions } from "@/modal/ScheduleType";
+import {
+  getColorOptions,
+  ReminderOptions,
+  getPriorityOptions,
+  RepeatOptions,
+  getGroupOptions,
+} from "@/modal/ScheduleType";
 import { ScheduleData, ScheduleSave, SubTask } from "@/modal/UserData";
 import { Icon } from "@iconify/vue";
 
@@ -56,8 +62,8 @@ export default defineComponent({
     schedule: Object,
     save: Object,
   },
-  emits: ["update:schedule", "update:save"],
-  setup(props: any, ctx) {
+  // emits: ["update:schedule", "update:save"],
+  setup(props: any) {
     // 当前日程
     const curScheduleData = ref<ScheduleData>(new ScheduleData());
     // 日程存档
@@ -96,7 +102,8 @@ export default defineComponent({
     watch(
       () => props.schedule,
       () => {
-        if (props.schedule) curScheduleData.value = props.schedule! as ScheduleData;
+        if (props.schedule) curScheduleData.value = props.schedule as ScheduleData;
+        else curScheduleData.value = new ScheduleData();
         refreshUI();
       }
     );
@@ -104,6 +111,7 @@ export default defineComponent({
       () => props.save,
       () => {
         if (props.save) curSave.value = props.save as ScheduleSave;
+        else curSave.value = new ScheduleSave();
         refreshUI();
       }
     );
@@ -230,6 +238,12 @@ export default defineComponent({
         }
         return sa - sb;
       });
+      // 如果所有子任务都完成了，整个任务变成完成状态
+      const cnt = curScheduleData.value.subTasks?.filter((t: any) => subTaskChecked(t)).length;
+      if (cnt === curScheduleData.value.subTasks?.length) {
+        curSave.value!.state = 1;
+        // onTaskCheckboxChange
+      }
     };
     const subTaskChecked = (task: SubTask) => {
       return (curSave.value!.subTasks[task.id] || 0) === 1;
@@ -272,8 +286,8 @@ export default defineComponent({
         toastData.value.isOpen = true;
         return;
       }
-      ctx.emit("update:schedule", curScheduleData.value);
-      ctx.emit("update:save", curSave.value);
+      // ctx.emit("update:schedule", curScheduleData.value);
+      // ctx.emit("update:save", curSave.value);
       props.modal?.$el.dismiss(curScheduleData.value, "confirm");
     };
 

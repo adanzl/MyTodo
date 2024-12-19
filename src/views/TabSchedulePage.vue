@@ -6,8 +6,8 @@
           <ion-button><ion-icon color="default" :icon="list"></ion-icon></ion-button>
         </ion-buttons>
         <ion-title class="ion-text-center">
-          <span v-if="selectedDate">{{ selectedDate.dt.format("YY年MM月") }}</span>
-          <div v-else>日历</div>
+          <h3 v-if="selectedDate">{{ selectedDate.dt.format("YY年MM月") }}</h3>
+          <h3 v-else>日历</h3>
         </ion-title>
         <ion-buttons slot="end" class="ion-padding">
           <ion-button @click="btnTodayClk" v-if="!isToday()"> 今 </ion-button>
@@ -68,15 +68,22 @@
                         }"
                         class="scheduleItemLabel">
                         <h2>{{ schedule.title }}</h2>
-                        <p>
-                          {{ selectedDate?.dt.format("ddd") }}
-                          <ion-icon :icon="listOutline" style="position: relative; top: 3px"></ion-icon>
-                          {{
-                            schedule?.subTasks?.filter(
-                              (t) => (selectedDate?.save[schedule.id]?.subTasks[t.id] || 0) === 1
-                            ).length
-                          }}/{{ schedule?.subTasks?.length }}
-                        </p>
+                        <div class="flex">
+                          <p>
+                            {{ selectedDate?.dt.format("ddd") }}
+                          </p>
+                          <p class="schedule-lb-sub">
+                            <ion-icon :icon="listOutline" style="position: relative; top: 3px"></ion-icon>
+                            {{
+                              schedule?.subTasks?.filter(
+                                (t) => (selectedDate?.save[schedule.id]?.subTasks[t.id] || 0) === 1
+                              ).length
+                            }}/{{ schedule?.subTasks?.length }}
+                          </p>
+                          <p class="schedule-lb-group">
+                            {{ getGroupOptions(schedule.groupId).label }}
+                          </p>
+                        </div>
                       </ion-label>
                       <span
                         class="v-dot"
@@ -122,9 +129,7 @@
         :modal="scheduleModal"
         :schedule="scheduleModalData"
         :save="scheduleSave"
-        @willDismiss="onScheduleModalDismiss"
-        @update:save="onUpdateScheduleSave"
-        @update:schedule="onUpdateScheduleData">
+        @willDismiss="onScheduleModalDismiss">
       </SchedulePop>
       <ion-alert
         :is-open="scheduleDelConfirm.isOpen"
