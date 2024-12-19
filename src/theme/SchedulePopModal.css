@@ -56,11 +56,12 @@ ion-modal::part(backdrop) {
     text-align: center;
 }
 
-.group::part(native){
+.group::part(native) {
     display: flex;
     justify-content: center;
 }
-.group-tab{
+
+.group-tab {
     display: flex;
     /* background-color: blue; */
     align-items: center;
@@ -69,7 +70,13 @@ ion-modal::part(backdrop) {
     font-size: 16px;
     /* justify-content: space-around; */
 }
+
 .group-tab::part(native) {
     padding: 0;
     align-items: start;
+}
+
+/* 隐藏滚动条 */
+ion-content::part(scroll)::-webkit-scrollbar {
+    display: none;
 }

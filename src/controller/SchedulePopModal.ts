@@ -8,7 +8,7 @@ import {
   RepeatOptions,
   getGroupOptions,
 } from "@/modal/ScheduleType";
-import { ScheduleData, ScheduleSave, SubTask } from "@/modal/UserData";
+import { ScheduleData, ScheduleSave, SubTask, parseScheduleData } from "@/modal/UserData";
 import { Icon } from "@iconify/vue";
 
 import {
@@ -62,7 +62,7 @@ export default defineComponent({
     schedule: Object,
     save: Object,
   },
-  // emits: ["update:schedule", "update:save"],
+  emits: ["update:schedule", "update:save"],
   setup(props: any) {
     // 当前日程
     const curScheduleData = ref<ScheduleData>(new ScheduleData());
@@ -98,28 +98,25 @@ export default defineComponent({
       });
     };
 
-    onMounted(() => {});
-    watch(
-      () => props.schedule,
-      () => {
-        if (props.schedule) curScheduleData.value = props.schedule as ScheduleData;
-        else curScheduleData.value = new ScheduleData();
-        refreshUI();
-      }
-    );
-    watch(
-      () => props.save,
-      () => {
-        if (props.save) curSave.value = props.save as ScheduleSave;
-        else curSave.value = new ScheduleSave();
-        refreshUI();
-      }
-    );
+    onMounted(() => {
+      watch(
+        () => props.schedule,
+        () => {
+          if (props.schedule) curScheduleData.value = parseScheduleData(JSON.stringify(props.schedule));
+          else curScheduleData.value = new ScheduleData();
+          refreshUI();
+        }
+      );
+      watch(
+        () => props.save,
+        () => {
+          if (props.save) curSave.value = JSON.parse(JSON.stringify(props.save));
+          else curSave.value = new ScheduleSave();
+          refreshUI();
+        }
+      );
+    });
 
-    // 返回cancel
-    const btnCancelClk = () => {
-      props.modal?.$el.dismiss(curScheduleData.value, "cancel");
-    };
     // ============ Tab1 ============
     // 任务状态改变
     const onTaskCheckboxChange = (event: any) => {
@@ -166,12 +163,16 @@ export default defineComponent({
         { offset: 1, height: "0", top: "0" },
       ];
 
-      let animation = createAnimation().addElement(dtComponentItem.value.$el).duration(300).keyframes(kf).beforeStyles({
-        "transform-origin": "top",
-        overflow: "hidden",
-        display: "block",
-        position: "relative",
-      });
+      let animation = createAnimation()
+        .addElement(dtComponentItem.value.$el)
+        .duration(300)
+        .keyframes(kf)
+        .beforeStyles({
+          "transform-origin": "top",
+          overflow: "hidden",
+          display: "block",
+          position: "relative",
+        });
       if (!dateShowFlag.value) {
         animation = animation.direction("reverse");
         scheduleTab.value.$el.scrollToPoint(0, 130, 200);
@@ -288,7 +289,13 @@ export default defineComponent({
       }
       // ctx.emit("update:schedule", curScheduleData.value);
       // ctx.emit("update:save", curSave.value);
-      props.modal?.$el.dismiss(curScheduleData.value, "confirm");
+      props.modal?.$el.dismiss([curScheduleData.value, curSave.value], "confirm");
+    };
+    // 返回cancel
+    const btnCancelClk = () => {
+      curSave.value = props.save;
+      curScheduleData.value = props.schedule;
+      props.modal?.$el.dismiss([], "cancel");
     };
 
     return {

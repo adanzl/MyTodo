@@ -38,7 +38,6 @@ export class UserData {
   name: string = ""; // 用户名称
   schedules: ScheduleData[] = []; // 日程计划列表
   // 计划完成情况  日期->对应日期完成情况(任务id->完成情况)
-  // save: Map<string, Map<number, ScheduleSave>>;
   save: Record<string, Record<number, ScheduleSave>> = {};
 }
 
@@ -47,9 +46,30 @@ export const S_TS = (dt?: dayjs.Dayjs): string => {
   return dt.format("YYYY-MM-DD");
 };
 
+export const parseScheduleData = (jsonStr: string): ScheduleData => {
+  const ret = JSON.parse(jsonStr) as ScheduleData;
+  ret.startTs = dayjs(ret.startTs);
+  ret.endTs = dayjs(ret.endTs);
+  ret.repeatEndTs = ret.repeatEndTs && dayjs(ret.repeatEndTs);
+  return ret;
+};
+
+export const parseUserData = (jsonStr: string): UserData => {
+  const ret = JSON.parse(jsonStr) as UserData;
+  for (let i = 0; i < ret.schedules.length; i++) {
+    const schedule = ret.schedules[i];
+    schedule.startTs = dayjs(schedule.startTs);
+    schedule.endTs = dayjs(schedule.endTs);
+    schedule.repeatEndTs = schedule.repeatEndTs && dayjs(schedule.repeatEndTs);
+  }
+  return ret;
+};
+
 export default {
   ScheduleData,
   ScheduleSave,
   UserData,
   S_TS,
+  parseUserData,
+  parseScheduleData,
 };

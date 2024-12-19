@@ -37,7 +37,7 @@ import { defineComponent, nextTick, onMounted, ref } from "vue";
 
 import { getSave, setSave } from "@/modal/NetUtil";
 import { ColorOptions, getColorOptions, getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
-import { S_TS, ScheduleData, ScheduleSave, UserData } from "@/modal/UserData";
+import { S_TS, ScheduleData, ScheduleSave, UserData, parseUserData } from "@/modal/UserData";
 import { Icon } from "@iconify/vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import "swiper/css";
@@ -244,14 +244,8 @@ export default defineComponent({
       // 获取数据
       getSave(1)
         .then((res: any) => {
-          userData.value = JSON.parse(res.data);
+          userData.value = parseUserData(res.data);
           console.log("getSave", userData.value);
-          for (let i = 0; i < userData.value.schedules.length; i++) {
-            const schedule = userData.value.schedules[i];
-            schedule.startTs = dayjs(schedule.startTs);
-            schedule.endTs = dayjs(schedule.endTs);
-            schedule.repeatEndTs = schedule.repeatEndTs && dayjs(schedule.repeatEndTs);
-          }
           updateScheduleData();
           chooseSelectedDate();
           setTimeout(() => {
@@ -458,9 +452,9 @@ export default defineComponent({
     };
     // 添加日程页面关闭回调
     const onScheduleModalDismiss = (event: any) => {
-      const scheduleData = event.detail.data;
-      // console.log("onScheduleModalDismiss", event, scheduleSave.value);
-      if (scheduleData && event.detail.role === "confirm") {
+      console.log("onScheduleModalDismiss", event, event.detail.data);
+      const [scheduleData, save] = event.detail.data;
+      if (event.detail.role === "confirm") {
         // 处理数据
         // 日程变化
         if (scheduleData.id === -1) {
@@ -475,15 +469,15 @@ export default defineComponent({
           }
         }
         // 存档变化
-        if (selectedDate.value) {
-          if (!(S_TS(selectedDate.value.dt) in userData.value.save)) {
-            userData.value.save[S_TS(selectedDate.value.dt)] = {};
+        if (save) {
+          if (!(S_TS(save.dt) in userData.value.save)) {
+            userData.value.save[S_TS(save.dt)] = {};
           }
-          const map = userData.value.save[S_TS(selectedDate.value.dt)];
+          const map = userData.value.save[S_TS(save.dt)];
           map![scheduleData.id!] = scheduleSave.value!;
         }
         updateScheduleData();
-        doSaveUserData();
+        // doSaveUserData();
       }
       isScheduleModalOpen.value = false;
     };

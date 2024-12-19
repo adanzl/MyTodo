@@ -1,21 +1,24 @@
 <template>
-  <ion-modal show-backdrop="false" id="main" mode="ios">
+  <ion-modal show-backdrop="false" id="main" mode="ios" aria-hidden="false">
     <ion-header>
-      <ion-toolbar class="ion-padding">
-        <ion-icon
-          slot="start"
-          :icon="chevronBackOutline"
-          style="width: 30px; height: 25px; position: absolute; top: 15px"
-          @click="btnCancelClk"></ion-icon>
+      <ion-toolbar>
+        <ion-buttons slot="start" class="ion-padding">
+          <ion-button @click="btnCancelClk">
+            <ion-icon :icon="chevronBackOutline"> </ion-icon>
+          </ion-button>
+        </ion-buttons>
         <ion-title>
-          <h1>{{ (curScheduleData?.id === -1 ? "Add" : "Edit") + " Schedule" }}</h1>
+          <h3>{{ (curScheduleData?.id === -1 ? "Add" : "Edit") + " Schedule" }}</h3>
         </ion-title>
       </ion-toolbar>
     </ion-header>
     <ion-content class="main_content ion-padding" ref="scheduleTab">
       <ion-list :inset="true">
         <ion-item>
-          <ion-checkbox slot="start" @ionChange="onTaskCheckboxChange" :checked="curSave?.state === 1">
+          <ion-checkbox
+            slot="start"
+            @ionChange="onTaskCheckboxChange"
+            :checked="curSave?.state === 1">
           </ion-checkbox>
           <ion-input
             placeholder="输入日程标题"
@@ -46,13 +49,21 @@
               :color="getPriorityOptions(curScheduleData.priority).color">
             </Icon>
           </ion-button>
-          <PrioritySelector trigger="btnPriority" @update:value="onPriorityChange" :value="curScheduleData.priority">
+          <PrioritySelector
+            trigger="btnPriority"
+            @update:value="onPriorityChange"
+            :value="curScheduleData.priority">
           </PrioritySelector>
           <ion-button id="btnColor" class="group-tab" fill="none">
             <ion-icon slot="start" :icon="colorPalette" aria-hidden="true"> </ion-icon>
-            <span :style="{ 'background-color': getColorOptions(curScheduleData.color).tag }" class="v-dot"></span>
+            <span
+              :style="{ 'background-color': getColorOptions(curScheduleData.color).tag }"
+              class="v-dot"></span>
           </ion-button>
-          <ColorSelector trigger="btnColor" @update:value="onColorChange" :value="curScheduleData.color">
+          <ColorSelector
+            trigger="btnColor"
+            @update:value="onColorChange"
+            :value="curScheduleData.color">
           </ColorSelector>
         </ion-item>
       </ion-list>
@@ -88,7 +99,11 @@
               </ion-segment>
               <ion-button @click="btnDatetimeOkClk">OK </ion-button>
             </ion-buttons>
-            <ion-datetime presentation="date" @ionChange="onDtChange" size="cover" class="schedule-datetime-date">
+            <ion-datetime
+              presentation="date"
+              @ionChange="onDtChange"
+              size="cover"
+              class="schedule-datetime-date">
             </ion-datetime>
             <ion-item
               class="ion-no-padding"
@@ -100,7 +115,9 @@
               <!-- 开始时间 -->
               <ion-icon :icon="timeOutline" aria-hidden="true" slot="start"> </ion-icon>
               <ion-label>Start time </ion-label>
-              <label>{{ curScheduleData.allDay ? "All day" : curScheduleData.startTs?.format("HH:mm") }}</label>
+              <label>{{
+                curScheduleData.allDay ? "All day" : curScheduleData.startTs?.format("HH:mm")
+              }}</label>
               <ion-modal
                 class="start-time-modal"
                 :isOpen="datetimeShowFlag"
@@ -128,7 +145,9 @@
                   class="schedule-datetime-time">
                 </ion-datetime>
                 <ion-item>
-                  <ion-toggle :checked="curScheduleData.allDay" @ionChange="onScheduleDatetimeAllDayChange">
+                  <ion-toggle
+                    :checked="curScheduleData.allDay"
+                    @ionChange="onScheduleDatetimeAllDayChange">
                     <h3>All day</h3>
                   </ion-toggle>
                 </ion-item>
@@ -144,7 +163,11 @@
                     ">
                     Cancel
                   </ion-button>
-                  <ion-button size="large" fill="clear" style="width: 50%" @click="btnScheduleDatetimeOkClk">
+                  <ion-button
+                    size="large"
+                    fill="clear"
+                    style="width: 50%"
+                    @click="btnScheduleDatetimeOkClk">
                     Done
                   </ion-button>
                 </ion-item>
@@ -182,7 +205,9 @@
           <ion-icon :icon="power" slot="start"></ion-icon>
           <ion-label>Repeat End</ion-label>
           <ion-datetime-button datetime="idRepeatEndTs">
-            <ion-label slot="date-target" v-if="curScheduleData?.repeatEndTs === undefined">None</ion-label>
+            <ion-label slot="date-target" v-if="curScheduleData?.repeatEndTs === undefined"
+              >None</ion-label
+            >
           </ion-datetime-button>
           <ion-modal :keep-contents-mounted="true" ref="repeatEndTsModal">
             <ion-datetime
@@ -219,14 +244,21 @@
           </ion-input>
         </ion-item>
         <ion-item v-for="task in curScheduleData?.subTasks" :key="task">
-          <ion-checkbox slot="start" :checked="subTaskChecked(task)" @ionChange="onSubtaskCheckboxChange($event, task)">
+          <ion-checkbox
+            slot="start"
+            :checked="subTaskChecked(task)"
+            @ionChange="onSubtaskCheckboxChange($event, task)">
           </ion-checkbox>
           <ion-input
             :value="task.name"
             @ionChange="onSubtaskInputChange($event, task)"
             :class="{ 'text-line-through': subTaskChecked(task) }">
           </ion-input>
-          <ion-icon :icon="removeCircleOutline" slot="end" @click="btnSubtaskRemoveClk($event, task)"> </ion-icon>
+          <ion-icon
+            :icon="removeCircleOutline"
+            slot="end"
+            @click="btnSubtaskRemoveClk($event, task)">
+          </ion-icon>
         </ion-item>
       </ion-list>
     </ion-content>

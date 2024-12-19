@@ -1,15 +1,24 @@
 <template>
-  <ion-modal ref="modal" aria-hidden="true" id="colorSelector" mode="ios" @ionModalDidDismiss="onModalDismiss">
+  <ion-modal
+    ref="modal"
+    aria-hidden="true"
+    id="colorSelector"
+    mode="ios"
+    @ionModalDidDismiss="onModalDismiss">
     <ion-item>
       <ion-title>Color</ion-title>
     </ion-item>
     <ion-content class="ion-padding">
       <ion-item>
-        <ion-radio-group :value="valueRef" @ionChange="onSelectChange">
-          <ion-radio v-for="(op, idx) in ColorOptions" :key="idx" :value="op.id" class="option-item">
+        <ion-radio-group :value="valueRef" @ionChange="onSelectChange" class="width-100">
+          <ion-radio
+            v-for="(op, idx) in ColorOptions"
+            :key="idx"
+            :value="op.id"
+            class="option-item">
             <ion-item lines="none" style="flex: 1">
               <span :style="{ 'background-color': op.tag }" class="v-dot" slot="start"></span>
-              {{ op.label }}
+              <ion-label style="margin-left: 5px;">{{ op.label }}</ion-label>
             </ion-item>
           </ion-radio>
         </ion-radio-group>

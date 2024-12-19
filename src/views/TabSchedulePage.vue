@@ -3,7 +3,7 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start" class="ion-padding">
-          <ion-button><ion-icon color="default" :icon="list"></ion-icon></ion-button>
+          <ion-button> <ion-icon color="default" :icon="list"></ion-icon> </ion-button>
         </ion-buttons>
         <ion-title class="ion-text-center">
           <h3 v-if="selectedDate">{{ selectedDate.dt.format("YY年MM月") }}</h3>
@@ -37,11 +37,19 @@
           </CalenderTab>
         </swiper-slide>
       </swiper>
-      <ion-button color="light" expand="full" fill="clear" size="small" @click="btnCalendarFoldClk()">
+      <ion-button
+        color="light"
+        expand="full"
+        fill="clear"
+        size="small"
+        @click="btnCalendarFoldClk()">
         <ion-icon :icon="bFold ? chevronDown : chevronUp" size="medium" color="primary"> </ion-icon>
       </ion-button>
       <!-- 日程列表 -->
-      <ion-content color="light" @touchmove="onScheduleListTouchMove" @touchstart="onScheduleListTouchStart">
+      <ion-content
+        color="light"
+        @touchmove="onScheduleListTouchMove"
+        @touchstart="onScheduleListTouchStart">
         <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
           <ion-refresher-content></ion-refresher-content>
         </ion-refresher>
@@ -51,7 +59,12 @@
               <ion-label>{{ selectedDate?.dt.format("MM-DD") }}</ion-label>
             </ion-item>
             <div slot="content">
-              <ion-list :inset="true" lines="full" mode="ios" ref="curScheduleList" class="schedule-list">
+              <ion-list
+                :inset="true"
+                lines="full"
+                mode="ios"
+                ref="curScheduleList"
+                class="schedule-list">
                 <!-- 日程条目 -->
                 <ion-item-sliding v-for="(schedule, idx) in selectedDate?.events" :key="idx">
                   <ion-item>
@@ -73,7 +86,9 @@
                             {{ selectedDate?.dt.format("ddd") }}
                           </p>
                           <p class="schedule-lb-sub">
-                            <ion-icon :icon="listOutline" style="position: relative; top: 3px"></ion-icon>
+                            <ion-icon
+                              :icon="listOutline"
+                              style="position: relative; top: 3px"></ion-icon>
                             {{
                               schedule?.subTasks?.filter(
                                 (t) => (selectedDate?.save[schedule.id]?.subTasks[t.id] || 0) === 1
@@ -87,7 +102,10 @@
                       </ion-label>
                       <span
                         class="v-dot"
-                        :style="{ 'background-color': getColorOptions(schedule.color).tag, 'margin-left': '10px' }">
+                        :style="{
+                          'background-color': getColorOptions(schedule.color).tag,
+                          'margin-left': '10px',
+                        }">
                       </span>
                       <!-- <ion-icon
                         :icon="icons.mdiRomanNums[getPriorityOptions(schedule.priority).icon]"
@@ -123,7 +141,6 @@
       </ion-content>
       <SchedulePop
         id="pop-modal"
-        aria-hidden="false"
         ref="scheduleModal"
         :is-open="isScheduleModalOpen"
         :modal="scheduleModal"

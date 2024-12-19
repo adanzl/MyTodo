@@ -1,5 +1,10 @@
 <template>
-  <ion-modal ref="modal" aria-hidden="true" id="prioritySelector" mode="ios" @ionModalDidDismiss="onModalDismiss">
+  <ion-modal
+    ref="modal"
+    aria-hidden="true"
+    id="prioritySelector"
+    mode="ios"
+    @ionModalDidDismiss="onModalDismiss">
     <ion-item>
       <ion-title>Priority</ion-title>
     </ion-item>
@@ -10,14 +15,10 @@
             v-for="(op, idx) in PriorityOptions"
             :key="idx"
             :value="op.id"
-            mode="ios"
-            class="option-item"
-            justify="space-between">
+            class="option-item">
             <ion-item lines="none" style="flex: 1">
-              <!-- <ion-icon :icon="icons.mdiRomanNums[op.icon]" :style="{ color: op.color }" size="large" slot="start">
-              </ion-icon> -->
-              <Icon :icon="op.icon" :height="'36'" :color="op.color"> </Icon>
-              <span class="v-label">{{ op.label }} </span>
+              <span><Icon :icon="op.icon" :height="'36'" :color="op.color"></Icon></span>
+              <ion-label style="margin-left: 8px;">{{ op.label }}</ion-label>
             </ion-item>
           </ion-radio>
         </ion-radio-group>
