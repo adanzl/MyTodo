@@ -17,19 +17,26 @@
       <ion-list>
         <ion-item>
           <ion-label>Schedule</ion-label>
+          <Icon :icon="'mdi:roman-numeral-7'" size="large" :height="'36'" color="#1a65eb" />
         </ion-item>
         <ion-item v-for="(schedule, idx) in userData.schedules" :key="idx">
           <ion-label>
-            <div style="display: flex">
+            <div style="display: flex; align-items: center">
               <span
                 class="v-dot"
                 :style="{ 'background-color': getColorOptions(schedule.color).tag, 'margin-inline': '2px' }">
               </span>
-              <ion-icon
+              <Icon
+                :icon="getPriorityOptions(schedule.priority).icon"
+                :height="'36'"
+                :color="getPriorityOptions(schedule.priority).color">
+              </Icon>
+              <ion-label>{{ "{" + getGroupOptions(schedule.groupId).label + "}" }}</ion-label>
+              <!-- <ion-icon
                 :icon="icons.mdiRomanNums[getPriorityOptions(schedule.priority).icon]"
                 :style="{ color: getPriorityOptions(schedule.priority).color }"
                 style="font-size: 1.5rem">
-              </ion-icon>
+              </ion-icon> -->
               <h2>[{{ schedule.id }}] {{ schedule.title }}</h2>
             </div>
             <p>

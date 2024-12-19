@@ -52,16 +52,16 @@ export const getColorOptions = (id: number): ColorType => {
 
 export interface PriorityType {
   id: number;
-  icon: number;
+  icon: string;
   color: string;
   label: string;
 }
 // 优先级类型
 export const PriorityOptions: PriorityType[] = [
-  { id: 0, icon: 0, color: "#1a65eb !important", label: "Low" },
-  { id: 1, icon: 1, color: "#2dd55b !important", label: "Medium" },
-  { id: 2, icon: 2, color: "#ffc409 !important", label: "High" },
-  { id: 3, icon: 3, color: "#cb1a27 !important", label: "Critical" },
+  { id: 0, icon: "mdi:roman-numeral-1", color: "#1a65eb !important", label: "Low" },
+  { id: 1, icon: "mdi:roman-numeral-2", color: "#2dd55b !important", label: "Medium" },
+  { id: 2, icon: "mdi:roman-numeral-3", color: "#ffc409 !important", label: "High" },
+  { id: 3, icon: "mdi:roman-numeral-4", color: "#cb1a27 !important", label: "Critical" },
 ];
 export const getPriorityOptions = (id: number): PriorityType => {
   for (const v of PriorityOptions) {
@@ -72,9 +72,32 @@ export const getPriorityOptions = (id: number): PriorityType => {
   return PriorityOptions[0];
 };
 
+// 分组配置
+export interface GroupType {
+  id: number;
+  label: string;
+  color: string;
+}
+export const GroupOptions: GroupType[] = [
+  { id: 0, label: "All", color: "white" },
+  { id: 1, label: "Work", color: "red" },
+  { id: 2, label: "Home", color: "yellow" },
+];
+
+export const getGroupOptions = (id: number): GroupType => {
+  for (const v of GroupOptions) {
+    if (v.id === id) {
+      return v;
+    }
+  }
+  return GroupOptions[0];
+};
+
 export default {
   ReminderOptions,
   RepeatOptions,
   ColorOptions,
+  GroupOptions,
   getColorOptions,
+  getGroupOptions,
 };

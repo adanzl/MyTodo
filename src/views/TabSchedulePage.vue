@@ -82,11 +82,16 @@
                         class="v-dot"
                         :style="{ 'background-color': getColorOptions(schedule.color).tag, 'margin-left': '10px' }">
                       </span>
-                      <ion-icon
+                      <!-- <ion-icon
                         :icon="icons.mdiRomanNums[getPriorityOptions(schedule.priority).icon]"
                         :style="{ color: getPriorityOptions(schedule.priority).color }"
                         style="font-size: 2rem">
-                      </ion-icon>
+                      </ion-icon> -->
+                      <Icon
+                        :icon="getPriorityOptions(schedule.priority).icon"
+                        :height="'36'"
+                        :color="getPriorityOptions(schedule.priority).color">
+                      </Icon>
                     </div>
                   </ion-item>
                   <ion-item-options side="end">

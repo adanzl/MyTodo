@@ -1,23 +1,15 @@
 <template>
-  <ion-modal ref="modal" aria-hidden="true" id="prioritySelector" mode="ios" @ionModalDidDismiss="onModalDismiss">
+  <ion-modal ref="modal" aria-hidden="true" id="groupSelector" mode="ios" @ionModalDidDismiss="onModalDismiss">
     <ion-item>
-      <ion-title>Priority</ion-title>
+      <ion-title>Group</ion-title>
     </ion-item>
     <ion-content class="ion-padding">
       <ion-item>
-        <ion-radio-group :value="valueRef" @ionChange="onSelectChange" class="width-100">
-          <ion-radio
-            v-for="(op, idx) in PriorityOptions"
-            :key="idx"
-            :value="op.id"
-            mode="ios"
-            class="option-item"
-            justify="space-between">
+        <ion-radio-group :value="valueRef" @ionChange="onSelectChange">
+          <ion-radio v-for="(op, idx) in GroupOptions" :key="idx" :value="op.id" class="option-item">
             <ion-item lines="none" style="flex: 1">
-              <!-- <ion-icon :icon="icons.mdiRomanNums[op.icon]" :style="{ color: op.color }" size="large" slot="start">
-              </ion-icon> -->
-              <Icon :icon="op.icon" :height="'36'" :color="op.color"> </Icon>
-              <span class="v-label">{{ op.label }} </span>
+              <span class="v-dot" slot="start"></span>
+              {{ op.label }}
             </ion-item>
           </ion-radio>
         </ion-radio-group>
@@ -34,8 +26,7 @@
 import { onMounted, ref, watch } from "vue";
 import { createTriggerController } from "@/modal/Overlay.ts";
 import { IonRadioGroup, IonRadio } from "@ionic/vue";
-import { PriorityOptions } from "@/modal/ScheduleType";
-import { Icon } from "@iconify/vue";
+import { GroupOptions } from "@/modal/ScheduleType";
 
 const props = defineProps({
   trigger: {
@@ -75,6 +66,7 @@ onMounted(() => {
     () => props.trigger,
     (newValue) => {
       if (newValue) {
+        // 当 trigger 属性变化时，添加点击监听器
         triggerController.addClickListener(modal.value!.$el!, newValue);
       }
     },
@@ -90,6 +82,8 @@ const onModalDismiss = () => {
 ion-modal {
   --height: 50%;
   --width: 95%;
+  /* --border-radius: 16px; */
+  /* --box-shadow: 0 28px 48px rgba(0, 0, 0, 0.4); */
   align-items: end;
 }
 ion-modal {
@@ -110,10 +104,6 @@ ion-radio {
 ion-modal::part(backdrop) {
   background-color: var(--ion-color-dark) !important;
   opacity: 0.3 !important;
-}
-.option-item {
-  display: block;
-  overflow: hidden;
 }
 .option-item::part(label) {
   margin: 0;

@@ -1,12 +1,19 @@
 import icons from "@/modal/Icons";
 import { getSave } from "@/modal/NetUtil";
-import { getColorOptions, getPriorityOptions } from "@/modal/ScheduleType";
+import { getColorOptions, getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
 import { S_TS, UserData } from "@/modal/UserData";
+import { Icon } from "@iconify/vue";
 import { IonRefresher, IonRefresherContent } from "@ionic/vue";
 import dayjs from "dayjs";
 import { defineComponent, onMounted, ref } from "vue";
 
 export default defineComponent({
+  components: {
+    IonRefresher,
+    IonRefresherContent,
+    S_TS,
+    Icon,
+  },
   setup() {
     const userData = ref<UserData>(new UserData());
     const toastData = ref({
@@ -40,14 +47,11 @@ export default defineComponent({
       S_TS,
       getColorOptions,
       getPriorityOptions,
+      getGroupOptions,
       icons,
     };
   },
-  components: {
-    IonRefresher,
-    IonRefresherContent,
-    S_TS,
-  },
+
   data() {
     return {};
   },

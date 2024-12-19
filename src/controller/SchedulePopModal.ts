@@ -1,8 +1,9 @@
 import ColorSelector from "@/components/ColorSelector.vue";
 import PrioritySelector from "@/components/PrioritySelector.vue";
-import { getColorOptions, ReminderOptions, getPriorityOptions, RepeatOptions } from "@/modal/ScheduleType";
+import GroupSelector from "@/components/GroupSelector.vue";
+import { getColorOptions, ReminderOptions, getPriorityOptions, RepeatOptions, getGroupOptions } from "@/modal/ScheduleType";
 import { ScheduleData, ScheduleSave, SubTask } from "@/modal/UserData";
-import icons from "@/modal/Icons";
+import { Icon } from "@iconify/vue";
 
 import {
   createAnimation,
@@ -47,6 +48,8 @@ export default defineComponent({
     IonSelectOption,
     ColorSelector,
     PrioritySelector,
+    GroupSelector,
+    Icon,
   },
   props: {
     modal: Object,
@@ -125,6 +128,10 @@ export default defineComponent({
     // 优先级选择
     const onPriorityChange = (nv: number) => {
       curScheduleData.value!.priority = nv;
+    };
+    // 分组选择
+    const onGroupChange = (nv: number) => {
+      curScheduleData.value!.groupId = nv;
     };
     // ============ Tab2 ============
     // 日期类型切换，开始日期和结束日期
@@ -271,7 +278,6 @@ export default defineComponent({
     };
 
     return {
-      icons,
       curScheduleData,
       scheduleDTComponent,
       scheduleStartTsComponent,
@@ -300,6 +306,7 @@ export default defineComponent({
       datetimeShowFlag,
       scheduleTab,
       getColorOptions,
+      getGroupOptions,
       getPriorityOptions,
       onTaskCheckboxChange,
       onTypeChange,
@@ -307,6 +314,7 @@ export default defineComponent({
       onDtChange,
       onReminderChange,
       onPriorityChange,
+      onGroupChange,
       onRepeatChange,
       onRepeatEndDtChange,
       onSubtaskCheckboxChange,

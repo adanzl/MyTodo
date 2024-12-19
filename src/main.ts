@@ -56,6 +56,7 @@ import {
   IonModal,
 } from "@ionic/vue";
 
+
 const app = createApp(App).use(IonicVue).use(router);
 
 app.component("ion-content", IonContent);

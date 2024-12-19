@@ -1,10 +1,10 @@
 import CalenderTab from "@/components/CalendarTab.vue";
 import SchedulePop from "@/components/SchedulePopModal.vue";
+import icons from "@/modal/Icons";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import "@ionic/vue/css/ionic-swiper.css";
 import "swiper/css";
 import "swiper/css/effect-fade";
-import icons from "@/modal/Icons";
 
 import {
   IonAccordion,
@@ -36,8 +36,9 @@ import { Swiper, SwiperSlide } from "swiper/vue";
 import { defineComponent, nextTick, onMounted, ref } from "vue";
 
 import { getSave, setSave } from "@/modal/NetUtil";
+import { ColorOptions, getColorOptions, getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
 import { S_TS, ScheduleData, ScheduleSave, UserData } from "@/modal/UserData";
-import { ColorOptions, getColorOptions, getPriorityOptions } from "@/modal/ScheduleType";
+import { Icon } from "@iconify/vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import "swiper/css";
 import "swiper/css/effect-fade";
@@ -74,8 +75,11 @@ export default defineComponent({
     SchedulePop,
     Swiper,
     SwiperSlide,
+    Icon,
   },
   setup() {
+    // https://iconify.design/docs/icon-components/vue/
+    // https://yesicon.app/search/roman?coll=mdi
     const userData = ref<UserData>({
       id: 1,
       name: "leo",
@@ -492,6 +496,7 @@ export default defineComponent({
       ColorOptions,
       getColorOptions,
       getPriorityOptions,
+      getGroupOptions,
       addCircleOutline,
       alarmOutline,
       chevronDown,

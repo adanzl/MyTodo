@@ -30,19 +30,20 @@
         <!-- 分组信息 -->
         <ion-item class="group">
           <ion-button id="btnGroup" class="group-tab" fill="none">
-            <ion-icon :icon="bookmark" aria-hidden="true"> </ion-icon>
-            <ion-select value="work">
-              <ion-select-option value="none">None</ion-select-option>
-              <ion-select-option value="work">Work</ion-select-option>
-              <ion-select-option value="other">Other</ion-select-option>
-            </ion-select>
+            <ion-icon :icon="bookmark" aria-hidden="true"></ion-icon>
+            <ion-label>{{ getGroupOptions(curScheduleData.groupId).label }}</ion-label>
           </ion-button>
+          <GroupSelector
+            trigger="btnGroup"
+            @update:value="onGroupChange"
+            :value="curScheduleData.groupId"></GroupSelector>
           <ion-button id="btnPriority" class="group-tab" fill="none">
             <ion-label><strong>Pri</strong></ion-label>
-            <ion-icon
-              :icon="icons.mdiRomanNums[getPriorityOptions(curScheduleData.priority).icon]"
-              :style="{ color: getPriorityOptions(curScheduleData.priority).color }"
-              size="large"></ion-icon>
+            <Icon
+              :icon="getPriorityOptions(curScheduleData.priority).icon"
+              :height="'36'"
+              :color="getPriorityOptions(curScheduleData.priority).color">
+            </Icon>
           </ion-button>
           <PrioritySelector trigger="btnPriority" @update:value="onPriorityChange" :value="curScheduleData.priority">
           </PrioritySelector>
