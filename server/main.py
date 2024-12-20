@@ -39,8 +39,8 @@ def get_pic():
 
 @app.route("/getAllPic", methods=['GET'])
 def get_all_pic():
-    page_size = request.args.get('pageSize', 20)
-    page_num = request.args.get('pageNum', 1)
+    page_size = request.args.get('pageSize', 20, type=int)
+    page_num = request.args.get('pageNum', 1, type=int)
     log.info("===== [Get All Pic] ", page_num, page_size)
     return db_mgr.get_all_pic(page_num, page_size)
 
