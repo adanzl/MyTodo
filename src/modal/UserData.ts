@@ -90,6 +90,9 @@ export const parseScheduleData = (jsonStr: string): ScheduleData => {
 
 export const parseUserData = (jsonStr: string): UserData => {
   const ret = JSON.parse(jsonStr) as UserData;
+  if (ret.schedules === undefined) {
+    ret.schedules = [];
+  }
   for (let i = 0; i < ret.schedules.length; i++) {
     const schedule = ret.schedules[i];
     schedule.startTs = dayjs(schedule.startTs);

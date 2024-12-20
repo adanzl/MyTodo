@@ -236,9 +236,6 @@ export default defineComponent({
           }
         }
       }
-      if (selectedDate.value) {
-        console.log("ST ", S_TS(selectedDate.value.dt));
-      }
     };
     const isToday = () => {
       return dayjs().startOf("day").unix() == selectedDate.value?.dt.unix();
@@ -247,7 +244,7 @@ export default defineComponent({
       // 获取数据
       getSave(1)
         .then((res: any) => {
-          userData.value = parseUserData(res.data);
+          userData.value = parseUserData(res);
           console.log("getSave", userData.value);
           updateScheduleData();
           chooseSelectedDate();
@@ -256,6 +253,7 @@ export default defineComponent({
           }, 100);
         })
         .catch((err) => {
+          console.log("getSave", err);
           toastData.value.isOpen = true;
           toastData.value.text = JSON.stringify(err);
         });

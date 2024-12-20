@@ -25,7 +25,7 @@ export default defineComponent({
       // 获取数据
       getSave(1)
         .then((res: any) => {
-          userData.value = parseUserData(res.data);
+          userData.value = parseUserData(res);
         })
         .catch((err) => {
           toastData.value.isOpen = true;
@@ -52,7 +52,7 @@ export default defineComponent({
     handleRefresh(event: any) {
       getSave(1)
         .then((res: any) => {
-          this.userData = parseUserData(res.data);
+          this.userData = parseUserData(res);
           for (let i = 0; i < this.userData.schedules.length; i++) {
             const schedule = this.userData.schedules[i];
             schedule.startTs = dayjs(schedule.startTs);
