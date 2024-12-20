@@ -121,13 +121,13 @@ def set_pic(id, data) -> dict:
     return {"code": 0, "msg": "ok", "data": id}
 
 
-def del_pic(id) -> dict:
+def del_pic(id: int) -> dict:
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     try:
         cur.execute(f"""
             DELETE FROM {TABLE_PIC} WHERE id=?;
-            """, (id))
+            """, (id, ))
         conn.commit()
         cnt = cur.rowcount
     except Exception as e:
