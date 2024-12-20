@@ -86,7 +86,7 @@ watch(() => props.slide, updateMinSlide, { deep: true });
 watch(() => props.selectedDate, updateMinSlide, { deep: true });
 watch(() => props.minimal, onMinimalChange, { deep: true });
 
-const weekHead = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const weekHead = ["日", "一", "二", "三", "四", "五", "六"];
 </script>
 <style escaped lang="css">
 ion-chip.selected {

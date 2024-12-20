@@ -6,7 +6,7 @@
     mode="ios"
     @ionModalDidDismiss="onModalDismiss">
     <ion-item>
-      <ion-title>Color</ion-title>
+      <ion-title>颜色选择</ion-title>
     </ion-item>
     <ion-content class="ion-padding">
       <ion-item>
@@ -25,8 +25,8 @@
       </ion-item>
     </ion-content>
     <ion-footer>
-      <ion-button style="width: 40%" fill="clear" @click="cancel()">Cancel</ion-button>
-      <ion-button style="width: 40%" fill="clear" @click="confirm()">OK</ion-button>
+      <ion-button style="width: 40%" fill="clear" @click="cancel()">取消</ion-button>
+      <ion-button style="width: 40%" fill="clear" @click="confirm()">确定</ion-button>
     </ion-footer>
   </ion-modal>
 </template>

@@ -76,7 +76,3 @@ ion-modal::part(backdrop) {
     align-items: start;
 }
 
-/* 隐藏滚动条 */
-ion-content::part(scroll)::-webkit-scrollbar {
-    display: none;
-}

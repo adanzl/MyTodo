@@ -6,7 +6,7 @@
     mode="ios"
     @ionModalDidDismiss="onModalDismiss">
     <ion-item>
-      <ion-title>Group</ion-title>
+      <ion-title>分组信息</ion-title>
     </ion-item>
     <ion-content class="ion-padding">
       <ion-item>
@@ -19,7 +19,7 @@
             <ion-item lines="none" style="flex: 1">
               <span>
                 <!-- <Icon icon="mdi:bookmark" aria-hidden="true" height="28"></Icon> -->
-                <ion-icon :icon="bookmark" aria-hidden="true" style="font-size: 20px;"></ion-icon>
+                <ion-icon :icon="bookmark" aria-hidden="true" style="font-size: 20px"></ion-icon>
               </span>
               <ion-label style="margin-left: 8px">{{ op.label }}</ion-label>
             </ion-item>
@@ -28,8 +28,8 @@
       </ion-item>
     </ion-content>
     <ion-footer>
-      <ion-button style="width: 40%" fill="clear" @click="cancel()">Cancel</ion-button>
-      <ion-button style="width: 40%" fill="clear" @click="confirm()">OK</ion-button>
+      <ion-button style="width: 40%" fill="clear" @click="cancel()">取消</ion-button>
+      <ion-button style="width: 40%" fill="clear" @click="confirm()">确定</ion-button>
     </ion-footer>
   </ion-modal>
 </template>

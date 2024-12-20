@@ -20,11 +20,11 @@ export interface RepeatType {
 
 // 日程重复类型
 export const RepeatOptions: RepeatType[] = [
-  { id: 0, label: "None", tag: "" },
-  { id: 1, label: "Daily", tag: "day" },
-  { id: 2, label: "Weekly", tag: "week" },
-  { id: 3, label: "Monthly", tag: "month" },
-  { id: 4, label: "Yearly", tag: "year" },
+  { id: 0, label: "无", tag: "" },
+  { id: 1, label: "每天", tag: "day" },
+  { id: 2, label: "每星期", tag: "week" },
+  { id: 3, label: "每月", tag: "month" },
+  { id: 4, label: "每年", tag: "year" },
 ];
 
 export interface ColorType {
@@ -58,10 +58,10 @@ export interface PriorityType {
 }
 // 优先级类型
 export const PriorityOptions: PriorityType[] = [
-  { id: 0, icon: "mdi:roman-numeral-1", color: "#1a65eb !important", label: "Low" },
-  { id: 1, icon: "mdi:roman-numeral-2", color: "#2dd55b !important", label: "Medium" },
-  { id: 2, icon: "mdi:roman-numeral-3", color: "#ffc409 !important", label: "High" },
-  { id: 3, icon: "mdi:roman-numeral-4", color: "#cb1a27 !important", label: "Critical" },
+  { id: 0, icon: "mdi:roman-numeral-1", color: "#1a65eb !important", label: "较低" },
+  { id: 1, icon: "mdi:roman-numeral-2", color: "#2dd55b !important", label: "中等" },
+  { id: 2, icon: "mdi:roman-numeral-3", color: "#ffc409 !important", label: "较高" },
+  { id: 3, icon: "mdi:roman-numeral-4", color: "#cb1a27 !important", label: "核心" },
 ];
 export const getPriorityOptions = (id: number): PriorityType => {
   for (const v of PriorityOptions) {
@@ -79,9 +79,9 @@ export interface GroupType {
   color: string;
 }
 export const GroupOptions: GroupType[] = [
-  { id: 0, label: "All", color: "white" },
-  { id: 1, label: "Work", color: "red" },
-  { id: 2, label: "Home", color: "yellow" },
+  { id: 0, label: "未分类", color: "white" },
+  { id: 1, label: "工作", color: "red" },
+  { id: 2, label: "学习", color: "yellow" },
 ];
 
 export const getGroupOptions = (id: number): GroupType => {

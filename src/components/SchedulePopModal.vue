@@ -8,7 +8,7 @@
           </ion-button>
         </ion-buttons>
         <ion-title>
-          <h3>{{ (curScheduleData?.id === -1 ? "Add" : "Edit") + " Schedule" }}</h3>
+          <h3>{{ (curScheduleData?.id === -1 ? "新增" : "编辑") + "日程" }}</h3>
         </ion-title>
       </ion-toolbar>
     </ion-header>
@@ -92,15 +92,16 @@
         <ion-item ref="dtComponentItem" class="height-0-block flex">
           <div ref="scheduleDTComponent" style="width: 100%">
             <ion-buttons class="ion-justify-content-around">
-              <ion-button @click="btnScheduleDateClearClk"> Clear </ion-button>
+              <ion-button @click="btnScheduleDateClearClk">清除</ion-button>
               <ion-segment v-model="scheduleType" style="width: 130px" @ionChange="onDtTabChange">
-                <ion-segment-button value="0" id="dtStart"> Start </ion-segment-button>
-                <ion-segment-button value="1" id="dtEnd"> End </ion-segment-button>
+                <ion-segment-button value="0" id="dtStart">开始</ion-segment-button>
+                <ion-segment-button value="1" id="dtEnd">结束</ion-segment-button>
               </ion-segment>
-              <ion-button @click="btnDatetimeOkClk">OK </ion-button>
+              <ion-button @click="btnDatetimeOkClk">确定</ion-button>
             </ion-buttons>
             <ion-datetime
               presentation="date"
+              locale="zh-cn"
               @ionChange="onDtChange"
               size="cover"
               class="schedule-datetime-date">
@@ -114,9 +115,9 @@
               ">
               <!-- 开始时间 -->
               <ion-icon :icon="timeOutline" aria-hidden="true" slot="start"> </ion-icon>
-              <ion-label>Start time </ion-label>
+              <ion-label>开始时间</ion-label>
               <label>{{
-                curScheduleData.allDay ? "All day" : curScheduleData.startTs?.format("HH:mm")
+                curScheduleData.allDay ? "全天" : curScheduleData.startTs?.format("HH:mm")
               }}</label>
               <ion-modal
                 class="start-time-modal"
@@ -128,7 +129,7 @@
                   }
                 ">
                 <ion-item>
-                  <ion-title><h2>Start time</h2></ion-title>
+                  <ion-title><h2>开始时间</h2></ion-title>
                 </ion-item>
                 <ion-datetime
                   id="dts"
@@ -148,7 +149,7 @@
                   <ion-toggle
                     :checked="curScheduleData.allDay"
                     @ionChange="onScheduleDatetimeAllDayChange">
-                    <h3>All day</h3>
+                    <h3>全天</h3>
                   </ion-toggle>
                 </ion-item>
                 <ion-item>
@@ -161,21 +162,21 @@
                         datetimeShowFlag = false;
                       }
                     ">
-                    Cancel
+                    清除
                   </ion-button>
                   <ion-button
                     size="large"
                     fill="clear"
                     style="width: 50%"
                     @click="btnScheduleDatetimeOkClk">
-                    Done
+                    确定
                   </ion-button>
                 </ion-item>
               </ion-modal>
             </ion-item>
           </div>
         </ion-item>
-        <ion-item :button="true" :detail="true">
+        <!-- <ion-item :button="true" :detail="true">
           <ion-icon :icon="notifications" aria-hidden="true" slot="start"> </ion-icon>
           <ion-select
             id="selectReminder"
@@ -189,12 +190,12 @@
               {{ op.label }}
             </ion-select-option>
           </ion-select>
-        </ion-item>
+        </ion-item> -->
         <ion-item detail="true">
           <ion-icon :icon="repeat" aria-hidden="true" slot="start"> </ion-icon>
           <ion-select :value="curScheduleData?.repeat" @ion-change="onRepeatChange">
             <div slot="label">
-              <ion-label>Repeat</ion-label>
+              <ion-label>重复</ion-label>
             </div>
             <ion-select-option v-for="(op, idx) in RepeatOptions" :key="idx" :value="op.id">
               {{ op.label }}
@@ -203,22 +204,23 @@
         </ion-item>
         <ion-item detail="true" :button="true">
           <ion-icon :icon="power" slot="start"></ion-icon>
-          <ion-label>Repeat End</ion-label>
+          <ion-label>重复停止</ion-label>
           <ion-datetime-button datetime="idRepeatEndTs">
-            <ion-label slot="date-target" v-if="curScheduleData?.repeatEndTs === undefined"
-              >None</ion-label
-            >
+            <ion-label slot="date-target" v-if="curScheduleData?.repeatEndTs === undefined">
+              无
+            </ion-label>
           </ion-datetime-button>
           <ion-modal :keep-contents-mounted="true" ref="repeatEndTsModal">
             <ion-datetime
+              locale="zh-cn"
               id="idRepeatEndTs"
               ref="repeatEndTsComponent"
               :value="curScheduleData?.repeatEndTs?.format('YYYY-MM-DD')"
               presentation="date"
               @ionChange="onRepeatEndDtChange">
               <ion-buttons slot="buttons" class="ion-justify-content-around">
-                <ion-button color="warning" @click="btnRepeatEndClearClk"> Clear </ion-button>
-                <ion-button @click="btnRepeatEndOkClk">OK</ion-button>
+                <ion-button color="warning" @click="btnRepeatEndClearClk"> 清除 </ion-button>
+                <ion-button @click="btnRepeatEndOkClk">确定</ion-button>
               </ion-buttons>
             </ion-datetime>
           </ion-modal>
@@ -227,7 +229,7 @@
       <ion-list :inset="true">
         <ion-item lines="none">
           <ion-icon :icon="listOutline" slot="start"></ion-icon>
-          <ion-label>Sub-task</ion-label>
+          <ion-label>子任务</ion-label>
           <span>
             {{ curScheduleData?.subTasks?.filter((t: any) => subTaskChecked(t)).length }}/{{
               curScheduleData?.subTasks?.length
@@ -239,7 +241,7 @@
           <ion-icon :icon="add" slot="start" style="width: 22px"></ion-icon>
           <ion-input
             v-model="addSubtaskInput"
-            placeholder="Add a subtask"
+            placeholder="添加子任务"
             @ionChange="onSubtaskInputChange($event, undefined)">
           </ion-input>
         </ion-item>
@@ -264,7 +266,7 @@
     </ion-content>
     <ion-footer>
       <ion-toolbar class="transparent">
-        <ion-button expand="block" color="warning" @click="btnSaveClk"> Save </ion-button>
+        <ion-button expand="block" color="warning" @click="btnSaveClk"> 保存 </ion-button>
       </ion-toolbar>
     </ion-footer>
     <ion-toast

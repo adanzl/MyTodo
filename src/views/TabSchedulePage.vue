@@ -133,7 +133,7 @@
           </ion-accordion>
           <ion-accordion value="goals">
             <ion-item slot="header" color="light">
-              <ion-label>Goals</ion-label>
+              <ion-label>里程碑</ion-label>
             </ion-item>
             <div class="ion-padding" slot="content">Content</div>
           </ion-accordion>

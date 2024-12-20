@@ -43,3 +43,8 @@ ion-content::part(background) {
 ion-modal::part(content) {
   --border-radius: 16px;
 }
+
+/* 隐藏滚动条 */
+ion-content::part(scroll)::-webkit-scrollbar {
+  display: none;
+}
