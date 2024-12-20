@@ -1,3 +1,4 @@
+import json
 import logging
 import sqlite3
 import traceback
@@ -47,7 +48,7 @@ def get_save(id) -> str:
         return {"code": -1, "msg": 'error ' + str(e)}
     finally:
         cur.close()
-    return {"code": 0, "msg": "ok", "data": data}
+    return {"code": 0, "msg": "ok", "data": json.loads(data)}
 
 
 def set_save(id, user_name, data) -> str:
