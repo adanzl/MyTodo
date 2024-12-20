@@ -37,6 +37,14 @@ def get_pic():
     return db_mgr.get_pic(id)
 
 
+@app.route("/getAllPic", methods=['GET'])
+def get_all_pic():
+    page_size = request.args.get('pageSize', 20)
+    page_num = request.args.get('pageNum', 1)
+    log.info("===== [Get All Pic] ", page_num, page_size)
+    return db_mgr.get_all_pic(page_num, page_size)
+
+
 @app.route("/viewPic", methods=['GET'])
 def view_pic():
     id = request.args.get('id')

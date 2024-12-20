@@ -32,7 +32,7 @@ def init_db():
     cur.close()
 
 
-def get_save(id) -> str:
+def get_save(id) -> dict:
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     try:
@@ -51,7 +51,7 @@ def get_save(id) -> str:
     return {"code": 0, "msg": "ok", "data": json.loads(data)}
 
 
-def set_save(id, user_name, data) -> str:
+def set_save(id, user_name, data) -> dict:
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     try:
@@ -77,7 +77,7 @@ def set_save(id, user_name, data) -> str:
     return {"code": 0, "msg": "ok", "data": id}
 
 
-def get_pic(id) -> str:
+def get_pic(id) -> dict:
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     try:
@@ -96,7 +96,7 @@ def get_pic(id) -> str:
     return {"code": 0, "msg": "ok", "data": data}
 
 
-def set_pic(id, data) -> str:
+def set_pic(id, data) -> dict:
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     try:
@@ -121,7 +121,7 @@ def set_pic(id, data) -> str:
     return {"code": 0, "msg": "ok", "data": id}
 
 
-def del_pic(id) -> str:
+def del_pic(id) -> dict:
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     try:
@@ -137,3 +137,20 @@ def del_pic(id) -> str:
     finally:
         cur.close()
     return {"code": 0, "msg": "ok", "data": cnt}
+
+
+def get_all_pic(page_num=1, page_size=20) -> dict:
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    try:
+        cur.execute(f"""
+            SELECT * FROM {TABLE_PIC} LIMIT ? OFFSET ?;
+            """, (page_size, (page_num - 1) * page_size))
+        result = cur.fetchall()
+    except Exception as e:
+        log.error(e)
+        traceback.print_exc()
+        return {"code": -1, "msg": 'error ' + str(e)}
+    finally:
+        cur.close()
+    return {"code": 0, "msg": "ok", "data": result}
