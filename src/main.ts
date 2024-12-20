@@ -56,6 +56,8 @@ import {
   IonModal,
 } from "@ionic/vue";
 
+import {initNet as initNet} from "@/modal/NetUtil.ts";
+
 
 const app = createApp(App).use(IonicVue).use(router);
 
@@ -81,10 +83,12 @@ app.component("ion-toggle", IonToggle);
 app.component("ion-modal", IonModal);
 
 console.log(`当前 Vue 版本是：${app.version}`);
+
 // console.log(GConfig);
 // GConfig.init__();
 // https://ionicframework.com/docs/vue/pwa
 // npm cache verify
+initNet();
 router.isReady().then(() => {
   app.mount("#app");
 });

@@ -21,26 +21,29 @@ async function checkAddress(url: string) {
   }
 }
 
-checkAddress(REMOTE.url).then((ret) => {
-  if (ret && !LOCAL.available) {
-    REMOTE.available = true;
-    console.log("use url:", REMOTE.url);
-    URL = REMOTE.url;
-  }
-});
-checkAddress(LOCAL.url).then((ret) => {
-  if (ret) {
-    LOCAL.available = true;
-    console.log("use url:", LOCAL.url, ret);
-    URL = LOCAL.url;
-  }
-});
+export async function initNet() {
+  await checkAddress(REMOTE.url).then((ret) => {
+    if (ret && !LOCAL.available) {
+      REMOTE.available = true;
+      console.log("use url:", REMOTE.url);
+      URL = REMOTE.url;
+    }
+  });
+  await checkAddress(LOCAL.url).then((ret) => {
+    if (ret) {
+      LOCAL.available = true;
+      console.log("use url:", LOCAL.url, ret);
+      URL = LOCAL.url;
+    }
+  });
+  console.log("init");
+}
 export async function getSave(id: number) {
   if (id === undefined) {
     throw new Error("id is undefined");
   }
   const rsp: any = await axios.get(URL + "/getSave", { params: { id: id } });
-  // console.log(rsp.data);
+  // console.log(rsp.data.data);
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
   }
@@ -72,4 +75,5 @@ export function setSave(id: number | undefined, user: string, data: string) {
 export default {
   getSave,
   setSave,
+  initNet,
 };

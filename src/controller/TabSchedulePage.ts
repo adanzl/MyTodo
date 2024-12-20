@@ -244,8 +244,8 @@ export default defineComponent({
       // 获取数据
       getSave(1)
         .then((res: any) => {
+          // console.log("getSave", res);
           userData.value = parseUserData(res);
-          console.log("getSave", userData.value);
           updateScheduleData();
           chooseSelectedDate();
           setTimeout(() => {
@@ -484,7 +484,7 @@ export default defineComponent({
           map![scheduleData.id!] = scheduleSave.value!;
         }
         updateScheduleData();
-        // doSaveUserData();
+        doSaveUserData();
       }
       isScheduleModalOpen.value = false;
     };
