@@ -72,8 +72,21 @@ export function setSave(id: number | undefined, user: string, data: string) {
       });
   });
 }
+
+export async function getPicList(pageNum?: number, pageSize?: number) {
+  const rsp: any = await axios.get(URL + "/getAllPic", {
+    params: { pageNum: pageNum, pageSize: pageSize },
+  });
+  // console.log(rsp.data.data);
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
+
 export default {
   getSave,
   setSave,
+  getPicList,
   initNet,
 };

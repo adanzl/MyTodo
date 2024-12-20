@@ -147,10 +147,11 @@ def get_all_pic(page_num=1, page_size=20) -> dict:
             SELECT * FROM {TABLE_PIC} LIMIT ? OFFSET ?;
             """, (page_size, (page_num - 1) * page_size))
         result = cur.fetchall()
+        data = [{'id': r[0], 'data': r[1]} for r in result]
     except Exception as e:
         log.error(e)
         traceback.print_exc()
         return {"code": -1, "msg": 'error ' + str(e)}
     finally:
         cur.close()
-    return {"code": 0, "msg": "ok", "data": result}
+    return {"code": 0, "msg": "ok", "data": data}

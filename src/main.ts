@@ -56,8 +56,7 @@ import {
   IonModal,
 } from "@ionic/vue";
 
-import {initNet as initNet} from "@/modal/NetUtil.ts";
-
+import { initNet as initNet } from "@/modal/NetUtil.ts";
 
 const app = createApp(App).use(IonicVue).use(router);
 
@@ -88,7 +87,8 @@ console.log(`当前 Vue 版本是：${app.version}`);
 // GConfig.init__();
 // https://ionicframework.com/docs/vue/pwa
 // npm cache verify
-initNet();
-router.isReady().then(() => {
+
+router.isReady().then(async () => {
+  await initNet();
   app.mount("#app");
 });
