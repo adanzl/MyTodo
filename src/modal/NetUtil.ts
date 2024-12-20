@@ -3,8 +3,8 @@ import axios from "axios";
 // natapp.cn
 // 最新域名： cat /usr/env/natapp/log/natapp.log
 const REMOTE = { url: "http://2kutu3.natappfree.cc/api", available: false };
-// const LOCAL = { url: "http://192.168.50.184:9527/api", available: false };
-const LOCAL = { url: "http://localhost:8888", available: false };
+const LOCAL = { url: "http://192.168.50.184:9527/api", available: false };
+// const LOCAL = { url: "http://localhost:8888", available: false };
 let URL = "http://2kutu3.natappfree.cc/api";
 // const URL = "http://192.168.50.184:9527/api";
 
@@ -21,14 +21,14 @@ async function checkAddress(url: string) {
   }
 }
 
-await checkAddress(REMOTE.url).then((ret) => {
+checkAddress(REMOTE.url).then((ret) => {
   if (ret && !LOCAL.available) {
     REMOTE.available = true;
     console.log("use url:", REMOTE.url);
     URL = REMOTE.url;
   }
 });
-await checkAddress(LOCAL.url).then((ret) => {
+checkAddress(LOCAL.url).then((ret) => {
   if (ret) {
     LOCAL.available = true;
     console.log("use url:", LOCAL.url, ret);
