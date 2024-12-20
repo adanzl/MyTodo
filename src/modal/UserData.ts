@@ -1,8 +1,14 @@
 import dayjs from "dayjs";
 
-export interface SubTask {
-  id: number;
-  name: string;
+export class SubTask {
+  id: number = -1;
+  name?: string;
+  static Copy(o: SubTask): SubTask {
+    return {
+      id: o.id,
+      name: o.name,
+    };
+  }
 }
 
 // 日程计划数据
@@ -20,6 +26,17 @@ export class ScheduleData {
   repeat: number = 0; // 重复类型
   repeatEndTs?: dayjs.Dayjs; // 重复结束类型
   subTasks: SubTask[] = []; // 子任务列表
+  static Copy(o: ScheduleData) : ScheduleData{
+    const ret = JSON.parse(JSON.stringify(o));
+    ret.startTs = o.startTs?.clone();
+    ret.endTs = o.endTs?.clone();
+    ret.repeatEndTs = o.repeatEndTs?.clone();
+    ret.subTasks = [];
+    for (const subTask of o.subTasks) {
+      ret.subTasks.push(SubTask.Copy(subTask));
+    }
+    return ret;
+  }
   constructor() {
     this.startTs = dayjs().startOf("day");
     this.endTs = dayjs().startOf("day");
@@ -30,6 +47,12 @@ export class ScheduleData {
 export class ScheduleSave {
   state: number = -1;
   subTasks: Record<number, number> = {}; // <number, number>;
+  static Copy(o: ScheduleSave): ScheduleSave {
+    const ret = new ScheduleSave();
+          ret.state = o.state;
+          ret.subTasks = JSON.parse(JSON.stringify(o.subTasks));
+          return ret;
+  }
 }
 
 // 用户数据
@@ -39,6 +62,17 @@ export class UserData {
   schedules: ScheduleData[] = []; // 日程计划列表
   // 计划完成情况  日期->对应日期完成情况(任务id->完成情况)
   save: Record<string, Record<number, ScheduleSave>> = {};
+  static Copy(o: UserData): UserData {
+    const ret = new UserData();
+    ret.id = o.id;
+    ret.name = o.name;
+    ret.schedules = []
+    for (const schedule of o.schedules) {
+      ret.schedules.push(ScheduleData.Copy(schedule));
+    }
+    ret.save = JSON.parse(JSON.stringify(o.save));
+    return ret;
+  }
 }
 
 export const S_TS = (dt?: dayjs.Dayjs): string => {
@@ -62,6 +96,7 @@ export const parseUserData = (jsonStr: string): UserData => {
     schedule.endTs = dayjs(schedule.endTs);
     schedule.repeatEndTs = schedule.repeatEndTs && dayjs(schedule.repeatEndTs);
   }
+
   return ret;
 };
 

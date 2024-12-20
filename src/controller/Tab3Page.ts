@@ -52,7 +52,7 @@ export default defineComponent({
     handleRefresh(event: any) {
       getSave(1)
         .then((res: any) => {
-          this.userData = JSON.parse(res.data);
+          this.userData = parseUserData(res.data);
           for (let i = 0; i < this.userData.schedules.length; i++) {
             const schedule = this.userData.schedules[i];
             schedule.startTs = dayjs(schedule.startTs);

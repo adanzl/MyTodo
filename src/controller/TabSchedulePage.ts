@@ -36,7 +36,12 @@ import { Swiper, SwiperSlide } from "swiper/vue";
 import { defineComponent, nextTick, onMounted, ref } from "vue";
 
 import { getSave, setSave } from "@/modal/NetUtil";
-import { ColorOptions, getColorOptions, getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
+import {
+  ColorOptions,
+  getColorOptions,
+  getGroupOptions,
+  getPriorityOptions,
+} from "@/modal/ScheduleType";
 import { S_TS, ScheduleData, ScheduleSave, UserData, parseUserData } from "@/modal/UserData";
 import { Icon } from "@iconify/vue";
 import "@ionic/vue/css/ionic-swiper.css";
@@ -80,12 +85,7 @@ export default defineComponent({
   setup() {
     // https://iconify.design/docs/icon-components/vue/
     // https://yesicon.app/search/roman?coll=mdi
-    const userData = ref<UserData>({
-      id: 1,
-      name: "leo",
-      schedules: [],
-      save: {},
-    });
+    const userData = ref<UserData>(new UserData());
     let currentDate = dayjs().startOf("day");
     let pTouch: any;
     let lstTs = 0;
@@ -168,7 +168,10 @@ export default defineComponent({
                 }
               } else if (schedule.repeat == 4) {
                 // yearly
-                if (_dt.date() == schedule.startTs.date() && _dt.month() == schedule.startTs.month()) {
+                if (
+                  _dt.date() == schedule.startTs.date() &&
+                  _dt.month() == schedule.startTs.month()
+                ) {
                   dayData.events.push(schedule);
                 }
               }
@@ -388,7 +391,11 @@ export default defineComponent({
       return selectedDate.value!.save[scheduleId]?.state === 1;
     };
     // 日程状态改变
-    const onScheduleCheckboxChange = (_event: any, day: DayData | undefined, scheduleId: number) => {
+    const onScheduleCheckboxChange = (
+      _event: any,
+      day: DayData | undefined,
+      scheduleId: number
+    ) => {
       if (day) {
         // console.log("onScheduleCheckboxChange", day, scheduleId);
         const preSave = day.save[scheduleId] || {
@@ -414,7 +421,7 @@ export default defineComponent({
     // 日程按钮点击
     const btnScheduleClk = (event: any, schedule: ScheduleData) => {
       isScheduleModalOpen.value = true;
-      scheduleModalData.value = schedule as ScheduleData;
+      scheduleModalData.value = schedule;
       scheduleSave.value = selectedDate.value?.save[schedule.id];
       event.stopPropagation();
       // console.log("btnScheduleClk", schedule, scheduleSave.value);
@@ -433,7 +440,9 @@ export default defineComponent({
       // 处理数据
       scheduleDelConfirm.value.isOpen = false;
       if (event.detail.role === "confirm") {
-        const idx = userData.value.schedules.findIndex((s) => s.id === scheduleDelConfirm.value.data.id);
+        const idx = userData.value.schedules.findIndex(
+          (s) => s.id === scheduleDelConfirm.value.data.id
+        );
         if (idx !== -1) {
           userData.value.schedules.splice(idx, 1);
         }
@@ -452,7 +461,7 @@ export default defineComponent({
     };
     // 添加日程页面关闭回调
     const onScheduleModalDismiss = (event: any) => {
-      console.log("onScheduleModalDismiss", event, event.detail.data);
+      // console.log("onScheduleModalDismiss", event, event.detail.data);
       const [scheduleData, save] = event.detail.data;
       if (event.detail.role === "confirm") {
         // 处理数据

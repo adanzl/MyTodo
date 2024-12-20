@@ -8,7 +8,7 @@ import {
   RepeatOptions,
   getGroupOptions,
 } from "@/modal/ScheduleType";
-import { ScheduleData, ScheduleSave, SubTask, parseScheduleData } from "@/modal/UserData";
+import { ScheduleData, ScheduleSave, SubTask } from "@/modal/UserData";
 import { Icon } from "@iconify/vue";
 
 import {
@@ -59,15 +59,21 @@ export default defineComponent({
   },
   props: {
     modal: Object,
-    schedule: Object,
-    save: Object,
+    schedule: {
+      type: Object,
+      default: new ScheduleData(),
+    },
+    save: {
+      type: Object,
+      default: new ScheduleSave(),
+    },
   },
   emits: ["update:schedule", "update:save"],
   setup(props: any) {
     // 当前日程
-    const curScheduleData = ref<ScheduleData>(new ScheduleData());
+    const curScheduleData = ref<ScheduleData>(ScheduleData.Copy(props.schedule));
     // 日程存档
-    const curSave = ref<ScheduleSave>(new ScheduleSave());
+    const curSave = ref<ScheduleSave>(ScheduleSave.Copy(props.save));
     const dateShowFlag = ref(false); // 开始日期选择器显示标记
     const scheduleTab = ref(); // 日程tab
     const scheduleDTComponent = ref(); // 日期选择器组件
@@ -87,6 +93,7 @@ export default defineComponent({
     const reminderOptions = ref(ReminderOptions); //  提醒选项
 
     const refreshUI = () => {
+      // console.log("refreshUI", curScheduleData.value, curSave.value, props);
       // task 排序
       curScheduleData.value?.subTasks.sort((a: SubTask, b: SubTask) => {
         const sa = curSave.value.subTasks[a.id] || 0;
@@ -102,16 +109,16 @@ export default defineComponent({
       watch(
         () => props.schedule,
         () => {
-          if (props.schedule) curScheduleData.value = parseScheduleData(JSON.stringify(props.schedule));
-          else curScheduleData.value = new ScheduleData();
+          if (props.schedule) {
+            curScheduleData.value =ScheduleData.Copy( props.schedule);
+          }
           refreshUI();
         }
       );
       watch(
         () => props.save,
         () => {
-          if (props.save) curSave.value = JSON.parse(JSON.stringify(props.save));
-          else curSave.value = new ScheduleSave();
+          if (props.save) curSave.value = ScheduleSave.Copy(props.save);
           refreshUI();
         }
       );
@@ -293,8 +300,10 @@ export default defineComponent({
     };
     // 返回cancel
     const btnCancelClk = () => {
-      curSave.value = props.save;
-      curScheduleData.value = props.schedule;
+      // console.log("cancel", props.save, props.schedule);
+      curScheduleData.value = ScheduleData.Copy(props.schedule);
+      curSave.value = ScheduleSave.Copy(props.save);
+      refreshUI();
       props.modal?.$el.dismiss([], "cancel");
     };
 
