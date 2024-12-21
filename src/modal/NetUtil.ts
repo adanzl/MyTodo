@@ -2,10 +2,10 @@ import axios from "axios";
 // const URL = "https://3ft23fh89533.vicp.fun/api";
 // natapp.cn
 // 最新域名： cat /usr/env/natapp/log/natapp.log
-const REMOTE = { url: "http://2kutu3.natappfree.cc/api", available: false };
+const REMOTE = { url: "http://cm9ic5.natappfree.cc/api", available: false };
 const LOCAL = { url: "http://192.168.50.184:9527/api", available: false };
 // const LOCAL = { url: "http://localhost:8888", available: false };
-let URL = "http://2kutu3.natappfree.cc/api";
+let URL = "";
 // const URL = "http://192.168.50.184:9527/api";
 
 async function checkAddress(url: string) {
