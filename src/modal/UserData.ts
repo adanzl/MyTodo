@@ -1,12 +1,14 @@
 import dayjs from "dayjs";
 
-export class SubTask {
+export class Subtask {
   id: number = -1;
-  name?: string;
-  static Copy(o: SubTask): SubTask {
+  name?: string = "";
+  imgIds: number[] = []; // 图片id列表
+  static Copy(o: Subtask): Subtask {
     return {
       id: o.id,
       name: o.name,
+      imgIds: o.imgIds?.concat(),
     };
   }
 }
@@ -25,15 +27,17 @@ export class ScheduleData {
   reminder: number = 0; // 提醒类型
   repeat: number = 0; // 重复类型
   repeatEndTs?: dayjs.Dayjs; // 重复结束类型
-  subTasks: SubTask[] = []; // 子任务列表
-  static Copy(o: ScheduleData) : ScheduleData{
+  subtasks: Subtask[] = []; // 子任务列表
+  static Copy(o: ScheduleData): ScheduleData {
     const ret = JSON.parse(JSON.stringify(o));
     ret.startTs = o.startTs?.clone();
     ret.endTs = o.endTs?.clone();
     ret.repeatEndTs = o.repeatEndTs?.clone();
-    ret.subTasks = [];
-    for (const subTask of o.subTasks) {
-      ret.subTasks.push(SubTask.Copy(subTask));
+    ret.subtasks = [];
+    if (o.subtasks) {
+      for (const subtask of o.subtasks) {
+        ret.subtasks.push(Subtask.Copy(subtask));
+      }
     }
     return ret;
   }
@@ -46,12 +50,12 @@ export class ScheduleData {
 // 日程存档
 export class ScheduleSave {
   state: number = -1;
-  subTasks: Record<number, number> = {}; // <number, number>;
+  subtasks: Record<number, number> = {}; // <number, number>;
   static Copy(o: ScheduleSave): ScheduleSave {
     const ret = new ScheduleSave();
-          ret.state = o.state;
-          ret.subTasks = JSON.parse(JSON.stringify(o.subTasks));
-          return ret;
+    ret.state = o.state;
+    ret.subtasks = JSON.parse(JSON.stringify(o.subtasks));
+    return ret;
   }
 }
 
@@ -66,7 +70,7 @@ export class UserData {
     const ret = new UserData();
     ret.id = o.id;
     ret.name = o.name;
-    ret.schedules = []
+    ret.schedules = [];
     for (const schedule of o.schedules) {
       ret.schedules.push(ScheduleData.Copy(schedule));
     }
@@ -98,6 +102,9 @@ export const parseUserData = (jsonStr: string): UserData => {
     schedule.startTs = dayjs(schedule.startTs);
     schedule.endTs = dayjs(schedule.endTs);
     schedule.repeatEndTs = schedule.repeatEndTs && dayjs(schedule.repeatEndTs);
+    if (schedule.subtasks === undefined) {
+      schedule.subtasks = [];
+    }
   }
 
   return ret;

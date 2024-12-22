@@ -3,7 +3,7 @@ ion-modal#pop-modal {
     --min-width: fit-content;
     --height: 100%;
     --min-height: 50%;
-    --border-radius: 6px;
+    /* --border-radius: 6px; */
     --box-shadow: 0 28px 48px rgba(0, 0, 0, 0.4);
 }
 
@@ -42,6 +42,7 @@ ion-modal#pop-modal {
     margin-left: 6px;
     margin-bottom: 2px;
 }
+
 .schedule-lb-group {
     white-space: nowrap;
     width: 50px;
@@ -62,4 +63,10 @@ ion-item[slot='header'] ion-icon {
 
 ion-item[slot='header'] {
     margin: 0;
+}
+
+
+.schedule-group-item::part(native) {
+    height: 35px !important;
+    min-height: 0 !important;
 }

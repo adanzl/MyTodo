@@ -35,7 +35,7 @@ import { Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
 import { defineComponent, nextTick, onMounted, ref } from "vue";
 
-import { getSave, setSave } from "@/modal/NetUtil";
+import { getSave, setSave } from "@/utils/NetUtil";
 import {
   ColorOptions,
   getColorOptions,
@@ -244,8 +244,8 @@ export default defineComponent({
       // 获取数据
       getSave(1)
         .then((res: any) => {
-          // console.log("getSave", res);
           userData.value = parseUserData(res);
+          console.log("getSave", userData.value);
           updateScheduleData();
           chooseSelectedDate();
           setTimeout(() => {

@@ -4,6 +4,7 @@
     aria-hidden="true"
     id="colorSelector"
     mode="ios"
+    class="bottom-modal"
     @ionModalDidDismiss="onModalDismiss">
     <ion-item>
       <ion-title>颜色选择</ion-title>
@@ -18,7 +19,7 @@
             class="option-item">
             <ion-item lines="none" style="flex: 1">
               <span :style="{ 'background-color': op.tag }" class="v-dot" slot="start"></span>
-              <ion-label style="margin-left: 5px;">{{ op.label }}</ion-label>
+              <ion-label style="margin-left: 5px">{{ op.label }}</ion-label>
             </ion-item>
           </ion-radio>
         </ion-radio-group>
@@ -33,7 +34,7 @@
 
 <script lang="ts" setup>
 import { onMounted, ref, watch } from "vue";
-import { createTriggerController } from "@/modal/Overlay.ts";
+import { createTriggerController } from "@/utils/Overlay";
 import { IonRadioGroup, IonRadio } from "@ionic/vue";
 import { ColorOptions } from "@/modal/ScheduleType";
 
@@ -88,32 +89,6 @@ const onModalDismiss = () => {
 </script>
 
 <style scoped>
-ion-modal {
-  --height: 50%;
-  --width: 95%;
-  /* --border-radius: 16px; */
-  /* --box-shadow: 0 28px 48px rgba(0, 0, 0, 0.4); */
-  align-items: end;
-}
-ion-modal {
-  bottom: var(--ion-safe-area-bottom);
-}
-
-ion-footer {
-  display: flex;
-  justify-content: space-around;
-}
-ion-radio {
-  --border-radius: 4px;
-  --inner-border-radius: 4px;
-
-  --color: #ddd;
-  --color-checked: #6815ec;
-}
-ion-modal::part(backdrop) {
-  background-color: var(--ion-color-dark) !important;
-  opacity: 0.3 !important;
-}
 .option-item::part(label) {
   margin: 0;
   width: 100%;

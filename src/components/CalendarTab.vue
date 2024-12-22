@@ -5,7 +5,10 @@
         {{ head }}
       </ion-col>
     </ion-row>
-    <ion-row class="calendar-row" v-for="week in minimal ? minSlide?.weekArr : slide.weekArr" :key="week">
+    <ion-row
+      class="calendar-row"
+      v-for="week in minimal ? minSlide?.weekArr : slide.weekArr"
+      :key="week">
       <ion-col
         class="ion-text-center ion-no-padding"
         @click="daySelectCallback(slide, day)"
@@ -14,7 +17,9 @@
         <ion-chip
           :class="{
             vertical: true,
-            transparent: day.dt.unix() !== selectedDate.dt.unix() && day.dt.unix() !== dayjs().startOf('day').unix(),
+            transparent:
+              day.dt.unix() !== selectedDate.dt.unix() &&
+              day.dt.unix() !== dayjs().startOf('day').unix(),
             selected: selectedDate && day.dt.unix() === selectedDate.dt.unix(),
             today:
               day.dt.unix() === dayjs().startOf('day').unix() &&
@@ -89,12 +94,14 @@ watch(() => props.minimal, onMinimalChange, { deep: true });
 const weekHead = ["日", "一", "二", "三", "四", "五", "六"];
 </script>
 <style escaped lang="css">
+ion-chip {
+  margin: 0;
+}
 ion-chip.selected {
   --color: #fff !important;
   --background: #ff3609 !important;
 }
 ion-chip.today {
-  /* --color: #fff !important; */
   --background: yellow !important;
 }
 .dot {
@@ -104,14 +111,5 @@ ion-chip.today {
   border-radius: 50%;
   background-color: #007bff;
   margin-top: 5px;
-}
-
-.vertical {
-  display: flex;
-  flex-direction: column;
-}
-
-.gray {
-  --color: #b5b1b1 !important;
 }
 </style>

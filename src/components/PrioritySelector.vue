@@ -4,6 +4,7 @@
     aria-hidden="true"
     id="prioritySelector"
     mode="ios"
+    class="bottom-modal"
     @ionModalDidDismiss="onModalDismiss">
     <ion-item>
       <ion-title>优先级</ion-title>
@@ -18,7 +19,7 @@
             class="option-item">
             <ion-item lines="none" style="flex: 1">
               <span><Icon :icon="op.icon" :height="'36'" :color="op.color"></Icon></span>
-              <ion-label style="margin-left: 8px;">{{ op.label }}</ion-label>
+              <ion-label style="margin-left: 8px">{{ op.label }}</ion-label>
             </ion-item>
           </ion-radio>
         </ion-radio-group>
@@ -33,7 +34,7 @@
 
 <script lang="ts" setup>
 import { onMounted, ref, watch } from "vue";
-import { createTriggerController } from "@/modal/Overlay.ts";
+import { createTriggerController } from "@/utils/Overlay";
 import { IonRadioGroup, IonRadio } from "@ionic/vue";
 import { PriorityOptions } from "@/modal/ScheduleType";
 import { Icon } from "@iconify/vue";
@@ -88,30 +89,6 @@ const onModalDismiss = () => {
 </script>
 
 <style scoped>
-ion-modal {
-  --height: 50%;
-  --width: 95%;
-  align-items: end;
-}
-ion-modal {
-  bottom: var(--ion-safe-area-bottom);
-}
-
-ion-footer {
-  display: flex;
-  justify-content: space-around;
-}
-ion-radio {
-  --border-radius: 4px;
-  --inner-border-radius: 4px;
-
-  --color: #ddd;
-  --color-checked: #6815ec;
-}
-ion-modal::part(backdrop) {
-  background-color: var(--ion-color-dark) !important;
-  opacity: 0.3 !important;
-}
 .option-item {
   display: block;
   overflow: hidden;

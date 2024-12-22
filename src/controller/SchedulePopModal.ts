@@ -1,6 +1,7 @@
 import ColorSelector from "@/components/ColorSelector.vue";
 import PrioritySelector from "@/components/PrioritySelector.vue";
 import GroupSelector from "@/components/GroupSelector.vue";
+import SubtaskPopModal from "@/components/SubtaskPopModal.vue";
 import {
   getColorOptions,
   ReminderOptions,
@@ -8,7 +9,7 @@ import {
   RepeatOptions,
   getGroupOptions,
 } from "@/modal/ScheduleType";
-import { ScheduleData, ScheduleSave, SubTask } from "@/modal/UserData";
+import { ScheduleData, ScheduleSave, Subtask } from "@/modal/UserData";
 import { Icon } from "@iconify/vue";
 
 import {
@@ -28,7 +29,6 @@ import localizedFormat from "dayjs/plugin/localizedFormat";
 import "dayjs/locale/zh-cn";
 dayjs.extend(localizedFormat);
 dayjs.locale("zh-cn");
-
 
 import {
   add,
@@ -61,6 +61,7 @@ export default defineComponent({
     ColorSelector,
     PrioritySelector,
     GroupSelector,
+    SubtaskPopModal,
     Icon,
   },
   props: {
@@ -89,7 +90,8 @@ export default defineComponent({
     const repeatEndTsComponent = ref(); // 重复结束日期选择器
     const repeatEndTsModal = ref(); // 重复结束日期选择器modal
     const scheduleType = ref("0"); // 日期类型 0:start 1:end
-    const addSubtaskInput = ref(); // 新增子任务输入框
+    const openSubtaskModal = ref(false);
+    const curSubtask = ref<any>();
     // 提示框数据
     const toastData = ref({
       isOpen: false,
@@ -101,9 +103,9 @@ export default defineComponent({
     const refreshUI = () => {
       // console.log("refreshUI", curScheduleData.value, curSave.value, props);
       // task 排序
-      curScheduleData.value?.subTasks.sort((a: SubTask, b: SubTask) => {
-        const sa = curSave.value.subTasks[a.id] || 0;
-        const sb = curSave.value.subTasks[b.id] || 0;
+      curScheduleData.value?.subtasks.sort((a: Subtask, b: Subtask) => {
+        const sa = curSave.value.subtasks[a.id] || 0;
+        const sb = curSave.value.subtasks[b.id] || 0;
         if (sa === sb) {
           return a.id - b.id;
         }
@@ -116,7 +118,7 @@ export default defineComponent({
         () => props.schedule,
         () => {
           if (props.schedule) {
-            curScheduleData.value =ScheduleData.Copy( props.schedule);
+            curScheduleData.value = ScheduleData.Copy(props.schedule);
           }
           refreshUI();
         }
@@ -239,55 +241,63 @@ export default defineComponent({
     };
     // ============ Tab3 ============
     // 子任务状态改变
-    const onSubtaskCheckboxChange = (event: any, task?: SubTask) => {
+    const onSubtaskCheckboxChange = (event: any, task?: Subtask) => {
       if (task) {
-        curSave.value!.subTasks[task.id] = event.detail.checked ? 1 : 0;
+        curSave.value!.subtasks[task.id] = event.detail.checked ? 1 : 0;
       }
       // task 排序
-      curScheduleData.value!.subTasks.sort((a: SubTask, b: SubTask) => {
-        const sa = curSave.value!.subTasks[a.id] || 0;
-        const sb = curSave.value!.subTasks[b.id] || 0;
+      curScheduleData.value!.subtasks.sort((a: Subtask, b: Subtask) => {
+        const sa = curSave.value!.subtasks[a.id] || 0;
+        const sb = curSave.value!.subtasks[b.id] || 0;
         if (sa === sb) {
           return a.id - b.id;
         }
         return sa - sb;
       });
       // 如果所有子任务都完成了，整个任务变成完成状态
-      const cnt = curScheduleData.value.subTasks?.filter((t: any) => subTaskChecked(t)).length;
-      if (cnt === curScheduleData.value.subTasks?.length) {
+      const cnt = curScheduleData.value.subtasks?.filter((t: any) => subTaskChecked(t)).length;
+      if (cnt === curScheduleData.value.subtasks?.length) {
         curSave.value!.state = 1;
         // onTaskCheckboxChange
       }
     };
-    const subTaskChecked = (task: SubTask) => {
-      return (curSave.value!.subTasks[task.id] || 0) === 1;
+    const subTaskChecked = (task: Subtask) => {
+      return (curSave.value!.subtasks[task.id] || 0) === 1;
     };
-    // 子任务名称改变
-    const onSubtaskInputChange = (event: any, task?: SubTask) => {
-      // console.log("onSubtaskInputChange", event.detail.value, task);
-      if (task) {
-        if (event.detail.value) {
-          task.name = event.detail.value;
-        } else {
-          // 移除
-          btnSubtaskRemoveClk(null, task);
-        }
+    // 子任务更新
+    const onSubtaskChange = (task: Subtask) => {
+      console.log("onSubtaskChange", task);
+      if (task.id === -1) {
+        // 新建
+        task.id = curScheduleData.value.subtasks.length;
+        curScheduleData.value.subtasks?.unshift(task);
       } else {
-        if (event.detail.value) {
-          curScheduleData.value.subTasks?.unshift({
-            id: curScheduleData.value.subTasks.length,
-            name: event.detail.value,
-          });
+        // 更新
+        for (const subtask of curScheduleData.value.subtasks) {
+          if (subtask.id === task.id) {
+            subtask.name = task.name;
+            subtask.imgIds = task.imgIds;
+            break;
+          }
         }
-        addSubtaskInput.value = "";
       }
     };
 
+    // 子任务点击
+    const onSubtaskClk = (_event: any, task: Subtask) => {
+      curSubtask.value = task as Subtask;
+      openSubtaskModal.value = true;
+    };
+    // 子任务添加点击
+    const btnSubtaskAddClk = () => {
+      curSubtask.value = null;
+      openSubtaskModal.value = true;
+    };
     // 子任务移除点击
-    const btnSubtaskRemoveClk = (event: any, task: SubTask) => {
-      for (let i = 0; i < curScheduleData.value.subTasks?.length; i++) {
-        if (curScheduleData.value.subTasks[i].id === task.id) {
-          curScheduleData.value.subTasks.splice(i, 1);
+    const btnSubtaskRemoveClk = (_event: any, task: Subtask) => {
+      for (let i = 0; i < curScheduleData.value.subtasks?.length; i++) {
+        if (curScheduleData.value.subtasks[i].id === task.id) {
+          curScheduleData.value.subtasks.splice(i, 1);
           break;
         }
       }
@@ -314,6 +324,8 @@ export default defineComponent({
     };
 
     return {
+      openSubtaskModal,
+      curSubtask,
       curScheduleData,
       scheduleDTComponent,
       scheduleStartTsComponent,
@@ -323,7 +335,6 @@ export default defineComponent({
       chevronBackOutline,
       dtComponentItem,
       scheduleType,
-      addSubtaskInput,
       toastData,
       reminderOptions,
       dayjs,
@@ -356,7 +367,7 @@ export default defineComponent({
       onSubtaskCheckboxChange,
       onColorChange,
       subTaskChecked,
-      onSubtaskInputChange,
+      onSubtaskChange,
       btnScheduleDTClk,
       btnDatetimeOkClk,
       btnRepeatEndOkClk,
@@ -367,6 +378,8 @@ export default defineComponent({
       btnScheduleDatetimeOkClk,
       onScheduleDatetimeAllDayChange,
       btnCancelClk,
+      onSubtaskClk,
+      btnSubtaskAddClk,
       RepeatOptions,
     };
   },

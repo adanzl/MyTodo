@@ -48,7 +48,7 @@
               Remind: {{ schedule.reminder }} | Repeat: {{ schedule.repeat }} | RepeatEnd:
               {{ S_TS(schedule.repeatEndTs) }}
             </p>
-            <p v-for="(task, idx) in schedule.subTasks" :key="idx">
+            <p v-for="(task, idx) in schedule.subtasks" :key="idx">
               {{ task.name }}
             </p>
           </ion-label>

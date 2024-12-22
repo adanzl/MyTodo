@@ -56,7 +56,7 @@ import {
   IonModal,
 } from "@ionic/vue";
 
-import { initNet as initNet } from "@/modal/NetUtil.ts";
+import { initNet as initNet } from "@/utils/NetUtil";
 
 const app = createApp(App).use(IonicVue).use(router);
 

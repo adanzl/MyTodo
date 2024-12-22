@@ -42,8 +42,9 @@
         expand="full"
         fill="clear"
         size="small"
+        class="ion-no-margin"
         @click="btnCalendarFoldClk()">
-        <ion-icon :icon="bFold ? chevronDown : chevronUp" size="medium" color="primary"> </ion-icon>
+        <ion-icon :icon="bFold ? chevronDown : chevronUp" color="primary"> </ion-icon>
       </ion-button>
       <!-- 日程列表 -->
       <ion-content
@@ -55,8 +56,9 @@
         </ion-refresher>
         <ion-accordion-group :multiple="true" :value="['schedule', 'goals']">
           <ion-accordion value="schedule">
-            <ion-item slot="header" color="light" size="small">
+            <ion-item slot="header" color="light" class="schedule-group-item">
               <ion-label>{{ selectedDate?.dt.format("MM-DD") }}</ion-label>
+              <p style="margin-right: 8px;" class="gray">{{ selectedDate?.events.length }}</p>
             </ion-item>
             <div slot="content">
               <ion-list
@@ -90,10 +92,10 @@
                               :icon="listOutline"
                               style="position: relative; top: 3px"></ion-icon>
                             {{
-                              schedule?.subTasks?.filter(
-                                (t) => (selectedDate?.save[schedule.id]?.subTasks[t.id] || 0) === 1
+                              schedule?.subtasks?.filter(
+                                (t) => (selectedDate?.save[schedule.id]?.subtasks[t.id] || 0) === 1
                               ).length
-                            }}/{{ schedule?.subTasks?.length }}
+                            }}/{{ schedule?.subtasks?.length }}
                           </p>
                           <p class="schedule-lb-group">
                             {{ getGroupOptions(schedule.groupId).label }}
@@ -132,7 +134,7 @@
             </div>
           </ion-accordion>
           <ion-accordion value="goals">
-            <ion-item slot="header" color="light">
+            <ion-item slot="header" color="light" class="schedule-group-item">
               <ion-label>里程碑</ion-label>
             </ion-item>
             <div class="ion-padding" slot="content">Content</div>

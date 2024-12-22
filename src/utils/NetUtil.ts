@@ -12,7 +12,7 @@ async function checkAddress(url: string) {
   try {
     const response = await axios
       .create({
-        timeout: 200,
+        timeout: 500,
       })
       .head(url + "/");
     return response.status >= 200 && response.status < 300;
@@ -73,7 +73,7 @@ export function setSave(id: number | undefined, user: string, data: string) {
   });
 }
 
-export async function setPic(id: number | undefined, data: string) {
+export async function setPic(id: number | undefined, data: string): Promise<string> {
   const rsp: any = await axios.post(URL + "/setPic", {
     id: id,
     data: data,
@@ -103,11 +103,20 @@ export async function getPicList(pageNum?: number, pageSize?: number) {
   }
   return rsp.data.data;
 }
+export async function getPic(id: number): Promise<string> {
+  const rsp: any = await axios.get(URL + "/getPic", { params: { id: id } });
+  console.log("getPic", rsp.data);
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
 
 export default {
   getSave,
   setSave,
   getPicList,
+  getPic,
   setPic,
   delPic,
   initNet,

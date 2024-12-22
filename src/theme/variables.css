@@ -48,3 +48,43 @@ ion-modal::part(content) {
 ion-content::part(scroll)::-webkit-scrollbar {
   display: none;
 }
+
+:root {
+  --color-gray: #b5b1b1;
+}
+
+.vertical {
+  display: flex;
+  flex-direction: column;
+}
+
+.gray {
+  color: var(--color-gray) !important;
+}
+
+.bottom-modal ion-footer {
+  display: flex;
+  justify-content: space-around;
+}
+
+.bottom-modal ::part(backdrop) {
+  background-color: var(--ion-color-dark) !important;
+  opacity: 0.3 !important;
+}
+
+.bottom-modal {
+  --height: 50%;
+  --width: 95%;
+  align-items: end;
+  bottom: var(--ion-safe-area-bottom);
+}
+
+.pre-img-block {
+  display: flex;
+  width: 100px;
+  height: 100px;
+  align-items: center;
+  justify-content: center;
+  font-size: 5em;
+  border: 1px solid #0054e9;
+}

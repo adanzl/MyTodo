@@ -1,5 +1,5 @@
 import icons from "@/modal/Icons";
-import { getSave } from "@/modal/NetUtil";
+import { getSave } from "@/utils/NetUtil";
 import { getColorOptions, getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
 import { S_TS, UserData, parseUserData } from "@/modal/UserData";
 import { Icon } from "@iconify/vue";

@@ -75,7 +75,7 @@
             <div class="ion-text-center">
               <ion-label>{{ curScheduleData.startTs?.format("MM-DD,ddd") }}</ion-label>
               <ion-label color="tertiary" class="font-size-mini">
-                {{ curScheduleData.allDay ? "All Day" : curScheduleData?.startTs?.format("HH:mm") }}
+                {{ curScheduleData.allDay ? "全天" : curScheduleData?.startTs?.format("HH:mm") }}
               </ion-label>
             </div>
             <div>
@@ -84,7 +84,7 @@
             <div class="ion-text-center">
               <ion-label>{{ curScheduleData.endTs?.format("MM-DD,ddd") }}</ion-label>
               <ion-label color="tertiary" class="font-size-mini">
-                {{ curScheduleData.allDay ? "All Day" : curScheduleData?.endTs?.format("HH:mm") }}
+                {{ curScheduleData.allDay ? "全天" : curScheduleData?.endTs?.format("HH:mm") }}
               </ion-label>
             </div>
           </div>
@@ -231,31 +231,43 @@
           <ion-icon :icon="listOutline" slot="start"></ion-icon>
           <ion-label>子任务</ion-label>
           <span>
-            {{ curScheduleData?.subTasks?.filter((t: any) => subTaskChecked(t)).length }}/{{
-              curScheduleData?.subTasks?.length
+            {{ curScheduleData?.subtasks?.filter((t: any) => subTaskChecked(t)).length }}/{{
+              curScheduleData?.subtasks?.length
             }}
           </span>
         </ion-item>
         <!-- 子任务 -->
         <ion-item lines="none">
           <ion-icon :icon="add" slot="start" style="width: 22px"></ion-icon>
-          <ion-input
-            v-model="addSubtaskInput"
-            placeholder="添加子任务"
-            @ionChange="onSubtaskInputChange($event, undefined)">
-          </ion-input>
+          <ion-button @click="btnSubtaskAddClk">添加子任务</ion-button>
         </ion-item>
-        <ion-item v-for="task in curScheduleData?.subTasks" :key="task">
+        <SubtaskPopModal
+          @update:value="onSubtaskChange"
+          :value="curSubtask"
+          :is-open="openSubtaskModal"
+          @ion-modal-will-dismiss="
+            () => {
+              openSubtaskModal = false;
+            }
+          ">
+        </SubtaskPopModal>
+        <ion-item
+          v-for="(task, idx) in curScheduleData?.subtasks"
+          @click="onSubtaskClk($event, task)"
+          :key="idx">
           <ion-checkbox
             slot="start"
             :checked="subTaskChecked(task)"
             @ionChange="onSubtaskCheckboxChange($event, task)">
           </ion-checkbox>
-          <ion-input
-            :value="task.name"
-            @ionChange="onSubtaskInputChange($event, task)"
-            :class="{ 'text-line-through': subTaskChecked(task) }">
-          </ion-input>
+          <div class="width-100">
+            <ion-label :class="{ 'text-line-through': subTaskChecked(task) }" class="ion-no-margin">
+              {{ task.name }}
+            </ion-label>
+            <div class="pre-img-block" v-for="(img, idx) in task.imgIds" :key="idx">
+              {{ img }}
+            </div>
+          </div>
           <ion-icon
             :icon="removeCircleOutline"
             slot="end"
