@@ -111,7 +111,8 @@ def set_pic(id, data) -> dict:
                 INSERT INTO {TABLE_PIC} (data) VALUES (?);
                 """, (data, ))
         conn.commit()
-        id = cur.lastrowid
+        if not id:
+            id = cur.lastrowid
     except Exception as e:
         log.error(e)
         traceback.print_exc()
