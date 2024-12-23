@@ -81,7 +81,7 @@ def get_pic(id) -> dict:
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     try:
-        cur.execute(f"SELECT * FROM {TABLE_PIC} WHERE id=?", (id))
+        cur.execute(f"SELECT * FROM {TABLE_PIC} WHERE id=?", (id,))
         result = cur.fetchone()
         if result:
             data = result[1]
