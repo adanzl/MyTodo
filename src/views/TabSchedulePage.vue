@@ -58,7 +58,7 @@
           <ion-accordion value="schedule">
             <ion-item slot="header" color="light" class="schedule-group-item">
               <ion-label>{{ selectedDate?.dt.format("MM-DD") }}</ion-label>
-              <p style="margin-right: 8px;" class="gray">{{ selectedDate?.events.length }}</p>
+              <p style="margin-right: 8px" class="gray">{{ selectedDate?.events.length }}</p>
             </ion-item>
             <div slot="content">
               <ion-list
@@ -91,11 +91,9 @@
                             <ion-icon
                               :icon="listOutline"
                               style="position: relative; top: 3px"></ion-icon>
-                            {{
-                              schedule?.subtasks?.filter(
-                                (t) => (selectedDate?.save[schedule.id]?.subtasks[t.id] || 0) === 1
-                              ).length
-                            }}/{{ schedule?.subtasks?.length }}
+                            {{ countFinishedSubtask(schedule) }}
+                            /
+                            {{ schedule?.subtasks?.length }}
                           </p>
                           <p class="schedule-lb-group">
                             {{ getGroupOptions(schedule.groupId).label }}

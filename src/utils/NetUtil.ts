@@ -12,7 +12,7 @@ async function checkAddress(url: string) {
   try {
     const response = await axios
       .create({
-        timeout: 500,
+        timeout: 1000,
       })
       .head(url + "/");
     return response.status >= 200 && response.status < 300;
@@ -21,22 +21,24 @@ async function checkAddress(url: string) {
   }
 }
 
-export async function initNet() {
-  await checkAddress(REMOTE.url).then((ret) => {
+export async function initNet(): Promise<void> {
+  const b1 = await checkAddress(REMOTE.url).then((ret) => {
     if (ret && !LOCAL.available) {
       REMOTE.available = true;
       console.log("use url:", REMOTE.url);
       URL = REMOTE.url;
     }
+    return ret;
   });
-  await checkAddress(LOCAL.url).then((ret) => {
+  const b2 = await checkAddress(LOCAL.url).then((ret) => {
     if (ret) {
       LOCAL.available = true;
       console.log("use url:", LOCAL.url, ret);
       URL = LOCAL.url;
     }
+    return ret;
   });
-  console.log("init net");
+  console.log("init net ", b1, b2);
 }
 export async function getSave(id: number) {
   if (id === undefined) {
@@ -51,7 +53,7 @@ export async function getSave(id: number) {
 }
 
 export function setSave(id: number | undefined, user: string, data: string) {
-  // console.log(data); 
+  // console.log(data);
   return new Promise((resolve, reject) => {
     if (id === undefined) {
       reject(new Error("id is undefined"));

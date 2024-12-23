@@ -24,6 +24,7 @@ import {
   IonSegmentView,
   IonSelect,
   IonSelectOption,
+  IonActionSheet,
 } from "@ionic/vue";
 import dayjs from "dayjs";
 import localizedFormat from "dayjs/plugin/localizedFormat";
@@ -64,6 +65,7 @@ export default defineComponent({
     PrioritySelector,
     GroupSelector,
     SubtaskPopModal,
+    IonActionSheet,
     Icon,
   },
   props: {
@@ -95,6 +97,8 @@ export default defineComponent({
     const openSubtaskModal = ref(false);
     const curSubtask = ref<any>();
     const imgs = ref<Record<number, string>>({});
+    let changeFlag = false; // 改变标记 日程中可覆盖的值被修改的标记
+    const openSaveSheet = ref(false); // 保存面板显示标记
     // 提示框数据
     const toastData = ref({
       isOpen: false,
@@ -144,25 +148,29 @@ export default defineComponent({
     });
 
     // ============ Tab1 ============
+    // 任务标题
+    const onTitleChange = (event: any) => {
+      curScheduleData.value!.title = event.detail.value;
+      changeFlag = true;
+    };
     // 任务状态改变
     const onTaskCheckboxChange = (event: any) => {
       curSave.value!.state = event.detail.checked ? 1 : 0;
     };
-    // 日程类型切换
-    const onTypeChange = (event: any) => {
-      console.log(event.detail.value);
-    };
     // 颜色选择
     const onColorChange = (nv: number) => {
       curScheduleData.value!.color = nv;
+      changeFlag = true;
     };
     // 优先级选择
     const onPriorityChange = (nv: number) => {
       curScheduleData.value!.priority = nv;
+      changeFlag = true;
     };
     // 分组选择
     const onGroupChange = (nv: number) => {
       curScheduleData.value!.groupId = nv;
+      changeFlag = true;
     };
     // ============ Tab2 ============
     // 日期类型切换，开始日期和结束日期
@@ -292,6 +300,7 @@ export default defineComponent({
           }
         }
       }
+      changeFlag = true;
     };
 
     // 子任务点击
@@ -319,6 +328,7 @@ export default defineComponent({
                   break;
                 }
               }
+              changeFlag = true;
             },
           },
           "取消",
@@ -327,6 +337,30 @@ export default defineComponent({
       await alert.present();
     };
     // ============ 保存 ============
+    const saveActionButtons = [
+      {
+        text: "保存当前日程",
+        handler: () => {
+          props.modal?.$el.dismiss([curScheduleData.value, curSave.value], "cur");
+          openSaveSheet.value = false;
+        },
+      },
+      {
+        text: "保存所有日程",
+        handler: () => {
+          props.modal?.$el.dismiss([curScheduleData.value, curSave.value], "all");
+          openSaveSheet.value = false;
+        },
+      },
+      {
+        text: "取消",
+        role: "cancel",
+        handler: () => {
+          openSaveSheet.value = false;
+        },
+      },
+    ];
+
     // 保存按钮点击
     const btnSaveClk = () => {
       if (!curScheduleData.value.title) {
@@ -334,20 +368,29 @@ export default defineComponent({
         toastData.value.isOpen = true;
         return;
       }
-      // ctx.emit("update:schedule", curScheduleData.value);
-      // ctx.emit("update:save", curSave.value);
-      props.modal?.$el.dismiss([curScheduleData.value, curSave.value], "confirm");
+      if (changeFlag && curScheduleData.value.id !== -1) {
+        openSaveSheet.value = true;
+      } else {
+        props.modal?.$el.dismiss([curScheduleData.value, curSave.value], "all");
+      }
     };
     // 返回cancel
     const btnCancelClk = () => {
       // console.log("cancel", props.save, props.schedule);
       curScheduleData.value = ScheduleData.Copy(props.schedule);
       curSave.value = ScheduleSave.Copy(props.save);
+      openSaveSheet.value = false;
+      changeFlag = false;
       refreshUI();
       props.modal?.$el.dismiss([], "cancel");
     };
+    // ============ UI ============
+    const onToastDismiss = () => (toastData.value.isOpen = false);
 
     return {
+      onTitleChange,
+      openSaveSheet,
+      saveActionButtons,
       imgs,
       openSubtaskModal,
       curSubtask,
@@ -381,7 +424,6 @@ export default defineComponent({
       getGroupOptions,
       getPriorityOptions,
       onTaskCheckboxChange,
-      onTypeChange,
       onDtTabChange,
       onDtChange,
       onReminderChange,
@@ -405,6 +447,7 @@ export default defineComponent({
       btnCancelClk,
       onSubtaskClk,
       btnSubtaskAddClk,
+      onToastDismiss,
       RepeatOptions,
     };
   },

@@ -143,6 +143,7 @@ export default defineComponent({
         for (let i = 0; i < 7; i++) {
           const dayData = new DayData(_dt);
           const ts = _dt.unix();
+          const save = userData.value.save[S_TS(_dt)];
           for (const schedule of userData.value.schedules) {
             if (schedule.startTs && schedule.startTs.startOf("day").unix() <= ts) {
               if (schedule.startTs.startOf("day").unix() === ts) {
@@ -176,20 +177,34 @@ export default defineComponent({
                 }
               }
             }
-
-            // 排序日程
-            const save = userData.value.save[S_TS(_dt)];
-            if (save) {
-              dayData.save = save;
-              dayData.events.sort((a: ScheduleData, b: ScheduleData) => {
-                const sa: number = save[a.id]?.state || 0;
-                const sb: number = save[b.id]?.state || 0;
-                if (sa === sb) {
-                  return (a.id ?? 0) - (b.id ?? 0);
-                }
-                return sa - sb;
-              });
+            // schedule;
+            const scheduleSave = save?.[schedule.id];
+            if (scheduleSave && scheduleSave.scheduleOverride) {
+              const os = scheduleSave.scheduleOverride;
+              // 处理覆盖问题
+              // 任务标题
+              os.title && (schedule.title = os.title);
+              // 颜色id
+              os.color && (schedule.color = os.color);
+              // 优先级
+              os.priority && (schedule.priority = os.priority);
+              // 分组id
+              os.groupId && (schedule.groupId = os.groupId);
+              // 子任务列表
+              os.subtasks && (schedule.subtasks = os.subtasks);
             }
+          }
+          // 排序日程
+          if (save) {
+            dayData.save = save;
+            dayData.events.sort((a: ScheduleData, b: ScheduleData) => {
+              const sa: number = save[a.id]?.state || 0;
+              const sb: number = save[b.id]?.state || 0;
+              if (sa === sb) {
+                return (a.id ?? 0) - (b.id ?? 0);
+              }
+              return sa - sb;
+            });
           }
           if (selectedDate.value?.dt.unix() == _dt.unix()) {
             selectedDate.value = dayData;
@@ -384,6 +399,20 @@ export default defineComponent({
           event.target.complete();
         });
     };
+    // 计算完成任务数量
+    const countFinishedSubtask = (schedule: ScheduleData) => {
+      try {
+        return schedule?.subtasks?.filter(
+          (t) =>
+            ((selectedDate.value?.save[schedule.id]?.subtasks &&
+              selectedDate.value?.save[schedule.id]?.subtasks[t.id]) ||
+              0) === 1
+        ).length;
+      } catch (error) {
+        console.log("countFinishedSubtask", error);
+        return 0;
+      }
+    };
     // 日程完成状态
     const scheduleChecked = (scheduleId: number) => {
       return selectedDate.value!.save[scheduleId]?.state === 1;
@@ -461,7 +490,7 @@ export default defineComponent({
     const onScheduleModalDismiss = (event: any) => {
       // console.log("onScheduleModalDismiss", event, event.detail.data);
       const [scheduleData, save] = event.detail.data;
-      if (event.detail.role === "confirm") {
+      if (event.detail.role === "all") {
         // 处理数据
         // 日程变化
         if (scheduleData.id === -1) {
@@ -475,13 +504,25 @@ export default defineComponent({
             userData.value.schedules[idx] = scheduleData;
           }
         }
-        // 存档变化
+        // FIXME 存档变化
         if (save) {
           if (!(S_TS(save.dt) in userData.value.save)) {
             userData.value.save[S_TS(save.dt)] = {};
           }
           const map = userData.value.save[S_TS(save.dt)];
-          map![scheduleData.id!] = scheduleSave.value!;
+          map![scheduleData.id!] = save;
+        }
+        updateScheduleData();
+        doSaveUserData();
+      } else if (event.detail.role === "cur") {
+        // 只管当天日程 存档变化
+        if (save) {
+          if (!(S_TS(save.dt) in userData.value.save)) {
+            userData.value.save[S_TS(save.dt)] = {};
+          }
+          const map = userData.value.save[S_TS(save.dt)];
+          const s: ScheduleSave = (map![scheduleData.id!] = save);
+          s.scheduleOverride = scheduleData;
         }
         updateScheduleData();
         doSaveUserData();
@@ -521,6 +562,7 @@ export default defineComponent({
       lstTs,
       alertButtons,
       scheduleDelConfirm,
+      countFinishedSubtask,
       IonicSlides,
       createSlideData,
       chooseSelectedDate,

@@ -24,11 +24,7 @@
             placeholder="输入日程标题"
             :value="curScheduleData?.title"
             :required="true"
-            @ionChange="
-                  ($event: any) => {
-                    curScheduleData.title = $event.detail.value;
-                  }
-                ">
+            @ionChange="onTitleChange">
           </ion-input>
         </ion-item>
         <!-- 分组信息 -->
@@ -116,9 +112,9 @@
               <!-- 开始时间 -->
               <ion-icon :icon="timeOutline" aria-hidden="true" slot="start"> </ion-icon>
               <ion-label>开始时间</ion-label>
-              <label>{{
-                curScheduleData.allDay ? "全天" : curScheduleData.startTs?.format("HH:mm")
-              }}</label>
+              <label>
+                {{ curScheduleData.allDay ? "全天" : curScheduleData.startTs?.format("HH:mm") }}
+              </label>
               <ion-modal
                 class="start-time-modal"
                 :isOpen="datetimeShowFlag"
@@ -261,7 +257,7 @@
           </ion-checkbox>
           <div class="subtask-content" @click="onSubtaskClk($event, task)">
             <ion-label :class="{ 'text-line-through': subTaskChecked(task) }" class="ion-no-margin">
-              <h2>{{ task.name }}</h2>
+              {{ task.name }}
             </ion-label>
             <div class="pre-img-group" style="margin-top: 5px">
               <div class="pre-img-block" v-for="(img, idx) in task.imgIds" :key="idx">
@@ -279,9 +275,6 @@
     </ion-content>
     <ion-footer>
       <ion-toolbar class="transparent">
-        <ion-checkbox label-placement="end">
-          提醒我
-        </ion-checkbox>
         <ion-button expand="block" color="warning" @click="btnSaveClk"> 保存 </ion-button>
       </ion-toolbar>
     </ion-footer>
@@ -289,12 +282,9 @@
       :is-open="toastData.isOpen"
       :message="toastData.text"
       :duration="toastData.duration"
-      @didDismiss="
-        () => {
-          toastData.isOpen = false;
-        }
-      ">
+      @didDismiss="onToastDismiss">
     </ion-toast>
+    <ion-action-sheet :is-open="openSaveSheet" :buttons="saveActionButtons"> </ion-action-sheet>
   </ion-modal>
 </template>
 <script lang="ts" src="../controller/SchedulePopModal.ts"></script>
