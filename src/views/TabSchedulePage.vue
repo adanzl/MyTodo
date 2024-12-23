@@ -10,7 +10,7 @@
           <h3 v-else>日历</h3>
         </ion-title>
         <ion-buttons slot="end" class="ion-padding">
-          <ion-button @click="btnTodayClk" v-if="!isToday()"> 今 </ion-button>
+          <ion-button style="position: absolute; right: 50px;" @click="btnTodayClk" v-if="!isToday()"> 今 </ion-button>
           <ion-button @click="btnSortClk">
             <ion-icon :icon="swapVertical" class="button-native"></ion-icon>
           </ion-button>
