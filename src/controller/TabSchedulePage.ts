@@ -144,7 +144,8 @@ export default defineComponent({
           const dayData = new DayData(_dt);
           const ts = _dt.unix();
           const save = userData.value.save[S_TS(_dt)];
-          for (const schedule of userData.value.schedules) {
+          for (const s of userData.value.schedules) {
+            const schedule = ScheduleData.Copy(s); 
             if (schedule.startTs && schedule.startTs.startOf("day").unix() <= ts) {
               if (schedule.startTs.startOf("day").unix() === ts) {
                 dayData.events.push(schedule);
@@ -489,45 +490,47 @@ export default defineComponent({
     // 添加日程页面关闭回调
     const onScheduleModalDismiss = (event: any) => {
       // console.log("onScheduleModalDismiss", event, event.detail.data);
-      const [scheduleData, save] = event.detail.data;
+      isScheduleModalOpen.value = false;
+      if (event.detail.role === "backdrop") return;
+      const [_scheduleData, _scheduleSave] = event.detail.data;
+      const dt = selectedDate.value?.dt;
       if (event.detail.role === "all") {
         // 处理数据
         // 日程变化
-        if (scheduleData.id === -1) {
+        if (_scheduleData.id === -1) {
           // add id userData.value.schedules id的最大值=1
           const id = userData.value.schedules.reduce((max, s) => (s.id! > max ? s.id! : max), 0);
-          scheduleData.id = id;
-          userData.value.schedules.push(scheduleData);
+          _scheduleData.id = id;
+          userData.value.schedules.push(_scheduleData);
         } else {
-          const idx = userData.value.schedules.findIndex((s) => s.id === scheduleData.id);
+          const idx = userData.value.schedules.findIndex((s) => s.id === _scheduleData.id);
           if (idx !== -1) {
-            userData.value.schedules[idx] = scheduleData;
+            userData.value.schedules[idx] = _scheduleData;
           }
         }
-        // FIXME 存档变化
-        if (save) {
-          if (!(S_TS(save.dt) in userData.value.save)) {
-            userData.value.save[S_TS(save.dt)] = {};
+        // 存档变化
+        if (dt) {
+          if (!(S_TS(dt) in userData.value.save)) {
+            userData.value.save[S_TS(dt)] = {};
           }
-          const map = userData.value.save[S_TS(save.dt)];
-          map![scheduleData.id!] = save;
+          const map = userData.value.save[S_TS(dt)];
+          map![_scheduleData.id!] = _scheduleSave;
         }
         updateScheduleData();
         doSaveUserData();
       } else if (event.detail.role === "cur") {
         // 只管当天日程 存档变化
-        if (save) {
-          if (!(S_TS(save.dt) in userData.value.save)) {
-            userData.value.save[S_TS(save.dt)] = {};
+        if (dt) {
+          if (!(S_TS(dt) in userData.value.save)) {
+            userData.value.save[S_TS(dt)] = {};
           }
-          const map = userData.value.save[S_TS(save.dt)];
-          const s: ScheduleSave = (map![scheduleData.id!] = save);
-          s.scheduleOverride = scheduleData;
+          const map = userData.value.save[S_TS(dt)];
+          const s: ScheduleSave = (map![_scheduleData.id!] = _scheduleSave);
+          s.scheduleOverride = _scheduleData;
         }
         updateScheduleData();
         doSaveUserData();
       }
-      isScheduleModalOpen.value = false;
     };
 
     // ========== 日程弹窗结束 ===========

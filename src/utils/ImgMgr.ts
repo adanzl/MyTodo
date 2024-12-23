@@ -14,7 +14,7 @@ export async function getImage(id: number) {
 }
 
 export async function setImage(id: number | undefined, data: string) {
-  console.log("setImage", id, data);
+  // console.log("setImage", id, data);
   const ret = await setPic(id, data);
   LocalCache.remove("img_" + id);
   return ret;

@@ -1,13 +1,13 @@
 import ColorSelector from "@/components/ColorSelector.vue";
-import PrioritySelector from "@/components/PrioritySelector.vue";
 import GroupSelector from "@/components/GroupSelector.vue";
+import PrioritySelector from "@/components/PrioritySelector.vue";
 import SubtaskPopModal from "@/components/SubtaskPopModal.vue";
 import {
   getColorOptions,
-  ReminderOptions,
-  getPriorityOptions,
-  RepeatOptions,
   getGroupOptions,
+  getPriorityOptions,
+  ReminderOptions,
+  RepeatOptions,
 } from "@/modal/ScheduleType";
 import { ScheduleData, ScheduleSave, Subtask } from "@/modal/UserData";
 import { Icon } from "@iconify/vue";
@@ -15,6 +15,7 @@ import { Icon } from "@iconify/vue";
 import {
   alertController,
   createAnimation,
+  IonActionSheet,
   IonCheckbox,
   IonDatetime,
   IonDatetimeButton,
@@ -24,30 +25,29 @@ import {
   IonSegmentView,
   IonSelect,
   IonSelectOption,
-  IonActionSheet,
 } from "@ionic/vue";
 import dayjs from "dayjs";
-import localizedFormat from "dayjs/plugin/localizedFormat";
 import "dayjs/locale/zh-cn";
+import localizedFormat from "dayjs/plugin/localizedFormat";
 dayjs.extend(localizedFormat);
 dayjs.locale("zh-cn");
 
+import { getImage } from "@/utils/ImgMgr";
 import {
   add,
   airplane,
   bookmark,
   calendar,
+  chevronBackOutline,
   colorPalette,
   listOutline,
   notifications,
   power,
   removeCircleOutline,
-  chevronBackOutline,
   repeat,
-  timeOutline,
+  timeOutline
 } from "ionicons/icons";
 import { defineComponent, onMounted, ref, watch } from "vue";
-import { getImage } from "@/utils/ImgMgr";
 
 export default defineComponent({
   components: {
@@ -295,6 +295,9 @@ export default defineComponent({
         for (const subtask of curScheduleData.value.subtasks) {
           if (subtask.id === task.id) {
             subtask.name = task.name;
+            task.imgIds?.forEach(async (imgId) => {
+              imgs.value[imgId] = await getImage(imgId);
+            });
             subtask.imgIds = task.imgIds;
             break;
           }
