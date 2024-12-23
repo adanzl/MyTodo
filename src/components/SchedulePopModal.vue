@@ -239,7 +239,7 @@
         <!-- 子任务 -->
         <ion-item lines="none">
           <ion-icon :icon="add" slot="start" style="width: 22px"></ion-icon>
-          <ion-button @click="btnSubtaskAddClk" expand="full" class="width-100">
+          <ion-button @click="btnSubtaskAddClk" expand="full" class="width-100" color="light">
             添加子任务
           </ion-button>
         </ion-item>
