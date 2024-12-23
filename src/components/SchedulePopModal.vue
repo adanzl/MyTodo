@@ -239,7 +239,9 @@
         <!-- 子任务 -->
         <ion-item lines="none">
           <ion-icon :icon="add" slot="start" style="width: 22px"></ion-icon>
-          <ion-button @click="btnSubtaskAddClk">添加子任务</ion-button>
+          <ion-button @click="btnSubtaskAddClk" expand="full" class="width-100">
+            添加子任务
+          </ion-button>
         </ion-item>
         <SubtaskPopModal
           @update:value="onSubtaskChange"
@@ -251,21 +253,20 @@
             }
           ">
         </SubtaskPopModal>
-        <ion-item
-          v-for="(task, idx) in curScheduleData?.subtasks"
-          @click="onSubtaskClk($event, task)"
-          :key="idx">
+        <ion-item v-for="(task, idx) in curScheduleData?.subtasks" :key="idx">
           <ion-checkbox
             slot="start"
             :checked="subTaskChecked(task)"
             @ionChange="onSubtaskCheckboxChange($event, task)">
           </ion-checkbox>
-          <div class="width-100">
+          <div class="subtask-content" @click="onSubtaskClk($event, task)">
             <ion-label :class="{ 'text-line-through': subTaskChecked(task) }" class="ion-no-margin">
-              {{ task.name }}
+              <h2>{{ task.name }}</h2>
             </ion-label>
-            <div class="pre-img-block" v-for="(img, idx) in task.imgIds" :key="idx">
-              {{ img }}
+            <div class="pre-img-group" style="margin-top: 5px">
+              <div class="pre-img-block" v-for="(img, idx) in task.imgIds" :key="idx">
+                <img :src="imgs[img]" />
+              </div>
             </div>
           </div>
           <ion-icon
@@ -278,6 +279,9 @@
     </ion-content>
     <ion-footer>
       <ion-toolbar class="transparent">
+        <ion-checkbox label-placement="end">
+          提醒我
+        </ion-checkbox>
         <ion-button expand="block" color="warning" @click="btnSaveClk"> 保存 </ion-button>
       </ion-toolbar>
     </ion-footer>

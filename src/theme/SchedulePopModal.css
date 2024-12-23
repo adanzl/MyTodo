@@ -21,9 +21,6 @@ ion-select::part(icon) {
     opacity: 0;
 }
 
-ion-footer {
-    justify-content: space-around;
-}
 
 ion-modal::part(backdrop) {
     background-color: var(--ion-color-dark) !important;
@@ -74,4 +71,12 @@ ion-modal::part(backdrop) {
 .group-tab::part(native) {
     padding: 0;
     align-items: start;
+}
+
+.subtask-content {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }

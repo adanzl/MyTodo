@@ -1,7 +1,12 @@
+/**
+ * 计算图片在画布上的绘制位置和大小，使其在画布上居中显示。
+ * @param img 图片对象
+ * @param canvasWidth 画布的宽度
+ * @param canvasHeight 画布的高度
+ * @returns {dx, dy, drawWidth, drawHeight} 绘制位置和大小
+ */
 export function calcImgPos(img: HTMLImageElement, canvasWidth: number, canvasHeight: number) {
-  // 计算图像的宽高比
   const imageRatio = img.width / img.height;
-  // 计算画布的宽高比
   const canvasRatio = canvasWidth / canvasHeight;
 
   let drawWidth, drawHeight;

@@ -5,14 +5,14 @@
     </ion-item>
     <ion-content class="ion-padding">
       <ion-item>
-        <ion-input v-model="valueRef.name" placeholder="添加子任务"> </ion-input>
+        <ion-input v-model="valueRef.name" placeholder="添加子任务" size="5"> </ion-input>
       </ion-item>
       <ion-item>
         <div class="pre-img-block" v-for="(img, idx) in imgList" :key="idx">
           <img :src="img.data" @click="onImgClk($event, img)" />
         </div>
         <div class="pre-img-block" @click="btnAddImgClk">
-          <ion-icon :icon="add"></ion-icon>
+          <ion-icon :icon="add" color="primary"></ion-icon>
         </div>
       </ion-item>
     </ion-content>
@@ -20,30 +20,29 @@
       <ion-button class="alert-button" fill="clear" @click="cancel()"> 取消 </ion-button>
       <ion-button class="alert-button" fill="clear" @click="confirm()"> 确定 </ion-button>
     </div>
-    <ion-modal
-      class="preview-modal"
-      :isOpen="openPreview"
-      @willDismiss="
-        () => {
-          openPreview = false;
-        }
-      ">
-      <img :src="curImage.data" />
-      <ion-button style="position: relative" @click="btnModifyImgClk($event, curImage)">
-        Modify Image</ion-button
-      >
+    <!-- preview -->
+    <ion-modal class="preview-modal" :isOpen="openPreview" @willDismiss="onPreviewDismiss">
+      <ion-content @click="onPreviewClk">
+        <img class="preview-img" :src="curImage.data" />
+      </ion-content>
+      <ion-footer>
+        <ion-toolbar style="--background: transparent;">
+          <ion-button @click="btnModifyImgClk($event, curImage)" expand="block">
+            Modify Image
+          </ion-button>
+        </ion-toolbar>
+      </ion-footer>
     </ion-modal>
   </ion-modal>
 </template>
 
 <script lang="ts" setup>
-import { getImage, setImage } from "@/utils/ImgCache";
-import { createTriggerController } from "@/utils/Overlay";
 import { Subtask } from "@/modal/UserData";
-import { IonInput } from "@ionic/vue";
+import { getImage, loadAndSetImage } from "@/utils/ImgMgr";
+import { createTriggerController } from "@/utils/Overlay";
+import { IonInput, IonToolbar } from "@ionic/vue";
 import { add } from "ionicons/icons";
 import { onMounted, ref, watch } from "vue";
-import { calcImgPos } from "@/utils/Math";
 
 const props = defineProps({
   trigger: {
@@ -103,64 +102,19 @@ onMounted(() => {
   );
 });
 
-const loadImage = async (imgId?: number): Promise<number | null> => {
-  return new Promise((resolve) => {
-    const fileInput = document.createElement("input");
-    fileInput.type = "file";
-    fileInput.accept = "image/*";
-    fileInput.addEventListener("change", async (event: any) => {
-      const file = event.target?.files[0];
-      if (!file) {
-        resolve(null);
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const imageUrl = e.target!.result as string;
-        const img = new Image();
-        img.src = imageUrl;
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          const ctx = canvas.getContext("2d");
-          if (!ctx) {
-            resolve(null);
-            return;
-          }
-          const { dx, dy, drawWidth, drawHeight } = calcImgPos(
-            img,
-            canvasWidth.value,
-            canvasHeight.value
-          );
-          ctx.clearRect(0, 0, canvasWidth.value, canvasHeight.value);
-          ctx.drawImage(img, dx, dy, drawWidth, drawHeight);
-          canvas.toBlob((blob: any) => {
-            const reader = new FileReader();
-            reader.onload = async () => {
-              const base64 = reader.result as string;
-              const ret = await setImage(imgId, base64);
-              return resolve(parseInt(ret));
-            };
-            reader.readAsDataURL(blob);
-          }, "image/webp");
-        };
-      };
-      reader.readAsDataURL(file);
-    });
-    fileInput.click();
-  });
-};
 const btnAddImgClk = async () => {
-  const newImgId = await loadImage(undefined);
-  console.log("newImgId", newImgId);
-  // imgList.value.push({
-  //   id: parseInt(newImgId),
-  //   data: await getImage(parseInt(newImgId)),
-  // });
-  // valueRef.value.imgIds.push(parseInt(newImgId));
+  const imgId = await loadAndSetImage(undefined, canvasHeight.value, canvasWidth.value);
+  console.log("newImgId", imgId);
+  if (imgId === null) return;
+  imgList.value.push({
+    id: imgId,
+    data: await getImage(imgId),
+  });
+  valueRef.value.imgIds.push(imgId);
 };
 
 const btnModifyImgClk = async (event: any, img: any) => {
-  const imgId = await loadImage(img.id);
+  const imgId = await loadAndSetImage(img.id, canvasHeight.value, canvasWidth.value);
   console.log("imgId", imgId);
   if (imgId === null) return;
   for (const item of imgList.value) {
@@ -174,6 +128,11 @@ const btnModifyImgClk = async (event: any, img: any) => {
 const onImgClk = (_event: any, img: any) => {
   openPreview.value = true;
   curImage.value = img;
+};
+
+const onPreviewDismiss = () => (openPreview.value = false);
+const onPreviewClk = () => {
+  openPreview.value = false;
 };
 </script>
 
@@ -211,11 +170,43 @@ ion-modal {
   flex-shrink: 1;
 }
 .preview-modal {
-  --height: auto;
-  --width: auto;
+  --height: 100%;
+  --width: 95%;
+}
+.preview-modal img {
+  /* max-height: 100%; */
+  /* max-width: 100%; */
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+
+  max-height: 90vh;
+  max-width: 90vw;
+}
+
+.preview-modal ion-content::part(scroll) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.preview-modal ion-content::part(background) {
+  background-color: transparent !important;
 }
 .preview-modal::part(content) {
-  padding: 10px;
+  /* padding: 10px 10px 10px 10px; */
+  /* position: absolute; */
+  /* left: 0; */
+  /* right: 0; */
+  /* top: 0; */
+  /* bottom: 0; */
+  /* display: flex; */
+  /* flex-direction: column; */
+  width: 100%;
+  /* height: auto; */
+  background-color: transparent !important;
+  max-height: 100%;
+  /* align-items: center; */
+  /* justify-content: center; */
 }
 .preview-modal::part(backdrop) {
   background-color: var(--ion-color-dark) !important;

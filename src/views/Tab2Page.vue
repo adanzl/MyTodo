@@ -36,7 +36,7 @@
 </template>
 
 <script setup lang="ts">
-import { delPic, getPicList, setPic } from "@/utils/NetUtil";
+import { getPicList } from "@/utils/NetUtil";
 import {
   IonItemSliding,
   IonPage,
@@ -48,63 +48,29 @@ import {
 import { onMounted, ref } from "vue";
 import { trashOutline, createOutline } from "ionicons/icons";
 import { calcImgPos } from "@/utils/Math";
+import { loadAndSetImage, delImage } from "@/utils/ImgMgr";
 
 const canvasRef = ref<HTMLCanvasElement>();
 const canvasWidth = ref(400); // 设置canvas的宽度
 const canvasHeight = ref(300); // 设置canvas的高度
 const picList = ref<{ id: number; data: string }[]>([]);
 
-
-const loadImage = () => {
-  const fileInput = document.createElement("input");
-  fileInput.type = "file";
-  fileInput.accept = "image/*";
-  fileInput.addEventListener("change", async (event: any) => {
-    const file = event.target?.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const imageUrl = e.target!.result as string;
-      const img = new Image();
-      img.src = imageUrl;
-      img.onload = () => {
-        if (canvasRef.value) {
-          const ctx = canvasRef.value.getContext("2d");
-          if (ctx) {
-            const { dx, dy, drawWidth, drawHeight } = calcImgPos(
-              img,
-              canvasWidth.value,
-              canvasHeight.value
-            );
-            ctx.clearRect(0, 0, canvasWidth.value, canvasHeight.value);
-            ctx.drawImage(img, dx, dy, drawWidth, drawHeight);
-            canvasRef.value.toBlob((blob: any) => {
-              const reader = new FileReader();
-              reader.onload = () => {
-                const base64 = reader.result as string;
-                setPic(undefined, base64).then((res) => {
-                  console.log("setPic", res);
-                  getPicList().then((res) => {
-                    picList.value = res;
-                  });
-                });
-              };
-              reader.readAsDataURL(blob);
-            }, "image/webp");
-          }
-        }
-      };
-    };
-    reader.readAsDataURL(file);
-  });
-  fileInput.click();
-};
 onMounted(() => {
   getPicList().then((res) => {
     picList.value = res;
     console.log("picList", picList.value);
   });
 });
+const loadImage = async () => {
+  loadAndSetImage(undefined, canvasHeight.value, canvasWidth.value).then((res) => {
+    console.log("setPic id: ", res);
+    if (res !== null) {
+      getPicList().then((res) => {
+        picList.value = res;
+      });
+    }
+  });
+};
 const onItemClk = (event: any, item: any) => {
   const img = new Image();
   img.src = item.data;
@@ -132,7 +98,7 @@ const btnRemoveClk = async (_event: any, item: any) => {
         text: "OK",
         handler: () => {
           console.log("btnRemoveClk", item.id);
-          delPic(item.id).then((res) => {
+          delImage(item.id).then((res) => {
             console.log("delPic", res);
             getPicList().then((res) => {
               picList.value = res;
@@ -146,47 +112,14 @@ const btnRemoveClk = async (_event: any, item: any) => {
   await alert.present();
 };
 const btnModifyClk = (event: any, item: any) => {
-  const fileInput = document.createElement("input");
-  fileInput.type = "file";
-  fileInput.accept = "image/*";
-  fileInput.addEventListener("change", async (event: any) => {
-    const file = event.target?.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const imageUrl = e.target!.result as string;
-      const img = new Image();
-      img.src = imageUrl;
-      img.onload = () => {
-        if (canvasRef.value) {
-          const ctx = canvasRef.value.getContext("2d");
-          if (ctx) {
-            const { dx, dy, drawWidth, drawHeight } = calcImgPos(
-              img,
-              canvasWidth.value,
-              canvasHeight.value
-            );
-            ctx.clearRect(0, 0, canvasWidth.value, canvasHeight.value);
-            ctx.drawImage(img, dx, dy, drawWidth, drawHeight);
-            canvasRef.value.toBlob((blob: any) => {
-              const reader = new FileReader();
-              reader.onload = () => {
-                const base64 = reader.result as string;
-                setPic(item.id, base64).then((res) => {
-                  console.log("setPic", res);
-                  getPicList().then((res) => {
-                    picList.value = res;
-                  });
-                });
-              };
-              reader.readAsDataURL(blob);
-            }, "image/webp");
-          }
-        }
-      };
-    };
-    reader.readAsDataURL(file);
+  loadAndSetImage(item.id, canvasHeight.value, canvasWidth.value).then((res) => {
+    console.log("setPic id: ", res);
+    if (res !== null) {
+      getPicList().then((res) => {
+        picList.value = res;
+      });
+    }
   });
-  fileInput.click();
+  
 };
 </script>

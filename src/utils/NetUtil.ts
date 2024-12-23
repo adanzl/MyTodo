@@ -36,7 +36,7 @@ export async function initNet() {
       URL = LOCAL.url;
     }
   });
-  console.log("init");
+  console.log("init net");
 }
 export async function getSave(id: number) {
   if (id === undefined) {
@@ -51,7 +51,7 @@ export async function getSave(id: number) {
 }
 
 export function setSave(id: number | undefined, user: string, data: string) {
-  // console.log(data);
+  // console.log(data); 
   return new Promise((resolve, reject) => {
     if (id === undefined) {
       reject(new Error("id is undefined"));
@@ -105,7 +105,7 @@ export async function getPicList(pageNum?: number, pageSize?: number) {
 }
 export async function getPic(id: number): Promise<string> {
   const rsp: any = await axios.get(URL + "/getPic", { params: { id: id } });
-  console.log("getPic", rsp.data);
+  // console.log("getPic", rsp.data);
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
   }

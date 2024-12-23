@@ -13,6 +13,7 @@ import { ScheduleData, ScheduleSave, Subtask } from "@/modal/UserData";
 import { Icon } from "@iconify/vue";
 
 import {
+  alertController,
   createAnimation,
   IonCheckbox,
   IonDatetime,
@@ -45,6 +46,7 @@ import {
   timeOutline,
 } from "ionicons/icons";
 import { defineComponent, onMounted, ref, watch } from "vue";
+import { getImage } from "@/utils/ImgMgr";
 
 export default defineComponent({
   components: {
@@ -92,6 +94,7 @@ export default defineComponent({
     const scheduleType = ref("0"); // 日期类型 0:start 1:end
     const openSubtaskModal = ref(false);
     const curSubtask = ref<any>();
+    const imgs = ref<Record<number, string>>({});
     // 提示框数据
     const toastData = ref({
       isOpen: false,
@@ -110,6 +113,14 @@ export default defineComponent({
           return a.id - b.id;
         }
         return sa - sb;
+      });
+      imgs.value = {};
+      curScheduleData.value?.subtasks.forEach((subtask) => {
+        subtask.imgIds?.forEach((imgId) => {
+          getImage(imgId).then((img) => {
+            imgs.value[imgId] = img;
+          });
+        });
       });
     };
 
@@ -294,13 +305,26 @@ export default defineComponent({
       openSubtaskModal.value = true;
     };
     // 子任务移除点击
-    const btnSubtaskRemoveClk = (_event: any, task: Subtask) => {
-      for (let i = 0; i < curScheduleData.value.subtasks?.length; i++) {
-        if (curScheduleData.value.subtasks[i].id === task.id) {
-          curScheduleData.value.subtasks.splice(i, 1);
-          break;
-        }
-      }
+    const btnSubtaskRemoveClk = async (_event: any, task: Subtask) => {
+      const alert = await alertController.create({
+        header: "确认",
+        message: "确认删除 ： " + task.name,
+        buttons: [
+          {
+            text: "确定",
+            handler: () => {
+              for (let i = 0; i < curScheduleData.value.subtasks?.length; i++) {
+                if (curScheduleData.value.subtasks[i].id === task.id) {
+                  curScheduleData.value.subtasks.splice(i, 1);
+                  break;
+                }
+              }
+            },
+          },
+          "取消",
+        ],
+      });
+      await alert.present();
     };
     // ============ 保存 ============
     // 保存按钮点击
@@ -324,6 +348,7 @@ export default defineComponent({
     };
 
     return {
+      imgs,
       openSubtaskModal,
       curSubtask,
       curScheduleData,

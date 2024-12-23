@@ -41,7 +41,7 @@ export const ColorOptions: ColorType[] = [
   { id: 4, label: "Green", tag: "green" },
 ];
 
-export const getColorOptions = (id: number): ColorType => {
+export const getColorOptions = (id?: number): ColorType => {
   for (const v of ColorOptions) {
     if (v.id === id) {
       return v;
@@ -63,7 +63,7 @@ export const PriorityOptions: PriorityType[] = [
   { id: 2, icon: "mdi:roman-numeral-3", color: "#ffc409 !important", label: "较高" },
   { id: 3, icon: "mdi:roman-numeral-4", color: "#cb1a27 !important", label: "核心" },
 ];
-export const getPriorityOptions = (id: number): PriorityType => {
+export const getPriorityOptions = (id?: number): PriorityType => {
   for (const v of PriorityOptions) {
     if (v.id === id) {
       return v;
@@ -84,7 +84,7 @@ export const GroupOptions: GroupType[] = [
   { id: 2, label: "学习", color: "yellow" },
 ];
 
-export const getGroupOptions = (id: number): GroupType => {
+export const getGroupOptions = (id?: number): GroupType => {
   for (const v of GroupOptions) {
     if (v.id === id) {
       return v;

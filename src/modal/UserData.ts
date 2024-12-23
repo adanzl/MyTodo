@@ -18,14 +18,14 @@ export class ScheduleData {
   // ===== 日程数据 =====
   id: number = -1; // 任务id
   title?: string; // 任务标题
-  color = 0; // 颜色id
-  priority = -1; // 优先级
-  groupId = -1; // 分组id
+  color? = 0; // 颜色id
+  priority? = -1; // 优先级
+  groupId? = -1; // 分组id
   startTs?: dayjs.Dayjs; // 开始时间
   endTs?: dayjs.Dayjs; // 结束时间
-  allDay: boolean = true; // 是否全天
-  reminder: number = 0; // 提醒类型
-  repeat: number = 0; // 重复类型
+  allDay?: boolean = true; // 是否全天
+  reminder?: number = 0; // 提醒类型
+  repeat?: number = 0; // 重复类型
   repeatEndTs?: dayjs.Dayjs; // 重复结束类型
   subtasks: Subtask[] = []; // 子任务列表
   static Copy(o: ScheduleData): ScheduleData {
@@ -47,10 +47,12 @@ export class ScheduleData {
   }
 }
 
-// 日程存档
+// 日程存档【每天】
 export class ScheduleSave {
   state: number = -1;
   subtasks: Record<number, number> = {}; // <number, number>;
+  // 覆盖字段
+  scheduleOverride?: ScheduleData;
   static Copy(o: ScheduleSave): ScheduleSave {
     const ret = new ScheduleSave();
     ret.state = o.state;

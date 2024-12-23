@@ -81,10 +81,19 @@ ion-content::part(scroll)::-webkit-scrollbar {
 
 .pre-img-block {
   display: flex;
-  width: 100px;
-  height: 100px;
+  width: 70px;
+  height: 70px;
   align-items: center;
   justify-content: center;
+  margin-right: 1px;
   font-size: 5em;
   border: 1px solid #0054e9;
+  overflow: hidden;
+}
+
+.pre-img-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: start;
+  margin: 0 5px;
 }
