@@ -3,8 +3,14 @@ from flask_cors import CORS
 import logging
 import db_mgr
 
+from logging.handlers import TimedRotatingFileHandler
+
+handler = TimedRotatingFileHandler('logs/app.log', when="midnight", backupCount=3, encoding="utf-8")
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
 log = logging.getLogger(__name__)
-logging.basicConfig(filename='app.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+log.setLevel(logging.INFO)
+log.addHandler(handler)
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
 db_mgr.init_db()
@@ -75,8 +81,8 @@ def view_pic():
 @app.route("/setPic", methods=['POST'])
 def set_pic():
     args = request.get_json()
-    log.info("===== [Set Pic] " + json.dumps(args))
     id = args.get('id')
+    log.info("===== [Set Pic] id: " + id)
     data = args.get('data')
     return db_mgr.set_pic(id, data)
 
