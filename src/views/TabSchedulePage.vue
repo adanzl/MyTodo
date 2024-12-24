@@ -2,15 +2,20 @@
   <ion-page>
     <ion-header>
       <ion-toolbar>
-        <ion-buttons slot="start" class="ion-padding">
+        <ion-buttons slot="start">
           <ion-button> <ion-icon color="default" :icon="list"></ion-icon> </ion-button>
         </ion-buttons>
         <ion-title class="ion-text-center">
           <h3 v-if="selectedDate">{{ selectedDate.dt.format("YY年MM月") }}</h3>
           <h3 v-else>日历</h3>
         </ion-title>
-        <ion-buttons slot="end" class="ion-padding">
-          <ion-button style="position: absolute; right: 50px;" @click="btnTodayClk" v-if="!isToday()"> 今 </ion-button>
+        <ion-buttons slot="end">
+          <ion-button
+            style="position: absolute; right: 50px"
+            @click="btnTodayClk"
+            v-if="!isToday()">
+            今
+          </ion-button>
           <ion-button @click="btnSortClk">
             <ion-icon :icon="swapVertical" class="button-native"></ion-icon>
           </ion-button>
@@ -41,8 +46,8 @@
         color="light"
         expand="full"
         fill="clear"
-        size="small"
-        class="ion-no-margin"
+        class="ion-no-margin ion-no-padding"
+        style="min-height: auto"
         @click="btnCalendarFoldClk()">
         <ion-icon :icon="bFold ? chevronDown : chevronUp" color="primary"> </ion-icon>
       </ion-button>
@@ -158,11 +163,7 @@
         :is-open="toastData.isOpen"
         :message="toastData.text"
         :duration="toastData.duration"
-        @didDismiss="
-          () => {
-            toastData.isOpen = false;
-          }
-        ">
+        @didDismiss="() => (toastData.isOpen = false)">
       </ion-toast>
     </ion-content>
     <ion-fab slot="fixed" vertical="bottom" horizontal="end">

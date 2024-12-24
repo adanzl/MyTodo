@@ -42,26 +42,19 @@ import {
   getGroupOptions,
   getPriorityOptions,
 } from "@/modal/ScheduleType";
-import { S_TS, ScheduleData, ScheduleSave, UserData, parseUserData } from "@/modal/UserData";
+import {
+  DayData,
+  MonthData,
+  S_TS,
+  ScheduleData,
+  ScheduleSave,
+  UserData,
+  UData,
+} from "@/modal/UserData";
 import { Icon } from "@iconify/vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import "swiper/css";
 import "swiper/css/effect-fade";
-class DayData {
-  dt: dayjs.Dayjs = dayjs().startOf("day");
-  events: ScheduleData[] = []; // 当天可见日程
-  save: Record<number, ScheduleSave> = {}; // 日程id->日程保存情况
-  constructor(_dt: dayjs.Dayjs) {
-    this.dt = _dt;
-  }
-}
-export type SlideData = {
-  vid: number;
-  month: number;
-  year: number;
-  firstDayOfMonth: dayjs.Dayjs;
-  weekArr: DayData[][];
-};
 
 export default defineComponent({
   components: {
@@ -92,7 +85,7 @@ export default defineComponent({
     const slideArr = ref<any[]>([{}, {}, {}]); // 滑动数据
     const curScheduleList = ref();
     const swiperRef = ref(); // 滑动对象
-    const bFold = ref(false); // 日历折叠状态
+    const bFold = ref(true); // 日历折叠状态
     const selectedDate = ref<DayData>(); // 选中日期
     const scheduleModal = ref(); // 弹窗对象
     const scheduleModalData = ref<ScheduleData>();
@@ -127,103 +120,12 @@ export default defineComponent({
     // 初始化数据
     const updateScheduleData = () => {
       slideArr.value = [
-        createSlideData(currentDate.subtract(1, "months")),
-        createSlideData(currentDate),
-        createSlideData(currentDate.add(1, "months")),
+        UData.createMonthData(currentDate.subtract(1, "months"), userData.value, selectedDate),
+        UData.createMonthData(currentDate, userData.value, selectedDate),
+        UData.createMonthData(currentDate.add(1, "months"), userData.value, selectedDate),
       ];
     };
     //  初始化日历
-    const createSlideData = (datetime: dayjs.Dayjs): SlideData => {
-      const firstDayOfMonth = datetime.startOf("month");
-      let _dt = firstDayOfMonth.startOf("week");
-
-      const wArr: DayData[][] = [];
-      do {
-        const week: DayData[] = [];
-        for (let i = 0; i < 7; i++) {
-          const dayData = new DayData(_dt);
-          const ts = _dt.unix();
-          const save = userData.value.save[S_TS(_dt)];
-          for (const s of userData.value.schedules) {
-            const schedule = ScheduleData.Copy(s); 
-            if (schedule.startTs && schedule.startTs.startOf("day").unix() <= ts) {
-              if (schedule.startTs.startOf("day").unix() === ts) {
-                dayData.events.push(schedule);
-                continue;
-              }
-              // 处理repeat
-              if (schedule.repeatEndTs && schedule.repeatEndTs.unix() < ts) {
-                continue;
-              }
-              if (schedule.repeat == 1) {
-                // daily
-                dayData.events.push(schedule);
-              } else if (schedule.repeat == 2) {
-                // weekly
-                if (_dt.day() == schedule.startTs.day()) {
-                  dayData.events.push(schedule);
-                }
-              } else if (schedule.repeat == 3) {
-                // monthly
-                if (_dt.date() == schedule.startTs.date()) {
-                  dayData.events.push(schedule);
-                }
-              } else if (schedule.repeat == 4) {
-                // yearly
-                if (
-                  _dt.date() == schedule.startTs.date() &&
-                  _dt.month() == schedule.startTs.month()
-                ) {
-                  dayData.events.push(schedule);
-                }
-              }
-            }
-            // schedule;
-            const scheduleSave = save?.[schedule.id];
-            if (scheduleSave && scheduleSave.scheduleOverride) {
-              const os = scheduleSave.scheduleOverride;
-              // 处理覆盖问题
-              // 任务标题
-              os.title && (schedule.title = os.title);
-              // 颜色id
-              os.color && (schedule.color = os.color);
-              // 优先级
-              os.priority && (schedule.priority = os.priority);
-              // 分组id
-              os.groupId && (schedule.groupId = os.groupId);
-              // 子任务列表
-              os.subtasks && (schedule.subtasks = os.subtasks);
-            }
-          }
-          // 排序日程
-          if (save) {
-            dayData.save = save;
-            dayData.events.sort((a: ScheduleData, b: ScheduleData) => {
-              const sa: number = save[a.id]?.state || 0;
-              const sb: number = save[b.id]?.state || 0;
-              if (sa === sb) {
-                return (a.id ?? 0) - (b.id ?? 0);
-              }
-              return sa - sb;
-            });
-          }
-          if (selectedDate.value?.dt.unix() == _dt.unix()) {
-            selectedDate.value = dayData;
-          }
-          week.push(dayData);
-          _dt = _dt.add(1, "days");
-        }
-        wArr.push(week);
-      } while (_dt.month() == datetime.month());
-      // console.log("createSlideData", wArr);
-      return {
-        vid: datetime.year(),
-        month: datetime.month(),
-        year: datetime.year(),
-        firstDayOfMonth: firstDayOfMonth,
-        weekArr: wArr,
-      } as SlideData; // SlideData
-    };
     // 处理选中日期
     const chooseSelectedDate = () => {
       const mm = slideArr.value[1];
@@ -260,7 +162,7 @@ export default defineComponent({
       // 获取数据
       getSave(1)
         .then((res: any) => {
-          userData.value = parseUserData(res);
+          userData.value = UData.parseUserData(res);
           console.log("getSave", userData.value);
           updateScheduleData();
           chooseSelectedDate();
@@ -317,10 +219,11 @@ export default defineComponent({
 
     // ============ 日历开始 ============
     const slideChange = (obj: any) => {
+      // TODO minimal 模式下的滑动
       slideArr.value = [
-        createSlideData(currentDate.subtract(1, "months")),
-        createSlideData(currentDate),
-        createSlideData(currentDate.add(1, "months")),
+        UData.createMonthData(currentDate.subtract(1, "months"), userData.value, selectedDate),
+        UData.createMonthData(currentDate, userData.value, selectedDate),
+        UData.createMonthData(currentDate.add(1, "months"), userData.value, selectedDate),
       ];
       obj.slideTo(1, 0, false);
       obj.update();
@@ -345,7 +248,7 @@ export default defineComponent({
       swiper.slideTo(1, 0, false);
     };
     // 点击日历某个日期
-    const onDaySelected = (slide: SlideData, day: DayData) => {
+    const onDaySelected = (slide: MonthData, day: DayData) => {
       if (slide.month != day.dt.month()) {
         if (slide.year * 100 + slide.month < day.dt.year() * 100 + day.dt.month()) {
           swiperRef.value.slideNext();
@@ -425,11 +328,7 @@ export default defineComponent({
       scheduleId: number
     ) => {
       if (day) {
-        // console.log("onScheduleCheckboxChange", day, scheduleId);
-        const preSave = day.save[scheduleId] || {
-          state: 0,
-          subTasks: new Object(),
-        };
+        const preSave = day.save[scheduleId] || new ScheduleSave();
         preSave.state = _event.detail.checked ? 1 : 0;
         day.save[scheduleId] = preSave;
         nextTick(() => {
@@ -443,6 +342,7 @@ export default defineComponent({
             return sa - sb;
           });
         });
+        doSaveUserData()
       }
     };
 
@@ -567,7 +467,6 @@ export default defineComponent({
       scheduleDelConfirm,
       countFinishedSubtask,
       IonicSlides,
-      createSlideData,
       chooseSelectedDate,
       updateScheduleData,
       Keyboard,

@@ -82,42 +82,162 @@ export class UserData {
   }
 }
 
+// 一天的数据
+export class DayData {
+  dt: dayjs.Dayjs = dayjs().startOf("day");
+  events: ScheduleData[] = []; // 当天可见日程
+  save: Record<number, ScheduleSave> = {}; // 日程id->日程保存情况
+  constructor(_dt: dayjs.Dayjs) {
+    this.dt = _dt;
+  }
+}
+
+// 一个月的数据
+export class MonthData {
+  vid: number = 0;
+  month: number = 0;
+  year: number = 0;
+  firstDayOfMonth: dayjs.Dayjs = dayjs().startOf("day");
+  weekArr: DayData[][] = [];
+}
+
+export class UData {
+  /**
+   * 创建一个月的日历数据
+   * @param datetime 当前月份的某一天
+   * @param userData 用户数据
+   * @param selectedDate 选中的日期
+   * @returns 月份数据
+   */
+  static createMonthData(datetime: dayjs.Dayjs, userData: UserData, selectedDate?: any): MonthData {
+    const firstDayOfMonth = datetime.startOf("month");
+    let _dt = firstDayOfMonth.startOf("week");
+
+    const wArr: DayData[][] = [];
+    do {
+      const week: DayData[] = [];
+      for (let i = 0; i < 7; i++) {
+        const dayData = new DayData(_dt);
+        const ts = _dt.unix();
+        if (userData.save[S_TS(_dt)] == undefined) {
+          userData.save[S_TS(_dt)] = {};
+        }
+        const save = userData.save[S_TS(_dt)];
+        for (const s of userData.schedules) {
+          const schedule = ScheduleData.Copy(s);
+          if (schedule.startTs && schedule.startTs.startOf("day").unix() <= ts) {
+            if (schedule.startTs.startOf("day").unix() === ts) {
+              dayData.events.push(schedule);
+              continue;
+            }
+            // 处理repeat
+            if (schedule.repeatEndTs && schedule.repeatEndTs.unix() < ts) {
+              continue;
+            }
+            if (schedule.repeat == 1) {
+              // daily
+              dayData.events.push(schedule);
+            } else if (schedule.repeat == 2) {
+              // weekly
+              if (_dt.day() == schedule.startTs.day()) {
+                dayData.events.push(schedule);
+              }
+            } else if (schedule.repeat == 3) {
+              // monthly
+              if (_dt.date() == schedule.startTs.date()) {
+                dayData.events.push(schedule);
+              }
+            } else if (schedule.repeat == 4) {
+              // yearly
+              if (
+                _dt.date() == schedule.startTs.date() &&
+                _dt.month() == schedule.startTs.month()
+              ) {
+                dayData.events.push(schedule);
+              }
+            }
+          }
+          // schedule;
+          const scheduleSave = save?.[schedule.id];
+          if (scheduleSave && scheduleSave.scheduleOverride) {
+            const os = scheduleSave.scheduleOverride;
+            // 处理覆盖问题
+            // 任务标题
+            os.title && (schedule.title = os.title);
+            // 颜色id
+            os.color && (schedule.color = os.color);
+            // 优先级
+            os.priority && (schedule.priority = os.priority);
+            // 分组id
+            os.groupId && (schedule.groupId = os.groupId);
+            // 子任务列表
+            os.subtasks && (schedule.subtasks = os.subtasks);
+          }
+        }
+        // 排序日程
+        dayData.save = save;
+        dayData.events.sort((a: ScheduleData, b: ScheduleData) => {
+          const sa: number = save[a.id]?.state || 0;
+          const sb: number = save[b.id]?.state || 0;
+          if (sa === sb) {
+            return (a.id ?? 0) - (b.id ?? 0);
+          }
+          return sa - sb;
+        });
+        if (selectedDate && selectedDate.value?.dt.unix() == _dt.unix()) {
+          selectedDate.value = dayData;
+        }
+        week.push(dayData);
+        _dt = _dt.add(1, "days");
+      }
+      wArr.push(week);
+    } while (_dt.month() == datetime.month());
+    return {
+      vid: datetime.year(),
+      month: datetime.month(),
+      year: datetime.year(),
+      firstDayOfMonth: firstDayOfMonth,
+      weekArr: wArr,
+    } as MonthData;
+  }
+
+  static parseScheduleData(jsonStr: string): ScheduleData {
+    const ret = JSON.parse(jsonStr) as ScheduleData;
+    ret.startTs = dayjs(ret.startTs);
+    ret.endTs = dayjs(ret.endTs);
+    ret.repeatEndTs = ret.repeatEndTs && dayjs(ret.repeatEndTs);
+    return ret;
+  }
+
+  static parseUserData(jsonStr: string): UserData {
+    const ret = JSON.parse(jsonStr) as UserData;
+    if (ret.schedules === undefined) {
+      ret.schedules = [];
+    }
+    for (let i = 0; i < ret.schedules.length; i++) {
+      const schedule = ret.schedules[i];
+      schedule.startTs = dayjs(schedule.startTs);
+      schedule.endTs = dayjs(schedule.endTs);
+      schedule.repeatEndTs = schedule.repeatEndTs && dayjs(schedule.repeatEndTs);
+      if (schedule.subtasks === undefined) {
+        schedule.subtasks = [];
+      }
+    }
+
+    return ret;
+  }
+}
 export const S_TS = (dt?: dayjs.Dayjs): string => {
   if (dt === undefined) return "";
   return dt.format("YYYY-MM-DD");
-};
-
-export const parseScheduleData = (jsonStr: string): ScheduleData => {
-  const ret = JSON.parse(jsonStr) as ScheduleData;
-  ret.startTs = dayjs(ret.startTs);
-  ret.endTs = dayjs(ret.endTs);
-  ret.repeatEndTs = ret.repeatEndTs && dayjs(ret.repeatEndTs);
-  return ret;
-};
-
-export const parseUserData = (jsonStr: string): UserData => {
-  const ret = JSON.parse(jsonStr) as UserData;
-  if (ret.schedules === undefined) {
-    ret.schedules = [];
-  }
-  for (let i = 0; i < ret.schedules.length; i++) {
-    const schedule = ret.schedules[i];
-    schedule.startTs = dayjs(schedule.startTs);
-    schedule.endTs = dayjs(schedule.endTs);
-    schedule.repeatEndTs = schedule.repeatEndTs && dayjs(schedule.repeatEndTs);
-    if (schedule.subtasks === undefined) {
-      schedule.subtasks = [];
-    }
-  }
-
-  return ret;
 };
 
 export default {
   ScheduleData,
   ScheduleSave,
   UserData,
+  DayData,
+  MonthData,
   S_TS,
-  parseUserData,
-  parseScheduleData,
+  UData,
 };

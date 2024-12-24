@@ -1,7 +1,7 @@
 import icons from "@/modal/Icons";
 import { getSave } from "@/utils/NetUtil";
 import { getColorOptions, getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
-import { S_TS, UserData, parseUserData } from "@/modal/UserData";
+import { S_TS, UserData, UData } from "@/modal/UserData";
 import { Icon } from "@iconify/vue";
 import { IonRefresher, IonRefresherContent } from "@ionic/vue";
 import dayjs from "dayjs";
@@ -25,7 +25,7 @@ export default defineComponent({
       // 获取数据
       getSave(1)
         .then((res: any) => {
-          userData.value = parseUserData(res);
+          userData.value = UData.parseUserData(res);
         })
         .catch((err) => {
           toastData.value.isOpen = true;
@@ -52,7 +52,7 @@ export default defineComponent({
     handleRefresh(event: any) {
       getSave(1)
         .then((res: any) => {
-          this.userData = parseUserData(res);
+          this.userData = UData.parseUserData(res);
           for (let i = 0; i < this.userData.schedules.length; i++) {
             const schedule = this.userData.schedules[i];
             schedule.startTs = dayjs(schedule.startTs);
