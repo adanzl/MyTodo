@@ -49,6 +49,20 @@ def natapp():
             </body>
             </html>
         """
+@app.route("/log")
+def server_log():
+    with open("logs/app.log", "r") as f:
+        log_content = f.read()
+        return f"""
+            <html>
+            <head>
+                <title>Server Log</title>
+            </head>
+            <body>
+                <pre>{log_content}</pre>
+            </body>
+            </html>
+        """
 
 
 # =========== PIC ===========
