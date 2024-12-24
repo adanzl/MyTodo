@@ -30,7 +30,7 @@ def main():
 
 @app.route("/natapp")
 def natapp():
-    with open("/usr/env/natapp/natapp.log", "r") as f:
+    with open("/usr/env/natapp/log/natapp.log", "r") as f:
         return f.read()
 
 
