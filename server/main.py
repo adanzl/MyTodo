@@ -28,6 +28,11 @@ def af_request(resp):
 def main():
     return "<p>Hello, World!</p>"
 
+@app.route("/natapp")
+def natapp():
+    with open("/usr/env/natapp/natapp.log", "r") as f:
+        return f.read()
+
 
 # =========== PIC ===========
 @app.route("/getPic", methods=['GET'])

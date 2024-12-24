@@ -7,6 +7,8 @@
 
 `sudo systemctl restart myTodo.service`
 ## 配置natapp
+`cat /usr/env/natapp/log/natapp.log`
+
 `sudo vim /usr/env/natapp/config.ini`
 
 `sudo vim /etc/systemd/system/natapp.service`
