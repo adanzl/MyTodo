@@ -2,7 +2,7 @@ import axios from "axios";
 // const URL = "https://3ft23fh89533.vicp.fun/api";
 // natapp.cn
 // 最新域名： cat /usr/env/natapp/log/natapp.log
-const REMOTE = { url: "http://cm9ic5.natappfree.cc/api", available: false };
+const REMOTE = { url: "https://leo-zhao.natapp4.cc/api", available: false };
 const LOCAL = { url: "http://192.168.50.184:9527/api", available: false };
 // const LOCAL = { url: "http://localhost:8888", available: false };
 let URL = "";

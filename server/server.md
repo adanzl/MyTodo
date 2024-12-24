@@ -1,13 +1,17 @@
-8ae2d9ac3a0f4055
+
 # GIT
 `git -C /home/orangepi/project/MyTodo pull`
 # 服务器
-## 重启app服务
+## app服务
 `sudo vim /etc/systemd/system/myTodo.service`
 
 `sudo systemctl restart myTodo.service`
 ## 配置natapp
+`sudo vim /usr/env/natapp/config.ini`
+
 `sudo vim /etc/systemd/system/natapp.service`
+
+`sudo systemctl restart natapp.service`
 ## 配置caddy
 `sudo vim /etc/caddy/Caddyfile`
 
