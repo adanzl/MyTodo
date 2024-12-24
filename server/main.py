@@ -25,8 +25,8 @@ def af_request(resp):
     """
     resp = make_response(resp)
     resp.headers['Access-Control-Allow-Origin'] = '*'
-    resp.headers['Access-Control-Allow-Methods'] = 'GET,POST'
-    resp.headers['Access-Control-Allow-Headers'] = 'x-requested-with,content-type'
+    resp.headers['Access-Control-Allow-Methods'] = '*'
+    resp.headers['Access-Control-Allow-Headers'] = '*'
     return resp
 
 
