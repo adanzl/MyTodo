@@ -1,5 +1,5 @@
 <template>
-  <ion-modal mode="ios" aria-hidden="false">
+  <ion-modal mode="ios" aria-hidden="false" ref="selfRef">
     <ion-content class="main_content">
       <ion-item class="transparent">
         <h2 style="font-size: 20px; color: white">
@@ -8,14 +8,13 @@
         <ion-button slot="end" color="dark" @click="$emit('close')">Today</ion-button>
       </ion-item>
       <swiper
-        @transitionEnd="onSlideChange"
+        @transitionEnd="onTransitionEnd"
         @swiper="setSwiperInstance"
         :centered-slides="true"
         :modules="[IonicSlides, Keyboard, EffectCoverflow]"
         :effect="'coverflow'"
         :slidesPerView="'auto'"
         :freeMode="false"
-        :loop="true"
         :coverflowEffect="{
           rotate: 10,
           stretch: 0,
@@ -26,8 +25,8 @@
         :keyboard="true"
         style="height: 90%">
         <swiper-slide v-for="(day, idx) in dayArr" :key="idx" class="data-content">
-          <ion-content class="ion-padding">
-            <ion-item>日程 {{ day.dt.format("MM-DD") }}</ion-item>
+          <ion-content>
+            <ion-item>日程 {{ day?.dt.format("MM-DD") }}</ion-item>
             <ion-item v-for="(schedule, idx) in day.events" :key="idx">
               <ion-checkbox
                 style="--size: 26px; padding-right: 5px"
@@ -71,6 +70,7 @@
         </swiper-slide>
       </swiper>
     </ion-content>
+    <div style="width: 100%; height: 20%" @click="selfRef.$el.dismiss()"></div>
     <SchedulePop
       id="pop-modal"
       ref="scheduleModal"
@@ -112,7 +112,7 @@ const props = defineProps({
 const dayArr = ref<any[]>([{}, {}, {}]); // 滑动数据
 const swiperRef = ref(); // 滑动对象
 const currentDate = ref(dayjs(props.dt as dayjs.Dayjs)); // 当前日期
-
+const selfRef = ref();
 // === 弹窗对象
 const scheduleModal = ref();
 const scheduleModalData = ref<ScheduleData>();
@@ -130,52 +130,34 @@ watch(
 );
 // 初始化数据
 const updateScheduleData = () => {
-  // console.log("updateScheduleData", currentDate.value);
   dayArr.value = [
-    UData.createDayData(props.dt.subtract(2, "day"), props.userData as UserData),
-    UData.createDayData(props.dt.subtract(1, "day"), props.userData as UserData),
-    UData.createDayData(props.dt as dayjs.Dayjs, props.userData as UserData),
-    UData.createDayData(props.dt.add(1, "day"), props.userData as UserData),
-    UData.createDayData(props.dt.add(2, "day"), props.userData as UserData),
+    UData.createDayData(currentDate.value.subtract(1, "day"), props.userData as UserData),
+    UData.createDayData(currentDate.value as dayjs.Dayjs, props.userData as UserData),
+    UData.createDayData(currentDate.value.add(1, "day"), props.userData as UserData),
   ];
+  // console.log("updateScheduleData", currentDate.value, dayArr.value);
 };
-let previousIndex = 0; // 用于存储上一个活动幻灯片的索引
-const onSlideChange = (obj: any) => {
-  console.log("slideChange", obj.activeIndex, obj.previousIndex);
+const curIdx = 1;
+function onTransitionEnd(obj: any) {
+  if (curIdx === obj.activeIndex) return;
   const currentIndex = obj.activeIndex; // 获取当前活动幻灯片的索引
-  // if (currentIndex < previousIndex) {
-  //   console.log("slideChange <-");
-  //   currentDate.value = currentDate.value.subtract(1, "day");
-  //   if (currentIndex === 0) {
-  //     updateScheduleData();
-  //     obj.slideTo(obj.slides.length - 2, 0, false);
-  //   }
-  // } else if (currentIndex > previousIndex) {
-  //   console.log("slideChange ->");
-  //   currentDate.value = currentDate.value.add(1, "day");
-  //   if (currentIndex === obj.slides.length - 1) {
-  //     updateScheduleData();
-  //     obj.slideTo(1, 0, false);
-  //   }
-  // }
-  previousIndex = currentIndex;
-  // obj.slideTo(1, 0, false);
-  // obj.update();
-};
-// 向右滑
-const onSlideChangeNext = (obj: any) => {
-  currentDate.value = currentDate.value.add(1, "day");
-  onSlideChange(obj);
-};
-// 向左滑
-const onSlideChangePre = (obj: any) => {
-  currentDate.value = currentDate.value.subtract(1, "day");
-  onSlideChange(obj);
-};
+  const previousIndex = obj.previousIndex;
+  if (currentIndex < previousIndex) {
+    currentDate.value = currentDate.value.subtract(1, "day");
+    updateScheduleData();
+    // console.log("transitionEnd <-", currentIndex, previousIndex, obj.slides, dayArr.value);
+    obj.slideTo(1, 0, false);
+  } else if (currentIndex > previousIndex) {
+    currentDate.value = currentDate.value.add(1, "day");
+    updateScheduleData();
+    obj.slideTo(1, 0, false);
+    // console.log("transitionEnd ->", currentIndex, previousIndex, obj.slides, dayArr.value);
+  }
+}
 // 获取swiper对象
 const setSwiperInstance = (swiper: any) => {
   swiperRef.value = swiper;
-  swiper.slideTo(2, 0, false);
+  swiper.slideTo(1, 0, false);
 };
 // 计算完成任务数量
 const countFinishedSubtask = (day: DayData, schedule: ScheduleData) => {
@@ -247,7 +229,7 @@ const doSaveUserData = () => {
 </script>
 <style scoped>
 .main_content::part(scroll) {
-  height: 80%;
+  height: 100%;
   margin-top: 20%;
 }
 .main_content::part(background) {
@@ -292,5 +274,8 @@ ion-modal {
   margin: 0px;
   padding: 10px;
   flex: 1;
+}
+.scheduleItem h2 {
+  white-space: nowrap; /* 防止文本换行 */
 }
 </style>
