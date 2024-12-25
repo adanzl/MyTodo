@@ -35,7 +35,6 @@ import { Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
 import { defineComponent, nextTick, onMounted, ref } from "vue";
 
-import { getSave, setSave } from "@/utils/NetUtil";
 import {
   ColorOptions,
   getColorOptions,
@@ -45,12 +44,12 @@ import {
 import {
   DayData,
   MonthData,
-  S_TS,
   ScheduleData,
   ScheduleSave,
-  UserData,
   UData,
+  UserData
 } from "@/modal/UserData";
+import { getSave, setSave } from "@/utils/NetUtil";
 import { Icon } from "@iconify/vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import "swiper/css";
@@ -342,7 +341,7 @@ export default defineComponent({
             return sa - sb;
           });
         });
-        doSaveUserData()
+        doSaveUserData();
       }
     };
 
@@ -389,48 +388,21 @@ export default defineComponent({
     };
     // 添加日程页面关闭回调
     const onScheduleModalDismiss = (event: any) => {
-      // console.log("onScheduleModalDismiss", event, event.detail.data);
-      isScheduleModalOpen.value = false;
-      if (event.detail.role === "backdrop") return;
-      const [_scheduleData, _scheduleSave] = event.detail.data;
-      const dt = selectedDate.value?.dt;
-      if (event.detail.role === "all") {
-        // 处理数据
-        // 日程变化
-        if (_scheduleData.id === -1) {
-          // add id userData.value.schedules id的最大值=1
-          const id = userData.value.schedules.reduce((max, s) => (s.id! > max ? s.id! : max), 0);
-          _scheduleData.id = id;
-          userData.value.schedules.push(_scheduleData);
-        } else {
-          const idx = userData.value.schedules.findIndex((s) => s.id === _scheduleData.id);
-          if (idx !== -1) {
-            userData.value.schedules[idx] = _scheduleData;
-          }
+        isScheduleModalOpen.value = false;
+        if (event.detail.role === "backdrop") return;
+        const [_scheduleData, _scheduleSave] = event.detail.data;
+        const dt = selectedDate.value!.dt!;
+        const r = UData.updateSchedularData(
+          userData.value,
+          _scheduleData,
+          _scheduleSave,
+          dt,
+          event.detail.role
+        );
+        if (r) {
+          updateScheduleData();
+          doSaveUserData();
         }
-        // 存档变化
-        if (dt) {
-          if (!(S_TS(dt) in userData.value.save)) {
-            userData.value.save[S_TS(dt)] = {};
-          }
-          const map = userData.value.save[S_TS(dt)];
-          map![_scheduleData.id!] = _scheduleSave;
-        }
-        updateScheduleData();
-        doSaveUserData();
-      } else if (event.detail.role === "cur") {
-        // 只管当天日程 存档变化
-        if (dt) {
-          if (!(S_TS(dt) in userData.value.save)) {
-            userData.value.save[S_TS(dt)] = {};
-          }
-          const map = userData.value.save[S_TS(dt)];
-          const s: ScheduleSave = (map![_scheduleData.id!] = _scheduleSave);
-          s.scheduleOverride = _scheduleData;
-        }
-        updateScheduleData();
-        doSaveUserData();
-      }
     };
 
     // ========== 日程弹窗结束 ===========

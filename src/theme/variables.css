@@ -1,5 +1,13 @@
 /* For information on how to create your own theme, please see:
 http://ionicframework.com/docs/theming/ */
+:root {
+  --color-gray: #b5b1b1;
+  --color-main-bg: rgb(244, 245, 231);
+}
+
+.transparent::part(background) {
+  background: transparent !important;
+}
 
 .transparent {
   --background: transparent !important;
@@ -24,7 +32,7 @@ http://ionicframework.com/docs/theming/ */
 }
 
 ion-content::part(background) {
-  background: rgb(244, 245, 231);
+  background: var(--color-main-bg);
 }
 
 .v-dot {
@@ -49,9 +57,7 @@ ion-content::part(scroll)::-webkit-scrollbar {
   display: none;
 }
 
-:root {
-  --color-gray: #b5b1b1;
-}
+
 
 .vertical {
   display: flex;

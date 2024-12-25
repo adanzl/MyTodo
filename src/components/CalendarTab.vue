@@ -67,7 +67,7 @@ const updateMinSlide = () => {
     const dayOfMonth = dt.date();
     const firstDayOfWeek = firstDayOfMonth.day();
     const weekOfMonth = Math.ceil((dayOfMonth + firstDayOfWeek) / 7);
-    const wArr = props.slide.weekArr.slice(weekOfMonth, weekOfMonth + 1);
+    const wArr = props.slide.weekArr.slice(weekOfMonth-1, weekOfMonth );
     // console.log("wArr", weekOfMonth, wArr);
     minSlide.value = {
       vid: dt.year(),

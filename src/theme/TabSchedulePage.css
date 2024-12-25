@@ -18,7 +18,7 @@ ion-modal#pop-modal {
     /* background-color: rgba(0, 0, 0, 0.5); */
 }
 
-.scheduleItemLabel {
+.scheduleItem ion-label {
     margin: 0px;
     padding: 10px;
     flex: 1;
@@ -39,7 +39,6 @@ ion-modal#pop-modal {
 
 .schedule-lb-sub {
     width: 50px;
-    margin-left: 6px;
     margin-bottom: 2px;
 }
 

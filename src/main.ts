@@ -57,6 +57,13 @@ import {
 } from "@ionic/vue";
 
 import { initNet as initNet } from "@/utils/NetUtil";
+import dayjs from "dayjs";
+import "dayjs/locale/zh-cn";
+import localizedFormat from "dayjs/plugin/localizedFormat";
+dayjs.extend(localizedFormat);
+dayjs.locale("zh-cn", {
+  weekStart: 0, // 1 表示星期一，0 表示星期日
+});
 
 const app = createApp(App).use(IonicVue).use(router);
 

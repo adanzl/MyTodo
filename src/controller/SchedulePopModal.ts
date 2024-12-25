@@ -27,10 +27,6 @@ import {
   IonSelectOption,
 } from "@ionic/vue";
 import dayjs from "dayjs";
-import "dayjs/locale/zh-cn";
-import localizedFormat from "dayjs/plugin/localizedFormat";
-dayjs.extend(localizedFormat);
-dayjs.locale("zh-cn");
 
 import { getImage } from "@/utils/ImgMgr";
 import {

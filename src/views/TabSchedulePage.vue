@@ -89,9 +89,6 @@
                         class="scheduleItemLabel">
                         <h2>{{ schedule.title }}</h2>
                         <div class="flex">
-                          <p>
-                            {{ selectedDate?.dt.format("ddd") }}
-                          </p>
                           <p class="schedule-lb-sub">
                             <ion-icon
                               :icon="listOutline"
@@ -158,7 +155,8 @@
         header="Confirm!"
         :buttons="alertButtons"
         :sub-header="scheduleDelConfirm.text"
-        @didDismiss="onDelSchedulerConfirm($event)"></ion-alert>
+        @didDismiss="onDelSchedulerConfirm($event)">
+      </ion-alert>
       <ion-toast
         :is-open="toastData.isOpen"
         :message="toastData.text"

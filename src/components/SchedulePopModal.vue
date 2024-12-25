@@ -69,7 +69,7 @@
           <ion-icon :icon="calendar" slot="start"></ion-icon>
           <div class="flex ion-justify-content-around ion-padding width-100">
             <div class="ion-text-center">
-              <ion-label>{{ curScheduleData.startTs?.format("MM-DD,ddd") }}</ion-label>
+              <ion-label>{{ curScheduleData.startTs?.format("MM-DD") }}</ion-label>
               <ion-label color="tertiary" class="font-size-mini">
                 {{ curScheduleData.allDay ? "全天" : curScheduleData?.startTs?.format("HH:mm") }}
               </ion-label>
@@ -78,7 +78,7 @@
               <ion-label> >></ion-label>
             </div>
             <div class="ion-text-center">
-              <ion-label>{{ curScheduleData.endTs?.format("MM-DD,ddd") }}</ion-label>
+              <ion-label>{{ curScheduleData.endTs?.format("MM-DD") }}</ion-label>
               <ion-label color="tertiary" class="font-size-mini">
                 {{ curScheduleData.allDay ? "全天" : curScheduleData?.endTs?.format("HH:mm") }}
               </ion-label>
@@ -274,7 +274,7 @@
       </ion-list>
     </ion-content>
     <ion-footer>
-      <ion-toolbar class="transparent">
+      <ion-toolbar>
         <ion-button expand="block" color="warning" @click="btnSaveClk"> 保存 </ion-button>
       </ion-toolbar>
     </ion-footer>

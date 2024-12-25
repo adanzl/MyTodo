@@ -2,7 +2,10 @@
   <ion-page>
     <ion-header>
       <ion-toolbar>
-        <ion-title>日历视图</ion-title>
+        <ion-title>
+          <h3 v-if="currentDate">{{ currentDate.format("YY年MM月") }}</h3>
+          <h3 v-else>日历</h3>
+        </ion-title>
       </ion-toolbar>
     </ion-header>
     <ion-row style="background-color: antiquewhite; color: blue">
@@ -18,20 +21,13 @@
         :centered-slides="true"
         :autoHeight="true"
         :modules="[IonicSlides, Keyboard]"
-        :keyboard="true">
-        <swiper-slide v-for="(slide, idx) in slideArr" :key="idx">
-          <!-- <CalenderTab
-            :slide="slide"
-            :daySelectCallback="onDaySelected"
-            :selectedDate="selectedDate"
-            :minimal="bFold"
-            :swiperRef="swiperRef">
-          </CalenderTab> -->
+        >
+        <swiper-slide v-for="(month, idx) in monthArr" :key="idx">
           <ion-grid style="height: auto" fixed>
-            <ion-row v-for="week in slide.weekArr" :key="week">
+            <ion-row v-for="week in month.weekArr" :key="week">
               <ion-col
                 class="day-item"
-                @click="onDaySelected(slide, day)"
+                @click="onDaySelected(month, day)"
                 v-for="day in week"
                 :key="day">
                 <span>
@@ -39,7 +35,7 @@
                     :class="{
                       transparent: day.dt.unix() !== dayjs().startOf('day').unix(),
                       today: day.dt.unix() === dayjs().startOf('day').unix(),
-                      gray: day.dt.month() !== slide.month,
+                      gray: day.dt.month() !== month.month,
                     }">
                     {{ day.dt.date() }}
                   </ion-chip>
@@ -49,7 +45,7 @@
                   :key="idx"
                   :class="{
                     'text-line-through': day.save[event.id]?.state === 1,
-                    'gray': day.save[event.id]?.state === 1,
+                    gray: day.save[event.id]?.state === 1,
                   }">
                   {{ event.title }}
                 </div>
@@ -65,9 +61,17 @@
       :duration="toastData.duration"
       @didDismiss="() => (toastData.isOpen = false)">
     </ion-toast>
+    <TabCalendarPage
+      ref="scheduleModal"
+      :is-open="isScheduleModalOpen"
+      :dt="selectedDate?.dt"
+      :userData="userData"
+      @willDismiss="onScheduleModalDismiss">
+    </TabCalendarPage>
   </ion-page>
 </template>
 <script setup lang="ts">
+import TabCalendarPage from "@/components/CalendarCover.vue";
 import { DayData, MonthData, UData, UserData } from "@/modal/UserData";
 import { getSave } from "@/utils/NetUtil";
 import { IonCol, IonGrid, IonRow, IonicSlides } from "@ionic/vue";
@@ -84,11 +88,12 @@ const toastData = ref({
   duration: 3000,
   text: "",
 });
-const slideArr = ref<any[]>([{}, {}, {}]); // 滑动数据
+const monthArr = ref<any[]>([{}, {}, {}]); // 滑动数据
 const userData = ref<UserData>(new UserData());
 const swiperRef = ref(); // 滑动对象
 const selectedDate = ref<DayData>(); // 选中日期
-let currentDate = dayjs().startOf("day"); // 当前日期
+const currentDate = ref<dayjs.Dayjs>(dayjs().startOf("day")); // 当前日期(月)
+const isScheduleModalOpen = ref(false);
 onMounted(() => {
   // 获取数据
   getSave(1)
@@ -108,32 +113,29 @@ onMounted(() => {
 });
 // 初始化数据
 const updateScheduleData = () => {
-  slideArr.value = [
-    UData.createMonthData(currentDate.subtract(1, "months"), userData.value, selectedDate),
-    UData.createMonthData(currentDate, userData.value, selectedDate),
-    UData.createMonthData(currentDate.add(1, "months"), userData.value, selectedDate),
+  // console.log("updateScheduleData", currentDate.value);
+  monthArr.value = [
+    UData.createMonthData(currentDate.value.subtract(1, "months"), userData.value),
+    UData.createMonthData(currentDate.value, userData.value),
+    UData.createMonthData(currentDate.value.add(1, "months"), userData.value),
   ];
 };
 const slideChange = (obj: any) => {
-  slideArr.value = [
-    UData.createMonthData(currentDate.subtract(1, "months"), userData.value),
-    UData.createMonthData(currentDate, userData.value),
-    UData.createMonthData(currentDate.add(1, "months"), userData.value),
-  ];
+  updateScheduleData();
   obj.slideTo(1, 0, false);
   obj.update();
-  if (selectedDate.value && selectedDate.value.dt.month() !== currentDate.month()) {
+  if (selectedDate.value && selectedDate.value.dt.month() !== currentDate.value.month()) {
     selectedDate.value = undefined; // 清空选中日期
   }
 };
 // 向右滑
 const onSlideChangeNext = (obj: any) => {
-  currentDate = currentDate.add(1, "months").startOf("month");
+  currentDate.value = currentDate.value.add(1, "months").startOf("month");
   slideChange(obj);
 };
 // 向左滑
 const onSlideChangePre = (obj: any) => {
-  currentDate = currentDate.subtract(1, "months").startOf("month");
+  currentDate.value = currentDate.value.subtract(1, "months").startOf("month");
   slideChange(obj);
 };
 // 获取swiper对象
@@ -143,7 +145,12 @@ const setSwiperInstance = (swiper: any) => {
 };
 const onDaySelected = (slide: MonthData, day: DayData) => {
   selectedDate.value = day;
+  isScheduleModalOpen.value = true;
 };
+//
+function onScheduleModalDismiss() {
+  isScheduleModalOpen.value = false;
+}
 </script>
 <style lang="css" scoped>
 .day-item {
