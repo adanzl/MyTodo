@@ -135,6 +135,36 @@ export class UData {
       weekArr: wArr,
     } as MonthData;
   }
+  /**
+   * 创建一星期的日历数据
+   * @param datetime 当前周的某一天
+   * @param userData 用户数据
+   * @param selectedDate 选中的日期
+   * @returns 月份数据
+   */
+  static createWeekData(datetime: dayjs.Dayjs, userData: UserData, selectedDate?: any): MonthData {
+    const firstDayOfMonth = datetime.startOf("month");
+    let _dt = datetime.startOf("week");
+    // console.log("firstDayOfWeek", _dt);
+    const wArr: DayData[][] = [];
+    const week: DayData[] = [];
+    for (let i = 0; i < 7; i++) {
+      const dayData = UData.createDayData(_dt, userData);
+      if (selectedDate && selectedDate.value?.dt.unix() == _dt.unix()) {
+        selectedDate.value = dayData;
+      }
+      week.push(dayData);
+      _dt = _dt.add(1, "days");
+    }
+    wArr.push(week);
+    return {
+      vid: datetime.year(),
+      month: datetime.month(),
+      year: datetime.year(),
+      firstDayOfMonth: firstDayOfMonth,
+      weekArr: wArr,
+    } as MonthData;
+  }
 
   /**
    * 创建一天的数据

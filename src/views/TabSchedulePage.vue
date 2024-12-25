@@ -37,7 +37,6 @@
             :slide="slide"
             :daySelectCallback="onDaySelected"
             :selectedDate="selectedDate"
-            :minimal="bFold"
             :swiperRef="swiperRef">
           </CalenderTab>
         </swiper-slide>

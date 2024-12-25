@@ -41,14 +41,7 @@ import {
   getGroupOptions,
   getPriorityOptions,
 } from "@/modal/ScheduleType";
-import {
-  DayData,
-  MonthData,
-  ScheduleData,
-  ScheduleSave,
-  UData,
-  UserData
-} from "@/modal/UserData";
+import { DayData, MonthData, ScheduleData, ScheduleSave, UData, UserData } from "@/modal/UserData";
 import { getSave, setSave } from "@/utils/NetUtil";
 import { Icon } from "@iconify/vue";
 import "@ionic/vue/css/ionic-swiper.css";
@@ -118,11 +111,20 @@ export default defineComponent({
 
     // 初始化数据
     const updateScheduleData = () => {
-      slideArr.value = [
-        UData.createMonthData(currentDate.subtract(1, "months"), userData.value, selectedDate),
-        UData.createMonthData(currentDate, userData.value, selectedDate),
-        UData.createMonthData(currentDate.add(1, "months"), userData.value, selectedDate),
-      ];
+      if (bFold.value) {
+        slideArr.value = [
+          UData.createWeekData(currentDate.subtract(1, "weeks"), userData.value, selectedDate),
+          UData.createWeekData(currentDate, userData.value, selectedDate),
+          UData.createWeekData(currentDate.add(1, "weeks"), userData.value, selectedDate),
+        ];
+      } else {
+        slideArr.value = [
+          UData.createMonthData(currentDate.subtract(1, "months"), userData.value, selectedDate),
+          UData.createMonthData(currentDate, userData.value, selectedDate),
+          UData.createMonthData(currentDate.add(1, "months"), userData.value, selectedDate),
+        ];
+      }
+      // console.log("updateScheduleData", currentDate, slideArr.value);
     };
     //  初始化日历
     // 处理选中日期
@@ -132,8 +134,10 @@ export default defineComponent({
         console.warn("no weekArr");
         return;
       }
+      selectedDate.value = undefined; // 清空选中日期
       const now = dayjs().startOf("day");
       if (!selectedDate.value) {
+        // 选今天
         outer: for (const week of mm.weekArr) {
           for (const _dt of week) {
             if (_dt.dt.unix() == now.unix()) {
@@ -144,6 +148,7 @@ export default defineComponent({
         }
       }
       if (!selectedDate.value) {
+        // 选当前月的第一天
         outer: for (const week of mm.weekArr) {
           for (const _dt of week) {
             if (_dt.dt.unix() == currentDate.unix()) {
@@ -152,6 +157,10 @@ export default defineComponent({
             }
           }
         }
+      }
+      if (!selectedDate.value) {
+        // 选当周的第一天
+        selectedDate.value = mm.weekArr[0][0];
       }
     };
     const isToday = () => {
@@ -190,7 +199,6 @@ export default defineComponent({
       currentDate = dayjs().startOf("day");
       selectedDate.value = new DayData(dayjs().startOf("day"));
       updateScheduleData();
-      chooseSelectedDate();
     };
     // 排序按钮
     const btnSortClk = () => {
@@ -218,27 +226,27 @@ export default defineComponent({
 
     // ============ 日历开始 ============
     const slideChange = (obj: any) => {
-      // TODO minimal 模式下的滑动
-      slideArr.value = [
-        UData.createMonthData(currentDate.subtract(1, "months"), userData.value, selectedDate),
-        UData.createMonthData(currentDate, userData.value, selectedDate),
-        UData.createMonthData(currentDate.add(1, "months"), userData.value, selectedDate),
-      ];
+      updateScheduleData();
       obj.slideTo(1, 0, false);
       obj.update();
-      if (selectedDate.value && selectedDate.value.dt.month() !== currentDate.month()) {
-        selectedDate.value = undefined; // 清空选中日期
-      }
       chooseSelectedDate();
     };
     // 向右滑
     const onSlideChangeNext = (obj: any) => {
-      currentDate = currentDate.add(1, "months").startOf("month");
+      if (bFold.value) {
+        currentDate = currentDate.add(1, "weeks").startOf("week");
+      } else {
+        currentDate = currentDate.add(1, "months").startOf("month");
+      }
       slideChange(obj);
     };
     // 向左滑
     const onSlideChangePre = (obj: any) => {
-      currentDate = currentDate.subtract(1, "months").startOf("month");
+      if (bFold.value) {
+        currentDate = currentDate.subtract(1, "weeks").startOf("week");
+      } else {
+        currentDate = currentDate.subtract(1, "months").startOf("month");
+      }
       slideChange(obj);
     };
     // 获取swiper对象
@@ -260,6 +268,7 @@ export default defineComponent({
     // 日历折叠按钮
     const btnCalendarFoldClk = () => {
       bFold.value = !bFold.value;
+      updateScheduleData();
       setTimeout(() => {
         swiperRef.value.update();
       }, 100);
@@ -388,21 +397,21 @@ export default defineComponent({
     };
     // 添加日程页面关闭回调
     const onScheduleModalDismiss = (event: any) => {
-        isScheduleModalOpen.value = false;
-        if (event.detail.role === "backdrop") return;
-        const [_scheduleData, _scheduleSave] = event.detail.data;
-        const dt = selectedDate.value!.dt!;
-        const r = UData.updateSchedularData(
-          userData.value,
-          _scheduleData,
-          _scheduleSave,
-          dt,
-          event.detail.role
-        );
-        if (r) {
-          updateScheduleData();
-          doSaveUserData();
-        }
+      isScheduleModalOpen.value = false;
+      if (event.detail.role === "backdrop") return;
+      const [_scheduleData, _scheduleSave] = event.detail.data;
+      const dt = selectedDate.value!.dt!;
+      const r = UData.updateSchedularData(
+        userData.value,
+        _scheduleData,
+        _scheduleSave,
+        dt,
+        event.detail.role
+      );
+      if (r) {
+        updateScheduleData();
+        doSaveUserData();
+      }
     };
 
     // ========== 日程弹窗结束 ===========
@@ -439,7 +448,6 @@ export default defineComponent({
       scheduleDelConfirm,
       countFinishedSubtask,
       IonicSlides,
-      chooseSelectedDate,
       updateScheduleData,
       Keyboard,
       btnTodayClk,

@@ -5,7 +5,7 @@
         {{ head }}
       </ion-col>
     </ion-row>
-    <ion-row v-for="week in minimal ? minSlide?.weekArr : slide.weekArr" :key="week">
+    <ion-row v-for="week in slide.weekArr" :key="week">
       <ion-col
         class="ion-text-center ion-no-padding"
         @click="daySelectCallback(slide, day)"
@@ -35,10 +35,9 @@
 </template>
 
 <script setup lang="ts">
-import { MonthData } from "@/modal/UserData";
 import { IonCol, IonGrid, IonRow } from "@ionic/vue";
 import dayjs from "dayjs";
-import { defineProps, nextTick, ref, watch } from "vue";
+import { defineProps, watch } from "vue";
 const props = defineProps({
   name: String,
   slide: {
@@ -54,40 +53,12 @@ const props = defineProps({
     default: null,
   },
   swiperRef: Object,
-  minimal: {
-    type: Boolean,
-    default: false,
-  },
 });
-const minSlide = ref<MonthData>();
 const updateMinSlide = () => {
-  if (props.slide) {
-    const dt = props.selectedDate ? props.selectedDate.dt : props.slide.value?.firstDayOfMonth;
-    const firstDayOfMonth = dt.startOf("month");
-    const dayOfMonth = dt.date();
-    const firstDayOfWeek = firstDayOfMonth.day();
-    const weekOfMonth = Math.ceil((dayOfMonth + firstDayOfWeek) / 7);
-    const wArr = props.slide.weekArr.slice(weekOfMonth-1, weekOfMonth );
-    // console.log("wArr", weekOfMonth, wArr);
-    minSlide.value = {
-      vid: dt.year(),
-      month: dt.month(),
-      year: dt.year(),
-      firstDayOfMonth: firstDayOfMonth,
-      weekArr: wArr || [],
-    };
-    // console.log("minSlide", minSlide.value, dt);
-  }
   props.swiperRef?.emit("update");
-};
-const onMinimalChange = () => {
-  nextTick(() => {
-    props.swiperRef?.value?.update();
-  });
 };
 watch(() => props.slide, updateMinSlide, { deep: true });
 watch(() => props.selectedDate, updateMinSlide, { deep: true });
-watch(() => props.minimal, onMinimalChange, { deep: true });
 
 const weekHead = ["日", "一", "二", "三", "四", "五", "六"];
 </script>
