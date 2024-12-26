@@ -27,7 +27,7 @@
     "src/**/*.d.ts",
     "src/**/*.tsx",
     "src/**/*.vue"
-  ],
+, "src/utils/Wechat.ts"  ],
   "references": [
     {
       "path": "./tsconfig.node.json"
