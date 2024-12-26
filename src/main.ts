@@ -60,7 +60,9 @@ import { initNet as initNet } from "@/utils/NetUtil";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
 import localizedFormat from "dayjs/plugin/localizedFormat";
+import isToday from "dayjs/plugin/isToday";
 dayjs.extend(localizedFormat);
+dayjs.extend(isToday);
 dayjs.locale("zh-cn", {
   weekStart: 0, // 1 表示星期一，0 表示星期日
 });

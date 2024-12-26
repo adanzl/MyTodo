@@ -3,9 +3,12 @@
     <ion-content class="main_content">
       <ion-item class="transparent">
         <h2 style="font-size: 20px; color: white">
-          {{ currentDate.format("YYYY-MM-DD") + weekHead[currentDate.day()] }}
+          {{ currentDate.format("YYYY-MM-DD") + " " + weekHead[currentDate.day()] }}
         </h2>
-        <ion-button slot="end" color="dark" @click="btnTodayClk">Today</ion-button>
+        <ion-button slot="end" color="danger" @click="btnTodayClk" v-if="!currentDate.isToday()">
+          <Icon icon="mdi:calendar-today-outline" :height="'16'"> </Icon>
+          今天
+        </ion-button>
       </ion-item>
       <swiper
         @transitionEnd="onTransitionEnd"
@@ -138,10 +141,10 @@ const updateScheduleData = () => {
   ];
   // console.log("updateScheduleData", currentDate.value, dayArr.value);
 };
-const curIdx = 1;
+// 翻页事件
 function onTransitionEnd(obj: any) {
-  if (curIdx === obj.activeIndex) return;
-  const currentIndex = obj.activeIndex; // 获取当前活动幻灯片的索引
+  if (1 === obj.activeIndex) return;
+  const currentIndex = obj.activeIndex;
   const previousIndex = obj.previousIndex;
   if (currentIndex < previousIndex) {
     currentDate.value = currentDate.value.subtract(1, "day");
@@ -231,9 +234,9 @@ function doSaveUserData() {
 }
 // 今天按钮点击
 function btnTodayClk() {
-  // currentDate.value = dayjs();
-  // updateScheduleData();
-  // swiperRef?.value?.slideTo(1, 0, false);
+  currentDate.value = dayjs();
+  updateScheduleData();
+  swiperRef?.value?.slideTo(1, 0, false);
 }
 </script>
 <style scoped>
