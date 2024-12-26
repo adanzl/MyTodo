@@ -37,8 +37,8 @@ export const ColorOptions: ColorType[] = [
   { id: 0, label: "None", tag: "white" },
   { id: 1, label: "Red", tag: "red" },
   { id: 2, label: "Yellow", tag: "yellow" },
-  { id: 3, label: "Blue", tag: "blue" },
-  { id: 4, label: "Green", tag: "green" },
+  { id: 3, label: "Blue", tag: "#7970ff" },
+  { id: 4, label: "Green", tag: "#3fef28" },
 ];
 
 export const getColorOptions = (id?: number): ColorType => {

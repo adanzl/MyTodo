@@ -79,4 +79,4 @@
   </ion-page>
 </template>
 
-<script lang="ts" src="../controller/Tab3Page.ts"></script>
+<script lang="ts" src="@/views/Tab3Page.ts"></script>

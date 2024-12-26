@@ -8,11 +8,11 @@ const LOCAL = { url: "http://192.168.50.184:9527/api", available: false };
 let URL = "";
 // const URL = "http://192.168.50.184:9527/api";
 
-async function checkAddress(url: string) {
+async function checkAddress(url: string, timeout: number = 10000) {
   try {
     const response = await axios
       .create({
-        timeout: 1000,
+        timeout: timeout,
       })
       .head(url + "/");
     return response.status >= 200 && response.status < 300;
@@ -30,7 +30,7 @@ export async function initNet(): Promise<void> {
     }
     return ret;
   });
-  const b2 = await checkAddress(LOCAL.url).then((ret) => {
+  const b2 = await checkAddress(LOCAL.url, 100).then((ret) => {
     if (ret) {
       LOCAL.available = true;
       console.log("use url:", LOCAL.url, ret);

@@ -3,9 +3,17 @@
     <ion-header>
       <ion-toolbar>
         <ion-title>
-          <h3 v-if="currentDate">{{ currentDate.format("YY年MM月") }}</h3>
-          <h3 v-else>日历</h3>
+          <div v-if="currentDate">{{ currentDate.format("YY年MM月") }}</div>
+          <div v-else>日历</div>
         </ion-title>
+        <ion-buttons slot="end">
+          <ion-button
+            style="position: absolute; right: 50px"
+            @click="btnTodayClk"
+            v-if="!isThisMonth()">
+            今
+          </ion-button>
+        </ion-buttons>
       </ion-toolbar>
     </ion-header>
     <ion-row style="background-color: antiquewhite; color: blue">
@@ -20,8 +28,7 @@
         @swiper="setSwiperInstance"
         :centered-slides="true"
         :autoHeight="true"
-        :modules="[IonicSlides, Keyboard]"
-        >
+        :modules="[IonicSlides, Keyboard]">
         <swiper-slide v-for="(month, idx) in monthArr" :key="idx">
           <ion-grid style="height: auto" fixed>
             <ion-row v-for="week in month.weekArr" :key="week">
@@ -46,7 +53,8 @@
                   :class="{
                     'text-line-through': day.save[event.id]?.state === 1,
                     gray: day.save[event.id]?.state === 1,
-                  }">
+                  }"
+                  :style="{ 'background-color': getColorOptions(event.color).tag }">
                   {{ event.title }}
                 </div>
               </ion-col>
@@ -73,9 +81,17 @@
 </template>
 <script setup lang="ts">
 import CalendarCover from "@/components/CalendarCover.vue";
+import { getColorOptions } from "@/modal/ScheduleType";
 import { DayData, MonthData, UData, UserData } from "@/modal/UserData";
 import { getSave } from "@/utils/NetUtil";
-import { IonCol, IonGrid, IonRow, IonicSlides } from "@ionic/vue";
+import {
+  IonCol,
+  IonGrid,
+  IonRow,
+  IonicSlides,
+  loadingController,
+  onIonViewDidEnter,
+} from "@ionic/vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import dayjs from "dayjs";
 import "swiper/css";
@@ -95,12 +111,16 @@ const swiperRef = ref(); // 滑动对象
 const selectedDate = ref<DayData>(); // 选中日期
 const currentDate = ref<dayjs.Dayjs>(dayjs().startOf("day")); // 当前日期(月)
 const isScheduleModalOpen = ref(false);
-onMounted(() => {
+const refreshAllData = async () => {
+  const loading = await loadingController.create({
+    message: "Loading...",
+  });
+  loading.present();
   // 获取数据
   getSave(1)
     .then((res: any) => {
       userData.value = UData.parseUserData(res);
-      console.log("getSave", userData.value);
+      // console.log("getSave", userData.value);
       updateScheduleData();
       setTimeout(() => {
         swiperRef?.value?.update();
@@ -110,8 +130,21 @@ onMounted(() => {
       console.log("getSave", err);
       toastData.value.isOpen = true;
       toastData.value.text = JSON.stringify(err);
+    })
+    .finally(() => {
+      loading.dismiss();
     });
+};
+onMounted(async () => {
+  refreshAllData();
+  onIonViewDidEnter(() => {
+    refreshAllData();
+  });
 });
+// function onViewWillEnter() {
+//   console.log("onViewWillEnter");
+// }
+
 // 初始化数据
 const updateScheduleData = () => {
   // console.log("updateScheduleData", currentDate.value);
@@ -152,9 +185,19 @@ const onDaySelected = (slide: MonthData, day: DayData) => {
 function onScheduleModalDismiss() {
   isScheduleModalOpen.value = false;
 }
+// 今天
+function btnTodayClk() {
+  currentDate.value = dayjs().startOf("day");
+  updateScheduleData();
+}
+function isThisMonth() {
+  const today = dayjs().startOf("day");
+  return today.month() === currentDate.value.month() && today.year() === currentDate.value.year();
+}
 // 数据更新
 function onDataUpdate() {
   updateScheduleData();
+  slideChange(swiperRef.value);
 }
 </script>
 <style lang="css" scoped>
@@ -178,9 +221,10 @@ function onDataUpdate() {
   white-space: nowrap; /* 防止文本换行 */
   overflow: hidden; /* 隐藏溢出的文本 */
   text-overflow: space; /* 显示省略号 */
-  padding: 1px 1px 1px 1px;
+  padding: 1px 4px 1px 4px;
   margin-top: 1px;
-  background-color: #e9bcbcb6;
+  border-radius: 2px;
+  /* background-color: #e9bcbcb6; */
 }
 .day-item ion-chip {
   padding: 1px 3px 1px 3px;

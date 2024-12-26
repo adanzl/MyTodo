@@ -287,5 +287,5 @@
     <ion-action-sheet :is-open="openSaveSheet" :buttons="saveActionButtons"> </ion-action-sheet>
   </ion-modal>
 </template>
-<script lang="ts" src="../controller/SchedulePopModal.ts"></script>
+<script lang="ts" src="@/components/SchedulePopModal.ts"></script>
 <style scoped src="../theme/SchedulePopModal.css"></style>

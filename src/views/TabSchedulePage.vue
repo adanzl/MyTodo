@@ -6,14 +6,14 @@
           <ion-button> <ion-icon color="default" :icon="list"></ion-icon> </ion-button>
         </ion-buttons>
         <ion-title class="ion-text-center">
-          <h3 v-if="selectedDate">{{ selectedDate.dt.format("YY年MM月") }}</h3>
-          <h3 v-else>日历</h3>
+          <div v-if="selectedDate">{{ selectedDate.dt.format("YY年MM月") }}</div>
+          <div v-else>日历</div>
         </ion-title>
         <ion-buttons slot="end">
           <ion-button
             style="position: absolute; right: 50px"
             @click="btnTodayClk"
-            v-if="!isToday()">
+            v-if="!selectedDate?.dt.isToday()">
             今
           </ion-button>
           <ion-button @click="btnSortClk">
@@ -170,5 +170,5 @@
     </ion-fab>
   </ion-page>
 </template>
-<script lang="ts" src="../controller/TabSchedulePage.ts"></script>
+<script lang="ts" src="@/views/TabSchedulePage.ts"></script>
 <style lang="css" scoped src="../theme/TabSchedulePage.css"></style>

@@ -48,19 +48,22 @@ import {
   IonItem,
   IonLabel,
   IonList,
+  IonLoading,
+  IonModal,
   IonPage,
   IonTitle,
   IonToast,
   IonToggle,
   IonToolbar,
-  IonModal,
 } from "@ionic/vue";
 
-import { initNet as initNet } from "@/utils/NetUtil";
+import { Wechat } from "@/utils/Wechat";
+
+import { initNet } from "@/utils/NetUtil";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
-import localizedFormat from "dayjs/plugin/localizedFormat";
 import isToday from "dayjs/plugin/isToday";
+import localizedFormat from "dayjs/plugin/localizedFormat";
 dayjs.extend(localizedFormat);
 dayjs.extend(isToday);
 dayjs.locale("zh-cn", {
@@ -89,8 +92,10 @@ app.component("ion-alert", IonAlert);
 app.component("ion-backdrop", IonBackdrop);
 app.component("ion-toggle", IonToggle);
 app.component("ion-modal", IonModal);
+app.component("ion-loading", IonLoading);
 
 console.log(`当前 Vue 版本是：${app.version}`);
+console.log(`当前 wechat 版本是：${Wechat.env()}`);
 
 // console.log(GConfig);
 // GConfig.init__();

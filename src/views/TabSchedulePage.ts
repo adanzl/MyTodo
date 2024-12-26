@@ -18,6 +18,8 @@ import {
   IonItemSliding,
   IonRefresher,
   IonRefresherContent,
+  loadingController,
+  onIonViewDidEnter,
 } from "@ionic/vue";
 import dayjs from "dayjs";
 import {
@@ -67,6 +69,7 @@ export default defineComponent({
     SwiperSlide,
     Icon,
   },
+  emits: ["view:didEnter"],
   setup() {
     // https://iconify.design/docs/icon-components/vue/
     // https://yesicon.app/search/roman?coll=mdi
@@ -163,15 +166,17 @@ export default defineComponent({
         selectedDate.value = mm.weekArr[0][0];
       }
     };
-    const isToday = () => {
-      return dayjs().startOf("day").unix() == selectedDate.value?.dt.unix();
-    };
-    onMounted(() => {
+
+    const refreshAllData = async () => {
+      const loading = await loadingController.create({
+        message: "Loading...",
+      });
+      loading.present();
       // 获取数据
       getSave(1)
         .then((res: any) => {
           userData.value = UData.parseUserData(res);
-          console.log("getSave", userData.value);
+          // console.log("getSave", userData.value);
           updateScheduleData();
           chooseSelectedDate();
           setTimeout(() => {
@@ -182,7 +187,17 @@ export default defineComponent({
           console.log("getSave", err);
           toastData.value.isOpen = true;
           toastData.value.text = JSON.stringify(err);
+        })
+        .finally(() => {
+          loading.dismiss();
         });
+    };
+
+    onMounted(() => {
+      refreshAllData();
+      onIonViewDidEnter(() => {
+        refreshAllData();
+      });
     });
     // 保存存档
     const doSaveUserData = () => {
@@ -283,7 +298,6 @@ export default defineComponent({
       // console.log("onTouchMove", bMoving, event);
       const ds = dayjs().valueOf() - lstTs;
       if (ds < 300) {
-        // console.log("too fast", ds);
         return;
       }
       const d = event.touches[0].clientY - pTouch.clientY;
@@ -295,21 +309,10 @@ export default defineComponent({
       }
     };
     // 刷新页面事件
-    const handleRefresh = (event: any) => {
+    const handleRefresh = async (event: any) => {
       // console.log("handleRefresh", event);
-      getSave(1)
-        .then((res) => {
-          console.log("handleRefresh", res);
-          toastData.value.isOpen = true;
-          toastData.value.text = "更新成功";
-          event.target.complete();
-        })
-        .catch((err) => {
-          console.log("handleRefresh", err);
-          toastData.value.isOpen = true;
-          toastData.value.text = JSON.stringify(err);
-          event.target.complete();
-        });
+      await refreshAllData();
+      event.target.complete();
     };
     // 计算完成任务数量
     const countFinishedSubtask = (schedule: ScheduleData) => {
@@ -469,7 +472,6 @@ export default defineComponent({
       onDelSchedulerConfirm,
       btnAddScheduleClk,
       btnTestClk,
-      isToday,
     };
   },
   methods: {},
