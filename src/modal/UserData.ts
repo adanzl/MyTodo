@@ -242,6 +242,12 @@ export class UData {
 
   /**
    * 更新日程数据
+   * @param userData 用户数据
+   * @param _scheduleData 日程数据
+   * @param _scheduleSave 日程存档数据
+   * @param dt 当前日期
+   * @param type 更新类型 all:更新日程和存档 cur:更新存档
+   * @returns 是否更新成功
    */
   static updateSchedularData(
     userData: UserData,

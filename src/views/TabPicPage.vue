@@ -1,20 +1,20 @@
 <template>
-  <ion-page>
+  <ion-page class="main-bg">
     <ion-header>
       <ion-toolbar>
         <ion-title>Tab Pic</ion-title>
       </ion-toolbar>
     </ion-header>
+    <ion-item collapse="condense">
+      <ion-toolbar>
+        <ion-title size="large">Tab 2</ion-title>
+        <ion-buttons slot="end">
+          <ion-button @click="loadImage">选择图片</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-item>
+    <canvas ref="canvasRef" :width="canvasWidth" :height="canvasHeight" />
     <ion-content>
-      <ion-header collapse="condense">
-        <ion-toolbar>
-          <ion-title size="large">Tab 2</ion-title>
-          <ion-buttons slot="end">
-            <ion-button @click="loadImage">选择图片</ion-button>
-          </ion-buttons>
-        </ion-toolbar>
-      </ion-header>
-      <canvas ref="canvasRef" :width="canvasWidth" :height="canvasHeight" />
       <ion-list>
         <ion-item-sliding v-for="(item, idx) in picList" :key="idx">
           <ion-item @click="onItemClk($event, item)">

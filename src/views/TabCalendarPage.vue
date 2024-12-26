@@ -61,17 +61,18 @@
       :duration="toastData.duration"
       @didDismiss="() => (toastData.isOpen = false)">
     </ion-toast>
-    <TabCalendarPage
+    <CalendarCover
       ref="scheduleModal"
       :is-open="isScheduleModalOpen"
       :dt="selectedDate?.dt"
       :userData="userData"
+      @update:data="onDataUpdate"
       @willDismiss="onScheduleModalDismiss">
-    </TabCalendarPage>
+    </CalendarCover>
   </ion-page>
 </template>
 <script setup lang="ts">
-import TabCalendarPage from "@/components/CalendarCover.vue";
+import CalendarCover from "@/components/CalendarCover.vue";
 import { DayData, MonthData, UData, UserData } from "@/modal/UserData";
 import { getSave } from "@/utils/NetUtil";
 import { IonCol, IonGrid, IonRow, IonicSlides } from "@ionic/vue";
@@ -150,6 +151,10 @@ const onDaySelected = (slide: MonthData, day: DayData) => {
 //
 function onScheduleModalDismiss() {
   isScheduleModalOpen.value = false;
+}
+// 数据更新
+function onDataUpdate() {
+  updateScheduleData();
 }
 </script>
 <style lang="css" scoped>

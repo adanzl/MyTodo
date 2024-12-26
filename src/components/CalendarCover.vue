@@ -5,7 +5,7 @@
         <h2 style="font-size: 20px; color: white">
           {{ currentDate.format("YYYY-MM-DD") + weekHead[currentDate.day()] }}
         </h2>
-        <ion-button slot="end" color="dark" @click="$emit('close')">Today</ion-button>
+        <ion-button slot="end" color="dark" @click="btnTodayClk">Today</ion-button>
       </ion-item>
       <swiper
         @transitionEnd="onTransitionEnd"
@@ -109,6 +109,7 @@ const props = defineProps({
     required: true,
   },
 });
+const emits = defineEmits(["update:data"]);
 const dayArr = ref<any[]>([{}, {}, {}]); // 滑动数据
 const swiperRef = ref(); // 滑动对象
 const currentDate = ref(dayjs(props.dt as dayjs.Dayjs)); // 当前日期
@@ -189,6 +190,7 @@ const onScheduleCheckboxChange = (_event: any, day: DayData | undefined, schedul
       });
     });
     doSaveUserData();
+    emits("update:data", currentDate.value);
   }
 };
 // 日程按钮点击
@@ -214,10 +216,11 @@ const onScheduleModalDismiss = (event: any) => {
   if (r) {
     updateScheduleData();
     doSaveUserData();
+    emits("update:data", currentDate.value);
   }
 };
 // 保存存档
-const doSaveUserData = () => {
+function doSaveUserData() {
   setSave(props.userData.id, props.userData.name, JSON.stringify(props.userData))
     .then((res) => {
       console.log("doSaveUserData", res);
@@ -225,7 +228,13 @@ const doSaveUserData = () => {
     .catch((err) => {
       console.log("doSaveUserData", err);
     });
-};
+}
+// 今天按钮点击
+function btnTodayClk() {
+  // currentDate.value = dayjs();
+  // updateScheduleData();
+  // swiperRef?.value?.slideTo(1, 0, false);
+}
 </script>
 <style scoped>
 .main_content::part(scroll) {
