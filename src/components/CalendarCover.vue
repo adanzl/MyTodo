@@ -5,7 +5,7 @@
         <h2 style="font-size: 20px; color: white">
           {{ currentDate.format("YYYY-MM-DD") + " " + weekHead[currentDate.day()] }}
         </h2>
-        <ion-button slot="end" color="danger" @click="btnTodayClk" v-if="!currentDate.isToday()">
+        <ion-button slot="end" color="danger" @click="btnTodayClk" size="medium" v-if="!currentDate.isToday()">
           <Icon icon="mdi:calendar-today-outline" :height="'16'"> </Icon>
           今天
         </ion-button>
@@ -72,8 +72,13 @@
           </ion-content>
         </swiper-slide>
       </swiper>
+      <ion-fab slot="fixed" vertical="bottom" horizontal="end">
+        <ion-fab-button @click="btnAddScheduleClk">
+          <ion-icon :icon="addCircleOutline" size="large"></ion-icon>
+        </ion-fab-button>
+      </ion-fab>
     </ion-content>
-    <div style="width: 100%; height: 20%" @click="selfRef.$el.dismiss()"></div>
+    <div style="width: 100%; height: 10%" @click="selfRef.$el.dismiss()"></div>
     <SchedulePop
       id="pop-modal"
       ref="scheduleModal"
@@ -91,10 +96,10 @@ import { getColorOptions, getGroupOptions, getPriorityOptions } from "@/modal/Sc
 import { DayData, ScheduleData, ScheduleSave, UData, UserData } from "@/modal/UserData";
 import { setSave } from "@/utils/NetUtil";
 import { Icon } from "@iconify/vue";
-import { IonCheckbox, IonicSlides } from "@ionic/vue";
+import { IonCheckbox, IonicSlides, IonFab, IonFabButton } from "@ionic/vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import dayjs from "dayjs";
-import { listOutline } from "ionicons/icons";
+import { listOutline, addCircleOutline } from "ionicons/icons";
 import "swiper/css";
 import "swiper/css/effect-fade";
 import { EffectCoverflow, Keyboard } from "swiper/modules";
@@ -238,10 +243,18 @@ function btnTodayClk() {
   updateScheduleData();
   swiperRef?.value?.slideTo(1, 0, false);
 }
+
+// 添加日程按钮
+const btnAddScheduleClk = () => {
+  // 清空数据
+  scheduleModalData.value = undefined;
+  scheduleSave.value = undefined;
+  isScheduleModalOpen.value = true;
+};
 </script>
 <style scoped>
 .main_content::part(scroll) {
-  height: 100%;
+  height: 90%;
   margin-top: 20%;
 }
 .main_content::part(background) {

@@ -57,7 +57,7 @@ export class ScheduleSave {
   static Copy(o: ScheduleSave): ScheduleSave {
     const ret = new ScheduleSave();
     ret.state = o.state;
-    ret.subtasks = JSON.parse(JSON.stringify(o.subtasks));
+    if (o.subtasks) ret.subtasks = JSON.parse(JSON.stringify(o.subtasks));
     return ret;
   }
 }

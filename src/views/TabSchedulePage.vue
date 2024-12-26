@@ -86,7 +86,7 @@
                           'text-line-through': selectedDate?.save[schedule.id]?.state === 1,
                         }"
                         class="scheduleItemLabel">
-                        <h2>{{ schedule.title }}</h2>
+                        <h2>[{{ schedule.id }}]{{ schedule.title }}</h2>
                         <div class="flex">
                           <p class="schedule-lb-sub">
                             <ion-icon

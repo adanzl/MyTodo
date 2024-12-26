@@ -97,18 +97,12 @@
             </ion-buttons>
             <ion-datetime
               presentation="date"
+              max="2099-01-01"
               locale="zh-cn"
               @ionChange="onDtChange"
-              size="cover"
-              class="schedule-datetime-date">
+              size="cover">
             </ion-datetime>
-            <ion-item
-              class="ion-no-padding"
-              @click="
-                () => {
-                  datetimeShowFlag = true;
-                }
-              ">
+            <ion-item class="ion-no-padding" @click="() => (datetimeShowFlag = true)">
               <!-- 开始时间 -->
               <ion-icon :icon="timeOutline" aria-hidden="true" slot="start"> </ion-icon>
               <ion-label>开始时间</ion-label>
@@ -119,11 +113,7 @@
                 class="start-time-modal"
                 :isOpen="datetimeShowFlag"
                 :keep-contents-mounted="true"
-                @willDismiss="
-                  () => {
-                    datetimeShowFlag = false;
-                  }
-                ">
+                @willDismiss="() => (datetimeShowFlag = false)">
                 <ion-item>
                   <ion-title><h2>开始时间</h2></ion-title>
                 </ion-item>
@@ -134,11 +124,7 @@
                   :value="curScheduleData?.startTs?.format('YYYY-MM-DDTHH:mm')"
                   hourCycle="h23"
                   :disabled="curScheduleData?.allDay"
-                  @ionChange="
-                          (e:any) => {
-                            scheduleStartTsComponent = dayjs(e.detail.value);
-                          }
-                        "
+                  @ionChange="(e:any) => (scheduleStartTsComponent = dayjs(e.detail.value))"
                   class="schedule-datetime-time">
                 </ion-datetime>
                 <ion-item>
@@ -153,11 +139,7 @@
                     size="large"
                     fill="clear"
                     style="width: 50%"
-                    @click="
-                      () => {
-                        datetimeShowFlag = false;
-                      }
-                    ">
+                    @click="() => (datetimeShowFlag = false)">
                     清除
                   </ion-button>
                   <ion-button
@@ -211,8 +193,10 @@
               locale="zh-cn"
               id="idRepeatEndTs"
               ref="repeatEndTsComponent"
-              :value="curScheduleData?.repeatEndTs?.format('YYYY-MM-DD')"
+              :value="curScheduleData?.repeatEndTs?.format('YYYY-MM-DD') || dayjs().format('YYYY-MM-DD')"
               presentation="date"
+              size="cover"
+              max="2099-01-01"
               @ionChange="onRepeatEndDtChange">
               <ion-buttons slot="buttons" class="ion-justify-content-around">
                 <ion-button color="warning" @click="btnRepeatEndClearClk"> 清除 </ion-button>

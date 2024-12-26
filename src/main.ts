@@ -57,7 +57,6 @@ import {
   IonToolbar,
 } from "@ionic/vue";
 
-import { Wechat } from "@/utils/Wechat";
 
 import { initNet } from "@/utils/NetUtil";
 import dayjs from "dayjs";
@@ -95,7 +94,6 @@ app.component("ion-modal", IonModal);
 app.component("ion-loading", IonLoading);
 
 console.log(`当前 Vue 版本是：${app.version}`);
-console.log(`当前 wechat 版本是：${Wechat.env()}`);
 
 // console.log(GConfig);
 // GConfig.init__();

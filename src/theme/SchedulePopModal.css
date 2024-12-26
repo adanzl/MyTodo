@@ -49,10 +49,6 @@ ion-modal::part(backdrop) {
     font-size: larger;
 }
 
-.schedule-datetime-date::part(calendar-day) {
-    text-align: center;
-}
-
 .group::part(native) {
     display: flex;
     justify-content: center;

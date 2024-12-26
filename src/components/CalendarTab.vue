@@ -37,7 +37,7 @@
 <script setup lang="ts">
 import { IonCol, IonGrid, IonRow } from "@ionic/vue";
 import dayjs from "dayjs";
-import { defineProps, watch } from "vue";
+import { watch } from "vue";
 const props = defineProps({
   name: String,
   slide: {

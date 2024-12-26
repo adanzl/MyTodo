@@ -403,6 +403,7 @@ export default defineComponent({
       isScheduleModalOpen.value = false;
       if (event.detail.role === "backdrop") return;
       const [_scheduleData, _scheduleSave] = event.detail.data;
+      // console.log("onScheduleModalDismiss", _scheduleData, _scheduleSave, userData.value);
       const dt = selectedDate.value!.dt!;
       const r = UData.updateSchedularData(
         userData.value,
