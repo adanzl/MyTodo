@@ -2,9 +2,7 @@
   <ion-page>
     <ion-header>
       <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-button> <ion-icon color="default" :icon="list"></ion-icon> </ion-button>
-        </ion-buttons>
+
         <ion-title class="ion-text-center">
           <div v-if="selectedDate">{{ selectedDate.dt.format("YY年MM月") }}</div>
           <div v-else>日历</div>
@@ -16,9 +14,9 @@
             v-if="!selectedDate?.dt.isToday()">
             今
           </ion-button>
-          <ion-button @click="btnSortClk">
+          <!-- <ion-button @click="btnSortClk">
             <ion-icon :icon="swapVertical" class="button-native"></ion-icon>
-          </ion-button>
+          </ion-button> -->
         </ion-buttons>
       </ion-toolbar>
     </ion-header>

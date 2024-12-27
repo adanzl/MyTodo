@@ -5,8 +5,13 @@
         <h2 style="font-size: 20px; color: white">
           {{ currentDate.format("YYYY-MM-DD") + " " + weekHead[currentDate.day()] }}
         </h2>
-        <ion-button slot="end" color="danger" @click="btnTodayClk" size="medium" v-if="!currentDate.isToday()">
-          <Icon icon="mdi:calendar-today-outline" :height="'16'"> </Icon>
+        <ion-button
+          slot="end"
+          color="danger"
+          @click="btnTodayClk"
+          size="default"
+          :style="{ padding: '0px 10px', opacity: currentDate.isToday() ? '0' : '1' }">
+          <Icon icon="mdi:calendar-today-outline" :height="'16'" slot="start"> </Icon>
           今天
         </ion-button>
       </ion-item>
@@ -29,7 +34,15 @@
         style="height: 90%">
         <swiper-slide v-for="(day, idx) in dayArr" :key="idx" class="data-content">
           <ion-content>
-            <ion-item>日程 {{ day?.dt.format("MM-DD") }}</ion-item>
+            <ion-item color="light">
+              <Icon
+                icon="mdi:list-status"
+                style="color: var(--ion-color-tertiary)"
+                :height="'40'"
+                slot="start">
+              </Icon>
+              <div style="height: 50px"></div>
+            </ion-item>
             <ion-item v-for="(schedule, idx) in day.events" :key="idx">
               <ion-checkbox
                 style="--size: 26px; padding-right: 5px"
@@ -95,11 +108,10 @@ import SchedulePop from "@/components/SchedulePopModal.vue";
 import { getColorOptions, getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
 import { DayData, ScheduleData, ScheduleSave, UData, UserData } from "@/modal/UserData";
 import { setSave } from "@/utils/NetUtil";
-import { Icon } from "@iconify/vue";
-import { IonCheckbox, IonicSlides, IonFab, IonFabButton } from "@ionic/vue";
+import { IonCheckbox, IonFab, IonFabButton, IonicSlides } from "@ionic/vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import dayjs from "dayjs";
-import { listOutline, addCircleOutline } from "ionicons/icons";
+import { addCircleOutline, listOutline } from "ionicons/icons";
 import "swiper/css";
 import "swiper/css/effect-fade";
 import { EffectCoverflow, Keyboard } from "swiper/modules";
@@ -128,6 +140,7 @@ const scheduleModalData = ref<ScheduleData>();
 const scheduleSave = ref<ScheduleSave>();
 const isScheduleModalOpen = ref(false);
 // === 弹窗对象结束
+
 
 watch(
   () => props.dt,
@@ -227,6 +240,7 @@ const onScheduleModalDismiss = (event: any) => {
     emits("update:data", currentDate.value);
   }
 };
+
 // 保存存档
 function doSaveUserData() {
   setSave(props.userData.id, props.userData.name, JSON.stringify(props.userData))

@@ -2,7 +2,6 @@ import icons from "@/modal/Icons";
 import { getSave } from "@/utils/NetUtil";
 import { getColorOptions, getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
 import { S_TS, UserData, UData } from "@/modal/UserData";
-import { Icon } from "@iconify/vue";
 import { IonRefresher, IonRefresherContent } from "@ionic/vue";
 import dayjs from "dayjs";
 import { defineComponent, onMounted, ref } from "vue";
@@ -12,7 +11,6 @@ export default defineComponent({
     IonRefresher,
     IonRefresherContent,
     S_TS,
-    Icon,
   },
   setup() {
     const userData = ref<UserData>(new UserData());

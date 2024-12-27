@@ -11,7 +11,7 @@
     </ion-item>
     <ion-content class="ion-padding">
       <ion-item>
-        <ion-radio-group :value="valueRef" @ionChange="onSelectChange" class="width-100">
+        <ion-radio-group :value="valueRef" @ionChange="onSelectChange" class="width-100" mode="ios">
           <ion-radio
             v-for="(op, idx) in GroupOptions"
             :key="idx"
@@ -19,7 +19,6 @@
             class="option-item">
             <ion-item lines="none" style="flex: 1">
               <span>
-                <!-- <Icon icon="mdi:bookmark" aria-hidden="true" height="28"></Icon> -->
                 <ion-icon :icon="bookmark" aria-hidden="true" style="font-size: 20px"></ion-icon>
               </span>
               <ion-label style="margin-left: 8px">{{ op.label }}</ion-label>
@@ -39,7 +38,6 @@
 import { createTriggerController } from "@/utils/Overlay";
 import { GroupOptions } from "@/modal/ScheduleType";
 import { IonRadio, IonRadioGroup } from "@ionic/vue";
-// import { Icon } from "@iconify/vue";
 import { bookmark } from "ionicons/icons";
 import { onMounted, ref, watch } from "vue";
 const props = defineProps({

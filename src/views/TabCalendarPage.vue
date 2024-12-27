@@ -1,7 +1,10 @@
 <template>
-  <ion-page>
+  <ion-page id="main-content" main>
     <ion-header>
       <ion-toolbar>
+        <ion-buttons slot="start">
+          <ion-menu-button></ion-menu-button>
+        </ion-buttons>
         <ion-title class="ion-text-center">
           <div v-if="currentDate">{{ currentDate.format("YY年MM月") }}</div>
           <div v-else>日历</div>
@@ -48,7 +51,7 @@
                   </ion-chip>
                 </span>
                 <div
-                  v-for="(event, idx) of day.events"
+                  v-for="(event, idx) of day.events.filter(bShowScheduleItem)"
                   :key="idx"
                   :class="{
                     'text-line-through': day.save[event.id]?.state === 1,
@@ -82,23 +85,25 @@
 <script setup lang="ts">
 import CalendarCover from "@/components/CalendarCover.vue";
 import { getColorOptions } from "@/modal/ScheduleType";
-import { DayData, MonthData, UData, UserData } from "@/modal/UserData";
+import { DayData, MonthData, ScheduleData, UData, UserData } from "@/modal/UserData";
 import { getSave } from "@/utils/NetUtil";
 import {
   IonCol,
   IonGrid,
-  IonRow,
   IonicSlides,
+  IonMenuButton,
+  IonRow,
   loadingController,
   onIonViewDidEnter,
 } from "@ionic/vue";
+// import { list } from "ionicons/icons";
 import "@ionic/vue/css/ionic-swiper.css";
 import dayjs from "dayjs";
 import "swiper/css";
 import "swiper/css/effect-fade";
 import { Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
-import { onMounted, ref } from "vue";
+import { inject, onMounted, ref } from "vue";
 const weekHead = ["日", "一", "二", "三", "四", "五", "六"];
 const toastData = ref({
   isOpen: false,
@@ -111,6 +116,10 @@ const swiperRef = ref(); // 滑动对象
 const selectedDate = ref<DayData>(); // 选中日期
 const currentDate = ref<dayjs.Dayjs>(dayjs().startOf("day")); // 当前日期(月)
 const isScheduleModalOpen = ref(false);
+const filter = ref<any>({});
+
+const eventBus: any = inject("eventBus");
+
 const refreshAllData = async () => {
   const loading = await loadingController.create({
     message: "Loading...",
@@ -140,10 +149,23 @@ onMounted(async () => {
   onIonViewDidEnter(() => {
     refreshAllData();
   });
+  eventBus.$on("menuClose", (params: any) => {
+    console.log("menuClose", params);
+    filter.value = params;
+  });
 });
-// function onViewWillEnter() {
-//   console.log("onViewWillEnter");
-// }
+
+function bShowScheduleItem(schedule: ScheduleData) {
+  const [fGroup, fColor, fPriority] = [
+    parseInt(filter.value.group),
+    parseInt(filter.value.color),
+    parseInt(filter.value.priority),
+  ];
+  if (!isNaN(fGroup) && fGroup !== -1 && fGroup !== schedule.groupId) return false;
+  if (!isNaN(fColor) && fColor !== -1 && fColor !== schedule.color) return false;
+  if (!isNaN(fPriority) && fPriority !== -1 && fPriority !== schedule.priority) return false;
+  return true;
+}
 
 // 初始化数据
 const updateScheduleData = () => {

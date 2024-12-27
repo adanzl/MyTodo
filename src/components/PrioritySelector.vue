@@ -37,7 +37,6 @@ import { onMounted, ref, watch } from "vue";
 import { createTriggerController } from "@/utils/Overlay";
 import { IonRadioGroup, IonRadio } from "@ionic/vue";
 import { PriorityOptions } from "@/modal/ScheduleType";
-import { Icon } from "@iconify/vue";
 
 const props = defineProps({
   trigger: {

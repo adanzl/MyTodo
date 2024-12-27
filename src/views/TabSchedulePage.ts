@@ -45,7 +45,6 @@ import {
 } from "@/modal/ScheduleType";
 import { DayData, MonthData, ScheduleData, ScheduleSave, UData, UserData } from "@/modal/UserData";
 import { getSave, setSave } from "@/utils/NetUtil";
-import { Icon } from "@iconify/vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import "swiper/css";
 import "swiper/css/effect-fade";
@@ -67,7 +66,6 @@ export default defineComponent({
     SchedulePop,
     Swiper,
     SwiperSlide,
-    Icon,
   },
   emits: ["view:didEnter"],
   setup() {

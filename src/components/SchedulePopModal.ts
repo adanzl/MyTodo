@@ -10,7 +10,6 @@ import {
   RepeatOptions,
 } from "@/modal/ScheduleType";
 import { ScheduleData, ScheduleSave, Subtask } from "@/modal/UserData";
-import { Icon } from "@iconify/vue";
 
 import {
   alertController,
@@ -62,7 +61,6 @@ export default defineComponent({
     GroupSelector,
     SubtaskPopModal,
     IonActionSheet,
-    Icon,
   },
   props: {
     modal: Object,

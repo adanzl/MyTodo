@@ -1,6 +1,7 @@
 import { createApp } from "vue";
 import App from "./App.vue";
 import router from "./router";
+import EventBus from "./modal/EventBus";
 
 /* Core CSS required for Ionic components to work properly */
 import "@ionic/vue/css/core.css";
@@ -18,6 +19,10 @@ import "@ionic/vue/css/padding.css";
 import "@ionic/vue/css/text-alignment.css";
 import "@ionic/vue/css/text-transformation.css";
 
+import { defineCustomElements } from "@ionic/pwa-elements/loader";
+
+defineCustomElements(window);
+
 /**
  * Ionic Dark Mode
  * -----------------------------------------------------
@@ -32,6 +37,7 @@ import "@ionic/vue/css/text-transformation.css";
 /* Theme variables */
 import "./theme/variables.css";
 // import GConfig from "@/components/GConfig.vue";
+import { Icon } from "@iconify/vue";
 import {
   IonAlert,
   IonBackdrop,
@@ -57,7 +63,6 @@ import {
   IonToolbar,
 } from "@ionic/vue";
 
-
 import { initNet } from "@/utils/NetUtil";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
@@ -70,6 +75,7 @@ dayjs.locale("zh-cn", {
 });
 
 const app = createApp(App).use(IonicVue).use(router);
+app.provide("eventBus", EventBus);
 
 app.component("ion-content", IonContent);
 app.component("ion-footer", IonFooter);
@@ -91,6 +97,8 @@ app.component("ion-alert", IonAlert);
 app.component("ion-backdrop", IonBackdrop);
 app.component("ion-toggle", IonToggle);
 app.component("ion-modal", IonModal);
+// eslint-disable-next-line vue/multi-word-component-names
+app.component("Icon", Icon);
 app.component("ion-loading", IonLoading);
 
 console.log(`当前 Vue 版本是：${app.version}`);
