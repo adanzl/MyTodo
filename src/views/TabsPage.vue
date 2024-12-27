@@ -21,7 +21,9 @@
                 @ionChange="onCheckChange($event, groupRef, -1)"
                 :checked="bChecked(groupRef, -1)">
                 <ion-item lines="none" style="left: -6px">
-                  <Icon :icon="'mdi:check-all'" :height="'28'" style="margin: 0 10px 0 5px"></Icon>
+                  <icon-mdi-check-all
+                    :height="'28'"
+                    style="margin: 0 10px 0 5px"></icon-mdi-check-all>
                   <ion-label lines="none">全部</ion-label>
                 </ion-item>
               </ion-checkbox>
@@ -34,7 +36,10 @@
                 @ionChange="onCheckChange($event, groupRef, group.id)"
                 :checked="bChecked(groupRef, group.id)">
                 <ion-item lines="none">
-                  <Icon :icon="mdiTag" :height="'20'" style="margin-right: 15px" color="#7970ff"></Icon>
+                  <icon-mdi-tag
+                    :height="'20'"
+                    style="margin-right: 15px"
+                    color="#7970ff"></icon-mdi-tag>
                   <ion-label>{{ group.label }}</ion-label>
                 </ion-item>
               </ion-checkbox>
@@ -53,7 +58,9 @@
                 @ionChange="onCheckChange($event, colorRef, -1)"
                 :checked="bChecked(colorRef, -1)">
                 <ion-item lines="none" style="left: -6px">
-                  <Icon :icon="mdiCheckAll" :height="'28'" style="margin: 0 10px 0 5px"></Icon>
+                  <icon-mdi-check-all
+                    :height="'28'"
+                    style="margin: 0 10px 0 5px"></icon-mdi-check-all>
                   <ion-label lines="none">全部</ion-label>
                 </ion-item>
               </ion-checkbox>
@@ -86,7 +93,9 @@
                 @ionChange="onCheckChange($event, priorityRef, -1)"
                 :checked="bChecked(priorityRef, -1)">
                 <ion-item lines="none" style="left: -6px">
-                  <Icon :icon="'mdi:check-all'" :height="'28'" style="margin: 0 10px 0 5px"></Icon>
+                  <icon-mdi-check-all
+                    :height="'28'"
+                    style="margin: 0 10px 0 5px"></icon-mdi-check-all>
                   <ion-label lines="none">全部</ion-label>
                 </ion-item>
               </ion-checkbox>
@@ -99,11 +108,12 @@
                 @ionChange="onCheckChange($event, priorityRef, priority.id)"
                 :checked="bChecked(priorityRef, priority.id)">
                 <ion-item lines="none" style="left: -6px">
-                  <Icon
-                    :icon="priority.icon"
-                    :height="'36'"
+                  <component
+                    :is="priority.icon"
+                    :height="'36px'"
+                    width="36px"
                     :color="priority.color"
-                    style="margin-right: 8px"></Icon>
+                    style="margin-right: 8px" />
                   <ion-label>{{ priority.label }}</ion-label>
                 </ion-item>
               </ion-checkbox>
@@ -146,9 +156,6 @@
 
 <script setup lang="ts">
 import { bookmark, colorPalette } from "ionicons/icons";
-import { Icon } from '@iconify/vue';
-import mdiTag from '@iconify-icons/mdi/tag';
-import mdiCheckAll from '@iconify-icons/mdi/check-all';
 
 import { GroupOptions, ColorOptions, PriorityOptions } from "@/modal/ScheduleType";
 import {

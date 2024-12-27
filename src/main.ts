@@ -99,6 +99,7 @@ app.component("ion-toggle", IonToggle);
 app.component("ion-modal", IonModal);
 // eslint-disable-next-line vue/multi-word-component-names
 app.component("Icon", Icon);
+app.component("iconify-icon", Icon);
 app.component("ion-loading", IonLoading);
 
 console.log(`当前 Vue 版本是：${app.version}`);

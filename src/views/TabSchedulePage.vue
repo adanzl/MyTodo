@@ -1,8 +1,7 @@
 <template>
-  <ion-page>
+  <ion-page id="main-content">
     <ion-header>
       <ion-toolbar>
-
         <ion-title class="ion-text-center">
           <div v-if="selectedDate">{{ selectedDate.dt.format("YY年MM月") }}</div>
           <div v-else>日历</div>
@@ -106,16 +105,12 @@
                           'margin-left': '10px',
                         }">
                       </span>
-                      <!-- <ion-icon
-                        :icon="icons.mdiRomanNums[getPriorityOptions(schedule.priority).icon]"
-                        :style="{ color: getPriorityOptions(schedule.priority).color }"
-                        style="font-size: 2rem">
-                      </ion-icon> -->
-                      <Icon
-                        :icon="getPriorityOptions(schedule.priority).icon"
-                        :height="'36'"
+                      <component
+                        :is="getPriorityOptions(schedule.priority).icon"
+                        :height="'36px'"
+                        :width="'36px'"
                         :color="getPriorityOptions(schedule.priority).color">
-                      </Icon>
+                      </component>
                     </div>
                   </ion-item>
                   <ion-item-options side="end">

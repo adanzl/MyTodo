@@ -52,16 +52,20 @@ export const getColorOptions = (id?: number): ColorType => {
 
 export interface PriorityType {
   id: number;
-  icon: string;
+  icon: any;
   color: string;
   label: string;
 }
 // 优先级类型
+import MdiRomanNumeral1 from "virtual:icons/mdi/roman-numeral-1";
+import MdiRomanNumeral2 from "virtual:icons/mdi/roman-numeral-2";
+import MdiRomanNumeral3 from "virtual:icons/mdi/roman-numeral-3";
+import MdiRomanNumeral4 from "virtual:icons/mdi/roman-numeral-4";
 export const PriorityOptions: PriorityType[] = [
-  { id: 0, icon: "mdi:roman-numeral-1", color: "#1a65eb !important", label: "较低" },
-  { id: 1, icon: "mdi:roman-numeral-2", color: "#2dd55b !important", label: "中等" },
-  { id: 2, icon: "mdi:roman-numeral-3", color: "#ffc409 !important", label: "较高" },
-  { id: 3, icon: "mdi:roman-numeral-4", color: "#cb1a27 !important", label: "核心" },
+  { id: 0, icon: MdiRomanNumeral1, color: "#1a65eb", label: "较低" },
+  { id: 1, icon: MdiRomanNumeral2, color: "#2dd55b", label: "中等" },
+  { id: 2, icon: MdiRomanNumeral3, color: "#ffc409", label: "较高" },
+  { id: 3, icon: MdiRomanNumeral4, color: "#cb1a27", label: "核心" },
 ];
 export const getPriorityOptions = (id?: number): PriorityType => {
   for (const v of PriorityOptions) {

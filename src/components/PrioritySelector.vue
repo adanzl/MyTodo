@@ -18,7 +18,10 @@
             :value="op.id"
             class="option-item">
             <ion-item lines="none" style="flex: 1">
-              <span><Icon :icon="op.icon" :height="'36'" :color="op.color"></Icon></span>
+              <span>
+                <!-- <Icon :icon="op.icon" :height="'36'" :color="op.color"></Icon> -->
+                <component :is="op.icon" :height="'36px'" width="36px" :color="op.color" />
+              </span>
               <ion-label style="margin-left: 8px">{{ op.label }}</ion-label>
             </ion-item>
           </ion-radio>

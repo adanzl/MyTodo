@@ -39,11 +39,11 @@
             :value="curScheduleData.groupId"></GroupSelector>
           <ion-button id="btnPriority" class="group-tab" fill="none">
             <ion-label><strong>Pri</strong></ion-label>
-            <Icon
-              :icon="getPriorityOptions(curScheduleData.priority).icon"
-              :height="'36'"
-              :color="getPriorityOptions(curScheduleData.priority).color">
-            </Icon>
+            <component
+              :is="getPriorityOptions(curScheduleData.priority).icon"
+              :height="'36px'"
+              width="36px"
+              :color="getPriorityOptions(curScheduleData.priority).color" />
           </ion-button>
           <PrioritySelector
             trigger="btnPriority"

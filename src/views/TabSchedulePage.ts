@@ -1,6 +1,5 @@
 import CalenderTab from "@/components/CalendarTab.vue";
 import SchedulePop from "@/components/SchedulePopModal.vue";
-import icons from "@/modal/Icons";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import "@ionic/vue/css/ionic-swiper.css";
 import "swiper/css";
@@ -418,7 +417,6 @@ export default defineComponent({
 
     // ========== 日程弹窗结束 ===========
     return {
-      icons,
       ColorOptions,
       getColorOptions,
       getPriorityOptions,

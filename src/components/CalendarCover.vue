@@ -11,7 +11,7 @@
           @click="btnTodayClk"
           size="default"
           :style="{ padding: '0px 10px', opacity: currentDate.isToday() ? '0' : '1' }">
-          <Icon icon="mdi:calendar-today-outline" :height="'16'" slot="start"> </Icon>
+          <icon-mdi-calendar-today-outline :height="'16'" slot="start"> </icon-mdi-calendar-today-outline>
           今天
         </ion-button>
       </ion-item>
@@ -35,12 +35,11 @@
         <swiper-slide v-for="(day, idx) in dayArr" :key="idx" class="data-content">
           <ion-content>
             <ion-item color="light">
-              <Icon
-                icon="mdi:list-status"
+              <icon-mdi-list-status
                 style="color: var(--ion-color-tertiary)"
                 :height="'40'"
                 slot="start">
-              </Icon>
+              </icon-mdi-list-status>
               <div style="height: 50px"></div>
             </ion-item>
             <ion-item v-for="(schedule, idx) in day.events" :key="idx">
@@ -75,11 +74,11 @@
                     'margin-left': '10px',
                   }">
                 </span>
-                <Icon
-                  :icon="getPriorityOptions(schedule.priority).icon"
-                  :height="'36'"
-                  :color="getPriorityOptions(schedule.priority).color">
-                </Icon>
+                <component
+                  :is="getPriorityOptions(schedule.priority).icon"
+                  :height="'36px'"
+                  width="36px"
+                  :color="getPriorityOptions(schedule.priority).color" />
               </div>
             </ion-item>
           </ion-content>
@@ -108,6 +107,8 @@ import SchedulePop from "@/components/SchedulePopModal.vue";
 import { getColorOptions, getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
 import { DayData, ScheduleData, ScheduleSave, UData, UserData } from "@/modal/UserData";
 import { setSave } from "@/utils/NetUtil";
+// import midCalendarTodayOutline from "@iconify-icons/mdi/calendar-today-outline";
+// import mdiListStatus from "@iconify-icons/mdi/list-status";
 import { IonCheckbox, IonFab, IonFabButton, IonicSlides } from "@ionic/vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import dayjs from "dayjs";
@@ -117,7 +118,6 @@ import "swiper/css/effect-fade";
 import { EffectCoverflow, Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
 import { nextTick, ref, watch } from "vue";
-1;
 const weekHead = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
 const props = defineProps({
   dt: {
@@ -140,7 +140,6 @@ const scheduleModalData = ref<ScheduleData>();
 const scheduleSave = ref<ScheduleSave>();
 const isScheduleModalOpen = ref(false);
 // === 弹窗对象结束
-
 
 watch(
   () => props.dt,
