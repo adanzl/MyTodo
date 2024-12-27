@@ -1,5 +1,5 @@
 <template>
-  <ion-page class="main-bg">
+  <ion-page class="main-bg" id="main-content">
     <ion-header>
       <ion-toolbar>
         <ion-title>Tab Pic</ion-title>
