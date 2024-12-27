@@ -1,7 +1,6 @@
 <template>
   <ion-modal
     ref="modal"
-    aria-hidden="true"
     id="groupSelector"
     mode="ios"
     class="bottom-modal"
@@ -19,7 +18,7 @@
             class="option-item">
             <ion-item lines="none" style="flex: 1">
               <span>
-                <ion-icon :icon="bookmark" aria-hidden="true" style="font-size: 20px"></ion-icon>
+                <ion-icon :icon="bookmark" style="font-size: 20px"></ion-icon>
               </span>
               <ion-label style="margin-left: 8px">{{ op.label }}</ion-label>
             </ion-item>

@@ -1,7 +1,6 @@
 <template>
   <ion-modal
     ref="modal"
-    aria-hidden="true"
     id="prioritySelector"
     mode="ios"
     class="bottom-modal"

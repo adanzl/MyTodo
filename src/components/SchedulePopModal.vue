@@ -1,5 +1,5 @@
 <template>
-  <ion-modal show-backdrop="false" id="main" mode="ios" aria-hidden="false">
+  <ion-modal show-backdrop="false" id="main" mode="ios">
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start" class="ion-padding">
@@ -30,7 +30,7 @@
         <!-- 分组信息 -->
         <ion-item class="group">
           <ion-button id="btnGroup" class="group-tab" fill="none">
-            <ion-icon :icon="bookmark" aria-hidden="true"></ion-icon>
+            <ion-icon :icon="bookmark"></ion-icon>
             <ion-label>{{ getGroupOptions(curScheduleData.groupId).label }}</ion-label>
           </ion-button>
           <GroupSelector
@@ -51,7 +51,7 @@
             :value="curScheduleData.priority">
           </PrioritySelector>
           <ion-button id="btnColor" class="group-tab" fill="none">
-            <ion-icon slot="start" :icon="colorPalette" aria-hidden="true"> </ion-icon>
+            <ion-icon slot="start" :icon="colorPalette"> </ion-icon>
             <span
               :style="{ 'background-color': getColorOptions(curScheduleData.color).tag }"
               class="v-dot"></span>
@@ -104,7 +104,7 @@
             </ion-datetime>
             <ion-item class="ion-no-padding" @click="() => (datetimeShowFlag = true)">
               <!-- 开始时间 -->
-              <ion-icon :icon="timeOutline" aria-hidden="true" slot="start"> </ion-icon>
+              <ion-icon :icon="timeOutline" slot="start"> </ion-icon>
               <ion-label>开始时间</ion-label>
               <label>
                 {{ curScheduleData.allDay ? "全天" : curScheduleData.startTs?.format("HH:mm") }}
@@ -155,7 +155,7 @@
           </div>
         </ion-item>
         <!-- <ion-item :button="true" :detail="true">
-          <ion-icon :icon="notifications" aria-hidden="true" slot="start"> </ion-icon>
+          <ion-icon :icon="notifications"  slot="start"> </ion-icon>
           <ion-select
             id="selectReminder"
             aria-label="Reminder"
@@ -170,7 +170,7 @@
           </ion-select>
         </ion-item> -->
         <ion-item detail="true">
-          <ion-icon :icon="repeat" aria-hidden="true" slot="start"> </ion-icon>
+          <ion-icon :icon="repeat" slot="start"> </ion-icon>
           <ion-select :value="curScheduleData?.repeat" @ion-change="onRepeatChange">
             <div slot="label">
               <ion-label>重复</ion-label>
@@ -193,7 +193,9 @@
               locale="zh-cn"
               id="idRepeatEndTs"
               ref="repeatEndTsComponent"
-              :value="curScheduleData?.repeatEndTs?.format('YYYY-MM-DD') || dayjs().format('YYYY-MM-DD')"
+              :value="
+                curScheduleData?.repeatEndTs?.format('YYYY-MM-DD') || dayjs().format('YYYY-MM-DD')
+              "
               presentation="date"
               size="cover"
               max="2099-01-01"

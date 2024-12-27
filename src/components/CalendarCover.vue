@@ -1,5 +1,5 @@
 <template>
-  <ion-modal mode="ios" aria-hidden="false" ref="selfRef">
+  <ion-modal mode="ios" ref="selfRef">
     <ion-content class="main_content">
       <ion-item class="transparent">
         <h2 style="font-size: 20px; color: white">

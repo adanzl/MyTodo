@@ -1,5 +1,5 @@
 <template>
-  <ion-modal ref="modal" aria-hidden="true" id="subtaskPopModal" mode="ios">
+  <ion-modal ref="modal" id="subtaskPopModal" mode="ios">
     <ion-item>
       <ion-title>子任务</ion-title>
     </ion-item>
