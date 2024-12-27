@@ -157,13 +157,13 @@ onMounted(async () => {
 
 function bShowScheduleItem(schedule: ScheduleData) {
   const [fGroup, fColor, fPriority] = [
-    parseInt(filter.value.group),
-    parseInt(filter.value.color),
-    parseInt(filter.value.priority),
+    filter.value.group,
+    filter.value.color,
+    filter.value.priority,
   ];
-  if (!isNaN(fGroup) && fGroup !== -1 && fGroup !== schedule.groupId) return false;
-  if (!isNaN(fColor) && fColor !== -1 && fColor !== schedule.color) return false;
-  if (!isNaN(fPriority) && fPriority !== -1 && fPriority !== schedule.priority) return false;
+  if (fGroup && fGroup.get(schedule.groupId) === false) return false;
+  if (fColor && fColor.get(schedule.color) === false) return false;
+  if (fPriority && fPriority.get(schedule.priority) === false) return false;
   return true;
 }
 

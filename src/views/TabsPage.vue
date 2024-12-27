@@ -19,8 +19,11 @@
                 justify="space-between"
                 class="option-item"
                 @ionChange="onCheckChange($event, groupRef, -1)"
-                :checked="groupRef.size === 0">
-                <ion-item lines="none">全部</ion-item>
+                :checked="bChecked(groupRef, -1)">
+                <ion-item lines="none" style="left: -6px">
+                  <Icon :icon="'mdi:check-all'" :height="'28'" style="margin: 0 10px 0 5px"></Icon>
+                  <ion-label lines="none">全部</ion-label>
+                </ion-item>
               </ion-checkbox>
               <ion-checkbox
                 label-placement="start"
@@ -29,8 +32,11 @@
                 justify="space-between"
                 class="option-item"
                 @ionChange="onCheckChange($event, groupRef, group.id)"
-                :checked="groupRef.size === 0 || group.id in groupRef">
-                <ion-item lines="none">{{ group.label }}</ion-item>
+                :checked="bChecked(groupRef, group.id)">
+                <ion-item lines="none">
+                  <Icon :icon="'mdi:tag'" :height="'20'" style="margin-right: 15px" color="#7970ff"></Icon>
+                  <ion-label>{{ group.label }}</ion-label>
+                </ion-item>
               </ion-checkbox>
             </ion-list>
           </ion-accordion>
@@ -46,7 +52,10 @@
                 class="option-item"
                 @ionChange="onCheckChange($event, colorRef, -1)"
                 :checked="bChecked(colorRef, -1)">
-                <ion-item lines="none">全部</ion-item>
+                <ion-item lines="none" style="left: -6px">
+                  <Icon :icon="'mdi:check-all'" :height="'28'" style="margin: 0 10px 0 5px"></Icon>
+                  <ion-label lines="none">全部</ion-label>
+                </ion-item>
               </ion-checkbox>
               <ion-checkbox
                 label-placement="start"
@@ -76,7 +85,10 @@
                 class="option-item"
                 @ionChange="onCheckChange($event, priorityRef, -1)"
                 :checked="bChecked(priorityRef, -1)">
-                <ion-item lines="none">全部</ion-item>
+                <ion-item lines="none" style="left: -6px">
+                  <Icon :icon="'mdi:check-all'" :height="'28'" style="margin: 0 10px 0 5px"></Icon>
+                  <ion-label lines="none">全部</ion-label>
+                </ion-item>
               </ion-checkbox>
               <ion-checkbox
                 label-placement="start"
@@ -154,9 +166,10 @@ import {
 } from "ionicons/icons";
 import { inject, ref } from "vue";
 
-const groupRef = ref(new Set());
-const colorRef = ref(new Set());
-const priorityRef = ref(new Set());
+const groupRef = ref(new Map(GroupOptions.map((option) => [option.id, true])));
+const colorRef = ref(new Map(ColorOptions.map((option) => [option.id, true])));
+const priorityRef = ref(new Map(PriorityOptions.map((option) => [option.id, true])));
+// console.log(groupRef, colorRef, priorityRef);
 const eventBus: any = inject("eventBus");
 function onMenuClose() {
   eventBus.$emit("menuClose", {
@@ -166,30 +179,27 @@ function onMenuClose() {
   });
 }
 function bChecked(rRef: any, id: number): boolean {
-  //  as Set<number>
   if (id === -1) {
-    return rRef.size === 0;
+    return Array.from(rRef.values()).every((value) => value === true);
   }
-  return rRef.has(id) || rRef.size === 0;
+  // console.log(rRef, id, rRef.get(id));
+  return rRef.get(id) === true;
 }
 function btnFilterResetClick() {
-  groupRef.value = new Set();
-  colorRef.value = new Set();
-  priorityRef.value = new Set();
+  groupRef.value = new Map(GroupOptions.map((option) => [option.id, true]));
+  colorRef.value = new Map(ColorOptions.map((option) => [option.id, true]));
+  priorityRef.value = new Map(PriorityOptions.map((option) => [option.id, true]));
 }
 function onCheckChange(event: any, rRef: any, id: number) {
-  console.log(event, rRef, id);
+  // console.log(event, rRef, id);
   if (id === -1) {
-    if(!event.detail.checked){
-      rRef.clear();
-      event.target.setChecked(true);
+    if (event.detail.checked) {
+      for (const [k] of rRef) {
+        rRef.set(k, true);
+      }
     }
   } else {
-    if (event.detail.checked) {
-      rRef.add(id);
-    } else {
-      rRef.delete(id);
-    }
+    rRef.set(id, event.detail.checked);
   }
 }
 </script>
