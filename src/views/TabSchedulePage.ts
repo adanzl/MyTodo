@@ -276,6 +276,7 @@ export default defineComponent({
         }
       }
       selectedDate.value = day;
+      console.log("onDaySelected", day);
     };
     // 日历折叠按钮
     const btnCalendarFoldClk = () => {
@@ -316,7 +317,8 @@ export default defineComponent({
       try {
         return schedule?.subtasks?.filter(
           (t) =>
-            ((selectedDate.value?.save[schedule.id]?.subtasks &&
+            ((selectedDate.value?.save &&
+              selectedDate.value?.save[schedule.id]?.subtasks &&
               selectedDate.value?.save[schedule.id]?.subtasks[t.id]) ||
               0) === 1
         ).length;
@@ -327,7 +329,7 @@ export default defineComponent({
     };
     // 日程完成状态
     const scheduleChecked = (scheduleId: number) => {
-      return selectedDate.value!.save[scheduleId]?.state === 1;
+      return selectedDate.value!.save && selectedDate.value!.save[scheduleId]?.state === 1;
     };
     // 日程状态改变
     const onScheduleCheckboxChange = (
@@ -336,18 +338,16 @@ export default defineComponent({
       scheduleId: number
     ) => {
       if (day) {
+        if (!day.save) {
+          day.save = {};
+        }
         const preSave = day.save[scheduleId] || new ScheduleSave();
         preSave.state = _event.detail.checked ? 1 : 0;
         day.save[scheduleId] = preSave;
         nextTick(() => {
           // schedule 排序 这玩意必须延后一帧，否则会导致checkbox状态错乱
           day.events.sort((a: ScheduleData, b: ScheduleData) => {
-            const sa: number = day.save[a.id]?.state || 0;
-            const sb: number = day.save[b.id]?.state || 0;
-            if (sa === sb) {
-              return (a.id ?? 0) - (b.id ?? 0);
-            }
-            return sa - sb;
+            return UData.CmpScheduleData(a, b, day.save);
           });
         });
         doSaveUserData();
@@ -358,8 +358,9 @@ export default defineComponent({
     const btnScheduleClk = (event: any, schedule: ScheduleData) => {
       isScheduleModalOpen.value = true;
       scheduleModalData.value = schedule;
-      scheduleSave.value = selectedDate.value?.save[schedule.id];
-      event.stopPropagation();
+      scheduleSave.value = selectedDate.value?.save
+        ? selectedDate.value?.save[schedule.id]
+        : undefined;
       // console.log("btnScheduleClk", schedule, scheduleSave.value);
     };
     // 日程专注按钮

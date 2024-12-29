@@ -104,7 +104,7 @@
 <script setup lang="ts">
 import SchedulePop from "@/components/SchedulePopModal.vue";
 import { getColorOptions, getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
-import { DayData, ScheduleData, ScheduleSave, UData, UserData } from "@/modal/UserData";
+import { DayData, S_TS, ScheduleData, ScheduleSave, UData, UserData } from "@/modal/UserData";
 import { setSave } from "@/utils/NetUtil";
 // import midCalendarTodayOutline from "@iconify-icons/mdi/calendar-today-outline";
 // import mdiListStatus from "@iconify-icons/mdi/list-status";
@@ -184,7 +184,8 @@ const countFinishedSubtask = (day: DayData, schedule: ScheduleData) => {
   try {
     return schedule?.subtasks?.filter(
       (t: any) =>
-        ((day.save[schedule.id]?.subtasks && day.save[schedule.id]?.subtasks[t.id]) || 0) === 1
+        ((day.save && day.save[schedule.id]?.subtasks && day.save[schedule.id]?.subtasks[t.id]) ||
+          0) === 1
     ).length;
   } catch (error) {
     console.log("countFinishedSubtask", error);
@@ -194,18 +195,18 @@ const countFinishedSubtask = (day: DayData, schedule: ScheduleData) => {
 // 日程状态改变
 const onScheduleCheckboxChange = (_event: any, day: DayData | undefined, scheduleId: number) => {
   if (day) {
+    if (day.save === undefined) {
+      day.save = {};
+      const uSave = props.userData.save;
+      uSave[S_TS(day.dt)] = day.save;
+    }
     const preSave = day.save[scheduleId] || new ScheduleSave();
     preSave.state = _event.detail.checked ? 1 : 0;
     day.save[scheduleId] = preSave;
     nextTick(() => {
       // schedule 排序 这玩意必须延后一帧，否则会导致checkbox状态错乱
       day.events.sort((a: ScheduleData, b: ScheduleData) => {
-        const sa: number = day.save[a.id]?.state || 0;
-        const sb: number = day.save[b.id]?.state || 0;
-        if (sa === sb) {
-          return (a.id ?? 0) - (b.id ?? 0);
-        }
-        return sa - sb;
+        return UData.CmpScheduleData(a, b, day.save);
       });
     });
     doSaveUserData();
@@ -216,7 +217,7 @@ const onScheduleCheckboxChange = (_event: any, day: DayData | undefined, schedul
 const btnScheduleClk = (_event: any, schedule: ScheduleData, day: DayData) => {
   isScheduleModalOpen.value = true;
   scheduleModalData.value = schedule;
-  scheduleSave.value = day.save[schedule.id];
+  scheduleSave.value = day.save ? day.save[schedule.id] : undefined;
 };
 // 添加日程页面关闭回调
 const onScheduleModalDismiss = (event: any) => {
@@ -299,6 +300,4 @@ ion-modal {
 .data-content ion-content::part(background) {
   border-radius: 10px;
 }
-
-
 </style>

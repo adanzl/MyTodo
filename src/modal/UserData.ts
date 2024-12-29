@@ -86,7 +86,7 @@ export class UserData {
 export class DayData {
   dt: dayjs.Dayjs = dayjs().startOf("day");
   events: ScheduleData[] = []; // 当天可见日程
-  save: Record<number, ScheduleSave> = {}; // 日程id->日程保存情况
+  save?: Record<number, ScheduleSave> = {}; // 日程id->日程保存情况
   constructor(_dt?: dayjs.Dayjs) {
     if (_dt) this.dt = _dt;
   }
@@ -175,10 +175,16 @@ export class UData {
   static createDayData(_dt: dayjs.Dayjs, userData: UserData): DayData {
     const dayData = new DayData(_dt);
     const ts = _dt.unix();
-    if (userData.save[S_TS(_dt)] == undefined) {
-      userData.save[S_TS(_dt)] = {};
+    const dKey = S_TS(_dt);
+    // if (userData.save[S_TS(_dt)] == undefined) {
+    //   userData.save[S_TS(_dt)] = {};
+    // }
+    let save: Record<number, ScheduleSave> | undefined = userData.save[dKey];
+    if (save && Object.keys(save).length === 0) {
+      console.log("delete", dKey);
+      delete userData.save[dKey];
+      save = undefined;
     }
-    const save = userData.save[S_TS(_dt)];
     for (const s of userData.schedules) {
       const schedule = ScheduleData.Copy(s);
       if (schedule.startTs && schedule.startTs.startOf("day").unix() <= ts) {
@@ -230,16 +236,23 @@ export class UData {
     // 排序日程
     dayData.save = save;
     dayData.events.sort((a: ScheduleData, b: ScheduleData) => {
-      const sa: number = save[a.id]?.state || 0;
-      const sb: number = save[b.id]?.state || 0;
-      if (sa === sb) {
-        return (a.id ?? 0) - (b.id ?? 0);
-      }
-      return sa - sb;
+      return UData.CmpScheduleData(a, b, save);
     });
     return dayData;
   }
 
+  static CmpScheduleData(
+    a: ScheduleData,
+    b: ScheduleData,
+    save: Record<number, ScheduleSave> | undefined
+  ): number {
+    const sa: number = (save && save[a.id]?.state) || 0;
+    const sb: number = (save && save[b.id]?.state) || 0;
+    if (sa === sb) {
+      return (a.id ?? 0) - (b.id ?? 0);
+    }
+    return sa - sb;
+  }
   /**
    * 更新日程数据
    * @param userData 用户数据

@@ -72,12 +72,11 @@
                       :checked="scheduleChecked(schedule.id)"
                       @ionChange="onScheduleCheckboxChange($event, selectedDate, schedule.id)">
                     </ion-checkbox>
-                    <div
-                      @click="btnScheduleClk($event, schedule)"
-                      class="flex w-full items-center">
+                    <div @click="btnScheduleClk($event, schedule)" class="flex w-full items-center">
                       <ion-label
                         :class="{
-                          'text-line-through': selectedDate?.save[schedule.id]?.state === 1,
+                          'text-line-through':
+                            selectedDate?.save && selectedDate?.save[schedule.id]?.state === 1,
                         }"
                         class="p-2.5 flex-1">
                         <h2 class="truncate">[{{ schedule.id }}]{{ schedule.title }}</h2>

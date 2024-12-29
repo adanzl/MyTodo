@@ -20,7 +20,7 @@
       </ion-toolbar>
     </ion-header>
     <ion-row style="background-color: antiquewhite; color: blue">
-      <ion-col class="ion-text-center" v-for="head in weekHead" :key="head">
+      <ion-col class="ion-text-center flex-1" v-for="head in weekHead" :key="head">
         {{ head }}
       </ion-col>
     </ion-row>
@@ -33,10 +33,10 @@
         :autoHeight="true"
         :modules="[IonicSlides, Keyboard]">
         <swiper-slide v-for="(month, idx) in monthArr" :key="idx">
-          <ion-grid style="height: auto">
-            <ion-row v-for="week in month.weekArr" :key="week">
+          <ion-grid class="w-full">
+            <ion-row v-for="week in month.weekArr" :key="week" class="flex-nowrap">
               <ion-col
-                class="p-0 min-h-32 border-[1px] border-gray-100 border-solid flex-1"
+                class="p-0 min-h-32 border-[1px] border-gray-100 border-solid w-[14.28%]"
                 @click="onDaySelected(month, day)"
                 v-for="day in week"
                 :key="day">
@@ -55,11 +55,14 @@
                   v-for="(event, idx) of day.events.filter(bShowScheduleItem)"
                   :key="idx"
                   :class="{
-                    'text-line-through': day.save[event.id]?.state === 1,
-                    gray: day.save[event.id]?.state === 1,
+                    'text-line-through': day.save && day.save[event.id]?.state === 1,
+                    gray: day.save && day.save[event.id]?.state === 1,
                   }"
-                  class="text-xs text-left truncate mt-[1px] rounded-sm py-[1px] px-1"
-                  :style="{ 'background-color': getColorOptions(event.color).tag }">
+                  class="text-left truncate mt-[1px] rounded-sm py-[1px] px-1"
+                  :style="{
+                    'background-color': getColorOptions(event.color).tag,
+                    'font-size': 'clamp(9px, 2.8vw, 16px)',
+                  }">
                   {{ event.title }}
                 </div>
               </ion-col>
