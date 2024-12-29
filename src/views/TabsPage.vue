@@ -10,8 +10,8 @@
         <ion-accordion-group :multiple="true" :value="['group', 'color', 'priority']" mode="ios">
           <ion-accordion value="group">
             <ion-item slot="header" color="light">
-              <ion-icon :icon="bookmark" style="font-size: 20px"></ion-icon>
-              <ion-label style="margin-left: 10px">分组</ion-label>
+              <ion-icon :icon="bookmark" class="w-5"></ion-icon>
+              <ion-label class="mx-2.5">分组</ion-label>
             </ion-item>
             <ion-list class="ion-padding-horizontal" slot="content">
               <ion-checkbox
@@ -23,7 +23,7 @@
                 <ion-item lines="none" style="left: -6px">
                   <icon-mdi-check-all
                     :height="'28'"
-                    style="margin: 0 10px 0 5px"></icon-mdi-check-all>
+                    style="margin: 0 16px 0 5px"></icon-mdi-check-all>
                   <ion-label lines="none">全部</ion-label>
                 </ion-item>
               </ion-checkbox>
@@ -47,8 +47,8 @@
           </ion-accordion>
           <ion-accordion value="color">
             <ion-item slot="header" color="light">
-              <ion-icon :icon="colorPalette" style="font-size: 20px"></ion-icon>
-              <ion-label style="margin-left: 10px">颜色</ion-label>
+              <ion-icon :icon="colorPalette" class="w-5"></ion-icon>
+              <ion-label class="mx-2.5">颜色</ion-label>
             </ion-item>
             <ion-list class="ion-padding-horizontal" slot="content">
               <ion-checkbox
@@ -60,7 +60,7 @@
                 <ion-item lines="none" style="left: -6px">
                   <icon-mdi-check-all
                     :height="'28'"
-                    style="margin: 0 10px 0 5px"></icon-mdi-check-all>
+                    style="margin: 0 16px 0 5px"></icon-mdi-check-all>
                   <ion-label lines="none">全部</ion-label>
                 </ion-item>
               </ion-checkbox>
@@ -95,7 +95,7 @@
                 <ion-item lines="none" style="left: -6px">
                   <icon-mdi-check-all
                     :height="'28'"
-                    style="margin: 0 10px 0 5px"></icon-mdi-check-all>
+                    style="margin: 0 16px 0 5px"></icon-mdi-check-all>
                   <ion-label lines="none">全部</ion-label>
                 </ion-item>
               </ion-checkbox>

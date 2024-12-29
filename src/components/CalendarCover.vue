@@ -2,7 +2,7 @@
   <ion-modal mode="ios" ref="selfRef">
     <ion-content class="main_content">
       <ion-item class="transparent">
-        <h2 style="font-size: 20px; color: white">
+        <h2 class="text-xl font-bold text-white">
           {{ currentDate.format("YYYY-MM-DD") + " " + weekHead[currentDate.day()] }}
         </h2>
         <ion-button
@@ -11,7 +11,8 @@
           @click="btnTodayClk"
           size="default"
           :style="{ padding: '0px 10px', opacity: currentDate.isToday() ? '0' : '1' }">
-          <icon-mdi-calendar-today-outline :height="'16'" slot="start"> </icon-mdi-calendar-today-outline>
+          <icon-mdi-calendar-today-outline :height="'16'" slot="start">
+          </icon-mdi-calendar-today-outline>
           今天
         </ion-button>
       </ion-item>
@@ -31,33 +32,31 @@
           slideShadows: false,
         }"
         :keyboard="true"
-        style="height: 90%">
+        class="h-[90%]">
         <swiper-slide v-for="(day, idx) in dayArr" :key="idx" class="data-content">
           <ion-content>
             <ion-item color="light">
-              <icon-mdi-list-status
-                style="color: var(--ion-color-tertiary)"
-                :height="'40'"
-                slot="start">
+              <icon-mdi-list-status class="text-blue-500" :height="'30'" :width="'30'" slot="start">
               </icon-mdi-list-status>
-              <div style="height: 50px"></div>
+              <div class="h-12"></div>
             </ion-item>
             <ion-item v-for="(schedule, idx) in day.events" :key="idx">
               <ion-checkbox
-                style="--size: 26px; padding-right: 5px"
+                style="--size: 26px"
                 slot="start"
                 :checked="day.save[schedule.id]?.state === 1"
                 @ionChange="onScheduleCheckboxChange($event, day, schedule.id)">
               </ion-checkbox>
-              <div @click="btnScheduleClk($event, schedule, day)" class="scheduleItem">
+              <div @click="btnScheduleClk($event, schedule, day)" class="flex w-full items-center">
                 <ion-label
                   :class="{
                     'text-line-through': day.save[schedule.id]?.state === 1,
-                  }">
-                  <h2>{{ schedule.title }}</h2>
+                  }"
+                  class="p-2.5 flex-1">
+                  <h2 class="truncate">{{ schedule.title }}</h2>
                   <div class="flex">
                     <p class="schedule-lb-sub">
-                      <ion-icon :icon="listOutline" style="position: relative; top: 3px"></ion-icon>
+                      <ion-icon :icon="listOutline" class="relative top-0.5"></ion-icon>
                       {{ countFinishedSubtask(day, schedule) }}
                       /
                       {{ schedule?.subtasks?.length }}
@@ -68,10 +67,9 @@
                   </div>
                 </ion-label>
                 <span
-                  class="v-dot"
+                  class="v-dot ml-2.5"
                   :style="{
                     'background-color': getColorOptions(schedule.color).tag,
-                    'margin-left': '10px',
                   }">
                 </span>
                 <component
@@ -90,9 +88,10 @@
         </ion-fab-button>
       </ion-fab>
     </ion-content>
-    <div style="width: 100%; height: 10%" @click="selfRef.$el.dismiss()"></div>
+    <div class="w-full h-[10%]" @click="selfRef.$el.dismiss()"></div>
     <SchedulePop
       id="pop-modal"
+      aria-hidden="false"
       ref="scheduleModal"
       :is-open="isScheduleModalOpen"
       :modal="scheduleModal"
@@ -300,20 +299,6 @@ ion-modal {
 .data-content ion-content::part(background) {
   border-radius: 10px;
 }
-.scheduleItem {
-  position: relative;
-  display: flex;
-  box-sizing: border-box;
-  align-items: center;
-  width: 100%;
-  justify-content: space-between;
-}
-.scheduleItem ion-label {
-  margin: 0px;
-  padding: 10px;
-  flex: 1;
-}
-.scheduleItem h2 {
-  white-space: nowrap; /* 防止文本换行 */
-}
+
+
 </style>

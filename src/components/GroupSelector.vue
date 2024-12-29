@@ -1,6 +1,7 @@
 <template>
   <ion-modal
     ref="modal"
+    aria-hidden="false"
     id="groupSelector"
     mode="ios"
     class="bottom-modal"
@@ -8,7 +9,7 @@
     <ion-item>
       <ion-title>分组信息</ion-title>
     </ion-item>
-    <ion-content class="ion-padding">
+    <div class="ion-padding-horizontal">
       <ion-item>
         <ion-radio-group :value="valueRef" @ionChange="onSelectChange" class="width-100" mode="ios">
           <ion-radio
@@ -17,27 +18,27 @@
             :value="op.id"
             class="option-item">
             <ion-item lines="none" style="flex: 1">
-              <span>
-                <ion-icon :icon="bookmark" style="font-size: 20px"></ion-icon>
-              </span>
+              <icon-mdi-tag
+                :height="'20'"
+                style="margin-right: 15px"
+                color="#7970ff"></icon-mdi-tag>
               <ion-label style="margin-left: 8px">{{ op.label }}</ion-label>
             </ion-item>
           </ion-radio>
         </ion-radio-group>
       </ion-item>
-    </ion-content>
+    </div>
     <ion-footer>
-      <ion-button style="width: 40%" fill="clear" @click="cancel()">取消</ion-button>
-      <ion-button style="width: 40%" fill="clear" @click="confirm()">确定</ion-button>
+      <ion-button class="w-2/5" fill="clear" @click="cancel()">取消</ion-button>
+      <ion-button class="w-2/5" fill="clear" @click="confirm()">确定</ion-button>
     </ion-footer>
   </ion-modal>
 </template>
 
 <script lang="ts" setup>
-import { createTriggerController } from "@/utils/Overlay";
 import { GroupOptions } from "@/modal/ScheduleType";
+import { createTriggerController } from "@/utils/Overlay";
 import { IonRadio, IonRadioGroup } from "@ionic/vue";
-import { bookmark } from "ionicons/icons";
 import { onMounted, ref, watch } from "vue";
 const props = defineProps({
   trigger: {

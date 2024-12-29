@@ -1,6 +1,7 @@
 <template>
   <ion-modal
     ref="modal"
+    aria-hidden="false"
     id="prioritySelector"
     mode="ios"
     class="bottom-modal"
@@ -8,7 +9,7 @@
     <ion-item>
       <ion-title>优先级</ion-title>
     </ion-item>
-    <ion-content class="ion-padding">
+    <div class="ion-padding-horizontal">
       <ion-item>
         <ion-radio-group :value="valueRef" @ionChange="onSelectChange" class="width-100">
           <ion-radio
@@ -26,7 +27,7 @@
           </ion-radio>
         </ion-radio-group>
       </ion-item>
-    </ion-content>
+    </div>
     <ion-footer>
       <ion-button style="width: 40%" fill="clear" @click="cancel()">取消</ion-button>
       <ion-button style="width: 40%" fill="clear" @click="confirm()">确定</ion-button>

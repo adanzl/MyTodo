@@ -1,5 +1,5 @@
 <template>
-  <ion-grid style="height: auto">
+  <ion-grid>
     <ion-row>
       <ion-col class="ion-text-center" v-for="head in weekHead" :key="head">
         {{ head }}

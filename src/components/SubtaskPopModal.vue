@@ -1,5 +1,5 @@
 <template>
-  <ion-modal ref="modal" id="subtaskPopModal" mode="ios">
+  <ion-modal ref="modal" id="subtaskPopModal" mode="ios" aria-hidden="false">
     <ion-item>
       <ion-title>子任务</ion-title>
     </ion-item>
@@ -16,21 +16,28 @@
         </div>
       </ion-item>
     </ion-content>
-    <div id="button-group" class="button-group ion-button">
-      <ion-button class="alert-button" fill="clear" @click="cancel()"> 取消 </ion-button>
-      <ion-button class="alert-button" fill="clear" @click="confirm()"> 确定 </ion-button>
-    </div>
+    <ion-footer>
+      <ion-toolbar>
+        <div class="flex">
+          <ion-button class="flex-1" fill="clear" @click="cancel()"> 取消 </ion-button>
+          <ion-button class="flex-1" fill="clear" @click="confirm()"> 确定 </ion-button>
+        </div>
+      </ion-toolbar>
+    </ion-footer>
     <ion-action-sheet
       trigger="btnAdd"
       header="选取图片"
       :buttons="actionSheetButtons"></ion-action-sheet>
     <!-- preview -->
-    <ion-modal class="preview-modal" :isOpen="openPreview" @willDismiss="onPreviewDismiss">
-      <ion-content @click="onPreviewClk">
-        <img class="preview-img" :src="curImage.data" />
-      </ion-content>
+    <ion-modal
+      class="preview-modal backdrop transparent"
+      :isOpen="openPreview"
+      @willDismiss="onPreviewDismiss">
+      <div class="flex justify-center items-center h-full" @click="onPreviewClk">
+        <img class="object-contain w-full max-w-[90%]" :src="curImage.data" />
+      </div>
       <ion-header>
-        <ion-toolbar style="--background: transparent">
+        <ion-toolbar class="transparent">
           <ion-button @click="btnDelImgClk($event, curImage)" slot="end">
             <ion-icon :icon="trashOutline"></ion-icon>
           </ion-button>
@@ -180,75 +187,9 @@ ion-modal {
   --height: 50%;
   --width: 95%;
 }
-.option-item {
-  display: block;
-  overflow: hidden;
-}
-.option-item::part(label) {
-  margin: 0;
-  width: 100%;
-}
 
-.button-group {
-  display: flex !important;
-  flex-direction: row;
-  padding-inline-start: 8px;
-  padding-inline-end: 8px;
-  margin: 0;
-  border-radius: 0;
-  min-width: 50%;
-  border-top: 0.55px solid rgba(var(--ion-text-color-rgb, 0, 0, 0), 0.2);
-  border-right: 0.55px solid rgba(var(--ion-text-color-rgb, 0, 0, 0), 0.2);
-  background-color: transparent;
-  color: var(--ion-color-primary, #0054e9);
-  overflow: hidden;
-}
-.button-group ion-button {
-  flex-basis: auto;
-  flex-grow: 1;
-  flex-shrink: 1;
-}
 .preview-modal {
   --height: 100%;
   --width: 95%;
-}
-.preview-modal img {
-  /* max-height: 100%; */
-  /* max-width: 100%; */
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-
-  max-height: 90vh;
-  max-width: 90vw;
-}
-
-.preview-modal ion-content::part(scroll) {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.preview-modal ion-content::part(background) {
-  background-color: transparent !important;
-}
-.preview-modal::part(content) {
-  /* padding: 10px 10px 10px 10px; */
-  /* position: absolute; */
-  /* left: 0; */
-  /* right: 0; */
-  /* top: 0; */
-  /* bottom: 0; */
-  /* display: flex; */
-  /* flex-direction: column; */
-  width: 100%;
-  /* height: auto; */
-  background-color: transparent !important;
-  max-height: 100%;
-  /* align-items: center; */
-  /* justify-content: center; */
-}
-.preview-modal::part(backdrop) {
-  background-color: var(--ion-color-dark) !important;
-  opacity: 0.3 !important;
 }
 </style>
