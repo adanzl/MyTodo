@@ -33,20 +33,21 @@
         :autoHeight="true"
         :modules="[IonicSlides, Keyboard]">
         <swiper-slide v-for="(month, idx) in monthArr" :key="idx">
-          <ion-grid style="height: auto" fixed>
+          <ion-grid style="height: auto">
             <ion-row v-for="week in month.weekArr" :key="week">
               <ion-col
-                class="day-item"
+                class="p-0 min-h-32 border-[1px] border-gray-100 border-solid flex-1"
                 @click="onDaySelected(month, day)"
                 v-for="day in week"
                 :key="day">
-                <span>
+                <span class="bg-gray-200 text-left text-sm/4 block">
                   <ion-chip
                     :class="{
                       transparent: day.dt.unix() !== dayjs().startOf('day').unix(),
                       today: day.dt.unix() === dayjs().startOf('day').unix(),
                       gray: day.dt.month() !== month.month,
-                    }">
+                    }"
+                    class="py-[1px] px-1 min-h-0">
                     {{ day.dt.date() }}
                   </ion-chip>
                 </span>
@@ -57,6 +58,7 @@
                     'text-line-through': day.save[event.id]?.state === 1,
                     gray: day.save[event.id]?.state === 1,
                   }"
+                  class="text-xs text-left truncate mt-[1px] rounded-sm py-[1px] px-1"
                   :style="{ 'background-color': getColorOptions(event.color).tag }">
                   {{ event.title }}
                 </div>
@@ -150,7 +152,7 @@ onMounted(async () => {
     refreshAllData();
   });
   eventBus.$on("menuClose", (params: any) => {
-    console.log("menuClose", params);
+    // console.log("menuClose", params);
     filter.value = params;
   });
 });
@@ -223,34 +225,7 @@ function onDataUpdate() {
 }
 </script>
 <style lang="css" scoped>
-.day-item {
-  min-height: 120px;
-  width: 13vw;
-  border: 1px solid #f1eded;
-  padding: 0;
-}
-.day-item span {
-  display: block;
-  font-size: 14px;
-  text-align: left;
-  background-color: #f1eded;
-}
-.day-item div {
-  font-size: 12px;
-  text-align: left;
-  height: auto;
-  align-items: top;
-  white-space: nowrap; /* 防止文本换行 */
-  overflow: hidden; /* 隐藏溢出的文本 */
-  text-overflow: space; /* 显示省略号 */
-  padding: 1px 4px 1px 4px;
-  margin-top: 1px;
-  border-radius: 2px;
-  /* background-color: #e9bcbcb6; */
-}
-.day-item ion-chip {
-  padding: 1px 3px 1px 3px;
-  height: auto;
-  min-height: auto;
+ion-chip.today {
+  --background: rgb(255, 98, 0) !important;
 }
 </style>

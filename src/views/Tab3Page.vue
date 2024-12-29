@@ -13,6 +13,7 @@
         <ion-item>
           <ion-label>Id: {{ userData.id }}</ion-label>
           <ion-label>Name: {{ userData.name }}</ion-label>
+          <div class="text-3xl font-bold underline"> hello world</div>
         </ion-item>
       </ion-list>
       <ion-list>

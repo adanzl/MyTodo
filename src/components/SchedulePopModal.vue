@@ -2,7 +2,7 @@
   <ion-modal show-backdrop="false" id="main" mode="ios" aria-hidden="false">
     <ion-header>
       <ion-toolbar>
-        <ion-buttons slot="start" class="ion-padding">
+        <ion-buttons slot="start">
           <ion-button @click="btnCancelClk">
             <ion-icon :icon="chevronBackOutline"> </ion-icon>
           </ion-button>
@@ -12,7 +12,7 @@
         </ion-title>
       </ion-toolbar>
     </ion-header>
-    <ion-content class="main_content ion-padding" ref="scheduleTab">
+    <ion-content class="ion-padding" ref="scheduleTab">
       <ion-list :inset="true">
         <ion-item>
           <ion-checkbox
@@ -29,15 +29,15 @@
         </ion-item>
         <!-- 分组信息 -->
         <ion-item class="group">
-          <ion-button id="btnGroup" class="group-tab" fill="none">
-            <ion-icon :icon="bookmark" aria-hidden="true"></ion-icon>
+          <ion-button id="btnGroup" class="flex-1 text-base" fill="none">
+            <ion-icon :icon="bookmark"></ion-icon>
             <ion-label>{{ getGroupOptions(curScheduleData.groupId).label }}</ion-label>
           </ion-button>
           <GroupSelector
             trigger="btnGroup"
             @update:value="onGroupChange"
             :value="curScheduleData.groupId"></GroupSelector>
-          <ion-button id="btnPriority" class="group-tab" fill="none">
+          <ion-button id="btnPriority" class="flex-1 text-base" fill="none">
             <ion-label><strong>Pri</strong></ion-label>
             <component
               :is="getPriorityOptions(curScheduleData.priority).icon"
@@ -50,8 +50,8 @@
             @update:value="onPriorityChange"
             :value="curScheduleData.priority">
           </PrioritySelector>
-          <ion-button id="btnColor" class="group-tab" fill="none">
-            <ion-icon slot="start" :icon="colorPalette" aria-hidden="true"> </ion-icon>
+          <ion-button id="btnColor" class="flex-1 text-base" fill="none">
+            <ion-icon slot="start" :icon="colorPalette"> </ion-icon>
             <span
               :style="{ 'background-color': getColorOptions(curScheduleData.color).tag }"
               class="v-dot"></span>
@@ -70,7 +70,7 @@
           <div class="flex ion-justify-content-around ion-padding width-100">
             <div class="ion-text-center">
               <ion-label>{{ curScheduleData.startTs?.format("MM-DD") }}</ion-label>
-              <ion-label color="tertiary" class="font-size-mini">
+              <ion-label color="tertiary" class="text-xs/4">
                 {{ curScheduleData.allDay ? "全天" : curScheduleData?.startTs?.format("HH:mm") }}
               </ion-label>
             </div>
@@ -79,7 +79,7 @@
             </div>
             <div class="ion-text-center">
               <ion-label>{{ curScheduleData.endTs?.format("MM-DD") }}</ion-label>
-              <ion-label color="tertiary" class="font-size-mini">
+              <ion-label color="tertiary" class="text-xs/4">
                 {{ curScheduleData.allDay ? "全天" : curScheduleData?.endTs?.format("HH:mm") }}
               </ion-label>
             </div>
@@ -90,8 +90,8 @@
             <ion-buttons class="ion-justify-content-around">
               <ion-button @click="btnScheduleDateClearClk">清除</ion-button>
               <ion-segment v-model="scheduleType" style="width: 130px" @ionChange="onDtTabChange">
-                <ion-segment-button value="0" id="dtStart">开始</ion-segment-button>
-                <ion-segment-button value="1" id="dtEnd">结束</ion-segment-button>
+                <ion-segment-button value="0" class="w-16 min-w-0">开始</ion-segment-button>
+                <ion-segment-button value="1" class="w-16 min-w-0">结束</ion-segment-button>
               </ion-segment>
               <ion-button @click="btnDatetimeOkClk">确定</ion-button>
             </ion-buttons>
@@ -104,58 +104,16 @@
             </ion-datetime>
             <ion-item class="ion-no-padding" @click="() => (datetimeShowFlag = true)">
               <!-- 开始时间 -->
-              <ion-icon :icon="timeOutline" aria-hidden="true" slot="start"> </ion-icon>
+              <ion-icon :icon="timeOutline" slot="start"> </ion-icon>
               <ion-label>开始时间</ion-label>
-              <label>
+              <label class="mr-[6px]">
                 {{ curScheduleData.allDay ? "全天" : curScheduleData.startTs?.format("HH:mm") }}
               </label>
-              <ion-modal
-                class="start-time-modal"
-                :isOpen="datetimeShowFlag"
-                :keep-contents-mounted="true"
-                @willDismiss="() => (datetimeShowFlag = false)">
-                <ion-item>
-                  <ion-title><h2>开始时间</h2></ion-title>
-                </ion-item>
-                <ion-datetime
-                  id="dts"
-                  presentation="time"
-                  size="cover"
-                  :value="curScheduleData?.startTs?.format('YYYY-MM-DDTHH:mm')"
-                  hourCycle="h23"
-                  :disabled="curScheduleData?.allDay"
-                  @ionChange="(e:any) => (scheduleStartTsComponent = dayjs(e.detail.value))"
-                  class="schedule-datetime-time">
-                </ion-datetime>
-                <ion-item>
-                  <ion-toggle
-                    :checked="curScheduleData.allDay"
-                    @ionChange="onScheduleDatetimeAllDayChange">
-                    <h3>全天</h3>
-                  </ion-toggle>
-                </ion-item>
-                <ion-item>
-                  <ion-button
-                    size="large"
-                    fill="clear"
-                    style="width: 50%"
-                    @click="() => (datetimeShowFlag = false)">
-                    清除
-                  </ion-button>
-                  <ion-button
-                    size="large"
-                    fill="clear"
-                    style="width: 50%"
-                    @click="btnScheduleDatetimeOkClk">
-                    确定
-                  </ion-button>
-                </ion-item>
-              </ion-modal>
             </ion-item>
           </div>
         </ion-item>
         <!-- <ion-item :button="true" :detail="true">
-          <ion-icon :icon="notifications" aria-hidden="true" slot="start"> </ion-icon>
+          <ion-icon :icon="notifications" slot="start"> </ion-icon>
           <ion-select
             id="selectReminder"
             aria-label="Reminder"
@@ -170,8 +128,8 @@
           </ion-select>
         </ion-item> -->
         <ion-item detail="true">
-          <ion-icon :icon="repeat" aria-hidden="true" slot="start"> </ion-icon>
-          <ion-select :value="curScheduleData?.repeat" @ion-change="onRepeatChange">
+          <ion-icon :icon="repeat" slot="start"> </ion-icon>
+          <ion-select :value="curScheduleData?.repeat" @ion-change="onRepeatChange" class="no-ico">
             <div slot="label">
               <ion-label>重复</ion-label>
             </div>
@@ -180,29 +138,48 @@
             </ion-select-option>
           </ion-select>
         </ion-item>
-        <ion-item detail="true" :button="true">
+        <ion-item detail="true" :button="true" id="id-repeat-end">
           <ion-icon :icon="power" slot="start"></ion-icon>
           <ion-label>重复停止</ion-label>
-          <ion-datetime-button datetime="idRepeatEndTs">
-            <ion-label slot="date-target" v-if="curScheduleData?.repeatEndTs === undefined">
-              无
-            </ion-label>
-          </ion-datetime-button>
-          <ion-modal :keep-contents-mounted="true" ref="repeatEndTsModal">
+          <ion-label class="text-right mr-0">
+            {{
+              curScheduleData?.repeatEndTs === undefined
+                ? "无"
+                : curScheduleData?.repeatEndTs.format("YYYY-MM-DD")
+            }}
+          </ion-label>
+          <ion-modal
+            :keep-contents-mounted="true"
+            ref="repeatEndTsModal"
+            trigger="id-repeat-end"
+            class="bottom-modal"
+            style="--width: 95%; --height: auto"
+            aria-hidden="false">
             <ion-datetime
               locale="zh-cn"
               id="idRepeatEndTs"
               ref="repeatEndTsComponent"
-              :value="curScheduleData?.repeatEndTs?.format('YYYY-MM-DD') || dayjs().format('YYYY-MM-DD')"
+              :value="
+                curScheduleData?.repeatEndTs?.format('YYYY-MM-DD') || dayjs().format('YYYY-MM-DD')
+              "
               presentation="date"
               size="cover"
               max="2099-01-01"
               @ionChange="onRepeatEndDtChange">
-              <ion-buttons slot="buttons" class="ion-justify-content-around">
-                <ion-button color="warning" @click="btnRepeatEndClearClk"> 清除 </ion-button>
-                <ion-button @click="btnRepeatEndOkClk">确定</ion-button>
-              </ion-buttons>
             </ion-datetime>
+            <ion-footer class="flex justify-around">
+              <ion-button
+                class="w-2/5"
+                fill="clear"
+                size="default"
+                color="warning"
+                @click="btnRepeatEndClearClk">
+                清除
+              </ion-button>
+              <ion-button class="w-2/5" fill="clear" size="default" @click="btnRepeatEndOkClk">
+                确定
+              </ion-button>
+            </ion-footer>
           </ion-modal>
         </ion-item>
       </ion-list>
@@ -239,7 +216,7 @@
             :checked="subTaskChecked(task)"
             @ionChange="onSubtaskCheckboxChange($event, task)">
           </ion-checkbox>
-          <div class="subtask-content" @click="onSubtaskClk($event, task)">
+          <div class="flex flex-col justify-center" @click="onSubtaskClk($event, task)">
             <ion-label :class="{ 'text-line-through': subTaskChecked(task) }" class="ion-no-margin">
               {{ task.name }}
             </ion-label>
@@ -257,6 +234,40 @@
         </ion-item>
       </ion-list>
     </ion-content>
+    <!-- 开始时间弹窗 -->
+    <ion-modal
+      class="bottom-modal"
+      :isOpen="datetimeShowFlag"
+      :keep-contents-mounted="true"
+      @willDismiss="() => (datetimeShowFlag = false)">
+      <ion-item>
+        <ion-title><h2>开始时间</h2></ion-title>
+      </ion-item>
+      <ion-datetime
+        id="dts"
+        presentation="time"
+        size="cover"
+        :value="curScheduleData?.startTs?.format('YYYY-MM-DDTHH:mm')"
+        hourCycle="h23"
+        :disabled="curScheduleData?.allDay"
+        @ionChange="(e:any) => (scheduleStartTsComponent = dayjs(e.detail.value))"
+        class="schedule-datetime-time">
+      </ion-datetime>
+      <ion-item>
+        <ion-toggle
+          class="ion-padding-start"
+          :checked="curScheduleData.allDay"
+          @ionChange="onScheduleDatetimeAllDayChange">
+          <h3>全天</h3>
+        </ion-toggle>
+      </ion-item>
+      <ion-footer>
+        <ion-button fill="clear" class="w-2/5" @click="() => (datetimeShowFlag = false)">
+          清除
+        </ion-button>
+        <ion-button fill="clear" class="w-2/5" @click="btnScheduleDatetimeOkClk"> 确定 </ion-button>
+      </ion-footer>
+    </ion-modal>
     <ion-footer>
       <ion-toolbar>
         <ion-button expand="block" color="warning" @click="btnSaveClk"> 保存 </ion-button>
@@ -272,4 +283,13 @@
   </ion-modal>
 </template>
 <script lang="ts" src="@/components/SchedulePopModal.ts"></script>
-<style scoped src="../theme/SchedulePopModal.css"></style>
+<style scoped>
+.schedule-datetime-time::part(wheel-item) {
+  min-width: 100px;
+  color: rgb(255, 66, 97);
+  align-items: center;
+  text-align: center;
+  font-size: larger;
+}
+
+</style>

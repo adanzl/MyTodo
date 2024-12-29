@@ -62,12 +62,7 @@
               <p style="margin-right: 8px" class="gray">{{ selectedDate?.events.length }}</p>
             </ion-item>
             <div slot="content">
-              <ion-list
-                :inset="true"
-                lines="full"
-                mode="ios"
-                ref="curScheduleList"
-                class="schedule-list">
+              <ion-list :inset="true" lines="full" mode="ios" ref="curScheduleList" class="my-0">
                 <!-- 日程条目 -->
                 <ion-item-sliding v-for="(schedule, idx) in selectedDate?.events" :key="idx">
                   <ion-item>
@@ -77,15 +72,17 @@
                       :checked="scheduleChecked(schedule.id)"
                       @ionChange="onScheduleCheckboxChange($event, selectedDate, schedule.id)">
                     </ion-checkbox>
-                    <div @click="btnScheduleClk($event, schedule)" class="scheduleItem">
+                    <div
+                      @click="btnScheduleClk($event, schedule)"
+                      class="flex w-full items-center">
                       <ion-label
                         :class="{
                           'text-line-through': selectedDate?.save[schedule.id]?.state === 1,
                         }"
-                        class="scheduleItemLabel">
-                        <h2>[{{ schedule.id }}]{{ schedule.title }}</h2>
+                        class="p-2.5 flex-1">
+                        <h2 class="truncate">[{{ schedule.id }}]{{ schedule.title }}</h2>
                         <div class="flex">
-                          <p class="schedule-lb-sub">
+                          <p class="w-14 mb-0">
                             <ion-icon
                               :icon="listOutline"
                               style="position: relative; top: 3px"></ion-icon>
@@ -93,7 +90,7 @@
                             /
                             {{ schedule?.subtasks?.length }}
                           </p>
-                          <p class="schedule-lb-group">
+                          <p class="w-14">
                             {{ getGroupOptions(schedule.groupId).label }}
                           </p>
                         </div>
@@ -164,4 +161,9 @@
   </ion-page>
 </template>
 <script lang="ts" src="@/views/TabSchedulePage.ts"></script>
-<style lang="css" scoped src="../theme/TabSchedulePage.css"></style>
+<style lang="css" scoped>
+.schedule-group-item::part(native) {
+  height: 35px !important;
+  min-height: 0 !important;
+}
+</style>

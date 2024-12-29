@@ -19,7 +19,7 @@
         <ion-item-sliding v-for="(item, idx) in picList" :key="idx">
           <ion-item @click="onItemClk($event, item)">
             <ion-label>{{ item.id }}</ion-label>
-            <img :src="item.data" style="height: 60px" />
+            <img :src="item.data" class="max-w-16 max-h-16" />
           </ion-item>
           <ion-item-options side="end">
             <ion-item-option @click="btnModifyClk($event, item)">
