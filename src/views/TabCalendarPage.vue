@@ -1,11 +1,11 @@
 <template>
-  <ion-page id="main-content" main>
+  <ion-page id="main-content" main >
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
           <ion-menu-button></ion-menu-button>
         </ion-buttons>
-        <ion-title class="ion-text-center">
+        <ion-title>
           <div v-if="currentDate">{{ currentDate.format("YY年MM月") }}</div>
           <div v-else>日历</div>
         </ion-title>

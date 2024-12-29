@@ -2,7 +2,7 @@
   <ion-page id="main-content">
     <ion-header>
       <ion-toolbar>
-        <ion-title class="ion-text-center">
+        <ion-title>
           <div v-if="selectedDate">{{ selectedDate.dt.format("YY年MM月") }}</div>
           <div v-else>日历</div>
         </ion-title>

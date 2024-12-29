@@ -1,5 +1,5 @@
 <template>
-  <ion-modal show-backdrop="false" id="main" mode="ios">
+  <ion-modal show-backdrop="false" id="main">
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
@@ -102,7 +102,7 @@
               @ionChange="onDtChange"
               size="cover">
             </ion-datetime>
-            <ion-item class="ion-no-padding" @click="() => (datetimeShowFlag = true)">
+            <ion-item class="ion-no-padding" @click="() => (datetimeShowFlag = true)" lines="none">
               <!-- 开始时间 -->
               <ion-icon :icon="timeOutline" slot="start"> </ion-icon>
               <ion-label>开始时间</ion-label>
@@ -194,7 +194,7 @@
           </span>
         </ion-item>
         <!-- 子任务 -->
-        <ion-item lines="none">
+        <ion-item >
           <ion-icon :icon="add" slot="start" style="width: 22px"></ion-icon>
           <ion-button @click="btnSubtaskAddClk" expand="full" class="width-100" color="light">
             添加子任务

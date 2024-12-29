@@ -7,7 +7,7 @@
     </ion-header>
     <ion-item collapse="condense">
       <ion-toolbar>
-        <ion-title size="large">Tab 2</ion-title>
+        <h2 size="large">Tab</h2>
         <ion-buttons slot="end">
           <ion-button @click="loadImage">选择图片</ion-button>
         </ion-buttons>

@@ -5,7 +5,7 @@
     </ion-item>
     <ion-content class="ion-padding">
       <ion-item>
-        <ion-input v-model="valueRef.name" placeholder="添加子任务" size="5"> </ion-input>
+        <ion-input v-model="valueRef.name" placeholder="输入子任务名称" size="5"> </ion-input>
       </ion-item>
       <ion-item>
         <div class="pre-img-block" v-for="(img, idx) in imgList" :key="idx">
