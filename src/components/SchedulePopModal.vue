@@ -204,11 +204,7 @@
           @update:value="onSubtaskChange"
           :value="curSubtask"
           :is-open="openSubtaskModal"
-          @ion-modal-will-dismiss="
-            () => {
-              openSubtaskModal = false;
-            }
-          ">
+          @ion-modal-will-dismiss="() => (openSubtaskModal = false)">
         </SubtaskPopModal>
         <ion-item v-for="(task, idx) in curScheduleData?.subtasks" :key="idx">
           <ion-checkbox
@@ -216,7 +212,7 @@
             :checked="subTaskChecked(task)"
             @ionChange="onSubtaskCheckboxChange($event, task)">
           </ion-checkbox>
-          <div class="flex flex-col justify-center" @click="onSubtaskClk($event, task)">
+          <div class="flex flex-col justify-center w-full" @click="onSubtaskClk($event, task)">
             <ion-label :class="{ 'text-line-through': subTaskChecked(task) }" class="ion-no-margin">
               {{ task.name }}
             </ion-label>
@@ -291,5 +287,4 @@
   text-align: center;
   font-size: larger;
 }
-
 </style>

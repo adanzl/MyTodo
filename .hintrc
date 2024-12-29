@@ -1,0 +1,17 @@
+{
+  "extends": [
+    "development"
+  ],
+  "hints": {
+    "compat-api/html": [
+      "default",
+      {
+        "ignore": [
+          "meta[name=color-scheme]",
+          "meta[name=theme-color]"
+        ]
+      }
+    ],
+    "meta-viewport": "off"
+  }
+}

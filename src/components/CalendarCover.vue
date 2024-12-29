@@ -44,13 +44,13 @@
               <ion-checkbox
                 style="--size: 26px"
                 slot="start"
-                :checked="day.save[schedule.id]?.state === 1"
+                :checked="day.save && day.save[schedule.id]?.state === 1"
                 @ionChange="onScheduleCheckboxChange($event, day, schedule.id)">
               </ion-checkbox>
               <div @click="btnScheduleClk($event, schedule, day)" class="flex w-full items-center">
                 <ion-label
                   :class="{
-                    'text-line-through': day.save[schedule.id]?.state === 1,
+                    'text-line-through': day.save && day.save[schedule.id]?.state === 1,
                   }"
                   class="p-2.5 flex-1">
                   <h2 class="truncate">{{ schedule.title }}</h2>
