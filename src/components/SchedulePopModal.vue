@@ -214,7 +214,7 @@
             class="ion-no-padding"
             @ionChange="onSubtaskCheckboxChange($event, task)">
           </ion-checkbox>
-          <div class="flex flex-col justify-center w-full" @click="onSubtaskClk($event, task)">
+          <div class="flex flex-col w-full h-full" @click="onSubtaskClk($event, task)">
             <ion-label :class="{ 'text-line-through': subTaskChecked(task) }" class="ion-no-margin">
               {{ task.name }}
             </ion-label>
@@ -224,15 +224,25 @@
               </div>
             </div>
           </div>
-          <ion-icon
-            :icon="removeCircleOutline"
-            slot="end"
-            style="position: relative;top: -7px"
-            @click="btnSubtaskRemoveClk($event, task)">
-          </ion-icon>
+          <div slot="end" class="w-8 h-full" @click="btnSubtaskRemoveClk($event, task)">
+            <ion-icon :icon="removeCircleOutline" size="large" />
+          </div>
         </ion-item>
       </ion-list>
     </ion-content>
+
+    <ion-footer>
+      <ion-toolbar>
+        <ion-button expand="block" color="warning" @click="btnSaveClk"> 保存 </ion-button>
+      </ion-toolbar>
+    </ion-footer>
+    <ion-toast
+      :is-open="toastData.isOpen"
+      :message="toastData.text"
+      :duration="toastData.duration"
+      @didDismiss="onToastDismiss">
+    </ion-toast>
+    <ion-action-sheet :is-open="openSaveSheet" :buttons="saveActionButtons"> </ion-action-sheet>
     <!-- 开始时间弹窗 -->
     <ion-modal
       class="bottom-modal"
@@ -272,18 +282,6 @@
         </ion-button>
       </ion-footer>
     </ion-modal>
-    <ion-footer>
-      <ion-toolbar>
-        <ion-button expand="block" color="warning" @click="btnSaveClk"> 保存 </ion-button>
-      </ion-toolbar>
-    </ion-footer>
-    <ion-toast
-      :is-open="toastData.isOpen"
-      :message="toastData.text"
-      :duration="toastData.duration"
-      @didDismiss="onToastDismiss">
-    </ion-toast>
-    <ion-action-sheet :is-open="openSaveSheet" :buttons="saveActionButtons"> </ion-action-sheet>
   </ion-modal>
 </template>
 <script lang="ts" src="@/components/SchedulePopModal.ts"></script>

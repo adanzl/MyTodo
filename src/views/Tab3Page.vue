@@ -52,7 +52,7 @@
               {{ S_TS(schedule.repeatEndTs) }}
             </p>
             <p v-for="(task, idx) in schedule.subtasks" :key="idx">
-              {{ task.name }}
+              [{{task.id}}]{{ task.name }}
             </p>
           </ion-label>
         </ion-item>

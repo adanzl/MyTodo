@@ -28,16 +28,16 @@
         :freeMode="false"
         :coverflowEffect="{
           rotate: 20,
-          stretch: -30,
-          depth: 100,
+          stretch: -20,
+          depth: 10,
           modifier: 1,
-          slideShadows: false,
+          slideShadows: false,  // 是否开启slide阴影
         }"
         :keyboard="true"
         class="h-[90%]">
         <swiper-slide v-for="(day, idx) in dayArr" :key="idx" class="data-content">
           <ion-content>
-            <ion-item color="light">
+            <ion-item color="light" lines="none">
               <icon-mdi-list-status class="text-blue-500" :height="'30'" :width="'30'" slot="start">
               </icon-mdi-list-status>
               <div class="h-12"></div>
@@ -45,11 +45,10 @@
             <ion-item v-for="(schedule, idx) in day.events" :key="idx">
               <ion-checkbox
                 style="--size: 26px"
-                slot="start"
                 :checked="day.save && day.save[schedule.id]?.state === 1"
                 @ionChange="onScheduleCheckboxChange($event, day, schedule.id)">
               </ion-checkbox>
-              <div @click="btnScheduleClk($event, schedule, day)" class="flex w-full items-center">
+              <div @click="btnScheduleClk($event, schedule, day)" class="flex items-center w-full">
                 <ion-label
                   :class="{
                     'text-line-through': day.save && day.save[schedule.id]?.state === 1,

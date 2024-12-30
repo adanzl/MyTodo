@@ -259,6 +259,7 @@ export default defineComponent({
       if (task) {
         curSave.value!.subtasks[task.id] = event.detail.checked ? 1 : 0;
       }
+      // console.log("onSubtaskCheckboxChange", curSave.value, task);
       // task 排序
       curScheduleData.value!.subtasks.sort((a: Subtask, b: Subtask) => {
         const sa = curSave.value!.subtasks[a.id] || 0;
@@ -276,6 +277,7 @@ export default defineComponent({
       }
     };
     const subTaskChecked = (task: Subtask) => {
+      // console.log("subTaskChecked", task, (curSave.value!.subtasks[task.id] || 0) === 1);
       return (curSave.value!.subtasks[task.id] || 0) === 1;
     };
     // 子任务更新
@@ -317,6 +319,7 @@ export default defineComponent({
         header: "确认",
         message: "确认删除 ： " + task.name,
         buttons: [
+          "取消",
           {
             text: "确定",
             handler: () => {
@@ -329,7 +332,6 @@ export default defineComponent({
               changeFlag = true;
             },
           },
-          "取消",
         ],
       });
       await alert.present();
