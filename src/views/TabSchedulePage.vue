@@ -126,12 +126,12 @@
               </ion-list>
             </div>
           </ion-accordion>
-          <ion-accordion value="goals">
+          <!-- <ion-accordion value="goals">
             <ion-item slot="header" color="light" class="schedule-group-item">
               <ion-label>里程碑</ion-label>
             </ion-item>
             <div class="ion-padding" slot="content">Content</div>
-          </ion-accordion>
+          </ion-accordion> -->
         </ion-accordion-group>
       </ion-content>
       <SchedulePop
@@ -159,7 +159,7 @@
     </ion-content>
     <ion-fab slot="fixed" vertical="bottom" horizontal="end">
       <ion-fab-button @click="btnAddScheduleClk">
-        <ion-icon :icon="addCircleOutline" size="large"></ion-icon>
+        <ion-icon :icon="add" style="font-size: 36px"></ion-icon>
       </ion-fab-button>
     </ion-fab>
   </ion-page>

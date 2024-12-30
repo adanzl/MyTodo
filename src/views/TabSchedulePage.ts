@@ -23,7 +23,7 @@ import {
 } from "@ionic/vue";
 import dayjs from "dayjs";
 import {
-  addCircleOutline,
+  add,
   alarmOutline,
   chevronDown,
   chevronUp,
@@ -443,7 +443,7 @@ export default defineComponent({
       getColorOptions,
       getPriorityOptions,
       getGroupOptions,
-      addCircleOutline,
+      add,
       alarmOutline,
       chevronDown,
       chevronUp,

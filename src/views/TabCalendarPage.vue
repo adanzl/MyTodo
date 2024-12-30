@@ -40,11 +40,11 @@
           <ion-grid class="w-full">
             <ion-row v-for="week in month.weekArr" :key="week" class="flex-nowrap">
               <ion-col
-                class="p-0 min-h-32 border-[1px] border-gray-100 border-solid w-[14.28%]"
+                class="p-[1px] min-h-32 border-[0.5px] border-gray-300 border-solid w-[14.28%]"
                 @click="onDaySelected(month, day)"
                 v-for="day in week"
                 :key="day">
-                <span class="bg-gray-200 text-left text-sm/4 block">
+                <span class="bg-slate-200 text-left text-xs/[12px] block">
                   <ion-chip
                     :class="{
                       transparent: day.dt.unix() !== dayjs().startOf('day').unix(),

@@ -25,7 +25,7 @@
         </ion-item>
         <ion-item v-for="(schedule, idx) in userData.schedules" :key="idx">
           <ion-label>
-            <div style="display: flex; align-items: center">
+            <div class="flex items-center w-full">
               <span
                 class="v-dot"
                 :style="{
@@ -33,13 +33,13 @@
                   'margin-inline': '2px',
                 }">
               </span>
-              <h2>[{{ schedule.id }}] {{ schedule.title }}</h2>
+              <h2 class="flex-1">[{{ schedule.id }}] {{ schedule.title }}</h2>
               <component
                 :is="getPriorityOptions(schedule.priority).icon"
                 :height="'36px'"
                 width="36px"
                 :color="getPriorityOptions(schedule.priority).color" />
-              <ion-label>{{ "{" + getGroupOptions(schedule.groupId).label + "}" }}</ion-label>
+              <h2 class="w-16">{{ "{" + getGroupOptions(schedule.groupId).label + "}" }}</h2>
             </div>
             <p>
               range:

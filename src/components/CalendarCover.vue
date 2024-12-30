@@ -7,13 +7,15 @@
         </h2>
         <ion-button
           slot="end"
-          color="danger"
+          fill="clear"
           @click="btnTodayClk"
           size="small"
-          class="ion-padding"
-          :style="{ padding: '0px 10px', opacity: currentDate.isToday() ? '0' : '1' }">
-          <icon-mdi-calendar-today-outline :height="'16'" slot="start" />
-          今天
+          class="ion-padding-horizontal"
+          v-if="!currentDate.isToday()">
+          <div class="bg-orange-600 w-16 h-8 flex items-center text-white rounded-md p-2">
+            <icon-mdi-calendar-today-outline :height="'16'" slot="start" />
+            今天
+          </div>
         </ion-button>
       </ion-item>
       <swiper
@@ -25,8 +27,8 @@
         :slidesPerView="'auto'"
         :freeMode="false"
         :coverflowEffect="{
-          rotate: 10,
-          stretch: 0,
+          rotate: 20,
+          stretch: -30,
           depth: 100,
           modifier: 1,
           slideShadows: false,
@@ -55,7 +57,7 @@
                   class="p-2.5 flex-1">
                   <h2 class="truncate">{{ schedule.title }}</h2>
                   <div class="flex text-gray-400">
-                    <p class="schedule-lb-sub">
+                    <p class="mr-2">
                       <ion-icon :icon="listOutline" class="relative top-0.5"></ion-icon>
                       {{ countFinishedSubtask(day, schedule) }}
                       /
@@ -84,7 +86,7 @@
       </swiper>
       <ion-fab slot="fixed" vertical="bottom" horizontal="end">
         <ion-fab-button @click="btnAddScheduleClk">
-          <ion-icon :icon="addCircleOutline" size="large"></ion-icon>
+          <ion-icon :icon="add" size="large"></ion-icon>
         </ion-fab-button>
       </ion-fab>
     </ion-content>
@@ -111,7 +113,7 @@ import { setSave } from "@/utils/NetUtil";
 import { IonCheckbox, IonFab, IonFabButton, IonicSlides } from "@ionic/vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import dayjs from "dayjs";
-import { addCircleOutline, listOutline } from "ionicons/icons";
+import { add, listOutline } from "ionicons/icons";
 import "swiper/css";
 import "swiper/css/effect-fade";
 import { EffectCoverflow, Keyboard } from "swiper/modules";
