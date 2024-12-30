@@ -1,5 +1,8 @@
 <template>
-  <ion-modal show-backdrop="false" id="main">
+  <ion-modal
+    show-backdrop="false"
+    id="main"
+    @ion-modal-will-dismiss="onModalDismiss">
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
@@ -66,21 +69,29 @@
         <ion-item class="ion-text-center" :button="true" size="large" @click="btnScheduleDTClk">
           <ion-icon :icon="calendarOutline" slot="start"></ion-icon>
           <div class="flex ion-justify-content-around ion-padding w-full">
-            <div class="ion-text-center">
-              <ion-label>{{ curScheduleData.startTs?.format("MM-DD") }}</ion-label>
+            <div class="ion-text-center" v-if="curScheduleData.startTs">
+              <div class="flex items-baseline">
+                {{ curScheduleData.startTs.format("MM-DD") + "," }}
+                <p class="text-xs">{{ WEEK[curScheduleData.startTs.day()] }}</p>
+              </div>
               <ion-label color="tertiary" class="text-xs/4">
                 {{ curScheduleData.allDay ? "全天" : curScheduleData?.startTs?.format("HH:mm") }}
               </ion-label>
             </div>
+            <div v-else>暂无开始时间</div>
             <div>
-              <ion-label> >></ion-label>
+              <MdiChevronDoubleRight height="100%" preserveAspectRatio="none" />
             </div>
-            <div class="ion-text-center">
-              <ion-label>{{ curScheduleData.endTs?.format("MM-DD") }}</ion-label>
+            <div class="ion-text-center" v-if="curScheduleData.endTs">
+              <div class="flex items-baseline">
+                {{ curScheduleData.endTs.format("MM-DD") + "," }}
+                <p class="text-xs">{{ WEEK[curScheduleData.endTs.day()] }}</p>
+              </div>
               <ion-label color="tertiary" class="text-xs/4">
                 {{ curScheduleData.allDay ? "全天" : curScheduleData?.endTs?.format("HH:mm") }}
               </ion-label>
             </div>
+            <div v-else>暂无结束时间</div>
           </div>
         </ion-item>
         <ion-item ref="dtComponentItem" class="height-0-block flex">

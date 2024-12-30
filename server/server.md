@@ -23,3 +23,5 @@
 `sudo systemctl restart code-server@orangepi.service`
 
 `sudo systemctl daemon-reload`
+## 打包
+`npx npm run build --  --mode=production && npx cap copy`

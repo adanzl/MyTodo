@@ -3,6 +3,7 @@ import GroupSelector from "@/components/GroupSelector.vue";
 import RepeatSelector from "@/components/RepeatSelector.vue";
 import PrioritySelector from "@/components/PrioritySelector.vue";
 import SubtaskPopModal from "@/components/SubtaskPopModal.vue";
+import MdiChevronDoubleRight from "virtual:icons/mdi/chevron-double-right";
 import {
   getColorOptions,
   getGroupOptions,
@@ -10,6 +11,7 @@ import {
   getRepeatOptions,
   ReminderOptions,
   RepeatOptions,
+  WEEK,
 } from "@/modal/ScheduleType";
 import { ScheduleData, ScheduleSave, Subtask } from "@/modal/UserData";
 
@@ -47,6 +49,7 @@ import { defineComponent, nextTick, onMounted, ref, watch } from "vue";
 
 export default defineComponent({
   components: {
+    MdiChevronDoubleRight,
     createAnimation,
     IonCheckbox,
     IonDatetime,
@@ -261,7 +264,7 @@ export default defineComponent({
       }
       // console.log("onSubtaskCheckboxChange", curSave.value, task);
       // task 排序
-      nextTick(()=>{
+      nextTick(() => {
         curScheduleData.value!.subtasks.sort((a: Subtask, b: Subtask) => {
           const sa = curSave.value!.subtasks[a.id] || 0;
           const sb = curSave.value!.subtasks[b.id] || 0;
@@ -270,7 +273,7 @@ export default defineComponent({
           }
           return sa - sb;
         });
-      })
+      });
       // 如果所有子任务都完成了，整个任务变成完成状态
       const cnt = curScheduleData.value.subtasks?.filter((t: any) => subTaskChecked(t)).length;
       if (cnt === curScheduleData.value.subtasks?.length) {
@@ -387,8 +390,12 @@ export default defineComponent({
     };
     // ============ UI ============
     const onToastDismiss = () => (toastData.value.isOpen = false);
-
+    function onModalDismiss() {
+      scheduleDTComponent.value.style.height = scheduleDTComponent.value.offsetHeight;
+      dateShowFlag.value = false;
+    }
     return {
+      onModalDismiss,
       onTitleChange,
       openSaveSheet,
       saveActionButtons,
@@ -451,6 +458,7 @@ export default defineComponent({
       btnSubtaskAddClk,
       onToastDismiss,
       RepeatOptions,
+      WEEK,
     };
   },
 });
