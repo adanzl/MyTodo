@@ -12,7 +12,7 @@
         </ion-title>
       </ion-toolbar>
     </ion-header>
-    <ion-content class="ion-padding" ref="scheduleTab">
+    <ion-content class="" ref="scheduleTab">
       <ion-list :inset="true">
         <ion-item>
           <ion-checkbox
@@ -30,13 +30,13 @@
         <!-- 分组信息 -->
         <ion-item class="group">
           <ion-button id="btnGroup" class="flex-1 text-base" fill="none">
-            <ion-icon :icon="bookmark"></ion-icon>
+            <ion-icon :icon="bookmarksOutline" class="mr-1"></ion-icon>
             <ion-label>{{ getGroupOptions(curScheduleData.groupId).label }}</ion-label>
           </ion-button>
           <GroupSelector
             trigger="btnGroup"
             @update:value="onGroupChange"
-            :value="curScheduleData.groupId"></GroupSelector>
+            :value="curScheduleData.groupId" />
           <ion-button id="btnPriority" class="flex-1 text-base" fill="none">
             <ion-label><strong>Pri</strong></ion-label>
             <component
@@ -48,10 +48,9 @@
           <PrioritySelector
             trigger="btnPriority"
             @update:value="onPriorityChange"
-            :value="curScheduleData.priority">
-          </PrioritySelector>
+            :value="curScheduleData.priority" />
           <ion-button id="btnColor" class="flex-1 text-base" fill="none">
-            <ion-icon slot="start" :icon="colorPalette"> </ion-icon>
+            <ion-icon slot="start" :icon="colorPaletteOutline" />
             <span
               :style="{ 'background-color': getColorOptions(curScheduleData.color).tag }"
               class="v-dot"></span>
@@ -59,15 +58,14 @@
           <ColorSelector
             trigger="btnColor"
             @update:value="onColorChange"
-            :value="curScheduleData.color">
-          </ColorSelector>
+            :value="curScheduleData.color" />
         </ion-item>
       </ion-list>
       <ion-list :inset="true">
         <!-- 开始日期 -->
         <ion-item class="ion-text-center" :button="true" size="large" @click="btnScheduleDTClk">
-          <ion-icon :icon="calendar" slot="start"></ion-icon>
-          <div class="flex ion-justify-content-around ion-padding width-100">
+          <ion-icon :icon="calendarOutline" slot="start"></ion-icon>
+          <div class="flex ion-justify-content-around ion-padding w-full">
             <div class="ion-text-center">
               <ion-label>{{ curScheduleData.startTs?.format("MM-DD") }}</ion-label>
               <ion-label color="tertiary" class="text-xs/4">
@@ -86,12 +84,12 @@
           </div>
         </ion-item>
         <ion-item ref="dtComponentItem" class="height-0-block flex">
-          <div ref="scheduleDTComponent" style="width: 100%">
+          <div ref="scheduleDTComponent" class="w-full">
             <ion-buttons class="ion-justify-content-around">
               <ion-button @click="btnScheduleDateClearClk">清除</ion-button>
               <ion-segment v-model="scheduleType" style="width: 130px" @ionChange="onDtTabChange">
-                <ion-segment-button value="0" class="w-16 min-w-0">开始</ion-segment-button>
-                <ion-segment-button value="1" class="w-16 min-w-0">结束</ion-segment-button>
+                <ion-segment-button value="0" class="w-15 min-w-0">开始</ion-segment-button>
+                <ion-segment-button value="1" class="w-15 min-w-0">结束</ion-segment-button>
               </ion-segment>
               <ion-button @click="btnDatetimeOkClk">确定</ion-button>
             </ion-buttons>
@@ -112,6 +110,7 @@
             </ion-item>
           </div>
         </ion-item>
+        <!-- 提醒 -->
         <!-- <ion-item :button="true" :detail="true">
           <ion-icon :icon="notifications" slot="start"> </ion-icon>
           <ion-select
@@ -127,17 +126,19 @@
             </ion-select-option>
           </ion-select>
         </ion-item> -->
-        <ion-item detail="true">
+        <!-- 重复 -->
+        <ion-item detail="true" id="btnRepeat">
           <ion-icon :icon="repeat" slot="start"> </ion-icon>
-          <ion-select :value="curScheduleData?.repeat" @ion-change="onRepeatChange" class="no-ico">
-            <div slot="label">
-              <ion-label>重复</ion-label>
-            </div>
-            <ion-select-option v-for="(op, idx) in RepeatOptions" :key="idx" :value="op.id">
-              {{ op.label }}
-            </ion-select-option>
-          </ion-select>
+          <ion-label>重复</ion-label>
+          <ion-label class="text-right mr-0">{{
+            getRepeatOptions(curScheduleData.repeat).label
+          }}</ion-label>
         </ion-item>
+        <RepeatSelector
+          trigger="btnRepeat"
+          @update:value="onRepeatChange"
+          :dt="curScheduleData.startTs"
+          :value="curScheduleData?.repeat" />
         <ion-item detail="true" :button="true" id="id-repeat-end">
           <ion-icon :icon="power" slot="start"></ion-icon>
           <ion-label>重复停止</ion-label>
@@ -194,9 +195,9 @@
           </span>
         </ion-item>
         <!-- 子任务 -->
-        <ion-item >
+        <ion-item>
           <ion-icon :icon="add" slot="start" style="width: 22px"></ion-icon>
-          <ion-button @click="btnSubtaskAddClk" expand="full" class="width-100" color="light">
+          <ion-button @click="btnSubtaskAddClk" expand="full" class="w-full" color="light">
             添加子任务
           </ion-button>
         </ion-item>
@@ -206,10 +207,11 @@
           :is-open="openSubtaskModal"
           @ion-modal-will-dismiss="() => (openSubtaskModal = false)">
         </SubtaskPopModal>
-        <ion-item v-for="(task, idx) in curScheduleData?.subtasks" :key="idx">
+        <ion-item v-for="(task, idx) in curScheduleData?.subtasks" :key="idx" class="subtask-item">
           <ion-checkbox
             slot="start"
             :checked="subTaskChecked(task)"
+            class="ion-no-padding"
             @ionChange="onSubtaskCheckboxChange($event, task)">
           </ion-checkbox>
           <div class="flex flex-col justify-center w-full" @click="onSubtaskClk($event, task)">
@@ -225,6 +227,7 @@
           <ion-icon
             :icon="removeCircleOutline"
             slot="end"
+            style="position: relative;top: -7px"
             @click="btnSubtaskRemoveClk($event, task)">
           </ion-icon>
         </ion-item>
@@ -258,10 +261,15 @@
         </ion-toggle>
       </ion-item>
       <ion-footer>
-        <ion-button fill="clear" class="w-2/5" @click="() => (datetimeShowFlag = false)">
+        <ion-button
+          fill="clear"
+          class="flex-1 text-gray-400"
+          @click="() => (datetimeShowFlag = false)">
           清除
         </ion-button>
-        <ion-button fill="clear" class="w-2/5" @click="btnScheduleDatetimeOkClk"> 确定 </ion-button>
+        <ion-button fill="clear" class="flex-1 text-orange-400" @click="btnScheduleDatetimeOkClk">
+          确定
+        </ion-button>
       </ion-footer>
     </ion-modal>
     <ion-footer>
@@ -286,5 +294,9 @@
   align-items: center;
   text-align: center;
   font-size: larger;
+}
+.subtask-item::part(native) {
+  align-items: flex-start;
+  padding: 16px 16px 0 16px;
 }
 </style>

@@ -16,16 +16,30 @@ export interface RepeatType {
   id: number;
   label: string;
   tag: string;
+  icon?: any;
 }
 
 // 日程重复类型
+import MdiCalendarMonthOutline from "virtual:icons/mdi/calendar-month-outline";
+import MdiCalendarWeekBeginOutline from "virtual:icons/mdi/calendar-week-begin-outline";
+import MdiCalendarTodayOutline from "virtual:icons/mdi/calendar-today-outline";
+import MdiCalendarMultiselectOutline from "virtual:icons/mdi/calendar-multiselect-outline";
+import MdiCalendarBlankOutline from "virtual:icons/mdi/calendar-blank-outline";
 export const RepeatOptions: RepeatType[] = [
-  { id: 0, label: "无", tag: "" },
-  { id: 1, label: "每天", tag: "day" },
-  { id: 2, label: "每星期", tag: "week" },
-  { id: 3, label: "每月", tag: "month" },
-  { id: 4, label: "每年", tag: "year" },
+  { id: 0, label: "无", tag: "", icon: MdiCalendarBlankOutline },
+  { id: 1, label: "每天", tag: "day", icon: MdiCalendarMonthOutline },
+  { id: 2, label: "每星期", tag: "week", icon: MdiCalendarWeekBeginOutline },
+  { id: 3, label: "每月", tag: "month", icon: MdiCalendarTodayOutline },
+  { id: 4, label: "每年", tag: "year", icon: MdiCalendarMultiselectOutline },
 ];
+export const getRepeatOptions = (id?: number): RepeatType => {
+  for (const v of RepeatOptions) {
+    if (v.id === id) {
+      return v;
+    }
+  }
+  return RepeatOptions[0];
+};
 
 export interface ColorType {
   id: number;
@@ -35,10 +49,10 @@ export interface ColorType {
 // 颜色类型
 export const ColorOptions: ColorType[] = [
   { id: 0, label: "None", tag: "white" },
-  { id: 1, label: "Red", tag: "red" },
-  { id: 2, label: "Yellow", tag: "yellow" },
-  { id: 3, label: "Blue", tag: "#7970ff" },
-  { id: 4, label: "Green", tag: "#3fef28" },
+  { id: 1, label: "Red", tag: "#f87171" },
+  { id: 2, label: "Yellow", tag: "#fde047" },
+  { id: 3, label: "Blue", tag: "#93c5fd" },
+  { id: 4, label: "Green", tag: "#4ade80" },
 ];
 
 export const getColorOptions = (id?: number): ColorType => {
@@ -62,10 +76,10 @@ import MdiRomanNumeral2 from "virtual:icons/mdi/roman-numeral-2";
 import MdiRomanNumeral3 from "virtual:icons/mdi/roman-numeral-3";
 import MdiRomanNumeral4 from "virtual:icons/mdi/roman-numeral-4";
 export const PriorityOptions: PriorityType[] = [
-  { id: 0, icon: MdiRomanNumeral1, color: "#1a65eb", label: "较低" },
-  { id: 1, icon: MdiRomanNumeral2, color: "#2dd55b", label: "中等" },
-  { id: 2, icon: MdiRomanNumeral3, color: "#ffc409", label: "较高" },
-  { id: 3, icon: MdiRomanNumeral4, color: "#cb1a27", label: "核心" },
+  { id: 0, icon: MdiRomanNumeral1, color: "#1a65eb", label: "不重要并且不紧急" },
+  { id: 1, icon: MdiRomanNumeral2, color: "#2dd55b", label: "不重要但是紧急" },
+  { id: 2, icon: MdiRomanNumeral3, color: "#ffc409", label: "重要但是不紧急" },
+  { id: 3, icon: MdiRomanNumeral4, color: "#cb1a27", label: "重要并且紧急" },
 ];
 export const getPriorityOptions = (id?: number): PriorityType => {
   for (const v of PriorityOptions) {
@@ -102,6 +116,4 @@ export default {
   RepeatOptions,
   ColorOptions,
   GroupOptions,
-  getColorOptions,
-  getGroupOptions,
 };

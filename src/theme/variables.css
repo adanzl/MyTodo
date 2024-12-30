@@ -25,14 +25,6 @@ http://ionicframework.com/docs/theming/ */
   background: var(--color-main-bg);
 }
 
-.width-100 {
-  width: 100% !important;
-}
-
-.flex {
-  display: flex !important;
-}
-
 .height-0-block {
   display: block;
   height: 0;

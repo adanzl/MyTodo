@@ -15,6 +15,7 @@ import {
   IonItemOption,
   IonItemOptions,
   IonItemSliding,
+  IonMenuButton,
   IonRefresher,
   IonRefresherContent,
   loadingController,
@@ -34,7 +35,7 @@ import {
 } from "ionicons/icons";
 import { Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
-import { defineComponent, nextTick, onMounted, ref } from "vue";
+import { defineComponent, inject, nextTick, onMounted, ref } from "vue";
 
 import {
   ColorOptions,
@@ -56,6 +57,7 @@ export default defineComponent({
     IonFab,
     IonFabButton,
     IonicSlides,
+    IonMenuButton,
     IonItemOption,
     IonItemOptions,
     IonItemSliding,
@@ -71,7 +73,7 @@ export default defineComponent({
     // https://iconify.design/docs/icon-components/vue/
     // https://yesicon.app/search/roman?coll=mdi
     const userData = ref<UserData>(new UserData());
-    let currentDate = dayjs().startOf("day");
+    let currentDate = dayjs().startOf("day");  // 当前日期
     let pTouch: any;
     let lstTs = 0;
     const slideArr = ref<any[]>([{}, {}, {}]); // 滑动数据
@@ -83,6 +85,8 @@ export default defineComponent({
     const scheduleModalData = ref<ScheduleData>();
     const scheduleSave = ref<ScheduleSave>();
     const isScheduleModalOpen = ref(false);
+    const eventBus: any = inject("eventBus");
+    const filter = ref<any>({});
     const toastData = ref({
       isOpen: false,
       duration: 3000,
@@ -195,7 +199,23 @@ export default defineComponent({
       onIonViewDidEnter(() => {
         refreshAllData();
       });
+      eventBus.$on("menuClose", (params: any) => {
+        // console.log("menuClose", params);
+        filter.value = params;
+      });
     });
+    // 筛选日程
+    function bShowScheduleItem(schedule: ScheduleData) {
+      const [fGroup, fColor, fPriority] = [
+        filter.value.group,
+        filter.value.color,
+        filter.value.priority,
+      ];
+      if (fGroup && fGroup.get(schedule.groupId) === false) return false;
+      if (fColor && fColor.get(schedule.color) === false) return false;
+      if (fPriority && fPriority.get(schedule.priority) === false) return false;
+      return true;
+    }
     // 保存存档
     const doSaveUserData = () => {
       setSave(userData.value.id, userData.value.name, JSON.stringify(userData.value))
@@ -276,7 +296,8 @@ export default defineComponent({
         }
       }
       selectedDate.value = day;
-      console.log("onDaySelected", day);
+      currentDate = day.dt.startOf("day");
+      // console.log("onDaySelected", day);
     };
     // 日历折叠按钮
     const btnCalendarFoldClk = () => {
@@ -449,7 +470,6 @@ export default defineComponent({
       scheduleDelConfirm,
       countFinishedSubtask,
       IonicSlides,
-      updateScheduleData,
       Keyboard,
       btnTodayClk,
       btnSortClk,
@@ -470,6 +490,7 @@ export default defineComponent({
       onDelSchedulerConfirm,
       btnAddScheduleClk,
       btnTestClk,
+      bShowScheduleItem,
     };
   },
   methods: {},

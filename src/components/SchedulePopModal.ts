@@ -1,11 +1,13 @@
 import ColorSelector from "@/components/ColorSelector.vue";
 import GroupSelector from "@/components/GroupSelector.vue";
+import RepeatSelector from "@/components/RepeatSelector.vue";
 import PrioritySelector from "@/components/PrioritySelector.vue";
 import SubtaskPopModal from "@/components/SubtaskPopModal.vue";
 import {
   getColorOptions,
   getGroupOptions,
   getPriorityOptions,
+  getRepeatOptions,
   ReminderOptions,
   RepeatOptions,
 } from "@/modal/ScheduleType";
@@ -30,16 +32,16 @@ import { getImage } from "@/utils/ImgMgr";
 import {
   add,
   airplane,
-  bookmark,
-  calendar,
+  bookmarksOutline,
+  calendarOutline,
   chevronBackOutline,
-  colorPalette,
+  colorPaletteOutline,
   listOutline,
   notifications,
   power,
   removeCircleOutline,
   repeat,
-  timeOutline
+  timeOutline,
 } from "ionicons/icons";
 import { defineComponent, onMounted, ref, watch } from "vue";
 
@@ -57,6 +59,7 @@ export default defineComponent({
     ColorSelector,
     PrioritySelector,
     GroupSelector,
+    RepeatSelector,
     SubtaskPopModal,
     IonActionSheet,
   },
@@ -232,8 +235,8 @@ export default defineComponent({
     };
     // =========== 重复 ============
     // 重复类型切换
-    const onRepeatChange = (event: any) => {
-      curScheduleData.value!.repeat = event.detail.value;
+    const onRepeatChange = (nv: any) => {
+      curScheduleData.value!.repeat = nv;
     };
     // 重复结束日期改变
     const onRepeatEndDtChange = (event: any) => {
@@ -403,9 +406,9 @@ export default defineComponent({
       dayjs,
       add,
       airplane,
-      bookmark,
-      calendar,
-      colorPalette,
+      bookmarksOutline,
+      colorPaletteOutline,
+      calendarOutline,
       listOutline,
       notifications,
       power,
@@ -418,6 +421,7 @@ export default defineComponent({
       getColorOptions,
       getGroupOptions,
       getPriorityOptions,
+      getRepeatOptions,
       onTaskCheckboxChange,
       onDtTabChange,
       onDtChange,

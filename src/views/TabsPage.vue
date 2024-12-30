@@ -1,6 +1,6 @@
 <template>
   <ion-page>
-    <ion-menu content-id="main-content" @ionDidClose="onMenuClose">
+    <ion-menu content-id="main-content" @ionDidClose="onMenuClose" 	:swipe-gesture="false">
       <ion-header>
         <ion-toolbar color="light">
           <ion-title>筛选</ion-title>
@@ -9,8 +9,8 @@
       <ion-content>
         <ion-accordion-group :multiple="true" :value="['group', 'color', 'priority']" mode="ios">
           <ion-accordion value="group">
-            <ion-item slot="header" color="light">
-              <ion-icon :icon="bookmark" class="w-5"></ion-icon>
+            <ion-item slot="header" color="light" class="schedule-group-item">
+              <ion-icon :icon="bookmarksOutline" class="w-5"></ion-icon>
               <ion-label class="mx-2.5">分组</ion-label>
             </ion-item>
             <ion-list class="ion-padding-horizontal" slot="content">
@@ -46,8 +46,8 @@
             </ion-list>
           </ion-accordion>
           <ion-accordion value="color">
-            <ion-item slot="header" color="light">
-              <ion-icon :icon="colorPalette" class="w-5"></ion-icon>
+            <ion-item slot="header" color="light" class="schedule-group-item">
+              <ion-icon :icon="colorPaletteOutline" class="w-5"></ion-icon>
               <ion-label class="mx-2.5">颜色</ion-label>
             </ion-item>
             <ion-list class="ion-padding-horizontal" slot="content">
@@ -75,13 +75,16 @@
                 <ion-item lines="none">
                   <span :style="{ 'background-color': color.tag }" class="v-dot" slot="start">
                   </span>
-                  <ion-label>{{ color.label }}</ion-label>
+                  <ion-label
+                    :style="{ color: color.tag, 'text-shadow': '1px 1px 1px #FF0000' }">
+                    {{ color.label }}
+                  </ion-label>
                 </ion-item>
               </ion-checkbox>
             </ion-list>
           </ion-accordion>
           <ion-accordion value="priority">
-            <ion-item slot="header" color="light">
+            <ion-item slot="header" color="light" class="schedule-group-item">
               <ion-label style="margin-left: 2px"><strong>Pri</strong></ion-label>
               <ion-label> </ion-label>
             </ion-item>
@@ -113,8 +116,10 @@
                     :height="'36px'"
                     width="36px"
                     :color="priority.color"
-                    style="margin-right: 8px" />
-                  <ion-label>{{ priority.label }}</ion-label>
+                    class="mr-1" />
+                  <ion-label class="ml-2" :style="{ color: priority.color }">
+                    {{ priority.label }}
+                  </ion-label>
                 </ion-item>
               </ion-checkbox>
             </ion-list>
@@ -132,22 +137,22 @@
       <ion-tab-bar slot="bottom">
         <ion-tab-button tab="tabHome" href="/tabs/tab1">
           <ion-icon :icon="shieldCheckmarkOutline" />
-          <ion-label>日程</ion-label>
+          <ion-label>日程浏览</ion-label>
         </ion-tab-button>
 
         <ion-tab-button tab="tabCalendar" href="/tabs/tab2">
           <ion-icon :icon="calendarOutline" />
-          <ion-label>日历</ion-label>
+          <ion-label>日历视图</ion-label>
         </ion-tab-button>
 
         <ion-tab-button tab="tabPic" href="/tabs/tab3">
           <ion-icon :icon="gridOutline" />
-          <ion-label>图片</ion-label>
+          <ion-label>图片列表</ion-label>
         </ion-tab-button>
 
         <ion-tab-button tab="tabMy" href="/tabs/tab4">
           <ion-icon :icon="squareOutline" />
-          <ion-label>存档</ion-label>
+          <ion-label>存档信息</ion-label>
         </ion-tab-button>
       </ion-tab-bar>
     </ion-tabs>
@@ -155,7 +160,7 @@
 </template>
 
 <script setup lang="ts">
-import { bookmark, colorPalette } from "ionicons/icons";
+import { bookmarksOutline, colorPaletteOutline } from "ionicons/icons";
 
 import { GroupOptions, ColorOptions, PriorityOptions } from "@/modal/ScheduleType";
 import {
@@ -224,5 +229,9 @@ ion-menu::part(container) {
 }
 .option-item ion-label {
   margin: 0px 0px 0px 10px;
+}
+.schedule-group-item::part(native) {
+  height: 35px !important;
+  min-height: 0 !important;
 }
 </style>

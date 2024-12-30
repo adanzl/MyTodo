@@ -7,11 +7,11 @@
     class="bottom-modal"
     @ionModalDidDismiss="onModalDismiss">
     <ion-item>
-      <ion-title>分组信息</ion-title>
+      <ion-title>选择分组</ion-title>
     </ion-item>
     <div class="ion-padding-horizontal">
       <ion-item>
-        <ion-radio-group :value="valueRef" @ionChange="onSelectChange" class="width-100" mode="ios">
+        <ion-radio-group :value="valueRef" @ionChange="onSelectChange" class="w-full" mode="ios">
           <ion-radio
             v-for="(op, idx) in GroupOptions"
             :key="idx"
@@ -29,8 +29,8 @@
       </ion-item>
     </div>
     <ion-footer>
-      <ion-button class="w-2/5" fill="clear" @click="cancel()">取消</ion-button>
-      <ion-button class="w-2/5" fill="clear" @click="confirm()">确定</ion-button>
+      <ion-button class="flex-1 text-gray-400" fill="clear" @click="cancel()">取消</ion-button>
+      <ion-button class="flex-1 text-orange-400" fill="clear" @click="confirm()">确定</ion-button>
     </ion-footer>
   </ion-modal>
 </template>

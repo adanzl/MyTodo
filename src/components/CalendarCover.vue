@@ -9,10 +9,10 @@
           slot="end"
           color="danger"
           @click="btnTodayClk"
-          size="default"
+          size="small"
+          class="ion-padding"
           :style="{ padding: '0px 10px', opacity: currentDate.isToday() ? '0' : '1' }">
-          <icon-mdi-calendar-today-outline :height="'16'" slot="start">
-          </icon-mdi-calendar-today-outline>
+          <icon-mdi-calendar-today-outline :height="'16'" slot="start" />
           今天
         </ion-button>
       </ion-item>
@@ -54,7 +54,7 @@
                   }"
                   class="p-2.5 flex-1">
                   <h2 class="truncate">{{ schedule.title }}</h2>
-                  <div class="flex">
+                  <div class="flex text-gray-400">
                     <p class="schedule-lb-sub">
                       <ion-icon :icon="listOutline" class="relative top-0.5"></ion-icon>
                       {{ countFinishedSubtask(day, schedule) }}

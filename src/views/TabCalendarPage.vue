@@ -20,9 +20,13 @@
       </ion-toolbar>
     </ion-header>
     <ion-row style="background-color: antiquewhite; color: blue">
-      <ion-col class="ion-text-center flex-1" v-for="head in weekHead" :key="head">
-        {{ head }}
-      </ion-col>
+      <ion-col class="ion-text-center text-red-600">日</ion-col>
+      <ion-col class="ion-text-center">一</ion-col>
+      <ion-col class="ion-text-center">二</ion-col>
+      <ion-col class="ion-text-center">三</ion-col>
+      <ion-col class="ion-text-center">四</ion-col>
+      <ion-col class="ion-text-center">五</ion-col>
+      <ion-col class="ion-text-center text-red-600">六</ion-col>
     </ion-row>
     <ion-content>
       <swiper
@@ -109,7 +113,6 @@ import "swiper/css/effect-fade";
 import { Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
 import { inject, onMounted, ref } from "vue";
-const weekHead = ["日", "一", "二", "三", "四", "五", "六"];
 const toastData = ref({
   isOpen: false,
   duration: 3000,

@@ -33,18 +33,13 @@
                   'margin-inline': '2px',
                 }">
               </span>
+              <h2>[{{ schedule.id }}] {{ schedule.title }}</h2>
               <component
                 :is="getPriorityOptions(schedule.priority).icon"
                 :height="'36px'"
                 width="36px"
                 :color="getPriorityOptions(schedule.priority).color" />
               <ion-label>{{ "{" + getGroupOptions(schedule.groupId).label + "}" }}</ion-label>
-              <!-- <ion-icon
-                :icon="icons.mdiRomanNums[getPriorityOptions(schedule.priority).icon]"
-                :style="{ color: getPriorityOptions(schedule.priority).color }"
-                style="font-size: 1.5rem">
-              </ion-icon> -->
-              <h2>[{{ schedule.id }}] {{ schedule.title }}</h2>
             </div>
             <p>
               range:
@@ -107,6 +102,7 @@ onMounted(() => {
   getSave(1)
     .then((res: any) => {
       userData.value = UData.parseUserData(res);
+      // console.log(userData.value);
     })
     .catch((err) => {
       toastData.value.isOpen = true;

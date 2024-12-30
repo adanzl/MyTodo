@@ -2,28 +2,28 @@
   <ion-modal
     ref="modal"
     aria-hidden="false"
-    id="colorSelector"
-    mode="ios"
+    id="repeatSelector"
     class="bottom-modal"
     @ionModalDidDismiss="onModalDismiss">
     <ion-item>
-      <ion-title>选择颜色</ion-title>
+      <ion-title>选择重复方式</ion-title>
     </ion-item>
     <div class="ion-padding-horizontal">
       <ion-item>
-        <ion-radio-group :value="valueRef" @ionChange="onSelectChange" class="w-full">
+        <ion-radio-group :value="valueRef" @ionChange="onSelectChange" class="w-full" mode="ios">
           <ion-radio
-            v-for="(op, idx) in ColorOptions"
+            v-for="(op, idx) in RepeatOptions"
             :key="idx"
             :value="op.id"
             class="option-item">
             <ion-item lines="none" style="flex: 1">
-              <span :style="{ 'background-color': op.tag }" class="v-dot" slot="start"></span>
-              <ion-label
-                class="ml-1"
-                :style="{ color: op.tag, 'text-shadow': '1px 1px 1px #FF0000' }">
-                {{ op.label }}
-              </ion-label>
+              <span>
+                <component :is="op.icon" :height="'25px'" width="36px" color="#7970ff" />
+              </span>
+              <ion-label style="margin-left: 8px">{{ op.label }} </ion-label>
+              <ion-label class="text-gray-400 text-xs" v-if="op.tag"
+                >（下次 {{ dt.add(1, op.tag).format("YYYY-MM-DD") }}）</ion-label
+              >
             </ion-item>
           </ion-radio>
         </ion-radio-group>
@@ -37,11 +37,11 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref, watch } from "vue";
+import { RepeatOptions } from "@/modal/ScheduleType";
 import { createTriggerController } from "@/utils/Overlay";
-import { IonRadioGroup, IonRadio } from "@ionic/vue";
-import { ColorOptions } from "@/modal/ScheduleType";
-
+import { IonRadio, IonRadioGroup } from "@ionic/vue";
+import { onMounted, ref, watch } from "vue";
+import dayjs from "dayjs";
 const props = defineProps({
   trigger: {
     type: String,
@@ -50,6 +50,10 @@ const props = defineProps({
   value: {
     type: Number,
     default: 0,
+  },
+  dt: {
+    type: Object,
+    default: dayjs(),
   },
 });
 const triggerController = createTriggerController();

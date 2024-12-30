@@ -7,11 +7,11 @@
     class="bottom-modal"
     @ionModalDidDismiss="onModalDismiss">
     <ion-item>
-      <ion-title>优先级</ion-title>
+      <ion-title>选择优先级</ion-title>
     </ion-item>
     <div class="ion-padding-horizontal">
       <ion-item>
-        <ion-radio-group :value="valueRef" @ionChange="onSelectChange" class="width-100">
+        <ion-radio-group :value="valueRef" @ionChange="onSelectChange" class="w-full">
           <ion-radio
             v-for="(op, idx) in PriorityOptions"
             :key="idx"
@@ -19,18 +19,17 @@
             class="option-item">
             <ion-item lines="none" style="flex: 1">
               <span>
-                <!-- <Icon :icon="op.icon" :height="'36'" :color="op.color"></Icon> -->
                 <component :is="op.icon" :height="'36px'" width="36px" :color="op.color" />
               </span>
-              <ion-label style="margin-left: 8px">{{ op.label }}</ion-label>
+              <ion-label class="ml-2" :style="{'color': op.color}" >{{ op.label }}</ion-label>
             </ion-item>
           </ion-radio>
         </ion-radio-group>
       </ion-item>
     </div>
     <ion-footer>
-      <ion-button style="width: 40%" fill="clear" @click="cancel()">取消</ion-button>
-      <ion-button style="width: 40%" fill="clear" @click="confirm()">确定</ion-button>
+      <ion-button class="flex-1 text-gray-400" fill="clear" @click="cancel()">取消</ion-button>
+      <ion-button class="flex-1 text-orange-400" fill="clear" @click="confirm()">确定</ion-button>
     </ion-footer>
   </ion-modal>
 </template>

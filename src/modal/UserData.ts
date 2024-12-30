@@ -271,10 +271,11 @@ export class UData {
   ): boolean {
     const dKey = S_TS(dt);
     if (type === "all") {
+      // console.log("updateSchedularData", _scheduleData, _scheduleSave);
       // 日程变化
       if (_scheduleData.id === -1) {
         // add id userData.value.schedules id的最大值=1
-        const id = userData.schedules.reduce((max, s) => (s.id! > max ? s.id! : max), 0);
+        const id = userData.schedules.reduce((max, s) => (s.id! > max ? s.id! : max), 0) + 1;
         _scheduleData.id = id;
         userData.schedules.push(_scheduleData);
       } else {

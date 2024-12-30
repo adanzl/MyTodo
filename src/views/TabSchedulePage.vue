@@ -2,6 +2,9 @@
   <ion-page id="main-content">
     <ion-header>
       <ion-toolbar>
+        <ion-buttons slot="start">
+          <ion-menu-button></ion-menu-button>
+        </ion-buttons>
         <ion-title>
           <div v-if="selectedDate">{{ selectedDate.dt.format("YY年MM月") }}</div>
           <div v-else>日历</div>
@@ -64,7 +67,9 @@
             <div slot="content">
               <ion-list :inset="true" lines="full" mode="ios" ref="curScheduleList" class="my-0">
                 <!-- 日程条目 -->
-                <ion-item-sliding v-for="(schedule, idx) in selectedDate?.events" :key="idx">
+                <ion-item-sliding
+                  v-for="(schedule, idx) in selectedDate?.events.filter(bShowScheduleItem)"
+                  :key="idx">
                   <ion-item>
                     <ion-checkbox
                       style="--size: 26px; padding-right: 5px"
@@ -79,8 +84,8 @@
                             selectedDate?.save && selectedDate?.save[schedule.id]?.state === 1,
                         }"
                         class="p-2.5 flex-1">
-                        <h2 class="truncate">[{{ schedule.id }}]{{ schedule.title }}</h2>
-                        <div class="flex">
+                        <h2 class="truncate">{{ schedule.title }}</h2>
+                        <div class="flex text-gray-400">
                           <p class="w-14 mb-0">
                             <ion-icon
                               :icon="listOutline"
