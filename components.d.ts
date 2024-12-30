@@ -10,7 +10,6 @@ declare module 'vue' {
     CalendarCover: typeof import('./src/components/CalendarCover.vue')['default']
     CalendarTab: typeof import('./src/components/CalendarTab.vue')['default']
     ColorSelector: typeof import('./src/components/ColorSelector.vue')['default']
-    copy: typeof import('./src/components/GroupSelector copy.vue')['default']
     GConfig: typeof import('./src/components/GConfig.vue')['default']
     GroupSelector: typeof import('./src/components/GroupSelector.vue')['default']
     IconMdiAccount: typeof import('~icons/mdi/account')['default']
