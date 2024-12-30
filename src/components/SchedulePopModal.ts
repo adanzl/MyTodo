@@ -43,7 +43,7 @@ import {
   repeat,
   timeOutline,
 } from "ionicons/icons";
-import { defineComponent, onMounted, ref, watch } from "vue";
+import { defineComponent, nextTick, onMounted, ref, watch } from "vue";
 
 export default defineComponent({
   components: {
@@ -261,19 +261,20 @@ export default defineComponent({
       }
       // console.log("onSubtaskCheckboxChange", curSave.value, task);
       // task 排序
-      curScheduleData.value!.subtasks.sort((a: Subtask, b: Subtask) => {
-        const sa = curSave.value!.subtasks[a.id] || 0;
-        const sb = curSave.value!.subtasks[b.id] || 0;
-        if (sa === sb) {
-          return a.id - b.id;
-        }
-        return sa - sb;
-      });
+      nextTick(()=>{
+        curScheduleData.value!.subtasks.sort((a: Subtask, b: Subtask) => {
+          const sa = curSave.value!.subtasks[a.id] || 0;
+          const sb = curSave.value!.subtasks[b.id] || 0;
+          if (sa === sb) {
+            return a.id - b.id;
+          }
+          return sa - sb;
+        });
+      })
       // 如果所有子任务都完成了，整个任务变成完成状态
       const cnt = curScheduleData.value.subtasks?.filter((t: any) => subTaskChecked(t)).length;
       if (cnt === curScheduleData.value.subtasks?.length) {
         curSave.value!.state = 1;
-        // onTaskCheckboxChange
       }
     };
     const subTaskChecked = (task: Subtask) => {
