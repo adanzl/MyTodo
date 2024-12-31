@@ -77,11 +77,13 @@ export function setSave(id: number | undefined, user: string, data: string) {
 
 export async function setPic(id: number | undefined, data: string): Promise<string> {
   const rsp: any = await axios.post(URL + "/setData", {
-    id: id,
-    table: 't_user_pic',
+    table: "t_user_pic",
     data: {
-      data:data},
+      id: id,
+      data: data,
+    },
   });
+  console.log("setPic", rsp.data);
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
   }

@@ -194,7 +194,7 @@ def set_data(table, data):
                 f"""
                 INSERT INTO {table} ({fields}) VALUES ({values})
                 ON CONFLICT(id) DO UPDATE SET {set_values};
-                """, tuple(data.values()))
+                """, tuple(list(data.values()) + list(data.values())))
         else:
             cur.execute(f"""
                 INSERT INTO {table} ({fields}) VALUES ({values});
