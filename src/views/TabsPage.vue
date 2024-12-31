@@ -162,7 +162,7 @@
 <script setup lang="ts">
 import { bookmarksOutline, colorPaletteOutline } from "ionicons/icons";
 
-import { GroupOptions, ColorOptions, PriorityOptions } from "@/modal/ScheduleType";
+import { GroupOptions, PriorityOptions } from "@/modal/ScheduleType";
 import {
   IonAccordion,
   IonAccordionGroup,
@@ -180,6 +180,7 @@ import {
   squareOutline,
 } from "ionicons/icons";
 import { inject, ref } from "vue";
+import { ColorOptions } from "@/modal/ColorType";
 
 const groupRef = ref(new Map(GroupOptions.map((option) => [option.id, true])));
 const colorRef = ref(new Map(ColorOptions.map((option) => [option.id, true])));

@@ -96,7 +96,8 @@
 
 <script setup lang="ts">
 import { getSave } from "@/utils/NetUtil";
-import { getColorOptions, getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
+import { getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
+import { getColorOptions } from "@/modal/ColorType";
 import { S_TS, UserData, UData } from "@/modal/UserData";
 import { IonRefresher, IonRefresherContent, IonInputPasswordToggle } from "@ionic/vue";
 import dayjs from "dayjs";

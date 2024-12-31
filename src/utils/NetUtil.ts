@@ -1,3 +1,4 @@
+import { LoadColorData } from "@/modal/ColorType";
 import axios from "axios";
 // const URL = "https://3ft23fh89533.vicp.fun/api";
 // natapp.cn
@@ -39,6 +40,7 @@ export async function initNet(): Promise<void> {
     return ret;
   });
   console.log("init net ", b1, b2);
+  LoadColorData();
 }
 export async function getSave(id: number) {
   if (id === undefined) {
@@ -119,6 +121,15 @@ export async function getPic(id: number): Promise<string> {
   return rsp.data.data;
 }
 
+export async function getColorList(pageNum?: number, pageSize?: number) {
+  const rsp: any = await axios.get(URL + "/getAll", {
+    params: { table: "t_colors", pageNum: pageNum, pageSize: pageSize },
+  });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
 export default {
   getSave,
   setSave,

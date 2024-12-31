@@ -5,7 +5,6 @@ import PrioritySelector from "@/components/PrioritySelector.vue";
 import SubtaskPopModal from "@/components/SubtaskPopModal.vue";
 import MdiChevronDoubleRight from "virtual:icons/mdi/chevron-double-right";
 import {
-  getColorOptions,
   getGroupOptions,
   getPriorityOptions,
   getRepeatOptions,
@@ -13,6 +12,7 @@ import {
   RepeatOptions,
   WEEK,
 } from "@/modal/ScheduleType";
+import { getColorOptions } from "@/modal/ColorType";
 import { ScheduleData, ScheduleSave, Subtask } from "@/modal/UserData";
 
 import {

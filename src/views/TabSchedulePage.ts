@@ -36,13 +36,8 @@ import {
 import { Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
 import { defineComponent, inject, nextTick, onMounted, ref } from "vue";
-
-import {
-  ColorOptions,
-  getColorOptions,
-  getGroupOptions,
-  getPriorityOptions,
-} from "@/modal/ScheduleType";
+import { getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
+import { ColorOptions, getColorOptions } from "@/modal/ColorType";
 import { DayData, MonthData, ScheduleData, ScheduleSave, UData, UserData } from "@/modal/UserData";
 import { getSave, setSave } from "@/utils/NetUtil";
 import "@ionic/vue/css/ionic-swiper.css";
@@ -73,7 +68,7 @@ export default defineComponent({
     // https://iconify.design/docs/icon-components/vue/
     // https://yesicon.app/search/roman?coll=mdi
     const userData = ref<UserData>(new UserData());
-    let currentDate = dayjs().startOf("day");  // 当前日期
+    let currentDate = dayjs().startOf("day"); // 当前日期
     let pTouch: any;
     let lstTs = 0;
     const slideArr = ref<any[]>([{}, {}, {}]); // 滑动数据

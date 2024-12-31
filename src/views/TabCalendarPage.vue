@@ -93,7 +93,7 @@
 </template>
 <script setup lang="ts">
 import CalendarCover from "@/components/CalendarCover.vue";
-import { getColorOptions } from "@/modal/ScheduleType";
+import { getColorOptions } from "@/modal/ColorType";
 import { DayData, MonthData, ScheduleData, UData, UserData } from "@/modal/UserData";
 import { getSave } from "@/utils/NetUtil";
 import {

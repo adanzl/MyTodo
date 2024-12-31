@@ -108,7 +108,8 @@
 </template>
 <script setup lang="ts">
 import SchedulePop from "@/components/SchedulePopModal.vue";
-import { getColorOptions, getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
+import { getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
+import { getColorOptions } from "@/modal/ColorType";
 import { DayData, S_TS, ScheduleData, ScheduleSave, UData, UserData } from "@/modal/UserData";
 import { setSave } from "@/utils/NetUtil";
 // import midCalendarTodayOutline from "@iconify-icons/mdi/calendar-today-outline";

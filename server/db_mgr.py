@@ -158,10 +158,7 @@ def get_list(table, page_num=1, page_size=20) -> dict:
             """, (page_size, (page_num - 1) * page_size))
         result = cur.fetchall()
         data = {
-            'data': [{
-                'id': r[0],
-                'data': r[1]
-            } for r in result],
+            'data': [dict(zip([col[0] for col in cur.description], row)) for row in result],
             'totalCount': total_count,
             'pageNum': page_num,
             'pageSize': page_size,

@@ -40,7 +40,7 @@
 import { onMounted, ref, watch } from "vue";
 import { createTriggerController } from "@/utils/Overlay";
 import { IonRadioGroup, IonRadio } from "@ionic/vue";
-import { ColorOptions } from "@/modal/ScheduleType";
+import { ColorOptions } from "@/modal/ColorType";
 
 const props = defineProps({
   trigger: {

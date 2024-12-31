@@ -116,7 +116,7 @@ const btnModifyClk = (event: any, item: any) => {
     console.log("setPic id: ", res);
     if (res !== null) {
       getPicList().then((res) => {
-        picList.value = res;
+        picList.value = res.data;
       });
     }
   });
