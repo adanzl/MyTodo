@@ -76,9 +76,11 @@ export function setSave(id: number | undefined, user: string, data: string) {
 }
 
 export async function setPic(id: number | undefined, data: string): Promise<string> {
-  const rsp: any = await axios.post(URL + "/setPic", {
+  const rsp: any = await axios.post(URL + "/setData", {
     id: id,
-    data: data,
+    table: 't_user_pic',
+    data: {
+      data:data},
   });
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
@@ -86,8 +88,9 @@ export async function setPic(id: number | undefined, data: string): Promise<stri
   return rsp.data.data;
 }
 export async function delPic(id: number) {
-  const rsp: any = await axios.post(URL + "/delPic", {
+  const rsp: any = await axios.post(URL + "/delData", {
     id: id,
+    table: "t_user_pic",
   });
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
@@ -96,8 +99,8 @@ export async function delPic(id: number) {
 }
 
 export async function getPicList(pageNum?: number, pageSize?: number) {
-  const rsp: any = await axios.get(URL + "/getAllPic", {
-    params: { pageNum: pageNum, pageSize: pageSize },
+  const rsp: any = await axios.get(URL + "/getAll", {
+    params: { table: "t_user_pic", pageNum: pageNum, pageSize: pageSize },
   });
   // console.log(rsp.data.data);
   if (rsp.data.code !== 0) {
@@ -106,7 +109,7 @@ export async function getPicList(pageNum?: number, pageSize?: number) {
   return rsp.data.data;
 }
 export async function getPic(id: number): Promise<string> {
-  const rsp: any = await axios.get(URL + "/getPic", { params: { id: id } });
+  const rsp: any = await axios.get(URL + "/getData", { params: { table: "t_user_pic", id: id } });
   // console.log("getPic", rsp.data);
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);

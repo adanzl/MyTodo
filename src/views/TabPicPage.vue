@@ -57,7 +57,7 @@ const picList = ref<{ id: number; data: string }[]>([]);
 
 onMounted(() => {
   getPicList().then((res) => {
-    picList.value = res;
+    picList.value = res.data;
     console.log("picList", picList.value);
   });
 });
@@ -66,7 +66,7 @@ const loadImage = async () => {
     console.log("setPic id: ", res);
     if (res !== null) {
       getPicList().then((res) => {
-        picList.value = res;
+        picList.value = res.data;
       });
     }
   });

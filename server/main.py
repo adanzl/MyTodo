@@ -20,8 +20,6 @@ db_mgr.init_db()
 def af_request(resp):
     """
     #请求钩子，在所有的请求发生后执行，加入headers。
-    :param resp:
-    :return:
     """
     resp = make_response(resp)
     resp.headers['Access-Control-Allow-Origin'] = '*'
@@ -68,21 +66,6 @@ def server_log():
 
 
 # =========== PIC ===========
-@app.route("/getPic", methods=['GET'])
-def get_pic():
-    id = request.args.get('id')
-    log.info("===== [Get Pic] " + id)
-    return db_mgr.get_pic(id)
-
-
-@app.route("/getAllPic", methods=['GET'])
-def get_all_pic():
-    page_size = request.args.get('pageSize', 20, type=int)
-    page_num = request.args.get('pageNum', 1, type=int)
-    log.info("===== [Get All Pic] ", page_num, page_size)
-    return db_mgr.get_all_pic(page_num, page_size)
-
-
 @app.route("/viewPic", methods=['GET'])
 def view_pic():
     id = request.args.get('id')
@@ -92,24 +75,6 @@ def view_pic():
         return render_template('image.html', image_data=p_data['data'])
     else:
         return jsonify({'error': 'Image not found'}), 404
-
-
-@app.route("/setPic", methods=['POST'])
-def set_pic():
-    args = request.get_json()
-    id = args.get('id')
-    log.info("===== [Set Pic] id: " + id)
-    data = args.get('data')
-    return db_mgr.set_pic(id, data)
-
-
-@app.route("/delPic", methods=['POST'])
-def del_pic():
-    args = request.get_json()
-    log.info("===== [Del Pic] " + json.dumps(args))
-    id = args.get('id')
-    return db_mgr.del_pic(id)
-
 
 # =========== SAVE ===========
 @app.route("/getSave", methods=['GET'])
@@ -153,9 +118,8 @@ def set_data():
     args = request.get_json()
     log.info("===== [Set Data] " + json.dumps(args))
     table = args.get('table')
-    id = args.get('id')
     data = args.get('data')
-    return db_mgr.set_data(table, id, data)
+    return db_mgr.set_data(table, data)
 
 
 @app.route("/delData", methods=['POST'])
