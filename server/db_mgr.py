@@ -81,7 +81,7 @@ def get_pic(id) -> dict:
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     try:
-        cur.execute(f"SELECT * FROM {TABLE_PIC} WHERE id=?", (id,))
+        cur.execute(f"SELECT * FROM {TABLE_PIC} WHERE id=?", (id, ))
         result = cur.fetchone()
         if result:
             data = result[1]
@@ -149,6 +149,102 @@ def get_all_pic(page_num=1, page_size=20) -> dict:
             """, (page_size, (page_num - 1) * page_size))
         result = cur.fetchall()
         data = [{'id': r[0], 'data': r[1]} for r in result]
+    except Exception as e:
+        log.error(e)
+        traceback.print_exc()
+        return {"code": -1, "msg": 'error ' + str(e)}
+    finally:
+        cur.close()
+    return {"code": 0, "msg": "ok", "data": data}
+
+
+def get_data(table, id):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    try:
+        cur.execute(f"SELECT * FROM {table} WHERE id=?", (id, ))
+        result = cur.fetchone()
+        if result:
+            data = result[1]
+        else:
+            data = ""
+    except Exception as e:
+        log.error(e)
+        traceback.print_exc()
+        return {"code": -1, "msg": 'error ' + str(e)}
+    finally:
+        cur.close()
+    return {"code": 0, "msg": "ok", "data": data}
+
+
+def set_data(table, data):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    try:
+        id = data.get('id')
+        fields = ','.join(data.keys())
+        values = ','.join(['?'] * len(data))
+        set_values = ','.join([f"{k}=?" for k in data.keys()])
+        if id:
+            cur.execute(
+                f"""
+                INSERT INTO {table} ({fields}) VALUES ({values})
+                ON CONFLICT(id) DO UPDATE SET {set_values};
+                """, tuple(data.values()))
+        else:
+            cur.execute(f"""
+                INSERT INTO {table} ({fields}) VALUES ({values});
+                """, tuple(data.values()))
+        conn.commit()
+        if not id:
+            id = cur.lastrowid
+    except Exception as e:
+        log.error(e)
+        traceback.print_exc()
+        return {"code": -1, "msg": 'error ' + str(e)}
+    finally:
+        cur.close()
+    return {"code": 0, "msg": "ok", "data": id}
+
+
+def del_data(table, id: int) -> dict:
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    try:
+        cur.execute(f"""
+            DELETE FROM {table} WHERE id=?;
+            """, (id, ))
+        conn.commit()
+        cnt = cur.rowcount
+    except Exception as e:
+        log.error(e)
+        traceback.print_exc()
+        return {"code": -1, "msg": 'error ' + str(e)}
+    finally:
+        cur.close()
+    return {"code": 0, "msg": "ok", "data": cnt}
+
+
+def get_list(table, page_num=1, page_size=20) -> dict:
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    try:
+        cur.execute(f"SELECT COUNT(*) FROM {table}")
+        total_count = cur.fetchone()[0]
+        cur.execute(f"""
+            SELECT * FROM {table} LIMIT ? OFFSET ?;
+            """, (page_size, (page_num - 1) * page_size))
+        result = cur.fetchall()
+        data = {
+            'data': [{
+                'id': r[0],
+                'data': r[1]
+            } for r in result],
+            'totalCount': total_count,
+            'pageNum': page_num,
+            'pageSize': page_size,
+            'totalPage': (total_count + page_size - 1) // page_size,
+        }
     except Exception as e:
         log.error(e)
         traceback.print_exc()

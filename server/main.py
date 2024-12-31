@@ -49,6 +49,8 @@ def natapp():
             </body>
             </html>
         """
+
+
 @app.route("/log")
 def server_log():
     with open("logs/app.log", "r") as f:
@@ -125,6 +127,43 @@ def set_save():
     user = args.get('user')
     data = json.dumps(args.get('data'))
     return db_mgr.set_save(id, user, data)
+
+
+# =========== Common ===========
+@app.route("/getAll", methods=['GET'])
+def get_all():
+    page_size = request.args.get('pageSize', 20, type=int)
+    page_num = request.args.get('pageNum', 1, type=int)
+    table = request.args.get('table')
+    log.info("===== [Get All Data] ", table, page_num, page_size)
+    return db_mgr.get_list(page_num, page_size)
+
+
+@app.route("/getData", methods=['GET'])
+def get_data():
+    table = request.args.get('table')
+    id = request.args.get('id')
+    log.info("===== [Get Data] ", table, id)
+    return db_mgr.get_data(table, id)
+
+
+@app.route("/setData", methods=['POST'])
+def set_data():
+    args = request.get_json()
+    log.info("===== [Set Data] " + json.dumps(args))
+    table = args.get('table')
+    id = args.get('id')
+    data = json.dumps(args.get('data'))
+    return db_mgr.set_data(table, id, data)
+
+
+@app.route("/delData", methods=['POST'])
+def del_data():
+    args = request.get_json()
+    log.info("===== [Del Data] " + json.dumps(args))
+    table = args.get('table')
+    id = args.get('id')
+    return db_mgr.del_data(table, id)
 
 
 # . .venv/bin/activate
