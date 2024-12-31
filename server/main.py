@@ -70,11 +70,12 @@ def server_log():
 def view_pic():
     id = request.args.get('id')
     log.info("===== [View Pic] " + id)
-    p_data = db_mgr.get_pic(id)
+    p_data = db_mgr.get_data(db_mgr.TABLE_PIC, id)
     if p_data['code'] == 0:
         return render_template('image.html', image_data=p_data['data'])
     else:
         return jsonify({'error': 'Image not found'}), 404
+
 
 # =========== SAVE ===========
 @app.route("/getSave", methods=['GET'])
