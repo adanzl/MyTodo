@@ -136,7 +136,7 @@ def get_all():
     page_num = request.args.get('pageNum', 1, type=int)
     table = request.args.get('table')
     log.info("===== [Get All Data] ", table, page_num, page_size)
-    return db_mgr.get_list(page_num, page_size)
+    return db_mgr.get_list(table, page_num, page_size)
 
 
 @app.route("/getData", methods=['GET'])
