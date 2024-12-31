@@ -158,14 +158,14 @@ def get_all_pic(page_num=1, page_size=20) -> dict:
     return {"code": 0, "msg": "ok", "data": data}
 
 
-def get_data(table, id):
+def get_data(table, id, idx=1):
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     try:
         cur.execute(f"SELECT * FROM {table} WHERE id=?", (id, ))
         result = cur.fetchone()
         if result:
-            data = result[1]
+            data = result[idx]
         else:
             data = ""
     except Exception as e:

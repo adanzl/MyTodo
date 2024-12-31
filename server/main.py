@@ -143,8 +143,9 @@ def get_all():
 def get_data():
     table = request.args.get('table')
     id = request.args.get('id')
+    idx = request.args.get('idx', 1)
     log.info("===== [Get Data] ", table, id)
-    return db_mgr.get_data(table, id)
+    return db_mgr.get_data(table, id, idx)
 
 
 @app.route("/setData", methods=['POST'])
