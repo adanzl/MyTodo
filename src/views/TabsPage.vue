@@ -45,7 +45,7 @@
               </ion-checkbox>
             </ion-list>
           </ion-accordion>
-          <ion-accordion value="color">
+          <!-- <ion-accordion value="color">
             <ion-item slot="header" color="light" class="schedule-group-item">
               <ion-icon :icon="colorPaletteOutline" class="w-5"></ion-icon>
               <ion-label class="mx-2.5">颜色</ion-label>
@@ -82,7 +82,7 @@
                 </ion-item>
               </ion-checkbox>
             </ion-list>
-          </ion-accordion>
+          </ion-accordion> -->
           <ion-accordion value="priority">
             <ion-item slot="header" color="light" class="schedule-group-item">
               <ion-label style="margin-left: 2px"><strong>Pri</strong></ion-label>
@@ -160,7 +160,7 @@
 </template>
 
 <script setup lang="ts">
-import { bookmarksOutline, colorPaletteOutline } from "ionicons/icons";
+import { bookmarksOutline } from "ionicons/icons";
 
 import { GroupOptions, PriorityOptions } from "@/modal/ScheduleType";
 import {

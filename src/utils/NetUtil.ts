@@ -46,7 +46,9 @@ export async function getSave(id: number) {
   if (id === undefined) {
     throw new Error("id is undefined");
   }
-  const rsp: any = await axios.get(URL + "/getSave", { params: { id: id } });
+  const rsp: any = await axios.get(URL + "/getData", {
+    params: { id: id, table: "t_user_save", idx: 2 },
+  });
   // console.log(rsp.data.data);
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);

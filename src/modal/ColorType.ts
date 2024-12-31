@@ -15,10 +15,16 @@ export const ColorOptions: ColorType[] = [
 ];
 
 export async function LoadColorData() {
-  getColorList(1,30).then((res)=>{
-    console.log('LoadColorData', res);
-    // ColorOptions.length = 0;
-    
+  getColorList(1, 30).then((res) => {
+    console.log("LoadColorData", res);
+    ColorOptions.length = 0;
+    res.data.forEach((e: any) => {
+      ColorOptions.push({
+        id: e.id,
+        label: e.name,
+        tag: e.color,
+      });
+    });
   });
 }
 

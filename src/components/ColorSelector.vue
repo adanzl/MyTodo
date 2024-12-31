@@ -9,22 +9,28 @@
     <ion-item>
       <ion-title>选择颜色</ion-title>
     </ion-item>
-    <div class="ion-padding-horizontal">
+    <div>
       <ion-item>
-        <ion-radio-group :value="valueRef" @ionChange="onSelectChange" class="w-full">
+        <ion-radio-group
+          :value="valueRef"
+          @ionChange="onSelectChange"
+          class="w-full flex flex-wrap ion-padding">
           <ion-radio
             v-for="(op, idx) in ColorOptions"
             :key="idx"
             :value="op.id"
-            class="option-item">
-            <ion-item lines="none" style="flex: 1">
-              <span :style="{ 'background-color': op.tag }" class="v-dot" slot="start"></span>
+            :style="{ '--radio-bg-color': op.tag }"
+            label-placement="stacked"
+            alignment="center"
+            class="option-item w-1/4 max-w-[25%]">
+            <div class="w-full">
+              <!-- <span :style="{ 'background-color': op.tag }" class="v-dot" slot="start"></span> -->
               <ion-label
-                class="ml-1"
+                class="ml-1 overflow-hidden"
                 :style="{ color: op.tag, 'text-shadow': '1px 1px 1px #FF0000' }">
                 {{ op.label }}
               </ion-label>
-            </ion-item>
+            </div>
           </ion-radio>
         </ion-radio-group>
       </ion-item>
@@ -35,6 +41,33 @@
     </ion-footer>
   </ion-modal>
 </template>
+
+<style scoped>
+.option-item::part(label) {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  text-align: center;
+}
+
+ion-radio.ios::part(container) {
+  width: 30px;
+  height: 30px;
+
+  border: 2px solid #ddd;
+  border-radius: 50%;
+  background-color: var(--radio-bg-color);
+}
+
+.radio-checked.ios::part(container) {
+  border-color: #6815ec;
+  border-width: 2px;
+  color: transparent;
+}
+.radio-checked.ios::part(mark) {
+  opacity: 0;
+}
+</style>
 
 <script lang="ts" setup>
 import { onMounted, ref, watch } from "vue";
@@ -91,10 +124,3 @@ const onModalDismiss = () => {
   valueRef.value = props.value;
 };
 </script>
-
-<style scoped>
-.option-item::part(label) {
-  margin: 0;
-  width: 100%;
-}
-</style>
