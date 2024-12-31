@@ -143,8 +143,8 @@ def get_all():
 def get_data():
     table = request.args.get('table')
     id = request.args.get('id')
-    idx = request.args.get('idx', 1)
-    log.info("===== [Get Data] ", table, id)
+    idx = request.args.get('idx', 1, type=int)
+    log.info("===== [Get Data] ", table, id, idx)
     return db_mgr.get_data(table, id, idx)
 
 
