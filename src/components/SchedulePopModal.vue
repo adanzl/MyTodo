@@ -70,7 +70,7 @@
           <ion-icon :icon="calendarOutline" slot="start"></ion-icon>
           <div class="flex ion-justify-content-around ion-padding w-full">
             <div class="ion-text-center" v-if="curScheduleData.startTs">
-              <div class="flex items-baseline">
+              <div class="flex items-baseline font-bold text-red-500">
                 {{ curScheduleData.startTs.format("MM-DD") + "," }}
                 <p class="text-xs">{{ WEEK[curScheduleData.startTs.day()] }}</p>
               </div>
@@ -83,7 +83,7 @@
               <MdiChevronDoubleRight height="100%" preserveAspectRatio="none" />
             </div>
             <div class="ion-text-center" v-if="curScheduleData.endTs">
-              <div class="flex items-baseline">
+              <div class="flex items-baseline font-bold text-red-500">
                 {{ curScheduleData.endTs.format("MM-DD") + "," }}
                 <p class="text-xs">{{ WEEK[curScheduleData.endTs.day()] }}</p>
               </div>

@@ -28,20 +28,23 @@
         :freeMode="false"
         :coverflowEffect="{
           rotate: 20,
-          stretch: -20,
+          stretch: -10,
           depth: 10,
           modifier: 1,
-          slideShadows: false,  // 是否开启slide阴影
+          slideShadows: false, // 是否开启slide阴影
         }"
         :keyboard="true"
         class="h-[90%]">
-        <swiper-slide v-for="(day, idx) in dayArr" :key="idx" class="data-content">
+        <swiper-slide
+          v-for="(day, idx) in dayArr"
+          :key="idx"
+          class="data-content h-full w-4/5 flex-col">
+          <ion-item color="light" lines="none" class="w-full rounded-t">
+            <icon-mdi-list-status class="text-blue-500" :height="'30'" :width="'30'" slot="start">
+            </icon-mdi-list-status>
+            <div class="h-12"></div>
+          </ion-item>
           <ion-content>
-            <ion-item color="light" lines="none">
-              <icon-mdi-list-status class="text-blue-500" :height="'30'" :width="'30'" slot="start">
-              </icon-mdi-list-status>
-              <div class="h-12"></div>
-            </ion-item>
             <ion-item v-for="(schedule, idx) in day.events" :key="idx">
               <ion-checkbox
                 style="--size: 26px"
@@ -56,28 +59,29 @@
                   class="p-2.5 flex-1">
                   <h2 class="truncate">{{ schedule.title }}</h2>
                   <div class="flex text-gray-400">
-                    <p class="mr-2">
+                    <p class="w-14 mr-2">
                       <ion-icon :icon="listOutline" class="relative top-0.5"></ion-icon>
                       {{ countFinishedSubtask(day, schedule) }}
                       /
                       {{ schedule?.subtasks?.length }}
                     </p>
-                    <p class="schedule-lb-group">
+                    <p class="schedule-lb-group w-14">
                       {{ getGroupOptions(schedule.groupId).label }}
                     </p>
+                    <p>{{ schedule.allDay ? "全天" : schedule.startTs?.format("HH:mm") }}</p>
                   </div>
                 </ion-label>
                 <span
                   class="v-dot ml-2.5"
                   :style="{
                     'background-color': getColorOptions(schedule.color).tag,
-                  }">
-                </span>
+                  }" />
                 <component
                   :is="getPriorityOptions(schedule.priority).icon"
                   :height="'36px'"
                   width="36px"
                   :color="getPriorityOptions(schedule.priority).color" />
+                <!-- <div class="w-14">11x</div> -->
               </div>
             </ion-item>
           </ion-content>
@@ -289,16 +293,15 @@ ion-modal {
   --width: 100%;
   align-items: center;
 }
-.data-content {
-  height: 100%;
-  width: 80vw;
-}
 .data-content ion-content::part(scroll) {
   height: 100%;
-  border: 1px solid #e2d0d0;
-  border-radius: 10px;
+  /* border: 1px solid #e2d0d0; */
+  /* border-radius: 10px; */
+  border-bottom-right-radius: 10px;
+  border-bottom-left-radius: 10px;
 }
 .data-content ion-content::part(background) {
-  border-radius: 10px;
+  border-bottom-right-radius: 10px;
+  border-bottom-left-radius: 10px;
 }
 </style>

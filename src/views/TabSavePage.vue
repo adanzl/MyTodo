@@ -3,9 +3,10 @@
     <ion-header>
       <ion-toolbar>
         <ion-title>Tab Save</ion-title>
+        <ion-button fill="clear" @click="btnLogOffClk">LogOff</ion-button>
       </ion-toolbar>
     </ion-header>
-    <ion-content>
+    <ion-content v-if="bAuth">
       <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
@@ -13,7 +14,7 @@
         <ion-item>
           <ion-label>Id: {{ userData.id }}</ion-label>
           <ion-label>Name: {{ userData.name }}</ion-label>
-          <div class="text-3xl font-bold underline"> hello world</div>
+          <div class="text-3xl font-bold underline">hello world</div>
         </ion-item>
       </ion-list>
       <ion-list>
@@ -52,7 +53,7 @@
               {{ S_TS(schedule.repeatEndTs) }}
             </p>
             <p v-for="(task, idx) in schedule.subtasks" :key="idx">
-              [{{task.id}}]{{ task.name }}
+              [{{ task.id }}]{{ task.name }}
             </p>
           </ion-label>
         </ion-item>
@@ -68,17 +69,28 @@
           </ion-label>
         </ion-item>
       </ion-list>
-      <ion-toast
-        :is-open="toastData.isOpen"
-        :message="toastData.text"
-        :duration="toastData.duration"
-        @didDismiss="
-          () => {
-            toastData.isOpen = false;
-          }
-        ">
-      </ion-toast>
     </ion-content>
+    <div v-else class="w-full h-full items-stretch bg-white text-center ion-padding">
+      <ion-input
+        type="password"
+        label="Password"
+        value=""
+        @ionChange="onPassChange"
+        class="text-blue-500 mt-[50%]">
+        <ion-input-password-toggle slot="end"></ion-input-password-toggle>
+      </ion-input>
+      <ion-button class="w-3/5 mt-[20%]" @click="btnLoginClk">Login</ion-button>
+    </div>
+    <ion-toast
+      :is-open="toastData.isOpen"
+      :message="toastData.text"
+      :duration="toastData.duration"
+      @didDismiss="
+        () => {
+          toastData.isOpen = false;
+        }
+      ">
+    </ion-toast>
   </ion-page>
 </template>
 
@@ -86,18 +98,25 @@
 import { getSave } from "@/utils/NetUtil";
 import { getColorOptions, getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
 import { S_TS, UserData, UData } from "@/modal/UserData";
-import { IonRefresher, IonRefresherContent } from "@ionic/vue";
+import { IonRefresher, IonRefresherContent, IonInputPasswordToggle } from "@ionic/vue";
 import dayjs from "dayjs";
 import { onMounted, ref } from "vue";
 import MdiStore24Hour from "virtual:icons/mdi/store-24-hour";
 
 const userData = ref<UserData>(new UserData());
+const bAuth = ref(false);
+const pass = ref("");
 const toastData = ref({
   isOpen: false,
   duration: 3000,
   text: "",
 });
 onMounted(() => {
+  const data = localStorage.getItem("bAuth");
+  if (data) {
+    bAuth.value = data === "true";
+  }
+
   // 获取数据
   getSave(1)
     .then((res: any) => {
@@ -128,5 +147,19 @@ function handleRefresh(event: any) {
       toastData.value.text = JSON.stringify(err);
       event.target.complete();
     });
+}
+function btnLoginClk() {
+  console.log(pass.value);
+  if (pass.value === "NeverGonnaGiveYouUp") {
+    localStorage.setItem("bAuth", "true");
+    bAuth.value = true;
+  }
+}
+function onPassChange(event: any) {
+  pass.value = event.detail.value;
+}
+function btnLogOffClk() {
+  localStorage.setItem("bAuth", "false");
+  bAuth.value = false;
 }
 </script>

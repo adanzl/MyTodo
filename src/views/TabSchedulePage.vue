@@ -87,9 +87,7 @@
                         <h2 class="truncate">{{ schedule.title }}</h2>
                         <div class="flex text-gray-400">
                           <p class="w-14 mb-0">
-                            <ion-icon
-                              :icon="listOutline"
-                              style="position: relative; top: 3px"></ion-icon>
+                            <ion-icon :icon="listOutline" class="top-1 relative"/>
                             {{ countFinishedSubtask(schedule) }}
                             /
                             {{ schedule?.subtasks?.length }}
@@ -97,6 +95,7 @@
                           <p class="w-14">
                             {{ getGroupOptions(schedule.groupId).label }}
                           </p>
+                          <p>{{ schedule.allDay?"全天": schedule.startTs?.format("HH:mm") }}</p>
                         </div>
                       </ion-label>
                       <span

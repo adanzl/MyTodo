@@ -65,7 +65,7 @@
                   class="text-left truncate mt-[1px] rounded-sm py-[1px] px-1"
                   :style="{
                     'background-color': getColorOptions(event.color).tag,
-                    'font-size': 'clamp(9px, 2.8vw, 16px)',
+                    'font-size': 'clamp(9px, 2.7vw, 16px)',
                   }">
                   {{ event.title }}
                 </div>
