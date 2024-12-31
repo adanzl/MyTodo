@@ -166,8 +166,12 @@ def get_data(table, id, idx=1):
         result = cur.fetchone()
         if result:
             data = result[idx]
+            try:
+                data = json.loads(data)
+            except:
+                pass
         else:
-            data = ""
+            data = "{}"
     except Exception as e:
         log.error(e)
         traceback.print_exc()
