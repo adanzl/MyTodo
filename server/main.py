@@ -154,7 +154,7 @@ def set_data():
     log.info("===== [Set Data] " + json.dumps(args))
     table = args.get('table')
     id = args.get('id')
-    data = json.dumps(args.get('data'))
+    data = args.get('data')
     return db_mgr.set_data(table, id, data)
 
 
