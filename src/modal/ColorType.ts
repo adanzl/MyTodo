@@ -1,4 +1,5 @@
 import { getColorList } from "@/utils/NetUtil";
+import EventBus from "@/modal/EventBus";
 
 export interface ColorType {
   id: number;
@@ -15,15 +16,19 @@ export const ColorOptions: ColorType[] = [
 ];
 
 export async function LoadColorData() {
-  getColorList(1, 30).then((res) => {
-    console.log("LoadColorData", res);
-    ColorOptions.length = 0;
-    res.data.forEach((e: any) => {
-      ColorOptions.push({
-        id: e.id,
-        label: e.name,
-        tag: e.color,
+  return new Promise((resolve) => {
+    getColorList(1, 30).then((res) => {
+      console.log("LoadColorData", res);
+      ColorOptions.splice(0, ColorOptions.length);
+      res.data.forEach((e: any) => {
+        ColorOptions.push({
+          id: e.id,
+          label: e.name,
+          tag: e.color,
+        });
       });
+      EventBus.$emit("updateColor", ColorOptions);
+      resolve(ColorOptions);
     });
   });
 }

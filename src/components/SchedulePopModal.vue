@@ -1,13 +1,10 @@
 <template>
-  <ion-modal
-    show-backdrop="false"
-    id="main"
-    @ion-modal-will-dismiss="onModalDismiss">
+  <ion-modal show-backdrop="false" id="main" @ion-modal-will-dismiss="onModalDismiss">
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
           <ion-button @click="btnCancelClk">
-            <ion-icon :icon="chevronBackOutline"> </ion-icon>
+            <ion-icon :icon="chevronBackOutline" />
           </ion-button>
         </ion-buttons>
         <ion-title>

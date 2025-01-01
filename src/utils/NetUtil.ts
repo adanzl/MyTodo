@@ -132,6 +132,33 @@ export async function getColorList(pageNum?: number, pageSize?: number) {
   }
   return rsp.data.data;
 }
+
+export async function setColor(
+  id: number | undefined,
+  name: string,
+  color: string
+): Promise<string> {
+  const rsp: any = await axios.post(URL + "/setData", {
+    table: "t_colors",
+    data: { id: id, name: name, color: color },
+  });
+  // console.log("getPic", rsp.data);
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
+
+export async function delColor(id: number) {
+  const rsp: any = await axios.post(URL + "/delData", {
+    id: id,
+    table: "t_colors",
+  });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
 export default {
   getSave,
   setSave,

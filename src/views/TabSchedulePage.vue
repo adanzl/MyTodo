@@ -16,7 +16,7 @@
             v-if="!selectedDate?.dt.isToday()">
             今
           </ion-button>
-          <!-- <ion-button @click="btnSortClk">
+          <!-- <ion-button id="btnSort" @click="btnSortClk">
             <ion-icon :icon="swapVertical" class="button-native"></ion-icon>
           </ion-button> -->
         </ion-buttons>
@@ -87,7 +87,7 @@
                         <h2 class="truncate">{{ schedule.title }}</h2>
                         <div class="flex text-gray-400">
                           <p class="w-14 mb-0">
-                            <ion-icon :icon="listOutline" class="top-1 relative"/>
+                            <ion-icon :icon="listOutline" class="top-1 relative" />
                             {{ countFinishedSubtask(schedule) }}
                             /
                             {{ schedule?.subtasks?.length }}
@@ -95,7 +95,7 @@
                           <p class="w-14">
                             {{ getGroupOptions(schedule.groupId).label }}
                           </p>
-                          <p>{{ schedule.allDay?"全天": schedule.startTs?.format("HH:mm") }}</p>
+                          <p>{{ schedule.allDay ? "全天" : schedule.startTs?.format("HH:mm") }}</p>
                         </div>
                       </ion-label>
                       <span

@@ -7,7 +7,7 @@
       <ion-item>
         <ion-input v-model="valueRef.name" placeholder="输入子任务名称" size="5"> </ion-input>
       </ion-item>
-      <ion-item>
+      <ion-item lines="none">
         <div class="pre-img-block" v-for="(img, idx) in imgList" :key="idx">
           <img :src="img.data" @click="onImgClk($event, img)" />
         </div>
@@ -16,13 +16,9 @@
         </div>
       </ion-item>
     </ion-content>
-    <ion-footer>
-      <ion-toolbar>
-        <div class="flex">
-          <ion-button class="flex-1" fill="clear" @click="cancel()"> 取消 </ion-button>
-          <ion-button class="flex-1" fill="clear" @click="confirm()"> 确定 </ion-button>
-        </div>
-      </ion-toolbar>
+    <ion-footer class="flex">
+      <ion-button class="flex-1 text-gray-400" fill="clear" @click="cancel()"> 取消 </ion-button>
+      <ion-button class="flex-1 text-orange-400" fill="clear" @click="confirm()"> 确定 </ion-button>
     </ion-footer>
     <ion-action-sheet
       trigger="btnAdd"

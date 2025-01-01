@@ -1,6 +1,6 @@
 <template>
   <ion-page>
-    <ion-menu content-id="main-content" @ionDidClose="onMenuClose" 	:swipe-gesture="false">
+    <ion-menu content-id="main-content" @ionDidClose="onMenuClose" :swipe-gesture="false">
       <ion-header>
         <ion-toolbar color="light">
           <ion-title>筛选</ion-title>
@@ -126,10 +126,14 @@
           </ion-accordion>
         </ion-accordion-group>
       </ion-content>
-      <ion-footer>
-        <ion-toolbar>
-          <ion-button fill="clear" expand="full" @click="btnFilterResetClick()"> Reset </ion-button>
-        </ion-toolbar>
+      <ion-footer class="flex">
+        <ion-button fill="clear" class="flex-1" @click="btnFilterResetClick()">
+          重置筛选
+        </ion-button>
+        <ion-button fill="clear" class="flex-1 text-orange-400" id="btnColor">
+          <ion-icon :icon="colorPaletteOutline" />
+          编辑颜色
+        </ion-button>
       </ion-footer>
     </ion-menu>
     <ion-tabs>
@@ -156,6 +160,7 @@
         </ion-tab-button>
       </ion-tab-bar>
     </ion-tabs>
+    <ColorMgr trigger="btnColor" />
   </ion-page>
 </template>
 
@@ -175,6 +180,7 @@ import {
 } from "@ionic/vue";
 import {
   calendarOutline,
+  colorPaletteOutline,
   gridOutline,
   shieldCheckmarkOutline,
   squareOutline,

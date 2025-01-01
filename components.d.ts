@@ -9,6 +9,8 @@ declare module 'vue' {
   export interface GlobalComponents {
     CalendarCover: typeof import('./src/components/CalendarCover.vue')['default']
     CalendarTab: typeof import('./src/components/CalendarTab.vue')['default']
+    ColorMgr: typeof import('./src/components/ColorMgr.vue')['default']
+    ColorPicker: typeof import('./src/components/ColorPicker.vue')['default']
     ColorSelector: typeof import('./src/components/ColorSelector.vue')['default']
     GConfig: typeof import('./src/components/GConfig.vue')['default']
     GroupSelector: typeof import('./src/components/GroupSelector.vue')['default']
