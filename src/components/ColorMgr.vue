@@ -66,7 +66,9 @@
       </div>
     </ion-content>
     <ion-footer class="flex">
-      <ion-button class="flex-1 text-orange-400" fill="clear" @click="confirm()"> 确定 </ion-button>
+      <ion-toolbar>
+        <ion-button expand="full" fill="clear" @click="confirm()"> 确定 </ion-button>
+      </ion-toolbar>
     </ion-footer>
     <ColorPicker
       :isOpen="bOpenColorPicker"

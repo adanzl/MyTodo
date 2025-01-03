@@ -3,3 +3,7 @@ declare module "virtual:icons/*" {
   export default content;
 }
 
+declare module "~icons/*" {
+  const content: any;
+  export default content;
+}

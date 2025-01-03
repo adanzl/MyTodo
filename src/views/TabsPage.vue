@@ -36,10 +36,9 @@
                 @ionChange="onCheckChange($event, groupRef, group.id)"
                 :checked="bChecked(groupRef, group.id)">
                 <ion-item lines="none">
-                  <icon-mdi-tag
-                    :height="'20'"
-                    style="margin-right: 15px"
-                    color="#7970ff"></icon-mdi-tag>
+                  <span class="mr-3">
+                    <component :is="group.icon" :height="'22px'" width="22px" color="#7970ff" />
+                  </span>
                   <ion-label>{{ group.label }}</ion-label>
                 </ion-item>
               </ion-checkbox>
@@ -126,14 +125,16 @@
           </ion-accordion>
         </ion-accordion-group>
       </ion-content>
-      <ion-footer class="flex">
-        <ion-button fill="clear" class="flex-1" @click="btnFilterResetClick()">
-          重置筛选
-        </ion-button>
-        <ion-button fill="clear" class="flex-1 text-orange-400" id="btnColor">
-          <ion-icon :icon="colorPaletteOutline" />
-          编辑颜色
-        </ion-button>
+      <ion-footer>
+        <ion-toolbar class="flex">
+          <ion-button fill="clear" class="w-[48%]" @click="btnFilterResetClick()">
+            重置筛选
+          </ion-button>
+          <ion-button fill="clear" class="w-[48%]" color="warning" id="btnColor">
+            <ion-icon :icon="colorPaletteOutline" />
+            编辑颜色
+          </ion-button>
+        </ion-toolbar>
       </ion-footer>
     </ion-menu>
     <ion-tabs>

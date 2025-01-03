@@ -27,7 +27,10 @@
           <span>
             <strong> {{ day.dt.date() }}</strong>
           </span>
-          <span class="dot" v-if="day.events.length > 0"></span>
+          <span
+            class="dot"
+            :class="{ 'gray-bg': day.dt.month() !== slide.month }"
+            v-if="day.events.length > 0"></span>
         </ion-chip>
       </ion-col>
     </ion-row>

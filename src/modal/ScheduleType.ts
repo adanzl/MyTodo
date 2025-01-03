@@ -69,16 +69,20 @@ export const getPriorityOptions = (id?: number): PriorityType => {
   return PriorityOptions[0];
 };
 
+import MdiLearnOutline from "~icons/mdi/learn-outline";
+import MdiWorkOutline from "~icons/mdi/work-outline";
+import MdiRoundedCorner from "~icons/mdi/rounded-corner";
 // 分组配置
 export interface GroupType {
   id: number;
   label: string;
   color: string;
+  icon: any;
 }
 export const GroupOptions: GroupType[] = [
-  { id: 0, label: "未分类", color: "white" },
-  { id: 1, label: "工作", color: "red" },
-  { id: 2, label: "学习", color: "yellow" },
+  { id: 0, label: "未分类", color: "white", icon: MdiRoundedCorner },
+  { id: 1, label: "工作", color: "red", icon: MdiWorkOutline },
+  { id: 2, label: "学习", color: "yellow", icon: MdiLearnOutline },
 ];
 
 export const getGroupOptions = (id?: number): GroupType => {

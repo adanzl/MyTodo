@@ -30,7 +30,14 @@
         <!-- 分组信息 -->
         <ion-item class="group">
           <ion-button id="btnGroup" class="flex-1 text-base" fill="none">
-            <ion-icon :icon="bookmarksOutline" class="mr-1"></ion-icon>
+            <!-- <ion-icon :icon="bookmarksOutline" class="mr-1"></ion-icon> -->
+            <span class="mr-3">
+              <component
+                :is="getGroupOptions(curScheduleData.groupId).icon"
+                height="28px"
+                width="28px"
+                color="#7970ff" />
+            </span>
             <ion-label>{{ getGroupOptions(curScheduleData.groupId).label }}</ion-label>
           </ion-button>
           <GroupSelector
@@ -49,14 +56,14 @@
             trigger="btnPriority"
             @update:value="onPriorityChange"
             :value="curScheduleData.priority" />
-          <ion-button id="btnColor" class="flex-1 text-base" fill="none">
+          <ion-button id="btnColorSelect" class="flex-1 text-base" fill="none">
             <ion-icon slot="start" :icon="colorPaletteOutline" />
             <span
               :style="{ 'background-color': getColorOptions(curScheduleData.color).tag }"
               class="v-dot"></span>
           </ion-button>
           <ColorSelector
-            trigger="btnColor"
+            trigger="btnColorSelect"
             @update:value="onColorChange"
             :value="curScheduleData.color" />
         </ion-item>

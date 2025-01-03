@@ -18,10 +18,9 @@
             :value="op.id"
             class="option-item">
             <ion-item lines="none" style="flex: 1">
-              <icon-mdi-tag
-                :height="'20'"
-                style="margin-right: 15px"
-                color="#7970ff"></icon-mdi-tag>
+              <span class="mr-3">
+                <component :is="op.icon" :height="'28px'" width="36px" color="#7970ff"/>
+              </span>
               <ion-label style="margin-left: 8px">{{ op.label }}</ion-label>
             </ion-item>
           </ion-radio>

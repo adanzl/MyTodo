@@ -22,9 +22,8 @@
             :style="{ '--radio-bg-color': op.tag }"
             label-placement="stacked"
             alignment="center"
-            class="option-item w-1/4 max-w-[25%]">
+            class="option-item w-1/4 max-w-[25%] min-w-[25%]">
             <div class="w-full">
-              <!-- <span :style="{ 'background-color': op.tag }" class="v-dot" slot="start"></span> -->
               <ion-label
                 class="ml-1 overflow-hidden"
                 :style="{ color: op.tag, 'text-shadow': '1px 1px 1px #FF0000' }">
