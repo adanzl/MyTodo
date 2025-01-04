@@ -3,20 +3,16 @@
     <ion-header>
       <ion-toolbar>
         <ion-title>Tab Save</ion-title>
-        <ion-button fill="clear" @click="btnLogOffClk">LogOff</ion-button>
+        <ion-button slot="end" fill="clear" @click="btnLogOffClk">SignOut</ion-button>
       </ion-toolbar>
     </ion-header>
     <ion-content v-if="bAuth">
       <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
-      <ion-list>
-        <ion-item>
-          <ion-label>Id: {{ userData.id }}</ion-label>
-          <ion-label>Name: {{ userData.name }}</ion-label>
-          <div class="text-3xl font-bold underline">hello world</div>
-        </ion-item>
-      </ion-list>
+      <ion-item>
+        <ion-label>当前积分: [{{ userData.score }}]</ion-label>
+      </ion-item>
       <ion-list>
         <ion-item>
           <ion-label>Schedule</ion-label>
