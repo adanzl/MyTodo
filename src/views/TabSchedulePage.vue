@@ -92,6 +92,12 @@
                             /
                             {{ schedule?.subtasks?.length }}
                           </p>
+                          <span class="mr-1">
+                            <component
+                              :is="getGroupOptions(schedule.groupId).icon"
+                              height="18px"
+                              width="18px"/>
+                          </span>
                           <p class="w-14">
                             {{ getGroupOptions(schedule.groupId).label }}
                           </p>

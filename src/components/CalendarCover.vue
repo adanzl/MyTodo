@@ -65,6 +65,12 @@
                       /
                       {{ schedule?.subtasks?.length }}
                     </p>
+                    <span class="mr-1 pt-[1px]">
+                      <component
+                        :is="getGroupOptions(schedule.groupId).icon"
+                        height="16px"
+                        width="16px" />
+                    </span>
                     <p class="schedule-lb-group w-14">
                       {{ getGroupOptions(schedule.groupId).label }}
                     </p>

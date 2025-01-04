@@ -19,14 +19,14 @@
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
-    <ion-row style="background-color: antiquewhite; color: blue">
-      <ion-col class="ion-text-center text-red-600">日</ion-col>
-      <ion-col class="ion-text-center">一</ion-col>
-      <ion-col class="ion-text-center">二</ion-col>
-      <ion-col class="ion-text-center">三</ion-col>
-      <ion-col class="ion-text-center">四</ion-col>
-      <ion-col class="ion-text-center">五</ion-col>
-      <ion-col class="ion-text-center text-red-600">六</ion-col>
+    <ion-row class="text-blue-500" style="background-color: antiquewhite">
+      <ion-col class="ion-text-center font-bold	 text-red-600">日</ion-col>
+      <ion-col class="ion-text-center font-bold	">一</ion-col>
+      <ion-col class="ion-text-center font-bold	">二</ion-col>
+      <ion-col class="ion-text-center font-bold	">三</ion-col>
+      <ion-col class="ion-text-center font-bold	">四</ion-col>
+      <ion-col class="ion-text-center font-bold	">五</ion-col>
+      <ion-col class="ion-text-center font-bold	 text-red-600">六</ion-col>
     </ion-row>
     <ion-content>
       <swiper

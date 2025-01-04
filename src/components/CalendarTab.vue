@@ -1,9 +1,13 @@
 <template>
   <ion-grid>
-    <ion-row>
-      <ion-col class="ion-text-center" v-for="head in weekHead" :key="head">
-        {{ head }}
-      </ion-col>
+    <ion-row class="text-blue-500">
+      <ion-col class="ion-text-center font-bold	 text-red-600" >日</ion-col>
+      <ion-col class="ion-text-center font-bold	">一</ion-col>
+      <ion-col class="ion-text-center font-bold	">二</ion-col>
+      <ion-col class="ion-text-center font-bold	">三</ion-col>
+      <ion-col class="ion-text-center font-bold	">四</ion-col>
+      <ion-col class="ion-text-center font-bold	">五</ion-col>
+      <ion-col class="ion-text-center font-bold	 text-red-600">六</ion-col>
     </ion-row>
     <ion-row v-for="week in slide.weekArr" :key="week">
       <ion-col
@@ -63,7 +67,6 @@ const updateMinSlide = () => {
 watch(() => props.slide, updateMinSlide, { deep: true });
 watch(() => props.selectedDate, updateMinSlide, { deep: true });
 
-const weekHead = ["日", "一", "二", "三", "四", "五", "六"];
 </script>
 <style escaped lang="css">
 ion-chip {
