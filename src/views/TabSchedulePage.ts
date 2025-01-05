@@ -219,9 +219,10 @@ export default defineComponent({
     }
     // 保存存档
     const doSaveUserData = () => {
+      console.log("doSaveUserData", userData.value);
       setSave(userData.value.id, userData.value.name, JSON.stringify(userData.value))
-        .then((res) => {
-          console.log("doSaveUserData", res);
+        .then((res: any) => {
+          console.log("doSaveUserData", res.statusText);
         })
         .catch((err) => {
           console.log("doSaveUserData", err);
@@ -236,9 +237,6 @@ export default defineComponent({
     // 排序按钮
     const btnSortClk = () => {
       bReorderDisabled.value = !bReorderDisabled.value;
-      if(bReorderDisabled.value){
-        doSaveUserData();
-      }
     };
     // 左下测试按钮
     const btnTestClk = () => {
@@ -420,14 +418,14 @@ export default defineComponent({
         doSaveUserData();
       }
     };
-    function handleReorder(event: any) {
-      const lo = event.detail.from;
+    function onReorder(event: any) {
       let eList = selectedDate.value?.events.filter(bShowScheduleItem);
       // console.log(_.map(eList, 'title'));
       eList = event.detail.complete(eList);
       if (eList) {
-        let ii = eList[lo].order ?? 0;
+        let ii = eList[0].order ?? 0;
         _.forEach(eList, (e) => {
+          userData.value.schedules[e.id].order = ii;
           e.order = ii++;
         });
       }
@@ -435,6 +433,7 @@ export default defineComponent({
       selectedDate.value?.events.sort((a: ScheduleData, b: ScheduleData) => {
         return UData.CmpScheduleData(a, b, selectedDate.value?.save);
       });
+      doSaveUserData();
       // console.log(eList);
     }
     // ========== 日程列表结束 ===========
@@ -521,7 +520,7 @@ export default defineComponent({
       btnTestClk,
       bShowScheduleItem,
       bReorderDisabled,
-      handleReorder,
+      onReorder,
     };
   },
   methods: {},

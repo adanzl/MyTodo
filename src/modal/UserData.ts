@@ -260,14 +260,14 @@ export class UData {
     save: Record<number, ScheduleSave> | undefined
   ): number {
     // 状态
-    const sa: number = (save && save[a.id]?.state) ?? 99999;
-    const sb: number = (save && save[b.id]?.state) ?? 99999;
+    const sa: number = (save && save[a.id]?.state) ?? 0;
+    const sb: number = (save && save[b.id]?.state) ?? 0;
     if (sa !== sb) {
       return sa - sb;
     }
     // order
-    const oa: number = a.order ?? 0;
-    const ob: number = b.order ?? 0;
+    const oa: number = a.order ?? 99999;
+    const ob: number = b.order ?? 99999;
     if (oa !== ob) {
       return oa - ob;
     }

@@ -43,54 +43,64 @@
             <icon-mdi-list-status class="text-blue-500" :height="'30'" :width="'30'" slot="start">
             </icon-mdi-list-status>
             <div class="h-12"></div>
+            <ion-button id="btnSort" @click="btnSortClk" fill="clear" slot="end">
+              <ion-icon :icon="swapVertical" class="button-native"></ion-icon>
+            </ion-button>
           </ion-item>
           <ion-content>
-            <ion-item v-for="(schedule, idx) in day.events" :key="idx">
-              <ion-checkbox
-                style="--size: 26px"
-                :checked="day.save && day.save[schedule.id]?.state === 1"
-                @ionChange="onScheduleCheckboxChange($event, day, schedule.id)">
-              </ion-checkbox>
-              <div @click="btnScheduleClk($event, schedule, day)" class="flex items-center w-full">
-                <ion-label
-                  :class="{
-                    'text-line-through': day.save && day.save[schedule.id]?.state === 1,
-                  }"
-                  class="p-2.5 flex-1">
-                  <h2 class="truncate">{{ schedule.title }}</h2>
-                  <div class="flex text-gray-400">
-                    <p class="w-14 mr-2">
-                      <ion-icon :icon="listOutline" class="relative top-0.5"></ion-icon>
-                      {{ countFinishedSubtask(day, schedule) }}
-                      /
-                      {{ schedule?.subtasks?.length }}
-                    </p>
-                    <span class="mr-1 pt-[1px]">
-                      <component
-                        :is="getGroupOptions(schedule.groupId).icon"
-                        height="16px"
-                        width="16px" />
-                    </span>
-                    <p class="schedule-lb-group w-14">
-                      {{ getGroupOptions(schedule.groupId).label }}
-                    </p>
-                    <p>{{ schedule.allDay ? "全天" : schedule.startTs?.format("HH:mm") }}</p>
-                  </div>
-                </ion-label>
-                <span
-                  class="v-dot ml-2.5"
-                  :style="{
-                    'background-color': getColorOptions(schedule.color).tag,
-                  }" />
-                <component
-                  :is="getPriorityOptions(schedule.priority).icon"
-                  :height="'36px'"
-                  width="36px"
-                  :color="getPriorityOptions(schedule.priority).color" />
-                <!-- <div class="w-14">11x</div> -->
-              </div>
-              
-            </ion-item>
+            <ion-reorder-group
+              :disabled="bReorderDisabled"
+              @ionItemReorder="onReorder($event, day)">
+              <ion-item v-for="(schedule, idx) in day.events" :key="idx">
+                <ion-checkbox
+                  style="--size: 26px"
+                  :checked="day.save && day.save[schedule.id]?.state === 1"
+                  @ionChange="onScheduleCheckboxChange($event, day, schedule.id)">
+                </ion-checkbox>
+                <div
+                  @click="btnScheduleClk($event, schedule, day)"
+                  class="flex items-center w-full">
+                  <ion-label
+                    :class="{
+                      'text-line-through': day.save && day.save[schedule.id]?.state === 1,
+                    }"
+                    class="p-2.5 flex-1">
+                    <h2 class="truncate">{{ schedule.title }}</h2>
+                    <div class="flex text-gray-400">
+                      <p class="w-14 mr-2">
+                        <ion-icon :icon="listOutline" class="relative top-0.5"></ion-icon>
+                        {{ countFinishedSubtask(day, schedule) }}
+                        /
+                        {{ schedule?.subtasks?.length }}
+                      </p>
+                      <span class="mr-1 pt-[1px]">
+                        <component
+                          :is="getGroupOptions(schedule.groupId).icon"
+                          height="16px"
+                          width="16px" />
+                      </span>
+                      <p class="schedule-lb-group w-14">
+                        {{ getGroupOptions(schedule.groupId).label }}
+                      </p>
+                      <p>{{ schedule.allDay ? "全天" : schedule.startTs?.format("HH:mm") }}</p>
+                    </div>
+                  </ion-label>
+                  <span
+                    class="v-dot ml-2.5"
+                    :style="{
+                      'background-color': getColorOptions(schedule.color).tag,
+                    }" />
+                  <component
+                    v-if="bReorderDisabled"
+                    :is="getPriorityOptions(schedule.priority).icon"
+                    :height="'36px'"
+                    width="36px"
+                    :color="getPriorityOptions(schedule.priority).color" />
+                  <!-- <div class="w-14">11x</div> -->
+                  <ion-reorder slot="end"></ion-reorder>
+                </div>
+              </ion-item>
+            </ion-reorder-group>
           </ion-content>
         </swiper-slide>
       </swiper>
@@ -115,21 +125,29 @@
 </template>
 <script setup lang="ts">
 import SchedulePop from "@/components/SchedulePopModal.vue";
-import { getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
 import { getColorOptions } from "@/modal/ColorType";
+import { getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
 import { DayData, S_TS, ScheduleData, ScheduleSave, UData, UserData } from "@/modal/UserData";
 import { setSave } from "@/utils/NetUtil";
+import _ from "lodash";
 // import midCalendarTodayOutline from "@iconify-icons/mdi/calendar-today-outline";
 // import mdiListStatus from "@iconify-icons/mdi/list-status";
-import { IonCheckbox, IonFab, IonFabButton, IonicSlides } from "@ionic/vue";
+import {
+  IonCheckbox,
+  IonFab,
+  IonFabButton,
+  IonicSlides,
+  IonReorder,
+  IonReorderGroup,
+} from "@ionic/vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import dayjs from "dayjs";
-import { add, listOutline } from "ionicons/icons";
+import { add, listOutline, swapVertical } from "ionicons/icons";
 import "swiper/css";
 import "swiper/css/effect-fade";
 import { EffectCoverflow, Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
-import { nextTick, ref, watch } from "vue";
+import { nextTick, onMounted, ref, watch } from "vue";
 const weekHead = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
 const props = defineProps({
   dt: {
@@ -146,6 +164,7 @@ const dayArr = ref<any[]>([{}, {}, {}]); // 滑动数据
 const swiperRef = ref(); // 滑动对象
 const currentDate = ref(dayjs(props.dt as dayjs.Dayjs)); // 当前日期
 const selfRef = ref();
+const bReorderDisabled = ref(true);
 // === 弹窗对象
 const scheduleModal = ref();
 const scheduleModalData = ref<ScheduleData>();
@@ -168,8 +187,9 @@ const updateScheduleData = () => {
     UData.createDayData(currentDate.value as dayjs.Dayjs, props.userData as UserData),
     UData.createDayData(currentDate.value.add(1, "day"), props.userData as UserData),
   ];
-  // console.log("updateScheduleData", currentDate.value, dayArr.value);
+  console.log("updateScheduleData", currentDate.value, dayArr.value);
 };
+onMounted(() => {});
 // 翻页事件
 function onTransitionEnd(obj: any) {
   if (1 === obj.activeIndex) return;
@@ -277,6 +297,31 @@ const btnAddScheduleClk = () => {
   scheduleSave.value = undefined;
   isScheduleModalOpen.value = true;
 };
+
+// 排序按钮
+const btnSortClk = () => {
+  bReorderDisabled.value = !bReorderDisabled.value;
+};
+function onReorder(event: any, day: DayData) {
+  let eList = day.events;
+  // console.log(_.map(eList, 'title'));
+  eList = event.detail.complete(eList);
+  const userData = props.userData;
+  if (eList) {
+    let ii = eList[0].order ?? 0;
+    _.forEach(eList, (e) => {
+      userData.schedules[e.id].order = ii;
+      e.order = ii++;
+    });
+  }
+  // console.log(_.map(eList, "title"));
+  eList.sort((a: ScheduleData, b: ScheduleData) => {
+    return UData.CmpScheduleData(a, b, day.save);
+  });
+  doSaveUserData();
+  emits("update:data", currentDate.value);
+  // console.log(eList);
+}
 </script>
 <style scoped>
 .main_content::part(scroll) {

@@ -1,5 +1,5 @@
 <template>
-  <ion-page id="main-content" main >
+  <ion-page id="main-content" main>
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
@@ -20,13 +20,13 @@
       </ion-toolbar>
     </ion-header>
     <ion-row class="text-blue-500" style="background-color: antiquewhite">
-      <ion-col class="ion-text-center font-bold	 text-red-600">日</ion-col>
-      <ion-col class="ion-text-center font-bold	">一</ion-col>
-      <ion-col class="ion-text-center font-bold	">二</ion-col>
-      <ion-col class="ion-text-center font-bold	">三</ion-col>
-      <ion-col class="ion-text-center font-bold	">四</ion-col>
-      <ion-col class="ion-text-center font-bold	">五</ion-col>
-      <ion-col class="ion-text-center font-bold	 text-red-600">六</ion-col>
+      <ion-col class="ion-text-center font-bold text-red-600">日</ion-col>
+      <ion-col class="ion-text-center font-bold">一</ion-col>
+      <ion-col class="ion-text-center font-bold">二</ion-col>
+      <ion-col class="ion-text-center font-bold">三</ion-col>
+      <ion-col class="ion-text-center font-bold">四</ion-col>
+      <ion-col class="ion-text-center font-bold">五</ion-col>
+      <ion-col class="ion-text-center font-bold text-red-600">六</ion-col>
     </ion-row>
     <ion-content>
       <swiper
@@ -214,6 +214,7 @@ const onDaySelected = (slide: MonthData, day: DayData) => {
 function onScheduleModalDismiss() {
   isScheduleModalOpen.value = false;
 }
+
 // 今天
 function btnTodayClk() {
   currentDate.value = dayjs().startOf("day");

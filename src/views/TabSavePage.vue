@@ -41,8 +41,8 @@
             <p>
               range:
               {{ schedule?.startTs?.format("YYYY-MM-DD") }} -
-              {{ schedule?.endTs?.format("YYYY-MM-DD") }} AllDay:
-              {{ schedule.allDay }}
+              {{ schedule?.endTs?.format("YYYY-MM-DD") }}
+              allDay:{{ schedule.allDay }} order:{{ schedule.order }}
             </p>
             <p>
               Remind: {{ schedule.reminder }} | Repeat: {{ schedule.repeat }} | RepeatEnd:

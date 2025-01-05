@@ -67,7 +67,7 @@
             <div slot="content">
               <ion-reorder-group
                 :disabled="bReorderDisabled"
-                @ionItemReorder="handleReorder($event)"
+                @ionItemReorder="onReorder($event)"
                 mode="ios"
                 ref="curScheduleList"
                 class="my-0">

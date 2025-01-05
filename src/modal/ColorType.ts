@@ -18,7 +18,7 @@ export const ColorOptions: ColorType[] = [
 export async function LoadColorData() {
   return new Promise((resolve) => {
     getColorList(1, 30).then((res) => {
-      console.log("LoadColorData", res);
+      // console.log("LoadColorData", res);
       ColorOptions.splice(0, ColorOptions.length);
       res.data.forEach((e: any) => {
         ColorOptions.push({
