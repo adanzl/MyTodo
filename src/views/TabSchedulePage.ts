@@ -236,6 +236,9 @@ export default defineComponent({
     // 排序按钮
     const btnSortClk = () => {
       bReorderDisabled.value = !bReorderDisabled.value;
+      if(bReorderDisabled.value){
+        doSaveUserData();
+      }
     };
     // 左下测试按钮
     const btnTestClk = () => {
@@ -418,7 +421,6 @@ export default defineComponent({
       }
     };
     function handleReorder(event: any) {
-      console.log("Dragged from index", event.detail.from, "to", event.detail.to);
       const lo = event.detail.from;
       let eList = selectedDate.value?.events.filter(bShowScheduleItem);
       // console.log(_.map(eList, 'title'));
@@ -429,11 +431,11 @@ export default defineComponent({
           e.order = ii++;
         });
       }
-      console.log(_.map(eList, "title"));
+      // console.log(_.map(eList, "title"));
       selectedDate.value?.events.sort((a: ScheduleData, b: ScheduleData) => {
         return UData.CmpScheduleData(a, b, selectedDate.value?.save);
       });
-      console.log(eList);
+      // console.log(eList);
     }
     // ========== 日程列表结束 ===========
     // ========== 日程弹窗开始 ===========
