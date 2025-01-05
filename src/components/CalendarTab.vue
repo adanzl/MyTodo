@@ -34,7 +34,7 @@
           <span
             class="dot"
             :class="{ 'gray-bg': day.dt.month() !== slide.month }"
-            v-if="day.events.length > 0"></span>
+            v-if="false"></span>
         </ion-chip>
       </ion-col>
     </ion-row>

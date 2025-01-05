@@ -91,7 +91,7 @@ import { delColor, setColor } from "@/utils/NetUtil";
 import { createTriggerController } from "@/utils/Overlay";
 import { alertController } from "@ionic/vue";
 import { colorPaletteOutline, removeCircleOutline, saveOutline } from "ionicons/icons";
-import { forEach } from "lodash-es";
+import { forEach } from "lodash";
 import { inject, onMounted, ref, watch } from "vue";
 const props = defineProps({
   trigger: {

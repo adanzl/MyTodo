@@ -28,6 +28,7 @@ export class ScheduleData {
   color? = 0; // 颜色id
   priority? = -1; // 优先级
   groupId? = -1; // 分组id
+  order? = 0; // 排序 数字越大越靠后
   subtasks: Subtask[] = []; // 子任务列表
   static Copy(o: ScheduleData): ScheduleData {
     const ret = JSON.parse(JSON.stringify(o));
@@ -216,6 +217,16 @@ export class UData {
           if (_dt.date() == schedule.startTs.date() && _dt.month() == schedule.startTs.month()) {
             dayData.events.push(schedule);
           }
+        } else if (schedule.repeat == 5) {
+          // workday
+          if (_dt.day() !== 0 && _dt.day() !== 6) {
+            dayData.events.push(schedule);
+          }
+        } else if (schedule.repeat == 6) {
+          // weekend
+          if (_dt.day() === 0 || _dt.day() === 6) {
+            dayData.events.push(schedule);
+          }
         }
       }
       // schedule;
@@ -248,12 +259,19 @@ export class UData {
     b: ScheduleData,
     save: Record<number, ScheduleSave> | undefined
   ): number {
-    const sa: number = (save && save[a.id]?.state) || 0;
-    const sb: number = (save && save[b.id]?.state) || 0;
-    if (sa === sb) {
-      return (a.id ?? 0) - (b.id ?? 0);
+    // 状态
+    const sa: number = (save && save[a.id]?.state) ?? 99999;
+    const sb: number = (save && save[b.id]?.state) ?? 99999;
+    if (sa !== sb) {
+      return sa - sb;
     }
-    return sa - sb;
+    // order
+    const oa: number = a.order ?? 0;
+    const ob: number = b.order ?? 0;
+    if (oa !== ob) {
+      return oa - ob;
+    }
+    return (a.id ?? 0) - (b.id ?? 0);
   }
   /**
    * 更新日程数据

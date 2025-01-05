@@ -27,7 +27,7 @@
         :slidesPerView="'auto'"
         :freeMode="false"
         :coverflowEffect="{
-          rotate: 20,
+          rotate: 0,
           stretch: -10,
           depth: 10,
           modifier: 1,
@@ -89,6 +89,7 @@
                   :color="getPriorityOptions(schedule.priority).color" />
                 <!-- <div class="w-14">11x</div> -->
               </div>
+              
             </ion-item>
           </ion-content>
         </swiper-slide>
@@ -280,7 +281,7 @@ const btnAddScheduleClk = () => {
 <style scoped>
 .main_content::part(scroll) {
   height: 90%;
-  margin-top: 20%;
+  margin-top: 10vh;
 }
 .main_content::part(background) {
   display: none;

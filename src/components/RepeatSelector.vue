@@ -21,8 +21,8 @@
                 <component :is="op.icon" :height="'25px'" width="36px" color="#7970ff" />
               </span>
               <ion-label style="margin-left: 8px">{{ op.label }} </ion-label>
-              <ion-label class="text-gray-400 text-xs" v-if="op.tag"
-                >（下次 {{ dt.add(1, op.tag).format("YYYY-MM-DD") }}）</ion-label
+              <ion-label class="text-gray-400 text-xs font-mono" v-if="op.tag"
+                >（下次 {{ getNextRepeatDate(dt as dayjs.Dayjs, op.id) }}）</ion-label
               >
             </ion-item>
           </ion-radio>
@@ -37,7 +37,7 @@
 </template>
 
 <script lang="ts" setup>
-import { RepeatOptions } from "@/modal/ScheduleType";
+import { RepeatOptions,getNextRepeatDate } from "@/modal/ScheduleType";
 import { createTriggerController } from "@/utils/Overlay";
 import { IonRadio, IonRadioGroup } from "@ionic/vue";
 import { onMounted, ref, watch } from "vue";

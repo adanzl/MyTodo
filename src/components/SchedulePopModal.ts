@@ -8,8 +8,8 @@ import {
   getGroupOptions,
   getPriorityOptions,
   getRepeatOptions,
+  getNextRepeatDate,
   ReminderOptions,
-  RepeatOptions,
   WEEK,
 } from "@/modal/ScheduleType";
 import { getColorOptions } from "@/modal/ColorType";
@@ -306,17 +306,21 @@ export default defineComponent({
       }
       changeFlag = true;
     };
-
+    function onSubtaskPopDismiss() {
+      console.log("subtask pop willDismiss", curSubtask.value);
+      curSubtask.value = new Subtask();
+      openSubtaskModal.value = false;
+    }
     // 子任务点击
     const onSubtaskClk = (_event: any, task: Subtask) => {
       curSubtask.value = task as Subtask;
       openSubtaskModal.value = true;
     };
     // 子任务添加点击
-    const btnSubtaskAddClk = () => {
-      curSubtask.value = null;
+    function btnSubtaskAddClk() {
+      curSubtask.value = new Subtask();
       openSubtaskModal.value = true;
-    };
+    }
     // 子任务移除点击
     const btnSubtaskRemoveClk = async (_event: any, task: Subtask) => {
       const alert = await alertController.create({
@@ -432,6 +436,7 @@ export default defineComponent({
       getGroupOptions,
       getPriorityOptions,
       getRepeatOptions,
+      getNextRepeatDate,
       onTaskCheckboxChange,
       onDtTabChange,
       onDtChange,
@@ -457,7 +462,7 @@ export default defineComponent({
       onSubtaskClk,
       btnSubtaskAddClk,
       onToastDismiss,
-      RepeatOptions,
+      onSubtaskPopDismiss,
       WEEK,
     };
   },

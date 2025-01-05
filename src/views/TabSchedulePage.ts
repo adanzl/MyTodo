@@ -4,7 +4,12 @@ import { LocalNotifications } from "@capacitor/local-notifications";
 import "@ionic/vue/css/ionic-swiper.css";
 import "swiper/css";
 import "swiper/css/effect-fade";
+import _ from "lodash";
 
+import { ColorOptions, getColorOptions } from "@/modal/ColorType";
+import { getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
+import { DayData, MonthData, ScheduleData, ScheduleSave, UData, UserData } from "@/modal/UserData";
+import { getSave, setSave } from "@/utils/NetUtil";
 import {
   IonAccordion,
   IonAccordionGroup,
@@ -18,9 +23,12 @@ import {
   IonMenuButton,
   IonRefresher,
   IonRefresherContent,
+  IonReorder,
+  IonReorderGroup,
   loadingController,
   onIonViewDidEnter,
 } from "@ionic/vue";
+import "@ionic/vue/css/ionic-swiper.css";
 import dayjs from "dayjs";
 import {
   add,
@@ -33,16 +41,11 @@ import {
   swapVertical,
   trashOutline,
 } from "ionicons/icons";
+import "swiper/css";
+import "swiper/css/effect-fade";
 import { Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
 import { defineComponent, inject, nextTick, onMounted, ref } from "vue";
-import { getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
-import { ColorOptions, getColorOptions } from "@/modal/ColorType";
-import { DayData, MonthData, ScheduleData, ScheduleSave, UData, UserData } from "@/modal/UserData";
-import { getSave, setSave } from "@/utils/NetUtil";
-import "@ionic/vue/css/ionic-swiper.css";
-import "swiper/css";
-import "swiper/css/effect-fade";
 
 export default defineComponent({
   components: {
@@ -52,6 +55,8 @@ export default defineComponent({
     IonFab,
     IonFabButton,
     IonicSlides,
+    IonReorderGroup,
+    IonReorder,
     IonMenuButton,
     IonItemOption,
     IonItemOptions,
@@ -72,6 +77,7 @@ export default defineComponent({
     let pTouch: any;
     let lstTs = 0;
     const slideArr = ref<any[]>([{}, {}, {}]); // 滑动数据
+    const bReorderDisabled = ref(true);
     const curScheduleList = ref();
     const swiperRef = ref(); // 滑动对象
     const bFold = ref(true); // 日历折叠状态
@@ -125,7 +131,7 @@ export default defineComponent({
       }
       // console.log("updateScheduleData", currentDate, slideArr.value);
     };
-    //  初始化日历
+    // 初始化日历
     // 处理选中日期
     const chooseSelectedDate = () => {
       const mm = slideArr.value[1];
@@ -229,7 +235,7 @@ export default defineComponent({
     };
     // 排序按钮
     const btnSortClk = () => {
-      swiperRef?.value?.update();
+      bReorderDisabled.value = !bReorderDisabled.value;
     };
     // 左下测试按钮
     const btnTestClk = () => {
@@ -306,9 +312,17 @@ export default defineComponent({
     // ========== 日程列表开始 ===========
     const onScheduleListTouchStart = (event: any) => {
       // console.log("onTouchStart", bMoving, event);
+      if (!bReorderDisabled.value) {
+        // 日程排序时禁用调整日历折叠状态
+        return;
+      }
       pTouch = event.touches[0];
     };
     const onScheduleListTouchMove = (event: any) => {
+      if (!bReorderDisabled.value) {
+        // 日程排序时禁用调整日历折叠状态
+        return;
+      }
       // console.log("onTouchMove", bMoving, event);
       const ds = dayjs().valueOf() - lstTs;
       if (ds < 300) {
@@ -403,6 +417,24 @@ export default defineComponent({
         doSaveUserData();
       }
     };
+    function handleReorder(event: any) {
+      console.log("Dragged from index", event.detail.from, "to", event.detail.to);
+      const lo = event.detail.from;
+      let eList = selectedDate.value?.events.filter(bShowScheduleItem);
+      // console.log(_.map(eList, 'title'));
+      eList = event.detail.complete(eList);
+      if (eList) {
+        let ii = eList[lo].order ?? 0;
+        _.forEach(eList, (e) => {
+          e.order = ii++;
+        });
+      }
+      console.log(_.map(eList, "title"));
+      selectedDate.value?.events.sort((a: ScheduleData, b: ScheduleData) => {
+        return UData.CmpScheduleData(a, b, selectedDate.value?.save);
+      });
+      console.log(eList);
+    }
     // ========== 日程列表结束 ===========
     // ========== 日程弹窗开始 ===========
     // 添加日程按钮
@@ -486,6 +518,8 @@ export default defineComponent({
       btnAddScheduleClk,
       btnTestClk,
       bShowScheduleItem,
+      bReorderDisabled,
+      handleReorder,
     };
   },
   methods: {},

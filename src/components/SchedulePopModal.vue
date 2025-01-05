@@ -1,5 +1,5 @@
 <template>
-  <ion-modal show-backdrop="false" id="main" @ion-modal-will-dismiss="onModalDismiss">
+  <ion-modal id="main" @ion-modal-will-dismiss="onModalDismiss">
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
@@ -34,8 +34,8 @@
             <span class="mr-3">
               <component
                 :is="getGroupOptions(curScheduleData.groupId).icon"
-                height="28px"
-                width="28px"
+                height="24px"
+                width="24px"
                 color="#7970ff" />
             </span>
             <ion-label>{{ getGroupOptions(curScheduleData.groupId).label }}</ion-label>
@@ -104,7 +104,7 @@
               <ion-button @click="btnScheduleDateClearClk">清除</ion-button>
               <ion-segment v-model="scheduleType" style="width: 130px" @ionChange="onDtTabChange">
                 <ion-segment-button value="0" class="w-15 min-w-0">开始</ion-segment-button>
-                <ion-segment-button value="1" class="w-15 min-w-0">结束</ion-segment-button>
+                <!-- <ion-segment-button value="1" class="w-15 min-w-0">结束</ion-segment-button> -->
               </ion-segment>
               <ion-button @click="btnDatetimeOkClk">确定</ion-button>
             </ion-buttons>
@@ -145,9 +145,14 @@
         <ion-item detail="true" id="btnRepeat">
           <ion-icon :icon="repeat" slot="start"> </ion-icon>
           <ion-label>重复</ion-label>
-          <ion-label class="text-right mr-0">{{
-            getRepeatOptions(curScheduleData.repeat).label
-          }}</ion-label>
+          <ion-label class="text-right mr-0">
+            <div >
+              <p class="inline-block mr-2 gray">
+                {{ getNextRepeatDate(curScheduleData.startTs, curScheduleData.repeat) }}
+              </p>
+              <div class="inline-block">{{ getRepeatOptions(curScheduleData.repeat).label }}</div>
+            </div>
+          </ion-label>
         </ion-item>
         <RepeatSelector
           trigger="btnRepeat"
@@ -220,8 +225,7 @@
           @update:value="onSubtaskChange"
           :value="curSubtask"
           :is-open="openSubtaskModal"
-          @ion-modal-will-dismiss="() => (openSubtaskModal = false)">
-        </SubtaskPopModal>
+          @willDismiss="onSubtaskPopDismiss" />
         <ion-item v-for="(task, idx) in curScheduleData?.subtasks" :key="idx" class="subtask-item">
           <ion-checkbox
             slot="start"
@@ -311,5 +315,11 @@
 .subtask-item::part(native) {
   align-items: flex-start;
   padding: 16px 16px 0 16px;
+}
+ion-modal::part(content){
+  max-width: 500px;
+}
+ion-modal{
+  --height: 100%;
 }
 </style>

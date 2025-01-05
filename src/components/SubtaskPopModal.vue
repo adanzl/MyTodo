@@ -1,5 +1,11 @@
 <template>
-  <ion-modal ref="modal" id="subtaskPopModal" mode="ios" aria-hidden="false" class="backdrop">
+  <ion-modal
+    ref="modal"
+    id="subtaskPopModal"
+    mode="ios"
+    aria-hidden="false"
+    class="backdrop"
+    @willDismiss="onModalDismiss">
     <ion-item>
       <ion-title>子任务</ion-title>
     </ion-item>
@@ -12,7 +18,7 @@
           <img :src="img.data" @click="onImgClk($event, img)" />
         </div>
         <div class="pre-img-block" id="btnAdd">
-          <ion-icon :icon="add" color="primary"></ion-icon>
+          <ion-icon :icon="add" color="success" />
         </div>
       </ion-item>
     </ion-content>
@@ -58,7 +64,6 @@ const props = defineProps({
   },
   value: {
     type: Object,
-    default: new Subtask(),
   },
 });
 const triggerController = createTriggerController();
@@ -79,18 +84,15 @@ const confirm = () => {
 };
 
 const emits = defineEmits(["update:value"]);
+
 onMounted(() => {
   watch(
     () => props.value,
     async (v) => {
-      if (!v) {
-        valueRef.value = new Subtask();
-        imgList.value = [];
-        return;
-      }
+      console.log("set props.value", v);
       valueRef.value = Subtask.Copy(v as Subtask);
       imgList.value = [];
-      for (const imgId of v.imgIds) {
+      for (const imgId of v!.imgIds) {
         imgList.value.push({
           id: parseInt(imgId),
           data: await getImage(parseInt(imgId)),
@@ -113,6 +115,7 @@ const btnDelImgClk = async (event: any, img: any) => {
   const alert = await alertController.create({
     header: "确认删除",
     buttons: [
+      "取消",
       {
         text: "确定",
         handler: () => {
@@ -128,7 +131,6 @@ const btnDelImgClk = async (event: any, img: any) => {
           openPreview.value = false;
         },
       },
-      "取消",
     ],
   });
   await alert.present();
@@ -171,7 +173,7 @@ const onImgClk = (_event: any, img: any) => {
   openPreview.value = true;
   curImage.value = img;
 };
-
+function onModalDismiss() {}
 const onPreviewDismiss = () => (openPreview.value = false);
 const onPreviewClk = () => {
   openPreview.value = false;

@@ -1,3 +1,4 @@
+import _ from "lodash";
 export const WEEK = ["星期天", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
 export interface RemindType {
   id: number;
@@ -26,14 +27,19 @@ import MdiCalendarWeekBeginOutline from "virtual:icons/mdi/calendar-week-begin-o
 import MdiCalendarTodayOutline from "virtual:icons/mdi/calendar-today-outline";
 import MdiCalendarMultiselectOutline from "virtual:icons/mdi/calendar-multiselect-outline";
 import MdiCalendarBlankOutline from "virtual:icons/mdi/calendar-blank-outline";
+import MdiCalendarWeekendOutline from "~icons/mdi/calendar-weekend-outline?width=24px&height=24px";
+import MdiCalendarWeekOutline from "~icons/mdi/calendar-week-outline?width=24px&height=24px";
 export const RepeatOptions: RepeatType[] = [
   { id: 0, label: "无", tag: "", icon: MdiCalendarBlankOutline },
   { id: 1, label: "每天", tag: "day", icon: MdiCalendarMonthOutline },
+  { id: 5, label: "工作日", tag: "workday", icon: MdiCalendarWeekOutline },
+  { id: 6, label: "每周末", tag: "weekend", icon: MdiCalendarWeekendOutline },
   { id: 2, label: "每星期", tag: "week", icon: MdiCalendarWeekBeginOutline },
   { id: 3, label: "每月", tag: "month", icon: MdiCalendarTodayOutline },
   { id: 4, label: "每年", tag: "year", icon: MdiCalendarMultiselectOutline },
 ];
-export const getRepeatOptions = (id?: number): RepeatType => {
+
+export const getRepeatOptions = (id: number | undefined | null): RepeatType => {
   for (const v of RepeatOptions) {
     if (v.id === id) {
       return v;
@@ -42,6 +48,43 @@ export const getRepeatOptions = (id?: number): RepeatType => {
   return RepeatOptions[0];
 };
 
+/**
+ * 获取下一次的重复日期
+ */
+export function getNextRepeatDate(
+  date: dayjs.Dayjs | undefined,
+  repeatId: number | null | undefined
+) {
+  if (!date || !repeatId) {
+    return undefined;
+  }
+  const repeat = getRepeatOptions(repeatId);
+  if (repeat.id === 0) {
+    return undefined;
+  }
+  let ret = null;
+  if (_.includes([1, 2, 3, 4], repeat.id)) {
+    ret = date.add(1, repeat.tag as dayjs.ManipulateType);
+  } else if (repeat.id === 5) {
+    // 工作日
+    const week = date.day();
+    if (week === 5 || week === 6) {
+      ret = date.add(8 - week, "day");
+    } else {
+      ret = date.add(1, "day");
+    }
+  } else if (repeat.id === 6) {
+    // 周末
+    const week = date.day();
+    if (week === 5 || week === 6) {
+      ret = date.add(1, "day");
+    } else {
+      ret = date.add(6 - week, "day");
+    }
+  }
+  // console.log("getNextRepeatDate", repeat, ret);
+  return ret?.format("YYYY-MM-DD") ?? undefined;
+}
 
 export interface PriorityType {
   id: number;
@@ -72,6 +115,7 @@ export const getPriorityOptions = (id?: number): PriorityType => {
 import MdiLearnOutline from "~icons/mdi/learn-outline";
 import MdiWorkOutline from "~icons/mdi/work-outline";
 import MdiRoundedCorner from "~icons/mdi/rounded-corner";
+import dayjs from "dayjs";
 // 分组配置
 export interface GroupType {
   id: number;

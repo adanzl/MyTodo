@@ -16,9 +16,9 @@
             v-if="!selectedDate?.dt.isToday()">
             今
           </ion-button>
-          <!-- <ion-button id="btnSort" @click="btnSortClk">
+          <ion-button id="btnSort" @click="btnSortClk">
             <ion-icon :icon="swapVertical" class="button-native"></ion-icon>
-          </ion-button> -->
+          </ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
@@ -65,11 +65,16 @@
               <p style="margin-right: 8px" class="gray">{{ selectedDate?.events.length }}</p>
             </ion-item>
             <div slot="content">
-              <ion-list :inset="true" lines="full" mode="ios" ref="curScheduleList" class="my-0">
+              <ion-reorder-group
+                :disabled="bReorderDisabled"
+                @ionItemReorder="handleReorder($event)"
+                mode="ios"
+                ref="curScheduleList"
+                class="my-0">
                 <!-- 日程条目 -->
                 <ion-item-sliding
-                  v-for="(schedule, idx) in selectedDate?.events.filter(bShowScheduleItem)"
-                  :key="idx">
+                  v-for="schedule in selectedDate?.events.filter(bShowScheduleItem)"
+                  :key="schedule.id">
                   <ion-item>
                     <ion-checkbox
                       style="--size: 26px; padding-right: 5px"
@@ -96,7 +101,7 @@
                             <component
                               :is="getGroupOptions(schedule.groupId).icon"
                               height="18px"
-                              width="18px"/>
+                              width="18px" />
                           </span>
                           <p class="w-14">
                             {{ getGroupOptions(schedule.groupId).label }}
@@ -118,6 +123,7 @@
                         :color="getPriorityOptions(schedule.priority).color">
                       </component>
                     </div>
+                    <ion-reorder slot="end"></ion-reorder>
                   </ion-item>
                   <ion-item-options side="end">
                     <ion-item-option @click="btnScheduleAlarmClk">
@@ -128,7 +134,7 @@
                     </ion-item-option>
                   </ion-item-options>
                 </ion-item-sliding>
-              </ion-list>
+              </ion-reorder-group>
             </div>
           </ion-accordion>
           <!-- <ion-accordion value="goals">
