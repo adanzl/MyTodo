@@ -66,16 +66,10 @@ export class ScheduleSave {
 export class UserData {
   id: number = -1; // 用户id
   name: string = ""; // 用户名称
-  private _score: number = 0; // 积分
+  score: number = 0; // 积分
   schedules: ScheduleData[] = []; // 日程计划列表
   // 计划完成情况  日期->对应日期完成情况(任务id->完成情况)
   save: Record<string, Record<number, ScheduleSave>> = {};
-  get score(): number {
-    return 0 || this._score;
-  }
-  set score(score: number) {
-    this._score = score;
-  }
   static Copy(o: UserData): UserData {
     const ret = new UserData();
     ret.id = o.id;

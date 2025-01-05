@@ -105,7 +105,6 @@ import {
   loadingController,
   onIonViewDidEnter,
 } from "@ionic/vue";
-// import { list } from "ionicons/icons";
 import "@ionic/vue/css/ionic-swiper.css";
 import dayjs from "dayjs";
 import "swiper/css";

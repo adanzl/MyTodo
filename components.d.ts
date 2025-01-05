@@ -19,7 +19,6 @@ declare module 'vue' {
     IconMdiCheckAll: typeof import('~icons/mdi/check-all')['default']
     IconMdiListStatus: typeof import('~icons/mdi/list-status')['default']
     IconMdiRomanNumeral7: typeof import('~icons/mdi/roman-numeral7')['default']
-    IconMdiTag: typeof import('~icons/mdi/tag')['default']
     PrioritySelector: typeof import('./src/components/PrioritySelector.vue')['default']
     RepeatSelector: typeof import('./src/components/RepeatSelector.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

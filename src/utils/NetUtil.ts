@@ -70,10 +70,10 @@ export function setSave(id: number | undefined, user: string, data: string) {
         data: data,
         version: 1,
       })
-      .then((res) => {
+      .then((res:any) => {
         resolve(res);
       })
-      .catch((err) => {
+      .catch((err:any) => {
         reject(err);
       });
   });
