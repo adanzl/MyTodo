@@ -34,6 +34,8 @@
     "dayjs": "^1.11.13",
     "image-js": "^0.35.6",
     "ionicons": "^7.0.0",
+    "lodash": "^4.17.21",
+    "lodash-es": "^4.17.21",
     "swiper": "^11.1.15",
     "vue": "^3.3.0",
     "vue-router": "^4.2.0"
@@ -43,6 +45,8 @@
     "@iconify/json": "^2.2.289",
     "@iconify/utils": "^2.2.1",
     "@iconify/vue": "^4.2.0",
+    "@types/lodash": "^4.17.14",
+    "@types/lodash-es": "^4.17.12",
     "@vitejs/plugin-legacy": "^5.0.0",
     "@vitejs/plugin-vue": "^4.0.0",
     "@vue/eslint-config-typescript": "^12.0.0",

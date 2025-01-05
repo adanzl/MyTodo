@@ -91,6 +91,7 @@ import { delColor, setColor } from "@/utils/NetUtil";
 import { createTriggerController } from "@/utils/Overlay";
 import { alertController } from "@ionic/vue";
 import { colorPaletteOutline, removeCircleOutline, saveOutline } from "ionicons/icons";
+import { forEach } from "lodash-es";
 import { inject, onMounted, ref, watch } from "vue";
 const props = defineProps({
   trigger: {
@@ -109,7 +110,7 @@ const bOpenColorPicker = ref(false);
 const curColor = ref<any>({});
 eventBus.$on("updateColor", (params: any[]) => {
   colorOptions.value = [];
-  params.forEach((v) => colorOptions.value.push(v));
+  forEach(params, (v: any) => colorOptions.value.push(v));
 });
 
 const emits = defineEmits(["update:value"]);
@@ -173,7 +174,7 @@ const confirm = () => {
 };
 
 function onSetColor(color: any) {
-  console.log("onSetColor", curColor.value,color);
+  console.log("onSetColor", curColor.value, color);
   curColor.value.tag = color;
 }
 </script>

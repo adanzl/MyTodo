@@ -1,4 +1,4 @@
-package io.ionic.starter;
+package leo.todo;
 
 import com.getcapacitor.BridgeActivity;
 
