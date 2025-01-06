@@ -3,6 +3,7 @@ export class LiveUpdatePage {
   // https://github.com/capawesome-team/capacitor-plugins/blob/main/packages/live-update/android/src/main/java/io/capawesome/capacitorjs/plugins/liveupdate/LiveUpdate.java#L682
   // https://capawesome.io/plugins/live-update/#usage
   // https://capawesome.io/blog/announcing-the-capacitor-live-update-plugin/#installation
+  // npm config set package-lock false
   public static async getDeviceId(): Promise<void> {
     await LiveUpdate.getDeviceId();
   }
