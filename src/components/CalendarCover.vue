@@ -309,7 +309,7 @@ function onReorder(event: any, day: DayData) {
   const userData = props.userData;
   if (eList) {
     let ii = eList[0].order ?? 0;
-    _.forEach(eList, (e) => {
+    _.forEach(eList, (e: any) => {
       userData.schedules[e.id].order = ii;
       e.order = ii++;
     });
