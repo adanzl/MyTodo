@@ -4,7 +4,6 @@ const config: CapacitorConfig = {
   appId: "leo.todo",
   appName: "MyTodo",
   webDir: "dist",
-  bundledWebRuntime: true,
 };
 
 export default config;

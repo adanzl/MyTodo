@@ -51,55 +51,70 @@
             <ion-reorder-group
               :disabled="bReorderDisabled"
               @ionItemReorder="onReorder($event, day)">
-              <ion-item v-for="(schedule, idx) in day.events" :key="idx">
-                <ion-checkbox
-                  style="--size: 26px"
-                  :checked="day.save && day.save[schedule.id]?.state === 1"
-                  @ionChange="onScheduleCheckboxChange($event, day, schedule.id)">
-                </ion-checkbox>
+              <div v-for="(schedule, idx) in day.events" :key="idx" class="bg-white">
+                <ion-item lines="none">
+                  <ion-checkbox
+                    style="--size: 22px; padding-right: 10px"
+                    :checked="day.save && day.save[schedule.id]?.state === 1"
+                    @ionChange="onScheduleCheckboxChange($event, day, schedule.id)" />
+                  <div
+                    @click="btnScheduleClk($event, schedule, day)"
+                    class="flex items-center w-full">
+                    <ion-label
+                      :class="{
+                        'text-line-through': day.save && day.save[schedule.id]?.state === 1,
+                      }"
+                      class="pt-2.5 flex-1">
+                      <h2 class="truncate">{{ schedule.title }}</h2>
+                      <div class="flex text-gray-400">
+                        <p class="w-14 mr-2">
+                          <ion-icon :icon="listOutline" class="relative top-0.5"></ion-icon>
+                          {{ countFinishedSubtask(day, schedule) }}
+                          /
+                          {{ schedule?.subtasks?.length }}
+                        </p>
+                        <span class="mr-1 pt-[1px]">
+                          <component
+                            :is="getGroupOptions(schedule.groupId).icon"
+                            height="16px"
+                            width="16px" />
+                        </span>
+                        <p class="schedule-lb-group w-14">
+                          {{ getGroupOptions(schedule.groupId).label }}
+                        </p>
+                        <p>{{ schedule.allDay ? "全天" : schedule.startTs?.format("HH:mm") }}</p>
+                      </div>
+                    </ion-label>
+                    <span
+                      class="v-dot ml-2.5"
+                      :style="{
+                        'background-color': getColorOptions(schedule.color).tag,
+                      }" />
+                    <component
+                      v-if="bReorderDisabled"
+                      :is="getPriorityOptions(schedule.priority).icon"
+                      :height="'36px'"
+                      width="36px"
+                      :color="getPriorityOptions(schedule.priority).color" />
+                    <ion-reorder slot="end"></ion-reorder>
+                  </div>
+                </ion-item>
                 <div
-                  @click="btnScheduleClk($event, schedule, day)"
-                  class="flex items-center w-full">
-                  <ion-label
-                    :class="{
-                      'text-line-through': day.save && day.save[schedule.id]?.state === 1,
-                    }"
-                    class="p-2.5 flex-1">
-                    <h2 class="truncate">{{ schedule.title }}</h2>
-                    <div class="flex text-gray-400">
-                      <p class="w-14 mr-2">
-                        <ion-icon :icon="listOutline" class="relative top-0.5"></ion-icon>
-                        {{ countFinishedSubtask(day, schedule) }}
-                        /
-                        {{ schedule?.subtasks?.length }}
-                      </p>
-                      <span class="mr-1 pt-[1px]">
-                        <component
-                          :is="getGroupOptions(schedule.groupId).icon"
-                          height="16px"
-                          width="16px" />
-                      </span>
-                      <p class="schedule-lb-group w-14">
-                        {{ getGroupOptions(schedule.groupId).label }}
-                      </p>
-                      <p>{{ schedule.allDay ? "全天" : schedule.startTs?.format("HH:mm") }}</p>
-                    </div>
-                  </ion-label>
-                  <span
-                    class="v-dot ml-2.5"
-                    :style="{
-                      'background-color': getColorOptions(schedule.color).tag,
-                    }" />
-                  <component
-                    v-if="bReorderDisabled"
-                    :is="getPriorityOptions(schedule.priority).icon"
-                    :height="'36px'"
-                    width="36px"
-                    :color="getPriorityOptions(schedule.priority).color" />
-                  <!-- <div class="w-14">11x</div> -->
-                  <ion-reorder slot="end"></ion-reorder>
+                  class="pl-[45px] flex items-center"
+                  v-for="(sub, idx) in schedule.subtasks"
+                  :key="idx"
+                  @click="btnScheduleClk($event, schedule, day)">
+                  <ion-checkbox
+                    disabled
+                    class="sub-checkbox"
+                    :checked="
+                      day.save &&
+                      day.save[schedule.id]?.subtasks[sub.id] === 1
+                    " />
+                  <span class="pl-2 text-base">{{ sub.name }}</span>
                 </div>
-              </ion-item>
+                <div style="border-bottom-width: 1px" class="mt-2"></div>
+              </div>
             </ion-reorder-group>
           </ion-content>
         </swiper-slide>
@@ -356,5 +371,9 @@ ion-modal {
 .data-content ion-content::part(background) {
   border-bottom-right-radius: 10px;
   border-bottom-left-radius: 10px;
+}
+.sub-checkbox {
+  --size: 18px;
+  --border-radius: 4px;
 }
 </style>

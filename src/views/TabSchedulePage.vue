@@ -58,13 +58,13 @@
         <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
           <ion-refresher-content></ion-refresher-content>
         </ion-refresher>
-        <ion-accordion-group :multiple="true" :value="['schedule', 'goals']">
+        <ion-accordion-group :multiple="true" :value="['schedule']">
           <ion-accordion value="schedule">
             <ion-item slot="header" color="light" class="schedule-group-item">
               <ion-label>{{ selectedDate?.dt.format("MM-DD") }}</ion-label>
               <p style="margin-right: 8px" class="gray">{{ selectedDate?.events.length }}</p>
             </ion-item>
-            <div slot="content">
+            <div slot="content" >
               <ion-reorder-group
                 :disabled="bReorderDisabled"
                 @ionItemReorder="onReorder($event)"
@@ -75,7 +75,7 @@
                 <ion-item-sliding
                   v-for="schedule in selectedDate?.events.filter(bShowScheduleItem)"
                   :key="schedule.id">
-                  <ion-item>
+                  <ion-item lines="none">
                     <ion-checkbox
                       style="--size: 26px; padding-right: 5px"
                       slot="start"
@@ -88,7 +88,7 @@
                           'text-line-through':
                             selectedDate?.save && selectedDate?.save[schedule.id]?.state === 1,
                         }"
-                        class="p-2.5 flex-1">
+                        class="pt-2.5 flex-1">
                         <h2 class="truncate">{{ schedule.title }}</h2>
                         <div class="flex text-gray-400">
                           <p class="w-14 mb-0">
@@ -125,6 +125,21 @@
                     </div>
                     <ion-reorder slot="end"></ion-reorder>
                   </ion-item>
+                  <div
+                    class="pl-[60px] flex items-center"
+                    v-for="(sub, idx) in schedule.subtasks"
+                    :key="idx"
+                    @click="btnScheduleClk($event, schedule)">
+                    <ion-checkbox
+                      disabled
+                      class="sub-checkbox"
+                      :checked="
+                        selectedDate &&
+                        selectedDate.save &&
+                        selectedDate.save[schedule.id]?.subtasks[sub.id] === 1
+                      " />
+                    <span class="pl-2">{{ sub.name }}</span>
+                  </div>
                   <ion-item-options side="end">
                     <ion-item-option @click="btnScheduleAlarmClk">
                       <ion-icon :icon="alarmOutline"></ion-icon>
@@ -133,16 +148,11 @@
                       <ion-icon :icon="trashOutline"></ion-icon>
                     </ion-item-option>
                   </ion-item-options>
+                  <div style="border-bottom-width: 1px" class="mt-2"></div>
                 </ion-item-sliding>
               </ion-reorder-group>
             </div>
           </ion-accordion>
-          <!-- <ion-accordion value="goals">
-            <ion-item slot="header" color="light" class="schedule-group-item">
-              <ion-label>里程碑</ion-label>
-            </ion-item>
-            <div class="ion-padding" slot="content">Content</div>
-          </ion-accordion> -->
         </ion-accordion-group>
       </ion-content>
       <SchedulePop
@@ -180,5 +190,9 @@
 .schedule-group-item::part(native) {
   height: 35px !important;
   min-height: 0 !important;
+}
+.sub-checkbox {
+  --size: 18px;
+  --border-radius: 4px;
 }
 </style>
