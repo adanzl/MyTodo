@@ -24,4 +24,4 @@
 
 `sudo systemctl daemon-reload`
 ## 打包
-`npx npm run build --  --mode=production && npx cap copy`
+`git pull && npx npm run build --  --mode=production && npx capawesome manifests:generate --path dist npx cap copy`

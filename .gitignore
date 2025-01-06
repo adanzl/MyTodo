@@ -33,3 +33,4 @@ npm-debug.log*
 /www
 /server/__pycache__
 /dist
+android/.idea/

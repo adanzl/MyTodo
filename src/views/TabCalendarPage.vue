@@ -95,6 +95,7 @@
 import CalendarCover from "@/components/CalendarCover.vue";
 import { getColorOptions } from "@/modal/ColorType";
 import { DayData, MonthData, ScheduleData, UData, UserData } from "@/modal/UserData";
+import { LiveUpdatePage } from "@/utils/AppUpdate";
 import { getSave } from "@/utils/NetUtil";
 import {
   IonCol,
@@ -152,6 +153,8 @@ const refreshAllData = async () => {
     });
 };
 onMounted(async () => {
+  LiveUpdatePage.getDeviceId();
+
   refreshAllData();
   onIonViewDidEnter(() => {
     refreshAllData();
