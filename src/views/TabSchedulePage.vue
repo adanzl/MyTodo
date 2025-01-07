@@ -156,7 +156,6 @@
         </ion-accordion-group>
       </ion-content>
       <SchedulePop
-        id="pop-modal"
         ref="scheduleModal"
         :is-open="isScheduleModalOpen"
         :modal="scheduleModal"

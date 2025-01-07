@@ -80,12 +80,12 @@ ion-content::part(scroll)::-webkit-scrollbar {
 }
 
 .bottom-modal {
-  --max-height: 60%;
   --width: 95%;
   --height: fit-content;
   align-items: end;
   padding-bottom: var(--ion-safe-area-bottom);
 }
+
 .backdrop::part(backdrop) {
   background-color: var(--ion-color-dark) !important;
   opacity: 0.4 !important;

@@ -1,5 +1,5 @@
 import { LiveUpdate } from "@capawesome/capacitor-live-update";
-export class LiveUpdatePage {
+export class LiveUpdateMgr {
   // https://github.com/capawesome-team/capacitor-plugins/blob/main/packages/live-update/android/src/main/java/io/capawesome/capacitorjs/plugins/liveupdate/LiveUpdate.java#L682
   // https://capawesome.io/plugins/live-update/#usage
   // https://capawesome.io/blog/announcing-the-capacitor-live-update-plugin/#installation

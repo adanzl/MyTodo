@@ -95,7 +95,7 @@
 import CalendarCover from "@/components/CalendarCover.vue";
 import { getColorOptions } from "@/modal/ColorType";
 import { DayData, MonthData, ScheduleData, UData, UserData } from "@/modal/UserData";
-import { LiveUpdatePage } from "@/utils/AppUpdate";
+import { LiveUpdateMgr } from "@/utils/AppUpdate";
 import { getSave } from "@/utils/NetUtil";
 import {
   IonCol,
@@ -153,16 +153,21 @@ const refreshAllData = async () => {
     });
 };
 onMounted(async () => {
-  LiveUpdatePage.getDeviceId();
+  try {
+    await LiveUpdateMgr.getDeviceId();
+  } catch (err) {
+    console.log("getDeviceId err");
+  }
 
   refreshAllData();
-  onIonViewDidEnter(() => {
-    refreshAllData();
-  });
+
   eventBus.$on("menuClose", (params: any) => {
     // console.log("menuClose", params);
     filter.value = params;
   });
+});
+onIonViewDidEnter(() => {
+  refreshAllData();
 });
 
 function bShowScheduleItem(schedule: ScheduleData) {

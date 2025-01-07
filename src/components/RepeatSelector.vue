@@ -8,25 +8,39 @@
     <ion-item>
       <ion-title>选择重复方式</ion-title>
     </ion-item>
-    <div class="ion-padding-horizontal">
-      <ion-item>
+    <div class="ion-padding">
+      <ion-item lines="none">
         <ion-radio-group :value="valueRef" @ionChange="onSelectChange" class="w-full" mode="ios">
           <ion-radio
             v-for="(op, idx) in RepeatOptions"
             :key="idx"
             :value="op.id"
+            @click="onItemClk($event, op)"
             class="option-item">
-            <ion-item lines="none" style="flex: 1">
-              <span>
-                <component :is="op.icon" :height="'25px'" width="36px" color="#7970ff" />
-              </span>
-              <ion-label style="margin-left: 8px">{{ op.label }} </ion-label>
-              <ion-label class="text-gray-400 text-xs font-mono" v-if="op.tag"
-                >（下次 {{ getNextRepeatDate(dt as dayjs.Dayjs, op.id) }}）</ion-label
-              >
+            <ion-item lines="none">
+              <div class="flex w-full items-center">
+                <span>
+                  <component :is="op.icon" :height="'25px'" width="36px" color="#7970ff" />
+                </span>
+                <ion-label class="flex-1 ml-2">{{ op.label }} </ion-label>
+                <ion-label class="text-gray-400 text-xs font-mono" v-if="op.tag">
+                  （下次 {{ getNextRepeatDate(dt as dayjs.Dayjs, op.id, repeatData) }}）
+                </ion-label>
+              </div>
             </ion-item>
+            <div id="btnCustom" v-if="op.id === 999" class="pl-6 text-gray-400 text-wrap">
+              <p v-if="repeatData.week?.length">{{ buildCustomRepeatLabel(repeatData) }}</p>
+              <p v-else>自定义重复的日期</p>
+            </div>
           </ion-radio>
         </ion-radio-group>
+        <WeekSelector
+          ref="weekSelector"
+          trigger="btnCustom"
+          side="top"
+          alignment="center"
+          @update:value="onRepeatDataChange"
+          :value="repeatData" />
       </ion-item>
     </div>
     <ion-footer>
@@ -37,19 +51,26 @@
 </template>
 
 <script lang="ts" setup>
-import { RepeatOptions,getNextRepeatDate } from "@/modal/ScheduleType";
+import {
+  RepeatOptions,
+  getNextRepeatDate,
+  buildCustomRepeatLabel,
+  RepeatData,
+  RepeatType,
+} from "@/modal/ScheduleType";
 import { createTriggerController } from "@/utils/Overlay";
 import { IonRadio, IonRadioGroup } from "@ionic/vue";
 import { onMounted, ref, watch } from "vue";
 import dayjs from "dayjs";
+import WeekSelector from "@/components/WeekSelector.vue";
 const props = defineProps({
   trigger: {
     type: String,
     default: "",
   },
   value: {
-    type: Number,
-    default: 0,
+    type: Object,
+    default: null,
   },
   dt: {
     type: Object,
@@ -58,28 +79,29 @@ const props = defineProps({
 });
 const triggerController = createTriggerController();
 const modal = ref();
-const valueRef = ref(props.value);
+const weekSelector = ref();
+const valueRef = ref(props.value.repeat ?? 0);
+const repeatData = ref(props.value.repeatData ?? new RepeatData());
 
 const cancel = () => {
   modal.value.$el!.dismiss();
 };
 const confirm = () => {
-  emits("update:value", valueRef.value);
+  emits("update:value", valueRef.value, repeatData.value);
   modal.value.$el!.dismiss();
 };
 const onSelectChange = (e: any) => {
   console.log("onSelectChange", e.detail.value);
   valueRef.value = e.detail.value;
 };
+function onItemClk(_e: any, o: RepeatType) {
+  if (o.id === 999) {
+    weekSelector.value?.$el.present();
+  }
+}
 
 const emits = defineEmits(["update:value"]);
 onMounted(() => {
-  watch(
-    () => props.value,
-    (v) => {
-      valueRef.value = v;
-    }
-  );
   watch(
     () => props.trigger,
     (newValue) => {
@@ -92,8 +114,13 @@ onMounted(() => {
   );
 });
 const onModalDismiss = () => {
-  valueRef.value = props.value;
+  // valueRef.value = props.value;
 };
+
+function onRepeatDataChange(v: number[]) {
+  console.log("onRepeatDataChange", v);
+  repeatData.value.week = v;
+}
 </script>
 
 <style scoped>

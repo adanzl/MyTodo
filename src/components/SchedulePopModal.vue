@@ -12,7 +12,7 @@
         </ion-title>
       </ion-toolbar>
     </ion-header>
-    <ion-content class="" ref="scheduleTab">
+    <ion-content class="" ref="scheduleTab" mode="ios">
       <ion-list :inset="true">
         <ion-item>
           <ion-checkbox
@@ -66,7 +66,12 @@
       </ion-list>
       <ion-list :inset="true">
         <!-- 开始日期 -->
-        <ion-item class="ion-text-center" :button="true" size="large" @click="btnScheduleDTClk">
+        <ion-item
+          key="0"
+          class="ion-text-center"
+          :button="true"
+          size="large"
+          @click="btnScheduleDTClk">
           <ion-icon :icon="calendarOutline" slot="start"></ion-icon>
           <div class="flex ion-justify-content-around ion-padding w-full">
             <div class="ion-text-center" v-if="curScheduleData.startTs">
@@ -138,23 +143,48 @@
           </ion-select>
         </ion-item> -->
         <!-- 重复 -->
-        <ion-item detail="true" id="btnRepeat">
+        <ion-item detail="true" id="btnRepeat" lines="none">
           <ion-icon :icon="repeat" slot="start"> </ion-icon>
           <ion-label>重复</ion-label>
           <ion-label class="text-right mr-0">
             <div>
               <p class="inline-block mr-2 gray">
-                {{ getNextRepeatDate(curScheduleData.startTs, curScheduleData.repeat) }}
+                {{
+                  getNextRepeatDate(
+                    curScheduleData.startTs,
+                    curScheduleData.repeat,
+                    curScheduleData.repeatData
+                  )
+                }}
               </p>
               <div class="inline-block">{{ getRepeatOptions(curScheduleData.repeat).label }}</div>
             </div>
           </ion-label>
         </ion-item>
+        <div class="border-b ml-14" id="btnOutCustom">
+          <div v-if="curScheduleData.repeat === 999" class="text-gray-400 text-wrap ion-no-padding">
+            <p
+              v-if="
+                curScheduleData &&
+                curScheduleData.repeatData &&
+                curScheduleData.repeatData?.week?.length
+              ">
+              {{ buildCustomRepeatLabel(curScheduleData.repeatData) }}
+            </p>
+          </div>
+        </div>
         <RepeatSelector
           trigger="btnRepeat"
           @update:value="onRepeatChange"
           :dt="curScheduleData.startTs"
-          :value="curScheduleData?.repeat" />
+          :value="curScheduleData" />
+        <WeekSelector
+          ref="weekSelector"
+          trigger="btnOutCustom"
+          side="top"
+          alignment="center"
+          :value="curScheduleData.repeatData" />
+
         <ion-item detail="true" :button="true" id="id-repeat-end">
           <ion-icon :icon="power" slot="start"></ion-icon>
           <ion-label>重复停止</ion-label>

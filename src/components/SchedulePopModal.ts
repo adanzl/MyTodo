@@ -11,6 +11,7 @@ import {
   getNextRepeatDate,
   ReminderOptions,
   WEEK,
+  buildCustomRepeatLabel,
 } from "@/modal/ScheduleType";
 import { getColorOptions } from "@/modal/ColorType";
 import { ScheduleData, ScheduleSave, Subtask } from "@/modal/UserData";
@@ -46,10 +47,12 @@ import {
   timeOutline,
 } from "ionicons/icons";
 import { defineComponent, nextTick, onMounted, ref, watch } from "vue";
+import WeekSelector from "@/components/WeekSelector.vue";
 
 export default defineComponent({
   components: {
     MdiChevronDoubleRight,
+    WeekSelector,
     createAnimation,
     IonCheckbox,
     IonDatetime,
@@ -238,9 +241,10 @@ export default defineComponent({
     };
     // =========== 重复 ============
     // 重复类型切换
-    const onRepeatChange = (nv: any) => {
-      curScheduleData.value!.repeat = nv;
-    };
+    function onRepeatChange(v0: any, v1: any) {
+      curScheduleData.value!.repeat = v0;
+      curScheduleData.value!.repeatData = v1;
+    }
     // 重复结束日期改变
     const onRepeatEndDtChange = (event: any) => {
       curScheduleData.value!.repeatEndTs = dayjs(event.detail.value);
@@ -463,6 +467,7 @@ export default defineComponent({
       btnSubtaskAddClk,
       onToastDismiss,
       onSubtaskPopDismiss,
+      buildCustomRepeatLabel,
       WEEK,
     };
   },

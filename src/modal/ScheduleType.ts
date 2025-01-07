@@ -29,6 +29,7 @@ import MdiCalendarMultiselectOutline from "virtual:icons/mdi/calendar-multiselec
 import MdiCalendarBlankOutline from "virtual:icons/mdi/calendar-blank-outline";
 import MdiCalendarWeekendOutline from "~icons/mdi/calendar-weekend-outline?width=24px&height=24px";
 import MdiCalendarWeekOutline from "~icons/mdi/calendar-week-outline?width=24px&height=24px";
+import MdiHammerWrench from "~icons/mdi/hammer-wrench";
 export const RepeatOptions: RepeatType[] = [
   { id: 0, label: "无", tag: "", icon: MdiCalendarBlankOutline },
   { id: 1, label: "每天", tag: "day", icon: MdiCalendarMonthOutline },
@@ -37,7 +38,12 @@ export const RepeatOptions: RepeatType[] = [
   { id: 2, label: "每星期", tag: "week", icon: MdiCalendarWeekBeginOutline },
   { id: 3, label: "每月", tag: "month", icon: MdiCalendarTodayOutline },
   { id: 4, label: "每年", tag: "year", icon: MdiCalendarMultiselectOutline },
+  { id: 999, label: "自定义", tag: "custom", icon: MdiHammerWrench },
 ];
+
+export class RepeatData {
+  week: number[] = [];
+}
 
 export const getRepeatOptions = (id: number | undefined | null): RepeatType => {
   for (const v of RepeatOptions) {
@@ -48,12 +54,22 @@ export const getRepeatOptions = (id: number | undefined | null): RepeatType => {
   return RepeatOptions[0];
 };
 
+export function buildCustomRepeatLabel(repeatData: RepeatData) {
+  let ret = "每周: ";
+  _.forEach(repeatData.week, (v) => {
+    ret += WEEK[v] + ",";
+  });
+  ret = ret.slice(0, -1);
+  return ret;
+}
+
 /**
  * 获取下一次的重复日期
  */
 export function getNextRepeatDate(
   date: dayjs.Dayjs | undefined,
-  repeatId: number | null | undefined
+  repeatId: number | null | undefined,
+  repeatData: RepeatData | undefined
 ) {
   if (!date || !repeatId) {
     return undefined;
@@ -80,6 +96,15 @@ export function getNextRepeatDate(
       ret = date.add(1, "day");
     } else {
       ret = date.add(6 - week, "day");
+    }
+  } else if(repeat.id === 999){
+    if(repeatData?.week?.length){
+      repeatData.week.sort()
+      const day = date.day();
+      const idx = _.sortedIndex(repeatData.week, day);
+      if(idx === repeatData.week.length) {
+        // TODO
+      }
     }
   }
   // console.log("getNextRepeatDate", repeat, ret);

@@ -1,4 +1,5 @@
 import dayjs from "dayjs";
+import { RepeatData } from "./ScheduleType";
 
 export class Subtask {
   id: number = -1;
@@ -22,6 +23,7 @@ export class ScheduleData {
   allDay?: boolean = true; // 是否全天
   reminder?: number = 0; // 提醒类型
   repeat?: number = 0; // 重复类型
+  repeatData?: RepeatData = new RepeatData(); // 重复数据
   repeatEndTs?: dayjs.Dayjs; // 重复结束类型
   // 以下字段为覆盖字段，用于覆盖默认值
   title?: string; // 任务标题
