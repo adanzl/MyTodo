@@ -161,9 +161,12 @@
             </div>
           </ion-label>
         </ion-item>
-        <div class="border-b ml-14" id="btnOutCustom">
-          <div v-if="curScheduleData.repeat === 999" class="text-gray-400 text-wrap ion-no-padding">
+        <div class="border-b ml-14">
+          <div
+            v-if="curScheduleData.repeat === CUSTOM_REPEAT_ID"
+            class="text-gray-400 text-wrap ion-no-padding">
             <p
+              class="text-xs text-right pr-8 pb-1"
               v-if="
                 curScheduleData &&
                 curScheduleData.repeatData &&
@@ -178,12 +181,6 @@
           @update:value="onRepeatChange"
           :dt="curScheduleData.startTs"
           :value="curScheduleData" />
-        <WeekSelector
-          ref="weekSelector"
-          trigger="btnOutCustom"
-          side="top"
-          alignment="center"
-          :value="curScheduleData.repeatData" />
 
         <ion-item detail="true" :button="true" id="id-repeat-end">
           <ion-icon :icon="power" slot="start"></ion-icon>
@@ -275,7 +272,6 @@
         </ion-item>
       </ion-list>
     </ion-content>
-
     <ion-footer>
       <ion-toolbar>
         <ion-button expand="block" color="warning" @click="btnSaveClk"> 保存 </ion-button>

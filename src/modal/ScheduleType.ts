@@ -30,6 +30,7 @@ import MdiCalendarBlankOutline from "virtual:icons/mdi/calendar-blank-outline";
 import MdiCalendarWeekendOutline from "~icons/mdi/calendar-weekend-outline?width=24px&height=24px";
 import MdiCalendarWeekOutline from "~icons/mdi/calendar-week-outline?width=24px&height=24px";
 import MdiHammerWrench from "~icons/mdi/hammer-wrench";
+export const CUSTOM_REPEAT_ID = 999;
 export const RepeatOptions: RepeatType[] = [
   { id: 0, label: "无", tag: "", icon: MdiCalendarBlankOutline },
   { id: 1, label: "每天", tag: "day", icon: MdiCalendarMonthOutline },
@@ -38,7 +39,7 @@ export const RepeatOptions: RepeatType[] = [
   { id: 2, label: "每星期", tag: "week", icon: MdiCalendarWeekBeginOutline },
   { id: 3, label: "每月", tag: "month", icon: MdiCalendarTodayOutline },
   { id: 4, label: "每年", tag: "year", icon: MdiCalendarMultiselectOutline },
-  { id: 999, label: "自定义", tag: "custom", icon: MdiHammerWrench },
+  { id: CUSTOM_REPEAT_ID, label: "自定义", tag: "custom", icon: MdiHammerWrench },
 ];
 
 export class RepeatData {
@@ -97,13 +98,26 @@ export function getNextRepeatDate(
     } else {
       ret = date.add(6 - week, "day");
     }
-  } else if(repeat.id === 999){
-    if(repeatData?.week?.length){
-      repeatData.week.sort()
+  } else if (repeat.id === 999) {
+    if (repeatData?.week?.length) {
+      const ln = repeatData?.week?.length ?? 0;
+      repeatData!.week.sort();
       const day = date.day();
       const idx = _.sortedIndex(repeatData.week, day);
-      if(idx === repeatData.week.length) {
-        // TODO
+      if (idx === ln) {
+        // 不在repeat中
+        const d = 7 - day + repeatData.week[0];
+        ret = date.add(d, "day");
+      } else {
+        if (repeatData.week[idx] == day) {
+          // 当天在repeat中
+          const d = (repeatData.week[(idx + 1) % ln] + 7 - day) % 7;
+          ret = date.add(d, "day");
+        } else {
+          // 不在
+          const d = repeatData.week[idx] - day;
+          ret = date.add(d, "day");
+        }
       }
     }
   }
@@ -163,8 +177,4 @@ export const getGroupOptions = (id?: number): GroupType => {
   return GroupOptions[0];
 };
 
-export default {
-  ReminderOptions,
-  RepeatOptions,
-  GroupOptions,
-};
+export default {};

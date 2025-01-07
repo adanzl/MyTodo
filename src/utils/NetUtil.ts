@@ -70,10 +70,10 @@ export function setSave(id: number | undefined, user: string, data: string) {
         data: data,
         version: 1,
       })
-      .then((res:any) => {
+      .then((res: any) => {
         resolve(res);
       })
-      .catch((err:any) => {
+      .catch((err: any) => {
         reject(err);
       });
   });
@@ -159,12 +159,4 @@ export async function delColor(id: number) {
   }
   return rsp.data.data;
 }
-export default {
-  getSave,
-  setSave,
-  getPicList,
-  getPic,
-  setPic,
-  delPic,
-  initNet,
-};
+export default {};

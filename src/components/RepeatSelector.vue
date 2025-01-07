@@ -28,7 +28,10 @@
                 </ion-label>
               </div>
             </ion-item>
-            <div id="btnCustom" v-if="op.id === 999" class="pl-6 text-gray-400 text-wrap">
+            <div
+              id="btnCustom"
+              v-if="op.id === CUSTOM_REPEAT_ID"
+              class="pr-6 text-gray-400 text-wrap text-sm text-right ">
               <p v-if="repeatData.week?.length">{{ buildCustomRepeatLabel(repeatData) }}</p>
               <p v-else>自定义重复的日期</p>
             </div>
@@ -56,6 +59,7 @@ import {
   getNextRepeatDate,
   buildCustomRepeatLabel,
   RepeatData,
+  CUSTOM_REPEAT_ID,
   RepeatType,
 } from "@/modal/ScheduleType";
 import { createTriggerController } from "@/utils/Overlay";
@@ -95,7 +99,7 @@ const onSelectChange = (e: any) => {
   valueRef.value = e.detail.value;
 };
 function onItemClk(_e: any, o: RepeatType) {
-  if (o.id === 999) {
+  if (o.id === CUSTOM_REPEAT_ID) {
     weekSelector.value?.$el.present();
   }
 }

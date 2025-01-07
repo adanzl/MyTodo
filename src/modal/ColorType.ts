@@ -42,7 +42,4 @@ export const getColorOptions = (id?: number): ColorType => {
   return ColorOptions[0];
 };
 
-export default {
-  ColorOptions,
-  getColorOptions,
-};
+export default {};

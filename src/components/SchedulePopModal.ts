@@ -1,20 +1,21 @@
 import ColorSelector from "@/components/ColorSelector.vue";
 import GroupSelector from "@/components/GroupSelector.vue";
-import RepeatSelector from "@/components/RepeatSelector.vue";
 import PrioritySelector from "@/components/PrioritySelector.vue";
+import RepeatSelector from "@/components/RepeatSelector.vue";
 import SubtaskPopModal from "@/components/SubtaskPopModal.vue";
-import MdiChevronDoubleRight from "virtual:icons/mdi/chevron-double-right";
+import { getColorOptions } from "@/modal/ColorType";
 import {
+  buildCustomRepeatLabel,
+  CUSTOM_REPEAT_ID,
   getGroupOptions,
+  getNextRepeatDate,
   getPriorityOptions,
   getRepeatOptions,
-  getNextRepeatDate,
   ReminderOptions,
   WEEK,
-  buildCustomRepeatLabel,
 } from "@/modal/ScheduleType";
-import { getColorOptions } from "@/modal/ColorType";
 import { ScheduleData, ScheduleSave, Subtask } from "@/modal/UserData";
+import MdiChevronDoubleRight from "virtual:icons/mdi/chevron-double-right";
 
 import {
   alertController,
@@ -47,12 +48,10 @@ import {
   timeOutline,
 } from "ionicons/icons";
 import { defineComponent, nextTick, onMounted, ref, watch } from "vue";
-import WeekSelector from "@/components/WeekSelector.vue";
 
 export default defineComponent({
   components: {
     MdiChevronDoubleRight,
-    WeekSelector,
     createAnimation,
     IonCheckbox,
     IonDatetime,
@@ -468,6 +467,7 @@ export default defineComponent({
       onToastDismiss,
       onSubtaskPopDismiss,
       buildCustomRepeatLabel,
+      CUSTOM_REPEAT_ID,
       WEEK,
     };
   },

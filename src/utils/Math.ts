@@ -26,6 +26,4 @@ export function calcImgPos(img: HTMLImageElement, canvasWidth: number, canvasHei
   return { dx, dy, drawWidth, drawHeight };
 }
 
-export default {
-  calcImgPos,
-};
+export default {};

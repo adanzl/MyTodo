@@ -1,5 +1,6 @@
+import { CUSTOM_REPEAT_ID, RepeatData } from "@/modal/ScheduleType";
 import dayjs from "dayjs";
-import { RepeatData } from "./ScheduleType";
+import _ from 'lodash';
 
 export class Subtask {
   id: number = -1;
@@ -181,9 +182,6 @@ export class UData {
     const dayData = new DayData(_dt);
     const ts = _dt.unix();
     const dKey = S_TS(_dt);
-    // if (userData.save[S_TS(_dt)] == undefined) {
-    //   userData.save[S_TS(_dt)] = {};
-    // }
     let save: Record<number, ScheduleSave> | undefined = userData.save[dKey];
     if (save && Object.keys(save).length === 0) {
       console.log("delete", dKey);
@@ -227,6 +225,12 @@ export class UData {
         } else if (schedule.repeat == 6) {
           // weekend
           if (_dt.day() === 0 || _dt.day() === 6) {
+            dayData.events.push(schedule);
+          }
+        } else if (schedule.repeat === CUSTOM_REPEAT_ID) {
+          // 自定义repeat
+          const day = dayData.dt.day();
+          if (_.includes(schedule.repeatData?.week, day)) {
             dayData.events.push(schedule);
           }
         }
@@ -357,12 +361,4 @@ export const S_TS = (dt?: dayjs.Dayjs): string => {
   return dt.format("YYYY-MM-DD");
 };
 
-export default {
-  ScheduleData,
-  ScheduleSave,
-  UserData,
-  DayData,
-  MonthData,
-  S_TS,
-  UData,
-};
+export default {};

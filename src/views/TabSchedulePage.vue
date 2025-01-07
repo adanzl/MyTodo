@@ -138,7 +138,7 @@
                         selectedDate.save &&
                         selectedDate.save[schedule.id]?.subtasks[sub.id] === 1
                       " />
-                    <span class="pl-2">{{ sub.name }}</span>
+                    <span class="pl-2 text-gray-500 text-base">{{ sub.name }}</span>
                   </div>
                   <ion-item-options side="end">
                     <ion-item-option @click="btnScheduleAlarmClk">

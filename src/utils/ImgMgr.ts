@@ -145,10 +145,4 @@ export async function cameraAndSetImage(
     fileInput.click();
   });
 }
-export default {
-  getImage,
-  setImage,
-  delImage,
-  loadAndSetImage,
-  cameraAndSetImage,
-};
+export default {};

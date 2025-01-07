@@ -40,7 +40,7 @@
           <ion-grid class="w-full">
             <ion-row v-for="week in month.weekArr" :key="week" class="flex-nowrap">
               <ion-col
-                class="p-[1px] min-h-32 border-[0.5px] border-gray-300 border-solid w-[14.28%]"
+                class="p-[1px] min-h-32 border-[0.5px] border-gray-300 border-solid w-[14.28%] h-auto"
                 @click="onDaySelected(month, day)"
                 v-for="day in week"
                 :key="day">
@@ -221,6 +221,7 @@ const onDaySelected = (slide: MonthData, day: DayData) => {
 //
 function onScheduleModalDismiss() {
   isScheduleModalOpen.value = false;
+  swiperRef?.value?.update();
 }
 
 // 今天

@@ -111,7 +111,7 @@
                       day.save &&
                       day.save[schedule.id]?.subtasks[sub.id] === 1
                     " />
-                  <span class="pl-2 text-base">{{ sub.name }}</span>
+                  <span class="pl-2 text-base text-gray-500">{{ sub.name }}</span>
                 </div>
                 <div style="border-bottom-width: 1px" class="mt-2"></div>
               </div>
@@ -202,7 +202,7 @@ const updateScheduleData = () => {
     UData.createDayData(currentDate.value as dayjs.Dayjs, props.userData as UserData),
     UData.createDayData(currentDate.value.add(1, "day"), props.userData as UserData),
   ];
-  console.log("updateScheduleData", currentDate.value, dayArr.value);
+  // console.log("updateScheduleData", currentDate.value, dayArr.value);
 };
 onMounted(() => {});
 // 翻页事件
