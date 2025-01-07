@@ -61,11 +61,6 @@ ion-content::part(scroll)::-webkit-scrollbar {
   display: none;
 }
 
-.vertical {
-  display: flex;
-  flex-direction: column;
-}
-
 .gray {
   color: var(--color-gray) !important;
 }
@@ -76,6 +71,7 @@ ion-content::part(scroll)::-webkit-scrollbar {
 .bottom-modal ion-footer {
   display: flex;
   justify-content: space-around;
+  border-top-width: 1px;
 }
 
 .bottom-modal::part(backdrop) {
@@ -83,17 +79,16 @@ ion-content::part(scroll)::-webkit-scrollbar {
   opacity: 0.4 !important;
 }
 
+.bottom-modal {
+  --max-height: 60%;
+  --width: 95%;
+  --height: fit-content;
+  align-items: end;
+  padding-bottom: var(--ion-safe-area-bottom);
+}
 .backdrop::part(backdrop) {
   background-color: var(--ion-color-dark) !important;
   opacity: 0.4 !important;
-}
-
-.bottom-modal {
-  /* --max-height: 50%; */
-  --width: 95%;
-  --height: auto;
-  align-items: end;
-  padding-bottom: var(--ion-safe-area-bottom);
 }
 
 .pre-img-block {

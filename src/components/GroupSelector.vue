@@ -9,8 +9,8 @@
     <ion-item>
       <ion-title>选择分组</ion-title>
     </ion-item>
-    <div class="ion-padding-horizontal">
-      <ion-item>
+    <div class="ion-padding">
+      <ion-item lines="none">
         <ion-radio-group :value="valueRef" @ionChange="onSelectChange" class="w-full" mode="ios">
           <ion-radio
             v-for="(op, idx) in GroupOptions"

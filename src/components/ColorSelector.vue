@@ -10,7 +10,7 @@
       <ion-title>选择颜色</ion-title>
     </ion-item>
     <div>
-      <ion-item>
+      <ion-item lines="none">
         <ion-radio-group
           :value="valueRef"
           @ionChange="onSelectChange"
@@ -66,6 +66,7 @@ ion-radio.ios::part(container) {
 .radio-checked.ios::part(mark) {
   opacity: 0;
 }
+
 </style>
 
 <script lang="ts" setup>

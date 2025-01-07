@@ -9,8 +9,8 @@
     <ion-item>
       <ion-title>选择优先级</ion-title>
     </ion-item>
-    <div class="ion-padding-horizontal">
-      <ion-item>
+    <div class="ion-padding">
+      <ion-item lines="none">
         <ion-radio-group :value="valueRef" @ionChange="onSelectChange" class="w-full">
           <ion-radio
             v-for="(op, idx) in PriorityOptions"

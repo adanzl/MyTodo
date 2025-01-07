@@ -52,10 +52,6 @@
               width="36px"
               :color="getPriorityOptions(curScheduleData.priority).color" />
           </ion-button>
-          <PrioritySelector
-            trigger="btnPriority"
-            @update:value="onPriorityChange"
-            :value="curScheduleData.priority" />
           <ion-button id="btnColorSelect" class="flex-1 text-base" fill="none">
             <ion-icon slot="start" :icon="colorPaletteOutline" />
             <span
@@ -146,7 +142,7 @@
           <ion-icon :icon="repeat" slot="start"> </ion-icon>
           <ion-label>重复</ion-label>
           <ion-label class="text-right mr-0">
-            <div >
+            <div>
               <p class="inline-block mr-2 gray">
                 {{ getNextRepeatDate(curScheduleData.startTs, curScheduleData.repeat) }}
               </p>
@@ -301,6 +297,10 @@
         </ion-button>
       </ion-footer>
     </ion-modal>
+    <PrioritySelector
+      trigger="btnPriority"
+      @update:value="onPriorityChange"
+      :value="curScheduleData.priority" />
   </ion-modal>
 </template>
 <script lang="ts" src="@/components/SchedulePopModal.ts"></script>
@@ -316,10 +316,10 @@
   align-items: flex-start;
   padding: 16px 16px 0 16px;
 }
-ion-modal::part(content){
+ion-modal#main::part(content) {
   max-width: 500px;
 }
-ion-modal{
+ion-modal#main {
   --height: 100%;
 }
 </style>
