@@ -31,7 +31,9 @@ def init_db():
         CREATE TABLE IF NOT EXISTS {TABLE_USER} (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT,
-            icon TEXT
+            icon TEXT,
+            pwd TEXT,
+            score INTEGER DEFAULT 0
         );
     '''
     cur.execute(create_t_user_save_sql)

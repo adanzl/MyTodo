@@ -24,6 +24,7 @@
             placeholder="输入日程标题"
             :value="curScheduleData?.title"
             :required="true"
+            class="font-bold"
             @ionChange="onTitleChange">
           </ion-input>
         </ion-item>
@@ -337,6 +338,10 @@
   align-items: center;
   text-align: center;
   font-size: larger;
+}
+.subtask-item ion-checkbox {
+  --size: 18px;
+  --border-radius: 4px;
 }
 .subtask-item::part(native) {
   align-items: flex-start;

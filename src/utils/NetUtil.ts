@@ -104,6 +104,16 @@ export async function delPic(id: number) {
   return rsp.data.data;
 }
 
+export async function getUserList() {
+  const rsp: any = await axios.get(URL + "/getAll", {
+    params: { table: "t_user"},
+  });
+  // console.log(rsp.data.data);
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
 export async function getPicList(pageNum?: number, pageSize?: number) {
   const rsp: any = await axios.get(URL + "/getAll", {
     params: { table: "t_user_pic", pageNum: pageNum, pageSize: pageSize },

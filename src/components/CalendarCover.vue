@@ -125,7 +125,7 @@
         </ion-fab-button>
       </ion-fab>
     </ion-content>
-    <div class="w-full h-[20%]" @click="selfRef.$el.dismiss()"></div>
+    <div class="w-full h-[10%]" @click="selfRef.$el.dismiss()"></div>
     <SchedulePop
       id="pop-modal"
       aria-hidden="false"
