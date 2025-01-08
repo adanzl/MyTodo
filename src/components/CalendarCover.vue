@@ -125,7 +125,7 @@
         </ion-fab-button>
       </ion-fab>
     </ion-content>
-    <div class="w-full h-[10%]" @click="selfRef.$el.dismiss()"></div>
+    <div class="w-full h-[20%]" @click="selfRef.$el.dismiss()"></div>
     <SchedulePop
       id="pop-modal"
       aria-hidden="false"
@@ -341,7 +341,7 @@ function onReorder(event: any, day: DayData) {
 <style scoped>
 .main_content::part(scroll) {
   height: 90%;
-  margin-top: 10vh;
+  margin-top: 5vh;
 }
 .main_content::part(background) {
   display: none;

@@ -8,6 +8,7 @@ log = logging.getLogger(__name__)
 DB_NAME = "data.db"
 TABLE_SAVE = "t_user_save"
 TABLE_PIC = "t_user_pic"
+TABLE_USER = "t_user"
 
 
 def init_db():
@@ -26,8 +27,16 @@ def init_db():
             data TEXT
         );
     '''
+    create_t_user_sql = f'''
+        CREATE TABLE IF NOT EXISTS {TABLE_USER} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            icon TEXT
+        );
+    '''
     cur.execute(create_t_user_save_sql)
     cur.execute(create_t_user_pic_sql)
+    cur.execute(create_t_user_sql)
     conn.commit()
     cur.close()
 
