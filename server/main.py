@@ -131,6 +131,13 @@ def del_data():
     id = args.get('id')
     return db_mgr.del_data(table, id)
 
+@app.route("/query", methods=['POST'])
+def query():
+    args = request.get_json()
+    log.info("===== [Query Data] " + json.dumps(args))
+    sql = args.get('sql')
+    return db_mgr.query(sql)
+
 
 # . .venv/bin/activate
 if __name__ == '__main__':

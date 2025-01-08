@@ -146,6 +146,25 @@ def del_data(table, id: int) -> dict:
         cur.close()
     return {"code": 0, "msg": "ok", "data": cnt}
 
+def query(sql) -> dict:
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    try:
+        cur.execute(sql)
+        result = cur.fetchall()
+        if result:
+            data = result
+        else:
+            data = "{}"
+    except Exception as e:
+        log.error(e)
+        traceback.print_exc()
+        return {"code": -1, "msg": 'error ' + str(e)}
+    finally:
+        cur.close()
+    return {"code": 0, "msg": "ok", "data": data}
+
+
 
 def get_list(table, page_num=1, page_size=20) -> dict:
     conn = sqlite3.connect(DB_NAME)
