@@ -1,6 +1,6 @@
 <template>
   <ion-modal mode="ios" ref="selfRef" @willDismiss="onModalDismiss">
-    <ion-content class="main_content">
+    <ion-content class="main_content"  fixed-slot-placement="before">
       <ion-item class="transparent">
         <h2 class="text-xl font-bold text-white">
           {{ currentDate.format("YYYY-MM-DD") + " " + weekHead[currentDate.day()] }}
@@ -38,7 +38,7 @@
         <swiper-slide
           v-for="(day, idx) in dayArr"
           :key="idx"
-          class="data-content h-full w-4/5 flex-col">
+          class="data-content h-full w-[85%] flex-col">
           <ion-item color="light" lines="none" class="w-full rounded-t">
             <icon-mdi-list-status class="text-blue-500" :height="'30'" :width="'30'" slot="start">
             </icon-mdi-list-status>
@@ -47,7 +47,7 @@
               <ion-icon :icon="swapVertical" class="button-native"></ion-icon>
             </ion-button>
           </ion-item>
-          <ion-content>
+          <ion-content class="">
             <ion-reorder-group
               :disabled="bReorderDisabled"
               @ionItemReorder="onReorder($event, day)">
@@ -118,13 +118,13 @@
           </ion-content>
         </swiper-slide>
       </swiper>
-      <ion-fab slot="fixed" vertical="bottom" horizontal="end">
+      <ion-fab class="absolute right-[9%] bottom-[5%]">
         <ion-fab-button @click="btnAddScheduleClk">
           <ion-icon :icon="add" size="large"></ion-icon>
         </ion-fab-button>
       </ion-fab>
     </ion-content>
-    <div class="w-full h-[10%]" @click="selfRef.$el.dismiss()"></div>
+    <div class="w-full h-[10%] absolute bottom-0" @click="selfRef.$el.dismiss()"></div>
     <SchedulePop
       id="pop-modal"
       aria-hidden="false"
@@ -355,6 +355,7 @@ ion-modal {
   height: 100%;
   /* border: 1px solid #e2d0d0; */
   /* border-radius: 10px; */
+  padding: 4px;
   border-bottom-right-radius: 10px;
   border-bottom-left-radius: 10px;
 }
@@ -366,4 +367,5 @@ ion-modal {
   --size: 18px;
   --border-radius: 4px;
 }
+
 </style>
