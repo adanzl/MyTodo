@@ -11,14 +11,14 @@
           </ion-toolbar>
         </ion-header>
         <ion-content>
-          <ion-item lines="none">
+          <ion-item lines="none" @click="rewardLbClk" detail="true">
             <ion-avatar slot="start" class="ml-0 w-8 h-8">
               <ion-img :src="curUser.icon" />
             </ion-avatar>
             <ion-label class="font-bold">{{ curUser.name }}</ion-label>
             <MdiStar class="text-red-500" />
-            <div class="text-left flex-1 pl-1 font-bold">
-              {{ userScore }}
+            <div class="text-left pl-1 font-bold w-8">
+              {{ userData?.score ?? 0 }}
             </div>
           </ion-item>
           <ion-accordion-group :multiple="true" :value="['group', 'color', 'priority']" mode="ios">
@@ -230,8 +230,9 @@
 import { ColorOptions } from "@/modal/ColorType";
 import { GroupOptions, PriorityOptions } from "@/modal/ScheduleType";
 import { User } from "@/modal/UserData";
-import { getUserList } from "@/utils/NetUtil";
+import { getUserList, setSave } from "@/utils/NetUtil";
 import {
+  alertController,
   IonAccordion,
   IonAccordionGroup,
   IonAvatar,
@@ -267,7 +268,7 @@ import MdiStar from "~icons/mdi/star";
 const bLogin = ref(false);
 const userList = ref<any[]>([]);
 const errMsg = ref("");
-const userScore = ref(0);
+const userData = ref();
 const curUser = ref(new User());
 curUser.value.name = "点击选择用户";
 const userPopover = ref<any>(null);
@@ -347,8 +348,36 @@ function btnLogoff() {
   localStorage.removeItem("saveUser");
 }
 eventBus.$on("updateSave", (params: any) => {
-  userScore.value = params.score;
+  userData.value = params;
 });
+
+async function rewardLbClk() {
+  if (curUser.value.admin !== 1) return;
+  const alert = await alertController.create({
+    header: "设置奖励",
+    inputs: [{ type: "number", value: userData.value.score, placeholder: "积分" }],
+    buttons: [
+      {
+        text: "取消",
+        role: "cancel",
+      },
+      {
+        text: "确定",
+        handler: (e) => {
+          userData.value.score = parseInt(e[0]);
+          setSave(userData.value.id, userData.value.name, userData.value)
+            .then((res) => {
+              console.log("doSaveUserData", res);
+            })
+            .catch((err) => {
+              console.log("doSaveUserData", err);
+            });
+        },
+      },
+    ],
+  });
+  await alert.present();
+}
 </script>
 
 <style scoped>

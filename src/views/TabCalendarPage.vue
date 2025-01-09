@@ -185,7 +185,7 @@ function bShowScheduleItem(schedule: ScheduleData) {
 
 // 初始化数据
 const updateScheduleData = () => {
-  console.log("updateScheduleData", currentDate.value);
+  // console.log("updateScheduleData", currentDate.value);
   monthArr.value = [
     UData.createMonthData(currentDate.value.subtract(1, "months"), userData.value),
     UData.createMonthData(currentDate.value, userData.value),
