@@ -1,5 +1,5 @@
 <template>
-  <ion-modal mode="ios" ref="selfRef">
+  <ion-modal mode="ios" ref="selfRef" @willDismiss="onModalDismiss">
     <ion-content class="main_content">
       <ion-item class="transparent">
         <h2 class="text-xl font-bold text-white">
@@ -62,7 +62,7 @@
                     class="flex items-center w-full">
                     <ion-label
                       :class="{
-                        'text-line-through': day.save && day.save[schedule.id]?.state === 1,
+                        'line-through': day.save && day.save[schedule.id]?.state === 1,
                       }"
                       class="pt-2.5 flex-1">
                       <h2 class="truncate">{{ schedule.title }}</h2>
@@ -143,10 +143,6 @@ import { getColorOptions } from "@/modal/ColorType";
 import { getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
 import { DayData, S_TS, ScheduleData, ScheduleSave, UData, UserData } from "@/modal/UserData";
 import { setSave } from "@/utils/NetUtil";
-import _ from "lodash";
-import MdiStar from "~icons/mdi/star";
-// import midCalendarTodayOutline from "@iconify-icons/mdi/calendar-today-outline";
-// import mdiListStatus from "@iconify-icons/mdi/list-status";
 import {
   IonCheckbox,
   IonFab,
@@ -158,11 +154,13 @@ import {
 import "@ionic/vue/css/ionic-swiper.css";
 import dayjs from "dayjs";
 import { add, swapVertical } from "ionicons/icons";
+import _ from "lodash";
 import "swiper/css";
 import "swiper/css/effect-fade";
 import { EffectCoverflow, Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
 import { nextTick, onMounted, ref, watch } from "vue";
+import MdiStar from "~icons/mdi/star";
 const weekHead = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
 const props = defineProps({
   dt: {
@@ -248,7 +246,6 @@ const onScheduleCheckboxChange = (_event: any, day: DayData | undefined, schedul
       });
     });
     doSaveUserData();
-    emits("update:data", currentDate.value);
   }
 };
 // 日程按钮点击
@@ -274,14 +271,13 @@ const onScheduleModalDismiss = (event: any) => {
   if (r) {
     updateScheduleData();
     doSaveUserData();
-    emits("update:data", currentDate.value);
   }
 };
 
 // 保存存档
 function doSaveUserData() {
-  console.log("doSaveUserData", props.userData);
-  setSave(props.userData.id, props.userData.name, JSON.stringify(props.userData))
+  // console.log("doSaveUserData", props.userData);
+  setSave(props.userData.id, props.userData.name, props.userData)
     .then((res) => {
       console.log("doSaveUserData", res);
     })
@@ -325,8 +321,11 @@ function onReorder(event: any, day: DayData) {
     return UData.CmpScheduleData(a, b, day.save);
   });
   doSaveUserData();
-  emits("update:data", currentDate.value);
   // console.log(eList);
+}
+function onModalDismiss() {
+  // console.log("onModalDismiss");
+  emits("update:data", currentDate.value);
 }
 </script>
 <style scoped>

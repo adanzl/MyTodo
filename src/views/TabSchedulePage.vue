@@ -85,7 +85,7 @@
                     <div @click="btnScheduleClk($event, schedule)" class="flex w-full items-center">
                       <ion-label
                         :class="{
-                          'text-line-through':
+                          'line-through':
                             selectedDate?.save && selectedDate?.save[schedule.id]?.state === 1,
                         }"
                         class="pt-2.5 flex-1">

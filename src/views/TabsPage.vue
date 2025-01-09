@@ -17,7 +17,9 @@
             </ion-avatar>
             <ion-label class="font-bold">{{ curUser.name }}</ion-label>
             <MdiStar class="text-red-500" />
-            <div class="text-left flex-1 pl-1 font-bold">{{ getUserScore() }}</div>
+            <div class="text-left flex-1 pl-1 font-bold">
+              {{ userScore }}
+            </div>
           </ion-item>
           <ion-accordion-group :multiple="true" :value="['group', 'color', 'priority']" mode="ios">
             <ion-accordion value="group">
@@ -225,13 +227,9 @@
 </template>
 
 <script setup lang="ts">
-import CryptoJS from "crypto-js";
-
-import { bookmarksOutline } from "ionicons/icons";
-import MdiStar from "~icons/mdi/star";
-
 import { ColorOptions } from "@/modal/ColorType";
 import { GroupOptions, PriorityOptions } from "@/modal/ScheduleType";
+import { User } from "@/modal/UserData";
 import { getUserList } from "@/utils/NetUtil";
 import {
   IonAccordion,
@@ -253,7 +251,9 @@ import {
   IonTabButton,
   IonTabs,
 } from "@ionic/vue";
+import CryptoJS from "crypto-js";
 import {
+  bookmarksOutline,
   calendarOutline,
   colorPaletteOutline,
   gridOutline,
@@ -262,11 +262,12 @@ import {
 } from "ionicons/icons";
 import _ from "lodash";
 import { inject, onMounted, ref } from "vue";
-import { User } from "@/modal/UserData";
+import MdiStar from "~icons/mdi/star";
 
 const bLogin = ref(false);
 const userList = ref<any[]>([]);
 const errMsg = ref("");
+const userScore = ref(0);
 const curUser = ref(new User());
 curUser.value.name = "点击选择用户";
 const userPopover = ref<any>(null);
@@ -289,13 +290,6 @@ onMounted(async () => {
     globalVar.user = sUser;
   }
 });
-function getUserScore () {
-  let score = 0;
-  if (globalVar.userSave && globalVar.userSave.score){
-    score = globalVar.userSave.score;
-  }
-  return score;
-}
 function onMenuClose() {
   eventBus.$emit("menuClose", {
     group: groupRef.value,
@@ -352,6 +346,9 @@ function btnLogoff() {
   bLogin.value = false;
   localStorage.removeItem("saveUser");
 }
+eventBus.$on("updateSave", (params: any) => {
+  userScore.value = params.score;
+});
 </script>
 
 <style scoped>

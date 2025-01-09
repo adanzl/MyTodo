@@ -1,4 +1,6 @@
 import { LoadColorData } from "@/modal/ColorType";
+import { UData } from "@/modal/UserData";
+import EventBus from "@/modal/EventBus";
 import axios from "axios";
 // const URL = "https://3ft23fh89533.vicp.fun/api";
 // natapp.cn
@@ -53,10 +55,12 @@ export async function getSave(id: number) {
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
   }
-  return rsp.data.data;
+  const ret = UData.parseUserData(rsp.data.data);
+  EventBus.$emit("updateSave", ret);
+  return ret;
 }
 
-export function setSave(id: number | undefined, user: string, data: string) {
+export function setSave(id: number | undefined, user: string, data: any) {
   // console.log(data);
   return new Promise((resolve, reject) => {
     if (id === undefined) {
@@ -67,11 +71,12 @@ export function setSave(id: number | undefined, user: string, data: string) {
       .post(URL + "/setSave", {
         id: id,
         user: user,
-        data: data,
+        data: JSON.stringify(data),
         version: 1,
       })
       .then((res: any) => {
         resolve(res);
+        EventBus.$emit("updateSave", data);
       })
       .catch((err: any) => {
         reject(err);
@@ -106,7 +111,7 @@ export async function delPic(id: number) {
 
 export async function getUserList() {
   const rsp: any = await axios.get(URL + "/getAll", {
-    params: { table: "t_user"},
+    params: { table: "t_user" },
   });
   // console.log(rsp.data.data);
   if (rsp.data.code !== 0) {
@@ -115,16 +120,16 @@ export async function getUserList() {
   return rsp.data.data;
 }
 
-export async function setUserData( data: any) {
-    const rsp: any = await axios.post(URL + "/setData", {
-      table: "t_user",
-      data: data,
-    });
-    console.log("setUser", rsp.data);
-    if (rsp.data.code !== 0) {
-      throw new Error(rsp.data.msg);
-    }
-    return rsp.data.data;
+export async function setUserData(data: any) {
+  const rsp: any = await axios.post(URL + "/setData", {
+    table: "t_user",
+    data: data,
+  });
+  console.log("setUser", rsp.data);
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
 }
 
 export async function getPicList(pageNum?: number, pageSize?: number) {

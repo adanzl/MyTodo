@@ -266,7 +266,7 @@
             @ionChange="onSubtaskCheckboxChange($event, task)">
           </ion-checkbox>
           <div class="flex flex-col w-full h-full" @click="onSubtaskClk($event, task)">
-            <ion-label :class="{ 'text-line-through': subTaskChecked(task) }" class="ion-no-margin">
+            <ion-label :class="{ 'line-through': subTaskChecked(task) }" class="ion-no-margin">
               {{ task.name }}
             </ion-label>
             <div class="pre-img-group" style="margin-top: 5px">

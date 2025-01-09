@@ -59,8 +59,7 @@
                   v-for="(event, idx) of day.events.filter(bShowScheduleItem)"
                   :key="idx"
                   :class="{
-                    'text-line-through': day.save && day.save[event.id]?.state === 1,
-                    gray: day.save && day.save[event.id]?.state === 1,
+                    'line-through': day.save && day.save[event.id]?.state === 1,
                   }"
                   class="text-left truncate mt-[1px] rounded-sm py-[1px] px-1"
                   :style="{
@@ -136,9 +135,9 @@ const refreshAllData = async () => {
   loading.present();
   // 获取数据
   getSave(1)
-    .then((res: any) => {
-      userData.value = UData.parseUserData(res);
-      globalVar.userData = userData.value;
+    .then((uData: any) => {
+      userData.value = uData;
+      globalVar.userData = uData;
       // console.log("getSave", userData.value);
       updateScheduleData();
       setTimeout(() => {
@@ -186,7 +185,7 @@ function bShowScheduleItem(schedule: ScheduleData) {
 
 // 初始化数据
 const updateScheduleData = () => {
-  // console.log("updateScheduleData", currentDate.value);
+  console.log("updateScheduleData", currentDate.value);
   monthArr.value = [
     UData.createMonthData(currentDate.value.subtract(1, "months"), userData.value),
     UData.createMonthData(currentDate.value, userData.value),
@@ -237,8 +236,7 @@ function isThisMonth() {
 }
 // 数据更新
 function onDataUpdate() {
-  updateScheduleData();
-  slideChange(swiperRef.value);
+  slideChange(swiperRef.value); 
 }
 </script>
 <style lang="css" scoped>

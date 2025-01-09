@@ -73,7 +73,6 @@ dayjs.extend(isToday);
 dayjs.locale("zh-cn", {
   weekStart: 0, // 1 表示星期一，0 表示星期日
 });
-
 const app = createApp(App).use(IonicVue).use(router);
 app.provide("eventBus", EventBus);
 app.provide("globalVar", {});

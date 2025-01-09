@@ -94,7 +94,7 @@
 import { getSave } from "@/utils/NetUtil";
 import { getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
 import { getColorOptions } from "@/modal/ColorType";
-import { S_TS, UserData, UData } from "@/modal/UserData";
+import { S_TS, UserData } from "@/modal/UserData";
 import { IonRefresher, IonRefresherContent, IonInputPasswordToggle } from "@ionic/vue";
 import dayjs from "dayjs";
 import { onMounted, ref } from "vue";
@@ -116,8 +116,8 @@ onMounted(() => {
 
   // 获取数据
   getSave(1)
-    .then((res: any) => {
-      userData.value = UData.parseUserData(res);
+    .then((uData: any) => {
+      userData.value = uData;
       // console.log(userData.value);
     })
     .catch((err) => {
@@ -127,8 +127,8 @@ onMounted(() => {
 });
 function handleRefresh(event: any) {
   getSave(1)
-    .then((res: any) => {
-      userData.value = UData.parseUserData(res);
+    .then((uData: any) => {
+      userData.value = uData;
       for (let i = 0; i < userData.value.schedules.length; i++) {
         const schedule = userData.value.schedules[i];
         schedule.startTs = dayjs(schedule.startTs);

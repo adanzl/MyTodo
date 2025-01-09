@@ -31,10 +31,6 @@ http://ionicframework.com/docs/theming/ */
   overflow: hidden;
 }
 
-.text-line-through {
-  text-decoration: line-through;
-}
-
 ion-content::part(background) {
   background: var(--color-main-bg);
 }
