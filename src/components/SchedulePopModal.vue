@@ -3,7 +3,7 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-button @click="btnCancelClk">
+          <ion-button @click="btnBackClk">
             <ion-icon :icon="chevronBackOutline" />
           </ion-button>
         </ion-buttons>
@@ -227,6 +227,14 @@
             </ion-footer>
           </ion-modal>
         </ion-item>
+        <ion-item @click="btnRewardClk" detail="true">
+          <MdiGiftOutline class="text-red-500 w-[1.6em] h-[1.6em]" slot="start" />
+          <ion-label>奖励</ion-label>
+          <div slot="end" class="flex items-center">
+            <MdiStar class="text-red-500" />
+            <ion-label class="w-5 text-right">{{ curScheduleData.score ?? 0 }}</ion-label>
+          </div>
+        </ion-item>
       </ion-list>
       <ion-list :inset="true">
         <ion-item lines="none">
@@ -284,7 +292,7 @@
       :duration="toastData.duration"
       @didDismiss="onToastDismiss">
     </ion-toast>
-    <ion-action-sheet :is-open="openSaveSheet" :buttons="saveActionButtons"> </ion-action-sheet>
+    <ion-action-sheet :is-open="openSaveSheet" :buttons="saveActionButtons" />
     <!-- 开始时间弹窗 -->
     <ion-modal
       class="bottom-modal"

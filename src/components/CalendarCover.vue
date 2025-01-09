@@ -56,7 +56,7 @@
                   <ion-checkbox
                     style="--size: 22px; padding-right: 10px"
                     :checked="day.save && day.save[schedule.id]?.state === 1"
-                    @ionChange="onScheduleCheckboxChange($event, day, schedule.id)" />
+                    @ionChange="onScheduleCheckboxChange($event, day, schedule)" />
                   <div
                     @click="btnScheduleClk($event, schedule, day)"
                     class="flex items-center w-full">
@@ -67,22 +67,24 @@
                       class="pt-2.5 flex-1">
                       <h2 class="truncate">{{ schedule.title }}</h2>
                       <div class="flex text-gray-400">
-                        <p class="w-14 mr-2">
-                          <ion-icon :icon="listOutline" class="relative top-0.5"></ion-icon>
-                          {{ countFinishedSubtask(day, schedule) }}
-                          /
-                          {{ schedule?.subtasks?.length }}
-                        </p>
-                        <span class="mr-1 pt-[1px]">
+                        <span class="mr-1 flex items-center text-xs">
                           <component
                             :is="getGroupOptions(schedule.groupId).icon"
-                            height="16px"
-                            width="16px" />
+                            height="18px"
+                            width="18px" />
                         </span>
-                        <p class="schedule-lb-group w-14">
+                        <span class="w-11 mr-1 flex items-center text-xs">
                           {{ getGroupOptions(schedule.groupId).label }}
-                        </p>
-                        <p>{{ schedule.allDay ? "全天" : schedule.startTs?.format("HH:mm") }}</p>
+                        </span>
+                        <span class="mr-3 flex items-center text-xs">
+                          {{ schedule.allDay ? "全天" : schedule.startTs?.format("HH:mm") }}
+                        </span>
+                        <span class="mr-1 flex items-center">
+                          <MdiStar class="mr-1 text-sm" />
+                          <p class="w-5 text-sm">
+                            {{ schedule.score ?? 0 }}
+                          </p>
+                        </span>
                       </div>
                     </ion-label>
                     <span
@@ -107,10 +109,7 @@
                   <ion-checkbox
                     disabled
                     class="sub-checkbox"
-                    :checked="
-                      day.save &&
-                      day.save[schedule.id]?.subtasks[sub.id] === 1
-                    " />
+                    :checked="day.save && day.save[schedule.id]?.subtasks[sub.id] === 1" />
                   <span class="pl-2 text-base text-gray-500">{{ sub.name }}</span>
                 </div>
                 <div style="border-bottom-width: 1px" class="mt-2"></div>
@@ -145,6 +144,7 @@ import { getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
 import { DayData, S_TS, ScheduleData, ScheduleSave, UData, UserData } from "@/modal/UserData";
 import { setSave } from "@/utils/NetUtil";
 import _ from "lodash";
+import MdiStar from "~icons/mdi/star";
 // import midCalendarTodayOutline from "@iconify-icons/mdi/calendar-today-outline";
 // import mdiListStatus from "@iconify-icons/mdi/list-status";
 import {
@@ -157,7 +157,7 @@ import {
 } from "@ionic/vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import dayjs from "dayjs";
-import { add, listOutline, swapVertical } from "ionicons/icons";
+import { add, swapVertical } from "ionicons/icons";
 import "swiper/css";
 import "swiper/css/effect-fade";
 import { EffectCoverflow, Keyboard } from "swiper/modules";
@@ -227,30 +227,20 @@ const setSwiperInstance = (swiper: any) => {
   swiperRef.value = swiper;
   swiper.slideTo(1, 0, false);
 };
-// 计算完成任务数量
-const countFinishedSubtask = (day: DayData, schedule: ScheduleData) => {
-  try {
-    return schedule?.subtasks?.filter(
-      (t: any) =>
-        ((day.save && day.save[schedule.id]?.subtasks && day.save[schedule.id]?.subtasks[t.id]) ||
-          0) === 1
-    ).length;
-  } catch (error) {
-    console.log("countFinishedSubtask", error);
-    return 0;
-  }
-};
+
 // 日程状态改变
-const onScheduleCheckboxChange = (_event: any, day: DayData | undefined, scheduleId: number) => {
+const onScheduleCheckboxChange = (_event: any, day: DayData | undefined, schedule: ScheduleData) => {
   if (day) {
+    const dKey = S_TS(day.dt);
     if (day.save === undefined) {
       day.save = {};
       const uSave = props.userData.save;
-      uSave[S_TS(day.dt)] = day.save;
+      uSave[dKey] = day.save;
     }
-    const preSave = day.save[scheduleId] || new ScheduleSave();
+    const preSave = day.save[schedule.id] || new ScheduleSave();
     preSave.state = _event.detail.checked ? 1 : 0;
-    day.save[scheduleId] = preSave;
+    // day.save[scheduleId] = preSave;
+    UData.setScheduleSave(dKey, props.userData as UserData, schedule, preSave);
     nextTick(() => {
       // schedule 排序 这玩意必须延后一帧，否则会导致checkbox状态错乱
       day.events.sort((a: ScheduleData, b: ScheduleData) => {
@@ -290,6 +280,7 @@ const onScheduleModalDismiss = (event: any) => {
 
 // 保存存档
 function doSaveUserData() {
+  console.log("doSaveUserData", props.userData);
   setSave(props.userData.id, props.userData.name, JSON.stringify(props.userData))
     .then((res) => {
       console.log("doSaveUserData", res);

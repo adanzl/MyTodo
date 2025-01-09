@@ -114,6 +114,19 @@ export async function getUserList() {
   }
   return rsp.data.data;
 }
+
+export async function setUserData( data: any) {
+    const rsp: any = await axios.post(URL + "/setData", {
+      table: "t_user",
+      data: data,
+    });
+    console.log("setUser", rsp.data);
+    if (rsp.data.code !== 0) {
+      throw new Error(rsp.data.msg);
+    }
+    return rsp.data.data;
+}
+
 export async function getPicList(pageNum?: number, pageSize?: number) {
   const rsp: any = await axios.get(URL + "/getAll", {
     params: { table: "t_user_pic", pageNum: pageNum, pageSize: pageSize },

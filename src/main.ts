@@ -1,7 +1,7 @@
 import { createApp } from "vue";
 import App from "./App.vue";
 import router from "./router";
-import EventBus from "./modal/EventBus";
+import EventBus from "@/modal/EventBus";
 
 /* Core CSS required for Ionic components to work properly */
 import "@ionic/vue/css/core.css";
@@ -76,6 +76,7 @@ dayjs.locale("zh-cn", {
 
 const app = createApp(App).use(IonicVue).use(router);
 app.provide("eventBus", EventBus);
+app.provide("globalVar", {});
 
 app.component("ion-content", IonContent);
 app.component("ion-footer", IonFooter);

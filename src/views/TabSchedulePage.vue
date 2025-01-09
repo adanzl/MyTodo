@@ -64,7 +64,7 @@
               <ion-label>{{ selectedDate?.dt.format("MM-DD") }}</ion-label>
               <p style="margin-right: 8px" class="gray">{{ selectedDate?.events.length }}</p>
             </ion-item>
-            <div slot="content" >
+            <div slot="content">
               <ion-reorder-group
                 :disabled="bReorderDisabled"
                 @ionItemReorder="onReorder($event)"
@@ -91,22 +91,24 @@
                         class="pt-2.5 flex-1">
                         <h2 class="truncate">{{ schedule.title }}</h2>
                         <div class="flex text-gray-400">
-                          <p class="w-14 mb-0">
-                            <ion-icon :icon="listOutline" class="top-1 relative" />
-                            {{ countFinishedSubtask(schedule) }}
-                            /
-                            {{ schedule?.subtasks?.length }}
-                          </p>
-                          <span class="mr-1">
+                          <span class="mr-1 flex items-center text-base">
                             <component
                               :is="getGroupOptions(schedule.groupId).icon"
                               height="18px"
                               width="18px" />
                           </span>
-                          <p class="w-14">
+                          <span class="w-14 mr-1 flex items-center text-xs">
                             {{ getGroupOptions(schedule.groupId).label }}
-                          </p>
-                          <p>{{ schedule.allDay ? "全天" : schedule.startTs?.format("HH:mm") }}</p>
+                          </span>
+                          <span class="mr-3 flex items-center text-xs">
+                            {{ schedule.allDay ? "全天" : schedule.startTs?.format("HH:mm") }}
+                          </span>
+                          <span class="mr-1 flex items-center">
+                            <MdiStar class="mr-1 text-sm" />
+                            <p class="w-5 text-sm">
+                              {{ schedule.score ?? 0 }}
+                            </p>
+                          </span>
                         </div>
                       </ion-label>
                       <span
@@ -166,7 +168,10 @@
       <ion-alert
         :is-open="scheduleDelConfirm.isOpen"
         header="Confirm!"
-        :buttons="alertButtons"
+        :buttons="[
+          { text: 'Cancel', role: 'cancel' },
+          { text: 'OK', role: 'confirm' },
+        ]"
         :sub-header="scheduleDelConfirm.text"
         @didDismiss="onDelSchedulerConfirm($event)">
       </ion-alert>

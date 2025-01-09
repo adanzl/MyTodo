@@ -1,15 +1,11 @@
 import CalenderTab from "@/components/CalendarTab.vue";
 import SchedulePop from "@/components/SchedulePopModal.vue";
-import { LocalNotifications } from "@capacitor/local-notifications";
-import "@ionic/vue/css/ionic-swiper.css";
-import "swiper/css";
-import "swiper/css/effect-fade";
-import _ from "lodash";
-
-import { ColorOptions, getColorOptions } from "@/modal/ColorType";
+import { getColorOptions } from "@/modal/ColorType";
+import IonIcons from "@/modal/IonIcons";
 import { getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
 import { DayData, MonthData, ScheduleData, ScheduleSave, UData, UserData } from "@/modal/UserData";
 import { getSave, setSave } from "@/utils/NetUtil";
+import { LocalNotifications } from "@capacitor/local-notifications";
 import {
   IonAccordion,
   IonAccordionGroup,
@@ -30,25 +26,17 @@ import {
 } from "@ionic/vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import dayjs from "dayjs";
-import {
-  add,
-  alarmOutline,
-  chevronDown,
-  chevronUp,
-  ellipseOutline,
-  list,
-  listOutline,
-  swapVertical,
-  trashOutline,
-} from "ionicons/icons";
+import _ from "lodash";
 import "swiper/css";
 import "swiper/css/effect-fade";
 import { Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
 import { defineComponent, inject, nextTick, onMounted, ref } from "vue";
+import MdiStar from "~icons/mdi/star";
 
 export default defineComponent({
   components: {
+    MdiStar,
     IonAccordion,
     IonAccordionGroup,
     IonCheckbox,
@@ -70,63 +58,71 @@ export default defineComponent({
   },
   emits: ["view:didEnter"],
   setup() {
-    // https://iconify.design/docs/icon-components/vue/
     // https://yesicon.app/search/roman?coll=mdi
-    const userData = ref<UserData>(new UserData());
+    const eventBus: any = inject("eventBus");
+    const globalVar: any = inject("globalVar");
     let currentDate = dayjs().startOf("day"); // 当前日期
     let pTouch: any;
     let lstTs = 0;
-    const slideArr = ref<any[]>([{}, {}, {}]); // 滑动数据
-    const bReorderDisabled = ref(true);
-    const curScheduleList = ref();
-    const swiperRef = ref(); // 滑动对象
-    const bFold = ref(true); // 日历折叠状态
-    const selectedDate = ref<DayData>(); // 选中日期
-    const scheduleModal = ref(); // 弹窗对象
-    const scheduleModalData = ref<ScheduleData>();
-    const scheduleSave = ref<ScheduleSave>();
-    const isScheduleModalOpen = ref(false);
-    const eventBus: any = inject("eventBus");
-    const filter = ref<any>({});
-    const toastData = ref({
-      isOpen: false,
-      duration: 3000,
-      text: "",
-    });
-    //  删除日程确认框
-    const scheduleDelConfirm = ref<{
-      isOpen: boolean;
-      data: any;
-      text: string;
-    }>({
-      isOpen: false,
-      data: undefined,
-      text: "",
-    });
-    const alertButtons = [
-      {
-        text: "Cancel",
-        role: "cancel",
-      },
-      {
-        text: "OK",
-        role: "confirm",
-      },
-    ];
+    const refData = {
+      userData: ref<UserData>(new UserData()),
+      slideArr: ref<any[]>([{}, {}, {}]), // 滑动数据
+      bReorderDisabled: ref(true),
+      curScheduleList: ref(),
+      swiperRef: ref(), // 滑动对象
+      bFold: ref(true), // 日历折叠状态
+      selectedDate: ref<DayData>(), // 选中日期
+      scheduleModal: ref(), // 弹窗对象
+      scheduleModalData: ref<ScheduleData>(),
+      scheduleSave: ref<ScheduleSave>(),
+      isScheduleModalOpen: ref(false),
+      filter: ref<any>({}),
+      toastData: ref({
+        isOpen: false,
+        duration: 3000,
+        text: "",
+      }),
+      //  删除日程确认框
+      scheduleDelConfirm: ref<{
+        isOpen: boolean;
+        data: any;
+        text: string;
+      }>({
+        isOpen: false,
+        data: undefined,
+        text: "",
+      }),
+    };
 
     // 初始化数据
     const updateScheduleData = () => {
-      if (bFold.value) {
-        slideArr.value = [
-          UData.createWeekData(currentDate.subtract(1, "weeks"), userData.value, selectedDate),
-          UData.createWeekData(currentDate, userData.value, selectedDate),
-          UData.createWeekData(currentDate.add(1, "weeks"), userData.value, selectedDate),
+      if (refData.bFold.value) {
+        refData.slideArr.value = [
+          UData.createWeekData(
+            currentDate.subtract(1, "weeks"),
+            refData.userData.value,
+            refData.selectedDate
+          ),
+          UData.createWeekData(currentDate, refData.userData.value, refData.selectedDate),
+          UData.createWeekData(
+            currentDate.add(1, "weeks"),
+            refData.userData.value,
+            refData.selectedDate
+          ),
         ];
       } else {
-        slideArr.value = [
-          UData.createMonthData(currentDate.subtract(1, "months"), userData.value, selectedDate),
-          UData.createMonthData(currentDate, userData.value, selectedDate),
-          UData.createMonthData(currentDate.add(1, "months"), userData.value, selectedDate),
+        refData.slideArr.value = [
+          UData.createMonthData(
+            currentDate.subtract(1, "months"),
+            refData.userData.value,
+            refData.selectedDate
+          ),
+          UData.createMonthData(currentDate, refData.userData.value, refData.selectedDate),
+          UData.createMonthData(
+            currentDate.add(1, "months"),
+            refData.userData.value,
+            refData.selectedDate
+          ),
         ];
       }
       // console.log("updateScheduleData", currentDate, slideArr.value);
@@ -134,38 +130,38 @@ export default defineComponent({
     // 初始化日历
     // 处理选中日期
     const chooseSelectedDate = () => {
-      const mm = slideArr.value[1];
+      const mm = refData.slideArr.value[1];
       if (!mm.weekArr) {
         console.warn("no weekArr");
         return;
       }
-      selectedDate.value = undefined; // 清空选中日期
+      refData.selectedDate.value = undefined; // 清空选中日期
       const now = dayjs().startOf("day");
-      if (!selectedDate.value) {
+      if (!refData.selectedDate.value) {
         // 选今天
         outer: for (const week of mm.weekArr) {
           for (const _dt of week) {
             if (_dt.dt.unix() == now.unix()) {
-              selectedDate.value = _dt;
+              refData.selectedDate.value = _dt;
               break outer;
             }
           }
         }
       }
-      if (!selectedDate.value) {
+      if (!refData.selectedDate.value) {
         // 选当前月的第一天
         outer: for (const week of mm.weekArr) {
           for (const _dt of week) {
             if (_dt.dt.unix() == currentDate.unix()) {
-              selectedDate.value = _dt;
+              refData.selectedDate.value = _dt;
               break outer;
             }
           }
         }
       }
-      if (!selectedDate.value) {
+      if (!refData.selectedDate.value) {
         // 选当周的第一天
-        selectedDate.value = mm.weekArr[0][0];
+        refData.selectedDate.value = mm.weekArr[0][0];
       }
     };
 
@@ -177,18 +173,19 @@ export default defineComponent({
       // 获取数据
       getSave(1)
         .then((res: any) => {
-          userData.value = UData.parseUserData(res);
+          refData.userData.value = UData.parseUserData(res);
           // console.log("getSave", userData.value);
+          globalVar.userData = refData.userData.value;
           updateScheduleData();
           chooseSelectedDate();
           setTimeout(() => {
-            swiperRef?.value?.update();
+            refData.swiperRef?.value?.update();
           }, 100);
         })
         .catch((err) => {
           console.log("getSave", err);
-          toastData.value.isOpen = true;
-          toastData.value.text = JSON.stringify(err);
+          refData.toastData.value.isOpen = true;
+          refData.toastData.value.text = JSON.stringify(err);
         })
         .finally(() => {
           loading.dismiss();
@@ -202,25 +199,18 @@ export default defineComponent({
       });
       eventBus.$on("menuClose", (params: any) => {
         // console.log("menuClose", params);
-        filter.value = params;
+        refData.filter.value = params;
       });
     });
-    // 筛选日程
-    function bShowScheduleItem(schedule: ScheduleData) {
-      const [fGroup, fColor, fPriority] = [
-        filter.value.group,
-        filter.value.color,
-        filter.value.priority,
-      ];
-      if (fGroup && fGroup.get(schedule.groupId) === false) return false;
-      if (fColor && fColor.get(schedule.color) === false) return false;
-      if (fPriority && fPriority.get(schedule.priority) === false) return false;
-      return true;
-    }
+
     // 保存存档
     const doSaveUserData = () => {
-      console.log("doSaveUserData", userData.value);
-      setSave(userData.value.id, userData.value.name, JSON.stringify(userData.value))
+      console.log("doSaveUserData", refData.userData.value);
+      setSave(
+        refData.userData.value.id,
+        refData.userData.value.name,
+        JSON.stringify(refData.userData.value)
+      )
         .then((res: any) => {
           console.log("doSaveUserData", res.statusText);
         })
@@ -228,300 +218,274 @@ export default defineComponent({
           console.log("doSaveUserData", err);
         });
     };
-    // 返回今天按钮
-    const btnTodayClk = () => {
-      currentDate = dayjs().startOf("day");
-      selectedDate.value = new DayData(dayjs().startOf("day"));
-      updateScheduleData();
-    };
-    // 排序按钮
-    const btnSortClk = () => {
-      bReorderDisabled.value = !bReorderDisabled.value;
-    };
-    // 左下测试按钮
-    const btnTestClk = () => {
-      console.log(JSON.stringify(userData.value));
-      // 测试通知
-      LocalNotifications.schedule({
-        notifications: [
-          {
-            title: "On sale",
-            body: "Widgets are 10% off. Act fast!",
-            id: 1,
-            schedule: { at: new Date(Date.now() + 1000 * 5) },
-            sound: undefined,
-            attachments: undefined,
-            actionTypeId: "",
-            extra: null,
-          },
-        ],
-      });
+    // ============ 工具栏 ============
+    const toolbarMethod = {
+      // 返回今天按钮
+      btnTodayClk: () => {
+        currentDate = dayjs().startOf("day");
+        refData.selectedDate.value = new DayData(dayjs().startOf("day"));
+        updateScheduleData();
+      },
+      // 排序按钮
+      btnSortClk: () => {
+        refData.bReorderDisabled.value = !refData.bReorderDisabled.value;
+      },
+      // 左下测试按钮
+      btnTestClk: () => {
+        console.log(JSON.stringify(refData.userData.value));
+        // 测试通知
+        LocalNotifications.schedule({
+          notifications: [
+            {
+              title: "On sale",
+              body: "Widgets are 10% off. Act fast!",
+              id: 1,
+              schedule: { at: new Date(Date.now() + 1000 * 5) },
+              sound: undefined,
+              attachments: undefined,
+              actionTypeId: "",
+              extra: null,
+            },
+          ],
+        });
+      },
     };
 
-    // ============ 日历开始 ============
-    const slideChange = (obj: any) => {
-      updateScheduleData();
-      obj.slideTo(1, 0, false);
-      obj.update();
-      chooseSelectedDate();
-    };
-    // 向右滑
-    const onSlideChangeNext = (obj: any) => {
-      if (bFold.value) {
-        currentDate = currentDate.add(1, "weeks").startOf("week");
-      } else {
-        currentDate = currentDate.add(1, "months").startOf("month");
-      }
-      slideChange(obj);
-    };
-    // 向左滑
-    const onSlideChangePre = (obj: any) => {
-      if (bFold.value) {
-        currentDate = currentDate.subtract(1, "weeks").startOf("week");
-      } else {
-        currentDate = currentDate.subtract(1, "months").startOf("month");
-      }
-      slideChange(obj);
-    };
-    // 获取swiper对象
-    const setSwiperInstance = (swiper: any) => {
-      swiperRef.value = swiper;
-      swiper.slideTo(1, 0, false);
-    };
-    // 点击日历某个日期
-    const onDaySelected = (slide: MonthData, day: DayData) => {
-      if (slide.month != day.dt.month()) {
-        if (slide.year * 100 + slide.month < day.dt.year() * 100 + day.dt.month()) {
-          swiperRef.value.slideNext();
+    // ============ 日历 ============
+    const calenderMethod = {
+      // 滑动事件
+      slideChange: (obj: any) => {
+        updateScheduleData();
+        obj.slideTo(1, 0, false);
+        obj.update();
+        chooseSelectedDate();
+      },
+      // 向右滑
+      onSlideChangeNext: (obj: any) => {
+        if (refData.bFold.value) {
+          currentDate = currentDate.add(1, "weeks").startOf("week");
         } else {
-          swiperRef.value.slidePrev();
+          currentDate = currentDate.add(1, "months").startOf("month");
         }
-      }
-      selectedDate.value = day;
-      currentDate = day.dt.startOf("day");
-      // console.log("onDaySelected", day);
-    };
-    // 日历折叠按钮
-    const btnCalendarFoldClk = () => {
-      bFold.value = !bFold.value;
-      updateScheduleData();
-      setTimeout(() => {
-        swiperRef.value.update();
-      }, 100);
-    };
-    // ============ 日历结束 ============
-    // ========== 日程列表开始 ===========
-    const onScheduleListTouchStart = (event: any) => {
-      // console.log("onTouchStart", bMoving, event);
-      if (!bReorderDisabled.value) {
-        // 日程排序时禁用调整日历折叠状态
-        return;
-      }
-      pTouch = event.touches[0];
-    };
-    const onScheduleListTouchMove = (event: any) => {
-      if (!bReorderDisabled.value) {
-        // 日程排序时禁用调整日历折叠状态
-        return;
-      }
-      // console.log("onTouchMove", bMoving, event);
-      const ds = dayjs().valueOf() - lstTs;
-      if (ds < 300) {
-        return;
-      }
-      const d = event.touches[0].clientY - pTouch.clientY;
-      if (Math.abs(d) > 20) {
-        lstTs = dayjs().valueOf();
-        if (d > 0 === bFold.value) {
-          btnCalendarFoldClk();
+        calenderMethod.slideChange(obj);
+      },
+      // 向左滑
+      onSlideChangePre: (obj: any) => {
+        if (refData.bFold.value) {
+          currentDate = currentDate.subtract(1, "weeks").startOf("week");
+        } else {
+          currentDate = currentDate.subtract(1, "months").startOf("month");
         }
-      }
-    };
-    // 刷新页面事件
-    const handleRefresh = async (event: any) => {
-      // console.log("handleRefresh", event);
-      await refreshAllData();
-      event.target.complete();
-    };
-    // 计算完成任务数量
-    const countFinishedSubtask = (schedule: ScheduleData) => {
-      try {
-        return schedule?.subtasks?.filter(
-          (t) =>
-            ((selectedDate.value?.save &&
-              selectedDate.value?.save[schedule.id]?.subtasks &&
-              selectedDate.value?.save[schedule.id]?.subtasks[t.id]) ||
-              0) === 1
-        ).length;
-      } catch (error) {
-        console.log("countFinishedSubtask", error);
-        return 0;
-      }
-    };
-    // 日程完成状态
-    const scheduleChecked = (scheduleId: number) => {
-      return selectedDate.value!.save && selectedDate.value!.save[scheduleId]?.state === 1;
-    };
-    // 日程状态改变
-    const onScheduleCheckboxChange = (
-      _event: any,
-      day: DayData | undefined,
-      scheduleId: number
-    ) => {
-      if (day) {
-        if (!day.save) {
-          day.save = {};
+        calenderMethod.slideChange(obj);
+      },
+      // 获取swiper对象
+      setSwiperInstance: (swiper: any) => {
+        refData.swiperRef.value = swiper;
+        swiper.slideTo(1, 0, false);
+      },
+      // 点击日历某个日期
+      onDaySelected: (slide: MonthData, day: DayData) => {
+        if (slide.month != day.dt.month()) {
+          if (slide.year * 100 + slide.month < day.dt.year() * 100 + day.dt.month()) {
+            refData.swiperRef.value.slideNext();
+          } else {
+            refData.swiperRef.value.slidePrev();
+          }
         }
-        const preSave = day.save[scheduleId] || new ScheduleSave();
-        preSave.state = _event.detail.checked ? 1 : 0;
-        day.save[scheduleId] = preSave;
-        nextTick(() => {
-          // schedule 排序 这玩意必须延后一帧，否则会导致checkbox状态错乱
-          day.events.sort((a: ScheduleData, b: ScheduleData) => {
-            return UData.CmpScheduleData(a, b, day.save);
-          });
-        });
-        doSaveUserData();
-      }
+        refData.selectedDate.value = day;
+        currentDate = day.dt.startOf("day");
+        // console.log("onDaySelected", day);
+      },
+      // 日历折叠按钮
+      btnCalendarFoldClk: () => {
+        refData.bFold.value = !refData.bFold.value;
+        updateScheduleData();
+        setTimeout(() => {
+          refData.swiperRef.value.update();
+        }, 100);
+      },
     };
-
-    // 日程按钮点击
-    const btnScheduleClk = (event: any, schedule: ScheduleData) => {
-      isScheduleModalOpen.value = true;
-      scheduleModalData.value = schedule;
-      scheduleSave.value = selectedDate.value?.save
-        ? selectedDate.value?.save[schedule.id]
-        : undefined;
-      // console.log("btnScheduleClk", schedule, scheduleSave.value);
-    };
-    // 日程专注按钮
-    const btnScheduleAlarmClk = () => {
-      console.log("btnScheduleAlarmClk");
-    };
-    // 日程删除
-    const btnScheduleRemoveClk = (event: any, schedule: ScheduleData) => {
-      scheduleDelConfirm.value.isOpen = true;
-      scheduleDelConfirm.value.data = schedule;
-      scheduleDelConfirm.value.text = "del " + schedule.title + "?";
-    };
-    const onDelSchedulerConfirm = (event: any) => {
-      // 处理数据
-      scheduleDelConfirm.value.isOpen = false;
-      if (event.detail.role === "confirm") {
-        const idx = userData.value.schedules.findIndex(
-          (s) => s.id === scheduleDelConfirm.value.data.id
+    // ========== 日程列表 ===========
+    const scheduleListMethod = {
+      onScheduleListTouchStart: (event: any) => {
+        // console.log("onTouchStart", bMoving, event);
+        if (!refData.bReorderDisabled.value) {
+          // 日程排序时禁用调整日历折叠状态
+          return;
+        }
+        pTouch = event.touches[0];
+      },
+      onScheduleListTouchMove: (event: any) => {
+        if (!refData.bReorderDisabled.value) {
+          // 日程排序时禁用调整日历折叠状态
+          return;
+        }
+        // console.log("onTouchMove", bMoving, event);
+        const ds = dayjs().valueOf() - lstTs;
+        if (ds < 300) {
+          return;
+        }
+        const d = event.touches[0].clientY - pTouch.clientY;
+        if (Math.abs(d) > 20) {
+          lstTs = dayjs().valueOf();
+          if (d > 0 === refData.bFold.value) {
+            calenderMethod.btnCalendarFoldClk();
+          }
+        }
+      },
+      // 刷新页面事件
+      handleRefresh: async (event: any) => {
+        // console.log("handleRefresh", event);
+        await refreshAllData();
+        event.target.complete();
+      },
+      // 筛选日程
+      bShowScheduleItem: (schedule: ScheduleData) => {
+        const [fGroup, fColor, fPriority] = [
+          refData.filter.value.group,
+          refData.filter.value.color,
+          refData.filter.value.priority,
+        ];
+        if (fGroup && fGroup.get(schedule.groupId) === false) return false;
+        if (fColor && fColor.get(schedule.color) === false) return false;
+        if (fPriority && fPriority.get(schedule.priority) === false) return false;
+        return true;
+      },
+      // 计算完成任务数量
+      countFinishedSubtask: (schedule: ScheduleData) => {
+        try {
+          return schedule?.subtasks?.filter(
+            (t) =>
+              ((refData.selectedDate.value?.save &&
+                refData.selectedDate.value?.save[schedule.id]?.subtasks &&
+                refData.selectedDate.value?.save[schedule.id]?.subtasks[t.id]) ||
+                0) === 1
+          ).length;
+        } catch (error) {
+          console.log("countFinishedSubtask", error);
+          return 0;
+        }
+      },
+      // 日程完成状态
+      scheduleChecked: (scheduleId: number) => {
+        return (
+          refData.selectedDate.value!.save &&
+          refData.selectedDate.value!.save[scheduleId]?.state === 1
         );
-        if (idx !== -1) {
-          userData.value.schedules.splice(idx, 1);
+      },
+      // 日程状态改变
+      onScheduleCheckboxChange: (_event: any, day: DayData | undefined, scheduleId: number) => {
+        if (day) {
+          if (!day.save) {
+            day.save = {};
+          }
+          const preSave = day.save[scheduleId] || new ScheduleSave();
+          preSave.state = _event.detail.checked ? 1 : 0;
+          day.save[scheduleId] = preSave;
+          nextTick(() => {
+            // schedule 排序 这玩意必须延后一帧，否则会导致checkbox状态错乱
+            day.events.sort((a: ScheduleData, b: ScheduleData) => {
+              return UData.CmpScheduleData(a, b, day.save);
+            });
+          });
+          doSaveUserData();
         }
-        updateScheduleData();
-        doSaveUserData();
-      }
-    };
-    function onReorder(event: any) {
-      let eList = selectedDate.value?.events.filter(bShowScheduleItem);
-      // console.log(_.map(eList, 'title'));
-      eList = event.detail.complete(eList);
-      if (eList) {
-        let ii = eList[0].order ?? 0;
-        _.forEach(eList, (e) => {
-          userData.value.schedules[e.id].order = ii;
-          e.order = ii++;
+      },
+
+      // 日程按钮点击
+      btnScheduleClk: (event: any, schedule: ScheduleData) => {
+        refData.isScheduleModalOpen.value = true;
+        refData.scheduleModalData.value = schedule;
+        refData.scheduleSave.value = refData.selectedDate.value?.save
+          ? refData.selectedDate.value?.save[schedule.id]
+          : undefined;
+        // console.log("btnScheduleClk", schedule, scheduleSave.value);
+      },
+      // 日程专注按钮
+      btnScheduleAlarmClk: () => {
+        console.log("btnScheduleAlarmClk");
+      },
+      // 日程删除
+      btnScheduleRemoveClk: (event: any, schedule: ScheduleData) => {
+        refData.scheduleDelConfirm.value.isOpen = true;
+        refData.scheduleDelConfirm.value.data = schedule;
+        refData.scheduleDelConfirm.value.text = "del " + schedule.title + "?";
+      },
+      onDelSchedulerConfirm: (event: any) => {
+        // 处理数据
+        refData.scheduleDelConfirm.value.isOpen = false;
+        if (event.detail.role === "confirm") {
+          const idx = refData.userData.value.schedules.findIndex(
+            (s) => s.id === refData.scheduleDelConfirm.value.data.id
+          );
+          if (idx !== -1) {
+            refData.userData.value.schedules.splice(idx, 1);
+          }
+          updateScheduleData();
+          doSaveUserData();
+        }
+      },
+      onReorder: (event: any) => {
+        let eList = refData.selectedDate.value?.events.filter(scheduleListMethod.bShowScheduleItem);
+        // console.log(_.map(eList, 'title'));
+        eList = event.detail.complete(eList);
+        if (eList) {
+          let ii = eList[0].order ?? 0;
+          _.forEach(eList, (e) => {
+            refData.userData.value.schedules[e.id].order = ii;
+            e.order = ii++;
+          });
+        }
+        // console.log(_.map(eList, "title"));
+        refData.selectedDate.value?.events.sort((a: ScheduleData, b: ScheduleData) => {
+          return UData.CmpScheduleData(a, b, refData.selectedDate.value?.save);
         });
-      }
-      // console.log(_.map(eList, "title"));
-      selectedDate.value?.events.sort((a: ScheduleData, b: ScheduleData) => {
-        return UData.CmpScheduleData(a, b, selectedDate.value?.save);
-      });
-      doSaveUserData();
-      // console.log(eList);
-    }
-    // ========== 日程列表结束 ===========
-    // ========== 日程弹窗开始 ===========
-    // 添加日程按钮
-    const btnAddScheduleClk = () => {
-      // 清空数据
-      scheduleModalData.value = undefined;
-      scheduleSave.value = undefined;
-      isScheduleModalOpen.value = true;
-    };
-    // 添加日程页面关闭回调
-    const onScheduleModalDismiss = (event: any) => {
-      isScheduleModalOpen.value = false;
-      if (event.detail.role === "backdrop") return;
-      const [_scheduleData, _scheduleSave] = event.detail.data;
-      // console.log("onScheduleModalDismiss", _scheduleData, _scheduleSave, userData.value);
-      const dt = selectedDate.value!.dt!;
-      const r = UData.updateSchedularData(
-        userData.value,
-        _scheduleData,
-        _scheduleSave,
-        dt,
-        event.detail.role
-      );
-      if (r) {
-        updateScheduleData();
         doSaveUserData();
-      }
+        // console.log(eList);
+      },
+    };
+    // ========== 日程弹窗 ===========
+    const scheduleModalMethods = {
+      // 添加日程按钮
+      btnAddScheduleClk: () => {
+        // 清空数据
+        refData.scheduleModalData.value = undefined;
+        refData.scheduleSave.value = undefined;
+        refData.isScheduleModalOpen.value = true;
+      },
+      // 添加日程页面关闭回调
+      onScheduleModalDismiss: (event: any) => {
+        refData.isScheduleModalOpen.value = false;
+        if (event.detail.role === "backdrop") return;
+        const [_scheduleData, _scheduleSave] = event.detail.data;
+        // console.log("onScheduleModalDismiss", _scheduleData, _scheduleSave, userData.value);
+        const dt = refData.selectedDate.value!.dt!;
+        const r = UData.updateSchedularData(
+          refData.userData.value,
+          _scheduleData,
+          _scheduleSave,
+          dt,
+          event.detail.role
+        );
+        if (r) {
+          updateScheduleData();
+          doSaveUserData();
+        }
+      },
     };
 
-    // ========== 日程弹窗结束 ===========
     return {
-      ColorOptions,
       getColorOptions,
       getPriorityOptions,
       getGroupOptions,
-      add,
-      alarmOutline,
-      chevronDown,
-      chevronUp,
-      ellipseOutline,
-      list,
-      listOutline,
-      swapVertical,
-      trashOutline,
-      slideArr,
-      curScheduleList,
-      swiperRef,
-      bFold,
-      selectedDate,
-      scheduleModal,
-      scheduleModalData,
-      scheduleSave,
-      isScheduleModalOpen,
-      toastData,
-      userData,
-      currentDate,
-      pTouch,
-      lstTs,
-      alertButtons,
-      scheduleDelConfirm,
-      countFinishedSubtask,
       IonicSlides,
       Keyboard,
-      btnTodayClk,
-      btnSortClk,
-      onSlideChangeNext,
-      onSlideChangePre,
-      setSwiperInstance,
-      onDaySelected,
-      btnCalendarFoldClk,
-      onScheduleListTouchStart,
-      onScheduleListTouchMove,
-      handleRefresh,
-      scheduleChecked,
-      onScheduleCheckboxChange,
-      btnScheduleClk,
-      btnScheduleAlarmClk,
-      btnScheduleRemoveClk,
-      onScheduleModalDismiss,
-      onDelSchedulerConfirm,
-      btnAddScheduleClk,
-      btnTestClk,
-      bShowScheduleItem,
-      bReorderDisabled,
-      onReorder,
+      ...IonIcons,
+      ...refData,
+      ...toolbarMethod,
+      ...calenderMethod,
+      ...scheduleListMethod,
+      ...scheduleModalMethods,
     };
   },
-  methods: {},
 });

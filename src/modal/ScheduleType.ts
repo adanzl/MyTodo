@@ -22,13 +22,13 @@ export interface RepeatType {
 }
 
 // 日程重复类型
-import MdiCalendarMonthOutline from "virtual:icons/mdi/calendar-month-outline";
-import MdiCalendarWeekBeginOutline from "virtual:icons/mdi/calendar-week-begin-outline";
-import MdiCalendarTodayOutline from "virtual:icons/mdi/calendar-today-outline";
-import MdiCalendarMultiselectOutline from "virtual:icons/mdi/calendar-multiselect-outline";
-import MdiCalendarBlankOutline from "virtual:icons/mdi/calendar-blank-outline";
-import MdiCalendarWeekendOutline from "~icons/mdi/calendar-weekend-outline?width=24px&height=24px";
+import MdiCalendarBlankOutline from "~icons/mdi/calendar-blank-outline";
+import MdiCalendarMonthOutline from "~icons/mdi/calendar-month-outline";
+import MdiCalendarMultiselectOutline from "~icons/mdi/calendar-multiselect-outline";
+import MdiCalendarTodayOutline from "~icons/mdi/calendar-today-outline";
+import MdiCalendarWeekBeginOutline from "~icons/mdi/calendar-week-begin-outline";
 import MdiCalendarWeekOutline from "~icons/mdi/calendar-week-outline?width=24px&height=24px";
+import MdiCalendarWeekendOutline from "~icons/mdi/calendar-weekend-outline?width=24px&height=24px";
 import MdiHammerWrench from "~icons/mdi/hammer-wrench";
 export const CUSTOM_REPEAT_ID = 999;
 export const RepeatOptions: RepeatType[] = [
@@ -132,10 +132,10 @@ export interface PriorityType {
   label: string;
 }
 // 优先级类型
-import MdiRomanNumeral1 from "virtual:icons/mdi/roman-numeral-1";
-import MdiRomanNumeral2 from "virtual:icons/mdi/roman-numeral-2";
-import MdiRomanNumeral3 from "virtual:icons/mdi/roman-numeral-3";
-import MdiRomanNumeral4 from "virtual:icons/mdi/roman-numeral-4";
+import MdiRomanNumeral1 from "~icons/mdi/roman-numeral-1";
+import MdiRomanNumeral2 from "~icons/mdi/roman-numeral-2";
+import MdiRomanNumeral3 from "~icons/mdi/roman-numeral-3";
+import MdiRomanNumeral4 from "~icons/mdi/roman-numeral-4";
 export const PriorityOptions: PriorityType[] = [
   { id: 0, icon: MdiRomanNumeral1, color: "#1a65eb", label: "不重要并且不紧急" },
   { id: 1, icon: MdiRomanNumeral2, color: "#2dd55b", label: "不重要但是紧急" },
@@ -151,10 +151,10 @@ export const getPriorityOptions = (id?: number): PriorityType => {
   return PriorityOptions[0];
 };
 
-import MdiLearnOutline from "~icons/mdi/learn-outline";
-import MdiWorkOutline from "~icons/mdi/work-outline";
-import MdiRoundedCorner from "~icons/mdi/rounded-corner";
 import dayjs from "dayjs";
+import MdiLearnOutline from "~icons/mdi/learn-outline";
+import MdiRoundedCorner from "~icons/mdi/rounded-corner";
+import MdiWorkOutline from "~icons/mdi/work-outline";
 // 分组配置
 export interface GroupType {
   id: number;

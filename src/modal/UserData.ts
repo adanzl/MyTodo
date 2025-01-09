@@ -1,6 +1,14 @@
 import { CUSTOM_REPEAT_ID, RepeatData } from "@/modal/ScheduleType";
 import dayjs from "dayjs";
-import _ from 'lodash';
+import _ from "lodash";
+
+export class User {
+  id = -1;
+  name = "";
+  pwd = "";
+  icon = "/src/assets/images/avatar.svg";
+  admin = 0;
+}
 
 export class Subtask {
   id: number = -1;
@@ -32,6 +40,7 @@ export class ScheduleData {
   priority? = -1; // 优先级
   groupId? = -1; // 分组id
   order? = 0; // 排序 数字越大越靠后
+  score?: number; // 积分
   subtasks: Subtask[] = []; // 子任务列表
   static Copy(o: ScheduleData): ScheduleData {
     const ret = JSON.parse(JSON.stringify(o));
@@ -58,9 +67,12 @@ export class ScheduleSave {
   subtasks: Record<number, number> = {}; // <number, number>;
   // 覆盖字段
   scheduleOverride?: ScheduleData;
+  score?: number; // 通过这个任务获得的积分
   static Copy(o: ScheduleSave): ScheduleSave {
     const ret = new ScheduleSave();
     ret.state = o.state;
+    ret.score = o.score;
+    if (o.scheduleOverride) ret.scheduleOverride = ScheduleData.Copy(o.scheduleOverride);
     if (o.subtasks) ret.subtasks = JSON.parse(JSON.stringify(o.subtasks));
     return ret;
   }
@@ -115,7 +127,11 @@ export class UData {
    * @param selectedDate 选中的日期
    * @returns 月份数据
    */
-  static createMonthData(datetime: dayjs.Dayjs, userData: UserData, selectedDate?: any): MonthData {
+  public static createMonthData(
+    datetime: dayjs.Dayjs,
+    userData: UserData,
+    selectedDate?: any
+  ): MonthData {
     const firstDayOfMonth = datetime.startOf("month");
     let _dt = firstDayOfMonth.startOf("week");
     // console.log("firstDayOfWeek", _dt);
@@ -148,7 +164,11 @@ export class UData {
    * @param selectedDate 选中的日期
    * @returns 月份数据
    */
-  static createWeekData(datetime: dayjs.Dayjs, userData: UserData, selectedDate?: any): MonthData {
+  public static createWeekData(
+    datetime: dayjs.Dayjs,
+    userData: UserData,
+    selectedDate?: any
+  ): MonthData {
     const firstDayOfMonth = datetime.startOf("month");
     let _dt = datetime.startOf("week");
     // console.log("firstDayOfWeek", _dt);
@@ -178,7 +198,7 @@ export class UData {
    * @param userData 用户数据
    * @returns 当前日期的数据
    */
-  static createDayData(_dt: dayjs.Dayjs, userData: UserData): DayData {
+  public static createDayData(_dt: dayjs.Dayjs, userData: UserData): DayData {
     const dayData = new DayData(_dt);
     const ts = _dt.unix();
     const dKey = S_TS(_dt);
@@ -260,7 +280,7 @@ export class UData {
     return dayData;
   }
 
-  static CmpScheduleData(
+  public static CmpScheduleData(
     a: ScheduleData,
     b: ScheduleData,
     save: Record<number, ScheduleSave> | undefined
@@ -280,15 +300,45 @@ export class UData {
     return (a.id ?? 0) - (b.id ?? 0);
   }
   /**
+   * 设置日程存档，要同步奖励积分
+   */
+  public static setScheduleSave(
+    dKey: string,
+    userData: UserData,
+    _scheduleData: ScheduleData,
+    _scheduleSave: ScheduleSave
+  ) {
+    if (!(dKey in userData.save)) {
+      userData.save[dKey] = {};
+    }
+    const map = userData.save[dKey];
+    map![_scheduleData.id!] = _scheduleSave;
+    const oriScore = _scheduleSave.score ?? 0;
+    const newScore = _scheduleData.score ?? 0;
+    if (_scheduleSave.state === 1) {
+      // +积分
+      if (newScore > oriScore) {
+        userData.score += newScore - oriScore;
+        _scheduleSave.score = newScore;
+      }
+    } else {
+      // -积分
+      if (oriScore) {
+        userData.score -= oriScore;
+        _scheduleSave.score = 0;
+      }
+    }
+  }
+  /**
    * 更新日程数据
    * @param userData 用户数据
-   * @param _scheduleData 日程数据
-   * @param _scheduleSave 日程存档数据
+   * @param _scheduleData 新的日程数据
+   * @param _scheduleSave 新的日程存档数据
    * @param dt 当前日期
    * @param type 更新类型 all:更新日程和存档 cur:更新存档
    * @returns 是否更新成功
    */
-  static updateSchedularData(
+  public static updateSchedularData(
     userData: UserData,
     _scheduleData: ScheduleData,
     _scheduleSave: ScheduleSave,
@@ -311,19 +361,12 @@ export class UData {
         }
       }
       // 存档变化
-      if (!(dKey in userData.save)) {
-        userData.save[dKey] = {};
-      }
-      const map = userData.save[dKey];
-      map![_scheduleData.id!] = _scheduleSave;
+      UData.setScheduleSave(dKey, userData, _scheduleData, _scheduleSave);
     } else if (type === "cur") {
-      // 只管当天日程 存档变化
-      if (!(dKey in userData.save)) {
-        userData.save[dKey] = {};
-      }
-      const map = userData.save[dKey];
-      const s: ScheduleSave = (map![_scheduleData.id!] = _scheduleSave);
-      s.scheduleOverride = _scheduleData;
+      // 只管当天日程
+      // 存档变化
+      UData.setScheduleSave(dKey, userData, _scheduleData, _scheduleSave);
+      _scheduleSave.scheduleOverride = _scheduleData;
     } else {
       return false;
     }
@@ -343,6 +386,7 @@ export class UData {
     if (ret.schedules === undefined) {
       ret.schedules = [];
     }
+    if (isNaN(ret.score)) ret.score = 0;
     for (let i = 0; i < ret.schedules.length; i++) {
       const schedule = ret.schedules[i];
       schedule.startTs = dayjs(schedule.startTs);

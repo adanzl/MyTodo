@@ -127,6 +127,7 @@ const isScheduleModalOpen = ref(false);
 const filter = ref<any>({});
 
 const eventBus: any = inject("eventBus");
+const globalVar: any = inject("globalVar");
 
 const refreshAllData = async () => {
   const loading = await loadingController.create({
@@ -137,6 +138,7 @@ const refreshAllData = async () => {
   getSave(1)
     .then((res: any) => {
       userData.value = UData.parseUserData(res);
+      globalVar.userData = userData.value;
       // console.log("getSave", userData.value);
       updateScheduleData();
       setTimeout(() => {

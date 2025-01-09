@@ -17,7 +17,7 @@
             </ion-avatar>
             <ion-label class="font-bold">{{ curUser.name }}</ion-label>
             <MdiStar class="text-red-500" />
-            <div class="text-left flex-1 pl-1 font-bold">{{ curUser.score }}</div>
+            <div class="text-left flex-1 pl-1 font-bold">{{ getUserScore() }}</div>
           </ion-item>
           <ion-accordion-group :multiple="true" :value="['group', 'color', 'priority']" mode="ios">
             <ion-accordion value="group">
@@ -262,17 +262,13 @@ import {
 } from "ionicons/icons";
 import _ from "lodash";
 import { inject, onMounted, ref } from "vue";
+import { User } from "@/modal/UserData";
 
 const bLogin = ref(false);
 const userList = ref<any[]>([]);
 const errMsg = ref("");
-const curUser = ref({
-  id: -1,
-  name: "点击选择用户",
-  pwd: "",
-  icon: "/src/assets/images/avatar.svg",
-  score: 0,
-});
+const curUser = ref(new User());
+curUser.value.name = "点击选择用户";
 const userPopover = ref<any>(null);
 const textPwd = ref("");
 
@@ -280,6 +276,7 @@ const groupRef = ref(new Map(GroupOptions.map((option) => [option.id, true])));
 const colorRef = ref(new Map(ColorOptions.map((option) => [option.id, true])));
 const priorityRef = ref(new Map(PriorityOptions.map((option) => [option.id, true])));
 const eventBus: any = inject("eventBus");
+const globalVar: any = inject("globalVar");
 
 onMounted(async () => {
   const userData = await getUserList();
@@ -289,8 +286,16 @@ onMounted(async () => {
   if (sUser) {
     bLogin.value = true;
     curUser.value = sUser;
+    globalVar.user = sUser;
   }
 });
+function getUserScore () {
+  let score = 0;
+  if (globalVar.userSave && globalVar.userSave.score){
+    score = globalVar.userSave.score;
+  }
+  return score;
+}
 function onMenuClose() {
   eventBus.$emit("menuClose", {
     group: groupRef.value,
@@ -337,6 +342,7 @@ function btnLoginClick() {
   if (curUser.value.pwd === null || curUser.value.pwd === CryptoJS.MD5(textPwd.value).toString()) {
     errMsg.value = "";
     bLogin.value = true;
+    globalVar.user = curUser.value;
     localStorage.setItem("saveUser", curUser.value.id.toString());
   } else {
     errMsg.value = "密码错误";
