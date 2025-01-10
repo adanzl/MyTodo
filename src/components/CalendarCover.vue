@@ -29,7 +29,7 @@
         :coverflowEffect="{
           rotate: 0,
           stretch: -10,
-          depth: 10,
+          depth: 0,  // 这玩意在Safari上有问题
           modifier: 1,
           slideShadows: false, // 是否开启slide阴影
         }"

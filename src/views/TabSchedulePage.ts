@@ -3,7 +3,7 @@ import SchedulePop from "@/components/SchedulePopModal.vue";
 import { getColorOptions } from "@/modal/ColorType";
 import IonIcons from "@/modal/IonIcons";
 import { getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
-import { DayData, MonthData, ScheduleData, ScheduleSave, UData, UserData } from "@/modal/UserData";
+import { DayData, MonthData, S_TS, ScheduleData, ScheduleSave, UData, UserData } from "@/modal/UserData";
 import { getSave, setSave } from "@/utils/NetUtil";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import {
@@ -370,14 +370,16 @@ export default defineComponent({
         );
       },
       // 日程状态改变
-      onScheduleCheckboxChange: (_event: any, day: DayData | undefined, scheduleId: number) => {
+      onScheduleCheckboxChange: (_event: any, day: DayData | undefined, schedule: ScheduleData) => {
         if (day) {
+          const dKey = S_TS(day.dt);
           if (!day.save) {
             day.save = {};
           }
-          const preSave = day.save[scheduleId] || new ScheduleSave();
+          const preSave = day.save[schedule.id] || new ScheduleSave();
           preSave.state = _event.detail.checked ? 1 : 0;
-          day.save[scheduleId] = preSave;
+          UData.setScheduleSave(dKey, refData.userData.value as UserData, schedule, preSave);
+
           nextTick(() => {
             // schedule 排序 这玩意必须延后一帧，否则会导致checkbox状态错乱
             day.events.sort((a: ScheduleData, b: ScheduleData) => {
@@ -402,7 +404,7 @@ export default defineComponent({
         console.log("btnScheduleAlarmClk");
       },
       // 日程删除
-      btnScheduleRemoveClk: (event: any, schedule: ScheduleData) => {
+      btnScheduleRemoveClk: (_event: any, schedule: ScheduleData) => {
         refData.scheduleDelConfirm.value.isOpen = true;
         refData.scheduleDelConfirm.value.data = schedule;
         refData.scheduleDelConfirm.value.text = "del " + schedule.title + "?";
