@@ -29,7 +29,7 @@
         :coverflowEffect="{
           rotate: 0,
           stretch: -10,
-          depth: 10,
+          depth: 0,  // 这玩意在Safari上有问题
           modifier: 1,
           slideShadows: false, // 是否开启slide阴影
         }"
@@ -38,7 +38,7 @@
         <swiper-slide
           v-for="(day, idx) in dayArr"
           :key="idx"
-          class="data-content h-full w-4/5 flex-col">
+          class="data-content h-full w-[85%] flex-col">
           <ion-item color="light" lines="none" class="w-full rounded-t">
             <icon-mdi-list-status class="text-blue-500" :height="'30'" :width="'30'" slot="start">
             </icon-mdi-list-status>
