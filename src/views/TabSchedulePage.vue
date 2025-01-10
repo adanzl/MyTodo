@@ -80,7 +80,7 @@
                       style="--size: 26px; padding-right: 5px"
                       slot="start"
                       :checked="scheduleChecked(schedule.id)"
-                      @ionChange="onScheduleCheckboxChange($event, selectedDate, schedule.id)">
+                      @ionChange="onScheduleCheckboxChange($event, selectedDate, schedule)">
                     </ion-checkbox>
                     <div @click="btnScheduleClk($event, schedule)" class="flex w-full items-center">
                       <ion-label
