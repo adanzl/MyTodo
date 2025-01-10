@@ -1,3 +1,4 @@
+import avatar from "@/assets/images/avatar.svg";
 import { CUSTOM_REPEAT_ID, RepeatData } from "@/modal/ScheduleType";
 import dayjs from "dayjs";
 import _ from "lodash";
@@ -6,7 +7,7 @@ export class User {
   id = -1;
   name = "";
   pwd = "";
-  icon = "/src/assets/images/avatar.svg";
+  icon = `${avatar}`;
   admin = 0;
 }
 
