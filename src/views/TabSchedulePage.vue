@@ -61,8 +61,12 @@
         <ion-accordion-group :multiple="true" :value="['schedule']">
           <ion-accordion value="schedule">
             <ion-item slot="header" color="light" class="schedule-group-item">
-              <ion-label>{{ selectedDate?.dt.format("MM-DD") }}</ion-label>
-              <p style="margin-right: 8px" class="gray">{{ selectedDate?.events.length }}</p>
+              <div class="mr-3">{{ selectedDate?.dt.format("MM-DD") }}</div>
+              <MdiStar class="text-red-500 mr-1" />
+              <span> {{ userData?.score ?? 0 }}</span>
+              <p style="margin-right: 8px" class="gray" slot="end">
+                {{ selectedDate?.events.length }}
+              </p>
             </ion-item>
             <div slot="content">
               <ion-reorder-group
@@ -128,7 +132,7 @@
                     <ion-reorder slot="end"></ion-reorder>
                   </ion-item>
                   <div
-                    class="pl-[60px] flex items-center"
+                    class="pl-[60px] flex items-center text-gray-400"
                     v-for="(sub, idx) in schedule.subtasks"
                     :key="idx"
                     @click="btnScheduleClk($event, schedule)">
@@ -140,7 +144,9 @@
                         selectedDate.save &&
                         selectedDate.save[schedule.id]?.subtasks[sub.id] === 1
                       " />
-                    <span class="pl-2 text-gray-500 text-base">{{ sub.name }}</span>
+                    <span class="pl-2 text-base flex-1">{{ sub.name }}</span>
+                    <MdiStar class="" />
+                    <span class="w-5 text-right mr-6">{{ sub.score ?? 0 }}</span>
                   </div>
                   <ion-item-options side="end">
                     <ion-item-option @click="btnScheduleAlarmClk">
@@ -182,11 +188,9 @@
         @didDismiss="() => (toastData.isOpen = false)">
       </ion-toast>
     </ion-content>
-    <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-      <ion-fab-button @click="btnAddScheduleClk">
-        <ion-icon :icon="add" style="font-size: 36px"></ion-icon>
-      </ion-fab-button>
-    </ion-fab>
+    <FabButton @click="btnAddScheduleClk" hasBar>
+      <ion-icon :icon="add" style="font-size: 36px"></ion-icon>
+    </FabButton>
   </ion-page>
 </template>
 <script lang="ts" src="@/views/TabSchedulePage.ts"></script>

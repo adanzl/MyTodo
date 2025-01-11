@@ -1,4 +1,5 @@
 import CalenderTab from "@/components/CalendarTab.vue";
+import FabButton from "@/components/FabButton.vue";
 import SchedulePop from "@/components/SchedulePopModal.vue";
 import { getColorOptions } from "@/modal/ColorType";
 import IonIcons from "@/modal/IonIcons";
@@ -36,6 +37,7 @@ import MdiStar from "~icons/mdi/star";
 
 export default defineComponent({
   components: {
+    FabButton,
     MdiStar,
     IonAccordion,
     IonAccordionGroup,

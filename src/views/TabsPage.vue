@@ -250,7 +250,7 @@ import {
   IonRouterOutlet,
   IonTabBar,
   IonTabButton,
-  IonTabs,
+  IonTabs
 } from "@ionic/vue";
 import CryptoJS from "crypto-js";
 import {

@@ -1,6 +1,6 @@
 <template>
   <ion-modal mode="ios" ref="selfRef" @willDismiss="onModalDismiss">
-    <ion-content class="main_content"  fixed-slot-placement="before">
+    <ion-content class="main_content" fixed-slot-placement="before">
       <ion-item class="transparent">
         <h2 class="text-xl font-bold text-white">
           {{ currentDate.format("YYYY-MM-DD") + " " + weekHead[currentDate.day()] }}
@@ -29,7 +29,7 @@
         :coverflowEffect="{
           rotate: 0,
           stretch: -10,
-          depth: 0,  // 这玩意在Safari上有问题
+          depth: 0, // 这玩意在Safari上有问题
           modifier: 1,
           slideShadows: false, // 是否开启slide阴影
         }"
@@ -102,7 +102,7 @@
                   </div>
                 </ion-item>
                 <div
-                  class="pl-[45px] flex items-center"
+                  class="pl-[45px] flex items-center text-gray-400"
                   v-for="(sub, idx) in schedule.subtasks"
                   :key="idx"
                   @click="btnScheduleClk($event, schedule, day)">
@@ -110,7 +110,9 @@
                     disabled
                     class="sub-checkbox"
                     :checked="day.save && day.save[schedule.id]?.subtasks[sub.id] === 1" />
-                  <span class="pl-2 text-base text-gray-500">{{ sub.name }}</span>
+                  <span class="pl-2 text-base flex-1 text-left">{{ sub.name }}</span>
+                  <MdiStar class="w-[1em] h-[1em]" />
+                  <span class="w-5 text-right mr-6">{{ sub.score ?? 0 }}</span>
                 </div>
                 <div style="border-bottom-width: 1px" class="mt-2"></div>
               </div>
@@ -118,13 +120,16 @@
           </ion-content>
         </swiper-slide>
       </swiper>
-      <ion-fab class="absolute right-[9%] bottom-[5%]">
-        <ion-fab-button @click="btnAddScheduleClk">
-          <ion-icon :icon="add" size="large"></ion-icon>
-        </ion-fab-button>
-      </ion-fab>
     </ion-content>
     <div class="w-full h-[10%] absolute bottom-0" @click="selfRef.$el.dismiss()"></div>
+    <FabButton
+      @click="btnAddScheduleClk"
+      class="right-[9%] bottom-[10%]"
+      bottom="10%"
+      right="9%"
+      :hasBar="false">
+      <ion-icon :icon="add" size="large"></ion-icon>
+    </FabButton>
     <SchedulePop
       aria-hidden="false"
       ref="scheduleModal"
@@ -137,19 +142,13 @@
   </ion-modal>
 </template>
 <script setup lang="ts">
+import FabButton from "@/components/FabButton.vue";
 import SchedulePop from "@/components/SchedulePopModal.vue";
 import { getColorOptions } from "@/modal/ColorType";
 import { getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
 import { DayData, S_TS, ScheduleData, ScheduleSave, UData, UserData } from "@/modal/UserData";
 import { setSave } from "@/utils/NetUtil";
-import {
-  IonCheckbox,
-  IonFab,
-  IonFabButton,
-  IonicSlides,
-  IonReorder,
-  IonReorderGroup,
-} from "@ionic/vue";
+import { IonCheckbox, IonicSlides, IonReorder, IonReorderGroup } from "@ionic/vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import dayjs from "dayjs";
 import { add, swapVertical } from "ionicons/icons";
@@ -226,7 +225,11 @@ const setSwiperInstance = (swiper: any) => {
 };
 
 // 日程状态改变
-const onScheduleCheckboxChange = (_event: any, day: DayData | undefined, schedule: ScheduleData) => {
+const onScheduleCheckboxChange = (
+  _event: any,
+  day: DayData | undefined,
+  schedule: ScheduleData
+) => {
   if (day) {
     const dKey = S_TS(day.dt);
     if (day.save === undefined) {
@@ -366,5 +369,4 @@ ion-modal {
   --size: 18px;
   --border-radius: 4px;
 }
-
 </style>

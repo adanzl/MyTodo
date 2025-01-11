@@ -11,7 +11,16 @@
     </ion-item>
     <ion-content class="ion-padding">
       <ion-item>
+        <MdiCardTextOutline class="w-[1.6em] h-[1.6em]" slot="start" />
         <ion-input v-model="valueRef.name" placeholder="输入子任务名称" size="5"> </ion-input>
+      </ion-item>
+      <ion-item @click="btnRewardClk" detail="true">
+        <MdiGiftOutline class="text-red-500 w-[1.6em] h-[1.6em]" slot="start" />
+        <ion-label>奖励</ion-label>
+        <div slot="end" class="flex items-center">
+          <MdiStar class="text-red-500" />
+          <ion-label class="w-5 text-right">{{ valueRef.score ?? 0 }}</ion-label>
+        </div>
       </ion-item>
       <ion-item lines="none">
         <div class="pre-img-block" v-for="(img, idx) in imgList" :key="idx">
@@ -55,7 +64,9 @@ import { cameraAndSetImage, getImage, loadAndSetImage } from "@/utils/ImgMgr";
 import { createTriggerController } from "@/utils/Overlay";
 import { alertController, IonInput, IonToolbar, IonActionSheet } from "@ionic/vue";
 import { add, trashOutline } from "ionicons/icons";
-import { onMounted, ref, watch } from "vue";
+import { inject, onMounted, ref, watch } from "vue";
+import MdiGiftOutline from "~icons/mdi/gift-outline";
+import MdiCardTextOutline from "~icons/mdi/card-text-outline";
 
 const props = defineProps({
   trigger: {
@@ -66,6 +77,7 @@ const props = defineProps({
     type: Object,
   },
 });
+const globalVar = inject("globalVar") as any;
 const triggerController = createTriggerController();
 const modal = ref();
 const valueRef = ref<Subtask>(new Subtask()); // 子任务结构
@@ -178,6 +190,27 @@ const onPreviewDismiss = () => (openPreview.value = false);
 const onPreviewClk = () => {
   openPreview.value = false;
 };
+
+async function btnRewardClk() {
+  if (globalVar!.user?.admin !== 1) return;
+  const alert = await alertController.create({
+    header: "日程奖励",
+    inputs: [{ type: "number", value: valueRef.value.score, placeholder: "奖励积分" }],
+    buttons: [
+      {
+        text: "取消",
+        role: "cancel",
+      },
+      {
+        text: "确定",
+        handler: (e) => {
+          valueRef.value.score = parseInt(e[0]);
+        },
+      },
+    ],
+  });
+  await alert.present();
+}
 </script>
 
 <style scoped>

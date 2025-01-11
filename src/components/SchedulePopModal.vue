@@ -263,7 +263,9 @@
           :value="curSubtask"
           :is-open="openSubtaskModal"
           @willDismiss="onSubtaskPopDismiss" />
-        <ion-reorder-group :disabled="bReorderDisabled" @ionItemReorder="onReorder($event, curScheduleData)">
+        <ion-reorder-group
+          :disabled="bReorderDisabled"
+          @ionItemReorder="onReorder($event, curScheduleData)">
           <ion-item
             v-for="(task, idx) in curScheduleData?.subtasks"
             :key="idx"
@@ -275,8 +277,10 @@
               @ionChange="onSubtaskCheckboxChange($event, task)">
             </ion-checkbox>
             <div class="flex flex-col w-full h-full" @click="onSubtaskClk($event, task)">
-              <ion-label :class="{ 'line-through': subTaskChecked(task) }" class="ion-no-margin">
-                {{ task.name }}
+              <ion-label :class="{ 'line-through': subTaskChecked(task) }" class="ion-no-margin flex items-center">
+                <div class="flex-1">{{ task.name }}</div>
+                <MdiStar class="text-red-500" />
+                <span class="w-5 text-right mr-3">{{task.score ?? 0}}</span>
               </ion-label>
               <div class="pre-img-group" style="margin-top: 5px">
                 <div class="pre-img-block" v-for="(img, idx) in task.imgIds" :key="idx">
