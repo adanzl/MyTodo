@@ -23,6 +23,8 @@ import {
   IonActionSheet,
   IonCheckbox,
   IonDatetime,
+  IonReorder,
+  IonReorderGroup,
   IonSegment,
   IonSegmentButton,
   IonSegmentContent,
@@ -31,11 +33,11 @@ import {
   IonSelectOption,
 } from "@ionic/vue";
 import dayjs from "dayjs";
+import _ from "lodash";
 import { defineComponent, inject, nextTick, onMounted, ref, watch } from "vue";
 import MdiChevronDoubleRight from "~icons/mdi/chevron-double-right";
 import MdiGiftOutline from "~icons/mdi/gift-outline";
 import MdiStar from "~icons/mdi/star";
-import _ from "lodash";
 
 export default defineComponent({
   components: {
@@ -56,6 +58,8 @@ export default defineComponent({
     RepeatSelector,
     SubtaskPopModal,
     IonActionSheet,
+    IonReorder,
+    IonReorderGroup,
   },
   props: {
     modal: Object,
