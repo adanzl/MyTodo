@@ -240,10 +240,15 @@
         <ion-item lines="none">
           <ion-icon :icon="listOutline" slot="start"></ion-icon>
           <ion-label>子任务</ion-label>
-          <span>
+          <span class="mr-2">
             {{ curScheduleData?.subtasks?.filter((t: any) => subTaskChecked(t)).length }}/{{
               curScheduleData?.subtasks?.length
             }}
+          </span>
+          <span>
+            <ion-button id="btnSort" @click="btnSortClk" fill="clear" slot="end">
+              <ion-icon :icon="swapVertical" class="button-native"></ion-icon>
+            </ion-button>
           </span>
         </ion-item>
         <!-- 子任务 -->
@@ -258,27 +263,33 @@
           :value="curSubtask"
           :is-open="openSubtaskModal"
           @willDismiss="onSubtaskPopDismiss" />
-        <ion-item v-for="(task, idx) in curScheduleData?.subtasks" :key="idx" class="subtask-item">
-          <ion-checkbox
-            slot="start"
-            :checked="subTaskChecked(task)"
-            class="ion-no-padding"
-            @ionChange="onSubtaskCheckboxChange($event, task)">
-          </ion-checkbox>
-          <div class="flex flex-col w-full h-full" @click="onSubtaskClk($event, task)">
-            <ion-label :class="{ 'line-through': subTaskChecked(task) }" class="ion-no-margin">
-              {{ task.name }}
-            </ion-label>
-            <div class="pre-img-group" style="margin-top: 5px">
-              <div class="pre-img-block" v-for="(img, idx) in task.imgIds" :key="idx">
-                <img :src="imgs[img]" />
+        <ion-reorder-group :disabled="bReorderDisabled" @ionItemReorder="onReorder($event, curScheduleData)">
+          <ion-item
+            v-for="(task, idx) in curScheduleData?.subtasks"
+            :key="idx"
+            class="subtask-item">
+            <ion-checkbox
+              slot="start"
+              :checked="subTaskChecked(task)"
+              class="ion-no-padding"
+              @ionChange="onSubtaskCheckboxChange($event, task)">
+            </ion-checkbox>
+            <div class="flex flex-col w-full h-full" @click="onSubtaskClk($event, task)">
+              <ion-label :class="{ 'line-through': subTaskChecked(task) }" class="ion-no-margin">
+                {{ task.name }}
+              </ion-label>
+              <div class="pre-img-group" style="margin-top: 5px">
+                <div class="pre-img-block" v-for="(img, idx) in task.imgIds" :key="idx">
+                  <img :src="imgs[img]" />
+                </div>
               </div>
             </div>
-          </div>
-          <div slot="end" class="w-8 h-full" @click="btnSubtaskRemoveClk($event, task)">
-            <ion-icon :icon="removeCircleOutline" size="large" />
-          </div>
-        </ion-item>
+            <div slot="end" class="w-8 h-full" @click="btnSubtaskRemoveClk($event, task)">
+              <ion-icon :icon="removeCircleOutline" size="large" />
+            </div>
+            <ion-reorder slot="end"></ion-reorder>
+          </ion-item>
+        </ion-reorder-group>
       </ion-list>
     </ion-content>
     <ion-footer>

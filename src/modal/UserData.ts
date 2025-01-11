@@ -14,11 +14,13 @@ export class User {
 export class Subtask {
   id: number = -1;
   name?: string = "";
+  order?: number = 0;
   imgIds: number[] = []; // 图片id列表
   static Copy(o: Subtask): Subtask {
     return {
       id: o.id,
       name: o.name,
+      order: o.order,
       imgIds: o.imgIds?.concat(),
     };
   }
@@ -289,6 +291,22 @@ export class UData {
     // 状态
     const sa: number = (save && save[a.id]?.state) ?? 0;
     const sb: number = (save && save[b.id]?.state) ?? 0;
+    if (sa !== sb) {
+      return sa - sb;
+    }
+    // order
+    const oa: number = a.order ?? 99999;
+    const ob: number = b.order ?? 99999;
+    if (oa !== ob) {
+      return oa - ob;
+    }
+    return (a.id ?? 0) - (b.id ?? 0);
+  }
+
+  public static CmpScheduleSubtasks(a: Subtask, b: Subtask, save: ScheduleSave) {
+    // 状态
+    const sa: number = (save && save.subtasks && save.subtasks[a.id]) ?? 0;
+    const sb: number = (save && save.subtasks && save.subtasks[b.id]) ?? 0;
     if (sa !== sb) {
       return sa - sb;
     }

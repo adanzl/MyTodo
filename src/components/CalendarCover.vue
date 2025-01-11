@@ -126,7 +126,6 @@
     </ion-content>
     <div class="w-full h-[10%] absolute bottom-0" @click="selfRef.$el.dismiss()"></div>
     <SchedulePop
-      id="pop-modal"
       aria-hidden="false"
       ref="scheduleModal"
       :is-open="isScheduleModalOpen"

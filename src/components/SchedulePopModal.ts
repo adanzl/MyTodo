@@ -15,7 +15,7 @@ import {
   ReminderOptions,
   WEEK,
 } from "@/modal/ScheduleType";
-import { ScheduleData, ScheduleSave, Subtask } from "@/modal/UserData";
+import { ScheduleData, ScheduleSave, Subtask, UData } from "@/modal/UserData";
 import { getImage } from "@/utils/ImgMgr";
 import {
   alertController,
@@ -35,6 +35,7 @@ import { defineComponent, inject, nextTick, onMounted, ref, watch } from "vue";
 import MdiChevronDoubleRight from "~icons/mdi/chevron-double-right";
 import MdiGiftOutline from "~icons/mdi/gift-outline";
 import MdiStar from "~icons/mdi/star";
+import _ from "lodash";
 
 export default defineComponent({
   components: {
@@ -83,12 +84,16 @@ export default defineComponent({
       repeatEndTsComponent: ref(), // 重复结束日期选择器
       repeatEndTsModal: ref(), // 重复结束日期选择器modal
       scheduleType: ref("0"), // 日期类型 0:start 1:end
+      // =========== 子任务 ============
+      bReorderDisabled: ref(true),
       openSubtaskModal: ref(false),
       curSubtask: ref<any>(),
       imgs: ref<Record<number, string>>({}),
+      // =========== modal ============
+      // 保存面板显示标记
       openSaveSheet: ref(false), // 保存面板显示标记
       // 提示框数据
-      toastData : ref({
+      toastData: ref({
         isOpen: false,
         duration: 3000,
         text: "",
@@ -101,12 +106,7 @@ export default defineComponent({
       // console.log("refreshUI", curScheduleData.value, curSave.value, props);
       // task 排序
       refData.curScheduleData.value?.subtasks.sort((a: Subtask, b: Subtask) => {
-        const sa = refData.curSave.value.subtasks[a.id] || 0;
-        const sb = refData.curSave.value.subtasks[b.id] || 0;
-        if (sa === sb) {
-          return a.id - b.id;
-        }
-        return sa - sb;
+        return UData.CmpScheduleSubtasks(a, b, refData.curSave.value);
       });
       refData.imgs.value = {};
       refData.curScheduleData.value?.subtasks.forEach((subtask) => {
@@ -255,6 +255,24 @@ export default defineComponent({
     };
     // ============ Tab3 ============
     const tab3Method = {
+      btnSortClk: () => {
+        refData.bReorderDisabled.value = !refData.bReorderDisabled.value;
+      },
+      // 子任务排序改变
+      onReorder: (event: any, curScheduleData: any) => {
+        let eList = curScheduleData.subtasks;
+        eList = event.detail.complete(eList);
+        if (eList) {
+          let ii = eList[0].order ?? 0;
+          _.forEach(eList, (v) => {
+            v.order = ii;
+            ii++;
+          });
+        }
+        eList.sort((a: Subtask, b: Subtask) => {
+          return UData.CmpScheduleSubtasks(a, b, refData.curSave.value);
+        });
+      },
       // 子任务状态改变
       onSubtaskCheckboxChange: (event: any, task?: Subtask) => {
         if (task) {
@@ -264,12 +282,7 @@ export default defineComponent({
         // task 排序
         nextTick(() => {
           refData.curScheduleData.value!.subtasks.sort((a: Subtask, b: Subtask) => {
-            const sa = refData.curSave.value!.subtasks[a.id] || 0;
-            const sb = refData.curSave.value!.subtasks[b.id] || 0;
-            if (sa === sb) {
-              return a.id - b.id;
-            }
-            return sa - sb;
+            return UData.CmpScheduleSubtasks(a, b, refData.curSave.value);
           });
         });
         // 如果所有子任务都完成了，整个任务变成完成状态
