@@ -4,7 +4,15 @@ import SchedulePop from "@/components/SchedulePopModal.vue";
 import { getColorOptions } from "@/modal/ColorType";
 import IonIcons from "@/modal/IonIcons";
 import { getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
-import { DayData, MonthData, S_TS, ScheduleData, ScheduleSave, UData, UserData } from "@/modal/UserData";
+import {
+  DayData,
+  MonthData,
+  S_TS,
+  ScheduleData,
+  ScheduleSave,
+  UData,
+  UserData,
+} from "@/modal/UserData";
 import { getSave, setSave } from "@/utils/NetUtil";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import {
@@ -226,7 +234,12 @@ export default defineComponent({
       },
       // 排序按钮
       btnSortClk: () => {
-        refData.bReorderDisabled.value = !refData.bReorderDisabled.value;
+        if (!refData.bFold.value) {
+          calenderMethod.btnCalendarFoldClk();
+        }
+        setTimeout(() => {
+          refData.bReorderDisabled.value = !refData.bReorderDisabled.value;
+        },100);
       },
       // 左下测试按钮
       btnTestClk: () => {
@@ -283,14 +296,14 @@ export default defineComponent({
       },
       // 点击日历某个日期
       onDaySelected: (slide: MonthData, day: DayData) => {
-        if (slide.month != day.dt.month()) {
-          if (slide.year * 100 + slide.month < day.dt.year() * 100 + day.dt.month()) {
-            refData.swiperRef.value.slideNext();
-          } else {
-            refData.swiperRef.value.slidePrev();
-          }
-        }
         refData.selectedDate.value = day;
+        // if (slide.month != day.dt.month()) {
+        //   if (slide.year * 100 + slide.month < day.dt.year() * 100 + day.dt.month()) {
+        //     refData.swiperRef.value.slideNext();
+        //   } else {
+        //     refData.swiperRef.value.slidePrev();
+        //   }
+        // }
         currentDate = day.dt.startOf("day");
         // console.log("onDaySelected", day);
       },
@@ -298,6 +311,7 @@ export default defineComponent({
       btnCalendarFoldClk: () => {
         refData.bFold.value = !refData.bFold.value;
         updateScheduleData();
+        // refData.selectedDate.value.$forceUpdate();
         setTimeout(() => {
           refData.swiperRef.value.update();
         }, 100);
@@ -330,12 +344,6 @@ export default defineComponent({
             calenderMethod.btnCalendarFoldClk();
           }
         }
-      },
-      // 刷新页面事件
-      handleRefresh: async (event: any) => {
-        // console.log("handleRefresh", event);
-        await refreshAllData();
-        event.target.complete();
       },
       // 筛选日程
       bShowScheduleItem: (schedule: ScheduleData) => {
@@ -427,8 +435,9 @@ export default defineComponent({
       },
       onReorder: (event: any) => {
         let eList = refData.selectedDate.value?.events.filter(scheduleListMethod.bShowScheduleItem);
-        // console.log(_.map(eList, 'title'));
+        // console.log(_.map(eList, 'order'));
         eList = event.detail.complete(eList);
+        // console.log(_.map(eList, 'order'));
         if (eList) {
           let ii = eList[0].order ?? 0;
           _.forEach(eList, (e) => {
@@ -436,18 +445,23 @@ export default defineComponent({
             e.order = ii++;
           });
         }
-        // console.log(_.map(eList, "title"));
+        // console.log(_.map(refData.selectedDate.value?.events, "order"));
         refData.selectedDate.value?.events.sort((a: ScheduleData, b: ScheduleData) => {
           return UData.CmpScheduleData(a, b, refData.selectedDate.value?.save);
         });
+        // console.log(_.map(refData.selectedDate.value?.events, "order"));
         doSaveUserData();
         // console.log(eList);
+      },
+      // 总奖励
+      countAllReward: (schedule: ScheduleData) => {
+        return UData.CountScheduleReward(schedule);
       },
     };
     // ========== 日程弹窗 ===========
     const scheduleModalMethods = {
       // 添加日程按钮
-      btnAddScheduleClk: () => {
+      btnAddScheduleClk: async () => {
         // 清空数据
         refData.scheduleModalData.value = undefined;
         refData.scheduleSave.value = undefined;

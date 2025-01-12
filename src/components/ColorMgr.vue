@@ -35,7 +35,7 @@
           <ion-icon :icon="saveOutline" />
         </button>
       </div>
-      <div class="flex items-center p-2 h-16" v-for="(color, idx) in colorOptions" :key="idx">
+      <div class="flex items-center px-2 h-16" v-for="(color, idx) in colorOptions" :key="idx">
         <span class="flex w-8 justify-center items-center">{{ color.id }}</span>
         <span
           class="v-dot w-in"
@@ -57,17 +57,19 @@
           fill="outline"
           :value="color.tag"
           @ionChange="inputChange($event, color, 1)" />
-        <button class="w-8 h-full" @click="btnSaveClk($event, color)">
-          <ion-icon :icon="saveOutline" />
+        <button class="w-8 h-full pt-1" @click="btnSaveClk($event, color)">
+          <ion-icon :icon="saveOutline" class="w-5 h-5" />
         </button>
-        <button class="w-8 h-full" @click="btnRemoveClk($event, color)">
-          <ion-icon :icon="removeCircleOutline" />
+        <button class="w-8 h-full pt-1" @click="btnRemoveClk($event, color)">
+          <ion-icon :icon="removeCircleOutline" class="w-5 h-5" />
         </button>
       </div>
     </ion-content>
     <ion-footer class="flex">
       <ion-toolbar>
-        <ion-button expand="full" fill="clear" @click="confirm()"> 确定 </ion-button>
+        <ion-button expand="full" class="min-h-0 ion-no-margin" fill="clear" @click="confirm()">
+          确定
+        </ion-button>
       </ion-toolbar>
     </ion-footer>
     <ColorPicker
@@ -86,7 +88,7 @@
 </style>
 <script lang="ts" setup>
 import ColorPicker from "@/components/ColorPicker.vue";
-import { LoadColorData } from "@/modal/ColorType";
+import { ColorOptions, LoadColorData } from "@/modal/ColorType";
 import { delColor, setColor } from "@/utils/NetUtil";
 import { createTriggerController } from "@/utils/Overlay";
 import { alertController } from "@ionic/vue";
@@ -105,12 +107,13 @@ const modal = ref();
 const valueRef = ref<any>();
 const n_color = ref({ tag: "#000000", label: "" });
 const eventBus: any = inject("eventBus");
-const colorOptions = ref<any[]>([]);
+const colorOptions = ref<any[]>(ColorOptions);
 const bOpenColorPicker = ref(false);
 const curColor = ref<any>({});
 eventBus.$on("updateColor", (params: any[]) => {
   colorOptions.value = [];
   _.forEach(params, (v: any) => colorOptions.value.push(v));
+  console.log("updateColor", colorOptions.value);
 });
 
 const emits = defineEmits(["update:value"]);

@@ -30,7 +30,7 @@
         </ion-item>
         <!-- 分组信息 -->
         <ion-item class="group">
-          <ion-button id="btnGroup" class="flex-1 text-base" fill="none">
+          <ion-button id="btnGroup" class="flex-1 min-w-fit text-base" fill="none">
             <!-- <ion-icon :icon="bookmarksOutline" class="mr-1"></ion-icon> -->
             <span class="mr-3">
               <component
@@ -63,6 +63,11 @@
             trigger="btnColorSelect"
             @update:value="onColorChange"
             :value="curScheduleData.color" />
+          <ion-button @click="btnRewardClk" class="flex-1 text-base" fill="none">
+            <MdiGiftOutline class="text-red-500 w-[1.2em] h-[1.2em]" slot="start" />
+            <MdiStar class="text-red-500 w-[1.4em] h-[1.4em]" />
+            <span>{{ curScheduleData.score ?? 0 }}</span>
+          </ion-button>
         </ion-item>
       </ion-list>
       <ion-list :inset="true">
@@ -227,12 +232,12 @@
             </ion-footer>
           </ion-modal>
         </ion-item>
-        <ion-item @click="btnRewardClk" detail="true">
+        <ion-item detail="true">
           <MdiGiftOutline class="text-red-500 w-[1.6em] h-[1.6em]" slot="start" />
-          <ion-label>奖励</ion-label>
+          <ion-label>总奖励</ion-label>
           <div slot="end" class="flex items-center">
             <MdiStar class="text-red-500" />
-            <ion-label class="w-5 text-right">{{ curScheduleData.score ?? 0 }}</ion-label>
+            <ion-label class="w-5 text-right">{{ countAllReward() }}</ion-label>
           </div>
         </ion-item>
       </ion-list>
@@ -277,10 +282,12 @@
               @ionChange="onSubtaskCheckboxChange($event, task)">
             </ion-checkbox>
             <div class="flex flex-col w-full h-full" @click="onSubtaskClk($event, task)">
-              <ion-label :class="{ 'line-through': subTaskChecked(task) }" class="ion-no-margin flex items-center">
+              <ion-label
+                :class="{ 'line-through': subTaskChecked(task) }"
+                class="ion-no-margin flex items-center">
                 <div class="flex-1">{{ task.name }}</div>
                 <MdiStar class="text-red-500" />
-                <span class="w-5 text-right mr-3">{{task.score ?? 0}}</span>
+                <span class="w-5 text-right mr-3">{{ task.score ?? 0 }}</span>
               </ion-label>
               <div class="pre-img-group" style="margin-top: 5px">
                 <div class="pre-img-block" v-for="(img, idx) in task.imgIds" :key="idx">

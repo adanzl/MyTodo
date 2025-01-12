@@ -67,6 +67,7 @@ import { add, trashOutline } from "ionicons/icons";
 import { inject, onMounted, ref, watch } from "vue";
 import MdiGiftOutline from "~icons/mdi/gift-outline";
 import MdiCardTextOutline from "~icons/mdi/card-text-outline";
+import MdiStar from "~icons/mdi/star";
 
 const props = defineProps({
   trigger: {

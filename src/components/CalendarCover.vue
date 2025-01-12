@@ -1,7 +1,7 @@
 <template>
   <ion-modal mode="ios" ref="selfRef" @willDismiss="onModalDismiss">
     <ion-content class="main_content" fixed-slot-placement="before">
-      <ion-item class="transparent">
+      <ion-item class="transparent ion-padding-start">
         <h2 class="text-xl font-bold text-white">
           {{ currentDate.format("YYYY-MM-DD") + " " + weekHead[currentDate.day()] }}
         </h2>
@@ -10,7 +10,8 @@
           fill="clear"
           @click="btnTodayClk"
           size="small"
-          class="ion-padding-horizontal"
+          shape="round"
+          class="ion-no-padding mr-3"
           v-if="!currentDate.isToday()">
           <div class="bg-orange-600 w-16 h-8 flex items-center text-white rounded-md p-2">
             <icon-mdi-calendar-today-outline :height="'16'" slot="start" />
@@ -82,7 +83,7 @@
                         <span class="mr-1 flex items-center">
                           <MdiStar class="mr-1 text-sm" />
                           <p class="w-5 text-sm">
-                            {{ schedule.score ?? 0 }}
+                            {{ countAllReward(schedule) }}
                           </p>
                         </span>
                       </div>
@@ -327,7 +328,13 @@ function onReorder(event: any, day: DayData) {
 }
 function onModalDismiss() {
   // console.log("onModalDismiss");
+  bReorderDisabled.value = true;
   emits("update:data", currentDate.value);
+}
+
+// 总奖励
+function countAllReward(schedule: ScheduleData) {
+  return UData.CountScheduleReward(schedule);
 }
 </script>
 <style scoped>
@@ -357,7 +364,7 @@ ion-modal {
   height: 100%;
   /* border: 1px solid #e2d0d0; */
   /* border-radius: 10px; */
-  padding: 4px;
+  padding: 6px;
   border-bottom-right-radius: 10px;
   border-bottom-left-radius: 10px;
 }

@@ -151,6 +151,11 @@ export default defineComponent({
       // 任务状态改变
       onTaskCheckboxChange: (event: any) => {
         refData.curSave.value!.state = event.detail.checked ? 1 : 0;
+        if (event.detail.checked) {
+          _.forEach(refData.curScheduleData.value.subtasks, (subtask) => {
+            refData.curSave.value!.subtasks[subtask.id] = 1;
+          });
+        }
       },
       // 颜色选择
       onColorChange: (nv: number) => {
@@ -255,6 +260,10 @@ export default defineComponent({
         refData.repeatEndTsComponent.value.$el.cancel();
         refData.curScheduleData.value!.repeatEndTs = undefined;
         refData.repeatEndTsModal.value.$el.dismiss();
+      },
+      // 总奖励
+      countAllReward: () => {
+        return UData.CountScheduleReward(refData.curScheduleData.value);
       },
     };
     // ============ Tab3 ============
@@ -416,6 +425,7 @@ export default defineComponent({
         refData.scheduleDTComponent.value.style.height =
           refData.scheduleDTComponent.value.offsetHeight;
         refData.dateShowFlag.value = false;
+        refData.bReorderDisabled.value = true;
       },
     };
     return {

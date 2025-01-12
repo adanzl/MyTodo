@@ -2,6 +2,7 @@ import avatar from "@/assets/images/avatar.svg";
 import { CUSTOM_REPEAT_ID, RepeatData } from "@/modal/ScheduleType";
 import dayjs from "dayjs";
 import _ from "lodash";
+import EventBus from "./EventBus";
 
 export class User {
   id = -1;
@@ -68,7 +69,7 @@ export class ScheduleData {
 
 // 日程存档【每天】
 export class ScheduleSave {
-  state: number = -1;
+  state: 0|1 = 0;
   subtasks: Record<number, number> = {}; // <number, number>;
   // 覆盖字段
   scheduleOverride?: ScheduleData;
@@ -334,19 +335,25 @@ export class UData {
     }
     const map = userData.save[dKey];
     map![_scheduleData.id!] = _scheduleSave;
-    const oriScore = _scheduleSave.score ?? 0;
-    const newScore = _scheduleData.score ?? 0;
+    const oriScore = _scheduleSave.score ?? 0; // 表示已经给的积分
     if (_scheduleSave.state === 1) {
+      let newScore = _scheduleData.score ?? 0;
+      // 处理子任务
+      _.forEach(_scheduleData.subtasks, (v) => {
+        newScore += v.score ?? 0;
+        _scheduleSave.subtasks[v.id] = 1;
+      });
       // +积分
       if (newScore > oriScore) {
         userData.score += newScore - oriScore;
         _scheduleSave.score = newScore;
+        EventBus.$emit("getReward", newScore - oriScore);
       }
     } else {
-      // -积分
-      if (oriScore) {
-        userData.score -= oriScore;
-        _scheduleSave.score = 0;
+      // -积分 减积分的地方 只核减任务的主积分
+      if (_scheduleSave.score) {
+        userData.score -= _scheduleData.score ?? 0;
+        _scheduleSave.score -= _scheduleData.score ?? 0;
       }
     }
   }
@@ -417,8 +424,15 @@ export class UData {
         schedule.subtasks = [];
       }
     }
-
     return ret;
+  }
+
+  static CountScheduleReward(schedule: ScheduleData) {
+    return (
+      schedule.subtasks?.reduce((sum: number, t: any) => {
+        return sum + (t.score ?? 0);
+      }, 0) + (schedule.score ?? 0)
+    );
   }
 }
 export const S_TS = (dt?: dayjs.Dayjs): string => {

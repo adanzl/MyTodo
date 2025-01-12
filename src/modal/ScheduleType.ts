@@ -153,7 +153,7 @@ export const getPriorityOptions = (id?: number): PriorityType => {
 
 import dayjs from "dayjs";
 import MdiLearnOutline from "~icons/mdi/learn-outline";
-import MdiRoundedCorner from "~icons/mdi/rounded-corner";
+import MdiBorderRoundCorners from "~icons/mdi/border-round-corners";
 import MdiWorkOutline from "~icons/mdi/work-outline";
 // 分组配置
 export interface GroupType {
@@ -163,7 +163,7 @@ export interface GroupType {
   icon: any;
 }
 export const GroupOptions: GroupType[] = [
-  { id: 0, label: "未分类", color: "white", icon: MdiRoundedCorner },
+  { id: 0, label: "未分类", color: "white", icon: MdiBorderRoundCorners },
   { id: 1, label: "工作", color: "red", icon: MdiWorkOutline },
   { id: 2, label: "学习", color: "yellow", icon: MdiLearnOutline },
 ];

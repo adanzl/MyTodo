@@ -55,9 +55,6 @@
         color="light"
         @touchmove="onScheduleListTouchMove"
         @touchstart="onScheduleListTouchStart">
-        <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
-          <ion-refresher-content></ion-refresher-content>
-        </ion-refresher>
         <ion-accordion-group :multiple="true" :value="['schedule']">
           <ion-accordion value="schedule">
             <ion-item slot="header" color="light" class="schedule-group-item">
@@ -71,9 +68,9 @@
             <div slot="content">
               <ion-reorder-group
                 :disabled="bReorderDisabled"
+                ref="curScheduleList"
                 @ionItemReorder="onReorder($event)"
                 mode="ios"
-                ref="curScheduleList"
                 class="my-0">
                 <!-- 日程条目 -->
                 <ion-item-sliding
@@ -93,7 +90,9 @@
                             selectedDate?.save && selectedDate?.save[schedule.id]?.state === 1,
                         }"
                         class="pt-2.5 flex-1">
-                        <h2 class="truncate">{{ schedule.title }}</h2>
+                        <h2 class="truncate">
+                          {{ schedule.title }}
+                        </h2>
                         <div class="flex text-gray-400">
                           <span class="mr-1 flex items-center text-base">
                             <component
@@ -110,7 +109,7 @@
                           <span class="mr-1 flex items-center">
                             <MdiStar class="mr-1 text-sm" />
                             <p class="w-5 text-sm">
-                              {{ schedule.score ?? 0 }}
+                              {{ countAllReward(schedule) }}
                             </p>
                           </span>
                         </div>

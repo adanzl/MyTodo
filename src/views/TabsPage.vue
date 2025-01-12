@@ -141,10 +141,17 @@
         </ion-content>
         <ion-footer>
           <ion-toolbar class="flex">
-            <ion-button fill="clear" class="w-[48%]" @click="btnFilterResetClick()">
+            <ion-button
+              fill="clear"
+              class="w-[48%] min-h-0 ion-no-margin"
+              @click="btnFilterResetClick()">
               重置筛选
             </ion-button>
-            <ion-button fill="clear" class="w-[48%]" color="warning" id="btnColor">
+            <ion-button
+              fill="clear"
+              class="w-[48%] min-h-0 ion-no-margin"
+              color="warning"
+              id="btnColor">
               <ion-icon :icon="colorPaletteOutline" />
               编辑颜色
             </ion-button>
@@ -223,6 +230,7 @@
         </ion-card-content>
       </ion-card>
     </div>
+    <RewardPop :is-open="bOpenReward.open" :value="bOpenReward.score" @willDismiss="onRewardDismiss"/>
   </ion-page>
 </template>
 
@@ -250,7 +258,7 @@ import {
   IonRouterOutlet,
   IonTabBar,
   IonTabButton,
-  IonTabs
+  IonTabs,
 } from "@ionic/vue";
 import CryptoJS from "crypto-js";
 import {
@@ -273,6 +281,10 @@ const curUser = ref(new User());
 curUser.value.name = "点击选择用户";
 const userPopover = ref<any>(null);
 const textPwd = ref("");
+const bOpenReward = ref({
+  open: false,
+  score: 0,
+});
 
 const groupRef = ref(new Map(GroupOptions.map((option) => [option.id, true])));
 const colorRef = ref(new Map(ColorOptions.map((option) => [option.id, true])));
@@ -350,7 +362,13 @@ function btnLogoff() {
 eventBus.$on("updateSave", (params: any) => {
   userData.value = params;
 });
-
+eventBus.$on("getReward", (params: any) => {
+  bOpenReward.value.open = true;
+  bOpenReward.value.score = params;
+});
+function onRewardDismiss() {
+  bOpenReward.value.open = false;
+}
 async function rewardLbClk() {
   if (curUser.value.admin !== 1) return;
   const alert = await alertController.create({
