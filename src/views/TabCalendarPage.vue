@@ -35,7 +35,7 @@
         @swiper="setSwiperInstance"
         :centered-slides="true"
         :autoHeight="true"
-        :modules="[IonicSlides, Keyboard]">
+        :modules="[Keyboard, IonicSlides]">
         <swiper-slide v-for="(month, idx) in monthArr" :key="idx">
           <ion-grid class="w-full">
             <ion-row v-for="week in month.weekArr" :key="week" class="flex-nowrap">
@@ -99,11 +99,11 @@ import { getSave } from "@/utils/NetUtil";
 import {
   IonCol,
   IonGrid,
-  IonicSlides,
   IonMenuButton,
   IonRow,
   loadingController,
   onIonViewDidEnter,
+  IonicSlides,
 } from "@ionic/vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import dayjs from "dayjs";
@@ -236,7 +236,7 @@ function isThisMonth() {
 }
 // 数据更新
 function onDataUpdate() {
-  slideChange(swiperRef.value); 
+  slideChange(swiperRef.value);
 }
 </script>
 <style lang="css" scoped>

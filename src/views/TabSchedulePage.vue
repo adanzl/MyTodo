@@ -22,7 +22,7 @@
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
-    <ion-content :scroll-y="false">
+    <div class="h-fit" style="background-color: var(--color-main-bg)">
       <!-- https://blog.csdn.net/weixin_41863239/article/details/82490886 -->
       <swiper
         @slideNextTransitionEnd="onSlideChangeNext"
@@ -30,7 +30,7 @@
         @swiper="setSwiperInstance"
         :centered-slides="true"
         :autoHeight="true"
-        :modules="[IonicSlides, Keyboard]"
+        :modules="[Keyboard, IonicSlides]"
         :keyboard="true">
         <swiper-slide v-for="(slide, idx) in slideArr" :key="idx">
           <CalenderTab
@@ -50,9 +50,11 @@
         @click="btnCalendarFoldClk()">
         <ion-icon :icon="bFold ? chevronDown : chevronUp" color="primary"> </ion-icon>
       </ion-button>
+    </div>
+    <ion-content ref="scheduleList" scrollEvents @ionScroll="onScheduleListScroll">
       <!-- 日程列表 -->
-      <ion-content
-        color="light"
+      <div
+        class="flex-1 h-full"
         @touchmove="onScheduleListTouchMove"
         @touchstart="onScheduleListTouchStart">
         <ion-accordion-group :multiple="true" :value="['schedule']">
@@ -161,7 +163,7 @@
             </div>
           </ion-accordion>
         </ion-accordion-group>
-      </ion-content>
+      </div>
       <SchedulePop
         ref="scheduleModal"
         :is-open="isScheduleModalOpen"

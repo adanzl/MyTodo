@@ -73,6 +73,7 @@ export default defineComponent({
     const globalVar: any = inject("globalVar");
     let currentDate = dayjs().startOf("day"); // 当前日期
     let pTouch: any;
+    let scheduleListScrollY = 0;
     let lstTs = 0;
     const refData = {
       userData: ref<UserData>(new UserData()),
@@ -87,6 +88,7 @@ export default defineComponent({
       scheduleSave: ref<ScheduleSave>(),
       isScheduleModalOpen: ref(false),
       filter: ref<any>({}),
+      scheduleList: ref(),
       toastData: ref({
         isOpen: false,
         duration: 3000,
@@ -239,7 +241,7 @@ export default defineComponent({
         }
         setTimeout(() => {
           refData.bReorderDisabled.value = !refData.bReorderDisabled.value;
-        },100);
+        }, 100);
       },
       // 左下测试按钮
       btnTestClk: () => {
@@ -308,8 +310,11 @@ export default defineComponent({
         // console.log("onDaySelected", day);
       },
       // 日历折叠按钮
-      btnCalendarFoldClk: () => {
-        refData.bFold.value = !refData.bFold.value;
+      btnCalendarFoldClk: (value?: boolean) => {
+        const v = value ?? !refData.bFold.value;
+        if (v === refData.bFold.value) return;
+        refData.bFold.value = v;
+        // console.log("btnCalendarFoldClk", refData.bFold.value);
         updateScheduleData();
         // refData.selectedDate.value.$forceUpdate();
         setTimeout(() => {
@@ -319,29 +324,56 @@ export default defineComponent({
     };
     // ========== 日程列表 ===========
     const scheduleListMethod = {
+      onScheduleListScroll: (event: any) => {
+        // console.log("onScheduleListScroll", event.detail.currentY);
+        scheduleListScrollY = event.detail.currentY;
+        // const ds = dayjs().valueOf() - lstTs;
+        // if (ds < 300) {
+        //   // 防止抖动
+        //   return;
+        // }
+        // if (pTouch == null) {
+        //   pTouch = event.detail.currentY;
+        //   return;
+        // }
+        // const d = pTouch - event.detail.currentY;
+        // if (Math.abs(d) > 20) {
+        //   lstTs = dayjs().valueOf();
+        //   if (d > 0 === refData.bFold.value) {
+        //     calenderMethod.btnCalendarFoldClk();
+        //   }
+        //   pTouch = event.detail.currentY;
+        // }
+      },
       onScheduleListTouchStart: (event: any) => {
-        // console.log("onTouchStart", bMoving, event);
+        // console.log("onScheduleListScrollStart", event);
         if (!refData.bReorderDisabled.value) {
           // 日程排序时禁用调整日历折叠状态
           return;
         }
         pTouch = event.touches[0];
       },
-      onScheduleListTouchMove: (event: any) => {
+      onScheduleListTouchMove: async (event: any) => {
         if (!refData.bReorderDisabled.value) {
           // 日程排序时禁用调整日历折叠状态
           return;
         }
-        // console.log("onTouchMove", bMoving, event);
         const ds = dayjs().valueOf() - lstTs;
         if (ds < 300) {
+          // 防止抖动
           return;
         }
+
         const d = event.touches[0].clientY - pTouch.clientY;
-        if (Math.abs(d) > 20) {
+        // console.log("onTouchMove", d, event);
+        if (Math.abs(d) > 10) {
           lstTs = dayjs().valueOf();
-          if (d > 0 === refData.bFold.value) {
-            calenderMethod.btnCalendarFoldClk();
+          if (d < 0) {
+            calenderMethod.btnCalendarFoldClk(true);
+          } else {
+            if (scheduleListScrollY < 10) {
+              calenderMethod.btnCalendarFoldClk(false);
+            }
           }
         }
       },

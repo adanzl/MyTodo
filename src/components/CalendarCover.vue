@@ -23,7 +23,7 @@
         @transitionEnd="onTransitionEnd"
         @swiper="setSwiperInstance"
         :centered-slides="true"
-        :modules="[IonicSlides, Keyboard, EffectCoverflow]"
+        :modules="[Keyboard, EffectCoverflow, IonicSlides]"
         :effect="'coverflow'"
         :slidesPerView="'auto'"
         :freeMode="false"
