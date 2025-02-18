@@ -1,4 +1,5 @@
 <template>
+  <!-- 暂时不用了 -->
   <ion-page class="main-bg" id="main-content">
     <ion-header>
       <ion-toolbar>

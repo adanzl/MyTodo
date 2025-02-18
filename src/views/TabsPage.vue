@@ -171,9 +171,9 @@
             <ion-label>日历视图</ion-label>
           </ion-tab-button>
 
-          <ion-tab-button tab="tabPic" href="/tabs/tab3">
-            <ion-icon :icon="gridOutline" />
-            <ion-label>图片列表</ion-label>
+          <ion-tab-button tab="tabChat" href="/tabs/tab3">
+            <ion-icon :icon="chatboxEllipsesOutline" />
+            <ion-label>智能对话</ion-label>
           </ion-tab-button>
 
           <ion-tab-button tab="tabMy" href="/tabs/tab4">
@@ -265,7 +265,7 @@ import {
   bookmarksOutline,
   calendarOutline,
   colorPaletteOutline,
-  gridOutline,
+  chatboxEllipsesOutline,
   shieldCheckmarkOutline,
   squareOutline,
 } from "ionicons/icons";

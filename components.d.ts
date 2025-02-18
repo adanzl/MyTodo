@@ -28,5 +28,6 @@ declare module 'vue' {
     SchedulePopModal: typeof import('./src/components/SchedulePopModal.vue')['default']
     SubtaskPopModal: typeof import('./src/components/SubtaskPopModal.vue')['default']
     WeekSelector: typeof import('./src/components/WeekSelector.vue')['default']
+    XunfeiIat: typeof import('./src/components/XunfeiIat.vue')['default']
   }
 }

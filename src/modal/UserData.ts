@@ -50,9 +50,9 @@ export class ScheduleData {
   subtasks: Subtask[] = []; // 子任务列表
   static Copy(o: ScheduleData): ScheduleData {
     const ret = JSON.parse(JSON.stringify(o));
-    ret.startTs = o.startTs?.clone();
-    ret.endTs = o.endTs?.clone();
-    ret.repeatEndTs = o.repeatEndTs?.clone();
+    ret.startTs = ret.startTs && dayjs(ret.startTs);
+    ret.endTs = ret.endTs && dayjs(ret.endTs);
+    ret.repeatEndTs = ret.repeatEndTs && dayjs(ret.repeatEndTs);
     ret.subtasks = [];
     if (o.subtasks) {
       for (const subtask of o.subtasks) {
@@ -69,7 +69,7 @@ export class ScheduleData {
 
 // 日程存档【每天】
 export class ScheduleSave {
-  state: 0|1 = 0;
+  state: 0 | 1 = 0;
   subtasks: Record<number, number> = {}; // <number, number>;
   // 覆盖字段
   scheduleOverride?: ScheduleData;
