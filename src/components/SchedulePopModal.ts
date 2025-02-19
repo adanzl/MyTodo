@@ -331,6 +331,7 @@ export default defineComponent({
           }
         }
         changeFlag = true;
+        refData.curSubtask.value = task;
       },
       onSubtaskPopDismiss: () => {
         console.log("subtask pop willDismiss", refData.curSubtask.value);

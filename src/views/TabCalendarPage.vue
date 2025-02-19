@@ -93,6 +93,7 @@
 <script setup lang="ts">
 import CalendarCover from "@/components/CalendarCover.vue";
 import { getColorOptions } from "@/modal/ColorType";
+import { C_EVENT } from "@/modal/EventBus";
 import { DayData, MonthData, ScheduleData, UData, UserData } from "@/modal/UserData";
 import { LiveUpdateMgr } from "@/utils/AppUpdate";
 import { getSave } from "@/utils/NetUtil";
@@ -162,7 +163,7 @@ onMounted(async () => {
 
   refreshAllData();
 
-  eventBus.$on("menuClose", (params: any) => {
+  eventBus.$on(C_EVENT.MENU_CLOSE, (params: any) => {
     // console.log("menuClose", params);
     filter.value = params;
   });

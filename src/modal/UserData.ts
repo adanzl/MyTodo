@@ -2,7 +2,8 @@ import avatar from "@/assets/images/avatar.svg";
 import { CUSTOM_REPEAT_ID, RepeatData } from "@/modal/ScheduleType";
 import dayjs from "dayjs";
 import _ from "lodash";
-import EventBus from "./EventBus";
+import EventBus, { C_EVENT } from "./EventBus";
+import { GlobalVar } from "@/main";
 
 export class User {
   id = -1;
@@ -10,6 +11,7 @@ export class User {
   pwd = "";
   icon = `${avatar}`;
   admin = 0;
+  score = 0;
 }
 
 export class Subtask {
@@ -86,9 +88,8 @@ export class ScheduleSave {
 
 // 用户数据
 export class UserData {
-  id: number = -1; // 用户id
-  name: string = ""; // 用户名称
-  score: number = 0; // 积分
+  id: number = -1; // 存档id
+  name: string = ""; // 存档名称
   schedules: ScheduleData[] = []; // 日程计划列表
   // 计划完成情况  日期->对应日期完成情况(任务id->完成情况)
   save: Record<string, Record<number, ScheduleSave>> = {};
@@ -96,7 +97,6 @@ export class UserData {
     const ret = new UserData();
     ret.id = o.id;
     ret.name = o.name;
-    ret.score = o.score;
     ret.schedules = [];
     for (const schedule of o.schedules) {
       ret.schedules.push(ScheduleData.Copy(schedule));
@@ -216,6 +216,22 @@ export class UData {
     }
     for (const s of userData.schedules) {
       const schedule = ScheduleData.Copy(s);
+      // schedule;
+      const scheduleSave = save?.[schedule.id];
+      if (scheduleSave && scheduleSave.scheduleOverride) {
+        const os = scheduleSave.scheduleOverride;
+        // 处理覆盖问题
+        // 任务标题
+        os.title && (schedule.title = os.title);
+        // 颜色id
+        os.color && (schedule.color = os.color);
+        // 优先级
+        os.priority && (schedule.priority = os.priority);
+        // 分组id
+        os.groupId && (schedule.groupId = os.groupId);
+        // 子任务列表
+        os.subtasks && (schedule.subtasks = os.subtasks);
+      }
       if (schedule.startTs && schedule.startTs.startOf("day").unix() <= ts) {
         if (schedule.startTs.startOf("day").unix() === ts) {
           dayData.events.push(schedule);
@@ -260,22 +276,6 @@ export class UData {
             dayData.events.push(schedule);
           }
         }
-      }
-      // schedule;
-      const scheduleSave = save?.[schedule.id];
-      if (scheduleSave && scheduleSave.scheduleOverride) {
-        const os = scheduleSave.scheduleOverride;
-        // 处理覆盖问题
-        // 任务标题
-        os.title && (schedule.title = os.title);
-        // 颜色id
-        os.color && (schedule.color = os.color);
-        // 优先级
-        os.priority && (schedule.priority = os.priority);
-        // 分组id
-        os.groupId && (schedule.groupId = os.groupId);
-        // 子任务列表
-        os.subtasks && (schedule.subtasks = os.subtasks);
       }
     }
     // 排序日程
@@ -336,6 +336,7 @@ export class UData {
     const map = userData.save[dKey];
     map![_scheduleData.id!] = _scheduleSave;
     const oriScore = _scheduleSave.score ?? 0; // 表示已经给的积分
+    let dScore = 0; // 要变更的积分
     if (_scheduleSave.state === 1) {
       let newScore = _scheduleData.score ?? 0;
       // 处理子任务
@@ -345,16 +346,20 @@ export class UData {
       });
       // +积分
       if (newScore > oriScore) {
-        userData.score += newScore - oriScore;
+        dScore += newScore - oriScore;
         _scheduleSave.score = newScore;
-        EventBus.$emit("getReward", newScore - oriScore);
+        EventBus.$emit(C_EVENT.REWARD, newScore - oriScore);
       }
     } else {
       // -积分 减积分的地方 只核减任务的主积分
       if (_scheduleSave.score) {
-        userData.score -= _scheduleData.score ?? 0;
+        dScore -= _scheduleData.score ?? 0;
         _scheduleSave.score -= _scheduleData.score ?? 0;
       }
+    }
+    // 变更积分
+    if (dScore !== 0) {
+      GlobalVar.user.score += dScore;
     }
   }
   /**
@@ -414,7 +419,6 @@ export class UData {
     if (ret.schedules === undefined) {
       ret.schedules = [];
     }
-    if (isNaN(ret.score)) ret.score = 0;
     for (let i = 0; i < ret.schedules.length; i++) {
       const schedule = ret.schedules[i];
       schedule.startTs = dayjs(schedule.startTs);

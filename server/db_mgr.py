@@ -11,7 +11,7 @@ TABLE_PIC = "t_user_pic"
 TABLE_USER = "t_user"
 
 
-def init_db():
+def init():
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     create_t_user_save_sql = f'''

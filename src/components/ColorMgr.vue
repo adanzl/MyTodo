@@ -89,6 +89,7 @@
 <script lang="ts" setup>
 import ColorPicker from "@/components/ColorPicker.vue";
 import { ColorOptions, LoadColorData } from "@/modal/ColorType";
+import { C_EVENT } from "@/modal/EventBus";
 import { delColor, setColor } from "@/utils/NetUtil";
 import { createTriggerController } from "@/utils/Overlay";
 import { alertController } from "@ionic/vue";
@@ -110,10 +111,10 @@ const eventBus: any = inject("eventBus");
 const colorOptions = ref<any[]>(ColorOptions);
 const bOpenColorPicker = ref(false);
 const curColor = ref<any>({});
-eventBus.$on("updateColor", (params: any[]) => {
+eventBus.$on(C_EVENT.UPDATE_COLOR, (params: any[]) => {
   colorOptions.value = [];
   _.forEach(params, (v: any) => colorOptions.value.push(v));
-  console.log("updateColor", colorOptions.value);
+  // console.log("updateColor", colorOptions.value);
 });
 
 const emits = defineEmits(["update:value"]);

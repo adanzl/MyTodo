@@ -1,6 +1,6 @@
 import { LoadColorData } from "@/modal/ColorType";
 import { UData } from "@/modal/UserData";
-import EventBus from "@/modal/EventBus";
+import EventBus, { C_EVENT } from "@/modal/EventBus";
 import axios from "axios";
 // const URL = "https://3ft23fh89533.vicp.fun/api";
 // natapp.cn
@@ -56,7 +56,7 @@ export async function getSave(id: number) {
     throw new Error(rsp.data.msg);
   }
   const ret = UData.parseUserData(rsp.data.data);
-  EventBus.$emit("updateSave", ret);
+  EventBus.$emit(C_EVENT.UPDATE_SAVE, ret);
   return ret;
 }
 
@@ -76,12 +76,27 @@ export function setSave(id: number | undefined, user: string, data: any) {
       })
       .then((res: any) => {
         resolve(res);
-        EventBus.$emit("updateSave", data);
+        EventBus.$emit(C_EVENT.UPDATE_SAVE, data);
       })
       .catch((err: any) => {
         reject(err);
       });
   });
+}
+
+export async function setUserInfo(id: number | undefined, score: number) {
+  const rsp: any = await axios.post(URL + "/setData", {
+    table: "t_user",
+    data: {
+      id: id,
+      score: score,
+    },
+  });
+  console.log("setUserInfo", rsp.data);
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
 }
 
 export async function setPic(id: number | undefined, data: string): Promise<string> {
@@ -104,6 +119,17 @@ export async function delPic(id: number) {
     table: "t_user_pic",
   });
   if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
+
+export async function getScheduleList(){
+  const rsp: any = await axios.get(URL + "/getAll", {
+    params: { table: "t_schedule" },
+  });
+  // console.log(rsp.data.data);
+  if (rsp.data.code!== 0) {
     throw new Error(rsp.data.msg);
   }
   return rsp.data.data;

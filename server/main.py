@@ -2,6 +2,7 @@ from flask import Flask, json, make_response, request, render_template, jsonify
 from flask_cors import CORS
 import logging
 import db_mgr
+import ai_mgr
 
 from logging.handlers import TimedRotatingFileHandler
 
@@ -13,7 +14,8 @@ log.setLevel(logging.INFO)
 log.addHandler(handler)
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
-db_mgr.init_db()
+db_mgr.init()
+ai_mgr.init()
 
 
 @app.after_request
@@ -138,6 +140,20 @@ def query():
     sql = args.get('sql')
     return db_mgr.query(sql)
 
+# ai
+@app.route("/chat", methods=['POST'])
+def chat():
+    args = request.get_json()
+    log.info("===== [Chat] " + json.dumps(args, ensure_ascii=False))
+    # return db_mgr.get_ai_list(page_num, page_size) 
+    prompt = args.get('prompt')
+    if not prompt:
+        return jsonify({"error": "缺少 prompt 参数"}), 400
+    result = ai_mgr.call_doubao_api(prompt)
+    if result:
+        return jsonify(result)
+    else:
+        return jsonify({"error": "调用 API 失败"}), 500
 
 # . .venv/bin/activate
 if __name__ == '__main__':

@@ -61,8 +61,9 @@
           <ion-accordion value="schedule">
             <ion-item slot="header" color="light" class="schedule-group-item">
               <div class="mr-3">{{ selectedDate?.dt.format("MM-DD") }}</div>
+              <span class="mr-1 text-sm">当前有</span>
               <MdiStar class="text-red-500 mr-1" />
-              <span> {{ userData?.score ?? 0 }}</span>
+              <span> {{ user?.score ?? 0 }}</span>
               <p style="margin-right: 8px" class="gray" slot="end">
                 {{ selectedDate?.events.length }}
               </p>

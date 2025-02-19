@@ -2,6 +2,7 @@ import CalenderTab from "@/components/CalendarTab.vue";
 import FabButton from "@/components/FabButton.vue";
 import SchedulePop from "@/components/SchedulePopModal.vue";
 import { getColorOptions } from "@/modal/ColorType";
+import { C_EVENT } from "@/modal/EventBus";
 import IonIcons from "@/modal/IonIcons";
 import { getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
 import {
@@ -11,6 +12,7 @@ import {
   ScheduleData,
   ScheduleSave,
   UData,
+  User,
   UserData,
 } from "@/modal/UserData";
 import { getSave, setSave } from "@/utils/NetUtil";
@@ -77,6 +79,7 @@ export default defineComponent({
     let lstTs = 0;
     const refData = {
       userData: ref<UserData>(new UserData()),
+      user: ref<User>(globalVar.user),
       slideArr: ref<any[]>([{}, {}, {}]), // 滑动数据
       bReorderDisabled: ref(true),
       curScheduleList: ref(),
@@ -209,8 +212,7 @@ export default defineComponent({
       onIonViewDidEnter(() => {
         refreshAllData();
       });
-      eventBus.$on("menuClose", (params: any) => {
-        // console.log("menuClose", params);
+      eventBus.$on(C_EVENT.MENU_CLOSE, (params: any) => {
         refData.filter.value = params;
       });
     });

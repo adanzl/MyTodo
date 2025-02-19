@@ -18,10 +18,42 @@
             <ion-label class="font-bold">{{ curUser.name }}</ion-label>
             <MdiStar class="text-red-500" />
             <div class="text-left pl-1 font-bold w-8">
-              {{ userData?.score ?? 0 }}
+              {{ curUser?.score ?? 0 }}
             </div>
           </ion-item>
-          <ion-accordion-group :multiple="true" :value="['group', 'color', 'priority']" mode="ios">
+          <ion-accordion-group
+            :multiple="true"
+            :value="['project', 'group', 'priority']"
+            mode="ios">
+            <ion-accordion value="project">
+              <ion-item slot="header" color="light" class="schedule-group-item">
+                <ion-icon :icon="bookmarksOutline" class="w-5"></ion-icon>
+                <ion-label class="mx-2.5">项目</ion-label>
+              </ion-item>
+              <ion-list class="ion-padding-horizontal" slot="content">
+                <ion-radio-group
+                  :value="scheduleListSelectedId"
+                  @ionChange="onScheduleListChange($event)">
+                  <ion-item
+                    lines="none"
+                    v-for="(o, idx) in scheduleListRef"
+                    :key="idx"
+                    style="--inner-padding-end: 0">
+                    <ion-radio
+                      justify="space-between"
+                      :value="o.id"
+                      :disabled="curUser.admin !== 1">
+                      <ion-label>
+                        <span class="mr-3">
+                          <ion-icon :icon="bookmarksOutline" class="w-5"></ion-icon>
+                        </span>
+                        {{ o.name }}
+                      </ion-label>
+                    </ion-radio>
+                  </ion-item>
+                </ion-radio-group>
+              </ion-list>
+            </ion-accordion>
             <ion-accordion value="group">
               <ion-item slot="header" color="light" class="schedule-group-item">
                 <ion-icon :icon="bookmarksOutline" class="w-5"></ion-icon>
@@ -58,44 +90,6 @@
                 </ion-checkbox>
               </ion-list>
             </ion-accordion>
-            <!-- <ion-accordion value="color">
-            <ion-item slot="header" color="light" class="schedule-group-item">
-              <ion-icon :icon="colorPaletteOutline" class="w-5"></ion-icon>
-              <ion-label class="mx-2.5">颜色</ion-label>
-            </ion-item>
-            <ion-list class="ion-padding-horizontal" slot="content">
-              <ion-checkbox
-                label-placement="start"
-                justify="space-between"
-                class="option-item"
-                @ionChange="onCheckChange($event, colorRef, -1)"
-                :checked="bChecked(colorRef, -1)">
-                <ion-item lines="none" style="left: -6px">
-                  <icon-mdi-check-all
-                    :height="'28'"
-                    style="margin: 0 16px 0 5px"></icon-mdi-check-all>
-                  <ion-label lines="none">全部</ion-label>
-                </ion-item>
-              </ion-checkbox>
-              <ion-checkbox
-                label-placement="start"
-                v-for="(color, idx) in ColorOptions"
-                :key="idx"
-                justify="space-between"
-                class="option-item"
-                @ionChange="onCheckChange($event, colorRef, color.id)"
-                :checked="bChecked(colorRef, color.id)">
-                <ion-item lines="none">
-                  <span :style="{ 'background-color': color.tag }" class="v-dot" slot="start">
-                  </span>
-                  <ion-label
-                    :style="{ color: color.tag, 'text-shadow': '1px 1px 1px #FF0000' }">
-                    {{ color.label }}
-                  </ion-label>
-                </ion-item>
-              </ion-checkbox>
-            </ion-list>
-          </ion-accordion> -->
             <ion-accordion value="priority">
               <ion-item slot="header" color="light" class="schedule-group-item">
                 <ion-label style="margin-left: 2px"><strong>Pri</strong></ion-label>
@@ -230,15 +224,19 @@
         </ion-card-content>
       </ion-card>
     </div>
-    <RewardPop :is-open="bOpenReward.open" :value="bOpenReward.score" @willDismiss="onRewardDismiss"/>
+    <RewardPop
+      :is-open="bOpenReward.open"
+      :value="bOpenReward.score"
+      @willDismiss="onRewardDismiss" />
   </ion-page>
 </template>
 
 <script setup lang="ts">
 import { ColorOptions } from "@/modal/ColorType";
+import { C_EVENT } from "@/modal/EventBus";
 import { GroupOptions, PriorityOptions } from "@/modal/ScheduleType";
-import { User } from "@/modal/UserData";
-import { getUserList, setSave } from "@/utils/NetUtil";
+import { User, UserData } from "@/modal/UserData";
+import { getScheduleList, getUserList, setUserInfo } from "@/utils/NetUtil";
 import {
   alertController,
   IonAccordion,
@@ -276,7 +274,7 @@ import MdiStar from "~icons/mdi/star";
 const bLogin = ref(false);
 const userList = ref<any[]>([]);
 const errMsg = ref("");
-const userData = ref();
+const userData = ref<UserData>();
 const curUser = ref(new User());
 curUser.value.name = "点击选择用户";
 const userPopover = ref<any>(null);
@@ -289,22 +287,31 @@ const bOpenReward = ref({
 const groupRef = ref(new Map(GroupOptions.map((option) => [option.id, true])));
 const colorRef = ref(new Map(ColorOptions.map((option) => [option.id, true])));
 const priorityRef = ref(new Map(PriorityOptions.map((option) => [option.id, true])));
+const scheduleListRef = ref<{ id: number; name: string }[]>([]);
+const scheduleListSelectedId = ref(1);
 const eventBus: any = inject("eventBus");
 const globalVar: any = inject("globalVar");
 
 onMounted(async () => {
-  const userData = await getUserList();
-  userList.value = userData.data;
+  const userListData = await getUserList();
+  userList.value = userListData.data;
   const sUserId = localStorage.getItem("saveUser");
-  const sUser = _.find(userData.data, (u) => u.id.toString() === sUserId);
+  const sUser = _.find(userListData.data, (u) => u.id.toString() === sUserId);
   if (sUser) {
     bLogin.value = true;
     curUser.value = sUser;
     globalVar.user = sUser;
   }
+  getScheduleList().then(async (data) => {
+    scheduleListRef.value = [];
+    data.data.forEach((item: any) => {
+      scheduleListRef.value.push({ id: item.id, name: item.name });
+    });
+    console.log(data.data);
+  });
 });
 function onMenuClose() {
-  eventBus.$emit("menuClose", {
+  eventBus.$emit(C_EVENT.MENU_CLOSE, {
     group: groupRef.value,
     color: colorRef.value,
     priority: priorityRef.value,
@@ -359,10 +366,10 @@ function btnLogoff() {
   bLogin.value = false;
   localStorage.removeItem("saveUser");
 }
-eventBus.$on("updateSave", (params: any) => {
+eventBus.$on(C_EVENT.UPDATE_SAVE, (params: any) => {
   userData.value = params;
 });
-eventBus.$on("getReward", (params: any) => {
+eventBus.$on(C_EVENT.REWARD, (params: any) => {
   bOpenReward.value.open = true;
   bOpenReward.value.score = params;
 });
@@ -373,7 +380,7 @@ async function rewardLbClk() {
   if (curUser.value.admin !== 1) return;
   const alert = await alertController.create({
     header: "设置奖励",
-    inputs: [{ type: "number", value: userData.value.score, placeholder: "积分" }],
+    inputs: [{ type: "number", value: curUser.value.score, placeholder: "积分" }],
     buttons: [
       {
         text: "取消",
@@ -382,19 +389,19 @@ async function rewardLbClk() {
       {
         text: "确定",
         handler: (e) => {
-          userData.value.score = parseInt(e[0]);
-          setSave(userData.value.id, userData.value.name, userData.value)
-            .then((res) => {
-              console.log("doSaveUserData", res);
-            })
-            .catch((err) => {
-              console.log("doSaveUserData", err);
-            });
+          curUser.value.score = parseInt(e[0]);
+          setUserInfo(curUser.value.id, curUser.value.score).then((res) => {
+            console.log("setUserInfo", res);
+          });
         },
       },
     ],
   });
   await alert.present();
+}
+function onScheduleListChange(event: any) {
+  console.log("Current value:", JSON.stringify(event.detail.value));
+  scheduleListSelectedId.value = event.detail.value;
 }
 </script>
 

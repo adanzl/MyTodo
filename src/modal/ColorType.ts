@@ -1,5 +1,5 @@
 import { getColorList } from "@/utils/NetUtil";
-import EventBus from "@/modal/EventBus";
+import EventBus, { C_EVENT } from "@/modal/EventBus";
 
 export interface ColorType {
   id: number;
@@ -27,7 +27,7 @@ export async function LoadColorData() {
           tag: e.color,
         });
       });
-      EventBus.$emit("updateColor", ColorOptions);
+      EventBus.$emit(C_EVENT.UPDATE_COLOR, ColorOptions);
       resolve(ColorOptions);
     });
   });
