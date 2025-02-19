@@ -9,9 +9,6 @@
       <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
-      <ion-item>
-        <ion-label>当前积分: [{{ userData.score }}]</ion-label>
-      </ion-item>
       <ion-list>
         <ion-item>
           <ion-label>Schedule</ion-label>
