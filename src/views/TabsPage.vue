@@ -225,9 +225,10 @@
       </ion-card>
     </div>
     <RewardPop
-      :is-open="bOpenReward.open"
-      :value="bOpenReward.score"
+      :is-open="bOpenRewardPop.open"
+      :value="bOpenRewardPop.score"
       @willDismiss="onRewardDismiss" />
+    <RewardSet :is-open="rewardSet.open" />
   </ion-page>
 </template>
 
@@ -236,9 +237,9 @@ import { ColorOptions } from "@/modal/ColorType";
 import { C_EVENT } from "@/modal/EventBus";
 import { GroupOptions, PriorityOptions } from "@/modal/ScheduleType";
 import { User, UserData } from "@/modal/UserData";
-import { getScheduleList, getUserList, setUserInfo } from "@/utils/NetUtil";
+import { getScheduleList, getUserList } from "@/utils/NetUtil";
+import RewardSet from "@/components/RewardSet.vue";
 import {
-  alertController,
   IonAccordion,
   IonAccordionGroup,
   IonAvatar,
@@ -279,9 +280,12 @@ const curUser = ref(new User());
 curUser.value.name = "点击选择用户";
 const userPopover = ref<any>(null);
 const textPwd = ref("");
-const bOpenReward = ref({
+const bOpenRewardPop = ref({
   open: false,
   score: 0,
+});
+const rewardSet = ref({
+  open: false,
 });
 
 const groupRef = ref(new Map(GroupOptions.map((option) => [option.id, true])));
@@ -307,7 +311,7 @@ onMounted(async () => {
     data.data.forEach((item: any) => {
       scheduleListRef.value.push({ id: item.id, name: item.name });
     });
-    console.log(data.data);
+    // console.log(data.data);
   });
 });
 function onMenuClose() {
@@ -370,34 +374,15 @@ eventBus.$on(C_EVENT.UPDATE_SAVE, (params: any) => {
   userData.value = params;
 });
 eventBus.$on(C_EVENT.REWARD, (params: any) => {
-  bOpenReward.value.open = true;
-  bOpenReward.value.score = params;
+  bOpenRewardPop.value.open = true;
+  bOpenRewardPop.value.score = params;
 });
 function onRewardDismiss() {
-  bOpenReward.value.open = false;
+  bOpenRewardPop.value.open = false;
 }
 async function rewardLbClk() {
   if (curUser.value.admin !== 1) return;
-  const alert = await alertController.create({
-    header: "设置奖励",
-    inputs: [{ type: "number", value: curUser.value.score, placeholder: "积分" }],
-    buttons: [
-      {
-        text: "取消",
-        role: "cancel",
-      },
-      {
-        text: "确定",
-        handler: (e) => {
-          curUser.value.score = parseInt(e[0]);
-          setUserInfo(curUser.value.id, curUser.value.score).then((res) => {
-            console.log("setUserInfo", res);
-          });
-        },
-      },
-    ],
-  });
-  await alert.present();
+  rewardSet.value.open = true;
 }
 function onScheduleListChange(event: any) {
   console.log("Current value:", JSON.stringify(event.detail.value));
