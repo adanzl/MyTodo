@@ -87,7 +87,7 @@ def get_all_pic(page_num=1, page_size=20) -> dict:
     return {"code": 0, "msg": "ok", "data": data}
 
 
-def get_data(table, id, idx=1):
+def get_data_idx(table, id, idx=1):
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     try:
@@ -95,6 +95,28 @@ def get_data(table, id, idx=1):
         result = cur.fetchone()
         if result:
             data = result[idx]
+            try:
+                data = json.loads(data)
+            except:
+                pass
+        else:
+            data = "{}"
+    except Exception as e:
+        log.error(e)
+        traceback.print_exc()
+        return {"code": -1, "msg": 'error ' + str(e)}
+    finally:
+        cur.close()
+    return {"code": 0, "msg": "ok", "data": data}
+
+def get_data(table, id, fields):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    try:
+        cur.execute(f"SELECT {fields} FROM {table} WHERE id=?", (id, ))
+        result = cur.fetchone()
+        if result:
+            data = dict(zip([col[0] for col in cur.description], result)) 
             try:
                 data = json.loads(data)
             except:

@@ -73,7 +73,7 @@ def server_log():
 def view_pic():
     id = request.args.get('id')
     log.info("===== [View Pic] " + id)
-    p_data = db_mgr.get_data(db_mgr.TABLE_PIC, id)
+    p_data = db_mgr.get_data_idx(db_mgr.TABLE_PIC, id)
     if p_data['code'] == 0:
         return render_template('image.html', image_data=p_data['data'])
     else:
@@ -115,9 +115,13 @@ def get_all():
 def get_data():
     table = request.args.get('table')
     id = request.args.get('id')
-    idx = request.args.get('idx', 1, type=int)
-    log.info("===== [Get Data] ", table, id, idx)
-    return db_mgr.get_data(table, id, idx)
+    idx = request.args.get('idx')
+    fields = request.args.get('fields')
+    log.info("===== [Get Data] ", table, id, idx, fields)
+    if(fields is None):
+        return db_mgr.get_data_idx(table, id, idx, fields)
+    else:
+        return db_mgr.get_data(table, id, fields)
 
 
 @app.route("/setData", methods=['POST'])
