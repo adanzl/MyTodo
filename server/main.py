@@ -115,7 +115,7 @@ def get_all():
 def get_data():
     table = request.args.get('table')
     id = request.args.get('id')
-    idx = request.args.get('idx')
+    idx = request.args.get('idx', type=int)
     fields = request.args.get('fields')
     log.info("===== [Get Data] ", table, id, idx, fields)
     if(fields is None):
