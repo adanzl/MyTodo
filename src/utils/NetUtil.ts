@@ -1,5 +1,5 @@
 import { LoadColorData } from "@/modal/ColorType";
-import { UData } from "@/modal/UserData";
+import { UData, UserData } from "@/modal/UserData";
 import EventBus, { C_EVENT } from "@/modal/EventBus";
 import axios from "axios";
 // const URL = "https://3ft23fh89533.vicp.fun/api";
@@ -49,13 +49,14 @@ export async function getSave(id: number) {
     throw new Error("id is undefined");
   }
   const rsp: any = await axios.get(URL + "/getData", {
-    params: { id: id, table: "t_schedule", idx: 2 },
+    params: { id: id, table: "t_schedule", fields: "data,user_id" },
   });
   // console.log(rsp.data.data);
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
   }
-  const ret = UData.parseUserData(rsp.data.data);
+  const ret: UserData = UData.parseUserData(rsp.data.data.data);
+  ret.userId = rsp.data.data.user_id;
   EventBus.$emit(C_EVENT.UPDATE_SAVE, ret);
   return ret;
 }
@@ -70,7 +71,10 @@ export function setSave(id: number | undefined, data: any) {
     axios
       .post(URL + "/setData", {
         table: "t_schedule",
-        data: data,
+        data: {
+          id: id,
+          data: JSON.stringify(data),
+        },
       })
       .then((res: any) => {
         if (res.data.code === 0) {
@@ -95,6 +99,15 @@ export async function setUserInfo(id: number | undefined, score: number) {
     },
   });
   console.log("setUserInfo", rsp.data);
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
+
+export async function getUserInfo(id: number) {
+  const rsp: any = await axios.get(URL + "/getData", { params: { table: "t_user", id: id, fields: "id,score"} });
+  // console.log("getPic", rsp.data);
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
   }

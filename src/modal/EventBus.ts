@@ -32,6 +32,7 @@ export const C_EVENT = {
   UPDATE_COLOR: "updateColor",
   UPDATE_SAVE: "updateSave",
   UPDATE_SCHEDULE_GROUP: "updateScheduleListId",
+  UPDATE_USER_INFO: "updateUserInfo",
   REWARD: "reward",
 };
 

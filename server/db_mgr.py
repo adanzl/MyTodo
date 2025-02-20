@@ -117,10 +117,6 @@ def get_data(table, id, fields):
         result = cur.fetchone()
         if result:
             data = dict(zip([col[0] for col in cur.description], result)) 
-            try:
-                data = json.loads(data)
-            except:
-                pass
         else:
             data = "{}"
     except Exception as e:

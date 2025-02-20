@@ -225,7 +225,7 @@ export default defineComponent({
     // 保存存档
     const doSaveUserData = () => {
       console.log("doSaveUserData", refData.userData.value);
-      setSave(refData.userData.value.id, refData.userData.value)
+      setSave(globalVar.scheduleListId, refData.userData.value)
         .then((res: any) => {
           console.log("doSaveUserData", res.statusText);
         })

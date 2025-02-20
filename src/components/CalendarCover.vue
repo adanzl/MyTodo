@@ -158,7 +158,7 @@ import "swiper/css";
 import "swiper/css/effect-fade";
 import { EffectCoverflow, Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
-import { nextTick, onMounted, ref, watch } from "vue";
+import { inject, nextTick, onMounted, ref, watch } from "vue";
 import MdiStar from "~icons/mdi/star";
 const weekHead = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
 const props = defineProps({
@@ -171,6 +171,7 @@ const props = defineProps({
     required: true,
   },
 });
+const globalVar: any = inject("globalVar");
 const emits = defineEmits(["update:data"]);
 const dayArr = ref<any[]>([{}, {}, {}]); // 滑动数据
 const swiperRef = ref(); // 滑动对象
@@ -280,7 +281,7 @@ const onScheduleModalDismiss = (event: any) => {
 // 保存存档
 function doSaveUserData() {
   // console.log("doSaveUserData", props.userData);
-  setSave(props.userData.id, props.userData)
+  setSave(globalVar.scheduleListId, props.userData)
     .then((res) => {
       console.log("doSaveUserData", res);
     })

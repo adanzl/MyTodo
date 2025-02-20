@@ -1,9 +1,9 @@
 import avatar from "@/assets/images/avatar.svg";
 import { CUSTOM_REPEAT_ID, RepeatData } from "@/modal/ScheduleType";
+import { getUserInfo, setUserInfo } from "@/utils/NetUtil";
 import dayjs from "dayjs";
 import _ from "lodash";
 import EventBus, { C_EVENT } from "./EventBus";
-import { GlobalVar } from "@/main";
 
 export class User {
   id = -1;
@@ -90,6 +90,7 @@ export class ScheduleSave {
 export class UserData {
   id: number = -1; // 存档id
   name: string = ""; // 存档名称
+  userId: number = -1; // 用户id
   schedules: ScheduleData[] = []; // 日程计划列表
   // 计划完成情况  日期->对应日期完成情况(任务id->完成情况)
   save: Record<string, Record<number, ScheduleSave>> = {};
@@ -357,9 +358,13 @@ export class UData {
         _scheduleSave.score -= _scheduleData.score ?? 0;
       }
     }
-    // 变更积分
+    // 变更积分 只能给日程的所有者加积分
     if (dScore !== 0) {
-      GlobalVar.user.score += dScore;
+      // GlobalVar.user.score += dScore;
+      getUserInfo(userData.userId).then((userInfo: any) => {
+        userInfo.score += dScore;
+        setUserInfo(userData.userId, userInfo.score);
+      });
     }
   }
   /**
@@ -414,10 +419,13 @@ export class UData {
     return ret;
   }
 
-  static parseUserData(jsonStr: string): UserData {
-    const ret = JSON.parse(jsonStr) as UserData;
+  static parseUserData(userDataStr: string): UserData {
+    const ret = JSON.parse(userDataStr);
     if (ret.schedules === undefined) {
       ret.schedules = [];
+    }
+    if (ret.save === undefined) {
+      ret.save = {};
     }
     for (let i = 0; i < ret.schedules.length; i++) {
       const schedule = ret.schedules[i];

@@ -3,6 +3,7 @@
     ref="modal"
     aria-hidden="false"
     class="bottom-modal"
+    @ionModalDidPresent="onModalPresent"
     @ionModalDidDismiss="onModalDismiss">
     <ion-item>
       <ion-title>设定星星数量</ion-title>
@@ -29,12 +30,13 @@
 
 <script lang="ts" setup>
 import { User } from "@/modal/UserData";
-import { getUserList } from "@/utils/NetUtil";
-import { onIonViewDidEnter, IonAvatar, IonImg } from "@ionic/vue";
+import { getUserList, setUserInfo } from "@/utils/NetUtil";
+import { IonAvatar, IonImg } from "@ionic/vue";
 import { onMounted, ref } from "vue";
 
 const modal = ref();
 const userList = ref<any>([]);
+const modifyUser = new Set<User>();
 
 const cancel = () => {
   modal.value.$el!.dismiss();
@@ -61,19 +63,25 @@ const confirm = () => {
 };
 
 onMounted(async () => {
-  const uList = await getUserList();
+  // const uList = await getUserList();
   // console.log("userList", uList);
-  userList.value = uList.data;
+  // userList.value = uList.data;
 });
-onIonViewDidEnter(async () => {
-  userList.value = await getUserList();
-  console.log("userList", userList.value);
-});
+async function onModalPresent() {
+  getUserList().then((uList) => {
+    userList.value = uList.data;
+  });
+  // console.log("userList", uList);
+}
 const onModalDismiss = () => {
-  // valueRef.value = props.value;
+  modifyUser.forEach((u: User) => {
+    setUserInfo(u.id, u.score);
+  });
+  modifyUser.clear();
 };
 function onInputChange(e: any, u: User) {
   u.score = e.detail.value;
+  modifyUser.add(u);
 }
 </script>
 
