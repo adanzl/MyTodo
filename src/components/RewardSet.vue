@@ -13,7 +13,7 @@
           <ion-img :src="u.icon" />
         </ion-avatar>
         <div class="w-16">{{ u.name }}</div>
-        <ion-input :value="u.score" fill="outline"></ion-input>
+        <ion-input :value="u.score" fill="outline" @ionChange="onInputChange($event, u)"></ion-input>
       </ion-item>
     </div>
     <ion-footer>
@@ -24,8 +24,9 @@
 </template>
 
 <script lang="ts" setup>
+import { User } from "@/modal/UserData";
 import { getUserList } from "@/utils/NetUtil";
-import { onIonViewDidEnter,IonAvatar, IonImg } from "@ionic/vue";
+import { onIonViewDidEnter, IonAvatar, IonImg } from "@ionic/vue";
 import { onMounted, ref } from "vue";
 
 const modal = ref();
@@ -51,6 +52,7 @@ const confirm = () => {
   //     },
   //   ],
   // });
+  console.log("confirm", userList.value);
   modal.value.$el!.dismiss();
 };
 
@@ -66,6 +68,10 @@ onIonViewDidEnter(async () => {
 const onModalDismiss = () => {
   // valueRef.value = props.value;
 };
+function onInputChange(e: any, u: User) {
+  u.score = e.detail.value;
+  
+}
 </script>
 
 <style scoped>

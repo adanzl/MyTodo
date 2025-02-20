@@ -228,7 +228,7 @@
       :is-open="bOpenRewardPop.open"
       :value="bOpenRewardPop.score"
       @willDismiss="onRewardDismiss" />
-    <RewardSet :is-open="rewardSet.open" />
+    <RewardSet :is-open="rewardSet.open" @willDismiss="onRewardSetDismiss" />
   </ion-page>
 </template>
 
@@ -387,6 +387,9 @@ async function rewardLbClk() {
 function onScheduleListChange(event: any) {
   console.log("Current value:", JSON.stringify(event.detail.value));
   scheduleListSelectedId.value = event.detail.value;
+}
+function onRewardSetDismiss(){
+  rewardSet.value.open = false;
 }
 </script>
 
