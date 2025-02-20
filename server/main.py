@@ -9,9 +9,10 @@ from logging.handlers import TimedRotatingFileHandler
 handler = TimedRotatingFileHandler('logs/app.log', when="midnight", backupCount=3, encoding="utf-8")
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
+logging.basicConfig(level=logging.INFO, handlers=[handler])
+
 log = logging.getLogger(__name__)
-log.setLevel(logging.INFO)
-log.addHandler(handler)
+
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
 db_mgr.init()

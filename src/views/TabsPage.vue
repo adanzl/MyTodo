@@ -306,22 +306,28 @@ onMounted(async () => {
   userList.value = userListData.data;
   const sUserId = localStorage.getItem("saveUser");
   const sUser = _.find(userListData.data, (u) => u.id.toString() === sUserId);
+  globalVar.scheduleListId = 1;
   if (sUser) {
     bLogin.value = true;
     curUser.value = sUser;
     globalVar.user = sUser;
+    updateScheduleGroup(sUser.id);
   }
-  globalVar.scheduleListId = 1;
+  loading.dismiss();
+});
+
+async function updateScheduleGroup(userId: number) {
   const scheduleListData = await getScheduleList();
+  globalVar.scheduleListId = 1;
+  scheduleListRef.value=[];
   scheduleListData.data.forEach((item: any) => {
     scheduleListRef.value.push({ id: item.id, name: item.name });
-    if (sUser && item.user_id === sUser.id) {
+    if (item.user_id === userId) {
       globalVar.scheduleListId = item.id;
     }
   });
-  loading.dismiss();
-  eventBus.$emit(C_EVENT.UPDATE_SAVE);
-});
+  eventBus.$emit(C_EVENT.UPDATE_SCHEDULE_GROUP, globalVar.scheduleListId);
+}
 function onMenuClose() {
   eventBus.$emit(C_EVENT.MENU_CLOSE, {
     group: groupRef.value,
@@ -370,6 +376,7 @@ function btnLoginClick() {
     bLogin.value = true;
     globalVar.user = curUser.value;
     localStorage.setItem("saveUser", curUser.value.id.toString());
+    updateScheduleGroup(curUser.value.id);
   } else {
     errMsg.value = "密码错误";
   }
@@ -393,10 +400,11 @@ async function rewardLbClk() {
   rewardSet.value.open = true;
 }
 function onScheduleListChange(event: any) {
-  console.log("Current value:", JSON.stringify(event.detail.value));
-  scheduleListSelectedId.value = event.detail.value;
+  // console.log("Current value:", JSON.stringify(event.detail.value));
+  globalVar.scheduleListId = scheduleListSelectedId.value = event.detail.value;
+  eventBus.$emit(C_EVENT.UPDATE_SCHEDULE_GROUP, globalVar.scheduleListId);
 }
-function onRewardSetDismiss(){
+function onRewardSetDismiss() {
   rewardSet.value.open = false;
 }
 </script>

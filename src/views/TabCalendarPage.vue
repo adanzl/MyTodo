@@ -129,13 +129,13 @@ const filter = ref<any>({});
 const eventBus: any = inject("eventBus");
 const globalVar: any = inject("globalVar");
 
-const refreshAllData = async () => {
+const refreshAllData = async (id: number) => {
   const loading = await loadingController.create({
     message: "Loading...",
   });
   loading.present();
   // 获取数据
-  getSave(1)
+  getSave(id)
     .then((uData: any) => {
       userData.value = uData;
       globalVar.userData = uData;
@@ -161,7 +161,11 @@ onMounted(async () => {
     console.log("getDeviceId err");
   }
 
-  refreshAllData();
+  // refreshAllData();
+  eventBus.$on(C_EVENT.UPDATE_SCHEDULE_GROUP, () => {
+    // console.log("UPDATE_SCHEDULE_GROUP", params);
+    refreshAllData(globalVar.scheduleListId);
+  });
 
   eventBus.$on(C_EVENT.MENU_CLOSE, (params: any) => {
     // console.log("menuClose", params);
@@ -169,7 +173,7 @@ onMounted(async () => {
   });
 });
 onIonViewDidEnter(() => {
-  refreshAllData();
+  refreshAllData(globalVar.scheduleListId);
 });
 
 function bShowScheduleItem(schedule: ScheduleData) {

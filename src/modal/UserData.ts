@@ -208,7 +208,7 @@ export class UData {
     const dayData = new DayData(_dt);
     const ts = _dt.unix();
     const dKey = S_TS(_dt);
-    let save: Record<number, ScheduleSave> | undefined = userData.save[dKey];
+    let save: Record<number, ScheduleSave> | undefined = userData.save && userData.save[dKey];
     if (save && Object.keys(save).length === 0) {
       console.log("delete", dKey);
       delete userData.save[dKey];

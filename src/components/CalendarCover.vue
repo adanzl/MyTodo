@@ -280,7 +280,7 @@ const onScheduleModalDismiss = (event: any) => {
 // 保存存档
 function doSaveUserData() {
   // console.log("doSaveUserData", props.userData);
-  setSave(props.userData.id, props.userData.name, props.userData)
+  setSave(props.userData.id, props.userData)
     .then((res) => {
       console.log("doSaveUserData", res);
     })

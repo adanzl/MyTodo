@@ -49,7 +49,7 @@ export async function getSave(id: number) {
     throw new Error("id is undefined");
   }
   const rsp: any = await axios.get(URL + "/getData", {
-    params: { id: id, table: "t_user_save", idx: 2 },
+    params: { id: id, table: "t_schedule", idx: 2 },
   });
   // console.log(rsp.data.data);
   if (rsp.data.code !== 0) {
@@ -60,7 +60,7 @@ export async function getSave(id: number) {
   return ret;
 }
 
-export function setSave(id: number | undefined, user: string, data: any) {
+export function setSave(id: number | undefined, data: any) {
   // console.log(data);
   return new Promise((resolve, reject) => {
     if (id === undefined) {
@@ -68,15 +68,17 @@ export function setSave(id: number | undefined, user: string, data: any) {
       return;
     }
     axios
-      .post(URL + "/setSave", {
-        id: id,
-        user: user,
-        data: JSON.stringify(data),
-        version: 1,
+      .post(URL + "/setData", {
+        table: "t_schedule",
+        data: data,
       })
       .then((res: any) => {
-        resolve(res);
-        EventBus.$emit(C_EVENT.UPDATE_SAVE, data);
+        if (res.data.code === 0) {
+          resolve(res);
+          EventBus.$emit(C_EVENT.UPDATE_SAVE, data);
+        } else {
+          reject(new Error(res.data.msg));
+        }
       })
       .catch((err: any) => {
         reject(err);
@@ -124,12 +126,12 @@ export async function delPic(id: number) {
   return rsp.data.data;
 }
 
-export async function getScheduleList(){
+export async function getScheduleList() {
   const rsp: any = await axios.get(URL + "/getAll", {
     params: { table: "t_schedule", fields: "id, name, user_id" },
   });
   // console.log(rsp.data.data);
-  if (rsp.data.code!== 0) {
+  if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
   }
   return rsp.data.data;
@@ -139,7 +141,7 @@ export async function getUserList() {
   const rsp: any = await axios.get(URL + "/getAll", {
     params: { table: "t_user" },
   });
-  console.log(rsp.data.data);
+  // console.log(rsp.data.data);
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
   }

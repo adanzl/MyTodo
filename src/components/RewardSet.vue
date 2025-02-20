@@ -13,7 +13,11 @@
           <ion-img :src="u.icon" />
         </ion-avatar>
         <div class="w-64">{{ u.name }}</div>
-        <ion-input :value="u.score" fill="outline" type="number"  @ionChange="onInputChange($event, u)""></ion-input>
+        <ion-input
+          :value="u.score"
+          fill="outline"
+          type="number"
+          @ionChange="onInputChange($event, u)"></ion-input>
       </ion-item>
     </div>
     <ion-footer>
@@ -58,7 +62,7 @@ const confirm = () => {
 
 onMounted(async () => {
   const uList = await getUserList();
-  console.log("userList", uList);
+  // console.log("userList", uList);
   userList.value = uList.data;
 });
 onIonViewDidEnter(async () => {
@@ -70,7 +74,6 @@ const onModalDismiss = () => {
 };
 function onInputChange(e: any, u: User) {
   u.score = e.detail.value;
-  
 }
 </script>
 

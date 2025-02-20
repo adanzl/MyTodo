@@ -206,17 +206,16 @@ export default defineComponent({
           loading.dismiss();
         });
     };
-    eventBus.$on(C_EVENT.UPDATE_SAVE, (params: any) => {
-      console.log("updateScheduleData", params);
-      // refreshAllData(globalVar.scheduleListId);
-      // TODO
+    eventBus.$on(C_EVENT.UPDATE_SCHEDULE_GROUP, () => {
+      // console.log("UPDATE_SCHEDULE_GROUP", params);
+      refreshAllData(globalVar.scheduleListId);
     });
     onMounted(() => {
-      console.log("onMounted page");
+      // console.log("onMounted page");
       // refreshAllData();
       onIonViewDidEnter(() => {
-        console.log("onIonViewDidEnter");
-        refreshAllData();
+        // console.log("onIonViewDidEnter");
+        refreshAllData(globalVar.scheduleListId);
       });
       eventBus.$on(C_EVENT.MENU_CLOSE, (params: any) => {
         refData.filter.value = params;
@@ -226,12 +225,12 @@ export default defineComponent({
     // 保存存档
     const doSaveUserData = () => {
       console.log("doSaveUserData", refData.userData.value);
-      setSave(refData.userData.value.id, refData.userData.value.name, refData.userData.value)
+      setSave(refData.userData.value.id, refData.userData.value)
         .then((res: any) => {
           console.log("doSaveUserData", res.statusText);
         })
         .catch((err) => {
-          console.log("doSaveUserData", err);
+          console.error("doSaveUserData", err);
         });
     };
     // ============ 工具栏 ============
