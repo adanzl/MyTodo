@@ -177,15 +177,21 @@ def query(sql) -> dict:
 
 
 
-def get_list(table, page_num=1, page_size=20) -> dict:
+def get_list(table, page_num=1, page_size=20, fields: str|list='*') -> dict:
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     try:
         cur.execute(f"SELECT COUNT(*) FROM {table}")
         total_count = cur.fetchone()[0]
-        cur.execute(f"""
-            SELECT * FROM {table} LIMIT ? OFFSET ?;
-            """, (page_size, (page_num - 1) * page_size))
+        if type(fields) == 'str':
+            cur.execute(f"""
+                SELECT {fields} FROM {table} LIMIT ? OFFSET ?;
+                """, (page_size, (page_num - 1) * page_size))
+        else:
+            cur.execute(f"""
+                SELECT {','.join(fields)} FROM {table} LIMIT ? OFFSET ?;
+                """, (page_size, (page_num - 1) * page_size))
+            
         result = cur.fetchall()
         data = {
             'data': [dict(zip([col[0] for col in cur.description], row)) for row in result],
