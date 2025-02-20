@@ -12,8 +12,8 @@
         <ion-avatar slot="start" class="w-12 h-12">
           <ion-img :src="u.icon" />
         </ion-avatar>
-        <div class="w-16">{{ u.name }}</div>
-        <ion-input :value="u.score" fill="outline"></ion-input>
+        <div class="w-64">{{ u.name }}</div>
+        <ion-input :value="u.score" fill="outline" type="number"></ion-input>
       </ion-item>
     </div>
     <ion-footer>

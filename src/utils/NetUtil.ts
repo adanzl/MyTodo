@@ -126,7 +126,7 @@ export async function delPic(id: number) {
 
 export async function getScheduleList(){
   const rsp: any = await axios.get(URL + "/getAll", {
-    params: { table: "t_schedule" },
+    params: { table: "t_schedule", fields: "id, name, user_id" },
   });
   // console.log(rsp.data.data);
   if (rsp.data.code!== 0) {
@@ -139,7 +139,7 @@ export async function getUserList() {
   const rsp: any = await axios.get(URL + "/getAll", {
     params: { table: "t_user" },
   });
-  // console.log(rsp.data.data);
+  console.log(rsp.data.data);
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
   }
