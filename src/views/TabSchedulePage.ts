@@ -180,13 +180,13 @@ export default defineComponent({
       }
     };
 
-    const refreshAllData = async () => {
+    const refreshAllData = async (id: number = 1) => {
       const loading = await loadingController.create({
         message: "Loading...",
       });
       loading.present();
       // 获取数据
-      getSave(1)
+      getSave(id)
         .then((uData: any) => {
           refData.userData.value = uData;
           // console.log("getSave", userData.value);
@@ -206,10 +206,16 @@ export default defineComponent({
           loading.dismiss();
         });
     };
-
+    eventBus.$on(C_EVENT.UPDATE_SAVE, (params: any) => {
+      console.log("updateScheduleData", params);
+      // refreshAllData(globalVar.scheduleListId);
+      // TODO
+    });
     onMounted(() => {
-      refreshAllData();
+      console.log("onMounted page");
+      // refreshAllData();
       onIonViewDidEnter(() => {
+        console.log("onIonViewDidEnter");
         refreshAllData();
       });
       eventBus.$on(C_EVENT.MENU_CLOSE, (params: any) => {

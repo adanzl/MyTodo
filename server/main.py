@@ -102,9 +102,12 @@ def set_save():
 def get_all():
     page_size = request.args.get('pageSize', 20, type=int)
     page_num = request.args.get('pageNum', 1, type=int)
+    fields = request.args.get('fields', '*')
     table = request.args.get('table')
-    log.info("===== [Get All Data] ", table, page_num, page_size)
-    return db_mgr.get_list(table, page_num, page_size)
+    log.info("===== [Get All Data] ", table, page_num, page_size, fields)
+    if fields != '*' :
+        fields = fields.split(',')
+    return db_mgr.get_list(table, page_num, page_size, fields)
 
 
 @app.route("/getData", methods=['GET'])

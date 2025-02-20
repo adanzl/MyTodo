@@ -258,6 +258,7 @@ import {
   IonTabBar,
   IonTabButton,
   IonTabs,
+  loadingController,
 } from "@ionic/vue";
 import CryptoJS from "crypto-js";
 import {
@@ -297,6 +298,10 @@ const eventBus: any = inject("eventBus");
 const globalVar: any = inject("globalVar");
 
 onMounted(async () => {
+  const loading = await loadingController.create({
+    message: "Loading...",
+  });
+  loading.present();
   const userListData = await getUserList();
   userList.value = userListData.data;
   const sUserId = localStorage.getItem("saveUser");
@@ -306,13 +311,16 @@ onMounted(async () => {
     curUser.value = sUser;
     globalVar.user = sUser;
   }
-  getScheduleList().then(async (data) => {
-    scheduleListRef.value = [];
-    data.data.forEach((item: any) => {
-      scheduleListRef.value.push({ id: item.id, name: item.name });
-    });
-    // console.log(data.data);
+  globalVar.scheduleListId = 1;
+  const scheduleListData = await getScheduleList();
+  scheduleListData.data.forEach((item: any) => {
+    scheduleListRef.value.push({ id: item.id, name: item.name });
+    if (sUser && item.user_id === sUser.id) {
+      globalVar.scheduleListId = item.id;
+    }
   });
+  loading.dismiss();
+  eventBus.$emit(C_EVENT.UPDATE_SAVE);
 });
 function onMenuClose() {
   eventBus.$emit(C_EVENT.MENU_CLOSE, {
