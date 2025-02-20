@@ -119,7 +119,7 @@ def get_data():
     fields = request.args.get('fields')
     log.info("===== [Get Data] ", table, id, idx, fields)
     if(fields is None):
-        return db_mgr.get_data_idx(table, id, idx, fields)
+        return db_mgr.get_data_idx(table, id, idx)
     else:
         return db_mgr.get_data(table, id, fields)
 
