@@ -318,12 +318,12 @@ onMounted(async () => {
 
 async function updateScheduleGroup(userId: number) {
   const scheduleListData = await getScheduleList();
-  globalVar.scheduleListId = 1;
-  scheduleListRef.value=[];
+  scheduleListSelectedId.value = globalVar.scheduleListId = 1;
+  scheduleListRef.value = [];
   scheduleListData.data.forEach((item: any) => {
     scheduleListRef.value.push({ id: item.id, name: item.name });
     if (item.user_id === userId) {
-      globalVar.scheduleListId = item.id;
+      scheduleListSelectedId.value = globalVar.scheduleListId = item.id;
     }
   });
   eventBus.$emit(C_EVENT.UPDATE_SCHEDULE_GROUP, globalVar.scheduleListId);
