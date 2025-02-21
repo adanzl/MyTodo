@@ -13,10 +13,12 @@
         <ion-avatar slot="start" class="w-12 h-12">
           <ion-img :src="u.icon" />
         </ion-avatar>
-        <div class="w-64">{{ u.name }}</div>
+        <div class="w-64 ml-3">{{ u.name }}</div>
         <ion-input
           :value="u.score"
+          class="m-1"
           fill="outline"
+          mode="md"
           type="number"
           @ionChange="onInputChange($event, u)"></ion-input>
       </ion-item>
