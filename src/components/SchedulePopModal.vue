@@ -24,7 +24,7 @@
             placeholder="输入日程标题"
             :value="curScheduleData?.title"
             :required="true"
-            class="font-bold"
+            class="font-bold ml-2"
             @ionChange="onTitleChange">
           </ion-input>
         </ion-item>
@@ -149,9 +149,9 @@
           </ion-select>
         </ion-item> -->
         <!-- 重复 -->
-        <ion-item detail="true" id="btnRepeat" lines="none">
+        <ion-item detail="true" id="btnRepeat" lines="">
           <ion-icon :icon="repeat" slot="start"> </ion-icon>
-          <ion-label>重复</ion-label>
+          <ion-label class="ml-1">重复</ion-label>
           <ion-label class="text-right mr-0">
             <div>
               <p class="inline-block mr-2 gray">
@@ -164,24 +164,23 @@
                 }}
               </p>
               <div class="inline-block">{{ getRepeatOptions(curScheduleData.repeat).label }}</div>
+              <div
+                v-if="curScheduleData.repeat === CUSTOM_REPEAT_ID"
+                class="text-gray-400 text-wrap ion-no-padding">
+                <p
+                  class="text-xs text-right pr-1 pb-1"
+                  v-if="
+                    curScheduleData &&
+                    curScheduleData.repeatData &&
+                    curScheduleData.repeatData?.week?.length
+                  ">
+                  {{ buildCustomRepeatLabel(curScheduleData.repeatData) }}
+                </p>
+              </div>
             </div>
           </ion-label>
         </ion-item>
-        <div class="border-b ml-14">
-          <div
-            v-if="curScheduleData.repeat === CUSTOM_REPEAT_ID"
-            class="text-gray-400 text-wrap ion-no-padding">
-            <p
-              class="text-xs text-right pr-8 pb-1"
-              v-if="
-                curScheduleData &&
-                curScheduleData.repeatData &&
-                curScheduleData.repeatData?.week?.length
-              ">
-              {{ buildCustomRepeatLabel(curScheduleData.repeatData) }}
-            </p>
-          </div>
-        </div>
+
         <RepeatSelector
           trigger="btnRepeat"
           @update:value="onRepeatChange"
@@ -190,7 +189,7 @@
 
         <ion-item detail="true" :button="true" id="id-repeat-end">
           <ion-icon :icon="power" slot="start"></ion-icon>
-          <ion-label>重复停止</ion-label>
+          <ion-label class="ml-1">重复停止</ion-label>
           <ion-label class="text-right mr-0">
             {{
               curScheduleData?.repeatEndTs === undefined
@@ -234,7 +233,7 @@
         </ion-item>
         <ion-item detail="true">
           <MdiGiftOutline class="text-red-500 w-[1.6em] h-[1.6em]" slot="start" />
-          <ion-label>总奖励</ion-label>
+          <ion-label class="ml-1">总奖励</ion-label>
           <div slot="end" class="flex items-center">
             <MdiStar class="text-red-500" />
             <ion-label class="w-5 text-right">{{ countAllReward() }}</ion-label>
@@ -278,13 +277,13 @@
             <ion-checkbox
               slot="start"
               :checked="subTaskChecked(task)"
-              class="ion-no-padding"
+              class="ion-no-padding mt-1"
               @ionChange="onSubtaskCheckboxChange($event, task)">
             </ion-checkbox>
             <div class="flex flex-col w-full h-full" @click="onSubtaskClk($event, task)">
               <ion-label
                 :class="{ 'line-through': subTaskChecked(task) }"
-                class="ion-no-margin flex items-center">
+                class="ion-no-margin flex items-center ml-2">
                 <div class="flex-1">{{ task.name }}</div>
                 <MdiStar class="text-red-500" />
                 <span class="w-5 text-right mr-3">{{ task.score ?? 0 }}</span>
@@ -303,9 +302,9 @@
         </ion-reorder-group>
       </ion-list>
     </ion-content>
-    <ion-footer>
-      <ion-toolbar>
-        <ion-button expand="block" color="warning" @click="btnSaveClk"> 保存 </ion-button>
+    <ion-footer >
+      <ion-toolbar class="ion-padding">
+        <ion-button mod="ios" expand="block" color="warning" @click="btnSaveClk"> 保存 </ion-button>
       </ion-toolbar>
     </ion-footer>
     <ion-toast

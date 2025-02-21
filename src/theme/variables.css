@@ -1,8 +1,8 @@
 /* For information on how to create your own theme, please see:
 http://ionicframework.com/docs/theming/ */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@config '../../tailwind.config.js';
 
 :root {
   --color-gray: #b5b1b1;
@@ -67,7 +67,7 @@ ion-content::part(scroll)::-webkit-scrollbar {
 .bottom-modal ion-footer {
   display: flex;
   justify-content: space-around;
-  border-top-width: 1px;
+  border-top-width: 0.1px;
 }
 
 .bottom-modal::part(backdrop) {

@@ -4,6 +4,7 @@
     aria-hidden="false"
     id="repeatSelector"
     class="bottom-modal"
+    mode="ios"
     @ionModalDidDismiss="onModalDismiss">
     <ion-item>
       <ion-title>选择重复方式</ion-title>
@@ -31,7 +32,7 @@
             <div
               id="btnCustom"
               v-if="op.id === CUSTOM_REPEAT_ID"
-              class="pr-6 text-gray-400 text-wrap text-sm text-right ">
+              class="pr-6 text-gray-400 text-wrap text-sm text-right">
               <p v-if="repeatData.week?.length">{{ buildCustomRepeatLabel(repeatData) }}</p>
               <p v-else>自定义重复的日期</p>
             </div>

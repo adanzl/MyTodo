@@ -70,6 +70,7 @@ watch(() => props.selectedDate, updateMinSlide, { deep: true });
 <style escaped lang="css">
 ion-chip {
   margin: 0;
+  padding-inline: 8px;
 }
 ion-chip.selected {
   --color: #fff !important;

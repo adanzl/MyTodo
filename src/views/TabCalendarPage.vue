@@ -19,7 +19,7 @@
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
-    <ion-row class="text-blue-500" style="background-color: antiquewhite">
+    <ion-row class="text-blue-500 pt-1" style="background-color: antiquewhite">
       <ion-col class="ion-text-center font-bold text-red-600">日</ion-col>
       <ion-col class="ion-text-center font-bold">一</ion-col>
       <ion-col class="ion-text-center font-bold">二</ion-col>
@@ -61,7 +61,7 @@
                   :class="{
                     'line-through': day.save && day.save[event.id]?.state === 1,
                   }"
-                  class="text-left truncate mt-[1px] rounded-sm py-[1px] px-1"
+                  class="text-left truncate mt-[1px] rounded-xs py-[1px] px-1"
                   :style="{
                     'background-color': getColorOptions(event.color).tag,
                     'font-size': 'clamp(9px, 2.7vw, 16px)',

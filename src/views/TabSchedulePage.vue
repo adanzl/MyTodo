@@ -22,7 +22,7 @@
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
-    <div class="h-fit" style="background-color: var(--color-main-bg)">
+    <div class="h-fit pt-1" style="background-color: var(--color-main-bg)">
       <!-- https://blog.csdn.net/weixin_41863239/article/details/82490886 -->
       <swiper
         @slideNextTransitionEnd="onSlideChangeNext"
@@ -158,7 +158,7 @@
                       <ion-icon :icon="trashOutline"></ion-icon>
                     </ion-item-option>
                   </ion-item-options>
-                  <div style="border-bottom-width: 1px" class="mt-2"></div>
+                  <div style="height: 1px; box-shadow: 0 0 0 0.1px #f00 inset;" class="mt-2"></div>
                 </ion-item-sliding>
               </ion-reorder-group>
             </div>

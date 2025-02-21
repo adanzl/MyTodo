@@ -12,7 +12,6 @@ declare module 'vue' {
     ColorMgr: typeof import('./src/components/ColorMgr.vue')['default']
     ColorPicker: typeof import('./src/components/ColorPicker.vue')['default']
     ColorSelector: typeof import('./src/components/ColorSelector.vue')['default']
-    copy: typeof import('./src/components/RewardPop copy.vue')['default']
     FabButton: typeof import('./src/components/FabButton.vue')['default']
     GConfig: typeof import('./src/components/GConfig.vue')['default']
     GroupSelector: typeof import('./src/components/GroupSelector.vue')['default']
