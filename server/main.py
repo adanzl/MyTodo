@@ -25,7 +25,7 @@ def af_request(resp):
     #请求钩子，在所有的请求发生后执行，加入headers。
     """
     resp = make_response(resp)
-    resp.headers['Access-Control-Allow-Origin'] = '*'
+    # resp.headers['Access-Control-Allow-Origin'] = '*'
     resp.headers['Access-Control-Allow-Methods'] = '*'
     resp.headers['Access-Control-Allow-Headers'] = '*'
     return resp
