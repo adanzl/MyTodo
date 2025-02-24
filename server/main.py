@@ -25,7 +25,7 @@ def af_request(resp):
     #请求钩子，在所有的请求发生后执行，加入headers。
     """
     resp = make_response(resp)
-    # resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Origin'] = '*'
     resp.headers['Access-Control-Allow-Methods'] = '*'
     resp.headers['Access-Control-Allow-Headers'] = '*'
     return resp
@@ -38,7 +38,7 @@ def main():
 
 @app.route("/natapp")
 def natapp():
-    with open("/usr/env/natapp/log/natapp.log", "r") as f:
+    with open("/opt/natapp/logs/natapp_web.log", "r") as f:
         log_content = f.read()
         return f"""
             <html>
@@ -153,7 +153,7 @@ def query():
 def chat():
     args = request.get_json()
     log.info("===== [Chat] " + json.dumps(args, ensure_ascii=False))
-    # return db_mgr.get_ai_list(page_num, page_size) 
+    # return db_mgr.get_ai_list(page_num, page_size)
     prompt = args.get('prompt')
     if not prompt:
         return jsonify({"error": "缺少 prompt 参数"}), 400
