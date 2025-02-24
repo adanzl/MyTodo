@@ -1,20 +1,28 @@
 from flask import Flask, json, make_response, request, render_template, jsonify
 from flask_cors import CORS
+from flask_socketio import SocketIO
 import logging
+from chat_mgr import ChatMgr
 import db_mgr
 import ai_mgr
 
 from logging.handlers import TimedRotatingFileHandler
 
-handler = TimedRotatingFileHandler('logs/app.log', when="midnight", backupCount=3, encoding="utf-8")
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-logging.basicConfig(level=logging.INFO, handlers=[handler])
+file_handler = TimedRotatingFileHandler('logs/app.log', when="midnight", backupCount=3, encoding="utf-8")
+std_handler = logging.StreamHandler()
+std_handler.setFormatter(formatter)
+file_handler.setFormatter(formatter)
+logging.basicConfig(level=logging.INFO, handlers=[file_handler,std_handler])
 
 log = logging.getLogger(__name__)
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True)
+CORS(app, supports_credentials=True, origins="*")
+# 创建 SocketIO 实例并与 Flask 应用关联
+socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
+
+chat_mgr = ChatMgr(socketio)
 db_mgr.init()
 ai_mgr.init()
 
@@ -165,4 +173,6 @@ def chat():
 
 # . .venv/bin/activate
 if __name__ == '__main__':
-    app.run(debug=True, port=8888)  #开始运行flask应用程序，以调试模式运行
+    #开始运行flask应用程序，以调试模式运行
+    # app.run(debug=True, port=8888)  
+    socketio.run(app, debug=True, port=8888)
