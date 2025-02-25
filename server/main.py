@@ -92,7 +92,7 @@ def view_pic():
 @app.route("/getSave", methods=['GET'])
 def get_save():
     id = request.args.get('id')
-    log.info("===== [Get Save] " + id)
+    log.info("===== [Get Save] " , id)
     return db_mgr.get_save(id)
 
 
@@ -113,7 +113,7 @@ def get_all():
     page_num = request.args.get('pageNum', 1, type=int)
     fields = request.args.get('fields', '*')
     table = request.args.get('table')
-    log.info("===== [Get All Data] ", table, page_num, page_size, fields)
+    log.info("===== [Get All Data] ", request.args)
     if fields != '*' :
         fields = fields.split(',')
     return db_mgr.get_list(table, page_num, page_size, fields)
