@@ -113,7 +113,7 @@ def get_all():
     page_num = request.args.get('pageNum', 1, type=int)
     fields = request.args.get('fields', '*')
     table = request.args.get('table')
-    log.info("===== [Get All Data] ", request.args)
+    log.info("===== [Get All Data] ", json.dumps(request.args))
     if fields != '*' :
         fields = fields.split(',')
     return db_mgr.get_list(table, page_num, page_size, fields)
@@ -125,7 +125,7 @@ def get_data():
     id = request.args.get('id')
     idx = request.args.get('idx', type=int)
     fields = request.args.get('fields')
-    log.info("===== [Get Data] ", request.args)
+    log.info("===== [Get Data] ", json.dumps(request.args))
     if(fields is None):
         return db_mgr.get_data_idx(table, id, idx)
     else:
