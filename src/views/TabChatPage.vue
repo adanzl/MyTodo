@@ -12,15 +12,27 @@
           {{ msg.content }}
         </ion-item>
       </ion-list>
-      <ion-footer>
-        <ion-toolbar>
-          <ion-input v-model="inputText" placeholder="Type a message"></ion-input>
-          <ion-button @click="sendTextMessage">发送</ion-button>
-          <ion-button @click="startRecording">Record Audio</ion-button>
-          <ion-button @click="stopRecording">Stop Record</ion-button>
-        </ion-toolbar>
-      </ion-footer>
     </ion-content>
+    <ion-item>
+      <div class="flex p-2 w-full">
+        <ion-input
+          class="flex-1 mr-1"
+          v-model="inputText"
+          placeholder="Type a message"
+          fill="solid"
+          style="--color: #000"
+          mode="md" />
+        <ion-button @click="sendTextMessage">发送</ion-button>
+        <ion-button
+          @click="stopRecording"
+          v-if="mediaRecorder && mediaRecorder.state === 'recording'">
+          <Icon icon="mdi:stop-circle-outline" width="24" height="24" />
+        </ion-button>
+        <ion-button @click="startRecording" v-else>
+          <Icon icon="mdi:microphone" width="24" height="24" />
+        </ion-button>
+      </div>
+    </ion-item>
   </ion-page>
 </template>
 
@@ -28,13 +40,14 @@
 import { IonToolbar } from "@ionic/vue";
 import { onMounted, ref } from "vue";
 import io from "socket.io-client";
+import { getApiUrl } from "@/utils/NetUtil";
 // import { trashOutline, createOutline } from "ionicons/icons";
 
 // 存储识别结果的变量
 const inputText = ref("");
 const messages = ref<any>([]);
-
-const socket = io("http://localhost:8888");
+const url = getApiUrl().replace("api", "");
+const socket = io(url);
 const isWaitingForTranslation = ref(false);
 const mediaRecorder = ref<MediaRecorder | null>(null);
 const recordedChunks = ref<any>([]);

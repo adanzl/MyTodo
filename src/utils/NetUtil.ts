@@ -8,8 +8,12 @@ import axios from "axios";
 const REMOTE = { url: "https://leo-zhao.natapp4.cc/api", available: false };
 const LOCAL = { url: "http://192.168.50.171:8848/api", available: false };
 // const LOCAL = { url: "http://localhost:8888", available: false };
-let URL = "";
+let API_URL = "";
 // const URL = "http://192.168.50.184:9527/api";
+
+export function getApiUrl() {
+  return API_URL;
+}
 
 async function checkAddress(url: string, timeout: number = 10000) {
   try {
@@ -25,30 +29,33 @@ async function checkAddress(url: string, timeout: number = 10000) {
 }
 
 export async function initNet(): Promise<void> {
-  const b1 = await checkAddress(REMOTE.url).then((ret) => {
+  await checkAddress(REMOTE.url).then((ret) => {
     if (ret && !LOCAL.available) {
       REMOTE.available = true;
       console.log("use url:", REMOTE.url);
-      URL = REMOTE.url;
+      API_URL = REMOTE.url;
     }
     return ret;
   });
-  const b2 = await checkAddress(LOCAL.url, 100).then((ret) => {
-    if (ret) {
-      LOCAL.available = true;
-      console.log("use url:", LOCAL.url, ret);
-      URL = LOCAL.url;
-    }
-    return ret;
-  });
-  console.log("init net ", b1, b2);
+  const protocol = window.location.protocol;
+  if (protocol !== "https:") {
+    await checkAddress(LOCAL.url, 100).then((ret) => {
+      if (ret) {
+        LOCAL.available = true;
+        console.log("use url:", LOCAL.url, ret);
+        API_URL = LOCAL.url;
+      }
+      return ret;
+    });
+  }
+  console.log("init net ");
   LoadColorData();
 }
 export async function getSave(id: number) {
   if (id === undefined) {
     throw new Error("id is undefined");
   }
-  const rsp: any = await axios.get(URL + "/getData", {
+  const rsp: any = await axios.get(API_URL + "/getData", {
     params: { id: id, table: "t_schedule", fields: "data,user_id" },
   });
   // console.log(rsp.data.data);
@@ -69,7 +76,7 @@ export function setSave(id: number | undefined, data: any) {
       return;
     }
     axios
-      .post(URL + "/setData", {
+      .post(API_URL + "/setData", {
         table: "t_schedule",
         data: {
           id: id,
@@ -91,7 +98,7 @@ export function setSave(id: number | undefined, data: any) {
 }
 
 export async function setUserInfo(id: number | undefined, score: number) {
-  const rsp: any = await axios.post(URL + "/setData", {
+  const rsp: any = await axios.post(API_URL + "/setData", {
     table: "t_user",
     data: {
       id: id,
@@ -106,7 +113,9 @@ export async function setUserInfo(id: number | undefined, score: number) {
 }
 
 export async function getUserInfo(id: number) {
-  const rsp: any = await axios.get(URL + "/getData", { params: { table: "t_user", id: id, fields: "id,score"} });
+  const rsp: any = await axios.get(API_URL + "/getData", {
+    params: { table: "t_user", id: id, fields: "id,score" },
+  });
   // console.log("getPic", rsp.data);
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
@@ -115,7 +124,7 @@ export async function getUserInfo(id: number) {
 }
 
 export async function setPic(id: number | undefined, data: string): Promise<string> {
-  const rsp: any = await axios.post(URL + "/setData", {
+  const rsp: any = await axios.post(API_URL + "/setData", {
     table: "t_user_pic",
     data: {
       id: id,
@@ -129,7 +138,7 @@ export async function setPic(id: number | undefined, data: string): Promise<stri
   return rsp.data.data;
 }
 export async function delPic(id: number) {
-  const rsp: any = await axios.post(URL + "/delData", {
+  const rsp: any = await axios.post(API_URL + "/delData", {
     id: id,
     table: "t_user_pic",
   });
@@ -140,7 +149,7 @@ export async function delPic(id: number) {
 }
 
 export async function getScheduleList() {
-  const rsp: any = await axios.get(URL + "/getAll", {
+  const rsp: any = await axios.get(API_URL + "/getAll", {
     params: { table: "t_schedule", fields: "id,name,user_id" },
   });
   // console.log(rsp.data.data);
@@ -151,7 +160,7 @@ export async function getScheduleList() {
 }
 
 export async function getUserList() {
-  const rsp: any = await axios.get(URL + "/getAll", {
+  const rsp: any = await axios.get(API_URL + "/getAll", {
     params: { table: "t_user" },
   });
   // console.log(rsp.data.data);
@@ -162,7 +171,7 @@ export async function getUserList() {
 }
 
 export async function setUserData(data: any) {
-  const rsp: any = await axios.post(URL + "/setData", {
+  const rsp: any = await axios.post(API_URL + "/setData", {
     table: "t_user",
     data: data,
   });
@@ -174,7 +183,7 @@ export async function setUserData(data: any) {
 }
 
 export async function getPicList(pageNum?: number, pageSize?: number) {
-  const rsp: any = await axios.get(URL + "/getAll", {
+  const rsp: any = await axios.get(API_URL + "/getAll", {
     params: { table: "t_user_pic", pageNum: pageNum, pageSize: pageSize },
   });
   // console.log(rsp.data.data);
@@ -184,7 +193,7 @@ export async function getPicList(pageNum?: number, pageSize?: number) {
   return rsp.data.data;
 }
 export async function getPic(id: number): Promise<string> {
-  const rsp: any = await axios.get(URL + "/getData", { params: { table: "t_user_pic", id: id } });
+  const rsp: any = await axios.get(API_URL + "/getData", { params: { table: "t_user_pic", id: id } });
   // console.log("getPic", rsp.data);
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
@@ -193,7 +202,7 @@ export async function getPic(id: number): Promise<string> {
 }
 
 export async function getColorList(pageNum?: number, pageSize?: number) {
-  const rsp: any = await axios.get(URL + "/getAll", {
+  const rsp: any = await axios.get(API_URL + "/getAll", {
     params: { table: "t_colors", pageNum: pageNum, pageSize: pageSize },
   });
   if (rsp.data.code !== 0) {
@@ -207,7 +216,7 @@ export async function setColor(
   name: string,
   color: string
 ): Promise<string> {
-  const rsp: any = await axios.post(URL + "/setData", {
+  const rsp: any = await axios.post(API_URL + "/setData", {
     table: "t_colors",
     data: { id: id, name: name, color: color },
   });
@@ -219,7 +228,7 @@ export async function setColor(
 }
 
 export async function delColor(id: number) {
-  const rsp: any = await axios.post(URL + "/delData", {
+  const rsp: any = await axios.post(API_URL + "/delData", {
     id: id,
     table: "t_colors",
   });
