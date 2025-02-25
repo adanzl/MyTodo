@@ -23,9 +23,7 @@
           style="--color: #000"
           mode="md" />
         <ion-button @click="sendTextMessage">发送</ion-button>
-        <ion-button
-          @click="stopRecording"
-          v-if="mediaRecorder && mediaRecorder.state === 'recording'">
+        <ion-button @click="stopRecording" v-if="isRecording">
           <Icon icon="mdi:stop-circle-outline" width="24" height="24" />
         </ion-button>
         <ion-button @click="startRecording" v-else>
@@ -51,6 +49,7 @@ const socket = io(url);
 const isWaitingForTranslation = ref(false);
 const mediaRecorder = ref<MediaRecorder | null>(null);
 const recordedChunks = ref<any>([]);
+const isRecording = ref(false);
 
 onMounted(() => {});
 // 发送握手请求
@@ -113,15 +112,19 @@ async function startRecording() {
       };
 
       mediaRecorder.value.start();
+      isRecording.value = true;
     } catch (error) {
       console.error("Error starting recording:", error);
+      isRecording.value = false;
     }
   }
 }
 
 function stopRecording() {
+  console.log("stopRecording");
   if (mediaRecorder.value && mediaRecorder.value.state === "recording") {
     mediaRecorder.value!.stop();
   }
+  isRecording.value = false;
 }
 </script>
