@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO, handlers=[file_handler,std_handler])
 log = logging.getLogger(__name__)
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True, origins="*")
+CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})
 # 创建 SocketIO 实例并与 Flask 应用关联
 socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
 
