@@ -6,7 +6,7 @@ import axios from "axios";
 // natapp.cn
 // 最新域名： cat /usr/env/natapp/log/natapp.log
 const REMOTE = { url: "https://leo-zhao.natapp4.cc/api", available: false };
-const LOCAL = { url: "http://192.168.50.184:9527/api", available: false };
+const LOCAL = { url: "http://192.168.50.171:8848/api", available: false };
 // const LOCAL = { url: "http://localhost:8888", available: false };
 let URL = "";
 // const URL = "http://192.168.50.184:9527/api";
@@ -141,7 +141,7 @@ export async function delPic(id: number) {
 
 export async function getScheduleList() {
   const rsp: any = await axios.get(URL + "/getAll", {
-    params: { table: "t_schedule", fields: "id, name, user_id" },
+    params: { table: "t_schedule", fields: "id,name,user_id" },
   });
   // console.log(rsp.data.data);
   if (rsp.data.code !== 0) {

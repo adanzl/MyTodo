@@ -125,7 +125,7 @@ def get_data():
     id = request.args.get('id')
     idx = request.args.get('idx', type=int)
     fields = request.args.get('fields')
-    log.info("===== [Get Data] ", table, id, idx, fields)
+    log.info("===== [Get Data] ", request.args)
     if(fields is None):
         return db_mgr.get_data_idx(table, id, idx)
     else:
@@ -175,4 +175,4 @@ def chat():
 if __name__ == '__main__':
     #开始运行flask应用程序，以调试模式运行
     # app.run(debug=True, port=8888)  
-    socketio.run(app, debug=True, port=8888)
+    socketio.run(app, debug=True, port=8000)
