@@ -1,10 +1,12 @@
 import base64
 import logging
 from flask import request, json
-from flask_socketio import send, emit
+from flask_socketio import emit
+from funasr import AutoModel
 
 log = logging.getLogger(__name__)
 
+model = AutoModel(model="paraformer-zh-streaming")  # cSpell: disable-line
 
 class ClientContext:
 
@@ -17,7 +19,9 @@ def translate_text(text):
 
 
 def fun_asr(audio_data):
-    return 'size: ' + str(len(audio_data))
+    result = model(audio_data, batch_size_token=0)
+    text = result[0]['text']
+    return text
 
 
 class ChatMgr:

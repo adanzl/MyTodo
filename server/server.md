@@ -50,11 +50,24 @@
         --restart=always \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -v portainer_data:/data \
-        portainer/portainer-ce`
+        portainer/portainer-ce
 
 ## cloud-beaver
+
 https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-from-docker-image
 
+## redis
+ 配置文件 /data/redis/redis.conf
+ 
+ 数据文件 /data/redis/data
+
+
+    docker run -d -p 6379:6379 --name redis \
+        --restart=always \
+        -v /data/redis/redis.conf:/usr/local/etc/redis/redis.conf \
+        -v /data/redis/data:/data \
+        hub.rat.dev/redis redis-server /usr/local/etc/redis/redis.conf
+        
 ## 服务器端口
 
 | Server       |     Port |
@@ -65,3 +78,4 @@ https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-fro
 | cockpit      |     9090 |
 | portainer    |     9000 |
 | cloud-beaver |        x |
+| redis        |     6379 |
