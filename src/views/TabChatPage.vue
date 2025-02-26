@@ -53,6 +53,7 @@ const isWaitingForTranslation = ref(false);
 const mediaRecorder = ref<MediaRecorder | null>(null);
 const recordedChunks = ref<any>([]);
 const isRecording = ref(false);
+const SAMPLE_RATE = 16000;
 
 onMounted(() => {});
 // 发送握手请求
@@ -67,8 +68,9 @@ socket.on("message", (data) => {
   } else if (data.type === "translation") {
     messages.value.push({ content: `Translation: ${data.content}` });
     isWaitingForTranslation.value = false;
-  } else if (data.error) {
-    messages.value.push({ content: `Unknown: ${data}` });
+  } else {
+    messages.value.push({ content: `Unknown: ${JSON.stringify(data)}` });
+    isWaitingForTranslation.value = false;
   }
 });
 socket.on("handshake_response", (data) => {
@@ -87,7 +89,10 @@ const sendTextMessage = () => {
 async function startRecording() {
   if (!isWaitingForTranslation.value) {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: {
+            sampleRate: SAMPLE_RATE,
+            channelCount: 1
+        } });
       mediaRecorder.value = new MediaRecorder(stream);
       recordedChunks.value = [];
 
@@ -113,8 +118,8 @@ async function startRecording() {
         };
         reader.readAsDataURL(blob);
       };
-
-      mediaRecorder.value.start();
+      // 将mediaRecorder的切片间隔设置为300ms（与FunASR的流式窗口匹配）
+      mediaRecorder.value.start(300);
       isRecording.value = true;
     } catch (error) {
       console.error("Error starting recording:", error);

@@ -3,10 +3,12 @@ import logging
 from flask import request, json
 from flask_socketio import emit
 from funasr import AutoModel
+import numpy as np
 
 log = logging.getLogger(__name__)
 
-model = AutoModel(model="paraformer-zh-streaming")  # cSpell: disable-line
+model = AutoModel(model="paraformer-zh-streaming", vad_model="fsmn-vad", disable_update=True)  # cSpell: disable-line
+
 
 class ClientContext:
 
@@ -17,12 +19,41 @@ class ClientContext:
 def translate_text(text):
     return text
 
+chunk_size = [0, 10, 5] #[0, 10, 5] 600ms, [0, 8, 4] 480ms
 
-def fun_asr(audio_data):
-    decoded_bytes = base64.b64decode(audio_data)
-    result = model(decoded_bytes, batch_size_token=0)
-    text = result[0]['text']
-    return text
+def fun_asr(audio_bytes, sample_rate=16000):
+    """处理原始音频bytes数据流"""
+    # 将bytes转为numpy数组（假设为16bit PCM格式）
+    audio_data = np.frombuffer(audio_bytes, dtype=np.int16)
+    audio_data = audio_data.astype(np.float32) / 32768.0  # 归一化
+
+    # 计算分块参数（200ms对应的采样点数）
+    chunk_stride = int(chunk_size[1] * sample_rate / 1000)  # 200ms=3200采样点@16kHz
+
+    # 流式处理
+    cache = {}
+    results = []
+
+    total_chunks = len(audio_data) // chunk_stride + 1
+    for i in range(total_chunks):
+        chunk = audio_data[i * chunk_stride : (i + 1) * chunk_stride]
+        is_final = i == total_chunks - 1
+
+        # 核心识别调用
+        res = model.generate(
+            input=chunk,
+            cache=cache,
+            is_final=is_final,
+            chunk_size=chunk_size,
+            encoder_chunk_look_back=4,  # 上下文回溯[5,8](@ref)
+            decoder_chunk_look_back=1,
+        )
+
+        if res and res[0]["text"]:
+            results.append(res[0]["text"])
+            print(f"实时结果: {res[0]['text']}")  # 增量输出
+
+    return "".join(results)
 
 
 class ChatMgr:
@@ -43,25 +74,24 @@ class ChatMgr:
         translated = translate_text(text)
         self.socketio.emit('message', {'type': 'translation', 'content': translated}, room=sid)
 
-    def handle_audio(self, sid, audio_data):
-        if self.clients.get(sid).pending_audio:
+    def handle_audio(self, sid, audio_bytes):
+        client = self.clients.get(sid)
+        if not client or client.pending_audio:
             return
-        self.clients[sid].pending_audio = True
+        client.pending_audio = True
+        self.socketio.start_background_task(self.process_audio_chain, sid, audio_bytes)
 
-        # 异步处理语音识别
-        self.socketio.start_background_task(self.process_audio_chain, sid, audio_data)
-
-    def process_audio_chain(self, sid, audio_data):
+    def process_audio_chain(self, sid, audio_bytes):
         try:
-            text = fun_asr(audio_data)  # 需实现FunASR的具体调用
-            self.socketio.emit('message', {'type': 'recognition', 'content': text}, room=sid)
+            text = fun_asr(audio_bytes)  # 调用 FunASR 进行语音识别
+            self.socketio.emit("message", {"type": "recognition", "content": text}, room=sid)
 
             # 继续翻译
             translated = translate_text(text)
-            self.socketio.emit('message', {'type': 'translation', 'content': translated}, room=sid)
+            self.socketio.emit("message", {"type": "translation", "content": translated}, room=sid)
         except Exception as e:
-            log.error(f'Error processing audio chain: {e}')
-            self.socketio.emit('message', {'type': 'error', 'content': str(e)}, room=sid)
+            log.error(f"Error processing audio chain: {e}")
+            self.socketio.emit("message", {"type": "error", "content": str(e)}, room=sid)
         finally:
             self.clients[sid].pending_audio = False
 
