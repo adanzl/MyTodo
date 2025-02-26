@@ -89,10 +89,12 @@ const sendTextMessage = () => {
 async function startRecording() {
   if (!isWaitingForTranslation.value) {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: {
-            sampleRate: SAMPLE_RATE,
-            channelCount: 1
-        } });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          sampleRate: SAMPLE_RATE,
+          channelCount: 1,
+        },
+      });
       mediaRecorder.value = new MediaRecorder(stream);
       recordedChunks.value = [];
 
@@ -108,7 +110,10 @@ async function startRecording() {
         reader.onloadend = () => {
           if (typeof reader.result === "string") {
             const base64Data = reader.result!.split(",")[1];
-            const message = JSON.stringify({ type: "audio", content: base64Data });
+            const byteLength = atob(base64Data).length; // 解码后字节长度
+            // 强制对齐到2字节（int16大小）
+            const alignedData = byteLength % 2 === 0 ? base64Data : base64Data.slice(0, -1); // 舍弃最后1字节
+            const message = JSON.stringify({ type: "audio", content: alignedData });
             socket.emit("message", message);
             console.log("Audio sent:", message.length);
             isWaitingForTranslation.value = true;
