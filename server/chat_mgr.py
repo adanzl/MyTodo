@@ -19,7 +19,8 @@ def translate_text(text):
 
 
 def fun_asr(audio_data):
-    result = model(audio_data, batch_size_token=0)
+    decoded_bytes = base64.b64decode(audio_data)
+    result = model(decoded_bytes, batch_size_token=0)
     text = result[0]['text']
     return text
 

@@ -47,6 +47,7 @@ import MdiStopCircleOutline from "~icons/mdi/stop-circle-outline";
 const inputText = ref("");
 const messages = ref<any>([]);
 const url = getApiUrl().replace("api", "");
+// const url = http://127.0.0.1:8000/;
 const socket = io(url);
 const isWaitingForTranslation = ref(false);
 const mediaRecorder = ref<MediaRecorder | null>(null);
