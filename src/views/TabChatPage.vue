@@ -24,10 +24,10 @@
           mode="md" />
         <ion-button @click="sendTextMessage">发送</ion-button>
         <ion-button @click="stopRecording" v-if="isRecording">
-          <Icon icon="mdi:stop-circle-outline" width="24" height="24" />
+          <MdiStopCircleOutline width="24" height="24" />
         </ion-button>
         <ion-button @click="startRecording" v-else>
-          <Icon icon="mdi:microphone" width="24" height="24" />
+          <MdiMicrophone width="24" height="24" />
         </ion-button>
       </div>
     </ion-item>
@@ -39,6 +39,8 @@ import { IonToolbar } from "@ionic/vue";
 import { onMounted, ref } from "vue";
 import io from "socket.io-client";
 import { getApiUrl } from "@/utils/NetUtil";
+import MdiMicrophone from "~icons/mdi/microphone";
+import MdiStopCircleOutline from "~icons/mdi/stop-circle-outline";
 // import { trashOutline, createOutline } from "ionicons/icons";
 
 // 存储识别结果的变量
