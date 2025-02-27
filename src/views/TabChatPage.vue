@@ -35,13 +35,13 @@
 </template>
 
 <script setup lang="ts">
-import { IonToolbar } from "@ionic/vue";
-import { onMounted, ref } from "vue";
-import io from "socket.io-client";
 import { getApiUrl } from "@/utils/NetUtil";
+import { IonToolbar } from "@ionic/vue";
+import io from "socket.io-client";
+import RecordRTC from "recordrtc";
+import { onMounted, ref } from "vue";
 import MdiMicrophone from "~icons/mdi/microphone";
 import MdiStopCircleOutline from "~icons/mdi/stop-circle-outline";
-// import { trashOutline, createOutline } from "ionicons/icons";
 
 // 存储识别结果的变量
 const inputText = ref("");
@@ -50,8 +50,8 @@ const url = getApiUrl().replace("api", "");
 // const url = http://127.0.0.1:8000/;
 const socket = io(url);
 const isWaitingForTranslation = ref(false);
-const mediaRecorder = ref<MediaRecorder | null>(null);
-const recordedChunks = ref<any>([]);
+const audioBuffer = ref<ArrayBuffer[]>([]); // 缓冲区数组
+const recorder = ref<RecordRTC | null>();
 const isRecording = ref(false);
 const SAMPLE_RATE = 16000;
 
@@ -86,45 +86,53 @@ const sendTextMessage = () => {
     inputText.value = "";
   }
 };
+function sendData(data: ArrayBuffer) {
+  if (!socket.connected) {
+    console.warn("WebSocket未连接，稍后重试");
+    return;
+  }
+  const message = JSON.stringify({ type: "audio", content: data });
+  console.log("==> sendData", message);
+  socket.emit("message", message);
+}
+function processBuffer(chunk_size: number = 4 * 1024) {
+  if (chunk_size === -1) chunk_size = audioBuffer.value.length;
+  while (audioBuffer.value.length && audioBuffer.value.length >= chunk_size) {
+    // 每4KB发送一次
+    const chunk: any = audioBuffer.value.splice(0, chunk_size);
+    audioBuffer.value = audioBuffer.value.splice(chunk.length);
+    sendData(chunk);
+  }
+}
 async function startRecording() {
   if (!isWaitingForTranslation.value) {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          sampleRate: SAMPLE_RATE,
-          channelCount: 1,
-        },
-      });
-      mediaRecorder.value = new MediaRecorder(stream);
-      recordedChunks.value = [];
+      // 请求麦克风权限
+      navigator.mediaDevices
+        .getUserMedia({ audio: true })
+        .then((stream) => {
+          const config = {
+            type: "audio",
+            // mimeType: "audio/webm; codecs=opus", // 使用Opus编码更高效
+            mimeType: "audio/webm;codecs=pcm",
+            sampleRate: SAMPLE_RATE, // 16kHz采样率
+            timeSlice: 200,
+            ondataavailable: (e: Blob) => {
+              // 处理数据块
+              e.arrayBuffer().then((buffer) => {
+                audioBuffer.value.push(buffer);
+                processBuffer();
+              });
+            },
+          };
 
-      mediaRecorder.value.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          recordedChunks.value.push(event.data);
-        }
-      };
-
-      mediaRecorder.value.onstop = () => {
-        const blob = new Blob(recordedChunks.value, { type: "audio/wav" });
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          if (typeof reader.result === "string") {
-            const base64Data = reader.result!.split(",")[1];
-            const byteLength = atob(base64Data).length; // 解码后字节长度
-            // 强制对齐到2字节（int16大小）
-            const alignedData = byteLength % 2 === 0 ? base64Data : base64Data.slice(0, -1); // 舍弃最后1字节
-            const message = JSON.stringify({ type: "audio", content: alignedData });
-            socket.emit("message", message);
-            console.log("Audio sent:", message.length);
-            isWaitingForTranslation.value = true;
-          } else {
-            console.error("Error converting audio to base64");
-          }
-        };
-        reader.readAsDataURL(blob);
-      };
-      // 将mediaRecorder的切片间隔设置为300ms（与FunASR的流式窗口匹配）
-      mediaRecorder.value.start(300);
+          recorder.value = new RecordRTC(stream, config as RecordRTC.Options);
+          recorder.value.startRecording();
+        })
+        .catch((error) => {
+          console.error("麦克风权限获取失败", error);
+          isRecording.value = false;
+        });
       isRecording.value = true;
     } catch (error) {
       console.error("Error starting recording:", error);
@@ -134,10 +142,12 @@ async function startRecording() {
 }
 
 function stopRecording() {
-  console.log("stopRecording");
-  if (mediaRecorder.value && mediaRecorder.value.state === "recording") {
-    mediaRecorder.value!.stop();
+  console.log("==> stopRecording");
+  if (isRecording.value === false) return;
+  if (recorder.value) {
+    recorder.value.stopRecording();
   }
+  processBuffer(-1);
   isRecording.value = false;
 }
 </script>

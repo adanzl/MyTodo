@@ -57,17 +57,29 @@
 https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-from-docker-image
 
 ## redis
- 配置文件 /data/redis/redis.conf
- 
- 数据文件 /data/redis/data
 
+配置文件 /data/redis/redis.conf
+
+数据文件 /data/redis/data
 
     docker run -d -p 6379:6379 --name redis \
         --restart=always \
         -v /data/redis/redis.conf:/usr/local/etc/redis/redis.conf \
         -v /data/redis/data:/data \
         hub.rat.dev/redis redis-server /usr/local/etc/redis/redis.conf
-        
+
+
+## funASR
+
+    # 拉取镜像
+    docker pull registry.cn-hangzhou.aliyuncs.com/funasr_repo/funasr:funasr-runtime-sdk-online-cpu-0.1.12
+    # 创建模型文件夹
+    mkdir -p /mnt/data/funasr/models
+    # 运行容器
+    docker run -p 9096:10095 -it --privileged=true \
+        -v /mnt/data/funasr/models:/workspace/models \
+        registry.cn-hangzhou.aliyuncs.com/funasr_repo/funasr:funasr-runtime-sdk-online-cpu-0.1.12
+
 ## 服务器端口
 
 | Server       |     Port |
@@ -77,5 +89,6 @@ https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-fro
 | nginx        | 8848/443 |
 | cockpit      |     9090 |
 | portainer    |     9000 |
+| funASR       |     9096 |
 | cloud-beaver |        x |
 | redis        |     6379 |
