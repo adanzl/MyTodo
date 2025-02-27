@@ -76,9 +76,8 @@ https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-fro
     # 创建模型文件夹
     mkdir -p /mnt/data/funasr/models
     # 运行容器
-    docker run -p 9096:10095 -it --privileged=true \
-        -v /mnt/data/funasr/models:/workspace/models \
-        registry.cn-hangzhou.aliyuncs.com/funasr_repo/funasr:funasr-runtime-sdk-online-cpu-0.1.12
+    docker run -p 9095:10095 -itd -w /workspace/FunASR/runtime --privileged=true --name funASR_online --restart=always -v /mnt/data/funasr/models:/workspace/models registry.cn-hangzhou.aliyuncs.com/funasr_repo/funasr:funasr-runtime-sdk-online-cpu-0.1.12 bash -c "nohup bash /workspace/FunASR/runtime/run_server_2pass.sh --download-model-dir /workspace/models --vad-dir damo/speech_fsmn_vad_zh-cn-16k-common-onnx --model-dir iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online --online-model-dir damo/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online-onnx --punc-dir damo/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727-onnx --lm-dir damo/speech_ngram_lm_zh-cn-ai-wesp-fst --itn-dir thuduj12/fst_itn_zh --certfile 0 --hotword /workspace/models/hotwords.txt > /var/log/funasr.log 2>&1 & tail -f /var/log/funasr.log"
+
 
 ## 服务器端口
 
@@ -89,6 +88,6 @@ https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-fro
 | nginx        | 8848/443 |
 | cockpit      |     9090 |
 | portainer    |     9000 |
-| funASR       |     9096 |
+| funASR       |     9095 |
 | cloud-beaver |        x |
 | redis        |     6379 |
