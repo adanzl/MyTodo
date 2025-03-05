@@ -91,7 +91,7 @@ function sendData(data: ArrayBuffer) {
     console.warn("WebSocket未连接，稍后重试");
     return;
   }
-  const message = JSON.stringify({ type: "audio", content: data });
+  const message = JSON.stringify({ type: "audio", simple: SAMPLE_RATE, content: data });
   console.log("==> sendData", message);
   socket.emit("message", message);
 }
