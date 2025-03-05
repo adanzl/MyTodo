@@ -46,11 +46,10 @@ import MdiStopCircleOutline from "~icons/mdi/stop-circle-outline";
 // 存储识别结果的变量
 const inputText = ref("");
 const messages = ref<any>([]);
-const url = getApiUrl().replace("api", "");
-// const url = http://127.0.0.1:8000/;
+// const url = getApiUrl().replace("api", "");
+const url = "http://127.0.0.1:8000/";
 const socket = io(url);
 const isWaitingForTranslation = ref(false);
-const audioBuffer = ref<ArrayBuffer[]>([]); // 缓冲区数组
 const recorder = ref<RecordRTC | null>();
 const isRecording = ref(false);
 const SAMPLE_RATE = 16000;
@@ -76,6 +75,15 @@ socket.on("message", (data) => {
 socket.on("handshake_response", (data) => {
   console.log("handshake:", data);
 });
+socket.on("disconnect", () => {
+  console.log("Disconnected from the server.");
+});
+socket.on("error", (error) => {
+  console.error("WebSocket error:", error);
+});
+socket.on("close", () => {
+  console.log("WebSocket connection closed.");
+});
 
 // 模拟发送消息
 const sendTextMessage = () => {
@@ -86,53 +94,34 @@ const sendTextMessage = () => {
     inputText.value = "";
   }
 };
-function sendData(data: ArrayBuffer) {
+function sendData(data: string, finish: boolean = false) {
   if (!socket.connected) {
     console.warn("WebSocket未连接，稍后重试");
     return;
   }
-  const message = JSON.stringify({ type: "audio", simple: SAMPLE_RATE, content: data });
-  console.log("==> sendData", message);
+  const message = JSON.stringify({
+    type: "audio",
+    simple: SAMPLE_RATE,
+    content: data,
+    finish: finish,
+  });
+  console.log("==> sendData audio ", data.length, finish);
   socket.emit("message", message);
-}
-function processBuffer(chunk_size: number = 4 * 1024) {
-  if (chunk_size === -1) chunk_size = audioBuffer.value.length;
-  while (audioBuffer.value.length && audioBuffer.value.length >= chunk_size) {
-    // 每4KB发送一次
-    const chunk: any = audioBuffer.value.splice(0, chunk_size);
-    audioBuffer.value = audioBuffer.value.splice(chunk.length);
-    sendData(chunk);
-  }
 }
 async function startRecording() {
   if (!isWaitingForTranslation.value) {
     try {
       // 请求麦克风权限
-      navigator.mediaDevices
-        .getUserMedia({ audio: true })
-        .then((stream) => {
-          const config = {
-            type: "audio",
-            // mimeType: "audio/webm; codecs=opus", // 使用Opus编码更高效
-            mimeType: "audio/webm;codecs=pcm",
-            sampleRate: SAMPLE_RATE, // 16kHz采样率
-            timeSlice: 200,
-            ondataavailable: (e: Blob) => {
-              // 处理数据块
-              e.arrayBuffer().then((buffer) => {
-                audioBuffer.value.push(buffer);
-                processBuffer();
-              });
-            },
-          };
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const config = {
+        type: "audio",
+        // mimeType: "audio/webm; codecs=opus", // 使用Opus编码更高效
+        mimeType: "audio/webm;codecs=pcm",
+        sampleRate: SAMPLE_RATE, // 16kHz采样率
+      };
 
-          recorder.value = new RecordRTC(stream, config as RecordRTC.Options);
-          recorder.value.startRecording();
-        })
-        .catch((error) => {
-          console.error("麦克风权限获取失败", error);
-          isRecording.value = false;
-        });
+      recorder.value = new RecordRTC(stream, config as RecordRTC.Options);
+      recorder.value.startRecording();
       isRecording.value = true;
     } catch (error) {
       console.error("Error starting recording:", error);
@@ -145,9 +134,26 @@ function stopRecording() {
   console.log("==> stopRecording");
   if (isRecording.value === false) return;
   if (recorder.value) {
-    recorder.value.stopRecording();
+    recorder.value.stopRecording(async () => {
+      // 处理数据块
+      // e.arrayBuffer().then((buffer) => {
+      //   audioBuffer.value.push(buffer);
+      //   processBuffer();
+      // });
+      // 获取录制的音频文件
+      const blob = await recorder.value!.getBlob();
+      // 将音频文件转换为 Base64 编码
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === "string") {
+          const base64Data = reader.result!.split(",")[1];
+          // 通过 WebSocket 发送 Base64 编码的音频数据
+          sendData(base64Data, true);
+        }
+      };
+      reader.readAsDataURL(blob);
+    });
   }
-  processBuffer(-1);
   isRecording.value = false;
 }
 </script>
