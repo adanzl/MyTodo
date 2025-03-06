@@ -54,6 +54,7 @@ class ChatMgr:
         '''
         处理音频数据 单条
         '''
+        log.info(f"[CHAT] Handle_audio: {len(audio_bytes)} bytes")
         client: ClientContext = self.clients.get(sid)
         if not client:
             log.warning(f"[CHAT] Client {sid} not found")

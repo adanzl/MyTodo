@@ -148,13 +148,14 @@ class AsrClient:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                print(f"Error receiving result: {e}")
+                log.error(f"Error receiving result: {e}")
                 break
             await asyncio.sleep(0)
 
     async def process_audio(self, sample_rate, audio_data):
         try:
             async with websockets.connect(ASR_SERVER) as ws:
+                log.info(f"=> asr connect {ASR_SERVER}")
                 await self.start_asr(ws, sample_rate)
                 receive_task = asyncio.create_task(self.receive_results(ws))
                 await self.send_data(ws, audio_data)
@@ -162,5 +163,5 @@ class AsrClient:
                 await self.end_asr()
             return self.text_print
         except Exception as e:
-            print(f"Error processing audio: {e}")
+            log.error(f"Error processing audio: {e}")
             return None
