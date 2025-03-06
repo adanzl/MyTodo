@@ -1,6 +1,4 @@
 import logging
-import asyncio
-import ssl
 import threading
 import time
 import websocket
@@ -73,6 +71,8 @@ class AsrClient:
 
     def send_data(self, ws, bytes_msg):
         log.info(f"=> asr send_data {len(bytes_msg)} [{self.package_size}]")
+        # with open("asr.pcm", "wb") as f:
+        #     f.write(bytes_msg)
         self.buffer.extend(bytes_msg)
         while len(self.buffer) >= self.package_size:
             s_data = self.buffer[:self.package_size]
@@ -111,49 +111,6 @@ class AsrClient:
     def close(self):
         if self.is_running and self.ws:
             self.ws.close()
-
-    def receive_results(self, ws):
-        while True:
-            try:
-                msg = ws.recv()
-                log.info(f"====> handle asr msg {msg}")
-                meg = json.loads(msg)
-                text = meg["text"]
-                timestamp = ""
-                offline_msg_done = meg.get("is_final", False)
-                if "timestamp" in meg:
-                    timestamp = meg["timestamp"]
-                if "mode" not in meg:
-                    return
-                if meg["mode"] == "online":
-                    self.text_print += "{}".format(text)
-                    self.text_print = self.text_print[-ASR_MX_WORDS:]
-                    # self.on_message(self.text_print)
-                elif meg["mode"] == "offline":
-                    if timestamp != "":
-                        self.text_print += "{} timestamp: {}".format(text, timestamp)
-                    else:
-                        self.text_print += "{}".format(text)
-                    # self.on_message(self.text_print)
-                    offline_msg_done = True
-                else:
-                    if meg["mode"] == "2pass-online":
-                        self.text_print_2pass_online += "{}".format(text)
-                        self.text_print = self.text_print_2pass_offline + self.text_print_2pass_online
-                    else:
-                        self.text_print_2pass_online = ""
-                        self.text_print = self.text_print_2pass_offline + "{}".format(text)
-                        self.text_print_2pass_offline += "{}".format(text)
-                    self.text_print = self.text_print[-ASR_MX_WORDS:]
-                    # self.on_message(self.text_print)
-                # send_one(ws)
-                if meg['is_final']:
-                    break
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                log.error(f"Error receiving result: {e}")
-                break
 
     def on_open(self, ws):
         log.info("=> asr open")

@@ -53,7 +53,7 @@ const socket = io(url);
 const isWaitingForTranslation = ref(false);
 const recorder = ref<RecordRTC | null>();
 const isRecording = ref(false);
-const SAMPLE_RATE = 16000;
+const SAMPLE_RATE = 48000;
 const audioRef = ref<HTMLAudioElement | null>(null);
 
 onMounted(() => {});
@@ -118,8 +118,11 @@ async function startRecording() {
       const config = {
         type: "audio",
         // mimeType: "audio/webm; codecs=opus", // 使用Opus编码更高效
-        mimeType: "audio/webm",
+        mimeType: "audio/wav",
+        recorderType: RecordRTC.StereoAudioRecorder,
         sampleRate: SAMPLE_RATE, // 16kHz采样率
+        numberOfAudioChannels: 2,
+        bitrate: 16, // 16kHz采样率
       };
 
       recorder.value = new RecordRTC(stream, config as RecordRTC.Options);

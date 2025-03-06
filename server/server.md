@@ -1,5 +1,6 @@
 # 服务器
-
+## app 依赖
+> pip3 install websocket-client flask requests flask_cors flask_socketio eventlet
 ## app 服务
 
 > `sudo vim /etc/systemd/system/my-todo.service`

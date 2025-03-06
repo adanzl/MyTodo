@@ -1,4 +1,3 @@
-# import asyncio
 import base64
 import logging
 
@@ -34,15 +33,6 @@ class ChatMgr:
     def add_client(self, sid):
         self.clients[sid] = ClientContext(sid)
 
-    def handle_ars_result(self, sid, result):
-        with app.app_context():
-            try:
-                msg = {"type": "recognition", "content": result}
-                log.info(f"[CHAT] Emit result: {msg} , {sid}")
-                socketio.emit("message", msg, room=sid)
-            except Exception as e:
-                log.error(f"[CHAT] Error emitting result to client {sid}: {e}")
-
     def remove_client(self, sid):
         if sid in self.clients:
             del self.clients[sid]
@@ -64,39 +54,11 @@ class ChatMgr:
         def _process(sid, sample_rate, audio_bytes):
             try:
                 client.asr.process_audio(sample_rate, audio_bytes, sid)
-                # msg = {"type": "recognition", "content": result}
-                # log.info(f"[CHAT] Emit result: {msg} , {sid}")
-                # socketio.emit("message", msg, room=sid)
             except Exception as e:
                 log.error(f"[CHAT] Error emitting result to client {sid}: {e}")
             socketio.emit("message", {"type": "recognition", "content": "OK"}, room=sid)
 
         socketio.start_background_task(_process, sid, sample_rate, audio_bytes)
-
-        # try:
-        #     if not client.pending_audio:
-        #         client.start_asr(sample_rate)
-        #         time.sleep(0.001)
-        #     client.asr.send_data(audio_bytes)
-
-        #     # # 继续翻译
-        #     # translated = translate_text(text)
-        #     # socketio.emit("message", {"type": "translation", "content": translated}, room=sid)
-        # except Exception as e:
-        #     log.error(f"Error processing audio chain: {e}")
-        #     socketio.emit("message", {"type": "error", "content": str(e)}, room=sid)
-        # try:
-        #     # 连接到外部 WebSocket 服务器
-        #     async with websockets.connect(self.EXTERNAL_SERVER_URI) as external_ws:
-        #         # 发送音频任务数据到外部服务器
-        #         await external_ws.send(audio_data)
-        #         # 接收外部服务器的解析结果
-        #         result = await external_ws.recv()
-        #         # 将解析结果发送回客户端
-        #         self.socketio.emit('audio_result', result, room=sid)
-        # except Exception as e:
-        #     log.error(f"Error processing audio chain: {e}")
-        #     socketio.emit("message", {"type": "error", "content": str(e)}, room=sid)
 
     def register_events(self):
         # 处理客户端连接事件
