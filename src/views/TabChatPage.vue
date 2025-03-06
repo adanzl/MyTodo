@@ -13,6 +13,7 @@
         </ion-item>
       </ion-list>
     </ion-content>
+    <audio ref="audioRef" type="audio/wav" controls style="width: auto;" class="m-2"></audio>
     <ion-item>
       <div class="flex p-2 w-full">
         <ion-input
@@ -53,6 +54,7 @@ const isWaitingForTranslation = ref(false);
 const recorder = ref<RecordRTC | null>();
 const isRecording = ref(false);
 const SAMPLE_RATE = 16000;
+const audioRef = ref<HTMLAudioElement | null>(null);
 
 onMounted(() => {});
 // 发送握手请求
@@ -116,7 +118,7 @@ async function startRecording() {
       const config = {
         type: "audio",
         // mimeType: "audio/webm; codecs=opus", // 使用Opus编码更高效
-        mimeType: "audio/webm;codecs=pcm",
+        mimeType: "audio/webm",
         sampleRate: SAMPLE_RATE, // 16kHz采样率
       };
 
@@ -142,6 +144,12 @@ function stopRecording() {
       // });
       // 获取录制的音频文件
       const blob = await recorder.value!.getBlob();
+      // 创建音频 URL
+      const audioUrl = URL.createObjectURL(blob);
+      // 将 URL 赋值给 <audio> 标签
+      if (audioRef.value) {
+        audioRef.value.src = audioUrl;
+      }
       // 将音频文件转换为 Base64 编码
       const reader = new FileReader();
       reader.onloadend = () => {
