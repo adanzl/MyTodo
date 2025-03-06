@@ -8,6 +8,7 @@ from core.chat.chat_mgr import ChatMgr
 
 from app import app, socketio
 
+# cSpell: disable-next-line
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 file_handler = TimedRotatingFileHandler('logs/app.log', when="midnight", backupCount=3, encoding="utf-8")
 std_handler = logging.StreamHandler()
