@@ -1,3 +1,4 @@
+# import asyncio
 import base64
 import logging
 
@@ -50,7 +51,7 @@ class ChatMgr:
         translated = translate_text(text)
         socketio.emit('message', {'type': 'translation', 'content': translated}, room=sid)
 
-    async def handle_audio(self, sid, sample_rate, audio_bytes):
+    def handle_audio(self, sid, sample_rate, audio_bytes):
         '''
         处理音频数据 单条
         '''
@@ -60,17 +61,18 @@ class ChatMgr:
             log.warning(f"[CHAT] Client {sid} not found")
             return
 
-        async def _process(sid, sample_rate, audio_bytes):
+        def _process(sid, sample_rate, audio_bytes):
             try:
-                result = await client.asr.process_audio(sample_rate, audio_bytes)
-                msg = {"type": "recognition", "content": result}
-                log.info(f"[CHAT] Emit result: {msg} , {sid}")
-                socketio.emit("message", msg, room=sid)
+                client.asr.process_audio(sample_rate, audio_bytes, sid)
+                # msg = {"type": "recognition", "content": result}
+                # log.info(f"[CHAT] Emit result: {msg} , {sid}")
+                # socketio.emit("message", msg, room=sid)
             except Exception as e:
                 log.error(f"[CHAT] Error emitting result to client {sid}: {e}")
+            socketio.emit("message", {"type": "recognition", "content": "OK"}, room=sid)
 
         socketio.start_background_task(_process, sid, sample_rate, audio_bytes)
-        socketio.emit("message", {"type": "recognition", "content": "OK"}, room=sid)
+
         # try:
         #     if not client.pending_audio:
         #         client.start_asr(sample_rate)
