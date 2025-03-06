@@ -56,6 +56,7 @@ class ChatMgr:
         '''
         client: ClientContext = self.clients.get(sid)
         if not client:
+            log.warning(f"[CHAT] Client {sid} not found")
             return
 
         async def _process(sid, sample_rate, audio_bytes):
@@ -66,7 +67,6 @@ class ChatMgr:
                 socketio.emit("message", msg, room=sid)
             except Exception as e:
                 log.error(f"[CHAT] Error emitting result to client {sid}: {e}")
-            ...
 
         socketio.start_background_task(_process, sid, sample_rate, audio_bytes)
         socketio.emit("message", {"type": "recognition", "content": "OK"}, room=sid)
@@ -132,4 +132,4 @@ class ChatMgr:
                 self.handle_text(client_id, content)
             elif data_type == 'audio':
                 audio_bytes = base64.b64decode(content)
-                self.handle_audio(client_id, data['simple'], audio_bytes)
+                self.handle_audio(client_id, data['sample'], audio_bytes)

@@ -46,8 +46,8 @@ import MdiStopCircleOutline from "~icons/mdi/stop-circle-outline";
 // 存储识别结果的变量
 const inputText = ref("");
 const messages = ref<any>([]);
-// const url = getApiUrl().replace("api", "");
-const url = "http://127.0.0.1:8000/";
+const url = getApiUrl().replace("api", "");
+// const url = "http://127.0.0.1:8000/";
 const socket = io(url);
 const isWaitingForTranslation = ref(false);
 const recorder = ref<RecordRTC | null>();
@@ -101,7 +101,7 @@ function sendData(data: string, finish: boolean = false) {
   }
   const message = JSON.stringify({
     type: "audio",
-    simple: SAMPLE_RATE,
+    sample: SAMPLE_RATE,
     content: data,
     finish: finish,
   });
