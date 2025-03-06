@@ -121,8 +121,7 @@ async function startRecording() {
         mimeType: "audio/wav",
         recorderType: RecordRTC.StereoAudioRecorder,
         sampleRate: SAMPLE_RATE, // 16kHz采样率
-        numberOfAudioChannels: 2,
-        bitrate: 16, // 16kHz采样率
+        numberOfAudioChannels: 1,
       };
 
       recorder.value = new RecordRTC(stream, config as RecordRTC.Options);
