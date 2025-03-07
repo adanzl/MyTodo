@@ -3,10 +3,8 @@ from logging.handlers import TimedRotatingFileHandler
 
 import core.ai.ai_mgr as ai_mgr
 import core.db.db_mgr as db_mgr
-from core.api.routes import api_bp
-from core.chat.chat_mgr import ChatMgr
-
 from app import app, socketio
+from core.chat.chat_mgr import ChatMgr
 
 # cSpell: disable-next-line
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -21,8 +19,6 @@ log = logging.getLogger(__name__)
 chat_mgr = ChatMgr()
 db_mgr.init()
 ai_mgr.init()
-
-app.register_blueprint(api_bp, url_prefix='/')
 
 
 @app.route("/")

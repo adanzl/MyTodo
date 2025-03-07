@@ -3,7 +3,7 @@ import logging
 
 from flask import json, request
 
-from app import app, socketio
+from app import socketio
 from core.chat.asr_client import AsrClient
 
 log = logging.getLogger(__name__)
@@ -43,22 +43,22 @@ class ChatMgr:
 
     def handle_audio(self, sid, sample_rate, audio_bytes):
         '''
-        处理音频数据 单条
+        处理音频数据
         '''
-        log.info(f"[CHAT] Handle_audio: {len(audio_bytes)} bytes")
+        # log.info(f"[CHAT] Handle_audio: {len(audio_bytes)} bytes")
         client: ClientContext = self.clients.get(sid)
         if not client:
             log.warning(f"[CHAT] Client {sid} not found")
             return
 
-        def _process(sid, sample_rate, audio_bytes):
-            try:
-                client.asr.process_audio(sample_rate, audio_bytes, sid)
-            except Exception as e:
-                log.error(f"[CHAT] Error emitting result to client {sid}: {e}")
-            socketio.emit("message", {"type": "recognition", "content": "OK"}, room=sid)
+            # def _process(sid, sample_rate, audio_bytes):
+        try:
+            client.asr.process_audio(sample_rate, audio_bytes, sid)
+        except Exception as e:
+            log.error(f"[CHAT] Error emitting result to client {sid}: {e}")
 
-        socketio.start_background_task(_process, sid, sample_rate, audio_bytes)
+        # socketio.start_background_task(_process, sid, sample_rate, audio_bytes)
+        # socketio.emit("message", {"type": "recognition", "content": "OK"}, room=sid)
 
     def register_events(self):
         # 处理客户端连接事件
@@ -87,14 +87,16 @@ class ChatMgr:
             data = json.loads(msg)
             client_id = request.sid
             data_type = data['type']
-            log.info(f'[CHAT] Received message from {client_id}: {data_type}')
             content = data.get('content', '')
 
             if client_id not in self.clients:
                 return
 
             if data_type == 'text':
+                log.info(f'[CHAT] Received message from {client_id}: {data_type}')
                 self.handle_text(client_id, content)
             elif data_type == 'audio':
                 audio_bytes = base64.b64decode(content)
                 self.handle_audio(client_id, data['sample'], audio_bytes)
+                if data['finish']:
+                    self.clients[client_id].asr.end_asr()
