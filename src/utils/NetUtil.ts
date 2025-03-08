@@ -1,6 +1,6 @@
 import { LoadColorData } from "@/modal/ColorType";
-import { UData, UserData } from "@/modal/UserData";
 import EventBus, { C_EVENT } from "@/modal/EventBus";
+import { UData, UserData } from "@/modal/UserData";
 import axios from "axios";
 // const URL = "https://3ft23fh89533.vicp.fun/api";
 // natapp.cn

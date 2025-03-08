@@ -233,12 +233,12 @@
 </template>
 
 <script setup lang="ts">
+import RewardSet from "@/components/RewardSet.vue";
 import { ColorOptions } from "@/modal/ColorType";
 import { C_EVENT } from "@/modal/EventBus";
 import { GroupOptions, PriorityOptions } from "@/modal/ScheduleType";
 import { User, UserData } from "@/modal/UserData";
 import { getScheduleList, getUserList } from "@/utils/NetUtil";
-import RewardSet from "@/components/RewardSet.vue";
 import {
   IonAccordion,
   IonAccordionGroup,
@@ -264,8 +264,8 @@ import CryptoJS from "crypto-js";
 import {
   bookmarksOutline,
   calendarOutline,
-  colorPaletteOutline,
   chatboxEllipsesOutline,
+  colorPaletteOutline,
   shieldCheckmarkOutline,
   squareOutline,
 } from "ionicons/icons";

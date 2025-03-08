@@ -15,7 +15,7 @@ import {
   User,
   UserData,
 } from "@/modal/UserData";
-import { getSave, setSave } from "@/utils/NetUtil";
+import { getSave, getUserInfo, setSave } from "@/utils/NetUtil";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import {
   IonAccordion,
@@ -209,6 +209,11 @@ export default defineComponent({
     eventBus.$on(C_EVENT.UPDATE_SCHEDULE_GROUP, () => {
       // console.log("UPDATE_SCHEDULE_GROUP", params);
       refreshAllData(globalVar.scheduleListId);
+    });
+    eventBus.$on(C_EVENT.UPDATE_USER_INFO, async () => {
+      getUserInfo(refData.user.value.id).then((userInfo: any) => {
+        refData.user.value = userInfo;
+      });
     });
     onMounted(() => {
       // console.log("onMounted page");

@@ -363,7 +363,9 @@ export class UData {
       // GlobalVar.user.score += dScore;
       getUserInfo(userData.userId).then((userInfo: any) => {
         userInfo.score += dScore;
-        setUserInfo(userData.userId, userInfo.score);
+        setUserInfo(userData.userId, userInfo.score).then(() => {
+          EventBus.$emit(C_EVENT.UPDATE_USER_INFO);
+        });
       });
     }
   }
