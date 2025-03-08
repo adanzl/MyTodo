@@ -29,57 +29,6 @@ class AsrClient:
         self.text_print_2pass_online = ""
         self.text_print_2pass_offline = ""
 
-    def handle_message(self, msg):
-        log.info(f"====> handle asr msg {msg}")
-        try:
-            meg = json.loads(msg)
-            text = meg["text"]
-            timestamp = ""
-            offline_msg_done = meg.get("is_final", False)
-            if "timestamp" in meg:
-                timestamp = meg["timestamp"]
-            if "mode" not in meg:
-                return
-            if meg["mode"] == "online":
-                self.text_print += "{}".format(text)
-                self.text_print = self.text_print[-ASR_MX_WORDS:]
-                # self.on_message(self.text_print)
-            elif meg["mode"] == "offline":
-                if timestamp != "":
-                    self.text_print += "{} timestamp: {}".format(text, timestamp)
-                else:
-                    self.text_print += "{}".format(text)
-                # self.on_message(self.text_print)
-                offline_msg_done = True
-            else:
-                if meg["mode"] == "2pass-online":
-                    self.text_print_2pass_online += "{}".format(text)
-                    self.text_print = self.text_print_2pass_offline + self.text_print_2pass_online
-                else:
-                    self.text_print_2pass_online = ""
-                    self.text_print = self.text_print_2pass_offline + "{}".format(text)
-                    self.text_print_2pass_offline += "{}".format(text)
-                self.text_print = self.text_print[-ASR_MX_WORDS:]
-                # self.on_message(self.text_print)
-            # send_one(ws)
-        except Exception as e:
-            log.error("Exception:", e)
-
-    # def send_message(self, message):
-    #     if self.is_running and self.ws:
-    #         self.ws.send(message)
-
-    # def send_data(self, ws, bytes_msg):
-    #     log.info(f"=> asr send_data {len(bytes_msg)} [{self.package_size}]")
-    #     # with open("asr.pcm", "wb") as f:
-    #     #     f.write(bytes_msg)
-    #     self.buffer.extend(bytes_msg)
-    #     while len(self.buffer) >= self.package_size:
-    #         s_data = self.buffer[:self.package_size]
-    #         self.buffer = self.buffer[self.package_size:]
-    #         ws.send_bytes(s_data)
-    #         time.sleep(0.001)
-
     def start_asr(self, ws):
         chunk_size = 60 * ASR_CHUNK_SIZE[1] / ASR_CHUNK_INTERVAL
         self.package_size = int(self.sample_rate / 1000 * chunk_size)
@@ -150,7 +99,7 @@ class AsrClient:
             msg = {"type": "recognition", "content": self.text_print, "timestamp": timestamp}
             log.info(f"[CHAT] Emit result: {msg} , {self.sid}")
             socketio.emit('message', msg, room=self.sid)
-            # send_one(ws)
+            self.text_print = ""
             # if offline_msg_done:
             #     self.close()
         except Exception as e:

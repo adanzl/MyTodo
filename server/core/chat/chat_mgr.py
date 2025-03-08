@@ -50,15 +50,11 @@ class ChatMgr:
         if not client:
             log.warning(f"[CHAT] Client {sid} not found")
             return
-
-            # def _process(sid, sample_rate, audio_bytes):
         try:
             client.asr.process_audio(sample_rate, audio_bytes, sid)
         except Exception as e:
             log.error(f"[CHAT] Error emitting result to client {sid}: {e}")
 
-        # socketio.start_background_task(_process, sid, sample_rate, audio_bytes)
-        # socketio.emit("message", {"type": "recognition", "content": "OK"}, room=sid)
 
     def register_events(self):
         # 处理客户端连接事件
