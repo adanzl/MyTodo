@@ -19,15 +19,17 @@ ASR_WAV = "h5"
 
 class AsrClient:
 
-    def __init__(self):
+    def __init__(self, on_result=None):
         self.is_running = False
         self.sample_rate = -1
         self.package_size = -1
         self.buffer = bytearray()
         self.ws = None
+        self.text_all = ""
         self.text_print = ""
         self.text_print_2pass_online = ""
         self.text_print_2pass_offline = ""
+        self.on_result = on_result
 
     def start_asr(self, ws):
         chunk_size = 60 * ASR_CHUNK_SIZE[1] / ASR_CHUNK_INTERVAL
@@ -43,6 +45,7 @@ class AsrClient:
         log.info(f"=> start asr {message}")
         ws.send(message)
         self.text_print = ""
+        self.text_all = ""
         self.text_print_2pass_online = ""
         self.text_print_2pass_offline = ""
 
@@ -99,9 +102,12 @@ class AsrClient:
             msg = {"type": "recognition", "content": self.text_print, "timestamp": timestamp}
             log.info(f"[CHAT] Emit result: {msg} , {self.sid}")
             socketio.emit('message', msg, room=self.sid)
+            self.text_all += self.text_print
             self.text_print = ""
             # if offline_msg_done:
             #     self.close()
+            if self.on_result:
+                self.on_result(self.text_all)
         except Exception as e:
             msg = {"type": "error", "content": json.dumps({"error": str(e)})}
             socketio.emit('message', msg, room=self.sid)

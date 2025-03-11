@@ -5,6 +5,7 @@ from flask import json, request
 
 from app import socketio
 from core.chat.asr_client import AsrClient
+from core.ai.ai_local import AILocal
 
 log = logging.getLogger(__name__)
 
@@ -14,10 +15,19 @@ class ClientContext:
     def __init__(self, sid):
         self.sid = sid
         self.pending_audio = False
-        self.asr = AsrClient()
+        self.ai = AILocal(self.on_ai_msg)
+        self.asr = AsrClient(self.on_asr_result)
+
 
     def close(self):
         self.asr.close()
+
+    def on_asr_result(self, text):
+        self.ai.stream_msg(text)
+
+    def on_ai_msg(self, text):
+        msg = {"type": "translation", "content": text}
+        socketio.emit('message', msg, room=self.sid)
 
 
 def translate_text(text):
