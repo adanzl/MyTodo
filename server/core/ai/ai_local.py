@@ -16,7 +16,7 @@ class AILocal:
             "Authorization": f"Bearer {API_KEY}",
         }
         self.conversation_id = ""
-        self.on_msg = on_msg
+        self.on_msg = on_msg or (lambda x, y: None)
 
     def stream_msg(self, query: str, user: str = "", inputs: dict = None, timeout: int = 30):
         payload = {
@@ -43,12 +43,12 @@ class AILocal:
                         chunk = json.loads(line.decode("utf-8")[6:])
                         self.conversation_id = chunk["conversation_id"]
                         if "answer" in chunk:
-                            if self.on_msg:
-                                self.on_msg(chunk["answer"])
+                            self.on_msg(chunk["answer"], 0)
                         elif "error" in chunk:
                             raise RuntimeError(chunk["error"])
                         elif chunk['event'] == 'message_end':
                             log.info(chunk['metadata'])
+                            self.on_msg(chunk["metadata"], 1)
 
         except requests.exceptions.RequestException as e:
             log.error(f"请求失败: {str(e)}")

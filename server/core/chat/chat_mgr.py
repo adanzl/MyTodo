@@ -13,6 +13,7 @@ MSG_TYPE_ERROR = "error"
 MSG_TYPE_CHAT = "chat"
 MSG_TYPE_RECOGNITION = "recognition"
 MSG_TYPE_TRANSLATION = "translation"
+MSG_TYPE_SIGNAL = "CHAT_END"
 
 
 class ClientContext:
@@ -24,7 +25,6 @@ class ClientContext:
         self.asr = AsrClient(self.on_asr_result, self.on_err)
 
     def close(self):
-
         self.asr.close()
 
     def on_asr_result(self, text):
@@ -32,7 +32,7 @@ class ClientContext:
         socketio.emit('message', msg, room=self.sid)
         self.ai.stream_msg(text)
 
-    def on_ai_msg(self, text):
+    def on_ai_msg(self, text, type=0):
         # log.info(f"[AI] ON MSG: {text}")
         msg = {"type": MSG_TYPE_CHAT, "content": text}
         socketio.emit('message', msg, room=self.sid)
