@@ -3,14 +3,21 @@
   <ion-page class="main-bg" id="main-content">
     <ion-header>
       <ion-toolbar>
-        <ion-title>Tab Pic</ion-title>
+        <ion-title>Tab Chat</ion-title>
       </ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding">
-      <ion-list>
-        <ion-item v-for="(msg, idx) in messages" :key="idx">
-          {{ msg.content }}
-        </ion-item>
+      <ion-list class="bg-transparent">
+        <div v-for="(msg, idx) in messages" :key="idx" class="p-1.5 w-full">
+          <div
+            v-if="msg.role == 'server'"
+            class="w-[80%] bg-pink-200 rounded-lg p-2 shadow-md ml-auto">
+            {{ msg.content }}
+          </div>
+          <div v-else class="w-[80%] bg-green-500 text-white p-2 rounded-lg shadow-md">
+            {{ msg.content }}
+          </div>
+        </div>
       </ion-list>
     </ion-content>
     <audio ref="audioRef" type="audio/wav" controls style="width: auto" class="m-2"></audio>
@@ -19,9 +26,12 @@
         <ion-input
           class="flex-1 mr-1"
           v-model="inputText"
+          ref="inputRef"
           placeholder="Type a message"
           fill="solid"
           style="--color: #000"
+          @keyup.enter="sendTextMessage"
+          autofocus="true"
           mode="md" />
         <ion-button @click="sendTextMessage">发送</ion-button>
         <ion-button @click="stopRecording" v-if="isRecording">
@@ -37,7 +47,7 @@
 
 <script setup lang="ts">
 import { getApiUrl } from "@/utils/NetUtil";
-import { IonToolbar } from "@ionic/vue";
+import { IonToolbar, onIonViewDidEnter } from "@ionic/vue";
 import io from "socket.io-client";
 import Recorder from "recorder-core/recorder.wav.min";
 Recorder.CLog = function () {}; // 屏蔽Recorder的日志输出
@@ -45,13 +55,20 @@ import { onMounted, ref } from "vue";
 import MdiMicrophone from "~icons/mdi/microphone";
 import MdiStopCircleOutline from "~icons/mdi/stop-circle-outline";
 
+const MSG_TYPE_ERROR = "error";
+const MSG_TYPE_CHAT = "chat";
+const MSG_TYPE_CHAT_END = "chat_end";
+const MSG_TYPE_RECOGNITION = "recognition";
+const MSG_TYPE_TRANSLATION = "translation";
+
 // 存储识别结果的变量
 const inputText = ref("");
+const inputRef = ref<HTMLElement | null>(null);
 const messages = ref<any>([]);
 const url = getApiUrl().replace("api", "");
 // const url = "http://127.0.0.1:8000/";
 const socket = io(url);
-const isWaitingForTranslation = ref(false);
+const isWaitingServer = ref(false);
 const isRecording = ref(false);
 const SAMPLE_RATE = 16000;
 const audioRef = ref<HTMLAudioElement | null>(null);
@@ -68,24 +85,39 @@ const rec = Recorder({
 });
 let sampleBuf = new Int16Array();
 
-onMounted(() => {});
+onMounted(async () => {
+  messages.value.push({ content: "你好，我是楠楠，和我聊点什么吧", role: "server" });
+});
+onIonViewDidEnter(async () => {});
 // 发送握手请求
 socket.on("connect", () => {
   console.log("Connected to the server. Sending handshake...");
   socket.emit("handshake", { key: "123456" });
 });
 socket.on("message", (data) => {
-  console.log("Received message:", data);
-  if (data.type === "recognition") {
+  // console.log("Received message:", data);
+  if (data.type === MSG_TYPE_RECOGNITION) {
     if (data.content) {
-      messages.value.push({ content: `Recognition: ${data.content}` });
+      messages.value.push({ content: data.content, role: "me" });
     }
-  } else if (data.type === "translation") {
-    messages.value.push({ content: `Translation: ${data.content}` });
-    isWaitingForTranslation.value = false;
+  } else if (data.type === MSG_TYPE_TRANSLATION) {
+    messages.value.push({ content: `Translation: ${data.content}`, role: "server" });
+    isWaitingServer.value = false;
+  } else if (data.type === MSG_TYPE_ERROR) {
+    messages.value.push({ content: `ERROR: ${data.content}`, role: "server" });
+    isWaitingServer.value = false;
+  } else if (data.type === MSG_TYPE_CHAT) {
+    if (messages.value.length === 0 || messages.value[messages.value.length - 1].role === "me") {
+      messages.value.push({ content: data.content, role: "server" });
+    } else {
+      messages.value[messages.value.length - 1].content += data.content;
+    }
+  } else if (data.type === MSG_TYPE_CHAT_END) {
+    console.log("==> MSG_TYPE_CHAT_END", data.connect);
+    isWaitingServer.value = false;
   } else {
-    messages.value.push({ content: `Unknown: ${JSON.stringify(data)}` });
-    isWaitingForTranslation.value = false;
+    messages.value.push({ content: `Unknown: ${JSON.stringify(data)}`, role: "server" });
+    isWaitingServer.value = false;
   }
 });
 socket.on("handshake_response", (data) => console.log("handshake:", data));
@@ -95,10 +127,11 @@ socket.on("close", () => console.log("WebSocket connection closed."));
 
 // 模拟发送消息
 const sendTextMessage = () => {
-  if (inputText.value && !isWaitingForTranslation.value) {
+  if (inputText.value && !isWaitingServer.value) {
     const message = JSON.stringify({ type: "text", content: inputText.value });
+    messages.value.push({ content: inputText.value, role: "me" });
     socket.emit("message", message);
-    isWaitingForTranslation.value = true;
+    isWaitingServer.value = true;
     inputText.value = "";
   }
 };
@@ -117,7 +150,7 @@ function sendData(data: string, finish: boolean = false) {
   socket.emit("message", message);
 }
 async function startRecording() {
-  if (!isWaitingForTranslation.value) {
+  if (!isWaitingServer.value) {
     try {
       rec.open(() => {
         rec.start();
@@ -162,16 +195,6 @@ function stopRecording() {
   rec.stop(
     (blob: Blob) => {
       audioRef.value!.src = (window.URL || webkitURL).createObjectURL(blob);
-      // 将音频文件转换为 Base64 编码
-      // const reader = new FileReader();
-      // reader.onloadend = () => {
-      //   if (typeof reader.result === "string") {
-      //     const base64Data = reader.result!.split(",")[1];
-      //     // 通过 WebSocket 发送 Base64 编码的音频数据
-      //     sendData(base64Data, true);
-      //   }
-      // };
-      // reader.readAsDataURL(blob);
       if (sampleBuf.length) {
         const sendBuf = sampleBuf;
         sampleBuf = new Int16Array();

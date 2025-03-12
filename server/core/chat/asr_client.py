@@ -101,8 +101,7 @@ class AsrClient:
                 self.text_print = self.text_print[-ASR_MX_WORDS:]
             msg = {"type": "recognition", "content": self.text_print, "timestamp": timestamp}
             log.info(f"[CHAT] Emit result: {msg} , {self.sid}")
-            # socketio.emit('message', msg, room=self.sid)
-            self.text_all += self.text_print
+            self.text_all = self.text_print
             self.text_print = ""
             # if offline_msg_done:
             #     self.close()
