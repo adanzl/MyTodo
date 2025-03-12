@@ -47,6 +47,8 @@ class AILocal:
                                 self.on_msg(chunk["answer"])
                         elif "error" in chunk:
                             raise RuntimeError(chunk["error"])
+                        elif chunk['event'] == 'message_end':
+                            log.info(chunk['metadata'])
 
         except requests.exceptions.RequestException as e:
             log.error(f"请求失败: {str(e)}")
@@ -55,12 +57,16 @@ class AILocal:
 
 
 if __name__ == "__main__":
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    std_handler = logging.StreamHandler()
+    std_handler.setFormatter(formatter)
+    logging.basicConfig(level=logging.INFO, handlers=[std_handler])
 
     def f(msg):
         print(msg, end="")
 
     ai = AILocal(f)
     while True:
-        print('ready')
+        log.info('ready')
         msg = input('>?')
-        ai.stream_msg(msg)
+        ai.stream_msg(msg, 'leo')

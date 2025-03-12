@@ -18,7 +18,6 @@ class ClientContext:
         self.ai = AILocal(self.on_ai_msg)
         self.asr = AsrClient(self.on_asr_result)
 
-
     def close(self):
         self.asr.close()
 
@@ -51,7 +50,7 @@ class ChatMgr:
     def handle_text(self, sid, text):
         # translated = translate_text(text)
         client: ClientContext = self.clients.get(sid)
-        client.ai.stream_msg(text)
+        client.ai.stream_msg(text, 'user')
         # socketio.emit('message', {'type': 'translation', 'content': translated}, room=sid)
 
     def handle_audio(self, sid, sample_rate, audio_bytes):
@@ -67,7 +66,6 @@ class ChatMgr:
             client.asr.process_audio(sample_rate, audio_bytes, sid)
         except Exception as e:
             log.error(f"[CHAT] Error emitting result to client {sid}: {e}")
-
 
     def register_events(self):
         # 处理客户端连接事件
