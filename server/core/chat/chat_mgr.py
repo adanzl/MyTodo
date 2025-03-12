@@ -9,24 +9,36 @@ from core.ai.ai_local import AILocal
 
 log = logging.getLogger(__name__)
 
+MSG_TYPE_ERROR = "error"
+MSG_TYPE_CHAT = "chat"
+MSG_TYPE_RECOGNITION = "recognition"
+MSG_TYPE_TRANSLATION = "translation"
+
 
 class ClientContext:
 
     def __init__(self, sid):
         self.sid = sid
         self.pending_audio = False
-        self.ai = AILocal(self.on_ai_msg)
-        self.asr = AsrClient(self.on_asr_result)
+        self.ai = AILocal(self.on_ai_msg, self.on_err)
+        self.asr = AsrClient(self.on_asr_result, self.on_err)
 
     def close(self):
+
         self.asr.close()
 
     def on_asr_result(self, text):
+        msg = {"type": MSG_TYPE_RECOGNITION, "content": text}
+        socketio.emit('message', msg, room=self.sid)
         self.ai.stream_msg(text)
 
     def on_ai_msg(self, text):
-        log.info(f"[AI] ON MSG: {text}")
-        msg = {"type": "translation", "content": text}
+        # log.info(f"[AI] ON MSG: {text}")
+        msg = {"type": MSG_TYPE_CHAT, "content": text}
+        socketio.emit('message', msg, room=self.sid)
+
+    def on_err(self, err):
+        msg = {"type": MSG_TYPE_ERROR, "content": json.dumps(err)}
         socketio.emit('message', msg, room=self.sid)
 
 
@@ -51,7 +63,6 @@ class ChatMgr:
         # translated = translate_text(text)
         client: ClientContext = self.clients.get(sid)
         client.ai.stream_msg(text, 'user')
-        # socketio.emit('message', {'type': 'translation', 'content': translated}, room=sid)
 
     def handle_audio(self, sid, sample_rate, audio_bytes):
         '''

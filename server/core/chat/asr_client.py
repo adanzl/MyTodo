@@ -4,7 +4,7 @@ import time
 import websocket
 import json
 
-from app import socketio
+# from app import socketio
 
 log = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ ASR_WAV = "h5"
 
 class AsrClient:
 
-    def __init__(self, on_result=None):
+    def __init__(self, on_result=None, on_err=None):
         self.is_running = False
         self.sample_rate = -1
         self.package_size = -1
@@ -29,7 +29,8 @@ class AsrClient:
         self.text_print = ""
         self.text_print_2pass_online = ""
         self.text_print_2pass_offline = ""
-        self.on_result = on_result
+        self.on_result = on_result or (lambda text: None)
+        self.on_err = on_err or(lambda text: None)
 
     def start_asr(self, ws):
         chunk_size = 60 * ASR_CHUNK_SIZE[1] / ASR_CHUNK_INTERVAL
@@ -69,8 +70,7 @@ class AsrClient:
             self.is_running = True
         except Exception as e:
             log.error(f"Error : {e}")
-            msg = {"type": "error", "content": json.dumps({"error": str(e)})}
-            socketio.emit('message', msg, room=self.sid)
+            self.on_err(e)
 
     def on_message(self, ws, msg):
         log.info(f"====> handle asr msg {msg}")
@@ -101,7 +101,7 @@ class AsrClient:
                 self.text_print = self.text_print[-ASR_MX_WORDS:]
             msg = {"type": "recognition", "content": self.text_print, "timestamp": timestamp}
             log.info(f"[CHAT] Emit result: {msg} , {self.sid}")
-            socketio.emit('message', msg, room=self.sid)
+            # socketio.emit('message', msg, room=self.sid)
             self.text_all += self.text_print
             self.text_print = ""
             # if offline_msg_done:
@@ -109,8 +109,7 @@ class AsrClient:
             if self.on_result:
                 self.on_result(self.text_all)
         except Exception as e:
-            msg = {"type": "error", "content": json.dumps({"error": str(e)})}
-            socketio.emit('message', msg, room=self.sid)
+            self.on_err(e)
             log.error("Exception:", e)
 
     def on_error(self, ws, error):
@@ -143,7 +142,7 @@ class AsrClient:
         self.buffer.extend(audio_data)
         if self.ws is None:
             self.connect(sid, sample_rate)
-            socketio.emit("message", {"type": "recognition", "content": "OK"}, room=sid)
+            # socketio.emit("message", {"type": "recognition", "content": "OK"}, room=sid)
         if self.is_running:
             while len(self.buffer) >= self.package_size:
                 s_data = self.buffer[:self.package_size]
