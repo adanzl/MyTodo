@@ -26,6 +26,7 @@ class ClientContext:
         self.ai.stream_msg(text)
 
     def on_ai_msg(self, text):
+        log.info(f"[AI] ON MSG: {text}")
         msg = {"type": "translation", "content": text}
         socketio.emit('message', msg, room=self.sid)
 
