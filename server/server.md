@@ -107,12 +107,18 @@ https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-fro
     --restart=always -v /mnt/data/funasr/models:/workspace/models \
     registry.cn-hangzhou.aliyuncs.com/funasr_repo/funasr:funasr-runtime-sdk-cpu-0.4.6 bash -c "nohup bash /workspace/FunASR/runtime/run_server.sh --download-model-dir /workspace/models --vad-dir damo/speech_fsmn_vad_zh-cn-16k-common-onnx --model-dir damo/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-onnx  --punc-dir damo/punc_ct-transformer_cn-en-common-vocab471067-large-onnx --lm-dir damo/speech_ngram_lm_zh-cn-ai-wesp-fst --itn-dir thuduj12/fst_itn_zh --certfile 0 --hotword /workspace/models/hotwords.txt > /var/log/funasr.log 2>&1 & tail -f /var/log/funasr.log"
 
-## ollama
+## Ollama
 
     docker run -d --device /dev/kfd --device /dev/dri \
     -v /mnt/data/ollama:/root/.ollama --restart=always \
     -p 9097:11434 \
-    --name ollama ollama/ollama:rocm serve
+    --name Ollama ollama/ollama:rocm serve
+
+## LocalAI
+
+    docker run -itd -p 9099:8080 -v /mnt/data/local-ai:/models \
+    --name local-ai --restart=always localai/localai:latest-cpu \
+    --models-path /models --context-size 700 --threads 16
 
 ## 服务器端口
 
@@ -127,5 +133,6 @@ https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-fro
 | redis_insight  |     9001 |
 | funASR_online  |     9095 |
 | funASR_offline |     9096 |
-| ollama aly     |     9097 |
+| ollama         |     9097 |
 | dify           |     9098 |
+| local_ai       |   x 9099 |
