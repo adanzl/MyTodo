@@ -6,7 +6,7 @@
         <ion-title>Tab Chat</ion-title>
       </ion-toolbar>
     </ion-header>
-    <ion-content class="ion-padding">
+    <ion-content class="ion-padding" ref="chatContent">
       <ion-list class="bg-transparent">
         <div v-for="(msg, idx) in messages" :key="idx" class="p-1.5 w-full">
           <div
@@ -16,7 +16,8 @@
             <div v-if="msg.audioSrc">
               class="absolute -left-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex
               items-center justify-center" @click="playAudio(msg)">
-              <ion-icon :icon="volumeMediumOutline" class="w-6 h-6"></ion-icon>
+              <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" />
+              <audio type="audio/wav" style="width: auto" class="m-2"></audio>
             </div>
           </div>
           <div v-else class="w-[80%] bg-green-500 text-white p-2 rounded-lg shadow-md relative">
@@ -25,13 +26,14 @@
               v-if="msg.audioSrc"
               class="absolute -right-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center text-black"
               @click="playAudio(msg)">
-              <ion-icon :icon="volumeMediumOutline" class="w-6 h-6"></ion-icon>
+              <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" />
+              <audio type="audio/wav" style="width: auto" class="m-2"></audio>
             </div>
           </div>
         </div>
       </ion-list>
     </ion-content>
-    <audio ref="audioRef" type="audio/wav" controls style="width: auto" class="m-2"></audio>
+    <audio ref="audioRef" type="audio/wav" style="width: auto" class="m-2"></audio>
     <ion-item>
       <div class="flex p-2 w-full">
         <ion-input
@@ -84,6 +86,7 @@ const isWaitingServer = ref(false);
 const isRecording = ref(false);
 const SAMPLE_RATE = 16000;
 const audioRef = ref<HTMLAudioElement | null>(null);
+const chatContent = ref<any>(null);
 const rec = Recorder({
   type: "wav",
   bitRate: 16,
@@ -131,6 +134,7 @@ socket.on("message", (data) => {
     messages.value.push({ content: `Unknown: ${JSON.stringify(data)}`, role: "server" });
     isWaitingServer.value = false;
   }
+  chatContent.value.$el.scrollToBottom(200);
 });
 socket.on("handshake_response", (data) => console.log("handshake:", data));
 socket.on("disconnect", () => console.log("Disconnected from the server."));
@@ -221,5 +225,20 @@ function stopRecording() {
   isRecording.value = false;
 }
 
-function playAudio(msg: any) {}
+function playAudio(msg: any) {
+  console.log("==> playAudio", msg);
+  // 创建一个新的audio元素
+  const audio = new Audio(msg.audioSrc); // 替换为你的音频文件路径
+  // 可以设置一些属性，比如音量
+  audio.volume = 1; // 音量范围是0到1
+  // 播放音频
+  audio
+    .play()
+    .then(() => {
+      console.log("Audio is playing");
+    })
+    .catch((error) => {
+      console.error("Error playing audio:", error);
+    });
+}
 </script>
