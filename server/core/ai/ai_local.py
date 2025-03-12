@@ -24,7 +24,7 @@ class AILocal:
             "query": query,
             "conversation_id": self.conversation_id,
             "response_mode": "streaming",  # 启用流式模式
-            "user": "leo",
+            "user": user,
         }
 
         try:

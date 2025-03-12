@@ -48,8 +48,10 @@ class ChatMgr:
             del self.clients[sid]
 
     def handle_text(self, sid, text):
-        translated = translate_text(text)
-        socketio.emit('message', {'type': 'translation', 'content': translated}, room=sid)
+        # translated = translate_text(text)
+        client: ClientContext = self.clients.get(sid)
+        client.ai.stream_msg(text)
+        # socketio.emit('message', {'type': 'translation', 'content': translated}, room=sid)
 
     def handle_audio(self, sid, sample_rate, audio_bytes):
         '''
