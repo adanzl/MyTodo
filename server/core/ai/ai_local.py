@@ -26,6 +26,7 @@ class AILocal:
             "response_mode": "streaming",  # 启用流式模式
             "user": user,
         }
+        log.info(f"[AI] Query: {query}")
 
         try:
             with requests.post(
