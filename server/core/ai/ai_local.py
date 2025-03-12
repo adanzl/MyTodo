@@ -48,9 +48,9 @@ class AILocal:
                             raise RuntimeError(chunk["error"])
 
         except requests.exceptions.RequestException as e:
-            print(f"请求失败: {str(e)}")
+            log.error(f"请求失败: {str(e)}")
         except Exception as ee:
-            print("响应数据解析错误 " + line.decode("utf-8"))
+            log.error("响应数据解析错误 " + line.decode("utf-8"))
 
 
 if __name__ == "__main__":
