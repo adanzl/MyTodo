@@ -11,11 +11,22 @@
         <div v-for="(msg, idx) in messages" :key="idx" class="p-1.5 w-full">
           <div
             v-if="msg.role == 'server'"
-            class="w-[80%] bg-pink-200 rounded-lg p-2 shadow-md ml-auto">
+            class="w-[80%] bg-pink-200 rounded-lg p-2 shadow-md ml-auto relative">
             {{ msg.content }}
+            <div v-if="msg.audioSrc">
+              class="absolute -left-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex
+              items-center justify-center" @click="playAudio(msg)">
+              <ion-icon :icon="volumeMediumOutline" class="w-6 h-6"></ion-icon>
+            </div>
           </div>
-          <div v-else class="w-[80%] bg-green-500 text-white p-2 rounded-lg shadow-md">
+          <div v-else class="w-[80%] bg-green-500 text-white p-2 rounded-lg shadow-md relative">
             {{ msg.content }}
+            <div
+              v-if="msg.audioSrc"
+              class="absolute -right-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center text-black"
+              @click="playAudio(msg)">
+              <ion-icon :icon="volumeMediumOutline" class="w-6 h-6"></ion-icon>
+            </div>
           </div>
         </div>
       </ion-list>
@@ -54,6 +65,7 @@ Recorder.CLog = function () {}; // 屏蔽Recorder的日志输出
 import { onMounted, ref } from "vue";
 import MdiMicrophone from "~icons/mdi/microphone";
 import MdiStopCircleOutline from "~icons/mdi/stop-circle-outline";
+import { volumeMediumOutline } from "ionicons/icons";
 
 const MSG_TYPE_ERROR = "error";
 const MSG_TYPE_CHAT = "chat";
@@ -98,7 +110,7 @@ socket.on("message", (data) => {
   // console.log("Received message:", data);
   if (data.type === MSG_TYPE_RECOGNITION) {
     if (data.content) {
-      messages.value.push({ content: data.content, role: "me" });
+      messages.value.push({ content: data.content, role: "me", audioSrc: audioRef.value!.src });
     }
   } else if (data.type === MSG_TYPE_TRANSLATION) {
     messages.value.push({ content: `Translation: ${data.content}`, role: "server" });
@@ -208,4 +220,6 @@ function stopRecording() {
   );
   isRecording.value = false;
 }
+
+function playAudio(msg: any) {}
 </script>
