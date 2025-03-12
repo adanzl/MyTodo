@@ -19,7 +19,7 @@ class AILocal:
         self.on_msg = on_msg or (lambda x, y: None)
         self.on_err = on_err or (lambda x: None)
 
-    def stream_msg(self, query: str, user: str = "", inputs: dict = None, timeout: int = 30):
+    def stream_msg(self, query: str, user: str = "user", inputs: dict = None, timeout: int = 30):
         payload = {
             "inputs": inputs or {},
             "query": query,
