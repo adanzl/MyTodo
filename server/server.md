@@ -1,6 +1,9 @@
 # 服务器
+
 ## app 依赖
+
 > pip3 install websocket-client flask requests flask_cors flask_socketio eventlet
+
 ## app 服务
 
 > `sudo vim /etc/systemd/system/my-todo.service`
@@ -107,9 +110,10 @@ https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-fro
 ## ollama
 
     docker run -d --device /dev/kfd --device /dev/dri \
-    -v /mnt/data/ollama:/root/.ollama \
-    -p 11434:11434 \
-    --name ollama ollama/ollama:rocm
+    -v /mnt/data/ollama:/root/.ollama --restart=always \
+    -p 9097:11434 \
+    --name ollama ollama/ollama:rocm serve
+
 ## 服务器端口
 
 | Server         |     Port |
@@ -123,3 +127,5 @@ https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-fro
 | redis_insight  |     9001 |
 | funASR_online  |     9095 |
 | funASR_offline |     9096 |
+| ollama aly     |     9097 |
+| dify           |     9098 |
