@@ -9,7 +9,7 @@ log = logging.getLogger(__name__)
 
 class AILocal:
 
-    def __init__(self, on_msg=None):
+    def __init__(self, on_msg=None, on_err=None):
         self.headers = {
             "Content-Type": "application/json",
             "Accept": "application/json",
@@ -17,6 +17,7 @@ class AILocal:
         }
         self.conversation_id = ""
         self.on_msg = on_msg or (lambda x, y: None)
+        self.on_err = on_err or (lambda x: None)
 
     def stream_msg(self, query: str, user: str = "", inputs: dict = None, timeout: int = 30):
         payload = {
@@ -52,8 +53,10 @@ class AILocal:
 
         except requests.exceptions.RequestException as e:
             log.error(f"请求失败: {str(e)}")
+            self.on_err(e)
         except Exception as ee:
             log.error("响应数据解析错误 " + line.decode("utf-8"))
+            self.on_err(ee)
 
 
 if __name__ == "__main__":
