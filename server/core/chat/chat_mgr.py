@@ -13,7 +13,7 @@ MSG_TYPE_ERROR = "error"
 MSG_TYPE_CHAT = "chat"
 MSG_TYPE_RECOGNITION = "recognition"
 MSG_TYPE_TRANSLATION = "translation"
-MSG_TYPE_SIGNAL = "CHAT_END"
+MSG_TYPE_SIGNAL = "chat_end"
 
 
 class ClientContext:
@@ -34,7 +34,11 @@ class ClientContext:
 
     def on_ai_msg(self, text, type=0):
         # log.info(f"[AI] ON MSG: {text}")
-        msg = {"type": MSG_TYPE_CHAT, "content": text}
+        if type == 0:
+            msg = {"type": MSG_TYPE_CHAT, "content": text}
+        else:
+            msg = {"type": MSG_TYPE_SIGNAL, "content": text}
+
         socketio.emit('message', msg, room=self.sid)
 
     def on_err(self, err):
