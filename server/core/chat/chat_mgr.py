@@ -130,7 +130,8 @@ class ChatMgr:
                     self.clients[client_id].asr.end_asr()
 
         @socketio.on('tts')
-        def handle_tts_request(data):
+        def handle_tts_request(msg):
+            data = json.loads(msg)
             text = data.get('content')
             role = data.get('role', None)
             if not text:
