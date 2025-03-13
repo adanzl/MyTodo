@@ -116,12 +116,14 @@ socket.on("message", (data) => {
   }
   chatContent.value.$el.scrollToBottom(200);
 });
+// 处理asr结果
 socket.on("msg_asr", (data) => {
   if (data.content) {
     messages.value.push({ content: data.content, role: "me", audioSrc: audioRef.value!.src });
   }
   chatContent.value.$el.scrollToBottom(200);
 });
+// 处理ai chat结果
 socket.on("msg_chat", (data) => {
   if (messages.value.length === 0 || messages.value[messages.value.length - 1].role === "me") {
     messages.value.push({ content: data.content, role: "server" });
@@ -134,6 +136,7 @@ socket.on("end_chat", (data: any) => {
     console.log("==> MSG_TYPE_CHAT_END", data.content);
     isWaitingServer.value = false;
 });
+// 处理tts结果
 socket.on("data_audio", (data: any) => {
   if (data.type === "tts") {
     const chunk = data.data; // 假设 data 是 ArrayBuffer
@@ -151,6 +154,10 @@ socket.on("data_audio", (data: any) => {
   } else {
     console.warn("Unknown bin data", data);
   }
+});
+socket.on("end_audio", (data: any) => {
+    console.log("==> end_audio", data.content);
+    isWaitingServer.value = false;
 });
 socket.on("handshake_response", (data) => console.log("handshake:", data));
 socket.on("disconnect", () => console.log("Disconnected from the server."));

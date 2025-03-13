@@ -60,6 +60,7 @@ class AILocal:
 
 
 if __name__ == "__main__":
+    # cSpell: disable-next-line
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     std_handler = logging.StreamHandler()
     std_handler.setFormatter(formatter)
