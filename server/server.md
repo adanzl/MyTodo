@@ -114,25 +114,29 @@ https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-fro
     -p 9097:11434 \
     --name Ollama ollama/ollama:rocm serve
 
-## LocalAI
+## Cosy-voice
+
+    git clone --recursive https://github.com/FunAudioLLM/CosyVoice.git
+    cd CosyVoice/
+    cd runtime/python/
+    docker build -t cosy-voice .
 
     docker run -itd -p 9099:8080 -v /mnt/data/local-ai:/models \
     --name local-ai --restart=always localai/localai:latest-cpu \
     --models-path /models --context-size 700 --threads 16
+    
+    docker run -d --runtime=nvidia -p 9099:50000 cosy-voice /bin/bash -c "cd /opt/CosyVoice/CosyVoice/runtime/python/fastapi && python3 server.py --port 50000 --model_dir iic/CosyVoice-300M && sleep infinity"
+    
+    cd fastapi && python3 client.py --port 50000 --mode <sft|zero_shot|cross_lingual|instruct>
 
 ## 服务器端口
 
-| Server         |     Port |
-| -------------- | -------: |
-| my-todo        |     8000 |
-| code-server    |     8001 |
-| nginx          | 8848/443 |
-| redis          |     6379 |
-| cockpit        |     9090 |
-| portainer      |     9000 |
-| redis_insight  |     9001 |
-| funASR_online  |     9095 |
-| funASR_offline |     9096 |
-| ollama         |     9097 |
-| dify           |     9098 |
-| local_ai       |   x 9099 |
+| Server        | Port     | Server         | Port |
+| ------------- | -------- | -------------- | ---: |
+| my-todo       | 8000     | funASR-online  | 9095 |
+| code-server   | 8001     | funASR-offline | 9096 |
+| nginx         | 8848/443 | ollama         | 9097 |
+| redis         | 6379     | dify           | 9098 |
+| cockpit       | 9090     | cosy-voice     | 9099 |
+| portainer     | 9000     |
+| redis_insight | 9001     |
