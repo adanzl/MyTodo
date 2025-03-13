@@ -140,17 +140,20 @@ socket.on("end_chat", (data: any) => {
 // 处理tts结果
 socket.on("data_audio", (data: any) => {
   if (data.type === "tts") {
-    const chunk = data.data; // 假设 data 是 ArrayBuffer
-    console.log(chunk.length, typeof(chunk));
-    // 使用 MediaSource API 处理流式音频
-    // // 确保 SourceBuffer 没有在更新
-    // if (!sourceBuffer.updating) {
-    //   // 将接收到的数据块追加到 SourceBuffer
-    //   sourceBuffer.appendBuffer(chunk.buffer); // 注意这里使用 chunk.buffer
-    // } else {
-    //   console.warn("SourceBuffer 正在更新，等待更新完成...");
-    //   // 可选：实现缓冲队列以处理 SourceBuffer 忙碌的情况
-    // }
+    const chunk = new Uint8Array(data.data); // 接收的是二进制数据
+    console.log(chunk.length, typeof chunk);
+    if (chunk instanceof ArrayBuffer) {
+      // 如果数据是 ArrayBuffer
+      if (!ttsAudioBuffer.value!.updating) {
+        ttsAudioBuffer.value!.appendBuffer(chunk);
+      } else {
+        console.warn("SourceBuffer 正在更新，等待更新完成...");
+      }
+    } else {
+      console.warn("未知的数据类型");
+    }
+
+
   } else {
     console.warn("Unknown bin data", data);
   }
