@@ -47,7 +47,7 @@ class ClientContext:
 
     def on_tts_msg(self, data, type=0):
         if type == 0:
-            socketio.emit('data_audio', {'type': 'tts', 'data': data}, binary=True, room=self.sid)
+            socketio.emit('data_audio', {'type': 'tts', 'data': data}, room=self.sid)
         else:
             socketio.emit('end_audio', {'content': data}, room=self.sid)
 

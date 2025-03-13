@@ -13,9 +13,9 @@
             v-if="msg.role == 'server'"
             class="w-[80%] bg-pink-200 rounded-lg p-2 shadow-md ml-auto relative">
             {{ msg.content }}
-            <div v-if="msg.audioSrc">
-              class="absolute -left-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex
-              items-center justify-center" @click="playAudio(msg)">
+            <div
+              class="absolute -left-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center"
+              @click="playAudio(msg)">
               <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" />
               <audio type="audio/wav" style="width: auto" class="m-2"></audio>
             </div>
@@ -23,7 +23,6 @@
           <div v-else class="w-[80%] bg-green-500 text-white p-2 rounded-lg shadow-md relative">
             {{ msg.content }}
             <div
-              v-if="msg.audioSrc"
               class="absolute -right-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center text-black"
               @click="playAudio(msg)">
               <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" />
@@ -84,7 +83,9 @@ const isWaitingServer = ref(false);
 const isRecording = ref(false);
 const SAMPLE_RATE = 16000;
 const audioRef = ref<HTMLAudioElement | null>(null);
+const lstAudioSrc = ref<string>("");
 const chatContent = ref<any>(null);
+const ttsAudioBuffer = ref<SourceBuffer | null>(null);
 const rec = Recorder({
   type: "wav",
   bitRate: 16,
@@ -119,7 +120,7 @@ socket.on("message", (data) => {
 // 处理asr结果
 socket.on("msg_asr", (data) => {
   if (data.content) {
-    messages.value.push({ content: data.content, role: "me", audioSrc: audioRef.value!.src });
+    messages.value.push({ content: data.content, role: "me", audioSrc: lstAudioSrc.value });
   }
   chatContent.value.$el.scrollToBottom(200);
 });
@@ -133,31 +134,30 @@ socket.on("msg_chat", (data) => {
   chatContent.value.$el.scrollToBottom(200);
 });
 socket.on("end_chat", (data: any) => {
-    console.log("==> MSG_TYPE_CHAT_END", data.content);
-    isWaitingServer.value = false;
+  console.log("==> MSG_TYPE_CHAT_END", data.content);
+  isWaitingServer.value = false;
 });
 // 处理tts结果
 socket.on("data_audio", (data: any) => {
   if (data.type === "tts") {
     const chunk = data.data; // 假设 data 是 ArrayBuffer
-    console.log(chunk.length);
+    console.log(chunk.length, typeof(chunk));
     // 使用 MediaSource API 处理流式音频
-    // if (!mediaSource) {
-    //   mediaSource = new MediaSource();
-    //   audio.src = URL.createObjectURL(mediaSource);
-    //   mediaSource.addEventListener("sourceopen", () => {
-    //     const sourceBuffer = mediaSource.addSourceBuffer("audio/wav"); // 根据实际格式调整
-    //     // 这里需要累积缓冲区并处理 SourceBuffer 的更新
-    //     // 由于复杂性，建议简化处理，例如将接收到的音频数据保存为文件后播放
-    //   });
+    // // 确保 SourceBuffer 没有在更新
+    // if (!sourceBuffer.updating) {
+    //   // 将接收到的数据块追加到 SourceBuffer
+    //   sourceBuffer.appendBuffer(chunk.buffer); // 注意这里使用 chunk.buffer
+    // } else {
+    //   console.warn("SourceBuffer 正在更新，等待更新完成...");
+    //   // 可选：实现缓冲队列以处理 SourceBuffer 忙碌的情况
     // }
   } else {
     console.warn("Unknown bin data", data);
   }
 });
 socket.on("end_audio", (data: any) => {
-    console.log("==> end_audio", data.content);
-    isWaitingServer.value = false;
+  console.log("==> end_audio", data.content);
+  isWaitingServer.value = false;
 });
 socket.on("handshake_response", (data) => console.log("handshake:", data));
 socket.on("disconnect", () => console.log("Disconnected from the server."));
@@ -234,7 +234,7 @@ function stopRecording() {
   if (isRecording.value === false) return;
   rec.stop(
     (blob: Blob) => {
-      audioRef.value!.src = (window.URL || webkitURL).createObjectURL(blob);
+      lstAudioSrc.value = (window.URL || webkitURL).createObjectURL(blob);
       if (sampleBuf.length) {
         const sendBuf = sampleBuf;
         sampleBuf = new Int16Array();
@@ -251,18 +251,28 @@ function stopRecording() {
 
 function playAudio(msg: any) {
   console.log("==> playAudio", msg);
-  // 创建一个新的audio元素
-  const audio = new Audio(msg.audioSrc); // 替换为你的音频文件路径
-  // 可以设置一些属性，比如音量
-  audio.volume = 1; // 音量范围是0到1
-  // 播放音频
-  audio
-    .play()
-    .then(() => {
-      console.log("Audio is playing");
-    })
-    .catch((error) => {
-      console.error("Error playing audio:", error);
+  if (msg.audioSrc) {
+    const audio = new Audio(msg.audioSrc); // 替换为你的音频文件路径
+    audio.volume = 1; // 音量范围是0到1
+    audio.play();
+  } else {
+    const payload = JSON.stringify({
+      content: msg.content,
+      role: "太乙",
     });
+    const mediaSource = new MediaSource();
+    audioRef.value!.src = URL.createObjectURL(mediaSource);
+
+    // 等待 MediaSource 打开
+    mediaSource.addEventListener("sourceopen", () => {
+      ttsAudioBuffer.value = mediaSource.addSourceBuffer('audio/webm; codecs="vorbis"');
+      // 错误处理
+      ttsAudioBuffer.value.addEventListener("error", (e) => {
+        console.error("SourceBuffer 错误:", e);
+      });
+
+      socket.emit("tts", payload);
+    });
+  }
 }
 </script>
