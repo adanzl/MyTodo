@@ -29,17 +29,17 @@ class ClientContext:
 
     def on_asr_result(self, text):
         msg = {"type": 'msg_asr', "content": text}
-        socketio.emit(EVENT_MESSAGE, msg, room=self.sid)
+        socketio.emit('msg_asr', msg, room=self.sid)
         self.ai.stream_msg(text)
 
     def on_ai_msg(self, text, type=0):
         # log.info(f"[AI] ON MSG: {text}")
         if type == 0:
-            msg = {"type": 'msg_chat', "content": text}
+            event = 'msg_chat'
         else:
-            msg = {"type": 'end_chat', "content": text}
+            event = 'end_chat'
 
-        socketio.emit(EVENT_MESSAGE, msg, room=self.sid)
+        socketio.emit(event, {'content': text}, room=self.sid)
 
     def on_err(self, err):
         msg = {"type": MSG_TYPE_ERROR, "content": json.dumps(err)}
