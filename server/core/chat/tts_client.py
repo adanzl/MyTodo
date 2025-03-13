@@ -8,9 +8,9 @@ FASTAPI_URL = "http://192.168.50.171:9099/inference_zero_shot"  # FastAPI 服务
 
 ROLE_MAP = {
     # cSpell: disable-next-line
-    "太乙": '/models/prompt/zh_taiyi_prompt.wav',
-    "default": '/models/prompt/zero_shot_prompt.wav',
-    "中文女": '/models/prompt/zh_woman_prompt.wav',
+    "太乙": '/mnt/data/CosyVoice/pretrained_models/prompt/zh_taiyi_prompt.wav',
+    "default": '/mnt/data/CosyVoice/pretrained_models/prompt/zero_shot_prompt.wav',
+    "中文女": '/mnt/data/CosyVoice/pretrained_models/prompt/zh_woman_prompt.wav',
 }
 
 
