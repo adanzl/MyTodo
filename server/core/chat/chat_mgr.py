@@ -6,14 +6,13 @@ from flask import json, request
 from app import socketio
 from core.chat.asr_client import AsrClient
 from core.ai.ai_local import AILocal
+from core.chat.tts_client import TTSClient
 
 log = logging.getLogger(__name__)
 
 MSG_TYPE_ERROR = "error"
-MSG_TYPE_CHAT = "chat"
-MSG_TYPE_RECOGNITION = "recognition"
-MSG_TYPE_TRANSLATION = "translation"
-MSG_TYPE_SIGNAL = "chat_end"
+
+EVENT_MESSAGE = "message"
 
 
 class ClientContext:
@@ -23,27 +22,34 @@ class ClientContext:
         self.pending_audio = False
         self.ai = AILocal(self.on_ai_msg, self.on_err)
         self.asr = AsrClient(self.on_asr_result, self.on_err)
+        self.tts = TTSClient(self.on_tts_msg, self.on_err)
 
     def close(self):
         self.asr.close()
 
     def on_asr_result(self, text):
-        msg = {"type": MSG_TYPE_RECOGNITION, "content": text}
-        socketio.emit('message', msg, room=self.sid)
+        msg = {"type": 'msg_asr', "content": text}
+        socketio.emit(EVENT_MESSAGE, msg, room=self.sid)
         self.ai.stream_msg(text)
 
     def on_ai_msg(self, text, type=0):
         # log.info(f"[AI] ON MSG: {text}")
         if type == 0:
-            msg = {"type": MSG_TYPE_CHAT, "content": text}
+            msg = {"type": 'msg_chat', "content": text}
         else:
-            msg = {"type": MSG_TYPE_SIGNAL, "content": text}
+            msg = {"type": 'end_chat', "content": text}
 
-        socketio.emit('message', msg, room=self.sid)
+        socketio.emit(EVENT_MESSAGE, msg, room=self.sid)
 
     def on_err(self, err):
         msg = {"type": MSG_TYPE_ERROR, "content": json.dumps(err)}
-        socketio.emit('message', msg, room=self.sid)
+        socketio.emit('error', msg, room=self.sid)
+
+    def on_tts_msg(self, data, type=0):
+        if type == 0:
+            socketio.emit('data_audio', {'type': 'tts', 'data': data}, json=False, room=self.sid)
+        else:
+            socketio.emit('end_audio', {'content': data}, room=self.sid)
 
 
 def translate_text(text):
@@ -104,7 +110,7 @@ class ChatMgr:
             log.info(f'Client {client_id} disconnected. Total clients: {len(self.clients)}')
 
         # 处理接收到的消息事件
-        @socketio.on('message')
+        @socketio.on(EVENT_MESSAGE)
         def handle_message(msg):
             data = json.loads(msg)
             client_id = request.sid
@@ -122,3 +128,13 @@ class ChatMgr:
                 self.handle_audio(client_id, data['sample'], audio_bytes)
                 if data['finish']:
                     self.clients[client_id].asr.end_asr()
+
+        @socketio.on('tts')
+        def handle_tts_request(data):
+            text = data.get('text')
+            if not text:
+                socketio.emit('error', {'error': 'Missing text'})
+                return
+
+            client_id = request.sid
+            self.clients[client_id].tts.stream_msg(text)

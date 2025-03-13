@@ -69,10 +69,6 @@ import MdiMicrophone from "~icons/mdi/microphone";
 import MdiStopCircleOutline from "~icons/mdi/stop-circle-outline";
 import { volumeMediumOutline } from "ionicons/icons";
 
-const MSG_TYPE_ERROR = "error";
-const MSG_TYPE_CHAT = "chat";
-const MSG_TYPE_CHAT_END = "chat_end";
-const MSG_TYPE_RECOGNITION = "recognition";
 const MSG_TYPE_TRANSLATION = "translation";
 
 // 存储识别结果的变量
@@ -81,7 +77,9 @@ const inputRef = ref<HTMLElement | null>(null);
 const messages = ref<any>([]);
 const url = getApiUrl().replace("api", "");
 // const url = "http://127.0.0.1:8000/";
-const socket = io(url);
+const socket = io(url, {
+  transports: ["websocket"], // 强制使用 WebSocket 传输
+});
 const isWaitingServer = ref(false);
 const isRecording = ref(false);
 const SAMPLE_RATE = 16000;
@@ -110,31 +108,49 @@ socket.on("connect", () => {
   socket.emit("handshake", { key: "123456" });
 });
 socket.on("message", (data) => {
-  // console.log("Received message:", data);
-  if (data.type === MSG_TYPE_RECOGNITION) {
-    if (data.content) {
-      messages.value.push({ content: data.content, role: "me", audioSrc: audioRef.value!.src });
-    }
-  } else if (data.type === MSG_TYPE_TRANSLATION) {
+  if (data.type === MSG_TYPE_TRANSLATION) {
     messages.value.push({ content: `Translation: ${data.content}`, role: "server" });
-    isWaitingServer.value = false;
-  } else if (data.type === MSG_TYPE_ERROR) {
-    messages.value.push({ content: `ERROR: ${data.content}`, role: "server" });
-    isWaitingServer.value = false;
-  } else if (data.type === MSG_TYPE_CHAT) {
-    if (messages.value.length === 0 || messages.value[messages.value.length - 1].role === "me") {
-      messages.value.push({ content: data.content, role: "server" });
-    } else {
-      messages.value[messages.value.length - 1].content += data.content;
-    }
-  } else if (data.type === MSG_TYPE_CHAT_END) {
-    console.log("==> MSG_TYPE_CHAT_END", data.connect);
     isWaitingServer.value = false;
   } else {
     messages.value.push({ content: `Unknown: ${JSON.stringify(data)}`, role: "server" });
-    isWaitingServer.value = false;
   }
   chatContent.value.$el.scrollToBottom(200);
+});
+socket.on("msg_asr", (data) => {
+  if (data.content) {
+    messages.value.push({ content: data.content, role: "me", audioSrc: audioRef.value!.src });
+  }
+  chatContent.value.$el.scrollToBottom(200);
+});
+socket.on("msg_chat", (data) => {
+  if (messages.value.length === 0 || messages.value[messages.value.length - 1].role === "me") {
+    messages.value.push({ content: data.content, role: "server" });
+  } else {
+    messages.value[messages.value.length - 1].content += data.content;
+  }
+  chatContent.value.$el.scrollToBottom(200);
+});
+socket.on("end_chat", (data: any) => {
+    console.log("==> MSG_TYPE_CHAT_END", data.content);
+    isWaitingServer.value = false;
+});
+socket.on("data_audio", (data: any) => {
+  if (data.type === "tts") {
+    const chunk = data.data; // 假设 data 是 ArrayBuffer
+    console.log(chunk.length);
+    // 使用 MediaSource API 处理流式音频
+    // if (!mediaSource) {
+    //   mediaSource = new MediaSource();
+    //   audio.src = URL.createObjectURL(mediaSource);
+    //   mediaSource.addEventListener("sourceopen", () => {
+    //     const sourceBuffer = mediaSource.addSourceBuffer("audio/wav"); // 根据实际格式调整
+    //     // 这里需要累积缓冲区并处理 SourceBuffer 的更新
+    //     // 由于复杂性，建议简化处理，例如将接收到的音频数据保存为文件后播放
+    //   });
+    // }
+  } else {
+    console.warn("Unknown bin data", data);
+  }
 });
 socket.on("handshake_response", (data) => console.log("handshake:", data));
 socket.on("disconnect", () => console.log("Disconnected from the server."));
@@ -149,6 +165,7 @@ const sendTextMessage = () => {
     socket.emit("message", message);
     isWaitingServer.value = true;
     inputText.value = "";
+    chatContent.value.$el.scrollToBottom(200);
   }
 };
 function sendData(data: string, finish: boolean = false) {
