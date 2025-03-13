@@ -6,6 +6,13 @@ import traceback
 log = logging.getLogger(__name__)
 FASTAPI_URL = "http://192.168.50.171:9099/inference_zero_shot"  # FastAPI 服务器地址
 
+ROLE_MAP = {
+    # cSpell: disable-next-line
+    "太乙": '/models/prompt/zh_taiyi_prompt.wav',
+    "default": '/models/prompt/zero_shot_prompt.wav',
+    "中文女": '/models/prompt/zh_woman_prompt.wav',
+}
+
 
 class TTSClient:
 
@@ -13,16 +20,15 @@ class TTSClient:
         self.on_msg = on_msg or (lambda x, y: None)
         self.on_err = on_err or (lambda x: None)
 
-    def stream_msg(self, text: str, user: str = "中文女", timeout: int = 30):
+    def stream_msg(self, text: str, user: str = ""):
 
         try:
             # 发起请求到 FastAPI 服务器，并处理流式响应
             payload = {
                 "tts_text": text,
-                "spk_id": user,  # 中文女
                 "prompt_text": "希望你以后能够做的比我还好呦。",
             }
-            prompt_wav = "/mnt/data/CosyVoice/asset/zero_shot_prompt.wav"
+            prompt_wav = ROLE_MAP.get(user, ROLE_MAP["default"])
             files = [(
                 "prompt_wav",
                 ("prompt_wav", open(prompt_wav, "rb"), "application/octet-stream"),

@@ -131,10 +131,11 @@ class ChatMgr:
 
         @socketio.on('tts')
         def handle_tts_request(data):
-            text = data.get('text')
+            text = data.get('content')
+            role = data.get('role', None)
             if not text:
                 socketio.emit('error', {'error': 'Missing text'})
                 return
 
             client_id = request.sid
-            self.clients[client_id].tts.stream_msg(text)
+            self.clients[client_id].tts.stream_msg(text, role)
