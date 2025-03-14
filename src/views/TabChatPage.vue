@@ -32,7 +32,7 @@
         </div>
       </ion-list>
     </ion-content>
-    <audio ref="audioRef" type="audio/wav" style="width: auto" class="m-2"></audio>
+    <audio ref="audioRef" style="width: auto" class="m-2"></audio>
     <ion-item>
       <div class="flex p-2 w-full">
         <ion-input
@@ -85,7 +85,8 @@ const SAMPLE_RATE = 16000;
 const audioRef = ref<HTMLAudioElement | null>(null);
 const lstAudioSrc = ref<string>("");
 const chatContent = ref<any>(null);
-const ttsAudioBuffer = ref<SourceBuffer | null>(null);
+// const ttsAudioBuffer = ref<SourceBuffer | null>(null);
+const ttsData=ref<any>({audioBuffer: null, msg: null});
 const rec = Recorder({
   type: "wav",
   bitRate: 16,
@@ -97,7 +98,8 @@ const rec = Recorder({
     autoGainControl: true, //自动增益（AGC）开关，取值和回声消除开关一样
   },
 });
-let sampleBuf = new Int16Array();
+let recSampleBuf = new Int16Array();
+let playAudioData: ArrayBuffer[] = [];
 
 onMounted(async () => {
   messages.value.push({ content: "你好，我是楠楠，和我聊点什么吧", role: "server" });
@@ -140,27 +142,35 @@ socket.on("end_chat", (data: any) => {
 // 处理tts结果
 socket.on("data_audio", (data: any) => {
   if (data.type === "tts") {
-    const chunk = new Uint8Array(data.data); // 接收的是二进制数据
-    console.log(chunk.length, typeof chunk);
+    const chunk = data.data; // 接收的是二进制数据
+    // console.log(chunk.length, data.data);
     if (chunk instanceof ArrayBuffer) {
+      playAudioData.push(chunk);
       // 如果数据是 ArrayBuffer
-      if (!ttsAudioBuffer.value!.updating) {
-        ttsAudioBuffer.value!.appendBuffer(chunk);
-      } else {
-        console.warn("SourceBuffer 正在更新，等待更新完成...");
+      if (!ttsData.value.audioBuffer!.updating) {
+        // ttsAudioBuffer.value!.appendBuffer(chunk);
+        const combinedBuffer = new Uint8Array(
+          playAudioData.reduce((acc, curr) => acc + curr.byteLength, 0)
+        );
+        let offset = 0;
+        // 将所有数据块合并为一个 Uint8Array
+        playAudioData.forEach((chunk) => {
+          combinedBuffer.set(new Uint8Array(chunk), offset);
+          offset += chunk.byteLength;
+        });
+        ttsData.value.audioBuffer.appendBuffer(combinedBuffer); // 直接添加 ArrayBuffer 数据
+        // 清空已处理的数据
+        playAudioData = [];
       }
     } else {
       console.warn("未知的数据类型");
     }
-
-
   } else {
     console.warn("Unknown bin data", data);
   }
 });
 socket.on("end_audio", (data: any) => {
   console.log("==> end_audio", data.content);
-  isWaitingServer.value = false;
 });
 socket.on("handshake_response", (data) => console.log("handshake:", data));
 socket.on("disconnect", () => console.log("Disconnected from the server."));
@@ -218,12 +228,12 @@ function recProcess(
   const array_48k = new Array(data_48k);
   const data_16k = Recorder.SampleData(array_48k, bufferSampleRate, SAMPLE_RATE).data;
 
-  sampleBuf = Int16Array.from([...sampleBuf, ...data_16k]);
+  recSampleBuf = Int16Array.from([...recSampleBuf, ...data_16k]);
   const chunk_size = 960; // for asr chunk_size [5, 10, 5]
   // info_div.innerHTML = "" + bufferDuration / 1000 + "s";
-  while (sampleBuf.length >= chunk_size) {
-    const sendBuf = sampleBuf.slice(0, chunk_size);
-    sampleBuf = sampleBuf.slice(chunk_size, sampleBuf.length);
+  while (recSampleBuf.length >= chunk_size) {
+    const sendBuf = recSampleBuf.slice(0, chunk_size);
+    recSampleBuf = recSampleBuf.slice(chunk_size, recSampleBuf.length);
     const uint8 = new Uint8Array(sendBuf.buffer);
     const base64Data = btoa(String.fromCharCode(...uint8));
     // console.log("==> recProcess ", base64Data);
@@ -238,9 +248,9 @@ function stopRecording() {
   rec.stop(
     (blob: Blob) => {
       lstAudioSrc.value = (window.URL || webkitURL).createObjectURL(blob);
-      if (sampleBuf.length) {
-        const sendBuf = sampleBuf;
-        sampleBuf = new Int16Array();
+      if (recSampleBuf.length) {
+        const sendBuf = recSampleBuf;
+        recSampleBuf = new Int16Array();
         const uint8 = new Uint8Array(sendBuf.buffer);
         const base64Data = btoa(String.fromCharCode(...uint8));
         sendData(base64Data);
@@ -254,6 +264,7 @@ function stopRecording() {
 
 function playAudio(msg: any) {
   console.log("==> playAudio", msg);
+  ttsData.value.msg = msg;
   if (msg.audioSrc) {
     const audio = new Audio(msg.audioSrc); // 替换为你的音频文件路径
     audio.volume = 1; // 音量范围是0到1
@@ -265,16 +276,35 @@ function playAudio(msg: any) {
     });
     const mediaSource = new MediaSource();
     audioRef.value!.src = URL.createObjectURL(mediaSource);
+    playAudioData = [];
 
     // 等待 MediaSource 打开
     mediaSource.addEventListener("sourceopen", () => {
-      ttsAudioBuffer.value = mediaSource.addSourceBuffer('audio/webm; codecs="vorbis"');
+      ttsData.value.audioBuffer = mediaSource.addSourceBuffer("audio/mpeg");
       // 错误处理
-      ttsAudioBuffer.value.addEventListener("error", (e) => {
+      ttsData.value.audioBuffer.addEventListener("error", (e: any) => {
         console.error("SourceBuffer 错误:", e);
+      });
+      ttsData.value.audioBuffer.addEventListener("updateend", () => {
+        // 如果还有数据未处理，可以继续添加
+        if (playAudioData.length > 0 && !ttsData.value.audioBuffer.updating) {
+          const combinedBuffer = new Uint8Array(
+            playAudioData.reduce((acc, curr) => acc + curr.byteLength, 0)
+          );
+          let offset = 0;
+          // 将所有数据块合并为一个 Uint8Array
+          playAudioData.forEach((chunk) => {
+            combinedBuffer.set(new Uint8Array(chunk), offset);
+            offset += chunk.byteLength;
+          });
+          ttsData.value.audioBuffer.appendBuffer(combinedBuffer); // 直接添加 ArrayBuffer 数据
+          // 清空已处理的数据
+          playAudioData = [];
+        }
       });
 
       socket.emit("tts", payload);
+      audioRef.value!.play();
     });
   }
 }

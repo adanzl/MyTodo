@@ -41,8 +41,8 @@ class ClientContext:
 
         socketio.emit(event, {'content': text}, room=self.sid)
 
-    def on_err(self, err):
-        msg = {"type": MSG_TYPE_ERROR, "content": json.dumps(err)}
+    def on_err(self, err: Exception):
+        msg = {"type": MSG_TYPE_ERROR, "content": err}
         socketio.emit('error', msg, room=self.sid)
 
     def on_tts_msg(self, data, type=0):

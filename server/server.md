@@ -122,7 +122,7 @@ https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-fro
     docker build -t cosy-voice .
     
     docker run -d -p 9099:50000 --name cosy-voice --restart=always -v /mnt/data/CosyVoice/pretrained_models:/models \
-    cosy-voice /bin/bash -c "pip install /models/CosyVoice-ttsfrd/ttsfrd_dependency-0.1-py3-none-any.whl /models/CosyVoice-ttsfrd/ttsfrd-0.4.2-cp310-cp310-linux_x86_64.whl cd /opt/CosyVoice/CosyVoice/runtime/python/fastapi && python3 server.py --port 50000 --model_dir /models/CosyVoice2-0.5B && sleep infinity"
+    cosy-voice /bin/bash -c "cd /opt/CosyVoice/CosyVoice/runtime/python/fastapi && python3 server.py --port 50000 --model_dir /models/CosyVoice2-0.5B && sleep infinity"
     
     cd fastapi && python3 client.py --port 50000 --mode <sft|zero_shot|cross_lingual|instruct>
 
