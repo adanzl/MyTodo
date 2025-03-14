@@ -23,6 +23,7 @@
           <div v-else class="w-[80%] bg-green-500 text-white p-2 rounded-lg shadow-md relative">
             {{ msg.content }}
             <div
+              v-if="msg.audioSrc"
               class="absolute -right-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center text-black"
               @click="playAudio(msg)">
               <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" />
@@ -69,6 +70,9 @@ import MdiStopCircleOutline from "~icons/mdi/stop-circle-outline";
 import { volumeMediumOutline } from "ionicons/icons";
 
 const MSG_TYPE_TRANSLATION = "translation";
+const TTS_AUTO = true;
+// cSpell: disable-next-line
+const TTS_ROLE = "cosyvoice-woman-8a96d641d8d0491984c085d98870b79d";
 
 // 存储识别结果的变量
 const inputText = ref("");
@@ -86,7 +90,7 @@ const audioRef = ref<HTMLAudioElement | null>(null);
 const lstAudioSrc = ref<string>("");
 const chatContent = ref<any>(null);
 // const ttsAudioBuffer = ref<SourceBuffer | null>(null);
-const ttsData=ref<any>({audioBuffer: null, msg: null});
+const ttsData = ref<any>({ audioBuffer: null, msg: null });
 const rec = Recorder({
   type: "wav",
   bitRate: 16,
@@ -108,7 +112,13 @@ onIonViewDidEnter(async () => {});
 // 发送握手请求
 socket.on("connect", () => {
   console.log("Connected to the server. Sending handshake...");
-  socket.emit("handshake", { key: "123456" });
+  socket.emit("handshake", {
+    key: "123456",
+    ttsAuto: TTS_AUTO,
+    ttsRole: TTS_ROLE,
+    ttsSpeed: 1.0,
+    ttsVol: 50,
+  });
 });
 socket.on("message", (data) => {
   if (data.type === MSG_TYPE_TRANSLATION) {
@@ -138,6 +148,7 @@ socket.on("msg_chat", (data) => {
 socket.on("end_chat", (data: any) => {
   console.log("==> MSG_TYPE_CHAT_END", data.content);
   isWaitingServer.value = false;
+  playAudio(messages.value[messages.value.length - 1]);
 });
 // 处理tts结果
 socket.on("data_audio", (data: any) => {
@@ -180,12 +191,22 @@ socket.on("close", () => console.log("WebSocket connection closed."));
 // 模拟发送消息
 const sendTextMessage = () => {
   if (inputText.value && !isWaitingServer.value) {
-    const message = JSON.stringify({ type: "text", content: inputText.value });
+    const message = JSON.stringify({
+      type: "text",
+      content: inputText.value,
+    });
     messages.value.push({ content: inputText.value, role: "me" });
-    socket.emit("message", message);
+
     isWaitingServer.value = true;
     inputText.value = "";
     chatContent.value.$el.scrollToBottom(200);
+    if (TTS_AUTO) {
+      streamAudio(() => {
+        socket.emit("message", message);
+      });
+    } else {
+      socket.emit("message", message);
+    }
   }
 };
 function sendData(data: string, finish: boolean = false) {
@@ -263,6 +284,7 @@ function stopRecording() {
 }
 
 function playAudio(msg: any) {
+  if (isWaitingServer.value) return;
   console.log("==> playAudio", msg);
   ttsData.value.msg = msg;
   if (msg.audioSrc) {
@@ -272,40 +294,46 @@ function playAudio(msg: any) {
   } else {
     const payload = JSON.stringify({
       content: msg.content,
-      role: "longwan_v2",
+      role: TTS_ROLE,
     });
-    const mediaSource = new MediaSource();
-    audioRef.value!.src = URL.createObjectURL(mediaSource);
-    playAudioData = [];
-
-    // 等待 MediaSource 打开
-    mediaSource.addEventListener("sourceopen", () => {
-      ttsData.value.audioBuffer = mediaSource.addSourceBuffer("audio/mpeg");
-      // 错误处理
-      ttsData.value.audioBuffer.addEventListener("error", (e: any) => {
-        console.error("SourceBuffer 错误:", e);
-      });
-      ttsData.value.audioBuffer.addEventListener("updateend", () => {
-        // 如果还有数据未处理，可以继续添加
-        if (playAudioData.length > 0 && !ttsData.value.audioBuffer.updating) {
-          const combinedBuffer = new Uint8Array(
-            playAudioData.reduce((acc, curr) => acc + curr.byteLength, 0)
-          );
-          let offset = 0;
-          // 将所有数据块合并为一个 Uint8Array
-          playAudioData.forEach((chunk) => {
-            combinedBuffer.set(new Uint8Array(chunk), offset);
-            offset += chunk.byteLength;
-          });
-          ttsData.value.audioBuffer.appendBuffer(combinedBuffer); // 直接添加 ArrayBuffer 数据
-          // 清空已处理的数据
-          playAudioData = [];
-        }
-      });
-
+    streamAudio(() => {
       socket.emit("tts", payload);
-      audioRef.value!.play();
     });
   }
+}
+
+function streamAudio(f = () => {}) {
+  const mediaSource = new MediaSource();
+  audioRef.value!.src = URL.createObjectURL(mediaSource);
+  playAudioData = [];
+
+  // 等待 MediaSource 打开
+  mediaSource.addEventListener("sourceopen", () => {
+    ttsData.value.audioBuffer = mediaSource.addSourceBuffer("audio/mpeg");
+    // 错误处理
+    ttsData.value.audioBuffer.addEventListener("error", (e: any) => {
+      console.error("SourceBuffer 错误:", e);
+    });
+    ttsData.value.audioBuffer.addEventListener("updateend", () => {
+      // 如果还有数据未处理，可以继续添加
+      if (playAudioData.length > 0 && !ttsData.value.audioBuffer.updating) {
+        const combinedBuffer = new Uint8Array(
+          playAudioData.reduce((acc, curr) => acc + curr.byteLength, 0)
+        );
+        let offset = 0;
+        // 将所有数据块合并为一个 Uint8Array
+        playAudioData.forEach((chunk) => {
+          combinedBuffer.set(new Uint8Array(chunk), offset);
+          offset += chunk.byteLength;
+        });
+        ttsData.value.audioBuffer.appendBuffer(combinedBuffer); // 直接添加 ArrayBuffer 数据
+        // 清空已处理的数据
+        playAudioData = [];
+      }
+    });
+
+    audioRef.value!.play();
+    f();
+  });
 }
 </script>

@@ -23,6 +23,7 @@ class ClientContext:
         self.ai = AILocal(self.on_ai_msg, self.on_err)
         self.asr = AsrClient(self.on_asr_result, self.on_err)
         self.tts = TTSClient(self.on_tts_msg, self.on_err)
+        self.autoTTS = False
 
     def close(self):
         self.asr.close()
@@ -36,8 +37,11 @@ class ClientContext:
         # log.info(f"[AI] ON MSG: {text}")
         if type == 0:
             event = 'msg_chat'
+            if self.autoTTS:
+                self.tts.stream_msg(text)
         else:
             event = 'end_chat'
+            self.tts.stream_complete()
 
         socketio.emit(event, {'content': text}, room=self.sid)
 
@@ -65,9 +69,10 @@ class ChatMgr:
     def add_client(self, sid):
         try:
             self.clients[sid] = ClientContext(sid)
+            return self.clients[sid]
         except Exception as e:
             log.error(f"[CHAT] Error adding client {sid}: {e}")
-    
+
     def remove_client(self, sid):
         if sid in self.clients:
             del self.clients[sid]
@@ -95,14 +100,17 @@ class ChatMgr:
         # 处理客户端连接事件
         @socketio.on('handshake')
         def handle_handshake(data):
-            if data['key'] == '123456':
-                self.add_client(request.sid)
-                log.info(f'Client {request.sid} connected. Total clients: {len(self.clients)}')
-                socketio.emit('handshake_response', {'message': 'Handshake successful'})
-                return {'status': 'connected'}
-            else:
+            if data['key'] != '123456':
                 socketio.disconnect(request.sid)
                 return {'status': 'rejected'}
+            ctx = self.add_client(request.sid)
+            ctx.autoTTS = data.get('ttsAuto', False)
+            ctx.tts.vol = data.get('ttsVol', 50)
+            ctx.tts.speed = data.get('ttsSpeed', 1.0)
+            log.info(f'Client {request.sid} connected. Total clients: {len(self.clients)}')
+
+            socketio.emit('handshake_response', {'message': 'Handshake successful'})
+            return {'status': 'connected'}
 
         # 处理客户端断开连接事件
         @socketio.on('disconnect')
@@ -118,11 +126,13 @@ class ChatMgr:
             data = json.loads(msg)
             client_id = request.sid
             data_type = data['type']
+            autoAudio = data.get('autoAudio', False)
             content = data.get('content', '')
 
             if client_id not in self.clients:
                 return
-
+            ctx = self.clients[client_id]
+            ctx.autoTTS = autoAudio
             if data_type == 'text':
                 log.info(f'[CHAT] Received message from {client_id}: {data_type}')
                 self.handle_text(client_id, content)
@@ -130,7 +140,7 @@ class ChatMgr:
                 audio_bytes = base64.b64decode(content)
                 self.handle_audio(client_id, data['sample'], audio_bytes)
                 if data['finish']:
-                    self.clients[client_id].asr.end_asr()
+                    ctx.asr.end_asr()
 
         @socketio.on('tts')
         def handle_tts_request(msg):
@@ -142,4 +152,4 @@ class ChatMgr:
                 return
 
             client_id = request.sid
-            self.clients[client_id].tts.stream_msg(text, role)
+            self.clients[client_id].tts.process_msg(text, role)

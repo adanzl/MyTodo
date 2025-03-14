@@ -35,8 +35,12 @@ class TTSClient(ResultCallback):
         self.on_msg = on_msg or (lambda x, y: None)
         self.on_err = on_err or (lambda x: None)
         dashscope.api_key = "sk-b7b302bad3b3410a9e21ca2294de4a08"
+        self.synthesizer = None
+        self.role = DEFAULT_ROLE
+        self.speed = 1.0
+        self.vol = 50
 
-    def stream_msg(self, text: str, role: str = DEFAULT_ROLE):
+    def process_msg(self, text: str, role: str = None):
         try:
             # 发起请求到 FastAPI 服务器，并处理流式响应
             # payload = {
@@ -65,9 +69,13 @@ class TTSClient(ResultCallback):
             #         self.on_msg(chunk)
             # log.info("[TTS COMPLETE] ")
             # self.on_msg("Completed", 1)
+            if role is None:
+                role = self.role
             synthesizer = SpeechSynthesizer(
                 model=MODEL_MAP.get(role, DEFAULT_MODEL),
                 voice=role,
+                volume=self.vol,
+                speech_rate=self.speed,
                 callback=self,
             )
             synthesizer.call(text)
@@ -77,11 +85,35 @@ class TTSClient(ResultCallback):
             traceback.print_stack()
             self.on_err(e)
 
+    def stream_msg(self, text: str, role: str = None):
+        try:
+            if role is None:
+                role = self.role
+            if self.synthesizer is None:
+                self.synthesizer = SpeechSynthesizer(
+                    model=MODEL_MAP.get(role, DEFAULT_MODEL),
+                    voice=role,
+                    volume=self.vol,
+                    speech_rate=self.speed,
+                    callback=self,
+                )
+            self.synthesizer.streaming_call(text)
+        except Exception as e:
+            log.error(e)
+            traceback.print_stack()
+            self.on_err(e)
+
+    def stream_complete(self):
+        if self.synthesizer is None:
+            return
+        self.synthesizer.streaming_complete()
+
     def on_open(self):
-        log.info("[TTS] open")
+        # log.info("[TTS] open")
+        ...
 
     def on_complete(self):
-        log.info("[TTS] finished")
+        # log.info("[TTS] finished")
         self.on_msg("Completed", 1)
 
     def on_error(self, message: str):
@@ -89,6 +121,7 @@ class TTSClient(ResultCallback):
 
     def on_close(self):
         log.info(f"[TTS] closed")
+        self.synthesizer = None
 
     def on_event(self, message):
         pass
@@ -112,4 +145,4 @@ if __name__ == "__main__":
             log.info("Message END")
 
     tts = TTSClient(on_msg=f)
-    tts.stream_msg("你好不好啊，我很好，真是个美妙的开始呢")
+    tts.process_msg("你好不好啊，我很好，真是个美妙的开始呢")
