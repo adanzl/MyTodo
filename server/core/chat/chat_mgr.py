@@ -126,13 +126,11 @@ class ChatMgr:
             data = json.loads(msg)
             client_id = request.sid
             data_type = data['type']
-            autoAudio = data.get('autoAudio', False)
             content = data.get('content', '')
 
             if client_id not in self.clients:
                 return
             ctx = self.clients[client_id]
-            ctx.autoTTS = autoAudio
             if data_type == 'text':
                 log.info(f'[CHAT] Received message from {client_id}: {data_type}')
                 self.handle_text(client_id, content)

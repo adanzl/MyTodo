@@ -111,14 +111,16 @@ onMounted(async () => {
 onIonViewDidEnter(async () => {});
 // 发送握手请求
 socket.on("connect", () => {
-  console.log("Connected to the server. Sending handshake...");
-  socket.emit("handshake", {
+  const msg = {
     key: "123456",
     ttsAuto: TTS_AUTO,
     ttsRole: TTS_ROLE,
     ttsSpeed: 1.0,
     ttsVol: 50,
-  });
+  };
+
+  console.log("Connected to the server. Sending handshake...", msg);
+  socket.emit("handshake", msg);
 });
 socket.on("message", (data) => {
   if (data.type === MSG_TYPE_TRANSLATION) {
@@ -148,7 +150,7 @@ socket.on("msg_chat", (data) => {
 socket.on("end_chat", (data: any) => {
   console.log("==> MSG_TYPE_CHAT_END", data.content);
   isWaitingServer.value = false;
-  playAudio(messages.value[messages.value.length - 1]);
+  // playAudio(messages.value[messages.value.length - 1]);
 });
 // 处理tts结果
 socket.on("data_audio", (data: any) => {
