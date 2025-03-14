@@ -63,8 +63,11 @@ class ChatMgr:
         self.register_events()
 
     def add_client(self, sid):
-        self.clients[sid] = ClientContext(sid)
-
+        try:
+            self.clients[sid] = ClientContext(sid)
+        except Exception as e:
+            log.error(f"[CHAT] Error adding client {sid}: {e}")
+    
     def remove_client(self, sid):
         if sid in self.clients:
             del self.clients[sid]
