@@ -272,7 +272,7 @@ function playAudio(msg: any) {
   } else {
     const payload = JSON.stringify({
       content: msg.content,
-      role: "太乙",
+      role: "longwan_v2",
     });
     const mediaSource = new MediaSource();
     audioRef.value!.src = URL.createObjectURL(mediaSource);
