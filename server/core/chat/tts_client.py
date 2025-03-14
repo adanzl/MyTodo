@@ -16,7 +16,7 @@ ROLE_MAP = {
 
 # cSpell: disable
 DEFAULT_ROLE = "longwan_v2"
-DEFAULT_MODEL = "cosyvoice"
+DEFAULT_MODEL = "cosyvoice-v1"
 MODEL_MAP = {
     "longwan_v2": "cosyvoice-v2",
     'longcheng_v2': 'cosyvoice-v2',
