@@ -42,7 +42,7 @@ class AILocal:
                 response.raise_for_status()
 
                 for line in response.iter_lines():
-                    if line:
+                    if line and line.startswith(b"data:"):
                         chunk = json.loads(line.decode("utf-8")[6:])
                         self.aiConversationId = chunk["conversation_id"]
                         if "answer" in chunk:
