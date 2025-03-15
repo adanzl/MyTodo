@@ -64,7 +64,7 @@ import { IonToolbar, onIonViewDidEnter } from "@ionic/vue";
 import io from "socket.io-client";
 import Recorder from "recorder-core/recorder.wav.min";
 Recorder.CLog = function () {}; // 屏蔽Recorder的日志输出
-import { onMounted, ref } from "vue";
+import { inject, onMounted, ref } from "vue";
 import MdiMicrophone from "~icons/mdi/microphone";
 import MdiStopCircleOutline from "~icons/mdi/stop-circle-outline";
 import { volumeMediumOutline } from "ionicons/icons";
@@ -76,6 +76,7 @@ const TTS_ROLE = "cosyvoice-woman-8a96d641d8d0491984c085d98870b79d";
 const aiConversationId = ref(localStorage.getItem("aiConversationId") || "");
 // 存储识别结果的变量
 const inputText = ref("");
+const globalVar: any = inject("globalVar");
 const inputRef = ref<HTMLElement | null>(null);
 const messages = ref<any>([]);
 const url = getApiUrl().replace("api", "");
@@ -118,6 +119,7 @@ socket.on("connect", () => {
     ttsSpeed: 1.0,
     ttsVol: 50,
     aiConversationId: aiConversationId.value,
+    user: globalVar.user.name,
   };
 
   console.log("Connected to the server. Sending handshake...", msg);
@@ -192,7 +194,7 @@ socket.on("endAudio", (data: any) => {
 });
 socket.on("handshakeResponse", (data) => console.log("handshake:", data));
 socket.on("disconnect", () => console.log("Disconnected from the server."));
-socket.on("error", (error) => console.error("WebSocket error:", error));
+socket.on("error", (error) => console.error("msg error:", error));
 socket.on("close", () => console.log("WebSocket connection closed."));
 
 // 模拟发送消息

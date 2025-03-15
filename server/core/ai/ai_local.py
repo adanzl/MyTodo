@@ -17,16 +17,17 @@ class AILocal:
             "Authorization": f"Bearer {API_KEY}",
         }
         self.aiConversationId = ""
+        self.user = 'user'
         self.on_msg = on_msg or (lambda x, y: None)
         self.on_err = on_err or (lambda x: None)
 
-    def stream_msg(self, query: str, user: str = "user", inputs: dict = None, timeout: int = 30):
+    def stream_msg(self, query: str, inputs: dict = None, timeout: int = 30):
         payload = {
             "inputs": inputs or {},
             "query": query,
             "conversation_id": self.aiConversationId,
             "response_mode": "streaming",  # 启用流式模式
-            "user": user,
+            "user": self.user,
         }
         log.info(f"[AI] Query: {query}")
 
@@ -71,7 +72,8 @@ if __name__ == "__main__":
         print(msg, end="")
 
     ai = AILocal(f)
+    ai.user = 'leo'
     while True:
         log.info('ready')
         msg = input('>?')
-        ai.stream_msg(msg, 'leo')
+        ai.stream_msg(msg)

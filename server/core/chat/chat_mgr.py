@@ -46,6 +46,7 @@ class ClientContext:
         socketio.emit(event, {'content': text, 'aiConversationId': self.ai.aiConversationId}, room=self.sid)
 
     def on_err(self, err: Exception):
+        log.error(f"[CHAT] Error: {err}")
         msg = {"type": MSG_TYPE_ERROR, "content": err}
         socketio.emit('error', msg, room=self.sid)
 
@@ -80,7 +81,7 @@ class ChatMgr:
     def handle_text(self, sid, text):
         # translated = translate_text(text)
         client: ClientContext = self.clients.get(sid)
-        client.ai.stream_msg(text, 'user')
+        client.ai.stream_msg(text)
 
     def handle_audio(self, sid, sample_rate, audio_bytes):
         '''
@@ -105,6 +106,7 @@ class ChatMgr:
                 return {'status': 'rejected'}
             ctx = self.add_client(request.sid)
             ctx.ai.aiConversationId = data.get('aiConversationId', '')
+            ctx.ai.user = data.get('user', 'user')
             ctx.autoTTS = data.get('ttsAuto', False)
             ctx.tts.vol = data.get('ttsVol', 50)
             ctx.tts.speed = data.get('ttsSpeed', 1.0)
