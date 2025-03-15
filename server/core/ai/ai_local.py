@@ -21,7 +21,7 @@ class AILocal:
         self.on_msg = on_msg or (lambda x, y: None)
         self.on_err = on_err or (lambda x: None)
 
-    def stream_msg(self, query: str, inputs: dict = None, timeout: int = 30):
+    def stream_msg(self, query: str, inputs: dict = None, timeout: int = 30, try_times=0):
         payload = {
             "inputs": inputs or {},
             "query": query,
@@ -55,7 +55,11 @@ class AILocal:
 
         except requests.exceptions.RequestException as e:
             log.error(f"请求失败: {str(e)}")
-            self.on_err(e)
+            if try_times < 1:
+                self.aiConversationId = ""
+                self.stream_msg(query, inputs, timeout, try_times + 1)
+            else:
+                self.on_err(e)
         except Exception as ee:
             log.error("响应数据解析错误 " + line.decode("utf-8"))
             self.on_err(ee)
