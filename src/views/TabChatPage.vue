@@ -218,7 +218,7 @@ const sendTextMessage = () => {
     }
   }
 };
-function sendData(data: string, finish: boolean = false) {
+function sendAudioData(data: string, finish: boolean = false) {
   if (!socket.connected) {
     console.warn("WebSocket未连接，稍后重试");
     return;
@@ -268,7 +268,7 @@ function recProcess(
     const base64Data = btoa(String.fromCharCode(...uint8));
     // console.log("==> recProcess ", base64Data);
     // 通过 WebSocket 发送 Base64 编码的音频数据
-    sendData(base64Data);
+    sendAudioData(base64Data);
   }
 }
 
@@ -283,9 +283,12 @@ function stopRecording() {
         recSampleBuf = new Int16Array();
         const uint8 = new Uint8Array(sendBuf.buffer);
         const base64Data = btoa(String.fromCharCode(...uint8));
-        sendData(base64Data);
+        sendAudioData(base64Data);
       }
-      sendData("", true);
+      sendAudioData("", true);
+      if (TTS_AUTO) {
+        streamAudio(() => {});
+      }
     },
     (errMsg: any) => console.log("errMsg: " + errMsg)
   );
