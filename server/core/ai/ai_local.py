@@ -3,7 +3,8 @@ import requests
 import json
 
 API_URL = "http://192.168.50.171:9098/v1"
-API_KEY = "app-Iji9pr366YfTcOewZmOhLh8h"
+# cSpell: disable-next-line
+API_KEY = "app-dLf0axfqNnVHwWjFqs0EVo8H"
 log = logging.getLogger(__name__)
 
 

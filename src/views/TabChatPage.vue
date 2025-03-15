@@ -73,7 +73,7 @@ const MSG_TYPE_TRANSLATION = "translation";
 const TTS_AUTO = true;
 // cSpell: disable-next-line
 const TTS_ROLE = "cosyvoice-woman-8a96d641d8d0491984c085d98870b79d";
-
+const aiConversationId = ref(localStorage.getItem("aiConversationId") || "");
 // 存储识别结果的变量
 const inputText = ref("");
 const inputRef = ref<HTMLElement | null>(null);
@@ -117,6 +117,7 @@ socket.on("connect", () => {
     ttsRole: TTS_ROLE,
     ttsSpeed: 1.0,
     ttsVol: 50,
+    aiConversationId: aiConversationId.value,
   };
 
   console.log("Connected to the server. Sending handshake...", msg);
@@ -132,28 +133,32 @@ socket.on("message", (data) => {
   chatContent.value.$el.scrollToBottom(200);
 });
 // 处理asr结果
-socket.on("msg_asr", (data) => {
+socket.on("msgAsr", (data) => {
   if (data.content) {
     messages.value.push({ content: data.content, role: "me", audioSrc: lstAudioSrc.value });
   }
   chatContent.value.$el.scrollToBottom(200);
 });
 // 处理ai chat结果
-socket.on("msg_chat", (data) => {
+socket.on("msgChat", (data) => {
   if (messages.value.length === 0 || messages.value[messages.value.length - 1].role === "me") {
     messages.value.push({ content: data.content, role: "server" });
   } else {
     messages.value[messages.value.length - 1].content += data.content;
   }
+  if (data.aiConversationId != aiConversationId.value) {
+    aiConversationId.value = data.aiConversationId;
+    localStorage.setItem("aiConversationId", aiConversationId.value);
+  }
   chatContent.value.$el.scrollToBottom(200);
 });
-socket.on("end_chat", (data: any) => {
+socket.on("endChat", (data: any) => {
   console.log("==> MSG_TYPE_CHAT_END", data.content);
   isWaitingServer.value = false;
   // playAudio(messages.value[messages.value.length - 1]);
 });
 // 处理tts结果
-socket.on("data_audio", (data: any) => {
+socket.on("dataAudio", (data: any) => {
   if (data.type === "tts") {
     const chunk = data.data; // 接收的是二进制数据
     // console.log(chunk.length, data.data);
@@ -182,10 +187,10 @@ socket.on("data_audio", (data: any) => {
     console.warn("Unknown bin data", data);
   }
 });
-socket.on("end_audio", (data: any) => {
+socket.on("endAudio", (data: any) => {
   console.log("==> end_audio", data.content);
 });
-socket.on("handshake_response", (data) => console.log("handshake:", data));
+socket.on("handshakeResponse", (data) => console.log("handshake:", data));
 socket.on("disconnect", () => console.log("Disconnected from the server."));
 socket.on("error", (error) => console.error("WebSocket error:", error));
 socket.on("close", () => console.log("WebSocket connection closed."));
