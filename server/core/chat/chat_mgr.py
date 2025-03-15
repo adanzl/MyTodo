@@ -29,21 +29,21 @@ class ClientContext:
         self.asr.close()
 
     def on_asr_result(self, text):
-        msg = {"type": 'msg_asr', "content": text}
-        socketio.emit('msg_asr', msg, room=self.sid)
+        msg = {"content": text}
+        socketio.emit('msgAsr', msg, room=self.sid)
         self.ai.stream_msg(text)
 
     def on_ai_msg(self, text, type=0):
         # log.info(f"[AI] ON MSG: {text}")
         if type == 0:
-            event = 'msg_chat'
+            event = 'msgChat'
             if self.autoTTS:
                 self.tts.stream_msg(text)
         else:
-            event = 'end_chat'
+            event = 'endChat'
             self.tts.stream_complete()
 
-        socketio.emit(event, {'content': text}, room=self.sid)
+        socketio.emit(event, {'content': text, 'aiConversationId': self.ai.aiConversationId}, room=self.sid)
 
     def on_err(self, err: Exception):
         msg = {"type": MSG_TYPE_ERROR, "content": err}
@@ -51,9 +51,9 @@ class ClientContext:
 
     def on_tts_msg(self, data, type=0):
         if type == 0:
-            socketio.emit('data_audio', {'type': 'tts', 'data': data}, room=self.sid)
+            socketio.emit('dataAudio', {'type': 'tts', 'data': data}, room=self.sid)
         else:
-            socketio.emit('end_audio', {'content': data}, room=self.sid)
+            socketio.emit('endAudio', {'content': data}, room=self.sid)
 
 
 def translate_text(text):
@@ -104,12 +104,13 @@ class ChatMgr:
                 socketio.disconnect(request.sid)
                 return {'status': 'rejected'}
             ctx = self.add_client(request.sid)
+            ctx.ai.aiConversationId = data.get('aiConversationId', '')
             ctx.autoTTS = data.get('ttsAuto', False)
             ctx.tts.vol = data.get('ttsVol', 50)
             ctx.tts.speed = data.get('ttsSpeed', 1.0)
-            log.info(f'Client {request.sid} connected. Total clients: {len(self.clients)}')
+            log.info(f'Client {request.sid} connected. Total clients: {len(self.clients)}, {json.dumps(data)}')
 
-            socketio.emit('handshake_response', {'message': 'Handshake successful'})
+            socketio.emit('handshakeResponse', {'message': 'Handshake successful'})
             return {'status': 'connected'}
 
         # 处理客户端断开连接事件

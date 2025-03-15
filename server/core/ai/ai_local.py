@@ -15,7 +15,7 @@ class AILocal:
             "Accept": "application/json",
             "Authorization": f"Bearer {API_KEY}",
         }
-        self.conversation_id = ""
+        self.aiConversationId = ""
         self.on_msg = on_msg or (lambda x, y: None)
         self.on_err = on_err or (lambda x: None)
 
@@ -23,7 +23,7 @@ class AILocal:
         payload = {
             "inputs": inputs or {},
             "query": query,
-            "conversation_id": self.conversation_id,
+            "conversation_id": self.aiConversationId,
             "response_mode": "streaming",  # 启用流式模式
             "user": user,
         }
@@ -42,7 +42,7 @@ class AILocal:
                 for line in response.iter_lines():
                     if line:
                         chunk = json.loads(line.decode("utf-8")[6:])
-                        self.conversation_id = chunk["conversation_id"]
+                        self.aiConversationId = chunk["conversation_id"]
                         if "answer" in chunk:
                             self.on_msg(chunk["answer"], 0)
                         elif "error" in chunk:
