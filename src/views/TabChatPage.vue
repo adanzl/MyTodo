@@ -61,8 +61,8 @@
         <ion-button
           class="flex-1 mr-1"
           @pointerdown="startRecording"
-          @pointerup="stopRecording"
-          @pointerleave="stopRecording(true)">
+          @pointerup="stopRecording($event)"
+          @pointerleave="stopRecording($event, true)">
           <MdiStopCircleOutline v-if="isRecording" width="24" height="24" />
           <MdiMicrophone v-else width="24" height="24" />
         </ion-button>
@@ -301,8 +301,8 @@ function recProcess(
   }
 }
 
-function stopRecording(cancel = false) {
-  console.log("==> stopRecording");
+function stopRecording(_event: any, cancel = false) {
+  console.log("==> stopRecording", cancel);
   if (isRecording.value === false) return;
   rec.stop(
     (blob: Blob) => {
@@ -315,7 +315,7 @@ function stopRecording(cancel = false) {
         sendAudioData(base64Data);
       }
       sendAudioData("", true, cancel);
-      if (TTS_AUTO) {
+      if (TTS_AUTO && !cancel) {
         streamAudio(() => {});
       }
     },
