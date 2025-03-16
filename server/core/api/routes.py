@@ -147,8 +147,9 @@ def set_rds_data():
         args = request.get_json()
         log.info("===== [Set rds Data] " + json.dumps(args))
         table = args.get('table')
-        id = args.get('id')
-        value = args.get('value')
+        data = args.get('data')
+        id = data.get('id')
+        value = data.get('value')
         rds.set(f"{table}:{id}", value)
         return {"code": 0, "msg": "ok", "data": id}
     except Exception as e:
