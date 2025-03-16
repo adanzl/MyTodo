@@ -1,9 +1,17 @@
 from flask import Blueprint, render_template, request, jsonify, json
 import logging
 import core.db.db_mgr as db_mgr
+import redis
 
 log = logging.getLogger(__name__)
 api_bp = Blueprint('api', __name__)
+rds = redis.Redis(
+    host='192.168.50.171',  # Redis服务器地址，默认为localhost
+    port=6379,  # Redis服务器端口，默认为6379
+    db=0,  # 使用的数据库编号，默认为0
+    password=None,  # 如果Redis设置了密码，则在这里填写
+    decode_responses=True  # 是否将返回的数据自动解码为字符串
+)
 
 
 @api_bp.route("/natapp")
@@ -118,3 +126,23 @@ def query():
     log.info("===== [Query Data] " + json.dumps(args))
     sql = args.get('sql')
     return db_mgr.query(sql)
+
+
+@api_bp.route("/getRdsData", methods=['GET'])
+def get_rds_data():
+    table = request.args.get('table')
+    id = request.args.get('id')
+    log.info(f"===== [Get Rds Data] {table}-{id}")
+    key = f"{table}:{id}"
+    return rds.get(key)
+
+
+@api_bp.route("/setRdsData", methods=['POST'])
+def set_rds_data():
+    args = request.get_json()
+    log.info("===== [Set rds Data] " + json.dumps(args))
+    table = args.get('table')
+    id = args.get('id')
+    value = args.get('value')
+    rds.set(f"{table}:{id}", value)
+    return {"code": 0, "msg": "ok", "data": id}
