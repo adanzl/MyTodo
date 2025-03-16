@@ -130,19 +130,27 @@ def query():
 
 @api_bp.route("/getRdsData", methods=['GET'])
 def get_rds_data():
-    table = request.args.get('table')
-    id = request.args.get('id')
-    log.info(f"===== [Get Rds Data] {table}-{id}")
-    key = f"{table}:{id}"
-    return rds.get(key)
+    try:
+        table = request.args.get('table')
+        id = request.args.get('id')
+        log.info(f"===== [Get Rds Data] {table}-{id}")
+        key = f"{table}:{id}"
+        return {"code": 0, "msg": "ok", "data": rds.get(key)}
+    except Exception as e:
+        log.error(e)
+        return {"code": -1, "msg": 'error' + str(e)}
 
 
 @api_bp.route("/setRdsData", methods=['POST'])
 def set_rds_data():
-    args = request.get_json()
-    log.info("===== [Set rds Data] " + json.dumps(args))
-    table = args.get('table')
-    id = args.get('id')
-    value = args.get('value')
-    rds.set(f"{table}:{id}", value)
-    return {"code": 0, "msg": "ok", "data": id}
+    try:
+        args = request.get_json()
+        log.info("===== [Set rds Data] " + json.dumps(args))
+        table = args.get('table')
+        id = args.get('id')
+        value = args.get('value')
+        rds.set(f"{table}:{id}", value)
+        return {"code": 0, "msg": "ok", "data": id}
+    except Exception as e:
+        log.error(e)
+        return {"code": -1, "msg": 'error' + str(e)}
