@@ -59,7 +59,7 @@
 </template>
 
 <script setup lang="ts">
-import { getApiUrl } from "@/utils/NetUtil";
+import { getApiUrl, getConversationId, setConversationId } from "@/utils/NetUtil";
 import { IonToolbar, onIonViewDidEnter } from "@ionic/vue";
 import io from "socket.io-client";
 import Recorder from "recorder-core/recorder.wav.min";
@@ -73,10 +73,10 @@ const MSG_TYPE_TRANSLATION = "translation";
 const TTS_AUTO = true;
 // cSpell: disable-next-line
 const TTS_ROLE = "cosyvoice-woman-8a96d641d8d0491984c085d98870b79d";
-const aiConversationId = ref(localStorage.getItem("aiConversationId") || "");
 // 存储识别结果的变量
 const inputText = ref("");
 const globalVar: any = inject("globalVar");
+const aiConversationId = ref("");
 const inputRef = ref<HTMLElement | null>(null);
 const messages = ref<any>([]);
 const url = getApiUrl().replace("api", "");
@@ -109,7 +109,9 @@ let playAudioData: ArrayBuffer[] = [];
 onMounted(async () => {
   messages.value.push({ content: "你好，我是楠楠，和我聊点什么吧", role: "server" });
 });
-onIonViewDidEnter(async () => {});
+onIonViewDidEnter(async () => {
+  aiConversationId.value = (await getConversationId(globalVar.user.id)) || "";
+});
 // 发送握手请求
 socket.on("connect", () => {
   const msg = {
@@ -150,7 +152,7 @@ socket.on("msgChat", (data) => {
   }
   if (data.aiConversationId != aiConversationId.value) {
     aiConversationId.value = data.aiConversationId;
-    localStorage.setItem("aiConversationId", aiConversationId.value);
+    setConversationId(globalVar.user.id, aiConversationId.value);
   }
   chatContent.value.$el.scrollToBottom(200);
 });

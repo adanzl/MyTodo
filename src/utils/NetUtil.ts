@@ -112,6 +112,32 @@ export async function setUserInfo(id: number | undefined, score: number) {
   return rsp.data.data;
 }
 
+export async function getConversationId(id: number) {
+  const rsp: any = await axios.get(API_URL + "/getRdsData", {
+    params: { table: "conversation:id", id: id },
+  });
+  // console.log("getPic", rsp.data);
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
+
+export async function setConversationId(id: number, cId: string) {
+  const rsp: any = await axios.post(API_URL + "/setRdsData", {
+    table: "conversation:id",
+    data: {
+      id: id,
+      value: cId,
+    },
+  });
+  console.log("setConversationId", rsp.data);
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
+
 export async function getUserInfo(id: number) {
   const rsp: any = await axios.get(API_URL + "/getData", {
     params: { table: "t_user", id: id, fields: "id,score" },
