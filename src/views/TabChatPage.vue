@@ -58,11 +58,7 @@
         <!-- <ion-button class="flex-1 mr-1 w-full" mode="md" @click="stopRecording" v-if="isRecording">
           <MdiStopCircleOutline width="24" height="24" />
         </ion-button> -->
-        <ion-button
-          class="flex-1 mr-1"
-          @pointerdown="startRecording"
-          @pointerup="stopRecording($event)"
-          @pointerleave="stopRecording($event, true)">
+        <ion-button class="flex-1 mr-1" ref="recBtn" @pointerdown="startRecording">
           <MdiStopCircleOutline v-if="isRecording" width="24" height="24" />
           <MdiMicrophone v-else width="24" height="24" />
         </ion-button>
@@ -82,7 +78,7 @@
 
 <script setup lang="ts">
 import { getApiUrl, getConversationId, setConversationId } from "@/utils/NetUtil";
-import { IonToolbar, onIonViewDidEnter, IonCheckbox } from "@ionic/vue";
+import { IonToolbar, onIonViewDidEnter, IonCheckbox, createGesture } from "@ionic/vue";
 import io from "socket.io-client";
 import Recorder from "recorder-core/recorder.wav.min";
 Recorder.CLog = function () {}; // 屏蔽Recorder的日志输出
@@ -106,6 +102,7 @@ const aiConversationId = ref("");
 const inputRef = ref<HTMLElement | null>(null);
 const messages = ref<any>([]);
 const url = getApiUrl().replace("api", "");
+const recBtn = ref<any>();
 // const url = "http://127.0.0.1:8000/";
 const socket = io(url, {
   transports: ["websocket"], // 强制使用 WebSocket 传输
@@ -132,7 +129,7 @@ const rec = Recorder({
 let recSampleBuf = new Int16Array();
 let playAudioData: ArrayBuffer[] = [];
 
-onMounted(async () => {
+onMounted(() => {
   messages.value.push({ content: "你好，我是楠楠，和我聊点什么吧", role: "server" });
 });
 onIonViewDidEnter(async () => {
@@ -263,10 +260,42 @@ function sendAudioData(data: string, finish: boolean = false, cancel = false) {
 }
 async function startRecording() {
   if (!isWaitingServer.value) {
+    console.log("==> startRecording");
     try {
       rec.open(() => {
+        console.info("Recording started");
         rec.start();
       });
+      // 创建手势
+      const gesture = createGesture({
+        el: recBtn.value.$el, // 目标元素
+        gestureName: "longPress", // 手势名称
+        threshold: 0, // 触发距离阈值
+        onStart: () => {
+          console.log("长按开始");
+        },
+        onMove: (ev) => {
+          // 检查是否移动出按钮范围
+          const rect = recBtn.value.$el.getBoundingClientRect();
+          const isOutside =
+            ev.currentX < rect.left ||
+            ev.currentX > rect.right ||
+            ev.currentY < rect.top ||
+            ev.currentY > rect.bottom;
+
+          if (isOutside) {
+            stopRecording(true); // 移动出按钮范围时取消录制
+            gesture.destroy();
+          }
+        },
+        onEnd: () => {
+          stopRecording(false); // 长按结束时触发
+          gesture.destroy();
+        },
+      });
+
+      // 启用手势
+      gesture.enable();
       isRecording.value = true;
     } catch (error) {
       console.error("Error starting recording:", error);
@@ -301,9 +330,9 @@ function recProcess(
   }
 }
 
-function stopRecording(_event: any, cancel = false) {
-  console.log("==> stopRecording", cancel);
+function stopRecording(cancel = false) {
   if (isRecording.value === false) return;
+  console.log("==> stopRecording", cancel);
   rec.stop(
     (blob: Blob) => {
       lstAudioSrc.value = (window.URL || webkitURL).createObjectURL(blob);
