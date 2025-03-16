@@ -35,7 +35,10 @@
     </ion-content>
     <audio ref="audioRef" style="width: auto" class="m-2"></audio>
     <ion-item>
-      <div class="flex p-2 w-full">
+      <div class="flex py-2 w-full h-[72px]" v-if="INPUT_TYPE == 'text'">
+        <div class="w-12 h-auto flex items-center" @click="btnChangeMode">
+          <WeuiVoiceOutlined width="40" height="40" />
+        </div>
         <ion-input
           class="flex-1 mr-1"
           v-model="inputText"
@@ -47,12 +50,31 @@
           autofocus="true"
           mode="md" />
         <ion-button @click="sendTextMessage">发送</ion-button>
-        <ion-button @click="stopRecording" v-if="isRecording">
+      </div>
+      <div class="flex py-2 w-full h-[72px]" v-else>
+        <div class="w-12 h-auto flex items-center" @click="btnChangeMode">
+          <WeuiKeyboardOutlined width="40" height="40" />
+        </div>
+        <!-- <ion-button class="flex-1 mr-1 w-full" mode="md" @click="stopRecording" v-if="isRecording">
           <MdiStopCircleOutline width="24" height="24" />
+        </ion-button> -->
+        <ion-button
+          class="flex-1 mr-1"
+          @pointerdown="startRecording"
+          @pointerup="stopRecording"
+          @pointerleave="stopRecording(true)">
+          <MdiStopCircleOutline v-if="isRecording" width="24" height="24" />
+          <MdiMicrophone v-else width="24" height="24" />
         </ion-button>
-        <ion-button @click="startRecording" v-else>
-          <MdiMicrophone width="24" height="24" />
-        </ion-button>
+        <div class="w-12 flex flex-col pl-2">
+          <ion-checkbox
+            class="ml-1 h-8"
+            style="--size: 22px"
+            :checked="AUDIO_TYPE == 'hold'"
+            alignment="center"
+            @ionChange="onAudioTypeChange" />
+          <span>hold</span>
+        </div>
       </div>
     </ion-item>
   </ion-page>
@@ -60,19 +82,23 @@
 
 <script setup lang="ts">
 import { getApiUrl, getConversationId, setConversationId } from "@/utils/NetUtil";
-import { IonToolbar, onIonViewDidEnter } from "@ionic/vue";
+import { IonToolbar, onIonViewDidEnter, IonCheckbox } from "@ionic/vue";
 import io from "socket.io-client";
 import Recorder from "recorder-core/recorder.wav.min";
 Recorder.CLog = function () {}; // 屏蔽Recorder的日志输出
 import { inject, onMounted, ref } from "vue";
 import MdiMicrophone from "~icons/mdi/microphone";
 import MdiStopCircleOutline from "~icons/mdi/stop-circle-outline";
+import WeuiVoiceOutlined from "~icons/weui/voice-outlined";
+import WeuiKeyboardOutlined from "~icons/weui/keyboard-outlined";
 import { volumeMediumOutline } from "ionicons/icons";
 
 const MSG_TYPE_TRANSLATION = "translation";
 const TTS_AUTO = true;
 // cSpell: disable-next-line
 const TTS_ROLE = "cosyvoice-woman-8a96d641d8d0491984c085d98870b79d";
+const INPUT_TYPE = ref("audio");
+const AUDIO_TYPE = ref("hold");
 // 存储识别结果的变量
 const inputText = ref("");
 const globalVar: any = inject("globalVar");
@@ -220,7 +246,7 @@ const sendTextMessage = () => {
     }
   }
 };
-function sendAudioData(data: string, finish: boolean = false) {
+function sendAudioData(data: string, finish: boolean = false, cancel = false) {
   if (!socket.connected) {
     console.warn("WebSocket未连接，稍后重试");
     return;
@@ -230,6 +256,7 @@ function sendAudioData(data: string, finish: boolean = false) {
     sample: SAMPLE_RATE,
     content: data,
     finish: finish,
+    cancel: cancel,
   });
   // console.log("==> sendData audio ", data.length, finish);
   socket.emit("message", message);
@@ -274,7 +301,7 @@ function recProcess(
   }
 }
 
-function stopRecording() {
+function stopRecording(cancel = false) {
   console.log("==> stopRecording");
   if (isRecording.value === false) return;
   rec.stop(
@@ -287,7 +314,7 @@ function stopRecording() {
         const base64Data = btoa(String.fromCharCode(...uint8));
         sendAudioData(base64Data);
       }
-      sendAudioData("", true);
+      sendAudioData("", true, cancel);
       if (TTS_AUTO) {
         streamAudio(() => {});
       }
@@ -349,5 +376,19 @@ function streamAudio(f = () => {}) {
     audioRef.value!.play();
     f();
   });
+}
+function btnChangeMode() {
+  if (INPUT_TYPE.value == "text") {
+    INPUT_TYPE.value = "voice";
+  } else {
+    INPUT_TYPE.value = "text";
+  }
+}
+function onAudioTypeChange() {
+  if (AUDIO_TYPE.value == "hold") {
+    AUDIO_TYPE.value = "stream";
+  } else {
+    AUDIO_TYPE.value = "hold";
+  }
 }
 </script>

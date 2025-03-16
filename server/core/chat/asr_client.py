@@ -30,7 +30,8 @@ class AsrClient:
         self.text_print_2pass_online = ""
         self.text_print_2pass_offline = ""
         self.on_result = on_result or (lambda text: None)
-        self.on_err = on_err or(lambda text: None)
+        self.on_err = on_err or (lambda text: None)
+        self.cancel = False
 
     def start_asr(self, ws):
         chunk_size = 60 * ASR_CHUNK_SIZE[1] / ASR_CHUNK_INTERVAL
@@ -105,8 +106,9 @@ class AsrClient:
             self.text_print = ""
             # if offline_msg_done:
             #     self.close()
-            if self.on_result:
+            if not self.cancel:
                 self.on_result(self.text_all)
+            self.cancel = False
         except Exception as e:
             self.on_err(e)
             log.error("Exception:", e)

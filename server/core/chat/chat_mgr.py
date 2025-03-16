@@ -25,6 +25,7 @@ class ClientContext:
         self.tts = TTSClient(self.on_tts_msg, self.on_err)
         self.autoTTS = False
 
+
     def close(self):
         self.asr.close()
 
@@ -140,6 +141,9 @@ class ChatMgr:
             elif data_type == 'audio':
                 audio_bytes = base64.b64decode(content)
                 self.handle_audio(client_id, data['sample'], audio_bytes)
+                cancel = data.get('cancel', False)
+                if cancel:
+                    ctx.asr.cancel = True
                 if data['finish']:
                     ctx.asr.end_asr()
 
