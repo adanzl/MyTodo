@@ -79,7 +79,7 @@
 <script setup lang="ts">
 import { getApiUrl, getConversationId, setConversationId } from "@/utils/NetUtil";
 import { IonToolbar, onIonViewDidEnter, IonCheckbox, createGesture } from "@ionic/vue";
-import io from "socket.io-client";
+import io, { Socket } from "socket.io-client";
 import Recorder from "recorder-core/recorder.wav.min";
 Recorder.CLog = function () {}; // 屏蔽Recorder的日志输出
 import { inject, onMounted, ref } from "vue";
@@ -104,9 +104,8 @@ const messages = ref<any>([]);
 const url = getApiUrl().replace("api", "");
 const recBtn = ref<any>();
 // const url = "http://127.0.0.1:8000/";
-const socket = io(url, {
-  transports: ["websocket"], // 强制使用 WebSocket 传输
-});
+const socketRef = ref<Socket>();
+
 const isWaitingServer = ref(false);
 const isRecording = ref(false);
 const SAMPLE_RATE = 16000;
@@ -131,96 +130,102 @@ let playAudioData: ArrayBuffer[] = [];
 
 onMounted(() => {
   messages.value.push({ content: "你好，我是楠楠，和我聊点什么吧", role: "server" });
+  initSocketIO();
 });
 onIonViewDidEnter(async () => {
   aiConversationId.value = (await getConversationId(globalVar.user.id)) || "";
 });
-// 发送握手请求
-socket.on("connect", () => {
-  const msg = {
-    key: "123456",
-    ttsAuto: TTS_AUTO,
-    ttsRole: TTS_ROLE,
-    ttsSpeed: 1.0,
-    ttsVol: 50,
-    aiConversationId: aiConversationId.value,
-    user: globalVar.user.name,
-  };
+function initSocketIO() {
+  socketRef.value = io(url, {
+    transports: ["websocket"], // 强制使用 WebSocket 传输
+  });
+  // 发送握手请求
+  socketRef.value.on("connect", () => {
+    const msg = {
+      key: "123456",
+      ttsAuto: TTS_AUTO,
+      ttsRole: TTS_ROLE,
+      ttsSpeed: 1.0,
+      ttsVol: 50,
+      aiConversationId: aiConversationId.value,
+      user: globalVar.user.name,
+    };
 
-  console.log("Connected to the server. Sending handshake...", msg);
-  socket.emit("handshake", msg);
-});
-socket.on("message", (data) => {
-  if (data.type === MSG_TYPE_TRANSLATION) {
-    messages.value.push({ content: `Translation: ${data.content}`, role: "server" });
+    console.log("Connected to the server. Sending handshake...", msg);
+    socketRef.value!.emit("handshake", msg);
+  });
+  socketRef.value.on("message", (data) => {
+    if (data.type === MSG_TYPE_TRANSLATION) {
+      messages.value.push({ content: `Translation: ${data.content}`, role: "server" });
+      isWaitingServer.value = false;
+    } else {
+      messages.value.push({ content: `Unknown: ${JSON.stringify(data)}`, role: "server" });
+    }
+    chatContent.value.$el.scrollToBottom(200);
+  });
+  // 处理asr结果
+  socketRef.value.on("msgAsr", (data) => {
+    if (data.content) {
+      messages.value.push({ content: data.content, role: "me", audioSrc: lstAudioSrc.value });
+    }
+    chatContent.value.$el.scrollToBottom(200);
+  });
+  // 处理ai chat结果
+  socketRef.value.on("msgChat", (data) => {
+    if (messages.value.length === 0 || messages.value[messages.value.length - 1].role === "me") {
+      messages.value.push({ content: data.content, role: "server" });
+    } else {
+      messages.value[messages.value.length - 1].content += data.content;
+    }
+    if (data.aiConversationId != aiConversationId.value) {
+      aiConversationId.value = data.aiConversationId;
+      setConversationId(globalVar.user.id, aiConversationId.value);
+    }
+    chatContent.value.$el.scrollToBottom(200);
+  });
+  socketRef.value.on("endChat", (data: any) => {
+    console.log("==> MSG_TYPE_CHAT_END", data.content);
     isWaitingServer.value = false;
-  } else {
-    messages.value.push({ content: `Unknown: ${JSON.stringify(data)}`, role: "server" });
-  }
-  chatContent.value.$el.scrollToBottom(200);
-});
-// 处理asr结果
-socket.on("msgAsr", (data) => {
-  if (data.content) {
-    messages.value.push({ content: data.content, role: "me", audioSrc: lstAudioSrc.value });
-  }
-  chatContent.value.$el.scrollToBottom(200);
-});
-// 处理ai chat结果
-socket.on("msgChat", (data) => {
-  if (messages.value.length === 0 || messages.value[messages.value.length - 1].role === "me") {
-    messages.value.push({ content: data.content, role: "server" });
-  } else {
-    messages.value[messages.value.length - 1].content += data.content;
-  }
-  if (data.aiConversationId != aiConversationId.value) {
-    aiConversationId.value = data.aiConversationId;
-    setConversationId(globalVar.user.id, aiConversationId.value);
-  }
-  chatContent.value.$el.scrollToBottom(200);
-});
-socket.on("endChat", (data: any) => {
-  console.log("==> MSG_TYPE_CHAT_END", data.content);
-  isWaitingServer.value = false;
-  // playAudio(messages.value[messages.value.length - 1]);
-});
-// 处理tts结果
-socket.on("dataAudio", (data: any) => {
-  if (data.type === "tts") {
-    const chunk = data.data; // 接收的是二进制数据
-    // console.log(chunk.length, data.data);
-    if (chunk instanceof ArrayBuffer) {
-      playAudioData.push(chunk);
-      // 如果数据是 ArrayBuffer
-      if (!ttsData.value.audioBuffer!.updating) {
-        // ttsAudioBuffer.value!.appendBuffer(chunk);
-        const combinedBuffer = new Uint8Array(
-          playAudioData.reduce((acc, curr) => acc + curr.byteLength, 0)
-        );
-        let offset = 0;
-        // 将所有数据块合并为一个 Uint8Array
-        playAudioData.forEach((chunk) => {
-          combinedBuffer.set(new Uint8Array(chunk), offset);
-          offset += chunk.byteLength;
-        });
-        ttsData.value.audioBuffer.appendBuffer(combinedBuffer); // 直接添加 ArrayBuffer 数据
-        // 清空已处理的数据
-        playAudioData = [];
+    // playAudio(messages.value[messages.value.length - 1]);
+  });
+  // 处理tts结果
+  socketRef.value.on("dataAudio", (data: any) => {
+    if (data.type === "tts") {
+      const chunk = data.data; // 接收的是二进制数据
+      // console.log(chunk.length, data.data);
+      if (chunk instanceof ArrayBuffer) {
+        playAudioData.push(chunk);
+        // 如果数据是 ArrayBuffer
+        if (!ttsData.value.audioBuffer!.updating) {
+          // ttsAudioBuffer.value!.appendBuffer(chunk);
+          const combinedBuffer = new Uint8Array(
+            playAudioData.reduce((acc, curr) => acc + curr.byteLength, 0)
+          );
+          let offset = 0;
+          // 将所有数据块合并为一个 Uint8Array
+          playAudioData.forEach((chunk) => {
+            combinedBuffer.set(new Uint8Array(chunk), offset);
+            offset += chunk.byteLength;
+          });
+          ttsData.value.audioBuffer.appendBuffer(combinedBuffer); // 直接添加 ArrayBuffer 数据
+          // 清空已处理的数据
+          playAudioData = [];
+        }
+      } else {
+        console.warn("未知的数据类型");
       }
     } else {
-      console.warn("未知的数据类型");
+      console.warn("Unknown bin data", data);
     }
-  } else {
-    console.warn("Unknown bin data", data);
-  }
-});
-socket.on("endAudio", (data: any) => {
-  console.log("==> end_audio", data.content);
-});
-socket.on("handshakeResponse", (data) => console.log("handshake:", data));
-socket.on("disconnect", () => console.log("Disconnected from the server."));
-socket.on("error", (error) => console.error("msg error:", error));
-socket.on("close", () => console.log("WebSocket connection closed."));
+  });
+  socketRef.value.on("endAudio", (data: any) => {
+    console.log("==> end_audio", data.content);
+  });
+  socketRef.value.on("handshakeResponse", (data) => console.log("handshake:", data));
+  socketRef.value.on("disconnect", () => console.log("Disconnected from the server."));
+  socketRef.value.on("error", (error) => console.error("msg error:", error));
+  socketRef.value.on("close", () => console.log("WebSocket connection closed."));
+}
 
 // 模拟发送消息
 const sendTextMessage = () => {
@@ -236,15 +241,15 @@ const sendTextMessage = () => {
     chatContent.value.$el.scrollToBottom(200);
     if (TTS_AUTO) {
       streamAudio(() => {
-        socket.emit("message", message);
+        socketRef.value!.emit("message", message);
       });
     } else {
-      socket.emit("message", message);
+      socketRef.value!.emit("message", message);
     }
   }
 };
 function sendAudioData(data: string, finish: boolean = false, cancel = false) {
-  if (!socket.connected) {
+  if (!socketRef.value!.connected) {
     console.warn("WebSocket未连接，稍后重试");
     return;
   }
@@ -256,7 +261,7 @@ function sendAudioData(data: string, finish: boolean = false, cancel = false) {
     cancel: cancel,
   });
   // console.log("==> sendData audio ", data.length, finish);
-  socket.emit("message", message);
+  socketRef.value!.emit("message", message);
 }
 async function startRecording() {
   if (!isWaitingServer.value) {
@@ -367,7 +372,7 @@ function playAudio(msg: any) {
       role: TTS_ROLE,
     });
     streamAudio(() => {
-      socket.emit("tts", payload);
+      socketRef.value!.emit("tts", payload);
     });
   }
 }

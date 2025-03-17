@@ -485,7 +485,8 @@ export default defineComponent({
         if (eList) {
           let ii = eList[0].order ?? 0;
           _.forEach(eList, (e) => {
-            refData.userData.value.schedules[e.id].order = ii;
+            const pre = _.find(refData.userData.value.schedules, (s) => s.id === e.id);
+            pre!.order = ii;
             e.order = ii++;
           });
         }
