@@ -140,8 +140,6 @@ onMounted(() => {
   messages.value.push({ content: "你好，我是楠楠，和我聊点什么吧", role: "server" });
   initSocketIO();
   audioRef.value!.addEventListener("ended", () => {
-    console.log("音频播放完毕");
-    stopAndClearAudio();
   });
 });
 onIonViewDidEnter(async () => {
@@ -189,7 +187,7 @@ function initSocketIO() {
   // 处理ai chat结果
   socketRef.value.on("msgChat", (data) => {
     if (messages.value.length === 0 || messages.value[messages.value.length - 1].role === "me") {
-      messages.value.push({ content: data.content, role: "server" });
+      messages.value.push({ content: data.content, role: "server" ,playing: TTS_AUTO});
     } else {
       messages.value[messages.value.length - 1].content += data.content;
     }
