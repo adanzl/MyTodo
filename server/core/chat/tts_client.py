@@ -40,35 +40,11 @@ class TTSClient(ResultCallback):
         self.speed = 1.0
         self.vol = 50
 
+    def streaming_cancel(self):
+        self.synthesizer.streaming_cancel()
+
     def process_msg(self, text: str, role: str = None):
         try:
-            # 发起请求到 FastAPI 服务器，并处理流式响应
-            # payload = {
-            #     "tts_text": text,
-            #     "prompt_text": "希望你以后能够做的比我还好呦。",
-            # }
-            # prompt_wav = ROLE_MAP.get(user, ROLE_MAP["default"])
-            # files = [
-            #     (
-            #         "prompt_wav",
-            #         ("prompt_wav", open(prompt_wav, "rb"), "application/octet-stream"),
-            #     )
-            # ]
-            # log.info(f"[TTS REQ] {json.dumps(payload,ensure_ascii=False)}")
-            # rsp = requests.request(
-            #     "GET", FASTAPI_URL, data=payload, files=files, stream=True
-            # )
-            # log.info(f"[TTS RSP]:  {rsp.status_code}, {rsp.reason}")
-            # if rsp.status_code != 200:
-            #     self.on_err(Exception(f"Error: {rsp.status_code}, {rsp.text}"))
-            #     return
-            # # 使用 Socket.IO 的分片消息发送音频数据
-            # for chunk in rsp.iter_content(chunk_size=16000):
-            #     if chunk:
-            #         # 使用二进制消息发送音频数据
-            #         self.on_msg(chunk)
-            # log.info("[TTS COMPLETE] ")
-            # self.on_msg("Completed", 1)
             if role is None:
                 role = self.role
             synthesizer = SpeechSynthesizer(

@@ -12,10 +12,10 @@
           <div
             v-if="msg.role == 'server'"
             class="w-[80%] bg-pink-200 rounded-lg p-2 shadow-md ml-auto relative">
-            {{ msg.content }}
+            {{ msg.content ?? "..." }}
             <div
               class="absolute -left-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center"
-              @click="playAudio(msg)">
+              @click="btnAudioClk(msg)">
               <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" />
               <audio type="audio/wav" style="width: auto" class="m-2"></audio>
             </div>
@@ -25,7 +25,7 @@
             <div
               v-if="msg.audioSrc"
               class="absolute -right-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center text-black"
-              @click="playAudio(msg)">
+              @click="btnAudioClk(msg)">
               <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" />
               <audio type="audio/wav" style="width: auto" class="m-2"></audio>
             </div>
@@ -93,6 +93,7 @@ const MSG_TYPE_TRANSLATION = "translation";
 const TTS_AUTO = true;
 // cSpell: disable-next-line
 const TTS_ROLE = "longwan_v2";
+const TTS_SPEED = 1.1;
 const INPUT_TYPE = ref("audio");
 const AUDIO_TYPE = ref("hold");
 // 存储识别结果的变量
@@ -100,7 +101,13 @@ const inputText = ref("");
 const globalVar: any = inject("globalVar");
 const aiConversationId = ref("");
 const inputRef = ref<HTMLElement | null>(null);
-const messages = ref<any>([]);
+class MSG {
+  content: string = "";
+  role: string = "";
+  audioSrc?: string = "";
+  playing? = false;
+}
+const messages = ref<MSG[]>([]);
 const url = getApiUrl().replace("api", "");
 const recBtn = ref<any>();
 // const url = "http://127.0.0.1:8000/";
@@ -110,6 +117,7 @@ const isWaitingServer = ref(false);
 const isRecording = ref(false);
 const SAMPLE_RATE = 16000;
 const audioRef = ref<HTMLAudioElement | null>(null);
+const audioPlayMsg = ref<MSG | null>(null);
 const lstAudioSrc = ref<string>("");
 const chatContent = ref<any>(null);
 // const ttsAudioBuffer = ref<SourceBuffer | null>(null);
@@ -145,7 +153,7 @@ function initSocketIO() {
       key: "123456",
       ttsAuto: TTS_AUTO,
       ttsRole: TTS_ROLE,
-      ttsSpeed: 1.2,
+      ttsSpeed: TTS_SPEED,
       ttsVol: 50,
       aiConversationId: aiConversationId.value,
       user: globalVar.user.name,
@@ -166,7 +174,11 @@ function initSocketIO() {
   // 处理asr结果
   socketRef.value.on("msgAsr", (data) => {
     if (data.content) {
-      messages.value.push({ content: data.content, role: "me", audioSrc: lstAudioSrc.value });
+      messages.value.push({
+        content: data.content,
+        role: "me",
+        audioSrc: lstAudioSrc.value,
+      });
     }
     chatContent.value.$el.scrollToBottom(200);
   });
@@ -196,7 +208,7 @@ function initSocketIO() {
       if (chunk instanceof ArrayBuffer) {
         playAudioData.push(chunk);
         // 如果数据是 ArrayBuffer
-        if (!ttsData.value.audioBuffer!.updating) {
+        if (ttsData.value.audioBuffer && !ttsData.value.audioBuffer.updating) {
           // ttsAudioBuffer.value!.appendBuffer(chunk);
           const combinedBuffer = new Uint8Array(
             playAudioData.reduce((acc, curr) => acc + curr.byteLength, 0)
@@ -267,10 +279,15 @@ async function startRecording() {
   if (!isWaitingServer.value) {
     console.log("==> startRecording");
     try {
-      rec.open(() => {
-        console.info("Recording started");
-        rec.start();
-      });
+      rec.open(
+        () => {
+          console.info("Recording started");
+          rec.start();
+        },
+        () => {
+          console.error("Recording failed");
+        }
+      );
       // 创建手势
       const gesture = createGesture({
         el: recBtn.value.$el, // 目标元素
@@ -352,29 +369,48 @@ function stopRecording(cancel = false) {
       if (TTS_AUTO && !cancel) {
         streamAudio(() => {});
       }
+      rec.close();
     },
     (errMsg: any) => console.log("errMsg: " + errMsg)
   );
   isRecording.value = false;
 }
 
-function playAudio(msg: any) {
+async function btnAudioClk(msg: MSG) {
   if (isWaitingServer.value) return;
   console.log("==> playAudio", msg);
-  ttsData.value.msg = msg;
-  if (msg.audioSrc) {
-    const audio = new Audio(msg.audioSrc); // 替换为你的音频文件路径
-    audio.volume = 1; // 音量范围是0到1
-    audio.play();
+  await stopAudio();
+  if (msg.playing) {
+    msg.playing = false;
   } else {
-    const payload = JSON.stringify({
-      content: msg.content,
-      role: TTS_ROLE,
-    });
-    streamAudio(() => {
-      socketRef.value!.emit("tts", payload);
-    });
+    msg.playing = true;
+    audioPlayMsg.value = msg;
+    if (msg.audioSrc) {
+      audioRef.value!.src = msg.audioSrc;
+      audioRef.value!.play();
+    } else {
+      ttsData.value.msg = msg;
+      const payload = JSON.stringify({
+        content: msg.content,
+        role: TTS_ROLE,
+      });
+      streamAudio(() => {
+        socketRef.value!.emit("tts", payload);
+      });
+    }
   }
+}
+async function stopAudio() {
+  audioRef.value!.pause();
+  if (ttsData.value.audioBuffer) {
+    ttsData.value.audioBuffer.abort();
+    ttsData.value.audioBuffer = null;
+    socketRef.value!.emit("ttsCancel");
+  }
+  if (audioPlayMsg.value) {
+    audioPlayMsg.value.playing = false;
+  }
+  audioPlayMsg.value = null;
 }
 
 function streamAudio(f = () => {}) {
