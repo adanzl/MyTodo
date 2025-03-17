@@ -25,7 +25,6 @@ class ClientContext:
         self.tts = TTSClient(self.on_tts_msg, self.on_err)
         self.autoTTS = False
 
-
     def close(self):
         self.asr.close()
 
@@ -164,5 +163,5 @@ class ChatMgr:
 
         @socketio.on('ttsCancel')
         def handle_tts_cancel(msg):
-            client_id = request.sid
-            self.clients[client_id].tts.streaming_cancel()
+            ctx = self.clients[request.sid]
+            ctx.tts.streaming_cancel()

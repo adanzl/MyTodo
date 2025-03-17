@@ -30,4 +30,7 @@ def main():
 if __name__ == '__main__':
     #开始运行flask应用程序，以调试模式运行
     # app.run(debug=True, port=8888)
-    socketio.run(app, debug=True, port=8000)
+    try:
+        socketio.run(app, debug=True, port=8000)
+    except Exception as e:
+        log.error(e)
