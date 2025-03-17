@@ -30,6 +30,8 @@ class ClientContext:
         self.asr.close()
 
     def on_asr_result(self, text):
+        if text == '':
+            return
         msg = {"content": text}
         socketio.emit('msgAsr', msg, room=self.sid)
         self.ai.stream_msg(text)

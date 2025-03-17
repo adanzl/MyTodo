@@ -121,7 +121,7 @@ const audioPlayMsg = ref<MSG | null>(null);
 const lstAudioSrc = ref<string>("");
 const chatContent = ref<any>(null);
 // const ttsAudioBuffer = ref<SourceBuffer | null>(null);
-const ttsData = ref<any>({ audioBuffer: null, msg: null, audioEnd: false });
+const ttsData = ref<any>({ audioBuffer: null, msg: null, audioEnd: false, mediaSource: null });
 const rec = Recorder({
   type: "wav",
   bitRate: 16,
@@ -139,6 +139,10 @@ let playAudioData: ArrayBuffer[] = [];
 onMounted(() => {
   messages.value.push({ content: "你好，我是楠楠，和我聊点什么吧", role: "server" });
   initSocketIO();
+  audioRef.value!.addEventListener("ended", () => {
+    console.log("音频播放完毕");
+    stopAndClearAudio();
+  });
 });
 onIonViewDidEnter(async () => {
   aiConversationId.value = (await getConversationId(globalVar.user.id)) || "";
@@ -403,15 +407,26 @@ async function btnAudioClk(msg: MSG) {
   }
 }
 async function stopAndClearAudio() {
-  audioRef.value!.pause();
+  if (audioRef.value) {
+    audioRef.value.pause();
+    audioRef.value!.src = "";
+  }
   if (ttsData.value.audioBuffer) {
+    // ttsData.value.audioBuffer.abort();
     ttsData.value.audioBuffer = null;
-    socketRef.value!.emit("ttsCancel");
+    console.log("==> ttsCancel");
+    socketRef.value!.emit("ttsCancel", {});
   }
   if (audioPlayMsg.value) {
     audioPlayMsg.value.playing = false;
   }
   audioPlayMsg.value = null;
+  if (ttsData.value.mediaSource) {
+    if (ttsData.value.mediaSource.readyState === "open") {
+      ttsData.value.mediaSource.endOfStream();
+    }
+    ttsData.value.mediaSource = null;
+  }
 }
 
 function streamAudio(f = () => {}) {
@@ -419,6 +434,7 @@ function streamAudio(f = () => {}) {
   audioRef.value!.src = URL.createObjectURL(mediaSource);
   playAudioData = [];
   ttsData.value.audioEnd = false;
+  ttsData.value.mediaSource = mediaSource;
 
   // 等待 MediaSource 打开
   mediaSource.addEventListener("sourceopen", () => {
@@ -449,11 +465,6 @@ function streamAudio(f = () => {}) {
       ) {
         mediaSource.endOfStream();
       }
-    });
-
-    audioRef.value!.addEventListener("ended", () => {
-      console.log("音频播放完毕");
-      stopAndClearAudio();
     });
 
     audioRef.value!.play();

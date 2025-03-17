@@ -42,7 +42,12 @@ class TTSClient(ResultCallback):
 
     def streaming_cancel(self):
         log.info("[TTS] cancel streaming")
-        self.synthesizer.streaming_cancel()
+        try:
+            self.synthesizer.streaming_cancel()
+        except Exception as e:
+            log.error(e)
+            traceback.print_stack()
+            self.on_err(e)
 
     def process_msg(self, text: str, role: str = None):
         try:
