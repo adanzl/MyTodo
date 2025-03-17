@@ -48,7 +48,7 @@ class ClientContext:
 
     def on_err(self, err: Exception):
         log.error(f"[CHAT] Error: {err}")
-        msg = {"type": MSG_TYPE_ERROR, "content": err}
+        msg = {"type": MSG_TYPE_ERROR, "content": str(err)}
         socketio.emit('error', msg, room=self.sid)
 
     def on_tts_msg(self, data, type=0):
@@ -158,6 +158,7 @@ class ChatMgr:
 
             client_id = request.sid
             self.clients[client_id].tts.stream_msg(text, role)
+            self.clients[client_id].tts.stream_complete()
 
         @socketio.on('ttsCancel')
         def handle_tts_cancel(msg):
