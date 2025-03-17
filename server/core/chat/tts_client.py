@@ -41,6 +41,7 @@ class TTSClient(ResultCallback):
         self.vol = 50
 
     def streaming_cancel(self):
+        log.info("[TTS] cancel streaming")
         self.synthesizer.streaming_cancel()
 
     def process_msg(self, text: str, role: str = None):
@@ -80,9 +81,14 @@ class TTSClient(ResultCallback):
             self.on_err(e)
 
     def stream_complete(self):
-        if self.synthesizer is None:
-            return
-        self.synthesizer.streaming_complete()
+        try:
+            if self.synthesizer is None:
+                return
+            self.synthesizer.streaming_complete()
+        except Exception as e:
+            log.error(e)
+            traceback.print_stack()
+            self.on_err(e)
 
     def on_open(self):
         # log.info("[TTS] open")
@@ -104,7 +110,12 @@ class TTSClient(ResultCallback):
 
     def on_data(self, data: bytes) -> None:
         # log.info("[TTS] result length: " + str(len(data)))
-        self.on_msg(data)
+        try:
+            self.on_msg(data)
+        except Exception as e:
+            log.error(e)
+            traceback.print_stack()
+            self.on_err(e)
 
 
 if __name__ == "__main__":

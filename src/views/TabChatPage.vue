@@ -121,7 +121,7 @@ const audioPlayMsg = ref<MSG | null>(null);
 const lstAudioSrc = ref<string>("");
 const chatContent = ref<any>(null);
 // const ttsAudioBuffer = ref<SourceBuffer | null>(null);
-const ttsData = ref<any>({ audioBuffer: null, msg: null });
+const ttsData = ref<any>({ audioBuffer: null, msg: null, audioEnd: false });
 const rec = Recorder({
   type: "wav",
   bitRate: 16,
@@ -231,6 +231,7 @@ function initSocketIO() {
     }
   });
   socketRef.value.on("endAudio", (data: any) => {
+    ttsData.value.audioEnd = true;
     console.log("==> end_audio", data.content);
   });
   socketRef.value.on("handshakeResponse", (data) => console.log("handshake:", data));
@@ -378,11 +379,12 @@ function stopRecording(cancel = false) {
 
 async function btnAudioClk(msg: MSG) {
   if (isWaitingServer.value) return;
-  console.log("==> playAudio", msg);
-  await stopAudio();
+  console.log("==> playAudio", msg.playing);
   if (msg.playing) {
     msg.playing = false;
+    stopAndClearAudio();
   } else {
+    stopAndClearAudio();
     msg.playing = true;
     audioPlayMsg.value = msg;
     if (msg.audioSrc) {
@@ -400,10 +402,9 @@ async function btnAudioClk(msg: MSG) {
     }
   }
 }
-async function stopAudio() {
+async function stopAndClearAudio() {
   audioRef.value!.pause();
   if (ttsData.value.audioBuffer) {
-    ttsData.value.audioBuffer.abort();
     ttsData.value.audioBuffer = null;
     socketRef.value!.emit("ttsCancel");
   }
@@ -417,6 +418,7 @@ function streamAudio(f = () => {}) {
   const mediaSource = new MediaSource();
   audioRef.value!.src = URL.createObjectURL(mediaSource);
   playAudioData = [];
+  ttsData.value.audioEnd = false;
 
   // 等待 MediaSource 打开
   mediaSource.addEventListener("sourceopen", () => {
@@ -440,7 +442,18 @@ function streamAudio(f = () => {}) {
         ttsData.value.audioBuffer.appendBuffer(combinedBuffer); // 直接添加 ArrayBuffer 数据
         // 清空已处理的数据
         playAudioData = [];
+      } else if (
+        playAudioData.length == 0 &&
+        !ttsData.value.audioBuffer.updating &&
+        ttsData.value.audioEnd
+      ) {
+        mediaSource.endOfStream();
       }
+    });
+
+    audioRef.value!.addEventListener("ended", () => {
+      console.log("音频播放完毕");
+      stopAndClearAudio();
     });
 
     audioRef.value!.play();
