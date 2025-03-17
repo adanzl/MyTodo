@@ -92,7 +92,7 @@ import { volumeMediumOutline } from "ionicons/icons";
 const MSG_TYPE_TRANSLATION = "translation";
 const TTS_AUTO = true;
 // cSpell: disable-next-line
-const TTS_ROLE = "cosyvoice-woman-8a96d641d8d0491984c085d98870b79d";
+const TTS_ROLE = "longwan_v2";
 const INPUT_TYPE = ref("audio");
 const AUDIO_TYPE = ref("hold");
 // 存储识别结果的变量
@@ -145,7 +145,7 @@ function initSocketIO() {
       key: "123456",
       ttsAuto: TTS_AUTO,
       ttsRole: TTS_ROLE,
-      ttsSpeed: 1.0,
+      ttsSpeed: 1.2,
       ttsVol: 50,
       aiConversationId: aiConversationId.value,
       user: globalVar.user.name,
