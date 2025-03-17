@@ -90,7 +90,7 @@ class TTSClient(ResultCallback):
 
     def on_complete(self):
         # log.info("[TTS] finished")
-        self.on_msg("Completed", 1)
+        self.on_msg("[TTS] Completed", 1)
 
     def on_error(self, message: str):
         log.error(f"[TTS] failed, {message}")

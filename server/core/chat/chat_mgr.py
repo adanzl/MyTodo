@@ -157,7 +157,7 @@ class ChatMgr:
                 return
 
             client_id = request.sid
-            self.clients[client_id].tts.process_msg(text, role)
+            self.clients[client_id].tts.stream_msg(text, role)
 
         @socketio.on('ttsCancel')
         def handle_tts_cancel(msg):
