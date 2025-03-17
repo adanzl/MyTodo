@@ -45,6 +45,7 @@ class TTSClient(ResultCallback):
         try:
             if self.synthesizer is not None:
                 self.synthesizer.streaming_cancel()
+                self.synthesizer = None
         except Exception as e:
             log.error(e)
             traceback.print_stack()
