@@ -88,7 +88,7 @@ import { getApiUrl, getConversationId, setConversationId } from "@/utils/NetUtil
 import { IonToolbar, onIonViewDidEnter, IonCheckbox, createGesture } from "@ionic/vue";
 import io, { Socket } from "socket.io-client";
 import Recorder from "recorder-core/recorder.wav.min";
-Recorder.CLog = function () {}; // 屏蔽Recorder的日志输出
+Recorder.CLog = function () { }; // 屏蔽Recorder的日志输出
 import { inject, onMounted, ref } from "vue";
 import MdiMicrophone from "~icons/mdi/microphone";
 import MdiStopCircleOutline from "~icons/mdi/stop-circle-outline";
@@ -146,7 +146,7 @@ let playAudioData: ArrayBuffer[] = [];
 onMounted(() => {
   messages.value.push({ content: "你好，我是楠楠，和我聊点什么吧", role: "server" });
   initSocketIO();
-  audioRef.value!.addEventListener("ended", () => {});
+  audioRef.value!.addEventListener("ended", () => { audioPlayMsg.value!.playing = false });
 });
 onIonViewDidEnter(async () => {
   aiConversationId.value = (await getConversationId(globalVar.user.id)) || "";
@@ -193,7 +193,11 @@ function initSocketIO() {
   // 处理ai chat结果
   socketRef.value.on("msgChat", (data) => {
     if (messages.value.length === 0 || messages.value[messages.value.length - 1].role === "me") {
-      messages.value.push({ content: data.content, role: "server", playing: TTS_AUTO });
+      const msg = { content: data.content, role: "server", playing: TTS_AUTO }
+      messages.value.push(msg);
+      if(TTS_AUTO) {
+        audioPlayMsg.value = msg;
+      }
     } else {
       messages.value[messages.value.length - 1].content += data.content;
     }
@@ -302,7 +306,7 @@ async function startRecording() {
         el: recBtn.value.$el, // 目标元素
         gestureName: "longPress", // 手势名称
         threshold: 0, // 触发距离阈值
-        onStart: () => {},
+        onStart: () => { },
         onMove: (ev) => {
           // 检查是否移动出按钮范围
           const rect = recBtn.value.$el.getBoundingClientRect();
@@ -374,7 +378,7 @@ function stopRecording(cancel = false) {
       }
       sendAudioData("", true, cancel);
       if (TTS_AUTO && !cancel) {
-        streamAudio(() => {});
+        streamAudio(() => { });
       }
       rec.close();
     },
@@ -431,7 +435,7 @@ async function stopAndClearAudio() {
   }
 }
 
-function streamAudio(f = () => {}) {
+function streamAudio(f = () => { }) {
   const mediaSource = new MediaSource();
   audioRef.value!.pause();
   audioRef.value!.src = URL.createObjectURL(mediaSource);
