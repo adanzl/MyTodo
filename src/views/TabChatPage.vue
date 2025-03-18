@@ -16,8 +16,8 @@
             <div
               class="absolute -left-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center"
               @click="btnAudioClk(msg)">
-              <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" />
-              <audio type="audio/wav" style="width: auto" class="m-2"></audio>
+              <MdiStopCircleOutline width="24" height="24" v-if="msg.playing" />
+              <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
             </div>
           </div>
           <div v-else class="w-[80%] bg-green-500 text-white p-2 rounded-lg shadow-md relative">
@@ -26,8 +26,8 @@
               v-if="msg.audioSrc"
               class="absolute -right-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center text-black"
               @click="btnAudioClk(msg)">
-              <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" />
-              <audio type="audio/wav" style="width: auto" class="m-2"></audio>
+              <MdiStopCircleOutline width="24" height="24" v-if="msg.playing" />
+              <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
             </div>
           </div>
         </div>
@@ -55,12 +55,19 @@
         <div class="w-12 h-auto flex items-center" @click="btnChangeMode">
           <WeuiKeyboardOutlined width="40" height="40" />
         </div>
-        <!-- <ion-button class="flex-1 mr-1 w-full" mode="md" @click="stopRecording" v-if="isRecording">
-          <MdiStopCircleOutline width="24" height="24" />
-        </ion-button> -->
-        <ion-button class="flex-1 mr-1" ref="recBtn" @pointerdown="startRecording">
-          <MdiStopCircleOutline v-if="isRecording" width="24" height="24" />
-          <MdiMicrophone v-else width="24" height="24" />
+        <ion-button
+          class="flex-1 mr-1"
+          ref="recBtn"
+          @pointerdown="startRecording"
+          :color="isRecording ? 'warning' : 'primary'">
+          <div v-if="isRecording" class="h-full flex items-center text-sm">
+            <MdiStopCircleOutline width="24" height="24" />
+            <span class="ml-1">松开发送</span>
+          </div>
+          <div v-else class="h-full flex items-center text-sm">
+            <MdiMicrophone width="24" height="24" />
+            <span class="ml-1">按住说话</span>
+          </div>
         </ion-button>
         <div class="w-12 flex flex-col pl-2">
           <ion-checkbox
@@ -139,8 +146,7 @@ let playAudioData: ArrayBuffer[] = [];
 onMounted(() => {
   messages.value.push({ content: "你好，我是楠楠，和我聊点什么吧", role: "server" });
   initSocketIO();
-  audioRef.value!.addEventListener("ended", () => {
-  });
+  audioRef.value!.addEventListener("ended", () => {});
 });
 onIonViewDidEnter(async () => {
   aiConversationId.value = (await getConversationId(globalVar.user.id)) || "";
@@ -187,7 +193,7 @@ function initSocketIO() {
   // 处理ai chat结果
   socketRef.value.on("msgChat", (data) => {
     if (messages.value.length === 0 || messages.value[messages.value.length - 1].role === "me") {
-      messages.value.push({ content: data.content, role: "server" ,playing: TTS_AUTO});
+      messages.value.push({ content: data.content, role: "server", playing: TTS_AUTO });
     } else {
       messages.value[messages.value.length - 1].content += data.content;
     }
@@ -296,9 +302,7 @@ async function startRecording() {
         el: recBtn.value.$el, // 目标元素
         gestureName: "longPress", // 手势名称
         threshold: 0, // 触发距离阈值
-        onStart: () => {
-          console.log("长按开始");
-        },
+        onStart: () => {},
         onMove: (ev) => {
           // 检查是否移动出按钮范围
           const rect = recBtn.value.$el.getBoundingClientRect();
@@ -429,6 +433,7 @@ async function stopAndClearAudio() {
 
 function streamAudio(f = () => {}) {
   const mediaSource = new MediaSource();
+  audioRef.value!.pause();
   audioRef.value!.src = URL.createObjectURL(mediaSource);
   playAudioData = [];
   ttsData.value.audioEnd = false;
@@ -464,8 +469,11 @@ function streamAudio(f = () => {}) {
         mediaSource.endOfStream();
       }
     });
-
-    audioRef.value!.play();
+    try {
+      audioRef.value!.play();
+    } catch (e) {
+      /* empty */
+    }
     f();
   });
 }
