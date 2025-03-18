@@ -60,14 +60,10 @@
           ref="recBtn"
           @pointerdown="startRecording"
           :color="isRecording ? 'warning' : 'primary'">
-          <div v-if="isRecording" class="h-full flex items-center text-sm">
-            <MdiStopCircleOutline width="24" height="24" />
-            <span class="ml-1">松开发送</span>
-          </div>
-          <div v-else class="h-full flex items-center text-sm">
-            <MdiMicrophone width="24" height="24" />
-            <span class="ml-1">按住说话</span>
-          </div>
+            <MdiStopCircleOutline v-if="isRecording" width="24" height="24" />
+            <MdiMicrophone v-else width="24" height="24" />
+            <span v-if="isRecording" class="ml-1 text-sm">松开发送</span>
+            <span v-else class="ml-1 text-sm">按住说话</span>
         </ion-button>
         <div class="w-12 flex flex-col pl-2">
           <ion-checkbox
