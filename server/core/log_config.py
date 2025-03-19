@@ -9,11 +9,11 @@ std_handler.setFormatter(formatter)
 file_handler.setFormatter(formatter)
 
 # 获取根日志记录器
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.INFO)
-root_logger.addHandler(file_handler)
-root_logger.addHandler(std_handler)
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+logger.addHandler(file_handler)
+logger.addHandler(std_handler)
 
 
 def root_logger():
-    return root_logger
+    return logger
