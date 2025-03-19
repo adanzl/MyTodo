@@ -169,3 +169,17 @@ class ChatMgr:
         def handle_chat_cancel():
             ctx = self.clients[request.sid]
             ctx.ai.streaming_cancel()
+
+        @socketio.on('config')
+        def handle_chat_config(data):
+            ctx = self.clients[request.sid]
+            if 'aiConversationId' in data:
+                ctx.ai.aiConversationId = data['aiConversationId']
+            if 'user' in data:
+                ctx.ai.user = data['user']
+            if 'ttsAuto' in data:
+                ctx.autoTTS = data['ttsAuto']
+            if 'ttsVol' in data:
+                ctx.tts.vol = data['ttsVol']
+            if 'ttsSpeed' in data:
+                ctx.tts.speed = data['ttsSpeed']
