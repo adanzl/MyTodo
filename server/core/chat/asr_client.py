@@ -44,7 +44,7 @@ class AsrClient:
             "wav_name": ASR_WAV,
             "is_speaking": False,
         })
-        log.info(f"=> start asr {message}")
+        log.info(f">>[ASR] start {message}")
         ws.send(message)
         self.text_print = ""
         self.text_all = ""
@@ -58,23 +58,23 @@ class AsrClient:
             self.ws.send_bytes(s_data)
         message = json.dumps({"is_speaking": False})
         self.ws.send(message)
-        log.info("=> end asr")
+        log.info(">>[ASR] End")
 
     def close(self):
         if self.ws:
             self.ws.close()
 
     def on_open(self, ws):
-        log.info("=> asr open")
+        log.info(">>[ASR] open")
         try:
             self.start_asr(ws)
             self.is_running = True
         except Exception as e:
-            log.error(f"Error : {e}")
+            log.error(f">>[ASR] Error : {e}")
             self.on_err(e)
 
     def on_message(self, ws, msg):
-        log.info(f"====> handle asr msg {msg}")
+        log.info(f">>[ASR] handle asr msg {msg}")
         try:
             meg = json.loads(msg)
             text = meg["text"]
@@ -83,7 +83,7 @@ class AsrClient:
             if "timestamp" in meg:
                 timestamp = meg["timestamp"]
             if "mode" not in meg:
-                log.warning("mode not in meg")
+                log.warning(">>[ASR] mode not in meg")
                 return
             if meg["mode"] == "online":
                 self.text_print += "{}".format(text)
@@ -101,7 +101,7 @@ class AsrClient:
                     self.text_print_2pass_offline += "{}".format(text)
                 self.text_print = self.text_print[-ASR_MX_WORDS:]
             msg = {"type": "recognition", "content": self.text_print, "timestamp": timestamp}
-            log.info(f"[CHAT] Emit result: {msg} , {self.sid}")
+            log.info(f">>[ASR] Receive result: {msg} , {self.sid}")
             self.text_all = self.text_print
             self.text_print = ""
             # if offline_msg_done:
@@ -114,10 +114,10 @@ class AsrClient:
             log.error("Exception:", e)
 
     def on_error(self, ws, error):
-        log.error(f"=> asr error {error}")
+        log.error(f">>[ASR] error {error}")
 
     def on_close(self, ws, close_status_code, close_msg):
-        log.info(f"=> asr close {close_status_code} {close_msg}")
+        log.info(f">>[ASR] Close {close_status_code} {close_msg}")
         self.buffer = bytearray()
         self.ws = None
         self.is_running = False

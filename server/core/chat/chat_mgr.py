@@ -112,18 +112,17 @@ class ChatMgr:
             ctx.autoTTS = data.get('ttsAuto', False)
             ctx.tts.vol = data.get('ttsVol', 50)
             ctx.tts.speed = data.get('ttsSpeed', 1.0)
-            log.info(f'Client {request.sid} connected. Total clients: {len(self.clients)}, {json.dumps(data)}')
+            log.info(f'[Chat] Client {request.sid} connected. Total clients: {len(self.clients)}, {json.dumps(data)}')
 
-            socketio.emit('handshakeResponse', {'message': 'Handshake successful'})
+            socketio.emit('handshakeResponse', {'message': 'Handshake successful'}, room=request.sid)
             return {'status': 'connected'}
 
         # 处理客户端断开连接事件
         @socketio.on('disconnect')
         def handle_disconnect():
-            log.info('[CHAT] disconnected')
             client_id = request.sid
             self.remove_client(client_id)
-            log.info(f'Client {client_id} disconnected. Total clients: {len(self.clients)}')
+            log.info(f'[CHAT] Client {client_id} disconnected. Total clients: {len(self.clients)}')
 
         # 处理接收到的消息事件
         @socketio.on(EVENT_MESSAGE)
@@ -154,7 +153,7 @@ class ChatMgr:
             text = data.get('content')
             role = data.get('role', None)
             if not text:
-                socketio.emit('error', {'error': 'Missing text'})
+                socketio.emit('error', {'error': 'Missing text'}, room=request.sid)
                 return
 
             client_id = request.sid

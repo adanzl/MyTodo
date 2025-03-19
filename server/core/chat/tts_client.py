@@ -41,13 +41,13 @@ class TTSClient(ResultCallback):
         self.vol = 50
 
     def streaming_cancel(self):
-        log.info("[TTS] cancel streaming")
+        log.info(">>[TTS] cancel streaming")
         try:
             if self.synthesizer is not None:
                 self.synthesizer.streaming_cancel()
                 self.synthesizer = None
         except Exception as e:
-            log.error(e)
+            log.error(">>[TTS]" + e)
             traceback.print_stack()
             self.on_err(e)
 
@@ -65,7 +65,7 @@ class TTSClient(ResultCallback):
             synthesizer.call(text)
 
         except Exception as e:
-            log.error(e)
+            log.error(f">>[TTS] {e}")
             traceback.print_stack()
             self.on_err(e)
 
@@ -83,7 +83,7 @@ class TTSClient(ResultCallback):
                 )
             self.synthesizer.streaming_call(text)
         except Exception as e:
-            log.error(e)
+            log.error(f">>[TTS] {e}")
             traceback.print_stack()
             self.on_err(e)
 
@@ -93,7 +93,7 @@ class TTSClient(ResultCallback):
                 return
             self.synthesizer.streaming_complete()
         except Exception as e:
-            log.error(e)
+            log.error(f">>[TTS] {e}")
             traceback.print_stack()
             self.on_err(e)
 
@@ -102,14 +102,14 @@ class TTSClient(ResultCallback):
         ...
 
     def on_complete(self):
-        # log.info("[TTS] finished")
-        self.on_msg("[TTS] Completed", 1)
+        # log.info(">>[TTS] finished")
+        self.on_msg(">>[TTS] Completed", 1)
 
     def on_error(self, message: str):
-        log.error(f"[TTS] failed, {message}")
+        log.error(f">>[TTS] failed, {message}")
 
     def on_close(self):
-        log.info(f"[TTS] closed")
+        log.info(f">>[TTS] closed")
         self.synthesizer = None
 
     def on_event(self, message):
@@ -120,7 +120,7 @@ class TTSClient(ResultCallback):
         try:
             self.on_msg(data)
         except Exception as e:
-            log.error(e)
+            log.error(f">>[TTS]{e}")
             traceback.print_stack()
             self.on_err(e)
 
@@ -134,9 +134,9 @@ if __name__ == "__main__":
 
     def f(data, type=0):
         if type == 0:
-            log.info(f"Data: {len(data)}")
+            log.info(f">>[TTS] Data: {len(data)}")
         else:
-            log.info("Message END")
+            log.info(">>[TTS] Message END")
 
     tts = TTSClient(on_msg=f)
     tts.process_msg("你好不好啊，我很好，真是个美妙的开始呢")
