@@ -1,9 +1,9 @@
-import logging
 import traceback
 
 import dashscope
+from core.log_config import root_logger
 
-log = logging.getLogger(__name__)
+log = root_logger()
 FASTAPI_URL = "http://192.168.50.171:9099/inference_zero_shot"  # FastAPI 服务器地址
 from dashscope.audio.tts_v2 import *
 
@@ -126,11 +126,6 @@ class TTSClient(ResultCallback):
 
 
 if __name__ == "__main__":
-    # cSpell: disable-next-line
-    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-    std_handler = logging.StreamHandler()
-    std_handler.setFormatter(formatter)
-    logging.basicConfig(level=logging.INFO, handlers=[std_handler])
 
     def f(data, type=0):
         if type == 0:

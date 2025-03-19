@@ -1,9 +1,10 @@
 import json
-import logging
 import sqlite3
 import traceback
 
-log = logging.getLogger(__name__)
+from core.log_config import root_logger
+
+log = root_logger()
 
 DB_NAME = "data.db"
 TABLE_SAVE = "t_user_save"
@@ -109,6 +110,7 @@ def get_data_idx(table, id, idx=1):
         cur.close()
     return {"code": 0, "msg": "ok", "data": data}
 
+
 def get_data(table, id, fields):
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
@@ -116,7 +118,7 @@ def get_data(table, id, fields):
         cur.execute(f"SELECT {fields} FROM {table} WHERE id=?", (id, ))
         result = cur.fetchone()
         if result:
-            data = dict(zip([col[0] for col in cur.description], result)) 
+            data = dict(zip([col[0] for col in cur.description], result))
         else:
             data = "{}"
     except Exception as e:
@@ -175,6 +177,7 @@ def del_data(table, id: int) -> dict:
         cur.close()
     return {"code": 0, "msg": "ok", "data": cnt}
 
+
 def query(sql) -> dict:
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
@@ -194,8 +197,7 @@ def query(sql) -> dict:
     return {"code": 0, "msg": "ok", "data": data}
 
 
-
-def get_list(table, page_num=1, page_size=20, fields: str|list='*') -> dict:
+def get_list(table, page_num=1, page_size=20, fields: str | list = '*') -> dict:
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     try:
@@ -206,10 +208,11 @@ def get_list(table, page_num=1, page_size=20, fields: str|list='*') -> dict:
                 SELECT {fields} FROM {table} LIMIT ? OFFSET ?;
                 """, (page_size, (page_num - 1) * page_size))
         else:
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT {','.join(fields)} FROM {table} LIMIT ? OFFSET ?;
                 """, (page_size, (page_num - 1) * page_size))
-            
+
         result = cur.fetchall()
         data = {
             'data': [dict(zip([col[0] for col in cur.description], row)) for row in result],

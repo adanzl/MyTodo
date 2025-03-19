@@ -1,14 +1,13 @@
 import base64
-import logging
-
-from flask import json, request
 
 from app import socketio
-from core.chat.asr_client import AsrClient
 from core.ai.ai_local import AILocal
+from core.chat.asr_client import AsrClient
 from core.chat.tts_client import TTSClient
+from core.log_config import root_logger
+from flask import json, request
 
-log = logging.getLogger(__name__)
+log = root_logger()
 
 MSG_TYPE_ERROR = "error"
 

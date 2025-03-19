@@ -1,9 +1,9 @@
-from flask import Blueprint, render_template, request, jsonify, json
-import logging
 import core.db.db_mgr as db_mgr
 import redis
+from core.log_config import root_logger
+from flask import Blueprint, json, jsonify, render_template, request
 
-log = logging.getLogger(__name__)
+log = root_logger()
 api_bp = Blueprint('api', __name__)
 rds = redis.Redis(
     host='192.168.50.171',  # Redis服务器地址，默认为localhost
