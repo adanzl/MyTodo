@@ -46,6 +46,12 @@ def server_log():
         """
 
 
+@api_bp.route("/write_log", methods=['POST'])
+def write_log():
+    args = request.get_data().decode('utf-8')
+    log.info("===== [Write Log] ", args)
+
+
 # =========== PIC ===========
 @api_bp.route("/viewPic", methods=['GET'])
 def view_pic():
