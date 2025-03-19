@@ -1,9 +1,16 @@
 <template>
-  <!-- 暂时不用了 -->
   <ion-page class="main-bg" id="main-content">
     <ion-header>
       <ion-toolbar>
         <ion-title>Tab Chat</ion-title>
+        <ion-buttons slot="end">
+          <ion-button @click="btnChatSettingClk">
+            <WeuiSettingOutlined class="button-native" width="30" height="30"/>
+          </ion-button>
+          <ion-button @click="btnNewChatClk">
+            <WeuiAdd2Outlined class="button-native" width="30" height="30"/>
+          </ion-button>
+        </ion-buttons>
       </ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding" ref="chatContent">
@@ -80,16 +87,20 @@
         </div>
       </div>
     </ion-item>
+    <ChatSetting :is-open="chatSetting.open" @willDismiss="onChatSettingDismiss" />
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { getApiUrl, getConversationId, setConversationId } from "@/utils/NetUtil";
+import { getApiUrl, getChatSetting, getConversationId, setConversationId } from "@/utils/NetUtil";
 import { IonToolbar, onIonViewDidEnter, IonCheckbox, createGesture } from "@ionic/vue";
 import io, { Socket } from "socket.io-client";
 import Recorder from "recorder-core/recorder.wav.min";
-Recorder.CLog = function () {}; // 屏蔽Recorder的日志输出
+Recorder.CLog = function () { }; // 屏蔽Recorder的日志输出
+import ChatSetting from "@/components/ChatSetting.vue";
 import { inject, onMounted, ref } from "vue";
+import WeuiAdd2Outlined from '~icons/weui/add2-outlined';
+import WeuiSettingOutlined from '~icons/weui/setting-outlined';
 import MdiMicrophone from "~icons/mdi/microphone";
 import MdiStopCircleOutline from "~icons/mdi/stop-circle-outline";
 import WeuiVoiceOutlined from "~icons/weui/voice-outlined";
@@ -100,7 +111,8 @@ const MSG_TYPE_TRANSLATION = "translation";
 const TTS_AUTO = true;
 // cSpell: disable-next-line
 const TTS_ROLE = "longwan_v2";
-const TTS_SPEED = 1.1;
+// const TTS_SPEED = 1.1;
+const chatSetting = ref({ open: false, ttsSpeed: 1.1, ttsRole: TTS_ROLE });
 const INPUT_TYPE = ref("audio");
 const AUDIO_TYPE = ref("hold");
 // 存储识别结果的变量
@@ -143,12 +155,19 @@ const rec = Recorder({
 let recSampleBuf = new Int16Array();
 let playAudioData: ArrayBuffer[] = [];
 
-onMounted(() => {
+onMounted(async () => {
   messages.value.push({ content: "你好，我是楠楠，和我聊点什么吧", role: "server" });
-  initSocketIO();
   audioRef.value!.addEventListener("ended", () => {
     audioPlayMsg.value!.playing = false;
   });
+  await getChatSetting(globalVar.user.id).then((setting) => {
+    if (setting) {
+      const v = JSON.parse(setting);
+      chatSetting.value.ttsSpeed = v.ttsSpeed;
+      chatSetting.value.ttsRole = v.ttsRole;
+    }
+  });
+  initSocketIO();
 });
 onIonViewDidEnter(async () => {
   aiConversationId.value = (await getConversationId(globalVar.user.id)) || "";
@@ -162,8 +181,8 @@ function initSocketIO() {
     const msg = {
       key: "123456",
       ttsAuto: TTS_AUTO,
-      ttsRole: TTS_ROLE,
-      ttsSpeed: TTS_SPEED,
+      ttsRole: chatSetting.value.ttsRole,
+      ttsSpeed: chatSetting.value.ttsSpeed,
       ttsVol: 50,
       aiConversationId: aiConversationId.value,
       user: globalVar.user.name,
@@ -303,7 +322,7 @@ async function startRecording() {
             el: recBtn.value.$el, // 目标元素
             gestureName: "longPress", // 手势名称
             threshold: 0, // 触发距离阈值
-            onStart: () => {},
+            onStart: () => { },
             onMove: (ev) => {
               // 检查是否移动出按钮范围
               const rect = recBtn.value.$el.getBoundingClientRect();
@@ -380,7 +399,7 @@ function stopRecording(cancel = false) {
       }
       sendAudioData("", true, cancel);
       if (TTS_AUTO && !cancel) {
-        streamAudio(() => {});
+        streamAudio(() => { });
       }
       rec.close();
     },
@@ -406,7 +425,7 @@ async function btnAudioClk(msg: MSG) {
       ttsData.value.msg = msg;
       const payload = JSON.stringify({
         content: msg.content,
-        role: TTS_ROLE,
+        role: chatSetting.value.ttsRole,
       });
       streamAudio(() => {
         socketRef.value!.emit("tts", payload);
@@ -437,7 +456,7 @@ async function stopAndClearAudio() {
   }
 }
 
-function streamAudio(f = () => {}) {
+function streamAudio(f = () => { }) {
   const mediaSource = new MediaSource();
   audioRef.value!.pause();
   audioRef.value!.src = URL.createObjectURL(mediaSource);
@@ -496,5 +515,23 @@ function onAudioTypeChange() {
   } else {
     AUDIO_TYPE.value = "hold";
   }
+}
+function btnNewChatClk() {
+
+}
+function btnChatSettingClk() {
+  chatSetting.value.open = true;
+}
+function onChatSettingDismiss(e: any) {
+  // console.log("onChatSettingDismiss", e);
+  if (e.detail.rol !== 'cancel') {
+    chatSetting.value.ttsSpeed = e.detail.data.ttsSpeed;
+    chatSetting.value.ttsRole = e.detail.data.ttsRole;
+    socketRef.value!.emit("config", {
+      ttsSpeed: e.detail.data.ttsSpeed,
+      ttsRole: e.detail.data.ttsRole,
+    })
+  }
+  chatSetting.value.open = false;
 }
 </script>

@@ -172,6 +172,7 @@ class ChatMgr:
 
         @socketio.on('config')
         def handle_chat_config(data):
+            log.info(f'[CHAT] Config: {data}')
             ctx = self.clients[request.sid]
             if 'aiConversationId' in data:
                 ctx.ai.aiConversationId = data['aiConversationId']

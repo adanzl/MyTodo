@@ -137,6 +137,31 @@ export async function setConversationId(id: number, cId: string) {
   }
   return rsp.data.data;
 }
+export async function getChatSetting(id: number) {
+  const rsp: any = await axios.get(API_URL + "/getRdsData", {
+    params: { table: "chatSetting", id: id },
+  });
+  // console.log("getPic", rsp.data);
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
+
+export async function setChatSetting(id: number, cId: string) {
+  const rsp: any = await axios.post(API_URL + "/setRdsData", {
+    table: "chatSetting",
+    data: {
+      id: id,
+      value: cId,
+    },
+  });
+  console.log("setChatSetting", rsp.data);
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
 
 export async function getUserInfo(id: number) {
   const rsp: any = await axios.get(API_URL + "/getData", {
@@ -219,7 +244,9 @@ export async function getPicList(pageNum?: number, pageSize?: number) {
   return rsp.data.data;
 }
 export async function getPic(id: number): Promise<string> {
-  const rsp: any = await axios.get(API_URL + "/getData", { params: { table: "t_user_pic", id: id } });
+  const rsp: any = await axios.get(API_URL + "/getData", {
+    params: { table: "t_user_pic", id: id },
+  });
   // console.log("getPic", rsp.data);
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
