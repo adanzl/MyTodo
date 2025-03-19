@@ -60,10 +60,14 @@
           ref="recBtn"
           @pointerdown="startRecording"
           :color="isRecording ? 'warning' : 'primary'">
-            <MdiStopCircleOutline v-if="isRecording" width="24" height="24" />
-            <MdiMicrophone v-else width="24" height="24" />
-            <span v-if="isRecording" class="ml-1 text-sm">松开发送</span>
-            <span v-else class="ml-1 text-sm">按住说话</span>
+          <div v-if="isRecording" class="flex items-center">
+            <MdiStopCircleOutline width="24" height="24" />
+            <label class="ml-1 text-sm">松开发送</label>
+          </div>
+          <div v-else class="flex items-center">
+            <MdiMicrophone width="24" height="24" />
+            <label class="ml-1 text-sm">按住说话</label>
+          </div>
         </ion-button>
         <div class="w-12 flex flex-col pl-2">
           <ion-checkbox
@@ -84,7 +88,7 @@ import { getApiUrl, getConversationId, setConversationId } from "@/utils/NetUtil
 import { IonToolbar, onIonViewDidEnter, IonCheckbox, createGesture } from "@ionic/vue";
 import io, { Socket } from "socket.io-client";
 import Recorder from "recorder-core/recorder.wav.min";
-Recorder.CLog = function () { }; // 屏蔽Recorder的日志输出
+Recorder.CLog = function () {}; // 屏蔽Recorder的日志输出
 import { inject, onMounted, ref } from "vue";
 import MdiMicrophone from "~icons/mdi/microphone";
 import MdiStopCircleOutline from "~icons/mdi/stop-circle-outline";
@@ -142,7 +146,9 @@ let playAudioData: ArrayBuffer[] = [];
 onMounted(() => {
   messages.value.push({ content: "你好，我是楠楠，和我聊点什么吧", role: "server" });
   initSocketIO();
-  audioRef.value!.addEventListener("ended", () => { audioPlayMsg.value!.playing = false });
+  audioRef.value!.addEventListener("ended", () => {
+    audioPlayMsg.value!.playing = false;
+  });
 });
 onIonViewDidEnter(async () => {
   aiConversationId.value = (await getConversationId(globalVar.user.id)) || "";
@@ -189,9 +195,9 @@ function initSocketIO() {
   // 处理ai chat结果
   socketRef.value.on("msgChat", (data) => {
     if (messages.value.length === 0 || messages.value[messages.value.length - 1].role === "me") {
-      const msg = { content: data.content, role: "server", playing: TTS_AUTO }
+      const msg = { content: data.content, role: "server", playing: TTS_AUTO };
       messages.value.push(msg);
-      if(TTS_AUTO) {
+      if (TTS_AUTO) {
         audioPlayMsg.value = msg;
       }
     } else {
@@ -292,40 +298,40 @@ async function startRecording() {
         () => {
           console.info("Recording started");
           rec.start();
+          // 创建手势
+          const gesture = createGesture({
+            el: recBtn.value.$el, // 目标元素
+            gestureName: "longPress", // 手势名称
+            threshold: 0, // 触发距离阈值
+            onStart: () => {},
+            onMove: (ev) => {
+              // 检查是否移动出按钮范围
+              const rect = recBtn.value.$el.getBoundingClientRect();
+              const isOutside =
+                ev.currentX < rect.left ||
+                ev.currentX > rect.right ||
+                ev.currentY < rect.top ||
+                ev.currentY > rect.bottom;
+
+              if (isOutside) {
+                stopRecording(true); // 移动出按钮范围时取消录制
+                gesture.destroy();
+              }
+            },
+            onEnd: () => {
+              stopRecording(false); // 长按结束时触发
+              gesture.destroy();
+            },
+          });
+
+          // 启用手势
+          gesture.enable();
+          isRecording.value = true;
         },
         () => {
           console.error("Recording failed");
         }
       );
-      // 创建手势
-      const gesture = createGesture({
-        el: recBtn.value.$el, // 目标元素
-        gestureName: "longPress", // 手势名称
-        threshold: 0, // 触发距离阈值
-        onStart: () => { },
-        onMove: (ev) => {
-          // 检查是否移动出按钮范围
-          const rect = recBtn.value.$el.getBoundingClientRect();
-          const isOutside =
-            ev.currentX < rect.left ||
-            ev.currentX > rect.right ||
-            ev.currentY < rect.top ||
-            ev.currentY > rect.bottom;
-
-          if (isOutside) {
-            stopRecording(true); // 移动出按钮范围时取消录制
-            gesture.destroy();
-          }
-        },
-        onEnd: () => {
-          stopRecording(false); // 长按结束时触发
-          gesture.destroy();
-        },
-      });
-
-      // 启用手势
-      gesture.enable();
-      isRecording.value = true;
     } catch (error) {
       console.error("Error starting recording:", error);
       isRecording.value = false;
@@ -374,7 +380,7 @@ function stopRecording(cancel = false) {
       }
       sendAudioData("", true, cancel);
       if (TTS_AUTO && !cancel) {
-        streamAudio(() => { });
+        streamAudio(() => {});
       }
       rec.close();
     },
@@ -431,7 +437,7 @@ async function stopAndClearAudio() {
   }
 }
 
-function streamAudio(f = () => { }) {
+function streamAudio(f = () => {}) {
   const mediaSource = new MediaSource();
   audioRef.value!.pause();
   audioRef.value!.src = URL.createObjectURL(mediaSource);
