@@ -48,8 +48,12 @@ def server_log():
 
 @api_bp.route("/write_log", methods=['POST'])
 def write_log():
-    args = request.get_data().decode('utf-8')
-    log.info("===== [Write Log] ", args)
+    try:
+        args = request.get_data().decode('utf-8')
+        log.info("===== [Write Log] ", args)
+    except Exception as e:
+        log.error("===== [Write Log] ", e)
+    return {}
 
 
 # =========== PIC ===========
