@@ -1,11 +1,6 @@
 import logging
 from logging.handlers import TimedRotatingFileHandler
 
-import core.ai.ai_mgr as ai_mgr
-import core.db.db_mgr as db_mgr
-from app import app, socketio
-from core.chat.chat_mgr import ChatMgr
-
 # cSpell: disable-next-line
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 file_handler = TimedRotatingFileHandler('logs/app.log', when="midnight", backupCount=3, encoding="utf-8")
@@ -13,6 +8,11 @@ std_handler = logging.StreamHandler()
 std_handler.setFormatter(formatter)
 file_handler.setFormatter(formatter)
 logging.basicConfig(level=logging.INFO, handlers=[file_handler, std_handler])
+
+import core.ai.ai_mgr as ai_mgr
+import core.db.db_mgr as db_mgr
+from app import app, socketio
+from core.chat.chat_mgr import ChatMgr
 
 log = logging.getLogger(__name__)
 
