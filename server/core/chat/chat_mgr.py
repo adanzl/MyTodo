@@ -164,3 +164,8 @@ class ChatMgr:
         def handle_tts_cancel(msg):
             ctx = self.clients[request.sid]
             ctx.tts.streaming_cancel()
+
+        @socketio.on('chatCancel')
+        def handle_chat_cancel():
+            ctx = self.clients[request.sid]
+            ctx.ai.streaming_cancel()
