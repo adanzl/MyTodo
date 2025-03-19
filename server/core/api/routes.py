@@ -50,9 +50,9 @@ def server_log():
 def write_log():
     try:
         args = request.get_data().decode('utf-8')
-        log.info("===== [Write Log] ", args)
+        log.info("===== [Write Log] " + args)
     except Exception as e:
-        log.error("===== [Write Log] ", e)
+        log.error(e)
     return {}
 
 
