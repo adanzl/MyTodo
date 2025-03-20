@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Server Log</title>
+    <script>
+      // 页面加载完成后执行
+      window.onload = function () {
+        // 默认启用自动刷新
+        let autoRefreshEnabled = true;
+        // 获取复选框元素
+        const checkbox = document.getElementById("auto-refresh-checkbox");
+        // 复选框状态改变时触发
+        checkbox.addEventListener("change", function () {
+          autoRefreshEnabled = checkbox.checked;
+        });
+
+        // 定义自动刷新函数
+        function autoRefresh() {
+          if (autoRefreshEnabled) {
+            location.reload(); // 刷新页面
+          }
+        }
+
+        // 每5秒调用一次自动刷新函数
+        setInterval(autoRefresh, 5000);
+      };
+    </script>
+  </head>
+  <body>
+    <label for="auto-refresh-checkbox">启用自动刷新：</label>
+    <input type="checkbox" id="auto-refresh-checkbox" checked />
+    <pre>{{log_content}}</pre>
+  </body>
+</html>

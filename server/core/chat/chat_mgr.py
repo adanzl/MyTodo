@@ -146,6 +146,7 @@ class ChatMgr:
                 if data['finish']:
                     ctx.asr.end_asr()
 
+        # 处理TTS请求
         @socketio.on('tts')
         def handle_tts_request(msg):
             data = json.loads(msg)

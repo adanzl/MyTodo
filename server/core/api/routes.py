@@ -33,17 +33,13 @@ def natapp():
 @api_bp.route("/log")
 def server_log():
     with open("logs/app.log", "r") as f:
-        log_content = f.read()
-        return f"""
-            <html>
-            <head>
-                <title>Server Log</title>
-            </head>
-            <body>
-                <pre>{log_content}</pre>
-            </body>
-            </html>
-        """
+        # 读取文件所有行
+        lines = f.readlines()
+        # 反转行的顺序
+        lines.reverse()
+        log_content = ''.join(lines)
+    return render_template('server_log.html', log_content=log_content)
+
 
 
 @api_bp.route("/write_log", methods=['POST'])
