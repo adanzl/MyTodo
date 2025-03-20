@@ -162,6 +162,30 @@ export async function setChatSetting(id: number, cId: string) {
   }
   return rsp.data.data;
 }
+export async function getChatMem(id: number) {
+  const rsp: any = await axios.get(API_URL + "/getRdsData", {
+    params: { table: "mem", id: id },
+  });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
+
+export async function setChatMem(id: number, cId: string) {
+  const rsp: any = await axios.post(API_URL + "/setRdsData", {
+    table: "mem",
+    data: {
+      id: id,
+      value: cId,
+    },
+  });
+  console.log("setChatMem", rsp.data);
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
 
 export async function getUserInfo(id: number) {
   const rsp: any = await axios.get(API_URL + "/getData", {

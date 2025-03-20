@@ -3,6 +3,7 @@
     ref="modal"
     aria-hidden="false"
     class="bottom-modal"
+    mode="ios"
     @ionModalDidPresent="onModalPresent"
     @ionModalDidDismiss="onModalDismiss">
     <ion-item>
@@ -27,6 +28,17 @@
           mode="md"
           @ionChange="onInputChange($event, 'ttsRole')" />
       </ion-item>
+      <div class="h-[40rem]">
+        <ion-content>
+          <ion-textarea
+            label="Chat Memory"
+            label-placement="floating"
+            :value="textareaMem"
+            :auto-grow="true"
+            @ionChange="onMemChange($event)"
+            ></ion-textarea>
+        </ion-content>
+      </div>
     </div>
     <ion-footer>
       <ion-button class="flex-1 text-gray-400" fill="clear" @click="cancel()">取消</ion-button>
@@ -36,26 +48,27 @@
 </template>
 
 <script lang="ts" setup>
-import { setChatSetting, getChatSetting } from "@/utils/NetUtil";
+import { setChatSetting, getChatSetting, getChatMem, getConversationId } from "@/utils/NetUtil";
 import { inject, onMounted, ref } from "vue";
+import { IonTextarea } from "@ionic/vue";
 
 const modal = ref();
 const globalVar: any = inject("globalVar");
+const textareaMem = ref("");
 const chatSetting = ref({
   ttsSpeed: 1.1,
   ttsRole: "longwan_v2",
 } as { [key: string]: any });
 
 const cancel = () => {
-  modal.value.$el!.dismiss({}, 'cancel');
+  modal.value.$el!.dismiss({}, "cancel");
 };
 const confirm = () => {
-  setChatSetting(globalVar.user.id, JSON.stringify(chatSetting.value))
-  modal.value.$el!.dismiss(chatSetting.value, 'confirm');
+  setChatSetting(globalVar.user.id, JSON.stringify(chatSetting.value));
+  modal.value.$el!.dismiss(chatSetting.value, "confirm");
 };
 
-onMounted(async () => {
-});
+onMounted(async () => { });
 async function onModalPresent() {
   getChatSetting(globalVar.user.id).then((setting) => {
     if (setting) {
@@ -64,11 +77,19 @@ async function onModalPresent() {
       chatSetting.value.ttsRole = v.ttsRole;
     }
   });
+  const aiConversationId = (await getConversationId(globalVar.user.id)) || "";
+  if (aiConversationId) {
+    getChatMem(aiConversationId).then((mem) => {
+      textareaMem.value = mem;
+    });
+  }
 }
-const onModalDismiss = () => {
-};
+const onModalDismiss = () => { };
 function onInputChange(e: any, key: string) {
   chatSetting.value[key] = e.detail.value;
+}
+function onMemChange(e: any) {
+  textareaMem.value = e.detail.value;
 }
 </script>
 

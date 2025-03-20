@@ -524,7 +524,7 @@ function btnChatSettingClk() {
 }
 function onChatSettingDismiss(e: any) {
   // console.log("onChatSettingDismiss", e);
-  if (e.detail.rol !== 'cancel') {
+  if (e.detail.rol === 'confirm') {
     chatSetting.value.ttsSpeed = e.detail.data.ttsSpeed;
     chatSetting.value.ttsRole = e.detail.data.ttsRole;
     socketRef.value!.emit("config", {
