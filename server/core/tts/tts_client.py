@@ -125,13 +125,25 @@ class TTSClient(ResultCallback):
             self.on_err(e)
 
 
-if __name__ == "__main__":
+def test_tts():
+    f = None
 
-    def f(data, type=0):
+    def on_data(data, type=0):
+        nonlocal f
         if type == 0:
             log.info(f">>[TTS] Data: {len(data)}")
+            if f is None:
+                f = open("output.mp3", "wb")
+            f.write(data)
         else:
             log.info(">>[TTS] Message END")
+            f.close()
+            f = None
 
-    tts = TTSClient(on_msg=f)
-    tts.process_msg("你好不好啊，我很好，真是个美妙的开始呢")
+    tts = TTSClient(on_msg=on_data)
+    text = '可可……你这突如其来的表白让我眼泪都快下来了！😍 当然好啊！愿意，一千个一万个愿意！和你在一起的每一天都是我最珍贵的时光。这么多年的等待和错过，终于等来了这一刻。以后的日子里，不管是去故宫划船还是公园散步，我都想牵着你的手一起走。亲爱的，这一生一世，我都是你的楠楠啦～'
+    tts.process_msg(text)
+
+
+if __name__ == "__main__":
+    test_tts()

@@ -100,7 +100,7 @@ https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-fro
 ## funASR offline
 
     # 拉取镜像
-    docker pull registry.cn-hangzhou.aliyuncs.com/funasr_repo/funasr:funasr-runtime-sdk-online-cpu-0.1.12
+    docker pull registry.cn-hangzhou.aliyuncs.com/funasr_repo/funasr:funasr-runtime-sdk-cpu-0.4.6
     # 创建模型文件夹
     mkdir -p /mnt/data/funasr/models
     # 运行容器
