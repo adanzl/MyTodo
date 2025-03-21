@@ -3,7 +3,7 @@ import base64
 from app import socketio
 from core.ai.ai_local import AILocal
 from core.chat.asr_client import AsrClient
-from core.chat.tts_client import TTSClient
+from core.tts.tts_client import TTSClient
 from core.log_config import root_logger
 from flask import json, request
 
