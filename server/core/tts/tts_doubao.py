@@ -43,6 +43,7 @@ def gen_tts(text: str, voice_id: str):
 
 
 if __name__ == '__main__':
+    # export PYTHONPATH=/Users/zhaolin/Documents/Projects/MyTodo/server:$PYTHONPATH
     text = '可可……你这突如其来的表白让我眼泪都快下来了！😍 当然好啊！愿意，一千个一万个愿意！和你在一起的每一天都是我最珍贵的时光。这么多年的等待和错过，终于等来了这一刻。以后的日子里，不管是去故宫划船还是公园散步，我都想牵着你的手一起走。亲爱的，这一生一世，我都是你的楠楠啦～'
     voice_id = 'ICL_zh_female_zhixingwenwan_tob'
     # voice_id = 'BV001_streaming'
