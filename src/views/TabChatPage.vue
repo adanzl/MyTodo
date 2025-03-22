@@ -5,40 +5,41 @@
         <ion-title>Tab Chat</ion-title>
         <ion-buttons slot="end">
           <ion-button @click="btnChatSettingClk">
-            <WeuiSettingOutlined class="button-native" width="30" height="30"/>
+            <WeuiSettingOutlined class="button-native" width="30" height="30" />
           </ion-button>
           <ion-button @click="btnNewChatClk">
-            <WeuiAdd2Outlined class="button-native" width="30" height="30"/>
+            <WeuiAdd2Outlined class="button-native" width="30" height="30" />
           </ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding" ref="chatContent">
-      <ion-list class="bg-transparent">
-        <div v-for="(msg, idx) in messages" :key="idx" class="p-1.5 w-full">
+      <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
+      <div v-for="(msg, idx) in messages" :key="idx" class="p-1.5 w-full">
+        <div
+          v-if="msg.role == 'server'"
+          class="w-[80%] bg-pink-200 rounded-lg p-2 shadow-md ml-auto relative">
+          {{ msg.content ?? "..." }}
           <div
-            v-if="msg.role == 'server'"
-            class="w-[80%] bg-pink-200 rounded-lg p-2 shadow-md ml-auto relative">
-            {{ msg.content ?? "..." }}
-            <div
-              class="absolute -left-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center"
-              @click="btnAudioClk(msg)">
-              <MdiStopCircleOutline width="24" height="24" v-if="msg.playing" />
-              <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
-            </div>
-          </div>
-          <div v-else class="w-[80%] bg-green-500 text-white p-2 rounded-lg shadow-md relative">
-            {{ msg.content }}
-            <div
-              v-if="msg.audioSrc"
-              class="absolute -right-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center text-black"
-              @click="btnAudioClk(msg)">
-              <MdiStopCircleOutline width="24" height="24" v-if="msg.playing" />
-              <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
-            </div>
+            class="absolute -left-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center"
+            @click="btnAudioClk(msg)">
+            <MdiStopCircleOutline width="24" height="24" v-if="msg.playing" />
+            <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
           </div>
         </div>
-      </ion-list>
+        <div v-else class="w-[80%] bg-green-500 text-white p-2 rounded-lg shadow-md relative">
+          {{ msg.content }}
+          <div
+            v-if="msg.audioSrc"
+            class="absolute -right-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center text-black"
+            @click="btnAudioClk(msg)">
+            <MdiStopCircleOutline width="24" height="24" v-if="msg.playing" />
+            <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
+          </div>
+        </div>
+      </div>
     </ion-content>
     <audio ref="audioRef" style="width: auto" class="m-2"></audio>
     <ion-item>
@@ -92,15 +93,29 @@
 </template>
 
 <script setup lang="ts">
-import { getApiUrl, getChatSetting, getConversationId, setConversationId } from "@/utils/NetUtil";
-import { IonToolbar, onIonViewDidEnter, IonCheckbox, createGesture } from "@ionic/vue";
+import {
+  getApiUrl,
+  getChatMessages,
+  getChatSetting,
+  getConversationId,
+  setConversationId,
+} from "@/utils/NetUtil";
+import {
+  IonToolbar,
+  onIonViewDidEnter,
+  IonCheckbox,
+  createGesture,
+  RefresherCustomEvent,
+  IonRefresher,
+  IonRefresherContent,
+} from "@ionic/vue";
 import io, { Socket } from "socket.io-client";
 import Recorder from "recorder-core/recorder.wav.min";
 Recorder.CLog = function () { }; // 屏蔽Recorder的日志输出
 import ChatSetting from "@/components/ChatSetting.vue";
 import { inject, onMounted, ref } from "vue";
-import WeuiAdd2Outlined from '~icons/weui/add2-outlined';
-import WeuiSettingOutlined from '~icons/weui/setting-outlined';
+import WeuiAdd2Outlined from "~icons/weui/add2-outlined";
+import WeuiSettingOutlined from "~icons/weui/setting-outlined";
 import MdiMicrophone from "~icons/mdi/microphone";
 import MdiStopCircleOutline from "~icons/mdi/stop-circle-outline";
 import WeuiVoiceOutlined from "~icons/weui/voice-outlined";
@@ -121,7 +136,7 @@ const globalVar: any = inject("globalVar");
 const aiConversationId = ref("");
 const inputRef = ref<HTMLElement | null>(null);
 class MSG {
-  id: string = "";
+  id?: string;
   content: string = "";
   role: string = "";
   audioSrc?: string = "";
@@ -160,6 +175,7 @@ onMounted(async () => {
   messages.value.push({ id: "", content: "你好，我是楠楠，和我聊点什么吧", role: "server" });
   audioRef.value!.addEventListener("ended", () => {
     audioPlayMsg.value!.playing = false;
+    ttsData.value.audioBuffer = null;
   });
   await getChatSetting(globalVar.user.id).then((setting) => {
     if (setting) {
@@ -205,7 +221,7 @@ function initSocketIO() {
   socketRef.value.on("msgAsr", (data) => {
     if (data.content) {
       messages.value.push({
-        id: "", 
+        id: "",
         content: data.content,
         role: "me",
         audioSrc: lstAudioSrc.value,
@@ -489,12 +505,10 @@ function streamAudio(f = () => { }) {
         ttsData.value.audioBuffer.appendBuffer(combinedBuffer); // 直接添加 ArrayBuffer 数据
         // 清空已处理的数据
         playAudioData = [];
-      } else if (
-        playAudioData.length == 0 &&
-        !ttsData.value.audioBuffer.updating &&
-        ttsData.value.audioEnd
-      ) {
-        mediaSource.endOfStream();
+      } else if (ttsData.value.audioEnd) {
+        if (ttsData.value.mediaSource) {
+          ttsData.value.mediaSource.endOfStream();
+        }
       }
     });
     try {
@@ -519,22 +533,33 @@ function onAudioTypeChange() {
     AUDIO_TYPE.value = "hold";
   }
 }
-function btnNewChatClk() {
-
-}
+function btnNewChatClk() { }
 function btnChatSettingClk() {
   chatSetting.value.open = true;
 }
 function onChatSettingDismiss(e: any) {
   // console.log("onChatSettingDismiss", e);
-  if (e.detail.rol === 'confirm') {
+  if (e.detail.rol === "confirm") {
     chatSetting.value.ttsSpeed = e.detail.data.ttsSpeed;
     chatSetting.value.ttsRole = e.detail.data.ttsRole;
     socketRef.value!.emit("config", {
       ttsSpeed: e.detail.data.ttsSpeed,
       ttsRole: e.detail.data.ttsRole,
-    })
+    });
   }
   chatSetting.value.open = false;
+}
+function handleRefresh(e: RefresherCustomEvent) {
+  let firstId = undefined;
+  if (messages.value.length > 0) {
+    firstId = messages.value[0].id;
+  }
+  getChatMessages(aiConversationId.value, 10, globalVar.user.name, firstId).then((data: any) => {
+    // messages;
+    data.forEach((item: any) => {
+      console.log(item);
+    });
+    e.target.complete();
+  });
 }
 </script>

@@ -160,12 +160,12 @@ def set_rds_data():
 @api_bp.route("/chatMessages", methods=['GET'])
 def chat_messages():
     try:
-        log.info("===== [Set rds Data] " + json.dumps(request.args))
+        log.info("===== [Chat Messages] " + json.dumps(request.args))
         c_id = request.args.get('conversation_id')
         limit = request.args.get('limit')
         first_id = request.args.get('first_id')
         user = request.args.get('user')
-        return {"code": 0, "msg": "ok", "data": AILocal.get_chat_messages(c_id, limit, first_id, user)}
+        return {"code": 0, "msg": "ok", "data": AILocal.get_chat_messages(c_id, limit, user, first_id)}
     except Exception as e:
         log.error(e)
         return {"code": -1, "msg": 'error' + str(e)}
