@@ -567,6 +567,9 @@ function handleRefresh(e: RefresherCustomEvent) {
     try {
       data.data.reverse().forEach((item: any) => {
         // console.log(item);
+        if(item.answer === ''){
+          return;
+        }
         messages.value.unshift({
           id: item.id,
           content: item.answer,
