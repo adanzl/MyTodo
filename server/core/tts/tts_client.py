@@ -152,4 +152,5 @@ def test_tts():
 
 
 if __name__ == "__main__":
+    # export PYTHONPATH=/Users/zhaolin/Documents/Projects/MyTodo/server:$PYTHONPATH
     test_tts()
