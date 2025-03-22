@@ -40,7 +40,7 @@ class ClientContext:
         if type == 0:
             event = 'msgChat'
             if self.autoTTS:
-                self.tts.stream_msg(text, id)
+                self.tts.stream_msg(text=text, id=id)
         else:
             event = 'endChat'
             self.tts.stream_complete()
