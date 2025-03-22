@@ -28,7 +28,7 @@
           mode="md"
           @ionChange="onInputChange($event, 'ttsRole')" />
       </ion-item>
-      <div class="h-[40rem]">
+      <div class="h-[24rem]">
         <ion-content>
           <ion-textarea
             label="Chat Memory"
