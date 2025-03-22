@@ -19,7 +19,7 @@ class AILocal:
         }
         self.aiConversationId = ""
         self.user = 'user'
-        self.on_msg = on_msg or (lambda x, y: None)
+        self.on_msg = on_msg or (lambda a, b, c: None)
         self.on_err = on_err or (lambda x: None)
         self.last_task_id = -1
 
@@ -49,13 +49,13 @@ class AILocal:
                         self.aiConversationId = chunk["conversation_id"]
                         if 'task_id' in chunk:
                             self.last_task_id = chunk['task_id']
-                        if "answer" in chunk:
-                            self.on_msg(chunk["answer"], 0)
-                        elif "error" in chunk:
-                            raise RuntimeError(chunk["error"])
+                        if "message" == chunk['event']:
+                            self.on_msg(chunk["answer"], chunk['message_id'], 0)
+                        elif chunk['event'] == 'error':
+                            raise RuntimeError(f'{chunk['code']} : {chunk["message"]}')
                         elif chunk['event'] == 'message_end':
                             log.info(chunk['metadata'])
-                            self.on_msg(chunk["metadata"], 1)
+                            self.on_msg(chunk["metadata"], chunk['message_id'], 1)
 
         except requests.exceptions.RequestException as e:
             log.error(f">>[AI] 请求失败: {str(e)}")

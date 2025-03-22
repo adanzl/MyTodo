@@ -1,17 +1,12 @@
 import core.db.db_mgr as db_mgr
-import redis
+
 from core.log_config import root_logger
 from flask import Blueprint, json, jsonify, render_template, request
+import core.db.rds_mgr as rds_mgr
 
 log = root_logger()
 api_bp = Blueprint('api', __name__)
-rds = redis.Redis(
-    host='192.168.50.171',  # Redis服务器地址，默认为localhost
-    port=6379,  # Redis服务器端口，默认为6379
-    db=0,  # 使用的数据库编号，默认为0
-    password=None,  # 如果Redis设置了密码，则在这里填写
-    decode_responses=True  # 是否将返回的数据自动解码为字符串
-)
+
 
 
 @api_bp.route("/natapp")
@@ -141,7 +136,7 @@ def get_rds_data():
         id = request.args.get('id')
         log.info(f"===== [Get Rds Data] {table}-{id}")
         key = f"{table}:{id}"
-        return {"code": 0, "msg": "ok", "data": rds.get(key)}
+        return {"code": 0, "msg": "ok", "data": rds_mgr.get_str(key)}
     except Exception as e:
         log.error(e)
         return {"code": -1, "msg": 'error' + str(e)}
@@ -156,7 +151,7 @@ def set_rds_data():
         data = args.get('data')
         id = data.get('id')
         value = data.get('value')
-        rds.set(f"{table}:{id}", value)
+        rds_mgr.set(f"{table}:{id}", value)
         return {"code": 0, "msg": "ok", "data": id}
     except Exception as e:
         log.error(e)

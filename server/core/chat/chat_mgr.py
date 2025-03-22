@@ -6,6 +6,7 @@ from core.chat.asr_client import AsrClient
 from core.tts.tts_client import TTSClient
 from core.log_config import root_logger
 from flask import json, request
+import core.db.rds_mgr as rds_mgr
 
 log = root_logger()
 
@@ -34,17 +35,17 @@ class ClientContext:
         socketio.emit('msgAsr', msg, room=self.sid)
         self.ai.stream_msg(text)
 
-    def on_ai_msg(self, text, type=0):
+    def on_ai_msg(self, text, id, type=0):
         # log.info(f"[AI] ON MSG: {text}")
         if type == 0:
             event = 'msgChat'
             if self.autoTTS:
-                self.tts.stream_msg(text)
+                self.tts.stream_msg(text, id)
         else:
             event = 'endChat'
             self.tts.stream_complete()
 
-        socketio.emit(event, {'content': text, 'aiConversationId': self.ai.aiConversationId}, room=self.sid)
+        socketio.emit(event, {'content': text, 'aiConversationId': self.ai.aiConversationId, 'id': id}, room=self.sid)
 
     def on_err(self, err: Exception):
         log.error(f"[CHAT] Error: {err}")
@@ -152,13 +153,23 @@ class ChatMgr:
             data = json.loads(msg)
             text = data.get('content')
             role = data.get('role', None)
+            id = data.get('id', '')
             if not text:
                 socketio.emit('error', {'error': 'Missing text'}, room=request.sid)
                 return
 
             client_id = request.sid
-            self.clients[client_id].tts.stream_msg(text, role)
-            self.clients[client_id].tts.stream_complete()
+            key = f"audio:{id}:{role}"
+            if rds_mgr.exists(key):
+                data = rds_mgr.get(key)
+                chunk_size = 1024
+                for i in range(0, len(data), chunk_size):
+                    chunk = data[i:i + chunk_size]
+                    socketio.emit('dataAudio', {'type': 'tts', 'data': chunk}, room=client_id)
+                socketio.emit('endAudio', {'content': data}, room=client_id)
+            else:
+                self.clients[client_id].tts.stream_msg(text, role)
+                self.clients[client_id].tts.stream_complete()
 
         @socketio.on('ttsCancel')
         def handle_tts_cancel(msg):

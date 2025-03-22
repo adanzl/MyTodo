@@ -5,6 +5,7 @@ from core.log_config import root_logger
 
 log = root_logger()
 FASTAPI_URL = "http://192.168.50.171:9099/inference_zero_shot"  # FastAPI 服务器地址
+import core.db.rds_mgr as rds_mgr
 from dashscope.audio.tts_v2 import *
 
 ROLE_MAP = {
@@ -69,10 +70,12 @@ class TTSClient(ResultCallback):
             traceback.print_stack()
             self.on_err(e)
 
-    def stream_msg(self, text: str, role: str = None):
+    def stream_msg(self, text: str, role: str = None, id=None):
         try:
             if role is None:
                 role = self.role
+            if id:
+                self.id = id
             if self.synthesizer is None:
                 self.synthesizer = SpeechSynthesizer(
                     model=MODEL_MAP.get(role, DEFAULT_MODEL),
@@ -118,6 +121,8 @@ class TTSClient(ResultCallback):
     def on_data(self, data: bytes) -> None:
         # log.info("[TTS] result length: " + str(len(data)))
         try:
+            key = f"audio:{self.id}:{self.role}"
+            rds_mgr.append_value(key, data)
             self.on_msg(data)
         except Exception as e:
             log.error(f">>[TTS]{e}")

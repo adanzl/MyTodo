@@ -121,6 +121,7 @@ const globalVar: any = inject("globalVar");
 const aiConversationId = ref("");
 const inputRef = ref<HTMLElement | null>(null);
 class MSG {
+  id: string = "";
   content: string = "";
   role: string = "";
   audioSrc?: string = "";
@@ -156,7 +157,7 @@ let recSampleBuf = new Int16Array();
 let playAudioData: ArrayBuffer[] = [];
 
 onMounted(async () => {
-  messages.value.push({ content: "你好，我是楠楠，和我聊点什么吧", role: "server" });
+  messages.value.push({ id: "", content: "你好，我是楠楠，和我聊点什么吧", role: "server" });
   audioRef.value!.addEventListener("ended", () => {
     audioPlayMsg.value!.playing = false;
   });
@@ -193,10 +194,10 @@ function initSocketIO() {
   });
   socketRef.value.on("message", (data) => {
     if (data.type === MSG_TYPE_TRANSLATION) {
-      messages.value.push({ content: `Translation: ${data.content}`, role: "server" });
+      messages.value.push({ id: "", content: `Translation: ${data.content}`, role: "server" });
       isWaitingServer.value = false;
     } else {
-      messages.value.push({ content: `Unknown: ${JSON.stringify(data)}`, role: "server" });
+      messages.value.push({ id: "", content: `Unknown: ${JSON.stringify(data)}`, role: "server" });
     }
     chatContent.value.$el.scrollToBottom(200);
   });
@@ -204,6 +205,7 @@ function initSocketIO() {
   socketRef.value.on("msgAsr", (data) => {
     if (data.content) {
       messages.value.push({
+        id: "", 
         content: data.content,
         role: "me",
         audioSrc: lstAudioSrc.value,
@@ -214,7 +216,7 @@ function initSocketIO() {
   // 处理ai chat结果
   socketRef.value.on("msgChat", (data) => {
     if (messages.value.length === 0 || messages.value[messages.value.length - 1].role === "me") {
-      const msg = { content: data.content, role: "server", playing: TTS_AUTO };
+      const msg = { id: data.id, content: data.content, role: "server", playing: TTS_AUTO };
       messages.value.push(msg);
       if (TTS_AUTO) {
         audioPlayMsg.value = msg;
@@ -280,7 +282,7 @@ const sendTextMessage = () => {
       type: "text",
       content: inputText.value,
     });
-    messages.value.push({ content: inputText.value, role: "me" });
+    messages.value.push({ id: "", content: inputText.value, role: "me" });
 
     isWaitingServer.value = true;
     inputText.value = "";
@@ -426,6 +428,7 @@ async function btnAudioClk(msg: MSG) {
       const payload = JSON.stringify({
         content: msg.content,
         role: chatSetting.value.ttsRole,
+        id: msg.id,
       });
       streamAudio(() => {
         socketRef.value!.emit("tts", payload);
