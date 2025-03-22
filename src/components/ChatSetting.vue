@@ -35,8 +35,7 @@
             label-placement="floating"
             :value="textareaMem"
             :auto-grow="true"
-            @ionChange="onMemChange($event)"
-            ></ion-textarea>
+            @ionChange="onMemChange($event)"></ion-textarea>
         </ion-content>
       </div>
     </div>
@@ -50,7 +49,7 @@
 <script lang="ts" setup>
 import { setChatSetting, getChatSetting, getChatMem, getConversationId } from "@/utils/NetUtil";
 import { inject, onMounted, ref } from "vue";
-import { IonTextarea } from "@ionic/vue";
+import { IonTextarea, loadingController } from "@ionic/vue";
 
 const modal = ref();
 const globalVar: any = inject("globalVar");
@@ -68,8 +67,12 @@ const confirm = () => {
   modal.value.$el!.dismiss(chatSetting.value, "confirm");
 };
 
-onMounted(async () => { });
+onMounted(async () => {});
 async function onModalPresent() {
+  const loading = await loadingController.create({
+    message: "Loading...",
+  });
+  loading.present();
   getChatSetting(globalVar.user.id).then((setting) => {
     if (setting) {
       const v = JSON.parse(setting);
@@ -79,12 +82,16 @@ async function onModalPresent() {
   });
   const aiConversationId = (await getConversationId(globalVar.user.id)) || "";
   if (aiConversationId) {
-    getChatMem(aiConversationId).then((mem) => {
-      textareaMem.value = mem;
-    });
+    getChatMem(aiConversationId)
+      .then((mem) => {
+        textareaMem.value = mem;
+      })
+      .finally(() => {
+        loading.dismiss();
+      });
   }
 }
-const onModalDismiss = () => { };
+const onModalDismiss = () => {};
 function onInputChange(e: any, key: string) {
   chatSetting.value[key] = e.detail.value;
 }

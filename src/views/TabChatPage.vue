@@ -17,29 +17,31 @@
       <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
-      <div v-for="(msg, idx) in messages" :key="idx" class="p-1.5 w-full">
-        <div
-          v-if="msg.role == 'server'"
-          class="w-[80%] bg-pink-200 rounded-lg p-2 shadow-md ml-auto relative">
-          {{ msg.content ?? "..." }}
+      <ion-list class="bg-transparent">
+        <div v-for="(msg, idx) in messages" :key="idx" class="p-1.5 w-full">
           <div
-            class="absolute -left-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center"
-            @click="btnAudioClk(msg)">
-            <MdiStopCircleOutline width="24" height="24" v-if="msg.playing" />
-            <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
+            v-if="msg.role == 'server'"
+            class="w-[80%] bg-pink-200 rounded-lg p-2 shadow-md ml-auto relative">
+            {{ msg.content ?? "..." }}
+            <div
+              class="absolute -left-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center"
+              @click="btnAudioClk(msg)">
+              <MdiStopCircleOutline width="24" height="24" v-if="msg.playing" />
+              <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
+            </div>
+          </div>
+          <div v-else class="w-[80%] bg-green-500 text-white p-2 rounded-lg shadow-md relative">
+            {{ msg.content }}
+            <div
+              v-if="msg.audioSrc"
+              class="absolute -right-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center text-black"
+              @click="btnAudioClk(msg)">
+              <MdiStopCircleOutline width="24" height="24" v-if="msg.playing" />
+              <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
+            </div>
           </div>
         </div>
-        <div v-else class="w-[80%] bg-green-500 text-white p-2 rounded-lg shadow-md relative">
-          {{ msg.content }}
-          <div
-            v-if="msg.audioSrc"
-            class="absolute -right-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center text-black"
-            @click="btnAudioClk(msg)">
-            <MdiStopCircleOutline width="24" height="24" v-if="msg.playing" />
-            <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
-          </div>
-        </div>
-      </div>
+      </ion-list>
     </ion-content>
     <audio ref="audioRef" style="width: auto" class="m-2"></audio>
     <ion-item>
@@ -111,7 +113,7 @@ import {
 } from "@ionic/vue";
 import io, { Socket } from "socket.io-client";
 import Recorder from "recorder-core/recorder.wav.min";
-Recorder.CLog = function () { }; // 屏蔽Recorder的日志输出
+Recorder.CLog = function () {}; // 屏蔽Recorder的日志输出
 import ChatSetting from "@/components/ChatSetting.vue";
 import { inject, onMounted, ref } from "vue";
 import WeuiAdd2Outlined from "~icons/weui/add2-outlined";
@@ -172,9 +174,10 @@ let recSampleBuf = new Int16Array();
 let playAudioData: ArrayBuffer[] = [];
 
 onMounted(async () => {
-  messages.value.push({ id: "", content: "你好，我是楠楠，和我聊点什么吧", role: "server" });
+  // messages.value.push({ id: "", content: "你好，我是楠楠，和我聊点什么吧", role: "server" });
   audioRef.value!.addEventListener("ended", () => {
     audioPlayMsg.value!.playing = false;
+    ttsData.value.audioEnd = true;
     ttsData.value.audioBuffer = null;
   });
   await getChatSetting(globalVar.user.id).then((setting) => {
@@ -185,6 +188,11 @@ onMounted(async () => {
     }
   });
   initSocketIO();
+  setInterval(() => {
+    if (ttsData.value.audioEnd && ttsData.value.mediaSource.readyState === "open") {
+      ttsData.value.mediaSource.endOfStream();
+    }
+  }, 2000);
 });
 onIonViewDidEnter(async () => {
   aiConversationId.value = (await getConversationId(globalVar.user.id)) || "";
@@ -340,7 +348,7 @@ async function startRecording() {
             el: recBtn.value.$el, // 目标元素
             gestureName: "longPress", // 手势名称
             threshold: 0, // 触发距离阈值
-            onStart: () => { },
+            onStart: () => {},
             onMove: (ev) => {
               // 检查是否移动出按钮范围
               const rect = recBtn.value.$el.getBoundingClientRect();
@@ -417,7 +425,7 @@ function stopRecording(cancel = false) {
       }
       sendAudioData("", true, cancel);
       if (TTS_AUTO && !cancel) {
-        streamAudio(() => { });
+        streamAudio(() => {});
       }
       rec.close();
     },
@@ -475,7 +483,7 @@ async function stopAndClearAudio() {
   }
 }
 
-function streamAudio(f = () => { }) {
+function streamAudio(f = () => {}) {
   const mediaSource = new MediaSource();
   audioRef.value!.pause();
   audioRef.value!.src = URL.createObjectURL(mediaSource);
@@ -533,7 +541,7 @@ function onAudioTypeChange() {
     AUDIO_TYPE.value = "hold";
   }
 }
-function btnNewChatClk() { }
+function btnNewChatClk() {}
 function btnChatSettingClk() {
   chatSetting.value.open = true;
 }
@@ -554,12 +562,26 @@ function handleRefresh(e: RefresherCustomEvent) {
   if (messages.value.length > 0) {
     firstId = messages.value[0].id;
   }
-  getChatMessages(aiConversationId.value, 10, globalVar.user.name, firstId).then((data: any) => {
+  getChatMessages(aiConversationId.value, 3, globalVar.user.name, firstId).then((data: any) => {
     // messages;
-    data.forEach((item: any) => {
-      console.log(item);
-    });
-    e.target.complete();
+    try {
+      data.data.reverse().forEach((item: any) => {
+        // console.log(item);
+        messages.value.unshift({
+          id: item.id,
+          content: item.answer,
+          role: "server",
+        });
+        messages.value.unshift({
+          id: item.id,
+          content: item.query,
+          role: "me",
+        });
+      });
+      // chatContent.value.$el.scrollToBottom(200);
+    } finally {
+      e.target.complete();
+    }
   });
 }
 </script>
