@@ -3,10 +3,10 @@ import core.db.db_mgr as db_mgr
 from core.log_config import root_logger
 from flask import Blueprint, json, jsonify, render_template, request
 import core.db.rds_mgr as rds_mgr
+from core.ai.ai_local import AILocal
 
 log = root_logger()
 api_bp = Blueprint('api', __name__)
-
 
 
 @api_bp.route("/natapp")
@@ -34,7 +34,6 @@ def server_log():
         lines.reverse()
         log_content = ''.join(lines)
     return render_template('server_log.html', log_content=log_content)
-
 
 
 @api_bp.route("/write_log", methods=['POST'])
@@ -153,6 +152,20 @@ def set_rds_data():
         value = data.get('value')
         rds_mgr.set(f"{table}:{id}", value)
         return {"code": 0, "msg": "ok", "data": id}
+    except Exception as e:
+        log.error(e)
+        return {"code": -1, "msg": 'error' + str(e)}
+
+
+@api_bp.route("/chatMessages", methods=['GET'])
+def chat_messages():
+    try:
+        log.info("===== [Set rds Data] " + json.dumps(request.args))
+        c_id = request.args.get('conversation_id')
+        limit = request.args.get('limit')
+        first_id = request.args.get('first_id')
+        user = request.args.get('user')
+        return {"code": 0, "msg": "ok", "data": AILocal.get_chat_messages(c_id, limit, first_id, user)}
     except Exception as e:
         log.error(e)
         return {"code": -1, "msg": 'error' + str(e)}

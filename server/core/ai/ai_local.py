@@ -8,15 +8,16 @@ API_URL = "http://192.168.50.171:9098/v1"
 # cSpell: disable-next-line
 API_KEY = "app-dLf0axfqNnVHwWjFqs0EVo8H"
 
+HEADERS = {
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+    "Authorization": f"Bearer {API_KEY}",
+}
 
 class AILocal:
 
+    
     def __init__(self, on_msg=None, on_err=None):
-        self.headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "Authorization": f"Bearer {API_KEY}",
-        }
         self.aiConversationId = ""
         self.user = 'user'
         self.on_msg = on_msg or (lambda a, b, c: None)
@@ -36,7 +37,7 @@ class AILocal:
         try:
             with requests.post(
                     f"{API_URL}/chat-messages",
-                    headers=self.headers,
+                    headers=HEADERS,
                     json=payload,
                     stream=True,
                     timeout=timeout,
@@ -72,7 +73,7 @@ class AILocal:
         payload = {"user": self.user}
         log.info(">>[AI] cancel streaming")
         try:
-            with requests.post(f"{API_URL}/chat-messages/:{self.last_task_id}/stop", headers=self.headers,
+            with requests.post(f"{API_URL}/chat-messages/:{self.last_task_id}/stop", headers=HEADERS,
                                json=payload) as response:
                 response.raise_for_status()
 
@@ -80,6 +81,26 @@ class AILocal:
             log.error(f">>[AI] 响应数据解析错误 {ee}")
             self.on_err(ee)
 
+    @staticmethod
+    def get_chat_messages(conversation_id, limit, user, first_id=None):
+        try:
+            payload = {
+                "first_id": first_id,
+                "conversation_id": conversation_id,
+                "user": user,
+                "limit": limit,
+            }
+            with requests.get(
+                f"{API_URL}/messages",
+                headers=HEADERS,
+                params=payload,
+            ) as r:
+                r.raise_for_status()
+                data = r.json()
+                return data
+        except Exception as e:
+            log.error(f"请求失败: {str(e)}")
+            return None
 
 if __name__ == "__main__":
 
