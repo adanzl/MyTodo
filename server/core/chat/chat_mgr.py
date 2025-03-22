@@ -162,7 +162,7 @@ class ChatMgr:
             key = f"audio:{id}:{role}"
             if rds_mgr.exists(key):
                 data = rds_mgr.get(key)
-                chunk_size = 1024
+                chunk_size = 3000
                 for i in range(0, len(data), chunk_size):
                     chunk = data[i:i + chunk_size]
                     socketio.emit('dataAudio', {'type': 'tts', 'data': chunk}, room=client_id)

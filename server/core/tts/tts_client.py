@@ -40,6 +40,7 @@ class TTSClient(ResultCallback):
         self.role = DEFAULT_ROLE
         self.speed = 1.0
         self.vol = 50
+        self.id = ''
 
     def streaming_cancel(self):
         log.info(">>[TTS] cancel streaming")
