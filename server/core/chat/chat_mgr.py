@@ -168,7 +168,7 @@ class ChatMgr:
                     socketio.emit('dataAudio', {'type': 'tts', 'data': chunk}, room=client_id)
                 socketio.emit('endAudio', {'content': data}, room=client_id)
             else:
-                self.clients[client_id].tts.stream_msg(text, role)
+                self.clients[client_id].tts.stream_msg(text, role, id)
                 self.clients[client_id].tts.stream_complete()
 
         @socketio.on('ttsCancel')

@@ -412,7 +412,7 @@ function stopRecording(cancel = false) {
 
 async function btnAudioClk(msg: MSG) {
   if (isWaitingServer.value) return;
-  console.log("==> playAudio", msg.playing);
+  console.log("==> playAudio", msg);
   if (msg.playing) {
     msg.playing = false;
     stopAndClearAudio();
