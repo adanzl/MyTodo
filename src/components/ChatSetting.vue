@@ -2,14 +2,16 @@
   <ion-modal
     ref="modal"
     aria-hidden="false"
-    class="bottom-modal"
+    id="main"
     mode="ios"
     @ionModalDidPresent="onModalPresent"
     @ionModalDidDismiss="onModalDismiss">
-    <ion-item>
-      <ion-title>Chat Setting</ion-title>
-    </ion-item>
-    <div class="ion-padding">
+    <ion-header>
+      <ion-toolbar>
+        <ion-title>Chat Setting</ion-title>
+      </ion-toolbar>
+    </ion-header>
+    <div class="ion-padding h-full flex flex-col">
       <ion-item lines="none">
         <div class="w-64 ml-3">语音速度</div>
         <ion-input
@@ -28,20 +30,23 @@
           mode="md"
           @ionChange="onInputChange($event, 'ttsRole')" />
       </ion-item>
-      <div class="h-[24rem]">
+      <div class="flex-1 pt-2">
         <ion-content>
           <ion-textarea
             label="Chat Memory"
             label-placement="floating"
             :value="textareaMem"
             :auto-grow="true"
+            class="p-2"
             @ionChange="onMemChange($event)"></ion-textarea>
         </ion-content>
       </div>
     </div>
     <ion-footer>
-      <ion-button class="flex-1 text-gray-400" fill="clear" @click="cancel()">取消</ion-button>
-      <ion-button class="flex-1 text-orange-400" fill="clear" @click="confirm()">确定</ion-button>
+      <div class="flex">
+        <ion-button class="flex-1 text-gray-400" fill="clear" @click="cancel()">取消</ion-button>
+        <ion-button class="flex-1 text-orange-400" fill="clear" @click="confirm()">确定</ion-button>
+      </div>
     </ion-footer>
   </ion-modal>
 </template>
@@ -104,5 +109,12 @@ function onMemChange(e: any) {
 .option-item::part(label) {
   margin: 0;
   width: 100%;
+}
+
+ion-modal#main::part(content) {
+  max-width: 500px;
+}
+ion-modal#main {
+  --height: 100%;
 }
 </style>

@@ -1,7 +1,6 @@
 import { createApp } from "vue";
 import App from "./App.vue";
 import router from "./router";
-import VConsole from "vconsole";
 import EventBus from "@/modal/EventBus";
 
 /* Core CSS required for Ionic components to work properly */
@@ -116,7 +115,8 @@ router.isReady().then(async () => {
   app.mount("#app");
 });
 // ignore
-console.log(import.meta.env);
+console.log(import.meta.env, navigator.userAgent);
 if (!import.meta.env.PROD) {
-  new VConsole();
+  // import VConsole from "vconsole";
+  // new VConsole();
 }
