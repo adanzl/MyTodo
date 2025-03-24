@@ -113,7 +113,7 @@ import {
 } from "@ionic/vue";
 import io, { Socket } from "socket.io-client";
 import Recorder from "recorder-core/recorder.wav.min";
-Recorder.CLog = function () {}; // 屏蔽Recorder的日志输出
+Recorder.CLog = function () { }; // 屏蔽Recorder的日志输出
 import ChatSetting from "@/components/ChatSetting.vue";
 import { inject, onMounted, ref } from "vue";
 import WeuiAdd2Outlined from "~icons/weui/add2-outlined";
@@ -348,7 +348,7 @@ async function startRecording() {
             el: recBtn.value.$el, // 目标元素
             gestureName: "longPress", // 手势名称
             threshold: 0, // 触发距离阈值
-            onStart: () => {},
+            onStart: () => { },
             onMove: (ev) => {
               // 检查是否移动出按钮范围
               const rect = recBtn.value.$el.getBoundingClientRect();
@@ -425,7 +425,7 @@ function stopRecording(cancel = false) {
       }
       sendAudioData("", true, cancel);
       if (TTS_AUTO && !cancel) {
-        streamAudio(() => {});
+        streamAudio(() => { });
       }
       rec.close();
     },
@@ -483,7 +483,7 @@ async function stopAndClearAudio() {
   }
 }
 
-function streamAudio(f = () => {}) {
+function streamAudio(f = () => { }) {
   const mediaSource = new MediaSource();
   audioRef.value!.pause();
   audioRef.value!.src = URL.createObjectURL(mediaSource);
@@ -515,7 +515,9 @@ function streamAudio(f = () => {}) {
         playAudioData = [];
       } else if (ttsData.value.audioEnd) {
         if (ttsData.value.mediaSource) {
-          ttsData.value.mediaSource.endOfStream();
+          try {
+            ttsData.value.mediaSource.endOfStream();
+          } catch (ignore) { /* empty */ }
         }
       }
     });
@@ -541,7 +543,7 @@ function onAudioTypeChange() {
     AUDIO_TYPE.value = "hold";
   }
 }
-function btnNewChatClk() {}
+function btnNewChatClk() { }
 function btnChatSettingClk() {
   chatSetting.value.open = true;
 }
@@ -567,7 +569,7 @@ function handleRefresh(e: RefresherCustomEvent) {
     try {
       data.data.reverse().forEach((item: any) => {
         // console.log(item);
-        if(item.answer === ''){
+        if (item.answer === '') {
           return;
         }
         messages.value.unshift({
