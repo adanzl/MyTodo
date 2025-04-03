@@ -125,6 +125,15 @@ https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-fro
     cosy-voice /bin/bash -c "cd /opt/CosyVoice/CosyVoice/runtime/python/fastapi && python3 server.py --port 50000 --model_dir /models/CosyVoice2-0.5B && sleep infinity"
 
     cd fastapi && python3 client.py --port 50000 --mode <sft|zero_shot|cross_lingual|instruct>
+    
+## gewechat
+
+    docker run -itd -v /mnt/data/gewechat:/root/temp -p 9101:2531 -p 9102:2532 --restart=always --name=geWechat gewe
+    
+## dify-on-wechat
+    cd /mnt/data/dify-on-wechat
+    conda activate py3_11
+    nohup python3 -u app.py >app.log 2>&1 &
 
 ## 服务器端口
 
@@ -135,5 +144,5 @@ https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-fro
 | nginx         | 8848/443 | ollama         |   9097 |
 | redis         | 6379     | dify           |   9098 |
 | cockpit       | 9090     | cosy-voice     | x 9099 |
-| portainer     | 9000     |
-| redis_insight | 9001     |
+| portainer     | 9000     | geWechat       |   9101 |
+| redis_insight | 9001     |                |   9102 |

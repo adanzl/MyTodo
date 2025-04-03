@@ -84,6 +84,8 @@ async function onModalPresent() {
       chatSetting.value.ttsSpeed = v.ttsSpeed;
       chatSetting.value.ttsRole = v.ttsRole;
     }
+  }).finally(() => {
+    loading.dismiss();
   });
   const aiConversationId = (await getConversationId(globalVar.user.id)) || "";
   if (aiConversationId) {
