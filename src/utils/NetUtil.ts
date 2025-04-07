@@ -162,6 +162,31 @@ export async function setChatSetting(id: number, cId: string) {
   }
   return rsp.data.data;
 }
+export async function getLotteryData() {
+  const rsp: any = await axios.get(API_URL + "/getRdsData", {
+    params: { table: "lottery", id: 1 },
+  });
+  // console.log("getPic", rsp.data);
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
+
+export async function setLotteryData(value: string) {
+  const rsp: any = await axios.post(API_URL + "/setRdsData", {
+    table: "lottery",
+    data: {
+      id: 1,
+      value: value,
+    },
+  });
+  // console.log("setChatSetting", rsp.data);
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
 export async function getChatMessages(
   conversation_id: string,
   limit: number,

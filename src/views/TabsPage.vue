@@ -170,7 +170,12 @@
             <ion-label>智能对话</ion-label>
           </ion-tab-button>
 
-          <ion-tab-button tab="tabMy" href="/tabs/tab4">
+          <ion-tab-button tab="tabLottery" href="/tabs/tab4">
+            <ion-icon :icon="giftOutline" />
+            <ion-label>神秘宝藏</ion-label>
+          </ion-tab-button>
+
+          <ion-tab-button tab="tabMy" href="/tabs/tab0">
             <ion-icon :icon="squareOutline" />
             <ion-label>存档信息</ion-label>
           </ion-tab-button>
@@ -268,6 +273,7 @@ import {
   colorPaletteOutline,
   shieldCheckmarkOutline,
   squareOutline,
+  giftOutline,
 } from "ionicons/icons";
 import _ from "lodash";
 import { inject, onMounted, ref } from "vue";
@@ -417,9 +423,11 @@ ion-menu::part(container) {
 .option-item::part(label) {
   width: 100%;
 }
+
 .option-item ion-label {
   margin: 0px 0px 0px 10px;
 }
+
 .schedule-group-item::part(native) {
   height: 35px !important;
   min-height: 0 !important;
