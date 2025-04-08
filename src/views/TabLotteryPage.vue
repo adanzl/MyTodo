@@ -131,7 +131,6 @@ function buildLotteryMatrix(data: any) {
     matrix.push(row);
   }
   lotteryMatrix.value = matrix;
-  console.log(lotteryMatrix.value);
 }
 
 function btnStartClk() {
@@ -177,7 +176,7 @@ function btnSettingClk() {
   lotterySetting.value.open = true;
 }
 function onSettingDismiss(event: any) {
-  console.log(event);
+  // console.log(event);
   lotterySetting.value.open = false;
   if (event.detail.role === "cancel") {
     return;
