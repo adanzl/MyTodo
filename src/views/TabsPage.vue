@@ -36,8 +36,8 @@
                   @ionChange="onScheduleListChange($event)">
                   <ion-item
                     lines="none"
-                    v-for="(o, idx) in scheduleListRef"
-                    :key="idx"
+                    v-for="o in scheduleListRef"
+                    :key="o.id"
                     style="--inner-padding-end: 0">
                     <ion-radio
                       justify="space-between"
