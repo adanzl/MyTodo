@@ -2,7 +2,10 @@ import LocalCache from "./LocalCache";
 import { calcImgPos } from "./Math";
 import { delPic, getPic, setPic } from "./NetUtil";
 
-export async function getImage(id: number) {
+export async function getImage(id?: number) {
+  if(id === undefined){
+    return '';
+  }
   let ret = LocalCache.get<string>("img_" + id);
   if (ret === null) {
     ret = await getPic(id);

@@ -11,16 +11,20 @@
         <ion-title>Lottery Setting</ion-title>
       </ion-toolbar>
     </ion-header>
+    <canvas ref="canvasRef" :width="canvasWidth" :height="canvasHeight" />
+    <ion-button @click="btnModifyClk()" :disabled="curItem === null">Set Img</ion-button>
     <ion-content>
       <ion-grid>
         <ion-row>
-          <ion-col size="1"> - </ion-col>
+          <ion-col size="2"> - </ion-col>
           <ion-col size="5"> 名称 </ion-col>
-          <ion-col size="3"> 权重 </ion-col>
+          <ion-col size="2"> 权重 </ion-col>
           <ion-col> 操作 </ion-col>
         </ion-row>
         <ion-row>
-          <ion-col size="1"> <span class="v-dot w-in" /> </ion-col>
+          <ion-col size="2" @click="onItemClk($event, nLottery)">
+            <img :src="avatar" class="max-w-8 max-h-8" />
+          </ion-col>
           <ion-col size="5">
             <ion-input
               class="w-full text-xs h-8 min-h-0 color-name"
@@ -30,7 +34,7 @@
               :value="nLottery.name"
               @ionChange="onInputChange($event, nLottery, 'name')" />
           </ion-col>
-          <ion-col size="3">
+          <ion-col size="2">
             <ion-input
               mode="md"
               class="w-full grow h-8 min-h-0"
@@ -45,7 +49,9 @@
           </ion-col>
         </ion-row>
         <ion-row v-for="(lottery, idx) in lotteryData" :key="idx">
-          <ion-col size="1"> <span class="v-dot w-in" /> </ion-col>
+          <ion-col size="2" @click="onItemClk($event, lottery)">
+            <img :src="lottery.img || avatar" class="max-w-8 max-h-8" />
+          </ion-col>
           <ion-col size="5">
             <ion-input
               class="w-full text-xs h-8 min-h-0 color-name"
@@ -54,7 +60,7 @@
               :value="lottery.name"
               @ionChange="onInputChange($event, lottery, 'name')" />
           </ion-col>
-          <ion-col size="3">
+          <ion-col size="2">
             <ion-input
               mode="md"
               class="w-full grow h-8 min-h-0"
@@ -80,15 +86,23 @@
 </template>
 
 <script lang="ts" setup>
+import avatar from "@/assets/images/avatar.svg";
 import { getLotteryData, setLotteryData } from "@/utils/NetUtil";
 import { removeCircleOutline, saveOutline } from "ionicons/icons";
 import { onMounted, ref } from "vue";
 import { alertController, loadingController, IonGrid, IonCol, IonRow } from "@ionic/vue";
+import { calcImgPos } from "@/utils/Math";
+import { getImage, loadAndSetImage } from "@/utils/ImgMgr";
+import { LotteryData } from "@/modal/UserData";
 
 const modal = ref();
+const canvasWidth = ref(400); // 设置canvas的宽度
+const canvasHeight = ref(300); // 设置canvas的高度
+const canvasRef = ref<HTMLCanvasElement>();
 const lotteryData = ref<[{ icon: ""; name: ""; weight: 1 }] | any[]>([]);
-const nLottery = ref({ icon: "", name: "", weight: 1 });
+const nLottery = ref(new LotteryData());
 const bModify = ref(false);
+const curItem = ref<LotteryData | null>(null);
 
 const cancel = async () => {
   const alert = await alertController.create({
@@ -128,8 +142,10 @@ async function onModalPresent() {
     .then((data: any) => {
       if (data) {
         lotteryData.value = JSON.parse(data);
+        lotteryData.value.forEach(async (item) => {
+          item.img = await getImage(item.imgId);
+        });
       }
-      // console.log(userData.value);
     })
     .finally(() => {
       loading.dismiss();
@@ -141,28 +157,44 @@ function onInputChange(e: any, lottery: any, key: string) {
   bModify.value = true;
 }
 
+async function btnModifyClk() {
+  if (curItem.value === null) {
+    return;
+  }
+  const imgId = await loadAndSetImage(curItem.value.imgId, canvasHeight.value, canvasWidth.value);
+  if (imgId !== null) {
+    curItem.value.imgId = imgId;
+    curItem.value.img = await getImage(imgId);
+    onItemClk(null, curItem.value);
+  }
+}
+
 async function btnRemoveClk(_event: any, item: any, idx: number) {
   bModify.value = true;
   lotteryData.value.splice(idx, 1);
-  console.log("btnRemoveClk", item);
-  // console.log("btnRemoveClk", color.id);
-  // const alert = await alertController.create({
-  //   header: "Confirm",
-  //   message: "确认删除 [" + color.label + "]",
-  //   buttons: [
-  //     {
-  //       text: "OK",
-  //       handler: () => {
-  //         console.log("btnRemoveClk", color.id);
-  //         // delColor(color.id).then(async () => {
-  //         //   LoadColorData();
-  //         // });
-  //       },
-  //     },
-  //     "Cancel",
-  //   ],
-  // });
-  // await alert.present();
+  if (curItem.value === item) {
+    curItem.value = null;
+  }
+}
+
+async function onItemClk(_event: any, item: LotteryData) {
+  curItem.value = item;
+  const img = new Image();
+  img.src = item.img! || avatar;
+  img.onload = () => {
+    if (canvasRef.value) {
+      const ctx = canvasRef.value.getContext("2d");
+      if (ctx) {
+        const { dx, dy, drawWidth, drawHeight } = calcImgPos(
+          img,
+          canvasWidth.value,
+          canvasHeight.value
+        );
+        ctx.clearRect(0, 0, canvasWidth.value, canvasHeight.value);
+        ctx.drawImage(img, dx, dy, drawWidth, drawHeight);
+      }
+    }
+  };
 }
 
 async function btnSaveClk(_event: any, item: any, idx: number) {
@@ -173,7 +205,7 @@ async function btnSaveClk(_event: any, item: any, idx: number) {
   bModify.value = true;
   if (idx === -1) {
     lotteryData.value.push(item);
-    nLottery.value = { icon: "", name: "", weight: 1 };
+    nLottery.value = new LotteryData();
   }
 }
 </script>

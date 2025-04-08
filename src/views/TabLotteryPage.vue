@@ -21,13 +21,14 @@
         <ion-card-content>
           <ion-grid>
             <ion-row v-for="(row, rowIdx) in lotteryMatrix" :key="rowIdx">
-              <ion-col v-for="(col, colIdx) in row" :key="colIdx" class="text-center">
+              <ion-col v-for="(item, colIdx) in row" :key="colIdx" class="text-center">
                 <div
                   :class="{
-                    highlight: col.highlight,
+                    highlight: item.highlight,
                   }"
                   class="text-lg">
-                  {{ col.name }}
+                  <img :src="item.img || avatar" class="max-w-16 max-h-16 m-auto" />
+                  {{ item.name }}
                 </div>
               </ion-col>
             </ion-row>
@@ -60,28 +61,31 @@
 </template>
 
 <script setup lang="ts">
+import avatar from "@/assets/images/avatar.svg";
+import { LotteryData } from "@/modal/UserData";
+import { getImage } from "@/utils/ImgMgr";
 import { getLotteryData } from "@/utils/NetUtil";
 import {
-  IonRefresher,
-  IonRefresherContent,
   IonCard,
   IonCardContent,
   IonCardHeader,
   IonCardTitle,
-  IonGrid,
   IonCol,
+  IonGrid,
+  IonRefresher,
+  IonRefresherContent,
   IonRow,
 } from "@ionic/vue";
+import _ from "lodash";
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import WeuiSettingOutlined from "~icons/weui/setting-outlined";
-import _ from "lodash";
 
-const lotteryData = ref<[{ icon: ""; name: ""; weight: 1; highlight: false }] | []>([]);
+const lotteryData = ref<LotteryData[] | []>([]);
 const COL_SIZE = 3; // 列数
-const ROW_SIZE_MIN = 6; // 行数最小值
+const ROW_SIZE_MIN = 4; // 行数最小值
 const LIGHT_RATE = 0.5; // 高亮比例
 const ANIMATION_TIME = 1000; // 动画时间
-const lotteryMatrix = ref<any[]>([]);
+const lotteryMatrix = ref<LotteryData[][]>([]);
 const toastData = ref({
   isOpen: false,
   duration: 3000,
@@ -118,15 +122,17 @@ function handleRefresh(event: any) {
     .finally(() => event.target.complete());
 }
 
-function buildLotteryMatrix(data: any) {
+async function buildLotteryMatrix(data: LotteryData[]) {
   lotteryData.value = data;
   const matrix: any = [];
   const length = Math.max(ROW_SIZE_MIN, Math.ceil(data.length / COL_SIZE));
   let ii = 0;
   for (let i = 0; i < length; i++) {
-    const row: any[] = [];
+    const row: LotteryData[] = [];
     for (let j = 0; j < COL_SIZE; j++) {
-      row.push(_.clone(data[ii++ % data.length]));
+      const d = data[ii++ % data.length];
+      d.img = await getImage(d.imgId);
+      row.push(_.clone(d));
     }
     matrix.push(row);
   }

@@ -14,6 +14,15 @@ export class User {
   score = 0;
 }
 
+export class LotteryData{
+  id: number = -1;
+  name: string = "";
+  imgId?: number ;
+  img?: string ;
+  weight: number = 1;
+  highlight: boolean = false;
+}
+
 export class Subtask {
   id: number = -1;
   name?: string = "";

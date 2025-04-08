@@ -308,7 +308,7 @@ export async function getPicList(pageNum?: number, pageSize?: number) {
 }
 export async function getPic(id: number): Promise<string> {
   const rsp: any = await axios.get(API_URL + "/getData", {
-    params: { table: "t_user_pic", id: id },
+    params: { table: "t_user_pic", id: id , idx: 1},
   });
   // console.log("getPic", rsp.data);
   if (rsp.data.code !== 0) {
