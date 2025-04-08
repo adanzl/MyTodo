@@ -276,7 +276,7 @@ import {
   giftOutline,
 } from "ionicons/icons";
 import _ from "lodash";
-import { inject, onMounted, ref } from "vue";
+import { inject, nextTick, onMounted, ref } from "vue";
 import MdiStar from "~icons/mdi/star";
 
 const bLogin = ref(false);
@@ -325,14 +325,16 @@ onMounted(async () => {
 async function updateScheduleGroup(userId: number) {
   const scheduleListData = await getScheduleList();
   scheduleListSelectedId.value = globalVar.scheduleListId = 1;
-  scheduleListRef.value = [];
-  scheduleListData.data.forEach((item: any) => {
-    scheduleListRef.value.push({ id: item.id, name: item.name });
-    if (item.user_id === userId) {
-      scheduleListSelectedId.value = globalVar.scheduleListId = item.id;
-    }
+  nextTick(() => {
+    scheduleListRef.value = [];
+    scheduleListData.data.forEach((item: any) => {
+      scheduleListRef.value.push({ id: item.id, name: item.name });
+      if (item.user_id === userId) {
+        scheduleListSelectedId.value = globalVar.scheduleListId = item.id;
+      }
+    });
+    eventBus.$emit(C_EVENT.UPDATE_SCHEDULE_GROUP, globalVar.scheduleListId);
   });
-  eventBus.$emit(C_EVENT.UPDATE_SCHEDULE_GROUP, globalVar.scheduleListId);
 }
 function onMenuClose() {
   eventBus.$emit(C_EVENT.MENU_CLOSE, {
