@@ -325,8 +325,8 @@ onMounted(async () => {
 async function updateScheduleGroup(userId: number) {
   const scheduleListData = await getScheduleList();
   scheduleListSelectedId.value = globalVar.scheduleListId = 1;
+  scheduleListRef.value = [];
   nextTick(() => {
-    scheduleListRef.value = [];
     scheduleListData.data.forEach((item: any) => {
       scheduleListRef.value.push({ id: item.id, name: item.name });
       if (item.user_id === userId) {
