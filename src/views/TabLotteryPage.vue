@@ -135,7 +135,6 @@ function buildLotteryMatrix(data: any) {
 }
 
 function btnStartClk() {
-  console.log("btnStartClk");
   if (animation.value > 0) {
     console.log("animation is running");
     return;
