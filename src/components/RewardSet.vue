@@ -3,8 +3,8 @@
     ref="modal"
     aria-hidden="false"
     class="bottom-modal"
-    @ionModalDidPresent="onModalPresent"
-    @ionModalDidDismiss="onModalDismiss">
+    @didPresent="onModalPresent"
+    @didDismiss="onModalDismiss">
     <ion-item>
       <ion-title>设定星星数量</ion-title>
     </ion-item>
@@ -60,7 +60,7 @@ const confirm = () => {
   //     },
   //   ],
   // });
-  console.log("confirm", userList.value);
+  // console.log("confirm", userList.value);
   modal.value.$el!.dismiss();
 };
 
@@ -76,6 +76,7 @@ async function onModalPresent() {
   // console.log("userList", uList);
 }
 async function onModalDismiss() {
+  // console.log("didDismiss", userList.value);
   modifyUser.forEach((u: User) => {
     setUserInfo(u.id, u.score);
   });
