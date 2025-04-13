@@ -75,12 +75,12 @@ async function onModalPresent() {
   });
   // console.log("userList", uList);
 }
-const onModalDismiss = () => {
+async function onModalDismiss() {
   modifyUser.forEach((u: User) => {
     setUserInfo(u.id, u.score);
   });
   modifyUser.clear();
-};
+}
 function onInputChange(e: any, u: User) {
   u.score = e.detail.value;
   modifyUser.add(u);
