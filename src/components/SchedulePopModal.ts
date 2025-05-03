@@ -126,16 +126,14 @@ export default defineComponent({
       watch(
         () => props.schedule,
         () => {
-          if (props.schedule) {
-            refData.curScheduleData.value = ScheduleData.Copy(props.schedule);
-          }
+          refData.curScheduleData.value = ScheduleData.Copy(props.schedule);
           refreshUI();
         }
       );
       watch(
         () => props.save,
         () => {
-          if (props.save) refData.curSave.value = ScheduleSave.Copy(props.save);
+          refData.curSave.value = ScheduleSave.Copy(props.save);
           refreshUI();
         }
       );
