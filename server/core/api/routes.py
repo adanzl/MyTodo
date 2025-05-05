@@ -169,3 +169,18 @@ def chat_messages():
     except Exception as e:
         log.error(e)
         return {"code": -1, "msg": 'error' + str(e)}
+
+
+@api_bp.route("/")
+def route_index():
+    return render_template('index.html')
+
+
+@api_bp.route("/home")
+def route_home():
+    return render_template('home.html')
+
+
+@api_bp.route("/lottery")
+def route_lottery():
+    return render_template('lottery.html')
