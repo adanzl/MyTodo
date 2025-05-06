@@ -9,6 +9,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     { path: "/home", component: Home },
     { path: "/lottery", component: Lottery },
     { path: "/info", component: Info },
+    { path: "/chat", component: Home },
+    { path: "/color", component: Home },
   ];
   // 创建路由实例
   const router = window.VueRouter.createRouter({

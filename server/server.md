@@ -87,6 +87,35 @@ https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-fro
         -v /mnt/data/redis/data:/data \
         redis/redis-stack-server:latest
 
+## MySQL
+
+配置文件 /mnt/data/mysql/conf
+
+数据文件 /mnt/data/mysql/data
+
+日志文件 /mnt/data/mysql/logs
+
+    docker run -d -p 8002:3306 --name mysql --restart=always \
+        -v /mnt/data/mysql/conf:/etc/mysql/conf.d \
+        -v /mnt/data/mysql/logs:/logs \
+        -v /mnt/data/mysql/data:/var/lib/mysql \
+        -e MYSQL_ROOT_PASSWORD='!Zhao575936' mysql:5.7.44
+
+
+## DBGate
+
+    docker run -d -it -p 8003:3000 --name DBGate --restart=always \
+        -e LOGIN=leo \
+        -e PASSWORD=\!Zhao575936 \
+        -e CONNECTIONS=con1 \
+        -e LABEL_con1=MYSQL \
+        -e SERVER_con1=192.168.50.171 \
+        -e USER_con1=leo \
+        -e PORT_con1=8002 \
+        -e PASSWORD_con1=H^12345678 \
+        -e ENGINE_con1=mysql@dbgate-plugin-mysql \
+        dbgate/dbgate:alpine
+
 ## funASR online
 
     # 拉取镜像
@@ -125,24 +154,27 @@ https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-fro
     cosy-voice /bin/bash -c "cd /opt/CosyVoice/CosyVoice/runtime/python/fastapi && python3 server.py --port 50000 --model_dir /models/CosyVoice2-0.5B && sleep infinity"
 
     cd fastapi && python3 client.py --port 50000 --mode <sft|zero_shot|cross_lingual|instruct>
-    
+
 ## gewechat
 
     docker run -itd -v /mnt/data/gewechat:/root/temp -p 9101:2531 -p 9102:2532 --restart=always --name=geWechat gewe
-    
+
 ## dify-on-wechat
+
     cd /mnt/data/dify-on-wechat
     conda activate py3_11
     nohup python3 -u app.py >app.log 2>&1 &
 
 ## 服务器端口
 
-| Server        | Port     | Server         |   Port |
-| ------------- | -------- | -------------- | -----: |
-| my-todo       | 8000     | funASR-online  |   9095 |
-| code-server   | 8001     | funASR-offline |   9096 |
-| nginx         | 8848/443 | ollama         |   9097 |
-| redis         | 6379     | dify           |   9098 |
-| cockpit       | 9090     | cosy-voice     | x 9099 |
-| portainer     | 9000     | geWechat       |   9101 |
-| redis_insight | 9001     |                |   9102 |
+| Server        | Port     | Server         |  Port |
+| ------------- | -------- | -------------- | ----: |
+| my-todo       | 8000     | funASR-online  |  9095 |
+| code-server   | 8001     | funASR-offline |  9096 |
+| mysql         | 8002     | ollama         |  9097 |
+| DBGate        | 8003     | dify           |  9098 |
+| nginx         | 8848/443 | cosy-voice     | x9099 |
+| redis         | 6379     | geWechat       |  9101 |
+| cockpit       | 9090     |                |  9102 |
+| portainer     | 9000     |                |       |
+| redis_insight | 9001     |                |       |
