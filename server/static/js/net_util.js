@@ -319,4 +319,49 @@ export async function delColor(id) {
   return rsp.data.data;
 }
 
+/**
+ * 获取数据
+ * @param {*} fields 字段
+ */
+export async function getData(table, id, fields) {
+  const rsp = await axios.get(API_URL + "/getData", {
+    params: { table: table, id: id, fields: fields },
+  });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
+
+/**
+ * 获取数据列表
+ */
+export async function getList(table, pageNum, pageSize) {
+  const rsp = await axios.get(API_URL + "/getAll", {
+    params: { table: table, pageNum, pageSize },
+  });
+
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+
+  return rsp.data.data;
+}
+/**
+ * 设置数据
+ */
+export async function setData(table, id, data) {
+  const rsp = await axios.post(API_URL + "/setData", {
+    table: table,
+    data,
+  });
+
+  console.log("setData", rsp.data);
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+
+  return rsp.data.data;
+}
+
 export default {};

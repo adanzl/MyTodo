@@ -1,4 +1,4 @@
-import { getLotteryData } from "../js/net_util.js";
+import { getData, getList, setData } from "../js/net_util.js";
 
 const { ref } = window.Vue;
 const { ElMessage } = window.ElementPlus;
@@ -21,11 +21,11 @@ const Lottery = {
   },
   async mounted() {
     console.log("Lottery组件已挂载");
-    getLotteryData()
+    getList("t_gift_category")
       .then((data) => {
-        // buildLotteryMatrix(JSON.parse(data));
-        Object.assign(this.lotteryData, JSON.parse(data)); // 浅合并
-        // console.log(this.lotteryData);
+        const d = data.data;
+        console.log(d);
+        Object.assign(this.lotteryData, d); // 浅合并
       })
       .catch((err) => {
         console.error(err);

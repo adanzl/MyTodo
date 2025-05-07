@@ -105,16 +105,20 @@ https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-fro
 ## DBGate
 
     docker run -d -it -p 8003:3000 --name DBGate --restart=always \
+        -v /mnt/data/project/MyTodo/server/data.db:/home/data.db \
         -e LOGIN=leo \
         -e PASSWORD=\!Zhao575936 \
-        -e CONNECTIONS=con1 \
+        -e CONNECTIONS=con1,con2 \
         -e LABEL_con1=MYSQL \
         -e SERVER_con1=192.168.50.171 \
         -e USER_con1=leo \
         -e PORT_con1=8002 \
         -e PASSWORD_con1=H^12345678 \
         -e ENGINE_con1=mysql@dbgate-plugin-mysql \
-        dbgate/dbgate:alpine
+        -e LABEL_con2=SQLite \
+        -e FILE_con2=/home/data.db \
+        -e ENGINE_con2=sqlite@dbgate-plugin-sqlite \
+        dbgate/dbgate:latest
 
 ## funASR online
 
