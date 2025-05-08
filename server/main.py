@@ -20,12 +20,10 @@ def main():
 if __name__ == '__main__':
     # app.run(debug=True, port=8888)
     from werkzeug.serving import run_simple
-    import os
     from werkzeug.middleware.dispatcher import DispatcherMiddleware
     from werkzeug.middleware.shared_data import SharedDataMiddleware
     try:
-        base_dir = os.path.dirname(os.path.abspath(__file__))  # 假设代码文件在项目根目录
-        static_app = SharedDataMiddleware(None, {'/web': os.path.join(base_dir, 'static')})
+        static_app = SharedDataMiddleware(None, {'/': 'static'})
         application = DispatcherMiddleware(
             None,  # 主应用（此处为空）
             {
