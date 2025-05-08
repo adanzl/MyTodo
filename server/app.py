@@ -3,7 +3,7 @@ from flask_cors import CORS
 from flask_socketio import SocketIO
 from core.api.routes import api_bp
 
-app = Flask(__name__, static_folder='static', static_url_path='/static')
+app = Flask(__name__, static_folder='static', static_url_path='')
 
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})
 # 创建 SocketIO 实例并与 Flask 应用关联

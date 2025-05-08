@@ -18,9 +18,14 @@ def main():
 
 # . .venv/bin/activate
 if __name__ == '__main__':
-    #开始运行flask应用程序，以调试模式运行
-    # app.run(debug=True, port=8888)
+    from werkzeug.serving import run_simple
+    from werkzeug.middleware.dispatcher import DispatcherMiddleware
     try:
-        socketio.run(app, debug=True, port=8000)
+        application = DispatcherMiddleware(
+            None,  # 主应用（此处为空）
+            {'/api': app}  # 子路径映射
+        )
+        run_simple('localhost', 8000, application, use_reloader=True)
+        # socketio.run(app, debug=True, port=8000)
     except Exception as e:
         log.error(e)
