@@ -18,37 +18,45 @@
 
   <body>
     <div id="app">
-      <div class="flex">
-        <div class="w-48">
-          <el-radio-group v-model="isCollapse" class="mb-5">
-            <el-radio-button :value="false">+</el-radio-button>
-            <el-radio-button :value="true">-</el-radio-button>
-          </el-radio-group>
-          <el-menu :default-active="$route.path" :collapse="isCollapse" unique-opened router>
-            <el-menu-item index="/home" @click="handleMenuSelect">
-              <el-icon><home-filled /></el-icon>
-              <template #title>Home</template>
-            </el-menu-item>
-            <el-menu-item index="/lottery" @click="handleMenuSelect">
-              <el-icon><present /></el-icon>
-              <template #title>抽奖设置</template>
-            </el-menu-item>
-            <el-menu-item index="/chat">
-              <el-icon><el-icon-menu /></el-icon>
-              <template #title>Chat</template>
-            </el-menu-item>
-            <el-menu-item index="/color" disabled>
-              <el-icon><document /></el-icon>
-              <template #title>Color</template>
-            </el-menu-item>
-            <el-menu-item index="/info">
-              <el-icon><document /></el-icon>
-              <template #title>Info</template>
-            </el-menu-item>
-          </el-menu>
-        </div>
-        <router-view class="flex-1"></router-view>
-      </div>
+      <el-container>
+        <el-aside width="200px" class="w-48">
+          <el-scrollbar>
+            <el-radio-group v-model="isCollapse" class="p-5 w-full flex">
+              <el-radio-button :value="false">+</el-radio-button>
+              <el-radio-button :value="true">-</el-radio-button>
+            </el-radio-group>
+            <el-menu :default-active="$route.path" :collapse="isCollapse" unique-opened router>
+              <el-menu-item index="/home" @click="handleMenuSelect">
+                <el-icon><home-filled /></el-icon>
+                <template #title>Home</template>
+              </el-menu-item>
+              <el-menu-item index="/lottery" @click="handleMenuSelect">
+                <el-icon><present /></el-icon>
+                <template #title>抽奖设置</template>
+              </el-menu-item>
+              <el-menu-item index="/chat">
+                <el-icon><el-icon-menu /></el-icon>
+                <template #title>Chat</template>
+              </el-menu-item>
+              <el-menu-item index="/color" disabled>
+                <el-icon><document /></el-icon>
+                <template #title>Color</template>
+              </el-menu-item>
+              <el-menu-item index="/info">
+                <el-icon><document /></el-icon>
+                <template #title>Info</template>
+              </el-menu-item>
+            </el-menu>
+          </el-scrollbar>
+        </el-aside>
+        <el-container>
+          <el-header class="flex justify-center items-center bg-blue-100">Header</el-header>
+      
+          <el-main>
+            <router-view></router-view>
+          </el-main>
+        </el-container>
+      </el-container>
     </div>
     <script defer src="js/app.js"></script>
   </body>
