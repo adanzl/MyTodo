@@ -1,16 +1,14 @@
 const { createApp, ref } = window.Vue;
 document.addEventListener("DOMContentLoaded", async () => {
-  const { default: Home } = await import("../view/home.js");
-  const { default: Lottery } = await import("../view/lottery.js");
   const { default: Info } = await import("../view/info.js");
 
   const routes = [
     { path: "/", redirect: "/home" },
-    { path: "/home", component: Home },
-    { path: "/lottery", component: Lottery },
+    { path: "/home", component: () => import("../view/home.js").then((m) => m.default) },
+    { path: "/lottery", component: () => import("../view/lottery.js").then((m) => m.default) },
     { path: "/info", component: Info },
-    { path: "/chat", component: Home },
-    { path: "/color", component: Home },
+    { path: "/chat", component: () => import("../view/home.js").then((m) => m.default) },
+    { path: "/color", component: () => import("../view/home.js").then((m) => m.default) },
   ];
   // 创建路由实例
   const router = window.VueRouter.createRouter({

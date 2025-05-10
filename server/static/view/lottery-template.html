@@ -1,0 +1,156 @@
+<div class="">
+  <div class="flex items-center">
+    <el-radio-group
+      size="large"
+      v-model="selectedCate"
+      class=""
+      @change="onCateChange(selectedCate)">
+      <el-radio-button v-for="item in lotteryCatList" :key="item.id" :value="item">
+        {{ item.name }}
+      </el-radio-button>
+    </el-radio-group>
+    <el-button type="primary" class="ml-1" @click="modifyCateModel=true">
+      <el-icon><Edit /></el-icon>
+    </el-button>
+    <div class="flex-1 flex items-center justify-end">
+      <el-button type="primary" class="" @click="onAddGiftClk">添加奖品</el-button>
+    </div>
+  </div>
+  <el-table :data="giftList" style="width: 100%">
+    <el-table-column prop="id" label="ID" width="50" />
+    <el-table-column label="Name" width="100">
+      <template #default="{ row, $index }">
+        <div class="flex items-center">
+          <template v-if="row.edited">
+            <el-input v-model="row.name" size="small" />
+          </template>
+          <template v-else>
+            <span> {{ row.name }} </span>
+          </template>
+        </div>
+      </template>
+    </el-table-column>
+    <el-table-column label="Img" width="80">
+      <template #default="{row, $index}">
+        <el-avatar :src="row.img" />
+      </template>
+    </el-table-column>
+    <el-table-column label="Category" width="180">
+      <template #default="{ row, $index }">
+        <div class="flex items-center">
+          <el-select
+            :disabled="!row.edited"
+            v-model="row.cate_id"
+            @change="handleGiftCatChange($event, row)">
+            <el-option
+              v-for="item in lotteryCatList"
+              :key="item.id"
+              :label="item.name"
+              :value="item.id" />
+          </el-select>
+        </div>
+      </template>
+    </el-table-column>
+    <el-table-column label="Cost" width="180">
+      <template #default="{ row, $index }">
+        <div class="flex items-center">
+          <template v-if="row.edited">
+            <el-input v-model="row.cost" size="small" />
+          </template>
+          <template v-else>
+            <span> {{ row.cost }} </span>
+          </template>
+        </div>
+      </template>
+    </el-table-column>
+    <el-table-column label="Operations">
+      <template #default="{row, $index}">
+        <el-button
+          v-if="row.edited"
+          class="w-16"
+          size="small"
+          type="primary"
+          @click="handleGiftSave(row,$index)">
+          Save
+        </el-button>
+        <el-button
+          v-if="row.edited"
+          class="w-16"
+          size="small"
+          @click="handleGiftCancel(row,$index)">
+          Cancel
+        </el-button>
+        <el-button v-else size="small" class="w-16" @click="handleCateEdit(row)"> Edit </el-button>
+        <el-button
+          v-if="row.id !== -1"
+          class="w-16"
+          size="small"
+          type="danger"
+          @click="handleGiftDel(row)">
+          Delete
+        </el-button>
+      </template>
+    </el-table-column>
+  </el-table>
+</div>
+<el-dialog v-model="modifyCateModel" title="类别管理" width="800" destroy-on-close>
+  <el-table :data="lotteryCatPopList">
+    <el-table-column property="id" label="ID" width="50" />
+    <el-table-column property="name" label="Name" width="100">
+      <template #default="{ row, $index }">
+        <div class="flex items-center">
+          <template v-if="row.edited">
+            <el-input v-model="row.name" size="small" @blur="handleCateBlur(row, 'name', $index)" />
+          </template>
+          <template v-else>
+            <span> {{ row.name }} </span>
+          </template>
+        </div>
+      </template>
+    </el-table-column>
+    <el-table-column property="cost" label="Cost" width="200">
+      <template #default="{ row, $index }">
+        <div class="flex items-center">
+          <template v-if="row.edited">
+            <el-input
+              v-model="row.cost"
+              size="small"
+              clearable
+              @blur="handleCateBlur(row, 'cost', $index)" />
+          </template>
+          <template v-else>
+            <span> {{ row.cost }} </span>
+          </template>
+        </div>
+      </template>
+    </el-table-column>
+    <el-table-column label="OP">
+      <template #default="{row, $index}">
+        <el-button
+          v-if="row.edited"
+          class="w-16"
+          size="small"
+          type="primary"
+          @click="handleCateSave(row,$index)">
+          Save
+        </el-button>
+        <el-button
+          v-if="row.edited"
+          class="w-16"
+          size="small"
+          @click="handleCateCancel(row,$index)">
+          Cancel
+        </el-button>
+        <el-button v-else size="small" class="w-16" @click="handleCateEdit(row)"> Edit </el-button>
+        <el-button
+          v-if="row.id !== -1"
+          class="w-16"
+          size="small"
+          type="danger"
+          @click="handleCateDelete(row)">
+          Delete
+        </el-button>
+      </template>
+    </el-table-column>
+  </el-table>
+</el-dialog>

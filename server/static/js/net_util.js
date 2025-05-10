@@ -350,13 +350,30 @@ export async function getList(table, pageNum, pageSize) {
 /**
  * 设置数据
  */
-export async function setData(table, id, data) {
+export async function setData(table, data) {
+  if (data.id) {
+    if (data.id === -1) {
+      data.id = null;
+    }
+  }
   const rsp = await axios.post(API_URL + "/setData", {
     table: table,
     data,
   });
 
   console.log("setData", rsp.data);
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+
+  return rsp.data.data;
+}
+export async function delData(table, id) {
+  const rsp = await axios.post(API_URL + "/delData", {
+    id,
+    table,
+  });
+
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
   }
