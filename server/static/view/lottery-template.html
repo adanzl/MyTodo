@@ -16,7 +16,7 @@
       <el-button type="primary" class="" @click="onAddGiftClk">添加奖品</el-button>
     </div>
   </div>
-  <el-table :data="giftList" style="width: 100%">
+  <el-table :data="giftList">
     <el-table-column prop="id" label="ID" width="50" />
     <el-table-column label="Name" width="100">
       <template #default="{ row, $index }">
@@ -30,9 +30,43 @@
         </div>
       </template>
     </el-table-column>
-    <el-table-column label="Img" width="80">
+    <!-- 图片 -->
+    <el-table-column label="Img" width="120">
       <template #default="{row, $index}">
-        <el-avatar :src="row.img" />
+        <div class="bg-blue-100 flex items-center h-[50px]">
+          <template v-if="!row.edited">
+            <div class="flex items-center">
+              <template v-if="!row.img">
+                <el-upload
+                  class="w-[50px] flex items-center justify-center bg-white"
+                  action="#"
+                  list-type="picture"
+                  :limit="1"
+                  :auto-upload="false"
+                  :show-file-list="false"
+                  :on-change="(file) => handleImageChange(file, row)">
+                  <el-icon><Plus /></el-icon>
+                </el-upload>
+              </template>
+              <template v-else>
+                <div class="relative z-50">
+                  <el-image 
+                    class="w-[50px] cursor-pointer !z-[9999]"
+                    :src="row.img"
+                    :preview-src-list="[row.img]"
+                    :preview-teleported="true"
+                    fit="contain"/>
+                </div>
+              </template>
+            </div>
+          </template>
+          <template v-else>
+            <el-image class="w-[50px]" :src="row.img" fit="contain"/>
+          </template>
+          <span size="small">
+            <el-icon><zoom-in /></el-icon>
+          </span>
+        </div>
       </template>
     </el-table-column>
     <el-table-column label="Category" width="180">

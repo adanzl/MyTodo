@@ -1,13 +1,22 @@
 <div class="">
-  <el-table :data="userList" stripe style="width: 90%">
+  <el-table :data="userList" stripe class="w-full">
     <el-table-column prop="id" label="ID" width="80" />
-    <el-table-column label="Icon" width="80">
+    <el-table-column label="Icon" width="100">
       <template #default="scope">
         <el-avatar :src="scope.row.icon" />
       </template>
     </el-table-column>
     <el-table-column prop="name" label="Name" width="100" />
-    <el-table-column prop="admin" label="Admin" width="180" />
-    <el-table-column prop="score" label="Score" />
+    <el-table-column prop="admin" label="Admin" width="100" class="items-center text-center" />
+    <el-table-column prop="score" label="Score" width="100">
+      <template #default="{ row, $index }">
+        <el-input v-model="row.score" size="small" />
+      </template>
+    </el-table-column>
+    <el-table-column label="Operations">
+      <template #default="{row, $index}">
+        <el-button class="w-16" @click="handleUpdateUser(row)"> Update </el-button>
+      </template>
+    </el-table-column>
   </el-table>
 </div>

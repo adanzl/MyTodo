@@ -1,4 +1,5 @@
 import { getData, getList, setData, delData } from "../js/net_util.js";
+import { compressImageToBase64 } from "../js/image_util.js";
 const _ = window._;
 const { ref, onMounted } = window.Vue;
 const { ElMessage } = window.ElementPlus;
@@ -129,6 +130,14 @@ async function createComponent() {
           setData("t_gift", data).then(() => {
             refreshGiftList();
           });
+        },
+        handleImageChange: (file, row) => {
+          if (file) {
+            compressImageToBase64(file.raw, 0.5).then((base64) => {
+              console.log("压缩后的base64", base64.length);
+              row.img = base64;
+            });
+          }
         },
       };
       const catePopFunc = {

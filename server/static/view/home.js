@@ -1,6 +1,6 @@
-import { getUserList } from "../js/net_util.js";
+import { getUserList, setData } from "../js/net_util.js";
 
-const { ref } = window.Vue;
+const { ref, onMounted } = window.Vue;
 let component = null;
 async function loadTemplate() {
   const response = await fetch("./view/home-template.html");
@@ -14,28 +14,33 @@ async function createComponent() {
       const refData = {
         userList: ref([]),
       };
+      const refreshUserList = async () => {
+        const data = await getUserList();
+        // console.log("getUserList", data.data);
+        Object.assign(refData.userList.value, data.data); // 浅合并
+      };
+      const refMethods = {
+        handleUpdateUser: (item) => {
+          const data = {
+            id: item.id,
+            score: item.score,
+          };
+          setData("t_user", data).then(() => {
+            console.log("update user", data);
+            refreshUserList();
+          });
+        },
+      };
+      onMounted(async () => {
+        await refreshUserList();
+        console.log("Home组件已挂载");
+      });
       return {
         ...refData,
+        ...refMethods,
       };
-    },
-    data() {
-      return {
-        message: "欢迎来到首页",
-        count: 0,
-      };
-    },
-    methods: {
-      increment() {
-        this.count++;
-      },
     },
     template,
-    async mounted() {
-      const data = await getUserList();
-      console.log("getUserList", data.data);
-      Object.assign(this.userList, data.data); // 浅合并
-      console.log("Home组件已挂载");
-    },
   };
   return component;
 }
