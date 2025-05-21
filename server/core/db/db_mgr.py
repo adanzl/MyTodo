@@ -211,7 +211,7 @@ def get_list(table, page_num=1, page_size=20, fields: str | list = '*', conditio
         if conditions and type(conditions) == dict:
             for k, v in conditions.items():
                 condition_str += f" AND {k}='{v}'"
-        sql_str = f"""SELECT {field_str} FROM {table} WHERE 1=1 {condition_str} LIMIT ? OFFSET ?;"""
+        sql_str = f"""SELECT {field_str} FROM {table} WHERE 1=1 {condition_str} ORDER BY id DESC LIMIT ? OFFSET ?;"""
         log.info(sql_str)
         cur.execute(sql_str, (page_size, (page_num - 1) * page_size))
 

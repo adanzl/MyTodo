@@ -16,7 +16,7 @@
       <el-button type="primary" class="" @click="onAddGiftClk">添加奖品</el-button>
     </div>
   </div>
-  <el-table :data="giftList">
+  <el-table :data="giftList.data">
     <!-- 图片 -->
     <el-table-column width="130" label="Image">
       <template #default="{row, $index}">
@@ -26,9 +26,9 @@
             <div class="flex items-center w-24">
               <template v-if="!row.img">
                 <el-upload
-                  class="flex items-center justify-center bg-white"
+                  class="flex items-center justify-center bg-white w-full h-full"
                   action="#"
-                  list-type="picture"
+                  list-type="picture-card"
                   :limit="1"
                   :auto-upload="false"
                   :show-file-list="false"
@@ -138,6 +138,13 @@
       </template>
     </el-table-column>
   </el-table>
+  <el-pagination
+    layout="prev, pager, next"
+    :total="giftList.totalCount"
+    :page-size="PAGE_SIZE"
+    class="mt-2"
+    background
+    @change="handlePageChange" />
 </div>
 <el-dialog v-model="modifyCateModel" title="类别管理" width="800" destroy-on-close>
   <el-table :data="lotteryCatPopList">

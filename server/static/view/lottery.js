@@ -14,8 +14,15 @@ async function createComponent() {
   component = {
     setup() {
       const refData = {
+        PAGE_SIZE: 10,
         selectedCate: ref(),
-        giftList: ref([]),
+        giftList: ref({
+          data: [],
+          pageNum: 1,
+          pageSize: 10,
+          totalCount: 0,
+          totalPage: 0,
+        }),
         lotteryCatList: ref([]),
       };
 
@@ -59,11 +66,15 @@ async function createComponent() {
         getList("t_gift", filter)
           .then((data) => {
             const d = data.data;
-            // console.log(d);
-            refData.giftList.value = [];
+            // console.log(data);
+            refData.giftList.value.data = [];
+            refData.giftList.value.pageNum = data.pageNum;
+            refData.giftList.value.pageSize = data.pageSize;
+            refData.giftList.value.totalCount = data.totalCount;
+            refData.giftList.value.totalPage = data.totalPage;
 
             _.forEach(d, (item) => {
-              refData.giftList.value.push({
+              refData.giftList.value.data.push({
                 id: item.id,
                 name: item.name,
                 img: item.image,
@@ -85,11 +96,12 @@ async function createComponent() {
         console.log(index, row);
       };
       const onCateChange = (item) => {
+        refData.selectedCate.value = item;
         refreshGiftList(item.id);
       };
       const giftFunc = {
         onAddGiftClk: () => {
-          refData.giftList.value.unshift({
+          refData.giftList.value.data.unshift({
             id: -1,
             name: "",
             img: "",
@@ -142,6 +154,9 @@ async function createComponent() {
               row.img = base64;
             });
           }
+        },
+        handlePageChange: (pageNum, pageSize) => {
+          refreshGiftList(refData.selectedCate.value.id, pageNum, pageSize);
         },
       };
       const catePopFunc = {
