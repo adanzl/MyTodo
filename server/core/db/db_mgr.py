@@ -207,6 +207,7 @@ def get_list(table, page_num=1, page_size=20, fields: str | list = '*', conditio
             field_str = fields
         else:
             field_str = ','.join(fields)
+        condition_str = ''
         if conditions and type(conditions) == dict:
             for k, v in conditions.items():
                 condition_str += f" AND {k}='{v}'"
