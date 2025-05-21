@@ -211,10 +211,11 @@ def get_list(table, page_num=1, page_size=20, fields: str | list = '*', conditio
         if conditions and type(conditions) == dict:
             for k, v in conditions.items():
                 condition_str += f" AND {k}='{v}'"
-        cur.execute(
-            f"""
+        sql_str = f"""
             SELECT {field_str} FROM {table} WHERE 1=1 {condition_str} LIMIT ? OFFSET ?;
-            """, (page_size, (page_num - 1) * page_size))
+            """, (page_size, (page_num - 1) * page_size)
+        log.info(sql_str)
+        cur.execute(sql_str)
 
         result = cur.fetchall()
         data = {
