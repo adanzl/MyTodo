@@ -121,7 +121,7 @@ async function createComponent() {
         },
         handleGiftCancel: (item, idx) => {
           if (item.id === -1) {
-            refData.giftList.value.splice(idx, 1);
+            refData.giftList.value.data.splice(idx, 1);
           } else {
             item.edited = false;
             getData("t_gift", item.id, "*").then((data) => {

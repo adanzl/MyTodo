@@ -107,10 +107,10 @@
     </el-table-column>
     <el-table-column label="Operations">
       <template #default="{row, $index}">
-        <div class="flex flex-col">
+        <div class="flex flex-col gap-2 [&_.el-button+_.el-button]:!ml-0">
           <el-button
             v-if="row.id !== -1"
-            class="w-16 ml-3"
+            class="w-16"
             size="small"
             type="danger"
             @click="handleGiftDel(row)">
@@ -118,17 +118,17 @@
           </el-button>
           <el-button
             v-if="row.edited"
-            class="w-16 mt-2"
+            class="w-16"
             size="small"
             @click="handleGiftCancel(row,$index)">
             Cancel
           </el-button>
-          <el-button v-else size="small" class="w-16 mt-2" @click="handleCateEdit(row)">
+          <el-button v-else size="small" class="w-16" @click="handleCateEdit(row)">
             Edit
           </el-button>
           <el-button
             v-if="row.edited"
-            class="w-16 mt-2"
+            class="w-16"
             size="small"
             type="primary"
             @click="handleGiftSave(row,$index)">
