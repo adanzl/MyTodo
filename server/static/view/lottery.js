@@ -52,7 +52,7 @@ async function createComponent() {
           });
       };
       const refreshGiftList = (cateId) => {
-        getList("t_gift")
+        getList("t_gift", { cate_id: cateId })
           .then((data) => {
             const d = data.data;
             // console.log(d);

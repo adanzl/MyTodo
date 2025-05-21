@@ -336,9 +336,9 @@ export async function getData(table, id, fields) {
 /**
  * 获取数据列表
  */
-export async function getList(table, pageNum, pageSize) {
+export async function getList(table, conditions, pageNum, pageSize) {
   const rsp = await axios.get(API_URL + "/getAll", {
-    params: { table: table, pageNum, pageSize },
+    params: { table: table, conditions: conditions, pageNum, pageSize },
   });
 
   if (rsp.data.code !== 0) {
