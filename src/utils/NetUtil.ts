@@ -308,7 +308,7 @@ export async function getPicList(pageNum?: number, pageSize?: number) {
 }
 export async function getPic(id: number): Promise<string> {
   const rsp: any = await axios.get(API_URL + "/getData", {
-    params: { table: "t_user_pic", id: id , idx: 1},
+    params: { table: "t_user_pic", id: id, idx: 1 },
   });
   // console.log("getPic", rsp.data);
   if (rsp.data.code !== 0) {
@@ -353,4 +353,30 @@ export async function delColor(id: number) {
   }
   return rsp.data.data;
 }
+
+/**
+ * 获取数据列表
+ */
+export async function getList(
+  table: string,
+  conditions: any = undefined,
+  pageNum: number = 1,
+  pageSize: number = 10
+) {
+  const rsp = await axios.get(API_URL + "/getAll", {
+    params: {
+      table: table,
+      conditions: conditions ? JSON.stringify(conditions) : undefined,
+      pageNum,
+      pageSize,
+    },
+  });
+
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+
+  return rsp.data.data;
+}
+
 export default {};
