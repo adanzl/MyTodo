@@ -197,21 +197,23 @@ def query(sql) -> dict:
     return {"code": 0, "msg": "ok", "data": data}
 
 
-def get_list(table, page_num=1, page_size=20, fields: str | list = '*') -> dict:
+def get_list(table, page_num=1, page_size=20, fields: str | list = '*', conditions=None) -> dict:
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     try:
         cur.execute(f"SELECT COUNT(*) FROM {table}")
         total_count = cur.fetchone()[0]
         if type(fields) == 'str':
-            cur.execute(f"""
-                SELECT {fields} FROM {table} LIMIT ? OFFSET ?;
-                """, (page_size, (page_num - 1) * page_size))
+            field_str = fields
         else:
-            cur.execute(
-                f"""
-                SELECT {','.join(fields)} FROM {table} LIMIT ? OFFSET ?;
-                """, (page_size, (page_num - 1) * page_size))
+            field_str = ','.join(fields)
+        if conditions and type(conditions) == dict:
+            for k, v in conditions.items():
+                condition_str += f" AND {k}='{v}'"
+        cur.execute(
+            f"""
+            SELECT {field_str} FROM {table} WHERE 1=1 {condition_str} LIMIT ? OFFSET ?;
+            """, (page_size, (page_num - 1) * page_size))
 
         result = cur.fetchall()
         data = {

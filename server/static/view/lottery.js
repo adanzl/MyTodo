@@ -51,7 +51,7 @@ async function createComponent() {
             ElMessage.error(JSON.stringify(err));
           });
       };
-      const refreshGiftList = () => {
+      const refreshGiftList = (cateId) => {
         getList("t_gift")
           .then((data) => {
             const d = data.data;
@@ -81,7 +81,7 @@ async function createComponent() {
         console.log(index, row);
       };
       const onCateChange = (item) => {
-        console.log(item);
+        refreshGiftList(item.id);
       };
       const giftFunc = {
         onAddGiftClk: () => {
@@ -109,7 +109,7 @@ async function createComponent() {
           } else {
             item.edited = false;
             getData("t_gift", item.id, "*").then((data) => {
-              console.log(data);
+              // console.log(data);
               Object.assign(item, data);
               // item.name = data.name;
               // item.img = data.image;

@@ -82,11 +82,12 @@ def get_all():
     page_size = request.args.get('pageSize', 20, type=int)
     page_num = request.args.get('pageNum', 1, type=int)
     fields = request.args.get('fields', '*')
+    conditions = request.args.get('conditions')
     table = request.args.get('table')
     log.info("===== [Get All Data] " + json.dumps(request.args))
     if fields != '*':
         fields = fields.split(',')
-    return db_mgr.get_list(table, page_num, page_size, fields)
+    return db_mgr.get_list(table, page_num, page_size, fields, conditions)
 
 
 @api_bp.route("/getData", methods=['GET'])
