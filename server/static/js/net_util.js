@@ -338,7 +338,12 @@ export async function getData(table, id, fields) {
  */
 export async function getList(table, conditions, pageNum, pageSize) {
   const rsp = await axios.get(API_URL + "/getAll", {
-    params: { table: table, conditions: conditions, pageNum, pageSize },
+    params: { 
+      table: table, 
+      conditions: conditions ? JSON.stringify(conditions) : undefined, 
+      pageNum, 
+      pageSize 
+    },
   });
 
   if (rsp.data.code !== 0) {

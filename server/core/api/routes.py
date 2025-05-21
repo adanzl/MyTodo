@@ -82,7 +82,8 @@ def get_all():
     page_size = request.args.get('pageSize', 20, type=int)
     page_num = request.args.get('pageNum', 1, type=int)
     fields = request.args.get('fields', '*')
-    conditions = request.args.get('conditions', type=dict)
+    conditions_str = request.args.get('conditions')
+    conditions = json.loads(conditions_str) if conditions_str else None
     table = request.args.get('table')
     log.info("===== [Get All Data] " + json.dumps(request.args))
     if fields != '*':
