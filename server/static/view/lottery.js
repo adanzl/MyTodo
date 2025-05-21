@@ -52,7 +52,11 @@ async function createComponent() {
           });
       };
       const refreshGiftList = (cateId) => {
-        getList("t_gift", { cate_id: cateId })
+        let filter = undefined;
+        if (cateId) {
+          filter = { cate_id: cateId };
+        }
+        getList("t_gift", filter)
           .then((data) => {
             const d = data.data;
             // console.log(d);
