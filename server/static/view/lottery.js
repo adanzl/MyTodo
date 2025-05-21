@@ -118,7 +118,7 @@ async function createComponent() {
             });
           }
         },
-        handleGiftSave: (item, idx) => {
+        handleGiftSave: (item) => {
           const data = {
             id: item.id,
             name: item.name,
@@ -126,7 +126,7 @@ async function createComponent() {
             cate_id: item.cate_id,
             cost: item.cost,
           };
-          console.log("handleGiftSave", item, data, idx);
+          // console.log("handleGiftSave", item, data, idx);
           setData("t_gift", data).then(() => {
             refreshGiftList();
           });

@@ -12,10 +12,32 @@ export async function compressImageToBase64(file, options = {}) {
   const defaultOptions = {
     maxWidth: 800,
     maxHeight: 600,
-    format: "image/jpeg",
     quality: 0.8,
   };
   const opt = { ...defaultOptions, ...options };
+
+  // 如果是SVG文件，直接读取内容
+  if (file.type === 'image/svg+xml') {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const svgContent = e.target.result;
+        // 检查是否是base64编码的SVG
+        if (svgContent.startsWith('data:image/svg+xml;base64,')) {
+          resolve(svgContent);
+        } else {
+          // 如果不是base64编码，则转换为base64
+          const base64 = btoa(new TextEncoder().encode(svgContent).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+          resolve(`data:image/svg+xml;base64,${base64}`);
+        }
+      };
+      reader.onerror = (error) => reject(`SVG读取失败: ${error.message}`);
+      reader.readAsText(file);
+    });
+  }
+
+  // 根据文件类型设置输出格式
+  const outputFormat = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
 
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -25,23 +47,22 @@ export async function compressImageToBase64(file, options = {}) {
       const ctx = canvas.getContext("2d");
       let [width, height] = [img.width, img.height];
 
-
-      // 2. 计算缩放尺寸
+      // 计算缩放尺寸
       if (width > opt.maxWidth || height > opt.maxHeight) {
         const ratio = Math.min(opt.maxWidth / width, opt.maxHeight / height);
         width = Math.floor(width * ratio);
         height = Math.floor(height * ratio);
       }
 
-      // 3. 绘制压缩图
+      // 绘制压缩图
       canvas.width = width;
       canvas.height = height;
       ctx.clearRect(0, 0, width, height);
       ctx.drawImage(img, 0, 0, width, height);
 
-      // 4. 生成Base64
+      // 生成Base64
       try {
-        const base64 = canvas.toDataURL(opt.format, opt.quality);
+        const base64 = canvas.toDataURL(outputFormat, opt.quality);
         URL.revokeObjectURL(img.src); // 释放内存
         resolve(base64);
       } catch (error) {

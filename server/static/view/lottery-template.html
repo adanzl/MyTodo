@@ -17,28 +17,16 @@
     </div>
   </div>
   <el-table :data="giftList">
-    <el-table-column prop="id" label="ID" width="50" />
-    <el-table-column label="Name" width="100">
-      <template #default="{ row, $index }">
-        <div class="flex items-center">
-          <template v-if="row.edited">
-            <el-input v-model="row.name" size="small" />
-          </template>
-          <template v-else>
-            <span> {{ row.name }} </span>
-          </template>
-        </div>
-      </template>
-    </el-table-column>
     <!-- 图片 -->
-    <el-table-column label="Img" width="120">
+    <el-table-column width="130" label="Image">
       <template #default="{row, $index}">
-        <div class="bg-blue-100 flex items-center h-[50px]">
-          <template v-if="!row.edited">
-            <div class="flex items-center">
+        <div class="h-24 flex">
+          <template v-if="row.edited">
+            <!-- 图片 -->
+            <div class="flex items-center w-24">
               <template v-if="!row.img">
                 <el-upload
-                  class="w-[50px] flex items-center justify-center bg-white"
+                  class="flex items-center justify-center bg-white"
                   action="#"
                   list-type="picture"
                   :limit="1"
@@ -49,26 +37,58 @@
                 </el-upload>
               </template>
               <template v-else>
-                <div class="relative z-50">
-                  <el-image 
-                    class="w-[50px] cursor-pointer !z-[9999]"
+                <div class="relative z-50 w-full h-full">
+                  <el-image
+                    class="w-24 cursor-pointer !z-[99]"
                     :src="row.img"
                     :preview-src-list="[row.img]"
                     :preview-teleported="true"
-                    fit="contain"/>
+                    fit="contain" />
+                  <el-upload
+                    class="absolute bottom-0 right-0 !z-[100]"
+                    action="#"
+                    :show-file-list="false"
+                    :auto-upload="false"
+                    :on-change="(file) => handleImageChange(file, row)">
+                    <el-button size="small" type="primary" circle>
+                      <el-icon><Edit /></el-icon>
+                    </el-button>
+                  </el-upload>
                 </div>
               </template>
             </div>
           </template>
           <template v-else>
-            <el-image class="w-[50px]" :src="row.img" fit="contain"/>
+            <div class="relative w-24">
+              <el-image
+                class="w-24 cursor-pointer !z-[9999]"
+                :src="row.img"
+                :preview-src-list="[row.img]"
+                :preview-teleported="true"
+                fit="contain" />
+            </div>
           </template>
-          <span size="small">
-            <el-icon><zoom-in /></el-icon>
-          </span>
         </div>
       </template>
     </el-table-column>
+    <el-table-column label="Info" width="200">
+      <template #default="{row, $index}">
+        <div class="flex flex-col">
+          <el-descriptions :column="1" size="small" border label-width="50">
+            <el-descriptions-item label="ID" width="100">
+              <el-input v-model="row.id" size="small" disabled></el-input>
+            </el-descriptions-item>
+            <el-descriptions-item label="名称">
+              <el-input v-model="row.name" size="small" :disabled="!row.edited" />
+            </el-descriptions-item>
+            <el-descriptions-item label="Cost">
+              <el-input v-model="row.cost" size="small" :disabled="!row.edited" />
+            </el-descriptions-item>
+          </el-descriptions>
+        </div>
+      </template>
+    </el-table-column>
+
     <el-table-column label="Category" width="180">
       <template #default="{ row, $index }">
         <div class="flex items-center">
@@ -85,44 +105,36 @@
         </div>
       </template>
     </el-table-column>
-    <el-table-column label="Cost" width="180">
-      <template #default="{ row, $index }">
-        <div class="flex items-center">
-          <template v-if="row.edited">
-            <el-input v-model="row.cost" size="small" />
-          </template>
-          <template v-else>
-            <span> {{ row.cost }} </span>
-          </template>
-        </div>
-      </template>
-    </el-table-column>
     <el-table-column label="Operations">
       <template #default="{row, $index}">
-        <el-button
-          v-if="row.edited"
-          class="w-16"
-          size="small"
-          type="primary"
-          @click="handleGiftSave(row,$index)">
-          Save
-        </el-button>
-        <el-button
-          v-if="row.edited"
-          class="w-16"
-          size="small"
-          @click="handleGiftCancel(row,$index)">
-          Cancel
-        </el-button>
-        <el-button v-else size="small" class="w-16" @click="handleCateEdit(row)"> Edit </el-button>
-        <el-button
-          v-if="row.id !== -1"
-          class="w-16"
-          size="small"
-          type="danger"
-          @click="handleGiftDel(row)">
-          Delete
-        </el-button>
+        <div class="flex flex-col">
+          <el-button
+            v-if="row.id !== -1"
+            class="w-16 ml-3"
+            size="small"
+            type="danger"
+            @click="handleGiftDel(row)">
+            Delete
+          </el-button>
+          <el-button
+            v-if="row.edited"
+            class="w-16 mt-2"
+            size="small"
+            @click="handleGiftCancel(row,$index)">
+            Cancel
+          </el-button>
+          <el-button v-else size="small" class="w-16 mt-2" @click="handleCateEdit(row)">
+            Edit
+          </el-button>
+          <el-button
+            v-if="row.edited"
+            class="w-16 mt-2"
+            size="small"
+            type="primary"
+            @click="handleGiftSave(row,$index)">
+            Save
+          </el-button>
+        </div>
       </template>
     </el-table-column>
   </el-table>
