@@ -24,9 +24,9 @@
           <ion-label>积分兑换</ion-label>
         </ion-segment-button>
       </ion-segment>
-      <ion-segment-view>
+      <ion-segment-view :style="{ height: `calc(100% - ${tabsHeight}px)` }">
         <!-- 抽奖页签 -->
-        <ion-segment-content id="lotterySpecial" class="flex flex-col h-full">
+        <ion-segment-content id="lotterySpecial" class="flex flex-col">
           <ion-item>
             <div class="flex items-center justify-center">
               <span>当前积分：</span>
@@ -34,7 +34,10 @@
               <div class="text-left pl-1 font-bold w-12">{{ globalVar.user.score }}</div>
             </div>
           </ion-item>
-          <ion-radio-group :value="selectedCate" class="radio-grid" @ionChange="handleShopCateChange">
+          <ion-radio-group
+            :value="selectedCate"
+            class="radio-grid p-10"
+            @ionChange="handleShopCateChange">
             <ion-radio
               v-for="item in lotteryCatList"
               :key="item.id"
@@ -48,11 +51,24 @@
             <ion-button @click="btnLotteryClk" size="default">
               <div class="w-20 h-20 flex flex-col items-center justify-center">
                 <span>立即抽奖</span>
-                <div class="flex items-center justify-center">
+                <div class="flex items-center justify-center mt-2">
                   <MdiStar class="text-red-500" />{{ selectedCate.cost }}
                 </div>
               </div>
             </ion-button>
+          </div>
+          <div class="bg-slate-100" id="history">
+            <swiper :options="slideOpts" class="py-4" :modules="[FreeMode]" @swiper="setSwiperInstance">
+              <swiper-slide v-for="item in lotteryHistory" :key="item.id" class="!w-auto px-2">
+                <div class="w-24 h-24 relative">
+                  <img :src="item.img" class="w-full h-full object-cover rounded-lg" />
+                  <div
+                    class="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1 rounded-b-lg truncate">
+                    {{ item.name }}
+                  </div>
+                </div>
+              </swiper-slide>
+            </swiper>
           </div>
         </ion-segment-content>
         <!-- 积分兑换页签 -->
@@ -115,21 +131,34 @@ import { LotteryData } from "@/modal/UserData";
 import { getImage } from "@/utils/ImgMgr";
 import { getList, getLotteryData } from "@/utils/NetUtil";
 import {
+  IonButton,
+  IonContent,
+  IonHeader,
+  IonIcon,
+  IonItem,
+  IonLabel,
+  IonList,
+  IonPage,
   IonRadio,
   IonRadioGroup,
-  IonSelect,
-  IonSelectOption,
   IonRefresher,
   IonRefresherContent,
   IonSegment,
   IonSegmentButton,
   IonSegmentContent,
   IonSegmentView,
+  IonSelect,
+  IonSelectOption,
   IonThumbnail,
   alertController,
 } from "@ionic/vue";
 import { giftOutline, heartOutline } from "ionicons/icons";
 import _ from "lodash";
+import "@ionic/vue/css/ionic-swiper.css";
+import "swiper/css";
+import "swiper/css/free-mode";
+import { FreeMode } from "swiper/modules";
+import { Swiper, SwiperSlide } from "swiper/vue";
 import { inject, onBeforeUnmount, onMounted, ref } from "vue";
 import MdiStar from "~icons/mdi/star";
 import WeuiSettingOutlined from "~icons/weui/setting-outlined";
@@ -144,7 +173,6 @@ const toastData = ref({
   text: "",
 });
 const lotterySetting = ref({ open: false });
-const animation = ref(-1);
 const globalVar: any = inject("globalVar");
 // const winner = ref({ bWin: false, prize: "" });
 
@@ -157,15 +185,77 @@ const giftList = ref<any>({
 });
 const lotteryCatList = ref<any>([]);
 const selectedCate = ref<any>({ id: 0, name: "全部", cost: 100 });
+const tabsHeight = ref(0);
+const swiperRef = ref(); // 滑动对象
+let observer: MutationObserver | null = null;
+
+const lotteryHistory = ref([
+  { id: 1, name: "奖品1", img: "https://picsum.photos/200" },
+  { id: 2, name: "奖品2", img: "https://picsum.photos/201" },
+  { id: 3, name: "奖品3", img: "https://picsum.photos/202" },
+  { id: 4, name: "奖品4", img: "https://picsum.photos/203" },
+  { id: 5, name: "奖品5", img: "https://picsum.photos/204" },
+]);
+
+const slideOpts = {
+  slidesPerView: 'auto',
+  spaceBetween: 0,
+  freeMode: {
+    enabled: true,
+    momentum: true,
+    momentumRatio: 0.5,
+    momentumVelocityRatio: 0.5,
+  },
+  touchRatio: 1,
+  touchAngle: 45,
+  watchSlidesProgress: true,
+  watchSlidesVisibility: true,
+};
+
+function setSwiperInstance(swiper: any) {
+  swiperRef.value = swiper;
+  swiper.update();
+}
+const updateTabsHeight = () => {
+  const tabs = document.querySelector("ion-tab-bar");
+  if (tabs) {
+    tabsHeight.value = tabs.clientHeight;
+  }
+};
 
 onMounted(() => {
   // 获取数据
   refreshGiftList();
   refreshCateList();
+
+  // 创建 MutationObserver 监听 tabs 元素
+  observer = new MutationObserver(() => {
+    updateTabsHeight();
+  });
+
+  // 开始监听 body 的变化，因为 tabs 可能还没有渲染
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+  });
+
+  // 立即尝试获取一次高度
+  updateTabsHeight();
+
+  // 监听窗口大小变化
+  window.addEventListener("resize", updateTabsHeight);
 });
+
 onBeforeUnmount(() => {
-  clearTimeout(animation.value);
+  // 移除事件监听
+  window.removeEventListener("resize", updateTabsHeight);
+  // 断开 observer
+  if (observer) {
+    observer.disconnect();
+    observer = null;
+  }
 });
+
 function handleRefresh(event: any) {
   getLotteryData()
     .then((data: any) => {
