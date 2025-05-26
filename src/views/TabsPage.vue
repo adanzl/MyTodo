@@ -17,7 +17,7 @@
             </ion-avatar>
             <ion-label class="font-bold">{{ curUser.name }}</ion-label>
             <MdiStar class="text-red-500" />
-            <div class="text-left pl-1 font-bold w-8">
+            <div class="text-left pl-1 font-bold w-12">
               {{ curUser?.score ?? 0 }}
             </div>
           </ion-item>

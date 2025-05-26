@@ -1,5 +1,5 @@
 <template>
-  <ion-page id="main-content">
+  <ion-page id="main-content" class="main-bg">
     <ion-header>
       <ion-toolbar>
         <ion-title>Secret Room</ion-title>
@@ -14,13 +14,9 @@
       <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
-      <ion-segment value="shop" @ionChange="handleSegmentChange">
-        <ion-segment-button value="lottery" content-id="lottery" layout="icon-start">
-          <ion-icon :icon="squareOutline"></ion-icon>
-          <ion-label>混合抽取</ion-label>
-        </ion-segment-button>
+      <ion-segment value="lotterySpecial" @ionChange="handleSegmentChange">
         <ion-segment-button value="lotterySpecial" content-id="lotterySpecial" layout="icon-start">
-          <ion-label>定向抽取</ion-label>
+          <ion-label>抽取奖励</ion-label>
           <ion-icon :icon="heartOutline"></ion-icon>
         </ion-segment-button>
         <ion-segment-button value="shop" content-id="shop" layout="icon-start">
@@ -29,18 +25,51 @@
         </ion-segment-button>
       </ion-segment>
       <ion-segment-view>
-        <ion-segment-content id="lottery">First</ion-segment-content>
-        <ion-segment-content id="lotterySpecial">Second</ion-segment-content>
+        <!-- 抽奖页签 -->
+        <ion-segment-content id="lotterySpecial" class="flex flex-col h-full">
+          <ion-item>
+            <div class="flex items-center justify-center">
+              <span>当前积分：</span>
+              <MdiStar class="text-red-500" />
+              <div class="text-left pl-1 font-bold w-12">{{ globalVar.user.score }}</div>
+            </div>
+          </ion-item>
+          <ion-radio-group :value="selectedCate" class="radio-grid" @ionChange="handleShopCateChange">
+            <ion-radio
+              v-for="item in lotteryCatList"
+              :key="item.id"
+              :value="item"
+              label-placement="end"
+              justify="start">
+              {{ item.name }}
+            </ion-radio>
+          </ion-radio-group>
+          <div class="flex items-center justify-center flex-1">
+            <ion-button @click="btnLotteryClk" size="default">
+              <div class="w-20 h-20 flex flex-col items-center justify-center">
+                <span>立即抽奖</span>
+                <div class="flex items-center justify-center">
+                  <MdiStar class="text-red-500" />{{ selectedCate.cost }}
+                </div>
+              </div>
+            </ion-button>
+          </div>
+        </ion-segment-content>
+        <!-- 积分兑换页签 -->
         <ion-segment-content id="shop">
           <ion-item>
-            <ion-select label="类别" placeholder="选择类别" v-model="selectedCate.id">
-              <ion-select-option :value="cate.id" v-for="cate in lotteryCatList" :key="cate.id">
+            <ion-select
+              label="类别"
+              placeholder="选择类别"
+              v-model="selectedCate"
+              @ionChange="handleShopCateChange">
+              <ion-select-option :value="cate" v-for="cate in lotteryCatList" :key="cate.id">
                 {{ cate.name }}
               </ion-select-option>
             </ion-select>
             <div class="flex w-1/3 items-center justify-center">
               <MdiStar class="text-red-500" />
-              <div class="text-left pl-1 font-bold w-8">100</div>
+              <div class="text-left pl-1 font-bold w-12">{{ globalVar.user.score }}</div>
             </div>
           </ion-item>
           <ion-list>
@@ -50,49 +79,22 @@
               </ion-thumbnail>
               <div class="w-full">
                 <ion-label>
-                  <h2>{{ item.name }}</h2>
+                  <h2 class="flex">
+                    <div class="w-8">[{{ item.id }}]</div>
+                    {{ item.name }}
+                  </h2>
                 </ion-label>
                 <div class="flex items-center">
                   <MdiStar class="text-red-500" />
-                  <div class="text-left pl-1 font-bold w-8">{{ item.cost }}</div>
+                  <div class="text-left pl-1 font-bold w-12">{{ item.cost }}</div>
+                  <p class="text-sm ml-2">{{ getCateName(item.cate_id) }}</p>
                 </div>
               </div>
-              <ion-button @click="btnExchangeClk(item)">兑</ion-button>
+              <ion-button @click="btnExchangeClk(item)" size="default"> 兑 </ion-button>
             </ion-item>
           </ion-list>
         </ion-segment-content>
       </ion-segment-view>
-      <!-- <ion-card class="ion-padding">
-        <ion-card-header>
-          <ion-card-title>抽奖</ion-card-title>
-        </ion-card-header>
-        <ion-card-content>
-          <ion-grid>
-            <ion-row v-for="(row, rowIdx) in lotteryMatrix" :key="rowIdx">
-              <ion-col v-for="(item, colIdx) in row" :key="colIdx" class="text-center">
-                <div
-                  :class="{
-                    highlight: item.highlight,
-                  }"
-                  class="text-lg">
-                  <img :src="item.img || avatar" class="max-w-16 max-h-16 m-auto" />
-                  {{ item.name }}
-                </div>
-              </ion-col>
-            </ion-row>
-          </ion-grid>
-        </ion-card-content>
-        <ion-card-content>
-          <ion-button expand="full" @click="btnStartClk" :disabled="animation > 0">
-            开始抽奖
-          </ion-button>
-        </ion-card-content>
-
-        <ion-card-content>
-          <p v-if="winner.bWin">恭喜你，抽中了：{{ winner.prize }}</p>
-          <p v-else>快来抽奖吧</p>
-        </ion-card-content>
-      </ion-card> -->
     </ion-content>
     <ion-toast
       :is-open="toastData.isOpen"
@@ -113,6 +115,8 @@ import { LotteryData } from "@/modal/UserData";
 import { getImage } from "@/utils/ImgMgr";
 import { getList, getLotteryData } from "@/utils/NetUtil";
 import {
+  IonRadio,
+  IonRadioGroup,
   IonSelect,
   IonSelectOption,
   IonRefresher,
@@ -122,18 +126,17 @@ import {
   IonSegmentContent,
   IonSegmentView,
   IonThumbnail,
+  alertController,
 } from "@ionic/vue";
-import { giftOutline, heartOutline, squareOutline } from "ionicons/icons";
+import { giftOutline, heartOutline } from "ionicons/icons";
 import _ from "lodash";
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { inject, onBeforeUnmount, onMounted, ref } from "vue";
 import MdiStar from "~icons/mdi/star";
 import WeuiSettingOutlined from "~icons/weui/setting-outlined";
 
 const lotteryData = ref<LotteryData[] | []>([]);
 const COL_SIZE = 3; // 列数
 const ROW_SIZE_MIN = 4; // 行数最小值
-const LIGHT_RATE = 0.5; // 高亮比例
-const ANIMATION_TIME = 1000; // 动画时间
 const lotteryMatrix = ref<LotteryData[][]>([]);
 const toastData = ref({
   isOpen: false,
@@ -142,7 +145,8 @@ const toastData = ref({
 });
 const lotterySetting = ref({ open: false });
 const animation = ref(-1);
-const winner = ref({ bWin: false, prize: "" });
+const globalVar: any = inject("globalVar");
+// const winner = ref({ bWin: false, prize: "" });
 
 const giftList = ref<any>({
   data: [],
@@ -152,7 +156,7 @@ const giftList = ref<any>({
   totalPage: 0,
 });
 const lotteryCatList = ref<any>([]);
-const selectedCate = ref<any>({ id: 0, name: "全部" });
+const selectedCate = ref<any>({ id: 0, name: "全部", cost: 100 });
 
 onMounted(() => {
   // 获取数据
@@ -190,46 +194,6 @@ async function buildLotteryMatrix(data: LotteryData[]) {
   }
   lotteryMatrix.value = matrix;
 }
-
-function btnStartClk() {
-  if (animation.value > 0) {
-    console.log("animation is running");
-    return;
-  }
-  const buildHighlight = () => {
-    const total = lotteryMatrix.value.length * COL_SIZE;
-    const cnt = Math.floor(total * LIGHT_RATE);
-    const ids: any[] = [];
-    for (let i = 0; i < cnt; i++) {
-      const idx = Math.floor(Math.random() * total);
-      const r = Math.floor(idx / COL_SIZE);
-      const c = idx % COL_SIZE;
-      lotteryMatrix.value[r][c].highlight = true;
-      ids.push(idx);
-    }
-    animation.value = setTimeout(() => {
-      for (const ii of ids) {
-        const r = Math.floor(ii / COL_SIZE);
-        const c = ii % COL_SIZE;
-        lotteryMatrix.value[r][c].highlight = false;
-      }
-      buildHighlight();
-    }, 150);
-  };
-  buildHighlight();
-  setTimeout(() => {
-    clearTimeout(animation.value);
-    animation.value = -1;
-    for (let i = 0; i < lotteryMatrix.value.length; i++) {
-      for (let j = 0; j < lotteryMatrix.value[i].length; j++) {
-        lotteryMatrix.value[i][j].highlight = false;
-      }
-    }
-    winner.value.bWin = true;
-    winner.value.prize =
-      lotteryData.value[Math.floor(Math.random() * lotteryData.value.length)].name;
-  }, ANIMATION_TIME);
-}
 function btnSettingClk() {
   lotterySetting.value.open = true;
 }
@@ -241,6 +205,37 @@ function onSettingDismiss(event: any) {
   }
   buildLotteryMatrix(event.detail.data);
 }
+
+function refreshCateList() {
+  getList("t_gift_category")
+    .then((data) => {
+      const d = data.data;
+      // console.log(d);
+      lotteryCatList.value = [...d];
+      lotteryCatList.value.unshift({ id: 0, name: "全部", cost: 100 });
+      if (selectedCate.value.id == 0) {
+        selectedCate.value = lotteryCatList.value[0];
+      }
+    })
+    .catch((err) => {
+      toastData.value.isOpen = true;
+      toastData.value.text = JSON.stringify(err);
+    });
+}
+
+function getCateName(cateId: number) {
+  const cate = _.find(lotteryCatList.value, { id: cateId });
+  return cate ? cate.name : "";
+}
+async function handleSegmentChange(event: any) {
+  console.log("segment change", event);
+  if (event.detail.value === "shop") {
+    refreshGiftList(selectedCate.value.id);
+  }
+}
+// 抽奖页签
+function btnLotteryClk() {}
+// 积分兑换页签
 function refreshGiftList(cateId?: number | undefined) {
   let filter = undefined;
   if (cateId) {
@@ -272,35 +267,44 @@ function refreshGiftList(cateId?: number | undefined) {
       toastData.value.text = JSON.stringify(err);
     });
 }
-function refreshCateList() {
-  getList("t_gift_category")
-    .then((data) => {
-      const d = data.data;
-      // console.log(d);
-      lotteryCatList.value = [...d];
-      lotteryCatList.value.unshift({ id: 0, name: "全部" });
-      if (selectedCate.value == null) {
-        selectedCate.value = lotteryCatList.value[0];
-      }
-    })
-    .catch((err) => {
-      toastData.value.isOpen = true;
-      toastData.value.text = JSON.stringify(err);
-    });
+function handleShopCateChange(event: any) {
+  selectedCate.value = event.detail.value;
+  refreshGiftList(selectedCate.value.id);
 }
-async function handleSegmentChange(event: any) {
-  console.log("segment change", event);
-  if (event.detail.value === "shop") {
-    refreshGiftList(undefined);
-  }
-}
-function btnExchangeClk(item: any) {
+async function btnExchangeClk(item: any) {
   console.log(item);
+  const alert = await alertController.create({
+    header: "Confirm",
+    subHeader: "确认兑换: " + item.name + "",
+    message: "花费：" + item.cost + " 积分",
+    buttons: [
+      {
+        text: "OK",
+        handler: () => {
+          console.log("cost");
+        },
+      },
+      "Cancel",
+    ],
+  });
+  await alert.present();
 }
 </script>
 <style scoped>
 .highlight {
   background-color: #ffeb3b; /* 亮起时的背景色 */
   transition: background-color 0.3s ease;
+}
+
+.radio-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 8px;
+}
+
+.radio-grid ion-radio {
+  margin: 0;
+  --padding-start: 0;
 }
 </style>
