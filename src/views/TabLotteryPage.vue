@@ -57,8 +57,17 @@
               </div>
             </ion-button>
           </div>
-          <div class="bg-slate-100" id="history">
-            <swiper :options="slideOpts" class="py-4" :modules="[FreeMode]" @swiper="setSwiperInstance">
+          <div class="bg-slate-100">
+            <!-- 心愿单 -->
+             <div class="px-4"><h2>心愿单</h2></div>
+            <swiper
+              class="py-4"
+              :freeMode="{'enabled': true, 'momentumRatio': 0.5}"
+              :modules="[FreeMode]"
+              :slidesPerView="'auto'"
+              :resistance="true"
+              :resistanceRatio="0.5"
+              @swiper="setSwiperInstance">
               <swiper-slide v-for="item in lotteryHistory" :key="item.id" class="!w-auto px-2">
                 <div class="w-24 h-24 relative">
                   <img :src="item.img" class="w-full h-full object-cover rounded-lg" />
@@ -196,21 +205,6 @@ const lotteryHistory = ref([
   { id: 4, name: "奖品4", img: "https://picsum.photos/203" },
   { id: 5, name: "奖品5", img: "https://picsum.photos/204" },
 ]);
-
-const slideOpts = {
-  slidesPerView: 'auto',
-  spaceBetween: 0,
-  freeMode: {
-    enabled: true,
-    momentum: true,
-    momentumRatio: 0.5,
-    momentumVelocityRatio: 0.5,
-  },
-  touchRatio: 1,
-  touchAngle: 45,
-  watchSlidesProgress: true,
-  watchSlidesVisibility: true,
-};
 
 function setSwiperInstance(swiper: any) {
   swiperRef.value = swiper;
