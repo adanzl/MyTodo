@@ -10,6 +10,7 @@ DB_NAME = "data.db"
 TABLE_SAVE = "t_user_save"
 TABLE_PIC = "t_user_pic"
 TABLE_USER = "t_user"
+TABLE_SCORE_HISTORY = "t_score_history"
 
 
 def init():
@@ -158,6 +159,34 @@ def set_data(table, data):
     finally:
         cur.close()
     return {"code": 0, "msg": "ok", "data": id}
+
+
+def add_score(user_id, value, action):
+    '''
+        增加积分
+    '''
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    try:
+        cur.execute(f"SELECT score FROM {TABLE_USER} WHERE id=?", (user_id, ))
+        pre_score = cur.fetchone()[0]
+        cur_score = pre_score + value
+        cur.execute(
+            f"""
+            INSERT INTO {TABLE_SCORE_HISTORY} (user_id, value, action, pre_value, current) VALUES (?,?,?,?,?);
+            """, (user_id, value, action, pre_score, cur_score))
+        cur.execute(
+            f"""
+            UPDATE {TABLE_USER} SET score=? WHERE id=?;
+            """, (cur_score, user_id))
+        conn.commit()
+    except Exception as e:
+        log.error(e)
+        traceback.print_exc()
+        return {"code": -1, "msg": 'error ' + str(e)}
+    finally:
+        cur.close()
+    return {"code": 0, "msg": "ok", "data": cur_score}
 
 
 def del_data(table, id: int) -> dict:

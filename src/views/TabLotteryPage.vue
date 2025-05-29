@@ -23,6 +23,10 @@
           <ion-icon :icon="giftOutline"></ion-icon>
           <ion-label>积分兑换</ion-label>
         </ion-segment-button>
+        <ion-segment-button value="history" content-id="history" layout="icon-start">
+          <MaterialSymbolsHistory width="25" height="25" />
+          <ion-label>积分历史</ion-label>
+        </ion-segment-button>
       </ion-segment>
       <ion-segment-view :style="{ height: `calc(100% - ${tabsHeight}px)` }">
         <!-- 抽奖页签 -->
@@ -59,10 +63,10 @@
           </div>
           <div class="bg-slate-100">
             <!-- 心愿单 -->
-             <div class="px-4"><h2>心愿单</h2></div>
+            <div class="px-4"><h2>心愿单</h2></div>
             <swiper
               class="py-4"
-              :freeMode="{'enabled': true, 'momentumRatio': 0.5}"
+              :freeMode="{ enabled: true, momentumRatio: 0.5 }"
               :modules="[FreeMode]"
               :slidesPerView="'auto'"
               :resistance="true"
@@ -119,6 +123,18 @@
             </ion-item>
           </ion-list>
         </ion-segment-content>
+        <ion-segment-content id="history">
+          <ion-item>
+            <div class="flex items-center justify-center">
+              <span>当前积分：</span>
+              <MdiStar class="text-red-500" />
+              <div class="text-left pl-1 font-bold w-12">{{ globalVar.user.score }}</div>
+            </div>
+          </ion-item>
+          <ion-list>
+            <ion-item v-for="item in scoreHistoryList.data" :key="item.id"> </ion-item>
+          </ion-list>
+        </ion-segment-content>
       </ion-segment-view>
     </ion-content>
     <ion-toast
@@ -171,6 +187,7 @@ import { Swiper, SwiperSlide } from "swiper/vue";
 import { inject, onBeforeUnmount, onMounted, ref } from "vue";
 import MdiStar from "~icons/mdi/star";
 import WeuiSettingOutlined from "~icons/weui/setting-outlined";
+import MaterialSymbolsHistory from "~icons/material-symbols/history";
 
 const lotteryData = ref<LotteryData[] | []>([]);
 const COL_SIZE = 3; // 列数
@@ -186,6 +203,13 @@ const globalVar: any = inject("globalVar");
 // const winner = ref({ bWin: false, prize: "" });
 
 const giftList = ref<any>({
+  data: [],
+  pageNum: 1,
+  pageSize: 10,
+  totalCount: 0,
+  totalPage: 0,
+});
+const scoreHistoryList = ref<any>({
   data: [],
   pageNum: 1,
   pageSize: 10,
@@ -221,6 +245,7 @@ onMounted(() => {
   // 获取数据
   refreshGiftList();
   refreshCateList();
+  refreshScoreHistoryList();
 
   // 创建 MutationObserver 监听 tabs 元素
   observer = new MutationObserver(() => {
@@ -290,6 +315,16 @@ function onSettingDismiss(event: any) {
   buildLotteryMatrix(event.detail.data);
 }
 
+function refreshScoreHistoryList() {
+  getList("t_score_history")
+   .then((data) => {
+      scoreHistoryList.value = data;
+    })
+   .catch((err) => {
+      toastData.value.isOpen = true;
+      toastData.value.text = JSON.stringify(err);
+    });
+}
 function refreshCateList() {
   getList("t_gift_category")
     .then((data) => {

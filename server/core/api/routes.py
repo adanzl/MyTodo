@@ -177,3 +177,11 @@ def chat_messages():
 def route_index():
     return render_template('index.html')
 
+@api_bp.route("/addScore", methods=['POST'])
+def add_score():
+    args = request.get_json()
+    log.info("===== [Add Score] " + json.dumps(args))
+    user = args.get('user')
+    value = args.get('value', type=int)
+    action = args.get('action')
+    return db_mgr.add_score(user, value, action)
