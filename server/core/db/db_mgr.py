@@ -170,7 +170,7 @@ def add_score(user_id, value, action, msg):
     try:
         cur.execute(f"SELECT score FROM {TABLE_USER} WHERE id=?", (user_id, ))
         pre_score = cur.fetchone()[0]
-        cur_score = pre_score + value
+        cur_score = pre_score + int(value)
         cur.execute(
             f"""
             INSERT INTO {TABLE_SCORE_HISTORY} (user_id, value, action, pre_value, current, msg) VALUES (?,?,?,?,?,?);
