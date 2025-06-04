@@ -161,7 +161,7 @@ def set_data(table, data):
     return {"code": 0, "msg": "ok", "data": id}
 
 
-def add_score(user_id, value, action):
+def add_score(user_id, value, action, msg):
     '''
         增加积分
     '''
@@ -173,8 +173,8 @@ def add_score(user_id, value, action):
         cur_score = pre_score + value
         cur.execute(
             f"""
-            INSERT INTO {TABLE_SCORE_HISTORY} (user_id, value, action, pre_value, current) VALUES (?,?,?,?,?);
-            """, (user_id, value, action, pre_score, cur_score))
+            INSERT INTO {TABLE_SCORE_HISTORY} (user_id, value, action, pre_value, current, msg) VALUES (?,?,?,?,?,?);
+            """, (user_id, value, action, pre_score, cur_score, msg))
         cur.execute(
             f"""
             UPDATE {TABLE_USER} SET score=? WHERE id=?;

@@ -184,4 +184,5 @@ def add_score():
     user = args.get('user')
     value = args.get('value', type=int)
     action = args.get('action')
-    return db_mgr.add_score(user, value, action)
+    msg = args.get('msg')
+    return db_mgr.add_score(user, value, action, msg)
