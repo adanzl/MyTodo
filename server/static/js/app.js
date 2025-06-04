@@ -1,5 +1,3 @@
-import Sidebar from './components/Sidebar.js';
-
 const { createApp, ref } = window.Vue;
 document.addEventListener("DOMContentLoaded", async () => {
   const { default: Info } = await import("../view/info.js");
@@ -40,9 +38,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       handleMenuSelect(obj) {
         console.log("menu select ", obj.index);
       },
-    },
-    components: {
-      Sidebar
     }
   });
   for (const [name, component] of Object.entries(window.ElementPlusIconsVue)) {
