@@ -14,7 +14,7 @@
       <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
-      <ion-segment value="lotterySpecial" @ionChange="handleSegmentChange">
+      <ion-segment value="history" @ionChange="handleSegmentChange">
         <ion-segment-button value="lotterySpecial" content-id="lotterySpecial" layout="icon-start">
           <ion-label>抽取奖励</ion-label>
           <ion-icon :icon="heartOutline"></ion-icon>
@@ -123,6 +123,7 @@
             </ion-item>
           </ion-list>
         </ion-segment-content>
+        <!-- 积分历史 -->
         <ion-segment-content id="history">
           <ion-item>
             <div class="flex items-center justify-center">
@@ -132,7 +133,22 @@
             </div>
           </ion-item>
           <ion-list>
-            <ion-item v-for="item in scoreHistoryList.data" :key="item.id"> </ion-item>
+            <ion-item v-for="item in scoreHistoryList.data" :key="item.id">
+              <div class="flex flex-col w-full">
+                <div class="flex justify-between">
+                  <div>id: {{ item.id }}</div>
+                  <div>{{ item.dt }}</div>
+                </div>
+                <div class="flex">
+                  <div>value: {{ item.value }}</div>
+                  <div class="ml-2">current: {{ item.current }}</div>
+                </div>
+                <div class="flex">
+                  <div class="">action: {{ item.action }}</div>
+                  <div class="ml-2">msg:{{ item.msg }}</div>
+                </div>
+              </div>
+            </ion-item>
           </ion-list>
         </ion-segment-content>
       </ion-segment-view>
@@ -317,10 +333,11 @@ function onSettingDismiss(event: any) {
 
 function refreshScoreHistoryList() {
   getList("t_score_history")
-   .then((data) => {
+    .then((data) => {
       scoreHistoryList.value = data;
+      // console.log(scoreHistoryList.value);
     })
-   .catch((err) => {
+    .catch((err) => {
       toastData.value.isOpen = true;
       toastData.value.text = JSON.stringify(err);
     });
