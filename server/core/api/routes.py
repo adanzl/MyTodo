@@ -182,7 +182,7 @@ def add_score():
     args = request.get_json()
     log.info("===== [Add Score] " + json.dumps(args))
     user = args.get('user')
-    value = args.get('value', type=int)
+    value = args.get('value')
     action = args.get('action')
     msg = args.get('msg')
     return db_mgr.add_score(user, value, action, msg)
