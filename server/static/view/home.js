@@ -18,11 +18,14 @@ async function createComponent() {
           data: null,
           value: 0,
         }),
+        loading: ref(false),
       };
       const refreshUserList = async () => {
+        refData.loading.value = true;
         const data = await getList("t_user");
         // console.log("getUserList", data.data);
         Object.assign(refData.userList.value, data.data); // 浅合并
+        refData.loading.value = false;
       };
       const refMethods = {
         handleUpdateUser: (item) => {
@@ -48,6 +51,8 @@ async function createComponent() {
           ).then(() => {
             refreshUserList();
           });
+          refData.dialogForm.value.visible = false;
+          refData.dialogForm.value.value = 0;
         },
         handleDialogClose: () => {
           refData.dialogForm.value.visible = false;
@@ -56,7 +61,7 @@ async function createComponent() {
       };
       onMounted(async () => {
         await refreshUserList();
-        console.log("Home组件已挂载");
+        // console.log("Home组件已挂载");
       });
       return {
         ...refData,

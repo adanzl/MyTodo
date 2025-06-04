@@ -1,4 +1,4 @@
-import UData from "./user_data.js"
+import { UData } from "./user_data.js";
 const axios = window.axios;
 const REMOTE = { url: "https://leo-zhao.natapp4.cc/api", available: true };
 const API_URL = REMOTE.url;

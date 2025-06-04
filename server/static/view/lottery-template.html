@@ -16,7 +16,7 @@
       <el-button type="primary" class="" @click="onAddGiftClk">添加奖品</el-button>
     </div>
   </div>
-  <el-table :data="giftList.data">
+  <el-table :data="giftList.data" v-loading="loading">
     <!-- 图片 -->
     <el-table-column width="130" label="Image">
       <template #default="{row, $index}">

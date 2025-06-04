@@ -1,0 +1,34 @@
+<div class="">
+  <div class="flex items-center">
+    <el-radio-group size="large" v-model="selectedUser" @change="onUserChange">
+      <el-radio-button v-for="item in userList" :key="item.id" :value="item">
+        {{ item.name }}
+      </el-radio-button>
+    </el-radio-group>
+  </div>
+  <el-table :data="recordList.data" v-loading="loading" stripe>
+    <el-table-column label="ID" prop="id"> </el-table-column>
+    <el-table-column label="user">
+      <template #default="{ row, $index }">
+        <template v-if="row.user">
+          <span>{{row.user.name}}</span>
+        </template>
+        <template v-else>
+          <span>{{row.user_id}}</span>
+        </template>
+      </template>
+    </el-table-column>
+    <el-table-column label="Action" prop="action"> </el-table-column>
+    <el-table-column label="Date" prop="dt"> </el-table-column>
+    <el-table-column label="Value" prop="value"> </el-table-column>
+    <el-table-column label="Current" prop="current"> </el-table-column>
+    <el-table-column label="MSG" prop="msg"> </el-table-column>
+  </el-table>
+  <el-pagination
+    layout="prev, pager, next"
+    :total="recordList.totalCount"
+    :page-size="PAGE_SIZE"
+    class="mt-2"
+    background
+    @change="handlePageChange" />
+</div>

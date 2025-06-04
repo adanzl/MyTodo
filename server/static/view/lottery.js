@@ -24,6 +24,7 @@ async function createComponent() {
           totalPage: 0,
         }),
         lotteryCatList: ref([]),
+        loading: ref(false),
       };
 
       const refCatePop = {
@@ -58,12 +59,13 @@ async function createComponent() {
             ElMessage.error(JSON.stringify(err));
           });
       };
-      const refreshGiftList = (cateId) => {
+      const refreshGiftList = (cateId, pageNum, pageSize) => {
+        refData.loading.value = true;
         let filter = undefined;
-        if (cateId) {
+        if (cateId && cateId !== 0) {
           filter = { cate_id: cateId };
         }
-        getList("t_gift", filter)
+        getList("t_gift", filter, pageNum, pageSize)
           .then((data) => {
             const d = data.data;
             // console.log(data);
@@ -87,7 +89,8 @@ async function createComponent() {
           .catch((err) => {
             console.error(err);
             ElMessage.error(JSON.stringify(err));
-          });
+          })
+          .finally(() => (refData.loading.value = false));
       };
       const handleEdit = (index, row) => {
         console.log(index, row);
@@ -191,9 +194,9 @@ async function createComponent() {
       };
 
       onMounted(() => {
-        console.log("Lottery组件已挂载");
+        // console.log("Lottery组件已挂载");
         refreshCateList();
-        refreshGiftList();
+        refreshGiftList(0, 1, refData.PAGE_SIZE);
       });
       return {
         ...refData,

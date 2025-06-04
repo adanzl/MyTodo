@@ -1,3 +1,5 @@
+import Sidebar from './components/Sidebar.js';
+
 const { createApp, ref } = window.Vue;
 document.addEventListener("DOMContentLoaded", async () => {
   const { default: Info } = await import("../view/info.js");
@@ -9,6 +11,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     { path: "/info", component: Info },
     { path: "/chat", component: () => import("../view/home.js").then((m) => m.default) },
     { path: "/color", component: () => import("../view/home.js").then((m) => m.default) },
+    { path: "/score", component: () => import("../view/score.js").then((m) => m.default) },
   ];
   // 创建路由实例
   const router = window.VueRouter.createRouter({
@@ -38,6 +41,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         console.log("menu select ", obj.index);
       },
     },
+    components: {
+      Sidebar
+    }
   });
   for (const [name, component] of Object.entries(window.ElementPlusIconsVue)) {
     if (name === "Menu") {
