@@ -1,3 +1,4 @@
+import UData from "./user_data.js"
 const axios = window.axios;
 const REMOTE = { url: "https://leo-zhao.natapp4.cc/api", available: true };
 const API_URL = REMOTE.url;
@@ -6,22 +7,22 @@ const API_URL = REMOTE.url;
 //   return REMOTE;
 // }
 
-// export async function getSave(id) {
-//   if (id === undefined) {
-//     throw new Error("id is undefined");
-//   }
+export async function getSave(id) {
+  if (id === undefined) {
+    throw new Error("id is undefined");
+  }
 
-//   const rsp = await axios.get(API_URL + "/getData", {
-//     params: { id, table: "t_schedule", fields: "data,user_id" },
-//   });
+  const rsp = await axios.get(API_URL + "/getData", {
+    params: { id, table: "t_schedule", fields: "data,user_id" },
+  });
 
-//   if (rsp.data.code !== 0) {
-//     throw new Error(rsp.data.msg);
-//   }
-//   const ret = UData.parseUserData(rsp.data.data.data);
-//   ret.userId = rsp.data.data.user_id;
-//   return ret;
-// }
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  const ret = UData.parseUserData(rsp.data.data.data);
+  ret.userId = rsp.data.data.user_id;
+  return ret;
+}
 
 // export function setSave(id, data) {
 //   return new Promise((resolve, reject) => {
@@ -214,12 +215,14 @@ export async function delData(table, id) {
  * @returns
  */
 export async function addScore(user, action, value, msg) {
-  const rsp = await axios.post(API_URL + "/setData", {
-    table: table,
-    data,
+  const rsp = await axios.post(API_URL + "/addScore", {
+    user,
+    action,
+    value,
+    msg,
   });
 
-  console.log("setData", rsp.data);
+  console.log("addScore", rsp.data);
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
   }

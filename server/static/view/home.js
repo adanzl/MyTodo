@@ -1,4 +1,4 @@
-import { getUserList, setData } from "../js/net_util.js";
+import { getList, setData } from "../js/net_util.js";
 
 const { ref, onMounted } = window.Vue;
 let component = null;
@@ -15,7 +15,7 @@ async function createComponent() {
         userList: ref([]),
       };
       const refreshUserList = async () => {
-        const data = await getUserList();
+        const data = await getList("t_user");
         // console.log("getUserList", data.data);
         Object.assign(refData.userList.value, data.data); // 浅合并
       };
