@@ -1,4 +1,8 @@
-const { createApp, ref } = window.Vue;
+import { getList } from "./net_util.js";
+const CryptoJS = window.CryptoJS;
+const { createApp, ref, onMounted } = window.Vue;
+const { ElMessage } = window.ElementPlus;
+const _ = window._;
 document.addEventListener("DOMContentLoaded", async () => {
   const { default: Info } = await import("../view/info.js");
 
@@ -18,10 +22,55 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   const app = createApp({
     setup() {
+      const KEY_USER_ID = "user_id";
       const isCollapse = ref(false);
+      const isLogin = ref(false);
+      const userList = ref([]);
+      const user = ref({
+        id: null,
+        password: "",
+      });
+      const loading = ref(false);
+      const refreshUserList = async () => {
+        loading.value = true;
+        const data = await getList("t_user");
+        // console.log("getUserList", data.data);
+        Object.assign(userList.value, data.data); // 浅合并
+        loading.value = false;
+      };
+      const doLogin = async () => {
+        // console.log("doLogin", user.value);
+        if (user.value.id) {
+          const uu = _.find(userList.value, { id: user.value.id });
+          console.log("uu", uu);
+          if (uu && (uu.pwd === null || uu.pwd === CryptoJS.MD5(user.value.password).toString())) {
+            isLogin.value = true;
+            localStorage.setItem(KEY_USER_ID, uu.id);
+          } else {
+            ElMessage.error("用户名或密码错误 ");
+          }
+        }
+      };
+      const doLogout = () => {
+        isLogin.value = false;
+        localStorage.removeItem(KEY_USER_ID);
+      };
+      onMounted(async () => {
+        await refreshUserList();
+        const uId = localStorage.getItem(KEY_USER_ID);
+        if (uId) {
+          isLogin.value = true;
+        }
+      });
 
       return {
         isCollapse,
+        isLogin,
+        userList,
+        loading,
+        user,
+        doLogin,
+        doLogout,
       };
     },
     data() {
@@ -30,15 +79,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       };
     },
     methods: {
-      handleClick() {
-        this.message = "你点击了按钮！";
-        console.log(window.ElementPlusIconsVue);
+      handleMenuSelect() {
+        // console.log("menu select ", obj.index);
       },
-
-      handleMenuSelect(obj) {
-        console.log("menu select ", obj.index);
-      },
-    }
+    },
   });
   for (const [name, component] of Object.entries(window.ElementPlusIconsVue)) {
     if (name === "Menu") {

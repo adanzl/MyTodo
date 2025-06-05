@@ -1,7 +1,7 @@
 import core.ai.ai_mgr as ai_mgr
 import core.db.db_mgr as db_mgr
 from app import app, socketio
-from core.chat.chat_mgr import ChatMgr
+from core.chat.ai_chat_mgr import ChatMgr
 from core.log_config import root_logger
 
 log = root_logger()

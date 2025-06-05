@@ -7,8 +7,8 @@
     </el-radio-group>
   </div>
   <el-table :data="recordList.data" v-loading="loading" stripe>
-    <el-table-column label="ID" prop="id"> </el-table-column>
-    <el-table-column label="user">
+    <el-table-column label="ID" prop="id" width="50"> </el-table-column>
+    <el-table-column label="user" width="60">
       <template #default="{ row, $index }">
         <template v-if="row.user">
           <span>{{row.user.name}}</span>
@@ -18,10 +18,11 @@
         </template>
       </template>
     </el-table-column>
-    <el-table-column label="Action" prop="action"> </el-table-column>
-    <el-table-column label="Date" prop="dt"> </el-table-column>
-    <el-table-column label="Value" prop="value"> </el-table-column>
-    <el-table-column label="Current" prop="current"> </el-table-column>
+    <el-table-column label="Action" prop="action" width="100"> </el-table-column>
+    <el-table-column label="Date" prop="dt" width="180"> </el-table-column>
+    <el-table-column label="Pre" prop="pre_value" width="70"> </el-table-column>
+    <el-table-column label="Value" prop="value" width="70"> </el-table-column>
+    <el-table-column label="Current" prop="current" width="80"> </el-table-column>
     <el-table-column label="MSG" prop="msg"> </el-table-column>
   </el-table>
   <el-pagination

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="shortcut icon" href="favicon.ico">
+    <link rel="shortcut icon" href="favicon.ico" />
     <title>MyTodo Management</title>
     <!-- <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script> -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus/dist/index.css" />
@@ -16,17 +16,21 @@
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.9/dayjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
   </head>
 
   <body>
     <div id="app">
-      <el-container>
+      <el-container :loading="loading">
         <el-aside width="200px" class="w-48">
           <el-scrollbar>
-            <el-radio-group v-model="isCollapse" class="p-5 w-full flex">
-              <el-radio-button :value="false">+</el-radio-button>
-              <el-radio-button :value="true">-</el-radio-button>
-            </el-radio-group>
+            <div class="flex justify-between items-center p-5">
+              <el-radio-group v-model="isCollapse" class="w-full flex">
+                <el-radio-button :value="false">-</el-radio-button>
+                <el-radio-button :value="true">+</el-radio-button>
+              </el-radio-group>
+              <el-button v-if="isLogin" @click="doLogout" size="small">注销</el-button>
+            </div>
             <el-menu :default-active="$route.path" :collapse="isCollapse" unique-opened router>
               <el-menu-item index="/home" @click="handleMenuSelect">
                 <el-icon><home-filled /></el-icon>
@@ -41,7 +45,7 @@
                 <template #title>Chat</template>
               </el-menu-item>
               <el-menu-item index="/color" disabled>
-                <el-icon><document /></el-icon>
+                <el-icon><Brush /></el-icon>
                 <template #title>Color</template>
               </el-menu-item>
               <el-menu-item index="/info">
@@ -55,14 +59,50 @@
             </el-menu>
           </el-scrollbar>
         </el-aside>
-        <el-container>
+        <el-container v-if="isLogin">
           <el-header class="flex justify-center items-center bg-blue-100">Header</el-header>
           <el-main>
             <router-view></router-view>
           </el-main>
         </el-container>
+        <el-container v-else>
+          <el-main class="bg-blue-100 !flex justify-center items-center h-screen">
+            <el-card class="w-[480px]" shadow="always">
+              <template #header>用户登录</template>
+              <div class="flex flex-col gap-2 items-center">
+                <el-select v-model="user.id" placeholder="Select" class="!w-60">
+                  <el-option
+                    class="!h-13"
+                    v-for="item in userList"
+                    :key="item.id"
+                    :label="item.name"
+                    :value="item.id">
+                    <div class="flex items-center border-b-1 border-gray-200">
+                      <el-avatar class="!h-10 !w-10" :src="item.icon"></el-avatar>
+                      <div class="pl-4 text-base text-gray-500">{{ item.name }}</div>
+                    </div>
+                  </el-option>
+                </el-select>
+                <el-input
+                  v-model="user.password"
+                  style="width: 240px"
+                  type="password"
+                  placeholder="Password"
+                  show-password></el-input>
+                <el-button
+                  type="primary"
+                  size="large"
+                  class="w-24 h-24 mt-4"
+                  :disabled="!user.id "
+                  @click="doLogin">
+                  Login
+                </el-button>
+              </div>
+            </el-card>
+          </el-main>
+        </el-container>
       </el-container>
     </div>
-    <script defer src="js/app.js"></script>
+    <script defer src="js/app.js" type="module"></script>
   </body>
 </html>

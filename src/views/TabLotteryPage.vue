@@ -364,7 +364,7 @@ function getCateName(cateId: number) {
   return cate ? cate.name : "";
 }
 async function handleSegmentChange(event: any) {
-  console.log("segment change", event);
+  // console.log("segment change", event);
   if (event.detail.value === "shop") {
     refreshGiftList(selectedCate.value.id);
   }
