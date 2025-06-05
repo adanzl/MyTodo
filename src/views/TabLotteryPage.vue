@@ -136,16 +136,31 @@
             <ion-item v-for="item in scoreHistoryList.data" :key="item.id">
               <div class="flex flex-col w-full">
                 <div class="flex justify-between">
-                  <div>id: {{ item.id }}</div>
-                  <div>{{ item.dt }}</div>
+                  <div>ID: {{ item.id }}</div>
+                  <div class="flex items-center">
+                    <ion-icon :icon="timeOutline"></ion-icon>
+                    {{ item.dt }}
+                  </div>
                 </div>
                 <div class="flex">
-                  <div>value: {{ item.value }}</div>
-                  <div class="ml-2">current: {{ item.current }}</div>
+                  <div class="flex item-center w-1/3">
+                    V:
+                    {{ item.value }}
+                  </div>
+                  <div class="ml-2 flex items-center">
+                    <MdiStar class="text-red-500" />
+                    {{ item.current }}
+                  </div>
                 </div>
                 <div class="flex">
-                  <div class="">action: {{ item.action }}</div>
-                  <div class="ml-2">msg:{{ item.msg }}</div>
+                  <div class="flex items-center w-1/3">
+                    <ion-icon :icon="bookmarkOutline"></ion-icon>
+                    {{ item.action }}
+                  </div>
+                  <div class="ml-2">
+                    <ion-icon :icon="chatboxEllipsesOutline"></ion-icon>
+                    {{ item.msg }}
+                  </div>
                 </div>
               </div>
             </ion-item>
@@ -193,7 +208,13 @@ import {
   IonThumbnail,
   alertController,
 } from "@ionic/vue";
-import { giftOutline, heartOutline } from "ionicons/icons";
+import {
+  giftOutline,
+  heartOutline,
+  timeOutline,
+  bookmarkOutline,
+  chatboxEllipsesOutline,
+} from "ionicons/icons";
 import _ from "lodash";
 import "@ionic/vue/css/ionic-swiper.css";
 import "swiper/css";

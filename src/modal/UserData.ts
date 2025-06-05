@@ -1,6 +1,6 @@
 import avatar from "@/assets/images/avatar.svg";
 import { CUSTOM_REPEAT_ID, RepeatData } from "@/modal/ScheduleType";
-import { getUserInfo, setUserInfo } from "@/utils/NetUtil";
+import { getUserInfo, addScore } from "@/utils/NetUtil";
 import dayjs from "dayjs";
 import _ from "lodash";
 import EventBus, { C_EVENT } from "./EventBus";
@@ -12,13 +12,14 @@ export class User {
   icon = `${avatar}`;
   admin = 0;
   score = 0;
+  dScore = 0;
 }
 
-export class LotteryData{
+export class LotteryData {
   id: number = -1;
   name: string = "";
-  imgId?: number ;
-  img?: string ;
+  imgId?: number;
+  img?: string;
   weight: number = 1;
   highlight: boolean = false;
 }
@@ -372,7 +373,7 @@ export class UData {
       // GlobalVar.user.score += dScore;
       getUserInfo(userData.userId).then((userInfo: any) => {
         userInfo.score += dScore;
-        setUserInfo(userData.userId, userInfo.score).then(() => {
+        addScore(userData.userId, "schedule", dScore, "任务状态改变").then(() => {
           EventBus.$emit(C_EVENT.UPDATE_USER_INFO);
         });
       });

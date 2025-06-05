@@ -97,18 +97,41 @@ export function setSave(id: number | undefined, data: any) {
   });
 }
 
-export async function setUserInfo(id: number | undefined, score: number) {
-  const rsp: any = await axios.post(API_URL + "/setData", {
-    table: "t_user",
-    data: {
-      id: id,
-      score: score,
-    },
+// export async function setUserInfo(id: number | undefined, score: number) {
+//   const rsp: any = await axios.post(API_URL + "/setData", {
+//     table: "t_user",
+//     data: {
+//       id: id,
+//       score: score,
+//     },
+//   });
+//   console.log("setUserInfo", rsp.data);
+//   if (rsp.data.code !== 0) {
+//     throw new Error(rsp.data.msg);
+//   }
+//   return rsp.data.data;
+// }
+/**
+ * 变更积分
+ * @param {*} user id
+ * @param {*} action 行为
+ * @param {*} value 分值
+ * @param {*} msg 备注
+ * @returns
+ */
+export async function addScore(user:number, action:string, value:number, msg:string) {
+  const rsp = await axios.post(API_URL + "/addScore", {
+    user,
+    action,
+    value,
+    msg,
   });
-  console.log("setUserInfo", rsp.data);
+
+  console.log("addScore", rsp.data);
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
   }
+
   return rsp.data.data;
 }
 

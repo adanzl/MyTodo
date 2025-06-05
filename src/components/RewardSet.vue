@@ -32,13 +32,14 @@
 
 <script lang="ts" setup>
 import { User } from "@/modal/UserData";
-import { getUserList, setUserInfo } from "@/utils/NetUtil";
+import { getUserList, addScore } from "@/utils/NetUtil";
 import { IonAvatar, IonImg } from "@ionic/vue";
-import { onMounted, ref } from "vue";
+import { inject, onMounted, ref } from "vue";
 
 const modal = ref();
 const userList = ref<any>([]);
-const modifyUser = new Set<User>();
+const modifyUser = new Map<number, User>();
+const globalVar: any = inject("globalVar");
 
 const cancel = () => {
   modal.value.$el!.dismiss();
@@ -72,19 +73,23 @@ onMounted(async () => {
 async function onModalPresent() {
   getUserList().then((uList) => {
     userList.value = uList.data;
+    userList.value.forEach((u: User) => {
+      u.dScore = 0;
+    });
   });
   // console.log("userList", uList);
 }
 async function onModalDismiss() {
   // console.log("didDismiss", userList.value);
   modifyUser.forEach((u: User) => {
-    setUserInfo(u.id, u.score);
+    addScore(u.id, "appAdmin", u.dScore, "app管理变更" + globalVar.user.name);
   });
   modifyUser.clear();
 }
 function onInputChange(e: any, u: User) {
-  u.score = e.detail.value;
-  modifyUser.add(u);
+  u.dScore += Number(e.detail.value) - u.score;
+  u.score = Number(e.detail.value);
+  modifyUser.set(u.id, u);
 }
 </script>
 
