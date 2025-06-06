@@ -139,30 +139,27 @@
           <ion-list>
             <ion-item v-for="item in scoreHistoryList.data" :key="item.id">
               <div class="flex flex-col w-full">
-                <div class="flex justify-between">
-                  <div>ID: {{ item.id }}</div>
-                  <div class="flex items-center">
-                    <ion-icon :icon="timeOutline"></ion-icon>
+                <div class="flex">
+                  <div class="w-1/5">ID: {{ item.id }}</div>
+                  <div class="ml-2 flex items-center w-1/4">
+                    {{ item.action }}
+                  </div>
+                  <div class="ml-2 flex items-center">
+                    <ion-icon  class="mr-1" :icon="timeOutline"></ion-icon>
                     {{ item.dt }}
                   </div>
                 </div>
-                <div class="flex">
-                  <div class="flex item-center w-1/3">
+                <div class="flex mb-2">
+                  <div class="flex item-center w-1/5">
                     V:
                     {{ item.value }}
                   </div>
-                  <div class="ml-2 flex items-center">
+                  <div class="ml-2 flex items-center w-1/4">
                     <MdiStar class="text-red-500" />
                     {{ item.current }}
                   </div>
-                </div>
-                <div class="flex">
-                  <div class="flex items-center w-1/3">
-                    <ion-icon :icon="bookmarkOutline"></ion-icon>
-                    {{ item.action }}
-                  </div>
-                  <div class="ml-2">
-                    <ion-icon :icon="chatbubbleEllipsesOutline"></ion-icon>
+                  <div class="ml-2 flex items-center">
+                    <ion-icon class="mr-1" :icon="chatbubbleEllipsesOutline"></ion-icon>
                     {{ item.msg }}
                   </div>
                 </div>
@@ -212,23 +209,22 @@ import {
   IonThumbnail,
   alertController,
 } from "@ionic/vue";
+import "@ionic/vue/css/ionic-swiper.css";
 import {
+  chatbubbleEllipsesOutline,
   giftOutline,
   heartOutline,
   timeOutline,
-  bookmarkOutline,
-  chatbubbleEllipsesOutline,
 } from "ionicons/icons";
 import _ from "lodash";
-import "@ionic/vue/css/ionic-swiper.css";
 import "swiper/css";
 import "swiper/css/free-mode";
 import { FreeMode } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
 import { inject, onBeforeUnmount, onMounted, ref } from "vue";
+import MaterialSymbolsHistory from "~icons/material-symbols/history";
 import MdiStar from "~icons/mdi/star";
 import WeuiSettingOutlined from "~icons/weui/setting-outlined";
-import MaterialSymbolsHistory from "~icons/material-symbols/history";
 
 const lotteryData = ref<LotteryData[] | []>([]);
 const COL_SIZE = 3; // 列数
@@ -392,17 +388,18 @@ function refreshCateList() {
     });
 }
 function refreshUserList() {
-  getUserList().then((uList) => {
-    userList.value = [...uList.data];
-    userList.value.unshift({ id: 0, name: "全部", score: 0 });
-    if (selectedUser.value.id == 0) {
-      selectedUser.value = userList.value[0];
-    }
-  })
-  .catch((err)=>{
-    toastData.value.isOpen = true;
-    toastData.value.text = JSON.stringify(err);
-  });
+  getUserList()
+    .then((uList) => {
+      userList.value = [...uList.data];
+      userList.value.unshift({ id: 0, name: "全部", score: 0 });
+      if (selectedUser.value.id == 0) {
+        selectedUser.value = userList.value[0];
+      }
+    })
+    .catch((err) => {
+      toastData.value.isOpen = true;
+      toastData.value.text = JSON.stringify(err);
+    });
 }
 
 function getCateName(cateId: number) {
