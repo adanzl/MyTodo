@@ -126,8 +126,12 @@
         <!-- 积分历史 -->
         <ion-segment-content id="history">
           <ion-item>
-            <div class="flex items-center justify-center">
-              <span>当前积分：</span>
+            <ion-select label="用户" v-model="selectedUser" @ionChange="handleUserChange">
+              <ion-select-option :value="item" v-for="item in userList" :key="item.id">
+                {{ item.name }}
+              </ion-select-option>
+            </ion-select>
+            <div class="flex w-1/3 items-center justify-center">
               <MdiStar class="text-red-500" />
               <div class="text-left pl-1 font-bold w-12">{{ globalVar.user.score }}</div>
             </div>
@@ -158,7 +162,7 @@
                     {{ item.action }}
                   </div>
                   <div class="ml-2">
-                    <ion-icon :icon="chatboxEllipsesOutline"></ion-icon>
+                    <ion-icon :icon="chatbubbleEllipsesOutline"></ion-icon>
                     {{ item.msg }}
                   </div>
                 </div>
@@ -185,7 +189,7 @@
 <script setup lang="ts">
 import { LotteryData } from "@/modal/UserData";
 import { getImage } from "@/utils/ImgMgr";
-import { getList, getLotteryData } from "@/utils/NetUtil";
+import { getList, getLotteryData, getUserList } from "@/utils/NetUtil";
 import {
   IonButton,
   IonContent,
@@ -213,7 +217,7 @@ import {
   heartOutline,
   timeOutline,
   bookmarkOutline,
-  chatboxEllipsesOutline,
+  chatbubbleEllipsesOutline,
 } from "ionicons/icons";
 import _ from "lodash";
 import "@ionic/vue/css/ionic-swiper.css";
@@ -229,6 +233,7 @@ import MaterialSymbolsHistory from "~icons/material-symbols/history";
 const lotteryData = ref<LotteryData[] | []>([]);
 const COL_SIZE = 3; // 列数
 const ROW_SIZE_MIN = 4; // 行数最小值
+const PAGE_SIZE = 5; // 每页显示的数量
 const lotteryMatrix = ref<LotteryData[][]>([]);
 const toastData = ref({
   isOpen: false,
@@ -242,19 +247,21 @@ const globalVar: any = inject("globalVar");
 const giftList = ref<any>({
   data: [],
   pageNum: 1,
-  pageSize: 10,
+  pageSize: PAGE_SIZE,
   totalCount: 0,
   totalPage: 0,
 });
 const scoreHistoryList = ref<any>({
   data: [],
   pageNum: 1,
-  pageSize: 10,
+  pageSize: PAGE_SIZE,
   totalCount: 0,
   totalPage: 0,
 });
 const lotteryCatList = ref<any>([]);
+const userList = ref<any>([]);
 const selectedCate = ref<any>({ id: 0, name: "全部", cost: 100 });
+const selectedUser = ref<any>({ id: 0, name: "全部", score: 0 });
 const tabsHeight = ref(0);
 const swiperRef = ref(); // 滑动对象
 let observer: MutationObserver | null = null;
@@ -280,9 +287,10 @@ const updateTabsHeight = () => {
 
 onMounted(() => {
   // 获取数据
-  refreshGiftList();
+  refreshGiftList(undefined, 1);
   refreshCateList();
-  refreshScoreHistoryList();
+  refreshScoreHistoryList(undefined, 1);
+  refreshUserList();
 
   // 创建 MutationObserver 监听 tabs 元素
   observer = new MutationObserver(() => {
@@ -352,8 +360,12 @@ function onSettingDismiss(event: any) {
   buildLotteryMatrix(event.detail.data);
 }
 
-function refreshScoreHistoryList() {
-  getList("t_score_history")
+function refreshScoreHistoryList(userId: number | undefined, pageNum: number) {
+  let filter = undefined;
+  if (userId) {
+    filter = { user_id: userId };
+  }
+  getList("t_score_history", filter, pageNum, PAGE_SIZE)
     .then((data) => {
       scoreHistoryList.value = data;
       // console.log(scoreHistoryList.value);
@@ -379,6 +391,19 @@ function refreshCateList() {
       toastData.value.text = JSON.stringify(err);
     });
 }
+function refreshUserList() {
+  getUserList().then((uList) => {
+    userList.value = [...uList.data];
+    userList.value.unshift({ id: 0, name: "全部", score: 0 });
+    if (selectedUser.value.id == 0) {
+      selectedUser.value = userList.value[0];
+    }
+  })
+  .catch((err)=>{
+    toastData.value.isOpen = true;
+    toastData.value.text = JSON.stringify(err);
+  });
+}
 
 function getCateName(cateId: number) {
   const cate = _.find(lotteryCatList.value, { id: cateId });
@@ -393,12 +418,12 @@ async function handleSegmentChange(event: any) {
 // 抽奖页签
 function btnLotteryClk() {}
 // 积分兑换页签
-function refreshGiftList(cateId?: number | undefined) {
+function refreshGiftList(cateId?: number | undefined, pageNum?: number) {
   let filter = undefined;
   if (cateId) {
     filter = { cate_id: cateId };
   }
-  getList("t_gift", filter)
+  getList("t_gift", filter, pageNum, PAGE_SIZE)
     .then((data) => {
       const d = data.data;
       // console.log(data);
@@ -427,6 +452,10 @@ function refreshGiftList(cateId?: number | undefined) {
 function handleShopCateChange(event: any) {
   selectedCate.value = event.detail.value;
   refreshGiftList(selectedCate.value.id);
+}
+function handleUserChange(event: any) {
+  selectedUser.value = event.detail.value;
+  refreshScoreHistoryList(selectedUser.value.id, 1);
 }
 async function btnExchangeClk(item: any) {
   console.log(item);

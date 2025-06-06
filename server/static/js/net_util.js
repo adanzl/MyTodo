@@ -3,10 +3,6 @@ const axios = window.axios;
 const REMOTE = { url: "https://leo-zhao.natapp4.cc/api", available: true };
 const API_URL = REMOTE.url;
 
-// export function getApiUrl() {
-//   return REMOTE;
-// }
-
 export async function getSave(id) {
   if (id === undefined) {
     throw new Error("id is undefined");
@@ -24,31 +20,6 @@ export async function getSave(id) {
   return ret;
 }
 
-// export function setSave(id, data) {
-//   return new Promise((resolve, reject) => {
-//     if (id === undefined) {
-//       reject(new Error("id is undefined"));
-//       return;
-//     }
-
-//     axios
-//       .post(API_URL + "/setData", {
-//         table: "t_schedule",
-//         data: { id, data: JSON.stringify(data) },
-//       })
-//       .then((res) => {
-//         if (res.data.code === 0) {
-//           resolve(res);
-//         } else {
-//           reject(new Error(res.data.msg));
-//         }
-//       })
-//       .catch((err) => {
-//         reject(err);
-//       });
-//   });
-// }
-
 export async function setUserInfo(id, score) {
   const rsp = await axios.post(API_URL + "/setData", {
     table: "t_user",
@@ -63,58 +34,6 @@ export async function setUserInfo(id, score) {
   return rsp.data.data;
 }
 
-// export async function getConversationId(id) {
-//   const rsp = await axios.get(API_URL + "/getRdsData", {
-//     params: { table: "conversation:id", id },
-//   });
-
-//   if (rsp.data.code !== 0) {
-//     throw new Error(rsp.data.msg);
-//   }
-
-//   return rsp.data.data;
-// }
-
-// export async function setConversationId(id, cId) {
-//   const rsp = await axios.post(API_URL + "/setRdsData", {
-//     table: "conversation:id",
-//     data: { id, value: cId },
-//   });
-
-//   console.log("setConversationId", rsp.data);
-//   if (rsp.data.code !== 0) {
-//     throw new Error(rsp.data.msg);
-//   }
-
-//   return rsp.data.data;
-// }
-
-// export async function getChatSetting(id) {
-//   const rsp = await axios.get(API_URL + "/getRdsData", {
-//     params: { table: "chatSetting", id },
-//   });
-
-//   if (rsp.data.code !== 0) {
-//     throw new Error(rsp.data.msg);
-//   }
-
-//   return rsp.data.data;
-// }
-
-// export async function setChatSetting(id, cId) {
-//   const rsp = await axios.post(API_URL + "/setRdsData", {
-//     table: "chatSetting",
-//     data: { id, value: cId },
-//   });
-
-//   console.log("setChatSetting", rsp.data);
-//   if (rsp.data.code !== 0) {
-//     throw new Error(rsp.data.msg);
-//   }
-
-//   return rsp.data.data;
-// }
-
 export async function getUserInfo(id) {
   const rsp = await axios.get(API_URL + "/getData", {
     params: { table: "t_user", id, fields: "id,score" },
@@ -126,18 +45,6 @@ export async function getUserInfo(id) {
 
   return rsp.data.data;
 }
-
-// export async function getScheduleList() {
-//   const rsp = await axios.get(API_URL + "/getAll", {
-//     params: { table: "t_schedule", fields: "id,name,user_id" },
-//   });
-
-//   if (rsp.data.code !== 0) {
-//     throw new Error(rsp.data.msg);
-//   }
-
-//   return rsp.data.data;
-// }
 
 /**
  * 获取数据
