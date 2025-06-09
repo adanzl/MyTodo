@@ -1,7 +1,7 @@
 import core.ai.ai_mgr as ai_mgr
 import core.db.db_mgr as db_mgr
 from app import app, socketio
-from core.chat.ai_chat_mgr import ChatMgr
+from core.chat.chat_mgr import ChatMgr
 from core.log_config import root_logger
 
 log = root_logger()
@@ -37,7 +37,7 @@ if __name__ == '__main__':
             })
         js_files = [os.path.join('static', f) for f in os.listdir('static') if f.endswith('.js') or f.endswith('.html')]
         run_simple(
-            'localhost',
+            '0.0.0.0',  # 修改为 0.0.0.0 允许外部访问
             8000,
             application,
             use_reloader=True,

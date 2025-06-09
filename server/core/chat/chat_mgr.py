@@ -21,14 +21,17 @@ class ClientContext:
         self.sid = sid
         self.pending_audio = False
         self.ai = AILocal(self.on_ai_msg, self.on_err)
-        self.asr = AsrClient(self.on_asr_result, self.on_err)
-        self.tts = TTSClient(self.on_tts_msg, self.on_err)
+        self.asr = AsrClient(self.on_asr_result, self.on_err)  # 语音识别
+        self.tts = TTSClient(self.on_tts_msg, self.on_err)  # 语音合成
         self.autoTTS = False
 
     def close(self):
         self.asr.close()
 
     def on_asr_result(self, text):
+        '''
+        处理asr的返回消息，收到消息后转发给ai和客户端
+        '''
         if text == '':
             return
         msg = {"content": text}
@@ -36,6 +39,9 @@ class ClientContext:
         self.ai.stream_msg(text)
 
     def on_ai_msg(self, text, id, type=0):
+        '''
+        处理AI的回复消息
+        '''
         # log.info(f"[AI] ON MSG: {text}")
         if type == 0:
             event = 'msgChat'
@@ -53,6 +59,9 @@ class ClientContext:
         socketio.emit('error', msg, room=self.sid)
 
     def on_tts_msg(self, data, type=0):
+        '''
+            处理tts的返回消息，type=0正常的流式返回，type=1表示tts已经结束的消息
+        '''
         if type == 0:
             socketio.emit('dataAudio', {'type': 'tts', 'data': data}, room=self.sid)
         else:
@@ -80,12 +89,12 @@ class ChatMgr:
         if sid in self.clients:
             del self.clients[sid]
 
-    def handle_text(self, sid, text):
+    def handle_text(self, sid, text, room_id):
         # translated = translate_text(text)
         client: ClientContext = self.clients.get(sid)
         client.ai.stream_msg(text)
 
-    def handle_audio(self, sid, sample_rate, audio_bytes):
+    def handle_audio(self, sid, sample_rate, audio_bytes, room_id):
         '''
         处理音频数据
         '''
@@ -131,21 +140,24 @@ class ChatMgr:
             client_id = request.sid
             data_type = data['type']
             content = data.get('content', '')
+            room_id = data.get('roomId', '')
 
             if client_id not in self.clients:
                 return
             ctx = self.clients[client_id]
             if data_type == 'text':
                 log.info(f'[CHAT] Received message from {client_id}: {data_type}')
-                self.handle_text(client_id, content)
+                self.handle_text(client_id, content, room_id)
             elif data_type == 'audio':
                 audio_bytes = base64.b64decode(content)
-                self.handle_audio(client_id, data['sample'], audio_bytes)
+                self.handle_audio(client_id, data['sample'], audio_bytes, room_id)
                 cancel = data.get('cancel', False)
                 if cancel:
                     ctx.asr.cancel = True
                 if data['finish']:
                     ctx.asr.end_asr()
+            else:
+                log.warning(f'[CHAT] Unknown message type: {data_type}')
 
         # 处理TTS请求
         @socketio.on('tts')

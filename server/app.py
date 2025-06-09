@@ -7,7 +7,16 @@ app = Flask(__name__, static_url_path='')
 
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})
 # 创建 SocketIO 实例并与 Flask 应用关联
-socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
+socketio = SocketIO(
+    app,
+    async_mode='eventlet',
+    cors_allowed_origins="*",
+    # path='socket.io/',  # 移除前导斜杠，因为 Flask 应用已经挂载在 /api 下
+    logger=True,  # 启用日志
+    engineio_logger=True,  # 启用 Engine.IO 日志
+    ping_timeout=60,  # 增加超时时间
+    ping_interval=25,  # 增加心跳间隔
+)
 
 app.register_blueprint(api_bp, url_prefix='/')
 

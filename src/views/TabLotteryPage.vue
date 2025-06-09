@@ -10,27 +10,33 @@
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
-    <ion-content>
-      <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
-        <ion-refresher-content></ion-refresher-content>
-      </ion-refresher>
-      <ion-segment value="history" @ionChange="handleSegmentChange">
-        <ion-segment-button value="lotterySpecial" content-id="lotterySpecial" layout="icon-start">
-          <ion-label>抽取奖励</ion-label>
-          <ion-icon :icon="heartOutline"></ion-icon>
-        </ion-segment-button>
-        <ion-segment-button value="shop" content-id="shop" layout="icon-start">
-          <ion-icon :icon="giftOutline"></ion-icon>
-          <ion-label>积分兑换</ion-label>
-        </ion-segment-button>
-        <ion-segment-button value="history" content-id="history" layout="icon-start">
-          <MaterialSymbolsHistory width="25" height="25" />
-          <ion-label>积分历史</ion-label>
-        </ion-segment-button>
-      </ion-segment>
-      <ion-segment-view :style="{ height: `calc(100% - ${tabsHeight}px)` }">
-        <!-- 抽奖页签 -->
-        <ion-segment-content id="lotterySpecial" class="flex flex-col">
+
+    <ion-segment value="lotterySpecial" @ionChange="handleSegmentChange">
+      <ion-segment-button
+        value="lotterySpecial"
+        content-id="lotterySpecial"
+        layout="icon-start"
+        class="text-blue-500">
+        <ion-label>抽取奖励</ion-label>
+        <ion-icon :icon="heartOutline"></ion-icon>
+      </ion-segment-button>
+      <ion-segment-button value="shop" content-id="shop" layout="icon-start" class="text-blue-500">
+        <ion-icon :icon="giftOutline"></ion-icon>
+        <ion-label>积分兑换</ion-label>
+      </ion-segment-button>
+      <ion-segment-button
+        value="history"
+        content-id="history"
+        layout="icon-start"
+        class="text-blue-500">
+        <MaterialSymbolsHistory width="25" height="25" />
+        <ion-label>积分历史</ion-label>
+      </ion-segment-button>
+    </ion-segment>
+    <ion-segment-view :style="{ height: `calc(100% - ${tabsHeight}px)` }">
+      <!-- 抽奖页签 -->
+      <ion-segment-content id="lotterySpecial">
+        <ion-content>
           <ion-item>
             <div class="flex items-center justify-center">
               <span>当前积分：</span>
@@ -40,7 +46,7 @@
           </ion-item>
           <ion-radio-group
             :value="selectedCate"
-            class="radio-grid p-10"
+            class="radio-grid p-5"
             @ionChange="handleShopCateChange">
             <ion-radio
               v-for="item in lotteryCatList"
@@ -48,10 +54,10 @@
               :value="item"
               label-placement="end"
               justify="start">
-              {{ item.name }}
+              <span class="text-black">{{ item.name }}</span>
             </ion-radio>
           </ion-radio-group>
-          <div class="flex items-center justify-center flex-1">
+          <div class="flex items-center justify-center bg-slate-400 h-[calc(100%-300px)]">
             <ion-button @click="btnLotteryClk" size="default">
               <div class="w-20 h-20 flex flex-col items-center justify-center">
                 <span>立即抽奖</span>
@@ -61,9 +67,9 @@
               </div>
             </ion-button>
           </div>
-          <div class="bg-slate-100">
-            <!-- 心愿单 -->
-            <div class="px-4"><h2>心愿单</h2></div>
+          <!-- 心愿单 -->
+          <div class="px-4">
+            <h2 class="text-lg text-blue-500 font-bold">心愿单</h2>
             <swiper
               class="py-4"
               :freeMode="{ enabled: true, momentumRatio: 0.5 }"
@@ -83,92 +89,95 @@
               </swiper-slide>
             </swiper>
           </div>
-        </ion-segment-content>
-        <!-- 积分兑换页签 -->
-        <ion-segment-content id="shop">
-          <ion-item>
-            <ion-select
-              label="类别"
-              placeholder="选择类别"
-              v-model="selectedCate"
-              @ionChange="handleShopCateChange">
-              <ion-select-option :value="cate" v-for="cate in lotteryCatList" :key="cate.id">
-                {{ cate.name }}
-              </ion-select-option>
-            </ion-select>
-            <div class="flex w-1/3 items-center justify-center">
-              <MdiStar class="text-red-500" />
-              <div class="text-left pl-1 font-bold w-12">{{ globalVar.user.score }}</div>
+        </ion-content>
+      </ion-segment-content>
+      <!-- 积分兑换页签 -->
+      <ion-segment-content id="shop">
+        <ion-item>
+          <ion-select
+            label="类别"
+            placeholder="选择类别"
+            v-model="selectedCate"
+            @ionChange="handleShopCateChange">
+            <ion-select-option :value="cate" v-for="cate in lotteryCatList" :key="cate.id">
+              {{ cate.name }}
+            </ion-select-option>
+          </ion-select>
+          <div class="flex w-1/3 items-center justify-center">
+            <MdiStar class="text-red-500" />
+            <div class="text-left pl-1 font-bold w-12">{{ globalVar.user.score }}</div>
+          </div>
+        </ion-item>
+        <ion-content>
+          <ion-item v-for="item in giftList.data" :key="item.id">
+            <ion-thumbnail slot="start">
+              <img :src="item.img" />
+            </ion-thumbnail>
+            <div class="w-full">
+              <ion-label>
+                <h2 class="flex">
+                  <div class="w-8">[{{ item.id }}]</div>
+                  {{ item.name }}
+                </h2>
+              </ion-label>
+              <div class="flex items-center">
+                <MdiStar class="text-red-500" />
+                <div class="text-left pl-1 font-bold w-12">{{ item.cost }}</div>
+                <p class="text-sm ml-2">{{ getCateName(item.cate_id) }}</p>
+              </div>
             </div>
+            <ion-button @click="btnExchangeClk(item)" size="default"> 兑 </ion-button>
           </ion-item>
-          <ion-list>
-            <ion-item v-for="item in giftList.data" :key="item.id">
-              <ion-thumbnail slot="start">
-                <img :src="item.img" />
-              </ion-thumbnail>
-              <div class="w-full">
-                <ion-label>
-                  <h2 class="flex">
-                    <div class="w-8">[{{ item.id }}]</div>
-                    {{ item.name }}
-                  </h2>
-                </ion-label>
-                <div class="flex items-center">
+        </ion-content>
+      </ion-segment-content>
+      <!-- 积分历史 -->
+      <ion-segment-content id="history">
+        <ion-item>
+          <ion-select label="用户" v-model="selectedUser" @ionChange="handleUserChange">
+            <ion-select-option :value="item" v-for="item in userList" :key="item.id">
+              {{ item.name }}
+            </ion-select-option>
+          </ion-select>
+          <div class="flex w-1/3 items-center justify-center">
+            <MdiStar class="text-red-500" />
+            <div class="text-left pl-1 font-bold w-12">{{ globalVar.user.score }}</div>
+          </div>
+        </ion-item>
+        <ion-content>
+          <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
+            <ion-refresher-content></ion-refresher-content>
+          </ion-refresher>
+          <ion-item v-for="item in scoreHistoryList.data" :key="item.id">
+            <div class="flex flex-col w-full">
+              <div class="flex">
+                <div class="w-1/5">ID: {{ item.id }}</div>
+                <div class="ml-2 flex items-center w-1/4">
+                  {{ item.action }}
+                </div>
+                <div class="ml-2 flex items-center">
+                  <ion-icon class="mr-1" :icon="timeOutline"></ion-icon>
+                  {{ item.dt }}
+                </div>
+              </div>
+              <div class="flex mb-2">
+                <div class="flex item-center w-1/5">
+                  V:
+                  {{ item.value }}
+                </div>
+                <div class="ml-2 flex items-center w-1/4">
                   <MdiStar class="text-red-500" />
-                  <div class="text-left pl-1 font-bold w-12">{{ item.cost }}</div>
-                  <p class="text-sm ml-2">{{ getCateName(item.cate_id) }}</p>
+                  {{ item.current }}
+                </div>
+                <div class="ml-2 flex items-center">
+                  <ion-icon class="mr-1" :icon="chatbubbleEllipsesOutline"></ion-icon>
+                  {{ item.msg }}
                 </div>
               </div>
-              <ion-button @click="btnExchangeClk(item)" size="default"> 兑 </ion-button>
-            </ion-item>
-          </ion-list>
-        </ion-segment-content>
-        <!-- 积分历史 -->
-        <ion-segment-content id="history">
-          <ion-item>
-            <ion-select label="用户" v-model="selectedUser" @ionChange="handleUserChange">
-              <ion-select-option :value="item" v-for="item in userList" :key="item.id">
-                {{ item.name }}
-              </ion-select-option>
-            </ion-select>
-            <div class="flex w-1/3 items-center justify-center">
-              <MdiStar class="text-red-500" />
-              <div class="text-left pl-1 font-bold w-12">{{ globalVar.user.score }}</div>
             </div>
           </ion-item>
-          <ion-list>
-            <ion-item v-for="item in scoreHistoryList.data" :key="item.id">
-              <div class="flex flex-col w-full">
-                <div class="flex">
-                  <div class="w-1/5">ID: {{ item.id }}</div>
-                  <div class="ml-2 flex items-center w-1/4">
-                    {{ item.action }}
-                  </div>
-                  <div class="ml-2 flex items-center">
-                    <ion-icon  class="mr-1" :icon="timeOutline"></ion-icon>
-                    {{ item.dt }}
-                  </div>
-                </div>
-                <div class="flex mb-2">
-                  <div class="flex item-center w-1/5">
-                    V:
-                    {{ item.value }}
-                  </div>
-                  <div class="ml-2 flex items-center w-1/4">
-                    <MdiStar class="text-red-500" />
-                    {{ item.current }}
-                  </div>
-                  <div class="ml-2 flex items-center">
-                    <ion-icon class="mr-1" :icon="chatbubbleEllipsesOutline"></ion-icon>
-                    {{ item.msg }}
-                  </div>
-                </div>
-              </div>
-            </ion-item>
-          </ion-list>
-        </ion-segment-content>
-      </ion-segment-view>
-    </ion-content>
+        </ion-content>
+      </ion-segment-content>
+    </ion-segment-view>
     <ion-toast
       :is-open="toastData.isOpen"
       :message="toastData.text"
@@ -194,7 +203,6 @@ import {
   IonIcon,
   IonItem,
   IonLabel,
-  IonList,
   IonPage,
   IonRadio,
   IonRadioGroup,
@@ -210,12 +218,7 @@ import {
   alertController,
 } from "@ionic/vue";
 import "@ionic/vue/css/ionic-swiper.css";
-import {
-  chatbubbleEllipsesOutline,
-  giftOutline,
-  heartOutline,
-  timeOutline,
-} from "ionicons/icons";
+import { chatbubbleEllipsesOutline, giftOutline, heartOutline, timeOutline } from "ionicons/icons";
 import _ from "lodash";
 import "swiper/css";
 import "swiper/css/free-mode";
