@@ -143,6 +143,55 @@ def get_rds_data():
         return {"code": -1, "msg": 'error' + str(e)}
 
 
+@api_bp.route("/getRdsList", methods=['GET'])
+def get_rds_list():
+    '''
+    获取redis列表的数据，分页
+    '''
+    try:
+        key = request.args.get('key')
+        page_size = request.args.get('pageSize', 20, type=int)
+        page_num = request.args.get('pageNum', 1, type=int)
+        log.info(f"===== [Get Rds List] {table}-{id}, pageSize={page_size}, pageNum={page_num}")
+
+        # 获取列表总长度
+        total = rds_mgr.llen(key)
+        if total == 0:
+            return {
+                "code": 0,
+                "msg": "ok",
+                "data": {
+                    "totalCount": 0,
+                    'totalPage': 0,
+                    "pageNum": page_num,
+                    "pageSize": page_size,
+                    "data": []
+                }
+            }
+
+        # 计算分页的起始和结束索引
+        start = (page_num - 1) * page_size
+        end = start + page_size - 1
+
+        # 获取指定范围的数据
+        data = rds_mgr.lrange(key, start, end)
+
+        return {
+            "code": 0,
+            "msg": "ok",
+            "data": {
+                "totalCount": 0,
+                'totalPage': 0,
+                "pageNum": page_num,
+                "pageSize": page_size,
+                "data": data
+            }
+        }
+    except Exception as e:
+        log.error(e)
+        return {"code": -1, "msg": 'error' + str(e)}
+
+
 @api_bp.route("/setRdsData", methods=['POST'])
 def set_rds_data():
     try:
@@ -177,6 +226,7 @@ def chat_messages():
 def route_index():
     return render_template('index.html')
 
+
 @api_bp.route("/addScore", methods=['POST'])
 def add_score():
     args = request.get_json()
@@ -186,3 +236,31 @@ def add_score():
     action = args.get('action')
     msg = args.get('msg')
     return db_mgr.add_score(user, value, action, msg)
+
+
+@api_bp.route("/addRdsList", methods=['POST'])
+def add_rds_list():
+    """
+    向Redis列表中插入数据
+    支持在列表头部或尾部插入数据
+    """
+    try:
+        args = request.get_json()
+        log.info("===== [Add Rds List] " + json.dumps(args))
+        
+        key = args.get('key')
+        value = args.get('value')
+        position = args.get('position', 'right')  # 默认为右侧（尾部）插入
+        
+        if not key or not value:
+            return {"code": -1, "msg": "key and value are required"}
+            
+        if position == 'left':
+            rds_mgr.lpush(key, value)
+        else:
+            rds_mgr.rpush(key, value)
+            
+        return {"code": 0, "msg": "ok", "data": value}
+    except Exception as e:
+        log.error(e)
+        return {"code": -1, "msg": 'error: ' + str(e)}
