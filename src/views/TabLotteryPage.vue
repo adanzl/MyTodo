@@ -108,7 +108,10 @@
             <div class="text-left pl-1 font-bold w-12">{{ globalVar.user.score }}</div>
           </div>
         </ion-item>
-        <ion-content>
+        <ion-content :scrollY="true" :style="{ height: 'calc(100% - 56px)' }">
+          <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
+            <ion-refresher-content></ion-refresher-content>
+          </ion-refresher>
           <ion-item v-for="item in giftList.data" :key="item.id">
             <ion-thumbnail slot="start">
               <img :src="item.img" />
@@ -133,6 +136,7 @@
       <!-- 积分历史 -->
       <ion-segment-content id="history">
         <ion-item>
+          <!-- 用户筛选 -->
           <ion-select label="用户" v-model="selectedUser" @ionChange="handleUserChange">
             <ion-select-option :value="item" v-for="item in userList" :key="item.id">
               {{ item.name }}
@@ -143,7 +147,7 @@
             <div class="text-left pl-1 font-bold w-12">{{ globalVar.user.score }}</div>
           </div>
         </ion-item>
-        <ion-content>
+        <ion-content :scrollY="true" :style="{ height: 'calc(100% - 56px)' }">
           <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
             <ion-refresher-content></ion-refresher-content>
           </ion-refresher>
@@ -154,7 +158,7 @@
                 <div class="ml-2 flex items-center w-1/4">
                   {{ item.action }}
                 </div>
-                <div class="ml-2 flex items-center">
+                <div class="ml-2 flex items-center text-sm">
                   <ion-icon class="mr-1" :icon="timeOutline"></ion-icon>
                   {{ item.dt }}
                 </div>
@@ -232,7 +236,7 @@ import WeuiSettingOutlined from "~icons/weui/setting-outlined";
 const lotteryData = ref<LotteryData[] | []>([]);
 const COL_SIZE = 3; // 列数
 const ROW_SIZE_MIN = 4; // 行数最小值
-const PAGE_SIZE = 5; // 每页显示的数量
+const PAGE_SIZE = 20; // 每页显示的数量
 const lotteryMatrix = ref<LotteryData[][]>([]);
 const toastData = ref({
   isOpen: false,
@@ -493,4 +497,8 @@ async function btnExchangeClk(item: any) {
   margin: 0;
   --padding-start: 0;
 }
+
+/* ion-content {
+  --padding-bottom: 56px;
+} */
 </style>

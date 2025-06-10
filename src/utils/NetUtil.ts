@@ -119,7 +119,7 @@ export function setSave(id: number | undefined, data: any) {
  * @param {*} msg 备注
  * @returns
  */
-export async function addScore(user:number, action:string, value:number, msg:string) {
+export async function addScore(user: number, action: string, value: number, msg: string) {
   const rsp = await axios.post(API_URL + "/addScore", {
     user,
     action,
@@ -223,16 +223,10 @@ export async function getAiChatMessages(
     throw new Error(rsp.data.msg);
   }
   return rsp.data.data;
-
 }
-export async function getChatMessages(
-  conversation_id: string,
-  limit: number,
-  user: string,
-  first_id?: string
-) {
-  const rsp: any = await axios.get(API_URL + "/chatMessages", {
-    params: { conversation_id: conversation_id, limit: limit, user: user, first_id: first_id },
+export async function getChatMessages(key: string, pageNum: number, pageSize: number) {
+  const rsp: any = await axios.get(API_URL + "/getRdsList", {
+    params: { key: "chat:" + key, pageSize: pageSize, pageNum: pageNum },
   });
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);

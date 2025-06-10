@@ -13,23 +13,21 @@
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
-    <ion-content class="" ref="chatContent">
-      <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
-        <ion-refresher-content></ion-refresher-content>
-      </ion-refresher>
-      <ion-segment :value="chatType" @ionChange="handleSegmentChange">
-        <ion-segment-button value="chat" content-id="chat" layout="icon-start">
-          <ion-icon :icon="heartOutline"></ion-icon>
-          <ion-label>聊天室</ion-label>
-        </ion-segment-button>
-        <ion-segment-button value="aiChat" content-id="aiChat" layout="icon-start">
-          <ion-icon :icon="heartOutline"></ion-icon>
-          <ion-label>AI</ion-label>
-        </ion-segment-button>
-      </ion-segment>
-      <ion-segment-view :style="{ height: `calc(100% - ${tabsHeight}px)` }">
-        <!-- 聊天室 -->
-        <ion-segment-content id="chat">
+
+    <ion-segment :value="chatType" @ionChange="handleSegmentChange">
+      <ion-segment-button :value="CHAT_ROOM" content-id="chat" layout="icon-start">
+        <ion-icon :icon="heartOutline"></ion-icon>
+        <ion-label>聊天室</ion-label>
+      </ion-segment-button>
+      <ion-segment-button :value="CHAT_AI" content-id="aiChat" layout="icon-start">
+        <ion-icon :icon="heartOutline"></ion-icon>
+        <ion-label>AI</ion-label>
+      </ion-segment-button>
+    </ion-segment>
+    <ion-segment-view :style="{ height: `calc(100% - ${tabsHeight}px)` }">
+      <!-- 聊天室 -->
+      <ion-segment-content id="chat">
+        <ion-content class="" ref="">
           <div class="flex h-full p-2 border-t-2">
             <ion-list class="bg-transparent">
               <div v-for="(msg, idx) in chatMessages" :key="idx" class="p-1.5 w-full">
@@ -59,9 +57,14 @@
               </div>
             </ion-list>
           </div>
-        </ion-segment-content>
-        <!-- AI -->
-        <ion-segment-content id="aiChat">
+        </ion-content>
+      </ion-segment-content>
+      <!-- AI -->
+      <ion-segment-content id="aiChat">
+        <ion-content class="" ref="chatContent">
+          <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
+            <ion-refresher-content></ion-refresher-content>
+          </ion-refresher>
           <div class="flex h-full p-2 border-t-2">
             <ion-list class="bg-transparent">
               <div v-for="(msg, idx) in aiChatMessages" :key="idx" class="p-1.5 w-full">
@@ -91,9 +94,9 @@
               </div>
             </ion-list>
           </div>
-        </ion-segment-content>
-      </ion-segment-view>
-    </ion-content>
+        </ion-content>
+      </ion-segment-content>
+    </ion-segment-view>
     <audio ref="audioRef" style="width: auto" class="m-2"></audio>
     <ion-item>
       <div class="flex py-2 w-full h-[72px]" v-if="INPUT_TYPE == 'text'">
@@ -187,6 +190,9 @@ const TTS_AUTO = true;
 // cSpell: disable-next-line
 const TTS_ROLE = "longwan_v2";
 // const TTS_SPEED = 1.1;
+
+const CHAT_ROOM = "chat_room";
+const CHAT_AI = "chat_ai";
 const chatSetting = ref({
   open: false,
   ttsSpeed: 1.1,
@@ -222,7 +228,7 @@ const audioRef = ref<HTMLAudioElement | null>(null);
 const audioPlayMsg = ref<MSG | null>(null);
 const lstAudioSrc = ref<string>("");
 const chatContent = ref<any>(null);
-const chatType = ref("chat");
+const chatType = ref(CHAT_ROOM);
 const ttsData = ref<any>({ audioBuffer: null, msg: null, audioEnd: false, mediaSource: null });
 const rec = Recorder({
   type: "wav",
@@ -682,17 +688,16 @@ function onChatSettingDismiss(e: any) {
   chatSetting.value.open = false;
 }
 function handleRefresh(e: RefresherCustomEvent) {
-  let firstId = undefined;
-  if (chatType.value === "chat") {
-    if (chatMessages.value.length > 0) {
-      firstId = chatMessages.value[0].id;
-    }
-    getChatMessages(chatSetting.value.chatRoomId, 3, globalVar.user.name, firstId).then(
-      (data: any) => {
+  if (chatType.value === CHAT_ROOM) {
+    getChatMessages(chatSetting.value.chatRoomId, 1, 3)
+      .then((data: any) => {
         console.log("==> handleRefresh", data);
-      }
-    );
-  } else if (chatType.value === "aiChat") {
+      })
+      .finally(() => {
+        e.target.complete();
+      });
+  } else if (chatType.value === CHAT_AI) {
+    let firstId = undefined;
     if (aiChatMessages.value.length > 0) {
       firstId = aiChatMessages.value[0].id;
     }
