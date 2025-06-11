@@ -152,7 +152,7 @@ def get_rds_list():
         key = request.args.get('key')
         page_size = request.args.get('pageSize', 20, type=int)
         page_num = request.args.get('pageNum', 1, type=int)
-        log.info(f"===== [Get Rds List] {table}-{id}, pageSize={page_size}, pageNum={page_num}")
+        log.info(f"===== [Get Rds List] {key}, pageSize={page_size}, pageNum={page_num}")
 
         # 获取列表总长度
         total = rds_mgr.llen(key)
@@ -247,19 +247,19 @@ def add_rds_list():
     try:
         args = request.get_json()
         log.info("===== [Add Rds List] " + json.dumps(args))
-        
+
         key = args.get('key')
         value = args.get('value')
         position = args.get('position', 'right')  # 默认为右侧（尾部）插入
-        
+
         if not key or not value:
             return {"code": -1, "msg": "key and value are required"}
-            
+
         if position == 'left':
             rds_mgr.lpush(key, value)
         else:
             rds_mgr.rpush(key, value)
-            
+
         return {"code": 0, "msg": "ok", "data": value}
     except Exception as e:
         log.error(e)
