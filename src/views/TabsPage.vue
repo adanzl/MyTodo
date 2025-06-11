@@ -233,7 +233,13 @@
       :is-open="bOpenRewardPop.open"
       :value="bOpenRewardPop.score"
       @willDismiss="onRewardDismiss" />
-    <RewardSet :is-open="rewardSet.open" @willDismiss="onRewardSetDismiss" />
+    <RewardSet :is-open="rewardSet.open" @willDismiss="() => (rewardSet.open = false)" />
+    <ion-toast
+      :is-open="toastData.isOpen"
+      :message="toastData.text"
+      :duration="toastData.duration"
+      @didDismiss="() => (toastData.isOpen = false)">
+    </ion-toast>
   </ion-page>
 </template>
 
@@ -293,6 +299,11 @@ const bOpenRewardPop = ref({
 });
 const rewardSet = ref({
   open: false,
+});
+const toastData = ref({
+  isOpen: false,
+  duration: 3000,
+  text: "",
 });
 
 const groupRef = ref(new Map(GroupOptions.map((option) => [option.id, true])));
@@ -398,6 +409,10 @@ eventBus.$on(C_EVENT.REWARD, (params: any) => {
   bOpenRewardPop.value.open = true;
   bOpenRewardPop.value.score = params;
 });
+eventBus.$on(C_EVENT.TOAST, (params: any) => {
+  toastData.value.isOpen = true;
+  toastData.value.text = params;
+});
 function onRewardDismiss() {
   bOpenRewardPop.value.open = false;
 }
@@ -410,9 +425,7 @@ function onScheduleListChange(event: any) {
   globalVar.scheduleListId = scheduleListSelectedId.value = event.detail.value;
   eventBus.$emit(C_EVENT.UPDATE_SCHEDULE_GROUP, globalVar.scheduleListId);
 }
-function onRewardSetDismiss() {
-  rewardSet.value.open = false;
-}
+
 </script>
 
 <style scoped>

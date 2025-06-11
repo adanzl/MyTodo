@@ -34,6 +34,7 @@ export const C_EVENT = {
   UPDATE_SCHEDULE_GROUP: "updateScheduleListId",
   UPDATE_USER_INFO: "updateUserInfo",
   REWARD: "reward",
+  TOAST: "toast",
 };
 
 export default EventBus;

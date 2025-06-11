@@ -182,21 +182,12 @@
         </ion-content>
       </ion-segment-content>
     </ion-segment-view>
-    <ion-toast
-      :is-open="toastData.isOpen"
-      :message="toastData.text"
-      :duration="toastData.duration"
-      @didDismiss="
-        () => {
-          toastData.isOpen = false;
-        }
-      ">
-    </ion-toast>
     <LotterySetting :is-open="lotterySetting.open" @willDismiss="onSettingDismiss" />
   </ion-page>
 </template>
 
 <script setup lang="ts">
+import EventBus, { C_EVENT } from "@/modal/EventBus";
 import { LotteryData } from "@/modal/UserData";
 import { getImage } from "@/utils/ImgMgr";
 import { getList, getLotteryData, getUserList } from "@/utils/NetUtil";
@@ -238,11 +229,6 @@ const COL_SIZE = 3; // 列数
 const ROW_SIZE_MIN = 4; // 行数最小值
 const PAGE_SIZE = 20; // 每页显示的数量
 const lotteryMatrix = ref<LotteryData[][]>([]);
-const toastData = ref({
-  isOpen: false,
-  duration: 3000,
-  text: "",
-});
 const lotterySetting = ref({ open: false });
 const globalVar: any = inject("globalVar");
 // const winner = ref({ bWin: false, prize: "" });
@@ -329,8 +315,7 @@ function handleRefresh(event: any) {
       buildLotteryMatrix(JSON.parse(data));
     })
     .catch((err) => {
-      toastData.value.isOpen = true;
-      toastData.value.text = JSON.stringify(err);
+      EventBus.$emit(C_EVENT.TOAST, JSON.stringify(err));
     })
     .finally(() => event.target.complete());
 }
@@ -374,8 +359,7 @@ function refreshScoreHistoryList(userId: number | undefined, pageNum: number) {
       // console.log(scoreHistoryList.value);
     })
     .catch((err) => {
-      toastData.value.isOpen = true;
-      toastData.value.text = JSON.stringify(err);
+      EventBus.$emit(C_EVENT.TOAST, JSON.stringify(err));
     });
 }
 function refreshCateList() {
@@ -390,8 +374,7 @@ function refreshCateList() {
       }
     })
     .catch((err) => {
-      toastData.value.isOpen = true;
-      toastData.value.text = JSON.stringify(err);
+      EventBus.$emit(C_EVENT.TOAST, JSON.stringify(err));
     });
 }
 function refreshUserList() {
@@ -404,8 +387,7 @@ function refreshUserList() {
       }
     })
     .catch((err) => {
-      toastData.value.isOpen = true;
-      toastData.value.text = JSON.stringify(err);
+      EventBus.$emit(C_EVENT.TOAST, JSON.stringify(err));
     });
 }
 
@@ -449,8 +431,7 @@ function refreshGiftList(cateId?: number | undefined, pageNum?: number) {
       });
     })
     .catch((err) => {
-      toastData.value.isOpen = true;
-      toastData.value.text = JSON.stringify(err);
+      EventBus.$emit(C_EVENT.TOAST, JSON.stringify(err));
     });
 }
 function handleShopCateChange(event: any) {

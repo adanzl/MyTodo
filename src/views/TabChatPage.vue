@@ -39,24 +39,28 @@
           <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
             <ion-refresher-content></ion-refresher-content>
           </ion-refresher>
-          <div class="flex h-full p-2 border-t-2">
+          <div class="flex flex-col h-full p-2 border-t-2">
             <div v-for="(msg, idx) in chatMessages" :key="idx" class="p-1.5 w-full">
-              <div
-                v-if="msg.role == 'server'"
-                class="w-[80%] bg-pink-200 rounded-lg p-2 shadow-md ml-auto relative">
-                {{ msg.content ?? "..." }}
+              <div v-if="msg.role == 'me'" class="flex">
                 <div
-                  class="absolute -left-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center"
+                  class="w-[70%] bg-green-500 text-white p-2 ml-auto rounded-lg shadow-md relative">
+                  {{ msg.content }}
+                </div>
+                <ion-avatar slot="start" class="w-12 h-12 ml-1">
+                  <ion-img :src="getUserInfo(msg.role).icon" />
+                </ion-avatar>
+                <div
+                  v-if="!msg.audioSrc"
+                  class="absolute -right-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center text-black"
                   @click="btnAudioClk(msg)">
                   <MdiStopCircleOutline width="24" height="24" v-if="msg.playing" />
                   <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
                 </div>
               </div>
-              <div v-else class="w-[80%] bg-green-500 text-white p-2 rounded-lg shadow-md relative">
-                {{ msg.content }}
+              <div v-else class="w-[80%] bg-pink-200 rounded-lg p-2 shadow-md mr-auto relative">
+                {{ msg.content ?? "..." }}
                 <div
-                  v-if="msg.audioSrc"
-                  class="absolute -right-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center text-black"
+                  class="absolute -left-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center"
                   @click="btnAudioClk(msg)">
                   <MdiStopCircleOutline width="24" height="24" v-if="msg.playing" />
                   <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
@@ -153,15 +157,19 @@
 
 <script setup lang="ts">
 import ChatSetting from "@/components/ChatSetting.vue";
+import EventBus, { C_EVENT } from "@/modal/EventBus";
 import {
   getApiUrl,
   getAiChatMessages,
   getChatSetting,
   setChatSetting,
   getChatMessages,
+  getUserList,
 } from "@/utils/NetUtil";
 import {
   createGesture,
+  IonImg,
+  IonAvatar,
   IonCheckbox,
   IonRefresher,
   IonRefresherContent,
@@ -209,6 +217,7 @@ const AUDIO_TYPE = ref("hold");
 const inputText = ref("");
 const globalVar: any = inject("globalVar");
 const inputRef = ref<HTMLElement | null>(null);
+const userList = ref<any>([]);
 class MSG {
   id?: string;
   content: string = "";
@@ -297,6 +306,22 @@ const updateChatSetting = async () => {
     }
   });
 };
+function refreshUserList() {
+  getUserList()
+    .then((uList) => {
+      userList.value = [...uList.data];
+    })
+    .catch((err) => {
+      EventBus.$emit(C_EVENT.TOAST, JSON.stringify(err));
+    });
+}
+
+function getUserInfo(userId: string) {
+  if (userId === "me") {
+    return globalVar.user;
+  }
+  return userList.value.find((u: any) => u.id === userId);
+}
 onBeforeUnmount(() => {
   // 移除事件监听
   window.removeEventListener("resize", updateTabsHeight);
@@ -308,6 +333,7 @@ onBeforeUnmount(() => {
 });
 onIonViewDidEnter(async () => {
   await updateChatSetting();
+  refreshUserList();
 });
 function initSocketIO() {
   socketRef.value = io(url, {
@@ -436,22 +462,26 @@ const sendTextMessage = () => {
       aiChatMessages.value.push({ id: "", content: inputText.value, role: "me" });
       aiChatContent.value.$el.scrollToBottom(200);
     } else if (chatType.value === CHAT_ROOM) {
-      chatMessages.value.push({ id: "", content: inputText.value, role: globalVar.user.id });
+      chatMessages.value.push({ id: "", content: inputText.value, role: "me" });
       chatContent.value.$el.scrollToBottom(200);
     }
 
     const message = JSON.stringify({
       type: "text",
       content: inputText.value,
+      chatType: chatType.value,
+      roomId: chatSetting.value.chatRoomId,
+      userId: globalVar.user.id,
     });
+    EventBus.$emit(C_EVENT.TOAST, inputText.value);
     inputText.value = "";
-    // isWaitingServer.value = true;
+    isWaitingServer.value = true;
     // if (TTS_AUTO) {
     //   streamAudio(() => {
     //     socketRef.value!.emit("message", message);
     //   });
     // } else {
-    //   socketRef.value!.emit("message", message);
+    socketRef.value!.emit("message", message);
     // }
   }
 };

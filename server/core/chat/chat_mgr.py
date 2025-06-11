@@ -1,4 +1,5 @@
 import base64
+import time
 
 from app import socketio
 from core.ai.ai_local import AILocal
@@ -89,10 +90,23 @@ class ChatMgr:
         if sid in self.clients:
             del self.clients[sid]
 
-    def handle_text(self, sid, text, room_id):
-        # translated = translate_text(text)
-        client: ClientContext = self.clients.get(sid)
-        client.ai.stream_msg(text)
+    def handle_text(self, sid, data):
+        chat_type = data.get('chatType', '')
+        content = data.get('content', '')
+        if chat_type == 'chat_room':
+            room_id = data.get('roomId', '')
+            user_id = data.get('userId', '')
+            rds_mgr.lpush(
+                room_id,
+                json.dumps({
+                    'user_id': user_id,
+                    'content': content,
+                    'type': 'text',
+                    'ts': time.strftime('%Y-%m-%d %H:%M:%S'),
+                }))
+        else:
+            client: ClientContext = self.clients.get(sid)
+            client.ai.stream_msg(content)
 
     def handle_audio(self, sid, sample_rate, audio_bytes, room_id):
         '''
@@ -139,6 +153,7 @@ class ChatMgr:
             data = json.loads(msg)
             client_id = request.sid
             data_type = data['type']
+            chat_type = data.get('chatType', '')
             content = data.get('content', '')
             room_id = data.get('roomId', '')
 
@@ -146,8 +161,8 @@ class ChatMgr:
                 return
             ctx = self.clients[client_id]
             if data_type == 'text':
-                log.info(f'[CHAT] Received message from {client_id}: {data_type}')
-                self.handle_text(client_id, content, room_id)
+                log.info(f'[CHAT] Received message from {client_id}: {data_type}, {chat_type}')
+                self.handle_text(client_id, data)
             elif data_type == 'audio':
                 audio_bytes = base64.b64decode(content)
                 self.handle_audio(client_id, data['sample'], audio_bytes, room_id)
