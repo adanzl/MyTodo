@@ -11,7 +11,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     { path: "/home", component: () => import("../view/home.js").then((m) => m.default) },
     { path: "/lottery", component: () => import("../view/lottery.js").then((m) => m.default) },
     { path: "/info", component: Info },
-    { path: "/chat", component: () => import("../view/home.js").then((m) => m.default) },
+    { path: "/chat", component: () => import("../view/chat.js").then((m) => m.default) },
     { path: "/color", component: () => import("../view/home.js").then((m) => m.default) },
     { path: "/score", component: () => import("../view/score.js").then((m) => m.default) },
   ];
@@ -24,7 +24,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     setup() {
       const KEY_USER_ID = "user_id";
       const isCollapse = ref(false);
-      const isLogin = ref(false);
+      const curUser = ref({ bLogin: false, id: null, name: null, ico: null });
       const userList = ref([]);
       const user = ref({
         id: null,
@@ -42,9 +42,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         // console.log("doLogin", user.value);
         if (user.value.id) {
           const uu = _.find(userList.value, { id: user.value.id });
-          console.log("uu", uu);
+          // console.log("uu", uu);
           if (uu && (uu.pwd === null || uu.pwd === CryptoJS.MD5(user.value.password).toString())) {
-            isLogin.value = true;
+            curUser.value.bLogin = true;
+            curUser.value.id = uu.id;
+            curUser.value.name = uu.name;
+            curUser.value.ico = uu.icon;
             localStorage.setItem(KEY_USER_ID, uu.id);
           } else {
             ElMessage.error("用户名或密码错误 ");
@@ -52,20 +55,26 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       };
       const doLogout = () => {
-        isLogin.value = false;
+        curUser.value.bLogin = false;
         localStorage.removeItem(KEY_USER_ID);
       };
       onMounted(async () => {
         await refreshUserList();
         const uId = localStorage.getItem(KEY_USER_ID);
         if (uId) {
-          isLogin.value = true;
+          curUser.value.bLogin = true;
+          const u = _.find(userList.value, (item) => item.id == uId);
+          if (u) {
+            curUser.value.id = u.id;
+            curUser.value.name = u.name;
+            curUser.value.ico = u.icon;
+          }
         }
       });
 
       return {
         isCollapse,
-        isLogin,
+        curUser,
         userList,
         loading,
         user,

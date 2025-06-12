@@ -76,6 +76,7 @@ def translate_text(text):
 class ChatMgr:
 
     def __init__(self):
+        log.info("[CHAT] ChatMgr init")
         self.clients: dict[str, ClientContext] = {}  # sid -> ClientContext
         self.register_events()
 

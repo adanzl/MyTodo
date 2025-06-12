@@ -175,13 +175,15 @@ def get_rds_list():
 
         # 获取指定范围的数据
         data = rds_mgr.lrange(key, start, end)
+        # 计算总页数
+        total_page = (total + page_size - 1) // page_size
 
         return {
             "code": 0,
             "msg": "ok",
             "data": {
-                "totalCount": 0,
-                'totalPage': 0,
+                "totalCount": total,
+                'totalPage': total_page,
                 "pageNum": page_num,
                 "pageSize": page_size,
                 "data": data

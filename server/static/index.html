@@ -25,11 +25,8 @@
         <el-aside width="200px" class="w-48">
           <el-scrollbar>
             <div class="flex justify-between items-center p-5">
-              <el-radio-group v-model="isCollapse" class="w-full flex">
-                <el-radio-button :value="false">-</el-radio-button>
-                <el-radio-button :value="true">+</el-radio-button>
-              </el-radio-group>
-              <el-button v-if="isLogin" @click="doLogout" size="small">注销</el-button>
+              <el-avatar :src="curUser.ico" ></el-avatar>
+              <el-button v-if="curUser.bLogin" @click="doLogout" size="small">注销</el-button>
             </div>
             <el-menu :default-active="$route.path" :collapse="isCollapse" unique-opened router>
               <el-menu-item index="/home" @click="handleMenuSelect">
@@ -59,7 +56,7 @@
             </el-menu>
           </el-scrollbar>
         </el-aside>
-        <el-container v-if="isLogin">
+        <el-container v-if="curUser.bLogin">
           <el-header class="flex justify-center items-center bg-blue-100">Header</el-header>
           <el-main>
             <router-view></router-view>

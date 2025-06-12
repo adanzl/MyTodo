@@ -1,3 +1,6 @@
+import eventlet
+
+eventlet.monkey_patch()  # 添加这行，在导入其他模块之前
 import core.ai.ai_mgr as ai_mgr
 import core.db.db_mgr as db_mgr
 from app import app, socketio
@@ -35,16 +38,22 @@ if __name__ == '__main__':
                 '/api': app,
                 '/web': static_app,  # 静态文件挂载到 /web
             })
-        js_files = [os.path.join('static', f) for f in os.listdir('static') if f.endswith('.js') or f.endswith('.html')]
-        run_simple(
-            '0.0.0.0',  # 修改为 0.0.0.0 允许外部访问
-            8000,
+        # js_files = [os.path.join('static', f) for f in os.listdir('static') if f.endswith('.js') or f.endswith('.html')]
+        # run_simple(
+        #     '0.0.0.0',  # 修改为 0.0.0.0 允许外部访问
+        #     8000,
+        #     application,
+        #     use_reloader=True,
+        #     use_debugger=True,
+        #     threaded=False,  # 禁用多线程
+        #     processes=1,  # 禁用多进程
+        #     reloader_type='stat',
+            # extra_files=js_files)
+        from eventlet import wsgi
+        wsgi.server(
+            eventlet.listen(('0.0.0.0', 8000)),
             application,
-            use_reloader=True,
-            use_debugger=True,
-            threaded=False,  # 禁用多线程
-            processes=1,  # 禁用多进程
-            reloader_type='stat',
-            extra_files=js_files)
+            debug=True
+        )
     except Exception as e:
         log.error(e)
