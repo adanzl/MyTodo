@@ -230,9 +230,9 @@ const aiChatContent = ref<any>(null);
 const chatMessages = ref<MSG[]>([]);
 const chatContent = ref<any>(null);
 
-const url = getApiUrl().replace("api", "");
-// const url = "http://localhost:8000/api"; // 使用 /api 前缀
-console.log(getApiUrl());
+const wsUrl = getApiUrl().replace("api", "");
+// const wsUrl = "http://localhost:8000"; // 使用 /api 前缀
+// console.log(getApiUrl());
 const recBtn = ref<any>();
 const socketRef = ref<Socket>();
 
@@ -270,6 +270,8 @@ onMounted(async () => {
       const v = JSON.parse(setting);
       chatSetting.value.ttsSpeed = v.ttsSpeed;
       chatSetting.value.ttsRole = v.ttsRole;
+      chatSetting.value.aiConversationId = v.aiConversationId;
+      chatSetting.value.chatRoomId = v.chatRoomId;
     }
   });
   initSocketIO();
@@ -336,9 +338,9 @@ onIonViewDidEnter(async () => {
   refreshUserList();
 });
 function initSocketIO() {
-  socketRef.value = io(url, {
+  socketRef.value = io(wsUrl, {
     transports: ["websocket"], // 强制使用 WebSocket 传输
-    path: "socket.io/", // 使用完整的路径
+    // path: "/api/socket.io/" 
   });
   // 发送握手请求
   socketRef.value.on("connect", () => {
@@ -353,7 +355,7 @@ function initSocketIO() {
       user: globalVar.user.name,
     };
 
-    // console.log("Connected to the server. Sending handshake...", msg);
+    // console.log("Connected to the server. Sending handshake...", chatConfig);
     socketRef.value!.emit("handshake", chatConfig);
   });
   socketRef.value.on("message", (data) => {
@@ -444,7 +446,9 @@ function initSocketIO() {
     ttsData.value.audioEnd = true;
     console.log("==> end_audio", data.content);
   });
-  socketRef.value.on("handshakeResponse", (data) => console.log("handshake:", data));
+  socketRef.value.on("handshakeResponse", () => {
+    // console.log("handshake:", data)
+  });
   socketRef.value.on("disconnect", () => console.log("Disconnected from the server."));
   socketRef.value.on("error", (error) => console.error("msg error:", error));
   socketRef.value.on("close", () => console.log("WebSocket connection closed."));
@@ -473,7 +477,7 @@ const sendTextMessage = () => {
       roomId: chatSetting.value.chatRoomId,
       userId: globalVar.user.id,
     });
-    EventBus.$emit(C_EVENT.TOAST, inputText.value);
+    // EventBus.$emit(C_EVENT.TOAST, inputText.value);
     inputText.value = "";
     isWaitingServer.value = true;
     // if (TTS_AUTO) {
@@ -729,6 +733,7 @@ function onChatSettingDismiss(e: any) {
 }
 function handleRefresh(e: RefresherCustomEvent) {
   if (chatType.value === CHAT_ROOM) {
+    console.log("==> handleRefresh", chatSetting.value);
     getChatMessages(chatSetting.value.chatRoomId, 1, 3)
       .then((data: any) => {
         console.log("==> handleRefresh", data);

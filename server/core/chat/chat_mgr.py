@@ -98,7 +98,7 @@ class ChatMgr:
             room_id = data.get('roomId', '')
             user_id = data.get('userId', '')
             rds_mgr.lpush(
-                room_id,
+                "chat:" + room_id,
                 json.dumps({
                     'user_id': user_id,
                     'content': content,
