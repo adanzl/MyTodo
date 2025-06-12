@@ -9,7 +9,7 @@ CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})
 # 创建 SocketIO 实例并与 Flask 应用关联
 socketio = SocketIO(
     app,
-    async_mode='eventlet',
+    async_mode='gevent',
     cors_allowed_origins="*",
     logger=True,  # 启用日志
     engineio_logger=True,  # 启用 Engine.IO 日志
