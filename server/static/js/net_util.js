@@ -136,4 +136,31 @@ export async function addScore(user, action, value, msg) {
 
   return rsp.data.data;
 }
+
+/**
+ * 获取rds列表数据
+ */
+export async function getRdsList(key, pageNum, pageSize) {
+  const rsp = await axios.get(API_URL + "/getRdsList", {
+    params: { key: key, pageSize: pageSize, pageNum: pageNum },
+  });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
+
+/**
+ * 获取rds数据
+ */
+export async function getRdsData(table, id) {
+  const rsp = await axios.get(API_URL + "/getRdsData", {
+    params: { table: table, id: id },
+  });
+  // console.log("getPic", rsp.data);
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
 export default {};

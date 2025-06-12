@@ -41,9 +41,9 @@
           </ion-refresher>
           <div class="flex flex-col h-full p-2 border-t-2">
             <div v-for="(msg, idx) in chatMessages" :key="idx" class="p-1.5 w-full">
-              <div v-if="msg.role == 'me'" class="flex">
+              <div v-if="msg.role === globalVar.user.id" class="flex">
                 <div
-                  class="w-[70%] bg-green-500 text-white p-2 ml-auto rounded-lg shadow-md relative">
+                  class="max-w-[70%] min-w-[40px] bg-green-500 text-white p-2 ml-auto rounded-lg shadow-md relative">
                   {{ msg.content }}
                 </div>
                 <ion-avatar slot="start" class="w-12 h-12 ml-1">
@@ -224,6 +224,8 @@ class MSG {
   role: string = "";
   audioSrc?: string = "";
   playing? = false;
+  ts?: string;
+  type?: string = "text";
 }
 const aiChatMessages = ref<MSG[]>([]);
 const aiChatContent = ref<any>(null);
@@ -308,8 +310,8 @@ const updateChatSetting = async () => {
     }
   });
 };
-function refreshUserList() {
-  getUserList()
+async function refreshUserList() {
+  await getUserList()
     .then((uList) => {
       userList.value = [...uList.data];
     })
@@ -335,12 +337,25 @@ onBeforeUnmount(() => {
 });
 onIonViewDidEnter(async () => {
   await updateChatSetting();
-  refreshUserList();
+  await refreshUserList();
+  getChatMessages(chatSetting.value.chatRoomId, 1, 3).then((data: any) => {
+    // console.log("==> handleRefresh", data);
+    data.data.forEach((item: any) => {
+      const d = JSON.parse(item);
+      chatMessages.value.unshift({
+        id: "_",
+        content: d.content,
+        role: d.user_id,
+        ts: d.ts,
+        type: d.type,
+      });
+    });
+  });
 });
 function initSocketIO() {
   socketRef.value = io(wsUrl, {
     transports: ["websocket"], // 强制使用 WebSocket 传输
-    // path: "/api/socket.io/" 
+    // path: "/api/socket.io/"
   });
   // 发送握手请求
   socketRef.value.on("connect", () => {
@@ -466,7 +481,7 @@ const sendTextMessage = () => {
       aiChatMessages.value.push({ id: "", content: inputText.value, role: "me" });
       aiChatContent.value.$el.scrollToBottom(200);
     } else if (chatType.value === CHAT_ROOM) {
-      chatMessages.value.push({ id: "", content: inputText.value, role: "me" });
+      chatMessages.value.push({ id: "", content: inputText.value, role: globalVar.user.id });
       chatContent.value.$el.scrollToBottom(200);
     }
 
@@ -733,10 +748,20 @@ function onChatSettingDismiss(e: any) {
 }
 function handleRefresh(e: RefresherCustomEvent) {
   if (chatType.value === CHAT_ROOM) {
-    console.log("==> handleRefresh", chatSetting.value);
+    // console.log("==> handleRefresh", chatSetting.value);
     getChatMessages(chatSetting.value.chatRoomId, 1, 3)
       .then((data: any) => {
-        console.log("==> handleRefresh", data);
+        // console.log("==> handleRefresh", data);
+        data.data.forEach((item: any) => {
+          const d = JSON.parse(item);
+          console.log(d);
+          chatMessages.value.unshift({
+            id: item.id,
+            content: item.content,
+            role: item.user_id,
+            type: item.type,
+          });
+        });
       })
       .finally(() => {
         e.target.complete();

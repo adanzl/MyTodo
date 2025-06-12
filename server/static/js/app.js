@@ -48,6 +48,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             curUser.value.id = uu.id;
             curUser.value.name = uu.name;
             curUser.value.ico = uu.icon;
+            window.curUser = curUser.value;
             localStorage.setItem(KEY_USER_ID, uu.id);
           } else {
             ElMessage.error("用户名或密码错误 ");
@@ -68,6 +69,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             curUser.value.id = u.id;
             curUser.value.name = u.name;
             curUser.value.ico = u.icon;
+            window.curUser = curUser.value;
           }
         }
       });

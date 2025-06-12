@@ -1,35 +1,40 @@
 <div class="max-w-250 h-full bg-blue-100 flex flex-col">
   <div class="flex-1">
-    <h1 class="text-center">Welcome to the Admin Panel</h1>
+    <h1 class="text-center">Welcome to the Admin Panel {{chatMessages.length}}</h1>
     <div class="flex flex-col h-full p-2 border-t-2">
-        <div v-for="(msg, idx) in chatMessages" :key="idx" class="p-1.5 w-full">
-          <div v-if="msg.role == 'me'" class="flex">
-            <div
-              class="w-[70%] bg-green-500 text-white p-2 ml-auto rounded-lg shadow-md relative">
-              {{ msg.content }}
-            </div>
-            <ion-avatar slot="start" class="w-12 h-12 ml-1">
-              <ion-img :src="getUserInfo(msg.role).icon" />
-            </ion-avatar>
-            <div
-              v-if="!msg.audioSrc"
-              class="absolute -right-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center text-black"
-              @click="btnAudioClk(msg)">
-              <MdiStopCircleOutline width="24" height="24" v-if="msg.playing" />
-              <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
-            </div>
+      <div v-for="(msg, idx) in chatMessages" :key="idx" class="p-1.5 w-full message-item">
+        <!-- 我的消息 -->
+        <div v-if="msg.role == window.curUser.id" class="flex">
+          <div
+            class="max-w-[70%] min-w-[40px] bg-green-500 text-white p-2 ml-auto rounded-lg shadow-md relative">
+            {{ msg.content }}
           </div>
-          <div v-else class="w-[80%] bg-pink-200 rounded-lg p-2 shadow-md mr-auto relative">
-            {{ msg.content ?? "..." }}
-            <div
+          <el-avatar :src="getUserInfo(msg.role).icon" class="w-12 h-12 ml-1">
+          </el-avatar>
+          <div
+            v-if="!msg.audioSrc"
+            class="absolute -right-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center text-black"
+            @click="btnAudioClk(msg)">
+            <MdiStopCircleOutline width="24" height="24" v-if="msg.playing" />
+            <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
+          </div>
+        </div>
+        <!-- 对方消息 -->
+        <div v-else class="flex">
+          <el-avatar :src="getUserInfo(msg.role).icon" class="w-12 h-12 ml-1"> </el-avatar>
+          <div
+            class="max-w-[70%] min-w-[40px] bg-pink-200 rounded-lg ml-2 p-2 shadow-md mr-auto relative">
+            {{ msg.content}}
+            <!-- <div
               class="absolute -left-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center"
               @click="btnAudioClk(msg)">
               <MdiStopCircleOutline width="24" height="24" v-if="msg.playing" />
               <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
-            </div>
+            </div> -->
           </div>
         </div>
       </div>
+    </div>
   </div>
   <div class="flex items-center">
     <el-input

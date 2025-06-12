@@ -11,8 +11,6 @@ socketio = SocketIO(
     app,
     async_mode='gevent',
     cors_allowed_origins="*",
-    logger=True,  # 启用日志
-    engineio_logger=True,  # 启用 Engine.IO 日志
     ping_timeout=60,  # 增加超时时间
     ping_interval=25,  # 增加心跳间隔
 )
