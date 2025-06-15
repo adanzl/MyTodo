@@ -97,14 +97,20 @@ class ChatMgr:
         if chat_type == 'chat_room':
             room_id = data.get('roomId', '')
             user_id = data.get('userId', '')
+            msg_data = {
+                'user_id': user_id,
+                'content': content,
+                'type': 'text',
+                'ts': time.strftime('%Y-%m-%d %H:%M:%S'),
+                'chat_type': chat_type,
+            }
             rds_mgr.lpush(
                 "chat:" + room_id,
-                json.dumps({
-                    'user_id': user_id,
-                    'content': content,
-                    'type': 'text',
-                    'ts': time.strftime('%Y-%m-%d %H:%M:%S'),
-                }))
+                json.dumps(msg_data, ensure_ascii=False))
+            for client in self.clients.values():
+                if client.sid != sid:
+                    socketio.emit('msgChat', msg_data, room=self.sid)
+
         else:
             client: ClientContext = self.clients.get(sid)
             client.ai.stream_msg(content)

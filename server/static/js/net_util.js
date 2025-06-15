@@ -2,7 +2,9 @@ import { UData } from "./user_data.js";
 const axios = window.axios;
 const REMOTE = { url: "https://leo-zhao.natapp4.cc/api", available: true };
 const API_URL = REMOTE.url;
-
+export function getApiUrl() {
+  return API_URL;
+}
 export async function getSave(id) {
   if (id === undefined) {
     throw new Error("id is undefined");

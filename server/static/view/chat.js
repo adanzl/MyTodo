@@ -1,7 +1,8 @@
-import { getList, setData, getRdsData, getRdsList } from "../js/net_util.js";
+import { getList, setData, getRdsData, getRdsList, getApiUrl } from "../js/net_util.js";
 
 const { ref, onMounted } = window.Vue;
 const _ = window._;
+const { ElMessage } = window.ElementPlus;
 let component = null;
 async function loadTemplate() {
   const response = await fetch("./view/chat-template.html");
@@ -25,6 +26,45 @@ async function createComponent() {
           chatRoomId: "v_chat_room_001",
         }),
       };
+      const wsUrl = getApiUrl().replace("api", "");
+      const socket = window.io(wsUrl, {
+        transports: ["websocket"],
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+      });
+      socket.on("connect", () => {
+        const chatConfig = {
+          key: "123456",
+          ttsAuto: false,
+          chatRoomId: refData.chatSetting.chatRoomId,
+          user: window.curUser.name,
+        };
+        // console.log("Connected to the server. Sending handshake...", chatConfig);
+        socket.emit("handshake", chatConfig);
+      });
+      socket.on("handshakeResponse", (data) => {
+        console.log("handshakeResponse:", data);
+      });
+      socket.on("disconnect", () => console.log("Disconnected from the server."));
+      socket.on("error", (error) => console.error("msg error:", error));
+      socket.on("close", () => console.log("WebSocket connection closed."));
+      socket.on("msgChat", (data) => {
+        if (data.chat_type === "chat_room") {
+          refData.chatMessages.value.unshift({
+            id: "_",
+            content: data.content,
+            role: data.user_id,
+            ts: data.ts,
+            type: data.type,
+          });
+        } else {
+          ElMessage.error(JSON.stringify(data));
+        }
+        // aiChatContent.value.$el.scrollToBottom(200);
+      });
+
       const refreshUserList = async () => {
         refData.loading.value = true;
         const data = await getList("t_user");
@@ -74,9 +114,15 @@ async function createComponent() {
           if (!refData.textInput.value) {
             return;
           }
-          console.log("onSendBtnClick", refData.textInput.value);
+          const message = JSON.stringify({
+            type: "text",
+            content: refData.textInput.value,
+            chatType: "chat_room",
+            roomId: refData.chatSetting.value.chatRoomId,
+            userId: window.curUser.id,
+          });
+          socket.emit("message", message);
           refData.textInput.value = "";
-          
         },
       };
       onMounted(async () => {
