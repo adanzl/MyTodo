@@ -104,11 +104,12 @@ class ChatMgr:
                 'ts': time.strftime('%Y-%m-%d %H:%M:%S'),
                 'chat_type': chat_type,
             }
-            rds_mgr.lpush(
+            rds_mgr.rpush(
                 "chat:" + room_id,
                 json.dumps(msg_data, ensure_ascii=False))
             for client in self.clients.values():
                 if client.sid != sid:
+                    log.info(f"[CHAT] Emitting [msgChat] to client {client.sid} msg {content}")
                     socketio.emit('msgChat', msg_data, room=self.sid)
 
         else:

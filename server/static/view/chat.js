@@ -81,11 +81,10 @@ async function createComponent() {
       };
       const refreshChatList = async () => {
         refData.loading.value = true;
-        const data = await getRdsList("chat:" + refData.chatSetting.value.chatRoomId, 1, 20);
-        console.log("getUserList", data.data);
-        Object.assign(refData.userList.value, data.data); // 浅合并
+        const data = await getRdsList("chat:" + refData.chatSetting.value.chatRoomId, 0, 20);
         _.forEach(data.data, (item) => {
           const d = JSON.parse(item);
+          console.log("d", d);
           refData.chatMessages.value.unshift({
             id: "_",
             content: d.content,
@@ -108,6 +107,8 @@ async function createComponent() {
           });
         },
         getUserInfo: (userId) => {
+          // console.log("getUserInfo", userId);
+          // console.log(refData.userList.value);
           return refData.userList.value.find((u) => u.id === userId);
         },
         onSendBtnClick: () => {

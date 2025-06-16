@@ -248,15 +248,11 @@ def add_rds_list():
 
         key = args.get('key')
         value = args.get('value')
-        position = args.get('position', 'right')  # 默认为右侧（尾部）插入
 
         if not key or not value:
             return {"code": -1, "msg": "key and value are required"}
 
-        if position == 'left':
-            rds_mgr.lpush(key, value)
-        else:
-            rds_mgr.rpush(key, value)
+        rds_mgr.rpush(key, value)
 
         return {"code": 0, "msg": "ok", "data": value}
     except Exception as e:
