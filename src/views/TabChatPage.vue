@@ -240,9 +240,9 @@ const aiChatContent = ref<any>(null);
 const chatMessages = ref<MSG[]>([]);
 const chatContent = ref<any>(null);
 
-const wsUrl = getApiUrl().replace("api", "");
-// const wsUrl = "http://localhost:8000"; // 使用 /api 前缀
-// console.log(getApiUrl());
+// const wsUrl = getApiUrl().replace("api", "");
+const wsUrl = "localhost:8000"; // 使用 /api 前缀
+console.log(getApiUrl());
 const recBtn = ref<any>();
 const socketRef = ref<Socket>();
 
@@ -347,7 +347,7 @@ onBeforeUnmount(() => {
 onIonViewDidEnter(async () => {
   await updateChatSetting();
   await refreshUserList();
-  getChatMessages(chatSetting.value.chatRoomId, -1, 1).then((data: any) => {
+  getChatMessages(chatSetting.value.chatRoomId, -1, 3).then((data: any) => {
     // console.log("==> handleRefresh", data);
     data.data.reverse().forEach((item: any) => {
       const d = JSON.parse(item);
@@ -365,7 +365,12 @@ onIonViewDidEnter(async () => {
 function initSocketIO() {
   socketRef.value = io(wsUrl, {
     transports: ["websocket"], // 强制使用 WebSocket 传输
-    // path: "/api/socket.io/"
+    path: "/api/socket.io/",
+    reconnection: true,
+    reconnectionAttempts: 5,      // 最大重连次数
+    reconnectionDelay: 1000,      // 重连延迟时间
+    secure: true,
+    rejectUnauthorized: false
   });
   // 发送握手请求
   socketRef.value.on("connect", () => {

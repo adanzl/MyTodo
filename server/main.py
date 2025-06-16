@@ -38,20 +38,17 @@ if __name__ == '__main__':
                 '/api': app,
                 '/web': static_app,  # 静态文件挂载到 /web
             })
-        # js_files = [os.path.join('static', f) for f in os.listdir('static') if f.endswith('.js') or f.endswith('.html')]
-        # run_simple(
-        #     '0.0.0.0',  # 修改为 0.0.0.0 允许外部访问
-        #     8000,
-        #     application,
-        #     use_reloader=True,
-        #     use_debugger=True,
-        #     threaded=False,  # 禁用多线程
-        #     processes=1,  # 禁用多进程
-        #     reloader_type='stat',
-        # extra_files=js_files)
         # 使用 gevent 的 WSGI 服务器
         from gevent.pywsgi import WSGIServer
-        http_server = WSGIServer(('0.0.0.0', 8000), application)
+        from geventwebsocket.handler import WebSocketHandler  # 添加这行
+        # SSL 证书路径
+        certfile = os.path.join(base_dir, 'cer', 'cert.pem')
+        keyfile = os.path.join(base_dir, 'cer', 'key.pem')
+        http_server = WSGIServer(
+            ('127.0.0.1', 8000),
+            application,
+            handler_class=WebSocketHandler,
+        )
         print('Server started on http://0.0.0.0:8000')
         http_server.serve_forever()
     except Exception as e:

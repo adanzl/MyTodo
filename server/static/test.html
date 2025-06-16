@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="shortcut icon" href="favicon.ico" />
+    <title>TTT</title>
+    <!-- <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script> -->
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/socket.io-client@4.8.1/dist/socket.io.min.js"
+      integrity="sha384-mkQ3/7FUtcGyoppY6bz/PORYoGqOl7/aSUMn2ymDOJcapfS6PHqxhRTMh1RR0Q6+"
+      crossorigin="anonymous"></script>
+  </head>
+  <body></body>
+</html>
+<script>
+  const wsUrl = "http://localhost:8000";
+
+  // 使用 let 声明变量，避免全局变量
+  let socketRef = null;
+
+  // 初始化 Socket.IO 连接
+  function initSocket() {
+    if (socketRef) {
+      socketRef.disconnect();
+    }
+
+    socketRef = window.io(wsUrl, {
+      transports: ["websocket"],
+      path: "/api/socket.io/",
+      timeout: 20000,
+      autoConnect: false,
+      forceNew: true,
+      upgrade: false,
+      rememberUpgrade: true
+    });
+
+    // 使用 on 而不是 once，避免重复连接
+    socketRef.on("connect", () => {
+      const chatConfig = {
+        key: "123456",
+        ttsAuto: false,
+        chatRoomId: "123",
+        user: "User",
+      };
+      console.log("Connected to the server. Sending handshake...", chatConfig);
+    });
+
+    socketRef.on("connect_error", (error) => {
+      console.error("Connection error:", error);
+    });
+
+    socketRef.on("disconnect", () => {
+      console.log("Disconnected from server");
+    });
+
+    // 手动连接
+    socketRef.connect();
+  }
+
+  // 页面加载完成后初始化
+  window.addEventListener('load', initSocket);
+
+  // 页面卸载前断开连接
+  window.addEventListener('beforeunload', () => {
+    if (socketRef) {
+      socketRef.disconnect();
+    }
+  });
+</script>

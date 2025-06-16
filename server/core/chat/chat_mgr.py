@@ -104,13 +104,13 @@ class ChatMgr:
                 'ts': time.strftime('%Y-%m-%d %H:%M:%S'),
                 'chat_type': chat_type,
             }
-            rds_mgr.rpush(
-                "chat:" + room_id,
-                json.dumps(msg_data, ensure_ascii=False))
-            for client in self.clients.values():
-                if client.sid != sid:
-                    log.info(f"[CHAT] Emitting [msgChat] to client {client.sid} msg {content}")
-                    socketio.emit('msgChat', msg_data, room=self.sid)
+            # rds_mgr.rpush("chat:" + room_id, json.dumps(msg_data, ensure_ascii=False))
+            # for client in self.clients.values():
+            #     if client.sid != sid:
+            #         log.info(f"[CHAT] Emitting [msgChat] to client {client.sid} msg {content}")
+            #         socketio.emit('msgChat', msg_data, room=client.sid)
+            log.info(f"[CHAT] Emitting [msgChat] to room {room_id} msg {content}")
+            socketio.emit('endChat', {}, room=sid)
 
         else:
             client: ClientContext = self.clients.get(sid)
@@ -143,10 +143,10 @@ class ChatMgr:
             ctx.autoTTS = data.get('ttsAuto', False)
             ctx.tts.vol = data.get('ttsVol', 50)
             ctx.tts.speed = data.get('ttsSpeed', 1.0)
-            log.info(f'[Chat] Client {request.sid} connected. Total clients: {len(self.clients)}, {json.dumps(data)}')
+            log.info(f'[CHAT] Client {request.sid} connected. Total clients: {len(self.clients)}, {json.dumps(data)}')
 
             socketio.emit('handshakeResponse', {'message': 'Handshake successful'}, room=request.sid)
-            return {'status': 'connected'}
+            return {'message': 'Handshake successful', 'status': 'ok'}
 
         # 处理客户端断开连接事件
         @socketio.on('disconnect')
@@ -168,6 +168,7 @@ class ChatMgr:
             if client_id not in self.clients:
                 return
             ctx = self.clients[client_id]
+            log.info(f'[CHAT] Received message from {client_id}: {data_type}, {chat_type}')
             if data_type == 'text':
                 log.info(f'[CHAT] Received message from {client_id}: {data_type}, {chat_type}')
                 self.handle_text(client_id, data)

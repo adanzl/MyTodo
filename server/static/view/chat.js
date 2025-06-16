@@ -26,44 +26,63 @@ async function createComponent() {
           chatRoomId: "v_chat_room_001",
         }),
       };
-      const wsUrl = getApiUrl().replace("api", "");
-      const socket = window.io(wsUrl, {
-        transports: ["websocket"],
-        reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-      });
-      socket.on("connect", () => {
-        const chatConfig = {
-          key: "123456",
-          ttsAuto: false,
-          chatRoomId: refData.chatSetting.chatRoomId,
-          user: window.curUser.name,
-        };
-        // console.log("Connected to the server. Sending handshake...", chatConfig);
-        socket.emit("handshake", chatConfig);
-      });
-      socket.on("handshakeResponse", (data) => {
-        console.log("handshakeResponse:", data);
-      });
-      socket.on("disconnect", () => console.log("Disconnected from the server."));
-      socket.on("error", (error) => console.error("msg error:", error));
-      socket.on("close", () => console.log("WebSocket connection closed."));
-      socket.on("msgChat", (data) => {
-        if (data.chat_type === "chat_room") {
-          refData.chatMessages.value.unshift({
-            id: "_",
-            content: data.content,
-            role: data.user_id,
-            ts: data.ts,
-            type: data.type,
-          });
-        } else {
-          ElMessage.error(JSON.stringify(data));
+      // const wsUrl = getApiUrl().replace("api", "");
+      const wsUrl = "http://localhost:8000"; // 使用 /api 前缀
+      console.log(getApiUrl());
+      const socketRef = ref();
+      function initSocket() {
+        if (socketRef.value) {
+          socketRef.value.disconnect();
         }
-        // aiChatContent.value.$el.scrollToBottom(200);
-      });
+
+        socketRef.value = window.io(wsUrl, {
+          transports: ["websocket"],
+          path: "/api/socket.io/",
+          timeout: 20000,
+          autoConnect: false,
+          forceNew: true,
+        });
+
+        socketRef.value.on("connect", () => {
+          const chatConfig = {
+            key: "123456",
+            ttsAuto: false,
+            chatRoomId: refData.chatSetting.value.chatRoomId,
+            user: window.curUser.name,
+          };
+          console.log("Connected to the server. Sending handshake...", chatConfig);
+          // socketRef.value.emit("handshake", chatConfig);
+        });
+
+        socketRef.value.on("handshakeResponse", (data) => {
+          console.log("handshakeResponse:", data);
+        });
+
+        socketRef.value.on("connect_error", (error) => {
+          console.error("Connection error:", error);
+        });
+
+        socketRef.value.on("disconnect", () => console.log("Disconnected from the server."));
+        socketRef.value.on("error", (error) => console.error("msg error:", error));
+        socketRef.value.on("close", () => console.log("WebSocket connection closed."));
+        socketRef.value.on("msgChat", (data) => {
+          if (data.chat_type === "chat_room") {
+            refData.chatMessages.value.unshift({
+              id: "_",
+              content: data.content,
+              role: data.user_id,
+              ts: data.ts,
+              type: data.type,
+            });
+          } else {
+            ElMessage.error(JSON.stringify(data));
+          }
+          // aiChatContent.value.$el.scrollToBottom(200);
+        });
+
+        // 手动连接
+        socketRef.value.connect();
+      }
 
       const refreshUserList = async () => {
         refData.loading.value = true;
@@ -81,10 +100,10 @@ async function createComponent() {
       };
       const refreshChatList = async () => {
         refData.loading.value = true;
-        const data = await getRdsList("chat:" + refData.chatSetting.value.chatRoomId, 0, 20);
-        _.forEach(data.data, (item) => {
+        const data = await getRdsList("chat:" + refData.chatSetting.value.chatRoomId, -1, 20);
+        _.forEachRight(data.data, (item) => {
           const d = JSON.parse(item);
-          console.log("d", d);
+          // console.log("d", d);
           refData.chatMessages.value.unshift({
             id: "_",
             content: d.content,
@@ -111,18 +130,32 @@ async function createComponent() {
           // console.log(refData.userList.value);
           return refData.userList.value.find((u) => u.id === userId);
         },
-        onSendBtnClick: () => {
+        onSendBtnClick: (event) => {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
           if (!refData.textInput.value) {
             return;
           }
-          const message = JSON.stringify({
-            type: "text",
-            content: refData.textInput.value,
-            chatType: "chat_room",
-            roomId: refData.chatSetting.value.chatRoomId,
-            userId: window.curUser.id,
+          // const message = JSON.stringify({
+          //   type: "text",
+          //   content: refData.textInput.value,
+          //   chatType: "chat_room",
+          //   roomId: refData.chatSetting.value.chatRoomId,
+          //   userId: window.curUser.id,
+          // });
+          // socketRef.value.emit("message", message);
+          // console.log("send message:", message);
+          const chatConfig = {
+            key: "123456",
+            ttsAuto: false,
+            chatRoomId: refData.chatSetting.value.chatRoomId,
+            user: window.curUser.name,
+          };
+          socketRef.value.emit("handshake", chatConfig, (response) => {
+            console.log(response);
           });
-          socket.emit("message", message);
           refData.textInput.value = "";
         },
       };
@@ -130,6 +163,7 @@ async function createComponent() {
         await refreshUserList();
         await getChatSetting();
         refreshChatList();
+        initSocket();
         // console.log("Home组件已挂载");
       });
       return {
