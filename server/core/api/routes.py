@@ -170,7 +170,7 @@ def get_rds_list():
             }
 
         # 获取指定范围的数据
-        start = max(0, start_id - page_size)  # 确保起始索引不小于0
+        start = max(0, total + start_id - page_size + 1)  # 确保起始索引不小于0
         data = rds_mgr.lrange(key, start, start_id)
         # 计算总页数
         total_page = (total + page_size - 1) // page_size

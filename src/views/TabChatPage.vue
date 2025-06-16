@@ -347,7 +347,7 @@ onBeforeUnmount(() => {
 onIonViewDidEnter(async () => {
   await updateChatSetting();
   await refreshUserList();
-  getChatMessages(chatSetting.value.chatRoomId, -1, 3).then((data: any) => {
+  getChatMessages(chatSetting.value.chatRoomId, -1, 1).then((data: any) => {
     // console.log("==> handleRefresh", data);
     data.data.reverse().forEach((item: any) => {
       const d = JSON.parse(item);
