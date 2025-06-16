@@ -151,8 +151,8 @@ def get_rds_list():
     try:
         key = request.args.get('key')
         page_size = request.args.get('pageSize', 20, type=int)
-        page_num = request.args.get('pageNum', 1, type=int)
-        log.info(f"===== [Get Rds List] {key}, pageSize={page_size}, pageNum={page_num}")
+        start_id = request.args.get('startId', 0, type=int)
+        log.info(f"===== [Get Rds List] {key}, pageSize={page_size}, pageNum={start_id}")
 
         # 获取列表总长度
         total = rds_mgr.llen(key)
@@ -163,18 +163,14 @@ def get_rds_list():
                 "data": {
                     "totalCount": 0,
                     'totalPage': 0,
-                    "pageNum": page_num,
+                    "startId": start_id,
                     "pageSize": page_size,
                     "data": []
                 }
             }
 
-        # 计算分页的起始和结束索引
-        start = (page_num - 1) * page_size
-        end = start + page_size - 1
-
         # 获取指定范围的数据
-        data = rds_mgr.lrange(key, start, end)
+        data = rds_mgr.lrange(key, start_id, start_id + page_size - 1)
         # 计算总页数
         total_page = (total + page_size - 1) // page_size
 
@@ -184,7 +180,7 @@ def get_rds_list():
             "data": {
                 "totalCount": total,
                 'totalPage': total_page,
-                "pageNum": page_num,
+                "startId": start_id,
                 "pageSize": page_size,
                 "data": data
             }

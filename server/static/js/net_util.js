@@ -142,9 +142,9 @@ export async function addScore(user, action, value, msg) {
 /**
  * 获取rds列表数据
  */
-export async function getRdsList(key, pageNum, pageSize) {
+export async function getRdsList(key, startId, pageSize) {
   const rsp = await axios.get(API_URL + "/getRdsList", {
-    params: { key: key, pageSize: pageSize, pageNum: pageNum },
+    params: { key: key, pageSize: pageSize, startId: startId },
   });
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
