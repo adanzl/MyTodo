@@ -214,7 +214,7 @@ export async function getAiChatMessages(
   conversation_id: string,
   limit: number,
   user: string,
-  first_id?: string
+  first_id?: string| number
 ) {
   const rsp: any = await axios.get(API_URL + "/chatMessages", {
     params: { conversation_id: conversation_id, limit: limit, user: user, first_id: first_id },
@@ -224,9 +224,13 @@ export async function getAiChatMessages(
   }
   return rsp.data.data;
 }
-export async function getChatMessages(key: string, pageNum: number, pageSize: number) {
+export async function getChatMessages(
+  key: string,
+  startId: number | string | undefined,
+  pageSize: number
+) {
   const rsp: any = await axios.get(API_URL + "/getRdsList", {
-    params: { key: "chat:" + key, pageSize: pageSize, pageNum: pageNum },
+    params: { key: "chat:" + key, pageSize: pageSize, startId: startId },
   });
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);

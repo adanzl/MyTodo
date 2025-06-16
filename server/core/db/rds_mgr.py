@@ -45,8 +45,8 @@ def lrange(key, start, end):
     """
     获取列表指定范围的数据
     :param key: Redis键名
-    :param start: 起始索引
-    :param end: 结束索引
+    :param start: 起始索引 include
+    :param end: 结束索引 include
     :return: 列表数据
     """
     data = rds.lrange(key, start, end)

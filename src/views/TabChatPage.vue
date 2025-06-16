@@ -41,6 +41,7 @@
           </ion-refresher>
           <div class="flex flex-col h-full p-2 border-t-2">
             <div v-for="(msg, idx) in chatMessages" :key="idx" class="p-1.5 w-full">
+              <!-- 自己 -->
               <div v-if="msg.role === globalVar.user.id" class="flex">
                 <div
                   class="max-w-[70%] min-w-[40px] bg-green-500 text-white p-2 ml-auto rounded-lg shadow-md relative">
@@ -57,8 +58,15 @@
                   <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
                 </div>
               </div>
-              <div v-else class="w-[80%] bg-pink-200 rounded-lg p-2 shadow-md mr-auto relative">
-                {{ msg.content ?? "..." }}
+              <!-- 他人 -->
+              <div v-else class="flex">
+                <ion-avatar slot="start" class="w-12 h-12 mr-1">
+                  <ion-img :src="getUserInfo(msg.role).icon" />
+                </ion-avatar>
+                <div
+                  class="max-w-[70%] min-w-[40px] bg-pink-200 p-2 mr-auto rounded-lg shadow-md relative">
+                  {{ msg.content }}
+                </div>
                 <div
                   class="absolute -left-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center"
                   @click="btnAudioClk(msg)">
@@ -219,7 +227,7 @@ const globalVar: any = inject("globalVar");
 const inputRef = ref<HTMLElement | null>(null);
 const userList = ref<any>([]);
 class MSG {
-  id?: string;
+  id?: string | number;
   content: string = "";
   role: string = "";
   audioSrc?: string = "";
@@ -321,6 +329,7 @@ async function refreshUserList() {
 }
 
 function getUserInfo(userId: string) {
+  // console.log("==> getUserInfo", userId);
   if (userId === "me") {
     return globalVar.user;
   }
@@ -338,12 +347,13 @@ onBeforeUnmount(() => {
 onIonViewDidEnter(async () => {
   await updateChatSetting();
   await refreshUserList();
-  getChatMessages(chatSetting.value.chatRoomId, 1, 3).then((data: any) => {
+  getChatMessages(chatSetting.value.chatRoomId, -1, 3).then((data: any) => {
     // console.log("==> handleRefresh", data);
-    data.data.forEach((item: any) => {
+    data.data.reverse().forEach((item: any) => {
       const d = JSON.parse(item);
+      // console.log("==> getChatMessages", d);
       chatMessages.value.unshift({
-        id: "_",
+        id: d.id,
         content: d.content,
         role: d.user_id,
         ts: d.ts,
@@ -374,6 +384,7 @@ function initSocketIO() {
     socketRef.value!.emit("handshake", chatConfig);
   });
   socketRef.value.on("message", (data) => {
+    console.log("==> message", data);
     if (data.type === MSG_TYPE_TRANSLATION) {
       aiChatMessages.value.push({
         id: "",
@@ -404,6 +415,7 @@ function initSocketIO() {
   });
   // 处理ai chat结果
   socketRef.value.on("msgChat", async (data) => {
+    console.log("==> msgChat", data);
     if (
       aiChatMessages.value.length === 0 ||
       aiChatMessages.value[aiChatMessages.value.length - 1].role === "me"
@@ -748,18 +760,20 @@ function onChatSettingDismiss(e: any) {
 }
 function handleRefresh(e: RefresherCustomEvent) {
   if (chatType.value === CHAT_ROOM) {
+    const firstId = chatMessages.value.length + 1;
     // console.log("==> handleRefresh", chatSetting.value);
-    getChatMessages(chatSetting.value.chatRoomId, 1, 3)
+    getChatMessages(chatSetting.value.chatRoomId, -firstId, 3)
       .then((data: any) => {
         // console.log("==> handleRefresh", data);
-        data.data.forEach((item: any) => {
+        data.data.reverse().forEach((item: any) => {
           const d = JSON.parse(item);
           console.log(d);
           chatMessages.value.unshift({
-            id: item.id,
-            content: item.content,
-            role: item.user_id,
-            type: item.type,
+            id: d.id,
+            content: d.content,
+            role: d.user_id,
+            ts: d.ts,
+            type: d.type,
           });
         });
       })
