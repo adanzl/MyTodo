@@ -240,9 +240,9 @@ const aiChatContent = ref<any>(null);
 const chatMessages = ref<MSG[]>([]);
 const chatContent = ref<any>(null);
 
-// const wsUrl = getApiUrl().replace("api", "");
-const wsUrl = "localhost:8000"; // 使用 /api 前缀
-console.log(getApiUrl());
+const wsUrl = getApiUrl().replace("api", "");
+// const wsUrl = "localhost:8000"; // 使用 /api 前缀
+// console.log(getApiUrl());
 const recBtn = ref<any>();
 const socketRef = ref<Socket>();
 
@@ -365,12 +365,12 @@ onIonViewDidEnter(async () => {
 function initSocketIO() {
   socketRef.value = io(wsUrl, {
     transports: ["websocket"], // 强制使用 WebSocket 传输
-    path: "/api/socket.io/",
+    // path: "/api/socket.io/",
     reconnection: true,
-    reconnectionAttempts: 5,      // 最大重连次数
-    reconnectionDelay: 1000,      // 重连延迟时间
+    reconnectionAttempts: 5, // 最大重连次数
+    reconnectionDelay: 1000, // 重连延迟时间
     secure: true,
-    rejectUnauthorized: false
+    rejectUnauthorized: false,
   });
   // 发送握手请求
   socketRef.value.on("connect", () => {
@@ -421,23 +421,33 @@ function initSocketIO() {
   // 处理ai chat结果
   socketRef.value.on("msgChat", async (data) => {
     console.log("==> msgChat", data);
-    if (
-      aiChatMessages.value.length === 0 ||
-      aiChatMessages.value[aiChatMessages.value.length - 1].role === "me"
-    ) {
-      const msg = { id: data.id, content: data.content, role: "server", playing: TTS_AUTO };
-      aiChatMessages.value.push(msg);
-      if (TTS_AUTO) {
-        audioPlayMsg.value = msg;
-      }
+    if (data.chat_type === CHAT_ROOM) {
+      chatMessages.value.push({
+            id: data.id,
+            content: data.content,
+            role: data.user_id,
+            ts: data.ts,
+            type: data.type,
+          });
     } else {
-      aiChatMessages.value[aiChatMessages.value.length - 1].content += data.content;
+      if (
+        aiChatMessages.value.length === 0 ||
+        aiChatMessages.value[aiChatMessages.value.length - 1].role === "me"
+      ) {
+        const msg = { id: data.id, content: data.content, role: "server", playing: TTS_AUTO };
+        aiChatMessages.value.push(msg);
+        if (TTS_AUTO) {
+          audioPlayMsg.value = msg;
+        }
+      } else {
+        aiChatMessages.value[aiChatMessages.value.length - 1].content += data.content;
+      }
+      if (data.aiConversationId != chatSetting.value.aiConversationId) {
+        chatSetting.value.aiConversationId = data.aiConversationId;
+        setChatSetting(globalVar.user.id, JSON.stringify(chatSetting.value));
+      }
+      aiChatContent.value.$el.scrollToBottom(200);
     }
-    if (data.aiConversationId != chatSetting.value.aiConversationId) {
-      chatSetting.value.aiConversationId = data.aiConversationId;
-      setChatSetting(globalVar.user.id, JSON.stringify(chatSetting.value));
-    }
-    aiChatContent.value.$el.scrollToBottom(200);
   });
   socketRef.value.on("endChat", (data: any) => {
     console.log("==> MSG_TYPE_CHAT_END", data.content);

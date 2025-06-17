@@ -31,7 +31,7 @@ class ClientContext:
 
     def on_asr_result(self, text):
         '''
-        处理asr的返回消息，收到消息后转发给ai和客户端
+            处理asr的返回消息，收到消息后转发给ai和客户端
         '''
         if text == '':
             return
@@ -41,7 +41,7 @@ class ClientContext:
 
     def on_ai_msg(self, text, id, type=0):
         '''
-        处理AI的回复消息
+            处理AI的回复消息
         '''
         # log.info(f"[AI] ON MSG: {text}")
         if type == 0:
@@ -105,11 +105,10 @@ class ChatMgr:
                 'chat_type': chat_type,
             }
             # rds_mgr.rpush("chat:" + room_id, json.dumps(msg_data, ensure_ascii=False))
-            # for client in self.clients.values():
-            #     if client.sid != sid:
-            #         log.info(f"[CHAT] Emitting [msgChat] to client {client.sid} msg {content}")
-            #         socketio.emit('msgChat', msg_data, room=client.sid)
-            log.info(f"[CHAT] Emitting [msgChat] to room {room_id} msg {content}")
+            for client in self.clients.values():
+                if client.sid != sid:
+                    log.info(f"[CHAT] Emitting [msgChat] to client {client.sid} msg {content}")
+                    socketio.emit('msgChat', msg_data, room=client.sid)
             socketio.emit('endChat', {}, room=sid)
 
         else:
@@ -118,7 +117,7 @@ class ChatMgr:
 
     def handle_audio(self, sid, sample_rate, audio_bytes, room_id):
         '''
-        处理音频数据
+            处理音频数据
         '''
         # log.info(f"[CHAT] Handle_audio: {len(audio_bytes)} bytes")
         client: ClientContext = self.clients.get(sid)
@@ -168,9 +167,8 @@ class ChatMgr:
             if client_id not in self.clients:
                 return
             ctx = self.clients[client_id]
-            log.info(f'[CHAT] Received message from {client_id}: {data_type}, {chat_type}')
             if data_type == 'text':
-                log.info(f'[CHAT] Received message from {client_id}: {data_type}, {chat_type}')
+                log.info(f'[CHAT] Received message from {client_id}: {data_type}, {chat_type} {content}')
                 self.handle_text(client_id, data)
             elif data_type == 'audio':
                 audio_bytes = base64.b64decode(content)

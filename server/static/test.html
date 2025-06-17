@@ -5,67 +5,62 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="shortcut icon" href="favicon.ico" />
     <title>TTT</title>
-    <!-- <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script> -->
-
-    <script
-      src="https://cdn.jsdelivr.net/npm/socket.io-client@4.8.1/dist/socket.io.min.js"
-      integrity="sha384-mkQ3/7FUtcGyoppY6bz/PORYoGqOl7/aSUMn2ymDOJcapfS6PHqxhRTMh1RR0Q6+"
-      crossorigin="anonymous"></script>
   </head>
   <body></body>
 </html>
 <script>
-  const wsUrl = "http://localhost:8000";
+  const wsUrl = "ws://localhost:8000/api/socket.io/";
+  let ws = null;
 
-  // 使用 let 声明变量，避免全局变量
-  let socketRef = null;
-
-  // 初始化 Socket.IO 连接
-  function initSocket() {
-    if (socketRef) {
-      socketRef.disconnect();
+  function initWebSocket() {
+    if (ws) {
+      ws.close();
+      ws = null;
     }
 
-    socketRef = window.io(wsUrl, {
-      transports: ["websocket"],
-      path: "/api/socket.io/",
-      timeout: 20000,
-      autoConnect: false,
-      forceNew: true,
-      upgrade: false,
-      rememberUpgrade: true
-    });
+    ws = new WebSocket(wsUrl);
 
-    // 使用 on 而不是 once，避免重复连接
-    socketRef.on("connect", () => {
+    ws.onopen = () => {
+      console.log("WebSocket connected");
       const chatConfig = {
         key: "123456",
         ttsAuto: false,
         chatRoomId: "123",
         user: "User",
       };
-      console.log("Connected to the server. Sending handshake...", chatConfig);
-    });
+      ws.send(JSON.stringify({
+        type: "handshake",
+        data: chatConfig
+      }));
+    };
 
-    socketRef.on("connect_error", (error) => {
-      console.error("Connection error:", error);
-    });
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log("Received:", data);
+      } catch (e) {
+        console.log("Received raw:", event.data);
+      }
+    };
 
-    socketRef.on("disconnect", () => {
-      console.log("Disconnected from server");
-    });
+    ws.onerror = (error) => {
+      console.error("WebSocket error:", error);
+    };
 
-    // 手动连接
-    socketRef.connect();
+    ws.onclose = (event) => {
+      console.log("WebSocket closed:", event.code, event.reason);
+    };
   }
 
-  // 页面加载完成后初始化
-  window.addEventListener('load', initSocket);
+  // 延迟初始化
+  setTimeout(() => {
+    initWebSocket();
+  }, 1000);
 
-  // 页面卸载前断开连接
-  window.addEventListener('beforeunload', () => {
-    if (socketRef) {
-      socketRef.disconnect();
+  window.addEventListener("beforeunload", () => {
+    if (ws) {
+      ws.close();
+      ws = null;
     }
   });
 </script>

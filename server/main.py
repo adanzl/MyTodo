@@ -25,10 +25,10 @@ def null_application(environ, start_response):
 
 
 if __name__ == '__main__':
-    from werkzeug.serving import run_simple
+    import os
+
     from werkzeug.middleware.dispatcher import DispatcherMiddleware
     from werkzeug.middleware.shared_data import SharedDataMiddleware
-    import os
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))  # 假设代码文件在项目根目录
         static_app = SharedDataMiddleware(null_application, {'/': 'static'})
@@ -41,9 +41,8 @@ if __name__ == '__main__':
         # 使用 gevent 的 WSGI 服务器
         from gevent.pywsgi import WSGIServer
         from geventwebsocket.handler import WebSocketHandler  # 添加这行
+
         # SSL 证书路径
-        certfile = os.path.join(base_dir, 'cer', 'cert.pem')
-        keyfile = os.path.join(base_dir, 'cer', 'key.pem')
         http_server = WSGIServer(
             ('127.0.0.1', 8000),
             application,

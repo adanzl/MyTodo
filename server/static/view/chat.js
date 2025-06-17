@@ -50,8 +50,8 @@ async function createComponent() {
             chatRoomId: refData.chatSetting.value.chatRoomId,
             user: window.curUser.name,
           };
-          console.log("Connected to the server. Sending handshake...", chatConfig);
-          // socketRef.value.emit("handshake", chatConfig);
+          console.log("Connected to the server. Send handshake...", chatConfig);
+          socketRef.value.emit("handshake", chatConfig);
         });
 
         socketRef.value.on("handshakeResponse", (data) => {
@@ -65,9 +65,12 @@ async function createComponent() {
         socketRef.value.on("disconnect", () => console.log("Disconnected from the server."));
         socketRef.value.on("error", (error) => console.error("msg error:", error));
         socketRef.value.on("close", () => console.log("WebSocket connection closed."));
+        socketRef.value.on("endChat", (data) => {
+          console.log("endChat", data);
+        });
         socketRef.value.on("msgChat", (data) => {
           if (data.chat_type === "chat_room") {
-            refData.chatMessages.value.unshift({
+            refData.chatMessages.value.push({
               id: "_",
               content: data.content,
               role: data.user_id,
@@ -127,35 +130,27 @@ async function createComponent() {
         },
         getUserInfo: (userId) => {
           // console.log("getUserInfo", userId);
-          // console.log(refData.userList.value);
           return refData.userList.value.find((u) => u.id === userId);
         },
-        onSendBtnClick: (event) => {
-          if (event) {
-            event.preventDefault();
-            event.stopPropagation();
-          }
+        onSendBtnClick: () => {
           if (!refData.textInput.value) {
             return;
           }
-          // const message = JSON.stringify({
-          //   type: "text",
-          //   content: refData.textInput.value,
-          //   chatType: "chat_room",
-          //   roomId: refData.chatSetting.value.chatRoomId,
-          //   userId: window.curUser.id,
-          // });
-          // socketRef.value.emit("message", message);
-          // console.log("send message:", message);
-          const chatConfig = {
-            key: "123456",
-            ttsAuto: false,
-            chatRoomId: refData.chatSetting.value.chatRoomId,
-            user: window.curUser.name,
-          };
-          socketRef.value.emit("handshake", chatConfig, (response) => {
-            console.log(response);
+          refData.chatMessages.value.push({
+            id: "_",
+            content: refData.textInput.value,
+            role: window.curUser.id,
+            type: "text",
           });
+          const message = JSON.stringify({
+            type: "text",
+            content: refData.textInput.value,
+            chatType: "chat_room",
+            roomId: refData.chatSetting.value.chatRoomId,
+            userId: window.curUser.id,
+          });
+          socketRef.value.emit("message", message);
+          console.log("send message:", message);
           refData.textInput.value = "";
         },
       };
