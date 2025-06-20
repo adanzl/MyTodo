@@ -58,7 +58,10 @@
             </ion-radio>
           </ion-radio-group>
           <div class="flex items-center justify-center bg-slate-400 h-[calc(100%-300px)]">
-            <ion-button @click="btnLotteryClk" size="default">
+            <ion-button
+              @click="btnLotteryClk"
+              size="default"
+              :disabled="globalVar.user.score < selectedCate.cost">
               <div class="w-20 h-20 flex flex-col items-center justify-center">
                 <span>立即抽奖</span>
                 <div class="flex items-center justify-center mt-2">
@@ -97,6 +100,7 @@
           <ion-select
             label="类别"
             placeholder="选择类别"
+            justify="start"
             v-model="selectedCate"
             @ionChange="handleShopCateChange">
             <ion-select-option :value="cate" v-for="cate in lotteryCatList" :key="cate.id">
@@ -129,7 +133,12 @@
                 <p class="text-sm ml-2">{{ getCateName(item.cate_id) }}</p>
               </div>
             </div>
-            <ion-button @click="btnExchangeClk(item)" size="default"> 兑 </ion-button>
+            <ion-button
+              @click="btnExchangeClk(item)"
+              size="default"
+              :disabled="globalVar.user.score < item.cost">
+              兑
+            </ion-button>
           </ion-item>
         </ion-content>
       </ion-segment-content>
@@ -137,7 +146,11 @@
       <ion-segment-content id="history">
         <ion-item>
           <!-- 用户筛选 -->
-          <ion-select label="用户" v-model="selectedUser" @ionChange="handleUserChange">
+          <ion-select
+            label="用户"
+            v-model="selectedUser"
+            @ionChange="handleUserChange"
+            justify="start">
             <ion-select-option :value="item" v-for="item in userList" :key="item.id">
               {{ item.name }}
             </ion-select-option>
@@ -152,22 +165,24 @@
             <ion-refresher-content></ion-refresher-content>
           </ion-refresher>
           <ion-item v-for="item in scoreHistoryList.data" :key="item.id">
+            <ion-avatar slot="start" class="w-12 h-12">
+              <img :src="getUserInfo(item.user_id).icon" />
+            </ion-avatar>
             <div class="flex flex-col w-full">
               <div class="flex">
-                <div class="w-1/5">ID: {{ item.id }}</div>
                 <div class="ml-2 flex items-center w-1/4">
-                  {{ item.action }}
+                  <ion-icon
+                    :icon="item.value >= 0 ? caretUpOutline : caretDownOutline"
+                    :class="item.value >= 0 ? 'text-green-500' : 'text-red-500'"
+                    class="w-[20px] h-[20px]"></ion-icon>
+                  {{ item.value }}
                 </div>
                 <div class="ml-2 flex items-center text-sm">
-                  <ion-icon class="mr-1" :icon="timeOutline"></ion-icon>
+                  <ion-icon class="mr-1 h-[18px] w-[18px]" :icon="timeOutline"></ion-icon>
                   {{ formatDate(item.dt) }}
                 </div>
               </div>
               <div class="flex mb-2">
-                <div class="flex item-center w-1/5">
-                  V:
-                  {{ item.value }}
-                </div>
                 <div class="ml-2 flex items-center w-1/4">
                   <MdiStar class="text-red-500" />
                   {{ item.current }}
@@ -192,6 +207,8 @@ import { LotteryData } from "@/modal/UserData";
 import { getImage } from "@/utils/ImgMgr";
 import { getList, getLotteryData, getUserList } from "@/utils/NetUtil";
 import {
+  alertController,
+  IonAvatar,
   IonButton,
   IonContent,
   IonHeader,
@@ -210,11 +227,17 @@ import {
   IonSelect,
   IonSelectOption,
   IonThumbnail,
-  alertController,
 } from "@ionic/vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import dayjs from "dayjs";
-import { chatbubbleEllipsesOutline, giftOutline, heartOutline, timeOutline } from "ionicons/icons";
+import {
+  chatbubbleEllipsesOutline,
+  giftOutline,
+  heartOutline,
+  timeOutline,
+  caretUpOutline,
+  caretDownOutline,
+} from "ionicons/icons";
 import _ from "lodash";
 import "swiper/css";
 import "swiper/css/free-mode";
@@ -275,12 +298,12 @@ const updateTabsHeight = () => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
   // 获取数据
   refreshGiftList(undefined, 1);
   refreshCateList();
+  await refreshUserList();
   refreshScoreHistoryList(undefined, 1);
-  refreshUserList();
 
   // 创建 MutationObserver 监听 tabs 元素
   observer = new MutationObserver(() => {
@@ -378,8 +401,8 @@ function refreshCateList() {
       EventBus.$emit(C_EVENT.TOAST, JSON.stringify(err));
     });
 }
-function refreshUserList() {
-  getUserList()
+async function refreshUserList() {
+  await getUserList()
     .then((uList) => {
       userList.value = [...uList.data];
       userList.value.unshift({ id: 0, name: "全部", score: 0 });
@@ -395,6 +418,9 @@ function refreshUserList() {
 function getCateName(cateId: number) {
   const cate = _.find(lotteryCatList.value, { id: cateId });
   return cate ? cate.name : "";
+}
+function getUserInfo(userId: number) {
+  return userList.value.find((u: any) => u.id === userId);
 }
 async function handleSegmentChange(event: any) {
   // console.log("segment change", event);
