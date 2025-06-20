@@ -104,5 +104,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   app.use(router);
   app.use(window.ElementPlus);
+  app.use(window.vant);
   app.mount("#app");
 });

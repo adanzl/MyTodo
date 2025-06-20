@@ -1,8 +1,9 @@
 import { getList, setData, getRdsData, getRdsList, getApiUrl } from "../js/net_util.js";
 
-const { ref, onMounted } = window.Vue;
+const { ref, onMounted, nextTick } = window.Vue;
 const _ = window._;
 const { ElMessage } = window.ElementPlus;
+const CHAT_PAGE_SIZE = 3;
 let component = null;
 async function loadTemplate() {
   const response = await fetch("./view/chat-template.html");
@@ -26,7 +27,6 @@ async function createComponent() {
           aiConversationId: "",
           chatRoomId: "v_chat_room_001",
         }),
-        isRefreshing: ref(false), // 新增刷新状态
       };
       const wsUrl = getApiUrl().replace("api", "");
       // const wsUrl = "http://localhost:8000"; // 使用 /api 前缀
@@ -98,14 +98,29 @@ async function createComponent() {
       };
       const getChatSetting = async () => {
         const data = await getRdsData("chatSetting", window.curUser.id);
-        console.log("getChatSetting", data);
+        // console.log("getChatSetting", data);
         if (data) {
           refData.chatSetting.value = data.data;
         }
       };
-      const refreshChatList = async () => {
+
+      const scrollChatToBottom = () => {
+        nextTick(() => {
+          setTimeout(() => {
+            const el = refData.chatContent.value;
+            if (el) {
+              el.scrollTop = el.scrollHeight;
+            }
+          }, 10);
+        });
+      };
+      const getChatMessages = async (startId, pageSize, bScroll) => {
         refData.loading.value = true;
-        const data = await getRdsList("chat:" + refData.chatSetting.value.chatRoomId, -1, 3);
+        const data = await getRdsList(
+          "chat:" + refData.chatSetting.value.chatRoomId,
+          startId,
+          pageSize
+        );
         _.forEachRight(data.data, (item) => {
           const d = JSON.parse(item);
           // console.log("d", d);
@@ -118,6 +133,9 @@ async function createComponent() {
           });
         });
         refData.loading.value = false;
+        if (bScroll) {
+          scrollChatToBottom();
+        }
       };
       const refMethods = {
         handleUpdateUser: (item) => {
@@ -154,14 +172,20 @@ async function createComponent() {
           socketRef.value.emit("message", message);
           console.log("send message:", message);
           refData.textInput.value = "";
+          scrollChatToBottom();
+        },
+        onRefresh: async () => {
+          // console.log("onRefresh");
+          const firstId = refData.chatMessages.value.length + 1;
+          getChatMessages(-firstId, CHAT_PAGE_SIZE, false);
         },
       };
       onMounted(async () => {
         await refreshUserList();
         await getChatSetting();
-        refreshChatList();
+        await getChatMessages(-1, CHAT_PAGE_SIZE, true);
+        // refData.chatContent.value.$el.scrollToBottom(0);
         initSocket();
-        // console.log("Home组件已挂载");
       });
       return {
         ...refData,
