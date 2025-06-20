@@ -1,7 +1,6 @@
 import base64
 import time
 
-from app import socketio
 from core.ai.ai_local import AILocal
 from core.chat.asr_client import AsrClient
 from core.tts.tts_client import TTSClient
@@ -36,7 +35,7 @@ class ClientContext:
         if text == '':
             return
         msg = {"content": text}
-        socketio.emit('msgAsr', msg, room=self.sid)
+        self.socketio.emit('msgAsr', msg, room=self.sid)
         self.ai.stream_msg(text)
 
     def on_ai_msg(self, text, id, type=0):
@@ -52,21 +51,26 @@ class ClientContext:
             event = 'endChat'
             self.tts.stream_complete()
 
-        socketio.emit(event, {'content': text, 'aiConversationId': self.ai.aiConversationId, 'id': id}, room=self.sid)
+        self.socketio.emit(event, {
+            'content': text,
+            'aiConversationId': self.ai.aiConversationId,
+            'id': id
+        },
+                           room=self.sid)
 
     def on_err(self, err: Exception):
         log.error(f"[CHAT] Error: {err}")
         msg = {"type": MSG_TYPE_ERROR, "content": str(err)}
-        socketio.emit('error', msg, room=self.sid)
+        self.socketio.emit('error', msg, room=self.sid)
 
     def on_tts_msg(self, data, type=0):
         '''
             处理tts的返回消息，type=0正常的流式返回，type=1表示tts已经结束的消息
         '''
         if type == 0:
-            socketio.emit('dataAudio', {'type': 'tts', 'data': data}, room=self.sid)
+            self.socketio.emit('dataAudio', {'type': 'tts', 'data': data}, room=self.sid)
         else:
-            socketio.emit('endAudio', {'content': data}, room=self.sid)
+            self.socketio.emit('endAudio', {'content': data}, room=self.sid)
 
 
 def translate_text(text):
@@ -75,8 +79,9 @@ def translate_text(text):
 
 class ChatMgr:
 
-    def __init__(self):
+    def __init__(self, socketio):
         log.info("[CHAT] ChatMgr init")
+        self.socketio = socketio
         self.clients: dict[str, ClientContext] = {}  # sid -> ClientContext
         self.register_events()
 
@@ -108,8 +113,8 @@ class ChatMgr:
             for client in self.clients.values():
                 if client.sid != sid:
                     log.info(f"[CHAT] Emitting [msgChat] to client {client.sid} msg {content}")
-                    socketio.emit('msgChat', msg_data, room=client.sid)
-            socketio.emit('endChat', {}, room=sid)
+                    self.socketio.emit('msgChat', msg_data, room=client.sid)
+            self.socketio.emit('endChat', {}, room=sid)
 
         else:
             client: ClientContext = self.clients.get(sid)
@@ -131,10 +136,10 @@ class ChatMgr:
 
     def register_events(self):
         # 处理客户端连接事件
-        @socketio.on('handshake')
+        @self.socketio.on('handshake')
         def handle_handshake(data):
             if data['key'] != '123456':
-                socketio.disconnect(request.sid)
+                self.socketio.disconnect(request.sid)
                 return {'status': 'rejected'}
             ctx = self.add_client(request.sid)
             ctx.ai.aiConversationId = data.get('aiConversationId', '')
@@ -144,18 +149,18 @@ class ChatMgr:
             ctx.tts.speed = data.get('ttsSpeed', 1.0)
             log.info(f'[CHAT] Client {request.sid} connected. Total clients: {len(self.clients)}, {json.dumps(data)}')
 
-            socketio.emit('handshakeResponse', {'message': 'Handshake successful'}, room=request.sid)
+            self.socketio.emit('handshakeResponse', {'message': 'Handshake successful'}, room=request.sid)
             return {'message': 'Handshake successful', 'status': 'ok'}
 
         # 处理客户端断开连接事件
-        @socketio.on('disconnect')
+        @self.socketio.on('disconnect')
         def handle_disconnect():
             client_id = request.sid
             self.remove_client(client_id)
             log.info(f'[CHAT] Client {client_id} disconnected. Total clients: {len(self.clients)}')
 
         # 处理接收到的消息事件
-        @socketio.on(EVENT_MESSAGE)
+        @self.socketio.on(EVENT_MESSAGE)
         def handle_message(msg):
             data = json.loads(msg)
             client_id = request.sid
@@ -182,14 +187,14 @@ class ChatMgr:
                 log.warning(f'[CHAT] Unknown message type: {data_type}')
 
         # 处理TTS请求
-        @socketio.on('tts')
+        @self.socketio.on('tts')
         def handle_tts_request(msg):
             data = json.loads(msg)
             text = data.get('content')
             role = data.get('role', None)
             id = data.get('id', '')
             if not text:
-                socketio.emit('error', {'error': 'Missing text'}, room=request.sid)
+                self.socketio.emit('error', {'error': 'Missing text'}, room=request.sid)
                 return
 
             client_id = request.sid
@@ -199,23 +204,23 @@ class ChatMgr:
                 chunk_size = 3000
                 for i in range(0, len(data), chunk_size):
                     chunk = data[i:i + chunk_size]
-                    socketio.emit('dataAudio', {'type': 'tts', 'data': chunk}, room=client_id)
-                socketio.emit('endAudio', {'content': data}, room=client_id)
+                    self.socketio.emit('dataAudio', {'type': 'tts', 'data': chunk}, room=client_id)
+                self.socketio.emit('endAudio', {'content': data}, room=client_id)
             else:
                 self.clients[client_id].tts.stream_msg(text, role, id)
                 self.clients[client_id].tts.stream_complete()
 
-        @socketio.on('ttsCancel')
+        @self.socketio.on('ttsCancel')
         def handle_tts_cancel(msg):
             ctx = self.clients[request.sid]
             ctx.tts.streaming_cancel()
 
-        @socketio.on('chatCancel')
+        @self.socketio.on('chatCancel')
         def handle_chat_cancel():
             ctx = self.clients[request.sid]
             ctx.ai.streaming_cancel()
 
-        @socketio.on('config')
+        @self.socketio.on('config')
         def handle_chat_config(data):
             log.info(f'[CHAT] Config: {data}')
             ctx = self.clients[request.sid]

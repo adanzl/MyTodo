@@ -1,0 +1,16 @@
+{
+    "python-envs.defaultEnvManager": "ms-python.python:conda",
+    "python-envs.defaultPackageManager": "ms-python.python:conda",
+    "python-envs.pythonProjects": [],
+    "cSpell.words": [
+        "geventwebsocket",
+        "jsonify",
+        "llen",
+        "lrange",
+        "natapp",
+        "pywsgi",
+        "rpush"
+    ],
+    "python.languageServer": "Pylance",
+    "basedpyright.disableLanguageServices": true
+}

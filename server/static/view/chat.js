@@ -17,6 +17,7 @@ async function createComponent() {
         userList: ref([]),
         loading: ref(false),
         textInput: ref(""),
+        chatContent: ref(),
         chatMessages: ref([]),
         chatSetting: ref({
           open: false,
@@ -25,10 +26,11 @@ async function createComponent() {
           aiConversationId: "",
           chatRoomId: "v_chat_room_001",
         }),
+        isRefreshing: ref(false), // 新增刷新状态
       };
-      // const wsUrl = getApiUrl().replace("api", "");
-      const wsUrl = "http://localhost:8000"; // 使用 /api 前缀
-      console.log(getApiUrl());
+      const wsUrl = getApiUrl().replace("api", "");
+      // const wsUrl = "http://localhost:8000"; // 使用 /api 前缀
+      // console.log(getApiUrl());
       const socketRef = ref();
       function initSocket() {
         if (socketRef.value) {
@@ -37,7 +39,7 @@ async function createComponent() {
 
         socketRef.value = window.io(wsUrl, {
           transports: ["websocket"],
-          path: "/api/socket.io/",
+          // path: "/api/socket.io/",
           timeout: 20000,
           autoConnect: false,
           forceNew: true,
@@ -103,7 +105,7 @@ async function createComponent() {
       };
       const refreshChatList = async () => {
         refData.loading.value = true;
-        const data = await getRdsList("chat:" + refData.chatSetting.value.chatRoomId, -1, 20);
+        const data = await getRdsList("chat:" + refData.chatSetting.value.chatRoomId, -1, 3);
         _.forEachRight(data.data, (item) => {
           const d = JSON.parse(item);
           // console.log("d", d);

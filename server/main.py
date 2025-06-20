@@ -1,23 +1,30 @@
+from flask import make_response
 from gevent import monkey
 
 monkey.patch_all()  # 在导入其他模块之前进行 patch
-import core.ai.ai_mgr as ai_mgr
-import core.db.db_mgr as db_mgr
-from app import app, socketio
-from core.chat.chat_mgr import ChatMgr
+from core import create_app
 from core.log_config import root_logger
 
 log = root_logger()
 
-chat_mgr = ChatMgr()
-db_mgr.init()
-ai_mgr.init()
+app = create_app()
 
 
 @app.route("/")
 def main():
     return "<p>Hello, World!</p>"
 
+
+@app.after_request
+def af_request(resp):
+    """
+    #请求钩子，在所有的请求发生后执行，加入headers。
+    """
+    resp = make_response(resp)
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Methods'] = '*'
+    resp.headers['Access-Control-Allow-Headers'] = '*'
+    return resp
 
 def null_application(environ, start_response):
     start_response("404 NOT FOUND", [("Content-Type", "text/plain")])
@@ -30,7 +37,7 @@ if __name__ == '__main__':
     from werkzeug.middleware.dispatcher import DispatcherMiddleware
     from werkzeug.middleware.shared_data import SharedDataMiddleware
     try:
-        base_dir = os.path.dirname(os.path.abspath(__file__))  # 假设代码文件在项目根目录
+        base_dir = os.path.dirname(os.path.abspath(__file__))
         static_app = SharedDataMiddleware(null_application, {'/': 'static'})
         application = DispatcherMiddleware(
             null_application,  # 主应用（此处为空）
@@ -38,17 +45,17 @@ if __name__ == '__main__':
                 '/api': app,
                 '/web': static_app,  # 静态文件挂载到 /web
             })
-        # 使用 gevent 的 WSGI 服务器
         from gevent.pywsgi import WSGIServer
-        from geventwebsocket.handler import WebSocketHandler  # 添加这行
-
-        # SSL 证书路径
+        from geventwebsocket.handler import WebSocketHandler
+        PORT = 8000
+        HOST = '127.0.0.1'
         http_server = WSGIServer(
-            ('127.0.0.1', 8000),
+            (HOST, PORT),
             application,
+            log=None,
             handler_class=WebSocketHandler,
         )
-        print('Server started on http://0.0.0.0:8000')
+        log.info(f'Server started on http://{HOST}:{PORT}')
         http_server.serve_forever()
     except Exception as e:
         log.error(e)

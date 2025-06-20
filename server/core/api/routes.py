@@ -1,4 +1,4 @@
-import core.db.db_mgr as db_mgr
+from core.db.db_mgr import DB_Mgr as db_mgr
 
 from core.log_config import root_logger
 from flask import Blueprint, json, jsonify, render_template, request

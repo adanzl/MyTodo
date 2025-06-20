@@ -53,10 +53,6 @@
   }
 
   // 延迟初始化
-  setTimeout(() => {
-    initWebSocket();
-  }, 1000);
-
   window.addEventListener("beforeunload", () => {
     if (ws) {
       ws.close();
