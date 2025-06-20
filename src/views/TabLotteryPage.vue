@@ -129,8 +129,8 @@
               </ion-label>
               <div class="flex items-center">
                 <MdiStar class="text-red-500" />
-                <div class="text-left pl-1 font-bold w-12">{{ item.cost }}</div>
-                <p class="text-sm ml-2">{{ getCateName(item.cate_id) }}</p>
+                <div class="text-left pl-1 pt-1 font-bold w-12">{{ item.cost }}</div>
+                <p class="text-sm ml-2 pt-1">{{ getCateName(item.cate_id) }}</p>
               </div>
             </div>
             <ion-button
