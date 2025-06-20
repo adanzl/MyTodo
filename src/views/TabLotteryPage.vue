@@ -160,7 +160,7 @@
                 </div>
                 <div class="ml-2 flex items-center text-sm">
                   <ion-icon class="mr-1" :icon="timeOutline"></ion-icon>
-                  {{ item.dt }}
+                  {{ formatDate(item.dt) }}
                 </div>
               </div>
               <div class="flex mb-2">
@@ -213,6 +213,7 @@ import {
   alertController,
 } from "@ionic/vue";
 import "@ionic/vue/css/ionic-swiper.css";
+import dayjs from "dayjs";
 import { chatbubbleEllipsesOutline, giftOutline, heartOutline, timeOutline } from "ionicons/icons";
 import _ from "lodash";
 import "swiper/css";
@@ -441,6 +442,10 @@ function handleShopCateChange(event: any) {
 function handleUserChange(event: any) {
   selectedUser.value = event.detail.value;
   refreshScoreHistoryList(selectedUser.value.id, 1);
+}
+function formatDate(dateStr: string) {
+  if (!dateStr) return dateStr;
+  return dayjs(dateStr).format("YYYY-MM-DD HH:mm:ss");
 }
 async function btnExchangeClk(item: any) {
   console.log(item);
