@@ -17,13 +17,14 @@ EVENT_MESSAGE = "message"
 
 class ClientContext:
 
-    def __init__(self, sid):
+    def __init__(self, sid, socketio):
         self.sid = sid
         self.pending_audio = False
         self.ai = AILocal(self.on_ai_msg, self.on_err)
         self.asr = AsrClient(self.on_asr_result, self.on_err)  # 语音识别
         self.tts = TTSClient(self.on_tts_msg, self.on_err)  # 语音合成
         self.autoTTS = False
+        self.socketio = socketio
 
     def close(self):
         self.asr.close()
@@ -87,7 +88,7 @@ class ChatMgr:
 
     def add_client(self, sid):
         try:
-            self.clients[sid] = ClientContext(sid)
+            self.clients[sid] = ClientContext(sid, self.socketio)
             return self.clients[sid]
         except Exception as e:
             log.error(f"[CHAT] Error adding client {sid}: {e}")
