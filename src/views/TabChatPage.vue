@@ -205,7 +205,7 @@ const tabsHeight = ref(0);
 let observer: MutationObserver | null = null;
 
 const MSG_TYPE_TRANSLATION = "translation";
-const TTS_AUTO = true;
+const TTS_AUTO = false;
 // cSpell: disable-next-line
 const TTS_ROLE = "longwan_v2";
 // const TTS_SPEED = 1.1;
@@ -271,6 +271,7 @@ let playAudioData: ArrayBuffer[] = [];
 onMounted(async () => {
   // messages.value.push({ id: "", content: "你好，我是楠楠，和我聊点什么吧", role: "server" });
   audioRef.value!.addEventListener("ended", () => {
+    console.log("==> event audio ended");
     audioPlayMsg.value!.playing = false;
     ttsData.value.audioEnd = true;
     ttsData.value.audioBuffer = null;
