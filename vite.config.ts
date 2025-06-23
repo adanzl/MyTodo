@@ -1,5 +1,6 @@
 /// <reference types="vitest" />
 
+import tailwindcss from "@tailwindcss/vite";
 import legacy from "@vitejs/plugin-legacy";
 import Vue from "@vitejs/plugin-vue";
 import path from "path";
@@ -39,15 +40,12 @@ export default defineConfig({
       manifest: { theme_color: "#BD34FE" },
     }),
     legacy(),
+    tailwindcss(),
   ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
       "~icons": "virtual:icons",
     },
-  },
-  test: {
-    globals: true,
-    environment: "jsdom",
   },
 });

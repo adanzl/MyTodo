@@ -113,14 +113,10 @@ export function getPriorityOptions(id) {
   return PriorityOptions[0];
 }
 
-// import MdiLearnOutline from "~icons/mdi/learn-outline";
-// import MdiBorderRoundCorners from "~icons/mdi/border-round-corners";
-// import MdiWorkOutline from "~icons/mdi/work-outline";
-
 export const GroupOptions = [
-  { id: 0, label: "未分类", color: "white", icon: 'MdiBorderRoundCorners' },
-  { id: 1, label: "工作", color: "red", icon: 'MdiWorkOutline' },
-  { id: 2, label: "学习", color: "yellow", icon: 'MdiLearnOutline' },
+  { id: 0, label: "未分类", color: "white", icon: "MdiBorderRoundCorners" },
+  { id: 1, label: "工作", color: "red", icon: "MdiWorkOutline" },
+  { id: 2, label: "学习", color: "yellow", icon: "MdiLearnOutline" },
 ];
 
 export function getGroupOptions(id) {

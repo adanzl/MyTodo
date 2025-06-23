@@ -62,7 +62,7 @@
             <ion-item slot="header" color="light" class="schedule-group-item">
               <div class="mr-3">{{ selectedDate?.dt.format("MM-DD") }}</div>
               <span class="mr-1 text-sm">当前有</span>
-              <MdiStar class="text-red-500 mr-1" />
+              <Icon icon="mdi:star" class="text-red-500 w-4 h-4 mr-1" />
               <span> {{ user?.score ?? 0 }}</span>
               <p style="margin-right: 8px" class="gray" slot="end">
                 {{ selectedDate?.events.length }}
@@ -110,7 +110,7 @@
                             {{ schedule.allDay ? "全天" : schedule.startTs?.format("HH:mm") }}
                           </span>
                           <span class="mr-1 flex items-center">
-                            <MdiStar class="mr-1 text-sm" />
+                            <Icon icon="mdi:star" class="text-red-500 w-4 h-4 mr-1" />
                             <p class="w-5 text-sm">
                               {{ countAllReward(schedule) }}
                             </p>
@@ -147,7 +147,7 @@
                         selectedDate.save[schedule.id]?.subtasks[sub.id] === 1
                       " />
                     <span class="pl-2 text-base flex-1">{{ sub.name }}</span>
-                    <MdiStar class="" />
+                    <Icon icon="mdi:star" class="text-red-500" />
                     <span class="w-5 text-right mr-6">{{ sub.score ?? 0 }}</span>
                   </div>
                   <ion-item-options side="end">

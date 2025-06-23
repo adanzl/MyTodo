@@ -11,14 +11,14 @@
     </ion-item>
     <ion-content class="ion-padding">
       <ion-item>
-        <MdiCardTextOutline class="w-[1.6em] h-[1.6em]" slot="start" />
+        <Icon icon="mdi:card-text-outline" class="w-[1.6em] h-[1.6em]" slot="start" />
         <ion-input v-model="valueRef.name" placeholder="输入子任务名称" size="5"> </ion-input>
       </ion-item>
       <ion-item @click="btnRewardClk" detail="true">
-        <MdiGiftOutline class="text-red-500 w-[1.6em] h-[1.6em]" slot="start" />
+        <Icon icon="mdi:gift-outline" class="text-red-500 w-[1.6em] h-[1.6em]" slot="start" />
         <ion-label>奖励</ion-label>
         <div slot="end" class="flex items-center">
-          <MdiStar class="text-red-500" />
+          <Icon icon="mdi:star" class="text-red-500 w-5 h-5" />
           <ion-label class="w-5 text-right">{{ valueRef.score ?? 0 }}</ion-label>
         </div>
       </ion-item>
@@ -31,7 +31,7 @@
         </div>
       </ion-item>
     </ion-content>
-    <ion-footer class="flex">
+    <ion-footer class="!flex">
       <ion-button class="flex-1 text-gray-400" fill="clear" @click="cancel()"> 取消 </ion-button>
       <ion-button class="flex-1 text-orange-400" fill="clear" @click="confirm()"> 确定 </ion-button>
     </ion-footer>
@@ -62,12 +62,9 @@
 import { Subtask } from "@/modal/UserData";
 import { cameraAndSetImage, getImage, loadAndSetImage } from "@/utils/ImgMgr";
 import { createTriggerController } from "@/utils/Overlay";
-import { alertController, IonInput, IonToolbar, IonActionSheet } from "@ionic/vue";
+import { alertController, IonActionSheet, IonInput, IonToolbar } from "@ionic/vue";
 import { add, trashOutline } from "ionicons/icons";
 import { inject, onMounted, ref, watch } from "vue";
-import MdiGiftOutline from "~icons/mdi/gift-outline";
-import MdiCardTextOutline from "~icons/mdi/card-text-outline";
-import MdiStar from "~icons/mdi/star";
 
 const props = defineProps({
   trigger: {

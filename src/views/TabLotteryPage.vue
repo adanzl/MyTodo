@@ -5,7 +5,7 @@
         <ion-title>Secret Room</ion-title>
         <ion-buttons slot="end">
           <ion-button @click="btnSettingClk">
-            <WeuiSettingOutlined class="button-native" width="30" height="30" />
+            <Icon icon="weui:setting-outlined" class="w-8 h-8 button-native" />
           </ion-button>
         </ion-buttons>
       </ion-toolbar>
@@ -29,7 +29,7 @@
         content-id="history"
         layout="icon-start"
         class="text-blue-500">
-        <MaterialSymbolsHistory width="25" height="25" />
+        <Icon icon="material-symbols:history" class="w-6 h-6" />
         <ion-label>积分历史</ion-label>
       </ion-segment-button>
     </ion-segment>
@@ -40,7 +40,7 @@
           <ion-item>
             <div class="flex items-center justify-center">
               <span>当前积分：</span>
-              <MdiStar class="text-red-500" />
+              <Icon icon="mdi:star" class="text-red-500 w-5 h-5" />
               <div class="text-left pl-1 font-bold w-12">{{ globalVar.user.score }}</div>
             </div>
           </ion-item>
@@ -65,7 +65,8 @@
               <div class="w-20 h-20 flex flex-col items-center justify-center">
                 <span>立即抽奖</span>
                 <div class="flex items-center justify-center mt-2">
-                  <MdiStar class="text-red-500" />{{ selectedCate.cost }}
+                  <Icon icon="mdi:star" class="text-red-500 w-5 h-5" />
+                  {{ selectedCate.cost }}
                 </div>
               </div>
             </ion-button>
@@ -75,11 +76,11 @@
             <h2 class="text-lg text-blue-500 font-bold">心愿单</h2>
             <swiper
               class="py-4"
-              :freeMode="{ enabled: true, momentumRatio: 0.5 }"
               :modules="[FreeMode]"
               :slidesPerView="'auto'"
               :resistance="true"
               :resistanceRatio="0.5"
+              :momentum-ratio="0.5"
               @swiper="setSwiperInstance">
               <swiper-slide v-for="item in lotteryHistory" :key="item.id" class="!w-auto px-2">
                 <div class="w-24 h-24 relative">
@@ -108,7 +109,7 @@
             </ion-select-option>
           </ion-select>
           <div class="flex w-1/3 items-center justify-center">
-            <MdiStar class="text-red-500" />
+            <Icon icon="mdi:star" class="text-red-500 w-5 h-5" />
             <div class="text-left pl-1 font-bold w-12">{{ globalVar.user.score }}</div>
           </div>
         </ion-item>
@@ -116,11 +117,11 @@
           <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
             <ion-refresher-content></ion-refresher-content>
           </ion-refresher>
-          <ion-item v-for="item in giftList.data" :key="item.id">
+          <ion-item v-for="item in giftList.data" :key="item.id" class="">
             <ion-thumbnail slot="start">
               <img :src="item.img" />
             </ion-thumbnail>
-            <div class="w-full">
+            <div class="w-full m-2">
               <ion-label>
                 <h2 class="flex">
                   <div class="w-8">[{{ item.id }}]</div>
@@ -128,7 +129,7 @@
                 </h2>
               </ion-label>
               <div class="flex items-center">
-                <MdiStar class="text-red-500" />
+                <Icon icon="mdi:star" class="text-red-500 w-5 h-5" />
                 <div class="text-left pl-1 pt-1 font-bold w-12">{{ item.cost }}</div>
                 <p class="text-sm ml-2 pt-1">{{ getCateName(item.cate_id) }}</p>
               </div>
@@ -156,7 +157,7 @@
             </ion-select-option>
           </ion-select>
           <div class="flex w-1/3 items-center justify-center">
-            <MdiStar class="text-red-500" />
+            <Icon icon="mdi:star" class="text-red-500 w-5 h-5" />
             <div class="text-left pl-1 font-bold w-12">{{ globalVar.user.score }}</div>
           </div>
         </ion-item>
@@ -184,7 +185,7 @@
               </div>
               <div class="flex mb-2">
                 <div class="ml-2 flex items-center w-1/4">
-                  <MdiStar class="text-red-500" />
+                  <Icon icon="mdi:star" class="text-red-500 w-5 h-5" />
                   {{ item.current }}
                 </div>
                 <div class="ml-2 flex items-center">
@@ -231,12 +232,12 @@ import {
 import "@ionic/vue/css/ionic-swiper.css";
 import dayjs from "dayjs";
 import {
+  caretDownOutline,
+  caretUpOutline,
   chatbubbleEllipsesOutline,
   giftOutline,
   heartOutline,
   timeOutline,
-  caretUpOutline,
-  caretDownOutline,
 } from "ionicons/icons";
 import _ from "lodash";
 import "swiper/css";
@@ -244,9 +245,6 @@ import "swiper/css/free-mode";
 import { FreeMode } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
 import { inject, onBeforeUnmount, onMounted, ref } from "vue";
-import MaterialSymbolsHistory from "~icons/material-symbols/history";
-import MdiStar from "~icons/mdi/star";
-import WeuiSettingOutlined from "~icons/weui/setting-outlined";
 
 const lotteryData = ref<LotteryData[] | []>([]);
 const COL_SIZE = 3; // 列数
@@ -509,8 +507,4 @@ async function btnExchangeClk(item: any) {
   margin: 0;
   --padding-start: 0;
 }
-
-/* ion-content {
-  --padding-bottom: 56px;
-} */
 </style>

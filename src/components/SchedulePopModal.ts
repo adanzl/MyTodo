@@ -35,15 +35,9 @@ import {
 import dayjs from "dayjs";
 import _ from "lodash";
 import { defineComponent, inject, nextTick, onMounted, ref, watch } from "vue";
-import MdiChevronDoubleRight from "~icons/mdi/chevron-double-right";
-import MdiGiftOutline from "~icons/mdi/gift-outline";
-import MdiStar from "~icons/mdi/star";
 
 export default defineComponent({
   components: {
-    MdiStar,
-    MdiGiftOutline,
-    MdiChevronDoubleRight,
     IonCheckbox,
     IonDatetime,
     IonSegment,

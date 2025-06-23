@@ -5,10 +5,7 @@
         <ion-title>Tab Chat</ion-title>
         <ion-buttons slot="end">
           <ion-button @click="btnChatSettingClk">
-            <WeuiSettingOutlined class="button-native" width="30" height="30" />
-          </ion-button>
-          <ion-button @click="btnNewChatClk">
-            <WeuiAdd2Outlined class="button-native" width="30" height="30" />
+            <Icon icon="weui:setting-outlined" class="h-7 w-7" />
           </ion-button>
         </ion-buttons>
       </ion-toolbar>
@@ -39,7 +36,7 @@
           <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
             <ion-refresher-content></ion-refresher-content>
           </ion-refresher>
-          <div class="flex flex-col h-full p-2 border-t-2">
+          <div class="flex flex-col h-full p-2 border-t-1 border-gray-200">
             <div v-for="(msg, idx) in chatMessages" :key="idx" class="p-1.5 w-full">
               <!-- 自己 -->
               <div v-if="msg.role === globalVar.user.id" class="flex">
@@ -54,7 +51,7 @@
                   v-if="!msg.audioSrc"
                   class="absolute -right-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center text-black"
                   @click="btnAudioClk(msg)">
-                  <MdiStopCircleOutline width="24" height="24" v-if="msg.playing" />
+                  <Icon icon="mdi:stop-circle-outline" class="w-6 h-6" v-if="msg.playing" />
                   <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
                 </div>
               </div>
@@ -70,7 +67,7 @@
                 <div
                   class="absolute -left-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center"
                   @click="btnAudioClk(msg)">
-                  <MdiStopCircleOutline width="24" height="24" v-if="msg.playing" />
+                  <Icon icon="mdi:stop-circle-outline" class="w-6 h-6" v-if="msg.playing" />
                   <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
                 </div>
               </div>
@@ -84,7 +81,7 @@
           <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
             <ion-refresher-content></ion-refresher-content>
           </ion-refresher>
-          <div class="flex flex-col h-full p-2 border-t-2">
+          <div class="flex flex-col h-full p-2 border-t-1 border-gray-200">
             <div v-for="(msg, idx) in aiChatMessages" :key="idx" class="p-1.5 w-full">
               <div
                 v-if="msg.role == 'server'"
@@ -93,7 +90,7 @@
                 <div
                   class="absolute -left-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center"
                   @click="btnAudioClk(msg)">
-                  <MdiStopCircleOutline width="24" height="24" v-if="msg.playing" />
+                  <Icon icon="mdi:stop-circle-outline" class="w-6 h-6" v-if="msg.playing" />
                   <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
                 </div>
               </div>
@@ -103,7 +100,7 @@
                   v-if="msg.audioSrc"
                   class="absolute -right-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center text-black"
                   @click="btnAudioClk(msg)">
-                  <MdiStopCircleOutline width="24" height="24" v-if="msg.playing" />
+                  <Icon icon="mdi:stop-circle-outline" class="w-6 h-6" v-if="msg.playing" />
                   <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
                 </div>
               </div>
@@ -116,7 +113,7 @@
     <ion-item>
       <div class="flex py-2 w-full h-[72px]" v-if="INPUT_TYPE == 'text'">
         <div class="w-12 h-auto flex items-center" @click="btnChangeMode">
-          <WeuiVoiceOutlined width="40" height="40" />
+          <Icon icon="weui:voice-outlined" class="h-10 w-10" />
         </div>
         <ion-input
           class="flex-1 mr-1"
@@ -132,7 +129,7 @@
       </div>
       <div class="flex py-2 w-full h-[72px]" v-else>
         <div class="w-12 h-auto flex items-center" @click="btnChangeMode">
-          <WeuiKeyboardOutlined width="40" height="40" />
+          <Icon icon="weui:keyboard-outlined" class="h-10 w-10" />
         </div>
         <ion-button
           class="flex-1 mr-1"
@@ -140,11 +137,11 @@
           @pointerdown="startRecording"
           :color="isRecording ? 'warning' : 'primary'">
           <div v-if="isRecording" class="flex items-center">
-            <MdiStopCircleOutline width="24" height="24" />
+            <Icon icon="mdi:stop-circle-outline" class="h-6 w-6" />
             <label class="ml-1 text-sm">松开发送</label>
           </div>
           <div v-else class="flex items-center">
-            <MdiMicrophone width="24" height="24" />
+            <Icon icon="mdi:microphone" class="h-6 w-6" />
             <label class="ml-1 text-sm">按住说话</label>
           </div>
         </ion-button>
@@ -167,18 +164,18 @@
 import ChatSetting from "@/components/ChatSetting.vue";
 import EventBus, { C_EVENT } from "@/modal/EventBus";
 import {
-  getApiUrl,
   getAiChatMessages,
-  getChatSetting,
-  setChatSetting,
+  getApiUrl,
   getChatMessages,
+  getChatSetting,
   getUserList,
+  setChatSetting,
 } from "@/utils/NetUtil";
 import {
   createGesture,
-  IonImg,
   IonAvatar,
   IonCheckbox,
+  IonImg,
   IonRefresher,
   IonRefresherContent,
   IonSegment,
@@ -193,12 +190,7 @@ import { heartOutline, volumeMediumOutline } from "ionicons/icons";
 import Recorder from "recorder-core/recorder.wav.min";
 import io, { Socket } from "socket.io-client";
 import { inject, onBeforeUnmount, onMounted, ref } from "vue";
-import MdiMicrophone from "~icons/mdi/microphone";
-import MdiStopCircleOutline from "~icons/mdi/stop-circle-outline";
-import WeuiAdd2Outlined from "~icons/weui/add2-outlined";
-import WeuiKeyboardOutlined from "~icons/weui/keyboard-outlined";
-import WeuiSettingOutlined from "~icons/weui/setting-outlined";
-import WeuiVoiceOutlined from "~icons/weui/voice-outlined";
+
 Recorder.CLog = function () {}; // 屏蔽Recorder的日志输出
 
 const tabsHeight = ref(0);
@@ -350,6 +342,7 @@ onIonViewDidEnter(async () => {
   await refreshUserList();
   getChatMessages(chatSetting.value.chatRoomId, -1, 3).then((data: any) => {
     // console.log("==> handleRefresh", data);
+    chatMessages.value = [];
     data.data.reverse().forEach((item: any) => {
       const d = JSON.parse(item);
       // console.log("==> getChatMessages", d);
@@ -424,12 +417,12 @@ function initSocketIO() {
     console.log("==> msgChat", data);
     if (data.chat_type === CHAT_ROOM) {
       chatMessages.value.push({
-            id: data.id,
-            content: data.content,
-            role: data.user_id,
-            ts: data.ts,
-            type: data.type,
-          });
+        id: data.id,
+        content: data.content,
+        role: data.user_id,
+        ts: data.ts,
+        type: data.type,
+      });
     } else {
       if (
         aiChatMessages.value.length === 0 ||
@@ -757,7 +750,6 @@ function onAudioTypeChange() {
     AUDIO_TYPE.value = "hold";
   }
 }
-function btnNewChatClk() {}
 function btnChatSettingClk() {
   chatSetting.value.open = true;
 }

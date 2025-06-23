@@ -4,9 +4,9 @@
       <span class="text-center w-full">恭喜获得</span>
     </ion-item>
     <div class="flex flex-col h-full items-center">
-      <MdiGiftOutline class="text-red-500 mt-10 w-16 h-16" />
+      <Icon icon="mdi:gift-outline" class="text-red-500 mt-10 w-16 h-16" />
       <div class="font-bold text-[30px] flex mt-4 items-center">
-        <MdiStar class="text-red-500" />
+        <Icon icon="mdi:star" class="text-red-500" />
         <div class="ml-2">{{ props.value }}</div>
       </div>
     </div>
@@ -20,8 +20,6 @@ ion-modal {
 </style>
 
 <script setup lang="ts">
-import MdiStar from "~icons/mdi/star";
-import MdiGiftOutline from "~icons/mdi/gift-outline";
 const props = defineProps({
   value: {
     type: Number,

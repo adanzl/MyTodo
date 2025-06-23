@@ -1,8 +1,5 @@
 /* For information on how to create your own theme, please see:
 http://ionicframework.com/docs/theming/ */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
 :root {
   --color-gray: #b5b1b1;
@@ -60,6 +57,7 @@ ion-content::part(scroll)::-webkit-scrollbar {
 .gray {
   color: var(--color-gray) !important;
 }
+
 .gray-bg {
   background-color: var(--color-gray) !important;
 }

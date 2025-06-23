@@ -43,12 +43,10 @@ import "swiper/css/effect-fade";
 import { Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
 import { defineComponent, inject, nextTick, onMounted, ref } from "vue";
-import MdiStar from "~icons/mdi/star";
 
 export default defineComponent({
   components: {
     FabButton,
-    MdiStar,
     IonAccordion,
     IonAccordionGroup,
     IonCheckbox,

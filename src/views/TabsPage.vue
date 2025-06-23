@@ -15,8 +15,8 @@
             <ion-avatar slot="start" class="ml-0 w-8 h-8">
               <ion-img :src="curUser.icon" />
             </ion-avatar>
-            <ion-label class="font-bold">{{ curUser.name }}</ion-label>
-            <MdiStar class="text-red-500" />
+            <ion-label class="font-bold ml-3">{{ curUser.name }}</ion-label>
+            <Icon icon="mdi:star" class="text-red-500 w-5 h-5" />
             <div class="text-left pl-1 font-bold w-12">
               {{ curUser?.score ?? 0 }}
             </div>
@@ -183,9 +183,9 @@
       </ion-tabs>
       <ColorMgr trigger="btnColor" />
     </div>
-    <div v-else class="bg-white h-full flex justify-center items-center">
+    <div v-else class="bg-white h-full flex justify-center items-center px-4">
       <ion-card class="max-w-96 max-h-96 w-full">
-        <ion-card-header>
+        <ion-card-header class="p-10">
           <ion-card-title>用户登录</ion-card-title>
         </ion-card-header>
         <ion-card-content class="p-10">
@@ -193,7 +193,7 @@
             <ion-avatar slot="start" class="w-16 h-16">
               <ion-img :src="curUser.icon" />
             </ion-avatar>
-            <ion-label class="text-2xl font-bold">{{ curUser.name }}</ion-label>
+            <ion-label class="ml-5 text-2xl font-bold">{{ curUser.name }}</ion-label>
           </ion-item>
           <ion-item>
             <ion-input type="password" label="Password" @ionChange="onPwdChange" class="mt-4">
@@ -210,7 +210,7 @@
                       <ion-avatar slot="start" class="w-12 h-12">
                         <ion-img :src="u.icon" />
                       </ion-avatar>
-                      <div>{{ u.name }}</div>
+                      <ion-label class="ml-5">{{ u.name }}</ion-label>
                     </ion-item>
                   </ion-radio>
                 </ion-item>
@@ -283,7 +283,6 @@ import {
 } from "ionicons/icons";
 import _ from "lodash";
 import { inject, onMounted, ref } from "vue";
-import MdiStar from "~icons/mdi/star";
 
 const bLogin = ref(false);
 const userList = ref<any[]>([]);
@@ -425,7 +424,6 @@ function onScheduleListChange(event: any) {
   globalVar.scheduleListId = scheduleListSelectedId.value = event.detail.value;
   eventBus.$emit(C_EVENT.UPDATE_SCHEDULE_GROUP, globalVar.scheduleListId);
 }
-
 </script>
 
 <style scoped>

@@ -64,8 +64,8 @@
             @update:value="onColorChange"
             :value="curScheduleData.color" />
           <ion-button @click="btnRewardClk" class="flex-1 text-base" fill="none">
-            <MdiGiftOutline class="text-red-500 w-[1.2em] h-[1.2em]" slot="start" />
-            <MdiStar class="text-red-500 w-[1.4em] h-[1.4em]" />
+            <Icon icon="mdi:gift-outline" class="text-red-500 w-[1.2em] h-[1.2em]" slot="start" />
+            <Icon icon="mdi:star" class="text-red-500 w-[1.4em] h-[1.4em]" />
             <span>{{ curScheduleData.score ?? 0 }}</span>
           </ion-button>
         </ion-item>
@@ -91,7 +91,7 @@
             </div>
             <div v-else>暂无开始时间</div>
             <div>
-              <MdiChevronDoubleRight height="100%" preserveAspectRatio="none" />
+              <Icon icon="mdi:chevron-double-right" class="h-full" preserveAspectRatio="none" />
             </div>
             <div class="ion-text-center" v-if="curScheduleData.endTs">
               <div class="flex items-baseline font-bold text-red-500">
@@ -154,7 +154,7 @@
           <ion-label class="ml-1">重复</ion-label>
           <ion-label class="text-right mr-0">
             <div>
-              <p class="inline-block mr-2 gray">
+              <p class="inline-block pr-2 gray">
                 {{
                   getNextRepeatDate(
                     curScheduleData.startTs,
@@ -232,10 +232,10 @@
           </ion-modal>
         </ion-item>
         <ion-item detail="true">
-          <MdiGiftOutline class="text-red-500 w-[1.6em] h-[1.6em]" slot="start" />
+          <Icon icon="mdi:gift-outline" class="text-red-500 w-[1.6em] h-[1.6em]" slot="start" />
           <ion-label class="ml-1">总奖励</ion-label>
           <div slot="end" class="flex items-center">
-            <MdiStar class="text-red-500" />
+            <Icon icon="mdi:star" class="text-red-500 h-5 w-5" />
             <ion-label class="w-5 text-right">{{ countAllReward() }}</ion-label>
           </div>
         </ion-item>
@@ -243,7 +243,7 @@
       <ion-list :inset="true">
         <ion-item lines="none">
           <ion-icon :icon="listOutline" slot="start"></ion-icon>
-          <ion-label>子任务</ion-label>
+          <ion-label class="ml-1">子任务</ion-label>
           <span class="mr-2">
             {{ curScheduleData?.subtasks?.filter((t: any) => subTaskChecked(t)).length }}/{{
               curScheduleData?.subtasks?.length
@@ -280,15 +280,13 @@
               class="ion-no-padding mt-1"
               @ionChange="onSubtaskCheckboxChange($event, task)">
             </ion-checkbox>
-            <div class="flex flex-col w-full h-full" @click="onSubtaskClk($event, task)">
-              <ion-label
-                :class="{ 'line-through': subTaskChecked(task) }"
-                class="ion-no-margin flex items-center ml-2">
+            <div class="flex flex-1 h-full" @click="onSubtaskClk($event, task)">
+              <ion-label :class="{ 'line-through': subTaskChecked(task) }" class="!flex ml-2">
                 <div class="flex-1">{{ task.name }}</div>
-                <MdiStar class="text-red-500" />
-                <span class="w-5 text-right mr-3">{{ task.score ?? 0 }}</span>
+                <Icon icon="mdi:star" class="text-red-500 w-5 h-5 mt-[2px] ml-1" />
+                <span class="w-3 text-right mr-3">{{ task.score ?? 0 }}</span>
               </ion-label>
-              <div class="pre-img-group" style="margin-top: 5px">
+              <div class="pre-img-group mt-[5px] bg-amber-700">
                 <div class="pre-img-block" v-for="(img, idx) in task.imgIds" :key="idx">
                   <img :src="imgs[img]" />
                 </div>
@@ -302,7 +300,7 @@
         </ion-reorder-group>
       </ion-list>
     </ion-content>
-    <ion-footer >
+    <ion-footer>
       <ion-toolbar class="ion-padding">
         <ion-button mod="ios" expand="block" color="warning" @click="btnSaveClk"> 保存 </ion-button>
       </ion-toolbar>

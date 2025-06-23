@@ -26,7 +26,6 @@
         :modules="[Keyboard, EffectCoverflow, IonicSlides]"
         :effect="'coverflow'"
         :slidesPerView="'auto'"
-        :freeMode="false"
         :coverflowEffect="{
           rotate: 0,
           stretch: -10,
@@ -34,7 +33,6 @@
           modifier: 1,
           slideShadows: false, // 是否开启slide阴影
         }"
-        :keyboard="true"
         class="h-[90%]">
         <swiper-slide
           v-for="(day, idx) in dayArr"
@@ -52,7 +50,10 @@
             <ion-reorder-group
               :disabled="bReorderDisabled"
               @ionItemReorder="onReorder($event, day)">
-              <div v-for="(schedule, idx) in day.events" :key="idx" class="bg-white">
+              <div
+                v-for="(schedule, idx) in day.events"
+                :key="idx"
+                class="bg-white border-b-[0.5px] border-gray-500">
                 <ion-item lines="none">
                   <ion-checkbox
                     style="--size: 22px; padding-right: 10px"
@@ -81,7 +82,7 @@
                           {{ schedule.allDay ? "全天" : schedule.startTs?.format("HH:mm") }}
                         </span>
                         <span class="mr-1 flex items-center">
-                          <MdiStar class="mr-1 text-sm" />
+                          <Icon icon="mdi:star" class="text-red-500 mr-1 text-sm" />
                           <p class="w-5 text-sm">
                             {{ countAllReward(schedule) }}
                           </p>
@@ -112,10 +113,10 @@
                     class="sub-checkbox"
                     :checked="day.save && day.save[schedule.id]?.subtasks[sub.id] === 1" />
                   <span class="pl-2 text-base flex-1 text-left">{{ sub.name }}</span>
-                  <MdiStar class="w-[1em] h-[1em]" />
+                  <Icon icon="mdi:star" class="text-red-500 w-[1em] h-[1em]" />
                   <span class="w-5 text-right mr-6">{{ sub.score ?? 0 }}</span>
                 </div>
-                <div style="border-bottom-width: 1px" class="mt-2"></div>
+                <!-- <div style="border-bottom-width: 1px" class="mt-2"></div> -->
               </div>
             </ion-reorder-group>
           </ion-content>
@@ -159,7 +160,6 @@ import "swiper/css/effect-fade";
 import { EffectCoverflow, Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
 import { inject, nextTick, onMounted, ref, watch } from "vue";
-import MdiStar from "~icons/mdi/star";
 const weekHead = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
 const props = defineProps({
   dt: {
