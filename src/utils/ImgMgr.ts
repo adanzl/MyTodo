@@ -1,6 +1,6 @@
-import LocalCache from "./LocalCache";
-import { calcImgPos } from "./Math";
-import { delPic, getPic, setPic } from "./NetUtil";
+import LocalCache from "./LocalCache.ts";
+import { calcImgPos } from "./Math.ts";
+import { delPic, getPic, setPic } from "./NetUtil.ts";
 
 export async function getImage(id?: number) {
   if(id === undefined){

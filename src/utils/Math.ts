@@ -5,11 +5,11 @@
  * @param canvasHeight 画布的高度
  * @returns {dx, dy, drawWidth, drawHeight} 绘制位置和大小
  */
-export function calcImgPos(img: HTMLImageElement, canvasWidth: number, canvasHeight: number) {
+export function calcImgPos(img: HTMLImageElement, canvasWidth: number, canvasHeight: number): any {
   const imageRatio = img.width / img.height;
   const canvasRatio = canvasWidth / canvasHeight;
 
-  let drawWidth, drawHeight;
+  let drawWidth: number, drawHeight: number;
 
   if (imageRatio > canvasRatio) {
     // 如果图像的宽高比大于画布的宽高比，则以画布的宽度为基准计算绘制的高度

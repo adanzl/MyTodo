@@ -1,5 +1,5 @@
-import { getColorList } from "@/utils/NetUtil";
-import EventBus, { C_EVENT } from "@/modal/EventBus";
+import { getColorList } from "@/utils/NetUtil.ts";
+import EventBus, { C_EVENT } from "@/modal/EventBus.ts";
 
 export interface ColorType {
   id: number;

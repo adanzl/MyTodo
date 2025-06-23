@@ -1,9 +1,9 @@
 import avatar from "@/assets/images/avatar.svg";
-import { CUSTOM_REPEAT_ID, RepeatData } from "@/modal/ScheduleType";
-import { getUserInfo, addScore } from "@/utils/NetUtil";
+import { CUSTOM_REPEAT_ID, RepeatData } from "@/modal/ScheduleType.ts";
+import { getUserInfo, addScore } from "@/utils/NetUtil.ts";
 import dayjs from "dayjs";
 import _ from "lodash";
-import EventBus, { C_EVENT } from "./EventBus";
+import EventBus, { C_EVENT } from "@/modal/EventBus.ts";
 
 export class User {
   id = -1;
