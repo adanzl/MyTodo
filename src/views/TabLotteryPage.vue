@@ -5,7 +5,7 @@
         <ion-title>Secret Room</ion-title>
         <ion-buttons slot="end">
           <ion-button @click="btnSettingClk">
-            <Icon icon="weui:setting-outlined" class="w-8 h-8 button-native" />
+            <Icon icon="weui:setting-outlined" class="w-7 h-7" />
           </ion-button>
         </ion-buttons>
       </ion-toolbar>
@@ -46,7 +46,7 @@
           </ion-item>
           <ion-radio-group
             :value="selectedCate"
-            class="radio-grid p-5"
+            class="radio-grid"
             @ionChange="handleShopCateChange">
             <ion-radio
               v-for="item in lotteryCatList"
@@ -500,7 +500,7 @@ async function btnExchangeClk(item: any) {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
-  padding: 8px;
+  padding: 8px 18px;
 }
 
 .radio-grid ion-radio {

@@ -8,7 +8,7 @@
           </ion-button>
         </ion-buttons>
         <ion-title>
-          <h3>{{ (curScheduleData?.id === -1 ? "新增" : "编辑") + "日程" }}</h3>
+          <div>{{ (curScheduleData?.id === -1 ? "新增" : "编辑") + "日程" }}</div>
         </ion-title>
       </ion-toolbar>
     </ion-header>
