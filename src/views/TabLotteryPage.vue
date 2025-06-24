@@ -17,20 +17,20 @@
         content-id="lotterySpecial"
         layout="icon-start"
         class="text-blue-500">
-        <ion-label>抽取奖励</ion-label>
-        <ion-icon :icon="heartOutline"></ion-icon>
+        <ion-icon :icon="heartOutline" class="w-4 h-4"></ion-icon>
+        <ion-label class="ml-1">抽取奖励</ion-label>
       </ion-segment-button>
       <ion-segment-button value="shop" content-id="shop" layout="icon-start" class="text-blue-500">
-        <ion-icon :icon="giftOutline"></ion-icon>
-        <ion-label>积分兑换</ion-label>
+        <ion-icon :icon="giftOutline" class="w-4 h-4"></ion-icon>
+        <ion-label class="ml-1">积分兑换</ion-label>
       </ion-segment-button>
       <ion-segment-button
         value="history"
         content-id="history"
         layout="icon-start"
         class="text-blue-500">
-        <Icon icon="material-symbols:history" class="w-6 h-6" />
-        <ion-label>积分历史</ion-label>
+        <Icon icon="material-symbols:history" class="w-4 h-4" />
+        <ion-label class="ml-1">积分历史</ion-label>
       </ion-segment-button>
     </ion-segment>
     <ion-segment-view :style="{ height: `calc(100% - ${tabsHeight}px)` }">
@@ -73,8 +73,21 @@
           </div>
           <!-- 心愿单 -->
           <div class="px-4">
-            <h2 class="text-lg text-blue-500 font-bold">心愿单</h2>
+            <div class="flex items-end justify-between h-12 mb-2">
+              <div class="w-24 text-2xl text-blue-500 font-bold">心愿单</div>
+              <div class="">
+                <div class="text-right text-xs text-gray-500 mr-2">
+                  进度满足时必定获得心愿单内容
+                  {{ wishList.progress }}%
+                </div>
+                <progress
+                  class="progress progress-primary w-56 h-3"
+                  :value="wishList.progress"
+                  max="100"></progress>
+              </div>
+            </div>
             <swiper
+              v-if="wishList.data.length > 0"
               class="py-4"
               :modules="[FreeMode]"
               :slidesPerView="'auto'"
@@ -82,9 +95,14 @@
               :resistanceRatio="0.5"
               :momentum-ratio="0.5"
               @swiper="setSwiperInstance">
-              <swiper-slide v-for="item in lotteryHistory" :key="item.id" class="!w-auto px-2">
+              <swiper-slide v-for="item in wishList.data" :key="item.id" class="!w-auto px-2">
                 <div class="w-24 h-24 relative">
                   <img :src="item.img" class="w-full h-full object-cover rounded-lg" />
+                  <div
+                    class="absolute top-0 right-0 bg-amber-300 w-6 h-6 flex items-center justify-center"
+                    @click="btnRemoveWishClk(item)">
+                    x
+                  </div>
                   <div
                     class="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1 rounded-b-lg truncate">
                     {{ item.name }}
@@ -92,6 +110,11 @@
                 </div>
               </swiper-slide>
             </swiper>
+            <ion-card v-else class="m-4 ion-padding">
+              <ion-card-content>
+                <div class="text-center text-gray-500">暂无心愿单内容</div>
+              </ion-card-content>
+            </ion-card>
           </div>
         </ion-content>
       </ion-segment-content>
@@ -135,10 +158,17 @@
               </div>
             </div>
             <ion-button
+              class="w-14 h-10"
               @click="btnExchangeClk(item)"
-              size="default"
               :disabled="globalVar.user.score < item.cost">
               兑
+            </ion-button>
+            <ion-button
+              class="w-14 h-10 ml-2"
+              color="warning"
+              @click="btnAddWishClk(item)"
+              :disabled="item.id in wishList.ids">
+              愿
             </ion-button>
           </ion-item>
         </ion-content>
@@ -206,11 +236,13 @@
 import EventBus, { C_EVENT } from "@/modal/EventBus";
 import { LotteryData } from "@/modal/UserData";
 import { getImage } from "@/utils/ImgMgr";
-import { getList, getLotteryData, getUserList } from "@/utils/NetUtil";
+import { getGiftData, getList, getLotteryData, getUserList, setUserData } from "@/utils/NetUtil";
 import {
   alertController,
   IonAvatar,
   IonButton,
+  IonCard,
+  IonCardContent,
   IonContent,
   IonHeader,
   IonIcon,
@@ -227,7 +259,7 @@ import {
   IonSegmentView,
   IonSelect,
   IonSelectOption,
-  IonThumbnail,
+  IonThumbnail
 } from "@ionic/vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import dayjs from "dayjs";
@@ -253,8 +285,12 @@ const PAGE_SIZE = 20; // 每页显示的数量
 const lotteryMatrix = ref<LotteryData[][]>([]);
 const lotterySetting = ref({ open: false });
 const globalVar: any = inject("globalVar");
-// const winner = ref({ bWin: false, prize: "" });
 
+const wishList = ref<any>({
+  progress: 30.2,
+  ids: [],
+  data: [],
+}); // 心愿单
 const giftList = ref<any>({
   data: [],
   pageNum: 1,
@@ -276,14 +312,6 @@ const selectedUser = ref<any>({ id: 0, name: "全部", score: 0 });
 const tabsHeight = ref(0);
 const swiperRef = ref(); // 滑动对象
 let observer: MutationObserver | null = null;
-
-const lotteryHistory = ref([
-  { id: 1, name: "奖品1", img: "https://picsum.photos/200" },
-  { id: 2, name: "奖品2", img: "https://picsum.photos/201" },
-  { id: 3, name: "奖品3", img: "https://picsum.photos/202" },
-  { id: 4, name: "奖品4", img: "https://picsum.photos/203" },
-  { id: 5, name: "奖品5", img: "https://picsum.photos/204" },
-]);
 
 function setSwiperInstance(swiper: any) {
   swiperRef.value = swiper;
@@ -402,10 +430,30 @@ function refreshCateList() {
 async function refreshUserList() {
   await getUserList()
     .then((uList) => {
+      // console.log(uList);
       userList.value = [...uList.data];
       userList.value.unshift({ id: 0, name: "全部", score: 0 });
       if (selectedUser.value.id == 0) {
         selectedUser.value = userList.value[0];
+      }
+
+      // 获取心愿数据
+      const sUser = _.find(uList.data, (u) => u.id === globalVar.user.id);
+      if (sUser) {
+        wishList.value.progress = sUser.wish_progress ?? 0;
+        if (sUser.wish_list) {
+          wishList.value.ids = sUser.wish_list;
+          wishList.value.data = [];
+          _.forEach(wishList.value.ids, async (gId) => {
+            const item = await getGiftData(gId);
+            // console.log("wishList item", item);
+            wishList.value.data.push({
+              id: item.id,
+              name: item.name,
+              img: item.image,
+            });
+          });
+        }
       }
     })
     .catch((err) => {
@@ -471,8 +519,58 @@ function formatDate(dateStr: string) {
   if (!dateStr) return dateStr;
   return dayjs(dateStr).format("YYYY-MM-DD HH:mm:ss");
 }
+
+async function btnRemoveWishClk(item: any) {
+  // console.log("remove wish ", item);
+  const alert = await alertController.create({
+    header: "Confirm",
+    subHeader: "确认移除心愿单",
+    message: "[" + item.id + "] " + item.name,
+    buttons: [
+      {
+        text: "OK",
+        handler: () => {
+          // console.log("cost");
+          _.remove(globalVar.user.wish_list, (i) => i === item.id);
+          setUserData(globalVar.user)
+            .then(() => {
+              EventBus.$emit(C_EVENT.TOAST, "移除心愿成功");
+              _.remove(wishList.value.ids, (i) => i === item.id);
+              _.remove(wishList.value.data, (i) => i.id === item.id);
+            })
+            .catch((err) => {
+              EventBus.$emit(C_EVENT.TOAST, JSON.stringify(err));
+            });
+        },
+      },
+      "Cancel",
+    ],
+  });
+  await alert.present();
+}
+async function btnAddWishClk(item: any) {
+  // console.log("add wish ", item);
+  if (globalVar.user.wish_list === undefined) {
+    globalVar.user.wish_list = [];
+  }
+  globalVar.user.wish_list.push(item.id);
+  setUserData(globalVar.user)
+    .then(() => {
+      EventBus.$emit(C_EVENT.TOAST, "添加心愿成功");
+      wishList.value.ids.push(item.id);
+      wishList.value.data.push({
+        id: item.id,
+        name: item.name,
+        img: item.img,
+      });
+    })
+    .catch((err) => {
+      EventBus.$emit(C_EVENT.TOAST, JSON.stringify(err));
+    });
+}
+
 async function btnExchangeClk(item: any) {
-  console.log(item);
+  // console.log(item);
   const alert = await alertController.create({
     header: "Confirm",
     subHeader: "确认兑换: " + item.name + "",

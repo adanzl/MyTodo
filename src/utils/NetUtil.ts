@@ -2,6 +2,7 @@ import { LoadColorData } from "@/modal/ColorType.ts";
 import EventBus, { C_EVENT } from "@/modal/EventBus.ts";
 import { UData, UserData } from "@/modal/UserData.ts";
 import axios from "axios";
+import _ from "lodash";
 // const URL = "https://3ft23fh89533.vicp.fun/api";
 // natapp.cn
 // 最新域名： cat /usr/env/natapp/log/natapp.log
@@ -95,6 +96,20 @@ export function setSave(id: number | undefined, data: any) {
         reject(err);
       });
   });
+}
+
+export async function getGiftData(id: number) {
+  if (id === undefined) {
+    throw new Error("id is undefined");
+  }
+  const rsp: any = await axios.get(API_URL + "/getData", {
+    params: { id: id, table: "t_gift", fields: "*" },
+  });
+  // console.log(rsp.data.data);
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
 }
 
 // export async function setUserInfo(id: number | undefined, score: number) {
@@ -214,7 +229,7 @@ export async function getAiChatMessages(
   conversation_id: string,
   limit: number,
   user: string,
-  first_id?: string| number
+  first_id?: string | number
 ) {
   const rsp: any = await axios.get(API_URL + "/chatMessages", {
     params: { conversation_id: conversation_id, limit: limit, user: user, first_id: first_id },
@@ -317,6 +332,11 @@ export async function getUserList() {
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
   }
+  _.forEach(rsp.data.data.data, (item: any) => {
+    if (item.wish_list) {
+      item.wish_list = JSON.parse(item.wish_list);
+    }
+  });
   return rsp.data.data;
 }
 

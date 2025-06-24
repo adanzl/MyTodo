@@ -448,6 +448,12 @@ export class UData {
         schedule.subtasks = [];
       }
     }
+    if (ret.wishList === undefined) {
+      ret.wishList = [];
+    }
+    if (ret.wishProcess === undefined) {
+      ret.wishProcess = 0;
+    }
     return ret;
   }
 

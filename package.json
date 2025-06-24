@@ -33,6 +33,7 @@
     "@types/axios": "^0.9.36",
     "axios": "1.10.0",
     "crypto-js": "^4.2.0",
+    "daisyui": "^5.0.43",
     "date-fns": "4.1.0",
     "dayjs": "^1.11.13",
     "image-js": "0.36.0",
