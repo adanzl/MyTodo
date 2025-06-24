@@ -103,23 +103,32 @@ class DB_Mgr:
         try:
             metadata = MetaData()
             table_obj = Table(table, metadata, autoload_with=db_obj.engine)
-            id = data.get('id')
+            
+            # 处理数据，将list类型转换为JSON字符串
+            processed_data = {}
+            for key, value in data.items():
+                if isinstance(value, list):
+                    processed_data[key] = json.dumps(value, ensure_ascii=False)
+                else:
+                    processed_data[key] = value
+            
+            id = processed_data.get('id')
             if id:
                 # 查找是否存在
                 stmt_sel = select(table_obj).where(table_obj.c.id == id)
                 result = db_obj.session.execute(stmt_sel).fetchone()
                 if result:
                     # 存在则更新
-                    stmt_upd = table_obj.update().where(table_obj.c.id == id).values(**data)
+                    stmt_upd = table_obj.update().where(table_obj.c.id == id).values(**processed_data)
                     db_obj.session.execute(stmt_upd)
                 else:
                     # 不存在则插入
-                    stmt_ins = table_obj.insert().values(**data)
+                    stmt_ins = table_obj.insert().values(**processed_data)
                     res = db_obj.session.execute(stmt_ins)
                     id = res.inserted_primary_key[0] if res.inserted_primary_key else id
             else:
                 # 没有id直接插入
-                stmt_ins = table_obj.insert().values(**data)
+                stmt_ins = table_obj.insert().values(**processed_data)
                 res = db_obj.session.execute(stmt_ins)
                 id = res.inserted_primary_key[0] if res.inserted_primary_key else None
             db_obj.session.commit()
