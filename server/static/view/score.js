@@ -2,6 +2,7 @@ import { getList } from "../js/net_util.js";
 
 const { ref, onMounted } = window.Vue;
 const _ = window._;
+const dayjs = window.dayjs;
 let component = null;
 async function loadTemplate() {
   const response = await fetch("./view/score-template.html");
@@ -53,6 +54,7 @@ async function createComponent() {
 
             _.forEach(d, (item) => {
               item.user = refMethods.getUserInfo(item.user_id);
+              item.dt =  dayjs(item.dt).format("YYYY-MM-DD HH:mm:ss");
               refData.recordList.value.data.push(item);
             });
           })
