@@ -81,17 +81,30 @@ class DB_Mgr:
         try:
             metadata = MetaData()
             table_obj = Table(table, metadata, autoload_with=db_obj.engine)
-            if isinstance(fields, str):
-                fields = [f.strip() for f in fields.split(',')]
-            columns = [table_obj.c[f] for f in fields if f in table_obj.c]
-            if not columns:
-                return {"code": -1, "msg": f"无效的字段: {fields}", "data": None}
-            stmt = select(*columns).where(table_obj.c.id == id)
-            result = db_obj.session.execute(stmt).fetchone()
-            if result:
-                data = dict(zip(fields, result))
+            
+            if fields == '*':
+                # 返回所有列
+                stmt = select(table_obj).where(table_obj.c.id == id)
+                result = db_obj.session.execute(stmt).fetchone()
+                if result:
+                    # 获取所有列名
+                    columns = [col.name for col in table_obj.columns]
+                    data = dict(zip(columns, result))
+                else:
+                    data = {}
             else:
-                data = {}
+                # 指定字段查询
+                if isinstance(fields, str):
+                    fields = [f.strip() for f in fields.split(',')]
+                columns = [table_obj.c[f] for f in fields if f in table_obj.c]
+                if not columns:
+                    return {"code": -1, "msg": f"无效的字段: {fields}", "data": None}
+                stmt = select(*columns).where(table_obj.c.id == id)
+                result = db_obj.session.execute(stmt).fetchone()
+                if result:
+                    data = dict(zip(fields, result))
+                else:
+                    data = {}
         except Exception as e:
             log.error(e)
             traceback.print_exc()
