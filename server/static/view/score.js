@@ -68,7 +68,7 @@ async function createComponent() {
         },
         onUserChange: async (item) => {
           console.log("onUserChange", item);
-          await refreshRecordList(item.id);
+          await refreshRecordList(item.id, 1, refData.PAGE_SIZE);
         },
         handlePageChange: (pageNum, pageSize) => {
           refreshRecordList(refData.selectedUser.value.id, pageNum, pageSize);

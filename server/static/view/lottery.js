@@ -1,4 +1,4 @@
-import { getData, getList, setData, delData } from "../js/net_util.js";
+import { getData, getList, setData, delData, getRdsData } from "../js/net_util.js";
 import { compressImageToBase64 } from "../js/image_util.js";
 const _ = window._;
 const { ref, onMounted } = window.Vue;
@@ -25,6 +25,9 @@ async function createComponent() {
         }),
         lotteryCatList: ref([]),
         loading: ref(false),
+        lotterySetting: ref({
+          
+        }),
       };
 
       const refCatePop = {
@@ -192,11 +195,19 @@ async function createComponent() {
           }
         },
       };
-
+      const getLotterySetting = async () => {
+        getRdsData("lotterySetting").then((data) => {
+          // console.log("getLotterySetting", data);
+          if (data) {
+            refData.lotterySetting = data;
+          }
+        });
+      };
       onMounted(() => {
         // console.log("Lottery组件已挂载");
         refreshCateList();
         refreshGiftList(0, 1, refData.PAGE_SIZE);
+        getLotterySetting();
       });
       return {
         ...refData,

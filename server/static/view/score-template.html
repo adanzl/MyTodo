@@ -33,9 +33,10 @@
     <el-table-column label="MSG" prop="msg"> </el-table-column>
   </el-table>
   <el-pagination
-    layout="prev, pager, next"
+    layout="sizes, prev, pager, next"
     :total="recordList.totalCount"
-    :page-size="PAGE_SIZE"
+    :size="PAGE_SIZE"
+    :page-sizes="[10, 20, 50]"
     class="mt-2"
     background
     @change="handlePageChange" />
