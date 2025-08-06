@@ -11,6 +11,6 @@
         "pywsgi",
         "rpush"
     ],
-    "python.languageServer": "Pylance",
+    "python.languageServer": "None",
     "basedpyright.disableLanguageServices": true
 }

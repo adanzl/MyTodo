@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     { path: "/chat", component: () => import("../view/chat.js").then((m) => m.default) },
     { path: "/color", component: () => import("../view/home.js").then((m) => m.default) },
     { path: "/score", component: () => import("../view/score.js").then((m) => m.default) },
+    { path: "/timetable", component: () => import("../view/timetable.js").then((m) => m.default) },
   ];
   // 创建路由实例
   const router = window.VueRouter.createRouter({

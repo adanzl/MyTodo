@@ -101,7 +101,6 @@ https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-fro
         -v /mnt/data/mysql/data:/var/lib/mysql \
         -e MYSQL_ROOT_PASSWORD='!Zhao575936' mysql:5.7.44
 
-
 ## DBGate
 
     docker run -d -it -p 8003:3000 --name DBGate --restart=always \
@@ -169,6 +168,16 @@ https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-fro
     conda activate py3_11
     nohup python3 -u app.py >app.log 2>&1 &
 
+## docker-chrome
+
+    docker run \
+        --name chrome-novnc --restart=always \
+        -e PORT=8080 \
+        -p 9103:8080 \
+        -e VNC_PASS=Zhao575936 \
+        -e VNC_RESOLUTION=1600x900 \
+        -d vital987/chrome-novnc:latest
+
 ## 服务器端口
 
 | Server        | Port     | Server         |  Port |
@@ -179,6 +188,6 @@ https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-fro
 | DBGate        | 8003     | dify           |  9098 |
 | nginx         | 8848/443 | cosy-voice     | x9099 |
 | redis         | 6379     | geWechat       |  9101 |
-| cockpit       | 9090     |                |  9102 |
-| portainer     | 9000     |                |       |
+| cockpit       | 9090     | geWechat       |  9102 |
+| portainer     | 9000     | chrome         |  9103 |
 | redis_insight | 9001     |                |       |
