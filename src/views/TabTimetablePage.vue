@@ -36,7 +36,7 @@
     </div>
 
     <!-- 固定的表头区域 -->
-    <div class="flex border-b border-gray-200 bg-white pr-4">
+    <div class="flex border-b border-gray-200 bg-white">
       <!-- 时间轴表头 -->
       <div
         class="w-20 h-8 flex items-center justify-center text-xs font-bold border-r border-gray-200 bg-gray-50 text-gray-800">
@@ -374,10 +374,6 @@ const editCourse = (course: any, child: string) => {
 };
 
 const addCourse = (event: MouseEvent, child: string) => {
-  console.log("addCourse called for", child);
-  console.log("event target:", event.target);
-  console.log("event currentTarget:", event.currentTarget);
-
   // 获取点击的网格索引
   const clickedElement = event.currentTarget as HTMLElement;
   const gridIndex = parseInt(clickedElement.getAttribute("data-index") || "0");
@@ -404,20 +400,6 @@ const addCourse = (event: MouseEvent, child: string) => {
   editingChild.value = child;
   isEditingExistingCourse.value = false;
   isEditModalOpen.value = true;
-
-  console.log("Modal should be open:", isEditModalOpen.value);
-  console.log("editingCourse:", editingCourse.value);
-  console.log(
-    "gridIndex:",
-    gridIndex,
-    "clickedHour:",
-    clickedHour,
-    "validHour:",
-    validHour,
-    "availableTime:",
-    availableTime
-  );
-  console.log("TIME_CONFIG:", TIME_CONFIG);
 };
 
 // 查找指定小时内的最早可用时间
@@ -501,7 +483,6 @@ const deleteCourse = async () => {
             // 保存到RDS
             try {
               await setRdsData("t_timetable", 0, JSON.stringify(timetableData.value));
-              console.log("课程已删除");
             } catch (error) {
               console.error("删除课程失败:", error);
             }
@@ -542,13 +523,12 @@ const saveCourse = async () => {
     timetableData.value[key].push({ ...editingCourse.value });
   }
 
-  // 保存到RDS
-  try {
-    await setRdsData("t_timetable", 0, JSON.stringify(timetableData.value));
-    console.log("课程表数据已保存");
-  } catch (error) {
-    console.error("保存课程表数据失败:", error);
-  }
+      // 保存到RDS
+    try {
+      await setRdsData("t_timetable", 0, JSON.stringify(timetableData.value));
+    } catch (error) {
+      console.error("保存课程表数据失败:", error);
+    }
 
   closeEditModal();
 };
@@ -557,7 +537,6 @@ const saveCourse = async () => {
 const loadTimetableData = async () => {
   try {
     const data = await getRdsData("t_timetable", 0);
-    // console.log('课程表数据:', data);
     if (data) {
       timetableData.value = JSON.parse(data);
     } else {
@@ -635,6 +614,21 @@ ion-segment-button {
 /* 去掉ion-segment-button下button的padding */
 ion-segment-button::part(native) {
   padding: 0;
+}
+
+/* 隐藏ion-content的滚动条但保持滚动功能 */
+ion-content {
+  --overflow: auto;
+}
+
+ion-content::part(scroll) {
+  overflow: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+ion-content::part(scroll)::-webkit-scrollbar {
+  display: none; /* Chrome, Safari and Opera */
 }
 
 </style>
