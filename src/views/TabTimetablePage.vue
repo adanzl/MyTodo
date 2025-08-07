@@ -163,7 +163,7 @@
           </ion-select>
         </ion-item>
         <ion-item>
-          <Icon icon="mdi:card-text-outline" class="w-[1.6em] h-[1.6em] mr-2" slot="start" />
+          <Icon icon="mdi:card-text-outline" class="w-[1.6em] h-[1.6em] mr-2 self-start mt-2" slot="start" />
           <ion-textarea
             v-model="editingCourse.name"
             placeholder="输入课程名称"
@@ -364,7 +364,10 @@ const getCourseTextClass = (course: any) => {
 };
 
 const editCourse = (course: any, child: string) => {
-  editingCourse.value = { ...course };
+  editingCourse.value = { 
+    ...course,
+    colorId: course.colorId || 1 // 如果没有颜色ID，默认使用1
+  };
   editingChild.value = child;
   isEditingExistingCourse.value = true;
   isEditModalOpen.value = true;
@@ -634,11 +637,4 @@ ion-segment-button::part(native) {
   padding: 0;
 }
 
-/* 确保分割线对齐 */
-ion-content {
-  --padding-start: 0;
-  --padding-end: 0;
-  --padding-top: 0;
-  --padding-bottom: 0;
-}
 </style>
