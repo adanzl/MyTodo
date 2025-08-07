@@ -2,7 +2,7 @@
   <ion-page class="main-bg" id="main-content">
     <ion-header>
       <ion-toolbar>
-        <ion-title>Tab Chat</ion-title>
+        <ion-title class="px-2">Tab Chat</ion-title>
         <ion-buttons slot="end">
           <ion-button @click="btnChatSettingClk">
             <Icon icon="weui:setting-outlined" class="h-7 w-7" />

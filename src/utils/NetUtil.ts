@@ -435,4 +435,35 @@ export async function getList(
   return rsp.data.data;
 }
 
+/**
+ * 获取rds数据
+ */
+export async function getRdsData(table: string, id: number) {
+  const rsp = await axios.get(API_URL + "/getRdsData", {
+    params: { table: table, id: id },
+  });
+  // console.log("getRdsData", rsp.data);
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
+/**
+ * 设置rds数据
+ */
+export async function setRdsData(table: string, id: number, value: any) {
+  const rsp = await axios.post(API_URL + "/setRdsData", {
+    table: table,
+    data: {
+      id: id,
+      value: value,
+    },
+  });
+  // console.log("setRdsData", rsp.data);
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
+
 export default {};

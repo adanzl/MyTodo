@@ -177,7 +177,7 @@
 
           <ion-tab-button tab="tabMy" href="/tabs/tab0">
             <ion-icon :icon="squareOutline" />
-            <ion-label>存档信息</ion-label>
+            <ion-label>课程表</ion-label>
           </ion-tab-button>
         </ion-tab-bar>
       </ion-tabs>

@@ -2,7 +2,7 @@
   <ion-page id="main-content" class="main-bg">
     <ion-header>
       <ion-toolbar>
-        <ion-title>Secret Room</ion-title>
+        <ion-title class="px-2">Secret Room</ion-title>
         <ion-buttons slot="end">
           <ion-button @click="btnSettingClk">
             <Icon icon="weui:setting-outlined" class="w-7 h-7" />

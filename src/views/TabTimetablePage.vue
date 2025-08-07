@@ -1,0 +1,644 @@
+<template>
+  <ion-page id="main-content" main>
+    <ion-header>
+      <ion-toolbar>
+        <ion-title>
+          <div class="px-2">课程表</div>
+        </ion-title>
+      </ion-toolbar>
+    </ion-header>
+
+    <!-- 星期选择 -->
+    <div class="p-1 bg-gray-50">
+      <ion-segment v-model="selectedWeekday" @ionChange="onWeekdayChange" class="rounded-lg">
+        <ion-segment-button value="周一" class="rounded-l-lg">
+          <ion-label>周一</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="周二">
+          <ion-label>周二</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="周三">
+          <ion-label>周三</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="周四">
+          <ion-label>周四</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="周五">
+          <ion-label>周五</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="周六">
+          <ion-label>周六</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="周日" class="rounded-r-lg">
+          <ion-label>周日</ion-label>
+        </ion-segment-button>
+      </ion-segment>
+    </div>
+
+    <!-- 固定的表头区域 -->
+    <div class="flex border-b border-gray-200 bg-white pr-4">
+      <!-- 时间轴表头 -->
+      <div
+        class="w-20 h-8 flex items-center justify-center text-xs font-bold border-r border-gray-200 bg-gray-50 text-gray-800">
+        时间
+      </div>
+      <!-- 昭昭表头 -->
+      <div
+        class="flex-1 h-8 flex items-center justify-center text-xs font-bold border-r border-gray-200 bg-blue-50 text-blue-800">
+        昭昭
+      </div>
+      <!-- 灿灿表头 -->
+      <div class="flex-1 h-8 flex items-center justify-center text-xs font-bold bg-green-50 text-green-800">
+        灿灿
+      </div>
+    </div>
+
+    <!-- 滚动内容区域 -->
+    <ion-content class="ion-no-padding" ref="scrollContainer">
+      <div class="flex">
+        <!-- 时间轴 -->
+        <div class="w-20 border-r border-gray-200">
+          <div class="relative bg-gray-50">
+            <div
+              v-for="time in timeSlots"
+              :key="time"
+              class="h-15 flex items-center justify-center text-xs border-b border-gray-100 text-gray-600">
+              {{ time }}
+            </div>
+          </div>
+        </div>
+
+        <!-- 课程内容区域 -->
+        <div class="flex-1 flex relative">
+          <!-- 昭昭的课程 -->
+          <div class="flex-1 relative border-r border-gray-200">
+            <div class="relative">
+              <!-- 时间网格背景 -->
+              <div class="absolute inset-0 z-0">
+                <div
+                  v-for="(_, index) in TIME_CONFIG.endHour - TIME_CONFIG.startHour + 1"
+                  :key="index"
+                  :data-index="index"
+                  class="absolute w-full border-b border-gray-100"
+                  :style="{
+                    top: `${index * TIME_CONFIG.hourHeight}px`,
+                    height: `${TIME_CONFIG.hourHeight}px`,
+                  }"
+                  @click="addCourse($event, 'zhaozhao')"></div>
+              </div>
+              <div
+                v-for="course in zhaozhaoCourses"
+                :key="course.id"
+                :class="getCourseClasses(course)"
+                :style="getCourseStyle(course)"
+                @click.stop="editCourse(course, 'zhaozhao')"
+                class="relative z-10">
+                <div class="font-bold leading-tight" :class="getCourseTextClass(course)">
+                  {{ course.name }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 灿灿的课程 -->
+          <div class="flex-1 relative">
+            <div class="relative">
+              <!-- 时间网格背景 -->
+              <div class="absolute inset-0 z-0">
+                <div
+                  v-for="(_, index) in TIME_CONFIG.endHour - TIME_CONFIG.startHour + 1"
+                  :key="index"
+                  :data-index="index"
+                  class="absolute w-full border-b border-gray-100"
+                  :style="{
+                    top: `${index * TIME_CONFIG.hourHeight}px`,
+                    height: `${TIME_CONFIG.hourHeight}px`,
+                  }"
+                  @click="addCourse($event, 'cancan')"></div>
+              </div>
+              <div
+                v-for="course in cancanCourses"
+                :key="course.id"
+                :class="getCourseClasses(course)"
+                :style="getCourseStyle(course)"
+                @click.stop="editCourse(course, 'cancan')"
+                class="relative z-10">
+                <div class="font-bold leading-tight" :class="getCourseTextClass(course)">
+                  {{ course.name }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ion-content>
+
+    <!-- 编辑课程弹窗 -->
+
+    <ion-modal :is-open="isEditModalOpen" @willDismiss="closeEditModal" mode="ios" class="backdrop">
+      <ion-item>
+        <ion-title>编辑课程</ion-title>
+        <!-- 删除按钮 - 右上角 -->
+        <ion-button
+          v-if="isEditingExistingCourse"
+          @click="deleteCourse"
+          slot="end"
+          fill="clear"
+          color="danger">
+          <ion-icon :icon="trashOutline"></ion-icon>
+        </ion-button>
+      </ion-item>
+      <ion-content class="ion-padding">
+        <ion-item>
+          <Icon icon="mdi:clock-outline" class="w-[1.6em] h-[1.6em] mr-2" slot="start" />
+          <ion-label>开始时间</ion-label>
+          <ion-select
+            v-model="editingCourse.startTime"
+            interface="popover"
+            placeholder="选择时间"
+            class="flex-1">
+            <ion-select-option v-for="time in timeOptions" :key="time.value" :value="time.value">
+              {{ time.label }}
+            </ion-select-option>
+          </ion-select>
+        </ion-item>
+        <ion-item>
+          <Icon icon="mdi:card-text-outline" class="w-[1.6em] h-[1.6em] mr-2" slot="start" />
+          <ion-textarea
+            v-model="editingCourse.name"
+            placeholder="输入课程名称"
+            :rows="3"
+            :auto-grow="true">
+          </ion-textarea>
+        </ion-item>
+        <ion-item>
+          <Icon icon="mdi:timer-outline" class="w-[1.6em] h-[1.6em] mr-2" slot="start" />
+          <ion-label>持续时间</ion-label>
+          <div slot="end" class="flex items-center gap-2">
+            <ion-button @click="adjustDuration(-10)" fill="clear" size="small">
+              <ion-icon :icon="removeOutline"></ion-icon>
+            </ion-button>
+            <ion-label class="w-12 text-center">{{ editingCourse.duration || 60 }}</ion-label>
+            <ion-button @click="adjustDuration(10)" fill="clear" size="small">
+              <ion-icon :icon="addOutline"></ion-icon>
+            </ion-button>
+          </div>
+        </ion-item>
+        <ion-item lines="none">
+          <Icon icon="mdi:palette-outline" class="w-[1.6em] h-[1.6em] mr-2" slot="start" />
+          <ion-label>颜色</ion-label>
+          <div slot="end" class="flex gap-2">
+            <div
+              v-for="(color, id) in COURSE_COLORS"
+              :key="id"
+              class="w-6 h-6 rounded-full cursor-pointer border-2 transition-all duration-200"
+              :class="[
+                color.bg,
+                editingCourse.colorId == id ? 'border-gray-800 scale-110' : 'border-gray-300',
+              ]"
+              @click="editingCourse.colorId = Number(id)"></div>
+          </div>
+        </ion-item>
+      </ion-content>
+      <ion-footer class="!flex">
+        <ion-button class="flex-1 text-gray-400" fill="clear" @click="closeEditModal">
+          取消
+        </ion-button>
+        <ion-button class="flex-1 text-orange-400" fill="clear" @click="saveCourse">
+          确定
+        </ion-button>
+      </ion-footer>
+    </ion-modal>
+  </ion-page>
+</template>
+
+<script setup lang="ts">
+import { getRdsData, setRdsData } from "@/utils/NetUtil";
+import {
+  IonButton,
+  IonContent,
+  IonHeader,
+  IonItem,
+  IonLabel,
+  IonPage,
+  IonSegment,
+  IonSegmentButton,
+  IonTextarea,
+  IonIcon,
+  IonSelect,
+  IonSelectOption,
+  alertController,
+  IonModal,
+  IonToolbar,
+} from "@ionic/vue";
+import { trashOutline, removeOutline, addOutline } from "ionicons/icons";
+import { computed, onMounted, ref } from "vue";
+
+// 课程数据 - 从RDS加载
+const timetableData = ref({});
+
+// 响应式数据
+const selectedWeekday = ref("");
+const isEditModalOpen = ref(false);
+const editingCourse = ref<any>({});
+const editingChild = ref("");
+const isEditingExistingCourse = ref(false);
+const scrollContainer = ref<any>();
+
+// 获取当前星期
+const getCurrentWeekday = () => {
+  const weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+  const today = new Date().getDay();
+  return weekdays[today];
+};
+
+// 初始化选中星期
+const initializeWeekday = () => {
+  selectedWeekday.value = getCurrentWeekday();
+};
+
+const COURSE_COLORS = {
+  1: { bg: "bg-blue-300", border: "border-blue-600", hover: "hover:bg-blue-400" },
+  2: { bg: "bg-green-300", border: "border-green-400", hover: "hover:bg-green-400" },
+  3: { bg: "bg-purple-300", border: "border-purple-400", hover: "hover:bg-purple-400" },
+  4: { bg: "bg-orange-300", border: "border-orange-400", hover: "hover:bg-orange-400" },
+  5: { bg: "bg-pink-300", border: "border-pink-400", hover: "hover:bg-pink-400" },
+};
+
+// 时间配置
+const TIME_CONFIG = {
+  startHour: 9,
+  endHour: 22,
+  hourHeight: 60, // 每小时的像素高度
+  minHeight: 20, // 最小高度
+};
+
+// 生成时间槽 (9:00-22:00, 每小时显示一次)
+const timeSlots = computed(() => {
+  const slots = [];
+  for (let hour = TIME_CONFIG.startHour; hour <= TIME_CONFIG.endHour; hour++) {
+    const time = `${hour.toString().padStart(2, "0")}:00`;
+    slots.push(time);
+  }
+  return slots;
+});
+
+// 生成时间选项 (8:00-22:00, 每10分钟一个间隔)
+const timeOptions = computed(() => {
+  const options = [];
+  for (let hour = 8; hour <= 22; hour++) {
+    for (let minute = 0; minute < 60; minute += 10) {
+      const timeValue = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+      const timeLabel = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+      options.push({
+        value: timeValue,
+        label: timeLabel,
+      });
+    }
+  }
+  return options;
+});
+
+// 获取当前选中星期的课程
+const zhaozhaoCourses = computed(() => {
+  const key = `${selectedWeekday.value}-zhaozhao`;
+  return timetableData.value[key] || [];
+});
+
+const cancanCourses = computed(() => {
+  const key = `${selectedWeekday.value}-cancan`;
+  return timetableData.value[key] || [];
+});
+
+// 方法
+const onWeekdayChange = (event: any) => {
+  selectedWeekday.value = event.detail.value;
+  // 星期切换后滚动到最早课程
+  setTimeout(() => {
+    scrollToEarliestCourse();
+  }, 50);
+};
+
+const getCourseStyle = (course: any) => {
+  const [hours, minutes] = course.startTime.split(":").map(Number);
+  const startMinutes = hours * 60 + minutes;
+  const startTimeMinutes = TIME_CONFIG.startHour * 60;
+  const top = ((startMinutes - startTimeMinutes) / 60) * TIME_CONFIG.hourHeight;
+  const height = (course.duration / 60) * TIME_CONFIG.hourHeight;
+
+  return {
+    position: "absolute" as const,
+    top: `${top}px`,
+    height: `${height}px`,
+    minHeight: `${TIME_CONFIG.minHeight}px`,
+  };
+};
+
+const getCourseClasses = (course: any) => {
+  const colorId = course.colorId || 1;
+  const colorConfig = COURSE_COLORS[colorId] || COURSE_COLORS[1];
+
+  return [
+    "absolute left-2 right-2 rounded p-2 text-xs overflow-hidden cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-md",
+    colorConfig.bg,
+    colorConfig.border,
+    colorConfig.hover,
+  ].join(" ");
+};
+
+// 获取课程文本显示类
+const getCourseTextClass = (course: any) => {
+  const duration = course.duration || 60;
+
+  // 计算允许显示的行数：每20分钟1行
+  const allowedLines = Math.floor(duration / 20);
+
+  // 根据允许的行数设置显示类
+  if (allowedLines <= 1) {
+    return "truncate"; // 单行显示，超出部分省略
+  } else {
+    // 使用 Tailwind 的 line-clamp 类
+    const lineClampClass = `line-clamp-${Math.min(allowedLines, 6)}`; // 最多6行
+    return `whitespace-pre-line ${lineClampClass}`;
+  }
+};
+
+const editCourse = (course: any, child: string) => {
+  editingCourse.value = { ...course };
+  editingChild.value = child;
+  isEditingExistingCourse.value = true;
+  isEditModalOpen.value = true;
+};
+
+const addCourse = (event: MouseEvent, child: string) => {
+  console.log("addCourse called for", child);
+  console.log("event target:", event.target);
+  console.log("event currentTarget:", event.currentTarget);
+
+  // 获取点击的网格索引
+  const clickedElement = event.currentTarget as HTMLElement;
+  const gridIndex = parseInt(clickedElement.getAttribute("data-index") || "0");
+
+  // 根据网格索引计算对应的小时
+  const clickedHour = TIME_CONFIG.startHour + gridIndex;
+
+  // 确保时间在有效范围内
+  const validHour = Math.max(TIME_CONFIG.startHour, Math.min(TIME_CONFIG.endHour, clickedHour));
+
+  // 查找该小时的最早可用时间
+  const availableTime = findAvailableTimeInHour(validHour, child);
+
+  // 创建新课程
+  editingCourse.value = {
+    id: Date.now(),
+    name: "",
+    startTime: `${availableTime.hour.toString().padStart(2, "0")}:${availableTime.minute
+      .toString()
+      .padStart(2, "0")}`,
+    duration: 60,
+    colorId: 1,
+  };
+  editingChild.value = child;
+  isEditingExistingCourse.value = false;
+  isEditModalOpen.value = true;
+
+  console.log("Modal should be open:", isEditModalOpen.value);
+  console.log("editingCourse:", editingCourse.value);
+  console.log(
+    "gridIndex:",
+    gridIndex,
+    "clickedHour:",
+    clickedHour,
+    "validHour:",
+    validHour,
+    "availableTime:",
+    availableTime
+  );
+  console.log("TIME_CONFIG:", TIME_CONFIG);
+};
+
+// 查找指定小时内的最早可用时间
+const findAvailableTimeInHour = (targetHour: number, child: string) => {
+  const key = `${selectedWeekday.value}-${child}`;
+  const courses = timetableData.value[key] || [];
+
+  // 按开始时间排序
+  const sortedCourses = courses.sort((a: any, b: any) => {
+    const timeA = a.startTime.split(":").map(Number);
+    const timeB = b.startTime.split(":").map(Number);
+    return timeA[0] * 60 + timeA[1] - (timeB[0] * 60 + timeB[1]);
+  });
+
+  // 在该小时内查找最早可用时间（10分钟间隔）
+  for (let minute = 0; minute < 60; minute += 10) {
+    const timeInMinutes = targetHour * 60 + minute;
+    if (!isTimeOccupiedByMinutes(timeInMinutes, sortedCourses)) {
+      return { hour: targetHour, minute: minute };
+    }
+  }
+
+  // 如果该小时内没有可用时间，查找下一个小时的可用时间
+  for (let hour = targetHour + 1; hour <= TIME_CONFIG.endHour; hour++) {
+    for (let minute = 0; minute < 60; minute += 10) {
+      const timeInMinutes = hour * 60 + minute;
+      if (!isTimeOccupiedByMinutes(timeInMinutes, sortedCourses)) {
+        return { hour: hour, minute: minute };
+      }
+    }
+  }
+
+  // 如果都不可用，返回目标小时的00分钟
+  return { hour: targetHour, minute: 0 };
+};
+
+// 检查指定分钟时间是否被占用
+const isTimeOccupiedByMinutes = (timeInMinutes: number, courses: any[]) => {
+  return courses.some((course: any) => {
+    const [courseHour, courseMinute] = course.startTime.split(":").map(Number);
+    const courseStart = courseHour * 60 + courseMinute;
+    const courseEnd = courseStart + course.duration;
+
+    // 检查目标时间是否与现有课程重叠
+    return timeInMinutes >= courseStart && timeInMinutes < courseEnd;
+  });
+};
+
+const adjustDuration = (change: number) => {
+  const currentDuration = Number(editingCourse.value.duration) || 60;
+  const newDuration = currentDuration + change;
+
+  // 限制最小10分钟，最大240分钟（4小时）
+  if (newDuration >= 10 && newDuration <= 240) {
+    editingCourse.value.duration = newDuration;
+  }
+};
+
+const deleteCourse = async () => {
+  // 创建确认对话框
+  const alert = await alertController.create({
+    header: "确认删除",
+    message: `确定要删除课程"${editingCourse.value.name || "未命名课程"}"吗？`,
+    buttons: [
+      {
+        text: "取消",
+        role: "cancel",
+      },
+      {
+        text: "删除",
+        role: "destructive",
+        handler: async () => {
+          const key = `${selectedWeekday.value}-${editingChild.value}`;
+
+          if (timetableData.value[key]) {
+            // 从数组中移除课程
+            timetableData.value[key] = timetableData.value[key].filter(
+              (course: any) => course.id !== editingCourse.value.id
+            );
+
+            // 保存到RDS
+            try {
+              await setRdsData("t_timetable", 0, JSON.stringify(timetableData.value));
+              console.log("课程已删除");
+            } catch (error) {
+              console.error("删除课程失败:", error);
+            }
+          }
+
+          closeEditModal();
+        },
+      },
+    ],
+  });
+
+  await alert.present();
+};
+
+const closeEditModal = () => {
+  isEditModalOpen.value = false;
+  editingCourse.value = {};
+  editingChild.value = "";
+  isEditingExistingCourse.value = false;
+};
+
+const saveCourse = async () => {
+  const key = `${selectedWeekday.value}-${editingChild.value}`;
+  if (!timetableData.value[key]) {
+    timetableData.value[key] = [];
+  }
+
+  // 检查是新增还是编辑
+  const existingIndex = timetableData.value[key].findIndex(
+    (c: any) => c.id === editingCourse.value.id
+  );
+
+  if (existingIndex !== -1) {
+    // 编辑现有课程
+    timetableData.value[key][existingIndex] = { ...editingCourse.value };
+  } else {
+    // 新增课程
+    timetableData.value[key].push({ ...editingCourse.value });
+  }
+
+  // 保存到RDS
+  try {
+    await setRdsData("t_timetable", 0, JSON.stringify(timetableData.value));
+    console.log("课程表数据已保存");
+  } catch (error) {
+    console.error("保存课程表数据失败:", error);
+  }
+
+  closeEditModal();
+};
+
+// 加载数据
+const loadTimetableData = async () => {
+  try {
+    const data = await getRdsData("t_timetable", 0);
+    // console.log('课程表数据:', data);
+    if (data) {
+      timetableData.value = JSON.parse(data);
+    } else {
+      // 如果没有数据，初始化为空对象
+      timetableData.value = {};
+    }
+  } catch (error) {
+    console.error("加载课程表数据失败:", error);
+    // 初始化为空对象
+    timetableData.value = {};
+  }
+};
+
+onMounted(async () => {
+  await loadTimetableData();
+  initializeWeekday();
+  scrollToEarliestCourse();
+});
+
+// 滚动到当天最早的课程
+const scrollToEarliestCourse = () => {
+  // 等待DOM更新完成
+  setTimeout(() => {
+    if (scrollContainer.value) {
+      // 获取当天所有课程
+      const allCourses = [...zhaozhaoCourses.value, ...cancanCourses.value];
+
+      if (allCourses.length > 0) {
+        // 找到最早的课程
+        const earliestCourse = allCourses.reduce((earliest, course) => {
+          const [earliestHour, earliestMinute] = earliest.startTime.split(":").map(Number);
+          const [courseHour, courseMinute] = course.startTime.split(":").map(Number);
+          const earliestMinutes = earliestHour * 60 + earliestMinute;
+          const courseMinutes = courseHour * 60 + courseMinute;
+          return courseMinutes < earliestMinutes ? course : earliest;
+        });
+
+        // 计算滚动位置
+        const [hours, minutes] = earliestCourse.startTime.split(":").map(Number);
+        const startMinutes = hours * 60 + minutes;
+        const startTimeMinutes = TIME_CONFIG.startHour * 60;
+        const scrollTop = ((startMinutes - startTimeMinutes) / 60) * TIME_CONFIG.hourHeight;
+
+        // 使用 ion-content 的滚动方法
+        const contentElement = scrollContainer.value.$el;
+        if (contentElement) {
+          const scrollElement = contentElement.shadowRoot?.querySelector('.inner-scroll');
+          if (scrollElement) {
+            scrollElement.scrollTop = Math.max(0, scrollTop - 60);
+          }
+        }
+      }
+    }
+  }, 100);
+};
+</script>
+
+<style scoped>
+ion-modal {
+  --height: 70%;
+  --width: 95%;
+}
+
+/* 确保星期选择器按钮平均分配宽度 */
+ion-segment {
+  display: flex;
+  width: 100%;
+}
+
+ion-segment-button {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 去掉ion-segment-button下button的padding */
+ion-segment-button::part(native) {
+  padding: 0;
+}
+
+/* 确保分割线对齐 */
+ion-content {
+  --padding-start: 0;
+  --padding-end: 0;
+  --padding-top: 0;
+  --padding-bottom: 0;
+}
+</style>

@@ -33,7 +33,7 @@ const routes: Array<RouteRecordRaw> = [
       },
       {
         path: 'tab0',
-        component: () => import('@/views/TabSavePage.vue')
+        component: () => import('@/views/TabTimetablePage.vue')
       }
     ]
   }
