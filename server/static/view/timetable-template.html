@@ -13,10 +13,11 @@
         <el-radio-button label="cancan">灿灿</el-radio-button>
       </el-radio-group>
       <el-button 
-        @click="quickAddCourse" 
-        type="success" 
-        size="default">
-        快速添加
+        @click="reloadTimetable" 
+        type="info" 
+        :loading="loading"
+        :disabled="loading">
+        {{ loading ? '加载中...' : '重新加载' }}
       </el-button>
 
       <el-button 
@@ -75,8 +76,7 @@
                       getCourseColor(course).border,
                       getCourseColor(course).hover,
                       {
-                        'border-dashed': course.duration >= 60,
-                        'z-20': course.duration >= 60
+                        'border-dashed': course.duration >= 60
                       }
                     ]"
                     :style="getCourseBlockStyle(course, hour)"
@@ -104,8 +104,7 @@
                       getCourseColor(course).border,
                       getCourseColor(course).hover,
                       {
-                        'border-dashed': course.duration >= 60,
-                        'z-20': course.duration >= 60
+                        'border-dashed': course.duration >= 60
                       }
                     ]"
                     :style="getCourseBlockStyle(course, hour)"
@@ -129,10 +128,22 @@
     <div v-if="getCourseCount() === 0 && !loading" class="text-center py-6 bg-blue-50 rounded-lg mt-4 border border-blue-200">
       <div class="flex items-center justify-center space-x-2 text-blue-600">
         <el-icon><InfoFilled /></el-icon>
-        <span class="text-sm">暂无课程数据，点击任意时间格子或使用快速添加按钮来添加课程</span>
+        <span class="text-sm">暂无课程数据，点击任意时间格子来添加课程</span>
       </div>
       <div class="mt-3 space-x-2">
-        <el-button type="primary" size="small" @click="quickAddCourse">快速添加课程</el-button>
+        <el-button type="info" size="small" @click="reloadTimetable">重新加载</el-button>
+        <el-button type="info" size="small" @click="printTimetable">打印课程表</el-button>
+      </div>
+    </div>
+    
+    <!-- 非空状态提示 -->
+    <div v-if="getCourseCount() > 0 && !loading" class="text-center py-4 bg-gray-50 rounded-lg mt-4 border border-gray-200">
+      <div class="flex items-center justify-center space-x-2 text-gray-600">
+        <el-icon><InfoFilled /></el-icon>
+        <span class="text-sm">当前共有 {{ getCourseCount() }} 门课程</span>
+      </div>
+      <div class="mt-3 space-x-2">
+        <el-button type="info" size="small" @click="reloadTimetable">重新加载</el-button>
         <el-button type="info" size="small" @click="printTimetable">打印课程表</el-button>
       </div>
     </div>

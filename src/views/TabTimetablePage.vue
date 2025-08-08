@@ -5,6 +5,11 @@
         <ion-title>
           <div class="px-2">课程表</div>
         </ion-title>
+        <ion-buttons slot="end">
+          <ion-button @click="refreshData" fill="clear" class="text-gray-400 pr-2">
+            <ion-icon :icon="refreshOutline"></ion-icon>
+          </ion-button>
+        </ion-buttons>
       </ion-toolbar>
     </ion-header>
 
@@ -214,6 +219,7 @@
 
 <script setup lang="ts">
 import { getRdsData, setRdsData } from "@/utils/NetUtil";
+import EventBus, { C_EVENT } from "@/modal/EventBus";
 import {
   IonButton,
   IonContent,
@@ -231,7 +237,7 @@ import {
   IonModal,
   IonToolbar,
 } from "@ionic/vue";
-import { trashOutline, removeOutline, addOutline } from "ionicons/icons";
+import { trashOutline, removeOutline, addOutline, refreshOutline } from "ionicons/icons";
 import { computed, onMounted, ref } from "vue";
 
 // 课程数据 - 从RDS加载
@@ -547,6 +553,22 @@ const loadTimetableData = async () => {
     console.error("加载课程表数据失败:", error);
     // 初始化为空对象
     timetableData.value = {};
+  }
+};
+
+// 刷新数据
+const refreshData = async () => {
+  try {
+    await loadTimetableData();
+    // 刷新后滚动到最早课程
+    setTimeout(() => {
+      scrollToEarliestCourse();
+    }, 100);
+    // 发送刷新成功提示
+    EventBus.$emit(C_EVENT.TOAST, "课程表数据刷新成功");
+  } catch (error) {
+    // 发送错误提示
+    EventBus.$emit(C_EVENT.TOAST, JSON.stringify(error));
   }
 };
 

@@ -80,9 +80,10 @@ async function createComponent() {
             const hourStartTime = new Date(`2000-01-01 ${hourStart}`);
             const hourEndTime = new Date(`2000-01-01 ${hourEnd}`);
 
-            // 检查课程是否在当前小时块内有显示部分
-            // 条件：课程结束时间 > 小时块开始时间 且 课程开始时间 <= 小时块结束时间
-            const shouldInclude = courseEndTime > hourStartTime && courseStartTime <= hourEndTime;
+            // 过滤条件：课程结束时间 > 小时块开始时间 且 课程开始时间 <= 小时块结束时间
+            // 或者：课程开始时间 <= 小时块开始时间 且 课程结束时间 > 小时块开始时间
+            const shouldInclude = (courseEndTime > hourStartTime && courseStartTime <= hourEndTime) ||
+                                (courseStartTime <= hourStartTime && courseEndTime > hourStartTime);
 
             return shouldInclude;
           })
@@ -91,40 +92,27 @@ async function createComponent() {
         return filteredCourses;
       };
 
-      // 计算课程块样式 - 垂直方向表示时间，高度表示持续时间
+      // 计算课程块样式 - 超过60分钟的课程显示为连续色块
       const getCourseBlockStyle = (course, hour) => {
         const [h, m] = course.startTime.split(":").map(Number);
         const currentHour = parseInt(hour.split(":")[0]);
 
-        let top = 0;
-        let height = 100;
-
-        // 如果课程开始时间在当前小时
-        if (h === currentHour) {
-          top = (m / 60) * 100;
-          // 计算课程在当前小时内的实际高度
-          const remainingMinutes = 60 - m;
-          height = Math.min((course.duration / 60) * 100, (remainingMinutes / 60) * 100);
-        } else {
-          // 如果课程从上一小时开始，在当前小时继续
-          top = 0;
-          const courseEndTime = new Date(`2000-01-01 ${course.startTime}`);
-          courseEndTime.setMinutes(courseEndTime.getMinutes() + course.duration);
-          const endHour = courseEndTime.getHours();
-          const endMinutes = courseEndTime.getMinutes();
-          
-          // 如果课程在当前小时结束，计算当前小时的部分
-          if (endHour === currentHour) {
-            height = (endMinutes / 60) * 100;
-          } else {
-            // 如果课程在当前小时继续到下一小时，当前小时显示完整60分钟
-            height = 100; // 显示完整小时
-          }
+        // 如果课程不在当前小时开始，不显示（避免重复显示）
+        if (h !== currentHour) {
+          return {
+            display: "none"
+          };
         }
 
+        // 计算课程在当前小时内的位置和高度
+        const top = (m / 60) * 100;
+        
+        // 计算课程的总高度（以小时为单位）
+        const totalHeight = (course.duration / 60) * 100;
+        
         return {
           top: `${top}%`,
-          height: `${height}%`,
+          height: `${totalHeight}%`,
           position: "absolute",
           width: "100%",
           zIndex: 10,
@@ -143,70 +131,13 @@ async function createComponent() {
         return `${endHour.toString().padStart(2, "0")}:${endMin.toString().padStart(2, "0")}`;
       };
 
-      // 判断是否应该显示课程名称
+      // 判断是否应该显示课程名称 - 只在开始的小时块显示
       const shouldShowCourseName = (course, hour) => {
-        const [h, m] = course.startTime.split(":").map(Number);
+        const [h] = course.startTime.split(":").map(Number);
         const currentHour = parseInt(hour.split(":")[0]);
         
-        // 计算课程在当前小时块中的显示高度
-        let displayHeight = 0;
-        
-        // 如果课程在当前小时开始
-        if (h === currentHour) {
-          const remainingMinutes = 60 - m;
-          displayHeight = Math.min(course.duration, remainingMinutes);
-        } else {
-          // 如果课程从其他小时开始，计算在当前小时的部分
-          const courseEndTime = new Date(`2000-01-01 ${course.startTime}`);
-          courseEndTime.setMinutes(courseEndTime.getMinutes() + course.duration);
-          const endHour = courseEndTime.getHours();
-          const endMinutes = courseEndTime.getMinutes();
-          
-          if (endHour === currentHour) {
-            displayHeight = endMinutes;
-          } else {
-            displayHeight = 60; // 完整小时
-          }
-        }
-        
-        // 计算课程在所有小时块中的显示高度
-        const allDisplayHeights = [];
-        const courseEndTime = new Date(`2000-01-01 ${course.startTime}`);
-        courseEndTime.setMinutes(courseEndTime.getMinutes() + course.duration);
-        const endHour = courseEndTime.getHours();
-        const endMinutes = courseEndTime.getMinutes();
-        
-        // 计算每个小时块的显示高度
-        for (let hourNum = h; hourNum <= endHour; hourNum++) {
-          let hourHeight = 0;
-          
-          if (hourNum === h) {
-            // 开始小时
-            const remainingMinutes = 60 - m;
-            hourHeight = Math.min(course.duration, remainingMinutes);
-          } else if (hourNum === endHour) {
-            // 结束小时
-            hourHeight = endMinutes;
-          } else {
-            // 中间小时
-            hourHeight = 60;
-          }
-          
-          allDisplayHeights.push(hourHeight);
-        }
-        
-        // 找到最大高度
-        const maxHeight = Math.max(...allDisplayHeights);
-        
-        // 如果当前块的高度等于最大高度，且是第一个达到最大高度的块，则显示名称
-        if (displayHeight === maxHeight) {
-          // 检查是否是第一个达到最大高度的块
-          const currentHourIndex = currentHour - h;
-          const isFirstMaxHeight = allDisplayHeights.indexOf(maxHeight) === currentHourIndex;
-          return isFirstMaxHeight;
-        }
-        
-        return false;
+        // 只有课程开始的小时块才显示名称
+        return h === currentHour;
       };
 
 
@@ -389,29 +320,18 @@ async function createComponent() {
         showEditModal.value = false;
       };
 
-      // 快速添加课程
-      const quickAddCourse = () => {
-        const currentTime = new Date();
-        const hours = currentTime.getHours().toString().padStart(2, "0");
-        const minutes = Math.floor(currentTime.getMinutes() / 10) * 10;
-        const time = `${hours}:${minutes.toString().padStart(2, "0")}`;
-
-        // 获取当前是周几
-        const weekDays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
-        const day = weekDays[currentTime.getDay()];
-
-        // 根据筛选模式选择孩子
-        const child = filterChild.value === "all" ? "zhaozhao" : filterChild.value;
-
-        editingCourse.value = {
-          day,
-          child,
-          startTime: time,
-          name: "",
-          duration: 10,
-        };
-
-        showEditModal.value = true;
+      // 重新加载课程表数据
+      const reloadTimetable = async () => {
+        try {
+          loading.value = true;
+          await loadTimetableData();
+          ElMessage.success("课程表数据已重新加载！");
+        } catch (error) {
+          console.error("重新加载失败:", error);
+          ElMessage.error("重新加载失败，请重试");
+        } finally {
+          loading.value = false;
+        }
       };
 
       // 获取筛选显示文本
@@ -616,7 +536,7 @@ async function createComponent() {
         saveCourse,
         deleteCourse,
         closeModal,
-        quickAddCourse,
+        reloadTimetable,
         getFilterDisplayText,
         getCourseCount,
         saveTimetable,
