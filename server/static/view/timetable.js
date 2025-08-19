@@ -227,7 +227,8 @@ async function createComponent() {
           startTime: earliestTime,
           name: '',
           duration: 30,
-          colorId: 1
+          colorId: 1,
+          originalStartTime: null // 新建课程时设为null
         };
         showEditModal.value = true;
       };
@@ -244,6 +245,7 @@ async function createComponent() {
             name: course.name,
             duration: course.duration,
             colorId: course.colorId || 1,
+            originalStartTime: course.startTime, // 保存原始开始时间
           };
           showEditModal.value = true;
         }
@@ -260,40 +262,37 @@ async function createComponent() {
         const key = `${day}-${child}`;
         if (!timetableData.value[key]) timetableData.value[key] = [];
 
-        // 如果是编辑，先删除原有同startTime的
-        timetableData.value[key] = timetableData.value[key].filter(
-          (c) => c.startTime !== startTime
-        );
-
-        // 检查时间冲突
+        // 检查时间冲突（在删除原有课程之前）
         const existingCourses = timetableData.value[key];
+        const newStartTime = new Date(`2000-01-01 ${startTime}`);
         const newEndTime = new Date(`2000-01-01 ${startTime}`);
         newEndTime.setMinutes(newEndTime.getMinutes() + duration);
 
         for (const course of existingCourses) {
+          // 跳过当前正在编辑的课程（避免自己与自己冲突）
+          if (editingCourse.value.originalStartTime && course.startTime === editingCourse.value.originalStartTime) {
+            continue;
+          }
+
+          const courseStartTime = new Date(`2000-01-01 ${course.startTime}`);
           const courseEndTime = new Date(`2000-01-01 ${course.startTime}`);
           courseEndTime.setMinutes(courseEndTime.getMinutes() + course.duration);
 
-          // 计算结束时间，格式为HH:MM
-          const courseEndHour = courseEndTime.getHours();
-          const courseEndMin = courseEndTime.getMinutes();
-          const courseEndTimeStr = `${courseEndHour.toString().padStart(2, "0")}:${courseEndMin
-            .toString()
-            .padStart(2, "0")}`;
-
-          // 计算新课程结束时间，格式为HH:MM
-          const newEndHour = newEndTime.getHours();
-          const newEndMin = newEndTime.getMinutes();
-          const newEndTimeStr = `${newEndHour.toString().padStart(2, "0")}:${newEndMin
-            .toString()
-            .padStart(2, "0")}`;
-
-          if (startTime < courseEndTimeStr && newEndTimeStr > course.startTime) {
+          // 检查时间重叠：新课程开始时间 < 现有课程结束时间 且 新课程结束时间 > 现有课程开始时间
+          if (newStartTime < courseEndTime && newEndTime > courseStartTime) {
             ElMessage.error("课程时间冲突，请选择其他时间");
             return;
           }
         }
 
+        // 如果是编辑，删除原有同startTime的课程
+        if (editingCourse.value.originalStartTime) {
+          timetableData.value[key] = timetableData.value[key].filter(
+            (c) => c.startTime !== editingCourse.value.originalStartTime
+          );
+        }
+
+        // 添加新课程
         timetableData.value[key].push({
           startTime: cleanTimeFormat(startTime),
           name: name.trim(),
