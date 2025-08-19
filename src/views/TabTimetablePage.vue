@@ -454,6 +454,49 @@ const isTimeOccupiedByMinutes = (timeInMinutes: number, courses: any[]) => {
   });
 };
 
+// 检查时间冲突
+const checkTimeConflicts = () => {
+  const key = `${selectedWeekday.value}-${editingChild.value}`;
+  const courses = timetableData.value[key] || [];
+  const conflicts: string[] = [];
+
+  // 获取当前编辑课程的时间信息
+  const [editHour, editMinute] = editingCourse.value.startTime.split(":").map(Number);
+  const editStart = editHour * 60 + editMinute;
+  const editEnd = editStart + editingCourse.value.duration;
+
+  // 检查与其他课程的冲突
+  courses.forEach((course: any) => {
+    // 跳过当前正在编辑的课程
+    if (course.id === editingCourse.value.id) {
+      return;
+    }
+
+    const [courseHour, courseMinute] = course.startTime.split(":").map(Number);
+    const courseStart = courseHour * 60 + courseMinute;
+    const courseEnd = courseStart + course.duration;
+
+    // 检查时间重叠
+    if (
+      (editStart >= courseStart && editStart < courseEnd) ||
+      (editEnd > courseStart && editEnd <= courseEnd) ||
+      (editStart <= courseStart && editEnd >= courseEnd)
+    ) {
+      const conflictTime = `${course.startTime} - ${formatTime(courseStart + course.duration)}`;
+      conflicts.push(`与课程"${course.name}"时间冲突 (${conflictTime})`);
+    }
+  });
+
+  return conflicts;
+};
+
+// 格式化时间
+const formatTime = (minutes: number) => {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`;
+};
+
 const adjustDuration = (change: number) => {
   const currentDuration = Number(editingCourse.value.duration) || 60;
   const newDuration = currentDuration + change;
@@ -516,6 +559,24 @@ const saveCourse = async () => {
     timetableData.value[key] = [];
   }
 
+  // 检查时间冲突
+  const conflicts = checkTimeConflicts();
+  if (conflicts.length > 0) {
+    // 显示冲突提示
+    const alert = await alertController.create({
+      header: "时间冲突",
+      message: `检测到以下时间冲突：\n${conflicts.join('\n')}\n\n请调整课程时间后重试。`,
+      buttons: [
+        {
+          text: "确定",
+          role: "cancel",
+        },
+      ],
+    });
+    await alert.present();
+    return;
+  }
+
   // 检查是新增还是编辑
   const existingIndex = timetableData.value[key].findIndex(
     (c: any) => c.id === editingCourse.value.id
@@ -529,12 +590,12 @@ const saveCourse = async () => {
     timetableData.value[key].push({ ...editingCourse.value });
   }
 
-      // 保存到RDS
-    try {
-      await setRdsData("t_timetable", 0, JSON.stringify(timetableData.value));
-    } catch (error) {
-      console.error("保存课程表数据失败:", error);
-    }
+  // 保存到RDS
+  try {
+    await setRdsData("t_timetable", 0, JSON.stringify(timetableData.value));
+  } catch (error) {
+    console.error("保存课程表数据失败:", error);
+  }
 
   closeEditModal();
 };
