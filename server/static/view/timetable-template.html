@@ -65,7 +65,7 @@
           <template v-for="day in weekDays" :key="day">
             <td v-if="filterChild === 'all' || filterChild === 'zhaozhao'" class="border border-gray-200 relative" style="height: 80px;">
               <div 
-                class="w-full h-full bg-gray-50 rounded cursor-pointer hover:bg-blue-50 transition-colors relative"
+                class="w-full h-full bg-blue-50 rounded cursor-pointer hover:bg-blue-100 transition-colors relative"
                 @click="onHourCellClick(day, 'zhaozhao', hour)"
               >
                 <template v-for="course in getCoursesForHour(day, 'zhaozhao', hour)" :key="course.startTime">
@@ -122,6 +122,20 @@
           </template>
         </tr>
       </tbody>
+      <tfoot>
+        <tr class="bg-gray-50">
+          <th class="border border-gray-200 px-2 py-2 text-center font-semibold text-gray-700 min-w-20">
+            时间
+          </th>
+          <th 
+            v-for="day in weekDays" 
+            :key="day" 
+            class="border border-gray-200 px-2 py-2 text-center font-semibold text-gray-700 min-w-32"
+            :colspan="filterChild === 'all' ? 2 : 1">
+            {{ day }}
+          </th>
+        </tr>
+      </tfoot>
     </table>
     
     <!-- 空状态提示 -->
