@@ -75,6 +75,23 @@
 
         <!-- 课程内容区域 -->
         <div class="flex-1 flex relative">
+          <!-- 当前时间线 -->
+          <div
+            v-if="currentTimePosition !== null"
+            class="absolute left-0 right-0 z-20 pointer-events-none current-time-line"
+            :style="{ top: `${currentTimePosition}px` }">
+            <div class="relative">
+              <div class="h-0.5 bg-red-500 shadow-lg"></div>
+              <div class="absolute -top-1 -left-1 w-3 h-3 bg-red-500 rounded-full shadow-lg current-time-dot"></div>
+              <!-- 时间显示在水平线中间 -->
+              <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                <div class="bg-red-500 text-white text-[8px] px-1 py-0.5 rounded-full font-bold shadow-lg whitespace-nowrap">
+                  {{ currentTimeDisplay }}
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- 昭昭的课程 -->
           <div class="flex-1 relative border-r border-gray-200">
             <div class="relative">
@@ -98,6 +115,11 @@
                 :style="getCourseStyle(course)"
                 @click.stop="editCourse(course, 'zhaozhao')"
                 class="relative z-10">
+                <!-- 课程时间显示 -->
+                <div class="absolute -top-1 right-0 text-[8px] font-bold text-gray-800 px-1 pt-1.5 pb-0.5 z-20 leading-tight">
+                  <div>{{ course.startTime }}</div>
+                  <div>{{ formatCourseEndTime(course.startTime, course.duration) }}</div>
+                </div>
                 <div class="font-bold leading-tight" :class="getCourseTextClass(course)">
                   {{ course.name }}
                 </div>
@@ -128,6 +150,11 @@
                 :style="getCourseStyle(course)"
                 @click.stop="editCourse(course, 'cancan')"
                 class="relative z-10">
+                <!-- 课程时间显示 -->
+                <div class="absolute -top-1 right-0 text-[8px] font-bold text-gray-800 px-1 pt-1.5 pb-0.5 z-20 leading-tight">
+                  <div>{{ course.startTime }}</div>
+                  <div>{{ formatCourseEndTime(course.startTime, course.duration) }}</div>
+                </div>
                 <div class="font-bold leading-tight" :class="getCourseTextClass(course)">
                   {{ course.name }}
                 </div>
@@ -161,13 +188,32 @@
             v-model="editingCourse.startTime"
             interface="popover"
             placeholder="选择时间"
-            class="flex-1">
+            class="flex-1 text-left">
             <ion-select-option v-for="time in timeOptions" :key="time.value" :value="time.value">
               {{ time.label }}
             </ion-select-option>
           </ion-select>
         </ion-item>
+
         <ion-item>
+          <Icon icon="mdi:clock-end-outline" class="w-[1.6em] h-[1.6em] mr-2" slot="start" />
+          <ion-label>结束时间</ion-label>
+          <ion-label slot="end" class="text-gray-500 w-[50%]">{{ endTimeDisplay }}</ion-label>
+        </ion-item>
+        <ion-item>
+          <Icon icon="mdi:timer-outline" class="w-[1.6em] h-[1.6em] mr-2" slot="start" />
+          <ion-label>持续时间</ion-label>
+          <div slot="end" class="flex items-center gap-2 w-[50%]">
+            <ion-button @click="adjustDuration(-10)" fill="outline" size="small" style="margin-right: auto;">
+              <ion-icon :icon="removeOutline"></ion-icon>
+            </ion-button>
+            <ion-label class="w-12 text-center">{{ editingCourse.duration || 60 }}</ion-label>
+            <ion-button @click="adjustDuration(10)" fill="outline" size="small">
+              <ion-icon :icon="addOutline"></ion-icon>
+            </ion-button>
+          </div>
+        </ion-item>
+                <ion-item>
           <Icon icon="mdi:card-text-outline" class="w-[1.6em] h-[1.6em] mr-2 self-start mt-2" slot="start" />
           <ion-textarea
             v-model="editingCourse.name"
@@ -175,19 +221,6 @@
             :rows="3"
             :auto-grow="true">
           </ion-textarea>
-        </ion-item>
-        <ion-item>
-          <Icon icon="mdi:timer-outline" class="w-[1.6em] h-[1.6em] mr-2" slot="start" />
-          <ion-label>持续时间</ion-label>
-          <div slot="end" class="flex items-center gap-2">
-            <ion-button @click="adjustDuration(-10)" fill="clear" size="small">
-              <ion-icon :icon="removeOutline"></ion-icon>
-            </ion-button>
-            <ion-label class="w-12 text-center">{{ editingCourse.duration || 60 }}</ion-label>
-            <ion-button @click="adjustDuration(10)" fill="clear" size="small">
-              <ion-icon :icon="addOutline"></ion-icon>
-            </ion-button>
-          </div>
         </ion-item>
         <ion-item lines="none">
           <Icon icon="mdi:palette-outline" class="w-[1.6em] h-[1.6em] mr-2" slot="start" />
@@ -238,7 +271,7 @@ import {
   IonToolbar,
 } from "@ionic/vue";
 import { trashOutline, removeOutline, addOutline, refreshOutline } from "ionicons/icons";
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, onBeforeUnmount, ref } from "vue";
 
 // 课程数据 - 从RDS加载
 const timetableData = ref({});
@@ -250,6 +283,7 @@ const editingCourse = ref<any>({});
 const editingChild = ref("");
 const isEditingExistingCourse = ref(false);
 const scrollContainer = ref<any>();
+const currentTime = ref(new Date());
 
 // 获取当前星期
 const getCurrentWeekday = () => {
@@ -273,13 +307,13 @@ const COURSE_COLORS = {
 
 // 时间配置
 const TIME_CONFIG = {
-  startHour: 9,
+  startHour: 7,
   endHour: 22,
   hourHeight: 60, // 每小时的像素高度
   minHeight: 20, // 最小高度
 };
 
-// 生成时间槽 (9:00-22:00, 每小时显示一次)
+// 生成时间槽 (7:00-22:00, 每小时显示一次)
 const timeSlots = computed(() => {
   const slots = [];
   for (let hour = TIME_CONFIG.startHour; hour <= TIME_CONFIG.endHour; hour++) {
@@ -289,10 +323,10 @@ const timeSlots = computed(() => {
   return slots;
 });
 
-// 生成时间选项 (8:00-22:00, 每10分钟一个间隔)
+// 生成时间选项 (6:00-22:00, 每10分钟一个间隔)
 const timeOptions = computed(() => {
   const options = [];
-  for (let hour = 8; hour <= 22; hour++) {
+  for (let hour = 6; hour <= 22; hour++) {
     for (let minute = 0; minute < 60; minute += 10) {
       const timeValue = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
       const timeLabel = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
@@ -314,6 +348,49 @@ const zhaozhaoCourses = computed(() => {
 const cancanCourses = computed(() => {
   const key = `${selectedWeekday.value}-cancan`;
   return timetableData.value[key] || [];
+});
+
+// 计算当前时间在时间轴上的位置
+const currentTimePosition = computed(() => {
+  const now = currentTime.value;
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+  
+  // 如果当前时间不在显示范围内，返回null
+  if (hours < TIME_CONFIG.startHour || hours > TIME_CONFIG.endHour) {
+    return null;
+  }
+  
+  // 计算相对于开始时间的分钟数
+  const totalMinutes = hours * 60 + minutes;
+  const startTimeMinutes = TIME_CONFIG.startHour * 60;
+  const relativeMinutes = totalMinutes - startTimeMinutes;
+  
+  // 转换为像素位置
+  const position = (relativeMinutes / 60) * TIME_CONFIG.hourHeight;
+  return position;
+});
+
+// 格式化当前时间显示
+const currentTimeDisplay = computed(() => {
+  const now = currentTime.value;
+  return `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+});
+
+// 计算结束时间
+const endTimeDisplay = computed(() => {
+  if (!editingCourse.value.startTime || !editingCourse.value.duration) {
+    return "";
+  }
+  
+  const [hours, minutes] = editingCourse.value.startTime.split(":").map(Number);
+  const startMinutes = hours * 60 + minutes;
+  const endMinutes = startMinutes + editingCourse.value.duration;
+  
+  const endHours = Math.floor(endMinutes / 60);
+  const endMins = endMinutes % 60;
+  
+  return `${endHours.toString().padStart(2, "0")}:${endMins.toString().padStart(2, "0")}`;
 });
 
 // 方法
@@ -497,6 +574,18 @@ const formatTime = (minutes: number) => {
   return `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`;
 };
 
+// 格式化课程结束时间
+const formatCourseEndTime = (startTime: string, duration: number) => {
+  const [hours, minutes] = startTime.split(":").map(Number);
+  const startMinutes = hours * 60 + minutes;
+  const endMinutes = startMinutes + duration;
+  
+  const endHours = Math.floor(endMinutes / 60);
+  const endMins = endMinutes % 60;
+  
+  return `${endHours.toString().padStart(2, "0")}:${endMins.toString().padStart(2, "0")}`;
+};
+
 const adjustDuration = (change: number) => {
   const currentDuration = Number(editingCourse.value.duration) || 60;
   const newDuration = currentDuration + change;
@@ -633,10 +722,37 @@ const refreshData = async () => {
   }
 };
 
+// 定时器引用
+let timeUpdateInterval: number | null = null;
+
+// 更新时间
+const updateCurrentTime = () => {
+  currentTime.value = new Date();
+};
+
 onMounted(async () => {
   await loadTimetableData();
   initializeWeekday();
   scrollToEarliestCourse();
+  
+  // 启动定时器，每1分钟更新一次时间
+  timeUpdateInterval = setInterval(updateCurrentTime, 60000);
+});
+
+onBeforeUnmount(() => {
+  // 在组件销毁前清理定时器
+  if (timeUpdateInterval) {
+    clearInterval(timeUpdateInterval);
+    timeUpdateInterval = null;
+  }
+});
+
+onUnmounted(() => {
+  // 确保定时器被清理
+  if (timeUpdateInterval) {
+    clearInterval(timeUpdateInterval);
+    timeUpdateInterval = null;
+  }
 });
 
 // 滚动到当天最早的课程
@@ -712,6 +828,34 @@ ion-content::part(scroll) {
 
 ion-content::part(scroll)::-webkit-scrollbar {
   display: none; /* Chrome, Safari and Opera */
+}
+
+/* 当前时间线动画效果 */
+.current-time-line {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* 时间线圆点动画 */
+.current-time-dot {
+  animation: pulse-dot 2s infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
 }
 
 </style>
