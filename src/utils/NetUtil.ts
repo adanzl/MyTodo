@@ -202,7 +202,7 @@ export async function setChatSetting(id: number, cId: string) {
 }
 export async function getLotteryData() {
   const rsp: any = await axios.get(API_URL + "/getRdsData", {
-    params: { table: "lottery", id: 1 },
+    params: { table: "lottery", id: 2 },
   });
   // console.log("getPic", rsp.data);
   if (rsp.data.code !== 0) {
@@ -215,7 +215,7 @@ export async function setLotteryData(value: string) {
   const rsp: any = await axios.post(API_URL + "/setRdsData", {
     table: "lottery",
     data: {
-      id: 1,
+      id: 2,
       value: value,
     },
   });

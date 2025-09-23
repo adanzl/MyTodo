@@ -48,7 +48,7 @@
             </button>
           </ion-col>
         </ion-row>
-        <ion-row v-for="(lottery, idx) in lotteryData" :key="idx">
+        <ion-row v-for="(lottery, idx) in lotteryData.giftList" :key="idx">
           <ion-col size="2" @click="onItemClk($event, lottery)">
             <img :src="lottery.img || avatar" class="max-w-8 max-h-8" />
           </ion-col>
@@ -99,7 +99,10 @@ const modal = ref();
 const canvasWidth = ref(400); // 设置canvas的宽度
 const canvasHeight = ref(300); // 设置canvas的高度
 const canvasRef = ref<HTMLCanvasElement>();
-const lotteryData = ref<[{ icon: ""; name: ""; weight: 1 }] | any[]>([]);
+const lotteryData = ref<{ fee: 10; giftList: [{ icon: ""; name: ""; weight: 1 }] } | any>({
+  fee: 10,
+  giftList: [],
+});
 const nLottery = ref(new LotteryData());
 const bModify = ref(false);
 const curItem = ref<LotteryData | null>(null);
@@ -142,7 +145,7 @@ async function onModalPresent() {
     .then((data: any) => {
       if (data) {
         lotteryData.value = JSON.parse(data);
-        lotteryData.value.forEach(async (item) => {
+        lotteryData.value.giftList.forEach(async (item) => {
           item.img = await getImage(item.imgId);
         });
       }

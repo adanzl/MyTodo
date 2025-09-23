@@ -9,7 +9,8 @@
         "lrange",
         "natapp",
         "pywsgi",
-        "rpush"
+        "rpush",
+        "zhaozhao"
     ],
     "python.languageServer": "None",
     "basedpyright.disableLanguageServices": true

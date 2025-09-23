@@ -1,4 +1,4 @@
-import { getData, getList, setData, delData, getRdsData } from "../js/net_util.js";
+import { getData, getList, setData, delData, getRdsData, setRdsData } from "../js/net_util.js";
 import { compressImageToBase64 } from "../js/image_util.js";
 const _ = window._;
 const { ref, onMounted } = window.Vue;
@@ -26,8 +26,9 @@ async function createComponent() {
         lotteryCatList: ref([]),
         loading: ref(false),
         lotterySetting: ref({
-          
+
         }),
+        lotterySettingData: ref({ fee: 10 }),
       };
 
       const refCatePop = {
@@ -95,8 +96,9 @@ async function createComponent() {
           })
           .finally(() => (refData.loading.value = false));
       };
-      const handleEdit = (index, row) => {
-        console.log(index, row);
+      const handleEdit = () => {
+        // console.log(refData.lotterySettingData.value);
+        setRdsData("lottery", 2, JSON.stringify(refData.lotterySettingData.value));
       };
       const handleDelete = (index, row) => {
         console.log(index, row);
@@ -196,10 +198,10 @@ async function createComponent() {
         },
       };
       const getLotterySetting = async () => {
-        getRdsData("lotterySetting").then((data) => {
-          // console.log("getLotterySetting", data);
+        getRdsData("lottery", 2).then((data) => {
+          console.log("getLotterySetting", data);
           if (data) {
-            refData.lotterySetting = data;
+            Object.assign(refData.lotterySettingData.value, JSON.parse(data));
           }
         });
       };

@@ -234,8 +234,6 @@
 
 <script setup lang="ts">
 import EventBus, { C_EVENT } from "@/modal/EventBus";
-import { LotteryData } from "@/modal/UserData";
-import { getImage } from "@/utils/ImgMgr";
 import { getGiftData, getList, getLotteryData, getUserList, setUserData } from "@/utils/NetUtil";
 import {
   alertController,
@@ -259,7 +257,7 @@ import {
   IonSegmentView,
   IonSelect,
   IonSelectOption,
-  IonThumbnail
+  IonThumbnail,
 } from "@ionic/vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import dayjs from "dayjs";
@@ -278,13 +276,10 @@ import { FreeMode } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
 import { inject, onBeforeUnmount, onMounted, ref } from "vue";
 
-const lotteryData = ref<LotteryData[] | []>([]);
-const COL_SIZE = 3; // 列数
-const ROW_SIZE_MIN = 4; // 行数最小值
 const PAGE_SIZE = 20; // 每页显示的数量
-const lotteryMatrix = ref<LotteryData[][]>([]);
 const lotterySetting = ref({ open: false });
 const globalVar: any = inject("globalVar");
+const lotteryDate = ref<any>({});
 
 const wishList = ref<any>({
   progress: 30.2,
@@ -307,7 +302,7 @@ const scoreHistoryList = ref<any>({
 });
 const lotteryCatList = ref<any>([]);
 const userList = ref<any>([]);
-const selectedCate = ref<any>({ id: 0, name: "全部", cost: 100 });
+const selectedCate = ref<any>({ id: 0, name: "全部", cost: lotteryDate.value.fee || 10 });
 const selectedUser = ref<any>({ id: 0, name: "全部", score: 0 });
 const tabsHeight = ref(0);
 const swiperRef = ref(); // 滑动对象
@@ -330,6 +325,7 @@ onMounted(async () => {
   refreshCateList();
   await refreshUserList();
   refreshScoreHistoryList(undefined, 1);
+  handleRefresh({ target: { complete: () => {} } });
 
   // 创建 MutationObserver 监听 tabs 元素
   observer = new MutationObserver(() => {
@@ -362,7 +358,11 @@ onBeforeUnmount(() => {
 function handleRefresh(event: any) {
   getLotteryData()
     .then((data: any) => {
-      buildLotteryMatrix(JSON.parse(data));
+      // buildLotteryMatrix(JSON.parse(data));
+      lotteryDate.value = JSON.parse(data);
+      if (selectedCate.value.id == 0) {
+        selectedCate.value.cost = lotteryDate.value.fee || 10;
+      }
     })
     .catch((err) => {
       EventBus.$emit(C_EVENT.TOAST, JSON.stringify(err));
@@ -370,22 +370,6 @@ function handleRefresh(event: any) {
     .finally(() => event.target.complete());
 }
 
-async function buildLotteryMatrix(data: LotteryData[]) {
-  lotteryData.value = data;
-  const matrix: any = [];
-  const length = Math.max(ROW_SIZE_MIN, Math.ceil(data.length / COL_SIZE));
-  let ii = 0;
-  for (let i = 0; i < length; i++) {
-    const row: LotteryData[] = [];
-    for (let j = 0; j < COL_SIZE; j++) {
-      const d = data[ii++ % data.length];
-      d.img = await getImage(d.imgId);
-      row.push(_.clone(d));
-    }
-    matrix.push(row);
-  }
-  lotteryMatrix.value = matrix;
-}
 function btnSettingClk() {
   lotterySetting.value.open = true;
 }
@@ -395,7 +379,6 @@ function onSettingDismiss(event: any) {
   if (event.detail.role === "cancel") {
     return;
   }
-  buildLotteryMatrix(event.detail.data);
 }
 
 function refreshScoreHistoryList(userId: number | undefined, pageNum: number) {
@@ -418,7 +401,7 @@ function refreshCateList() {
       const d = data.data;
       // console.log(d);
       lotteryCatList.value = [...d];
-      lotteryCatList.value.unshift({ id: 0, name: "全部", cost: 100 });
+      lotteryCatList.value.unshift({ id: 0, name: "全部", cost: lotteryDate.value.fee || 100 });
       if (selectedCate.value.id == 0) {
         selectedCate.value = lotteryCatList.value[0];
       }

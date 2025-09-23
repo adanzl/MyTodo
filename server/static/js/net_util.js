@@ -176,7 +176,7 @@ export async function setRdsData(table, id, value) {
       value: value,
     },
   });
-  // console.log("setRdsData", rsp.data);
+  console.log("setRdsData", rsp.data);
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
   }

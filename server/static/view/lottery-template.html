@@ -1,4 +1,13 @@
 <div class="">
+  <div class="flex w-[400px] items-center mb-2">
+    <el-text class="w-24">普通抽奖费用</el-text>
+    <el-input
+      v-model="lotterySettingData.fee"
+      class="!w-32 ml-2" type="number"/>
+    <el-button type="primary" class="ml-2" @click="handleEdit">
+      Update
+    </el-button>
+  </div>
   <el-divider />
   <div class="flex items-center">
     <el-radio-group
