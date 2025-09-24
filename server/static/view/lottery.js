@@ -97,7 +97,7 @@ async function createComponent() {
           })
           .finally(() => (refData.loading.value = false));
       };
-      const handleEdit = () => {
+      const handleUpdateFee = () => {
         // console.log(refData.lotterySettingData.value);
         setRdsData("lottery", 2, JSON.stringify(refData.lotterySettingData.value));
       };
@@ -217,7 +217,7 @@ async function createComponent() {
         ...refData,
         ...refCatePop,
         refreshData: refreshCateList,
-        handleEdit,
+        handleUpdateFee,
         handleDelete,
         onCateChange,
         ...giftFunc,

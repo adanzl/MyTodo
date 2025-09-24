@@ -368,7 +368,7 @@ function handleRefresh(event: any) {
       // buildLotteryMatrix(JSON.parse(data));
       lotteryDate.value = JSON.parse(data);
       if (selectedCate.value.id == 0) {
-        selectedCate.value.cost = lotteryDate.value.fee || 10;
+        selectedCate.value.cost = lotteryDate.value.fee;
       }
     })
     .catch((err) => {
