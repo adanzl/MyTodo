@@ -259,9 +259,9 @@ def do_lottery():
         if cate_id == 0:
             key = f"lottery:2"
             cate_data = rds_mgr.get_str(key)
-            if not cate_data or cate_data['fee'] is None:
+            if not cate_data or json.loads(cate_data)['fee'] is None:
                 return {"code": -1, "msg": "No lottery data"}
-            cate_cost = cate_data['fee']
+            cate_cost = json.loads(cate_data)['fee']
         else:
             cate_data = db_mgr.get_data('t_gift_category', cate_id, "id,name,cost")
             if cate_data['code'] != 0:
