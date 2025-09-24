@@ -466,4 +466,15 @@ export async function setRdsData(table: string, id: number, value: any) {
   return rsp.data.data;
 }
 
+export async function doLottery(userId: number, cateId: number) {
+  const rsp = await axios.post(API_URL + "/doLottery", {
+    user_id: userId,
+    cate_id: cateId,
+  });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
+
 export default {};

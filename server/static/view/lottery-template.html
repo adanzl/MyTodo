@@ -1,12 +1,8 @@
 <div class="">
   <div class="flex w-[400px] items-center mb-2">
     <el-text class="w-24">普通抽奖费用</el-text>
-    <el-input
-      v-model="lotterySettingData.fee"
-      class="!w-32 ml-2" type="number"/>
-    <el-button type="primary" class="ml-2" @click="handleEdit">
-      Update
-    </el-button>
+    <el-input v-model="lotterySettingData.fee" class="!w-32 ml-2" type="number" />
+    <el-button type="primary" class="ml-2" @click="handleEdit"> Update </el-button>
   </div>
   <el-divider />
   <div class="flex items-center">
@@ -112,6 +108,13 @@
               :label="item.name"
               :value="item.id" />
           </el-select>
+        </div>
+      </template>
+    </el-table-column>
+    <el-table-column label="启用" width="80">
+      <template #default="{ row, $index }">
+        <div class="flex items-center pl-2">
+          <el-checkbox v-model="row.enable" size="large" :disabled="!row.edited" />
         </div>
       </template>
     </el-table-column>

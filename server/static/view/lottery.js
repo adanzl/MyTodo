@@ -86,6 +86,7 @@ async function createComponent() {
                 img: item.image,
                 cate_id: item.cate_id,
                 cost: item.cost,
+                enable: item.enable === 1,
                 edited: false,
               });
             });
@@ -148,6 +149,7 @@ async function createComponent() {
             name: item.name,
             image: item.img,
             cate_id: item.cate_id,
+            enable: item.enable ? 1 : 0,
             cost: item.cost,
           };
           // console.log("handleGiftSave", item, data, idx);

@@ -4,6 +4,7 @@ from core.log_config import root_logger
 from flask import Blueprint, json, jsonify, render_template, request
 import core.db.rds_mgr as rds_mgr
 from core.ai.ai_local import AILocal
+import random
 
 log = root_logger()
 api_bp = Blueprint('api', __name__)
@@ -235,6 +236,61 @@ def add_score():
     action = args.get('action')
     msg = args.get('msg')
     return db_mgr.add_score(user, value, action, msg)
+
+
+@api_bp.route("/doLottery", methods=['POST'])
+def do_lottery():
+    """
+    执行抽奖
+    """
+    try:
+        args = request.get_json()
+        log.info("===== [Do Lottery] " + json.dumps(args))
+
+        user_id = args.get('user_id')
+        cate_id = args.get('cate_id')
+
+        if not user_id or not cate_id:
+            return {"code": -1, "msg": "user_id and cate_id are required"}
+        user_data = db_mgr.get_data('t_user', user_id, "id,score")
+        if user_data['code'] != 0:
+            return {"code": -1, "msg": "User not found"}
+        user_score = user_data['data']['score']
+        if cate_id == '0':
+            key = f"lottery:2"
+            cate_data = rds_mgr.get_str(key)
+            if not cate_data or cate_data['fee'] is None:
+                return {"code": -1, "msg": "No lottery data"}
+            cate_cost = cate_data['fee']
+        else:
+            cate_data = db_mgr.get_data('t_gift_category', cate_id, "id,name,cost")
+            if cate_data['code'] != 0:
+                return {"code": -1, "msg": "Category not found"}
+            cate_cost = cate_data['data']['cost']
+        if user_score < cate_cost:
+            return {"code": -1, "msg": "Not enough score"}
+        if cate_id == '0':
+            lottery_poll = db_mgr.get_list('t_gift', 1, 200, '*', {'enable': 1})
+        else:
+            lottery_poll = db_mgr.get_list('t_gift', 1, 200, '*', {'enable': 1, 'cate_id': cate_id})
+
+        # 检查奖品池是否为空
+        if lottery_poll['code'] != 0 or not lottery_poll['data'] or len(lottery_poll['data']) == 0:
+            return {"code": -1, "msg": "No available gifts"}
+
+        # 随机抽奖逻辑
+        gifts = lottery_poll['data']
+        selected_gift = random.choice(gifts)
+
+        if not selected_gift:
+            return {"code": -1, "msg": "Lottery failed"}
+        # 扣除积分
+        db_mgr.add_score(user_id, -cate_cost, 'lottery', f"获得[{selected_gift['id']}]{selected_gift.get('name', '')}")
+
+        return {"code": 0, "msg": "抽奖成功", "data": {"gift": selected_gift, "cost": cate_cost}}
+    except Exception as e:
+        log.error(e)
+        return {"code": -1, "msg": 'error: ' + str(e)}
 
 
 @api_bp.route("/addRdsList", methods=['POST'])

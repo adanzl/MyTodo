@@ -234,7 +234,14 @@
 
 <script setup lang="ts">
 import EventBus, { C_EVENT } from "@/modal/EventBus";
-import { getGiftData, getList, getLotteryData, getUserList, setUserData } from "@/utils/NetUtil";
+import {
+  doLottery,
+  getGiftData,
+  getList,
+  getLotteryData,
+  getUserList,
+  setUserData,
+} from "@/utils/NetUtil";
 import {
   alertController,
   IonAvatar,
@@ -458,12 +465,20 @@ async function handleSegmentChange(event: any) {
   }
 }
 // 抽奖页签
-function btnLotteryClk() {}
+function btnLotteryClk() {
+  doLottery(globalVar.user.id, selectedCate.value.id)
+    .then((data) => {
+      EventBus.$emit(C_EVENT.TOAST, "恭喜你抽中了 " + data.name);
+    })
+    .catch((err) => {
+      EventBus.$emit(C_EVENT.TOAST, JSON.stringify(err));
+    });
+}
 // 积分兑换页签
 function refreshGiftList(cateId?: number | undefined, pageNum?: number) {
-  let filter = undefined;
+  const filter = { enable: 1 };
   if (cateId) {
-    filter = { cate_id: cateId };
+    filter["cate_id"] = cateId;
   }
   getList("t_gift", filter, pageNum, PAGE_SIZE)
     .then((data) => {
