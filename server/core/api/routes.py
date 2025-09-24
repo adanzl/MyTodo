@@ -273,15 +273,15 @@ def do_lottery():
             lottery_poll = db_mgr.get_list('t_gift', 1, 200, '*', {'enable': 1})
         else:
             lottery_poll = db_mgr.get_list('t_gift', 1, 200, '*', {'enable': 1, 'cate_id': cate_id})
-        log.info(f"Lottery Poll: {lottery_poll}")
+        # log.info(f"Lottery Poll: {lottery_poll}")
         # 检查奖品池是否为空
-        if lottery_poll['code'] != 0 or not lottery_poll['data'] or len(lottery_poll['data']) == 0:
+        if lottery_poll['code'] != 0 or not lottery_poll['data']['data'] or len(lottery_poll['data']['data']) == 0:
             return {"code": -1, "msg": "No available gifts"}
 
         # 随机抽奖逻辑
-        gifts = lottery_poll['data']
+        gifts = lottery_poll['data']['data']
         selected_gift = random.choice(gifts)
-        log.info(f"Selected Gift: {selected_gift}")
+        log.info(f"Selected Gift: [{selected_gift['id']}] {selected_gift.get('name', '')}")
         if not selected_gift:
             return {"code": -1, "msg": "Lottery failed"}
         # 扣除积分
