@@ -250,13 +250,13 @@ def do_lottery():
         user_id = args.get('user_id')
         cate_id = args.get('cate_id')
 
-        if not user_id or not cate_id:
+        if user_id is None or cate_id is None:
             return {"code": -1, "msg": "user_id and cate_id are required"}
         user_data = db_mgr.get_data('t_user', user_id, "id,score")
         if user_data['code'] != 0:
             return {"code": -1, "msg": "User not found"}
         user_score = user_data['data']['score']
-        if cate_id == '0':
+        if cate_id == 0:
             key = f"lottery:2"
             cate_data = rds_mgr.get_str(key)
             if not cate_data or cate_data['fee'] is None:
@@ -269,7 +269,7 @@ def do_lottery():
             cate_cost = cate_data['data']['cost']
         if user_score < cate_cost:
             return {"code": -1, "msg": "Not enough score"}
-        if cate_id == '0':
+        if cate_id == 0:
             lottery_poll = db_mgr.get_list('t_gift', 1, 200, '*', {'enable': 1})
         else:
             lottery_poll = db_mgr.get_list('t_gift', 1, 200, '*', {'enable': 1, 'cate_id': cate_id})

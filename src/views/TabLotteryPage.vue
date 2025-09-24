@@ -468,6 +468,7 @@ async function handleSegmentChange(event: any) {
 function btnLotteryClk() {
   doLottery(globalVar.user.id, selectedCate.value.id)
     .then((data) => {
+      console.log("lottery data", data);
       EventBus.$emit(C_EVENT.TOAST, "恭喜你抽中了 " + data.name);
     })
     .catch((err) => {
