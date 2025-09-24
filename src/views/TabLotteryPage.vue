@@ -469,7 +469,11 @@ function btnLotteryClk() {
   doLottery(globalVar.user.id, selectedCate.value.id)
     .then((data) => {
       console.log("lottery data", data);
-      EventBus.$emit(C_EVENT.TOAST, "恭喜你抽中了 " + data.name);
+      EventBus.$emit(C_EVENT.REWARD, {
+        value:  data.gift.name, 
+        img: data.gift.image,
+        rewardType: "gift",
+      });
     })
     .catch((err) => {
       EventBus.$emit(C_EVENT.TOAST, JSON.stringify(err));

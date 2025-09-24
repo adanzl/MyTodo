@@ -287,7 +287,7 @@ def do_lottery():
         # 扣除积分
         db_mgr.add_score(user_id, -cate_cost, 'lottery', f"获得[{selected_gift['id']}]{selected_gift.get('name', '')}")
 
-        return {"code": 0, "msg": "抽奖成功", "data": {"gift": selected_gift, "cost": cate_cost}}
+        return {"code": 0, "msg": "抽奖成功", "data": {"gift": selected_gift, "fee": cate_cost}}
     except Exception as e:
         log.error(e)
         return {"code": -1, "msg": 'error: ' + str(e)}

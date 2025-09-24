@@ -231,7 +231,9 @@
     </div>
     <RewardPop
       :is-open="bOpenRewardPop.open"
-      :value="bOpenRewardPop.score"
+      :value="bOpenRewardPop.value"
+      :reward-type="bOpenRewardPop.rewardType"
+      :img="bOpenRewardPop.img"
       @willDismiss="onRewardDismiss" />
     <RewardSet :is-open="rewardSet.open" @willDismiss="() => (rewardSet.open = false)" />
     <ion-toast
@@ -250,6 +252,7 @@ import { C_EVENT } from "@/modal/EventBus";
 import { GroupOptions, PriorityOptions } from "@/modal/ScheduleType";
 import { User, UserData } from "@/modal/UserData";
 import { getScheduleList, getUserList } from "@/utils/NetUtil";
+import avatar from "@/assets/images/avatar.svg";
 import {
   IonAccordion,
   IonAccordionGroup,
@@ -294,7 +297,9 @@ const userPopover = ref<any>(null);
 const textPwd = ref("");
 const bOpenRewardPop = ref({
   open: false,
-  score: 0,
+  value: "0",
+  rewardType: "points",
+  img: avatar,
 });
 const rewardSet = ref({
   open: false,
@@ -406,7 +411,9 @@ eventBus.$on(C_EVENT.UPDATE_SAVE, (params: any) => {
 });
 eventBus.$on(C_EVENT.REWARD, (params: any) => {
   bOpenRewardPop.value.open = true;
-  bOpenRewardPop.value.score = params;
+  bOpenRewardPop.value.value = String(params.value);
+  bOpenRewardPop.value.rewardType = params.rewardType;
+  bOpenRewardPop.value.img = params.img;
 });
 eventBus.$on(C_EVENT.TOAST, (params: any) => {
   toastData.value.isOpen = true;

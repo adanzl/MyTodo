@@ -359,7 +359,10 @@ export class UData {
       if (newScore > oriScore) {
         dScore += newScore - oriScore;
         _scheduleSave.score = newScore;
-        EventBus.$emit(C_EVENT.REWARD, newScore - oriScore);
+        EventBus.$emit(C_EVENT.REWARD, {
+          rewardType: "points",
+          value: newScore - oriScore,
+        });
       }
     } else {
       // -积分 减积分的地方 只核减任务的主积分
