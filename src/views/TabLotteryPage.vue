@@ -328,10 +328,7 @@ const updateTabsHeight = () => {
 
 onMounted(async () => {
   // 获取数据
-  refreshGiftList(undefined, 1);
-  refreshCateList();
   await refreshUserList();
-  refreshScoreHistoryList(undefined, 1);
   handleRefresh({ target: { complete: () => {} } });
 
   // 创建 MutationObserver 监听 tabs 元素
@@ -363,6 +360,9 @@ onBeforeUnmount(() => {
 });
 
 function handleRefresh(event: any) {
+  refreshGiftList(undefined, 1);
+  refreshCateList();
+  refreshScoreHistoryList(undefined, 1);
   getLotteryData()
     .then((data: any) => {
       // buildLotteryMatrix(JSON.parse(data));
@@ -470,7 +470,7 @@ function btnLotteryClk() {
     .then((data) => {
       console.log("lottery data", data);
       EventBus.$emit(C_EVENT.REWARD, {
-        value:  data.gift.name, 
+        value: data.gift.name,
         img: data.gift.image,
         rewardType: "gift",
       });
