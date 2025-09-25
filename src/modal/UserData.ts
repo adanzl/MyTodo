@@ -347,6 +347,7 @@ export class UData {
     const map = userData.save[dKey];
     map![_scheduleData.id!] = _scheduleSave;
     const oriScore = _scheduleSave.score ?? 0; // 表示已经给的积分
+    let desc = "";
     let dScore = 0; // 要变更的积分
     if (_scheduleSave.state === 1) {
       let newScore = _scheduleData.score ?? 0;
@@ -359,6 +360,7 @@ export class UData {
       if (newScore > oriScore) {
         dScore += newScore - oriScore;
         _scheduleSave.score = newScore;
+        desc += _scheduleData.title + " ";
         EventBus.$emit(C_EVENT.REWARD, {
           rewardType: "points",
           value: newScore - oriScore,
@@ -369,6 +371,7 @@ export class UData {
       if (_scheduleSave.score) {
         dScore -= _scheduleData.score ?? 0;
         _scheduleSave.score -= _scheduleData.score ?? 0;
+        desc += _scheduleData.title + " ";
       }
     }
     // 变更积分 只能给日程的所有者加积分
@@ -376,7 +379,7 @@ export class UData {
       // GlobalVar.user.score += dScore;
       getUserInfo(userData.userId).then((userInfo: any) => {
         userInfo.score += dScore;
-        addScore(userData.userId, "schedule", dScore, "任务状态改变").then(() => {
+        addScore(userData.userId, "schedule", dScore, "任务:" + desc).then(() => {
           EventBus.$emit(C_EVENT.UPDATE_USER_INFO);
         });
       });
