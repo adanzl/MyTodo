@@ -519,6 +519,7 @@ function handleUserChange(event: any) {
   refreshScoreHistoryList(selectedUser.value.id, 1);
 }
 function formatDate(dateStr: string) {
+  // return dateStr;
   if (!dateStr) return dateStr;
   return dayjs(dateStr).format("YYYY-MM-DD HH:mm:ss");
 }

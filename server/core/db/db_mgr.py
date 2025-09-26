@@ -15,15 +15,6 @@ log = root_logger()
 DB_NAME = "data.db"
 TABLE_SAVE = "t_user_save"
 
-
-def get_china_time():
-    """
-    获取中国时区的当前时间
-    """
-    china_tz = timezone(timedelta(hours=8))  # 中国时区 UTC+8
-    return datetime.datetime.now(china_tz).strftime("%Y-%m-%d %H:%M:%S")
-
-
 class DB_Mgr:
 
     @staticmethod
@@ -183,7 +174,7 @@ class DB_Mgr:
                                          pre_value=pre_score,
                                          current=cur_score,
                                          msg=msg,
-                                         dt=get_china_time())
+                                         dt=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %z"))
 
             # 更新用户积分
             user.score = cur_score
