@@ -168,13 +168,19 @@ class DB_Mgr:
             cur_score = pre_score + int(value)
 
             # 创建积分历史记录
+            # 手动计算时区偏移，确保正确输出时区信息
+            now = datetime.datetime.now()
+            offset = now.astimezone().utcoffset()
+            offset_hours = int(offset.total_seconds() / 3600)
+            offset_str = f"{offset_hours:+03d}:00"
+            
             score_history = ScoreHistory(user_id=user_id,
                                          value=value,
                                          action=action,
                                          pre_value=pre_score,
                                          current=cur_score,
                                          msg=msg,
-                                         dt=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %z"))
+                                         dt=now.strftime(f"%Y-%m-%d %H:%M:%S {offset_str}"))
 
             # 更新用户积分
             user.score = cur_score
