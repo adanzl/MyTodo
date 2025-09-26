@@ -1,6 +1,7 @@
 import json
 import traceback
-import datetime as dayjs
+import datetime
+from datetime import timezone, timedelta
 
 from core.db import db_obj
 from core.log_config import root_logger
@@ -13,6 +14,14 @@ log = root_logger()
 
 DB_NAME = "data.db"
 TABLE_SAVE = "t_user_save"
+
+
+def get_china_time():
+    """
+    获取中国时区的当前时间
+    """
+    china_tz = timezone(timedelta(hours=8))  # 中国时区 UTC+8
+    return datetime.datetime.now(china_tz).strftime("%Y-%m-%d %H:%M:%S")
 
 
 class DB_Mgr:
@@ -81,7 +90,7 @@ class DB_Mgr:
         try:
             metadata = MetaData()
             table_obj = Table(table, metadata, autoload_with=db_obj.engine)
-            
+
             if fields == '*':
                 # 返回所有列
                 stmt = select(table_obj).where(table_obj.c.id == id)
@@ -116,7 +125,7 @@ class DB_Mgr:
         try:
             metadata = MetaData()
             table_obj = Table(table, metadata, autoload_with=db_obj.engine)
-            
+
             # 处理数据，将list类型转换为JSON字符串
             processed_data = {}
             for key, value in data.items():
@@ -124,7 +133,7 @@ class DB_Mgr:
                     processed_data[key] = json.dumps(value, ensure_ascii=False)
                 else:
                     processed_data[key] = value
-            
+
             id = processed_data.get('id')
             if id:
                 # 查找是否存在
@@ -174,7 +183,7 @@ class DB_Mgr:
                                          pre_value=pre_score,
                                          current=cur_score,
                                          msg=msg,
-                                         dt=dayjs.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                                         dt=get_china_time())
 
             # 更新用户积分
             user.score = cur_score
