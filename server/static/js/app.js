@@ -18,7 +18,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     { path: "/color", component: () => import(`../view/home.js${timestamp}`).then((m) => m.default) },
     { path: "/score", component: () => import(`../view/score.js${timestamp}`).then((m) => m.default) },
     { path: "/timetable", component: () => import(`../view/timetable.js${timestamp}`).then((m) => m.default) },
-    { path: "/device", component: () => import(`../view/device.js${timestamp}`).then((m) => m.default) },
+    { path: "/media", component: () => import(`../view/media.js${timestamp}`).then((m) => m.default) },
   ];
   // 创建路由实例
   const router = window.VueRouter.createRouter({

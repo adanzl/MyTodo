@@ -10,10 +10,12 @@ import os
 from typing import Dict, List, Optional
 try:
     from core.log_config import root_logger
+    from core.db import rds_mgr
     log = root_logger()
 except ImportError:
     import logging
     log = logging.getLogger()
+    rds_mgr = None
 
 # 尝试使用 gevent.subprocess，如果不可用则使用标准 subprocess
 try:
