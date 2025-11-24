@@ -4,17 +4,21 @@ const { createApp, ref, onMounted } = window.Vue;
 const { ElMessage } = window.ElementPlus;
 const _ = window._;
 document.addEventListener("DOMContentLoaded", async () => {
-  const { default: Info } = await import("../view/info.js");
+  // 添加时间戳避免缓存
+  const timestamp = `?t=${Date.now()}`;
+  
+  const { default: Info } = await import(`../view/info.js${timestamp}`);
 
   const routes = [
     { path: "/", redirect: "/home" },
-    { path: "/home", component: () => import("../view/home.js").then((m) => m.default) },
-    { path: "/lottery", component: () => import("../view/lottery.js").then((m) => m.default) },
+    { path: "/home", component: () => import(`../view/home.js${timestamp}`).then((m) => m.default) },
+    { path: "/lottery", component: () => import(`../view/lottery.js${timestamp}`).then((m) => m.default) },
     { path: "/info", component: Info },
-    { path: "/chat", component: () => import("../view/chat.js").then((m) => m.default) },
-    { path: "/color", component: () => import("../view/home.js").then((m) => m.default) },
-    { path: "/score", component: () => import("../view/score.js").then((m) => m.default) },
-    { path: "/timetable", component: () => import("../view/timetable.js").then((m) => m.default) },
+    { path: "/chat", component: () => import(`../view/chat.js${timestamp}`).then((m) => m.default) },
+    { path: "/color", component: () => import(`../view/home.js${timestamp}`).then((m) => m.default) },
+    { path: "/score", component: () => import(`../view/score.js${timestamp}`).then((m) => m.default) },
+    { path: "/timetable", component: () => import(`../view/timetable.js${timestamp}`).then((m) => m.default) },
+    { path: "/device", component: () => import(`../view/device.js${timestamp}`).then((m) => m.default) },
   ];
   // 创建路由实例
   const router = window.VueRouter.createRouter({

@@ -182,4 +182,17 @@ export async function setRdsData(table, id, value) {
   }
   return rsp.data.data;
 }
+
+export async function bluetoothAction(action, method, params) {
+  let rsp = null;
+  if (method === "GET") {
+    rsp = await axios.get(API_URL + "/bluetooth/" + action, {
+      params: params,
+    });
+  } else {
+    rsp = await axios.post(API_URL + "/bluetooth/" + action, params);
+  }
+  return rsp.data;
+}
+
 export default {};
