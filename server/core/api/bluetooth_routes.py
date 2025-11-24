@@ -8,6 +8,7 @@ from core.device.bluetooth import (
     scan_devices_sync,
     connect_device_sync,
     disconnect_device_sync,
+    get_system_connected_devices_sync,
 )
 
 log = root_logger()
@@ -106,7 +107,7 @@ def bluetooth_get_connected():
     """
     try:
         log.info("===== [Bluetooth Get Connected Devices]")
-        devices = get_bluetooth_mgr().get_system_connected_devices()
+        devices = get_system_connected_devices_sync()
         return {"code": 0, "msg": "ok", "data": devices}
     except Exception as e:
         log.error(e)

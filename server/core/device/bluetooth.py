@@ -5,6 +5,8 @@ import asyncio
 import json
 import platform
 import re
+import shutil
+import os
 from typing import Dict, List, Optional
 try:
     from core.log_config import root_logger
@@ -47,7 +49,7 @@ class BluetoothDevice:
             "connected": bool(self.connected),
             "metadata": self._ensure_json_serializable(self.metadata)
         }
-    
+
     def _ensure_json_serializable(self, obj):
         """递归确保对象是 JSON 可序列化的"""
         if isinstance(obj, bytes):
@@ -126,7 +128,7 @@ class BluetoothMgr:
                                 # 先检查是否大部分字节在可打印 ASCII 范围内（0x20-0x7E）或常见中文编码范围
                                 printable_count = sum(1 for b in data_bytes if 0x20 <= b <= 0x7E)
                                 ratio = printable_count / len(data_bytes) if len(data_bytes) > 0 else 0
-                                
+
                                 # 如果超过 70% 是可打印 ASCII，尝试解码
                                 if ratio > 0.7:
                                     for encoding in ['utf-8', 'gbk', 'gb2312']:
@@ -139,7 +141,7 @@ class BluetoothMgr:
                                                 break
                                         except (UnicodeDecodeError, UnicodeError):
                                             continue
-                                
+
                                 # 构建返回数据
                                 result = {
                                     'hex': data_bytes.hex(),
@@ -147,7 +149,7 @@ class BluetoothMgr:
                                 }
                                 if decoded_str:
                                     result['decoded'] = decoded_str
-                                
+
                                 manufacturer_data_decoded[manufacturer_id] = result
                             else:
                                 # 如果不是 bytes，直接使用；如果是 bytes，转换为可序列化格式
@@ -159,7 +161,7 @@ class BluetoothMgr:
                                 else:
                                     manufacturer_data_decoded[manufacturer_id] = data_bytes
                         metadata['manufacturer_data'] = manufacturer_data_decoded
-                    
+
                     if hasattr(advertisement_data, 'service_data'):
                         if advertisement_data.service_data:
                             # 处理 service_data，确保所有 bytes 都被转换
@@ -176,7 +178,7 @@ class BluetoothMgr:
                             metadata['service_data'] = service_data_dict
                         else:
                             metadata['service_data'] = {}
-                    
+
                     if hasattr(advertisement_data, 'service_uuids'):
                         if advertisement_data.service_uuids:
                             # 确保所有 UUID 都转换为字符串
@@ -324,24 +326,73 @@ class BluetoothMgr:
             return self.devices[address].to_dict()
         return None
 
-    def _run_subprocess_safe(self, cmd, timeout=10):
+    def _find_command(self, cmd_name):
+        """
+        查找命令的完整路径
+        """
+        # 首先尝试使用 shutil.which
+        cmd_path = shutil.which(cmd_name)
+        if cmd_path:
+            return cmd_path
+
+        # 如果找不到，尝试常见路径
+        common_paths = [
+            "/usr/bin",
+            "/usr/local/bin",
+            "/bin",
+            "/sbin",
+            "/usr/sbin",
+        ]
+        for path in common_paths:
+            full_path = os.path.join(path, cmd_name)
+            if os.path.exists(full_path) and os.access(full_path, os.X_OK):
+                return full_path
+
+        return None
+
+    def _run_subprocess_safe(self, cmd, timeout=10, env=None):
         """
         在 gevent 环境中安全地运行 subprocess
         """
         def _run():
             try:
+                # 如果是字符串命令，尝试查找完整路径
+                if isinstance(cmd, list) and len(cmd) > 0:
+                    cmd_name = cmd[0]
+                    cmd_path = self._find_command(cmd_name)
+                    if cmd_path:
+                        cmd[0] = cmd_path
+
+                # 设置环境变量，确保包含系统 PATH
+                process_env = os.environ.copy()
+                if env:
+                    process_env.update(env)
+                # 确保 PATH 包含常见路径
+                if 'PATH' not in process_env or not process_env['PATH']:
+                    process_env['PATH'] = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+                else:
+                    # 确保常见路径在 PATH 中
+                    common_paths = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+                    if common_paths not in process_env['PATH']:
+                        process_env['PATH'] = f"{process_env['PATH']}:{common_paths}"
+
                 process = subprocess.Popen(
                     cmd,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    text=True
+                    text=True,
+                    env=process_env
                 )
                 stdout, stderr = process.communicate(timeout=timeout)
                 return process.returncode, stdout, stderr
+            except FileNotFoundError as e:
+                # 命令不存在
+                log.warning(f"[BLUETOOTH] Command not found: {cmd[0] if isinstance(cmd, list) else cmd}")
+                return -2, "", str(e)
             except Exception as e:
                 log.error(f"[BLUETOOTH] Subprocess error: {e}")
                 return -1, "", str(e)
-        
+
         if GEVENT_AVAILABLE and spawn:
             # 在独立的 greenlet 中运行，避免线程问题
             greenlet = spawn(_run)
@@ -357,7 +408,7 @@ class BluetoothMgr:
         """
         connected_devices = []
         system = platform.system()
-        
+
         try:
             if system == "Darwin":  # macOS
                 # 使用 system_profiler 获取蓝牙设备信息
@@ -365,7 +416,7 @@ class BluetoothMgr:
                     ["system_profiler", "SPBluetoothDataType", "-json"],
                     timeout=10
                 )
-                
+
                 if result_code == 0:
                     try:
                         bluetooth_data = json.loads(stdout)
@@ -387,7 +438,7 @@ class BluetoothMgr:
                                         connected_devices.append(device_info)
                     except json.JSONDecodeError:
                         log.warning("[BLUETOOTH] Failed to parse system_profiler output")
-            
+
             elif system == "Linux":
                 # 使用 bluetoothctl 获取已连接设备
                 try:
@@ -432,7 +483,7 @@ class BluetoothMgr:
                                         connected_devices.append(device_info)
                     except FileNotFoundError:
                         log.warning("[BLUETOOTH] bluetoothctl and hcitool not found")
-            
+
             elif system == "Windows":
                 # 使用 PowerShell 获取已连接设备
                 ps_command = """
@@ -465,10 +516,10 @@ class BluetoothMgr:
                                 connected_devices.append(device_info)
                             except json.JSONDecodeError:
                                 continue
-            
+
             log.info(f"[BLUETOOTH] Found {len(connected_devices)} system connected devices")
             return connected_devices
-            
+
         except Exception as e:
             log.error(f"[BLUETOOTH] Error getting system connected devices: {e}")
             return []
@@ -534,7 +585,11 @@ def get_bluetooth_mgr() -> BluetoothMgr:
 
 # 同步包装函数（用于在Flask路由中使用）
 def scan_devices_sync(timeout: float = 5.0) -> List[Dict]:
-    """同步扫描设备（在事件循环中运行）"""
+    """
+    同步扫描设备（在事件循环中运行）
+    :param timeout: 扫描超时时间（秒）
+    :return: 设备列表
+    """
     import concurrent.futures
     try:
         # 尝试获取正在运行的事件循环
@@ -552,6 +607,18 @@ def scan_devices_sync(timeout: float = 5.0) -> List[Dict]:
         return []
     except Exception as e:
         log.error(f"[BLUETOOTH] Scan error: {e}")
+        return []
+
+
+def get_system_connected_devices_sync() -> List[Dict]:
+    """
+    同步获取系统已连接的蓝牙设备列表
+    :return: 已连接设备列表
+    """
+    try:
+        return get_bluetooth_mgr().get_system_connected_devices()
+    except Exception as e:
+        log.error(f"[BLUETOOTH] Get system connected devices error: {e}")
         return []
 
 
@@ -630,3 +697,8 @@ if __name__ == "__main__":
     print(f"Found {len(devices)} devices")
     for device in devices:
         print(f"【{device['address']}】{device['name']}")
+    # 测试获取系统已连接的设备
+    connected_devices = get_system_connected_devices_sync()
+    print(f"Found {len(connected_devices)} connected devices")
+    for device in connected_devices:
+        print(f"【{device.get('address', 'N/A')}】{device.get('name', 'Unknown')}")
