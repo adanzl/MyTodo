@@ -2,6 +2,7 @@
 蓝牙设备管理路由
 '''
 import os
+import urllib.parse
 from flask import Blueprint, json, request
 from core.log_config import root_logger
 from core.device.bluetooth import (
@@ -121,7 +122,20 @@ def bluetooth_list_directory():
     获取服务器目录列表
     """
     try:
+        # 获取路径参数，并进行 URL 解码以支持中文和特殊字符
         path = request.args.get('path', '')
+        if path:
+            # URL 解码以支持中文字符和特殊字符
+            # 可能需要多次解码（如果前端已经编码了）
+            while '%' in path:
+                try:
+                    decoded = urllib.parse.unquote(path)
+                    if decoded == path:
+                        break
+                    path = decoded
+                except Exception:
+                    break
+        
         log.info(f"===== [Bluetooth List Directory] path={path}")
         
         # 默认基础目录
@@ -132,8 +146,10 @@ def bluetooth_list_directory():
             path = default_base_dir
         else:
             # 安全检查：防止路径遍历攻击
-            if '..' in path or path.startswith('~'):
-                return {"code": -1, "msg": "Invalid path"}
+            # 检查路径中是否包含 .. 作为路径组件（不是文件名中的 ...）
+            path_parts = path.split('/')
+            if '..' in path_parts or path.startswith('~'):
+                return {"code": -1, "msg": "Invalid path: Path traversal not allowed"}
             
             # 规范化路径
             if not os.path.isabs(path):
