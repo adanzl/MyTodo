@@ -1,4 +1,4 @@
-import { bluetoothAction, getRdsData, setRdsData } from "../js/net_util.js";
+import { bluetoothAction, getRdsData, setRdsData, mediaAction } from "../js/net_util.js";
 
 const { ref, onMounted, nextTick, watch } = window.Vue;
 const { ElMessage } = window.ElementPlus;
@@ -50,6 +50,8 @@ async function createComponent() {
         loading: ref(false),
         deviceList: ref([]),
         connectedDeviceList: ref([]),
+        playing: ref(false),
+        stopping: ref(false),
       };
 
       // 刷新已连接设备列表
@@ -923,6 +925,57 @@ async function createComponent() {
         canNavigateUp.value = path && path !== "/mnt" && path !== "/";
       };
 
+      // 播放目录
+      const handlePlayDirectory = async () => {
+        try {
+          refData.playing.value = true;
+          
+          // 获取选中的设备地址（如果有）
+          const deviceAddress = refData.connectedDeviceList.value.length > 0 
+            ? refData.connectedDeviceList.value[0].address 
+            : null;
+          
+          // 构建请求参数
+          const params = {};
+          if (refData.selectedPath.value) {
+            params.path = refData.selectedPath.value;
+          }
+          if (deviceAddress) {
+            params.device_address = deviceAddress;
+          }
+          
+          const rsp = await mediaAction("playDir", "POST", params);
+          if (rsp.code === 0) {
+            ElMessage.success("开始播放");
+          } else {
+            ElMessage.error(rsp.msg || "播放失败");
+          }
+        } catch (error) {
+          console.error("播放失败:", error);
+          ElMessage.error("播放失败: " + (error.message || "未知错误"));
+        } finally {
+          refData.playing.value = false;
+        }
+      };
+
+      // 停止播放
+      const handleStopPlayback = async () => {
+        try {
+          refData.stopping.value = true;
+          const rsp = await mediaAction("stop", "POST");
+          if (rsp.code === 0) {
+            ElMessage.success("已停止播放");
+          } else {
+            ElMessage.error(rsp.msg || "停止失败");
+          }
+        } catch (error) {
+          console.error("停止失败:", error);
+          ElMessage.error("停止失败: " + (error.message || "未知错误"));
+        } finally {
+          refData.stopping.value = false;
+        }
+      };
+
       const refMethods = {
         handleUpdateDeviceList,
         handleOpenScanDialog,
@@ -947,6 +1000,8 @@ async function createComponent() {
         handleConnectDevice,
         handleDisconnectDevice,
         refreshConnectedList,
+        handlePlayDirectory,
+        handleStopPlayback,
         handleDialogClose: () => {
           refData.dialogForm.value.visible = false;
           refData.dialogForm.value.value = 0;

@@ -29,6 +29,22 @@
     </el-table>
   </div>
 
+  <!-- 播放控制 -->
+  <div class="mt-4">
+    <div class="flex items-center gap-2">
+      <el-button 
+        type="success" 
+        @click="handlePlayDirectory" 
+        :loading="playing"
+        :disabled="connectedDeviceList.length === 0">
+        播放
+      </el-button>
+      <el-button type="danger" @click="handleStopPlayback" :loading="stopping">
+        停止
+      </el-button>
+    </div>
+  </div>
+
   <!-- Cron 表达式配置 -->
   <div class="mt-4">
     <div class="text-sm text-gray-600 mb-2">重复时间配置 (Cron 表达式)</div>
