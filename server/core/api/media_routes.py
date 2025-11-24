@@ -40,7 +40,7 @@ def get_media_files(directory):
     media_files = []
     if not os.path.exists(directory) or not os.path.isdir(directory):
         return media_files
-
+    
     try:
         for item in os.listdir(directory):
             item_path = os.path.join(directory, item)
@@ -56,7 +56,7 @@ def get_media_files(directory):
         media_files.sort(key=lambda x: x['name'])
     except Exception as e:
         log.error(f"[MEDIA] Error listing directory {directory}: {e}")
-
+    
     return media_files
 
 
@@ -68,7 +68,7 @@ def stop_current_playback():
     try:
         if not _pygame_initialized:
             return {"code": -1, "msg": "Pygame not initialized"}
-
+        
         # 检查是否有正在播放的音频
         if pygame.mixer.music.get_busy():
             pygame.mixer.music.stop()
@@ -91,20 +91,20 @@ def play_media_file(file_path, bluetooth_device=None):
     try:
         if not _pygame_initialized:
             return {"code": -1, "msg": "Pygame not initialized"}
-
+        
         # 停止当前正在播放的音频
         stop_result = stop_current_playback()
         if stop_result.get('code') == 0:
             log.info("[MEDIA] Stopped previous playback before starting new one")
-
+        
         # 检查文件是否存在
         if not os.path.exists(file_path):
             return {"code": -1, "msg": f"File not found: {file_path}"}
-
+        
         # 使用 pygame.mixer.music 播放音频文件
         try:
-            sound = pygame.mixer.music.load(file_path)
-            sound.play()
+            pygame.mixer.music.load(file_path)
+            pygame.mixer.music.play()
             log.info(f"[MEDIA] Playing file: {file_path}")
             return {"code": 0, "msg": "Playing", "file": os.path.basename(file_path)}
         except pygame.error as e:
@@ -122,16 +122,16 @@ def media_play_dir():
     """
     try:
         log.info("===== [Media Play Directory]")
-
+        
         # 从请求体获取参数（可选）
         args = request.get_json() or {}
         custom_path = args.get('path')  # 可选：允许前端指定路径
         device_address = args.get('device_address')  # 可选：指定设备地址
-
+        
         # 1. 按优先级获取/连接蓝牙设备
         target_device = None
         connected_devices = []
-
+        
         # 优先级1: 使用传入的设备地址
         if device_address:
             log.info(f"Attempting to connect to specified device: {device_address}")
@@ -141,14 +141,14 @@ def media_play_dir():
                 log.info(f"Successfully connected to specified device: {device_address}")
             else:
                 log.warning(f"Failed to connect to specified device {device_address}: {connect_result.get('msg')}")
-
+        
         # 优先级2: 使用系统已连接的设备
         if not target_device:
             connected_devices = get_system_connected_devices_sync()
             if connected_devices:
                 target_device = connected_devices[0]
                 log.info(f"Using system connected device: {target_device.get('address', 'N/A')}")
-
+        
         # 优先级3: 从 Redis 存档中获取设备并连接
         if not target_device and rds_mgr:
             try:
@@ -173,13 +173,13 @@ def media_play_dir():
                                     log.warning(f"Failed to connect to saved device {saved_address}: {connect_result.get('msg')}")
             except Exception as e:
                 log.warning(f"[MEDIA] Failed to load saved devices from Redis: {e}")
-
+        
         # 如果所有方式都失败，返回错误
         if not target_device:
             return {"code": -1, "msg": "无法获取或连接蓝牙设备，请检查设备连接状态"}
-
+        
         log.info(f"Using bluetooth device: {target_device.get('address', 'N/A')} - {target_device.get('name', 'Unknown')}")
-
+        
         # 2. 获取目录路径：优先使用请求参数，其次从 Redis 获取配置，最后使用默认路径
         selected_path = None
         if custom_path:
@@ -196,23 +196,23 @@ def media_play_dir():
                         log.info(f"Loaded selected_path from Redis: {selected_path}")
                 except Exception as e:
                     log.warning(f"[MEDIA] Failed to load config from Redis: {e}")
-
+            
             # 如果没有配置，使用默认路径
             if not selected_path:
                 selected_path = "/mnt"
                 log.info(f"Using default path: {selected_path}")
-
+        
         # 验证路径
         if not os.path.exists(selected_path) or not os.path.isdir(selected_path):
             return {"code": -1, "msg": f"目录不存在: {selected_path}"}
-
+        
         # 3. 获取目录下的所有媒体文件
         media_files = get_media_files(selected_path)
         if not media_files:
             return {"code": -1, "msg": f"目录下没有找到媒体文件: {selected_path}"}
-
+        
         log.info(f"Found {len(media_files)} media files in {selected_path}")
-
+        
         # 4. 播放文件（这里可以按顺序播放，或者返回文件列表让前端控制）
         # 为了简化，这里返回文件列表和第一个文件的播放结果
         play_results = []
@@ -223,7 +223,7 @@ def media_play_dir():
                 'file': first_file['name'],
                 'result': play_result
             })
-
+        
         return {
             "code": 0,
             "msg": "ok",
