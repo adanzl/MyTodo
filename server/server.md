@@ -10,6 +10,8 @@
 
 > `sudo systemctl restart my-todo`
 
+> 本地调试 运行main.py
+
 ## 配置 natapp
 
 `cat /opt/natapp/logs/natapp_web.log`

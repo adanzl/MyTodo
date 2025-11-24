@@ -1,7 +1,7 @@
 from flask import make_response
 from gevent import monkey
 
-monkey.patch_all()  # 在导入其他模块之前进行 patch
+monkey.patch_all(subprocess=True)  # 在导入其他模块之前进行 patch，包括 subprocess
 from core import create_app
 from core.log_config import root_logger
 

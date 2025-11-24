@@ -5,6 +5,7 @@ from flask_sqlalchemy import SQLAlchemy
 
 import core.ai.ai_mgr as ai_mgr
 from core.api.routes import api_bp
+from core.api.bluetooth_routes import bluetooth_bp
 from core.chat.chat_mgr import ChatMgr
 from core.db.db_mgr import DB_Mgr
 import os
@@ -25,6 +26,7 @@ def create_app():
     )
 
     app.register_blueprint(api_bp, url_prefix='/')
+    app.register_blueprint(bluetooth_bp, url_prefix='/')
 
     ChatMgr(socketio)
     DB_Mgr.init(app)
