@@ -472,7 +472,7 @@ async function createComponent() {
             // file_list 不保存，需要时重新获取
             // connected_devices 不保存，由 refreshConnectedList 获取实时数据
           };
-          await setRdsData("SCHELUE_PLAY", "bluetooth", JSON.stringify(configData));
+          await setRdsData("SCHEDULE_PLAY", "bluetooth", JSON.stringify(configData));
         } catch (error) {
           console.error("保存配置失败:", error);
         }
@@ -481,7 +481,7 @@ async function createComponent() {
       // 加载配置
       const loadBluetoothConfig = async () => {
         try {
-          const dataStr = await getRdsData("SCHELUE_PLAY", "bluetooth");
+          const dataStr = await getRdsData("SCHEDULE_PLAY", "bluetooth");
           if (dataStr) {
             const data = JSON.parse(dataStr);
             if (data.cron_expression) {

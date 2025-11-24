@@ -53,7 +53,7 @@ class AILocal:
                         if "message" == chunk['event']:
                             self.on_msg(chunk["answer"], chunk['message_id'], 0)
                         elif chunk['event'] == 'error':
-                            raise RuntimeError(f'{chunk['code']} : {chunk["message"]}')
+                            raise RuntimeError(f'{chunk["code"]} : {chunk["message"]}')
                         elif chunk['event'] == 'message_end':
                             log.info(chunk['metadata'])
                             self.on_msg(chunk["metadata"], chunk['message_id'], 1)

@@ -3,13 +3,16 @@
     "python-envs.defaultPackageManager": "ms-python.python:conda",
     "python-envs.pythonProjects": [],
     "cSpell.words": [
+        "bluetoothctl",
         "geventwebsocket",
+        "hcitool",
         "jsonify",
         "llen",
         "lrange",
         "natapp",
         "pywsgi",
         "rpush",
+        "rssi",
         "zhaozhao"
     ],
     "python.languageServer": "None",

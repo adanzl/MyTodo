@@ -443,10 +443,8 @@ class BluetoothMgr:
                 # 使用 bluetoothctl 获取已连接设备
                 try:
                     # bluetoothctl devices 返回已连接的设备列表
-                    result_code, stdout, stderr = self._run_subprocess_safe(
-                        ["bluetoothctl", "devices"],
-                        timeout=10
-                    )
+                    result_code, stdout, stderr = self._run_subprocess_safe(["bluetoothctl", "devices", "Connected"],
+                                                                            timeout=10)
                     if result_code == 0:
                         # 解析 bluetoothctl 输出格式: "Device XX:XX:XX:XX:XX:XX Device Name"
                         for line in stdout.strip().split('\n'):
@@ -629,11 +627,11 @@ def connect_device_sync(address: str, timeout: float = 10.0) -> Dict:
         asyncio.get_running_loop()
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future = executor.submit(_run_async, get_bluetooth_mgr().connect_device(address), timeout=timeout)
-            result = future.result(timeout=timeout + 2.0)
+            result = future.result(timeout=timeout + 5.0)
     except RuntimeError:
         result = _run_async(get_bluetooth_mgr().connect_device(address), timeout=timeout)
     except concurrent.futures.TimeoutError:
-        log.error(f"[BLUETOOTH] Connect timeout after {timeout + 2.0}s")
+        log.error(f"[BLUETOOTH] Connect timeout after {timeout + 5.0}s")
         return {"code": -1, "msg": f"Connection timeout after {timeout}s"}
     except Exception as e:
         log.error(f"[BLUETOOTH] Connect error: {e}")
