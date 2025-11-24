@@ -391,26 +391,25 @@ class BluetoothMgr:
             elif system == "Linux":
                 # 使用 bluetoothctl 获取已连接设备
                 try:
+                    # bluetoothctl devices 返回已连接的设备列表
                     result_code, stdout, stderr = self._run_subprocess_safe(
-                        ["bluetoothctl", "--format", "json", "devices", "Connected"],
+                        ["bluetoothctl", "devices"],
                         timeout=10
                     )
                     if result_code == 0:
-                        # bluetoothctl 可能返回多行 JSON
+                        # 解析 bluetoothctl 输出格式: "Device XX:XX:XX:XX:XX:XX Device Name"
                         for line in stdout.strip().split('\n'):
-                            if line.strip():
-                                try:
-                                    device_data = json.loads(line)
-                                    if device_data.get("Connected") == "yes":
-                                        device_info = {
-                                            "address": device_data.get("Address", ""),
-                                            "name": device_data.get("Name", device_data.get("Address", "Unknown")),
-                                            "connected": True,
-                                            "alias": device_data.get("Alias", None),
-                                        }
-                                        connected_devices.append(device_info)
-                                except json.JSONDecodeError:
-                                    continue
+                            if line.strip() and line.startswith('Device'):
+                                parts = line.split(' ', 2)
+                                if len(parts) >= 2:
+                                    address = parts[1]
+                                    name = parts[2] if len(parts) > 2 else address
+                                    device_info = {
+                                        "address": address,
+                                        "name": name,
+                                        "connected": True,
+                                    }
+                                    connected_devices.append(device_info)
                 except FileNotFoundError:
                     # 如果没有 bluetoothctl，尝试使用 hcitool
                     try:
