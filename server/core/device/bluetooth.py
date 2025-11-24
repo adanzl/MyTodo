@@ -55,7 +55,6 @@ class BluetoothDevice:
         if isinstance(obj, bytes):
             return {
                 'hex': obj.hex(),
-                'raw': list(obj),
                 'length': len(obj)
             }
         elif isinstance(obj, dict):
@@ -170,7 +169,6 @@ class BluetoothMgr:
                                 if isinstance(data, bytes):
                                     service_data_dict[str(service_uuid)] = {
                                         'hex': data.hex(),
-                                        'raw': list(data),
                                         'length': len(data)
                                     }
                                 else:
