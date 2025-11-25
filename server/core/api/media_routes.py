@@ -173,9 +173,10 @@ def cron_update():
         enabled = args.get('enabled')
         expression = args.get('expression')
         command = args.get('command')
+        duration = args.get('duration')
         
         client = get_device_agent_client()
-        result = client.cron_update(enabled=enabled, expression=expression, command=command)
+        result = client.cron_update(enabled=enabled, expression=expression, command=command, duration=duration)
         
         # 转换device_agent的响应格式为server端统一格式
         if result.get('success'):

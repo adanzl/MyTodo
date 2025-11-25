@@ -177,6 +177,24 @@
         下次运行: {{ nextRunTime }}
       </span>
     </div>
+    <div class="flex items-center gap-2 mt-2">
+      <span class="text-sm text-gray-600 w-20">持续时间:</span>
+      <el-input-number
+        v-model="cronDuration"
+        :min="0"
+        :max="1440"
+        :step="1"
+        :disabled="!cronEnabled"
+        class="!w-[200px]">
+      </el-input-number>
+      <span class="text-sm text-gray-500">分钟（0表示不自动停止）</span>
+      <span v-if="cronDuration > 0" class="text-sm text-blue-600">
+        ({{ formatDurationMinutes(cronDuration) }})
+      </span>
+      <el-button type="primary" size="small" @click="saveBluetoothConfig" :disabled="!cronEnabled">
+        保存
+      </el-button>
+    </div>
   </div>
 
   <!-- Cron 可视化生成弹窗 -->

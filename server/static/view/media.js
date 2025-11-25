@@ -27,6 +27,8 @@ async function createComponent() {
         selectedFiles: ref([]),
         cronExpression: ref(""),
         cronEnabled: ref(false),
+        cronCommand: ref("play_next_track"),
+        cronDuration: ref(0),
         nextRunTime: ref(""),
         cronBuilderVisible: ref(false),
         cronBuilder: ref({
@@ -397,6 +399,14 @@ async function createComponent() {
             updateData.expression = cron5Parts;
           }
           
+          // 添加持续时间（将分钟转换为秒）
+          if (refData.cronDuration.value !== null && refData.cronDuration.value !== undefined) {
+            const minutes = parseInt(refData.cronDuration.value);
+            if (!isNaN(minutes) && minutes >= 0) {
+              updateData.duration = minutes * 60; // 转换为秒
+            }
+          }
+          
           const cronRsp = await cronAction("update", "POST", updateData);
           if (cronRsp.code !== 0) {
             console.error("保存 Cron 配置失败:", cronRsp.msg);
@@ -433,6 +443,14 @@ async function createComponent() {
                 }
               } else {
                 refData.cronExpression.value = "";
+              }
+              
+              // 获取持续时间（将秒转换为分钟）
+              if (cronRsp.data.duration !== null && cronRsp.data.duration !== undefined) {
+                const seconds = parseInt(cronRsp.data.duration) || 0;
+                refData.cronDuration.value = Math.floor(seconds / 60); // 转换为分钟
+              } else {
+                refData.cronDuration.value = 0;
               }
             }
           } catch (error) {
@@ -836,6 +854,23 @@ async function createComponent() {
         const sizes = ["B", "KB", "MB", "GB"];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
+      };
+
+      // 格式化持续时间（分钟转换为可读格式）
+      const formatDurationMinutes = (minutes) => {
+        if (!minutes || minutes === 0) return "不停止";
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        
+        const parts = [];
+        if (hours > 0) {
+          parts.push(`${hours}小时`);
+        }
+        if (mins > 0) {
+          parts.push(`${mins}分钟`);
+        }
+        
+        return parts.length > 0 ? parts.join(" ") : "0分钟";
       };
 
 
@@ -1251,6 +1286,7 @@ async function createComponent() {
         handlePreviewCron,
         updateNextRunTime,
         formatSize,
+        formatDurationMinutes,
         handleConnectDevice,
         handleDisconnectDevice,
         refreshConnectedList,

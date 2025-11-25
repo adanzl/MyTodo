@@ -188,13 +188,15 @@ class DeviceAgentClient:
         return self._request("GET", "/cron/status")
     
     def cron_update(self, enabled: Optional[bool] = None, 
-                    expression: Optional[str] = None, 
-                    command: Optional[str] = None) -> Dict[str, Any]:
+                   expression: Optional[str] = None, 
+                   command: Optional[str] = None,
+                   duration: Optional[int] = None) -> Dict[str, Any]:
         """
         更新 Cron 定时任务配置
         :param enabled: 是否启用
         :param expression: Cron 表达式（格式: 分 时 日 月 周）
         :param command: 要执行的命令
+        :param duration: 持续时间（秒），执行后多久自动停止播放
         :return: 更新结果
         """
         data = {}
@@ -204,6 +206,8 @@ class DeviceAgentClient:
             data["expression"] = expression
         if command is not None:
             data["command"] = command
+        if duration is not None:
+            data["duration"] = duration
         return self._request("POST", "/cron/update", json_data=data)
 
 

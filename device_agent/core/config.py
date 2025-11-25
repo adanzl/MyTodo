@@ -101,14 +101,26 @@ class Config:
             print(f"保存配置文件失败: {e}")
             return False
     
+    def get_cron_duration(self) -> Optional[int]:
+        """获取 cron 任务持续时间（秒）"""
+        duration_str = self.get('cron.duration')
+        if duration_str:
+            try:
+                return int(duration_str)
+            except ValueError:
+                return None
+        return None
+    
     def update_cron_config(self, enabled: Optional[bool] = None, 
                           expression: Optional[str] = None, 
-                          command: Optional[str] = None) -> bool:
+                          command: Optional[str] = None,
+                          duration: Optional[int] = None) -> bool:
         """
         更新 cron 配置
         :param enabled: 是否启用
         :param expression: cron 表达式
         :param command: 要执行的命令
+        :param duration: 持续时间（秒），执行后多久自动停止播放
         :return: 是否成功
         """
         try:
@@ -120,6 +132,9 @@ class Config:
             
             if command is not None:
                 self.config['cron.command'] = command
+            
+            if duration is not None:
+                self.config['cron.duration'] = str(duration) if duration > 0 else ''
             
             return self.save_config()
         except Exception as e:

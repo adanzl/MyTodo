@@ -33,6 +33,7 @@ class CronScheduler:
         self._started = False  # 标记是否已经调用过 start()
         self._executing = False  # 标记是否正在执行任务
         self._execute_lock = threading.Lock()  # 执行锁
+        self._stop_timer = None  # 自动停止定时器
     
     def execute_command(self):
         """执行配置的命令（带执行锁保护）"""
@@ -58,6 +59,11 @@ class CronScheduler:
                 success = play_next_track_func()
                 if success:
                     log.info("播放列表播放成功")
+                    
+                    # 检查是否配置了持续时间
+                    duration = self.config.get_cron_duration()
+                    if duration and duration > 0:
+                        self._schedule_stop(duration)
                 else:
                     log.warning("播放列表播放失败")
                 return
@@ -89,6 +95,41 @@ class CronScheduler:
             self._executing = False
             self._execute_lock.release()
             log.debug("定时任务执行完成，释放执行锁")
+    
+    def _schedule_stop(self, duration: int):
+        """
+        安排在指定时间后自动停止播放
+        :param duration: 持续时间（秒）
+        """
+        # 取消之前的定时器（如果有）
+        if self._stop_timer:
+            self._stop_timer.cancel()
+            log.debug("取消之前的停止定时器")
+        
+        log.info(f"将在 {duration} 秒后自动停止播放")
+        
+        # 创建新的定时器
+        self._stop_timer = threading.Timer(duration, self._auto_stop)
+        self._stop_timer.daemon = True  # 设置为守护线程
+        self._stop_timer.start()
+    
+    def _auto_stop(self):
+        """自动停止播放"""
+        try:
+            log.info("持续时间已到，自动停止播放")
+            
+            # 导入 stop_current_playback 函数
+            from core.api.media_routes import stop_current_playback
+            result = stop_current_playback()
+            
+            if result.get('code') == 0:
+                log.info(f"自动停止成功: {result.get('msg')}")
+            else:
+                log.error(f"自动停止失败: {result.get('msg')}")
+        except Exception as e:
+            log.error(f"自动停止播放时发生错误: {str(e)}")
+        finally:
+            self._stop_timer = None
     
     def parse_cron_expression(self, cron_expr: str) -> dict:
         """
@@ -225,12 +266,16 @@ class CronScheduler:
     
     def get_status(self) -> dict:
         """获取调度器状态"""
+        duration = self.config.get_cron_duration()
+        
         return {
             'running': self.scheduler.running if self.scheduler else False,
             'enabled': self.config.is_cron_enabled(),
             'cron_expression': self.config.get_cron_expression(),
             'command': self.config.get_cron_command(),
+            'duration': duration,
             'is_executing': self._executing,
+            'has_stop_timer': self._stop_timer is not None and self._stop_timer.is_alive(),
             'jobs': [
                 {
                     'id': job.id,

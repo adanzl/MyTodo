@@ -53,6 +53,7 @@ def cron_update():
         enabled = data.get('enabled')
         expression = data.get('expression')
         command = data.get('command')
+        duration = data.get('duration')
         
         # 验证参数
         if enabled is not None and not isinstance(enabled, bool):
@@ -70,11 +71,20 @@ def cron_update():
                     'error': 'cron 表达式格式错误，应为 5 个字段（分 时 日 月 周）'
                 }), 400
         
+        # 如果提供了 duration，验证格式
+        if duration is not None:
+            if not isinstance(duration, int) or duration < 0:
+                return jsonify({
+                    'success': False,
+                    'error': 'duration 必须是非负整数（秒）'
+                }), 400
+        
         # 更新配置
         success = config.update_cron_config(
             enabled=enabled,
             expression=expression,
-            command=command
+            command=command,
+            duration=duration
         )
         
         if not success:

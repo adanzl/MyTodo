@@ -192,6 +192,14 @@ Content-Type: application/json
   "expression": "0 7 * * *",
   "command": "play_next_track"
 }
+
+# 配置定时播放，播放 3600 秒（1小时）后自动停止
+{
+  "enabled": true,
+  "expression": "0 7 * * *",
+  "command": "play_next_track",
+  "duration": 3600
+}
 ```
 
 ### 系统监控
