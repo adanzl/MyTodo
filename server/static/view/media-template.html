@@ -95,12 +95,42 @@
             <span class="text-xs text-gray-500 w-8">{{ index + 1 }}</span>
             <span 
               class="flex-1 text-sm truncate"
-              :class="{ 'font-semibold text-blue-600': index === playlistStatus.current_index }">
+              :class="{ 'font-semibold text-blue-600': index === playlistStatus.current_index }"
+              :title="file">
               {{ file.split('/').pop() || file }}
             </span>
             <el-tag v-if="index === playlistStatus.current_index" type="success" size="small">
               当前
             </el-tag>
+            <div class="flex items-center gap-1">
+              <el-button
+                type="primary"
+                size="small"
+                circle
+                @click="handleMovePlaylistItemUp(index)"
+                :disabled="index === 0 || playlistLoading"
+                title="上移">
+                ↑
+              </el-button>
+              <el-button
+                type="primary"
+                size="small"
+                circle
+                @click="handleMovePlaylistItemDown(index)"
+                :disabled="index === playlistStatus.playlist.length - 1 || playlistLoading"
+                title="下移">
+                ↓
+              </el-button>
+              <el-button
+                type="danger"
+                size="small"
+                circle
+                @click="handleDeletePlaylistItem(index)"
+                :disabled="playlistLoading"
+                title="删除">
+                ×
+              </el-button>
+            </div>
           </div>
         </div>
       </div>
@@ -326,7 +356,7 @@
   <!-- Cron 预览弹窗 -->
   <el-dialog v-model="cronPreviewVisible" title="Cron 执行时间预览" width="500">
     <div v-if="cronPreviewTimes.length > 0">
-      <div class="text-sm text-gray-600 mb-3">下3次执行时间：</div>
+      <div class="text-sm text-gray-600 mb-3">下5次执行时间：</div>
       <el-timeline>
         <el-timeline-item
           v-for="(time, index) in cronPreviewTimes"

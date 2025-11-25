@@ -1,7 +1,7 @@
 import { bluetoothAction, playlistAction, cronAction } from "../js/net_util.js";
 
 const { ref, onMounted, nextTick, watch } = window.Vue;
-const { ElMessage } = window.ElementPlus;
+const { ElMessage, ElMessageBox } = window.ElementPlus;
 let component = null;
 async function loadTemplate() {
   const timestamp = `?t=${Date.now()}`;
@@ -804,7 +804,7 @@ async function createComponent() {
           return;
         }
         try {
-          const times = calculateNextCronTimes(cronExpr, 3);
+          const times = calculateNextCronTimes(cronExpr, 5);
           refData.cronPreviewTimes.value = times;
           refData.cronPreviewVisible.value = true;
         } catch (error) {
@@ -820,7 +820,7 @@ async function createComponent() {
           return;
         }
         try {
-          const times = calculateNextCronTimes(refData.cronExpression.value, 3);
+          const times = calculateNextCronTimes(refData.cronExpression.value, 5);
           refData.cronPreviewTimes.value = times;
           refData.cronPreviewVisible.value = true;
         } catch (error) {
@@ -954,6 +954,129 @@ async function createComponent() {
           return filePath.split('/').pop() || filePath;
         }
         return null;
+      };
+
+      // ========== 播放列表管理功能（调整顺序、删除） ==========
+      
+      // 上移播放列表项
+      const handleMovePlaylistItemUp = async (index) => {
+        if (index <= 0) return;
+        
+        try {
+          refData.playlistLoading.value = true;
+          const playlist = [...refData.playlistStatus.value.playlist];
+          const deviceAddress = refData.playlistStatus.value.device_address;
+          
+          // 交换位置
+          [playlist[index - 1], playlist[index]] = [playlist[index], playlist[index - 1]];
+          
+          // 更新播放列表
+          const updateRsp = await playlistAction("update", "POST", {
+            playlist: playlist,
+            device_address: deviceAddress,
+          });
+          
+          if (updateRsp.code === 0) {
+            // 如果当前索引需要调整，需要手动设置（因为update会重置为0）
+            // 但device_agent的update接口会重置索引为0，所以我们需要在更新后手动设置
+            // 不过由于device_agent的限制，我们只能通过重新获取状态来同步
+            await refreshPlaylistStatus();
+            ElMessage.success("已上移");
+          } else {
+            ElMessage.error(updateRsp.msg || "上移失败");
+          }
+        } catch (error) {
+          console.error("上移失败:", error);
+          ElMessage.error("上移失败: " + (error.message || "未知错误"));
+        } finally {
+          refData.playlistLoading.value = false;
+        }
+      };
+
+      // 下移播放列表项
+      const handleMovePlaylistItemDown = async (index) => {
+        if (!refData.playlistStatus.value) return;
+        const playlist = refData.playlistStatus.value.playlist || [];
+        if (index >= playlist.length - 1) return;
+        
+        try {
+          refData.playlistLoading.value = true;
+          const newPlaylist = [...playlist];
+          const deviceAddress = refData.playlistStatus.value.device_address;
+          
+          // 交换位置
+          [newPlaylist[index], newPlaylist[index + 1]] = [newPlaylist[index + 1], newPlaylist[index]];
+          
+          // 更新播放列表
+          const updateRsp = await playlistAction("update", "POST", {
+            playlist: newPlaylist,
+            device_address: deviceAddress,
+          });
+          
+          if (updateRsp.code === 0) {
+            await refreshPlaylistStatus();
+            ElMessage.success("已下移");
+          } else {
+            ElMessage.error(updateRsp.msg || "下移失败");
+          }
+        } catch (error) {
+          console.error("下移失败:", error);
+          ElMessage.error("下移失败: " + (error.message || "未知错误"));
+        } finally {
+          refData.playlistLoading.value = false;
+        }
+      };
+
+      // 删除播放列表项
+      const handleDeletePlaylistItem = async (index) => {
+        if (!refData.playlistStatus.value) return;
+        
+        const playlist = refData.playlistStatus.value.playlist || [];
+        if (index < 0 || index >= playlist.length) return;
+        
+        const fileName = playlist[index].split('/').pop() || playlist[index];
+        
+        try {
+          // 显示确认对话框
+          await ElMessageBox.confirm(
+            `确定要删除 "${fileName}" 吗？`,
+            '确认删除',
+            {
+              confirmButtonText: '确定',
+              cancelButtonText: '取消',
+              type: 'warning',
+            }
+          );
+          
+          // 用户确认后执行删除
+          refData.playlistLoading.value = true;
+          const newPlaylist = [...playlist];
+          const deviceAddress = refData.playlistStatus.value.device_address;
+          
+          // 删除指定项
+          newPlaylist.splice(index, 1);
+          
+          // 更新播放列表
+          const updateRsp = await playlistAction("update", "POST", {
+            playlist: newPlaylist,
+            device_address: deviceAddress,
+          });
+          
+          if (updateRsp.code === 0) {
+            await refreshPlaylistStatus();
+            ElMessage.success("已删除");
+          } else {
+            ElMessage.error(updateRsp.msg || "删除失败");
+          }
+        } catch (error) {
+          // 用户取消删除时，ElMessageBox 会抛出错误，这是正常的
+          if (error !== 'cancel') {
+            console.error("删除失败:", error);
+            ElMessage.error("删除失败: " + (error.message || "未知错误"));
+          }
+        } finally {
+          refData.playlistLoading.value = false;
+        }
       };
 
       // ========== 文件浏览和添加到播放列表功能 ==========
@@ -1138,6 +1261,10 @@ async function createComponent() {
         handlePlayNext,
         handleStopPlaylist,
         getCurrentPlaylistFile,
+        // 播放列表管理
+        handleMovePlaylistItemUp,
+        handleMovePlaylistItemDown,
+        handleDeletePlaylistItem,
         // 文件浏览相关
         handleOpenFileBrowser,
         handleCloseFileBrowser,
