@@ -169,6 +169,42 @@ class DeviceAgentClient:
         :return: 播放结果
         """
         return self._request("POST", "/playlist/playNext")
+    
+    def playlist_stop(self) -> Dict[str, Any]:
+        """
+        停止播放列表播放
+        :return: 停止结果
+        """
+        # 播放列表的停止实际上就是停止媒体播放
+        return self._request("POST", "/media/stop")
+    
+    # ========== Cron 定时任务相关接口 ==========
+    
+    def cron_get_status(self) -> Dict[str, Any]:
+        """
+        获取 Cron 定时任务状态
+        :return: Cron 状态
+        """
+        return self._request("GET", "/cron/status")
+    
+    def cron_update(self, enabled: Optional[bool] = None, 
+                    expression: Optional[str] = None, 
+                    command: Optional[str] = None) -> Dict[str, Any]:
+        """
+        更新 Cron 定时任务配置
+        :param enabled: 是否启用
+        :param expression: Cron 表达式（格式: 分 时 日 月 周）
+        :param command: 要执行的命令
+        :return: 更新结果
+        """
+        data = {}
+        if enabled is not None:
+            data["enabled"] = enabled
+        if expression is not None:
+            data["expression"] = expression
+        if command is not None:
+            data["command"] = command
+        return self._request("POST", "/cron/update", json_data=data)
 
 
 # 全局客户端实例

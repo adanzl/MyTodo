@@ -1,4 +1,4 @@
-import { bluetoothAction, getRdsData, setRdsData, mediaAction } from "../js/net_util.js";
+import { bluetoothAction, getRdsData, setRdsData, mediaAction, playlistAction, cronAction } from "../js/net_util.js";
 
 const { ref, onMounted, nextTick, watch } = window.Vue;
 const { ElMessage } = window.ElementPlus;
@@ -21,12 +21,17 @@ async function createComponent() {
         }),
         scanDialogVisible: ref(false),
         directoryDialogVisible: ref(false),
+        fileBrowserDialogVisible: ref(false),
         selectedPath: ref(""),
         currentPath: ref("/mnt"),
+        fileBrowserPath: ref("/mnt"),
         directoryList: ref([]),
         directoryLoading: ref(false),
         fileList: ref([]),
         fileListLoading: ref(false),
+        fileBrowserList: ref([]),
+        fileBrowserLoading: ref(false),
+        selectedFiles: ref([]),
         cronExpression: ref(""),
         nextRunTime: ref(""),
         cronBuilderVisible: ref(false),
@@ -52,6 +57,10 @@ async function createComponent() {
         connectedDeviceList: ref([]),
         playing: ref(false),
         stopping: ref(false),
+        // 播放列表相关
+        playlistStatus: ref(null),
+        playlistLoading: ref(false),
+        playlistRefreshing: ref(false),
       };
 
       // 刷新已连接设备列表
@@ -466,11 +475,27 @@ async function createComponent() {
       // 保存配置
       const saveBluetoothConfig = async () => {
         try {
+          // 保存 Cron 表达式到 device_agent
+          if (refData.cronExpression.value) {
+            // 将6部分的cron表达式转换为5部分（device_agent使用5部分格式：分 时 日 月 周）
+            const cronParts = refData.cronExpression.value.trim().split(/\s+/);
+            let cron5Parts = refData.cronExpression.value;
+            if (cronParts.length === 6) {
+              // 去掉秒部分，保留分 时 日 月 周
+              cron5Parts = cronParts.slice(1).join(' ');
+            }
+            
+            const cronRsp = await cronAction("update", "POST", {
+              expression: cron5Parts,
+            });
+            if (cronRsp.code !== 0) {
+              console.error("保存 Cron 表达式失败:", cronRsp.msg);
+            }
+          }
+          
+          // 保存 selected_path 到 RDS（这个仍然使用 RDS）
           const configData = {
-            cron_expression: refData.cronExpression.value,
             selected_path: refData.selectedPath.value,
-            // file_list 不保存，需要时重新获取
-            // connected_devices 不保存，由 refreshConnectedList 获取实时数据
           };
           await setRdsData("SCHEDULE_PLAY", "bluetooth", JSON.stringify(configData));
         } catch (error) {
@@ -481,19 +506,35 @@ async function createComponent() {
       // 加载配置
       const loadBluetoothConfig = async () => {
         try {
+          // 从 device_agent 获取 Cron 表达式
+          try {
+            const cronRsp = await cronAction("status", "GET");
+            if (cronRsp.code === 0 && cronRsp.data) {
+              const cronExpr = cronRsp.data.cron_expression;
+              if (cronExpr) {
+                // device_agent 返回的是5部分格式（分 时 日 月 周），转换为6部分格式（秒 分 时 日 月 周）
+                const cronParts = cronExpr.trim().split(/\s+/);
+                if (cronParts.length === 5) {
+                  // 添加秒部分（默认为0）
+                  refData.cronExpression.value = `0 ${cronExpr}`;
+                } else {
+                  refData.cronExpression.value = cronExpr;
+                }
+              }
+            }
+          } catch (error) {
+            console.error("获取 Cron 表达式失败:", error);
+          }
+          
+          // 从 RDS 加载 selected_path（这个仍然使用 RDS）
           const dataStr = await getRdsData("SCHEDULE_PLAY", "bluetooth");
           if (dataStr) {
             const data = JSON.parse(dataStr);
-            if (data.cron_expression) {
-              refData.cronExpression.value = data.cron_expression;
-            }
             if (data.selected_path) {
               refData.selectedPath.value = data.selected_path;
               // 重新获取文件列表（不保存，需要时重新获取）
               await loadFileList(data.selected_path);
             }
-            // 注意：file_list 不加载，由 loadFileList 重新获取
-            // 注意：connected_devices 由 refreshConnectedList 获取实时数据
           }
         } catch (error) {
           console.error("加载配置失败:", error);
@@ -925,28 +966,81 @@ async function createComponent() {
         canNavigateUp.value = path && path !== "/mnt" && path !== "/";
       };
 
-      // 播放目录
-      const handlePlayDirectory = async () => {
+
+      // 停止播放
+      const handleStopPlayback = async () => {
+        try {
+          refData.stopping.value = true;
+          const rsp = await mediaAction("stop", "POST");
+          if (rsp.code === 0) {
+            ElMessage.success("已停止播放");
+            // 刷新播放列表状态
+            await refreshPlaylistStatus();
+          } else {
+            ElMessage.error(rsp.msg || "停止失败");
+          }
+        } catch (error) {
+          console.error("停止失败:", error);
+          ElMessage.error("停止失败: " + (error.message || "未知错误"));
+        } finally {
+          refData.stopping.value = false;
+        }
+      };
+
+      // ========== 播放列表管理功能 ==========
+      
+      // 刷新播放列表状态
+      const refreshPlaylistStatus = async () => {
+        try {
+          refData.playlistRefreshing.value = true;
+          const rsp = await playlistAction("status", "GET");
+          if (rsp.code === 0) {
+            refData.playlistStatus.value = rsp.data || null;
+          } else {
+            // 如果获取失败，可能是播放列表为空，设置为null
+            refData.playlistStatus.value = null;
+          }
+        } catch (error) {
+          console.error("获取播放列表状态失败:", error);
+          refData.playlistStatus.value = null;
+        } finally {
+          refData.playlistRefreshing.value = false;
+        }
+      };
+
+      // 更新播放列表
+      const handleUpdatePlaylist = async (playlist, deviceAddress) => {
+        try {
+          refData.playlistLoading.value = true;
+          const rsp = await playlistAction("update", "POST", {
+            playlist: playlist,
+            device_address: deviceAddress,
+          });
+          if (rsp.code === 0) {
+            ElMessage.success("播放列表已更新");
+            await refreshPlaylistStatus();
+            return true;
+          } else {
+            ElMessage.error(rsp.msg || "更新播放列表失败");
+            return false;
+          }
+        } catch (error) {
+          console.error("更新播放列表失败:", error);
+          ElMessage.error("更新播放列表失败: " + (error.message || "未知错误"));
+          return false;
+        } finally {
+          refData.playlistLoading.value = false;
+        }
+      };
+
+      // 播放播放列表
+      const handlePlayPlaylist = async () => {
         try {
           refData.playing.value = true;
-          
-          // 获取选中的设备地址（如果有）
-          const deviceAddress = refData.connectedDeviceList.value.length > 0 
-            ? refData.connectedDeviceList.value[0].address 
-            : null;
-          
-          // 构建请求参数
-          const params = {};
-          if (refData.selectedPath.value) {
-            params.path = refData.selectedPath.value;
-          }
-          if (deviceAddress) {
-            params.device_address = deviceAddress;
-          }
-          
-          const rsp = await mediaAction("playDir", "POST", params);
+          const rsp = await playlistAction("play", "POST");
           if (rsp.code === 0) {
             ElMessage.success("开始播放");
+            await refreshPlaylistStatus();
           } else {
             ElMessage.error(rsp.msg || "播放失败");
           }
@@ -958,21 +1052,213 @@ async function createComponent() {
         }
       };
 
-      // 停止播放
-      const handleStopPlayback = async () => {
+      // 播放下一首
+      const handlePlayNext = async () => {
+        try {
+          refData.playing.value = true;
+          const rsp = await playlistAction("playNext", "POST");
+          if (rsp.code === 0) {
+            ElMessage.success("播放下一首");
+            await refreshPlaylistStatus();
+          } else {
+            ElMessage.error(rsp.msg || "播放下一首失败");
+          }
+        } catch (error) {
+          console.error("播放下一首失败:", error);
+          ElMessage.error("播放下一首失败: " + (error.message || "未知错误"));
+        } finally {
+          refData.playing.value = false;
+        }
+      };
+
+      // 停止播放列表
+      const handleStopPlaylist = async () => {
         try {
           refData.stopping.value = true;
-          const rsp = await mediaAction("stop", "POST");
+          const rsp = await playlistAction("stop", "POST");
           if (rsp.code === 0) {
             ElMessage.success("已停止播放");
+            await refreshPlaylistStatus();
           } else {
             ElMessage.error(rsp.msg || "停止失败");
           }
         } catch (error) {
-          console.error("停止失败:", error);
-          ElMessage.error("停止失败: " + (error.message || "未知错误"));
+          console.error("停止播放列表失败:", error);
+          ElMessage.error("停止播放列表失败: " + (error.message || "未知错误"));
         } finally {
           refData.stopping.value = false;
+        }
+      };
+
+      // 获取当前播放文件名称
+      const getCurrentPlaylistFile = () => {
+        if (!refData.playlistStatus.value) return null;
+        const playlist = refData.playlistStatus.value.playlist || [];
+        const currentIndex = refData.playlistStatus.value.current_index || 0;
+        if (currentIndex >= 0 && currentIndex < playlist.length) {
+          const filePath = playlist[currentIndex];
+          // 只返回文件名，不包含路径
+          return filePath.split('/').pop() || filePath;
+        }
+        return null;
+      };
+
+      // ========== 文件浏览和添加到播放列表功能 ==========
+      
+      // 打开文件浏览对话框
+      const handleOpenFileBrowser = () => {
+        refData.fileBrowserDialogVisible.value = true;
+        refData.fileBrowserPath.value = refData.selectedPath.value || "/mnt";
+        refData.selectedFiles.value = [];
+        handleRefreshFileBrowser();
+      };
+
+      // 关闭文件浏览对话框
+      const handleCloseFileBrowser = () => {
+        refData.fileBrowserDialogVisible.value = false;
+        refData.selectedFiles.value = [];
+      };
+
+      // 刷新文件浏览器列表
+      const handleRefreshFileBrowser = async () => {
+        try {
+          refData.fileBrowserLoading.value = true;
+          const path = refData.fileBrowserPath.value || "/mnt";
+          const rsp = await bluetoothAction("listDirectory", "GET", {
+            path: path,
+          });
+          if (rsp.code === 0) {
+            refData.fileBrowserList.value = rsp.data || [];
+            updateFileBrowserCanNavigateUp();
+          } else {
+            ElMessage.error(rsp.msg || "获取文件列表失败");
+          }
+        } catch (error) {
+          console.error("获取文件列表失败:", error);
+          ElMessage.error("获取文件列表失败: " + (error.message || "未知错误"));
+        } finally {
+          refData.fileBrowserLoading.value = false;
+        }
+      };
+
+      // 文件浏览器导航到上一级
+      const handleFileBrowserNavigateUp = () => {
+        const path = refData.fileBrowserPath.value;
+        if (path && path !== "/mnt" && path !== "/") {
+          const parts = path.split("/").filter(p => p);
+          parts.pop();
+          refData.fileBrowserPath.value = parts.length > 0 ? "/" + parts.join("/") : "/mnt";
+          updateFileBrowserCanNavigateUp();
+          handleRefreshFileBrowser();
+        }
+      };
+
+      // 文件浏览器导航到首页
+      const handleFileBrowserGoToHome = () => {
+        refData.fileBrowserPath.value = "/mnt";
+        updateFileBrowserCanNavigateUp();
+        handleRefreshFileBrowser();
+      };
+
+      // 文件浏览器点击行
+      const handleFileBrowserRowClick = (row) => {
+        if (row.isDirectory) {
+          const newPath = refData.fileBrowserPath.value === "/" 
+            ? `/${row.name}` 
+            : `${refData.fileBrowserPath.value}/${row.name}`;
+          refData.fileBrowserPath.value = newPath;
+          updateFileBrowserCanNavigateUp();
+          handleRefreshFileBrowser();
+        } else {
+          // 点击文件时切换选择状态
+          handleToggleFileSelection(row);
+        }
+      };
+
+      // 切换文件选择状态
+      const handleToggleFileSelection = (row) => {
+        const filePath = refData.fileBrowserPath.value === "/" 
+          ? `/${row.name}` 
+          : `${refData.fileBrowserPath.value}/${row.name}`;
+        const index = refData.selectedFiles.value.indexOf(filePath);
+        if (index > -1) {
+          refData.selectedFiles.value.splice(index, 1);
+        } else {
+          refData.selectedFiles.value.push(filePath);
+        }
+      };
+
+      // 检查文件是否被选中
+      const isFileSelected = (row) => {
+        const filePath = refData.fileBrowserPath.value === "/" 
+          ? `/${row.name}` 
+          : `${refData.fileBrowserPath.value}/${row.name}`;
+        return refData.selectedFiles.value.includes(filePath);
+      };
+
+      // 文件浏览器是否可以导航到上一级
+      const fileBrowserCanNavigateUp = ref(false);
+      const updateFileBrowserCanNavigateUp = () => {
+        const path = refData.fileBrowserPath.value;
+        fileBrowserCanNavigateUp.value = path && path !== "/mnt" && path !== "/";
+      };
+
+      // 添加文件到播放列表
+      const handleAddFilesToPlaylist = async () => {
+        if (refData.selectedFiles.value.length === 0) {
+          ElMessage.warning("请先选择要添加的文件");
+          return;
+        }
+
+        try {
+          refData.playlistLoading.value = true;
+          
+          // 获取当前播放列表
+          const statusRsp = await playlistAction("status", "GET");
+          let currentPlaylist = [];
+          let deviceAddress = null;
+          
+          if (statusRsp.code === 0 && statusRsp.data) {
+            currentPlaylist = statusRsp.data.playlist || [];
+            deviceAddress = statusRsp.data.device_address || null;
+          }
+
+          // 如果没有设备地址，尝试获取已连接的设备
+          if (!deviceAddress && refData.connectedDeviceList.value.length > 0) {
+            const connectedDevice = refData.connectedDeviceList.value.find(d => d.connected);
+            if (connectedDevice) {
+              deviceAddress = connectedDevice.address;
+            } else if (refData.connectedDeviceList.value.length > 0) {
+              deviceAddress = refData.connectedDeviceList.value[0].address;
+            }
+          }
+
+          // 合并文件列表（去重）
+          const newPlaylist = [...currentPlaylist];
+          for (const filePath of refData.selectedFiles.value) {
+            if (!newPlaylist.includes(filePath)) {
+              newPlaylist.push(filePath);
+            }
+          }
+
+          // 更新播放列表
+          const updateRsp = await playlistAction("update", "POST", {
+            playlist: newPlaylist,
+            device_address: deviceAddress,
+          });
+
+          if (updateRsp.code === 0) {
+            ElMessage.success(`成功添加 ${refData.selectedFiles.value.length} 个文件到播放列表`);
+            await refreshPlaylistStatus();
+            handleCloseFileBrowser();
+          } else {
+            ElMessage.error(updateRsp.msg || "添加文件到播放列表失败");
+          }
+        } catch (error) {
+          console.error("添加文件到播放列表失败:", error);
+          ElMessage.error("添加文件到播放列表失败: " + (error.message || "未知错误"));
+        } finally {
+          refData.playlistLoading.value = false;
         }
       };
 
@@ -1000,8 +1286,24 @@ async function createComponent() {
         handleConnectDevice,
         handleDisconnectDevice,
         refreshConnectedList,
-        handlePlayDirectory,
         handleStopPlayback,
+        // 播放列表相关
+        refreshPlaylistStatus,
+        handleUpdatePlaylist,
+        handlePlayPlaylist,
+        handlePlayNext,
+        handleStopPlaylist,
+        getCurrentPlaylistFile,
+        // 文件浏览相关
+        handleOpenFileBrowser,
+        handleCloseFileBrowser,
+        handleRefreshFileBrowser,
+        handleFileBrowserNavigateUp,
+        handleFileBrowserGoToHome,
+        handleFileBrowserRowClick,
+        handleToggleFileSelection,
+        isFileSelected,
+        handleAddFilesToPlaylist,
         handleDialogClose: () => {
           refData.dialogForm.value.visible = false;
           refData.dialogForm.value.value = 0;
@@ -1010,9 +1312,11 @@ async function createComponent() {
       
       // 初始化 canNavigateUp
       updateCanNavigateUp();
+      updateFileBrowserCanNavigateUp();
       
       onMounted(async () => {
         await refreshConnectedList();
+        await refreshPlaylistStatus();
         // 延迟加载配置，确保所有函数都已定义
         setTimeout(async () => {
           await loadBluetoothConfig();
@@ -1028,6 +1332,7 @@ async function createComponent() {
       return {
         ...refData,
         canNavigateUp,
+        fileBrowserCanNavigateUp,
         ...refMethods,
       };
     },

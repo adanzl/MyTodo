@@ -198,7 +198,7 @@ export async function bluetoothAction(action, method, params) {
 
 /**
  * 媒体操作接口
- * @param {string} action - 操作名称 (playDir, stop)
+ * @param {string} action - 操作名称 (stop)
  * @param {string} method - HTTP 方法 (GET, POST)
  * @param {object} params - 请求参数
  * @returns {Promise} 响应数据
@@ -211,6 +211,44 @@ export async function mediaAction(action, method, params = {}) {
     });
   } else {
     rsp = await axios.post(API_URL + "/media/" + action, params);
+  }
+  return rsp.data;
+}
+
+/**
+ * 播放列表操作接口
+ * @param {string} action - 操作名称 (update, status, play, playNext)
+ * @param {string} method - HTTP 方法 (GET, POST)
+ * @param {object} params - 请求参数
+ * @returns {Promise} 响应数据
+ */
+export async function playlistAction(action, method, params = {}) {
+  let rsp = null;
+  if (method === "GET") {
+    rsp = await axios.get(API_URL + "/playlist/" + action, {
+      params: params,
+    });
+  } else {
+    rsp = await axios.post(API_URL + "/playlist/" + action, params);
+  }
+  return rsp.data;
+}
+
+/**
+ * Cron 定时任务操作接口
+ * @param {string} action - 操作名称 (status, update)
+ * @param {string} method - HTTP 方法 (GET, POST)
+ * @param {object} params - 请求参数
+ * @returns {Promise} 响应数据
+ */
+export async function cronAction(action, method, params = {}) {
+  let rsp = null;
+  if (method === "GET") {
+    rsp = await axios.get(API_URL + "/cron/" + action, {
+      params: params,
+    });
+  } else {
+    rsp = await axios.post(API_URL + "/cron/" + action, params);
   }
   return rsp.data;
 }

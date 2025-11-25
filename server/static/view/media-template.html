@@ -32,16 +32,93 @@
   <!-- 播放控制 -->
   <div class="mt-4">
     <div class="flex items-center gap-2">
-      <el-button 
-        type="success" 
-        @click="handlePlayDirectory" 
-        :loading="playing"
-        :disabled="connectedDeviceList.length === 0">
-        播放
-      </el-button>
       <el-button type="danger" @click="handleStopPlayback" :loading="stopping">
-        停止
+        停止播放
       </el-button>
+    </div>
+  </div>
+
+  <!-- 播放列表管理 -->
+  <div class="mt-4">
+    <div class="flex items-center justify-between mb-2">
+      <h3 class="text-lg font-semibold">播放列表</h3>
+      <div class="flex items-center gap-2">
+        <el-button 
+          type="primary" 
+          size="small" 
+          @click="handleOpenFileBrowser">
+          添加文件
+        </el-button>
+        <el-button 
+          type="primary" 
+          size="small" 
+          @click="refreshPlaylistStatus" 
+          :loading="playlistRefreshing">
+          刷新
+        </el-button>
+        <el-button 
+          type="success" 
+          size="small" 
+          @click="handlePlayPlaylist" 
+          :loading="playing"
+          :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0">
+          播放
+        </el-button>
+        <el-button 
+          type="info" 
+          size="small" 
+          @click="handlePlayNext" 
+          :loading="playing"
+          :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0">
+          下一首
+        </el-button>
+        <el-button 
+          type="danger" 
+          size="small" 
+          @click="handleStopPlaylist" 
+          :loading="stopping">
+          停止
+        </el-button>
+      </div>
+    </div>
+    
+    <!-- 播放列表状态 -->
+    <div v-if="playlistStatus" class="border rounded p-3">
+      <div class="text-sm text-gray-600 mb-2">
+        <span>总数量: {{ playlistStatus.total || 0 }}</span>
+        <span class="ml-4">当前索引: {{ playlistStatus.current_index !== undefined ? playlistStatus.current_index + 1 : '-' }} / {{ playlistStatus.total || 0 }}</span>
+        <span v-if="getCurrentPlaylistFile()" class="ml-4 text-blue-600">
+          正在播放: {{ getCurrentPlaylistFile() }}
+        </span>
+      </div>
+      
+      <!-- 播放列表内容 -->
+      <div v-if="playlistStatus.playlist && playlistStatus.playlist.length > 0" class="mt-2">
+        <div class="text-sm font-medium mb-2">播放列表内容：</div>
+        <div class="max-h-60 overflow-y-auto border rounded p-2">
+          <div 
+            v-for="(file, index) in playlistStatus.playlist" 
+            :key="index"
+            class="flex items-center gap-2 p-1 hover:bg-gray-100 rounded"
+            :class="{ 'bg-blue-50': index === playlistStatus.current_index }">
+            <span class="text-xs text-gray-500 w-8">{{ index + 1 }}</span>
+            <span 
+              class="flex-1 text-sm truncate"
+              :class="{ 'font-semibold text-blue-600': index === playlistStatus.current_index }">
+              {{ file.split('/').pop() || file }}
+            </span>
+            <el-tag v-if="index === playlistStatus.current_index" type="success" size="small">
+              当前
+            </el-tag>
+          </div>
+        </div>
+      </div>
+      <div v-else class="text-sm text-gray-400 mt-2">
+        播放列表为空
+      </div>
+    </div>
+    <div v-else class="border rounded p-3 text-sm text-gray-400">
+      暂无播放列表，请先播放目录或更新播放列表
     </div>
   </div>
 
@@ -388,5 +465,87 @@
     <div v-if="deviceList.length === 0 && !loading" class="text-center text-gray-400 mt-4 py-8">
       暂无扫描到的设备，点击"刷新扫描"按钮开始扫描
     </div>
+  </el-dialog>
+
+  <!-- 文件浏览对话框 -->
+  <el-dialog
+    v-model="fileBrowserDialogVisible"
+    title="选择文件添加到播放列表"
+    width="800"
+    :before-close="handleCloseFileBrowser">
+    <div class="m-4">
+      <div class="flex items-center gap-2 mb-2">
+        <el-input v-model="fileBrowserPath" placeholder="当前路径" readonly> </el-input>
+        <el-button type="primary" @click="handleRefreshFileBrowser" :loading="fileBrowserLoading">
+          刷新
+        </el-button>
+      </div>
+      <div class="flex items-center gap-2 mb-2">
+        <el-button size="small" @click="handleFileBrowserNavigateUp" :disabled="!fileBrowserCanNavigateUp">
+          上一级
+        </el-button>
+        <el-button size="small" @click="handleFileBrowserGoToHome"> 首页 </el-button>
+        <span v-if="selectedFiles.length > 0" class="text-sm text-blue-600 ml-2">
+          已选择 {{ selectedFiles.length }} 个文件
+        </span>
+      </div>
+    </div>
+    <el-table
+      :data="fileBrowserList"
+      stripe
+      class="w-full"
+      v-loading="fileBrowserLoading"
+      :height="400"
+      @row-click="handleFileBrowserRowClick">
+      <el-table-column type="selection" width="55" :selectable="(row) => !row.isDirectory">
+        <template #default="{ row }">
+          <el-checkbox 
+            v-if="!row.isDirectory"
+            :model-value="isFileSelected(row)"
+            @change="handleToggleFileSelection(row)"
+            @click.stop>
+          </el-checkbox>
+        </template>
+      </el-table-column>
+      <el-table-column prop="name" label="名称" min-width="200">
+        <template #default="{ row }">
+          <div class="flex items-center gap-2">
+            <span v-if="row.isDirectory">📁</span>
+            <span v-else>📄</span>
+            <span>{{ row.name }}</span>
+          </div>
+        </template>
+      </el-table-column>
+      <el-table-column prop="size" label="大小" width="100">
+        <template #default="{ row }">
+          <span v-if="!row.isDirectory">{{ formatSize(row.size) }}</span>
+          <span v-else>-</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="状态" width="100">
+        <template #default="{ row }">
+          <el-tag v-if="!row.isDirectory && isFileSelected(row)" type="success" size="small">
+            已选择
+          </el-tag>
+        </template>
+      </el-table-column>
+    </el-table>
+    <template #footer>
+      <div class="flex items-center justify-between">
+        <span class="text-sm text-gray-500">
+          提示：点击文件可切换选择状态，双击目录可进入
+        </span>
+        <div class="flex gap-2">
+          <el-button @click="handleCloseFileBrowser">取消</el-button>
+          <el-button 
+            type="primary" 
+            @click="handleAddFilesToPlaylist" 
+            :loading="playlistLoading"
+            :disabled="selectedFiles.length === 0">
+            添加到播放列表 ({{ selectedFiles.length }})
+          </el-button>
+        </div>
+      </div>
+    </template>
   </el-dialog>
 </div>

@@ -98,13 +98,16 @@ class CronScheduler:
     
     def start(self):
         """启动调度器"""
+        log.debug(f"[DEBUG] start() 被调用，当前 _started={self._started}, id={id(self)}")
+        
         # 检查是否已经调用过 start()，避免重复初始化
         if self._started:
-            log.debug("定时任务调度器已经初始化过，跳过重复调用")
+            log.info(f"定时任务调度器已经初始化过，跳过重复调用 (实例ID: {id(self)})")
             return
         
         # 标记为已启动
         self._started = True
+        log.debug(f"[DEBUG] 设置 _started=True, id={id(self)}")
         
         if not self.config.is_cron_enabled():
             log.info("定时任务未启用 (cron.enabled=false)")
@@ -231,8 +234,9 @@ def get_scheduler() -> CronScheduler:
     if _scheduler_instance is None:
         with _scheduler_lock:
             if _scheduler_instance is None:
-                log.debug("创建定时任务调度器实例")
+                import os
                 _scheduler_instance = CronScheduler()
+                log.info(f"创建定时任务调度器实例 (PID: {os.getpid()}, 实例ID: {id(_scheduler_instance)})")
     
     return _scheduler_instance
 
