@@ -1,4 +1,4 @@
-import { bluetoothAction, getRdsData, setRdsData, mediaAction, playlistAction, cronAction } from "../js/net_util.js";
+import { bluetoothAction, playlistAction, cronAction } from "../js/net_util.js";
 
 const { ref, onMounted, nextTick, watch } = window.Vue;
 const { ElMessage } = window.ElementPlus;
@@ -20,19 +20,13 @@ async function createComponent() {
           value: 0,
         }),
         scanDialogVisible: ref(false),
-        directoryDialogVisible: ref(false),
         fileBrowserDialogVisible: ref(false),
-        selectedPath: ref(""),
-        currentPath: ref("/mnt"),
         fileBrowserPath: ref("/mnt"),
-        directoryList: ref([]),
-        directoryLoading: ref(false),
-        fileList: ref([]),
-        fileListLoading: ref(false),
         fileBrowserList: ref([]),
         fileBrowserLoading: ref(false),
         selectedFiles: ref([]),
         cronExpression: ref(""),
+        cronEnabled: ref(false),
         nextRunTime: ref(""),
         cronBuilderVisible: ref(false),
         cronBuilder: ref({
@@ -162,94 +156,6 @@ async function createComponent() {
         refData.scanDialogVisible.value = false;
       };
 
-      // 打开目录选择弹窗
-      const handleOpenDirectoryDialog = () => {
-        refData.directoryDialogVisible.value = true;
-        // 如果没有已选择的路径，使用默认路径 /mnt
-        refData.currentPath.value = refData.selectedPath.value || "/mnt";
-        handleRefreshDirectory();
-      };
-
-      // 关闭目录选择弹窗
-      const handleCloseDirectoryDialog = () => {
-        refData.directoryDialogVisible.value = false;
-      };
-
-      // 刷新目录列表
-      const handleRefreshDirectory = async () => {
-        try {
-          refData.directoryLoading.value = true;
-          const path = refData.currentPath.value || "/mnt";
-          const rsp = await bluetoothAction("listDirectory", "GET", {
-            path: path,
-          });
-          if (rsp.code === 0) {
-            refData.directoryList.value = rsp.data || [];
-            // 更新当前路径（后端可能返回实际使用的路径）
-            if (rsp.currentPath) {
-              refData.currentPath.value = rsp.currentPath;
-            }
-            updateCanNavigateUp();
-          } else {
-            ElMessage.error(rsp.msg || "获取目录列表失败");
-            // 如果失败，尝试重置到默认路径
-            if (refData.currentPath.value && refData.currentPath.value !== "/mnt") {
-              refData.currentPath.value = "/mnt";
-              // 不自动重试，让用户手动刷新
-            }
-          }
-        } catch (error) {
-          console.error("获取目录列表失败:", error);
-          ElMessage.error("获取目录列表失败: " + (error.message || "未知错误"));
-        } finally {
-          refData.directoryLoading.value = false;
-        }
-      };
-
-      // 导航到上一级
-      const handleNavigateUp = () => {
-        const path = refData.currentPath.value;
-        if (path && path !== "/mnt" && path !== "/") {
-          const parts = path.split("/").filter(p => p);
-          parts.pop();
-          refData.currentPath.value = parts.length > 0 ? "/" + parts.join("/") : "/mnt";
-          updateCanNavigateUp();
-          handleRefreshDirectory();
-        }
-      };
-
-      // 导航到首页（默认目录）
-      const handleGoToHome = () => {
-        refData.currentPath.value = "/mnt";
-        updateCanNavigateUp();
-        handleRefreshDirectory();
-      };
-
-      // 点击目录行
-      const handleDirectoryRowClick = (row) => {
-        if (row.isDirectory) {
-          const newPath = refData.currentPath.value === "/" 
-            ? `/${row.name}` 
-            : `${refData.currentPath.value}/${row.name}`;
-          refData.currentPath.value = newPath;
-          updateCanNavigateUp();
-          handleRefreshDirectory();
-        }
-      };
-
-      // 选择目录
-      const handleSelectDirectory = (row) => {
-        const selectedPath = refData.currentPath.value === "/" 
-          ? `/${row.name}` 
-          : `${refData.currentPath.value}/${row.name}`;
-        refData.selectedPath.value = selectedPath;
-        handleCloseDirectoryDialog();
-        ElMessage.success(`已选择目录: ${selectedPath}`);
-        // 选择目录后，加载文件列表
-        loadFileList(selectedPath);
-        // 自动保存配置
-        saveBluetoothConfig();
-      };
 
       // 打开 Cron 生成器
       const handleOpenCronBuilder = () => {
@@ -475,7 +381,11 @@ async function createComponent() {
       // 保存配置
       const saveBluetoothConfig = async () => {
         try {
-          // 保存 Cron 表达式到 device_agent
+          // 保存 Cron 配置到 device_agent
+          const updateData = {
+            enabled: refData.cronEnabled.value,
+          };
+          
           if (refData.cronExpression.value) {
             // 将6部分的cron表达式转换为5部分（device_agent使用5部分格式：分 时 日 月 周）
             const cronParts = refData.cronExpression.value.trim().split(/\s+/);
@@ -484,32 +394,33 @@ async function createComponent() {
               // 去掉秒部分，保留分 时 日 月 周
               cron5Parts = cronParts.slice(1).join(' ');
             }
-            
-            const cronRsp = await cronAction("update", "POST", {
-              expression: cron5Parts,
-            });
-            if (cronRsp.code !== 0) {
-              console.error("保存 Cron 表达式失败:", cronRsp.msg);
-            }
+            updateData.expression = cron5Parts;
           }
           
-          // 保存 selected_path 到 RDS（这个仍然使用 RDS）
-          const configData = {
-            selected_path: refData.selectedPath.value,
-          };
-          await setRdsData("SCHEDULE_PLAY", "bluetooth", JSON.stringify(configData));
+          const cronRsp = await cronAction("update", "POST", updateData);
+          if (cronRsp.code !== 0) {
+            console.error("保存 Cron 配置失败:", cronRsp.msg);
+            ElMessage.error("保存 Cron 配置失败: " + (cronRsp.msg || "未知错误"));
+          } else {
+            ElMessage.success("Cron 配置已保存");
+          }
         } catch (error) {
           console.error("保存配置失败:", error);
+          ElMessage.error("保存配置失败: " + (error.message || "未知错误"));
         }
       };
 
       // 加载配置
       const loadBluetoothConfig = async () => {
         try {
-          // 从 device_agent 获取 Cron 表达式
+          // 从 device_agent 获取 Cron 配置
           try {
             const cronRsp = await cronAction("status", "GET");
             if (cronRsp.code === 0 && cronRsp.data) {
+              // 获取 enabled 状态
+              refData.cronEnabled.value = cronRsp.data.enabled || false;
+              
+              // 获取 Cron 表达式
               const cronExpr = cronRsp.data.cron_expression;
               if (cronExpr) {
                 // device_agent 返回的是5部分格式（分 时 日 月 周），转换为6部分格式（秒 分 时 日 月 周）
@@ -520,21 +431,12 @@ async function createComponent() {
                 } else {
                   refData.cronExpression.value = cronExpr;
                 }
+              } else {
+                refData.cronExpression.value = "";
               }
             }
           } catch (error) {
-            console.error("获取 Cron 表达式失败:", error);
-          }
-          
-          // 从 RDS 加载 selected_path（这个仍然使用 RDS）
-          const dataStr = await getRdsData("SCHEDULE_PLAY", "bluetooth");
-          if (dataStr) {
-            const data = JSON.parse(dataStr);
-            if (data.selected_path) {
-              refData.selectedPath.value = data.selected_path;
-              // 重新获取文件列表（不保存，需要时重新获取）
-              await loadFileList(data.selected_path);
-            }
+            console.error("获取 Cron 配置失败:", error);
           }
         } catch (error) {
           console.error("加载配置失败:", error);
@@ -570,6 +472,12 @@ async function createComponent() {
           // 自动保存配置
           saveBluetoothConfig();
         }
+      };
+
+      // 切换 Cron 启用状态
+      const handleToggleCronEnabled = async () => {
+        // 立即保存配置
+        await saveBluetoothConfig();
       };
 
       // 应用示例
@@ -921,35 +829,6 @@ async function createComponent() {
         }
       };
 
-      // 加载文件列表
-      const loadFileList = async (path) => {
-        if (!path) {
-          refData.fileList.value = [];
-          return;
-        }
-        try {
-          refData.fileListLoading.value = true;
-          const rsp = await bluetoothAction("listDirectory", "GET", {
-            path: path,
-          });
-          if (rsp.code === 0) {
-            // 只显示文件，不显示目录
-            refData.fileList.value = (rsp.data || [])
-              .filter(item => !item.isDirectory && item.accessible !== false)
-              .map(item => item.name)
-              .sort();
-          } else {
-            refData.fileList.value = [];
-            ElMessage.warning(rsp.msg || "获取文件列表失败");
-          }
-        } catch (error) {
-          console.error("获取文件列表失败:", error);
-          refData.fileList.value = [];
-        } finally {
-          refData.fileListLoading.value = false;
-        }
-      };
-
       // 格式化文件大小
       const formatSize = (bytes) => {
         if (!bytes) return "0 B";
@@ -959,33 +838,7 @@ async function createComponent() {
         return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
       };
 
-      // 计算是否可以导航到上一级（使用 computed）
-      const canNavigateUp = ref(false);
-      const updateCanNavigateUp = () => {
-        const path = refData.currentPath.value;
-        canNavigateUp.value = path && path !== "/mnt" && path !== "/";
-      };
 
-
-      // 停止播放
-      const handleStopPlayback = async () => {
-        try {
-          refData.stopping.value = true;
-          const rsp = await mediaAction("stop", "POST");
-          if (rsp.code === 0) {
-            ElMessage.success("已停止播放");
-            // 刷新播放列表状态
-            await refreshPlaylistStatus();
-          } else {
-            ElMessage.error(rsp.msg || "停止失败");
-          }
-        } catch (error) {
-          console.error("停止失败:", error);
-          ElMessage.error("停止失败: " + (error.message || "未知错误"));
-        } finally {
-          refData.stopping.value = false;
-        }
-      };
 
       // ========== 播放列表管理功能 ==========
       
@@ -1108,7 +961,7 @@ async function createComponent() {
       // 打开文件浏览对话框
       const handleOpenFileBrowser = () => {
         refData.fileBrowserDialogVisible.value = true;
-        refData.fileBrowserPath.value = refData.selectedPath.value || "/mnt";
+        refData.fileBrowserPath.value = "/mnt";
         refData.selectedFiles.value = [];
         handleRefreshFileBrowser();
       };
@@ -1266,13 +1119,6 @@ async function createComponent() {
         handleUpdateDeviceList,
         handleOpenScanDialog,
         handleCloseScanDialog,
-        handleOpenDirectoryDialog,
-        handleCloseDirectoryDialog,
-        handleRefreshDirectory,
-        handleNavigateUp,
-        handleGoToHome,
-        handleDirectoryRowClick,
-        handleSelectDirectory,
         handleOpenCronBuilder,
         handleCloseCronBuilder,
         updateCronExpression,
@@ -1281,12 +1127,10 @@ async function createComponent() {
         handlePreviewGeneratedCron,
         handlePreviewCron,
         updateNextRunTime,
-        loadFileList,
         formatSize,
         handleConnectDevice,
         handleDisconnectDevice,
         refreshConnectedList,
-        handleStopPlayback,
         // 播放列表相关
         refreshPlaylistStatus,
         handleUpdatePlaylist,
@@ -1304,14 +1148,15 @@ async function createComponent() {
         handleToggleFileSelection,
         isFileSelected,
         handleAddFilesToPlaylist,
+        // Cron 相关
+        handleToggleCronEnabled,
         handleDialogClose: () => {
           refData.dialogForm.value.visible = false;
           refData.dialogForm.value.value = 0;
         },
       };
       
-      // 初始化 canNavigateUp
-      updateCanNavigateUp();
+      // 初始化文件浏览器导航
       updateFileBrowserCanNavigateUp();
       
       onMounted(async () => {
@@ -1331,7 +1176,6 @@ async function createComponent() {
       });
       return {
         ...refData,
-        canNavigateUp,
         fileBrowserCanNavigateUp,
         ...refMethods,
       };

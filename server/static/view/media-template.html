@@ -29,15 +29,6 @@
     </el-table>
   </div>
 
-  <!-- 播放控制 -->
-  <div class="mt-4">
-    <div class="flex items-center gap-2">
-      <el-button type="danger" @click="handleStopPlayback" :loading="stopping">
-        停止播放
-      </el-button>
-    </div>
-  </div>
-
   <!-- 播放列表管理 -->
   <div class="mt-4">
     <div class="flex items-center justify-between mb-2">
@@ -124,20 +115,35 @@
 
   <!-- Cron 表达式配置 -->
   <div class="mt-4">
-    <div class="text-sm text-gray-600 mb-2">重复时间配置 (Cron 表达式)</div>
+    <div class="flex items-center justify-between mb-2">
+      <div class="text-sm text-gray-600">重复时间配置 (Cron 表达式)</div>
+      <div class="flex items-center gap-2">
+        <span class="text-sm text-gray-600">启用定时任务</span>
+        <el-switch
+          v-model="cronEnabled"
+          @change="handleToggleCronEnabled"
+          active-text="开启"
+          inactive-text="关闭">
+        </el-switch>
+      </div>
+    </div>
     <div class="flex items-center gap-2">
       <el-input
         v-model="cronExpression"
         placeholder="例如: 0 0 * * * (每天0点执行)"
         class="!w-[280px]"
+        :disabled="!cronEnabled"
         @input="updateNextRunTime">
         <template #prepend>Cron</template>
       </el-input>
-      <el-button type="info" size="small" @click="handleOpenCronBuilder"> 帮助 </el-button>
-      <el-button type="success" size="small" @click="handlePreviewCron" :disabled="!cronExpression">
+      <el-button type="info" size="small" @click="handleOpenCronBuilder" :disabled="!cronEnabled"> 帮助 </el-button>
+      <el-button type="success" size="small" @click="handlePreviewCron" :disabled="!cronExpression || !cronEnabled">
         预览
       </el-button>
-      <span v-if="nextRunTime" class="text-sm text-gray-500 ml-2">
+      <el-button type="primary" size="small" @click="saveBluetoothConfig" :disabled="!cronEnabled">
+        保存
+      </el-button>
+      <span v-if="nextRunTime && cronEnabled" class="text-sm text-gray-500 ml-2">
         下次运行: {{ nextRunTime }}
       </span>
     </div>
@@ -334,100 +340,6 @@
     <div v-else class="text-center text-gray-400 py-4">
       无法解析 Cron 表达式，请检查格式是否正确
     </div>
-  </el-dialog>
-
-  <!-- 目录选择 -->
-  <div class="mt-4">
-    <div class="flex items-center gap-2">
-      <el-button type="primary" @click="handleOpenDirectoryDialog"> 选择目录 </el-button>
-      <el-input v-model="selectedPath" placeholder="请选择目录" readonly class="flex-1"> </el-input>
-    </div>
-    <!-- 文件列表 -->
-    <div v-if="selectedPath" class="mt-4">
-      <div v-if="fileList.length > 0 || fileListLoading" class="text-sm text-gray-600 mb-2">
-        文件列表 ({{ fileList.length }})
-      </div>
-      <div v-if="fileList.length > 0" class="border rounded p-3 max-h-60 overflow-y-auto">
-        <div class="grid grid-cols-3 gap-2">
-          <el-tag
-            v-for="(file, index) in fileList"
-            :key="index"
-            size="small"
-            type="info"
-            :title="file"
-            class="!pt-[2px]"
-            style="
-              text-align: left;
-              overflow: hidden;
-              text-overflow: ellipsis;
-              white-space: nowrap;
-              display: block;
-              width: 100%;
-            ">
-            {{ file }}
-          </el-tag>
-        </div>
-      </div>
-      <div v-if="fileList.length === 0 && !fileListLoading" class="text-sm text-gray-400 mt-2">
-        该目录下没有文件
-      </div>
-    </div>
-  </div>
-
-  <!-- 目录选择弹窗 -->
-  <el-dialog
-    v-model="directoryDialogVisible"
-    title="选择目录"
-    width="600"
-    :before-close="handleCloseDirectoryDialog">
-    <div class="m-4">
-      <div class="flex items-center gap-2 mb-2">
-        <el-input v-model="currentPath" placeholder="当前路径" readonly> </el-input>
-        <el-button type="primary" @click="handleRefreshDirectory" :loading="directoryLoading">
-          刷新
-        </el-button>
-      </div>
-      <div class="flex items-center gap-2">
-        <el-button size="small" @click="handleNavigateUp" :disabled="!canNavigateUp">
-          上一级
-        </el-button>
-        <el-button size="small" @click="handleGoToHome"> 首页 </el-button>
-      </div>
-    </div>
-    <el-table
-      :data="directoryList"
-      stripe
-      class="w-full"
-      v-loading="directoryLoading"
-      :height="300"
-      @row-click="handleDirectoryRowClick">
-      <el-table-column prop="name" label="名称" min-width="200">
-        <template #default="{ row }">
-          <div class="flex items-center gap-2">
-            <span v-if="row.isDirectory">📁</span>
-            <span v-else>📄</span>
-            <span>{{ row.name }}</span>
-          </div>
-        </template>
-      </el-table-column>
-      <el-table-column prop="size" label="大小" width="100">
-        <template #default="{ row }">
-          <span v-if="!row.isDirectory">{{ formatSize(row.size) }}</span>
-          <span v-else>-</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="100">
-        <template #default="{ row }">
-          <el-button
-            v-if="row.isDirectory"
-            size="small"
-            type="primary"
-            @click.stop="handleSelectDirectory(row)">
-            选择
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
   </el-dialog>
 
   <!-- 扫描设备弹窗 -->

@@ -80,6 +80,33 @@ def get_alsa_bluetooth_device(device_address=None, hci_adapter='hci0'):
         return None
 
 
+def get_playback_status():
+    """
+    获取当前播放状态
+    :return: 播放状态字典 {"is_playing": bool, "pid": int or None}
+    """
+    global _current_playback_process
+    
+    try:
+        if _current_playback_process and _current_playback_process.poll() is None:
+            # 进程还在运行
+            return {
+                "is_playing": True,
+                "pid": _current_playback_process.pid
+            }
+        else:
+            return {
+                "is_playing": False,
+                "pid": None
+            }
+    except Exception as e:
+        log.error(f"[MEDIA] Error checking playback status: {e}")
+        return {
+            "is_playing": False,
+            "pid": None
+        }
+
+
 def stop_current_playback():
     """
     停止当前正在播放的音频

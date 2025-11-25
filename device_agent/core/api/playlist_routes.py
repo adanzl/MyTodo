@@ -6,6 +6,7 @@ from flask import Blueprint, jsonify, request
 from core.log_config import root_logger
 from core.config import get_config
 from core.playlist_player import play_next_track
+from core.api.media_routes import get_playback_status
 
 log = root_logger()
 playlist_bp = Blueprint('playlist', __name__)
@@ -108,6 +109,9 @@ def playlist_status():
         if playlist and 0 <= current_index < len(playlist):
             current_file = playlist[current_index]
         
+        # 获取播放状态
+        playback_status = get_playback_status()
+        
         return jsonify({
             'success': True,
             'data': {
@@ -115,7 +119,9 @@ def playlist_status():
                 'total': len(playlist),
                 'current_index': current_index,
                 'current_file': current_file,
-                'device_address': device_address
+                'device_address': device_address,
+                'is_playing': playback_status['is_playing'],
+                'playing_pid': playback_status['pid']
             }
         })
         
