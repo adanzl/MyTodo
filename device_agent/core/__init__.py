@@ -9,7 +9,12 @@ from core.api.media_routes import media_bp
 
 def create_app():
     instance_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    app = Flask(__name__, instance_path=instance_path, instance_relative_config=True)
+    # 明确指定 template_folder 路径
+    template_folder = os.path.join(instance_path, 'templates')
+    app = Flask(__name__, 
+                instance_path=instance_path, 
+                instance_relative_config=True,
+                template_folder=template_folder)
 
     CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})
     # 创建 SocketIO 实例并与 Flask 应用关联
