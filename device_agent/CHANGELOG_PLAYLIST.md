@@ -5,14 +5,18 @@
 
 ### 修复
 - ✅ 修复定时任务调度器在应用启动时被多次初始化的问题
-- ✅ 添加调度器运行状态检查，避免重复启动
+- ✅ 添加 `_started` 标志跟踪初始化状态，避免重复调用
 - ✅ 使用双重检查锁定模式确保单例线程安全
 - ✅ 优化初始化日志，只在首次启动时输出
 
 ### 技术改进
-- ✅ 在 `CronScheduler.start()` 中添加 `self.scheduler.running` 检查
+- ✅ 在 `CronScheduler.__init__()` 中添加 `self._started` 标志
+- ✅ 在 `CronScheduler.start()` 中检查 `_started` 避免重复初始化
 - ✅ 在 `get_scheduler()` 中添加 `threading.Lock` 保护
 - ✅ 改进 `core/__init__.py` 中的启动日志逻辑
+
+### 为什么不能只用 `scheduler.running`？
+当 `cron.enabled=false` 时，调度器不会启动，`scheduler.running` 始终为 `False`，无法阻止重复初始化。使用 `_started` 标志可以跟踪是否已完成初始化流程。
 
 ### 文档
 - ✅ 新增 `BUGFIX_SCHEDULER.md` - 详细说明修复内容

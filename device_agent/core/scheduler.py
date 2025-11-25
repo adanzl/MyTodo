@@ -30,6 +30,7 @@ class CronScheduler:
         self.scheduler = BackgroundScheduler(timezone='Asia/Shanghai')
         self.config = get_config()
         self.job_id = 'cron_command_job'
+        self._started = False  # 标记是否已经调用过 start()
     
     def execute_command(self):
         """执行配置的命令"""
@@ -97,10 +98,13 @@ class CronScheduler:
     
     def start(self):
         """启动调度器"""
-        # 检查调度器是否已经在运行，避免重复启动
-        if self.scheduler.running:
-            log.debug("定时任务调度器已经在运行，跳过重复启动")
+        # 检查是否已经调用过 start()，避免重复初始化
+        if self._started:
+            log.debug("定时任务调度器已经初始化过，跳过重复调用")
             return
+        
+        # 标记为已启动
+        self._started = True
         
         if not self.config.is_cron_enabled():
             log.info("定时任务未启用 (cron.enabled=false)")
