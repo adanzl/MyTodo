@@ -119,6 +119,11 @@ POST /media/stop
 GET /media/getAudioDevices
 ```
 
+#### 调试信息（故障排查）
+```bash
+GET /media/debug
+```
+
 ### 定时任务
 
 #### 获取任务状态
@@ -160,6 +165,7 @@ cron.command=echo "定时任务执行: $(date)"
 
 - **蓝牙音频播放**: [BLUETOOTH_AUDIO_ALSA.md](BLUETOOTH_AUDIO_ALSA.md) - 完整的 ALSA 配置和故障排查
 - **媒体播放示例**: [MEDIA_API_EXAMPLES.md](MEDIA_API_EXAMPLES.md) - API 使用示例和代码
+- **故障排查指南**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - 常见问题和解决方案
 - **定时任务配置**: [README_CRON.md](README_CRON.md) - Cron 定时任务说明
 - **API 使用说明**: [API_USAGE.md](API_USAGE.md) - Cron API 详细文档
 

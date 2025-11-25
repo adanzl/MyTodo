@@ -2,6 +2,7 @@
 媒体管理路由
 '''
 import os
+import time
 import subprocess
 from flask import Blueprint, request
 from core.log_config import root_logger
@@ -127,21 +128,54 @@ def play_media_file_with_mpg123(file_path, alsa_device=None):
         # 添加文件路径
         cmd.append(file_path)
         
-        log.info(f"[MEDIA] Playing with mpg123: {' '.join(cmd)}")
+        log.info(f"[MEDIA]: {' '.join(cmd)}")
         
-        # 后台启动播放进程
+        # 准备环境变量 - 继承当前环境并确保包含必要的音频相关变量
+        env = os.environ.copy()
+        
+        # 确保 XDG_RUNTIME_DIR 存在（对于某些音频系统很重要）
+        if 'XDG_RUNTIME_DIR' not in env:
+            # 尝试设置默认值
+            import pwd
+            try:
+                user_info = pwd.getpwuid(os.getuid())
+                env['XDG_RUNTIME_DIR'] = f"/run/user/{os.getuid()}"
+            except:
+                pass
+        
+        # 确保 HOME 环境变量存在
+        if 'HOME' not in env:
+            try:
+                import pwd
+                user_info = pwd.getpwuid(os.getuid())
+                env['HOME'] = user_info.pw_dir
+            except:
+                pass
+        
+        # 后台启动播放进程，使用完整的环境变量
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            text=True,
+            env=env,
+            start_new_session=True  # 在新会话中启动，避免继承信号
         )
         
         # 保存进程引用以便后续停止
         global _current_playback_process
         _current_playback_process = process
         
-        log.info(f"[MEDIA] Started playback: {file_path}")
+        log.info(f"[MEDIA] Started playback: {file_path} (PID: {process.pid})")
+        
+        # 等待一小段时间检查进程是否立即退出（可能是错误）
+        time.sleep(0.1)
+        if process.poll() is not None:
+            # 进程已经退出，读取错误信息
+            stdout, stderr = process.communicate()
+            log.error(f"[MEDIA] mpg123 exited immediately. stderr: {stderr}")
+            return {"code": -1, "msg": f"mpg123 failed: {stderr}"}
+        
         return {"code": 0, "msg": "Playing", "file": os.path.basename(file_path), "pid": process.pid}
         
     except FileNotFoundError:
@@ -164,65 +198,6 @@ def media_stop():
     except Exception as e:
         log.error(f"[MEDIA] Stop error: {e}")
         return {"code": -1, "msg": f'error: {str(e)}'}
-
-
-@media_bp.route("/media/getAudioDevices", methods=['GET'])
-def media_get_audio_devices():
-    """
-    获取所有 ALSA 音频输出设备列表
-    """
-    try:
-        log.info("===== [Media Get Audio Devices]")
-        
-        # 获取所有 ALSA 设备
-        result = subprocess.run(
-            ['aplay', '-L'],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
-        
-        if result.returncode != 0:
-            return {"code": -1, "msg": "Failed to list audio devices"}
-        
-        # 解析输出
-        devices = []
-        current_device = None
-        
-        for line in result.stdout.split('\n'):
-            # ALSA 设备列表中，设备名不缩进，描述缩进
-            if line and not line.startswith(' '):
-                # 新的设备名
-                if current_device:
-                    devices.append(current_device)
-                current_device = {
-                    'name': line.strip(),
-                    'description': '',
-                    'is_bluetooth': 'bluealsa' in line.lower()
-                }
-            elif line and current_device:
-                # 设备描述
-                current_device['description'] += line.strip() + ' '
-        
-        if current_device:
-            devices.append(current_device)
-        
-        return {
-            "code": 0,
-            "msg": "ok",
-            "data": {
-                "devices": devices,
-                "total": len(devices),
-                "bluetooth_devices": [d for d in devices if d['is_bluetooth']]
-            }
-        }
-        
-    except FileNotFoundError:
-        return {"code": -1, "msg": "ALSA tools not available (install alsa-utils)"}
-    except Exception as e:
-        log.error(f"[MEDIA] Get audio devices error: {e}")
-        return {"code": -1, "msg": f'error: {str(e)}'}
-
 
 @media_bp.route("/media/play", methods=['POST'])
 def media_play_file():
@@ -286,4 +261,81 @@ def media_play_file():
         
     except Exception as e:
         log.error(f"[MEDIA] Play file error: {e}")
+        return {"code": -1, "msg": f'error: {str(e)}'}
+
+
+@media_bp.route("/media/debug", methods=['GET'])
+def media_debug():
+    """
+    调试接口：显示环境信息和进程状态
+    """
+    try:
+        import pwd
+        import grp
+        
+        # 获取当前用户信息
+        uid = os.getuid()
+        gid = os.getgid()
+        user_info = pwd.getpwuid(uid)
+        group_info = grp.getgrgid(gid)
+        
+        # 获取用户所属的所有组
+        groups = [grp.getgrgid(g).gr_name for g in os.getgroups()]
+        
+        # 检查音频权限
+        audio_groups = [g for g in groups if 'audio' in g.lower() or 'bluetooth' in g.lower()]
+        
+        # 检查 mpg123 是否存在
+        mpg123_path = None
+        try:
+            result = subprocess.run(['which', 'mpg123'], capture_output=True, text=True)
+            if result.returncode == 0:
+                mpg123_path = result.stdout.strip()
+        except:
+            pass
+        
+        # 获取蓝牙设备
+        bt_mgr = get_bluetooth_mgr()
+        paired_devices = bt_mgr.get_system_paired_devices()
+        
+        # 检查当前播放状态
+        playback_status = "idle"
+        if _current_playback_process and _current_playback_process.poll() is None:
+            playback_status = f"playing (PID: {_current_playback_process.pid})"
+        
+        return {
+            "code": 0,
+            "msg": "ok",
+            "data": {
+                "system": {
+                    "user": user_info.pw_name,
+                    "uid": uid,
+                    "gid": gid,
+                    "home": user_info.pw_dir,
+                    "shell": user_info.pw_shell,
+                    "groups": groups,
+                    "audio_groups": audio_groups,
+                },
+                "environment": {
+                    "XDG_RUNTIME_DIR": os.environ.get('XDG_RUNTIME_DIR'),
+                    "HOME": os.environ.get('HOME'),
+                    "USER": os.environ.get('USER'),
+                    "PATH": os.environ.get('PATH'),
+                    "DBUS_SESSION_BUS_ADDRESS": os.environ.get('DBUS_SESSION_BUS_ADDRESS'),
+                },
+                "tools": {
+                    "mpg123": mpg123_path,
+                },
+                "bluetooth": {
+                    "paired_devices_count": len(paired_devices),
+                    "connected_devices": [d for d in paired_devices if d.get('connected')],
+                },
+                "playback": {
+                    "status": playback_status,
+                }
+            }
+        }
+        
+    except Exception as e:
+        log.error(f"[MEDIA] Debug error: {e}")
         return {"code": -1, "msg": f'error: {str(e)}'}
