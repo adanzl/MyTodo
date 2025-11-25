@@ -19,6 +19,9 @@ def create_app():
                 instance_path=instance_path, 
                 instance_relative_config=True,
                 template_folder=template_folder)
+    
+    # 配置 JSON 返回时不转义中文字符
+    app.config['JSON_AS_ASCII'] = False
 
     CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})
     # 创建 SocketIO 实例并与 Flask 应用关联
