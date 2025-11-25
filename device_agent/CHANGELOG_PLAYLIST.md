@@ -1,5 +1,24 @@
 # 播放列表功能更新日志
 
+## 版本 1.1.1 (2025-11-25)
+**Bug 修复**: 定时任务调度器多次初始化问题
+
+### 修复
+- ✅ 修复定时任务调度器在应用启动时被多次初始化的问题
+- ✅ 添加调度器运行状态检查，避免重复启动
+- ✅ 使用双重检查锁定模式确保单例线程安全
+- ✅ 优化初始化日志，只在首次启动时输出
+
+### 技术改进
+- ✅ 在 `CronScheduler.start()` 中添加 `self.scheduler.running` 检查
+- ✅ 在 `get_scheduler()` 中添加 `threading.Lock` 保护
+- ✅ 改进 `core/__init__.py` 中的启动日志逻辑
+
+### 文档
+- ✅ 新增 `BUGFIX_SCHEDULER.md` - 详细说明修复内容
+
+---
+
 ## 版本 1.1 (2025-11-25)
 **功能**: 播放列表接口独立化 + 新增手动播放接口
 
@@ -17,6 +36,7 @@
 - ✅ 更新 `QUICK_START_PLAYLIST.md` 添加手动测试方法
 - ✅ 更新 `README.md` 添加 API 快速参考
 - ✅ 新增 `test_playlist_api.sh` 测试脚本
+- ✅ 新增 `PLAYLIST_API_QUICK_REF.md` - API 快速参考卡片
 
 ---
 

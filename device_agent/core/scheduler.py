@@ -3,6 +3,7 @@
 使用 APScheduler 实现 cron 定时任务
 """
 import subprocess
+import threading
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from core.config import get_config
@@ -96,6 +97,11 @@ class CronScheduler:
     
     def start(self):
         """启动调度器"""
+        # 检查调度器是否已经在运行，避免重复启动
+        if self.scheduler.running:
+            log.debug("定时任务调度器已经在运行，跳过重复启动")
+            return
+        
         if not self.config.is_cron_enabled():
             log.info("定时任务未启用 (cron.enabled=false)")
             return
@@ -210,12 +216,19 @@ class CronScheduler:
 
 # 全局调度器实例
 _scheduler_instance = None
+_scheduler_lock = threading.Lock()
 
 
 def get_scheduler() -> CronScheduler:
-    """获取全局调度器实例"""
+    """获取全局调度器实例（线程安全单例）"""
     global _scheduler_instance
+    
+    # 双重检查锁定模式
     if _scheduler_instance is None:
-        _scheduler_instance = CronScheduler()
+        with _scheduler_lock:
+            if _scheduler_instance is None:
+                log.debug("创建定时任务调度器实例")
+                _scheduler_instance = CronScheduler()
+    
     return _scheduler_instance
 

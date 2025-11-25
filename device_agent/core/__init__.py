@@ -42,8 +42,13 @@ def create_app():
     # 启动定时任务调度器
     try:
         scheduler = get_scheduler()
+        was_running = scheduler.scheduler.running
         scheduler.start()
-        log.info("定时任务调度器初始化完成")
+        # 只在首次启动时输出日志
+        if not was_running and scheduler.scheduler.running:
+            log.info("定时任务调度器已启动")
+        elif not was_running and not scheduler.scheduler.running:
+            log.debug("定时任务调度器已初始化（未启用）")
     except Exception as e:
         log.error(f"定时任务调度器启动失败: {str(e)}")
 
