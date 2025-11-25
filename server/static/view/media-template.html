@@ -2,7 +2,7 @@
   <!-- 已连接的设备列表 -->
   <div>
     <div class="flex items-center gap-2 mb-2">
-      <h3 class="text-lg font-semibold">已连接的设备</h3>
+      <h3 class="text-lg font-semibold">已配对的设备</h3>
       <el-button type="primary" @click="handleOpenScanDialog" size="small"> 扫描设备 </el-button>
     </div>
     <el-table :data="connectedDeviceList" stripe class="w-full" v-loading="loading" :height="200">
@@ -21,7 +21,7 @@
             type="danger"
             @click="handleDisconnectDevice(row)"
             :loading="row.disconnecting"
-            :disabled="row.disconnecting">
+            :disabled="row.disconnecting || !row.connected">
             断开
           </el-button>
         </template>

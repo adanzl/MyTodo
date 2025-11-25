@@ -31,15 +31,24 @@ class CronScheduler:
         self.config = get_config()
         self.job_id = 'cron_command_job'
         self._started = False  # 标记是否已经调用过 start()
+        self._executing = False  # 标记是否正在执行任务
+        self._execute_lock = threading.Lock()  # 执行锁
     
     def execute_command(self):
-        """执行配置的命令"""
-        command = self.config.get_cron_command()
-        if not command:
-            log.warning("未配置 cron.command，跳过执行")
+        """执行配置的命令（带执行锁保护）"""
+        # 尝试获取执行锁，如果获取失败说明上一次还在执行
+        if not self._execute_lock.acquire(blocking=False):
+            log.warning("定时任务正在执行中，跳过本次触发")
             return
         
         try:
+            self._executing = True
+            command = self.config.get_cron_command()
+            
+            if not command:
+                log.warning("未配置 cron.command，跳过执行")
+                return
+            
             log.info(f"执行定时任务命令: {command}")
             
             # 检查是否是播放列表播放命令
@@ -75,6 +84,11 @@ class CronScheduler:
             log.error(f"命令执行超时: {command}")
         except Exception as e:
             log.error(f"命令执行异常: {command}, 错误: {str(e)}")
+        finally:
+            # 执行完成，释放锁
+            self._executing = False
+            self._execute_lock.release()
+            log.debug("定时任务执行完成，释放执行锁")
     
     def parse_cron_expression(self, cron_expr: str) -> dict:
         """
@@ -131,13 +145,14 @@ class CronScheduler:
             # 创建 cron 触发器
             trigger = CronTrigger(**cron_params, timezone='Asia/Shanghai')
             
-            # 添加任务
+            # 添加任务（max_instances=1 确保同时只有一个实例在执行）
             self.scheduler.add_job(
                 self.execute_command,
                 trigger=trigger,
                 id=self.job_id,
                 name='定时执行命令',
-                replace_existing=True
+                replace_existing=True,
+                max_instances=1  # 同时只允许一个实例执行
             )
             
             # 启动调度器
@@ -194,7 +209,8 @@ class CronScheduler:
                 trigger=trigger,
                 id=self.job_id,
                 name='定时执行命令',
-                replace_existing=True
+                replace_existing=True,
+                max_instances=1  # 同时只允许一个实例执行
             )
             
             log.info(f"定时任务已重启: cron={cron_expr}, command={command}")
@@ -203,6 +219,10 @@ class CronScheduler:
             log.error(f"重启定时任务失败: {str(e)}")
             raise
     
+    def is_executing(self) -> bool:
+        """检查是否正在执行任务"""
+        return self._executing
+    
     def get_status(self) -> dict:
         """获取调度器状态"""
         return {
@@ -210,6 +230,7 @@ class CronScheduler:
             'enabled': self.config.is_cron_enabled(),
             'cron_expression': self.config.get_cron_expression(),
             'command': self.config.get_cron_command(),
+            'is_executing': self._executing,
             'jobs': [
                 {
                     'id': job.id,

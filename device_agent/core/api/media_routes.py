@@ -115,25 +115,40 @@ def stop_current_playback():
     global _current_playback_process
     
     try:
-        # 停止 mpg123 播放进程
-        if _current_playback_process and _current_playback_process.poll() is None:
+        log.debug(f"[MEDIA] stop_current_playback called, _current_playback_process={_current_playback_process}")
+        
+        # 检查播放进程状态
+        if _current_playback_process is None:
+            log.info("[MEDIA] No playback process reference")
+            return {"code": 0, "msg": "No playback in progress (no process reference)"}
+        
+        poll_result = _current_playback_process.poll()
+        log.debug(f"[MEDIA] Process poll result: {poll_result}, PID: {_current_playback_process.pid}")
+        
+        if poll_result is None:
             # 进程还在运行
             log.info(f"[MEDIA] Terminating playback process (PID: {_current_playback_process.pid})")
             _current_playback_process.terminate()
             try:
                 _current_playback_process.wait(timeout=2)
+                log.info(f"[MEDIA] Process {_current_playback_process.pid} terminated gracefully")
             except subprocess.TimeoutExpired:
-                log.warning("[MEDIA] Process did not terminate, killing it")
+                log.warning(f"[MEDIA] Process {_current_playback_process.pid} did not terminate, killing it")
                 _current_playback_process.kill()
                 _current_playback_process.wait()
+                log.info(f"[MEDIA] Process {_current_playback_process.pid} killed")
             _current_playback_process = None
-            log.info("[MEDIA] Stopped playback process")
             return {"code": 0, "msg": "Playback stopped"}
         else:
-            return {"code": 0, "msg": "No playback in progress"}
+            # 进程已经结束
+            log.info(f"[MEDIA] Process (PID: {_current_playback_process.pid}) already exited with code {poll_result}")
+            _current_playback_process = None
+            return {"code": 0, "msg": f"No playback in progress (process already exited with code {poll_result})"}
             
     except Exception as e:
         log.error(f"[MEDIA] Error stopping playback: {e}")
+        import traceback
+        log.error(f"[MEDIA] Traceback: {traceback.format_exc()}")
         return {"code": -1, "msg": f"Stop failed: {str(e)}"}
 
 

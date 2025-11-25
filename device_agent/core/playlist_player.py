@@ -3,11 +3,9 @@
 用于 cron 定时任务播放播放列表中的歌曲
 """
 import os
-import subprocess
-import time
 from core.config import get_config
 from core.log_config import root_logger
-from core.api.media_routes import get_alsa_bluetooth_device
+from core.api.media_routes import get_alsa_bluetooth_device, play_media_file_with_mpg123
 
 log = root_logger()
 
@@ -59,45 +57,14 @@ def play_next_track():
         log.info(f"[PLAYLIST] 播放第 {current_index + 1}/{len(playlist)} 首: {os.path.basename(file_path)}")
         log.info(f"[PLAYLIST] ALSA 设备: {alsa_device}")
         
-        # 构建 mpg123 命令
-        cmd = ['mpg123', '-a', alsa_device, file_path]
+        # 使用 media_routes 中的播放函数，确保进程被正确跟踪
+        result = play_media_file_with_mpg123(file_path, alsa_device)
         
-        # 准备环境变量
-        env = os.environ.copy()
-        if 'XDG_RUNTIME_DIR' not in env:
-            import pwd
-            try:
-                env['XDG_RUNTIME_DIR'] = f"/run/user/{os.getuid()}"
-            except:
-                pass
-        
-        if 'HOME' not in env:
-            try:
-                import pwd
-                user_info = pwd.getpwuid(os.getuid())
-                env['HOME'] = user_info.pw_dir
-            except:
-                pass
-        
-        # 启动播放进程
-        log.info(f"[PLAYLIST] 执行命令: {' '.join(cmd)}")
-        process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            env=env,
-            start_new_session=True
-        )
-        
-        # 等待一小段时间检查进程是否立即退出
-        time.sleep(0.1)
-        if process.poll() is not None:
-            stdout, stderr = process.communicate()
-            log.error(f"[PLAYLIST] mpg123 启动失败: {stderr}")
+        if result.get('code') != 0:
+            log.error(f"[PLAYLIST] 播放失败: {result.get('msg')}")
             return False
         
-        log.info(f"[PLAYLIST] 播放进程已启动 (PID: {process.pid})")
+        log.info(f"[PLAYLIST] 播放进程已启动 (PID: {result.get('pid')})")
         
         # 更新到下一首
         next_index = (current_index + 1) % len(playlist)
