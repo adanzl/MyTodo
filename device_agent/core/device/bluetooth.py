@@ -1,10 +1,7 @@
 '''
-蓝牙设备管理
+蓝牙设备管理 (Linux Only)
 '''
 import asyncio
-import json
-import platform
-import re
 import shutil
 import os
 from typing import Dict, List, Optional
@@ -393,141 +390,84 @@ class BluetoothMgr:
 
     def get_system_paired_devices(self) -> List[Dict]:
         """
-        获取系统已配对的蓝牙设备列表
+        获取系统已配对的蓝牙设备列表 (Linux Only)
         :return: 已配对设备列表
         """
-        connected_devices = []
-        system = platform.system()
+        paired_devices_list = []
 
         try:
-            if system == "Darwin":  # macOS
-                # 使用 system_profiler 获取蓝牙设备信息
+            # 使用 bluetoothctl 获取已配对设备，并检查连接状态
+            try:
+                # 先获取所有已配对设备
                 result_code, stdout, stderr = self._run_subprocess_safe(
-                    ["system_profiler", "SPBluetoothDataType", "-json"],
+                    ["bluetoothctl", "paired-devices"],
                     timeout=10
                 )
-
                 if result_code == 0:
-                    try:
-                        bluetooth_data = json.loads(stdout)
-                        # 解析 macOS 的蓝牙数据结构
-                        if "SPBluetoothDataType" in bluetooth_data:
-                            bt_data = bluetooth_data["SPBluetoothDataType"][0]
-                            # 查找已连接的设备
-                            for key, value in bt_data.items():
-                                if isinstance(value, dict) and "device_connected" in value:
-                                    if value.get("device_connected") == "Yes":
-                                        device_info = {
-                                            "address": value.get("device_address", ""),
-                                            "name": value.get("device_name", value.get("device_address", "Unknown")),
-                                            "connected": True,
-                                            "battery_percent": value.get("device_batteryPercent", None),
-                                            "is_apple_device": value.get("device_isAppleDevice", False),
-                                            "vendor_id": value.get("device_vendorID", None),
-                                        }
-                                        connected_devices.append(device_info)
-                    except json.JSONDecodeError:
-                        log.warning("[BLUETOOTH] Failed to parse system_profiler output")
-
-            elif system == "Linux":
-                # 使用 bluetoothctl 获取已配对设备，并检查连接状态
+                    paired_devices = {}
+                    # 解析 bluetoothctl 输出格式: "Device XX:XX:XX:XX:XX:XX Device Name"
+                    for line in stdout.strip().split('\n'):
+                        if line.strip() and line.startswith('Device'):
+                            parts = line.split(' ', 2)
+                            if len(parts) >= 2:
+                                address = parts[1]
+                                name = parts[2] if len(parts) > 2 else address
+                                paired_devices[address] = name
+                    
+                    # 对每个已配对设备使用 bluetoothctl info 查询连接状态
+                    for address, name in paired_devices.items():
+                        is_connected = False
+                        try:
+                            result_code, stdout, stderr = self._run_subprocess_safe(
+                                ["bluetoothctl", "info", address],
+                                timeout=5
+                            )
+                            if result_code == 0:
+                                # 解析输出，查找 "Connected: yes" 或 "Connected: no"
+                                for line in stdout.split('\n'):
+                                    line = line.strip()
+                                    if line.startswith('Connected:'):
+                                        # 格式: "Connected: yes" 或 "Connected: no"
+                                        value = line.split(':', 1)[1].strip().lower()
+                                        is_connected = (value == 'yes')
+                                        break
+                        except Exception as e:
+                            log.debug(f"[BLUETOOTH] Failed to get info for {address}: {e}")
+                        
+                        device_info = {
+                            "address": address,
+                            "name": name,
+                            "connected": is_connected,
+                        }
+                        paired_devices_list.append(device_info)
+                        
+            except FileNotFoundError:
+                # 如果没有 bluetoothctl，尝试使用 hcitool
+                log.warning("[BLUETOOTH] bluetoothctl not found, trying hcitool")
                 try:
-                    # 先获取所有已配对设备
-                    result_code, stdout, stderr = self._run_subprocess_safe(["bluetoothctl", "devices", "Paired"],
-                                                                            timeout=10)
+                    # hcitool con 只返回已连接的设备
+                    result_code, stdout, stderr = self._run_subprocess_safe(
+                        ["hcitool", "con"],
+                        timeout=10
+                    )
                     if result_code == 0:
-                        paired_devices = {}
-                        # 解析 bluetoothctl 输出格式: "Device XX:XX:XX:XX:XX:XX Device Name"
-                        for line in stdout.strip().split('\n'):
-                            if line.strip() and line.startswith('Device'):
-                                parts = line.split(' ', 2)
+                        # 解析 hcitool 输出
+                        for line in stdout.split('\n'):
+                            if '>' in line:
+                                parts = line.split()
                                 if len(parts) >= 2:
                                     address = parts[1]
-                                    name = parts[2] if len(parts) > 2 else address
-                                    paired_devices[address] = name
-                        
-                        # 获取所有已连接设备
-                        connected_addresses = set()
-                        result_code, stdout, stderr = self._run_subprocess_safe(["bluetoothctl", "devices", "Connected"],
-                                                                                timeout=10)
-                        if result_code == 0:
-                            for line in stdout.strip().split('\n'):
-                                if line.strip() and line.startswith('Device'):
-                                    parts = line.split(' ', 2)
-                                    if len(parts) >= 2:
-                                        connected_addresses.add(parts[1])
-                        
-                        # 为每个已配对设备设置连接状态
-                        for address, name in paired_devices.items():
-                            device_info = {
-                                "address": address,
-                                "name": name,
-                                "connected": address in connected_addresses,
-                            }
-                            connected_devices.append(device_info)
+                                    device_info = {
+                                        "address": address,
+                                        "name": address,  # hcitool 不提供名称
+                                        "connected": True,
+                                    }
+                                    paired_devices_list.append(device_info)
                 except FileNotFoundError:
-                    # 如果没有 bluetoothctl，尝试使用 hcitool
-                    try:
-                        # hcitool con 只返回已连接的设备
-                        result_code, stdout, stderr = self._run_subprocess_safe(
-                            ["hcitool", "con"],
-                            timeout=10
-                        )
-                        if result_code == 0:
-                            # 解析 hcitool 输出
-                            for line in stdout.split('\n'):
-                                if '>' in line:
-                                    parts = line.split()
-                                    if len(parts) >= 2:
-                                        address = parts[1]
-                                        device_info = {
-                                            "address": address,
-                                            "name": address,  # hcitool 不提供名称
-                                            "connected": True,
-                                        }
-                                        connected_devices.append(device_info)
-                    except FileNotFoundError:
-                        log.warning("[BLUETOOTH] bluetoothctl and hcitool not found")
+                    log.warning("[BLUETOOTH] hcitool not found either")
 
-            elif system == "Windows":
-                # 使用 PowerShell 获取已配对设备，并检查连接状态
-                # 获取所有蓝牙设备（包括已配对和已连接）
-                ps_command = """
-                $paired = Get-PnpDevice -Class Bluetooth | Where-Object {$_.Status -eq 'OK' -or $_.Status -eq 'Error'}
-                $connected = Get-PnpDevice -Class Bluetooth | Where-Object {$_.Status -eq 'OK'}
-                $connectedIds = $connected | ForEach-Object {$_.InstanceId}
-                $paired | ForEach-Object {
-                    $device = $_
-                    $friendlyName = $device.FriendlyName
-                    $instanceId = $device.InstanceId
-                    $isConnected = $connectedIds -contains $instanceId
-                    @{
-                        name = $friendlyName
-                        instanceId = $instanceId
-                        connected = $isConnected
-                    } | ConvertTo-Json
-                }
-                """
-                result_code, stdout, stderr = self._run_subprocess_safe(
-                    ["powershell", "-Command", ps_command],
-                    timeout=10
-                )
-                if result_code == 0:
-                    for line in stdout.strip().split('\n'):
-                        if line.strip():
-                            try:
-                                device_data = json.loads(line)
-                                device_info = {
-                                    "name": device_data.get("name", "Unknown"),
-                                    "instanceId": device_data.get("instanceId", ""),
-                                    "connected": device_data.get("connected", False),
-                                }
-                                connected_devices.append(device_info)
-                            except json.JSONDecodeError:
-                                continue
-
-            log.info(f"[BLUETOOTH] Found {len(connected_devices)} system paired devices")
-            return connected_devices
+            log.info(f"[BLUETOOTH] Found {len(paired_devices_list)} system paired devices")
+            return paired_devices_list
 
         except Exception as e:
             log.error(f"[BLUETOOTH] Error getting system paired devices: {e}")

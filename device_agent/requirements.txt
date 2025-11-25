@@ -1,0 +1,14 @@
+# Web Framework
+Flask==3.0.0
+flask-cors==4.0.0
+flask-socketio==5.3.5
+
+# Async Support
+gevent==23.9.1
+
+# Task Scheduler
+APScheduler==3.10.4
+
+# Other dependencies (if any)
+# Add your other dependencies here
+
