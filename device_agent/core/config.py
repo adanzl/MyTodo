@@ -3,7 +3,8 @@
 读取 config.properties 文件中的配置
 """
 import os
-from typing import Dict, Optional
+import json
+from typing import Dict, Optional, List
 
 
 class Config:
@@ -123,6 +124,54 @@ class Config:
             return self.save_config()
         except Exception as e:
             print(f"更新 cron 配置失败: {e}")
+            return False
+    
+    def get_playlist(self) -> List[str]:
+        """获取播放列表"""
+        playlist_str = self.get('playlist', '')
+        if not playlist_str:
+            return []
+        try:
+            return json.loads(playlist_str)
+        except:
+            return []
+    
+    def set_playlist(self, playlist: List[str]) -> bool:
+        """设置播放列表"""
+        try:
+            self.config['playlist'] = json.dumps(playlist, ensure_ascii=False)
+            return self.save_config()
+        except Exception as e:
+            print(f"设置播放列表失败: {e}")
+            return False
+    
+    def get_current_track_index(self) -> int:
+        """获取当前播放曲目索引"""
+        try:
+            return int(self.get('current_track_index', '0'))
+        except:
+            return 0
+    
+    def set_current_track_index(self, index: int) -> bool:
+        """设置当前播放曲目索引"""
+        try:
+            self.config['current_track_index'] = str(index)
+            return self.save_config()
+        except Exception as e:
+            print(f"设置当前曲目索引失败: {e}")
+            return False
+    
+    def get_bluetooth_device_address(self) -> Optional[str]:
+        """获取蓝牙设备地址"""
+        return self.get('bluetooth_device_address')
+    
+    def set_bluetooth_device_address(self, address: str) -> bool:
+        """设置蓝牙设备地址"""
+        try:
+            self.config['bluetooth_device_address'] = address
+            return self.save_config()
+        except Exception as e:
+            print(f"设置蓝牙设备地址失败: {e}")
             return False
 
 

@@ -21,6 +21,12 @@
 - 动态配置定时任务
 - 查看任务状态和执行日志
 
+### 🎼 播放列表管理
+- 配置音乐播放列表
+- 定时自动播放下一首歌曲
+- 循环播放，记录播放进度
+- 支持通过 API 更新播放列表
+
 ### 📊 系统监控
 - Web 日志查看界面
 - API 状态查询
@@ -143,6 +149,51 @@ Content-Type: application/json
 }
 ```
 
+### 播放列表
+
+#### 更新播放列表
+```bash
+POST /playlist/update
+Content-Type: application/json
+
+{
+  "playlist": [
+    "/home/orangepi/Videos/song1.mp3",
+    "/home/orangepi/Videos/song2.mp3",
+    "/home/orangepi/Videos/song3.mp3"
+  ],
+  "device_address": "58:EA:1F:1A:9A:8B"
+}
+```
+
+#### 获取播放列表状态
+```bash
+GET /playlist/status
+```
+
+#### 播放当前歌曲
+```bash
+POST /playlist/play
+```
+
+#### 播放下一首歌曲
+```bash
+POST /playlist/playNext
+```
+
+#### 配置定时播放
+```bash
+# 每天早上 7:00 自动播放下一首歌
+POST /cron/update
+Content-Type: application/json
+
+{
+  "enabled": true,
+  "expression": "0 7 * * *",
+  "command": "play_next_track"
+}
+```
+
 ### 系统监控
 
 #### Web 日志界面
@@ -163,6 +214,12 @@ cron.command=echo "定时任务执行: $(date)"
 
 ## 详细文档
 
+### 快速开始
+- **播放列表快速配置**: [QUICK_START_PLAYLIST.md](QUICK_START_PLAYLIST.md) - 5 分钟快速配置指南 ⭐
+- **API 快速参考**: [PLAYLIST_API_QUICK_REF.md](PLAYLIST_API_QUICK_REF.md) - 播放列表接口速查表 📋
+
+### 完整文档
+- **播放列表功能**: [PLAYLIST_API.md](PLAYLIST_API.md) - 播放列表配置和定时播放说明
 - **蓝牙音频播放**: [BLUETOOTH_AUDIO_ALSA.md](BLUETOOTH_AUDIO_ALSA.md) - 完整的 ALSA 配置和故障排查
 - **媒体播放示例**: [MEDIA_API_EXAMPLES.md](MEDIA_API_EXAMPLES.md) - API 使用示例和代码
 - **故障排查指南**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - 常见问题和解决方案
@@ -181,8 +238,9 @@ device_agent/
 │   ├── log_config.py      # 日志配置
 │   ├── config.py          # 配置读取
 │   ├── scheduler.py       # 定时任务调度器
+│   ├── playlist_player.py # 播放列表播放器
 │   ├── api/
-│   │   ├── routes.py      # 通用路由
+│   │   ├── routes.py      # 通用路由（含播放列表 API）
 │   │   ├── bluetooth_routes.py  # 蓝牙相关路由
 │   │   └── media_routes.py      # 媒体播放路由
 │   └── device/

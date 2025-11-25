@@ -10,6 +10,17 @@ from core.log_config import root_logger
 
 log = root_logger()
 
+# 延迟导入以避免循环依赖
+_playlist_player = None
+
+def get_playlist_player():
+    """获取播放列表播放器模块（延迟导入）"""
+    global _playlist_player
+    if _playlist_player is None:
+        from core.playlist_player import play_next_track
+        _playlist_player = play_next_track
+    return _playlist_player
+
 
 class CronScheduler:
     """定时任务调度器"""
@@ -29,7 +40,18 @@ class CronScheduler:
         try:
             log.info(f"执行定时任务命令: {command}")
             
-            # 执行命令
+            # 检查是否是播放列表播放命令
+            if command.strip() == "play_next_track":
+                log.info("检测到播放列表播放命令，调用播放器...")
+                play_next_track_func = get_playlist_player()
+                success = play_next_track_func()
+                if success:
+                    log.info("播放列表播放成功")
+                else:
+                    log.warning("播放列表播放失败")
+                return
+            
+            # 执行普通 shell 命令
             result = subprocess.run(
                 command,
                 shell=True,
