@@ -401,10 +401,10 @@ class BluetoothMgr:
             # 直接运行
             return _run()
 
-    def get_system_connected_devices(self) -> List[Dict]:
+    def get_system_paired_devices(self) -> List[Dict]:
         """
-        获取系统已连接的蓝牙设备列表
-        :return: 已连接设备列表
+        获取系统已配对的蓝牙设备列表
+        :return: 已配对设备列表
         """
         connected_devices = []
         system = platform.system()
@@ -440,12 +440,13 @@ class BluetoothMgr:
                         log.warning("[BLUETOOTH] Failed to parse system_profiler output")
 
             elif system == "Linux":
-                # 使用 bluetoothctl 获取已连接设备
+                # 使用 bluetoothctl 获取已配对设备，并检查连接状态
                 try:
-                    # bluetoothctl devices 返回已连接的设备列表
-                    result_code, stdout, stderr = self._run_subprocess_safe(["bluetoothctl", "devices", "Connected"],
+                    # 先获取所有已配对设备
+                    result_code, stdout, stderr = self._run_subprocess_safe(["bluetoothctl", "devices", "Paired"],
                                                                             timeout=10)
                     if result_code == 0:
+                        paired_devices = {}
                         # 解析 bluetoothctl 输出格式: "Device XX:XX:XX:XX:XX:XX Device Name"
                         for line in stdout.strip().split('\n'):
                             if line.strip() and line.startswith('Device'):
@@ -453,15 +454,31 @@ class BluetoothMgr:
                                 if len(parts) >= 2:
                                     address = parts[1]
                                     name = parts[2] if len(parts) > 2 else address
-                                    device_info = {
-                                        "address": address,
-                                        "name": name,
-                                        "connected": True,
-                                    }
-                                    connected_devices.append(device_info)
+                                    paired_devices[address] = name
+                        
+                        # 获取所有已连接设备
+                        connected_addresses = set()
+                        result_code, stdout, stderr = self._run_subprocess_safe(["bluetoothctl", "devices", "Connected"],
+                                                                                timeout=10)
+                        if result_code == 0:
+                            for line in stdout.strip().split('\n'):
+                                if line.strip() and line.startswith('Device'):
+                                    parts = line.split(' ', 2)
+                                    if len(parts) >= 2:
+                                        connected_addresses.add(parts[1])
+                        
+                        # 为每个已配对设备设置连接状态
+                        for address, name in paired_devices.items():
+                            device_info = {
+                                "address": address,
+                                "name": name,
+                                "connected": address in connected_addresses,
+                            }
+                            connected_devices.append(device_info)
                 except FileNotFoundError:
                     # 如果没有 bluetoothctl，尝试使用 hcitool
                     try:
+                        # hcitool con 只返回已连接的设备
                         result_code, stdout, stderr = self._run_subprocess_safe(
                             ["hcitool", "con"],
                             timeout=10
@@ -483,17 +500,21 @@ class BluetoothMgr:
                         log.warning("[BLUETOOTH] bluetoothctl and hcitool not found")
 
             elif system == "Windows":
-                # 使用 PowerShell 获取已连接设备
+                # 使用 PowerShell 获取已配对设备，并检查连接状态
+                # 获取所有蓝牙设备（包括已配对和已连接）
                 ps_command = """
-                Get-PnpDevice -Class Bluetooth | Where-Object {$_.Status -eq 'OK'} | 
-                ForEach-Object {
+                $paired = Get-PnpDevice -Class Bluetooth | Where-Object {$_.Status -eq 'OK' -or $_.Status -eq 'Error'}
+                $connected = Get-PnpDevice -Class Bluetooth | Where-Object {$_.Status -eq 'OK'}
+                $connectedIds = $connected | ForEach-Object {$_.InstanceId}
+                $paired | ForEach-Object {
                     $device = $_
                     $friendlyName = $device.FriendlyName
                     $instanceId = $device.InstanceId
+                    $isConnected = $connectedIds -contains $instanceId
                     @{
                         name = $friendlyName
                         instanceId = $instanceId
-                        connected = $true
+                        connected = $isConnected
                     } | ConvertTo-Json
                 }
                 """
@@ -509,17 +530,17 @@ class BluetoothMgr:
                                 device_info = {
                                     "name": device_data.get("name", "Unknown"),
                                     "instanceId": device_data.get("instanceId", ""),
-                                    "connected": True,
+                                    "connected": device_data.get("connected", False),
                                 }
                                 connected_devices.append(device_info)
                             except json.JSONDecodeError:
                                 continue
 
-            log.info(f"[BLUETOOTH] Found {len(connected_devices)} system connected devices")
+            log.info(f"[BLUETOOTH] Found {len(connected_devices)} system paired devices")
             return connected_devices
 
         except Exception as e:
-            log.error(f"[BLUETOOTH] Error getting system connected devices: {e}")
+            log.error(f"[BLUETOOTH] Error getting system paired devices: {e}")
             return []
 
     async def read_characteristic(self, address: str, characteristic_uuid: str) -> Dict:
@@ -608,15 +629,15 @@ def scan_devices_sync(timeout: float = 5.0) -> List[Dict]:
         return []
 
 
-def get_system_connected_devices_sync() -> List[Dict]:
+def get_system_paired_devices_sync() -> List[Dict]:
     """
-    同步获取系统已连接的蓝牙设备列表
-    :return: 已连接设备列表
+    同步获取系统已配对的蓝牙设备列表
+    :return: 已配对设备列表
     """
     try:
-        return get_bluetooth_mgr().get_system_connected_devices()
+        return get_bluetooth_mgr().get_system_paired_devices()
     except Exception as e:
-        log.error(f"[BLUETOOTH] Get system connected devices error: {e}")
+        log.error(f"[BLUETOOTH] Get system paired devices error: {e}")
         return []
 
 
@@ -696,7 +717,7 @@ if __name__ == "__main__":
     for device in devices:
         print(f"【{device['address']}】{device['name']}")
     # 测试获取系统已连接的设备
-    connected_devices = get_system_connected_devices_sync()
+    connected_devices = get_system_paired_devices_sync()
     print(f"Found {len(connected_devices)} connected devices")
     for device in connected_devices:
         print(f"【{device.get('address', 'N/A')}】{device.get('name', 'Unknown')}")

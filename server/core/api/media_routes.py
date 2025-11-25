@@ -7,7 +7,7 @@ import json
 from flask import Blueprint, request
 from core.log_config import root_logger
 from core.device.bluetooth import (
-    get_system_connected_devices_sync,
+    get_system_paired_devices_sync,
     connect_device_sync,
     get_bluetooth_mgr
 )
@@ -142,9 +142,9 @@ def media_play_dir():
             else:
                 log.warning(f"Failed to connect to specified device {device_address}: {connect_result.get('msg')}")
         
-        # 优先级2: 使用系统已连接的设备
+        # 优先级2: 使用系统已配对的设备
         if not target_device:
-            connected_devices = get_system_connected_devices_sync()
+            connected_devices = get_system_paired_devices_sync()
             if connected_devices:
                 target_device = connected_devices[0]
                 log.info(f"Using system connected device: {target_device.get('address', 'N/A')}")
