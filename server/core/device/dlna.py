@@ -18,7 +18,7 @@ except ImportError:
 log = root_logger()
 
 
-def _device_to_dict(device) -> Dict:
+def _device_to_dict(device: upnpclient.Device) -> Dict:
     """将 upnpclient.Device 对象转换为字典"""
     try:
         location = getattr(device, 'location', '')
@@ -31,6 +31,7 @@ def _device_to_dict(device) -> Dict:
             "manufacturer": getattr(device, 'manufacturer', ''),
             "model_name": getattr(device, 'model_name', ''),
             "location": location,
+            "service_type": getattr(device, 'service_type', ''),
         }
     except Exception as e:
         log.error(f"[DLNA] Error converting device: {e}")
@@ -58,8 +59,10 @@ async def scan_devices(timeout: float = 5.0) -> List[Dict]:
         if SSDPClient:
             try:
                 client = SSDPClient()
-                # 搜索 UPnP AVTransport 服务（DLNA 播放设备）
-                responses = client.m_search(st="urn:schemas-upnp-org:service:AVTransport:1", timeout=int(timeout), mx=int(timeout))
+                # 搜索媒体渲染器设备（MediaRenderer）- DLNA 播放设备
+                # m_search 只接受 st 和 mx 参数，mx 是最大等待时间（建议 1-5 秒）
+                mx_value = min(max(int(timeout), 1), 5)  # 限制在 1-5 秒之间
+                responses = client.m_search(st="urn:schemas-upnp-org:device:MediaRenderer:1", mx=mx_value)
                 for resp in responses:
                     location = resp.get("location") or resp.get("LOCATION")
                     if location and location not in locations:
@@ -67,7 +70,6 @@ async def scan_devices(timeout: float = 5.0) -> List[Dict]:
                 log.info(f"[DLNA] Found {len(locations)} device locations via ssdpy")
             except Exception as e:
                 log.warning(f"[DLNA] SSDPClient search failed: {e}")
-
 
         # 尝试使用 upnpclient 的搜索功能（如果可用）
         if not locations and hasattr(upnpclient, 'discover'):
@@ -115,18 +117,99 @@ def scan_devices_sync(timeout: float = 5.0) -> List[Dict]:
 
 
 class DlnaDev:
+    """DLNA 设备控制类"""
 
-    def __init__(self, address: str):
-        self.address = address
+    def __init__(self, location: str):
+        """
+        初始化 DLNA 设备
+        :param location: 设备描述文档的完整 URL
+        """
+        self.location = location
+        self._device = None
+        self._av_transport = None
+
+    def _get_device(self):
+        """获取 upnpclient.Device 对象"""
+        if self._device is None:
+            try:
+                if not self.location or not (self.location.startswith('http://')
+                                             or self.location.startswith('https://')):
+                    log.error(f"[DlnaDev] Invalid location URL: {self.location}")
+                    return None
+
+                self._device = upnpclient.Device(self.location)
+                log.info(f"[DlnaDev] Connected to device: {self._device.friendly_name} at {self.location}")
+            except Exception as e:
+                log.error(f"[DlnaDev] Failed to connect to device {self.location}: {e}")
+                return None
+        return self._device
+
+    def _get_av_transport(self):
+        """获取 AVTransport 服务"""
+        device = self._get_device()
+        if device is None:
+            return None
+
+        if self._av_transport is None:
+            try:
+                # 查找 AVTransport 服务
+                for service in device.services:
+                    if 'AVTransport' in service.service_type:
+                        self._av_transport = service
+                        log.debug(f"[DlnaDev] Found AVTransport service: {service.service_id}")
+                        break
+
+                if self._av_transport is None:
+                    log.error("[DlnaDev] AVTransport service not found")
+            except Exception as e:
+                log.error(f"[DlnaDev] Error getting AVTransport: {e}")
+
+        return self._av_transport
 
     def play(self, url: str) -> tuple[int, str]:
-        return 0, "ok"
+        """
+        播放媒体文件
+        :param url: 媒体文件 URL（可以是 http:// 或 file:// 路径）
+        :return: (错误码, 消息)
+        """
+        try:
+            av_transport = self._get_av_transport()
+            if av_transport is None:
+                return -1, "AVTransport service not available"
+
+            # 设置媒体 URI
+            try:
+                av_transport.SetAVTransportURI(InstanceID=0, CurrentURI=url, CurrentURIMetaData="")
+                log.info(f"[DlnaDev] Set media URI: {url}")
+            except Exception as e:
+                log.error(f"[DlnaDev] Failed to set URI: {e}")
+                return -1, f"Failed to set URI: {str(e)}"
+
+            # 开始播放
+            try:
+                av_transport.Play(InstanceID=0, Speed="1")
+                log.info(f"[DlnaDev] Play started: {url}")
+                return 0, "播放成功"
+            except Exception as e:
+                log.error(f"[DlnaDev] Failed to play: {e}")
+                return -1, f"播放失败: {str(e)}"
+        except Exception as e:
+            log.error(f"[DlnaDev] Play error: {e}")
+            return -1, f"播放异常: {str(e)}"
 
     def stop(self) -> tuple[int, str]:
-        return 0, "ok"
+        """
+        停止播放
+        :return: (错误码, 消息)
+        """
+        try:
+            av_transport = self._get_av_transport()
+            if av_transport is None:
+                return -1, "AVTransport service not available"
 
-    def play_next(self) -> tuple[int, str]:
-        return 0, "ok"
-
-    def play_prev(self) -> tuple[int, str]:
-        return 0, "ok"
+            av_transport.Stop(InstanceID=0)
+            log.info(f"[DlnaDev] Stop playback")
+            return 0, "停止成功"
+        except Exception as e:
+            log.error(f"[DlnaDev] Stop error: {e}")
+            return -1, f"停止失败: {str(e)}"
