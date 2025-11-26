@@ -29,7 +29,7 @@ def playlist_get():
     获取当前存储的播放列表集合，支持通过 id 只返回单个列表
     """
     try:
-        args = request.get_json()
+        args = request.args
         log.info("===== [Playlist Get] " + json.dumps(args))
         id = args.get("id")
         ret = playlist_mgr.get_playlist(id)

@@ -52,7 +52,7 @@ class PlaylistMgr:
             except (ValueError, AttributeError):
                 self.playlist_raw = None
         else:
-            self.playlist_raw = None
+            self.playlist_raw = {}
 
     def get_playlist(self, id: str = None) -> Dict[str, Any] | None:
         if id is None:

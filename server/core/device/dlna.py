@@ -18,7 +18,7 @@ except ImportError:
 log = root_logger()
 
 
-def _device_to_dict(device: upnpclient.Device) -> Dict:
+def _device_to_dict(device) -> Dict:
     """将 upnpclient.Device 对象转换为字典"""
     try:
         location = getattr(device, 'location', '')
@@ -31,7 +31,6 @@ def _device_to_dict(device: upnpclient.Device) -> Dict:
             "manufacturer": getattr(device, 'manufacturer', ''),
             "model_name": getattr(device, 'model_name', ''),
             "location": location,
-            "service_type": getattr(device, 'service_type', ''),
         }
     except Exception as e:
         log.error(f"[DLNA] Error converting device: {e}")

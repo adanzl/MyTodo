@@ -1,4 +1,4 @@
-import { bluetoothAction, getRdsData, setRdsData } from "../js/net_util.js";
+import { bluetoothAction, getRdsData, setRdsData, playlistAction } from "../js/net_util.js";
 
 const { ref, onMounted, nextTick, watch } = window.Vue;
 const { ElMessage, ElMessageBox } = window.ElementPlus;
@@ -62,7 +62,6 @@ async function createComponent() {
 
       const RDS_TABLE = "schedule_play";
       const RDS_CRON_KEY = "cron_config";
-      const RDS_PLAYLIST_KEY = "playlist_snapshot";
 
       const saveCronConfigToRds = async () => {
         try {
@@ -160,38 +159,110 @@ async function createComponent() {
         };
       };
 
-      const savePlaylistCollectionToRds = async (collectionOverride, activeIdOverride) => {
+      const savePlaylistCollectionToApi = async (collectionOverride) => {
         try {
           const collection = (collectionOverride || refData.playlistCollection.value || []).map((item) => ({
             ...item,
             total: Array.isArray(item.playlist) ? item.playlist.length : 0,
             updatedAt: Date.now(),
           }));
-          const payload = {
-            playlists: collection,
-            activePlaylistId: activeIdOverride || refData.activePlaylistId.value,
-            updatedAt: Date.now(),
-          };
-          await setRdsData(RDS_TABLE, RDS_PLAYLIST_KEY, JSON.stringify(payload));
+          
+          // 转换为后端期望的格式：字典格式，key 是播放列表 id
+          const playlistDict = {};
+          collection.forEach(item => {
+            if (item.id) {
+              playlistDict[item.id] = {
+                id: item.id,
+                name: item.name || "默认播放列表",
+                files: item.playlist || [],
+                current_index: item.current_index || 0,
+                device: item.device || { address: item.device_address || "", type: item.device_type || "" },
+                schedule: item.schedule || { enabled: 0, cron: "", duration: 0 },
+                create_time: item.create_time || new Date().toISOString(),
+                updated_time: new Date().toISOString(),
+              };
+            }
+          });
+          
+          // 通过接口保存
+          const response = await playlistAction("update", "POST", playlistDict);
+          if (response.code !== 0) {
+            throw new Error(response.msg || "保存播放列表失败");
+          }
         } catch (error) {
-          console.error("保存播放列表到 RDS 失败:", error);
+          console.error("保存播放列表到接口失败:", error);
         }
       };
 
-      const loadPlaylistFromRds = async () => {
+      // 保持向后兼容的函数名
+      const savePlaylistCollectionToRds = savePlaylistCollectionToApi;
+
+      const loadPlaylistFromApi = async () => {
         try {
-          const dataStr = await getRdsData(RDS_TABLE, RDS_PLAYLIST_KEY);
-          const parsed = dataStr ? JSON.parse(dataStr) : null;
+          // 从接口获取播放列表
+          const response = await playlistAction("get", "GET", {});
+          if (response.code !== 0) {
+            throw new Error(response.msg || "获取播放列表失败");
+          }
+          
+          // 接口返回的数据格式：{ code: 0, msg: "ok", data: {...} }
+          // data 是字典格式（所有播放列表，key 是 id），例如：{ "pl_123": {...}, "pl_456": {...} }
+          const apiData = response.data;
+          
+          // 转换数据格式以适配 normalizePlaylistCollection
+          let parsed = null;
+          if (apiData && typeof apiData === 'object') {
+            // 如果返回的是字典格式（多个播放列表，key 是 id）
+            if (!Array.isArray(apiData) && Object.keys(apiData).length > 0) {
+              // 将字典转换为数组，并转换字段名
+              const playlists = Object.values(apiData).map(item => ({
+                id: item.id,
+                name: item.name || "默认播放列表",
+                playlist: item.files || [],  // 后端使用 files，前端使用 playlist
+                current_index: item.current_index || 0,
+                device_address: item.device?.address || null,
+                device_type: item.device?.type || null,
+                device: item.device || {},
+                schedule: item.schedule || { enabled: 0, cron: "", duration: 0 },
+                create_time: item.create_time,
+                updated_time: item.updated_time,
+                updatedAt: item.updated_time ? new Date(item.updated_time).getTime() : Date.now(),
+              }));
+              
+              parsed = {
+                playlists: playlists,
+                activePlaylistId: playlists[0]?.id || null
+              };
+            }
+            // 如果返回的是数组
+            else if (Array.isArray(apiData)) {
+              parsed = {
+                playlists: apiData.map(item => ({
+                  ...item,
+                  playlist: item.files || item.playlist || [],
+                })),
+                activePlaylistId: apiData[0]?.id || null
+              };
+            }
+            // 如果返回的是单个播放列表对象
+            else if (apiData.id) {
+              parsed = {
+                playlists: [{
+                  ...apiData,
+                  playlist: apiData.files || apiData.playlist || [],
+                }],
+                activePlaylistId: apiData.id
+              };
+            }
+          }
+          
           const normalized = normalizePlaylistCollection(parsed);
           refData.playlistCollection.value = normalized.playlists;
           refData.activePlaylistId.value = normalized.activePlaylistId;
           syncActivePlaylist(normalized.playlists);
-          if (parsed && Array.isArray(parsed.playlist) && !Array.isArray(parsed.playlists)) {
-            await savePlaylistCollectionToRds(normalized.playlists, normalized.activePlaylistId);
-          }
           return normalized;
         } catch (error) {
-          console.error("从 RDS 加载播放列表失败:", error);
+          console.error("从接口加载播放列表失败:", error);
           const fallback = normalizePlaylistCollection(null);
           refData.playlistCollection.value = fallback.playlists;
           refData.activePlaylistId.value = fallback.activePlaylistId;
@@ -199,6 +270,9 @@ async function createComponent() {
           return fallback;
         }
       };
+
+      // 保持向后兼容的函数名
+      const loadPlaylistFromRds = loadPlaylistFromApi;
 
       const updateActivePlaylistData = async (mutator) => {
         if (typeof mutator !== "function") return null;
