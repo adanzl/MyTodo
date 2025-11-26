@@ -6,7 +6,6 @@ import json
 from flask import Blueprint, request
 
 from core.log_config import root_logger
-from core.device.agent import get_device_agent_client
 from core.models.playlist import playlist_mgr
 
 log = root_logger()
