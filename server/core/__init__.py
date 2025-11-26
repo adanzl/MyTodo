@@ -6,6 +6,7 @@ from flask_sqlalchemy import SQLAlchemy
 import core.ai.ai_mgr as ai_mgr
 from core.api.routes import api_bp
 from core.api.bluetooth_routes import bluetooth_bp
+from core.api.dlna_routes import dlna_bp
 from core.api.media_routes import media_bp
 from core.chat.chat_mgr import ChatMgr
 from core.db.db_mgr import DB_Mgr
@@ -30,11 +31,12 @@ def create_app():
     app.register_blueprint(api_bp, url_prefix='/')
     app.register_blueprint(bluetooth_bp, url_prefix='/')
     app.register_blueprint(media_bp, url_prefix='/')
+    app.register_blueprint(dlna_bp, url_prefix='/')
 
     ChatMgr(socketio)
     DB_Mgr.init(app)
     ai_mgr.init()
-    
+
     # 初始化定时任务调度器
     init_scheduler()
 
