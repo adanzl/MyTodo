@@ -11,11 +11,23 @@ from typing import Dict, List, Optional
 try:
     from core.log_config import root_logger
     from core.db import rds_mgr
+    from core import run_async
     log = root_logger()
 except ImportError:
     import logging
     log = logging.getLogger()
     rds_mgr = None
+    # 如果无法导入，使用本地定义
+    def run_async(coro, timeout=None):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            if timeout:
+                return loop.run_until_complete(asyncio.wait_for(coro, timeout=timeout))
+            return loop.run_until_complete(coro)
+        finally:
+            loop.close()
+            asyncio.set_event_loop(None)
 
 # 尝试使用 gevent.subprocess，如果不可用则使用标准 subprocess
 try:
@@ -615,12 +627,12 @@ def scan_devices_sync(timeout: float = 5.0) -> List[Dict]:
         asyncio.get_running_loop()
         # 如果有运行中的循环，需要在新线程中运行
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(_run_async, get_bluetooth_mgr().scan_devices(timeout))
+            future = executor.submit(run_async, get_bluetooth_mgr().scan_devices(timeout))
             # 设置超时时间，比扫描超时多5秒
             return future.result(timeout=timeout + 5.0)
     except RuntimeError:
         # 没有运行中的循环，创建新的事件循环
-        return _run_async(get_bluetooth_mgr().scan_devices(timeout))
+        return run_async(get_bluetooth_mgr().scan_devices(timeout))
     except concurrent.futures.TimeoutError:
         log.error(f"[BLUETOOTH] Scan timeout after {timeout + 5.0}s")
         return []
@@ -647,10 +659,10 @@ def connect_device_sync(address: str, timeout: float = 10.0) -> Dict:
     try:
         asyncio.get_running_loop()
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(_run_async, get_bluetooth_mgr().connect_device(address), timeout=timeout)
+            future = executor.submit(run_async, get_bluetooth_mgr().connect_device(address), timeout=timeout)
             result = future.result(timeout=timeout + 5.0)
     except RuntimeError:
-        result = _run_async(get_bluetooth_mgr().connect_device(address), timeout=timeout)
+        result = run_async(get_bluetooth_mgr().connect_device(address), timeout=timeout)
     except concurrent.futures.TimeoutError:
         log.error(f"[BLUETOOTH] Connect timeout after {timeout + 5.0}s")
         return {"code": -1, "msg": f"Connection timeout after {timeout}s"}
@@ -667,10 +679,10 @@ def disconnect_device_sync(address: str, timeout: float = 5.0) -> Dict:
     try:
         asyncio.get_running_loop()
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(_run_async, get_bluetooth_mgr().disconnect_device(address), timeout=timeout)
+            future = executor.submit(run_async, get_bluetooth_mgr().disconnect_device(address), timeout=timeout)
             result = future.result(timeout=timeout + 2.0)
     except RuntimeError:
-        result = _run_async(get_bluetooth_mgr().disconnect_device(address), timeout=timeout)
+        result = run_async(get_bluetooth_mgr().disconnect_device(address), timeout=timeout)
     except concurrent.futures.TimeoutError:
         log.error(f"[BLUETOOTH] Disconnect timeout after {timeout + 2.0}s")
         return {"code": -1, "msg": f"Disconnect timeout after {timeout}s"}
@@ -681,31 +693,7 @@ def disconnect_device_sync(address: str, timeout: float = 5.0) -> Dict:
     return result
 
 
-def _run_async(coro, timeout: float = None):
-    """在新的事件循环中运行协程"""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        if timeout:
-            return loop.run_until_complete(asyncio.wait_for(coro, timeout=timeout))
-        else:
-            return loop.run_until_complete(coro)
-    except asyncio.TimeoutError:
-        log.error(f"[BLUETOOTH] Async operation timeout after {timeout}s")
-        raise
-    finally:
-        try:
-            # 取消所有待处理的任务
-            pending = asyncio.all_tasks(loop)
-            for task in pending:
-                task.cancel()
-            if pending:
-                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-        except Exception:
-            pass
-        finally:
-            loop.close()
-            asyncio.set_event_loop(None)
+# _run_async 已移至 core.__init__.py 作为 run_async
 
 
 if __name__ == "__main__":

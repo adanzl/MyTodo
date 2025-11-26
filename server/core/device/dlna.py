@@ -1,54 +1,75 @@
 '''
 dlna设备管理
 '''
+import asyncio
+import concurrent.futures
 from typing import Dict, List
+from urllib.parse import urlparse
 from core.log_config import root_logger
-import upnpclient
-import ssdp
+from core import run_async
+
+try:
+    import upnpclient
+    import ssdp
+except ImportError:
+    upnpclient = None
+    ssdp = None
 
 log = root_logger()
 
 
-class DlnaDev:
-    """Dlna设备类"""
+def _device_to_dict(device) -> Dict:
+    """将 upnpclient.Device 对象转换为字典"""
+    try:
+        location = getattr(device, 'location', '')
+        address = urlparse(location).hostname if location else ''
+        
+        return {
+            "address": address,
+            "name": getattr(device, 'friendly_name', '') or address or 'Unknown',
+            "device_type": getattr(device, 'device_type', ''),
+            "manufacturer": getattr(device, 'manufacturer', ''),
+            "model_name": getattr(device, 'model_name', ''),
+            "location": location,
+        }
+    except Exception as e:
+        log.error(f"[DLNA] Error converting device: {e}")
+        return {"address": "", "name": "Unknown", "device_type": "", "manufacturer": "", "model_name": "", "location": ""}
 
-    def __init__(self, address: str):
-        self.address = address
-        log.info(f"[DlnaDev] init {self.address}")
 
-    def play(self, file_path: str) -> tuple[int, str]:
-        return 0, "播放成功"
-
-    def stop(self) -> tuple[int, str]:
-        return 0, "停止成功"
-
-
-class DlnaMgr:
-    """DLNA设备管理器"""
-
-    def __init__(self):
-        log.info("[DLNA] DlnaMgr init")
-        self.devices: Dict[str, Dict] = {}  # address -> device info
-
-    @staticmethod
-    async def scan_devices(timeout: float = 5.0) -> List[Dict]:
-        """
-        扫描DLNA设备
-        :param timeout: 扫描超时时间（秒）
-        :return: 设备列表
-        """
-        try:
-            log.info(f"[DLNA] Starting scan (timeout: {timeout}s)")
-            device_list = []
-            # 搜索 UPnP AVTransport 服务（DLNA 播放设备必带）
-            responses = ssdp.discover("urn:schemas-upnp-org:service:AVTransport:1", timeout=timeout)
-            for resp in responses:
-                # 通过设备描述 URL 获取设备详情
+async def scan_devices(timeout: float = 5.0) -> List[Dict]:
+    """扫描DLNA设备"""
+    if not (upnpclient and ssdp):
+        return []
+    
+    try:
+        log.info(f"[DLNA] Starting scan (timeout: {timeout}s)")
+        device_list = []
+        responses = ssdp.discover("urn:schemas-upnp-org:service:AVTransport:1", timeout=timeout)
+        
+        for resp in responses:
+            try:
                 device = upnpclient.Device(resp.location)
-                device_list.append(device)
-                log.inifo(f"发现设备: {device.friendly_name} (URL: {resp.location})")
-            log.info(f"[DLNA] Found {len(device_list)} devices")
-            return device_list
-        except Exception as e:
-            log.error(f"[DLNA] Scan error: {e}")
-            return []
+                device_list.append(_device_to_dict(device))
+            except Exception as e:
+                log.warning(f"[DLNA] Error processing {resp.location}: {e}")
+        
+        log.info(f"[DLNA] Found {len(device_list)} devices")
+        return device_list
+    except Exception as e:
+        log.error(f"[DLNA] Scan error: {e}")
+        return []
+
+
+def scan_devices_sync(timeout: float = 5.0) -> List[Dict]:
+    """同步扫描DLNA设备"""
+    try:
+        asyncio.get_running_loop()
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(run_async, scan_devices(timeout))
+            return future.result(timeout=timeout + 5.0)
+    except RuntimeError:
+        return run_async(scan_devices(timeout))
+    except Exception as e:
+        log.error(f"[DLNA] Scan error: {e}")
+        return []
