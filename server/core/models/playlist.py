@@ -62,7 +62,7 @@ class PlaylistMgr:
                 self.playlist_raw = None
         else:
             self.playlist_raw = {}
-        
+
         # 存储正在轮询的播放列表ID集合
         self._polling_playlists = set()
         # 轮询间隔（秒）
@@ -249,12 +249,14 @@ class PlaylistMgr:
         def poll_task():
             if id not in self._polling_playlists:
                 return
-            
+
             # 检查播放状态
             code, msg = self._check_and_auto_play_next(id)
             if code == 0:
                 log.info(f"[PlaylistMgr] 自动播放下一首成功: {id}")
             # code == -1 表示未播放完成，继续轮询
+            pos_code, pos_info = self.device_map.get(id)["obj"].get_position_info()
+            log.info(f"[PlaylistMgr] 播放位置信息: {json.dumps(pos_info)}")
 
         # 添加间隔任务
         job_id = f"playlist_poll_{id}"
@@ -264,7 +266,7 @@ class PlaylistMgr:
             job_id=job_id,
             seconds=self._polling_interval
         )
-        
+
         self._polling_playlists.add(id)
         log.info(f"[PlaylistMgr] 启动播放列表轮询任务: {id}, 间隔: {self._polling_interval}秒")
 
@@ -279,7 +281,7 @@ class PlaylistMgr:
         job_id = f"playlist_poll_{id}"
         scheduler = get_scheduler()
         scheduler.remove_job(job_id)
-        
+
         self._polling_playlists.discard(id)
         log.info(f"[PlaylistMgr] 停止播放列表轮询任务: {id}")
 
@@ -307,7 +309,7 @@ class PlaylistMgr:
             return -1, "无法获取播放状态"
 
         transport_state = transport_info.get("transport_state", "").upper()
-        
+
         # 如果状态是 STOPPED，检查是否是播放完成
         if transport_state == "STOPPED":
             # 检查位置信息，如果已播放到末尾，则认为是播放完成
@@ -315,7 +317,7 @@ class PlaylistMgr:
             if pos_code == 0:
                 track_duration = pos_info.get("track_duration", "00:00:00")
                 rel_time = pos_info.get("rel_time", "00:00:00")
-                
+
                 # 简单判断：如果已播放时间接近总时长（允许1秒误差），认为是播放完成
                 try:
                     def time_to_seconds(time_str):
@@ -324,10 +326,10 @@ class PlaylistMgr:
                         if len(parts) == 3:
                             return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
                         return 0
-                    
+
                     duration_sec = time_to_seconds(track_duration)
                     rel_sec = time_to_seconds(rel_time)
-                    
+
                     # 如果已播放时间 >= 总时长 - 1秒，认为是播放完成
                     if duration_sec > 0 and rel_sec >= duration_sec - 1:
                         # 播放完成，自动播放下一首
