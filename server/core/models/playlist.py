@@ -171,7 +171,7 @@ class PlaylistMgr:
         if device_obj is None:
             return -1, "设备不存在或未初始化"
 
-        return device_obj.stop()
+        return device_obj["obj"].stop()
 
 
 playlist_mgr = PlaylistMgr()
