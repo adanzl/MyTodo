@@ -31,115 +31,160 @@
 
   <!-- 播放列表管理 -->
   <div class="mt-4">
-    <div class="flex items-center justify-between mb-2">
-      <h3 class="text-lg font-semibold">播放列表</h3>
-      <div class="flex items-center gap-2">
-        <el-button 
-          type="primary" 
-          size="small" 
-          @click="handleOpenFileBrowser">
-          添加文件
-        </el-button>
-        <el-button 
-          type="primary" 
-          size="small" 
-          @click="refreshPlaylistStatus" 
-          :loading="playlistRefreshing">
-          刷新
-        </el-button>
-        <el-button 
-          type="success" 
-          size="small" 
-          @click="handlePlayPlaylist" 
-          :loading="playing"
-          :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0">
-          播放
-        </el-button>
-        <el-button 
-          type="info" 
-          size="small" 
-          @click="handlePlayNext" 
-          :loading="playing"
-          :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0">
-          下一首
-        </el-button>
-        <el-button 
-          type="danger" 
-          size="small" 
-          @click="handleStopPlaylist" 
-          :loading="stopping">
-          停止
-        </el-button>
-      </div>
-    </div>
-    
-    <!-- 播放列表状态 -->
-    <div v-if="playlistStatus" class="border rounded p-3">
-      <div class="text-sm text-gray-600 mb-2">
-        <span>总数量: {{ playlistStatus.total || 0 }}</span>
-        <span class="ml-4">当前索引: {{ playlistStatus.current_index !== undefined ? playlistStatus.current_index + 1 : '-' }} / {{ playlistStatus.total || 0 }}</span>
-        <span v-if="getCurrentPlaylistFile()" class="ml-4 text-blue-600">
-          正在播放: {{ getCurrentPlaylistFile() }}
-        </span>
-      </div>
-      
-      <!-- 播放列表内容 -->
-      <div v-if="playlistStatus.playlist && playlistStatus.playlist.length > 0" class="mt-2">
-        <div class="text-sm font-medium mb-2">播放列表内容：</div>
-        <div class="max-h-60 overflow-y-auto border rounded p-2">
-          <div 
-            v-for="(file, index) in playlistStatus.playlist" 
-            :key="index"
-            class="flex items-center gap-2 p-1 hover:bg-gray-100 rounded"
-            :class="{ 'bg-blue-50': index === playlistStatus.current_index }">
-            <span class="text-xs text-gray-500 w-8">{{ index + 1 }}</span>
-            <span 
-              class="flex-1 text-sm truncate"
-              :class="{ 'font-semibold text-blue-600': index === playlistStatus.current_index }"
-              :title="file">
-              {{ file.split('/').pop() || file }}
-            </span>
-            <el-tag v-if="index === playlistStatus.current_index" type="success" size="small">
-              当前
-            </el-tag>
-            <div class="flex items-center gap-1">
-              <el-button
-                type="primary"
-                size="small"
-                circle
-                @click="handleMovePlaylistItemUp(index)"
-                :disabled="index === 0 || playlistLoading"
-                title="上移">
-                ↑
-              </el-button>
-              <el-button
-                type="primary"
-                size="small"
-                circle
-                @click="handleMovePlaylistItemDown(index)"
-                :disabled="index === playlistStatus.playlist.length - 1 || playlistLoading"
-                title="下移">
-                ↓
-              </el-button>
-              <el-button
-                type="danger"
-                size="small"
-                circle
-                @click="handleDeletePlaylistItem(index)"
-                :disabled="playlistLoading"
-                title="删除">
-                ×
-              </el-button>
-            </div>
+    <div class="flex flex-col lg:flex-row gap-4">
+      <div class="w-full lg:w-64 border rounded p-3">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-base font-semibold">播放列表</h3>
+          <div class="flex items-center gap-1">
+            <el-button 
+              type="primary" 
+              size="small" 
+              plain
+              @click="refreshPlaylistStatus" 
+              :loading="playlistRefreshing">
+              刷新
+            </el-button>
+            <el-button 
+              type="success" 
+              size="small" 
+              @click="handleCreatePlaylist">
+              新建
+            </el-button>
           </div>
         </div>
+        <div v-if="playlistCollection && playlistCollection.length > 0" class="space-y-2 max-h-80 overflow-y-auto pr-1">
+          <div 
+            v-for="playlist in playlistCollection" 
+            :key="playlist.id"
+            class="border rounded px-3 py-2 cursor-pointer flex items-center gap-2"
+            :class="{ 'border-blue-500 bg-blue-50': playlist.id === activePlaylistId }"
+            @click="handleSelectPlaylist(playlist.id)">
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium truncate">{{ playlist.name }}</div>
+              <div class="text-xs text-gray-500">
+                曲目: {{ (playlist.playlist && playlist.playlist.length) || 0 }}
+              </div>
+            </div>
+            <el-button
+              v-if="playlistCollection.length > 1"
+              type="danger"
+              size="small"
+              circle
+              @click.stop="handleDeletePlaylistGroup(playlist.id)">
+              ×
+            </el-button>
+          </div>
+        </div>
+        <div v-else class="text-sm text-gray-400 text-center py-6">
+          暂无播放列表，请点击“新建”创建
+        </div>
       </div>
-      <div v-else class="text-sm text-gray-400 mt-2">
-        播放列表为空
+
+      <div class="flex-1 border rounded p-3 min-h-[220px]">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+          <div>
+            <h3 class="text-lg font-semibold">
+              {{ playlistStatus ? playlistStatus.name : "播放列表详情" }}
+            </h3>
+            <div class="text-sm text-gray-500" v-if="playlistStatus">
+              共 {{ playlistStatus.total || 0 }} 首，
+              当前索引: 
+              {{ playlistStatus.current_index !== undefined ? playlistStatus.current_index + 1 : '-' }} / {{ playlistStatus.total || 0 }}
+            </div>
+            <div class="text-sm text-blue-600" v-if="getCurrentPlaylistFile()">
+              正在播放: {{ getCurrentPlaylistFile() }}
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <el-button 
+              type="primary" 
+              size="small" 
+              @click="handleOpenFileBrowser"
+              :disabled="!playlistStatus">
+              添加文件
+            </el-button>
+            <el-button 
+              type="success" 
+              size="small" 
+              @click="handlePlayPlaylist" 
+              :loading="playing"
+              :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0">
+              播放
+            </el-button>
+            <el-button 
+              type="info" 
+              size="small" 
+              @click="handlePlayNext" 
+              :loading="playing"
+              :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0">
+              下一首
+            </el-button>
+            <el-button 
+              type="danger" 
+              size="small" 
+              @click="handleStopPlaylist" 
+              :loading="stopping">
+              停止
+            </el-button>
+          </div>
+        </div>
+
+        <div v-if="playlistStatus">
+          <div v-if="playlistStatus.playlist && playlistStatus.playlist.length > 0" class="max-h-60 overflow-y-auto border rounded p-2">
+            <div 
+              v-for="(file, index) in playlistStatus.playlist" 
+              :key="index"
+              class="flex items-center gap-2 p-1 hover:bg-gray-100 rounded"
+              :class="{ 'bg-blue-50': index === playlistStatus.current_index }">
+              <span class="text-xs text-gray-500 w-8">{{ index + 1 }}</span>
+              <span 
+                class="flex-1 text-sm truncate"
+                :class="{ 'font-semibold text-blue-600': index === playlistStatus.current_index }"
+                :title="file">
+                {{ file.split('/').pop() || file }}
+              </span>
+              <el-tag v-if="index === playlistStatus.current_index" type="success" size="small">
+                当前
+              </el-tag>
+              <div class="flex items-center gap-1">
+                <el-button
+                  type="primary"
+                  size="small"
+                  circle
+                  @click="handleMovePlaylistItemUp(index)"
+                  :disabled="index === 0 || playlistLoading"
+                  title="上移">
+                  ↑
+                </el-button>
+                <el-button
+                  type="primary"
+                  size="small"
+                  circle
+                  @click="handleMovePlaylistItemDown(index)"
+                  :disabled="index === playlistStatus.playlist.length - 1 || playlistLoading"
+                  title="下移">
+                  ↓
+                </el-button>
+                <el-button
+                  type="danger"
+                  size="small"
+                  circle
+                  @click="handleDeletePlaylistItem(index)"
+                  :disabled="playlistLoading"
+                  title="删除">
+                  ×
+                </el-button>
+              </div>
+            </div>
+          </div>
+          <div v-else class="text-sm text-gray-400">
+            当前播放列表为空，点击“添加文件”开始构建播放列表
+          </div>
+        </div>
+        <div v-else class="text-sm text-gray-400">
+          请先在左侧选择一个播放列表查看详情
+        </div>
       </div>
-    </div>
-    <div v-else class="border rounded p-3 text-sm text-gray-400">
-      暂无播放列表，请先播放目录或更新播放列表
     </div>
   </div>
 

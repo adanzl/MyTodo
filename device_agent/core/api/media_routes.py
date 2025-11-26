@@ -6,6 +6,7 @@ import time
 import subprocess
 from flask import Blueprint, request
 from core.log_config import root_logger
+from core.config import get_config
 from core.device.bluetooth import connect_device_sync, get_bluetooth_mgr
 
 log = root_logger()
@@ -68,7 +69,6 @@ def get_alsa_bluetooth_device(device_address=None, hci_adapter='hci0'):
         else:
             log.info(f"[MEDIA] Target bluetooth device: {device_name} ({device_address})")
         
-        # 3. 直接根据 MAC 地址构造 bluealsa ALSA 设备名称
         # 格式: bluealsa:HCI=hci0,DEV=XX:XX:XX:XX:XX:XX,PROFILE=a2dp
         alsa_device = f"bluealsa:HCI={hci_adapter},DEV={device_address.upper()},PROFILE=a2dp"
         
@@ -261,6 +261,13 @@ def media_play_file():
         # 检查文件是否存在
         if not os.path.exists(file_path):
             return {"code": -1, "msg": f"File not found: {file_path}"}
+        
+        # 如果没有指定设备地址，尝试使用默认设备
+        if not device_address:
+            config = get_config()
+            device_address = config.get_default_bluetooth_device()
+            if device_address:
+                log.info(f"[MEDIA] 使用默认蓝牙设备: {device_address}")
         
         # 停止当前播放
         stop_current_playback()

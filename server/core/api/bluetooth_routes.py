@@ -6,7 +6,7 @@ import os
 import urllib.parse
 from flask import Blueprint, json, request
 from core.log_config import root_logger
-from core.device_agent import get_device_agent_client
+from core.device.agent import get_device_agent_client
 
 log = root_logger()
 bluetooth_bp = Blueprint('bluetooth', __name__)

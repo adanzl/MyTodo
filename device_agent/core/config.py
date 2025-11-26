@@ -3,8 +3,7 @@
 读取 config.properties 文件中的配置
 """
 import os
-import json
-from typing import Dict, Optional, List
+from typing import Dict, Optional
 
 
 class Config:
@@ -38,19 +37,6 @@ class Config:
     def get(self, key: str, default: Optional[str] = None) -> Optional[str]:
         """获取配置值"""
         return self.config.get(key, default)
-    
-    def get_cron_expression(self) -> Optional[str]:
-        """获取 cron 表达式"""
-        return self.get('cron.expression')
-    
-    def get_cron_command(self) -> Optional[str]:
-        """获取要执行的命令"""
-        return self.get('cron.command')
-    
-    def is_cron_enabled(self) -> bool:
-        """检查 cron 是否启用"""
-        enabled = self.get('cron.enabled', 'false')
-        return enabled.lower() in ('true', '1', 'yes')
     
     def reload(self):
         """重新加载配置"""
@@ -101,92 +87,17 @@ class Config:
             print(f"保存配置文件失败: {e}")
             return False
     
-    def get_cron_duration(self) -> Optional[int]:
-        """获取 cron 任务持续时间（秒）"""
-        duration_str = self.get('cron.duration')
-        if duration_str:
-            try:
-                return int(duration_str)
-            except ValueError:
-                return None
-        return None
+    def get_default_bluetooth_device(self) -> Optional[str]:
+        """获取默认蓝牙设备地址"""
+        return self.get('default_bluetooth_device')
     
-    def update_cron_config(self, enabled: Optional[bool] = None, 
-                          expression: Optional[str] = None, 
-                          command: Optional[str] = None,
-                          duration: Optional[int] = None) -> bool:
-        """
-        更新 cron 配置
-        :param enabled: 是否启用
-        :param expression: cron 表达式
-        :param command: 要执行的命令
-        :param duration: 持续时间（秒），执行后多久自动停止播放
-        :return: 是否成功
-        """
+    def set_default_bluetooth_device(self, address: str) -> bool:
+        """设置默认蓝牙设备地址"""
         try:
-            if enabled is not None:
-                self.config['cron.enabled'] = 'true' if enabled else 'false'
-            
-            if expression is not None:
-                self.config['cron.expression'] = expression
-            
-            if command is not None:
-                self.config['cron.command'] = command
-            
-            if duration is not None:
-                self.config['cron.duration'] = str(duration) if duration > 0 else ''
-            
+            self.config['default_bluetooth_device'] = address
             return self.save_config()
         except Exception as e:
-            print(f"更新 cron 配置失败: {e}")
-            return False
-    
-    def get_playlist(self) -> List[str]:
-        """获取播放列表"""
-        playlist_str = self.get('playlist', '')
-        if not playlist_str:
-            return []
-        try:
-            return json.loads(playlist_str)
-        except:
-            return []
-    
-    def set_playlist(self, playlist: List[str]) -> bool:
-        """设置播放列表"""
-        try:
-            self.config['playlist'] = json.dumps(playlist, ensure_ascii=False)
-            return self.save_config()
-        except Exception as e:
-            print(f"设置播放列表失败: {e}")
-            return False
-    
-    def get_current_track_index(self) -> int:
-        """获取当前播放曲目索引"""
-        try:
-            return int(self.get('current_track_index', '0'))
-        except:
-            return 0
-    
-    def set_current_track_index(self, index: int) -> bool:
-        """设置当前播放曲目索引"""
-        try:
-            self.config['current_track_index'] = str(index)
-            return self.save_config()
-        except Exception as e:
-            print(f"设置当前曲目索引失败: {e}")
-            return False
-    
-    def get_bluetooth_device_address(self) -> Optional[str]:
-        """获取蓝牙设备地址"""
-        return self.get('bluetooth_device_address')
-    
-    def set_bluetooth_device_address(self, address: str) -> bool:
-        """设置蓝牙设备地址"""
-        try:
-            self.config['bluetooth_device_address'] = address
-            return self.save_config()
-        except Exception as e:
-            print(f"设置蓝牙设备地址失败: {e}")
+            print(f"设置默认蓝牙设备失败: {e}")
             return False
 
 

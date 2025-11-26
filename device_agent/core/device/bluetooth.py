@@ -296,23 +296,6 @@ class BluetoothMgr:
             log.error(f"[BLUETOOTH] Disconnect error: {e}")
             return {"code": -1, "msg": f"Disconnect failed: {str(e)}"}
 
-    def get_device_list(self) -> List[Dict]:
-        """
-        获取设备列表
-        :return: 设备列表
-        """
-        return [device.to_dict() for device in self.devices.values()]
-
-    def get_device(self, address: str) -> Optional[Dict]:
-        """
-        获取设备信息
-        :param address: 设备地址
-        :return: 设备信息
-        """
-        if address in self.devices:
-            return self.devices[address].to_dict()
-        return None
-
     def _find_command(self, cmd_name):
         """
         查找命令的完整路径

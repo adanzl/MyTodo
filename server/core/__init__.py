@@ -9,6 +9,7 @@ from core.api.bluetooth_routes import bluetooth_bp
 from core.api.media_routes import media_bp
 from core.chat.chat_mgr import ChatMgr
 from core.db.db_mgr import DB_Mgr
+from core.scheduler import init_scheduler
 import os
 
 
@@ -33,6 +34,9 @@ def create_app():
     ChatMgr(socketio)
     DB_Mgr.init(app)
     ai_mgr.init()
+    
+    # 初始化定时任务调度器
+    init_scheduler()
 
     return app
 

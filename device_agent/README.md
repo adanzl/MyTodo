@@ -16,17 +16,6 @@
 - 查看已配对设备列表
 - 获取设备连接状态
 
-### ⏰ 定时任务
-- 支持 Cron 表达式定时执行命令
-- 动态配置定时任务
-- 查看任务状态和执行日志
-
-### 🎼 播放列表管理
-- 配置音乐播放列表
-- 定时自动播放下一首歌曲
-- 循环播放，记录播放进度
-- 支持通过 API 更新播放列表
-
 ### 📊 系统监控
 - Web 日志查看界面
 - API 状态查询
@@ -91,6 +80,21 @@ Content-Type: application/json
 }
 ```
 
+#### 设置默认蓝牙设备
+```bash
+POST /bluetooth/setDefault
+Content-Type: application/json
+
+{
+  "address": "58:EA:1F:1A:9A:8B"
+}
+```
+
+#### 获取默认蓝牙设备
+```bash
+GET /bluetooth/default
+```
+
 ### 音频播放
 
 #### 播放单个音频文件（推荐）
@@ -101,6 +105,11 @@ Content-Type: application/json
 {
   "file_path": "/home/orangepi/Videos/music.mp3",
   "device_address": "D4:DA:21:BA:81:67"
+}
+
+# 或使用默认设备（无需指定 device_address）
+{
+  "file_path": "/home/orangepi/Videos/music.mp3"
 }
 ```
 
@@ -130,109 +139,12 @@ GET /media/getAudioDevices
 GET /media/debug
 ```
 
-### 定时任务
-
-#### 获取任务状态
-```bash
-GET /cron/status
-```
-
-#### 更新任务配置
-```bash
-POST /cron/update
-Content-Type: application/json
-
-{
-  "enabled": true,
-  "expression": "0 2 * * *",
-  "command": "python /path/to/script.py"
-}
-```
-
-### 播放列表
-
-#### 更新播放列表
-```bash
-POST /playlist/update
-Content-Type: application/json
-
-{
-  "playlist": [
-    "/home/orangepi/Videos/song1.mp3",
-    "/home/orangepi/Videos/song2.mp3",
-    "/home/orangepi/Videos/song3.mp3"
-  ],
-  "device_address": "58:EA:1F:1A:9A:8B"
-}
-```
-
-#### 获取播放列表状态
-```bash
-GET /playlist/status
-```
-
-#### 播放当前歌曲
-```bash
-POST /playlist/play
-```
-
-#### 播放下一首歌曲
-```bash
-POST /playlist/playNext
-```
-
-#### 配置定时播放
-```bash
-# 每天早上 7:00 自动播放下一首歌
-POST /cron/update
-Content-Type: application/json
-
-{
-  "enabled": true,
-  "expression": "0 7 * * *",
-  "command": "play_next_track"
-}
-
-# 配置定时播放，播放 3600 秒（1小时）后自动停止
-{
-  "enabled": true,
-  "expression": "0 7 * * *",
-  "command": "play_next_track",
-  "duration": 3600
-}
-```
-
 ### 系统监控
 
 #### Web 日志界面
 ```bash
 GET /log
 ```
-
-## 配置文件
-
-### config.properties
-
-```properties
-# 定时任务配置
-cron.enabled=false
-cron.expression=0 2 * * *
-cron.command=echo "定时任务执行: $(date)"
-```
-
-## 详细文档
-
-### 快速开始
-- **播放列表快速配置**: [QUICK_START_PLAYLIST.md](QUICK_START_PLAYLIST.md) - 5 分钟快速配置指南 ⭐
-- **API 快速参考**: [PLAYLIST_API_QUICK_REF.md](PLAYLIST_API_QUICK_REF.md) - 播放列表接口速查表 📋
-
-### 完整文档
-- **播放列表功能**: [PLAYLIST_API.md](PLAYLIST_API.md) - 播放列表配置和定时播放说明
-- **蓝牙音频播放**: [BLUETOOTH_AUDIO_ALSA.md](BLUETOOTH_AUDIO_ALSA.md) - 完整的 ALSA 配置和故障排查
-- **媒体播放示例**: [MEDIA_API_EXAMPLES.md](MEDIA_API_EXAMPLES.md) - API 使用示例和代码
-- **故障排查指南**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - 常见问题和解决方案
-- **定时任务配置**: [README_CRON.md](README_CRON.md) - Cron 定时任务说明
-- **API 使用说明**: [API_USAGE.md](API_USAGE.md) - Cron API 详细文档
 
 ## 项目结构
 
@@ -245,10 +157,8 @@ device_agent/
 │   ├── __init__.py        # Flask 应用初始化
 │   ├── log_config.py      # 日志配置
 │   ├── config.py          # 配置读取
-│   ├── scheduler.py       # 定时任务调度器
-│   ├── playlist_player.py # 播放列表播放器
 │   ├── api/
-│   │   ├── routes.py      # 通用路由（含播放列表 API）
+│   │   ├── routes.py      # 通用路由
 │   │   ├── bluetooth_routes.py  # 蓝牙相关路由
 │   │   └── media_routes.py      # 媒体播放路由
 │   └── device/

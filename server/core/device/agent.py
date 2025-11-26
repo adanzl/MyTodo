@@ -2,15 +2,22 @@
 Device Agent HTTP 客户端
 用于通过内网调用 device_agent 服务的接口
 """
+import os
 import requests
 from typing import Optional, Dict, Any
 from core.log_config import root_logger
-from .config import DEVICE_AGENT_BASE_URL, DEVICE_AGENT_TIMEOUT
-
 log = root_logger()
 
+DEVICE_AGENT_HOST = os.getenv('DEVICE_AGENT_HOST', '192.168.50.184')
+DEVICE_AGENT_PORT = os.getenv('DEVICE_AGENT_PORT', '8000')
 
-class DeviceAgentClient:
+# 完整的服务URL
+DEVICE_AGENT_BASE_URL = f"http://{DEVICE_AGENT_HOST}:{DEVICE_AGENT_PORT}"
+
+# 请求超时时间（秒）
+DEVICE_AGENT_TIMEOUT = 30
+
+class DeviceAgent:
     """Device Agent HTTP 客户端"""
     
     def __init__(self, base_url: str = None, timeout: int = None):
@@ -135,93 +142,4 @@ class DeviceAgentClient:
         """
         return self._request("POST", "/media/stop")
     
-    # ========== 播放列表相关接口 ==========
-    
-    def playlist_update(self, playlist: list, device_address: Optional[str] = None) -> Dict[str, Any]:
-        """
-        更新播放列表
-        :param playlist: 播放列表（文件路径列表）
-        :param device_address: 蓝牙设备地址（可选）
-        :return: 更新结果
-        """
-        data = {"playlist": playlist}
-        if device_address:
-            data["device_address"] = device_address
-        return self._request("POST", "/playlist/update", json_data=data)
-    
-    def playlist_status(self) -> Dict[str, Any]:
-        """
-        获取播放列表状态
-        :return: 播放列表状态
-        """
-        return self._request("GET", "/playlist/status")
-    
-    def playlist_play(self) -> Dict[str, Any]:
-        """
-        播放当前播放列表中的歌曲
-        :return: 播放结果
-        """
-        return self._request("POST", "/playlist/play")
-    
-    def playlist_play_next(self) -> Dict[str, Any]:
-        """
-        播放下一首歌曲
-        :return: 播放结果
-        """
-        return self._request("POST", "/playlist/playNext")
-    
-    def playlist_stop(self) -> Dict[str, Any]:
-        """
-        停止播放列表播放
-        :return: 停止结果
-        """
-        # 播放列表的停止实际上就是停止媒体播放
-        return self._request("POST", "/media/stop")
-    
-    # ========== Cron 定时任务相关接口 ==========
-    
-    def cron_get_status(self) -> Dict[str, Any]:
-        """
-        获取 Cron 定时任务状态
-        :return: Cron 状态
-        """
-        return self._request("GET", "/cron/status")
-    
-    def cron_update(self, enabled: Optional[bool] = None, 
-                   expression: Optional[str] = None, 
-                   command: Optional[str] = None,
-                   duration: Optional[int] = None) -> Dict[str, Any]:
-        """
-        更新 Cron 定时任务配置
-        :param enabled: 是否启用
-        :param expression: Cron 表达式（格式: 分 时 日 月 周）
-        :param command: 要执行的命令
-        :param duration: 持续时间（秒），执行后多久自动停止播放
-        :return: 更新结果
-        """
-        data = {}
-        if enabled is not None:
-            data["enabled"] = enabled
-        if expression is not None:
-            data["expression"] = expression
-        if command is not None:
-            data["command"] = command
-        if duration is not None:
-            data["duration"] = duration
-        return self._request("POST", "/cron/update", json_data=data)
-
-
-# 全局客户端实例
-_client_instance: Optional[DeviceAgentClient] = None
-
-
-def get_device_agent_client() -> DeviceAgentClient:
-    """
-    获取全局 Device Agent 客户端实例（单例模式）
-    :return: DeviceAgentClient 实例
-    """
-    global _client_instance
-    if _client_instance is None:
-        _client_instance = DeviceAgentClient()
-    return _client_instance
 

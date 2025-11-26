@@ -7,4 +7,6 @@ Requests==2.32.3
 websocket_client==1.8.0
 eventlet==0.39.0
 bleak==0.21.1
-pygame==2.5.2
+APScheduler==3.10.4
+upnpclient 
+ssdp
