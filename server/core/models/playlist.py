@@ -113,7 +113,7 @@ class PlaylistMgr:
             return -1, "设备不存在或未初始化"
 
         file_path = files[current_index]
-        return device_obj.play(file_path)
+        return device_obj["obj"].play(file_path)
 
     def play_next(self, id: str) -> tuple[int, str]:
         """播放下一首"""

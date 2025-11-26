@@ -1,4 +1,14 @@
-import { bluetoothAction, getRdsData, setRdsData, playlistAction } from "../js/net_util.js";
+import { bluetoothAction, getRdsData, setRdsData, playlistAction, getApiUrl } from "../js/net_util.js";
+
+/**
+ * 媒体播放管理组件
+ * 功能包括：
+ * - 播放列表管理（创建、编辑、删除）
+ * - 蓝牙设备扫描和连接
+ * - DLNA 设备控制
+ * - Cron 定时任务配置
+ * - 文件浏览器
+ */
 
 const { ref, onMounted, nextTick, watch } = window.Vue;
 const { ElMessage, ElMessageBox } = window.ElementPlus;
@@ -21,7 +31,7 @@ async function createComponent() {
         }),
         scanDialogVisible: ref(false),
         fileBrowserDialogVisible: ref(false),
-        fileBrowserPath: ref("/mnt"),
+        fileBrowserPath: ref("/mnt/ext_base"),
         fileBrowserList: ref([]),
         fileBrowserLoading: ref(false),
         selectedFiles: ref([]),
@@ -47,9 +57,13 @@ async function createComponent() {
         }),
         cronPreviewVisible: ref(false),
         cronPreviewTimes: ref([]),
+        editingPlaylistId: ref(null),
+        editingPlaylistName: ref(""),
         loading: ref(false),
         deviceList: ref([]),
         connectedDeviceList: ref([]),
+        dlnaDeviceList: ref([]),
+        dlnaScanning: ref(false),
         playing: ref(false),
         stopping: ref(false),
         // 播放列表相关
@@ -60,10 +74,12 @@ async function createComponent() {
         playlistRefreshing: ref(false),
       };
 
+      // Cron 配置相关常量
       const RDS_TABLE = "schedule_play";
       const RDS_CRON_KEY = "cron_config";
 
-      const saveCronConfigToRds = async () => {
+      // 保存 Cron 配置
+      const saveCronConfig = async () => {
         try {
           const cronConfig = {
             enabled: refData.cronEnabled.value,
@@ -79,12 +95,27 @@ async function createComponent() {
 
       const createPlaylistId = () => `pl_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
+      // 格式化日期时间为后端期望的格式：YYYY-MM-DD HH:mm:ss
+      const _formatDateTime = () => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+      };
+
       const createDefaultPlaylist = (overrides = {}) => ({
         id: overrides.id || createPlaylistId(),
         name: overrides.name || "默认播放列表",
         playlist: overrides.playlist || [],
         current_index: overrides.current_index || 0,
         device_address: overrides.device_address || null,
+        device_type: overrides.device_type || "dlna",
+        device: overrides.device || { type: "dlna", address: null },
+        schedule: overrides.schedule || { enabled: 0, cron: "", duration: 0 },
       });
 
       const normalizePlaylistItem = (item, fallbackName = "播放列表") => {
@@ -97,13 +128,20 @@ async function createComponent() {
           if (currentIndex >= playlist.length) currentIndex = playlist.length - 1;
         }
         const name = (item?.name && String(item.name).trim()) || fallbackName;
+        // 优先读取 device.type，如果没有则读取 device_type，最后默认为 "dlna"
+        const deviceType = item?.device?.type || item?.device_type || "dlna";
+        // 确保设备类型是有效的值：agent, dlna, bluetooth
+        const validDeviceType = ["agent", "dlna", "bluetooth"].includes(deviceType) ? deviceType : "dlna";
         return {
           id: item?.id || createPlaylistId(),
           name,
           playlist,
           total: playlist.length,
           current_index: currentIndex,
-          device_address: item?.device_address || null,
+          device_address: item?.device_address || item?.device?.address || null,
+          device_type: validDeviceType,
+          device: item?.device || { type: validDeviceType, address: item?.device_address || null },
+          schedule: item?.schedule || { enabled: 0, cron: "", duration: 0 },
           updatedAt: item?.updatedAt || Date.now(),
         };
       };
@@ -159,7 +197,42 @@ async function createComponent() {
         };
       };
 
-      const savePlaylistCollectionToApi = async (collectionOverride) => {
+      // 转换前端播放列表格式为后端 API 格式
+      const transformPlaylistToApiFormat = (collection) => {
+        const playlistDict = {};
+        collection.forEach(item => {
+          if (item.id) {
+            // 确定设备类型：优先使用 device.type，其次 device_type
+            let deviceType = "dlna"; // 默认值
+            if (item.device?.type && ["agent", "dlna", "bluetooth"].includes(item.device.type)) {
+              deviceType = item.device.type;
+            } else if (item.device_type && ["agent", "dlna", "bluetooth"].includes(item.device_type)) {
+              deviceType = item.device_type;
+            }
+            
+            // 确定设备地址：优先使用 device.address，其次 device_address
+            const deviceAddress = item.device?.address || item.device_address || "";
+            
+            playlistDict[item.id] = {
+              id: item.id,
+              name: item.name || "默认播放列表",
+              files: item.playlist || [],
+              current_index: item.current_index || 0,
+              device: {
+                address: deviceAddress,
+                type: deviceType
+              },
+              schedule: item.schedule || { enabled: 0, cron: "", duration: 0 },
+              create_time: item.create_time || _formatDateTime(),
+              updated_time: _formatDateTime(),
+            };
+          }
+        });
+        return playlistDict;
+      };
+
+      // 保存播放列表
+      const savePlaylist = async (collectionOverride) => {
         try {
           const collection = (collectionOverride || refData.playlistCollection.value || []).map((item) => ({
             ...item,
@@ -167,95 +240,78 @@ async function createComponent() {
             updatedAt: Date.now(),
           }));
           
-          // 转换为后端期望的格式：字典格式，key 是播放列表 id
-          const playlistDict = {};
-          collection.forEach(item => {
-            if (item.id) {
-              playlistDict[item.id] = {
-                id: item.id,
-                name: item.name || "默认播放列表",
-                files: item.playlist || [],
-                current_index: item.current_index || 0,
-                device: item.device || { address: item.device_address || "", type: item.device_type || "" },
-                schedule: item.schedule || { enabled: 0, cron: "", duration: 0 },
-                create_time: item.create_time || new Date().toISOString(),
-                updated_time: new Date().toISOString(),
-              };
-            }
-          });
-          
-          // 通过接口保存
+          const playlistDict = transformPlaylistToApiFormat(collection);
           const response = await playlistAction("update", "POST", playlistDict);
           if (response.code !== 0) {
             throw new Error(response.msg || "保存播放列表失败");
           }
         } catch (error) {
-          console.error("保存播放列表到接口失败:", error);
+          console.error("保存播放列表失败:", error);
         }
       };
 
-      // 保持向后兼容的函数名
-      const savePlaylistCollectionToRds = savePlaylistCollectionToApi;
+      // 转换 API 返回的数据格式为前端格式
+      const transformApiDataToPlaylistFormat = (apiData) => {
+        if (!apiData || typeof apiData !== 'object') {
+          return null;
+        }
+        
+        // 如果返回的是字典格式（多个播放列表，key 是 id）
+        if (!Array.isArray(apiData) && Object.keys(apiData).length > 0) {
+          const playlists = Object.values(apiData).map(item => ({
+            id: item.id,
+            name: item.name || "默认播放列表",
+            playlist: item.files || [],
+            current_index: item.current_index || 0,
+            device_address: item.device?.address || item.device_address || null,
+            device_type: item.device?.type || item.device_type || "dlna",
+            device: item.device || { type: item.device_type || "dlna", address: item.device_address || null },
+            schedule: item.schedule || { enabled: 0, cron: "", duration: 0 },
+            create_time: item.create_time,
+            updated_time: item.updated_time,
+            updatedAt: item.updated_time ? new Date(item.updated_time).getTime() : Date.now(),
+          }));
+          
+          return {
+            playlists: playlists,
+            activePlaylistId: playlists[0]?.id || null
+          };
+        }
+        
+        // 如果返回的是数组
+        if (Array.isArray(apiData)) {
+          return {
+            playlists: apiData.map(item => ({
+              ...item,
+              playlist: item.files || item.playlist || [],
+            })),
+            activePlaylistId: apiData[0]?.id || null
+          };
+        }
+        
+        // 如果返回的是单个播放列表对象
+        if (apiData.id) {
+          return {
+            playlists: [{
+              ...apiData,
+              playlist: apiData.files || apiData.playlist || [],
+            }],
+            activePlaylistId: apiData.id
+          };
+        }
+        
+        return null;
+      };
 
-      const loadPlaylistFromApi = async () => {
+      // 加载播放列表
+      const loadPlaylist = async () => {
         try {
-          // 从接口获取播放列表
           const response = await playlistAction("get", "GET", {});
           if (response.code !== 0) {
             throw new Error(response.msg || "获取播放列表失败");
           }
           
-          // 接口返回的数据格式：{ code: 0, msg: "ok", data: {...} }
-          // data 是字典格式（所有播放列表，key 是 id），例如：{ "pl_123": {...}, "pl_456": {...} }
-          const apiData = response.data;
-          
-          // 转换数据格式以适配 normalizePlaylistCollection
-          let parsed = null;
-          if (apiData && typeof apiData === 'object') {
-            // 如果返回的是字典格式（多个播放列表，key 是 id）
-            if (!Array.isArray(apiData) && Object.keys(apiData).length > 0) {
-              // 将字典转换为数组，并转换字段名
-              const playlists = Object.values(apiData).map(item => ({
-                id: item.id,
-                name: item.name || "默认播放列表",
-                playlist: item.files || [],  // 后端使用 files，前端使用 playlist
-                current_index: item.current_index || 0,
-                device_address: item.device?.address || null,
-                device_type: item.device?.type || null,
-                device: item.device || {},
-                schedule: item.schedule || { enabled: 0, cron: "", duration: 0 },
-                create_time: item.create_time,
-                updated_time: item.updated_time,
-                updatedAt: item.updated_time ? new Date(item.updated_time).getTime() : Date.now(),
-              }));
-              
-              parsed = {
-                playlists: playlists,
-                activePlaylistId: playlists[0]?.id || null
-              };
-            }
-            // 如果返回的是数组
-            else if (Array.isArray(apiData)) {
-              parsed = {
-                playlists: apiData.map(item => ({
-                  ...item,
-                  playlist: item.files || item.playlist || [],
-                })),
-                activePlaylistId: apiData[0]?.id || null
-              };
-            }
-            // 如果返回的是单个播放列表对象
-            else if (apiData.id) {
-              parsed = {
-                playlists: [{
-                  ...apiData,
-                  playlist: apiData.files || apiData.playlist || [],
-                }],
-                activePlaylistId: apiData.id
-              };
-            }
-          }
-          
+          const parsed = transformApiDataToPlaylistFormat(response.data);
           const normalized = normalizePlaylistCollection(parsed);
           refData.playlistCollection.value = normalized.playlists;
           refData.activePlaylistId.value = normalized.activePlaylistId;
@@ -271,8 +327,6 @@ async function createComponent() {
         }
       };
 
-      // 保持向后兼容的函数名
-      const loadPlaylistFromRds = loadPlaylistFromApi;
 
       const updateActivePlaylistData = async (mutator) => {
         if (typeof mutator !== "function") return null;
@@ -297,12 +351,13 @@ async function createComponent() {
         }) || currentItem;
         collection[index] = normalizePlaylistItem(updatedItem, currentItem.name);
         refData.playlistCollection.value = collection;
-        await savePlaylistCollectionToRds(collection, refData.activePlaylistId.value);
+        await savePlaylist(collection);
         syncActivePlaylist(collection);
         return refData.playlistStatus.value;
       };
 
-      const loadCronConfigFromRds = async () => {
+      // 加载 Cron 配置
+      const loadCronConfig = async () => {
         try {
           const dataStr = await getRdsData(RDS_TABLE, RDS_CRON_KEY);
           if (!dataStr) return;
@@ -388,6 +443,26 @@ async function createComponent() {
       };
 
       // 扫描设备
+      // 扫描 DLNA 设备
+      const scanDlnaDevices = async () => {
+        try {
+          refData.dlnaScanning.value = true;
+          const response = await fetch(`${getApiUrl()}/dlna/scan?timeout=5`);
+          const result = await response.json();
+          if (result.code === 0) {
+            refData.dlnaDeviceList.value = result.data || [];
+            ElMessage.success(`扫描到 ${refData.dlnaDeviceList.value.length} 个 DLNA 设备`);
+          } else {
+            ElMessage.error(result.msg || "扫描 DLNA 设备失败");
+          }
+        } catch (error) {
+          console.error("扫描 DLNA 设备失败:", error);
+          ElMessage.error("扫描 DLNA 设备失败: " + (error.message || "未知错误"));
+        } finally {
+          refData.dlnaScanning.value = false;
+        }
+      };
+
       const handleUpdateDeviceList = async () => {
         try {
           refData.loading.value = true;
@@ -619,10 +694,10 @@ async function createComponent() {
         
       };
 
-      // 保存配置
-      const saveBluetoothConfig = async () => {
+      // 应用 Cron 配置
+      const handleApplyCronConfig = async () => {
         try {
-          await saveCronConfigToRds();
+          await saveCronConfig();
           ElMessage.success("Cron 配置已保存");
         } catch (error) {
           console.error("保存配置失败:", error);
@@ -648,20 +723,30 @@ async function createComponent() {
         }
       };
 
-      // 应用生成的 Cron 表达式
+      // 应用生成的 Cron 表达式（应用到当前播放列表）
       const handleApplyCronExpression = () => {
         if (!refData.cronBuilder.value.generated) return;
-        refData.cronExpression.value = refData.cronBuilder.value.generated;
-        handleCloseCronBuilder();
-        updateNextRunTime();
-        saveBluetoothConfig();
-        ElMessage.success("Cron 表达式已应用");
+        const cronExpr = refData.cronBuilder.value.generated;
+        
+        // 如果当前有选中的播放列表，应用到播放列表
+        if (refData.playlistStatus.value) {
+          handleUpdatePlaylistCron(cronExpr);
+          handleCloseCronBuilder();
+          ElMessage.success("Cron 表达式已应用到当前播放列表");
+        } else {
+          // 否则应用到全局配置（向后兼容）
+          refData.cronExpression.value = cronExpr;
+          handleCloseCronBuilder();
+          updateNextRunTime();
+          handleApplyCronConfig();
+          ElMessage.success("Cron 表达式已应用");
+        }
       };
 
       // 切换 Cron 启用状态
       const handleToggleCronEnabled = async () => {
         // 立即保存配置
-        await saveBluetoothConfig();
+        await handleApplyCronConfig();
       };
 
       // 应用示例
@@ -672,7 +757,7 @@ async function createComponent() {
             if (refData.cronBuilder.value.generated) {
               refData.cronExpression.value = refData.cronBuilder.value.generated;
               updateNextRunTime();
-              saveBluetoothConfig();
+              handleApplyCronConfig();
               ElMessage.success("示例已应用");
             }
           });
@@ -931,6 +1016,116 @@ async function createComponent() {
       };
 
       // 预览 Cron 表达式
+      // 切换播放列表的 Cron 启用状态
+      const handleTogglePlaylistCronEnabled = async (enabled) => {
+        if (!refData.playlistStatus.value) return;
+        await updateActivePlaylistData((playlistInfo) => {
+          if (!playlistInfo.schedule) {
+            playlistInfo.schedule = { enabled: 0, cron: "", duration: 0 };
+          }
+          playlistInfo.schedule.enabled = enabled ? 1 : 0;
+          return playlistInfo;
+        });
+      };
+
+      // 更新播放列表的 Cron 表达式
+      const handleUpdatePlaylistCron = async (cron) => {
+        if (!refData.playlistStatus.value) return;
+        await updateActivePlaylistData((playlistInfo) => {
+          if (!playlistInfo.schedule) {
+            playlistInfo.schedule = { enabled: 0, cron: "", duration: 0 };
+          }
+          playlistInfo.schedule.cron = cron;
+          return playlistInfo;
+        });
+      };
+
+      // 更新播放列表的持续时间
+      const handleUpdatePlaylistDuration = async (duration) => {
+        if (!refData.playlistStatus.value) return;
+        await updateActivePlaylistData((playlistInfo) => {
+          if (!playlistInfo.schedule) {
+            playlistInfo.schedule = { enabled: 0, cron: "", duration: 0 };
+          }
+          playlistInfo.schedule.duration = duration || 0;
+          return playlistInfo;
+        });
+      };
+
+      // 预览播放列表的 Cron 执行时间
+      const handlePreviewPlaylistCron = () => {
+        if (!refData.playlistStatus.value || !refData.playlistStatus.value.schedule?.cron) {
+          ElMessage.warning("请先设置 Cron 表达式");
+          return;
+        }
+        try {
+          const cronExpr = refData.playlistStatus.value.schedule.cron;
+          const times = calculateNextCronTimes(cronExpr, 5);
+          if (times && times.length > 0) {
+            refData.cronPreviewTimes.value = times;
+            refData.cronPreviewVisible.value = true;
+          } else {
+            ElMessage.warning("无法解析 Cron 表达式");
+          }
+        } catch (error) {
+          ElMessage.error("预览失败: " + error.message);
+        }
+      };
+
+      // 更新播放列表的设备类型
+      const handleUpdatePlaylistDeviceType = async (deviceType) => {
+        if (!refData.playlistStatus.value) return;
+        
+        // 验证设备类型值
+        const validDeviceTypes = ["agent", "dlna", "bluetooth"];
+        if (!validDeviceTypes.includes(deviceType)) {
+          ElMessage.error(`无效的设备类型: ${deviceType}`);
+          return;
+        }
+        
+        await updateActivePlaylistData((playlistInfo) => {
+          if (!playlistInfo.device) {
+            playlistInfo.device = { address: playlistInfo.device_address || "", type: deviceType };
+          } else {
+            playlistInfo.device.type = deviceType;
+            playlistInfo.device.address = playlistInfo.device.address || playlistInfo.device_address || "";
+          }
+          playlistInfo.device_type = deviceType;
+          playlistInfo.device_address = playlistInfo.device.address || playlistInfo.device_address || "";
+          return playlistInfo;
+        });
+        
+        // 如果是 DLNA 类型，自动扫描设备
+        if (deviceType === "dlna") {
+          await scanDlnaDevices();
+        }
+      };
+
+      // 更新播放列表的设备地址
+      const handleUpdatePlaylistDeviceAddress = async (address) => {
+        if (!refData.playlistStatus.value) return;
+        await updateActivePlaylistData((playlistInfo) => {
+          if (!playlistInfo.device) {
+            playlistInfo.device = { address: "", type: playlistInfo.device_type || "" };
+          }
+          playlistInfo.device.address = address;
+          playlistInfo.device_address = address;
+          return playlistInfo;
+        });
+      };
+
+      // 选择蓝牙设备
+      const handleSelectBluetoothDevice = async (address) => {
+        await handleUpdatePlaylistDeviceAddress(address);
+        await handleUpdatePlaylistDeviceType("bluetooth");
+      };
+
+      // 选择设备代理设备
+      const handleSelectAgentDevice = async (address) => {
+        // 只更新设备地址，保持设备类型为 agent
+        await handleUpdatePlaylistDeviceAddress(address);
+      };
+
       const handlePreviewCron = () => {
         if (!refData.cronExpression.value) {
           ElMessage.warning("请输入 Cron 表达式");
@@ -980,7 +1175,7 @@ async function createComponent() {
       const refreshPlaylistStatus = async () => {
         try {
           refData.playlistRefreshing.value = true;
-          await loadPlaylistFromRds();
+          await loadPlaylist();
         } catch (error) {
           console.error("刷新播放列表状态失败:", error);
         } finally {
@@ -1183,10 +1378,122 @@ async function createComponent() {
         if (!exists) return;
         refData.activePlaylistId.value = playlistId;
         syncActivePlaylist(refData.playlistCollection.value);
+        
+        // 如果选中的播放列表设备类型是 DLNA，自动扫描设备
+        const playlist = refData.playlistStatus.value;
+        if (playlist && (playlist.device?.type === 'dlna' || playlist.device_type === 'dlna')) {
+          await scanDlnaDevices();
+        }
+        
         try {
-          await savePlaylistCollectionToRds();
+          await savePlaylist();
         } catch (error) {
           console.error("切换播放列表失败:", error);
+        }
+      };
+
+      // 开始编辑播放列表名称
+      const handleStartEditPlaylistName = (playlistId) => {
+        const playlist = refData.playlistCollection.value.find(p => p.id === playlistId);
+        if (playlist) {
+          refData.editingPlaylistId.value = playlistId;
+          refData.editingPlaylistName.value = playlist.name;
+          // 等待 DOM 更新后聚焦输入框
+          nextTick(() => {
+            const input = document.querySelector(`input[data-playlist-id="${playlistId}"]`);
+            if (input) {
+              input.focus();
+              input.select();
+            }
+          });
+        }
+      };
+
+      // 保存播放列表名称
+      const handleSavePlaylistName = async (playlistId) => {
+        const newName = refData.editingPlaylistName.value?.trim();
+        if (!newName || newName.length === 0) {
+          ElMessage.warning("播放列表名称不能为空");
+          refData.editingPlaylistId.value = null;
+          return;
+        }
+        
+        const playlist = refData.playlistCollection.value.find(p => p.id === playlistId);
+        if (!playlist || playlist.name === newName) {
+          refData.editingPlaylistId.value = null;
+          return;
+        }
+
+        try {
+          // 更新集合中对应项的名称
+          const collection = refData.playlistCollection.value.map(item => {
+            if (item.id === playlistId) {
+              return { ...item, name: newName };
+            }
+            return item;
+          });
+          refData.playlistCollection.value = collection;
+          
+          // 如果当前编辑的是激活的播放列表，同步更新状态
+          if (playlistId === refData.activePlaylistId.value) {
+            syncActivePlaylist(collection);
+          }
+          
+          // 保存到后端
+          await savePlaylist(collection);
+          
+          refData.editingPlaylistId.value = null;
+          ElMessage.success("播放列表名称已更新");
+        } catch (error) {
+          console.error("更新播放列表名称失败:", error);
+          ElMessage.error("更新播放列表名称失败: " + (error.message || "未知错误"));
+        }
+      };
+
+      // 取消编辑播放列表名称
+      const handleCancelEditPlaylistName = () => {
+        refData.editingPlaylistId.value = null;
+        refData.editingPlaylistName.value = "";
+      };
+
+      // 格式化日期时间，包含星期
+      const formatDateTimeWithWeekday = (dateStr) => {
+        if (!dateStr) return null;
+        try {
+          // 解析格式: "YYYY-MM-DD HH:mm:ss"
+          const parts = dateStr.match(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
+          if (!parts) return dateStr;
+          
+          const year = parseInt(parts[1], 10);
+          const month = parseInt(parts[2], 10) - 1; // 月份从0开始
+          const day = parseInt(parts[3], 10);
+          const hours = parseInt(parts[4], 10);
+          const minutes = parseInt(parts[5], 10);
+          const seconds = parseInt(parts[6], 10);
+          
+          const date = new Date(year, month, day, hours, minutes, seconds);
+          const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+          const weekday = weekdays[date.getDay()];
+          
+          return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')} ${weekday} ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        } catch (error) {
+          return dateStr;
+        }
+      };
+
+      // 获取播放列表的下次 Cron 运行时间
+      const getPlaylistNextCronTime = (playlist) => {
+        if (!playlist || !playlist.schedule || playlist.schedule.enabled !== 1 || !playlist.schedule.cron) {
+          return null;
+        }
+        try {
+          const times = calculateNextCronTimes(playlist.schedule.cron, 1);
+          if (times && times.length > 0) {
+            return formatDateTimeWithWeekday(times[0]);
+          }
+          return null;
+        } catch (error) {
+          return null;
         }
       };
 
@@ -1216,7 +1523,7 @@ async function createComponent() {
           refData.playlistCollection.value = updated;
           refData.activePlaylistId.value = newPlaylist.id;
           syncActivePlaylist(updated);
-          await savePlaylistCollectionToRds(updated, newPlaylist.id);
+          await savePlaylist(updated);
           ElMessage.success("播放列表已创建");
         } catch (error) {
           if (error === 'cancel') return;
@@ -1249,7 +1556,7 @@ async function createComponent() {
             refData.activePlaylistId.value = updated[0]?.id || "";
           }
           syncActivePlaylist(updated);
-          await savePlaylistCollectionToRds(updated);
+          await savePlaylist(updated);
           ElMessage.success("播放列表已删除");
         } catch (error) {
           if (error === 'cancel') return;
@@ -1267,7 +1574,7 @@ async function createComponent() {
           return;
         }
         refData.fileBrowserDialogVisible.value = true;
-        refData.fileBrowserPath.value = "/mnt";
+        refData.fileBrowserPath.value = "/mnt/ext_base";
         refData.selectedFiles.value = [];
         handleRefreshFileBrowser();
       };
@@ -1282,7 +1589,7 @@ async function createComponent() {
       const handleRefreshFileBrowser = async () => {
         try {
           refData.fileBrowserLoading.value = true;
-          const path = refData.fileBrowserPath.value || "/mnt";
+          const path = refData.fileBrowserPath.value || "/mnt/ext_base";
           const rsp = await bluetoothAction("listDirectory", "GET", {
             path: path,
           });
@@ -1303,10 +1610,10 @@ async function createComponent() {
       // 文件浏览器导航到上一级
       const handleFileBrowserNavigateUp = () => {
         const path = refData.fileBrowserPath.value;
-        if (path && path !== "/mnt" && path !== "/") {
+        if (path && path !== "/mnt/ext_base" && path !== "/") {
           const parts = path.split("/").filter(p => p);
           parts.pop();
-          refData.fileBrowserPath.value = parts.length > 0 ? "/" + parts.join("/") : "/mnt";
+          refData.fileBrowserPath.value = parts.length > 0 ? "/" + parts.join("/") : "/mnt/ext_base";
           updateFileBrowserCanNavigateUp();
           handleRefreshFileBrowser();
         }
@@ -1314,7 +1621,7 @@ async function createComponent() {
 
       // 文件浏览器导航到首页
       const handleFileBrowserGoToHome = () => {
-        refData.fileBrowserPath.value = "/mnt";
+        refData.fileBrowserPath.value = "/mnt/ext_base";
         updateFileBrowserCanNavigateUp();
         handleRefreshFileBrowser();
       };
@@ -1336,6 +1643,7 @@ async function createComponent() {
 
       // 切换文件选择状态
       const handleToggleFileSelection = (row) => {
+        if (row.isDirectory) return;
         const filePath = refData.fileBrowserPath.value === "/" 
           ? `/${row.name}` 
           : `${refData.fileBrowserPath.value}/${row.name}`;
@@ -1349,17 +1657,50 @@ async function createComponent() {
 
       // 检查文件是否被选中
       const isFileSelected = (row) => {
+        if (row.isDirectory) return false;
         const filePath = refData.fileBrowserPath.value === "/" 
           ? `/${row.name}` 
           : `${refData.fileBrowserPath.value}/${row.name}`;
         return refData.selectedFiles.value.includes(filePath);
       };
 
+      // 全选当前目录下的所有文件
+      const handleSelectAllFiles = () => {
+        const currentPath = refData.fileBrowserPath.value;
+        refData.fileBrowserList.value.forEach(row => {
+          if (!row.isDirectory) {
+            const filePath = currentPath === "/" 
+              ? `/${row.name}` 
+              : `${currentPath}/${row.name}`;
+            if (!refData.selectedFiles.value.includes(filePath)) {
+              refData.selectedFiles.value.push(filePath);
+            }
+          }
+        });
+      };
+
+      // 取消全选当前目录下的所有文件
+      const handleDeselectAllFiles = () => {
+        const currentPath = refData.fileBrowserPath.value;
+        const currentFiles = refData.fileBrowserList.value
+          .filter(row => !row.isDirectory)
+          .map(row => {
+            return currentPath === "/" 
+              ? `/${row.name}` 
+              : `${currentPath}/${row.name}`;
+          });
+        
+        // 只移除当前目录下的文件，保留其他目录的文件
+        refData.selectedFiles.value = refData.selectedFiles.value.filter(filePath => {
+          return !currentFiles.includes(filePath);
+        });
+      };
+
       // 文件浏览器是否可以导航到上一级
       const fileBrowserCanNavigateUp = ref(false);
       const updateFileBrowserCanNavigateUp = () => {
         const path = refData.fileBrowserPath.value;
-        fileBrowserCanNavigateUp.value = path && path !== "/mnt" && path !== "/";
+        fileBrowserCanNavigateUp.value = path && path !== "/mnt/ext_base" && path !== "/";
       };
 
       // 添加文件到播放列表
@@ -1446,6 +1787,10 @@ async function createComponent() {
         handleSelectPlaylist,
         handleCreatePlaylist,
         handleDeletePlaylistGroup,
+        handleStartEditPlaylistName,
+        handleSavePlaylistName,
+        handleCancelEditPlaylistName,
+        getPlaylistNextCronTime,
         // 文件浏览相关
         handleOpenFileBrowser,
         handleCloseFileBrowser,
@@ -1455,7 +1800,19 @@ async function createComponent() {
         handleFileBrowserRowClick,
         handleToggleFileSelection,
         isFileSelected,
+        handleSelectAllFiles,
+        handleDeselectAllFiles,
         handleAddFilesToPlaylist,
+        // 播放列表配置相关
+        handleTogglePlaylistCronEnabled,
+        handleUpdatePlaylistCron,
+        handleUpdatePlaylistDuration,
+        handlePreviewPlaylistCron,
+        handleUpdatePlaylistDeviceType,
+        handleUpdatePlaylistDeviceAddress,
+        handleSelectBluetoothDevice,
+        handleSelectAgentDevice,
+        scanDlnaDevices,
         // Cron 相关
         handleToggleCronEnabled,
         handleDialogClose: () => {
@@ -1469,8 +1826,8 @@ async function createComponent() {
       
       onMounted(async () => {
         await Promise.all([
-          loadCronConfigFromRds(),
-          loadPlaylistFromRds(),
+          loadCronConfig(),
+          loadPlaylist(),
           refreshConnectedList(),
         ]);
         updateNextRunTime();
