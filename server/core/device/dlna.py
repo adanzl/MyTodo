@@ -179,19 +179,7 @@ class DlnaDev:
 
             # 转换本地文件路径为 HTTP URL
             media_url = self._convert_to_http_url(url)
-            
-            # 设置播放模式为 NORMAL（禁用单曲循环）
-            # 注意：需要在设置 URI 之前设置播放模式
-            try:
-                if hasattr(av_transport, 'SetPlayMode'):
-                    av_transport.SetPlayMode(InstanceID=0, NewPlayMode='NORMAL')
-                    log.debug(f"[DlnaDev] Set play mode to NORMAL (disable repeat)")
-                else:
-                    log.debug(f"[DlnaDev] SetPlayMode not available, device may not support it")
-            except Exception as e:
-                # SetPlayMode 是可选的，某些设备可能不支持，不影响播放
-                log.debug(f"[DlnaDev] SetPlayMode failed (may not be supported): {e}")
-            
+
             # 设置媒体 URI
             try:
                 av_transport.SetAVTransportURI(InstanceID=0, CurrentURI=media_url, CurrentURIMetaData="")
@@ -200,14 +188,35 @@ class DlnaDev:
                 log.error(f"[DlnaDev] Failed to set URI: {e}")
                 return -1, f"Failed to set URI: {str(e)}"
 
+            # 设置播放模式为 NORMAL（禁用单曲循环）
+            # 注意：在设置 URI 之后、播放之前设置播放模式，这样更可靠
+            try:
+                if hasattr(av_transport, 'SetPlayMode'):
+                    av_transport.SetPlayMode(InstanceID=0, NewPlayMode='NORMAL')
+                    log.info(f"[DlnaDev] Set play mode to NORMAL (disable repeat)")
+                else:
+                    log.debug(f"[DlnaDev] SetPlayMode not available, device may not support it")
+            except Exception as e:
+                # SetPlayMode 是可选的，某些设备可能不支持，不影响播放
+                log.warning(f"[DlnaDev] SetPlayMode failed (may not be supported): {e}")
+
             # 开始播放
             try:
                 av_transport.Play(InstanceID=0, Speed="1")
                 log.info(f"[DlnaDev] Play started: {media_url}")
-                return 0, "播放成功"
             except Exception as e:
                 log.error(f"[DlnaDev] Failed to play: {e}")
                 return -1, f"播放失败: {str(e)}"
+
+            # 播放后再次设置播放模式（某些设备需要在播放后设置才生效）
+            try:
+                if hasattr(av_transport, 'SetPlayMode'):
+                    av_transport.SetPlayMode(InstanceID=0, NewPlayMode='NORMAL')
+                    log.debug(f"[DlnaDev] Set play mode to NORMAL after play (disable repeat)")
+            except Exception as e:
+                log.debug(f"[DlnaDev] SetPlayMode after play failed: {e}")
+
+            return 0, "播放成功"
         except Exception as e:
             log.error(f"[DlnaDev] Play error: {e}")
             return -1, f"播放异常: {str(e)}"
@@ -221,11 +230,11 @@ class DlnaDev:
         # 如果已经是 HTTP/HTTPS URL，直接返回
         if url.startswith('http://') or url.startswith('https://'):
             return url
-        
+
         # 如果是 file:// URL，提取路径
         if url.startswith('file://'):
             url = url[7:]  # 移除 file:// 前缀
-        
+
         # 如果是本地绝对路径（以 / 开头），转换为 HTTP URL
         if url.startswith('/') and os.path.exists(url):
             try:
@@ -235,7 +244,7 @@ class DlnaDev:
             except ImportError:
                 log.warning("[DlnaDev] Cannot import get_media_url, using original URL")
                 return url
-        
+
         # 其他情况直接返回（可能是相对路径或其他格式）
         return url
 
@@ -271,7 +280,7 @@ class DlnaDev:
                 transport_state = result.get('CurrentTransportState', 'UNKNOWN')
                 transport_status = result.get('CurrentTransportStatus', 'UNKNOWN')
                 speed = result.get('CurrentSpeed', '1')
-                
+
                 info = {
                     "transport_state": transport_state,  # PLAYING, STOPPED, PAUSED_PLAYBACK, etc.
                     "transport_status": transport_status,  # OK, ERROR_OCCURRED, etc.
@@ -302,7 +311,7 @@ class DlnaDev:
                 track_duration = result.get('TrackDuration', '00:00:00')
                 rel_time = result.get('RelTime', '00:00:00')  # 相对时间（已播放时间）
                 abs_time = result.get('AbsTime', '00:00:00')  # 绝对时间
-                
+
                 info = {
                     "track": track,
                     "track_duration": track_duration,  # 总时长，格式如 "00:03:45"
@@ -317,4 +326,3 @@ class DlnaDev:
         except Exception as e:
             log.error(f"[DlnaDev] GetPositionInfo error: {e}")
             return -1, {"error": str(e)}
-
