@@ -2,6 +2,7 @@
 定时任务调度器
 负责管理和执行后台 cron 定时任务
 """
+import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
@@ -12,6 +13,9 @@ from typing import Callable, Optional
 from core.log_config import root_logger
 
 log = root_logger()
+
+# 设置 APScheduler 的日志级别为 WARNING，减少任务执行的 INFO 日志
+logging.getLogger('apscheduler').setLevel(logging.WARNING)
 
 
 class TaskScheduler:
@@ -33,21 +37,17 @@ class TaskScheduler:
         """初始化调度器"""
         if self._initialized:
             return
-        
+
         self.scheduler = BackgroundScheduler(
             timezone='Asia/Shanghai',  # 设置时区
             job_defaults={
                 'coalesce': True,  # 合并错过的任务
                 'max_instances': 1  # 每个任务同时只允许一个实例
-            }
-        )
-        
+            })
+
         # 添加任务执行监听器
-        self.scheduler.add_listener(
-            self._job_executed_listener,
-            EVENT_JOB_EXECUTED | EVENT_JOB_ERROR
-        )
-        
+        self.scheduler.add_listener(self._job_executed_listener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
+
         self._initialized = True
         log.info("任务调度器初始化成功")
 
@@ -68,13 +68,7 @@ class TaskScheduler:
             self.scheduler.shutdown(wait=wait)
             log.info("任务调度器已关闭")
 
-    def add_cron_job(
-        self,
-        func: Callable,
-        job_id: str,
-        cron_expression: Optional[str] = None,
-        **cron_kwargs
-    ):
+    def add_cron_job(self, func: Callable, job_id: str, cron_expression: Optional[str] = None, **cron_kwargs):
         """
         添加 cron 定时任务
         
@@ -112,29 +106,21 @@ class TaskScheduler:
             else:
                 trigger = CronTrigger(**cron_kwargs)
 
-            self.scheduler.add_job(
-                func,
-                trigger=trigger,
-                id=job_id,
-                name=job_id,
-                replace_existing=True
-            )
+            self.scheduler.add_job(func, trigger=trigger, id=job_id, name=job_id, replace_existing=True)
             log.info(f"添加 cron 任务成功: {job_id}")
             return True
         except Exception as e:
             log.error(f"添加 cron 任务失败: {job_id}, 错误: {e}")
             return False
 
-    def add_interval_job(
-        self,
-        func: Callable,
-        job_id: str,
-        seconds: int = 0,
-        minutes: int = 0,
-        hours: int = 0,
-        days: int = 0,
-        start_date: Optional[datetime] = None
-    ):
+    def add_interval_job(self,
+                         func: Callable,
+                         job_id: str,
+                         seconds: int = 0,
+                         minutes: int = 0,
+                         hours: int = 0,
+                         days: int = 0,
+                         start_date: Optional[datetime] = None):
         """
         添加间隔执行任务
         
@@ -159,33 +145,16 @@ class TaskScheduler:
                 self.scheduler.remove_job(job_id)
                 log.info(f"移除已存在的任务: {job_id}")
 
-            trigger = IntervalTrigger(
-                seconds=seconds,
-                minutes=minutes,
-                hours=hours,
-                days=days,
-                start_date=start_date
-            )
+            trigger = IntervalTrigger(seconds=seconds, minutes=minutes, hours=hours, days=days, start_date=start_date)
 
-            self.scheduler.add_job(
-                func,
-                trigger=trigger,
-                id=job_id,
-                name=job_id,
-                replace_existing=True
-            )
+            self.scheduler.add_job(func, trigger=trigger, id=job_id, name=job_id, replace_existing=True)
             log.info(f"添加间隔任务成功: {job_id}, 间隔: {days}天 {hours}时 {minutes}分 {seconds}秒")
             return True
         except Exception as e:
             log.error(f"添加间隔任务失败: {job_id}, 错误: {e}")
             return False
 
-    def add_date_job(
-        self,
-        func: Callable,
-        job_id: str,
-        run_date: datetime
-    ):
+    def add_date_job(self, func: Callable, job_id: str, run_date: datetime):
         """
         添加定时执行任务（只执行一次）
         
@@ -207,13 +176,7 @@ class TaskScheduler:
 
             trigger = DateTrigger(run_date=run_date)
 
-            self.scheduler.add_job(
-                func,
-                trigger=trigger,
-                id=job_id,
-                name=job_id,
-                replace_existing=True
-            )
+            self.scheduler.add_job(func, trigger=trigger, id=job_id, name=job_id, replace_existing=True)
             log.info(f"添加定时任务成功: {job_id}, 执行时间: {run_date}")
             return True
         except Exception as e:
@@ -304,8 +267,6 @@ class TaskScheduler:
         """
         if event.exception:
             log.error(f"任务执行失败: {event.job_id}, 异常: {event.exception}")
-        else:
-            log.info(f"任务执行成功: {event.job_id}")
 
 
 # 全局调度器实例
@@ -339,19 +300,19 @@ def example_task():
 if __name__ == '__main__':
     # 测试代码
     scheduler = TaskScheduler()
-    
+
     # 添加每 10 秒执行一次的任务
     scheduler.add_interval_job(example_task, 'test_interval', seconds=10)
-    
+
     # 添加每分钟执行一次的 cron 任务
     scheduler.add_cron_job(example_task, 'test_cron', minute='*/1')
-    
+
     # 启动调度器
     scheduler.start()
-    
+
     # 打印所有任务
     scheduler.print_jobs()
-    
+
     # 保持运行
     try:
         import time

@@ -180,6 +180,18 @@ class DlnaDev:
             # 转换本地文件路径为 HTTP URL
             media_url = self._convert_to_http_url(url)
             
+            # 设置播放模式为 NORMAL（禁用单曲循环）
+            # 注意：需要在设置 URI 之前设置播放模式
+            try:
+                if hasattr(av_transport, 'SetPlayMode'):
+                    av_transport.SetPlayMode(InstanceID=0, NewPlayMode='NORMAL')
+                    log.debug(f"[DlnaDev] Set play mode to NORMAL (disable repeat)")
+                else:
+                    log.debug(f"[DlnaDev] SetPlayMode not available, device may not support it")
+            except Exception as e:
+                # SetPlayMode 是可选的，某些设备可能不支持，不影响播放
+                log.debug(f"[DlnaDev] SetPlayMode failed (may not be supported): {e}")
+            
             # 设置媒体 URI
             try:
                 av_transport.SetAVTransportURI(InstanceID=0, CurrentURI=media_url, CurrentURIMetaData="")

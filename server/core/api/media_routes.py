@@ -109,9 +109,9 @@ def playlist_stop():
         id = args.get("id")
         if id is None:
             return _err("id is required")
-        ret = playlist_mgr.stop(id)
+        ret, msg = playlist_mgr.stop(id)
         if ret != 0:
-            return _err(f"停止播放失败")
+            return _err(f"停止播放失败: {msg}")
         return _ok()
     except Exception as e:
         log.error(f"[PLAYLIST] Stop error: {e}")
