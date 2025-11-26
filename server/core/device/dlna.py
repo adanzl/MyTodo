@@ -10,10 +10,10 @@ from core.async_utils import run_async
 
 try:
     import upnpclient
-    import ssdp
+    from ssdpy import SSDPClient
 except ImportError:
     upnpclient = None
-    ssdp = None
+    SSDPClient = None
 
 log = root_logger()
 
@@ -46,25 +46,57 @@ def _device_to_dict(device) -> Dict:
 
 async def scan_devices(timeout: float = 5.0) -> List[Dict]:
     """扫描DLNA设备"""
-    if not (upnpclient and ssdp):
+    if not upnpclient or not SSDPClient:
+        log.warning("[DLNA] upnpclient or SSDPClient not available")
         return []
 
     try:
         log.info(f"[DLNA] Starting scan (timeout: {timeout}s)")
         device_list = []
-        responses = ssdp.discover("urn:schemas-upnp-org:service:AVTransport:1", timeout=timeout)
+        locations = set()  # 用于去重
 
-        for resp in responses:
+        if SSDPClient:
             try:
-                device = upnpclient.Device(resp.location)
-                device_list.append(_device_to_dict(device))
+                client = SSDPClient()
+                # 搜索 UPnP AVTransport 服务（DLNA 播放设备）
+                responses = client.m_search(st="urn:schemas-upnp-org:service:AVTransport:1", timeout=int(timeout), mx=int(timeout))
+                for resp in responses:
+                    location = resp.get("location") or resp.get("LOCATION")
+                    if location and location not in locations:
+                        locations.add(location)
+                log.info(f"[DLNA] Found {len(locations)} device locations via ssdpy")
             except Exception as e:
-                log.warning(f"[DLNA] Error processing {resp.location}: {e}")
+                log.warning(f"[DLNA] SSDPClient search failed: {e}")
+
+
+        # 尝试使用 upnpclient 的搜索功能（如果可用）
+        if not locations and hasattr(upnpclient, 'discover'):
+            try:
+                devices = upnpclient.discover(timeout=int(timeout))
+                for device in devices:
+                    if hasattr(device, 'location'):
+                        locations.add(device.location)
+                log.info(f"[DLNA] Found {len(locations)} device locations via upnpclient.discover")
+            except Exception as e:
+                log.warning(f"[DLNA] upnpclient.discover failed: {e}")
+
+        # 处理发现的设备
+        for location in locations:
+            try:
+                device = upnpclient.Device(location)
+                device_dict = _device_to_dict(device)
+                device_list.append(device_dict)
+                log.info(f"发现设备: {device_dict['name']} (地址: {device_dict['address']})")
+            except Exception as e:
+                log.warning(f"[DLNA] Error processing {location}: {e}")
+                continue
 
         log.info(f"[DLNA] Found {len(device_list)} devices")
         return device_list
     except Exception as e:
         log.error(f"[DLNA] Scan error: {e}")
+        import traceback
+        log.error(traceback.format_exc())
         return []
 
 
