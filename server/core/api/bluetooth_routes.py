@@ -2,15 +2,16 @@
 蓝牙设备管理路由
 通过调用 device_agent 服务接口实现
 '''
+from calendar import c
 import os
 import urllib.parse
 from flask import Blueprint, json, request
 from core.log_config import root_logger
-from core.device.agent import get_device_agent_client
+from core.device.agent import DeviceAgent
 
 log = root_logger()
 bluetooth_bp = Blueprint('bluetooth', __name__)
-
+device_agent = DeviceAgent()
 
 @bluetooth_bp.route("/bluetooth/scan", methods=['GET'])
 def bluetooth_scan():
@@ -20,8 +21,7 @@ def bluetooth_scan():
     try:
         timeout = request.args.get('timeout', 5.0, type=float)
         log.info(f"===== [Bluetooth Scan] timeout={timeout}")
-        client = get_device_agent_client()
-        result = client.bluetooth_scan(timeout)
+        result = device_agent.bluetooth_scan(timeout)
         return result
     except Exception as e:
         log.error(e)
@@ -35,8 +35,7 @@ def bluetooth_get_devices():
     """
     try:
         log.info("===== [Bluetooth Get Devices]")
-        client = get_device_agent_client()
-        result = client.bluetooth_get_devices()
+        result = device_agent.bluetooth_get_devices()
         return result
     except Exception as e:
         log.error(e)
@@ -53,8 +52,7 @@ def bluetooth_get_device():
         log.info(f"===== [Bluetooth Get Device] address={address}")
         if not address:
             return {"code": -1, "msg": "address is required"}
-        client = get_device_agent_client()
-        result = client.bluetooth_get_device(address)
+        result = device_agent.bluetooth_get_device(address)
         return result
     except Exception as e:
         log.error(e)
@@ -72,8 +70,7 @@ def bluetooth_connect():
         address = args.get('address')
         if not address:
             return {"code": -1, "msg": "address is required"}
-        client = get_device_agent_client()
-        result = client.bluetooth_connect(address)
+        result = device_agent.bluetooth_connect(address)
         return result
     except Exception as e:
         log.error(e)
@@ -91,8 +88,7 @@ def bluetooth_disconnect():
         address = args.get('address')
         if not address:
             return {"code": -1, "msg": "address is required"}
-        client = get_device_agent_client()
-        result = client.bluetooth_disconnect(address)
+        result = device_agent.bluetooth_disconnect(address)
         return result
     except Exception as e:
         log.error(e)
@@ -106,8 +102,7 @@ def bluetooth_get_connected():
     """
     try:
         log.info("===== [Bluetooth Get Connected Devices]")
-        client = get_device_agent_client()
-        result = client.bluetooth_get_connected()
+        result = device_agent.bluetooth_get_connected()
         return result
     except Exception as e:
         log.error(e)
@@ -133,12 +128,12 @@ def bluetooth_list_directory():
                     path = decoded
                 except Exception:
                     break
-        
+
         log.info(f"===== [Bluetooth List Directory] path={path}")
-        
+
         # 默认基础目录
         default_base_dir = '/mnt'
-        
+
         # 如果没有提供路径或路径为空，使用默认目录
         if not path or path == '':
             path = default_base_dir
@@ -148,7 +143,7 @@ def bluetooth_list_directory():
             path_parts = path.split('/')
             if '..' in path_parts or path.startswith('~'):
                 return {"code": -1, "msg": "Invalid path: Path traversal not allowed"}
-            
+
             # 规范化路径
             if not os.path.isabs(path):
                 # 如果是相对路径，从默认基础目录开始
@@ -156,23 +151,23 @@ def bluetooth_list_directory():
                 path = os.path.abspath(path)
             else:
                 path = os.path.abspath(path)
-            
+
             # 确保路径在 /mnt 目录内（安全限制）
             if not path.startswith('/mnt'):
                 log.warning(f"Path {path} is outside allowed directory /mnt, using default directory")
                 path = default_base_dir
-        
+
         # 验证路径
         if not os.path.exists(path):
             # 如果路径不存在，使用默认目录
             log.warning(f"Path does not exist: {path}, using default directory: {default_base_dir}")
             path = default_base_dir
-        
+
         if not os.path.isdir(path):
             # 如果不是目录，使用默认目录
             log.warning(f"Path is not a directory: {path}, using default directory: {default_base_dir}")
             path = default_base_dir
-        
+
         # 检查读取权限
         if not os.access(path, os.R_OK):
             # 如果没有读取权限，尝试使用默认目录
@@ -181,7 +176,7 @@ def bluetooth_list_directory():
                 path = default_base_dir
             else:
                 return {"code": -1, "msg": f"Permission denied: No read permission for {path}"}
-        
+
         # 获取目录内容
         items = []
         try:
@@ -200,7 +195,7 @@ def bluetooth_list_directory():
                             "accessible": False,
                         })
                         continue
-                    
+
                     stat_info = os.stat(entry_path)
                     items.append({
                         "name": entry,
@@ -220,10 +215,10 @@ def bluetooth_list_directory():
                         "accessible": False,
                     })
                     continue
-            
+
             # 排序：目录在前，然后按名称排序
             items.sort(key=lambda x: (not x["isDirectory"], x["name"].lower()))
-            
+
             return {"code": 0, "msg": "ok", "data": items, "currentPath": path}
         except PermissionError as e:
             log.error(f"Permission denied for {path}: {e}")
@@ -231,8 +226,7 @@ def bluetooth_list_directory():
         except Exception as e:
             log.error(f"Error listing directory: {e}")
             return {"code": -1, "msg": f"Error: {str(e)}"}
-            
+
     except Exception as e:
         log.error(e)
         return {"code": -1, "msg": 'error: ' + str(e)}
-
