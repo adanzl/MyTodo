@@ -187,14 +187,11 @@ class DlnaDev:
             except Exception as e:
                 log.error(f"[DlnaDev] Failed to set URI: {e}")
                 return -1, f"Failed to set URI: {str(e)}"
-
-            result = av_transport.GetSupportedPlayModes(InstanceID=0)
-            log.info(f"[DlnaDev] 设备支持的播放模式：{result['SupportedPlayModes']}")
             # 设置播放模式为 NORMAL（禁用单曲循环）
             # 注意：在设置 URI 之后、播放之前设置播放模式，这样更可靠
             try:
                 if hasattr(av_transport, 'SetPlayMode'):
-                    av_transport.SetPlayMode(InstanceID=0, NewPlayMode='NORMAL')
+                    av_transport.SetPlayMode(InstanceID=0, NewPlayMode='Sequential')
                     log.info(f"[DlnaDev] Set play mode to NORMAL (disable repeat)")
                 else:
                     log.debug(f"[DlnaDev] SetPlayMode not available, device may not support it")
