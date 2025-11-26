@@ -3,6 +3,7 @@ dlna设备管理
 '''
 import asyncio
 import concurrent.futures
+import json
 import os
 from typing import Dict, List
 from urllib.parse import urlparse
@@ -286,7 +287,7 @@ class DlnaDev:
                     "transport_status": transport_status,  # OK, ERROR_OCCURRED, etc.
                     "speed": speed
                 }
-                log.info(f"[DlnaDev] Transport info: {info}")
+                log.info(f"[DlnaDev] Transport info: {json.dumps(info)}")
                 return 0, info
             except Exception as e:
                 log.error(f"[DlnaDev] Failed to get transport info: {e}")
