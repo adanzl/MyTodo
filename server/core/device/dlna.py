@@ -3,6 +3,7 @@ dlna设备管理
 '''
 import asyncio
 import concurrent.futures
+import os
 from typing import Dict, List
 from urllib.parse import urlparse
 from core.log_config import root_logger
@@ -168,7 +169,7 @@ class DlnaDev:
     def play(self, url: str) -> tuple[int, str]:
         """
         播放媒体文件
-        :param url: 媒体文件 URL（可以是 http:// 或 file:// 路径）
+        :param url: 媒体文件 URL（可以是 http://、file:// 或本地文件路径）
         :return: (错误码, 消息)
         """
         try:
@@ -176,10 +177,13 @@ class DlnaDev:
             if av_transport is None:
                 return -1, "AVTransport service not available"
 
+            # 转换本地文件路径为 HTTP URL
+            media_url = self._convert_to_http_url(url)
+            
             # 设置媒体 URI
             try:
-                av_transport.SetAVTransportURI(InstanceID=0, CurrentURI=url, CurrentURIMetaData="")
-                log.info(f"[DlnaDev] Set media URI: {url}")
+                av_transport.SetAVTransportURI(InstanceID=0, CurrentURI=media_url, CurrentURIMetaData="")
+                log.info(f"[DlnaDev] Set media URI: {media_url} (original: {url})")
             except Exception as e:
                 log.error(f"[DlnaDev] Failed to set URI: {e}")
                 return -1, f"Failed to set URI: {str(e)}"
@@ -187,7 +191,7 @@ class DlnaDev:
             # 开始播放
             try:
                 av_transport.Play(InstanceID=0, Speed="1")
-                log.info(f"[DlnaDev] Play started: {url}")
+                log.info(f"[DlnaDev] Play started: {media_url}")
                 return 0, "播放成功"
             except Exception as e:
                 log.error(f"[DlnaDev] Failed to play: {e}")
@@ -195,6 +199,33 @@ class DlnaDev:
         except Exception as e:
             log.error(f"[DlnaDev] Play error: {e}")
             return -1, f"播放异常: {str(e)}"
+
+    def _convert_to_http_url(self, url: str) -> str:
+        """
+        将本地文件路径转换为 HTTP URL
+        :param url: 本地文件路径（如 /mnt/ext_base/audio/xiaopingguo.mp3）或已经是 HTTP URL
+        :return: HTTP URL
+        """
+        # 如果已经是 HTTP/HTTPS URL，直接返回
+        if url.startswith('http://') or url.startswith('https://'):
+            return url
+        
+        # 如果是 file:// URL，提取路径
+        if url.startswith('file://'):
+            url = url[7:]  # 移除 file:// 前缀
+        
+        # 如果是本地绝对路径（以 / 开头），转换为 HTTP URL
+        if url.startswith('/') and os.path.exists(url):
+            try:
+                # 动态导入以避免循环依赖
+                from core.api.media_routes import get_media_url
+                return get_media_url(url)
+            except ImportError:
+                log.warning("[DlnaDev] Cannot import get_media_url, using original URL")
+                return url
+        
+        # 其他情况直接返回（可能是相对路径或其他格式）
+        return url
 
     def stop(self) -> tuple[int, str]:
         """

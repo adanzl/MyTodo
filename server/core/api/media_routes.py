@@ -3,7 +3,10 @@
 通过调用 device_agent 服务接口实现
 '''
 import json
-from flask import Blueprint, request
+import os
+import socket
+from flask import Blueprint, request, send_file, abort
+from urllib.parse import quote
 
 from core.log_config import root_logger
 from core.models.playlist import playlist_mgr
@@ -113,3 +116,110 @@ def playlist_stop():
     except Exception as e:
         log.error(f"[PLAYLIST] Stop error: {e}")
         return _err(f'error: {str(e)}')
+
+
+# ========== 媒体文件服务接口（用于 DLNA 播放）==========
+
+def _get_local_ip():
+    """获取本机局域网IP地址"""
+    try:
+        # 连接到一个远程地址来获取本机IP（不会实际发送数据）
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        # 如果失败，尝试获取主机名对应的IP
+        try:
+            return socket.gethostbyname(socket.gethostname())
+        except Exception:
+            return "127.0.0.1"
+
+
+def _get_media_server_url():
+    """获取媒体文件服务器的完整URL"""
+    # 从请求中获取主机和端口，如果没有则使用默认值
+    host = request.host.split(':')[0] if request.host else _get_local_ip()
+    port = request.host.split(':')[1] if ':' in request.host else '8000'
+    scheme = request.scheme if hasattr(request, 'scheme') else 'http'
+    return f"{scheme}://{host}:{port}"
+
+
+@media_bp.route("/files/<path:filepath>", methods=['GET'])
+def serve_media_file(filepath):
+    """
+    提供媒体文件访问服务（用于 DLNA 播放）
+    :param filepath: 文件路径（相对于根目录，如 mnt/ext_base/audio/xiaopingguo.mp3）
+    """
+    try:
+        # 安全处理：移除路径中的危险字符
+        # 将 URL 编码的路径解码
+        filepath = filepath.replace('../', '').replace('..\\', '')
+        
+        # 如果路径不是以 / 开头，添加 /
+        if not filepath.startswith('/'):
+            filepath = '/' + filepath
+        
+        # 检查文件是否存在
+        if not os.path.exists(filepath) or not os.path.isfile(filepath):
+            log.warning(f"[MEDIA] File not found: {filepath}")
+            abort(404)
+        
+        # 获取文件扩展名以确定 Content-Type
+        ext = os.path.splitext(filepath)[1].lower()
+        mimetype_map = {
+            '.mp3': 'audio/mpeg',
+            '.wav': 'audio/wav',
+            '.flac': 'audio/flac',
+            '.aac': 'audio/aac',
+            '.ogg': 'audio/ogg',
+            '.m4a': 'audio/mp4',
+            '.mp4': 'video/mp4',
+            '.avi': 'video/x-msvideo',
+            '.mkv': 'video/x-matroska',
+        }
+        mimetype = mimetype_map.get(ext, 'application/octet-stream')
+        
+        log.info(f"[MEDIA] Serving file: {filepath} (MIME: {mimetype})")
+        return send_file(filepath, mimetype=mimetype)
+    except Exception as e:
+        log.error(f"[MEDIA] Error serving file {filepath}: {e}")
+        abort(500)
+
+
+def get_media_url(local_path: str) -> str:
+    """
+    将本地文件路径转换为可通过 HTTP 访问的 URL
+    :param local_path: 本地文件路径，如 /mnt/ext_base/audio/xiaopingguo.mp3
+    :return: HTTP URL，如 http://192.168.1.100:8000/api/media/files/mnt/ext_base/audio/xiaopingguo.mp3
+    """
+    try:
+        # 移除路径开头的 /
+        if local_path.startswith('/'):
+            filepath = local_path[1:]
+        else:
+            filepath = local_path
+        
+        # URL 编码路径
+        encoded_path = '/'.join(quote(part, safe='') for part in filepath.split('/'))
+        
+        # 获取服务器URL（需要从请求上下文获取，如果没有则使用默认值）
+        try:
+            from flask import has_request_context
+            if has_request_context():
+                base_url = _get_media_server_url()
+            else:
+                # 如果没有请求上下文，使用默认值
+                base_url = f"http://{_get_local_ip()}:8000"
+        except Exception:
+            base_url = f"http://{_get_local_ip()}:8000"
+        
+        # 根据 main.py 中的 DispatcherMiddleware 配置，应用挂载在 /api 下
+        # 所以完整路径是 /api/media/files/
+        media_url = f"{base_url}/api/media/files/{encoded_path}"
+        log.debug(f"[MEDIA] Converted {local_path} to {media_url}")
+        return media_url
+    except Exception as e:
+        log.error(f"[MEDIA] Error converting path {local_path}: {e}")
+        return local_path
