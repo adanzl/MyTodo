@@ -23,7 +23,7 @@ def _device_to_dict(device) -> Dict:
     try:
         location = getattr(device, 'location', '')
         address = urlparse(location).hostname if location else ''
-        
+
         return {
             "address": address,
             "name": getattr(device, 'friendly_name', '') or address or 'Unknown',
@@ -34,26 +34,33 @@ def _device_to_dict(device) -> Dict:
         }
     except Exception as e:
         log.error(f"[DLNA] Error converting device: {e}")
-        return {"address": "", "name": "Unknown", "device_type": "", "manufacturer": "", "model_name": "", "location": ""}
+        return {
+            "address": "",
+            "name": "Unknown",
+            "device_type": "",
+            "manufacturer": "",
+            "model_name": "",
+            "location": ""
+        }
 
 
 async def scan_devices(timeout: float = 5.0) -> List[Dict]:
     """扫描DLNA设备"""
     if not (upnpclient and ssdp):
         return []
-    
+
     try:
         log.info(f"[DLNA] Starting scan (timeout: {timeout}s)")
         device_list = []
         responses = ssdp.discover("urn:schemas-upnp-org:service:AVTransport:1", timeout=timeout)
-        
+
         for resp in responses:
             try:
                 device = upnpclient.Device(resp.location)
                 device_list.append(_device_to_dict(device))
             except Exception as e:
                 log.warning(f"[DLNA] Error processing {resp.location}: {e}")
-        
+
         log.info(f"[DLNA] Found {len(device_list)} devices")
         return device_list
     except Exception as e:
@@ -73,3 +80,21 @@ def scan_devices_sync(timeout: float = 5.0) -> List[Dict]:
     except Exception as e:
         log.error(f"[DLNA] Scan error: {e}")
         return []
+
+
+class DlnaDev:
+
+    def __init__(self, address: str):
+        self.address = address
+
+    def play(self, url: str) -> tuple[int, str]:
+        return 0, "ok"
+
+    def stop(self) -> tuple[int, str]:
+        return 0, "ok"
+
+    def play_next(self) -> tuple[int, str]:
+        return 0, "ok"
+
+    def play_prev(self) -> tuple[int, str]:
+        return 0, "ok"
