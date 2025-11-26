@@ -140,10 +140,10 @@ def _get_local_ip():
 def _get_media_server_url():
     """获取媒体文件服务器的完整URL"""
     # 返回固定的服务器地址和端口
-    return "http://192.168.50.172:8000"
+    return "http://192.168.50.172:8848"
 
 
-@media_bp.route("/files/<path:filepath>", methods=['GET'])
+@media_bp.route("/media/files/<path:filepath>", methods=['GET'])
 def serve_media_file(filepath):
     """
     提供媒体文件访问服务（用于 DLNA 播放）
