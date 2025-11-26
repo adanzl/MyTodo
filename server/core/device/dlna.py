@@ -6,7 +6,7 @@ import concurrent.futures
 from typing import Dict, List
 from urllib.parse import urlparse
 from core.log_config import root_logger
-from core import run_async
+from core.async_utils import run_async
 
 try:
     import upnpclient

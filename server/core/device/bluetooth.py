@@ -11,7 +11,7 @@ from typing import Dict, List, Optional
 try:
     from core.log_config import root_logger
     from core.db import rds_mgr
-    from core import run_async
+    from core.async_utils import run_async
     log = root_logger()
 except ImportError:
     import logging
