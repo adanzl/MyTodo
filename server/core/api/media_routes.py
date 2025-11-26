@@ -139,11 +139,8 @@ def _get_local_ip():
 
 def _get_media_server_url():
     """获取媒体文件服务器的完整URL"""
-    # 从请求中获取主机和端口，如果没有则使用默认值
-    host = request.host.split(':')[0] if request.host else _get_local_ip()
-    port = request.host.split(':')[1] if ':' in request.host else '8000'
-    scheme = request.scheme if hasattr(request, 'scheme') else 'http'
-    return f"{scheme}://{host}:{port}"
+    # 返回固定的服务器地址和端口
+    return "http://192.168.50.172:8000"
 
 
 @media_bp.route("/files/<path:filepath>", methods=['GET'])
@@ -204,16 +201,8 @@ def get_media_url(local_path: str) -> str:
         # URL 编码路径
         encoded_path = '/'.join(quote(part, safe='') for part in filepath.split('/'))
         
-        # 获取服务器URL（需要从请求上下文获取，如果没有则使用默认值）
-        try:
-            from flask import has_request_context
-            if has_request_context():
-                base_url = _get_media_server_url()
-            else:
-                # 如果没有请求上下文，使用默认值
-                base_url = f"http://{_get_local_ip()}:8000"
-        except Exception:
-            base_url = f"http://{_get_local_ip()}:8000"
+        # 获取服务器URL（使用固定地址）
+        base_url = _get_media_server_url()
         
         # 根据 main.py 中的 DispatcherMiddleware 配置，应用挂载在 /api 下
         # 所以完整路径是 /api/media/files/
