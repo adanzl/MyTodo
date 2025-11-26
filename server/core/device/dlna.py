@@ -191,7 +191,7 @@ class DlnaDev:
             # 注意：在设置 URI 之后、播放之前设置播放模式，这样更可靠
             try:
                 if hasattr(av_transport, 'SetPlayMode'):
-                    av_transport.SetPlayMode(InstanceID=0, NewPlayMode='None')
+                    av_transport.SetPlayMode(InstanceID=0, NewPlayMode='NORMAL')
                     log.info(f"[DlnaDev] Set play mode to NORMAL (disable repeat)")
                 else:
                     log.info(f"[DlnaDev] SetPlayMode not available, device may not support it")
