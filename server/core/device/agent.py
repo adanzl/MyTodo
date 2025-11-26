@@ -141,5 +141,87 @@ class DeviceAgent:
         :return: 停止结果
         """
         return self._request("POST", "/media/stop")
+
+    # ========== 统一设备接口 ==========
+    
+    def play(self, url: str) -> tuple[int, str]:
+        """
+        播放媒体文件（统一接口）
+        :param url: 媒体文件路径或URL
+        :return: (错误码, 消息)
+        """
+        # DeviceAgent 需要设备地址，从初始化时的 base_url 中提取
+        # 或者使用默认的蓝牙设备地址
+        result = self.media_play(url)
+        code = result.get("code", -1)
+        msg = result.get("msg", "未知错误")
+        return (code, msg)
+    
+    def stop(self) -> tuple[int, str]:
+        """
+        停止播放（统一接口）
+        :return: (错误码, 消息)
+        """
+        result = self.media_stop()
+        code = result.get("code", -1)
+        msg = result.get("msg", "未知错误")
+        return (code, msg)
+    
+    def get_transport_info(self) -> tuple[int, dict]:
+        """
+        获取传输状态信息（统一接口）
+        :return: (错误码, 状态字典)
+        """
+        # DeviceAgent 可能不支持获取传输状态，返回默认值
+        # 可以通过调用 device_agent 的 /media/status 接口来实现（如果存在）
+        try:
+            # 尝试调用状态接口（如果存在）
+            result = self._request("GET", "/media/status")
+            if result.get("code") == 0:
+                data = result.get("data", {})
+                return (0, {
+                    "transport_state": data.get("is_playing", False) and "PLAYING" or "STOPPED",
+                    "transport_status": "OK",
+                    "speed": "1"
+                })
+        except Exception:
+            pass
+        
+        # 如果接口不存在，返回未知状态
+        return (-1, {"error": "设备不支持获取传输状态"})
+    
+    def get_position_info(self) -> tuple[int, dict]:
+        """
+        获取播放位置信息（统一接口）
+        :return: (错误码, 位置字典)
+        """
+        # DeviceAgent 可能不支持获取位置信息，返回默认值
+        # 可以通过调用 device_agent 的 /media/position 接口来实现（如果存在）
+        try:
+            result = self._request("GET", "/media/position")
+            if result.get("code") == 0:
+                data = result.get("data", {})
+                return (0, {
+                    "track": "0",
+                    "track_duration": data.get("duration", "00:00:00"),
+                    "rel_time": data.get("position", "00:00:00"),
+                    "abs_time": "00:00:00"
+                })
+        except Exception:
+            pass
+        
+        # 如果接口不存在，返回未知状态
+        return (-1, {"error": "设备不支持获取位置信息"})
+    
+    def is_playing(self) -> bool:
+        """
+        检查是否正在播放（统一接口）
+        :return: True 如果正在播放，False 否则
+        """
+        code, info = self.get_transport_info()
+        if code != 0:
+            return False
+        transport_state = info.get("transport_state", "").upper()
+        return transport_state == "PLAYING"
     
 

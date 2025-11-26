@@ -243,3 +243,66 @@ class DlnaDev:
         except Exception as e:
             log.error(f"[DlnaDev] Stop error: {e}")
             return -1, f"停止失败: {str(e)}"
+
+    def get_transport_info(self) -> tuple[int, dict]:
+        """
+        获取传输状态信息
+        :return: (错误码, 状态字典) 状态字典包含: transport_state, transport_status, speed
+        """
+        try:
+            av_transport = self._get_av_transport()
+            if av_transport is None:
+                return -1, {"error": "AVTransport service not available"}
+
+            try:
+                result = av_transport.GetTransportInfo(InstanceID=0)
+                transport_state = result.get('CurrentTransportState', 'UNKNOWN')
+                transport_status = result.get('CurrentTransportStatus', 'UNKNOWN')
+                speed = result.get('CurrentSpeed', '1')
+                
+                info = {
+                    "transport_state": transport_state,  # PLAYING, STOPPED, PAUSED_PLAYBACK, etc.
+                    "transport_status": transport_status,  # OK, ERROR_OCCURRED, etc.
+                    "speed": speed
+                }
+                log.debug(f"[DlnaDev] Transport info: {info}")
+                return 0, info
+            except Exception as e:
+                log.error(f"[DlnaDev] Failed to get transport info: {e}")
+                return -1, {"error": str(e)}
+        except Exception as e:
+            log.error(f"[DlnaDev] GetTransportInfo error: {e}")
+            return -1, {"error": str(e)}
+
+    def get_position_info(self) -> tuple[int, dict]:
+        """
+        获取播放位置信息
+        :return: (错误码, 位置字典) 位置字典包含: track, track_duration, rel_time, abs_time
+        """
+        try:
+            av_transport = self._get_av_transport()
+            if av_transport is None:
+                return -1, {"error": "AVTransport service not available"}
+
+            try:
+                result = av_transport.GetPositionInfo(InstanceID=0)
+                track = result.get('Track', '0')
+                track_duration = result.get('TrackDuration', '00:00:00')
+                rel_time = result.get('RelTime', '00:00:00')  # 相对时间（已播放时间）
+                abs_time = result.get('AbsTime', '00:00:00')  # 绝对时间
+                
+                info = {
+                    "track": track,
+                    "track_duration": track_duration,  # 总时长，格式如 "00:03:45"
+                    "rel_time": rel_time,  # 已播放时长，格式如 "00:01:30"
+                    "abs_time": abs_time
+                }
+                log.debug(f"[DlnaDev] Position info: {info}")
+                return 0, info
+            except Exception as e:
+                log.error(f"[DlnaDev] Failed to get position info: {e}")
+                return -1, {"error": str(e)}
+        except Exception as e:
+            log.error(f"[DlnaDev] GetPositionInfo error: {e}")
+            return -1, {"error": str(e)}
+
