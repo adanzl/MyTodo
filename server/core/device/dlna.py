@@ -224,7 +224,7 @@ class DlnaDev:
     def _convert_to_http_url(self, url: str) -> str:
         """
         将本地文件路径转换为 HTTP URL
-        :param url: 本地文件路径（如 /mnt/ext_base/audio/xiaopingguo.mp3）或已经是 HTTP URL
+        :param url: 本地文件路径（如 /mnt/ext_base/audio/xxx.mp3）或已经是 HTTP URL
         :return: HTTP URL
         """
         # 如果已经是 HTTP/HTTPS URL，直接返回

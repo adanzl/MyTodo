@@ -4,17 +4,25 @@
     "python-envs.pythonProjects": [],
     "cSpell.words": [
         "bluetoothctl",
+        "DGRAM",
+        "DLNA",
         "geventwebsocket",
         "hcitool",
         "jsonify",
         "llen",
         "lrange",
+        "matroska",
+        "msvideo",
         "natapp",
         "pywsgi",
         "rpush",
         "rssi",
+        "SSDP",
+        "ssdpy",
+        "upnp",
+        "upnpclient",
         "zhaozhao"
     ],
-    "python.languageServer": "None",
+    "python.languageServer": "Default",
     "basedpyright.disableLanguageServices": true
 }

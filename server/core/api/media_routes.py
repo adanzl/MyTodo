@@ -119,24 +119,6 @@ def playlist_stop():
 
 
 # ========== 媒体文件服务接口（用于 DLNA 播放）==========
-
-def _get_local_ip():
-    """获取本机局域网IP地址"""
-    try:
-        # 连接到一个远程地址来获取本机IP（不会实际发送数据）
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except Exception:
-        # 如果失败，尝试获取主机名对应的IP
-        try:
-            return socket.gethostbyname(socket.gethostname())
-        except Exception:
-            return "127.0.0.1"
-
-
 def _get_media_server_url():
     """获取媒体文件服务器的完整URL"""
     # 返回固定的服务器地址和端口
@@ -147,7 +129,7 @@ def _get_media_server_url():
 def serve_media_file(filepath):
     """
     提供媒体文件访问服务（用于 DLNA 播放）
-    :param filepath: 文件路径（相对于根目录，如 mnt/ext_base/audio/xiaopingguo.mp3）
+    :param filepath: 文件路径
     """
     try:
         # 安全处理：移除路径中的危险字符
@@ -168,7 +150,6 @@ def serve_media_file(filepath):
         mimetype_map = {
             '.mp3': 'audio/mpeg',
             '.wav': 'audio/wav',
-            '.flac': 'audio/flac',
             '.aac': 'audio/aac',
             '.ogg': 'audio/ogg',
             '.m4a': 'audio/mp4',
@@ -188,8 +169,8 @@ def serve_media_file(filepath):
 def get_media_url(local_path: str) -> str:
     """
     将本地文件路径转换为可通过 HTTP 访问的 URL
-    :param local_path: 本地文件路径，如 /mnt/ext_base/audio/xiaopingguo.mp3
-    :return: HTTP URL，如 http://192.168.1.100:8000/api/media/files/mnt/ext_base/audio/xiaopingguo.mp3
+    :param local_path: 本地文件路径，如 /mnt/ext_base/audio/xxx.mp3
+    :return: HTTP URL，如 http://192.168.1.100:8000/api/media/files/mnt/ext_base/audio/xxx.mp3
     """
     try:
         # 移除路径开头的 /

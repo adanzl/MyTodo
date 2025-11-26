@@ -3,43 +3,27 @@
 '''
 import asyncio
 import json
-import platform
-import re
-import shutil
 import os
+import platform
+import shutil
 from typing import Dict, List, Optional
-try:
-    from core.log_config import root_logger
-    from core.db import rds_mgr
-    from core.async_utils import run_async
-    log = root_logger()
-except ImportError:
-    import logging
-    log = logging.getLogger()
-    rds_mgr = None
-    # 如果无法导入，使用本地定义
-    def run_async(coro, timeout=None):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            if timeout:
-                return loop.run_until_complete(asyncio.wait_for(coro, timeout=timeout))
-            return loop.run_until_complete(coro)
-        finally:
-            loop.close()
-            asyncio.set_event_loop(None)
+
+from core.async_utils import run_async
+from core.db import rds_mgr
+from core.log_config import root_logger
+
+log = root_logger()
 
 # 尝试使用 gevent.subprocess，如果不可用则使用标准 subprocess
 try:
-    from gevent import subprocess, spawn
+    from gevent import spawn, subprocess
     GEVENT_AVAILABLE = True
 except ImportError:
     import subprocess
     GEVENT_AVAILABLE = False
     spawn = None
 
-
-from bleak import BleakScanner, BleakClient
+from bleak import BleakClient, BleakScanner
 from bleak.backends.scanner import AdvertisementData
 
 
@@ -67,10 +51,7 @@ class BluetoothDevice:
     def _ensure_json_serializable(self, obj):
         """递归确保对象是 JSON 可序列化的"""
         if isinstance(obj, bytes):
-            return {
-                'hex': obj.hex(),
-                'length': len(obj)
-            }
+            return {'hex': obj.hex(), 'length': len(obj)}
         elif isinstance(obj, dict):
             return {str(k): self._ensure_json_serializable(v) for k, v in obj.items()}
         elif isinstance(obj, (list, tuple)):
@@ -124,7 +105,8 @@ class BluetoothMgr:
                     friendly_name = device.name
                 else:
                     # 使用地址的后6位作为标识
-                    addr_short = device.address.replace('-', '')[-6:].upper() if '-' in device.address else device.address[-6:].upper()
+                    addr_short = device.address.replace(
+                        '-', '')[-6:].upper() if '-' in device.address else device.address[-6:].upper()
                     friendly_name = f"Unknown Device ({addr_short})"
 
                 # 构建 metadata（从 advertisement_data 中提取）
@@ -156,10 +138,7 @@ class BluetoothMgr:
                                             continue
 
                                 # 构建返回数据
-                                result = {
-                                    'hex': data_bytes.hex(),
-                                    'length': len(data_bytes)
-                                }
+                                result = {'hex': data_bytes.hex(), 'length': len(data_bytes)}
                                 if decoded_str:
                                     result['decoded'] = decoded_str
 
@@ -181,10 +160,7 @@ class BluetoothMgr:
                             service_data_dict = {}
                             for service_uuid, data in advertisement_data.service_data.items():
                                 if isinstance(data, bytes):
-                                    service_data_dict[str(service_uuid)] = {
-                                        'hex': data.hex(),
-                                        'length': len(data)
-                                    }
+                                    service_data_dict[str(service_uuid)] = {'hex': data.hex(), 'length': len(data)}
                                 else:
                                     service_data_dict[str(service_uuid)] = data
                             metadata['service_data'] = service_data_dict
@@ -202,22 +178,15 @@ class BluetoothMgr:
                     if hasattr(advertisement_data, 'tx_power'):
                         metadata['tx_power'] = advertisement_data.tx_power
 
-                device_info = {
-                    "address": device.address,
-                    "name": friendly_name,
-                    "rssi": rssi,
-                    "metadata": metadata
-                }
+                device_info = {"address": device.address, "name": friendly_name, "rssi": rssi, "metadata": metadata}
                 device_list.append(device_info)
 
                 # 更新设备列表
                 if device.address not in self.devices:
-                    self.devices[device.address] = BluetoothDevice(
-                        address=device.address,
-                        name=friendly_name,
-                        rssi=rssi,
-                        metadata=metadata
-                    )
+                    self.devices[device.address] = BluetoothDevice(address=device.address,
+                                                                   name=friendly_name,
+                                                                   rssi=rssi,
+                                                                   metadata=metadata)
                 else:
                     # 更新现有设备信息
                     self.devices[device.address].name = friendly_name
@@ -366,6 +335,7 @@ class BluetoothMgr:
         """
         在 gevent 环境中安全地运行 subprocess
         """
+
         def _run():
             try:
                 # 如果是字符串命令，尝试查找完整路径
@@ -388,13 +358,11 @@ class BluetoothMgr:
                     if common_paths not in process_env['PATH']:
                         process_env['PATH'] = f"{process_env['PATH']}:{common_paths}"
 
-                process = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    env=process_env
-                )
+                process = subprocess.Popen(cmd,
+                                           stdout=subprocess.PIPE,
+                                           stderr=subprocess.PIPE,
+                                           text=True,
+                                           env=process_env)
                 stdout, stderr = process.communicate(timeout=timeout)
                 return process.returncode, stdout, stderr
             except FileNotFoundError as e:
@@ -425,9 +393,7 @@ class BluetoothMgr:
             if system == "Darwin":  # macOS
                 # 使用 system_profiler 获取蓝牙设备信息
                 result_code, stdout, stderr = self._run_subprocess_safe(
-                    ["system_profiler", "SPBluetoothDataType", "-json"],
-                    timeout=10
-                )
+                    ["system_profiler", "SPBluetoothDataType", "-json"], timeout=10)
 
                 if result_code == 0:
                     try:
@@ -467,18 +433,18 @@ class BluetoothMgr:
                                     address = parts[1]
                                     name = parts[2] if len(parts) > 2 else address
                                     paired_devices[address] = name
-                        
+
                         # 获取所有已连接设备
                         connected_addresses = set()
-                        result_code, stdout, stderr = self._run_subprocess_safe(["bluetoothctl", "devices", "Connected"],
-                                                                                timeout=10)
+                        result_code, stdout, stderr = self._run_subprocess_safe(
+                            ["bluetoothctl", "devices", "Connected"], timeout=10)
                         if result_code == 0:
                             for line in stdout.strip().split('\n'):
                                 if line.strip() and line.startswith('Device'):
                                     parts = line.split(' ', 2)
                                     if len(parts) >= 2:
                                         connected_addresses.add(parts[1])
-                        
+
                         # 为每个已配对设备设置连接状态
                         for address, name in paired_devices.items():
                             device_info = {
@@ -491,10 +457,7 @@ class BluetoothMgr:
                     # 如果没有 bluetoothctl，尝试使用 hcitool
                     try:
                         # hcitool con 只返回已连接的设备
-                        result_code, stdout, stderr = self._run_subprocess_safe(
-                            ["hcitool", "con"],
-                            timeout=10
-                        )
+                        result_code, stdout, stderr = self._run_subprocess_safe(["hcitool", "con"], timeout=10)
                         if result_code == 0:
                             # 解析 hcitool 输出
                             for line in stdout.split('\n'):
@@ -530,10 +493,8 @@ class BluetoothMgr:
                     } | ConvertTo-Json
                 }
                 """
-                result_code, stdout, stderr = self._run_subprocess_safe(
-                    ["powershell", "-Command", ps_command],
-                    timeout=10
-                )
+                result_code, stdout, stderr = self._run_subprocess_safe(["powershell", "-Command", ps_command],
+                                                                        timeout=10)
                 if result_code == 0:
                     for line in stdout.strip().split('\n'):
                         if line.strip():
@@ -599,7 +560,6 @@ class BluetoothMgr:
         except Exception as e:
             log.error(f"[BLUETOOTH] Write error: {e}")
             return {"code": -1, "msg": f"Write failed: {str(e)}"}
-
 
 
 # 全局实例
@@ -694,7 +654,6 @@ def disconnect_device_sync(address: str, timeout: float = 5.0) -> Dict:
 
 
 # _run_async 已移至 core.__init__.py 作为 run_async
-
 
 if __name__ == "__main__":
     # 测试代码

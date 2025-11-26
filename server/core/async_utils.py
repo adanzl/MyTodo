@@ -5,12 +5,12 @@
 import asyncio
 
 
-def run_async(coro, timeout: float = None):
+def run_async(coroutine, timeout: float = None):
     """
     在新的事件循环中运行协程
     用于在同步代码中调用异步函数
     
-    :param coro: 协程对象
+    :param coroutine: 协程对象
     :param timeout: 超时时间（秒），可选
     :return: 协程的返回值
     """
@@ -18,9 +18,9 @@ def run_async(coro, timeout: float = None):
     asyncio.set_event_loop(loop)
     try:
         if timeout:
-            return loop.run_until_complete(asyncio.wait_for(coro, timeout=timeout))
+            return loop.run_until_complete(asyncio.wait_for(coroutine, timeout=timeout))
         else:
-            return loop.run_until_complete(coro)
+            return loop.run_until_complete(coroutine)
     except asyncio.TimeoutError:
         raise
     finally:
