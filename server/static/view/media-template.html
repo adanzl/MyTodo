@@ -149,8 +149,11 @@
             <span 
               class="flex-1 text-sm truncate"
               :class="{ 'font-semibold text-blue-600': index === playlistStatus.current_index }"
-              :title="file">
-              {{ file.split('/').pop() || file }}
+              :title="typeof file === 'string' ? file : file.uri">
+              {{ (typeof file === 'string' ? file : file.uri || '').split('/').pop() || (typeof file === 'string' ? file : file.uri || '') }}
+              <span v-if="typeof file === 'object' && file.duration" class="text-xs text-gray-400 ml-2">
+                ({{ formatDuration(file.duration) }})
+              </span>
             </span>
             <el-tag v-if="index === playlistStatus.current_index" type="success" size="small">
               当前
@@ -680,6 +683,12 @@
       <el-table-column prop="size" label="大小" width="100">
         <template #default="{ row }">
           <span v-if="!row.isDirectory">{{ formatSize(row.size) }}</span>
+          <span v-else>-</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="duration" label="时长" width="100">
+        <template #default="{ row }">
+          <span v-if="!row.isDirectory && row.duration">{{ formatDuration(row.duration) }}</span>
           <span v-else>-</span>
         </template>
       </el-table-column>

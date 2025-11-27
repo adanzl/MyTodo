@@ -5,6 +5,8 @@ from flask import Blueprint, json, jsonify, render_template, request
 import core.db.rds_mgr as rds_mgr
 from core.ai.ai_local import AILocal
 import random
+import os
+import urllib.parse
 
 log = root_logger()
 api_bp = Blueprint('api', __name__)
@@ -312,6 +314,164 @@ def add_rds_list():
         rds_mgr.rpush(key, value)
 
         return {"code": 0, "msg": "ok", "data": value}
+    except Exception as e:
+        log.error(e)
+        return {"code": -1, "msg": 'error: ' + str(e)}
+
+
+def get_media_duration(file_path):
+    try:
+        ext = os.path.splitext(file_path)[1].lower()
+        audio_extensions = {'.mp3', '.wav', '.aac', '.ogg', '.m4a', '.flac', '.wma'}
+        if ext in audio_extensions:
+            try:
+                from mutagen import File  # type: ignore
+                audio_file = File(file_path)
+                if audio_file and hasattr(audio_file, 'info'):
+                    duration = audio_file.info.length
+                    return int(duration) if duration else None
+            except ImportError:
+                log.warning("mutagen library not available")
+            except Exception as e:
+                log.debug(f"Failed to get audio duration: {e}")
+        
+        video_extensions = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'}
+        if ext in video_extensions:
+            try:
+                import subprocess
+                result = subprocess.run(
+                    ['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', file_path],
+                    capture_output=True, text=True, timeout=5
+                )
+                if result.returncode == 0:
+                    duration = float(result.stdout.strip())
+                    return int(duration) if duration else None
+            except (FileNotFoundError, subprocess.TimeoutExpired, ValueError) as e:
+                log.debug(f"Failed to get video duration: {e}")
+        return None
+    except Exception as e:
+        log.debug(f"Error getting media duration: {e}")
+        return None
+
+
+@api_bp.route("/listDirectory", methods=['GET'])
+def list_directory():
+    try:
+        path = request.args.get('path', '')
+        extensions_filter = request.args.get('extensions', 'audio')  # 默认筛选音频
+        
+        if path:
+            while '%' in path:
+                try:
+                    decoded = urllib.parse.unquote(path)
+                    if decoded == path:
+                        break
+                    path = decoded
+                except Exception:
+                    break
+
+        log.info(f"===== [List Directory] path={path}, extensions={extensions_filter}")
+
+        default_base_dir = '/mnt'
+
+        if not path or path == '':
+            path = default_base_dir
+        else:
+            path_parts = path.split('/')
+            if '..' in path_parts or path.startswith('~'):
+                return {"code": -1, "msg": "Invalid path: Path traversal not allowed"}
+
+            if not os.path.isabs(path):
+                path = os.path.join(default_base_dir, path.lstrip('/'))
+                path = os.path.abspath(path)
+            else:
+                path = os.path.abspath(path)
+
+            if not path.startswith('/mnt'):
+                log.warning(f"Path {path} is outside allowed directory /mnt, using default directory")
+                path = default_base_dir
+
+        if not os.path.exists(path):
+            log.warning(f"Path does not exist: {path}, using default directory: {default_base_dir}")
+            path = default_base_dir
+
+        if not os.path.isdir(path):
+            log.warning(f"Path is not a directory: {path}, using default directory: {default_base_dir}")
+            path = default_base_dir
+
+        if not os.access(path, os.R_OK):
+            if path != default_base_dir and os.access(default_base_dir, os.R_OK):
+                log.warning(f"No read permission for {path}, using default directory: {default_base_dir}")
+                path = default_base_dir
+            else:
+                return {"code": -1, "msg": f"Permission denied: No read permission for {path}"}
+
+        items = []
+        try:
+            entries = os.listdir(path)
+            for entry in entries:
+                entry_path = os.path.join(path, entry)
+                try:
+                    if not os.access(entry_path, os.R_OK):
+                        items.append({
+                            "name": entry,
+                            "isDirectory": os.path.isdir(entry_path) if os.path.exists(entry_path) else False,
+                            "size": 0,
+                            "modified": 0,
+                            "accessible": False,
+                        })
+                        continue
+
+                    stat_info = os.stat(entry_path)
+                    item = {
+                        "name": entry,
+                        "isDirectory": os.path.isdir(entry_path),
+                        "size": stat_info.st_size if os.path.isfile(entry_path) else 0,
+                        "modified": stat_info.st_mtime,
+                        "accessible": True,
+                    }
+                    
+                    # 如果是多媒体文件，获取时长
+                    if os.path.isfile(entry_path):
+                        duration = get_media_duration(entry_path)
+                        if duration is not None:
+                            item["duration"] = duration
+                    
+                    items.append(item)
+                except (OSError, PermissionError) as e:
+                    log.warning(f"Cannot access {entry_path}: {e}")
+                    items.append({
+                        "name": entry,
+                        "isDirectory": False,
+                        "size": 0,
+                        "modified": 0,
+                        "accessible": False,
+                    })
+                    continue
+
+            items.sort(key=lambda x: (not x["isDirectory"], x["name"].lower()))
+            
+            if extensions_filter and extensions_filter != "all":
+                if extensions_filter == "audio":
+                    allowed_exts = {'.mp3', '.wav', '.aac', '.ogg', '.m4a', '.flac', '.wma'}
+                elif extensions_filter == "video":
+                    allowed_exts = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'}
+                elif extensions_filter.startswith("."):
+                    allowed_exts = {ext.strip().lower() for ext in extensions_filter.split(",")}
+                else:
+                    allowed_exts = None
+                
+                if allowed_exts:
+                    items = [item for item in items if item["isDirectory"] or os.path.splitext(item["name"])[1].lower() in allowed_exts]
+
+            return {"code": 0, "msg": "ok", "data": items, "currentPath": path}
+        except PermissionError as e:
+            log.error(f"Permission denied for {path}: {e}")
+            return {"code": -1, "msg": f"Permission denied: {str(e)}"}
+        except Exception as e:
+            log.error(f"Error listing directory: {e}")
+            return {"code": -1, "msg": f"Error: {str(e)}"}
+
     except Exception as e:
         log.error(e)
         return {"code": -1, "msg": 'error: ' + str(e)}
