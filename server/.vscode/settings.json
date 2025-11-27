@@ -23,6 +23,6 @@
         "upnpclient",
         "zhaozhao"
     ],
-    "python.languageServer": "None",
+    "python.languageServer": "Pylance",
     "basedpyright.disableLanguageServices": true
 }
