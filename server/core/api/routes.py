@@ -321,37 +321,19 @@ def add_rds_list():
 
 def get_media_duration(file_path):
     try:
-        ext = os.path.splitext(file_path)[1].lower()
-        audio_extensions = {'.mp3', '.wav', '.aac', '.ogg', '.m4a', '.flac', '.wma'}
-        if ext in audio_extensions:
-            try:
-                from mutagen import File  # type: ignore
-                audio_file = File(file_path)
-                if audio_file and hasattr(audio_file, 'info'):
-                    duration = audio_file.info.length
-                    return int(duration) if duration else None
-            except ImportError:
-                log.warning("mutagen library not available")
-            except Exception as e:
-                log.debug(f"Failed to get audio duration: {e}")
-        
-        video_extensions = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'}
-        if ext in video_extensions:
-            try:
-                import subprocess
-                result = subprocess.run(
-                    ['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', file_path],
-                    capture_output=True, text=True, timeout=5
-                )
-                if result.returncode == 0:
-                    duration = float(result.stdout.strip())
-                    return int(duration) if duration else None
-            except (FileNotFoundError, subprocess.TimeoutExpired, ValueError) as e:
-                log.debug(f"Failed to get video duration: {e}")
-        return None
+        import subprocess
+        result = subprocess.run(
+            ['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', file_path],
+            capture_output=True, text=True, timeout=3
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            duration = float(result.stdout.strip())
+            return int(duration) if duration else None
+    except (FileNotFoundError, subprocess.TimeoutExpired, ValueError) as e:
+        log.debug(f"Failed to get media duration with ffprobe: {e}")
     except Exception as e:
         log.debug(f"Error getting media duration: {e}")
-        return None
+    return None
 
 
 @api_bp.route("/listDirectory", methods=['GET'])
