@@ -383,7 +383,7 @@ class BluetoothMgr:
             try:
                 # 先获取所有已配对设备
                 result_code, stdout, stderr = self._run_subprocess_safe(
-                    ["bluetoothctl", "paired-devices"],
+                    ["bluetoothctl", "devices", "Paired"],
                     timeout=10
                 )
                 if result_code == 0:
