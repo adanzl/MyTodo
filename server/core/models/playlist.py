@@ -46,7 +46,6 @@ def _create_device(node):
 class PlaylistMgr:
 
     def __init__(self):
-        self.reload()
 
         # 存储正在轮询的播放列表ID集合
         self._polling_playlists = set()
@@ -54,6 +53,8 @@ class PlaylistMgr:
         self._polling_interval = 1
         # 存储定时任务触发的播放开始时间 {playlist_id: start_time}
         self._scheduled_play_start_times = {}
+        # 加载播放列表数据
+        self.reload()
 
     def get_playlist(self, id: str = None) -> Dict[str, Any] | None:
         if id is None:
