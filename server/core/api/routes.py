@@ -322,10 +322,13 @@ def add_rds_list():
 def get_media_duration(file_path):
     try:
         import subprocess
-        result = subprocess.run(
-            ['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', file_path],
-            capture_output=True, text=True, timeout=3
-        )
+        result = subprocess.run([
+            '/usr/bin/ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of',
+            'default=noprint_wrappers=1:nokey=1', file_path
+        ],
+                                capture_output=True,
+                                text=True,
+                                timeout=3)
         if result.returncode == 0 and result.stdout.strip():
             duration = float(result.stdout.strip())
             return int(duration) if duration else None
@@ -341,7 +344,7 @@ def list_directory():
     try:
         path = request.args.get('path', '')
         extensions_filter = request.args.get('extensions', 'audio')  # 默认筛选音频
-        
+
         if path:
             while '%' in path:
                 try:
@@ -412,13 +415,13 @@ def list_directory():
                         "modified": stat_info.st_mtime,
                         "accessible": True,
                     }
-                    
+
                     # 如果是多媒体文件，获取时长
                     if os.path.isfile(entry_path):
                         duration = get_media_duration(entry_path)
                         if duration is not None:
                             item["duration"] = duration
-                    
+
                     items.append(item)
                 except (OSError, PermissionError) as e:
                     log.warning(f"Cannot access {entry_path}: {e}")
@@ -432,7 +435,7 @@ def list_directory():
                     continue
 
             items.sort(key=lambda x: (not x["isDirectory"], x["name"].lower()))
-            
+
             if extensions_filter and extensions_filter != "all":
                 if extensions_filter == "audio":
                     allowed_exts = {'.mp3', '.wav', '.aac', '.ogg', '.m4a', '.flac', '.wma'}
@@ -442,9 +445,12 @@ def list_directory():
                     allowed_exts = {ext.strip().lower() for ext in extensions_filter.split(",")}
                 else:
                     allowed_exts = None
-                
+
                 if allowed_exts:
-                    items = [item for item in items if item["isDirectory"] or os.path.splitext(item["name"])[1].lower() in allowed_exts]
+                    items = [
+                        item for item in items
+                        if item["isDirectory"] or os.path.splitext(item["name"])[1].lower() in allowed_exts
+                    ]
 
             return {"code": 0, "msg": "ok", "data": items, "currentPath": path}
         except PermissionError as e:
