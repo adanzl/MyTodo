@@ -385,19 +385,19 @@ async function createComponent() {
         return refData.playlistStatus.value;
       };
 
-      // 刷新已连接设备列表
+      // 刷新已配对/已连接设备列表
       const refreshConnectedList = async () => {
         try {
           refData.loading.value = true;
-          const rsp = await bluetoothAction("connected", "GET");
+          const rsp = await bluetoothAction("paired", "GET");
           if (rsp.code === 0) {
             refData.connectedDeviceList.value = rsp.data || [];
           } else {
-            ElMessage.error(rsp.msg || "获取已连接设备失败");
+            ElMessage.error(rsp.msg || "获取蓝牙设备失败");
           }
         } catch (error) {
-          console.error("获取已连接设备失败:", error);
-          ElMessage.error("获取已连接设备失败");
+          console.error("获取蓝牙设备失败:", error);
+          ElMessage.error("获取蓝牙设备失败");
         } finally {
           refData.loading.value = false;
         }
@@ -1063,6 +1063,21 @@ async function createComponent() {
         return `${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
       };
 
+      const getPlaylistTotalDuration = (files) => {
+        if (!Array.isArray(files) || files.length === 0) {
+          return 0;
+        }
+        return files.reduce((sum, file) => {
+          if (file && typeof file === "object" && "duration" in file) {
+            const duration = Number(file.duration);
+            if (!Number.isNaN(duration) && duration > 0) {
+              return sum + duration;
+            }
+          }
+          return sum;
+        }, 0);
+      };
+
       // 格式化持续时间（分钟转换为可读格式）
       const formatDurationMinutes = (minutes) => {
         if (!minutes || minutes === 0) return "不停止";
@@ -1720,6 +1735,7 @@ async function createComponent() {
         handleUpdatePlaylistDeviceAddress,
         handleSelectBluetoothDevice,
         handleSelectAgentDevice,
+        getPlaylistTotalDuration,
         scanDlnaDevices,
       };
 

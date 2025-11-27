@@ -122,8 +122,8 @@ class DeviceAgent:
 
     def bluetooth_get_paired(self) -> Dict[str, Any]:
         """
-        获取已连接的蓝牙设备列表
-        :return: 已连接设备列表
+        获取已配对的蓝牙设备列表
+        :return: 已配对设备列表
         """
         return self._request("GET", "/bluetooth/paired")
 

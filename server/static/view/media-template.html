@@ -103,7 +103,8 @@
           </div>
           <div class="text-sm text-gray-500" v-if="playlistStatus">
             共 {{ playlistStatus.total || 0 }} 首，
-            当前: {{ playlistStatus.current_index !== undefined ? playlistStatus.current_index + 1 : '-' }} / {{ playlistStatus.total || 0 }}
+            当前: {{ playlistStatus.current_index !== undefined ? playlistStatus.current_index + 1 : '-' }} / {{ playlistStatus.total || 0 }}，
+            总时长: {{ formatDuration(getPlaylistTotalDuration(playlistStatus.playlist || [])) }}
           </div>
         </div>
         <div class="flex flex-wrap gap-2">
@@ -312,7 +313,7 @@
           <div class="mt-3">
             <div class="flex items-center justify-between mb-2">
               <h5 class="text-xs font-semibold text-gray-700">
-                <span v-if="playlistStatus.device?.type === 'agent' || playlistStatus.device_type === 'agent'">
+                <span v-if="playlistStatus.device?.type === 'agent' || playlistStatus.device_type === 'agent' || playlistStatus.device?.type === 'bluetooth' || playlistStatus.device_type === 'bluetooth'">
                   已配对的设备
                 </span>
                 <span v-else-if="playlistStatus.device?.type === 'dlna' || playlistStatus.device_type === 'dlna'">
@@ -329,7 +330,7 @@
                 扫描设备
               </el-button>
               <el-button
-                v-if="playlistStatus.device?.type === 'agent' || playlistStatus.device_type === 'agent'"
+                v-if="playlistStatus.device?.type === 'agent' || playlistStatus.device_type === 'agent' || playlistStatus.device?.type === 'bluetooth' || playlistStatus.device_type === 'bluetooth'"
                 type="primary"
                 size="small"
                 @click="handleOpenScanDialog">
@@ -338,7 +339,7 @@
             </div>
             
             <!-- 设备代理类型：显示已配对设备 -->
-            <div v-if="playlistStatus.device?.type === 'agent' || playlistStatus.device_type === 'agent'">
+            <div v-if="playlistStatus.device?.type === 'agent' || playlistStatus.device_type === 'agent' || playlistStatus.device?.type === 'bluetooth' || playlistStatus.device_type === 'bluetooth'">
               <div class="space-y-2 max-h-[200px] overflow-y-auto" v-loading="loading">
                 <div
                   v-for="device in connectedDeviceList"
@@ -352,7 +353,7 @@
                     <el-button
                       size="small"
                       type="primary"
-                      @click="handleSelectAgentDevice(device)"
+                      @click="(playlistStatus.device?.type === 'agent' || playlistStatus.device_type === 'agent') ? handleSelectAgentDevice(device) : handleSelectBluetoothDevice(device.address)"
                       :disabled="device.address === (playlistStatus.device?.address || playlistStatus.device_address)">
                       选择
                     </el-button>
@@ -389,23 +390,6 @@
                   暂无设备，点击"扫描设备"开始扫描
                 </div>
               </div>
-            </div>
-            
-            <!-- 蓝牙类型：显示已配对设备选择器 -->
-            <div v-else-if="playlistStatus.device?.type === 'bluetooth' || playlistStatus.device_type === 'bluetooth'">
-              <el-select
-                :model-value="playlistStatus.device?.address || playlistStatus.device_address || ''"
-                @change="handleSelectBluetoothDevice"
-                placeholder="选择蓝牙设备"
-                size="small"
-                class="w-full">
-                <el-option
-                  v-for="device in connectedDeviceList"
-                  :key="device.address"
-                  :label="device.name"
-                  :value="device.address">
-                </el-option>
-              </el-select>
             </div>
           </div>
         </div>
