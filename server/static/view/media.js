@@ -1228,7 +1228,9 @@ async function createComponent() {
         const status = refData.playlistStatus.value;
         if (!status || index < 0 || index >= status.playlist.length) return;
 
-        const fileName = status.playlist[index].split("/").pop() || status.playlist[index];
+        const fileItem = status.playlist[index];
+        const filePath = typeof fileItem === 'string' ? fileItem : (fileItem?.uri || '');
+        const fileName = filePath.split("/").pop() || filePath;
 
         try {
           await ElMessageBox.confirm(`确定要删除 "${fileName}" 吗？`, "确认删除", {
