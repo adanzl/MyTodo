@@ -46,15 +46,7 @@ def _create_device(node):
 class PlaylistMgr:
 
     def __init__(self):
-        raw = rds_mgr.get(PLAYLIST_RDS_FULL_KEY)
-        if raw:
-            try:
-                self.playlist_raw = json.loads(raw.decode("utf-8"))
-                self._refresh_device_map()
-            except (ValueError, AttributeError):
-                self.playlist_raw = None
-        else:
-            self.playlist_raw = {}
+        self.reload()
 
         # 存储正在轮询的播放列表ID集合
         self._polling_playlists = set()
@@ -112,6 +104,7 @@ class PlaylistMgr:
             else:
                 self.playlist_raw = {}
                 self._refresh_device_map()
+            log.info(f"[PlaylistMgr] Load success: {self.playlist_raw}")
             return 0
         except Exception as e:
             log.error(f"[PlaylistMgr] Reload error: {e}")

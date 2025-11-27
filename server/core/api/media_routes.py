@@ -36,7 +36,7 @@ def playlist_get():
         log.info("===== [Playlist Get] " + json.dumps(args))
         id = args.get("id")
         # 如果 id 为空、None 或空字符串，返回整个播放列表集合
-        if not id or id == "None" or id == "null":
+        if id is None or id == "None" or id == "null":
             ret = playlist_mgr.get_playlist(None)
         else:
             ret = playlist_mgr.get_playlist(id)
