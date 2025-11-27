@@ -7,7 +7,6 @@ from flask import Blueprint, json, jsonify, request
 from core.log_config import root_logger
 from core.config import get_config
 from core.device.bluetooth import (
-    get_bluetooth_mgr,
     scan_devices_sync,
     connect_device_sync,
     disconnect_device_sync,

@@ -5,6 +5,7 @@ from flask_sqlalchemy import SQLAlchemy
 
 import core.ai.ai_mgr as ai_mgr
 from core.api.routes import api_bp
+from core.api.agent_routes import agent_bp
 from core.api.bluetooth_routes import bluetooth_bp
 from core.api.dlna_routes import dlna_bp
 from core.api.media_routes import media_bp
@@ -32,6 +33,7 @@ def create_app():
     )
 
     app.register_blueprint(api_bp, url_prefix='/')
+    app.register_blueprint(agent_bp, url_prefix='/')
     app.register_blueprint(bluetooth_bp, url_prefix='/')
     app.register_blueprint(media_bp, url_prefix='/')
     app.register_blueprint(dlna_bp, url_prefix='/')

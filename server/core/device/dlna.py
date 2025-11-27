@@ -167,9 +167,37 @@ class DlnaDev:
 
         return self._av_transport
 
+    def _convert_to_http_url(self, url: str) -> str:
+        """
+        将本地文件路径转换为 HTTP URL
+        :param url: 本地文件路径（如 /mnt/ext_base/audio/xxx.mp3）或已经是 HTTP URL
+        :return: HTTP URL
+        """
+        # 如果已经是 HTTP/HTTPS URL，直接返回
+        if url.startswith('http://') or url.startswith('https://'):
+            return url
+
+        # 如果是 file:// URL，提取路径
+        if url.startswith('file://'):
+            url = url[7:]  # 移除 file:// 前缀
+
+        # 如果是本地绝对路径（以 / 开头），转换为 HTTP URL
+        if url.startswith('/') and os.path.exists(url):
+            try:
+                # 动态导入以避免循环依赖
+                from core.api.media_routes import get_media_url
+                return get_media_url(url)
+            except ImportError:
+                log.warning("[DlnaDev] Cannot import get_media_url, using original URL")
+                return url
+
+        # 其他情况直接返回（可能是相对路径或其他格式）
+        return url
+
+    # ========== 统一设备接口 ==========
     def play(self, url: str) -> tuple[int, str]:
         """
-        播放媒体文件
+        播放媒体文件【OUT】
         :param url: 媒体文件 URL（可以是 http://、file:// 或本地文件路径）
         :return: (错误码, 消息)
         """
@@ -202,36 +230,9 @@ class DlnaDev:
             log.error(f"[DlnaDev] Play error: {e}")
             return -1, f"播放异常: {str(e)}"
 
-    def _convert_to_http_url(self, url: str) -> str:
-        """
-        将本地文件路径转换为 HTTP URL
-        :param url: 本地文件路径（如 /mnt/ext_base/audio/xxx.mp3）或已经是 HTTP URL
-        :return: HTTP URL
-        """
-        # 如果已经是 HTTP/HTTPS URL，直接返回
-        if url.startswith('http://') or url.startswith('https://'):
-            return url
-
-        # 如果是 file:// URL，提取路径
-        if url.startswith('file://'):
-            url = url[7:]  # 移除 file:// 前缀
-
-        # 如果是本地绝对路径（以 / 开头），转换为 HTTP URL
-        if url.startswith('/') and os.path.exists(url):
-            try:
-                # 动态导入以避免循环依赖
-                from core.api.media_routes import get_media_url
-                return get_media_url(url)
-            except ImportError:
-                log.warning("[DlnaDev] Cannot import get_media_url, using original URL")
-                return url
-
-        # 其他情况直接返回（可能是相对路径或其他格式）
-        return url
-
     def stop(self) -> tuple[int, str]:
         """
-        停止播放
+        停止播放【OUT】
         :return: (错误码, 消息)
         """
         try:
