@@ -23,6 +23,6 @@
         "upnpclient",
         "zhaozhao"
     ],
-    "python.languageServer": "Default",
+    "python.languageServer": "None",
     "basedpyright.disableLanguageServices": true
 }
