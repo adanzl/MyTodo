@@ -102,7 +102,25 @@ class TaskScheduler:
 
             if cron_expression:
                 # 解析 cron 表达式
-                trigger = CronTrigger.from_crontab(cron_expression)
+                parts = cron_expression.strip().split()
+                
+                # 检查字段数量
+                if len(parts) == 6:
+                    # 6 字段格式：秒 分 时 日 月 周
+                    second, minute, hour, day, month, day_of_week = parts
+                    trigger = CronTrigger(
+                        second=second,
+                        minute=minute,
+                        hour=hour,
+                        day=day,
+                        month=month,
+                        day_of_week=day_of_week
+                    )
+                elif len(parts) == 5:
+                    # 5 字段格式：分 时 日 月 周（标准 cron）
+                    trigger = CronTrigger.from_crontab(cron_expression)
+                else:
+                    raise ValueError(f"不支持的 cron 表达式格式，字段数量: {len(parts)}，期望 5 或 6 个字段")
             else:
                 trigger = CronTrigger(**cron_kwargs)
 
