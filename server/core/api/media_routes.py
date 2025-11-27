@@ -35,9 +35,13 @@ def playlist_get():
         args = request.args
         log.info("===== [Playlist Get] " + json.dumps(args))
         id = args.get("id")
-        ret = playlist_mgr.get_playlist(id)
-        if ret is None:
-            return _err(f"未找到标识为 {id} 的播放列表")
+        # 如果 id 为空、None 或空字符串，返回整个播放列表集合
+        if not id or id == "None" or id == "null":
+            ret = playlist_mgr.get_playlist(None)
+        else:
+            ret = playlist_mgr.get_playlist(id)
+            if ret is None:
+                return _err(f"未找到标识为 {id} 的播放列表")
         return _ok(ret)
     except Exception as e:
         log.error(f"[PLAYLIST] Get error: {e}")

@@ -1,4 +1,4 @@
-import { bluetoothAction, getRdsData, setRdsData, playlistAction, getApiUrl } from "../js/net_util.js";
+import { bluetoothAction, playlistAction, getApiUrl } from "../js/net_util.js";
 
 /**
  * 媒体播放管理组件
@@ -10,7 +10,7 @@ import { bluetoothAction, getRdsData, setRdsData, playlistAction, getApiUrl } fr
  * - 文件浏览器
  */
 
-const { ref, onMounted, nextTick, watch } = window.Vue;
+const { ref, onMounted, nextTick } = window.Vue;
 const { ElMessage, ElMessageBox } = window.ElementPlus;
 let component = null;
 async function loadTemplate() {
@@ -35,11 +35,6 @@ async function createComponent() {
         fileBrowserList: ref([]),
         fileBrowserLoading: ref(false),
         selectedFiles: ref([]),
-        cronExpression: ref(""),
-        cronEnabled: ref(false),
-        cronDuration: ref(0),
-        nextRunTime: ref(""),
-        cronBuilderVisible: ref(false),
         cronBuilder: ref({
           second: "*",
           secondCustom: "",
@@ -72,25 +67,6 @@ async function createComponent() {
         playlistStatus: ref(null),
         playlistLoading: ref(false),
         playlistRefreshing: ref(false),
-      };
-
-      // Cron 配置相关常量
-      const RDS_TABLE = "schedule_play";
-      const RDS_CRON_KEY = "cron_config";
-
-      // 保存 Cron 配置
-      const saveCronConfig = async () => {
-        try {
-          const cronConfig = {
-            enabled: refData.cronEnabled.value,
-            expression: refData.cronExpression.value,
-            durationMinutes: refData.cronDuration.value,
-            updatedAt: Date.now(),
-          };
-          await setRdsData(RDS_TABLE, RDS_CRON_KEY, JSON.stringify(cronConfig));
-        } catch (error) {
-          console.error("保存 Cron 配置到 RDS 失败:", error);
-        }
       };
 
       const createPlaylistId = () => `pl_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -356,27 +332,6 @@ async function createComponent() {
         return refData.playlistStatus.value;
       };
 
-      // 加载 Cron 配置
-      const loadCronConfig = async () => {
-        try {
-          const dataStr = await getRdsData(RDS_TABLE, RDS_CRON_KEY);
-          if (!dataStr) return;
-          const data = JSON.parse(dataStr);
-          if (typeof data.enabled === "boolean") {
-            refData.cronEnabled.value = data.enabled;
-          }
-          if (typeof data.expression === "string" && data.expression.trim().length > 0) {
-            refData.cronExpression.value = data.expression;
-          }
-          if (data.durationMinutes !== undefined && data.durationMinutes !== null) {
-            refData.cronDuration.value = parseInt(data.durationMinutes, 10) || 0;
-          }
-          updateNextRunTime();
-        } catch (error) {
-          console.error("从 RDS 加载 Cron 配置失败:", error);
-        }
-      };
-
       // 刷新已连接设备列表
       const refreshConnectedList = async () => {
         try {
@@ -497,12 +452,16 @@ async function createComponent() {
       };
 
 
+      // Cron Builder 对话框显示状态（局部状态，不是全局配置）
+      const cronBuilderVisible = ref(false);
+
       // 打开 Cron 生成器
       const handleOpenCronBuilder = () => {
-        refData.cronBuilderVisible.value = true;
-        // 如果已有表达式，尝试解析
-        if (refData.cronExpression.value) {
-          parseCronExpression(refData.cronExpression.value);
+        cronBuilderVisible.value = true;
+        // 如果当前播放列表有 cron 表达式，尝试解析
+        const cronExpr = refData.playlistStatus.value?.schedule?.cron;
+        if (cronExpr) {
+          parseCronExpression(cronExpr);
         } else {
           // 重置为默认值
           resetCronBuilder();
@@ -511,7 +470,7 @@ async function createComponent() {
 
       // 关闭 Cron 生成器
       const handleCloseCronBuilder = () => {
-        refData.cronBuilderVisible.value = false;
+        cronBuilderVisible.value = false;
       };
 
       // 重置 Cron 生成器
@@ -694,59 +653,19 @@ async function createComponent() {
         
       };
 
-      // 应用 Cron 配置
-      const handleApplyCronConfig = async () => {
-        try {
-          await saveCronConfig();
-          ElMessage.success("Cron 配置已保存");
-        } catch (error) {
-          console.error("保存配置失败:", error);
-          ElMessage.error("保存配置失败: " + (error.message || "未知错误"));
-        }
-      };
-
-      // 更新下次运行时间
-      const updateNextRunTime = () => {
-        if (!refData.cronExpression.value) {
-          refData.nextRunTime.value = "";
-          return;
-        }
-        try {
-          const times = calculateNextCronTimes(refData.cronExpression.value, 1);
-          if (times && times.length > 0) {
-            refData.nextRunTime.value = times[0];
-          } else {
-            refData.nextRunTime.value = "";
-          }
-        } catch (error) {
-          refData.nextRunTime.value = "";
-        }
-      };
-
       // 应用生成的 Cron 表达式（应用到当前播放列表）
       const handleApplyCronExpression = () => {
         if (!refData.cronBuilder.value.generated) return;
         const cronExpr = refData.cronBuilder.value.generated;
         
-        // 如果当前有选中的播放列表，应用到播放列表
+        // 应用到当前播放列表
         if (refData.playlistStatus.value) {
           handleUpdatePlaylistCron(cronExpr);
           handleCloseCronBuilder();
           ElMessage.success("Cron 表达式已应用到当前播放列表");
         } else {
-          // 否则应用到全局配置（向后兼容）
-          refData.cronExpression.value = cronExpr;
-          handleCloseCronBuilder();
-          updateNextRunTime();
-          handleApplyCronConfig();
-          ElMessage.success("Cron 表达式已应用");
+          ElMessage.warning("请先选择一个播放列表");
         }
-      };
-
-      // 切换 Cron 启用状态
-      const handleToggleCronEnabled = async () => {
-        // 立即保存配置
-        await handleApplyCronConfig();
       };
 
       // 应用示例
@@ -755,10 +674,13 @@ async function createComponent() {
           parseCronExpression(example);
           nextTick(() => {
             if (refData.cronBuilder.value.generated) {
-              refData.cronExpression.value = refData.cronBuilder.value.generated;
-              updateNextRunTime();
-              handleApplyCronConfig();
-              ElMessage.success("示例已应用");
+              // 如果当前有选中的播放列表，应用到播放列表
+              if (refData.playlistStatus.value) {
+                handleUpdatePlaylistCron(refData.cronBuilder.value.generated);
+                ElMessage.success("示例已应用到当前播放列表");
+              } else {
+                ElMessage.warning("请先选择一个播放列表");
+              }
             }
           });
         } catch (error) {
@@ -1122,18 +1044,8 @@ async function createComponent() {
       };
 
       const handlePreviewCron = () => {
-        if (!refData.cronExpression.value) {
-          ElMessage.warning("请输入 Cron 表达式");
-          return;
-        }
-        try {
-          const times = calculateNextCronTimes(refData.cronExpression.value, 5);
-          refData.cronPreviewTimes.value = times;
-          refData.cronPreviewVisible.value = true;
-        } catch (error) {
-          ElMessage.error("预览失败: " + (error.message || "无效的 Cron 表达式"));
-          refData.cronPreviewTimes.value = [];
-        }
+        // 使用播放列表的 cron 预览功能
+        handlePreviewPlaylistCron();
       };
 
       // 格式化文件大小
@@ -1782,7 +1694,6 @@ async function createComponent() {
         applyExample,
         handlePreviewGeneratedCron,
         handlePreviewCron,
-        updateNextRunTime,
         formatSize,
         formatDurationMinutes,
         handleConnectDevice,
@@ -1827,8 +1738,6 @@ async function createComponent() {
         handleSelectBluetoothDevice,
         handleSelectAgentDevice,
         scanDlnaDevices,
-        // Cron 相关
-        handleToggleCronEnabled,
         handleDialogClose: () => {
           refData.dialogForm.value.visible = false;
           refData.dialogForm.value.value = 0;
@@ -1840,19 +1749,13 @@ async function createComponent() {
       
       onMounted(async () => {
         await Promise.all([
-          loadCronConfig(),
           loadPlaylist(),
           refreshConnectedList(),
         ]);
-        updateNextRunTime();
-      });
-      
-      // 监听 Cron 表达式变化，自动更新下次运行时间（在 onMounted 之后设置）
-      watch(() => refData.cronExpression.value, () => {
-        updateNextRunTime();
       });
       return {
         ...refData,
+        cronBuilderVisible,
         fileBrowserCanNavigateUp,
         ...refMethods,
       };
