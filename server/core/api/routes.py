@@ -330,9 +330,9 @@ def get_media_duration(file_path):
             duration = float(result.stdout.strip())
             return int(duration) if duration else None
     except (FileNotFoundError, subprocess.TimeoutExpired, ValueError) as e:
-        log.debug(f"Failed to get media duration with ffprobe: {e}")
+        log.warning(f"Failed to get media duration with ffprobe: {e}")
     except Exception as e:
-        log.debug(f"Error getting media duration: {e}")
+        log.warning(f"Error getting media duration: {e}")
     return None
 
 
