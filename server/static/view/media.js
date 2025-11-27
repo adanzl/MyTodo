@@ -52,6 +52,7 @@ async function createComponent() {
         playlistLoading: ref(false),
         playlistRefreshing: ref(false),
       };
+      const pendingDeviceType = ref(null);
 
       const createPlaylistId = () => `pl_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
       const _formatDateTime = () => {
@@ -387,17 +388,35 @@ async function createComponent() {
 
       // 刷新已配对/已连接设备列表
       const refreshConnectedList = async () => {
+        const playlistStatus = refData.playlistStatus.value;
+        const deviceType =
+          pendingDeviceType.value ||
+          playlistStatus?.device?.type ||
+          playlistStatus?.device_type ||
+          "dlna";
+        if (!["agent", "bluetooth"].includes(deviceType)) {
+          refData.connectedDeviceList.value = [];
+          return;
+        }
+
         try {
           refData.loading.value = true;
-          const rsp = await bluetoothAction("paired", "GET");
-          if (rsp.code === 0) {
-            refData.connectedDeviceList.value = rsp.data || [];
+          let rspData = null;
+          if (deviceType === "agent") {
+            const rsp = await axios.get(getApiUrl() + "/agent/paired");
+            rspData = rsp.data;
           } else {
-            ElMessage.error(rsp.msg || "获取蓝牙设备失败");
+            rspData = await bluetoothAction("paired", "GET");
+          }
+
+          if (rspData.code === 0) {
+            refData.connectedDeviceList.value = rspData.data || [];
+          } else {
+            ElMessage.error(rspData.msg || "获取设备失败");
           }
         } catch (error) {
-          console.error("获取蓝牙设备失败:", error);
-          ElMessage.error("获取蓝牙设备失败");
+          console.error("获取设备失败:", error);
+          ElMessage.error("获取设备失败");
         } finally {
           refData.loading.value = false;
         }
@@ -989,50 +1008,54 @@ async function createComponent() {
       const handleUpdatePlaylistDeviceType = async (deviceType) => {
         if (!refData.playlistStatus.value) return;
 
-        // 验证设备类型值
         const validDeviceTypes = ["agent", "dlna", "bluetooth"];
         if (!validDeviceTypes.includes(deviceType)) {
           ElMessage.error(`无效的设备类型: ${deviceType}`);
           return;
         }
 
-        await updateActivePlaylistData((playlistInfo) => {
-          if (!playlistInfo.device) {
-            playlistInfo.device = { address: playlistInfo.device_address || "", type: deviceType };
-          } else {
-            playlistInfo.device.type = deviceType;
-            playlistInfo.device.address =
-              playlistInfo.device.address || playlistInfo.device_address || "";
-          }
-          playlistInfo.device_type = deviceType;
-          playlistInfo.device_address =
-            playlistInfo.device.address || playlistInfo.device_address || "";
-          return playlistInfo;
-        });
+        pendingDeviceType.value = deviceType;
+        const status = refData.playlistStatus.value;
+        status.device_type = deviceType;
+        if (!status.device) {
+          status.device = { type: deviceType, address: "", name: null };
+        } else {
+          status.device.type = deviceType;
+        }
+
+        await refreshConnectedList();
       };
 
       // 更新播放列表的设备地址
       const handleUpdatePlaylistDeviceAddress = async (address, name = null) => {
         if (!refData.playlistStatus.value) return;
         await updateActivePlaylistData((playlistInfo) => {
+          const finalType =
+            pendingDeviceType.value ||
+            playlistInfo.device?.type ||
+            playlistInfo.device_type ||
+            "dlna";
+
           if (!playlistInfo.device) {
-            playlistInfo.device = { address: "", type: playlistInfo.device_type || "", name: null };
+            playlistInfo.device = { address: "", type: finalType, name: null };
           }
+          playlistInfo.device.type = finalType;
           playlistInfo.device.address = address;
           if (name !== null) {
             playlistInfo.device.name = name;
           }
           playlistInfo.device_address = address;
+          playlistInfo.device_type = finalType;
           return playlistInfo;
         });
+        pendingDeviceType.value = null;
       };
 
       // 选择蓝牙设备
       const handleSelectBluetoothDevice = async (address) => {
-        const device = refData.connectedDeviceList.value.find(d => d.address === address);
+        const device = refData.connectedDeviceList.value.find((d) => d.address === address);
         const name = device ? device.name : null;
         await handleUpdatePlaylistDeviceAddress(address, name);
-        await handleUpdatePlaylistDeviceType("bluetooth");
       };
 
       // 选择设备代理设备
@@ -1293,6 +1316,8 @@ async function createComponent() {
         if (!exists) return;
         refData.activePlaylistId.value = playlistId;
         syncActivePlaylist(refData.playlistCollection.value);
+        pendingDeviceType.value = null;
+        await refreshConnectedList();
 
         try {
           await savePlaylist();
@@ -1742,7 +1767,8 @@ async function createComponent() {
       updateFileBrowserCanNavigateUp();
 
       onMounted(async () => {
-        await Promise.all([loadPlaylist(), refreshConnectedList()]);
+        await loadPlaylist();
+        await refreshConnectedList();
       });
       return {
         ...refData,
