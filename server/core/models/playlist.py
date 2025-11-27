@@ -65,6 +65,7 @@ class PlaylistMgr:
             "device": {
                 "address": "",
                 "type": "",
+                "name": "",
             },
             "create_time": now,
             "updated_time": now,

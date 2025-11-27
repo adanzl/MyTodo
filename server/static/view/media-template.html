@@ -279,13 +279,18 @@
             
             <div>
               <div class="text-xs text-gray-600 mb-1">设备地址</div>
-              <el-input
-                :model-value="playlistStatus.device?.address || playlistStatus.device_address || ''"
-                @input="(val) => handleUpdatePlaylistDeviceAddress(val)"
-                placeholder="设备地址"
-                size="small"
-                class="w-full">
-              </el-input>
+              <div class="flex items-center gap-2">
+                <el-input
+                  :model-value="playlistStatus.device?.address || playlistStatus.device_address || ''"
+                  @input="(val) => handleUpdatePlaylistDeviceAddress(val)"
+                  placeholder="设备地址"
+                  size="small"
+                  class="flex-1">
+                </el-input>
+                <span v-if="playlistStatus.device?.name" class="text-xs text-gray-500 whitespace-nowrap">
+                  {{ playlistStatus.device.name }}
+                </span>
+              </div>
             </div>
             
           </div>
@@ -334,7 +339,7 @@
                     <el-button
                       size="small"
                       type="primary"
-                      @click="handleSelectAgentDevice(device.address)"
+                      @click="handleSelectAgentDevice(device)"
                       :disabled="device.address === (playlistStatus.device?.address || playlistStatus.device_address)">
                       选择
                     </el-button>
@@ -361,7 +366,7 @@
                     <el-button
                       size="small"
                       type="primary"
-                      @click="handleUpdatePlaylistDeviceAddress(device.location)"
+                      @click="handleUpdatePlaylistDeviceAddress(device.location, device.name)"
                       :disabled="device.location === (playlistStatus.device?.address || playlistStatus.device_address)">
                       选择
                     </el-button>

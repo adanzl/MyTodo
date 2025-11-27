@@ -72,7 +72,7 @@ async function createComponent() {
         current_index: overrides.current_index || 0,
         device_address: overrides.device_address || null,
         device_type: overrides.device_type || "dlna",
-        device: overrides.device || { type: "dlna", address: null },
+        device: overrides.device || { type: "dlna", address: null, name: null },
         schedule: overrides.schedule || { enabled: 0, cron: "", duration: 0 },
       });
 
@@ -100,7 +100,7 @@ async function createComponent() {
           current_index: currentIndex,
           device_address: item?.device_address || item?.device?.address || null,
           device_type: validDeviceType,
-          device: item?.device || { type: validDeviceType, address: item?.device_address || null },
+          device: item?.device || { type: validDeviceType, address: item?.device_address || null, name: item?.device?.name || null },
           schedule: item?.schedule || { enabled: 0, cron: "", duration: 0 },
           updatedAt: item?.updatedAt || Date.now(),
         };
@@ -199,6 +199,7 @@ async function createComponent() {
               device: {
                 address: deviceAddress,
                 type: deviceType,
+                name: item.device?.name || null,
               },
               schedule: item.schedule || { enabled: 0, cron: "", duration: 0 },
               create_time: item.create_time || _formatDateTime(),
@@ -1011,13 +1012,16 @@ async function createComponent() {
       };
 
       // 更新播放列表的设备地址
-      const handleUpdatePlaylistDeviceAddress = async (address) => {
+      const handleUpdatePlaylistDeviceAddress = async (address, name = null) => {
         if (!refData.playlistStatus.value) return;
         await updateActivePlaylistData((playlistInfo) => {
           if (!playlistInfo.device) {
-            playlistInfo.device = { address: "", type: playlistInfo.device_type || "" };
+            playlistInfo.device = { address: "", type: playlistInfo.device_type || "", name: null };
           }
           playlistInfo.device.address = address;
+          if (name !== null) {
+            playlistInfo.device.name = name;
+          }
           playlistInfo.device_address = address;
           return playlistInfo;
         });
@@ -1025,14 +1029,17 @@ async function createComponent() {
 
       // 选择蓝牙设备
       const handleSelectBluetoothDevice = async (address) => {
-        await handleUpdatePlaylistDeviceAddress(address);
+        const device = refData.connectedDeviceList.value.find(d => d.address === address);
+        const name = device ? device.name : null;
+        await handleUpdatePlaylistDeviceAddress(address, name);
         await handleUpdatePlaylistDeviceType("bluetooth");
       };
 
       // 选择设备代理设备
-      const handleSelectAgentDevice = async (address) => {
-        // 只更新设备地址，保持设备类型为 agent
-        await handleUpdatePlaylistDeviceAddress(address);
+      const handleSelectAgentDevice = async (device) => {
+        const address = typeof device === 'string' ? device : device.address;
+        const name = typeof device === 'string' ? null : device.name;
+        await handleUpdatePlaylistDeviceAddress(address, name);
       };
 
       // 格式化文件大小
