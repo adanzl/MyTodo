@@ -1094,11 +1094,6 @@ async function createComponent() {
           playlistInfo.device_address = playlistInfo.device.address || playlistInfo.device_address || "";
           return playlistInfo;
         });
-        
-        // 如果是 DLNA 类型，自动扫描设备
-        if (deviceType === "dlna") {
-          await scanDlnaDevices();
-        }
       };
 
       // 更新播放列表的设备地址
@@ -1186,19 +1181,32 @@ async function createComponent() {
       // 播放播放列表
       const handlePlayPlaylist = async () => {
         const status = refData.playlistStatus.value;
-        if (!status || !status.playlist || status.playlist.length === 0) {
+        if (!status || !status.id) {
+          ElMessage.warning("播放列表不存在");
+          return;
+        }
+        if (!status.playlist || status.playlist.length === 0) {
           ElMessage.warning("播放列表为空，请先添加文件");
           return;
         }
         try {
           refData.playing.value = true;
+          
+          // 先更新本地状态，确保索引有效
           await updateActivePlaylistData((playlistInfo) => {
             const list = Array.isArray(playlistInfo.playlist) ? playlistInfo.playlist : [];
             playlistInfo.current_index = Math.max(0, Math.min(playlistInfo.current_index || 0, list.length - 1));
             playlistInfo.total = list.length;
             return playlistInfo;
           });
-          ElMessage.success("播放状态已保存");
+          
+          // 调用后端播放接口，实际开始播放
+          const response = await playlistAction("play", "POST", { id: status.id });
+          if (response.code !== 0) {
+            throw new Error(response.msg || "播放失败");
+          }
+          
+          ElMessage.success("开始播放");
         } catch (error) {
           console.error("播放失败:", error);
           ElMessage.error("播放失败: " + (error.message || "未知错误"));
@@ -1210,20 +1218,26 @@ async function createComponent() {
       // 播放下一首
       const handlePlayNext = async () => {
         const status = refData.playlistStatus.value;
-        if (!status || !status.playlist || status.playlist.length === 0) {
+        if (!status || !status.id) {
+          ElMessage.warning("播放列表不存在");
+          return;
+        }
+        if (!status.playlist || status.playlist.length === 0) {
           ElMessage.warning("播放列表为空，无法播放下一首");
           return;
         }
         try {
           refData.playing.value = true;
-          await updateActivePlaylistData((playlistInfo) => {
-            const list = Array.isArray(playlistInfo.playlist) ? playlistInfo.playlist : [];
-            if (list.length === 0) return playlistInfo;
-            const nextIndex = (playlistInfo.current_index + 1) % list.length;
-            playlistInfo.current_index = nextIndex;
-            playlistInfo.total = list.length;
-            return playlistInfo;
-          });
+          
+          // 调用后端播放下一首接口
+          const response = await playlistAction("playNext", "POST", { id: status.id });
+          if (response.code !== 0) {
+            throw new Error(response.msg || "播放下一首失败");
+          }
+          
+          // 刷新播放列表状态以更新索引
+          await refreshPlaylistStatus();
+          
           ElMessage.success("已切换到下一首");
         } catch (error) {
           console.error("播放下一首失败:", error);
@@ -1236,17 +1250,23 @@ async function createComponent() {
       // 停止播放列表
       const handleStopPlaylist = async () => {
         const status = refData.playlistStatus.value;
-        if (!status || !status.playlist || status.playlist.length === 0) {
-          ElMessage.warning("播放列表为空");
+        if (!status || !status.id) {
+          ElMessage.warning("播放列表不存在");
           return;
         }
         try {
           refData.stopping.value = true;
-          await updateActivePlaylistData((playlistInfo) => {
-            playlistInfo.current_index = 0;
-            return playlistInfo;
-          });
-          ElMessage.success("播放状态已停止（本地记录）");
+          
+          // 调用后端停止播放接口
+          const response = await playlistAction("stop", "POST", { id: status.id });
+          if (response.code !== 0) {
+            throw new Error(response.msg || "停止播放失败");
+          }
+          
+          // 刷新播放列表状态
+          await refreshPlaylistStatus();
+          
+          ElMessage.success("已停止播放");
         } catch (error) {
           console.error("停止播放列表失败:", error);
           ElMessage.error("停止播放列表失败: " + (error.message || "未知错误"));
@@ -1378,12 +1398,6 @@ async function createComponent() {
         if (!exists) return;
         refData.activePlaylistId.value = playlistId;
         syncActivePlaylist(refData.playlistCollection.value);
-        
-        // 如果选中的播放列表设备类型是 DLNA，自动扫描设备
-        const playlist = refData.playlistStatus.value;
-        if (playlist && (playlist.device?.type === 'dlna' || playlist.device_type === 'dlna')) {
-          await scanDlnaDevices();
-        }
         
         try {
           await savePlaylist();

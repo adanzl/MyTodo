@@ -90,9 +90,9 @@ def playlist_play_next():
         id = args.get("id")
         if id is None:
             return _err("id is required")
-        ret = playlist_mgr.play_next(id)
+        ret, msg = playlist_mgr.play_next(id)
         if ret != 0:
-            return _err(f"播放下一首失败")
+            return _err(f"播放下一首失败: {msg}")
         return _ok()
     except Exception as e:
         log.error(f"[PLAYLIST] PlayNext error: {e}")

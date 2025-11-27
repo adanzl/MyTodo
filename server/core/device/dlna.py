@@ -188,18 +188,6 @@ class DlnaDev:
             except Exception as e:
                 log.error(f"[DlnaDev] Failed to set URI: {e}")
                 return -1, f"Failed to set URI: {str(e)}"
-            asyncio.sleep(1)
-            # 设置播放模式为 NORMAL（禁用单曲循环）
-            # 注意：在设置 URI 之后、播放之前设置播放模式，这样更可靠
-            try:
-                if hasattr(av_transport, 'SetPlayMode'):
-                    av_transport.SetPlayMode(InstanceID=0, NewPlayMode='NORMAL')
-                    log.info(f"[DlnaDev] Set play mode to NORMAL (disable repeat)")
-                else:
-                    log.info(f"[DlnaDev] SetPlayMode not available, device may not support it")
-            except Exception as e:
-                # SetPlayMode 是可选的，某些设备可能不支持，不影响播放
-                log.warning(f"[DlnaDev] SetPlayMode failed (may not be supported): {e}")
 
             # 开始播放
             try:
@@ -208,14 +196,6 @@ class DlnaDev:
             except Exception as e:
                 log.error(f"[DlnaDev] Failed to play: {e}")
                 return -1, f"播放失败: {str(e)}"
-
-            # 播放后再次设置播放模式（某些设备需要在播放后设置才生效）
-            try:
-                if hasattr(av_transport, 'SetPlayMode'):
-                    av_transport.SetPlayMode(InstanceID=0, NewPlayMode='NORMAL')
-                    log.debug(f"[DlnaDev] Set play mode to NORMAL after play (disable repeat)")
-            except Exception as e:
-                log.debug(f"[DlnaDev] SetPlayMode after play failed: {e}")
 
             return 0, "播放成功"
         except Exception as e:
@@ -287,7 +267,7 @@ class DlnaDev:
                     "transport_status": transport_status,  # OK, ERROR_OCCURRED, etc.
                     "speed": speed
                 }
-                log.info(f"[DlnaDev] Transport info: {json.dumps(info)}")
+                # log.info(f"[DlnaDev] Transport info: {json.dumps(info)}")
                 return 0, info
             except Exception as e:
                 log.error(f"[DlnaDev] Failed to get transport info: {e}")

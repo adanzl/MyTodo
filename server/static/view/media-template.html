@@ -26,19 +26,17 @@
         <div 
           v-for="playlist in playlistCollection" 
           :key="playlist.id"
-          class="border rounded px-3 py-2 cursor-pointer flex items-center gap-2 hover:bg-gray-50 group"
+          class="border rounded px-3 py-2 cursor-pointer hover:bg-gray-50 group min-h-[60px] flex flex-col justify-between"
           :class="{ 'border-blue-500 bg-blue-50': playlist.id === activePlaylistId }"
           @click="handleSelectPlaylist(playlist.id)">
-          <div class="flex-1 min-w-0">
-            <div v-if="editingPlaylistId !== playlist.id" class="flex items-center gap-2 group/name">
-              <div class="text-sm font-medium truncate flex-1 cursor-text" 
+          <!-- 第一行：名称、曲目数量、功能按钮 -->
+          <div class="flex items-center justify-between gap-2">
+            <div v-if="editingPlaylistId !== playlist.id" class="flex items-center gap-2 flex-1 min-w-0 group/name">
+              <div class="text-sm font-medium truncate cursor-text" 
                    @click.stop="handleStartEditPlaylistName(playlist.id)"
                    title="点击编辑名称">
                 {{ playlist.name }}
               </div>
-              <span class="text-xs text-gray-500 whitespace-nowrap">
-                曲目: {{ (playlist.playlist && playlist.playlist.length) || 0 }}
-              </span>
               <el-button
                 type="primary"
                 size="small"
@@ -49,7 +47,7 @@
                 ✎
               </el-button>
             </div>
-            <div v-else class="flex items-center gap-2">
+            <div v-else class="flex items-center gap-2 flex-1 min-w-0">
               <el-input
                 :model-value="editingPlaylistName"
                 @input="(val) => editingPlaylistName = val"
@@ -61,24 +59,31 @@
                 :data-playlist-id="playlist.id"
                 @click.stop>
               </el-input>
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
               <span class="text-xs text-gray-500 whitespace-nowrap">
                 曲目: {{ (playlist.playlist && playlist.playlist.length) || 0 }}
               </span>
-            </div>
-            <div v-if="getPlaylistNextCronTime(playlist)" class="text-[10px] text-blue-600 mt-0.5">
-              下次运行: {{ getPlaylistNextCronTime(playlist) }}
+              <div class="flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <el-button
+                  v-if="playlistCollection.length > 1"
+                  type="danger"
+                  size="small"
+                  circle
+                  class="!w-5 !h-5 !min-w-5 !p-0 text-xs"
+                  @click.stop="handleDeletePlaylistGroup(playlist.id)"
+                  title="删除">
+                  ×
+                </el-button>
+              </div>
             </div>
           </div>
-          <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <el-button
-              v-if="playlistCollection.length > 1"
-              type="danger"
-              size="small"
-              circle
-              @click.stop="handleDeletePlaylistGroup(playlist.id)"
-              title="删除">
-              ×
-            </el-button>
+          <!-- 第二行：下次运行时间（始终存在，保持固定高度） -->
+          <div class="text-[10px] text-blue-600 min-h-[14px]">
+            <span v-if="getPlaylistNextCronTime(playlist)">
+              下次运行: {{ getPlaylistNextCronTime(playlist) }}
+            </span>
+            <span v-else class="invisible">占位</span>
           </div>
         </div>
       </div>
