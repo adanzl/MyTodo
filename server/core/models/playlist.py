@@ -95,6 +95,28 @@ class PlaylistMgr:
         self._refresh_device_map()
         return 0
 
+    def reload(self) -> int:
+        """
+        重新从 RDS 中加载 playlist 数据
+        """
+        try:
+            raw = rds_mgr.get(PLAYLIST_RDS_FULL_KEY)
+            if raw:
+                try:
+                    self.playlist_raw = json.loads(raw.decode("utf-8"))
+                    self._refresh_device_map()
+                except (ValueError, AttributeError) as e:
+                    log.error(f"[PlaylistMgr] Reload error: {e}")
+                    self.playlist_raw = {}
+                    self._refresh_device_map()
+            else:
+                self.playlist_raw = {}
+                self._refresh_device_map()
+            return 0
+        except Exception as e:
+            log.error(f"[PlaylistMgr] Reload error: {e}")
+            return -1
+
     def _refresh_device_map(self):
         """刷新设备映射和定时任务"""
         self.device_map = {}

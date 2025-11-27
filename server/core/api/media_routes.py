@@ -118,6 +118,22 @@ def playlist_stop():
         return _err(f'error: {str(e)}')
 
 
+@media_bp.route("/playlist/reload", methods=['POST'])
+def playlist_reload():
+    """
+    重新从 RDS 中加载 playlist 数据
+    """
+    try:
+        log.info("===== [Playlist Reload]")
+        ret = playlist_mgr.reload()
+        if ret != 0:
+            return _err("重新加载播放列表失败")
+        return _ok()
+    except Exception as e:
+        log.error(f"[PLAYLIST] Reload error: {e}")
+        return _err(f'error: {str(e)}')
+
+
 # ========== 媒体文件服务接口（用于 DLNA 播放）==========
 def _get_media_server_url():
     """获取媒体文件服务器的完整URL"""
