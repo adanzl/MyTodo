@@ -136,7 +136,10 @@ class PlaylistMgr:
         
         success = scheduler.add_cron_job(func=cron_play_task, job_id=job_id, cron_expression=cron_expression)
         if success:
-            log.info(f"[PlaylistMgr] 创建定时任务成功: {playlist_id}, cron: {cron_expression}")
+            playlist_name = playlist_data.get("name", "未知播放列表")
+            job = scheduler.get_job(job_id)
+            next_run_time = job.next_run_time.strftime("%Y-%m-%d %H:%M:%S") if job and job.next_run_time else "未知"
+            log.info(f"[PlaylistMgr] 创建定时任务成功: {playlist_id}, 名称: {playlist_name}, cron: {cron_expression}, 下次触发时间: {next_run_time}")
         else:
             log.error(f"[PlaylistMgr] 创建定时任务失败: {playlist_id}, cron: {cron_expression}")
     

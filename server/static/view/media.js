@@ -1318,12 +1318,6 @@ async function createComponent() {
         syncActivePlaylist(refData.playlistCollection.value);
         pendingDeviceType.value = null;
         await refreshConnectedList();
-
-        try {
-          await savePlaylist();
-        } catch (error) {
-          console.error("切换播放列表失败:", error);
-        }
       };
 
       // 开始编辑播放列表名称
