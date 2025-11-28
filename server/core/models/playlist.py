@@ -109,20 +109,20 @@ class PlaylistMgr:
                 self.device_map[p_id] = _create_device(playlist_data.get("device", {}))
                 self._refresh_cron_job(p_id, playlist_data)
         self._cleanup_orphaned_cron_jobs()
-    
+
     def _refresh_cron_job(self, playlist_id: str, playlist_data: Dict[str, Any]):
         scheduler = get_scheduler()
         job_id = f"playlist_cron_{playlist_id}"
         schedule = playlist_data.get("schedule", {})
         enabled = schedule.get("enabled", 0)
         cron_expression = schedule.get("cron", "").strip()
-        
+
         if scheduler.get_job(job_id):
             scheduler.remove_job(job_id)
-        
+
         if enabled != 1 or not cron_expression:
             return
-        
+
         def cron_play_task(pid=playlist_id):
             try:
                 code, msg = self.play(pid)
@@ -133,27 +133,27 @@ class PlaylistMgr:
                     log.error(f"[PlaylistMgr] 定时任务播放失败: {pid}, {msg}")
             except Exception as e:
                 log.error(f"[PlaylistMgr] 定时任务执行异常: {pid}, {e}")
-        
+
         success = scheduler.add_cron_job(func=cron_play_task, job_id=job_id, cron_expression=cron_expression)
+        playlist_name = playlist_data.get("name", "未知播放列表")
         if success:
-            playlist_name = playlist_data.get("name", "未知播放列表")
             job = scheduler.get_job(job_id)
             next_run_time = job.next_run_time.strftime("%Y-%m-%d %H:%M:%S") if job and job.next_run_time else "未知"
-            log.info(f"[PlaylistMgr] 创建定时任务成功: {playlist_id}, 名称: {playlist_name}, cron: {cron_expression}, 下次触发时间: {next_run_time}")
+            log.info(f"[PlaylistMgr] 创建定时任务成功: {playlist_id}, {playlist_name}, cron: {cron_expression}")
         else:
-            log.error(f"[PlaylistMgr] 创建定时任务失败: {playlist_id}, cron: {cron_expression}")
-    
+            log.error(f"[PlaylistMgr] 创建定时任务失败: {playlist_id}, {playlist_name}, cron: {cron_expression}")
+
     def _cleanup_orphaned_cron_jobs(self):
         scheduler = get_scheduler()
         playlist_ids = set(self.playlist_raw.keys() if self.playlist_raw else [])
-        
+
         for job in scheduler.get_all_jobs():
             if job.id.startswith("playlist_cron_"):
                 playlist_id = job.id.replace("playlist_cron_", "", 1)
                 if playlist_id not in playlist_ids:
                     scheduler.remove_job(job.id)
                     log.info(f"[PlaylistMgr] 清理孤立的定时任务: {job.id}")
-        
+
         for playlist_id in list(self._scheduled_play_start_times.keys()):
             if playlist_id not in playlist_ids:
                 del self._scheduled_play_start_times[playlist_id]
@@ -174,7 +174,7 @@ class PlaylistMgr:
         playlist_data, code, msg = self._validate_playlist(id)
         if code != 0:
             return code, msg
-        
+
         files = playlist_data.get("files", [])
         current_index = playlist_data.get("current_index", 0)
         if current_index < 0 or current_index >= len(files):
@@ -183,7 +183,7 @@ class PlaylistMgr:
         file_path = _get_file_uri(files[current_index])
         if not file_path:
             return -1, "文件路径无效"
-        
+
         device = self.device_map[id]["obj"]
         code, msg = device.play(file_path)
         if code != 0:
@@ -197,12 +197,12 @@ class PlaylistMgr:
         playlist_data, code, msg = self._validate_playlist(id)
         if code != 0:
             return code, msg
-        
+
         files = playlist_data.get("files", [])
         playlist_data["current_index"] = new_index % len(files)
         playlist_data["updated_time"] = _TS()
         rds_mgr.set(PLAYLIST_RDS_FULL_KEY, json.dumps(self.playlist_raw, ensure_ascii=False))
-        
+
         code, msg = self.play(id)
         return (0, "播放成功") if code == 0 else (-1, msg)
 
@@ -230,7 +230,7 @@ class PlaylistMgr:
 
         # 停止轮询
         self._stop_polling(id)
-        
+
         # 清除定时任务触发的播放开始时间记录
         if id in self._scheduled_play_start_times:
             del self._scheduled_play_start_times[id]
@@ -249,7 +249,7 @@ class PlaylistMgr:
             return
         if device.get_transport_info()[0] != 0:
             return
-        
+
         def poll_task():
             if id not in self._polling_playlists:
                 return
