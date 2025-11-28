@@ -79,7 +79,11 @@ async function createComponent() {
 
       const normalizePlaylistItem = (item, fallbackName = "播放列表") => {
         const playlist = Array.isArray(item?.playlist) ? [...item.playlist] : [];
-        let currentIndex = typeof item?.current_index === "number" ? item.current_index : 0;
+        let currentIndex = typeof item?.current_index === "number" 
+          ? item.current_index 
+          : (item?.current_index !== undefined && item?.current_index !== null 
+              ? parseInt(item.current_index, 10) || 0 
+              : 0);
         if (playlist.length === 0) {
           currentIndex = 0;
         } else {
@@ -140,6 +144,26 @@ async function createComponent() {
         return { playlists: [defaultPlaylist], activePlaylistId: defaultPlaylist.id };
       };
 
+      // 保存/恢复选中的播放列表ID
+      const saveActivePlaylistId = (playlistId) => {
+        try {
+          if (playlistId) {
+            localStorage.setItem('active_playlist_id', playlistId);
+          }
+        } catch (error) {
+          console.warn("保存选中播放列表ID失败:", error);
+        }
+      };
+
+      const restoreActivePlaylistId = () => {
+        try {
+          return localStorage.getItem('active_playlist_id');
+        } catch (error) {
+          console.warn("恢复选中播放列表ID失败:", error);
+        }
+        return null;
+      };
+
       const syncActivePlaylist = (collection) => {
         const list = Array.isArray(collection) ? collection : refData.playlistCollection.value;
         if (!list || list.length === 0) {
@@ -148,15 +172,29 @@ async function createComponent() {
           return;
         }
         let activeId = refData.activePlaylistId.value;
-        let active = list.find((item) => item.id === activeId);
-        if (!active) {
-          active = list[0];
-          activeId = active.id;
-        }
+        const active = list.find((item) => item.id === activeId) || list[0];
+        activeId = active.id;
         refData.activePlaylistId.value = activeId;
+        
+        // 确保 current_index 是数字类型，直接使用 API 返回的值
+        let currentIndex = typeof active.current_index === "number" 
+          ? active.current_index 
+          : (active.current_index !== undefined && active.current_index !== null 
+              ? parseInt(active.current_index, 10) || 0 
+              : 0);
+        
+        // 确保 current_index 在有效范围内
+        if (active.playlist && active.playlist.length > 0) {
+          if (currentIndex < 0) currentIndex = 0;
+          if (currentIndex >= active.playlist.length) currentIndex = active.playlist.length - 1;
+        } else {
+          currentIndex = 0;
+        }
+        
         refData.playlistStatus.value = {
           ...active,
           playlist: [...(active.playlist || [])],
+          current_index: currentIndex,
         };
       };
 
@@ -257,7 +295,11 @@ async function createComponent() {
               id: item.id,
               name: item.name || "默认播放列表",
               playlist: normalizedFiles,
-              current_index: item.current_index || 0,
+              current_index: typeof item.current_index === "number" 
+                ? item.current_index 
+                : (item.current_index !== undefined && item.current_index !== null 
+                    ? parseInt(item.current_index, 10) || 0 
+                    : 0),
             device_address: item.device?.address || item.device_address || null,
             device_type: item.device?.type || item.device_type || "dlna",
             device: item.device || {
@@ -344,14 +386,30 @@ async function createComponent() {
           const parsed = transformApiDataToPlaylistFormat(response.data);
           const normalized = normalizePlaylistCollection(parsed);
           refData.playlistCollection.value = normalized.playlists;
-          refData.activePlaylistId.value = normalized.activePlaylistId;
+          
+          // 从 localStorage 恢复选中的播放列表ID
+          const savedPlaylistId = restoreActivePlaylistId();
+          if (savedPlaylistId && normalized.playlists.some(p => p.id === savedPlaylistId)) {
+            refData.activePlaylistId.value = savedPlaylistId;
+          } else {
+            refData.activePlaylistId.value = normalized.activePlaylistId;
+          }
+          
           syncActivePlaylist(normalized.playlists);
           return normalized;
         } catch (error) {
           console.error("从接口加载播放列表失败:", error);
           const fallback = normalizePlaylistCollection(null);
           refData.playlistCollection.value = fallback.playlists;
-          refData.activePlaylistId.value = fallback.activePlaylistId;
+          
+          // 从 localStorage 恢复选中的播放列表ID
+          const savedPlaylistId = restoreActivePlaylistId();
+          if (savedPlaylistId && fallback.playlists.some(p => p.id === savedPlaylistId)) {
+            refData.activePlaylistId.value = savedPlaylistId;
+          } else {
+            refData.activePlaylistId.value = fallback.activePlaylistId;
+          }
+          
           syncActivePlaylist(fallback.playlists);
           return fallback;
         }
@@ -381,6 +439,7 @@ async function createComponent() {
           }) || currentItem;
         collection[index] = normalizePlaylistItem(updatedItem, currentItem.name);
         refData.playlistCollection.value = collection;
+        
         await savePlaylist(collection);
         syncActivePlaylist(collection);
         return refData.playlistStatus.value;
@@ -1143,13 +1202,11 @@ async function createComponent() {
           refData.playing.value = true;
           await updateActivePlaylistData((playlistInfo) => {
             const list = Array.isArray(playlistInfo.playlist) ? playlistInfo.playlist : [];
-            playlistInfo.current_index = Math.max(
-              0,
-              Math.min(playlistInfo.current_index || 0, list.length - 1)
-            );
+            playlistInfo.current_index = Math.max(0, Math.min(playlistInfo.current_index || 0, list.length - 1));
             playlistInfo.total = list.length;
             return playlistInfo;
           });
+          
           const response = await playlistAction("play", "POST", { id: status.id });
           if (response.code !== 0) {
             throw new Error(response.msg || "播放失败");
@@ -1348,7 +1405,9 @@ async function createComponent() {
         if (!playlistId || playlistId === refData.activePlaylistId.value) return;
         const exists = refData.playlistCollection.value.find((item) => item.id === playlistId);
         if (!exists) return;
+        
         refData.activePlaylistId.value = playlistId;
+        saveActivePlaylistId(playlistId); // 保存选中的播放列表ID
         syncActivePlaylist(refData.playlistCollection.value);
         pendingDeviceType.value = null;
         await refreshConnectedList();
@@ -1494,6 +1553,7 @@ async function createComponent() {
           const updated = [...refData.playlistCollection.value, newPlaylist];
           refData.playlistCollection.value = updated;
           refData.activePlaylistId.value = newPlaylist.id;
+          saveActivePlaylistId(newPlaylist.id); // 保存新创建的播放列表ID
           syncActivePlaylist(updated);
           await savePlaylist(updated);
           ElMessage.success("播放列表已创建");
@@ -1520,9 +1580,20 @@ async function createComponent() {
           });
           const updated = refData.playlistCollection.value.filter((item) => item.id !== playlistId);
           refData.playlistCollection.value = updated;
-          if (playlistId === refData.activePlaylistId.value) {
-            refData.activePlaylistId.value = updated[0]?.id || "";
+          
+          // 如果删除的是当前选中的播放列表，切换到第一个
+          if (playlistId === refData.activePlaylistId.value && updated.length > 0) {
+            refData.activePlaylistId.value = updated[0].id;
+            saveActivePlaylistId(updated[0].id);
           }
+          
+          // 清理已删除播放列表的localStorage数据
+          try {
+            localStorage.removeItem(`playlist_index_${playlistId}`);
+          } catch (e) {
+            console.warn("清理播放列表索引失败:", e);
+          }
+          
           syncActivePlaylist(updated);
           await savePlaylist(updated);
           ElMessage.success("播放列表已删除");

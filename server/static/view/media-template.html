@@ -123,7 +123,7 @@
             :loading="playing"
             :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0"
             title="播放">
-            ▶
+            <span v-if="!playing">▶</span>
           </el-button>
           <el-button 
             type="info" 
@@ -133,7 +133,7 @@
             :loading="playing"
             :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0"
             title="下一首">
-            ⏭
+            <span v-if="!playing">⏭</span>
           </el-button>
           <el-button 
             type="danger" 
@@ -142,7 +142,7 @@
             @click="handleStopPlaylist" 
             :loading="stopping"
             title="停止">
-            ⏹
+            <span v-if="!stopping">⏹</span>
           </el-button>
           <el-button 
             type="warning" 
@@ -166,7 +166,7 @@
             <span class="text-xs text-gray-500 w-8">{{ index + 1 }}</span>
             <span 
               class="flex-1 text-sm truncate"
-              :class="{ 'font-semibold text-blue-600': index === playlistStatus.current_index }"
+              :class="{ 'text-blue-600': index === playlistStatus.current_index }"
               :title="typeof file === 'string' ? file : file.uri">
               {{ (typeof file === 'string' ? file : file.uri || '').split('/').pop() || (typeof file === 'string' ? file : file.uri || '') }}
               <span v-if="typeof file === 'object' && file.duration" class="text-xs text-gray-400 ml-2">
