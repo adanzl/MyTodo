@@ -138,6 +138,13 @@
             :loading="stopping">
             停止
           </el-button>
+          <el-button 
+            type="warning" 
+            size="small" 
+            @click="handleClearPlaylist" 
+            :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0 || playlistLoading">
+            清空列表
+          </el-button>
         </div>
       </div>
 

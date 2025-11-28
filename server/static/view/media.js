@@ -1310,6 +1310,40 @@ async function createComponent() {
         }
       };
 
+      // 清空播放列表
+      const handleClearPlaylist = async () => {
+        const status = refData.playlistStatus.value;
+        if (!status || !status.playlist || status.playlist.length === 0) return;
+
+        try {
+          await ElMessageBox.confirm(
+            `确定要清空播放列表 "${status.name}" 吗？此操作将删除所有 ${status.playlist.length} 个文件。`,
+            "确认清空",
+            {
+              confirmButtonText: "确定",
+              cancelButtonText: "取消",
+              type: "warning",
+            }
+          );
+
+          refData.playlistLoading.value = true;
+          await updateActivePlaylistData((playlistInfo) => {
+            playlistInfo.playlist = [];
+            playlistInfo.total = 0;
+            playlistInfo.current_index = 0;
+            return playlistInfo;
+          });
+          ElMessage.success("已清空播放列表");
+        } catch (error) {
+          if (error !== "cancel") {
+            console.error("清空失败:", error);
+            ElMessage.error("清空失败: " + (error.message || "未知错误"));
+          }
+        } finally {
+          refData.playlistLoading.value = false;
+        }
+      };
+
       const handleSelectPlaylist = async (playlistId) => {
         if (!playlistId || playlistId === refData.activePlaylistId.value) return;
         const exists = refData.playlistCollection.value.find((item) => item.id === playlistId);
@@ -1728,6 +1762,7 @@ async function createComponent() {
         handleMovePlaylistItemUp,
         handleMovePlaylistItemDown,
         handleDeletePlaylistItem,
+        handleClearPlaylist,
         handleSelectPlaylist,
         handleCreatePlaylist,
         handleDeletePlaylistGroup,

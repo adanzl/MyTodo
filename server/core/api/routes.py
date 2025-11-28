@@ -7,6 +7,7 @@ from core.ai.ai_local import AILocal
 import random
 import os
 import re
+import subprocess
 import urllib.parse
 
 log = root_logger()
@@ -414,17 +415,27 @@ def list_directory():
                 name = item["name"]
                 is_dir = item["isDirectory"]
                 
-                # 提取文件名中的所有数字
-                numbers = re.findall(r'\d+', name)
-                has_numbers = len(numbers) > 0
+                # 优先查找 "Track" 后面的数字（不区分大小写）
+                track_match = re.search(r'track\s+(\d+)', name, re.IGNORECASE)
+                if track_match:
+                    # 如果找到 Track 数字，使用它作为主要排序键
+                    track_number = int(track_match.group(1))
+                    has_track = True
+                else:
+                    track_number = float('inf')
+                    has_track = False
                 
-                # 返回排序键：(是否目录, 是否有数字, 数字列表, 文件名小写)
-                # 目录排在前面，然后有数字的文件按数字排序，没有数字的文件按字符串排序并排在最后
-                # 使用 [float('inf')] 确保没有数字的文件排在所有有数字的文件后面
+                # 提取文件名中的所有数字（用于次要排序）
+                all_numbers = re.findall(r'\d+', name)
+                has_numbers = len(all_numbers) > 0
+                
+                # 返回排序键：(是否目录, 是否有Track数字, Track数字, 所有数字列表, 文件名小写)
+                # 目录排在前面，然后有Track数字的文件按Track数字排序，没有Track数字的文件按所有数字排序，最后按文件名排序
                 return (
                     not is_dir,  # False (目录) 排在 True (文件) 前面
-                    not has_numbers,  # False (有数字) 排在 True (无数字) 前面，这样有数字的文件会先排序
-                    [int(n) for n in numbers] if numbers else [float('inf')],  # 数字列表用于自然排序，无数字的用无穷大排在最后
+                    not has_track,  # False (有Track数字) 排在 True (无Track数字) 前面
+                    track_number,  # Track 数字（主要排序键）
+                    [int(n) for n in all_numbers] if all_numbers else [],  # 所有数字列表（次要排序键）
                     name.lower()  # 字符串部分用于最终排序
                 )
             
@@ -457,3 +468,112 @@ def list_directory():
     except Exception as e:
         log.error(e)
         return {"code": -1, "msg": 'error: ' + str(e)}
+
+
+def get_media_duration(file_path):
+    """
+    使用 ffprobe 获取媒体文件的时长
+    :param file_path: 文件路径
+    :return: 时长（秒），如果失败返回 None
+    """
+    try:
+        result = subprocess.run([
+            '/usr/bin/ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of',
+            'default=noprint_wrappers=1:nokey=1', file_path
+        ],
+                                capture_output=True,
+                                text=True,
+                                timeout=5)
+        if result.returncode == 0 and result.stdout.strip():
+            duration = float(result.stdout.strip())
+            return int(duration) if duration else None
+    except (FileNotFoundError, subprocess.TimeoutExpired, ValueError) as e:
+        log.warning(f"Failed to get media duration with ffprobe: {e}")
+    except Exception as e:
+        log.warning(f"Error getting media duration: {e}")
+    return None
+
+
+@api_bp.route("/getFileInfo", methods=['GET'])
+def get_file_info():
+    """
+    获取文件信息接口
+    如果是媒体文件，使用 ffprobe 获取时长
+    """
+    try:
+        file_path = request.args.get('path', '')
+        if not file_path:
+            return {"code": -1, "msg": "文件路径不能为空"}
+
+        # URL 解码
+        while '%' in file_path:
+            try:
+                decoded = urllib.parse.unquote(file_path)
+                if decoded == file_path:
+                    break
+                file_path = decoded
+            except Exception:
+                break
+
+        # 安全检查：防止路径遍历
+        if '..' in file_path.split('/') or file_path.startswith('~'):
+            return {"code": -1, "msg": "Invalid path: Path traversal not allowed"}
+
+        # 处理相对路径
+        default_base_dir = '/mnt'
+        if not os.path.isabs(file_path):
+            file_path = os.path.join(default_base_dir, file_path.lstrip('/'))
+            file_path = os.path.abspath(file_path)
+        else:
+            file_path = os.path.abspath(file_path)
+
+        # 检查路径是否在允许的目录内
+        if not file_path.startswith('/mnt'):
+            log.warning(f"Path {file_path} is outside allowed directory /mnt")
+            return {"code": -1, "msg": "文件路径不在允许的目录内"}
+
+        # 检查文件是否存在
+        if not os.path.exists(file_path):
+            return {"code": -1, "msg": "文件不存在"}
+
+        if not os.path.isfile(file_path):
+            return {"code": -1, "msg": "路径不是文件"}
+
+        # 获取文件基本信息
+        stat_info = os.stat(file_path)
+        file_info = {
+            "name": os.path.basename(file_path),
+            "path": file_path,
+            "size": stat_info.st_size,
+            "modified": stat_info.st_mtime,
+            "isDirectory": False,
+        }
+
+        # 判断是否为媒体文件
+        media_extensions = {
+            '.mp3', '.wav', '.aac', '.ogg', '.m4a', '.flac', '.wma',  # 音频
+            '.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'  # 视频
+        }
+        file_ext = os.path.splitext(file_path)[1].lower()
+        is_media_file = file_ext in media_extensions
+
+        if is_media_file:
+            # 使用 ffprobe 获取媒体文件时长
+            duration = get_media_duration(file_path)
+            if duration is not None:
+                file_info["duration"] = duration
+            else:
+                file_info["duration"] = None
+        else:
+            file_info["duration"] = None
+
+        file_info["isMediaFile"] = is_media_file
+
+        return {"code": 0, "msg": "ok", "data": file_info}
+
+    except PermissionError as e:
+        log.error(f"Permission denied for {file_path}: {e}")
+        return {"code": -1, "msg": f"Permission denied: {str(e)}"}
+    except Exception as e:
+        log.error(f"Error getting file info: {e}")
+        return {"code": -1, "msg": f"Error: {str(e)}"}
