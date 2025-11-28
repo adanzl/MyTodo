@@ -320,26 +320,6 @@ def add_rds_list():
         return {"code": -1, "msg": 'error: ' + str(e)}
 
 
-def get_media_duration(file_path):
-    try:
-        import subprocess
-        result = subprocess.run([
-            '/usr/bin/ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of',
-            'default=noprint_wrappers=1:nokey=1', file_path
-        ],
-                                capture_output=True,
-                                text=True,
-                                timeout=3)
-        if result.returncode == 0 and result.stdout.strip():
-            duration = float(result.stdout.strip())
-            return int(duration) if duration else None
-    except (FileNotFoundError, subprocess.TimeoutExpired, ValueError) as e:
-        log.warning(f"Failed to get media duration with ffprobe: {e}")
-    except Exception as e:
-        log.warning(f"Error getting media duration: {e}")
-    return None
-
-
 @api_bp.route("/listDirectory", methods=['GET'])
 def list_directory():
     try:
@@ -417,12 +397,6 @@ def list_directory():
                         "accessible": True,
                     }
 
-                    # 如果是多媒体文件，获取时长
-                    if os.path.isfile(entry_path):
-                        duration = get_media_duration(entry_path)
-                        if duration is not None:
-                            item["duration"] = duration
-
                     items.append(item)
                 except (OSError, PermissionError) as e:
                     log.warning(f"Cannot access {entry_path}: {e}")
@@ -442,12 +416,15 @@ def list_directory():
                 
                 # 提取文件名中的所有数字
                 numbers = re.findall(r'\d+', name)
+                has_numbers = len(numbers) > 0
                 
-                # 返回排序键：(是否目录, 数字列表, 文件名小写)
-                # 目录排在前面，然后按数字排序，最后按字符串排序
+                # 返回排序键：(是否目录, 是否有数字, 数字列表, 文件名小写)
+                # 目录排在前面，然后有数字的文件按数字排序，没有数字的文件按字符串排序并排在最后
+                # 使用 [float('inf')] 确保没有数字的文件排在所有有数字的文件后面
                 return (
                     not is_dir,  # False (目录) 排在 True (文件) 前面
-                    [int(n) for n in numbers] if numbers else [],  # 数字列表用于自然排序
+                    not has_numbers,  # False (有数字) 排在 True (无数字) 前面，这样有数字的文件会先排序
+                    [int(n) for n in numbers] if numbers else [float('inf')],  # 数字列表用于自然排序，无数字的用无穷大排在最后
                     name.lower()  # 字符串部分用于最终排序
                 )
             
