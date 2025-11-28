@@ -10,12 +10,8 @@ from urllib.parse import urlparse
 from core.log_config import root_logger
 from core.async_utils import run_async
 
-try:
-    import upnpclient
-    from ssdpy import SSDPClient
-except ImportError:
-    upnpclient = None
-    SSDPClient = None
+import upnpclient
+from ssdpy import SSDPClient
 
 log = root_logger()
 

@@ -9,6 +9,7 @@ from core.device.agent import DeviceAgent
 from core.device.dlna import DlnaDev
 from core.log_config import root_logger
 from core.scheduler import get_scheduler
+from core.api.routes import get_media_duration
 
 log = root_logger()
 
@@ -45,7 +46,7 @@ class PlaylistMgr:
         self._scheduled_play_start_times = {}
         self.reload()
 
-    def get_playlist(self, id: str = None) -> Dict[str, Any] | None:
+    def get_playlist(self, id: str) -> Dict[str, Any] | None:
         if id is None:
             return self.playlist_raw
         return self.playlist_raw.get(id, None)
@@ -179,8 +180,19 @@ class PlaylistMgr:
             return -1, f"当前索引 {current_index} 超出范围"
 
         file_path = _get_file_uri(files[current_index])
+        
         if not file_path:
             return -1, "文件路径无效"
+
+        # 获取并更新文件时长
+       
+        duration = get_media_duration(file_path)
+        if duration is not None:
+            # 更新当前播放文件的时长
+            files[current_index] = {
+                "uri": files[current_index],
+                "duration": duration
+            }
 
         device = self.device_map[id]["obj"]
         code, msg = device.play(file_path)
