@@ -6,6 +6,7 @@ import core.db.rds_mgr as rds_mgr
 from core.ai.ai_local import AILocal
 import random
 import os
+import re
 import urllib.parse
 
 log = root_logger()
@@ -434,7 +435,23 @@ def list_directory():
                     })
                     continue
 
-            items.sort(key=lambda x: (not x["isDirectory"], x["name"].lower()))
+            # 自然排序函数：按文件名中的数字排序
+            def natural_sort_key(item):
+                name = item["name"]
+                is_dir = item["isDirectory"]
+                
+                # 提取文件名中的所有数字
+                numbers = re.findall(r'\d+', name)
+                
+                # 返回排序键：(是否目录, 数字列表, 文件名小写)
+                # 目录排在前面，然后按数字排序，最后按字符串排序
+                return (
+                    not is_dir,  # False (目录) 排在 True (文件) 前面
+                    [int(n) for n in numbers] if numbers else [],  # 数字列表用于自然排序
+                    name.lower()  # 字符串部分用于最终排序
+                )
+            
+            items.sort(key=natural_sort_key)
 
             if extensions_filter and extensions_filter != "all":
                 if extensions_filter == "audio":
