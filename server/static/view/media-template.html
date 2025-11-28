@@ -118,32 +118,40 @@
           <el-button 
             type="success" 
             size="small" 
+            circle
             @click="handlePlayPlaylist" 
             :loading="playing"
-            :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0">
-            播放
+            :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0"
+            title="播放">
+            ▶
           </el-button>
           <el-button 
             type="info" 
             size="small" 
+            circle
             @click="handlePlayNext" 
             :loading="playing"
-            :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0">
-            下一首
+            :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0"
+            title="下一首">
+            ⏭
           </el-button>
           <el-button 
             type="danger" 
             size="small" 
+            circle
             @click="handleStopPlaylist" 
-            :loading="stopping">
-            停止
+            :loading="stopping"
+            title="停止">
+            ⏹
           </el-button>
           <el-button 
             type="warning" 
             size="small" 
+            circle
             @click="handleClearPlaylist" 
-            :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0 || playlistLoading">
-            清空列表
+            :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0 || playlistLoading"
+            title="清空列表">
+            🗑
           </el-button>
         </div>
       </div>
