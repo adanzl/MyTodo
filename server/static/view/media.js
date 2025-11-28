@@ -97,6 +97,14 @@ async function createComponent() {
         const validDeviceType = ["agent", "dlna", "bluetooth"].includes(deviceType)
           ? deviceType
           : "dlna";
+        // 规范化 schedule，确保 cron 是字符串类型
+        const schedule = item?.schedule || { enabled: 0, cron: "", duration: 0 };
+        const normalizedSchedule = {
+          enabled: schedule.enabled || 0,
+          cron: (schedule.cron !== undefined && schedule.cron !== null) ? String(schedule.cron) : "",
+          duration: schedule.duration || 0,
+        };
+        
         return {
           id: item?.id || createPlaylistId(),
           name,
@@ -106,7 +114,7 @@ async function createComponent() {
           device_address: item?.device_address || item?.device?.address || null,
           device_type: validDeviceType,
           device: item?.device || { type: validDeviceType, address: item?.device_address || null, name: item?.device?.name || null },
-          schedule: item?.schedule || { enabled: 0, cron: "", duration: 0 },
+          schedule: normalizedSchedule,
           updatedAt: item?.updatedAt || Date.now(),
         };
       };
@@ -217,14 +225,13 @@ async function createComponent() {
             // 确定设备地址：优先使用 device.address，其次 device_address
             const deviceAddress = item.device?.address || item.device_address || "";
 
-            // 规范化 playlist 格式：确保是新格式 {"uri": "地址", "duration": 时长}
+            // 规范化 playlist 格式：确保是新格式 {"uri": "地址"}
             const normalizedFiles = (item.playlist || []).map((fileItem) => {
               if (typeof fileItem === "string") {
-                return { uri: fileItem, duration: null };
+                return { uri: fileItem };
               } else if (fileItem && typeof fileItem === "object") {
                 return {
                   uri: fileItem.uri || fileItem.path || fileItem.file || "",
-                  duration: fileItem.duration || null,
                 };
               }
               return null;
@@ -240,7 +247,7 @@ async function createComponent() {
                 type: deviceType,
                 name: item.device?.name || null,
               },
-              schedule: item.schedule || { enabled: 0, cron: "", duration: 0 },
+              schedule: item.schedule || { enabled: 0, cron: "" },
               create_time: item.create_time || _formatDateTime(),
               updated_time: _formatDateTime(),
             };
@@ -281,15 +288,22 @@ async function createComponent() {
             const files = item.files || [];
             const normalizedFiles = files.map((fileItem) => {
               if (typeof fileItem === "string") {
-                return { uri: fileItem, duration: null };
+                return { uri: fileItem };
               } else if (fileItem && typeof fileItem === "object") {
                 return {
                   uri: fileItem.uri || fileItem.path || fileItem.file || "",
-                  duration: fileItem.duration || null,
                 };
               }
               return null;
             }).filter((item) => item !== null);
+            
+            // 规范化 schedule，确保 cron 是字符串类型
+            const schedule = item.schedule || { enabled: 0, cron: "", duration: 0 };
+            const normalizedSchedule = {
+              enabled: schedule.enabled || 0,
+              cron: (schedule.cron !== undefined && schedule.cron !== null) ? String(schedule.cron) : "",
+              duration: schedule.duration || 0,
+            };
             
             return {
               id: item.id,
@@ -306,7 +320,7 @@ async function createComponent() {
               type: item.device_type || "dlna",
               address: item.device_address || null,
             },
-              schedule: item.schedule || { enabled: 0, cron: "", duration: 0 },
+              schedule: normalizedSchedule,
               create_time: item.create_time,
               updated_time: item.updated_time,
               updatedAt: item.updated_time ? new Date(item.updated_time).getTime() : Date.now(),
@@ -325,11 +339,10 @@ async function createComponent() {
             if (!Array.isArray(files)) return [];
             return files.map((fileItem) => {
               if (typeof fileItem === "string") {
-                return { uri: fileItem, duration: null };
+                return { uri: fileItem };
               } else if (fileItem && typeof fileItem === "object") {
                 return {
                   uri: fileItem.uri || fileItem.path || fileItem.file || "",
-                  duration: fileItem.duration || null,
                 };
               }
               return null;
@@ -591,7 +604,11 @@ async function createComponent() {
 
       const parseCronExpression = (cronExpr) => {
         try {
-          const parts = cronExpr.trim().split(/\s+/);
+          if (!cronExpr || typeof cronExpr !== 'string') {
+            resetCronBuilder();
+            return;
+          }
+          const parts = String(cronExpr).trim().split(/\s+/);
           let sec, min, hour, day, month, weekday;
 
           if (parts.length === 5) {
@@ -756,9 +773,12 @@ async function createComponent() {
         if (expr === "*") {
           return null; // null 表示匹配所有值
         }
+        if (!expr || typeof expr !== 'string') {
+          return null;
+        }
 
         const values = new Set();
-        const parts = expr.split(",");
+        const parts = String(expr).split(",");
 
         for (const part of parts) {
           const trimmed = part.trim();
@@ -797,7 +817,10 @@ async function createComponent() {
       // 计算 Cron 表达式的下 N 次执行时间
       const calculateNextCronTimes = (cronExpr, count = 3) => {
         try {
-          const parts = cronExpr.trim().split(/\s+/);
+          if (!cronExpr || typeof cronExpr !== 'string') {
+            throw new Error("Cron 表达式必须是字符串类型");
+          }
+          const parts = String(cronExpr).trim().split(/\s+/);
           if (parts.length !== 6) {
             throw new Error("Cron 表达式必须包含6个字段：秒 分 时 日 月 周");
           }
@@ -1031,17 +1054,7 @@ async function createComponent() {
         });
       };
 
-      // 更新播放列表的持续时间
-      const handleUpdatePlaylistDuration = async (duration) => {
-        if (!refData.playlistStatus.value) return;
-        await updateActivePlaylistData((playlistInfo) => {
-          if (!playlistInfo.schedule) {
-            playlistInfo.schedule = { enabled: 0, cron: "", duration: 0 };
-          }
-          playlistInfo.schedule.duration = duration || 0;
-          return playlistInfo;
-        });
-      };
+
 
       // 预览播放列表的 Cron 执行时间
       const handlePreviewPlaylistCron = () => {
@@ -1133,49 +1146,7 @@ async function createComponent() {
         return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
       };
 
-      // 格式化时长（秒转换为 HH:MM:SS 格式）
-      const formatDuration = (seconds) => {
-        if (!seconds || seconds === 0) return "-";
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        const secs = seconds % 60;
-        if (hours > 0) {
-          return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-        }
-        return `${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-      };
 
-      const getPlaylistTotalDuration = (files) => {
-        if (!Array.isArray(files) || files.length === 0) {
-          return 0;
-        }
-        return files.reduce((sum, file) => {
-          if (file && typeof file === "object" && "duration" in file) {
-            const duration = Number(file.duration);
-            if (!Number.isNaN(duration) && duration > 0) {
-              return sum + duration;
-            }
-          }
-          return sum;
-        }, 0);
-      };
-
-      // 格式化持续时间（分钟转换为可读格式）
-      const formatDurationMinutes = (minutes) => {
-        if (!minutes || minutes === 0) return "不停止";
-        const hours = Math.floor(minutes / 60);
-        const mins = minutes % 60;
-
-        const parts = [];
-        if (hours > 0) {
-          parts.push(`${hours}小时`);
-        }
-        if (mins > 0) {
-          parts.push(`${mins}分钟`);
-        }
-
-        return parts.length > 0 ? parts.join(" ") : "0分钟";
-      };
 
       const refreshPlaylistStatus = async () => {
         try {
@@ -1332,7 +1303,7 @@ async function createComponent() {
 
         const fileItem = status.playlist[index];
         const filePath = typeof fileItem === 'string' ? fileItem : (fileItem?.uri || '');
-        const fileName = filePath.split("/").pop() || filePath;
+        const fileName = (filePath ? String(filePath) : '').split("/").pop() || filePath;
 
         try {
           await ElMessageBox.confirm(`确定要删除 "${fileName}" 吗？`, "确认删除", {
@@ -1514,12 +1485,17 @@ async function createComponent() {
           !playlist ||
           !playlist.schedule ||
           playlist.schedule.enabled !== 1 ||
-          !playlist.schedule.cron
+          !playlist.schedule.cron ||
+          typeof playlist.schedule.cron !== 'string'
         ) {
           return null;
         }
         try {
-          const times = calculateNextCronTimes(playlist.schedule.cron, 1);
+          const cronExpr = String(playlist.schedule.cron).trim();
+          if (!cronExpr) {
+            return null;
+          }
+          const times = calculateNextCronTimes(cronExpr, 1);
           if (times && times.length > 0) {
             return formatDateTimeWithWeekday(times[0]);
           }
@@ -1644,7 +1620,7 @@ async function createComponent() {
       const handleFileBrowserNavigateUp = () => {
         const path = refData.fileBrowserPath.value;
         if (path && path !== "/mnt/ext_base" && path !== "/") {
-          const parts = path.split("/").filter((p) => p);
+          const parts = String(path).split("/").filter((p) => p);
           parts.pop();
           refData.fileBrowserPath.value =
             parts.length > 0 ? "/" + parts.join("/") : "/mnt/ext_base";
@@ -1770,20 +1746,11 @@ async function createComponent() {
               }
             });
             
-            // 添加新文件，格式化为新格式 {"uri": "地址", "duration": 时长}
+            // 添加新文件，格式化为新格式 {"uri": "地址"}
             for (const filePath of refData.selectedFiles.value) {
               if (!existingUris.has(filePath)) {
-                // 从文件列表中查找对应的文件信息（包含 duration）
-                const fileInfo = refData.fileBrowserList.value.find(
-                  (f) => !f.isDirectory && 
-                  (refData.fileBrowserPath.value === "/" 
-                    ? `/${f.name}` 
-                    : `${refData.fileBrowserPath.value}/${f.name}`) === filePath
-                );
-                
                 const fileItem = {
                   uri: filePath,
-                  duration: fileInfo?.duration || null,
                 };
                 list.push(fileItem);
                 existingUris.add(filePath);
@@ -1822,8 +1789,7 @@ async function createComponent() {
         applyExample,
         handlePreviewGeneratedCron,
         formatSize,
-        formatDuration,
-        formatDurationMinutes,
+
         handleConnectDevice,
         refreshConnectedList,
         refreshPlaylistStatus,
@@ -1854,13 +1820,13 @@ async function createComponent() {
         handleAddFilesToPlaylist,
         handleTogglePlaylistCronEnabled,
         handleUpdatePlaylistCron,
-        handleUpdatePlaylistDuration,
+
         handlePreviewPlaylistCron,
         handleUpdatePlaylistDeviceType,
         handleUpdatePlaylistDeviceAddress,
         handleSelectBluetoothDevice,
         handleSelectAgentDevice,
-        getPlaylistTotalDuration,
+
         scanDlnaDevices,
       };
 

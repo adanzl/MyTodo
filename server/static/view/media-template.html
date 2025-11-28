@@ -6,39 +6,35 @@
       <div class="flex items-center justify-between mb-3">
         <h3 class="text-base font-semibold">播放列表</h3>
         <div class="flex items-center gap-1">
-          <el-button 
-            type="primary" 
-            size="small" 
+          <el-button
+            type="primary"
+            size="small"
             plain
-            @click="refreshPlaylistStatus" 
+            @click="refreshPlaylistStatus"
             :loading="playlistRefreshing">
             刷新
           </el-button>
-          <el-button 
-            type="success" 
-            size="small" 
-            @click="handleCreatePlaylist">
-            新建
-          </el-button>
+          <el-button type="success" size="small" @click="handleCreatePlaylist"> 新建 </el-button>
         </div>
       </div>
-      <div v-if="playlistCollection && playlistCollection.length > 0" class="flex-1 overflow-y-auto space-y-2 pr-1">
-        <div 
-          v-for="playlist in playlistCollection" 
+      <div
+        v-if="playlistCollection && playlistCollection.length > 0"
+        class="flex-1 overflow-y-auto space-y-2 pr-1">
+        <div
+          v-for="playlist in playlistCollection"
           :key="playlist.id"
           class="border rounded px-3 py-2 cursor-pointer hover:bg-gray-50 group min-h-[60px] flex flex-col justify-between"
           :class="{ 'border-blue-500 bg-blue-50': playlist.id === activePlaylistId }"
           @click="handleSelectPlaylist(playlist.id)">
           <!-- 第一行：名称、曲目数量、功能按钮 -->
           <div class="flex items-center justify-between gap-2">
-            <div class="text-sm font-medium truncate flex-1 min-w-0">
-              {{ playlist.name }}
-            </div>
+            <div class="text-sm font-medium truncate flex-1 min-w-0">{{ playlist.name }}</div>
             <div class="flex items-center gap-2 flex-shrink-0">
               <span class="text-xs text-gray-500 whitespace-nowrap">
                 曲目: {{ (playlist.playlist && playlist.playlist.length) || 0 }}
               </span>
-              <div class="flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <div
+                class="flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                 <el-button
                   v-if="playlistCollection.length > 1"
                   type="danger"
@@ -71,10 +67,10 @@
       <div class="flex items-center justify-between mb-3">
         <div class="flex-1 min-w-0">
           <div v-if="playlistStatus" class="flex items-center gap-2 mb-1">
-            <div v-if="editingPlaylistId !== activePlaylistId" class="flex items-center gap-2 flex-1 min-w-0">
-              <h3 class="text-lg font-semibold truncate">
-                {{ playlistStatus.name }}
-              </h3>
+            <div
+              v-if="editingPlaylistId !== activePlaylistId"
+              class="flex items-center gap-2 flex-1 min-w-0">
+              <h3 class="text-lg font-semibold truncate">{{ playlistStatus.name }}</h3>
               <el-button
                 type="primary"
                 size="small"
@@ -102,53 +98,53 @@
             <h3 class="text-lg font-semibold">播放列表文件</h3>
           </div>
           <div class="text-sm text-gray-500" v-if="playlistStatus">
-            共 {{ playlistStatus.total || 0 }} 首，
-            当前: {{ playlistStatus.current_index !== undefined ? playlistStatus.current_index + 1 : '-' }} / {{ playlistStatus.total || 0 }}，
-            总时长: {{ formatDuration(getPlaylistTotalDuration(playlistStatus.playlist || [])) }}
+            共 {{ playlistStatus.total || 0 }} 首， 当前: {{ playlistStatus.current_index !==
+            undefined ? playlistStatus.current_index + 1 : '-' }} / {{ playlistStatus.total || 0
+            }}，
           </div>
         </div>
         <div class="flex flex-wrap gap-2">
-          <el-button 
-            type="primary" 
-            size="small" 
+          <el-button
+            type="primary"
+            size="small"
             @click="handleOpenFileBrowser"
             :disabled="!playlistStatus">
             添加文件
           </el-button>
-          <el-button 
-            type="success" 
-            size="small" 
+          <el-button
+            type="success"
+            size="small"
             circle
-            @click="handlePlayPlaylist" 
+            @click="handlePlayPlaylist"
             :loading="playing"
             :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0"
             title="播放">
             <span v-if="!playing">▶</span>
           </el-button>
-          <el-button 
-            type="info" 
-            size="small" 
+          <el-button
+            type="info"
+            size="small"
             circle
-            @click="handlePlayNext" 
+            @click="handlePlayNext"
             :loading="playing"
             :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0"
             title="下一首">
             <span v-if="!playing">⏭</span>
           </el-button>
-          <el-button 
-            type="danger" 
-            size="small" 
+          <el-button
+            type="danger"
+            size="small"
             circle
-            @click="handleStopPlaylist" 
+            @click="handleStopPlaylist"
             :loading="stopping"
             title="停止">
             <span v-if="!stopping">⏹</span>
           </el-button>
-          <el-button 
-            type="warning" 
-            size="small" 
+          <el-button
+            type="warning"
+            size="small"
             circle
-            @click="handleClearPlaylist" 
+            @click="handleClearPlaylist"
             :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0 || playlistLoading"
             title="清空列表">
             🗑
@@ -157,21 +153,20 @@
       </div>
 
       <div v-if="playlistStatus" class="flex-1 overflow-y-auto">
-        <div v-if="playlistStatus.playlist && playlistStatus.playlist.length > 0" class="border rounded p-2">
-          <div 
-            v-for="(file, index) in playlistStatus.playlist" 
+        <div
+          v-if="playlistStatus.playlist && playlistStatus.playlist.length > 0"
+          class="border rounded p-2">
+          <div
+            v-for="(file, index) in playlistStatus.playlist"
             :key="index"
             class="flex items-center gap-2 p-1 hover:bg-gray-100 rounded"
             :class="{ 'bg-blue-50': index === playlistStatus.current_index }">
             <span class="text-xs text-gray-500 w-8">{{ index + 1 }}</span>
-            <span 
+            <span
               class="flex-1 text-sm truncate"
               :class="{ 'text-blue-600': index === playlistStatus.current_index }"
-              :title="typeof file === 'string' ? file : file.uri">
-              {{ (typeof file === 'string' ? file : file.uri || '').split('/').pop() || (typeof file === 'string' ? file : file.uri || '') }}
-              <span v-if="typeof file === 'object' && file.duration" class="text-xs text-gray-400 ml-2">
-                ({{ formatDuration(file.duration) }})
-              </span>
+              :title="file.uri">
+              {{ file.uri.split('/').pop() }} 
             </span>
             <el-tag v-if="index === playlistStatus.current_index" type="success" size="small">
               当前
@@ -219,7 +214,7 @@
     <!-- 第三列：配置详情（Cron + 设备） -->
     <div class="w-80 border rounded p-3 flex flex-col">
       <h3 class="text-lg font-semibold mb-3">配置详情</h3>
-      
+
       <div v-if="playlistStatus" class="flex-1 overflow-y-auto space-y-4">
         <!-- Cron 定时任务配置 -->
         <div class="border rounded p-3">
@@ -232,7 +227,7 @@
               inactive-text="关闭">
             </el-switch>
           </div>
-          
+
           <div class="space-y-2">
             <div>
               <div class="text-xs text-gray-600 mb-1">Cron 表达式</div>
@@ -244,32 +239,22 @@
                   size="small"
                   :disabled="playlistStatus.schedule?.enabled !== 1">
                 </el-input>
-                <el-button type="info" size="small" @click="handleOpenCronBuilder" :disabled="playlistStatus.schedule?.enabled !== 1">助手</el-button>
+                <el-button
+                  type="info"
+                  size="small"
+                  @click="handleOpenCronBuilder"
+                  :disabled="playlistStatus.schedule?.enabled !== 1"
+                  >助手</el-button
+                >
               </div>
             </div>
-            
-            <div>
-              <div class="text-xs text-gray-600 mb-1">持续时间（分钟）</div>
-              <el-input-number
-                :model-value="playlistStatus.schedule?.duration || 0"
-                @change="handleUpdatePlaylistDuration"
-                :min="0"
-                :max="1440"
-                :step="1"
-                size="small"
-                :disabled="playlistStatus.schedule?.enabled !== 1"
-                class="w-full">
-              </el-input-number>
-              <div class="text-xs text-gray-500 mt-1">
-                0表示不自动停止
-                <span v-if="playlistStatus.schedule?.duration > 0">
-                  ({{ formatDurationMinutes(playlistStatus.schedule.duration) }})
-                </span>
-              </div>
-            </div>
-            
+
             <div v-if="playlistStatus.schedule?.cron && playlistStatus.schedule?.enabled === 1">
-              <el-button type="success" size="small" @click="handlePreviewPlaylistCron" class="w-full">
+              <el-button
+                type="success"
+                size="small"
+                @click="handlePreviewPlaylistCron"
+                class="w-full">
                 预览执行时间
               </el-button>
             </div>
@@ -279,7 +264,7 @@
         <!-- 设备配置 -->
         <div class="border rounded p-3">
           <h4 class="text-sm font-semibold mb-2">设备配置</h4>
-          
+
           <div class="space-y-2">
             <div>
               <div class="text-xs text-gray-600 mb-1">设备类型</div>
@@ -294,7 +279,7 @@
                 <el-option label="设备代理" value="agent" />
               </el-select>
             </div>
-            
+
             <div>
               <div class="text-xs text-gray-600 mb-1 flex items-center gap-2">
                 <span>设备地址</span>
@@ -321,17 +306,18 @@
                 </el-button>
               </div>
             </div>
-            
           </div>
-          
+
           <!-- 设备列表 -->
           <div class="mt-3">
             <div class="flex items-center justify-between mb-2">
               <h5 class="text-xs font-semibold text-gray-700">
-                <span v-if="playlistStatus.device?.type === 'agent' || playlistStatus.device_type === 'agent' || playlistStatus.device?.type === 'bluetooth' || playlistStatus.device_type === 'bluetooth'">
+                <span
+                  v-if="playlistStatus.device?.type === 'agent' || playlistStatus.device_type === 'agent' || playlistStatus.device?.type === 'bluetooth' || playlistStatus.device_type === 'bluetooth'">
                   已配对的设备
                 </span>
-                <span v-else-if="playlistStatus.device?.type === 'dlna' || playlistStatus.device_type === 'dlna'">
+                <span
+                  v-else-if="playlistStatus.device?.type === 'dlna' || playlistStatus.device_type === 'dlna'">
                   DLNA 设备
                 </span>
                 <span v-else>设备列表</span>
@@ -352,9 +338,10 @@
                 扫描设备
               </el-button>
             </div>
-            
+
             <!-- 设备代理类型：显示已配对设备 -->
-            <div v-if="playlistStatus.device?.type === 'agent' || playlistStatus.device_type === 'agent' || playlistStatus.device?.type === 'bluetooth' || playlistStatus.device_type === 'bluetooth'">
+            <div
+              v-if="playlistStatus.device?.type === 'agent' || playlistStatus.device_type === 'agent' || playlistStatus.device?.type === 'bluetooth' || playlistStatus.device_type === 'bluetooth'">
               <div class="space-y-2 max-h-[200px] overflow-y-auto" v-loading="loading">
                 <div
                   v-for="device in connectedDeviceList"
@@ -374,14 +361,17 @@
                     </el-button>
                   </div>
                 </div>
-                <div v-if="connectedDeviceList.length === 0" class="text-xs text-gray-400 text-center py-4">
+                <div
+                  v-if="connectedDeviceList.length === 0"
+                  class="text-xs text-gray-400 text-center py-4">
                   暂无设备
                 </div>
               </div>
             </div>
-            
+
             <!-- DLNA 类型：显示 DLNA 设备 -->
-            <div v-else-if="playlistStatus.device?.type === 'dlna' || playlistStatus.device_type === 'dlna'">
+            <div
+              v-else-if="playlistStatus.device?.type === 'dlna' || playlistStatus.device_type === 'dlna'">
               <div class="space-y-2 max-h-[200px] overflow-y-auto" v-loading="dlnaScanning">
                 <div
                   v-for="device in dlnaDeviceList"
@@ -389,7 +379,9 @@
                   class="flex items-center gap-2 p-2 border rounded hover:bg-gray-50">
                   <div class="flex-1 min-w-0">
                     <div class="text-sm font-medium truncate">{{ device.name }}</div>
-                    <div class="text-xs text-gray-500 truncate" :title="device.location">{{ device.location }}</div>
+                    <div class="text-xs text-gray-500 truncate" :title="device.location">
+                      {{ device.location }}
+                    </div>
                   </div>
                   <div class="flex-shrink-0">
                     <el-button
@@ -401,7 +393,9 @@
                     </el-button>
                   </div>
                 </div>
-                <div v-if="dlnaDeviceList.length === 0 && !dlnaScanning" class="text-xs text-gray-400 text-center py-4">
+                <div
+                  v-if="dlnaDeviceList.length === 0 && !dlnaScanning"
+                  class="text-xs text-gray-400 text-center py-4">
                   暂无设备，点击"扫描设备"开始扫描
                 </div>
               </div>
@@ -409,7 +403,7 @@
           </div>
         </div>
       </div>
-      
+
       <div v-else class="flex-1 flex items-center justify-center text-sm text-gray-400">
         请先选择一个播放列表
       </div>
@@ -660,7 +654,10 @@
         </el-button>
       </div>
       <div class="flex items-center gap-2 mb-2">
-        <el-button size="small" @click="handleFileBrowserNavigateUp" :disabled="!fileBrowserCanNavigateUp">
+        <el-button
+          size="small"
+          @click="handleFileBrowserNavigateUp"
+          :disabled="!fileBrowserCanNavigateUp">
           上一级
         </el-button>
         <el-button size="small" @click="handleFileBrowserGoToHome"> 首页 </el-button>
@@ -680,7 +677,7 @@
       @row-click="handleFileBrowserRowClick">
       <el-table-column width="55">
         <template #default="{ row }">
-          <el-checkbox 
+          <el-checkbox
             v-if="!row.isDirectory"
             :model-value="isFileSelected(row)"
             @change="handleToggleFileSelection(row)"
@@ -703,12 +700,7 @@
           <span v-else>-</span>
         </template>
       </el-table-column>
-      <el-table-column prop="duration" label="时长" width="100">
-        <template #default="{ row }">
-          <span v-if="!row.isDirectory && row.duration">{{ formatDuration(row.duration) }}</span>
-          <span v-else>-</span>
-        </template>
-      </el-table-column>
+
       <el-table-column label="状态" width="100">
         <template #default="{ row }">
           <el-tag v-if="!row.isDirectory && isFileSelected(row)" type="success" size="small">
@@ -719,14 +711,12 @@
     </el-table>
     <template #footer>
       <div class="flex items-center justify-between">
-        <span class="text-sm text-gray-500">
-          提示：点击文件可切换选择状态，双击目录可进入
-        </span>
+        <span class="text-sm text-gray-500"> 提示：点击文件可切换选择状态，双击目录可进入 </span>
         <div class="flex gap-2">
           <el-button @click="handleCloseFileBrowser">取消</el-button>
-          <el-button 
-            type="primary" 
-            @click="handleAddFilesToPlaylist" 
+          <el-button
+            type="primary"
+            @click="handleAddFilesToPlaylist"
             :loading="playlistLoading"
             :disabled="selectedFiles.length === 0">
             添加到播放列表 ({{ selectedFiles.length }})

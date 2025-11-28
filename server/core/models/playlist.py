@@ -1,5 +1,7 @@
 import datetime
 import json
+import os
+import sys
 import time
 from datetime import timedelta
 from typing import Dict, Any, List, Optional
@@ -96,7 +98,7 @@ class PlaylistMgr:
             else:
                 self.playlist_raw = {}
                 self._refresh_device_map()
-            log.info(f"[PlaylistMgr] Load success: {self.playlist_raw}")
+            log.info(f"[PlaylistMgr] Load success: {len(self.playlist_raw)} playlists")
             return 0
         except Exception as e:
             log.error(f"[PlaylistMgr] Reload error: {e}")
@@ -104,7 +106,7 @@ class PlaylistMgr:
 
     def _refresh_device_map(self):
         self.device_map = {}
-        if self.playlist_raw:
+        if self.playlist_raw and sys.platform != "win32":
             for p_id in self.playlist_raw:
                 playlist_data = self.playlist_raw[p_id]
                 self.device_map[p_id] = _create_device(playlist_data.get("device", {}))
@@ -189,10 +191,7 @@ class PlaylistMgr:
         duration = get_media_duration(file_path)
         if duration is not None:
             # 更新当前播放文件的时长
-            files[current_index] = {
-                "uri": files[current_index],
-                "duration": duration
-            }
+            files[current_index]["duration"] = duration
 
         device = self.device_map[id]["obj"]
         code, msg = device.play(file_path)
