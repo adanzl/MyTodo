@@ -168,7 +168,7 @@ class DlnaDev:
     def play(self, url: str) -> tuple[int, str]:
         """
         播放媒体文件【OUT】
-        :param url: 媒体文件 URL（可以是 http://、file:// 或本地文件路径）
+        :param url: 媒体文件 URL 可以是 http://、file:// 或本地文件路径
         :return: (错误码, 消息)
         """
         try:

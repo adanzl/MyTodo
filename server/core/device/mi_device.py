@@ -52,6 +52,9 @@ class MiDevice:
         """
         self.device_id = address  # 小米设备使用 deviceID 作为地址
         self.name = name or address
+        self.username = username or DEFAULT_MI_USERNAME
+        self.password = password or DEFAULT_MI_PASSWORD
+        self._mina_service = None
 
     @staticmethod
     async def scan_devices(username: str = None, password: str = None) -> List[Dict]:
@@ -85,7 +88,62 @@ class MiDevice:
         finally:
             MiDevice.scanning = False
 
-    
+    def _get_mina_service(self) -> MiNAService:
+        """获取 MiNAService 对象"""
+        if self._mina_service is None:
+            with ClientSession() as session:
+                account = MiAccount(
+                    session,
+                    self.username,
+                    self.password,
+                    os.path.join(str(Path.home()), ".mi.token"),
+                )
+                self._mina_service = MiNAService(account)
+        return self._mina_service
+
+    # ========== 统一设备接口 ==========
+    def play(self, url: str) -> tuple[int, str]:
+        """
+        播放媒体文件【OUT】
+        :param url: 媒体文件 URL (可以是 http://、file:// 或本地文件路径)
+        :return: (错误码, 消息)
+        """
+        try:
+            media_url = convert_to_http_url(url)
+            mina_service = self._get_mina_service()
+            mina_service.play_by_url(self.device_id, media_url)
+            return 0, "ok"
+        except Exception as e:
+            log.error(f"[MiDevice] Play error: {e}")
+            return -1, f"播放失败: {str(e)}"
+
+    def stop(self) -> tuple[int, str]:
+        """
+        停止播放【OUT】
+        :return: (错误码, 消息)
+        """
+        try:
+            mina_service = self._get_mina_service()
+            mina_service.player_stop(self.device_id)
+            return 0, "ok"
+        except Exception as e:
+            log.error(f"[MiDevice] Stop error: {e}")
+            return -1, f"停止失败: {str(e)}"
+
+    def get_position_info(self) -> tuple[int, dict]:
+        """
+        获取播放位置信息【OUT】
+        :return: (错误码, 位置信息)
+        """
+        return 0, {"position": 0, "duration": 0}
+
+    def get_transport_info(self) -> tuple[int, dict]:
+        """
+        获取播放传输信息【OUT】
+        :return: (错误码, 传输信息)
+        """
+        return 0, {"transport_info": "ok"}
+
 # 同步包装函数（用于在Flask路由中使用）
 
 
