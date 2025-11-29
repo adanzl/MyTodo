@@ -127,15 +127,16 @@ class PlaylistMgr:
             return
 
         def cron_play_task(pid=playlist_id):
-            try:
-                code, msg = self.play(pid)
-                if code == 0:
-                    self._scheduled_play_start_times[pid] = datetime.datetime.now()
-                    log.info(f"[PlaylistMgr] 定时任务播放成功: {pid}")
-                else:
-                    log.error(f"[PlaylistMgr] 定时任务播放失败: {pid}, {msg}")
-            except Exception as e:
-                log.error(f"[PlaylistMgr] 定时任务执行异常: {pid}, {e}")
+            log.info(f"[PlaylistMgr] 定时任务播放成功: {pid}")
+            # try:
+            #     code, msg = self.play(pid)
+            #     if code == 0:
+            #         self._scheduled_play_start_times[pid] = datetime.datetime.now()
+            #         log.info(f"[PlaylistMgr] 定时任务播放成功: {pid}")
+            #     else:
+            #         log.error(f"[PlaylistMgr] 定时任务播放失败: {pid}, {msg}")
+            # except Exception as e:
+            #     log.error(f"[PlaylistMgr] 定时任务执行异常: {pid}, {e}")
 
         success = scheduler.add_cron_job(func=cron_play_task, job_id=job_id, cron_expression=cron_expression)
         playlist_name = playlist_data.get("name", "未知播放列表")

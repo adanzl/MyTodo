@@ -8,7 +8,7 @@ import platform
 import shutil
 from typing import Any, Dict, List, Optional
 
-from core.async_utils import run_async
+from core.utils import run_async
 from core.log_config import root_logger
 
 log = root_logger()

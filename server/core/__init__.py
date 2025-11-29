@@ -9,13 +9,14 @@ from core.api.agent_routes import agent_bp
 from core.api.bluetooth_routes import bluetooth_bp
 from core.api.dlna_routes import dlna_bp
 from core.api.media_routes import media_bp
+from core.api.mi_routes import mi_bp
 from core.chat.chat_mgr import ChatMgr
 from core.db.db_mgr import DB_Mgr
 from core.scheduler import init_scheduler
 import os
 
-# 从 async_utils 导入 run_async，避免循环导入
-from core.async_utils import run_async
+# 从 utils 导入 run_async，避免循环导入
+from core.utils import run_async
 
 
 def create_app():
@@ -37,6 +38,7 @@ def create_app():
     app.register_blueprint(bluetooth_bp, url_prefix='/')
     app.register_blueprint(media_bp, url_prefix='/')
     app.register_blueprint(dlna_bp, url_prefix='/')
+    app.register_blueprint(mi_bp, url_prefix='/')
 
     ChatMgr(socketio)
     DB_Mgr.init(app)

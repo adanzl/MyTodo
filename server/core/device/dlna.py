@@ -8,7 +8,7 @@ import os
 from typing import Dict, List
 from urllib.parse import urlparse
 from core.log_config import root_logger
-from core.async_utils import run_async
+from core.utils import run_async, convert_to_http_url
 
 import upnpclient
 from ssdpy import SSDPClient
@@ -163,32 +163,6 @@ class DlnaDev:
 
         return self._av_transport
 
-    def _convert_to_http_url(self, url: str) -> str:
-        """
-        将本地文件路径转换为 HTTP URL
-        :param url: 本地文件路径（如 /mnt/ext_base/audio/xxx.mp3）或已经是 HTTP URL
-        :return: HTTP URL
-        """
-        # 如果已经是 HTTP/HTTPS URL，直接返回
-        if url.startswith('http://') or url.startswith('https://'):
-            return url
-
-        # 如果是 file:// URL，提取路径
-        if url.startswith('file://'):
-            url = url[7:]  # 移除 file:// 前缀
-
-        # 如果是本地绝对路径（以 / 开头），转换为 HTTP URL
-        if url.startswith('/') and os.path.exists(url):
-            try:
-                # 动态导入以避免循环依赖
-                from core.api.media_routes import get_media_url
-                return get_media_url(url)
-            except ImportError:
-                log.warning("[DlnaDev] Cannot import get_media_url, using original URL")
-                return url
-
-        # 其他情况直接返回（可能是相对路径或其他格式）
-        return url
 
     # ========== 统一设备接口 ==========
     def play(self, url: str) -> tuple[int, str]:
@@ -203,7 +177,7 @@ class DlnaDev:
                 return -1, "AVTransport service not available"
 
             # 转换本地文件路径为 HTTP URL
-            media_url = self._convert_to_http_url(url)
+            media_url = convert_to_http_url(url)
 
             # 设置媒体 URI
             try:
