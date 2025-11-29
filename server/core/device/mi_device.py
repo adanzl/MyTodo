@@ -4,7 +4,6 @@
 import asyncio
 import os
 from pathlib import Path
-from turtle import st
 from typing import Any, Dict, List, Optional
 
 from aiohttp import ClientSession
