@@ -114,7 +114,7 @@ class PlaylistMgr:
 
     def _refresh_device_map(self):
         self.device_map = {}
-        if self.playlist_raw and sys.platform != "linux":
+        if self.playlist_raw and sys.platform == "linux":
             for p_id in self.playlist_raw:
                 playlist_data = self.playlist_raw[p_id]
                 self.device_map[p_id] = _create_device(playlist_data.get("device", {}))
