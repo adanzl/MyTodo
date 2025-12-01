@@ -2,6 +2,7 @@
 小米设备管理
 '''
 import asyncio
+import json
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -9,7 +10,7 @@ from typing import Any, Dict, List, Optional
 from aiohttp import ClientSession
 from miservice import MiAccount, MiNAService
 
-from core.utils import run_async, convert_to_http_url
+from core.utils import run_async, convert_to_http_url, format_time_str
 from core.log_config import root_logger
 
 log = root_logger()
@@ -111,6 +112,7 @@ class MiDevice:
             media_url = convert_to_http_url(url)
             mina_service = self._get_mina_service()
             mina_service.play_by_url(self.device_id, media_url)
+            mina_service.player_set_loop(self.device_id, 1)
             return 0, "ok"
         except Exception as e:
             log.error(f"[MiDevice] Play error: {e}")
@@ -129,19 +131,43 @@ class MiDevice:
             log.error(f"[MiDevice] Stop error: {e}")
             return -1, f"停止失败: {str(e)}"
 
-    def get_position_info(self) -> tuple[int, dict]:
+    async def get_status(self) -> tuple[int, dict]:
         """
-        获取播放位置信息【OUT】
-        :return: (错误码, 位置信息)
+        获取播放状态信息
+        :return: (错误码, 状态字典) 
         """
-        return 0, {"position": 0, "duration": 0}
+        try:
+            mina_service = self._get_mina_service()
+            ret = await mina_service.player_get_status(self.device_id)
+            if ret['code'] != 0:
+                return -1, {"error": ret['message']}
+            info = json.loads(ret['data']['info']) 
+            state = 'STOPPED' if info['status'] == 1 else 'PLAYING'
+            play_song_detail = info['play_song_detail']
+            duration = format_time_str(play_song_detail['duration'] / 1000) if play_song_detail['duration'] else '00:00:00'
+            track_list = info['track_list']
+            audio_id = play_song_detail['audio_id']
+            position = play_song_detail['position']  # 播放位置 单位：毫秒
+            return 0, {
+                "transport_state": state,  # PLAYING, STOPPED
+                "transport_status": 'OK',  # OK, ERROR_OCCURRED, etc.
+                "speed": 1,
+                "track": track_list.index(audio_id) + 1,
+                "duration": duration,  # 总时长，格式如 "00:03:45"
+                "rel_time": format_time_str(position / 1000),  # 已播放时长，格式如 "00:01:30"
+            }
+        except Exception as e:
+            log.error(f"[MiDevice] Get status error: {e}")
+            return -1, {"error": f"获取播放状态信息失败: {str(e)}"}
 
-    def get_transport_info(self) -> tuple[int, dict]:
-        """
-        获取播放传输信息【OUT】
-        :return: (错误码, 传输信息)
-        """
-        return 0, {"transport_info": "ok"}
+        if position_code == 0:
+            status.update(position_info)
+        else:
+            status["position_error"] = position_info.get("error", "未知错误")
+
+        # 如果至少有一个成功，返回成功
+        return_code = 0 if (transport_code == 0 or position_code == 0) else -1
+        return return_code, status
 
 # 同步包装函数（用于在Flask路由中使用）
 

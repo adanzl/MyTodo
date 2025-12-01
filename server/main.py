@@ -34,9 +34,15 @@ def null_application(environ, start_response):
 if __name__ == '__main__':
     import os
 
-    from werkzeug.middleware.dispatcher import DispatcherMiddleware
-    from werkzeug.middleware.shared_data import SharedDataMiddleware
+    PORT = 8000
+    HOST = '127.0.0.1'
+    
     try:
+        from werkzeug.middleware.dispatcher import DispatcherMiddleware
+        from werkzeug.middleware.shared_data import SharedDataMiddleware
+        from gevent.pywsgi import WSGIServer
+        from geventwebsocket.handler import WebSocketHandler
+        
         base_dir = os.path.dirname(os.path.abspath(__file__))
         static_app = SharedDataMiddleware(null_application, {'/': 'static'})
         application = DispatcherMiddleware(
@@ -45,17 +51,20 @@ if __name__ == '__main__':
                 '/api': app,
                 '/web': static_app,  # 静态文件挂载到 /web
             })
-        from gevent.pywsgi import WSGIServer
-        from geventwebsocket.handler import WebSocketHandler
-        PORT = 8000
-        HOST = '127.0.0.1'
         http_server = WSGIServer(
             (HOST, PORT),
             application,
             log=None,
             handler_class=WebSocketHandler,
         )
-        log.info(f'Server started on http://{HOST}:{PORT}')
+        log.info(f'Server started on http://{HOST}:{PORT} (using gevent)')
         http_server.serve_forever()
+    except ImportError as e:
+        log.error(f'Gevent 相关模块导入失败: {e}')
+        log.error('请运行: pip install gevent gevent-websocket')
+        log.info('尝试使用 Flask 开发服务器...')
+        app.run(host=HOST, port=PORT, debug=False)
     except Exception as e:
-        log.error(e)
+        log.error(f'启动服务器失败: {e}')
+        log.info('尝试使用 Flask 开发服务器...')
+        app.run(host=HOST, port=PORT, debug=False)

@@ -69,3 +69,24 @@ def convert_to_http_url(url: str) -> str:
     # 其他情况直接返回（可能是相对路径或其他格式）
     return url
 
+
+def format_time_str(time_str: str) -> str:
+    """
+    将秒数格式化为 "HH:MM:SS" 格式
+    :param seconds: 秒数
+    :return: "HH:MM:SS" 格式的时间字符串
+    """
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    seconds = seconds % 60
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
+def time_to_seconds(time_str: str) -> int:
+    """
+    将 "HH:MM:SS" 格式的时间字符串转换为秒数
+    :param time_str: "HH:MM:SS" 格式的时间字符串
+    :return: 秒数
+    """
+    parts = time_str.split(':')
+    return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2]) if len(parts) == 3 else 0

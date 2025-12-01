@@ -248,7 +248,27 @@
                 >
               </div>
             </div>
-
+            
+            <div>
+              <div class="text-xs text-gray-600 mb-1">持续时间（分钟）</div>
+              <el-input-number
+                :model-value="playlistStatus.schedule?.duration || 0"
+                @change="handleUpdatePlaylistDuration"
+                :min="0"
+                :max="1440"
+                :step="1"
+                size="small"
+                :disabled="playlistStatus.schedule?.enabled !== 1"
+                class="w-full">
+              </el-input-number>
+              <div class="text-xs text-gray-500 mt-1">
+                0表示不自动停止
+                <span v-if="playlistStatus.schedule?.duration > 0">
+                  ({{ formatDurationMinutes(playlistStatus.schedule.duration) }})
+                </span>
+              </div>
+            </div>
+            
             <div v-if="playlistStatus.schedule?.cron && playlistStatus.schedule?.enabled === 1">
               <el-button
                 type="success"

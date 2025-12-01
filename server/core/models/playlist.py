@@ -12,6 +12,7 @@ from core.device.dlna import DlnaDev
 from core.log_config import root_logger
 from core.scheduler import get_scheduler
 from core.api.routes import get_media_duration
+from core.utils import time_to_seconds
 
 log = root_logger()
 
@@ -19,10 +20,13 @@ PLAYLIST_RDS_FULL_KEY = f"schedule_play:playlist_collection"
 DEFAULT_PLAYLIST_NAME = "默认播放列表"
 DEVICE_TYPES = {"device_agent", "bluetooth", "dlna"}
 
+
 def _generate_playlist_id() -> str:
     return f"pl_{int(time.time() * 1000)}"
 
+
 _TS = lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
 
 def _create_device(node):
     ret = {"node": node, "obj": None}
@@ -31,6 +35,7 @@ def _create_device(node):
     elif node["type"] == "dlna":
         ret["obj"] = DlnaDev(node["address"])
     return ret
+
 
 def _get_file_uri(file_item):
     if isinstance(file_item, str):
@@ -82,6 +87,9 @@ class PlaylistMgr:
         return 0
 
     def reload(self) -> int:
+        if sys.platform != "linux":
+            log.warning(f"[PlaylistMgr] Reload not supported on non-linux platforms : {sys.platform}")
+            return 0
         """
         重新从 RDS 中加载 playlist 数据
         """
@@ -106,7 +114,7 @@ class PlaylistMgr:
 
     def _refresh_device_map(self):
         self.device_map = {}
-        if self.playlist_raw and sys.platform != "win32":
+        if self.playlist_raw and sys.platform != "linux":
             for p_id in self.playlist_raw:
                 playlist_data = self.playlist_raw[p_id]
                 self.device_map[p_id] = _create_device(playlist_data.get("device", {}))
@@ -183,12 +191,12 @@ class PlaylistMgr:
             return -1, f"当前索引 {current_index} 超出范围"
 
         file_path = _get_file_uri(files[current_index])
-        
+
         if not file_path:
             return -1, "文件路径无效"
 
         # 获取并更新文件时长
-       
+
         duration = get_media_duration(file_path)
         if duration is not None:
             # 更新当前播放文件的时长
@@ -199,7 +207,7 @@ class PlaylistMgr:
         if code != 0:
             return code, msg
 
-        if device.get_transport_info()[0] == 0:
+        if device.get_status()[0] == 0:
             self._start_polling(id)
         return 0, "播放成功"
 
@@ -257,7 +265,7 @@ class PlaylistMgr:
         device = device_obj["obj"]
         if device is None:
             return
-        if device.get_transport_info()[0] != 0:
+        if device.get_status()[0] != 0:
             return
 
         def poll_task():
@@ -302,16 +310,12 @@ class PlaylistMgr:
                     code, msg = self.stop(id)
                     return (0, "播放时长限制到达，已停止播放") if code == 0 else (code, msg)
 
-        pos_code, pos_info = device.get_position_info()
+        pos_code, pos_info = device.get_status()
         if pos_code != 0:
             return -1, "无法获取播放位置信息"
 
-        def time_to_seconds(time_str):
-            parts = time_str.split(':')
-            return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2]) if len(parts) == 3 else 0
-
         try:
-            duration_sec = time_to_seconds(pos_info.get("track_duration", "00:00:00"))
+            duration_sec = time_to_seconds(pos_info.get("duration", "00:00:00"))
             rel_sec = time_to_seconds(pos_info.get("rel_time", "00:00:00"))
             if duration_sec <= 0:
                 return -1, "无法获取有效的曲目时长"

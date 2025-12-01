@@ -1054,6 +1054,35 @@ async function createComponent() {
         });
       };
 
+      // 更新播放列表的持续时间
+      const handleUpdatePlaylistDuration = async (duration) => {
+        if (!refData.playlistStatus.value) return;
+        await updateActivePlaylistData((playlistInfo) => {
+          if (!playlistInfo.schedule) {
+            playlistInfo.schedule = { enabled: 0, cron: "", duration: 0 };
+          }
+          playlistInfo.schedule.duration = duration || 0;
+          return playlistInfo;
+        });
+      };
+
+      // 格式化持续时间（分钟转换为可读格式）
+      const formatDurationMinutes = (minutes) => {
+        if (!minutes || minutes === 0) return "不停止";
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+
+        const parts = [];
+        if (hours > 0) {
+          parts.push(`${hours}小时`);
+        }
+        if (mins > 0) {
+          parts.push(`${mins}分钟`);
+        }
+
+        return parts.length > 0 ? parts.join(" ") : "0分钟";
+      };
+
 
 
       // 预览播放列表的 Cron 执行时间
@@ -1820,7 +1849,8 @@ async function createComponent() {
         handleAddFilesToPlaylist,
         handleTogglePlaylistCronEnabled,
         handleUpdatePlaylistCron,
-
+        handleUpdatePlaylistDuration,
+        formatDurationMinutes,
         handlePreviewPlaylistCron,
         handleUpdatePlaylistDeviceType,
         handleUpdatePlaylistDeviceAddress,

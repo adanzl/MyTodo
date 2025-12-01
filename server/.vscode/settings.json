@@ -1,5 +1,5 @@
 {
-    "python-envs.defaultPackageManager": "ms-python.python:pip",
+    "python-envs.defaultPackageManager": "ms-python.python:conda",
     "python-envs.pythonProjects": [],
     "cSpell.words": [
         "bluetoothctl",
@@ -22,5 +22,6 @@
         "upnpclient",
         "zhaozhao"
     ],
-    "basedpyright.disableLanguageServices": true
+    "basedpyright.disableLanguageServices": true,
+    "python-envs.defaultEnvManager": "ms-python.python:conda"
 }
