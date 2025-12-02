@@ -425,18 +425,39 @@ def list_directory():
                     track_number = float('inf')
                     has_track = False
                 
-                # 提取文件名中的所有数字（用于次要排序）
-                all_numbers = re.findall(r'\d+', name)
-                has_numbers = len(all_numbers) > 0
+                # 将文件名转换为自然排序的元组：将数字和文本分开
+                # 例如 "p1.mp3" -> ('p', 1, '.mp3'), "xiaopingguo_1.mp3" -> ('xiaopingguo_', 1, '.mp3')
+                def split_name_into_parts(s):
+                    parts = []
+                    current_text = ''
+                    i = 0
+                    while i < len(s):
+                        if s[i].isdigit():
+                            # 开始读取数字
+                            num_str = ''
+                            while i < len(s) and s[i].isdigit():
+                                num_str += s[i]
+                                i += 1
+                            if current_text:
+                                parts.append(current_text.lower())
+                                current_text = ''
+                            parts.append(int(num_str))
+                        else:
+                            current_text += s[i]
+                            i += 1
+                    if current_text:
+                        parts.append(current_text.lower())
+                    return tuple(parts)
                 
-                # 返回排序键：(是否目录, 是否有Track数字, Track数字, 所有数字列表, 文件名小写)
-                # 目录排在前面，然后有Track数字的文件按Track数字排序，没有Track数字的文件按所有数字排序，最后按文件名排序
+                name_parts = split_name_into_parts(name)
+                
+                # 返回排序键：(是否目录, 是否有Track数字, Track数字, 文件名自然排序元组)
+                # 目录排在前面，然后有Track数字的文件按Track数字排序，没有Track数字的文件按自然排序
                 return (
                     not is_dir,  # False (目录) 排在 True (文件) 前面
                     not has_track,  # False (有Track数字) 排在 True (无Track数字) 前面
                     track_number,  # Track 数字（主要排序键）
-                    [int(n) for n in all_numbers] if all_numbers else [],  # 所有数字列表（次要排序键）
-                    name.lower()  # 字符串部分用于最终排序
+                    name_parts  # 文件名自然排序元组
                 )
             
             items.sort(key=natural_sort_key)
