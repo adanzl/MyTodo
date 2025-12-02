@@ -443,7 +443,7 @@ def list_directory():
 
             if extensions_filter and extensions_filter != "all":
                 if extensions_filter == "audio":
-                    allowed_exts = {'.mp3', '.wav', '.aac', '.ogg', '.m4a', '.flac', '.wma'}
+                    allowed_exts = {'.mp3', '.wav', '.aac', '.ogg', '.m4a', '.flac', '.wma', '.mp4'}
                 elif extensions_filter == "video":
                     allowed_exts = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'}
                 elif extensions_filter.startswith("."):
