@@ -1597,6 +1597,62 @@ async function createComponent() {
         }
       };
 
+      const handlePlaylistMenuCommand = async (command, playlistId) => {
+        if (command === "delete") {
+          await handleDeletePlaylistGroup(playlistId);
+        } else if (command === "copy") {
+          await handleCopyPlaylist(playlistId);
+        }
+      };
+
+      const handleCopyPlaylist = async (playlistId) => {
+        if (!playlistId) return;
+        const sourcePlaylist = refData.playlistCollection.value.find((item) => item.id === playlistId);
+        if (!sourcePlaylist) return;
+        
+        try {
+          const defaultName = `${sourcePlaylist.name}_副本`;
+          const { value } = await ElMessageBox.prompt("请输入播放列表名称", "复制播放列表", {
+            confirmButtonText: "确定",
+            cancelButtonText: "取消",
+            inputValue: defaultName,
+            inputPlaceholder: defaultName,
+            inputValidator: (val) => (!!val && val.trim().length > 0) || "名称不能为空",
+          });
+          const playlistName = (value || defaultName).trim();
+          
+          // 复制播放列表内容（深拷贝）
+          const copiedPlaylist = sourcePlaylist.playlist 
+            ? sourcePlaylist.playlist.map(file => ({ ...file }))
+            : [];
+          const newPlaylist = normalizePlaylistItem(
+            {
+              id: createPlaylistId(),
+              name: playlistName,
+              playlist: copiedPlaylist,
+              current_index: 0,
+              device: sourcePlaylist.device ? { ...sourcePlaylist.device } : null,
+              device_address: sourcePlaylist.device_address || null,
+              device_type: sourcePlaylist.device_type || null,
+              schedule: sourcePlaylist.schedule ? { ...sourcePlaylist.schedule } : { enabled: 0, cron: "", duration: 0 },
+            },
+            playlistName
+          );
+          
+          const updated = [...refData.playlistCollection.value, newPlaylist];
+          refData.playlistCollection.value = updated;
+          refData.activePlaylistId.value = newPlaylist.id;
+          saveActivePlaylistId(newPlaylist.id);
+          syncActivePlaylist(updated);
+          await savePlaylist(updated);
+          ElMessage.success("播放列表已复制");
+        } catch (error) {
+          if (error === "cancel") return;
+          console.error("复制播放列表失败:", error);
+          ElMessage.error("复制播放列表失败: " + (error.message || "未知错误"));
+        }
+      };
+
       const handleDeletePlaylistGroup = async (playlistId) => {
         if (!playlistId) return;
         if (refData.playlistCollection.value.length <= 1) {
@@ -1606,7 +1662,7 @@ async function createComponent() {
         const target = refData.playlistCollection.value.find((item) => item.id === playlistId);
         if (!target) return;
         try {
-          await ElMessageBox.confirm(`确认删除播放列表“${target.name}”吗？`, "删除播放列表", {
+          await ElMessageBox.confirm(`确认删除播放列表"${target.name}"吗？`, "删除播放列表", {
             confirmButtonText: "删除",
             cancelButtonText: "取消",
             type: "warning",
@@ -1860,6 +1916,8 @@ async function createComponent() {
         handleSelectPlaylist,
         handleCreatePlaylist,
         handleDeletePlaylistGroup,
+        handlePlaylistMenuCommand,
+        handleCopyPlaylist,
         handleStartEditPlaylistName,
         handleSavePlaylistName,
         handleCancelEditPlaylistName,

@@ -34,17 +34,34 @@
                 曲目: {{ (playlist.playlist && playlist.playlist.length) || 0 }}
               </span>
               <div
-                class="flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <el-button
-                  v-if="playlistCollection.length > 1"
-                  type="danger"
-                  size="small"
-                  circle
-                  class="!w-5 !h-5 !min-w-5 !p-0 text-xs"
-                  @click.stop="handleDeletePlaylistGroup(playlist.id)"
-                  title="删除">
-                  ×
-                </el-button>
+                class="flex items-center justify-center">
+                <el-dropdown
+                  trigger="click"
+                  @command="(command) => handlePlaylistMenuCommand(command, playlist.id)"
+                  @click.stop>
+                  <el-button
+                    type="default"
+                    size="small"
+                    plain
+                    circle
+                    class="!w-5 !h-5 !min-w-5 !p-0 text-xs"
+                    title="更多">
+                    <span style="font-size: 16px; line-height: 1;" class="mb-1">»</span>
+                  </el-button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item command="copy">
+                        <span>复制</span>
+                      </el-dropdown-item>
+                      <el-dropdown-item
+                        v-if="playlistCollection.length > 1"
+                        command="delete"
+                        divided>
+                        <span style="color: #f56c6c">删除</span>
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
               </div>
             </div>
           </div>
@@ -141,13 +158,13 @@
             <span v-if="!stopping">⏹</span>
           </el-button>
           <el-button
-            type="warning"
+            type="plain"
             size="small"
             circle
             @click="handleClearPlaylist"
             :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0 || playlistLoading"
             title="清空列表">
-            🗑
+            🗑️
           </el-button>
         </div>
       </div>
