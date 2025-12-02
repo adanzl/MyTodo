@@ -20,7 +20,7 @@ from bleak import BleakClient, BleakScanner
 from bleak.backends.scanner import AdvertisementData
 
 
-class BluetoothDevice:
+class BluetoothDev:
     """蓝牙设备类"""
 
     def __init__(self, address: str, name: str = "", rssi: int = 0, metadata: dict = None):
@@ -98,7 +98,7 @@ class BluetoothMgr:
 
     def __init__(self):
         log.info("[BLUETOOTH] BluetoothMgr init")
-        self.devices: Dict[str, BluetoothDevice] = {}  # address -> BluetoothDevice
+        self.devices: Dict[str, BluetoothDev] = {}  # address -> BluetoothDevice
         self.scanning = False
         self._scan_task = None
 
@@ -140,7 +140,7 @@ class BluetoothMgr:
 
                 # 更新设备列表
                 if device.address not in self.devices:
-                    self.devices[device.address] = BluetoothDevice(address=device.address,
+                    self.devices[device.address] = BluetoothDev(address=device.address,
                                                                    name=friendly_name,
                                                                    rssi=rssi,
                                                                    metadata=metadata)
@@ -194,7 +194,7 @@ class BluetoothMgr:
             await client.connect()
 
             if address not in self.devices:
-                self.devices[address] = BluetoothDevice(address=address)
+                self.devices[address] = BluetoothDev(address=address)
 
             device = self.devices[address]
             device.client = client

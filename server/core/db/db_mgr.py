@@ -15,7 +15,7 @@ log = root_logger()
 DB_NAME = "data.db"
 TABLE_SAVE = "t_user_save"
 
-class DB_Mgr:
+class DbMgr:
 
     @staticmethod
     def init(app):

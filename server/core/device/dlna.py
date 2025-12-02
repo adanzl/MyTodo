@@ -279,7 +279,7 @@ class DlnaDev:
     def get_status(self) -> tuple[int, dict]:
         """
         获取播放状态信息（合并 transport_info 和 position_info）
-        :return: (错误码, 状态字典) 状态字典包含 transport_info 和 position_info 的所有字段（展开）
+        :return: (错误码, 状态字典) 格式: {'state', 'status', 'track', 'duration', 'position'}
         """
         transport_code, transport_info = self._get_transport_info()
         position_code, position_info = self._get_position_info()
@@ -288,17 +288,26 @@ class DlnaDev:
         if transport_code != 0 and position_code != 0:
             return -1, {"error": "无法获取播放状态信息"}
 
-        # 合并结果，展开 transport_info 和 position_info 的字段
+        # 构建统一格式的状态字典
         status = {}
+        
+        # 从 transport_info 获取 state 和 status
         if transport_code == 0:
-            status.update(transport_info)
+            status["state"] = transport_info.get("transport_state", "UNKNOWN")  # PLAYING, STOPPED, etc.
+            status["status"] = transport_info.get("transport_status", "UNKNOWN")  # OK, ERROR_OCCURRED, etc.
         else:
-            status["transport_error"] = transport_info.get("error", "未知错误")
-
+            status["state"] = "UNKNOWN"
+            status["status"] = "ERROR"
+        
+        # 从 position_info 获取 track, duration, position
         if position_code == 0:
-            status.update(position_info)
+            status["track"] = int(position_info.get("track", 0)) if position_info.get("track") else 0
+            status["duration"] = position_info.get("track_duration", "00:00:00")
+            status["position"] = position_info.get("rel_time", "00:00:00")
         else:
-            status["position_error"] = position_info.get("error", "未知错误")
+            status["track"] = 0
+            status["duration"] = "00:00:00"
+            status["position"] = "00:00:00"
 
         # 如果至少有一个成功，返回成功
         return_code = 0 if (transport_code == 0 or position_code == 0) else -1

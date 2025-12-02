@@ -1,6 +1,13 @@
 from flask import make_response
 from gevent import monkey
 
+# 在导入其他模块之前加载环境变量
+from dotenv import load_dotenv
+import os
+
+# 加载 .env 文件
+load_dotenv()
+
 monkey.patch_all(subprocess=True)  # 在导入其他模块之前进行 patch，包括 subprocess
 from core import create_app
 from core.log_config import root_logger

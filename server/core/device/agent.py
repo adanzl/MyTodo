@@ -127,50 +127,6 @@ class DeviceAgent:
         """
         return self._request("GET", "/bluetooth/paired")
 
-    def _get_transport_info(self) -> tuple[int, dict]:
-        """
-        获取传输状态信息【OUT】
-        :return: (错误码, 状态字典)
-        """
-        # DeviceAgent 可能不支持获取传输状态，返回默认值
-        # 可以通过调用 device_agent 的 /media/status 接口来实现（如果存在）
-        try:
-            # 尝试调用状态接口（如果存在）
-            result = self._request("GET", "/media/status")
-            if result.get("code") == 0:
-                data = result.get("data", {})
-                return (0, {
-                    "transport_state": data.get("is_playing", False) and "PLAYING" or "STOPPED",
-                    "transport_status": "OK",
-                    "speed": "1"
-                })
-        except Exception:
-            pass
-
-        # 如果接口不存在，返回未知状态
-        return (-1, {"error": "设备不支持获取传输状态"})
-
-    def _get_position_info(self) -> tuple[int, dict]:
-        """
-        获取播放位置信息【OUT】
-        :return: (错误码, 位置字典)
-        """
-        # DeviceAgent 可能不支持获取位置信息，返回默认值
-        # 可以通过调用 device_agent 的 /media/position 接口来实现（如果存在）
-        try:
-            result = self._request("GET", "/media/position")
-            if result.get("code") == 0:
-                data = result.get("data", {})
-                return (0, {
-                    "track": "1",
-                    "duration": data.get("duration", "00:00:00"),
-                    "rel_time": data.get("position", "00:00:00"),
-                })
-        except Exception:
-            pass
-
-        # 如果接口不存在，返回未知状态
-        return (-1, {"error": "设备不支持获取位置信息"})
 
     # ========== 统一设备接口 ==========
     def play(self, url: str) -> tuple[int, str]:
@@ -199,27 +155,16 @@ class DeviceAgent:
     def get_status(self) -> tuple[int, dict]:
         """
         获取播放状态信息（合并 transport_info 和 position_info）【OUT】
-        :return: (错误码, 状态字典) 状态字典包含 transport_info 和 position_info 的所有字段（展开）
+        :return: (错误码, 状态字典) 格式: {'state', 'status', 'track', 'duration', 'position'}
         """
-        transport_code, transport_info = self._get_transport_info()
-        position_code, position_info = self._get_position_info()
+        try:
+            # 尝试调用状态接口（如果存在）
+            result = self._request("GET", "/media/status")
+            if result.get("code") == 0:
+                data = result.get("data", {})
+                return (0, data)
+        except Exception:
+            pass
 
-        # 如果两个都失败，返回错误
-        if transport_code != 0 and position_code != 0:
-            return -1, {"error": "无法获取播放状态信息"}
-
-        # 合并结果，展开 transport_info 和 position_info 的字段
-        status = {}
-        if transport_code == 0:
-            status.update(transport_info)
-        else:
-            status["transport_error"] = transport_info.get("error", "未知错误")
-
-        if position_code == 0:
-            status.update(position_info)
-        else:
-            status["position_error"] = position_info.get("error", "未知错误")
-
-        # 如果至少有一个成功，返回成功
-        return_code = 0 if (transport_code == 0 or position_code == 0) else -1
-        return return_code, status
+        # 如果接口不存在，返回未知状态
+        return (-1, {"error": "设备不支持获取传输状态"})

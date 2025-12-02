@@ -8,7 +8,9 @@ from typing import Dict, Any, List, Optional
 
 from core.db import rds_mgr
 from core.device.agent import DeviceAgent
+from core.device.bluetooth import BluetoothDev
 from core.device.dlna import DlnaDev
+from core.device.mi_device import MiDevice
 from core.log_config import root_logger
 from core.scheduler import get_scheduler
 from core.api.routes import get_media_duration
@@ -18,7 +20,7 @@ log = root_logger()
 
 PLAYLIST_RDS_FULL_KEY = f"schedule_play:playlist_collection"
 DEFAULT_PLAYLIST_NAME = "默认播放列表"
-DEVICE_TYPES = {"device_agent", "bluetooth", "dlna"}
+DEVICE_TYPES = {"device_agent", "bluetooth", "dlna", "mi"}
 
 
 def _generate_playlist_id() -> str:
@@ -30,10 +32,14 @@ _TS = lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 def _create_device(node):
     ret = {"node": node, "obj": None}
-    if node["type"] in ("agent", "bluetooth"):
+    if node["type"] == "agent":
         ret["obj"] = DeviceAgent(node["address"])
+    elif node["type"] == "bluetooth":
+        ret["obj"] = BluetoothDev(node["address"])
     elif node["type"] == "dlna":
         ret["obj"] = DlnaDev(node["address"])
+    elif node["type"] == "mi":
+        ret["obj"] = MiDevice(node.get("address", ""))
     return ret
 
 
@@ -48,9 +54,9 @@ def _get_file_uri(file_item):
 class PlaylistMgr:
 
     def __init__(self):
-        self._polling_playlists = set()
-        self._polling_interval = 1
-        self._scheduled_play_start_times = {}
+        self._scheduled_play_start_times = {}  # 定时任务播放开始时间（用于duration限制）
+        self._file_timers = {}  # 文件播放定时器 {playlist_id: job_id}
+        self._playlist_duration_timers = {}  # 播放列表时长定时器 {playlist_id: job_id}
         self.reload()
 
     def get_playlist(self, id: str) -> Dict[str, Any] | None:
@@ -163,10 +169,29 @@ class PlaylistMgr:
                 if playlist_id not in playlist_ids:
                     scheduler.remove_job(job.id)
                     log.info(f"[PlaylistMgr] 清理孤立的定时任务: {job.id}")
+            elif job.id.startswith("playlist_file_timer_"):
+                playlist_id = job.id.replace("playlist_file_timer_", "", 1)
+                if playlist_id not in playlist_ids:
+                    scheduler.remove_job(job.id)
+                    log.info(f"[PlaylistMgr] 清理孤立的文件定时器: {job.id}")
+            elif job.id.startswith("playlist_duration_timer_"):
+                playlist_id = job.id.replace("playlist_duration_timer_", "", 1)
+                if playlist_id not in playlist_ids:
+                    scheduler.remove_job(job.id)
+                    log.info(f"[PlaylistMgr] 清理孤立的播放列表时长定时器: {job.id}")
 
         for playlist_id in list(self._scheduled_play_start_times.keys()):
             if playlist_id not in playlist_ids:
                 del self._scheduled_play_start_times[playlist_id]
+        
+        # 清理孤立的定时器记录
+        for playlist_id in list(self._file_timers.keys()):
+            if playlist_id not in playlist_ids:
+                del self._file_timers[playlist_id]
+        
+        for playlist_id in list(self._playlist_duration_timers.keys()):
+            if playlist_id not in playlist_ids:
+                del self._playlist_duration_timers[playlist_id]
 
     def _validate_playlist(self, id: str):
         if not self.playlist_raw or id not in self.playlist_raw:
@@ -196,19 +221,38 @@ class PlaylistMgr:
             return -1, "文件路径无效"
 
         # 获取并更新文件时长
-
         duration = get_media_duration(file_path)
+        file_duration_seconds = None
         if duration is not None:
             # 更新当前播放文件的时长
             files[current_index]["duration"] = duration
+            # 如果 duration 是秒数，直接使用；如果是字符串格式，转换为秒数
+            if isinstance(duration, (int, float)):
+                file_duration_seconds = duration
+            elif isinstance(duration, str):
+                file_duration_seconds = time_to_seconds(duration)
 
         device = self.device_map[id]["obj"]
         code, msg = device.play(file_path)
         if code != 0:
             return code, msg
 
-        if device.get_status()[0] == 0:
-            self._start_polling(id)
+        # 清除之前的文件定时器
+        self._clear_file_timer(id)
+
+        # 如果获取到了文件时长，启动定时器自动播放下一首
+        if file_duration_seconds and file_duration_seconds > 0:
+            self._start_file_timer(id, file_duration_seconds)
+
+        # 检查是否需要启动播放列表时长限制定时器
+        schedule = playlist_data.get("schedule", {})
+        playlist_duration_minutes = schedule.get("duration", 0)
+        if playlist_duration_minutes > 0:
+            # 如果还没有启动播放列表时长定时器，则启动
+            if id not in self._playlist_duration_timers:
+                self._start_playlist_duration_timer(id, playlist_duration_minutes)
+                self._scheduled_play_start_times[id] = datetime.datetime.now()
+
         return 0, "播放成功"
 
     def _update_index_and_play(self, id: str, new_index: int) -> tuple[int, str]:
@@ -246,8 +290,11 @@ class PlaylistMgr:
         if device_obj is None:
             return -1, "设备不存在或未初始化"
 
-        # 停止轮询
-        self._stop_polling(id)
+        # 清除文件定时器
+        self._clear_file_timer(id)
+
+        # 清除播放列表时长定时器
+        self._clear_playlist_duration_timer(id)
 
         # 清除定时任务触发的播放开始时间记录
         if id in self._scheduled_play_start_times:
@@ -256,74 +303,74 @@ class PlaylistMgr:
         # 停止播放
         return device_obj["obj"].stop()
 
-    def _start_polling(self, id: str):
-        if id in self._polling_playlists:
-            return
-        device_obj = self.device_map.get(id)
-        if device_obj is None:
-            return
-        device = device_obj["obj"]
-        if device is None:
-            return
-        if device.get_status()[0] != 0:
-            return
-
-        def poll_task():
-            if id not in self._polling_playlists:
-                return
-            code, msg = self._check_and_auto_play_next(id)
-            if code == 0:
-                log.info(f"[PlaylistMgr] 自动播放下一首成功: {id}")
-
+    def _start_file_timer(self, id: str, duration_seconds: float):
+        """
+        启动文件播放定时器，在文件播放完成后自动播放下一首
+        :param id: 播放列表ID
+        :param duration_seconds: 文件时长（秒）
+        """
         scheduler = get_scheduler()
-        scheduler.add_interval_job(func=poll_task, job_id=f"playlist_poll_{id}", seconds=self._polling_interval)
-        self._polling_playlists.add(id)
-        log.info(f"[PlaylistMgr] 启动播放列表轮询任务: {id}, 间隔: {self._polling_interval}秒")
+        job_id = f"playlist_file_timer_{id}"
+        
+        # 清除之前的定时器
+        if scheduler.get_job(job_id):
+            scheduler.remove_job(job_id)
+        
+        def play_next_task(pid=id):
+            log.info(f"[PlaylistMgr] 文件播放完成，自动播放下一首: {pid}")
+            self._clear_file_timer(pid)
+            self.play_next(pid)
+        
+        # 使用 DateTrigger 在指定时间后执行
+        run_date = datetime.datetime.now() + timedelta(seconds=duration_seconds)
+        scheduler.add_date_job(func=play_next_task, job_id=job_id, run_date=run_date)
+        self._file_timers[id] = job_id
+        log.info(f"[PlaylistMgr] 启动文件定时器: {id}, 将在 {duration_seconds} 秒后播放下一首")
 
-    def _stop_polling(self, id: str):
-        if id not in self._polling_playlists:
-            return
+    def _clear_file_timer(self, id: str):
+        """清除文件播放定时器"""
+        if id in self._file_timers:
+            scheduler = get_scheduler()
+            job_id = self._file_timers[id]
+            if scheduler.get_job(job_id):
+                scheduler.remove_job(job_id)
+                log.info(f"[PlaylistMgr] 清除文件定时器: {id}")
+            del self._file_timers[id]
+
+    def _start_playlist_duration_timer(self, id: str, duration_minutes: int):
+        """
+        启动播放列表时长限制定时器，在指定时长后停止播放列表
+        :param id: 播放列表ID
+        :param duration_minutes: 播放时长限制（分钟）
+        """
         scheduler = get_scheduler()
-        scheduler.remove_job(f"playlist_poll_{id}")
-        self._polling_playlists.discard(id)
-        log.info(f"[PlaylistMgr] 停止播放列表轮询任务: {id}")
+        job_id = f"playlist_duration_timer_{id}"
+        
+        # 清除之前的定时器
+        if scheduler.get_job(job_id):
+            scheduler.remove_job(job_id)
+        
+        def stop_playlist_task(pid=id):
+            log.info(f"[PlaylistMgr] 播放列表时长限制到达 ({duration_minutes} 分钟)，停止播放: {pid}")
+            self._clear_playlist_duration_timer(pid)
+            if pid in self._scheduled_play_start_times:
+                del self._scheduled_play_start_times[pid]
+            self.stop(pid)
+        
+        # 使用 DateTrigger 在指定时间后执行
+        run_date = datetime.datetime.now() + timedelta(minutes=duration_minutes)
+        scheduler.add_date_job(func=stop_playlist_task, job_id=job_id, run_date=run_date)
+        self._playlist_duration_timers[id] = job_id
+        log.info(f"[PlaylistMgr] 启动播放列表时长定时器: {id}, 将在 {duration_minutes} 分钟后停止播放")
 
-    def _check_and_auto_play_next(self, id: str) -> tuple[int, str]:
-        if not self.playlist_raw or id not in self.playlist_raw:
-            return -1, "播放列表不存在"
-        playlist_data = self.playlist_raw[id]
-        device_obj = self.device_map.get(id)
-        if device_obj is None:
-            return -1, "设备不存在或未初始化"
-        device = device_obj["obj"]
-        if device is None:
-            return -1, "设备对象未初始化"
-
-        if id in self._scheduled_play_start_times:
-            schedule = playlist_data.get("schedule", {})
-            duration_minutes = schedule.get("duration", 0)
-            if duration_minutes > 0:
-                elapsed_minutes = (datetime.datetime.now() - self._scheduled_play_start_times[id]).total_seconds() / 60
-                if elapsed_minutes >= duration_minutes:
-                    log.info(f"[PlaylistMgr] 定时任务播放时长限制到达 ({elapsed_minutes:.1f}分钟 >= {duration_minutes}分钟)，停止播放: {id}")
-                    del self._scheduled_play_start_times[id]
-                    code, msg = self.stop(id)
-                    return (0, "播放时长限制到达，已停止播放") if code == 0 else (code, msg)
-
-        pos_code, pos_info = device.get_status()
-        if pos_code != 0:
-            return -1, "无法获取播放位置信息"
-
-        try:
-            duration_sec = time_to_seconds(pos_info.get("duration", "00:00:00"))
-            rel_sec = time_to_seconds(pos_info.get("rel_time", "00:00:00"))
-            if duration_sec <= 0:
-                return -1, "无法获取有效的曲目时长"
-            if rel_sec >= duration_sec or rel_sec >= duration_sec - 1:
-                return self.play_next(id)
-        except Exception as e:
-            log.warning(f"[PlaylistMgr] Error checking playback completion: {e}")
-        return -1, "播放未完成"
-
+    def _clear_playlist_duration_timer(self, id: str):
+        """清除播放列表时长定时器"""
+        if id in self._playlist_duration_timers:
+            scheduler = get_scheduler()
+            job_id = self._playlist_duration_timers[id]
+            if scheduler.get_job(job_id):
+                scheduler.remove_job(job_id)
+                log.info(f"[PlaylistMgr] 清除播放列表时长定时器: {id}")
+            del self._playlist_duration_timers[id]
 
 playlist_mgr = PlaylistMgr()

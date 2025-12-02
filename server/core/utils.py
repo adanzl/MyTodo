@@ -70,16 +70,17 @@ def convert_to_http_url(url: str) -> str:
     return url
 
 
-def format_time_str(time_str: str) -> str:
+def format_time_str(seconds: float) -> str:
     """
     将秒数格式化为 "HH:MM:SS" 格式
-    :param seconds: 秒数
+    :param seconds: 秒数（可以是整数或浮点数）
     :return: "HH:MM:SS" 格式的时间字符串
     """
+    seconds = int(seconds)
     hours = seconds // 3600
     minutes = (seconds % 3600) // 60
-    seconds = seconds % 60
-    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+    secs = seconds % 60
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
 
 def time_to_seconds(time_str: str) -> int:

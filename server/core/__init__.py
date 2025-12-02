@@ -11,7 +11,7 @@ from core.api.dlna_routes import dlna_bp
 from core.api.media_routes import media_bp
 from core.api.mi_routes import mi_bp
 from core.chat.chat_mgr import ChatMgr
-from core.db.db_mgr import DB_Mgr
+from core.db.db_mgr import DbMgr
 from core.scheduler import init_scheduler
 import os
 
@@ -41,7 +41,7 @@ def create_app():
     app.register_blueprint(mi_bp, url_prefix='/')
 
     ChatMgr(socketio)
-    DB_Mgr.init(app)
+    DbMgr.init(app)
     ai_mgr.init()
 
     # 初始化定时任务调度器

@@ -44,6 +44,8 @@ async function createComponent() {
         connectedDeviceList: ref([]),
         dlnaDeviceList: ref([]),
         dlnaScanning: ref(false),
+        miDeviceList: ref([]),
+        miScanning: ref(false),
         playing: ref(false),
         stopping: ref(false),
         playlistCollection: ref([]),
@@ -93,8 +95,8 @@ async function createComponent() {
         const name = (item?.name && String(item.name).trim()) || fallbackName;
         // 优先读取 device.type，如果没有则读取 device_type，最后默认为 "dlna"
         const deviceType = item?.device?.type || item?.device_type || "dlna";
-        // 确保设备类型是有效的值：agent, dlna, bluetooth
-        const validDeviceType = ["agent", "dlna", "bluetooth"].includes(deviceType)
+        // 确保设备类型是有效的值：agent, dlna, bluetooth, mi
+        const validDeviceType = ["agent", "dlna", "bluetooth", "mi"].includes(deviceType)
           ? deviceType
           : "dlna";
         // 规范化 schedule，确保 cron 是字符串类型
@@ -213,11 +215,11 @@ async function createComponent() {
           if (item.id) {
             // 确定设备类型：优先使用 device.type，其次 device_type
             let deviceType = "dlna"; // 默认值
-            if (item.device?.type && ["agent", "dlna", "bluetooth"].includes(item.device.type)) {
+            if (item.device?.type && ["agent", "dlna", "bluetooth", "mi"].includes(item.device.type)) {
               deviceType = item.device.type;
             } else if (
               item.device_type &&
-              ["agent", "dlna", "bluetooth"].includes(item.device_type)
+              ["agent", "dlna", "bluetooth", "mi"].includes(item.device_type)
             ) {
               deviceType = item.device_type;
             }
@@ -535,6 +537,25 @@ async function createComponent() {
           ElMessage.error("扫描 DLNA 设备失败: " + (error.message || "未知错误"));
         } finally {
           refData.dlnaScanning.value = false;
+        }
+      };
+
+      const scanMiDevices = async () => {
+        try {
+          refData.miScanning.value = true;
+          const response = await fetch(`${getApiUrl()}/mi/scan?timeout=5`);
+          const result = await response.json();
+          if (result.code === 0) {
+            refData.miDeviceList.value = result.data || [];
+            ElMessage.success(`扫描到 ${refData.miDeviceList.value.length} 个小米设备`);
+          } else {
+            ElMessage.error(result.msg || "扫描小米设备失败");
+          }
+        } catch (error) {
+          console.error("扫描小米设备失败:", error);
+          ElMessage.error("扫描小米设备失败: " + (error.message || "未知错误"));
+        } finally {
+          refData.miScanning.value = false;
         }
       };
 
@@ -1109,7 +1130,7 @@ async function createComponent() {
       const handleUpdatePlaylistDeviceType = async (deviceType) => {
         if (!refData.playlistStatus.value) return;
 
-        const validDeviceTypes = ["agent", "dlna", "bluetooth"];
+        const validDeviceTypes = ["agent", "dlna", "bluetooth", "mi"];
         if (!validDeviceTypes.includes(deviceType)) {
           ElMessage.error(`无效的设备类型: ${deviceType}`);
           return;
@@ -1163,6 +1184,13 @@ async function createComponent() {
       const handleSelectAgentDevice = async (device) => {
         const address = typeof device === 'string' ? device : device.address;
         const name = typeof device === 'string' ? null : device.name;
+        await handleUpdatePlaylistDeviceAddress(address, name);
+      };
+
+      // 选择小米设备
+      const handleSelectMiDevice = async (device) => {
+        const address = device.deviceID || device.address || '';
+        const name = device.name || '';
         await handleUpdatePlaylistDeviceAddress(address, name);
       };
 
@@ -1856,8 +1884,9 @@ async function createComponent() {
         handleUpdatePlaylistDeviceAddress,
         handleSelectBluetoothDevice,
         handleSelectAgentDevice,
-
+        handleSelectMiDevice,
         scanDlnaDevices,
+        scanMiDevices,
       };
 
       updateFileBrowserCanNavigateUp();
