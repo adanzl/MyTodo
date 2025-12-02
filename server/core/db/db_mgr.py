@@ -22,7 +22,7 @@ class DbMgr:
         app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///./' + DB_NAME  # SQLite 数据库
         app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # 关闭修改跟踪（减少内存消耗）
         db_obj.init_app(app)
-        log.info("DB_Mgr init")
+        log.info("DbMgr init")
 
     @staticmethod
     def set_save(id, user_name, data) -> dict:

@@ -477,18 +477,14 @@ def get_media_duration(file_path):
     :return: 时长（秒），如果失败返回 None
     """
     try:
-        result = subprocess.run([
-            '/usr/bin/ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of',
-            'default=noprint_wrappers=1:nokey=1', file_path
-        ],
-                                capture_output=True,
-                                text=True,
-                                timeout=5)
+        cmds = ['/usr/bin/ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of',
+            'default=noprint_wrappers=1:nokey=1', file_path]
+        result = subprocess.run(cmds, capture_output=True, text=True, timeout=50)
         if result.returncode == 0 and result.stdout.strip():
             duration = float(result.stdout.strip())
             return int(duration) if duration else None
     except (FileNotFoundError, subprocess.TimeoutExpired, ValueError) as e:
-        log.warning(f"Failed to get media duration with ffprobe: {e}")
+        log.warning(f"Failed to get media duration with ffprobe {cmds.join(' ')} error: {e}")
     except Exception as e:
         log.warning(f"Error getting media duration: {e}")
     return None
