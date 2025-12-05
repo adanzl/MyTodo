@@ -4,8 +4,9 @@ import os
 import sys
 import time
 from datetime import timedelta
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
+from core.api.routes import get_media_duration
 from core.db import rds_mgr
 from core.device.agent import DeviceAgent
 from core.device.bluetooth import BluetoothDev
@@ -13,7 +14,6 @@ from core.device.dlna import DlnaDev
 from core.device.mi_device import MiDevice
 from core.log_config import root_logger
 from core.scheduler import get_scheduler
-from core.api.routes import get_media_duration
 from core.utils import time_to_seconds
 
 log = root_logger()
@@ -53,6 +53,8 @@ class PlaylistMgr:
         self._file_timers = {}  # 文件播放定时器 {playlist_id: job_id}
         self._playlist_duration_timers = {}  # 播放列表时长定时器 {playlist_id: job_id}
         self._playing_playlists = set()  # 正在播放的播放列表ID集合
+        self.playlist_raw = {}  # 播放列表数据
+        self.device_map = {}  # 设备映射
         self.reload()
 
     def get_playlist(self, id: str) -> Dict[str, Any] | None:
@@ -68,6 +70,11 @@ class PlaylistMgr:
     def reload(self) -> int:
         if sys.platform != "linux":
             log.warning(f"[PlaylistMgr] Reload not supported on non-linux platforms : {sys.platform}")
+            # 确保 playlist_raw 和 device_map 已初始化
+            if not hasattr(self, 'playlist_raw'):
+                self.playlist_raw = {}
+            if not hasattr(self, 'device_map'):
+                self.device_map = {}
             return 0
         """
         重新从 RDS 中加载 playlist 数据
