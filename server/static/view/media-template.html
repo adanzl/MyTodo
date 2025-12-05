@@ -117,7 +117,7 @@
           <div class="text-sm text-gray-500" v-if="playlistStatus">
             共 {{ playlistStatus.total || 0 }} 首， 当前: {{ playlistStatus.current_index !==
             undefined ? playlistStatus.current_index + 1 : '-' }} / {{ playlistStatus.total || 0
-            }}，
+            }}
           </div>
         </div>
         <div class="flex flex-wrap gap-2">
@@ -215,6 +215,15 @@
                 :disabled="playlistLoading"
                 title="删除">
                 ×
+              </el-button>
+              <el-button
+                type="success"
+                size="small"
+                circle
+                @click="handleCopyPlaylistItem(index)"
+                :disabled="playlistLoading"
+                title="复制到末尾">
+                📋
               </el-button>
             </div>
           </div>

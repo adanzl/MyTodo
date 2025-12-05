@@ -1395,6 +1395,40 @@ async function createComponent() {
         }
       };
 
+      // 复制播放列表项到末尾
+      const handleCopyPlaylistItem = async (index) => {
+        const status = refData.playlistStatus.value;
+        if (!status || index < 0 || index >= status.playlist.length) return;
+
+        const fileItem = status.playlist[index];
+        const filePath = typeof fileItem === 'string' ? fileItem : (fileItem?.uri || '');
+        const fileName = (filePath ? String(filePath) : '').split("/").pop() || filePath;
+
+        try {
+          refData.playlistLoading.value = true;
+          await updateActivePlaylistData((playlistInfo) => {
+            const list = [...playlistInfo.playlist];
+            // 复制文件项（深拷贝）
+            const copiedItem = typeof fileItem === 'string' 
+              ? fileItem 
+              : (fileItem && typeof fileItem === 'object' 
+                  ? { ...fileItem } 
+                  : { uri: filePath });
+            // 添加到列表末尾
+            list.push(copiedItem);
+            playlistInfo.playlist = list;
+            playlistInfo.total = list.length;
+            return playlistInfo;
+          });
+          ElMessage.success(`已复制 "${fileName}" 到列表末尾`);
+        } catch (error) {
+          console.error("复制失败:", error);
+          ElMessage.error("复制失败: " + (error.message || "未知错误"));
+        } finally {
+          refData.playlistLoading.value = false;
+        }
+      };
+
       // 清空播放列表
       const handleClearPlaylist = async () => {
         const status = refData.playlistStatus.value;
@@ -1912,6 +1946,7 @@ async function createComponent() {
         handleMovePlaylistItemUp,
         handleMovePlaylistItemDown,
         handleDeletePlaylistItem,
+        handleCopyPlaylistItem,
         handleClearPlaylist,
         handleSelectPlaylist,
         handleCreatePlaylist,
