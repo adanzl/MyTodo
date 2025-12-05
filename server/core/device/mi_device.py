@@ -138,7 +138,7 @@ class MiDevice:
                     os.path.join(str(Path.home()), ".mi.token"),
                 )
                 mina_service = MiNAService(account)
-                await mina_service.player_stop(self.device_id)
+                await mina_service.player_pause(self.device_id)
                 return 0, "ok"
             except Exception as e:
                 log.error(f"[MiDevice] Stop error: {e}")
