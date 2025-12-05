@@ -426,7 +426,9 @@ def list_directory():
                     has_track = False
                 
                 # 将文件名转换为自然排序的元组：将数字和文本分开
-                # 例如 "p1.mp3" -> ('p', 1, '.mp3'), "xxx.mp3" -> ('xxx_', 1, '.mp3')
+                # 例如 "p1.mp3" -> (0, 'p', 1, '.mp3'), "1abc.mp3" -> (1, 'abc', '.mp3')
+                # 使用 (类型标识, 值) 的格式确保类型安全比较
+                # 类型标识：0=文本, 1=数字，确保文本总是排在数字前面
                 def split_name_into_parts(s):
                     parts = []
                     current_text = ''
@@ -439,14 +441,14 @@ def list_directory():
                                 num_str += s[i]
                                 i += 1
                             if current_text:
-                                parts.append(current_text.lower())
+                                parts.append((0, current_text.lower()))  # 0 表示文本
                                 current_text = ''
-                            parts.append(int(num_str))
+                            parts.append((1, int(num_str)))  # 1 表示数字
                         else:
                             current_text += s[i]
                             i += 1
                     if current_text:
-                        parts.append(current_text.lower())
+                        parts.append((0, current_text.lower()))  # 0 表示文本
                     return tuple(parts)
                 
                 name_parts = split_name_into_parts(name)
@@ -457,7 +459,7 @@ def list_directory():
                     not is_dir,  # False (目录) 排在 True (文件) 前面
                     not has_track,  # False (有Track数字) 排在 True (无Track数字) 前面
                     track_number,  # Track 数字（主要排序键）
-                    name_parts  # 文件名自然排序元组
+                    name_parts  # 文件名自然排序元组，每个元素是 (类型标识, 值) 格式
                 )
             
             items.sort(key=natural_sort_key)
