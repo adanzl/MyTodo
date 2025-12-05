@@ -57,7 +57,9 @@ class PlaylistMgr:
         self.device_map = {}  # 设备映射
         self.reload()
 
-    def get_playlist(self, id: str) -> Dict[str, Any] | None:
+    def get_playlist(self, id: str | None) -> Dict[str, Any] | None:
+        if id is None:
+            return self.playlist_raw
         return self.playlist_raw.get(id, None)
 
     def save_playlist(self, collection: Dict[str, Any]) -> int:
@@ -172,7 +174,7 @@ class PlaylistMgr:
         for playlist_id in list(self._playlist_duration_timers.keys()):
             if playlist_id not in playlist_ids:
                 del self._playlist_duration_timers[playlist_id]
-        
+
         # 清理孤立的播放状态记录
         self._playing_playlists &= playlist_ids
 
@@ -198,7 +200,7 @@ class PlaylistMgr:
         # 检查是否正在播放，防止重复播放
         if not force and id in self._playing_playlists:
             return -1, "播放列表正在播放中，请勿重复播放"
-        
+
         playlist_data, code, msg = self._validate_playlist(id)
         if code != 0:
             return code, msg
