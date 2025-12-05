@@ -40,7 +40,7 @@ def playlist_get():
             ret = playlist_mgr.get_playlist(None)
         else:
             ret = playlist_mgr.get_playlist(id)
-            if ret is None:
+            if not ret:
                 return _err(f"未找到标识为 {id} 的播放列表")
         return _ok(ret)
     except Exception as e:

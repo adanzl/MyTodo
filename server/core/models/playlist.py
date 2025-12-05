@@ -4,7 +4,7 @@ import os
 import sys
 import time
 from datetime import timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from core.api.routes import get_media_duration
 from core.db import rds_mgr
@@ -57,10 +57,19 @@ class PlaylistMgr:
         self.device_map = {}  # 设备映射
         self.reload()
 
-    def get_playlist(self, id: str | None) -> Dict[str, Any] | None:
+    def get_playlist(self, id: str | None = None) -> Dict[str, Dict[str, Any]]:
+        """
+        获取播放列表
+        :param id: 播放列表ID，如果为None则返回所有播放列表
+        :return: 播放列表字典，格式为 {playlist_id: playlist_data}
+                 如果id为None，返回所有播放列表；如果id有值，返回只包含该播放列表的字典；如果不存在则返回空字典
+        """
         if id is None:
             return self.playlist_raw
-        return self.playlist_raw.get(id, None)
+        playlist_data = self.playlist_raw.get(id)
+        if playlist_data is None:
+            return {}
+        return {id: playlist_data}
 
     def save_playlist(self, collection: Dict[str, Any]) -> int:
         rds_mgr.set(PLAYLIST_RDS_FULL_KEY, json.dumps(collection, ensure_ascii=False))
