@@ -153,50 +153,57 @@ class MiDevice:
             log.error(f"[MiDevice] Stop error: {e}")
             return -1, f"停止失败: {str(e)}"
 
-    async def get_status(self) -> tuple[int, dict]:
+    def get_status(self) -> tuple[int, dict]:
         """
         获取播放状态信息
         :return: (错误码, 状态字典) 格式: {'state', 'status', 'track', 'duration', 'position'}
         """
-        session = None
+        async def _get_status_async():
+            session = None
+            try:
+                # 获取 MiNAService 对象
+                session = ClientSession()
+                account = MiAccount(
+                    session,
+                    self.username,
+                    self.password,
+                    os.path.join(str(Path.home()), ".mi.token"),
+                )
+                mina_service = MiNAService(account)
+                ret = await mina_service.player_get_status(self.device_id)
+                if ret['code'] != 0:
+                    return -1, {"error": ret['message']}
+                info = json.loads(ret['data']['info']) 
+                state = 'STOPPED' if info['status'] == 1 else 'PLAYING'
+                play_song_detail = info['play_song_detail']
+                duration = format_time_str(play_song_detail['duration'] / 1000) if play_song_detail.get('duration') else '00:00:00'
+                track_list = info.get('track_list', [])
+                audio_id = play_song_detail.get('audio_id')
+                position = play_song_detail.get('position', 0)  # 播放位置 单位：毫秒
+                
+                track = 0
+                if audio_id and track_list:
+                    track = track_list.index(audio_id) + 1
+                
+                return 0, {
+                    "state": state,  # PLAYING, STOPPED
+                    "status": 'OK',  # OK, ERROR
+                    "track": track,  # 当前曲目索引（从1开始）
+                    "duration": duration,  # 总时长，格式如 "00:03:45"
+                    "position": format_time_str(position / 1000),  # 已播放时长，格式如 "00:01:30"
+                }
+            except Exception as e:
+                log.error(f"[MiDevice] Get status error: {e}")
+                return -1, {"error": f"获取播放状态信息失败: {str(e)}"}
+            finally:
+                if session:
+                    await session.close()
+
         try:
-            # 获取 MiNAService 对象
-            session = ClientSession()
-            account = MiAccount(
-                session,
-                self.username,
-                self.password,
-                os.path.join(str(Path.home()), ".mi.token"),
-            )
-            mina_service = MiNAService(account)
-            ret = await mina_service.player_get_status(self.device_id)
-            if ret['code'] != 0:
-                return -1, {"error": ret['message']}
-            info = json.loads(ret['data']['info']) 
-            state = 'STOPPED' if info['status'] == 1 else 'PLAYING'
-            play_song_detail = info['play_song_detail']
-            duration = format_time_str(play_song_detail['duration'] / 1000) if play_song_detail.get('duration') else '00:00:00'
-            track_list = info.get('track_list', [])
-            audio_id = play_song_detail.get('audio_id')
-            position = play_song_detail.get('position', 0)  # 播放位置 单位：毫秒
-            
-            track = 0
-            if audio_id and track_list:
-                track = track_list.index(audio_id) + 1
-            
-            return 0, {
-                "state": state,  # PLAYING, STOPPED
-                "status": 'OK',  # OK, ERROR
-                "track": track,  # 当前曲目索引（从1开始）
-                "duration": duration,  # 总时长，格式如 "00:03:45"
-                "position": format_time_str(position / 1000),  # 已播放时长，格式如 "00:01:30"
-            }
+            return run_async(_get_status_async(), timeout=5.0)
         except Exception as e:
             log.error(f"[MiDevice] Get status error: {e}")
             return -1, {"error": f"获取播放状态信息失败: {str(e)}"}
-        finally:
-            if session:
-                await session.close()
 
 # 同步包装函数（用于在Flask路由中使用）
 

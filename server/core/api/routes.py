@@ -426,7 +426,7 @@ def list_directory():
                     has_track = False
                 
                 # 将文件名转换为自然排序的元组：将数字和文本分开
-                # 例如 "p1.mp3" -> ('p', 1, '.mp3'), "xiaopingguo_1.mp3" -> ('xiaopingguo_', 1, '.mp3')
+                # 例如 "p1.mp3" -> ('p', 1, '.mp3'), "xxx.mp3" -> ('xxx_', 1, '.mp3')
                 def split_name_into_parts(s):
                     parts = []
                     current_text = ''
