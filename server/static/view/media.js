@@ -1,7 +1,7 @@
 import { bluetoothAction, playlistAction, getApiUrl } from "../js/net_util.js";
 const axios = window.axios;
 
-const { ref, onMounted, nextTick } = window.Vue;
+const { ref, onMounted, onUnmounted, nextTick } = window.Vue;
 const { ElMessage, ElMessageBox } = window.ElementPlus;
 let component = null;
 async function loadTemplate() {
@@ -138,6 +138,7 @@ async function createComponent() {
           device: item?.device || { type: validDeviceType, address: item?.device_address || null, name: item?.device?.name || null },
           schedule: normalizedSchedule,
           updatedAt: item?.updatedAt || Date.now(),
+          is_playing: item?.is_playing === true || item?.is_playing === 1,
         };
       };
 
@@ -226,6 +227,7 @@ async function createComponent() {
           playlist: [...(active.playlist || [])],
           pre_files: [...(active.pre_files || [])],
           current_index: currentIndex,
+          is_playing: active.is_playing === true || active.is_playing === 1,
         };
       };
 
@@ -1243,10 +1245,59 @@ async function createComponent() {
 
 
 
-      const refreshPlaylistStatus = async () => {
+      // 刷新播放列表状态
+      // @param {boolean} onlyCurrent - 如果为 true，只刷新当前激活的播放列表；如果为 false，刷新全部播放列表
+      const refreshPlaylistStatus = async (onlyCurrent = false) => {
         try {
           refData.playlistRefreshing.value = true;
-          await loadPlaylist();
+          
+          if (onlyCurrent) {
+            // 只刷新当前激活的播放列表状态
+            const activeId = refData.activePlaylistId.value;
+            if (!activeId) {
+              return;
+            }
+            
+            // 只获取当前激活的播放列表
+            const response = await playlistAction("get", "GET", { id: activeId });
+            if (response.code !== 0) {
+              throw new Error(response.msg || "获取播放列表状态失败");
+            }
+
+            // 解析返回的数据
+            const parsed = transformApiDataToPlaylistFormat(response.data);
+            if (!parsed || !parsed.playlists || parsed.playlists.length === 0) {
+              return;
+            }
+
+            const updatedPlaylist = parsed.playlists[0];
+            
+            // 更新 playlistCollection 中对应的项
+            const collection = refData.playlistCollection.value.map((item) => {
+              if (item.id === activeId) {
+                return {
+                  ...item,
+                  ...updatedPlaylist,
+                  // 保留原有的 playlist 和 pre_files 数组引用，只更新状态字段
+                  playlist: updatedPlaylist.playlist || item.playlist,
+                  pre_files: updatedPlaylist.pre_files || item.pre_files,
+                  current_index: updatedPlaylist.current_index !== undefined 
+                    ? updatedPlaylist.current_index 
+                    : item.current_index,
+                  is_playing: updatedPlaylist.is_playing === true || updatedPlaylist.is_playing === 1,
+                };
+              }
+              return item;
+            });
+            
+            refData.playlistCollection.value = collection;
+            
+            // 同步更新当前激活的播放列表状态
+            syncActivePlaylist(collection);
+          } else {
+            // 刷新全部播放列表
+            await loadPlaylist();
+          }
         } catch (error) {
           console.error("刷新播放列表状态失败:", error);
         } finally {
@@ -2125,10 +2176,31 @@ async function createComponent() {
 
       updateFileBrowserCanNavigateUp();
 
+      // 定时器：每5秒刷新播放列表状态
+      let statusRefreshTimer = null;
+
       onMounted(async () => {
         await loadPlaylist();
         await refreshConnectedList();
+        
+        // 启动定时器，每5秒刷新一次当前播放列表状态
+        statusRefreshTimer = setInterval(async () => {
+          try {
+            await refreshPlaylistStatus(true);
+          } catch (error) {
+            console.error("定时刷新播放列表状态失败:", error);
+          }
+        }, 5000);
       });
+
+      onUnmounted(() => {
+        // 清理定时器
+        if (statusRefreshTimer) {
+          clearInterval(statusRefreshTimer);
+          statusRefreshTimer = null;
+        }
+      });
+
       return {
         ...refData,
         cronBuilderVisible,
