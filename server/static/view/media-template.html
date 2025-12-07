@@ -134,7 +134,7 @@
             circle
             @click="handlePlayPlaylist"
             :loading="playing"
-            :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0"
+            :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0 || playlistStatus.is_playing"
             title="播放">
             <span v-if="!playing">▶</span>
           </el-button>
@@ -179,7 +179,7 @@
               size="small"
               @click="handleOpenFileBrowserForPreFiles"
               :disabled="!playlistStatus">
-              添加文件
+              +
             </el-button>
           </div>
           <div

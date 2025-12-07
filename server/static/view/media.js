@@ -361,6 +361,7 @@ async function createComponent() {
               create_time: item.create_time,
               updated_time: item.updated_time,
               updatedAt: item.updated_time ? new Date(item.updated_time).getTime() : Date.now(),
+              is_playing: item.is_playing === true || item.is_playing === 1,
             };
           });
 
@@ -1276,6 +1277,9 @@ async function createComponent() {
           if (response.code !== 0) {
             throw new Error(response.msg || "播放失败");
           }
+
+          // 刷新播放列表状态以更新 is_playing
+          await refreshPlaylistStatus();
 
           ElMessage.success("开始播放");
         } catch (error) {

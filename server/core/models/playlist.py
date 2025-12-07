@@ -64,13 +64,23 @@ class PlaylistMgr:
         :param id: 播放列表ID，如果为None则返回所有播放列表
         :return: 播放列表字典，格式为 {playlist_id: playlist_data}
                  如果id为None，返回所有播放列表；如果id有值，返回只包含该播放列表的字典；如果不存在则返回空字典
+                 每个播放列表数据中包含 is_playing 字段，表示是否正在播放
         """
         if id is None:
-            return self.playlist_raw
+            # 返回所有播放列表，为每个添加 is_playing 状态
+            result = {}
+            for playlist_id, playlist_data in self.playlist_raw.items():
+                playlist_data_copy = playlist_data.copy()
+                playlist_data_copy['is_playing'] = playlist_id in self._playing_playlists
+                result[playlist_id] = playlist_data_copy
+            return result
         playlist_data = self.playlist_raw.get(id)
         if playlist_data is None:
             return {}
-        return {id: playlist_data}
+        # 为单个播放列表添加 is_playing 状态
+        playlist_data_copy = playlist_data.copy()
+        playlist_data_copy['is_playing'] = id in self._playing_playlists
+        return {id: playlist_data_copy}
 
     def save_playlist(self, collection: Dict[str, Any]) -> int:
         rds_mgr.set(PLAYLIST_RDS_FULL_KEY, json.dumps(collection, ensure_ascii=False))
