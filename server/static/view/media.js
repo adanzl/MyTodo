@@ -72,6 +72,7 @@ async function createComponent() {
         id: overrides.id || createPlaylistId(),
         name: overrides.name || "默认播放列表",
         playlist: overrides.playlist || [],
+        pre_files: overrides.pre_files || [],
         current_index: overrides.current_index || 0,
         device_address: overrides.device_address || null,
         device_type: overrides.device_type || "dlna",
@@ -80,7 +81,24 @@ async function createComponent() {
       });
 
       const normalizePlaylistItem = (item, fallbackName = "播放列表") => {
-        const playlist = Array.isArray(item?.playlist) ? [...item.playlist] : [];
+        const normalizeFiles = (files) => {
+          if (!Array.isArray(files)) return [];
+          return files.map((fileItem) => {
+            if (typeof fileItem === "string") {
+              return { uri: fileItem };
+            } else if (fileItem && typeof fileItem === "object") {
+              return {
+                uri: fileItem.uri || fileItem.path || fileItem.file || "",
+                duration: fileItem.duration || null,
+              };
+            }
+            return null;
+          }).filter((item) => item !== null);
+        };
+        
+        const playlist = normalizeFiles(item?.playlist || item?.files || []);
+        const pre_files = normalizeFiles(item?.pre_files || []);
+        
         let currentIndex = typeof item?.current_index === "number" 
           ? item.current_index 
           : (item?.current_index !== undefined && item?.current_index !== null 
@@ -111,6 +129,7 @@ async function createComponent() {
           id: item?.id || createPlaylistId(),
           name,
           playlist,
+          pre_files,
           total: playlist.length,
           current_index: currentIndex,
           device_address: item?.device_address || item?.device?.address || null,
@@ -204,6 +223,7 @@ async function createComponent() {
         refData.playlistStatus.value = {
           ...active,
           playlist: [...(active.playlist || [])],
+          pre_files: [...(active.pre_files || [])],
           current_index: currentIndex,
         };
       };
@@ -227,22 +247,29 @@ async function createComponent() {
             // 确定设备地址：优先使用 device.address，其次 device_address
             const deviceAddress = item.device?.address || item.device_address || "";
 
-            // 规范化 playlist 格式：确保是新格式 {"uri": "地址"}
-            const normalizedFiles = (item.playlist || []).map((fileItem) => {
-              if (typeof fileItem === "string") {
-                return { uri: fileItem };
-              } else if (fileItem && typeof fileItem === "object") {
-                return {
-                  uri: fileItem.uri || fileItem.path || fileItem.file || "",
-                };
-              }
-              return null;
-            }).filter((f) => f !== null);
+            // 规范化 playlist 和 pre_files 格式：确保是新格式 {"uri": "地址"}
+            const normalizeFiles = (files) => {
+              if (!Array.isArray(files)) return [];
+              return files.map((fileItem) => {
+                if (typeof fileItem === "string") {
+                  return { uri: fileItem };
+                } else if (fileItem && typeof fileItem === "object") {
+                  return {
+                    uri: fileItem.uri || fileItem.path || fileItem.file || "",
+                  };
+                }
+                return null;
+              }).filter((f) => f !== null);
+            };
+            
+            const normalizedFiles = normalizeFiles(item.playlist || []);
+            const normalizedPreFiles = normalizeFiles(item.pre_files || []);
             
             playlistDict[item.id] = {
               id: item.id,
               name: item.name || "默认播放列表",
               files: normalizedFiles,
+              pre_files: normalizedPreFiles,
               current_index: item.current_index || 0,
               device: {
                 address: deviceAddress,
@@ -285,19 +312,25 @@ async function createComponent() {
 
         // 如果返回的是字典格式（多个播放列表，key 是 id）
         if (!Array.isArray(apiData) && Object.keys(apiData).length > 0) {
-          const playlists = Object.values(apiData).map((item) => {
-            // 规范化 files 格式：兼容旧格式（字符串数组）和新格式（对象数组）
-            const files = item.files || [];
-            const normalizedFiles = files.map((fileItem) => {
+          const normalizeFiles = (files) => {
+            if (!Array.isArray(files)) return [];
+            return files.map((fileItem) => {
               if (typeof fileItem === "string") {
                 return { uri: fileItem };
               } else if (fileItem && typeof fileItem === "object") {
                 return {
                   uri: fileItem.uri || fileItem.path || fileItem.file || "",
+                  duration: fileItem.duration || null,
                 };
               }
               return null;
             }).filter((item) => item !== null);
+          };
+          
+          const playlists = Object.values(apiData).map((item) => {
+            // 规范化 files 和 pre_files 格式：兼容旧格式（字符串数组）和新格式（对象数组）
+            const normalizedFiles = normalizeFiles(item.files || []);
+            const normalizedPreFiles = normalizeFiles(item.pre_files || []);
             
             // 规范化 schedule，确保 cron 是字符串类型
             const schedule = item.schedule || { enabled: 0, cron: "", duration: 0 };
@@ -311,6 +344,7 @@ async function createComponent() {
               id: item.id,
               name: item.name || "默认播放列表",
               playlist: normalizedFiles,
+              pre_files: normalizedPreFiles,
               current_index: typeof item.current_index === "number" 
                 ? item.current_index 
                 : (item.current_index !== undefined && item.current_index !== null 
@@ -435,6 +469,7 @@ async function createComponent() {
         let collection = refData.playlistCollection.value.map((item) => ({
           ...item,
           playlist: Array.isArray(item.playlist) ? [...item.playlist] : [],
+          pre_files: Array.isArray(item.pre_files) ? [...item.pre_files] : [],
         }));
         if (collection.length === 0) {
           const defaultPlaylist = normalizePlaylistItem(createDefaultPlaylist());
@@ -451,6 +486,7 @@ async function createComponent() {
           mutator({
             ...currentItem,
             playlist: [...currentItem.playlist],
+            pre_files: [...(currentItem.pre_files || [])],
           }) || currentItem;
         collection[index] = normalizePlaylistItem(updatedItem, currentItem.name);
         refData.playlistCollection.value = collection;
@@ -1463,6 +1499,82 @@ async function createComponent() {
         }
       };
 
+      // 删除 pre_files 中的文件
+      const handleDeletePreFile = async (index) => {
+        const status = refData.playlistStatus.value;
+        if (!status || !status.pre_files || index < 0 || index >= status.pre_files.length) return;
+
+        const fileItem = status.pre_files[index];
+        const filePath = typeof fileItem === 'string' ? fileItem : (fileItem?.uri || '');
+        const fileName = (filePath ? String(filePath) : '').split("/").pop() || filePath;
+
+        try {
+          await ElMessageBox.confirm(`确定要删除 "${fileName}" 吗？`, "确认删除", {
+            confirmButtonText: "确定",
+            cancelButtonText: "取消",
+            type: "warning",
+          });
+
+          refData.playlistLoading.value = true;
+          await updateActivePlaylistData((playlistInfo) => {
+            const list = [...(playlistInfo.pre_files || [])];
+            list.splice(index, 1);
+            playlistInfo.pre_files = list;
+            return playlistInfo;
+          });
+          ElMessage.success("已删除");
+        } catch (error) {
+          if (error !== "cancel") {
+            console.error("删除失败:", error);
+            ElMessage.error("删除失败: " + (error.message || "未知错误"));
+          }
+        } finally {
+          refData.playlistLoading.value = false;
+        }
+      };
+
+      // 上移 pre_files 中的文件
+      const handleMovePreFileUp = async (index) => {
+        const status = refData.playlistStatus.value;
+        if (!status || !status.pre_files || index <= 0 || index >= status.pre_files.length) return;
+
+        try {
+          refData.playlistLoading.value = true;
+          await updateActivePlaylistData((playlistInfo) => {
+            const list = [...(playlistInfo.pre_files || [])];
+            [list[index - 1], list[index]] = [list[index], list[index - 1]];
+            playlistInfo.pre_files = list;
+            return playlistInfo;
+          });
+        } catch (error) {
+          console.error("上移失败:", error);
+          ElMessage.error("上移失败: " + (error.message || "未知错误"));
+        } finally {
+          refData.playlistLoading.value = false;
+        }
+      };
+
+      // 下移 pre_files 中的文件
+      const handleMovePreFileDown = async (index) => {
+        const status = refData.playlistStatus.value;
+        if (!status || !status.pre_files || index < 0 || index >= status.pre_files.length - 1) return;
+
+        try {
+          refData.playlistLoading.value = true;
+          await updateActivePlaylistData((playlistInfo) => {
+            const list = [...(playlistInfo.pre_files || [])];
+            [list[index], list[index + 1]] = [list[index + 1], list[index]];
+            playlistInfo.pre_files = list;
+            return playlistInfo;
+          });
+        } catch (error) {
+          console.error("下移失败:", error);
+          ElMessage.error("下移失败: " + (error.message || "未知错误"));
+        } finally {
+          refData.playlistLoading.value = false;
+        }
+      };
+
       const handleSelectPlaylist = async (playlistId) => {
         if (!playlistId || playlistId === refData.activePlaylistId.value) return;
         const exists = refData.playlistCollection.value.find((item) => item.id === playlistId);
@@ -1735,6 +1847,7 @@ async function createComponent() {
         refData.fileBrowserDialogVisible.value = true;
         refData.fileBrowserPath.value = "/mnt/ext_base";
         refData.selectedFiles.value = [];
+        refData.fileBrowserTarget.value = "files"; // 默认添加到 files
         handleRefreshFileBrowser();
       };
 
@@ -1881,11 +1994,13 @@ async function createComponent() {
           }
 
           await updateActivePlaylistData((playlistInfo) => {
-            const list = Array.isArray(playlistInfo.playlist) ? [...playlistInfo.playlist] : [];
+            const targetList = refData.fileBrowserTarget.value === "pre_files" 
+              ? (Array.isArray(playlistInfo.pre_files) ? [...playlistInfo.pre_files] : [])
+              : (Array.isArray(playlistInfo.playlist) ? [...playlistInfo.playlist] : []);
             
             // 获取已存在的 URI 集合（兼容新旧格式）
             const existingUris = new Set();
-            list.forEach((item) => {
+            targetList.forEach((item) => {
               if (typeof item === "string") {
                 existingUris.add(item);
               } else if (item && typeof item === "object" && item.uri) {
@@ -1899,23 +2014,28 @@ async function createComponent() {
                 const fileItem = {
                   uri: filePath,
                 };
-                list.push(fileItem);
+                targetList.push(fileItem);
                 existingUris.add(filePath);
               }
             }
             
-            playlistInfo.playlist = list;
-            playlistInfo.total = list.length;
-            playlistInfo.device_address = deviceAddress || playlistInfo.device_address;
-            if (list.length === 0) {
-              playlistInfo.current_index = 0;
-            } else if (playlistInfo.current_index >= list.length) {
-              playlistInfo.current_index = list.length - 1;
+            if (refData.fileBrowserTarget.value === "pre_files") {
+              playlistInfo.pre_files = targetList;
+            } else {
+              playlistInfo.playlist = targetList;
+              playlistInfo.total = targetList.length;
+              playlistInfo.device_address = deviceAddress || playlistInfo.device_address;
+              if (targetList.length === 0) {
+                playlistInfo.current_index = 0;
+              } else if (playlistInfo.current_index >= targetList.length) {
+                playlistInfo.current_index = targetList.length - 1;
+              }
             }
             return playlistInfo;
           });
 
-          ElMessage.success(`成功添加 ${refData.selectedFiles.value.length} 个文件到播放列表`);
+          const targetName = refData.fileBrowserTarget.value === "pre_files" ? "前置列表" : "播放列表";
+          ElMessage.success(`成功添加 ${refData.selectedFiles.value.length} 个文件到${targetName}`);
           handleCloseFileBrowser();
         } catch (error) {
           console.error("添加文件到播放列表失败:", error);
@@ -1948,6 +2068,9 @@ async function createComponent() {
         handleDeletePlaylistItem,
         handleCopyPlaylistItem,
         handleClearPlaylist,
+        handleDeletePreFile,
+        handleMovePreFileUp,
+        handleMovePreFileDown,
         handleSelectPlaylist,
         handleCreatePlaylist,
         handleDeletePlaylistGroup,

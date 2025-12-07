@@ -170,6 +170,58 @@
       </div>
 
       <div v-if="playlistStatus" class="flex-1 overflow-y-auto">
+        <!-- pre_files 列表 -->
+        <div class="border rounded p-2 mb-2">
+          <div class="text-xs font-semibold text-gray-600 mb-2">前置文件（播放时优先播放）</div>
+          <div
+            v-if="playlistStatus.pre_files && playlistStatus.pre_files.length > 0">
+            <div
+              v-for="(file, index) in playlistStatus.pre_files"
+              :key="'pre-' + index"
+              class="flex items-center gap-2 p-1 hover:bg-gray-100 rounded">
+              <span class="text-xs text-gray-500 w-8">{{ index + 1 }}</span>
+              <span
+                class="flex-1 text-sm truncate"
+                :title="file.uri">
+                {{ file.uri.split('/').pop() }} 
+              </span>
+              <div class="flex items-center gap-1">
+                <el-button
+                  type="primary"
+                  size="small"
+                  circle
+                  @click="handleMovePreFileUp(index)"
+                  :disabled="index === 0 || playlistLoading"
+                  title="上移">
+                  ↑
+                </el-button>
+                <el-button
+                  type="primary"
+                  size="small"
+                  circle
+                  @click="handleMovePreFileDown(index)"
+                  :disabled="index === playlistStatus.pre_files.length - 1 || playlistLoading"
+                  title="下移">
+                  ↓
+                </el-button>
+                <el-button
+                  type="danger"
+                  size="small"
+                  circle
+                  @click="handleDeletePreFile(index)"
+                  :disabled="playlistLoading"
+                  title="删除">
+                  ×
+                </el-button>
+              </div>
+            </div>
+          </div>
+          <div v-else class="text-sm text-gray-400 text-center py-4">
+            前置文件列表为空
+          </div>
+        </div>
+        
+        <!-- files 列表 -->
         <div
           v-if="playlistStatus.playlist && playlistStatus.playlist.length > 0"
           class="border rounded p-2">
@@ -228,7 +280,7 @@
             </div>
           </div>
         </div>
-        <div v-else class="text-sm text-gray-400 text-center py-8">
+        <div v-else-if="(!playlistStatus.pre_files || playlistStatus.pre_files.length === 0)" class="text-sm text-gray-400 text-center py-8">
           当前播放列表为空，点击"添加文件"开始构建播放列表
         </div>
       </div>
@@ -803,14 +855,18 @@
     <template #footer>
       <div class="flex items-center justify-between">
         <span class="text-sm text-gray-500"> 提示：点击文件可切换选择状态，双击目录可进入 </span>
-        <div class="flex gap-2">
+        <div class="flex gap-2 items-center">
+          <el-select v-model="fileBrowserTarget" size="small" style="width: 150px">
+            <el-option label="添加到主列表" value="files"></el-option>
+            <el-option label="添加到前置列表" value="pre_files"></el-option>
+          </el-select>
           <el-button @click="handleCloseFileBrowser">取消</el-button>
           <el-button
             type="primary"
             @click="handleAddFilesToPlaylist"
             :loading="playlistLoading"
             :disabled="selectedFiles.length === 0">
-            添加到播放列表 ({{ selectedFiles.length }})
+            添加 ({{ selectedFiles.length }})
           </el-button>
         </div>
       </div>

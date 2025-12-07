@@ -55,6 +55,7 @@ class PlaylistMgr:
         self._playing_playlists = set()  # 正在播放的播放列表ID集合
         self.playlist_raw = {}  # 播放列表数据
         self.device_map = {}  # 设备映射
+        self._play_state = {}  # 播放状态跟踪 {playlist_id: {'in_pre_files': bool, 'pre_index': int, 'file_index': int}}
         self.reload()
 
     def get_playlist(self, id: str | None = None) -> Dict[str, Dict[str, Any]]:
@@ -186,13 +187,20 @@ class PlaylistMgr:
 
         # 清理孤立的播放状态记录
         self._playing_playlists &= playlist_ids
+        
+        # 清理孤立的播放状态跟踪
+        for playlist_id in list(self._play_state.keys()):
+            if playlist_id not in playlist_ids:
+                del self._play_state[playlist_id]
 
     def _validate_playlist(self, id: str):
         if not self.playlist_raw or id not in self.playlist_raw:
             return None, -1, "播放列表不存在"
         playlist_data = self.playlist_raw[id]
         files = playlist_data.get("files", [])
-        if not files:
+        pre_files = playlist_data.get("pre_files", [])
+        # 至少要有 files 或 pre_files 之一
+        if not files and not pre_files:
             return None, -1, "播放列表为空"
         device_obj = self.device_map.get(id)
         if device_obj is None:
@@ -202,6 +210,7 @@ class PlaylistMgr:
     def play(self, id: str, force: bool = False) -> tuple[int, str]:
         """
         播放播放列表
+        播放逻辑：先从头播放 pre_files 中的所有文件，然后播放 files 中从 current_index 开始的文件
         :param id: 播放列表ID
         :param force: 是否强制播放（即使正在播放也继续）
         :return: (错误码, 消息)
@@ -214,13 +223,44 @@ class PlaylistMgr:
         if code != 0:
             return code, msg
 
+        pre_files = playlist_data.get("pre_files", [])
         files = playlist_data.get("files", [])
         current_index = playlist_data.get("current_index", 0)
-        if current_index < 0 or current_index >= len(files):
-            return -1, f"当前索引 {current_index} 超出范围"
+        
+        # 如果不是 force 模式（即用户主动调用 play），重置播放状态，从头开始
+        # 如果是 force 模式（即自动播放下一首），保持当前播放状态
+        if not force or id not in self._play_state:
+            # 初始化播放状态：如果有 pre_files，从 pre_files 开始；否则从 files 的 current_index 开始
+            if pre_files:
+                self._play_state[id] = {
+                    "in_pre_files": True,
+                    "pre_index": 0,
+                    "file_index": current_index
+                }
+            else:
+                self._play_state[id] = {
+                    "in_pre_files": False,
+                    "pre_index": 0,
+                    "file_index": current_index
+                }
+        
+        play_state = self._play_state[id]
+        
+        # 确定要播放的文件
+        if play_state["in_pre_files"]:
+            # 播放 pre_files
+            pre_index = play_state["pre_index"]
+            if pre_index < 0 or pre_index >= len(pre_files):
+                return -1, f"pre_files 索引 {pre_index} 超出范围"
+            file_item = pre_files[pre_index]
+        else:
+            # 播放 files
+            file_index = play_state["file_index"]
+            if file_index < 0 or file_index >= len(files):
+                return -1, f"files 索引 {file_index} 超出范围"
+            file_item = files[file_index]
 
-        file_path = _get_file_uri(files[current_index])
-
+        file_path = _get_file_uri(file_item)
         if not file_path:
             return -1, "文件路径无效"
 
@@ -229,7 +269,10 @@ class PlaylistMgr:
         file_duration_seconds = None
         if duration is not None:
             # 更新当前播放文件的时长
-            files[current_index]["duration"] = duration
+            if play_state["in_pre_files"]:
+                pre_files[play_state["pre_index"]]["duration"] = duration
+            else:
+                files[play_state["file_index"]]["duration"] = duration
             # 如果 duration 是秒数，直接使用；如果是字符串格式，转换为秒数
             if isinstance(duration, (int, float)):
                 file_duration_seconds = duration
@@ -262,33 +305,138 @@ class PlaylistMgr:
 
         return 0, "播放成功"
 
-    def _update_index_and_play(self, id: str, new_index: int) -> tuple[int, str]:
+    def _update_index_and_play(self, id: str, new_index: int = None, in_pre_files: bool = None, pre_index: int = None, file_index: int = None) -> tuple[int, str]:
+        """
+        更新播放索引并播放
+        :param id: 播放列表ID
+        :param new_index: 新的 files 索引（如果指定，会更新 file_index）
+        :param in_pre_files: 是否在播放 pre_files
+        :param pre_index: pre_files 的索引
+        :param file_index: files 的索引
+        :return: (错误码, 消息)
+        """
         playlist_data, code, msg = self._validate_playlist(id)
         if code != 0:
             return code, msg
 
         files = playlist_data.get("files", [])
-        playlist_data["current_index"] = new_index % len(files)
-        playlist_data["updated_time"] = _TS()
-        rds_mgr.set(PLAYLIST_RDS_FULL_KEY, json.dumps(self.playlist_raw, ensure_ascii=False))
+        pre_files = playlist_data.get("pre_files", [])
+        
+        # 更新播放状态
+        if id not in self._play_state:
+            self._play_state[id] = {
+                "in_pre_files": False,
+                "pre_index": 0,
+                "file_index": playlist_data.get("current_index", 0)
+            }
+        
+        play_state = self._play_state[id]
+        
+        # 根据参数更新状态
+        if new_index is not None:
+            # 如果指定了 new_index，更新 file_index（只对 files 生效）
+            play_state["file_index"] = new_index % len(files) if files else 0
+            play_state["in_pre_files"] = False
+        if in_pre_files is not None:
+            play_state["in_pre_files"] = in_pre_files
+        if pre_index is not None:
+            play_state["pre_index"] = pre_index
+        if file_index is not None:
+            play_state["file_index"] = file_index
+        
+        # 更新播放列表的 current_index（只对 files 生效）
+        if not play_state["in_pre_files"] and files:
+            playlist_data["current_index"] = play_state["file_index"]
+            playlist_data["updated_time"] = _TS()
+            rds_mgr.set(PLAYLIST_RDS_FULL_KEY, json.dumps(self.playlist_raw, ensure_ascii=False))
 
         # 使用 force=True 允许切换播放（因为已经在播放中）
         code, msg = self.play(id, force=True)
         return (0, "播放成功") if code == 0 else (-1, msg)
 
     def play_next(self, id: str) -> tuple[int, str]:
+        """
+        播放下一首
+        逻辑：如果在播放 pre_files，播放 pre_files 的下一首；如果 pre_files 播放完了，开始播放 files；如果在播放 files，播放 files 的下一首
+        """
         playlist_data, code, msg = self._validate_playlist(id)
         if code != 0:
             return code, msg
-        current_index = playlist_data.get("current_index", 0)
-        return self._update_index_and_play(id, current_index + 1)
+        
+        pre_files = playlist_data.get("pre_files", [])
+        files = playlist_data.get("files", [])
+        
+        if id not in self._play_state:
+            # 如果没有播放状态，初始化并从头开始
+            if pre_files:
+                return self._update_index_and_play(id, in_pre_files=True, pre_index=0, file_index=playlist_data.get("current_index", 0))
+            else:
+                current_index = playlist_data.get("current_index", 0)
+                return self._update_index_and_play(id, file_index=current_index)
+        
+        play_state = self._play_state[id]
+        
+        if play_state["in_pre_files"]:
+            # 当前在播放 pre_files
+            next_pre_index = play_state["pre_index"] + 1
+            if next_pre_index < len(pre_files):
+                # 还有下一首 pre_files，继续播放
+                return self._update_index_and_play(id, in_pre_files=True, pre_index=next_pre_index, file_index=play_state["file_index"])
+            else:
+                # pre_files 播放完了，开始播放 files
+                file_index = play_state["file_index"]
+                if files and file_index < len(files):
+                    return self._update_index_and_play(id, in_pre_files=False, pre_index=len(pre_files), file_index=file_index)
+                else:
+                    return -1, "没有更多文件可播放"
+        else:
+            # 当前在播放 files
+            next_file_index = play_state["file_index"] + 1
+            if next_file_index < len(files):
+                return self._update_index_and_play(id, in_pre_files=False, pre_index=play_state["pre_index"], file_index=next_file_index)
+            else:
+                return -1, "没有更多文件可播放"
 
     def play_pre(self, id: str) -> tuple[int, str]:
+        """
+        播放上一首
+        逻辑：如果在播放 files，播放 files 的上一首；如果 files 在开头，回到 pre_files 的最后；如果在播放 pre_files，播放 pre_files 的上一首
+        """
         playlist_data, code, msg = self._validate_playlist(id)
         if code != 0:
             return code, msg
-        current_index = playlist_data.get("current_index", 0)
-        return self._update_index_and_play(id, current_index - 1)
+        
+        pre_files = playlist_data.get("pre_files", [])
+        files = playlist_data.get("files", [])
+        
+        if id not in self._play_state:
+            # 如果没有播放状态，初始化
+            if pre_files:
+                return self._update_index_and_play(id, in_pre_files=True, pre_index=len(pre_files) - 1, file_index=playlist_data.get("current_index", 0))
+            else:
+                current_index = playlist_data.get("current_index", 0)
+                prev_index = (current_index - 1) % len(files) if files else 0
+                return self._update_index_and_play(id, file_index=prev_index)
+        
+        play_state = self._play_state[id]
+        
+        if play_state["in_pre_files"]:
+            # 当前在播放 pre_files
+            prev_pre_index = play_state["pre_index"] - 1
+            if prev_pre_index >= 0:
+                return self._update_index_and_play(id, in_pre_files=True, pre_index=prev_pre_index, file_index=play_state["file_index"])
+            else:
+                return -1, "已经是第一首"
+        else:
+            # 当前在播放 files
+            prev_file_index = play_state["file_index"] - 1
+            if prev_file_index >= 0:
+                return self._update_index_and_play(id, in_pre_files=False, pre_index=play_state["pre_index"], file_index=prev_file_index)
+            elif pre_files:
+                # files 在开头，回到 pre_files 的最后
+                return self._update_index_and_play(id, in_pre_files=True, pre_index=len(pre_files) - 1, file_index=0)
+            else:
+                return -1, "已经是第一首"
 
     def stop(self, id: str) -> tuple[int, str]:
         if not self.playlist_raw or id not in self.playlist_raw:
@@ -310,6 +458,10 @@ class PlaylistMgr:
 
         # 清除播放状态
         self._playing_playlists.discard(id)
+        
+        # 清除播放状态跟踪
+        if id in self._play_state:
+            del self._play_state[id]
 
         # 停止播放
         return device_obj["obj"].stop()
