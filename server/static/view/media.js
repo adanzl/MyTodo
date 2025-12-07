@@ -20,6 +20,7 @@ async function createComponent() {
         fileBrowserList: ref([]),
         fileBrowserLoading: ref(false),
         selectedFiles: ref([]),
+        fileBrowserTarget: ref("files"), // "files" 或 "pre_files"
         cronBuilder: ref({
           second: "*",
           secondCustom: "",
@@ -1851,6 +1852,18 @@ async function createComponent() {
         handleRefreshFileBrowser();
       };
 
+      const handleOpenFileBrowserForPreFiles = () => {
+        if (!refData.playlistStatus.value) {
+          ElMessage.warning("请先选择一个播放列表");
+          return;
+        }
+        refData.fileBrowserDialogVisible.value = true;
+        refData.fileBrowserPath.value = "/mnt/ext_base";
+        refData.selectedFiles.value = [];
+        refData.fileBrowserTarget.value = "pre_files"; // 默认添加到 pre_files
+        handleRefreshFileBrowser();
+      };
+
       const handleCloseFileBrowser = () => {
         refData.fileBrowserDialogVisible.value = false;
         refData.selectedFiles.value = [];
@@ -2081,6 +2094,7 @@ async function createComponent() {
         handleCancelEditPlaylistName,
         getPlaylistNextCronTime,
         handleOpenFileBrowser,
+        handleOpenFileBrowserForPreFiles,
         handleCloseFileBrowser,
         handleRefreshFileBrowser,
         handleFileBrowserNavigateUp,

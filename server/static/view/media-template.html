@@ -172,7 +172,16 @@
       <div v-if="playlistStatus" class="flex-1 overflow-y-auto">
         <!-- pre_files 列表 -->
         <div class="border rounded p-2 mb-2">
-          <div class="text-xs font-semibold text-gray-600 mb-2">前置文件（播放时优先播放）</div>
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-xs font-semibold text-gray-600">前置文件（播放时优先播放）</div>
+            <el-button
+              type="primary"
+              size="small"
+              @click="handleOpenFileBrowserForPreFiles"
+              :disabled="!playlistStatus">
+              添加文件
+            </el-button>
+          </div>
           <div
             v-if="playlistStatus.pre_files && playlistStatus.pre_files.length > 0">
             <div
@@ -216,7 +225,7 @@
               </div>
             </div>
           </div>
-          <div v-else class="text-sm text-gray-400 text-center py-4">
+          <div v-else class="text-sm text-gray-400 text-center py-1">
             前置文件列表为空
           </div>
         </div>
