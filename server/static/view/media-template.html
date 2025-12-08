@@ -206,14 +206,18 @@
               <span class="flex-1 text-sm truncate" :title="file.uri">
                 {{ file.uri.split('/').pop() }}
               </span>
-              <el-tag v-if="file.duration" type="info" size="small" class="whitespace-nowrap w-16 text-center">
+              <el-tag
+                v-if="file.duration"
+                type="info"
+                size="small"
+                class="whitespace-nowrap w-16 text-center">
                 {{ formatDuration(file.duration) }}
               </el-tag>
               <div v-else class="w-16"></div>
               <div class="flex items-center gap-1">
                 <el-button
                   v-show="showMoreActions"
-                  type="primary"
+                  type="plain"
                   size="small"
                   circle
                   @click="handleMovePreFileUp(index)"
@@ -223,7 +227,7 @@
                 </el-button>
                 <el-button
                   v-show="showMoreActions"
-                  type="primary"
+                  type="plain"
                   size="small"
                   circle
                   @click="handleMovePreFileDown(index)"
@@ -233,13 +237,13 @@
                 </el-button>
                 <el-button
                   v-show="showMoreActions"
-                  type="success"
+                  type="plain"
                   size="small"
                   circle
                   @click="handleCopyPreFile(index)"
                   :disabled="playlistLoading"
                   title="复制到末尾">
-                  📋
+                  <el-icon><DocumentCopy /></el-icon>
                 </el-button>
                 <el-button
                   type="plain"
@@ -248,7 +252,7 @@
                   @click="handleDeletePreFile(index)"
                   :disabled="playlistLoading"
                   title="删除">
-                  ×
+                  <el-icon><Minus /></el-icon>
                 </el-button>
               </div>
             </div>
@@ -272,7 +276,11 @@
               :title="file.uri">
               {{ file.uri.split('/').pop() }}
             </span>
-            <el-tag v-if="file.duration" type="info" size="small" class="whitespace-nowrap w-16 text-center">
+            <el-tag
+              v-if="file.duration"
+              type="info"
+              size="small"
+              class="whitespace-nowrap w-16 text-center">
               {{ formatDuration(file.duration) }}
             </el-tag>
             <div v-else class="w-16"></div>
@@ -282,7 +290,7 @@
             <div class="flex items-center gap-1">
               <el-button
                 v-show="showMoreActions"
-                type="primary"
+                type="plain"
                 size="small"
                 circle
                 @click="handleMovePlaylistItemUp(index)"
@@ -292,7 +300,7 @@
               </el-button>
               <el-button
                 v-show="showMoreActions"
-                type="primary"
+                type="plain"
                 size="small"
                 circle
                 @click="handleMovePlaylistItemDown(index)"
@@ -302,13 +310,13 @@
               </el-button>
               <el-button
                 v-show="showMoreActions"
-                type="success"
+                type="plain"
                 size="small"
                 circle
                 @click="handleCopyPlaylistItem(index)"
                 :disabled="playlistLoading"
                 title="复制到末尾">
-                📋
+                <el-icon><DocumentCopy /></el-icon>
               </el-button>
               <el-button
                 type="plain"
@@ -317,7 +325,7 @@
                 @click="handleDeletePlaylistItem(index)"
                 :disabled="playlistLoading"
                 title="删除">
-                ×
+                <el-icon><Minus /></el-icon>
               </el-button>
             </div>
           </div>
