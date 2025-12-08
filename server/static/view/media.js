@@ -93,6 +93,32 @@ async function createComponent() {
         }, 0);
       };
 
+      // 计算播放列表总时长（秒，包括前置文件和播放列表文件）
+      const getPlaylistTotalDuration = () => {
+        const status = refData.playlistStatus.value;
+        if (!status) return 0;
+        let total = 0;
+        
+        // 前置文件时长
+        if (status.pre_files && status.pre_files.length > 0) {
+          total += status.pre_files.reduce((sum, file) => {
+            const duration = file?.duration;
+            return sum + (typeof duration === 'number' && duration > 0 ? duration : 0);
+          }, 0);
+        }
+        
+        // 播放列表文件时长
+        const files = status.playlist || status.files || [];
+        if (files.length > 0) {
+          total += files.reduce((sum, file) => {
+            const duration = file?.duration;
+            return sum + (typeof duration === 'number' && duration > 0 ? duration : 0);
+          }, 0);
+        }
+        
+        return total;
+      };
+
       const createDefaultPlaylist = (overrides = {}) => ({
         id: overrides.id || createPlaylistId(),
         name: overrides.name || "默认播放列表",
@@ -2121,6 +2147,7 @@ async function createComponent() {
         scanDlnaDevices,
         scanMiDevices,
         getPreFilesTotalDuration,
+        getPlaylistTotalDuration,
       };
 
       updateFileBrowserCanNavigateUp();
