@@ -1,4 +1,4 @@
-<div class="p-4">
+<div class="p-1">
   <!-- 3列布局：播放列表 | 文件列表 | 配置详情 -->
   <div class="flex gap-4 h-[calc(100vh-150px)]">
     <!-- 第一列：播放列表列表 -->
@@ -11,8 +11,9 @@
             size="small"
             plain
             @click="refreshPlaylistStatus"
-            :loading="playlistRefreshing">
-            刷新
+            :loading="playlistRefreshing"
+            class="!w-8 !h-6 !p-0">
+            <el-icon v-if="!playlistRefreshing"><Refresh /></el-icon>
           </el-button>
           <el-button type="success" size="small" @click="handleCreatePlaylist"> 新建 </el-button>
         </div>
@@ -33,8 +34,7 @@
               <span class="text-xs text-gray-500 whitespace-nowrap">
                 曲目: {{ (playlist.playlist && playlist.playlist.length) || 0 }}
               </span>
-              <div
-                class="flex items-center justify-center">
+              <div class="flex items-center justify-center">
                 <el-dropdown
                   trigger="click"
                   @command="(command) => handlePlaylistMenuCommand(command, playlist.id)"
@@ -46,7 +46,7 @@
                     circle
                     class="!w-5 !h-5 !min-w-5 !p-0 text-xs"
                     title="更多">
-                    <span style="font-size: 16px; line-height: 1;" class="mb-1">»</span>
+                    <span style="font-size: 16px; line-height: 1" class="mb-1">»</span>
                   </el-button>
                   <template #dropdown>
                     <el-dropdown-menu>
@@ -89,12 +89,12 @@
               class="flex items-center gap-2 flex-1 min-w-0">
               <h3 class="text-lg font-semibold truncate">{{ playlistStatus.name }}</h3>
               <el-button
-                type="primary"
+                type="plain"
                 size="small"
                 circle
                 @click="handleStartEditPlaylistName(activePlaylistId)"
                 title="编辑名称">
-                ✎
+                <el-icon><Edit /></el-icon>
               </el-button>
             </div>
             <div v-else class="flex items-center gap-2 flex-1 min-w-0">
@@ -116,8 +116,7 @@
           </div>
           <div class="text-sm text-gray-500" v-if="playlistStatus">
             共 {{ playlistStatus.total || 0 }} 首， 当前: {{ playlistStatus.current_index !==
-            undefined ? playlistStatus.current_index + 1 : '-' }} / {{ playlistStatus.total || 0
-            }}
+            undefined ? playlistStatus.current_index + 1 : '-' }} / {{ playlistStatus.total || 0 }}
           </div>
         </div>
         <div class="flex flex-wrap gap-2">
@@ -126,10 +125,18 @@
             size="small"
             @click="handleOpenFileBrowser"
             :disabled="!playlistStatus">
-            添加文件
+            添加
           </el-button>
           <el-button
-            type="success"
+            type="plain"
+            size="small"
+            circle
+            @click="showMoreActions = !showMoreActions"
+            title="更多">
+            <el-icon><el-icon-menu /></el-icon>
+          </el-button>
+          <el-button
+            type="plain"
             size="small"
             circle
             @click="handlePlayPlaylist"
@@ -139,7 +146,7 @@
             <span v-if="!playing">▶</span>
           </el-button>
           <el-button
-            type="info"
+            type="plain"
             size="small"
             circle
             @click="handlePlayNext"
@@ -149,7 +156,7 @@
             <span v-if="!playing">⏭</span>
           </el-button>
           <el-button
-            type="danger"
+            type="plain"
             size="small"
             circle
             @click="handleStopPlaylist"
@@ -164,7 +171,7 @@
             @click="handleClearPlaylist"
             :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0 || playlistLoading"
             title="清空列表">
-            🗑️
+            <el-icon><Delete /></el-icon>
           </el-button>
         </div>
       </div>
@@ -173,7 +180,12 @@
         <!-- pre_files 列表 -->
         <div class="border rounded p-2 mb-2">
           <div class="flex items-center justify-between mb-2">
-            <div class="text-xs font-semibold text-gray-600">前置文件（播放时优先播放）</div>
+            <div class="text-xs font-semibold text-gray-600">
+              前置文件（播放时优先播放）
+              <span v-if="getPreFilesTotalDuration() > 0" class="ml-2 text-gray-500">
+                {{ formatDuration(getPreFilesTotalDuration()) }}
+              </span>
+            </div>
             <el-button
               type="primary"
               size="small"
@@ -182,20 +194,22 @@
               +
             </el-button>
           </div>
-          <div
-            v-if="playlistStatus.pre_files && playlistStatus.pre_files.length > 0">
+          <div v-if="playlistStatus.pre_files && playlistStatus.pre_files.length > 0">
             <div
               v-for="(file, index) in playlistStatus.pre_files"
               :key="'pre-' + index"
               class="flex items-center gap-2 p-1 hover:bg-gray-100 rounded">
               <span class="text-xs text-gray-500 w-8">{{ index + 1 }}</span>
-              <span
-                class="flex-1 text-sm truncate"
-                :title="file.uri">
-                {{ file.uri.split('/').pop() }} 
+              <span class="flex-1 text-sm truncate" :title="file.uri">
+                {{ file.uri.split('/').pop() }}
               </span>
+              <el-tag v-if="file.duration" type="info" size="small" class="whitespace-nowrap w-16 text-center">
+                {{ formatDuration(file.duration) }}
+              </el-tag>
+              <div v-else class="w-16"></div>
               <div class="flex items-center gap-1">
                 <el-button
+                  v-show="showMoreActions"
                   type="primary"
                   size="small"
                   circle
@@ -205,6 +219,7 @@
                   ↑
                 </el-button>
                 <el-button
+                  v-show="showMoreActions"
                   type="primary"
                   size="small"
                   circle
@@ -214,7 +229,17 @@
                   ↓
                 </el-button>
                 <el-button
-                  type="danger"
+                  v-show="showMoreActions"
+                  type="success"
+                  size="small"
+                  circle
+                  @click="handleCopyPreFile(index)"
+                  :disabled="playlistLoading"
+                  title="复制到末尾">
+                  📋
+                </el-button>
+                <el-button
+                  type="plain"
                   size="small"
                   circle
                   @click="handleDeletePreFile(index)"
@@ -225,11 +250,9 @@
               </div>
             </div>
           </div>
-          <div v-else class="text-sm text-gray-400 text-center py-1">
-            前置文件列表为空
-          </div>
+          <div v-else class="text-sm text-gray-400 text-center py-1">前置文件列表为空</div>
         </div>
-        
+
         <!-- files 列表 -->
         <div
           v-if="playlistStatus.playlist && playlistStatus.playlist.length > 0"
@@ -244,13 +267,18 @@
               class="flex-1 text-sm truncate"
               :class="{ 'text-blue-600': index === playlistStatus.current_index }"
               :title="file.uri">
-              {{ file.uri.split('/').pop() }} 
+              {{ file.uri.split('/').pop() }}
             </span>
-            <el-tag v-if="index === playlistStatus.current_index" type="success" size="small">
-              当前
+            <el-tag v-if="file.duration" type="info" size="small" class="whitespace-nowrap w-16 text-center">
+              {{ formatDuration(file.duration) }}
             </el-tag>
+            <div v-else class="w-16"></div>
+            <!-- <el-tag v-if="index === playlistStatus.current_index" type="success" size="small">
+              当前
+            </el-tag> -->
             <div class="flex items-center gap-1">
               <el-button
+                v-show="showMoreActions"
                 type="primary"
                 size="small"
                 circle
@@ -260,6 +288,7 @@
                 ↑
               </el-button>
               <el-button
+                v-show="showMoreActions"
                 type="primary"
                 size="small"
                 circle
@@ -269,15 +298,7 @@
                 ↓
               </el-button>
               <el-button
-                type="danger"
-                size="small"
-                circle
-                @click="handleDeletePlaylistItem(index)"
-                :disabled="playlistLoading"
-                title="删除">
-                ×
-              </el-button>
-              <el-button
+                v-show="showMoreActions"
                 type="success"
                 size="small"
                 circle
@@ -286,10 +307,21 @@
                 title="复制到末尾">
                 📋
               </el-button>
+              <el-button
+                type="plain"
+                size="small"
+                circle
+                @click="handleDeletePlaylistItem(index)"
+                :disabled="playlistLoading"
+                title="删除">
+                ×
+              </el-button>
             </div>
           </div>
         </div>
-        <div v-else-if="(!playlistStatus.pre_files || playlistStatus.pre_files.length === 0)" class="text-sm text-gray-400 text-center py-8">
+        <div
+          v-else-if="(!playlistStatus.pre_files || playlistStatus.pre_files.length === 0)"
+          class="text-sm text-gray-400 text-center py-8">
           当前播放列表为空，点击"添加文件"开始构建播放列表
         </div>
       </div>
@@ -335,7 +367,7 @@
                 >
               </div>
             </div>
-            
+
             <div>
               <div class="text-xs text-gray-600 mb-1">持续时间（分钟）</div>
               <el-input-number
@@ -355,7 +387,7 @@
                 </span>
               </div>
             </div>
-            
+
             <div v-if="playlistStatus.schedule?.cron && playlistStatus.schedule?.enabled === 1">
               <el-button
                 type="success"
@@ -531,7 +563,9 @@
                   class="flex items-center gap-2 p-2 border rounded hover:bg-gray-50">
                   <div class="flex-1 min-w-0">
                     <div class="text-sm font-medium truncate">{{ device.name }}</div>
-                    <div class="text-xs text-gray-500 truncate" :title="device.deviceID || device.address">
+                    <div
+                      class="text-xs text-gray-500 truncate"
+                      :title="device.deviceID || device.address">
                       {{ device.deviceID || device.address }}
                     </div>
                   </div>
