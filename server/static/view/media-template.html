@@ -134,7 +134,7 @@
             circle
             @click="handlePlayPlaylist"
             :loading="playing"
-            :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0 || playlistStatus.is_playing"
+            :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0 || !!playlistStatus.isPlaying"
             title="播放">
             <span v-if="!playing">▶</span>
           </el-button>

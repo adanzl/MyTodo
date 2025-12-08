@@ -138,7 +138,7 @@ async function createComponent() {
           device: item?.device || { type: validDeviceType, address: item?.device_address || null, name: item?.device?.name || null },
           schedule: normalizedSchedule,
           updatedAt: item?.updatedAt || Date.now(),
-          is_playing: item?.is_playing === true || item?.is_playing === 1,
+          isPlaying: item?.isPlaying === true || item?.isPlaying === 1 || false,
         };
       };
 
@@ -227,7 +227,7 @@ async function createComponent() {
           playlist: [...(active.playlist || [])],
           pre_files: [...(active.pre_files || [])],
           current_index: currentIndex,
-          is_playing: active.is_playing === true || active.is_playing === 1,
+          isPlaying: active?.isPlaying === true || active?.isPlaying === 1 || false,
         };
       };
 
@@ -363,7 +363,7 @@ async function createComponent() {
               create_time: item.create_time,
               updated_time: item.updated_time,
               updatedAt: item.updated_time ? new Date(item.updated_time).getTime() : Date.now(),
-              is_playing: item.is_playing === true || item.is_playing === 1,
+              isPlaying: item?.isPlaying === true || item?.isPlaying === 1 || false,
             };
           });
 
@@ -1284,7 +1284,7 @@ async function createComponent() {
                   current_index: updatedPlaylist.current_index !== undefined 
                     ? updatedPlaylist.current_index 
                     : item.current_index,
-                  is_playing: updatedPlaylist.is_playing === true || updatedPlaylist.is_playing === 1,
+                  isPlaying: updatedPlaylist?.isPlaying === true || updatedPlaylist?.isPlaying === 1 || false,
                 };
               }
               return item;
@@ -1329,7 +1329,7 @@ async function createComponent() {
             throw new Error(response.msg || "播放失败");
           }
 
-          // 刷新播放列表状态以更新 is_playing
+          // 刷新播放列表状态以更新 isPlaying
           await refreshPlaylistStatus();
 
           ElMessage.success("开始播放");

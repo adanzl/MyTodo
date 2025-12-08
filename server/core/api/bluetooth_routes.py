@@ -5,6 +5,7 @@
 '''
 from flask import Blueprint, json, request
 from core.log_config import root_logger
+from core.utils import _ok, _err
 from core.device.bluetooth import (
     scan_devices_sync,
     connect_device_sync,
@@ -26,12 +27,10 @@ def bluetooth_scan():
         timeout = request.args.get('timeout', 5.0, type=float)
         log.info(f"===== [Bluetooth Scan] timeout={timeout}")
         devices = scan_devices_sync(timeout)
-        return {"code": 0, "msg": "ok", "data": devices}
+        return _ok(devices)
     except Exception as e:
-        log.error(e)
-        return {"code": -1, "msg": 'error: ' + str(e)}
-
-
+        log.error(f"[Bluetooth] Scan error: {e}")
+        return _err(f'error: {str(e)}')
 
 
 @bluetooth_bp.route("/bluetooth/device", methods=['GET'])
@@ -43,14 +42,14 @@ def bluetooth_get_device():
         address = request.args.get('address')
         log.info(f"===== [Bluetooth Get Device] address={address}")
         if not address:
-            return {"code": -1, "msg": "address is required"}
+            return _err("address is required")
         device = bluetooth_mgr.get_device(address)
         if device:
-            return {"code": 0, "msg": "ok", "data": device}
-        return {"code": -1, "msg": "device not found"}
+            return _ok(device)
+        return _err("device not found")
     except Exception as e:
-        log.error(e)
-        return {"code": -1, "msg": 'error: ' + str(e)}
+        log.error(f"[Bluetooth] Get device error: {e}")
+        return _err(f'error: {str(e)}')
 
 
 @bluetooth_bp.route("/bluetooth/connect", methods=['POST'])
@@ -60,15 +59,18 @@ def bluetooth_connect():
     """
     try:
         args = request.get_json()
-        log.info("===== [Bluetooth Connect] " + json.dumps(args))
+        log.info(f"===== [Bluetooth Connect] {json.dumps(args)}")
         address = args.get('address')
         if not address:
-            return {"code": -1, "msg": "address is required"}
+            return _err("address is required")
         result = connect_device_sync(address)
-        return result
+        # 如果 result 已经是标准格式，直接返回；否则包装
+        if isinstance(result, dict) and 'code' in result:
+            return result
+        return _ok(result)
     except Exception as e:
-        log.error(e)
-        return {"code": -1, "msg": 'error: ' + str(e)}
+        log.error(f"[Bluetooth] Connect error: {e}")
+        return _err(f'error: {str(e)}')
 
 
 @bluetooth_bp.route("/bluetooth/disconnect", methods=['POST'])
@@ -78,17 +80,18 @@ def bluetooth_disconnect():
     """
     try:
         args = request.get_json()
-        log.info("===== [Bluetooth Disconnect] " + json.dumps(args))
+        log.info(f"===== [Bluetooth Disconnect] {json.dumps(args)}")
         address = args.get('address')
         if not address:
-            return {"code": -1, "msg": "address is required"}
+            return _err("address is required")
         result = disconnect_device_sync(address)
-        return result
+        # 如果 result 已经是标准格式，直接返回；否则包装
+        if isinstance(result, dict) and 'code' in result:
+            return result
+        return _ok(result)
     except Exception as e:
-        log.error(e)
-        return {"code": -1, "msg": 'error: ' + str(e)}
-
-
+        log.error(f"[Bluetooth] Disconnect error: {e}")
+        return _err(f'error: {str(e)}')
 
 
 @bluetooth_bp.route("/bluetooth/paired", methods=['GET'])
@@ -99,7 +102,7 @@ def bluetooth_get_paired():
     try:
         log.info("===== [Bluetooth Get Paired Devices]")
         devices = get_system_paired_devices_sync()
-        return {"code": 0, "msg": "ok", "data": devices}
+        return _ok(devices)
     except Exception as e:
-        log.error(e)
-        return {"code": -1, "msg": 'error: ' + str(e)}
+        log.error(f"[Bluetooth] Get paired devices error: {e}")
+        return _err(f'error: {str(e)}')
