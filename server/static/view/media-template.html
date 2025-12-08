@@ -189,13 +189,24 @@
                 {{ formatDuration(getPreFilesTotalDuration()) }}
               </span>
             </div>
-            <el-button
-              type="primary"
-              size="small"
-              @click="handleOpenFileBrowserForPreFiles"
-              :disabled="!playlistStatus">
-              +
-            </el-button>
+            <div class="flex items-center gap-1">
+              <el-button
+                type="danger"
+                size="small"
+                circle
+                @click="handleClearPreFiles"
+                :disabled="!playlistStatus || !playlistStatus.pre_files || playlistStatus.pre_files.length === 0 || playlistLoading"
+                title="清空列表">
+                <el-icon><Delete /></el-icon>
+              </el-button>
+              <el-button
+                type="primary"
+                size="small"
+                @click="handleOpenFileBrowserForPreFiles"
+                :disabled="!playlistStatus">
+                +
+              </el-button>
+            </div>
           </div>
           <div v-if="playlistStatus.pre_files && playlistStatus.pre_files.length > 0">
             <div

@@ -230,6 +230,9 @@ async function createComponent() {
         return null;
       };
 
+      // 保存最后一次添加文件时的目录路径（内存中）
+      let lastFileBrowserPath = "/mnt/ext_base";
+
       const syncActivePlaylist = (collection) => {
         const list = Array.isArray(collection) ? collection : refData.playlistCollection.value;
         if (!list || list.length === 0) {
@@ -1535,6 +1538,38 @@ async function createComponent() {
         }
       };
 
+      // 清空前置文件列表
+      const handleClearPreFiles = async () => {
+        const status = refData.playlistStatus.value;
+        if (!status || !status.pre_files || status.pre_files.length === 0) return;
+
+        try {
+          await ElMessageBox.confirm(
+            `确定要清空前置文件列表吗？此操作将删除所有 ${status.pre_files.length} 个前置文件。`,
+            "确认清空",
+            {
+              confirmButtonText: "确定",
+              cancelButtonText: "取消",
+              type: "warning",
+            }
+          );
+
+          refData.playlistLoading.value = true;
+          await updateActivePlaylistData((playlistInfo) => {
+            playlistInfo.pre_files = [];
+            return playlistInfo;
+          });
+          ElMessage.success("已清空前置文件列表");
+        } catch (error) {
+          if (error !== "cancel") {
+            console.error("清空失败:", error);
+            ElMessage.error("清空失败: " + (error.message || "未知错误"));
+          }
+        } finally {
+          refData.playlistLoading.value = false;
+        }
+      };
+
       // 上移 pre_files 中的文件
       const handleMovePreFileUp = async (index) => {
         const status = refData.playlistStatus.value;
@@ -1876,7 +1911,7 @@ async function createComponent() {
           return;
         }
         refData.fileBrowserDialogVisible.value = true;
-        refData.fileBrowserPath.value = "/mnt/ext_base";
+        refData.fileBrowserPath.value = lastFileBrowserPath;
         refData.selectedFiles.value = [];
         refData.fileBrowserTarget.value = "files"; // 默认添加到 files
         handleRefreshFileBrowser();
@@ -1888,7 +1923,7 @@ async function createComponent() {
           return;
         }
         refData.fileBrowserDialogVisible.value = true;
-        refData.fileBrowserPath.value = "/mnt/ext_base";
+        refData.fileBrowserPath.value = lastFileBrowserPath;
         refData.selectedFiles.value = [];
         refData.fileBrowserTarget.value = "pre_files"; // 默认添加到 pre_files
         handleRefreshFileBrowser();
@@ -2077,6 +2112,8 @@ async function createComponent() {
 
           const targetName = refData.fileBrowserTarget.value === "pre_files" ? "前置列表" : "播放列表";
           ElMessage.success(`成功添加 ${refData.selectedFiles.value.length} 个文件到${targetName}`);
+          // 保存当前目录路径，以便下次打开时使用
+          lastFileBrowserPath = refData.fileBrowserPath.value;
           handleCloseFileBrowser();
         } catch (error) {
           console.error("添加文件到播放列表失败:", error);
@@ -2110,6 +2147,7 @@ async function createComponent() {
         handleCopyPlaylistItem,
         handleClearPlaylist,
         handleDeletePreFile,
+        handleClearPreFiles,
         handleMovePreFileUp,
         handleMovePreFileDown,
         handleCopyPreFile,

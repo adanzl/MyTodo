@@ -364,8 +364,15 @@ class PlaylistMgr:
 
         pre_files, files = playlist_data.get("pre_files", []), playlist_data.get("files", [])
 
-        # 如果不是 force 模式或没有播放状态，初始化播放状态
-        if not force or id not in self._play_state:
+        # 如果不是 force 模式，初始化播放状态（从头开始）
+        # 如果是 force 模式但没有播放状态，也初始化
+        if not force:
+            self._init_play_state(id, playlist_data, pre_files)
+        elif id not in self._play_state:
+            self._init_play_state(id, playlist_data, pre_files)
+
+        # 确保播放状态存在
+        if id not in self._play_state:
             self._init_play_state(id, playlist_data, pre_files)
 
         play_state = self._play_state[id]
@@ -557,8 +564,19 @@ class PlaylistMgr:
                             time.sleep(wait_seconds)
                 except Exception as e:
                     log.error(f"[PlaylistMgr] 检查播放状态异常: {pid}, {e}")
+            # 清除定时器
             self._clear_timer(pid, self._file_timers, "playlist_file_timer_")
-            self.play_next(pid)
+            # 确保播放状态存在，如果不存在则初始化
+            if pid not in self._play_state:
+                playlist_data = self.playlist_raw.get(pid)
+                if playlist_data:
+                    pre_files = playlist_data.get("pre_files", [])
+                    self._init_play_state(pid, playlist_data, pre_files)
+            # 播放下一首
+            result = self.play_next(pid)
+            # 如果播放失败，记录错误但不抛出异常（避免影响定时器）
+            if result[0] != 0:
+                log.warning(f"[PlaylistMgr] 定时器触发播放下一首失败: {pid}, {result[1]}")
 
         # 使用 DateTrigger 在指定时间后执行
         run_date = datetime.datetime.now() + timedelta(seconds=duration_seconds)
