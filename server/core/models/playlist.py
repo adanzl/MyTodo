@@ -5,7 +5,7 @@ import sys
 import time
 import threading
 from datetime import timedelta
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Counter, Dict, List, Optional, Union
 
 from core.utils import get_media_duration
 from core.db import rds_mgr
@@ -55,6 +55,7 @@ class PlaylistMgr:
         self._play_state = {}  # 播放状态跟踪 {playlist_id: {'in_pre_files': bool, 'pre_index': int, 'file_index': int}}
         self._duration_fetch_thread = None  # 批量获取时长的单例线程
         self._duration_fetch_lock = threading.Lock()  # 线程锁
+        self._duration_blacklist = Counter()  # 获取时长失败的黑名单 {file_uri: failure_count}
         self.reload()
 
     def get_playlist(self, id: str | None = None) -> Dict[str, Dict[str, Any]]:
@@ -215,22 +216,28 @@ class PlaylistMgr:
                 log.debug("[PlaylistMgr] 批量获取时长的线程正在运行，跳过本次启动")
                 return
 
-        # 收集所有没有 duration 的文件 URI（去重）
-        files_to_fetch = set[Any]()  # {file_uri, ...}
+        # 收集所有没有 duration 的文件 URI（去重），排除黑名单中失败超过3次的文件
+        files_to_fetch = set()  # {file_uri, ...}
         for playlist_data in playlists.values():
             # 检查 pre_files
             for file_item in playlist_data.get("pre_files", []):
                 if not file_item.get("duration"):
                     file_uri = _get_file_uri(file_item)
                     if file_uri:
-                        files_to_fetch.add(file_uri)
+                        # 检查黑名单，失败次数>=3则跳过
+                        failure_count = self._duration_blacklist.get(file_uri, 0)
+                        if failure_count < 3:
+                            files_to_fetch.add(file_uri)
 
             # 检查 files/playlist
             for file_item in playlist_data.get("files", []):
                 if not file_item.get("duration"):
                     file_uri = _get_file_uri(file_item)
                     if file_uri:
-                        files_to_fetch.add(file_uri)
+                        # 检查黑名单，失败次数>=3则跳过
+                        failure_count = self._duration_blacklist.get(file_uri, 0)
+                        if failure_count < 3:
+                            files_to_fetch.add(file_uri)
 
         if not files_to_fetch:
             return
@@ -247,9 +254,12 @@ class PlaylistMgr:
                     try:
                         duration = get_media_duration(file_uri)
                         file_durations[file_uri] = int(duration)
+                        # 成功获取，从黑名单中移除（如果存在）
+                        self._duration_blacklist.pop(file_uri, None)
                     except Exception as e:
                         failed_count += 1
-                        log.warning(f"[PlaylistMgr] 获取文件时长异常: {file_uri}, {e}")
+                        # 获取异常，更新黑名单
+                        self._duration_blacklist[file_uri] += 1
 
                 # 反向更新所有播放列表中匹配的文件 duration
                 updated_count = 0
