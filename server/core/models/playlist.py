@@ -6,7 +6,7 @@ import time
 from datetime import timedelta
 from typing import Any, Dict, List, Optional, Union
 
-from core.api.routes import get_media_duration
+from core.utils import get_media_duration
 from core.db import rds_mgr
 from core.device.agent import DeviceAgent
 from core.device.bluetooth import BluetoothDev

@@ -4,9 +4,35 @@
 """
 import asyncio
 import os
+import subprocess
+from urllib.parse import quote, unquote
+from typing import Optional, Tuple
 from core.log_config import root_logger
 
 log = root_logger()
+
+
+def ok_response(data=None):
+    """
+    返回成功响应
+    :param data: 响应数据，可选
+    :return: 成功响应字典
+    """
+    return {"code": 0, "msg": "ok", "data": data}
+
+
+def err_response(message: str):
+    """
+    返回错误响应
+    :param message: 错误消息
+    :return: 错误响应字典
+    """
+    return {"code": -1, "msg": message}
+
+
+# 为了保持向后兼容，提供别名
+_ok = ok_response
+_err = err_response
 
 
 def run_async(coroutine, timeout: float = None):
@@ -58,13 +84,7 @@ def convert_to_http_url(url: str) -> str:
 
     # 如果是本地绝对路径（以 / 开头），转换为 HTTP URL
     if url.startswith('/') and os.path.exists(url):
-        try:
-            # 动态导入以避免循环依赖
-            from core.api.media_routes import get_media_url
-            return get_media_url(url)
-        except ImportError:
-            log.warning("[Utils] Cannot import get_media_url, using original URL")
-            return url
+        return get_media_url(url)
 
     # 其他情况直接返回（可能是相对路径或其他格式）
     return url
@@ -91,3 +111,115 @@ def time_to_seconds(time_str: str) -> int:
     """
     parts = time_str.split(':')
     return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2]) if len(parts) == 3 else 0
+
+
+def get_media_duration(file_path):
+    """
+    使用 ffprobe 获取媒体文件的时长
+    :param file_path: 文件路径
+    :return: 时长（秒），如果失败返回 None
+    """
+    try:
+        cmds = ['/usr/bin/ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of',
+            'default=noprint_wrappers=1:nokey=1', file_path]
+        result = subprocess.run(cmds, capture_output=True, text=True, timeout=50)
+        if result.returncode == 0 and result.stdout.strip():
+            duration = float(result.stdout.strip())
+            return int(duration) if duration else None
+    except (FileNotFoundError, subprocess.TimeoutExpired, ValueError) as e:
+        log.warning(f"Failed to get media duration with ffprobe {' '.join(cmds)} error: {e}")
+    except Exception as e:
+        log.warning(f"Error getting media duration: {e}")
+    return None
+
+
+def _get_media_server_url():
+    """获取媒体文件服务器的完整URL"""
+    # 返回固定的服务器地址和端口
+    return "http://192.168.50.172:8848"
+
+
+def decode_url_path(path: str) -> str:
+    """
+    解码 URL 编码的路径
+    :param path: URL 编码的路径
+    :return: 解码后的路径
+    """
+    while '%' in path:
+        try:
+            decoded = unquote(path)
+            if decoded == path:
+                break
+            path = decoded
+        except Exception:
+            break
+    return path
+
+
+def validate_and_normalize_path(file_path: str, base_dir: str = '/mnt', must_be_file: bool = True) -> Tuple[Optional[str], Optional[str]]:
+    """
+    验证和规范化文件路径
+    :param file_path: 文件路径
+    :param base_dir: 基础目录，默认为 /mnt
+    :param must_be_file: 是否必须是文件（True）或可以是目录（False）
+    :return: (规范化后的路径, 错误消息)，如果成功则错误消息为 None
+    """
+    if not file_path:
+        return None, "文件路径不能为空"
+    
+    # URL 解码
+    file_path = decode_url_path(file_path)
+    
+    # 安全检查：防止路径遍历
+    if '..' in file_path.split('/') or file_path.startswith('~'):
+        return None, "Invalid path: Path traversal not allowed"
+    
+    # 处理相对路径
+    if not os.path.isabs(file_path):
+        file_path = os.path.join(base_dir, file_path.lstrip('/'))
+        file_path = os.path.abspath(file_path)
+    else:
+        file_path = os.path.abspath(file_path)
+    
+    # 检查路径是否在允许的目录内
+    if not file_path.startswith(base_dir):
+        log.warning(f"Path {file_path} is outside allowed directory {base_dir}")
+        return None, "文件路径不在允许的目录内"
+    
+    # 检查文件是否存在
+    if not os.path.exists(file_path):
+        return None, "文件不存在"
+    
+    if must_be_file and not os.path.isfile(file_path):
+        return None, "路径不是文件"
+    
+    return file_path, None
+
+
+def get_media_url(local_path: str) -> str:
+    """
+    将本地文件路径转换为可通过 HTTP 访问的 URL
+    :param local_path: 本地文件路径，如 /mnt/ext_base/audio/xxx.mp3
+    :return: HTTP URL，如 http://192.168.1.100:8000/api/media/files/mnt/ext_base/audio/xxx.mp3
+    """
+    try:
+        # 移除路径开头的 /
+        if local_path.startswith('/'):
+            filepath = local_path[1:]
+        else:
+            filepath = local_path
+        
+        # URL 编码路径
+        encoded_path = '/'.join(quote(part, safe='') for part in filepath.split('/'))
+        
+        # 获取服务器URL（使用固定地址）
+        base_url = _get_media_server_url()
+        
+        # 根据 main.py 中的 DispatcherMiddleware 配置，应用挂载在 /api 下
+        # 所以完整路径是 /api/media/files/
+        media_url = f"{base_url}/api/media/files/{encoded_path}"
+        log.debug(f"[MEDIA] Converted {local_path} to {media_url}")
+        return media_url
+    except Exception as e:
+        log.error(f"[MEDIA] Error converting path {local_path}: {e}")
+        return local_path

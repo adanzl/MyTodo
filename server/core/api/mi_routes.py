@@ -4,17 +4,10 @@
 from flask import Blueprint, request
 from core.log_config import root_logger
 from core.device.mi_device import scan_devices_sync
+from core.utils import _ok, _err
 
 log = root_logger()
 mi_bp = Blueprint('mi', __name__)
-
-
-def _ok(data=None):
-    return {"code": 0, "msg": "ok", "data": data}
-
-
-def _err(message: str):
-    return {"code": -1, "msg": message}
 
 
 @mi_bp.route("/mi/scan", methods=['GET'])

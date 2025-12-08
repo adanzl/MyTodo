@@ -4,24 +4,27 @@
 '''
 import json
 import os
-import socket
 from flask import Blueprint, request, send_file, abort
-from urllib.parse import quote
 
 from core.log_config import root_logger
 from core.models.playlist import playlist_mgr
+from core.utils import get_media_url, get_media_duration, validate_and_normalize_path, _ok, _err
 
 log = root_logger()
 media_bp = Blueprint('media', __name__)
 
-
-def _ok(data=None):
-    return {"code": 0, "msg": "ok", "data": data}
-
-
-def _err(message: str):
-    return {"code": -1, "msg": message}
-
+# 常量定义
+DEFAULT_BASE_DIR = '/mnt'
+MIMETYPE_MAP = {
+    '.mp3': 'audio/mpeg',
+    '.wav': 'audio/wav',
+    '.aac': 'audio/aac',
+    '.ogg': 'audio/ogg',
+    '.m4a': 'audio/mp4',
+    '.mp4': 'video/mp4',
+    '.avi': 'video/x-msvideo',
+    '.mkv': 'video/x-matroska',
+}
 
 
 # ========== 播放列表本地存储（RDS）接口 ==========
@@ -33,15 +36,16 @@ def playlist_get():
     """
     try:
         args = request.args
-        log.info("===== [Playlist Get] " + json.dumps(args))
-        id = args.get("id")
+        log.info(f"===== [Playlist Get] {json.dumps(args)}")
+        playlist_id = args.get("id")
+        
         # 如果 id 为空、None 或空字符串，返回整个播放列表集合
-        if id is None or id == "None" or id == "null":
+        if playlist_id is None or playlist_id in ("None", "null", ""):
             ret = playlist_mgr.get_playlist(None)
         else:
-            ret = playlist_mgr.get_playlist(id)
+            ret = playlist_mgr.get_playlist(playlist_id)
             if not ret:
-                return _err(f"未找到标识为 {id} 的播放列表")
+                return _err(f"未找到标识为 {playlist_id} 的播放列表")
         return _ok(ret)
     except Exception as e:
         log.error(f"[PLAYLIST] Get error: {e}")
@@ -58,7 +62,7 @@ def playlist_update():
         args = request.get_json(silent=True) or {}
         ret = playlist_mgr.save_playlist(args)
         if ret != 0:
-            return _err(f"更新播放列表失败")
+            return _err("更新播放列表失败")
         return _ok()
     except Exception as e:
         log.error(f"[PLAYLIST] Update error: {e}")
@@ -139,10 +143,35 @@ def playlist_reload():
 
 
 # ========== 媒体文件服务接口（用于 DLNA 播放）==========
-def _get_media_server_url():
-    """获取媒体文件服务器的完整URL"""
-    # 返回固定的服务器地址和端口
-    return "http://192.168.50.172:8848"
+
+@media_bp.route("/getDuration", methods=['GET'])
+def get_duration():
+    """
+    获取媒体文件的时长
+    :return: 时长（秒）
+    """
+    try:
+        file_path = request.args.get('path', '')
+        
+        # 验证和规范化路径
+        normalized_path, error_msg = validate_and_normalize_path(file_path, DEFAULT_BASE_DIR, must_be_file=True)
+        if error_msg:
+            return _err(error_msg)
+        
+        # 获取媒体文件时长
+        duration = get_media_duration(normalized_path)
+        if duration is not None:
+            return _ok({"duration": duration, "path": normalized_path})
+        else:
+            return _err("无法获取媒体文件时长")
+
+    except PermissionError as e:
+        file_path_str = file_path if 'file_path' in locals() else 'unknown'
+        log.error(f"Permission denied for {file_path_str}: {e}")
+        return _err(f"Permission denied: {str(e)}")
+    except Exception as e:
+        log.error(f"Error getting media duration: {e}")
+        return _err(f"Error: {str(e)}")
 
 
 @media_bp.route("/media/files/<path:filepath>", methods=['GET'])
@@ -153,7 +182,6 @@ def serve_media_file(filepath):
     """
     try:
         # 安全处理：移除路径中的危险字符
-        # 将 URL 编码的路径解码
         filepath = filepath.replace('../', '').replace('..\\', '')
         
         # 如果路径不是以 / 开头，添加 /
@@ -167,49 +195,10 @@ def serve_media_file(filepath):
         
         # 获取文件扩展名以确定 Content-Type
         ext = os.path.splitext(filepath)[1].lower()
-        mimetype_map = {
-            '.mp3': 'audio/mpeg',
-            '.wav': 'audio/wav',
-            '.aac': 'audio/aac',
-            '.ogg': 'audio/ogg',
-            '.m4a': 'audio/mp4',
-            '.mp4': 'video/mp4',
-            '.avi': 'video/x-msvideo',
-            '.mkv': 'video/x-matroska',
-        }
-        mimetype = mimetype_map.get(ext, 'application/octet-stream')
+        mimetype = MIMETYPE_MAP.get(ext, 'application/octet-stream')
         
         log.info(f"[MEDIA] Serving file: {filepath} (MIME: {mimetype})")
         return send_file(filepath, mimetype=mimetype)
     except Exception as e:
         log.error(f"[MEDIA] Error serving file {filepath}: {e}")
         abort(500)
-
-
-def get_media_url(local_path: str) -> str:
-    """
-    将本地文件路径转换为可通过 HTTP 访问的 URL
-    :param local_path: 本地文件路径，如 /mnt/ext_base/audio/xxx.mp3
-    :return: HTTP URL，如 http://192.168.1.100:8000/api/media/files/mnt/ext_base/audio/xxx.mp3
-    """
-    try:
-        # 移除路径开头的 /
-        if local_path.startswith('/'):
-            filepath = local_path[1:]
-        else:
-            filepath = local_path
-        
-        # URL 编码路径
-        encoded_path = '/'.join(quote(part, safe='') for part in filepath.split('/'))
-        
-        # 获取服务器URL（使用固定地址）
-        base_url = _get_media_server_url()
-        
-        # 根据 main.py 中的 DispatcherMiddleware 配置，应用挂载在 /api 下
-        # 所以完整路径是 /api/media/files/
-        media_url = f"{base_url}/api/media/files/{encoded_path}"
-        log.debug(f"[MEDIA] Converted {local_path} to {media_url}")
-        return media_url
-    except Exception as e:
-        log.error(f"[MEDIA] Error converting path {local_path}: {e}")
-        return local_path

@@ -6,20 +6,11 @@ import json
 from flask import Blueprint, request
 from core.log_config import root_logger
 from core.device.agent import DeviceAgent
+from core.utils import _ok, _err
 
 log = root_logger()
 agent_bp = Blueprint('agent', __name__)
 device_agent = DeviceAgent()
-
-
-def _ok(data=None):
-    """返回成功响应"""
-    return {"code": 0, "msg": "ok", "data": data}
-
-
-def _err(message: str):
-    """返回错误响应"""
-    return {"code": -1, "msg": message}
 
 
 @agent_bp.route("/agent/paired", methods=['GET'])

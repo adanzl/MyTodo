@@ -4,6 +4,7 @@ from core.log_config import root_logger
 from flask import Blueprint, json, jsonify, render_template, request
 import core.db.rds_mgr as rds_mgr
 from core.ai.ai_local import AILocal
+from core.utils import get_media_duration
 import random
 import os
 import re
@@ -491,26 +492,6 @@ def list_directory():
     except Exception as e:
         log.error(e)
         return {"code": -1, "msg": 'error: ' + str(e)}
-
-
-def get_media_duration(file_path):
-    """
-    使用 ffprobe 获取媒体文件的时长
-    :param file_path: 文件路径
-    :return: 时长（秒），如果失败返回 None
-    """
-    try:
-        cmds = ['/usr/bin/ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of',
-            'default=noprint_wrappers=1:nokey=1', file_path]
-        result = subprocess.run(cmds, capture_output=True, text=True, timeout=50)
-        if result.returncode == 0 and result.stdout.strip():
-            duration = float(result.stdout.strip())
-            return int(duration) if duration else None
-    except (FileNotFoundError, subprocess.TimeoutExpired, ValueError) as e:
-        log.warning(f"Failed to get media duration with ffprobe {cmds.join(' ')} error: {e}")
-    except Exception as e:
-        log.warning(f"Error getting media duration: {e}")
-    return None
 
 
 @api_bp.route("/getFileInfo", methods=['GET'])

@@ -4,17 +4,10 @@ DLNA设备管理路由
 from flask import Blueprint, request
 from core.log_config import root_logger
 from core.device.dlna import scan_devices_sync
+from core.utils import _ok, _err
 
 log = root_logger()
 dlna_bp = Blueprint('dlna', __name__)
-
-
-def _ok(data=None):
-    return {"code": 0, "msg": "ok", "data": data}
-
-
-def _err(message: str):
-    return {"code": -1, "msg": message}
 
 
 @dlna_bp.route("/dlna/scan", methods=['GET'])
