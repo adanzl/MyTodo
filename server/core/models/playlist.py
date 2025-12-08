@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import time
+import threading
 from datetime import timedelta
 from typing import Any, Dict, List, Optional, Union
 
@@ -39,11 +40,7 @@ def _create_device(node):
 
 
 def _get_file_uri(file_item):
-    if isinstance(file_item, str):
-        return file_item
-    if isinstance(file_item, dict):
-        return file_item.get("uri") or file_item.get("path") or file_item.get("file") or ""
-    return ""
+    return file_item.get("uri") or file_item.get("path") or file_item.get("file") or ""
 
 
 class PlaylistMgr:
@@ -56,6 +53,8 @@ class PlaylistMgr:
         self.playlist_raw = {}  # 播放列表数据
         self.device_map = {}  # 设备映射
         self._play_state = {}  # 播放状态跟踪 {playlist_id: {'in_pre_files': bool, 'pre_index': int, 'file_index': int}}
+        self._duration_fetch_thread = None  # 批量获取时长的单例线程
+        self._duration_fetch_lock = threading.Lock()  # 线程锁
         self.reload()
 
     def get_playlist(self, id: str | None = None) -> Dict[str, Dict[str, Any]]:
@@ -67,11 +66,17 @@ class PlaylistMgr:
                  如果播放列表中有 isPlaying 字段，表示正在播放
         """
         if id is None:
-            return self.playlist_raw
-        playlist_data = self.playlist_raw.get(id)
-        if playlist_data is None:
-            return {}
-        return {id: playlist_data}
+            result = self.playlist_raw
+        else:
+            playlist_data = self.playlist_raw.get(id)
+            if playlist_data is None:
+                return {}
+            result = {id: playlist_data}
+
+        # 汇总所有没有 duration 的文件，启动单例线程批量获取时长
+        self._start_batch_duration_fetch(result)
+
+        return result
 
     def _save_playlist_to_rds(self):
         """保存播放列表到 RDS"""
@@ -196,8 +201,96 @@ class PlaylistMgr:
         file_duration_seconds = int(duration)
         # 更新时长（file_item 是列表中的引用，直接修改即可）
         file_item["duration"] = file_duration_seconds
-        self._save_playlist_to_rds()        
+        self._save_playlist_to_rds()
         return file_duration_seconds
+
+    def _start_batch_duration_fetch(self, playlists: Dict[str, Dict[str, Any]]):
+        """
+        汇总所有没有 duration 的文件，启动单例线程批量获取时长
+        :param playlists: 播放列表字典
+        """
+        # 检查是否有正在运行的线程
+        with self._duration_fetch_lock:
+            if self._duration_fetch_thread is not None and self._duration_fetch_thread.is_alive():
+                log.debug("[PlaylistMgr] 批量获取时长的线程正在运行，跳过本次启动")
+                return
+
+        # 收集所有没有 duration 的文件 URI（去重）
+        files_to_fetch = set[Any]()  # {file_uri, ...}
+        for playlist_data in playlists.values():
+            # 检查 pre_files
+            for file_item in playlist_data.get("pre_files", []):
+                if not file_item.get("duration"):
+                    file_uri = _get_file_uri(file_item)
+                    if file_uri:
+                        files_to_fetch.add(file_uri)
+
+            # 检查 files/playlist
+            for file_item in playlist_data.get("files", []):
+                if not file_item.get("duration"):
+                    file_uri = _get_file_uri(file_item)
+                    if file_uri:
+                        files_to_fetch.add(file_uri)
+
+        if not files_to_fetch:
+            return
+
+        log.info(f"[PlaylistMgr] 发现 {len(files_to_fetch)} 个文件需要获取时长，启动批量获取线程")
+
+        def _batch_fetch_durations():
+            """批量获取文件时长的线程函数"""
+            file_durations = {}  # {file_uri: duration_seconds, ...}
+            failed_count = 0
+
+            try:
+                for file_uri in files_to_fetch:
+                    try:
+                        duration = get_media_duration(file_uri)
+                        file_durations[file_uri] = int(duration)
+                    except Exception as e:
+                        failed_count += 1
+                        log.warning(f"[PlaylistMgr] 获取文件时长异常: {file_uri}, {e}")
+
+                # 反向更新所有播放列表中匹配的文件 duration
+                updated_count = 0
+                for _, playlist_data in self.playlist_raw.items():
+                    # 更新 pre_files
+                    pre_files = playlist_data.get("pre_files", [])
+                    for file_item in pre_files:
+                        file_uri = _get_file_uri(file_item)
+                        if file_uri in file_durations and not file_item.get("duration"):
+                            file_item["duration"] = file_durations[file_uri]
+                            updated_count += 1
+
+                    # 更新 files/playlist
+                    files = playlist_data.get("files", [])
+                    for file_item in files:
+                        file_uri = _get_file_uri(file_item)
+                        if file_uri in file_durations and not file_item.get("duration"):
+                            file_item["duration"] = file_durations[file_uri]
+                            updated_count += 1
+
+                # 统一保存到 RDS
+                if updated_count > 0:
+                    self._save_playlist_to_rds()
+                    log.info(f"[PlaylistMgr] 批量获取时长完成: 成功 {updated_count} 个, 失败 {failed_count} 个")
+            except Exception as e:
+                log.error(f"[PlaylistMgr] 批量获取时长线程异常: {e}")
+            finally:
+                # 清理线程引用
+                with self._duration_fetch_lock:
+                    self._duration_fetch_thread = None
+
+        # 启动单例线程
+        with self._duration_fetch_lock:
+            if self._duration_fetch_thread is not None and self._duration_fetch_thread.is_alive():
+                log.debug("[PlaylistMgr] 批量获取时长的线程正在运行，跳过本次启动")
+                return
+
+            self._duration_fetch_thread = threading.Thread(target=_batch_fetch_durations,
+                                                           daemon=True,
+                                                           name="PlaylistDurationFetcher")
+            self._duration_fetch_thread.start()
 
     def _validate_playlist(self, id: str):
         """验证播放列表是否存在且有效"""
@@ -301,7 +394,10 @@ class PlaylistMgr:
 
         return 0, "播放成功"
 
-    def _update_index_and_play(self, id: str, in_pre_files: bool = None, pre_index: int = None,
+    def _update_index_and_play(self,
+                               id: str,
+                               in_pre_files: bool = None,
+                               pre_index: int = None,
                                file_index: int = None) -> tuple[int, str]:
         """更新播放索引并播放"""
         playlist_data, code, msg = self._validate_playlist(id)
@@ -343,7 +439,9 @@ class PlaylistMgr:
         # 如果没有播放状态，初始化并从头开始
         if id not in self._play_state:
             if pre_files:
-                return self._update_index_and_play(id, in_pre_files=True, pre_index=0,
+                return self._update_index_and_play(id,
+                                                   in_pre_files=True,
+                                                   pre_index=0,
                                                    file_index=playlist_data.get("current_index", 0))
             return self._update_index_and_play(id, file_index=playlist_data.get("current_index", 0))
 
@@ -353,7 +451,9 @@ class PlaylistMgr:
             # 播放 pre_files 的下一首
             next_pre_index = play_state["pre_index"] + 1
             if next_pre_index < len(pre_files):
-                return self._update_index_and_play(id, in_pre_files=True, pre_index=next_pre_index,
+                return self._update_index_and_play(id,
+                                                   in_pre_files=True,
+                                                   pre_index=next_pre_index,
                                                    file_index=play_state["file_index"])
             # pre_files 播放完了，开始播放 files
             if files and play_state["file_index"] < len(files):
@@ -377,7 +477,9 @@ class PlaylistMgr:
         # 如果没有播放状态，初始化
         if id not in self._play_state:
             if pre_files:
-                return self._update_index_and_play(id, in_pre_files=True, pre_index=len(pre_files) - 1,
+                return self._update_index_and_play(id,
+                                                   in_pre_files=True,
+                                                   pre_index=len(pre_files) - 1,
                                                    file_index=playlist_data.get("current_index", 0))
             current_index = playlist_data.get("current_index", 0)
             prev_index = (current_index - 1) % len(files) if files else 0
@@ -389,7 +491,9 @@ class PlaylistMgr:
             # 播放 pre_files 的上一首
             prev_pre_index = play_state["pre_index"] - 1
             if prev_pre_index >= 0:
-                return self._update_index_and_play(id, in_pre_files=True, pre_index=prev_pre_index,
+                return self._update_index_and_play(id,
+                                                   in_pre_files=True,
+                                                   pre_index=prev_pre_index,
                                                    file_index=play_state["file_index"])
             return -1, "已经是第一首"
         else:
