@@ -9,6 +9,7 @@ from core.api.media_routes import media_bp
 from core.api.keyboard_routes import keyboard_bp
 from core.log_config import root_logger
 from core.service.keyboard import start_keyboard_service
+from core.service.heartbeat import start_heartbeat_service
 
 log = root_logger()
 
@@ -39,5 +40,8 @@ def create_app():
     app.register_blueprint(media_bp, url_prefix='/')
     app.register_blueprint(keyboard_bp, url_prefix='/')
 
+    # 启动服务
     start_keyboard_service()
+    start_heartbeat_service()
+    
     return app, socketio
