@@ -67,16 +67,16 @@ class KeyboardListener:
         """按键按下事件处理"""
         if not self.is_running:
             return False
-        
+
         # 检查是否是 F12~F19
         if key in KEY_TO_NAME:
             key_name = KEY_TO_NAME[key]
             # log.info(f"[KEYBOARD] 检测到按键: {key_name}")
-            
+
             # 调用对应的处理函数
             with self._lock:
                 handler = self.handlers.get(key_name)
-            
+
             if handler:
                 try:
                     handler(key_name)
@@ -84,21 +84,21 @@ class KeyboardListener:
                     log.error(f"[KEYBOARD] 处理按键 {key_name} 时出错: {e}")
             else:
                 log.debug(f"[KEYBOARD] 按键 {key_name} 未设置处理函数")
-        
+
         return True
 
     def _listen_loop(self):
         """监听循环"""
         try:
-            
             # 创建键盘监听器
             self.listener = keyboard.Listener(on_press=self._on_key_press)
+            # 启动监听器
             self.listener.start()
-            
+
             # 保持监听器运行
             while self.is_running:
                 time.sleep(0.1)
-            
+
         except Exception as e:
             log.error(f"[KEYBOARD] 监听循环出错: {e}")
             log.error(f"[KEYBOARD] Traceback: {traceback.format_exc()}")
@@ -167,7 +167,7 @@ def create_key_handler(key: str) -> Callable:
     def handler(key_name: str):
         config = get_config()
         url = config.get(_get_config_key(key_name, "url"))
-        
+
         if not url:
             log.warning(f"[KEYBOARD] 按键 {key_name} 未配置 URL，跳过")
             return
@@ -192,7 +192,7 @@ def _setup_default_config():
     """设置F12的默认配置"""
     config = get_config()
     f12_url = config.get(_get_config_key("F12", "url"))
-    
+
     if not f12_url:
         # 设置F12的默认配置
         default_url = "http://localhost:8001/keyboard/status"
@@ -201,21 +201,6 @@ def _setup_default_config():
         config.save_config()
         log.info(f"[KEYBOARD] 已设置F12默认配置: GET {default_url}")
 
-
-def setup_handlers():
-    """设置所有已配置按键的处理函数"""
-    listener = get_keyboard_listener()
-    config = get_config()
-    
-    # 设置F12的默认配置（如果未配置）
-    _setup_default_config()
-
-    for key in KEY_CODES.keys():
-        url = config.get(_get_config_key(key, "url"))
-        if url:
-            handler = create_key_handler(key)
-            listener.set_handler(key, handler)
-            log.info(f"[KEYBOARD] 已配置按键 {key} -> {url}")
 
 
 def get_keyboard_status() -> Dict:
@@ -251,7 +236,18 @@ def start_keyboard_service():
     """
     try:
         listener = get_keyboard_listener()
-        setup_handlers()
+        # 设置所有已配置按键的处理函数
+        config = get_config()
+        # 设置F12的默认配置（如果未配置）
+        _setup_default_config()
+
+        for key in KEY_CODES.keys():
+            url = config.get(_get_config_key(key, "url"))
+            if url:
+                handler = create_key_handler(key)
+                listener.set_handler(key, handler)
+                log.info(f"[KEYBOARD] 已配置按键 {key} -> {url}")
+
         listener.start()
         return True, "键盘监听服务已启动"
     except Exception as e:

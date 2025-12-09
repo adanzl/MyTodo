@@ -1,7 +1,8 @@
 from flask import make_response
 from gevent import monkey
 
-monkey.patch_all(subprocess=True)  # 在导入其他模块之前进行 patch，包括 subprocess
+# 排除 threading 模块，避免影响 pynput 的线程操作
+monkey.patch_all(subprocess=True, thread=False)  # 不 patch thread，避免影响 pynput
 from core import create_app
 from core.log_config import root_logger
 

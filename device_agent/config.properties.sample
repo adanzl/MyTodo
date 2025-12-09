@@ -1,6 +1,42 @@
 # 配置文件示例
 
+# ============================================
+# 蓝牙配置
+# ============================================
 # 默认蓝牙设备地址（用于音频播放）
 # 通过 /bluetooth/setDefault 接口设置
 # default_bluetooth_device=58:EA:1F:1A:9A:8B
+
+# ============================================
+# 心跳上报配置
+# ============================================
+# Center服务器地址（用于心跳上报）
+# 如果未配置，心跳服务不会启动
+# center_server_url=http://your-center-server.com:8080
+
+# ============================================
+# 键盘按键配置 (F12~F19)
+# ============================================
+# 按键配置格式：
+# keyboard.{按键名}.url=请求URL
+# keyboard.{按键名}.method=HTTP方法 (GET/POST/PUT/DELETE)
+# keyboard.{按键名}.data=JSON格式的请求数据（可选）
+
+# F12 默认配置（如果未配置会自动设置）
+# keyboard.F12.url=http://localhost:8001/keyboard/status
+# keyboard.F12.method=GET
+
+# F13 配置示例
+# keyboard.F13.url=http://example.com/api/action
+# keyboard.F13.method=POST
+# keyboard.F13.data={"action": "test", "value": 123}
+
+# F14 配置示例
+# keyboard.F14.url=http://example.com/api/trigger
+# keyboard.F14.method=GET
+
+# 其他按键 (F15~F19) 配置方式相同
+# keyboard.F15.url=
+# keyboard.F15.method=
+# keyboard.F15.data=
 

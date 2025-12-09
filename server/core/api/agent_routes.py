@@ -106,3 +106,16 @@ def agent_stop():
     except Exception as e:
         log.error(f"[Agent] Stop error: {e}")
         return _err(f'error: {str(e)}')
+
+
+@agent_bp.route("/agent/heartbeat", methods=['GET'])
+def agent_heartbeat():
+    """
+    心跳检测接口（用于检查 agent 服务是否可用）
+    """
+    try:
+        log.debug("===== [Agent Heartbeat]")
+        return _ok({"status": "ok"})
+    except Exception as e:
+        log.error(f"[Agent] Heartbeat error: {e}")
+        return _err(f'error: {str(e)}')
