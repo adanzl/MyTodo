@@ -7,7 +7,7 @@ from core.log_config import root_logger
 
 log = root_logger()
 
-app = create_app()
+app, socketio = create_app()
 
 
 @app.route("/")
@@ -30,3 +30,11 @@ def af_request(resp):
 def null_application(environ, start_response):
     start_response("404 NOT FOUND", [("Content-Type", "text/plain")])
     yield b"NOT FOUND"
+
+
+if __name__ == '__main__':
+    PORT = 8001
+    HOST = '127.0.0.1'
+    
+    log.info(f"启动服务在 http://{HOST}:{PORT}")
+    socketio.run(app, host=HOST, port=PORT, debug=False)

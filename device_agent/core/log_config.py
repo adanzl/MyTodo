@@ -1,17 +1,26 @@
 import logging
+import os
+import platform
 from logging.handlers import TimedRotatingFileHandler
 
 # cSpell: disable-next-line
 formatter = logging.Formatter('%(asctime)s [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s')
-file_handler = TimedRotatingFileHandler('logs/app.log', when="midnight", backupCount=3, encoding="utf-8")
 std_handler = logging.StreamHandler()
 std_handler.setFormatter(formatter)
-file_handler.setFormatter(formatter)
 
 # 获取根日志记录器
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-logger.addHandler(file_handler)
+
+# 只在Linux平台添加文件处理器
+if platform.system() == 'Linux':
+    log_dir = 'logs'
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    file_handler = TimedRotatingFileHandler('logs/app.log', when="midnight", backupCount=3, encoding="utf-8")
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+
 logger.addHandler(std_handler)
 
 

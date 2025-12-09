@@ -6,7 +6,9 @@ from flask_socketio import SocketIO
 from core.api.routes import api_bp
 from core.api.bluetooth_routes import bluetooth_bp
 from core.api.media_routes import media_bp
+from core.api.keyboard_routes import keyboard_bp
 from core.log_config import root_logger
+from core.service.keyboard import start_keyboard_service
 
 log = root_logger()
 
@@ -35,5 +37,7 @@ def create_app():
     app.register_blueprint(api_bp, url_prefix='/')
     app.register_blueprint(bluetooth_bp, url_prefix='/')
     app.register_blueprint(media_bp, url_prefix='/')
+    app.register_blueprint(keyboard_bp, url_prefix='/')
 
-    return app
+    start_keyboard_service()
+    return app, socketio

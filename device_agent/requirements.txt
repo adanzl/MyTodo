@@ -6,6 +6,17 @@ flask-socketio==5.3.5
 # Async Support
 gevent==23.9.1
 
+# HTTP Requests
+requests==2.31.0
+
+# Keyboard Input (Cross-platform)
+pynput==1.7.6
+
+# Bluetooth (Cross-platform)
+# Note: Version >=0.22.0 supports pyobjc-core 10.x+
+# If you have pyobjc-core 12.x, upgrade bleak: pip install --upgrade bleak
+bleak>=0.22.0
+
 # Other dependencies (if any)
 # Add your other dependencies here
 

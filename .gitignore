@@ -38,3 +38,5 @@ npm-debug.log*
 /dist
 android/.idea/
 **/__pycache__
+device_agent/config.properties
+server/test.py
