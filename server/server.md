@@ -2,7 +2,7 @@
 
 ## app 依赖
 
-> pip3 install websocket-client flask requests flask_cors flask_socketio eventlet
+> pip3 install websocket-client flask requests flask_cors flask_socketio
 
 ## app 服务
 

@@ -4,7 +4,7 @@
 import os
 import pwd
 import time
-import subprocess
+from gevent import subprocess
 from flask import Blueprint, request
 from core.log_config import root_logger
 from core.config import get_config

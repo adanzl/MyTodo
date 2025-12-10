@@ -5,7 +5,6 @@ flask_socketio==5.5.1
 redis==6.0.0
 Requests==2.32.3
 websocket_client==1.8.0
-eventlet==0.39.0
 gevent>=23.9.1
 gevent-websocket>=0.10.1
 bleak==0.21.1

@@ -13,14 +13,8 @@ except ImportError:
     log = logging.getLogger()
     rds_mgr = None
 
-# 尝试使用 gevent.subprocess，如果不可用则使用标准 subprocess
-try:
-    from gevent import subprocess, spawn
-    GEVENT_AVAILABLE = True
-except ImportError:
-    import subprocess
-    GEVENT_AVAILABLE = False
-    spawn = None
+# 使用 gevent.subprocess（通过 monkey.patch_all 自动替换）
+from gevent import subprocess, spawn
 
 
 from bleak import BleakScanner, BleakClient
@@ -363,13 +357,9 @@ class BluetoothMgr:
                 log.error(f"[BLUETOOTH] Subprocess error: {e}")
                 return -1, "", str(e)
 
-        if GEVENT_AVAILABLE and spawn:
-            # 在独立的 greenlet 中运行，避免线程问题
-            greenlet = spawn(_run)
-            return greenlet.get(timeout=timeout + 2)
-        else:
-            # 直接运行
-            return _run()
+        # 在独立的 greenlet 中运行，避免阻塞 gevent 事件循环
+        greenlet = spawn(_run)
+        return greenlet.get(timeout=timeout + 2)
 
     def get_system_paired_devices(self) -> List[Dict]:
         """
