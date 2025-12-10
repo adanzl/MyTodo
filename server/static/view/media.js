@@ -289,9 +289,9 @@ async function createComponent() {
             // 确定设备地址：优先使用 device.address，其次 device_address
             const deviceAddress = item.device?.address || item.device_address || "";
 
-            // 规范化 playlist 和 pre_files 格式：确保是新格式 {"uri": "地址"}
-            const normalizedFiles = normalizeFiles(item.playlist || [], false);
-            const normalizedPreFiles = normalizeFiles(item.pre_files || [], false);
+            // 规范化 playlist 和 pre_files 格式：确保是新格式 {"uri": "地址"}，保留 duration
+            const normalizedFiles = normalizeFiles(item.playlist || [], true);
+            const normalizedPreFiles = normalizeFiles(item.pre_files || [], true);
             
             playlistDict[item.id] = {
               id: item.id,
@@ -454,8 +454,8 @@ async function createComponent() {
         if (typeof mutator !== "function") return null;
         let collection = refData.playlistCollection.value.map((item) => ({
           ...item,
-          playlist: Array.isArray(item.playlist) ? [...item.playlist] : [],
-          pre_files: Array.isArray(item.pre_files) ? [...item.pre_files] : [],
+          playlist: Array.isArray(item.playlist) ? item.playlist.map(f => ({ ...f })) : [],
+          pre_files: Array.isArray(item.pre_files) ? item.pre_files.map(f => ({ ...f })) : [],
         }));
         if (collection.length === 0) {
           const defaultPlaylist = normalizePlaylistItem(createDefaultPlaylist());
@@ -471,8 +471,8 @@ async function createComponent() {
         const updatedItem =
           mutator({
             ...currentItem,
-            playlist: [...currentItem.playlist],
-            pre_files: [...(currentItem.pre_files || [])],
+            playlist: currentItem.playlist.map(f => ({ ...f })),
+            pre_files: (currentItem.pre_files || []).map(f => ({ ...f })),
           }) || currentItem;
         collection[index] = normalizePlaylistItem(updatedItem, currentItem.name);
         refData.playlistCollection.value = collection;
