@@ -17,15 +17,13 @@ TABLE_SAVE = "t_user_save"
 
 class DbMgr:
 
-    @staticmethod
-    def init(app):
+    def init(self, app):
         app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///./' + DB_NAME  # SQLite 数据库
         app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # 关闭修改跟踪（减少内存消耗）
         db_obj.init_app(app)
         log.info("DbMgr init")
 
-    @staticmethod
-    def set_save(id, user_name, data) -> dict:
+    def set_save(self, id, user_name, data) -> dict:
         try:
             metadata = MetaData()
             table_obj = Table(TABLE_SAVE, metadata, autoload_with=db_obj.engine)
@@ -55,8 +53,7 @@ class DbMgr:
             return {"code": -1, "msg": 'error ' + str(e)}
         return {"code": 0, "msg": "ok", "data": id}
 
-    @staticmethod
-    def get_data_idx(table, id, idx=1):
+    def get_data_idx(self, table, id, idx=1):
         try:
             metadata = MetaData()
             table_obj = Table(table, metadata, autoload_with=db_obj.engine)
@@ -76,8 +73,7 @@ class DbMgr:
             return {"code": -1, "msg": 'error ' + str(e)}
         return {"code": 0, "msg": "ok", "data": data}
 
-    @staticmethod
-    def get_data(table, id, fields):
+    def get_data(self, table, id, fields):
         try:
             metadata = MetaData()
             table_obj = Table(table, metadata, autoload_with=db_obj.engine)
@@ -111,8 +107,7 @@ class DbMgr:
             return {"code": -1, "msg": 'error ' + str(e)}
         return {"code": 0, "msg": "ok", "data": data}
 
-    @staticmethod
-    def set_data(table, data):
+    def set_data(self, table, data):
         try:
             metadata = MetaData()
             table_obj = Table(table, metadata, autoload_with=db_obj.engine)
@@ -152,8 +147,7 @@ class DbMgr:
             return {"code": -1, "msg": 'error ' + str(e)}
         return {"code": 0, "msg": "ok", "data": id}
 
-    @staticmethod
-    def add_score(user_id, value, action, msg):
+    def add_score(self, user_id, value, action, msg):
         '''
             增加积分
         '''
@@ -173,7 +167,7 @@ class DbMgr:
             offset = now.astimezone().utcoffset()
             offset_hours = int(offset.total_seconds() / 3600)
             offset_str = f"{offset_hours:+03d}:00"
-            
+
             score_history = ScoreHistory(user_id=user_id,
                                          value=value,
                                          action=action,
@@ -196,8 +190,7 @@ class DbMgr:
             traceback.print_exc()
             return {"code": -1, "msg": f'error: {str(e)}'}
 
-    @staticmethod
-    def del_data(table, id: int) -> dict:
+    def del_data(self, table, id: int) -> dict:
         try:
             # 动态获取表对象
             metadata = MetaData()
@@ -213,8 +206,7 @@ class DbMgr:
             return {"code": -1, "msg": 'error ' + str(e)}
         return {"code": 0, "msg": "ok", "data": cnt}
 
-    @staticmethod
-    def query(sql) -> dict:
+    def query(self, sql) -> dict:
         try:
             result = db_obj.session.execute(text(sql))
             rows = result.fetchall()
@@ -229,8 +221,7 @@ class DbMgr:
             return {"code": -1, "msg": 'error ' + str(e)}
         return {"code": 0, "msg": "ok", "data": data}
 
-    @staticmethod
-    def get_list(table, page_num=1, page_size=20, fields: str | list = '*', conditions=None) -> dict:
+    def get_list(self, table, page_num=1, page_size=20, fields: str | list = '*', conditions=None) -> dict:
         try:
             # 动态获取表结构
             metadata = MetaData()
@@ -284,3 +275,6 @@ class DbMgr:
             log.error(e)
             traceback.print_exc()
             return {"code": -1, "msg": f'error: {str(e)}', "data": None}
+
+
+db_mgr = DbMgr()

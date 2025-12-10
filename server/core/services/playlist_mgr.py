@@ -14,7 +14,7 @@ from core.device.bluetooth import BluetoothDev
 from core.device.dlna import DlnaDev
 from core.device.mi_device import MiDevice
 from core.log_config import root_logger
-from core.scheduler import get_scheduler
+from core.services.scheduler_mgr import scheduler_mgr
 from core.utils import time_to_seconds
 
 log = root_logger()
@@ -50,12 +50,13 @@ class PlaylistMgr:
         self._file_timers = {}  # 文件播放定时器 {playlist_id: job_id}
         self._playlist_duration_timers = {}  # 播放列表时长定时器 {playlist_id: job_id}
         self._playing_playlists = set()  # 正在播放的播放列表ID集合
-        self.playlist_raw = {}  # 播放列表数据
-        self.device_map = {}  # 设备映射
+        self._playlist_raw = {}  # 播放列表数据
+        self._device_map = {}  # 设备映射
         self._play_state = {}  # 播放状态跟踪 {playlist_id: {'in_pre_files': bool, 'pre_index': int, 'file_index': int}}
         self._duration_fetch_thread = None  # 批量获取时长的单例线程
         self._duration_fetch_lock = threading.Lock()  # 线程锁
         self._duration_blacklist = Counter()  # 获取时长失败的黑名单 {file_uri: failure_count}
+        self._needs_reload = False  # 标记是否需要重新从 RDS 加载
         self.reload()
 
     def get_playlist(self, id: str | None = None) -> Dict[str, Dict[str, Any]]:
@@ -66,10 +67,15 @@ class PlaylistMgr:
                  如果id为None，返回所有播放列表；如果id有值，返回只包含该播放列表的字典；如果不存在则返回空字典
                  如果播放列表中有 isPlaying 字段，表示正在播放
         """
+        # 如果需要重新加载，再次尝试加载
+        if self._needs_reload:
+            log.info(f"[PlaylistMgr] 需要重新加载，再次尝试从 RDS 加载")
+            self.reload()
+
         if id is None:
-            result = self.playlist_raw
+            result = self._playlist_raw
         else:
-            playlist_data = self.playlist_raw.get(id)
+            playlist_data = self._playlist_raw.get(id)
             if playlist_data is None:
                 return {}
             result = {id: playlist_data}
@@ -81,10 +87,10 @@ class PlaylistMgr:
 
     def _save_playlist_to_rds(self):
         """保存播放列表到 RDS"""
-        rds_mgr.set(PLAYLIST_RDS_FULL_KEY, json.dumps(self.playlist_raw, ensure_ascii=False))
+        rds_mgr.set(PLAYLIST_RDS_FULL_KEY, json.dumps(self._playlist_raw, ensure_ascii=False))
 
     def save_playlist(self, collection: Dict[str, Any]) -> int:
-        self.playlist_raw = collection
+        self._playlist_raw = collection
         self._save_playlist_to_rds()
         # 更新设备映射
         self._refresh_device_map()
@@ -95,9 +101,10 @@ class PlaylistMgr:
             log.warning(f"[PlaylistMgr] Reload not supported on non-linux platforms : {sys.platform}")
             # 确保 playlist_raw 和 device_map 已初始化
             if not hasattr(self, 'playlist_raw'):
-                self.playlist_raw = {}
+                self._playlist_raw = {}
             if not hasattr(self, 'device_map'):
-                self.device_map = {}
+                self._device_map = {}
+            self._needs_reload = False
             return 0
         """
         重新从 RDS 中加载 playlist 数据
@@ -105,33 +112,29 @@ class PlaylistMgr:
         try:
             raw = rds_mgr.get(PLAYLIST_RDS_FULL_KEY)
             if raw:
-                try:
-                    self.playlist_raw = json.loads(raw.decode("utf-8"))
-                    self._refresh_device_map()
-                except (ValueError, AttributeError) as e:
-                    log.error(f"[PlaylistMgr] Reload error: {e}")
-                    self.playlist_raw = {}
-                    self._refresh_device_map()
+                self._playlist_raw = json.loads(raw.decode("utf-8"))
             else:
-                self.playlist_raw = {}
-                self._refresh_device_map()
-            log.info(f"[PlaylistMgr] Load success: {len(self.playlist_raw)} playlists")
+                self._playlist_raw = {}
+            self._refresh_device_map()
+            self._needs_reload = False
+            log.info(f"[PlaylistMgr] Load success: {len(self._playlist_raw)} playlists")
             return 0
         except Exception as e:
             log.error(f"[PlaylistMgr] Reload error: {e}")
+            self._needs_reload = True
             return -1
 
     def _refresh_device_map(self):
-        self.device_map = {}
-        if self.playlist_raw and sys.platform == "linux":
-            for p_id in self.playlist_raw:
-                playlist_data = self.playlist_raw[p_id]
-                self.device_map[p_id] = _create_device(playlist_data.get("device", {}))
+        self._device_map = {}
+        if self._playlist_raw and sys.platform == "linux":
+            for p_id in self._playlist_raw:
+                playlist_data = self._playlist_raw[p_id]
+                self._device_map[p_id] = _create_device(playlist_data.get("device", {}))
                 self._refresh_cron_job(p_id, playlist_data)
         self._cleanup_orphaned_cron_jobs()
 
     def _refresh_cron_job(self, playlist_id: str, playlist_data: Dict[str, Any]):
-        scheduler = get_scheduler()
+        scheduler = scheduler_mgr
         job_id = f"playlist_cron_{playlist_id}"
         schedule = playlist_data.get("schedule", {})
         enabled = schedule.get("enabled", 0)
@@ -164,8 +167,8 @@ class PlaylistMgr:
 
     def _cleanup_orphaned_cron_jobs(self):
         """清理孤立的定时任务和状态"""
-        scheduler = get_scheduler()
-        playlist_ids = set(self.playlist_raw.keys() if self.playlist_raw else [])
+        scheduler = scheduler_mgr
+        playlist_ids = set(self._playlist_raw.keys() if self._playlist_raw else [])
 
         # 清理孤立的定时任务
         job_prefixes = [("playlist_cron_", "定时任务"), ("playlist_file_timer_", "文件定时器"),
@@ -248,7 +251,7 @@ class PlaylistMgr:
             """批量获取文件时长的线程函数"""
             file_durations = {}  # {file_uri: duration_seconds, ...}
             failed_count = 0
-
+            failed_uris = []
             try:
                 for file_uri in files_to_fetch:
                     try:
@@ -258,12 +261,13 @@ class PlaylistMgr:
                         self._duration_blacklist.pop(file_uri, None)
                     except Exception as e:
                         failed_count += 1
+                        failed_uris.append(file_uri)
                         # 获取异常，更新黑名单
                         self._duration_blacklist[file_uri] += 1
 
                 # 反向更新所有播放列表中匹配的文件 duration
                 updated_count = 0
-                for _, playlist_data in self.playlist_raw.items():
+                for _, playlist_data in self._playlist_raw.items():
                     # 更新 pre_files
                     pre_files = playlist_data.get("pre_files", [])
                     for file_item in pre_files:
@@ -283,7 +287,7 @@ class PlaylistMgr:
                 # 统一保存到 RDS
                 if updated_count > 0:
                     self._save_playlist_to_rds()
-                    log.info(f"[PlaylistMgr] 批量获取时长完成: 成功 {updated_count} 个, 失败 {failed_count} 个")
+                    log.info(f"[PlaylistMgr] 批量获取时长完成: 成功 {updated_count} 个, 失败 {failed_count} 个, 失败文件: {failed_uris}")
             except Exception as e:
                 log.error(f"[PlaylistMgr] 批量获取时长线程异常: {e}")
             finally:
@@ -304,13 +308,13 @@ class PlaylistMgr:
 
     def _validate_playlist(self, id: str):
         """验证播放列表是否存在且有效"""
-        if not self.playlist_raw or id not in self.playlist_raw:
+        if not self._playlist_raw or id not in self._playlist_raw:
             return None, -1, "播放列表不存在"
-        playlist_data = self.playlist_raw[id]
+        playlist_data = self._playlist_raw[id]
         pre_files, files = playlist_data.get("pre_files", []), playlist_data.get("files", [])
         if not files and not pre_files:
             return None, -1, "播放列表为空"
-        device_obj = self.device_map.get(id)
+        device_obj = self._device_map.get(id)
         if device_obj is None:
             return None, -1, "设备不存在或未初始化"
         return playlist_data, 0, None
@@ -343,7 +347,7 @@ class PlaylistMgr:
         self._scheduled_play_start_times.pop(id, None)
         self._playing_playlists.discard(id)
         self._play_state.pop(id, None)
-        playlist_data = self.playlist_raw.get(id)
+        playlist_data = self._playlist_raw.get(id)
         if playlist_data and 'isPlaying' in playlist_data:
             del playlist_data['isPlaying']
 
@@ -388,7 +392,7 @@ class PlaylistMgr:
         file_duration_seconds = self._update_file_duration(file_path, file_item)
 
         # 播放文件
-        device = self.device_map[id]["obj"]
+        device = self._device_map[id]["obj"]
         code, msg = device.play(file_path)
         if code != 0:
             return code, msg
@@ -529,7 +533,7 @@ class PlaylistMgr:
         if code != 0:
             return code, msg
 
-        device_obj = self.device_map.get(id)
+        device_obj = self._device_map.get(id)
         if device_obj is None:
             return -1, "设备不存在或未初始化"
 
@@ -545,7 +549,7 @@ class PlaylistMgr:
         :param id: 播放列表ID
         :param duration_seconds: 文件时长（秒）
         """
-        scheduler = get_scheduler()
+        scheduler = scheduler_mgr
         job_id = f"playlist_file_timer_{id}"
 
         if scheduler.get_job(job_id):
@@ -553,7 +557,7 @@ class PlaylistMgr:
 
         def __play_next_task(pid=id):
             """定时器触发时，判断position，如果比duration小超过2s则等一下差值"""
-            device = self.device_map.get(pid, {}).get("obj")
+            device = self._device_map.get(pid, {}).get("obj")
             if device:
                 try:
                     code, status = device.get_status()
@@ -568,7 +572,7 @@ class PlaylistMgr:
             self._clear_timer(pid, self._file_timers, "playlist_file_timer_")
             # 确保播放状态存在，如果不存在则初始化
             if pid not in self._play_state:
-                playlist_data = self.playlist_raw.get(pid)
+                playlist_data = self._playlist_raw.get(pid)
                 if playlist_data:
                     pre_files = playlist_data.get("pre_files", [])
                     self._init_play_state(pid, playlist_data, pre_files)
@@ -587,7 +591,7 @@ class PlaylistMgr:
     def _clear_timer(self, id: str, timer_dict: Dict[str, str], job_prefix: str):
         """清除定时器"""
         if id in timer_dict:
-            scheduler = get_scheduler()
+            scheduler = scheduler_mgr
             job_id = timer_dict[id]
             if scheduler.get_job(job_id):
                 scheduler.remove_job(job_id)
@@ -599,7 +603,7 @@ class PlaylistMgr:
         :param id: 播放列表ID
         :param duration_minutes: 播放时长限制（分钟）
         """
-        scheduler = get_scheduler()
+        scheduler = scheduler_mgr
         job_id = f"playlist_duration_timer_{id}"
 
         if scheduler.get_job(job_id):

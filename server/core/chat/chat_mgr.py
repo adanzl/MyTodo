@@ -80,11 +80,13 @@ def translate_text(text):
 
 class ChatMgr:
 
-    def __init__(self, socketio):
+    def __init__(self):
         log.info("[CHAT] ChatMgr init")
-        self.socketio = socketio
         self.clients: dict[str, ClientContext] = {}  # sid -> ClientContext
-        self.register_events()
+
+    def init(self, socketio):
+        self.socketio = socketio
+        self._register_events()
 
     def add_client(self, sid):
         try:
@@ -135,7 +137,7 @@ class ChatMgr:
         except Exception as e:
             log.error(f"[CHAT] Error emitting result to client {sid}: {e}")
 
-    def register_events(self):
+    def _register_events(self):
         # 处理客户端连接事件
         @self.socketio.on('handshake')
         def handle_handshake(data):
@@ -235,3 +237,6 @@ class ChatMgr:
                 ctx.tts.vol = data['ttsVol']
             if 'ttsSpeed' in data:
                 ctx.tts.speed = data['ttsSpeed']
+
+
+chat_mgr = ChatMgr()

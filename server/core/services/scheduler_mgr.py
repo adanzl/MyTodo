@@ -18,7 +18,7 @@ log = root_logger()
 logging.getLogger('apscheduler').setLevel(logging.WARNING)
 
 
-class TaskScheduler:
+class SchedulerMgr:
     """
     定时任务调度器类
     支持 cron 表达式、间隔执行、定时执行等多种任务调度方式
@@ -29,7 +29,7 @@ class TaskScheduler:
     def __new__(cls):
         """单例模式"""
         if cls._instance is None:
-            cls._instance = super(TaskScheduler, cls).__new__(cls)
+            cls._instance = super(SchedulerMgr, cls).__new__(cls)
             cls._instance._initialized = False
         return cls._instance
 
@@ -82,7 +82,7 @@ class TaskScheduler:
         """
         if day_of_week == '*':
             return '*'
-        
+
         def convert_single_day(day_str: str) -> str:
             """转换单个周几数字"""
             try:
@@ -93,7 +93,7 @@ class TaskScheduler:
             except ValueError:
                 # 如果不是数字，可能是字符串别名或其他格式，直接返回
                 return day_str
-        
+
         # 处理范围表达式，如 "1-5"
         if '-' in day_of_week:
             parts = day_of_week.split('-')
@@ -101,13 +101,13 @@ class TaskScheduler:
                 start = convert_single_day(parts[0])
                 end = convert_single_day(parts[1])
                 return f"{start}-{end}"
-        
+
         # 处理列表表达式，如 "1,3,5" 或 "*/2"
         if ',' in day_of_week:
             days = day_of_week.split(',')
             converted_days = [convert_single_day(day.strip()) for day in days]
             return ','.join(converted_days)
-        
+
         # 处理步进表达式，如 "*/2" 或 "1-5/2"
         if '/' in day_of_week:
             parts = day_of_week.split('/')
@@ -116,7 +116,7 @@ class TaskScheduler:
                 step = parts[1]
                 converted_base = self._convert_standard_cron_weekday_to_apscheduler(base)
                 return f"{converted_base}/{step}"
-        
+
         # 单个数字
         return convert_single_day(day_of_week)
 
@@ -155,7 +155,7 @@ class TaskScheduler:
             if cron_expression:
                 # 解析 cron 表达式
                 parts = cron_expression.strip().split()
-                
+
                 # 检查字段数量
                 if len(parts) == 6:
                     # 6 字段格式：秒 分 时 日 月 周
@@ -352,26 +352,7 @@ class TaskScheduler:
 
 
 # 全局调度器实例
-_scheduler_instance = None
-
-
-def get_scheduler() -> TaskScheduler:
-    """
-    获取全局调度器实例
-    :return: TaskScheduler 实例
-    """
-    global _scheduler_instance
-    if _scheduler_instance is None:
-        _scheduler_instance = TaskScheduler()
-    return _scheduler_instance
-
-
-def init_scheduler():
-    """初始化并启动调度器"""
-    scheduler = get_scheduler()
-    scheduler.start()
-    return scheduler
-
+scheduler_mgr = SchedulerMgr()
 
 # 示例任务函数
 def example_task():
@@ -381,19 +362,18 @@ def example_task():
 
 if __name__ == '__main__':
     # 测试代码
-    scheduler = TaskScheduler()
 
     # 添加每 10 秒执行一次的任务
-    scheduler.add_interval_job(example_task, 'test_interval', seconds=10)
+    scheduler_mgr.add_interval_job(example_task, 'test_interval', seconds=10)
 
     # 添加每分钟执行一次的 cron 任务
-    scheduler.add_cron_job(example_task, 'test_cron', minute='*/1')
+    scheduler_mgr.add_cron_job(example_task, 'test_cron', minute='*/1')
 
     # 启动调度器
-    scheduler.start()
+    scheduler_mgr.start()
 
     # 打印所有任务
-    scheduler.print_jobs()
+    scheduler_mgr.print_jobs()
 
     # 保持运行
     try:
@@ -401,5 +381,5 @@ if __name__ == '__main__':
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        scheduler.shutdown()
+        scheduler_mgr.shutdown()
         log.info("调度器已停止")

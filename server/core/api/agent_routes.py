@@ -11,6 +11,19 @@ log = root_logger()
 agent_bp = Blueprint('agent', __name__)
 
 
+def _get_client_ip():
+    """获取客户端 IP 地址"""
+    # 优先检查代理头
+    if request.headers.get('X-Forwarded-For'):
+        # X-Forwarded-For 可能包含多个 IP，取第一个
+        ip = request.headers.get('X-Forwarded-For').split(',')[0].strip()
+    elif request.headers.get('X-Real-IP'):
+        ip = request.headers.get('X-Real-IP')
+    else:
+        ip = request.remote_addr
+    return ip
+
+
 @agent_bp.route("/agent/heartbeat", methods=['POST'])
 def agent_heartbeat():
     """
@@ -19,14 +32,17 @@ def agent_heartbeat():
     try:
         args = request.get_json() or {}
         address = args.get('address')
+        client_ip = _get_client_ip()
+        
+        # 如果没有提供 address，使用客户端 IP + 默认端口
         if not address:
             return _err("address is required")
 
         name = args.get('name')
         actions = args.get('actions')
 
-        log.debug(f"===== [Agent Heartbeat] address={address}, name={name}, actions={actions}")
-        agent_mgr.handle_heartbeat(address=address, name=name, actions=actions)
+        log.debug(f"===== [Agent Heartbeat] client_ip={client_ip}, address={address}, name={name}, actions={actions}")
+        agent_mgr.handle_heartbeat(client_ip=client_ip, address=address, name=name, actions=actions)
         return _ok()
     except Exception as e:
         log.error(f"[Agent] Heartbeat error: {e}")
