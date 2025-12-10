@@ -35,6 +35,9 @@ log = root_logger()
 # F12~F19 按键名列表
 KEY_NAMES = [f'F{i}' for i in range(12, 20)]
 
+# 向后兼容：KEY_CODES 字典（用于 API 验证）
+KEY_CODES = {name: name for name in KEY_NAMES}
+
 # pynput 按键映射（如果可用）
 PYNPUT_KEY_CODES = {}
 PYNPUT_KEY_TO_NAME = {}
