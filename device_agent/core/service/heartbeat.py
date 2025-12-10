@@ -35,14 +35,8 @@ class HeartbeatService:
     def _get_port(self) -> int:
         """获取服务端口（带缓存）"""
         if self._port is None:
-            port_str = config_mgr.get('server_port')
-            if port_str:
-                try:
-                    self._port = int(port_str)
-                except ValueError:
-                    self._port = 8001
-            else:
-                self._port = 8001
+            port_str = config_mgr.get('server_port', '8000')
+            self._port = int(port_str)
         return self._port
 
     def _get_name(self) -> str:
