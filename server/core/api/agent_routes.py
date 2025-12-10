@@ -59,10 +59,11 @@ def agent_event():
         client_ip = _get_client_ip()
         log.info(f"===== [Agent Event] client_ip={client_ip}, {args}")
 
-        event = args.get('event')
+        _key = args.get('key')
+        _value = args.get('value')
+        _action = args.get('action')
 
-        agent = agent_mgr.handle_event(client_ip = client_ip, event = event)
-        code, msg = agent.trigger_event(event)
+        code, msg = agent_mgr.handle_event(client_ip=client_ip, key=_key, value=_value, action=_action)
         if code == 0:
             return _ok()
         else:

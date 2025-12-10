@@ -405,7 +405,7 @@ def create_key_handler(key: str) -> Callable:
         data = _parse_config_data(data_str)
         data["key"] = key_name
         data["value"] = 1
-        data['type'] = 'keyboard'
+        data['action'] = 'keyboard'
         log.info(f"[KEYBOARD] 按键 {key_name} 触发，发送 {method} 请求到 {url}")
         result = _send_http_request(url, method=method, data=data, headers=None)
 

@@ -94,6 +94,23 @@ class AgentMgr:
             return self._devices
         return [device for device in self._devices.values() if action in device['actions']]
 
+    def handle_event(self, client_ip: str, key: str, value: str, action: str) -> tuple[int, str]:
+        """
+        处理事件
+        :param client_ip: 客户端 IP
+        :param key: 事件键
+        :param value: 事件值
+        :param type: 事件类型
+        :return: 事件处理结果
+        """
+        _devices = self._devices.get(client_ip)
+        if not _devices or action not in _devices.get('actions', []):
+            return -1, "device not found or action not supported"
+        _agent = self.get_agent(client_ip)
+        if not _agent:
+            return -1, "agent not found"
+        return 0, "ok"
+
 
 # 全局实例
 agent_mgr = AgentMgr()
