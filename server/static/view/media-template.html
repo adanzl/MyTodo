@@ -72,8 +72,8 @@
               <el-icon class="!w-3 !h-4"><VideoPlay /></el-icon> {{ getPlaylistNextCronTime(playlist) }}
             </span>
             <span v-else class="invisible">占位</span>
-            <span v-if="playlist.trigger_button" class="text-gray-500">
-              触发按钮: {{ playlist.trigger_button }}
+            <span v-if="playlist.trigger_button" class="text-gray-500 flex items-center gap-1">
+              <el-icon class="!w-3 !h-4"><Cpu /></el-icon> {{ playlist.trigger_button }}
             </span>
           </div>
         </div>

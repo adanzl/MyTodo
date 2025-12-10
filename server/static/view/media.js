@@ -305,6 +305,7 @@ async function createComponent() {
                 name: item.device?.name || null,
               },
               schedule: item.schedule || { enabled: 0, cron: "" },
+              trigger_button: item.trigger_button || "",
               create_time: item.create_time || _formatDateTime(),
               updated_time: _formatDateTime(),
             };
