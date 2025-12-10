@@ -11,6 +11,8 @@ requests==2.31.0
 
 # Keyboard Input (Cross-platform)
 pynput==1.7.6
+# Keyboard Input (Linux headless, optional)
+# python-evdev>=1.6.0  # 仅在 Linux 无桌面环境下需要，使用: pip install python-evdev
 
 # Bluetooth (Cross-platform)
 # Note: Version >=0.22.0 supports pyobjc-core 10.x+

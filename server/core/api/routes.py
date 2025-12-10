@@ -113,7 +113,7 @@ def get_data():
 @api_bp.route("/setData", methods=['POST'])
 def set_data():
     args = request.get_json()
-    log.info("===== [Set Data] " + json.dumps(args))
+    log.info("===== [Set Data] " + len(args))
     table = args.get('table')
     data = args.get('data')
     return db_mgr.set_data(table, data)
@@ -415,7 +415,7 @@ def list_directory():
             def natural_sort_key(item):
                 name = item["name"]
                 is_dir = item["isDirectory"]
-                
+
                 # 优先查找 "Track" 后面的数字（不区分大小写）
                 track_match = re.search(r'track\s+(\d+)', name, re.IGNORECASE)
                 if track_match:
@@ -425,7 +425,7 @@ def list_directory():
                 else:
                     track_number = float('inf')
                     has_track = False
-                
+
                 # 将文件名转换为自然排序的元组：将数字和文本分开
                 # 例如 "p1.mp3" -> (0, 'p', 1, '.mp3'), "1abc.mp3" -> (1, 'abc', '.mp3')
                 # 使用 (类型标识, 值) 的格式确保类型安全比较
@@ -451,9 +451,9 @@ def list_directory():
                     if current_text:
                         parts.append((0, current_text.lower()))  # 0 表示文本
                     return tuple(parts)
-                
+
                 name_parts = split_name_into_parts(name)
-                
+
                 # 返回排序键：(是否目录, 是否有Track数字, Track数字, 文件名自然排序元组)
                 # 目录排在前面，然后有Track数字的文件按Track数字排序，没有Track数字的文件按自然排序
                 return (
@@ -462,7 +462,7 @@ def list_directory():
                     track_number,  # Track 数字（主要排序键）
                     name_parts  # 文件名自然排序元组，每个元素是 (类型标识, 值) 格式
                 )
-            
+
             items.sort(key=natural_sort_key)
 
             if extensions_filter and extensions_filter != "all":
@@ -551,8 +551,20 @@ def get_file_info():
 
         # 判断是否为媒体文件
         media_extensions = {
-            '.mp3', '.wav', '.aac', '.ogg', '.m4a', '.flac', '.wma',  # 音频
-            '.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'  # 视频
+            '.mp3',
+            '.wav',
+            '.aac',
+            '.ogg',
+            '.m4a',
+            '.flac',
+            '.wma',  # 音频
+            '.mp4',
+            '.avi',
+            '.mkv',
+            '.mov',
+            '.wmv',
+            '.flv',
+            '.webm'  # 视频
         }
         file_ext = os.path.splitext(file_path)[1].lower()
         is_media_file = file_ext in media_extensions
