@@ -102,13 +102,5 @@ class Config:
 
 
 # 全局配置实例
-_config_instance = None
-
-
-def get_config() -> Config:
-    """获取全局配置实例"""
-    global _config_instance
-    if _config_instance is None:
-        _config_instance = Config()
-    return _config_instance
+config_mgr = Config()
 

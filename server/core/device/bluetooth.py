@@ -352,22 +352,14 @@ class BluetoothMgr:
             return []
 
 # 全局实例
-_bluetooth_mgr: Optional[BluetoothMgr] = None
-
-
-def get_bluetooth_mgr() -> BluetoothMgr:
-    """获取蓝牙管理器实例"""
-    global _bluetooth_mgr
-    if _bluetooth_mgr is None:
-        _bluetooth_mgr = BluetoothMgr()
-    return _bluetooth_mgr
+bluetooth_mgr: Optional[BluetoothMgr] = BluetoothMgr()
 
 
 # 同步包装函数（用于在Flask路由中使用）
 def scan_devices_sync(timeout: float = 5.0) -> List[Dict]:
     """同步扫描设备"""
     try:
-        return run_async(get_bluetooth_mgr().scan_devices(timeout), timeout=timeout + 2.0)
+        return run_async(bluetooth_mgr.scan_devices(timeout), timeout=timeout + 2.0)
     except asyncio.TimeoutError:
         log.error(f"[BLUETOOTH] Scan timeout after {timeout + 2.0}s")
         return []
@@ -382,7 +374,7 @@ def get_system_paired_devices_sync() -> List[Dict]:
     :return: 已配对设备列表
     """
     try:
-        return get_bluetooth_mgr().get_system_paired_devices()
+        return bluetooth_mgr.get_system_paired_devices()
     except Exception as e:
         log.error(f"[BLUETOOTH] Get system paired devices error: {e}")
         return []
@@ -391,7 +383,7 @@ def get_system_paired_devices_sync() -> List[Dict]:
 def connect_device_sync(address: str, timeout: float = 10.0) -> Dict:
     """同步连接设备"""
     try:
-        return run_async(get_bluetooth_mgr().connect_device(address), timeout=timeout)
+        return run_async(bluetooth_mgr.connect_device(address), timeout=timeout)
     except asyncio.TimeoutError:
         log.error(f"[BLUETOOTH] Connect timeout after {timeout}s")
         return {"code": -1, "msg": f"Connection timeout after {timeout}s"}
@@ -403,7 +395,7 @@ def connect_device_sync(address: str, timeout: float = 10.0) -> Dict:
 def disconnect_device_sync(address: str, timeout: float = 5.0) -> Dict:
     """同步断开设备"""
     try:
-        return run_async(get_bluetooth_mgr().disconnect_device(address), timeout=timeout)
+        return run_async(bluetooth_mgr.disconnect_device(address), timeout=timeout)
     except asyncio.TimeoutError:
         log.error(f"[BLUETOOTH] Disconnect timeout after {timeout}s")
         return {"code": -1, "msg": f"Disconnect timeout after {timeout}s"}

@@ -1,4 +1,3 @@
-
 '''
 蓝牙设备管理路由
 通过调用 device_agent 服务接口实现
@@ -10,13 +9,12 @@ from core.device.bluetooth import (
     scan_devices_sync,
     connect_device_sync,
     disconnect_device_sync,
-    get_bluetooth_mgr,
+    bluetooth_mgr,
     get_system_paired_devices_sync,
 )
 
 log = root_logger()
 bluetooth_bp = Blueprint('bluetooth', __name__)
-bluetooth_mgr = get_bluetooth_mgr()
 
 @bluetooth_bp.route("/bluetooth/scan", methods=['GET'])
 def bluetooth_scan():

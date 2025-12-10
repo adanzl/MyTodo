@@ -116,7 +116,7 @@ def scan_devices_sync(timeout: float = 5.0) -> List[Dict]:
 class DlnaDev:
     """DLNA 设备控制类"""
 
-    def __init__(self, location: str):
+    def __init__(self, location: str, name: str = ""):
         """
         初始化 DLNA 设备
         :param location: 设备描述文档的完整 URL
@@ -124,6 +124,7 @@ class DlnaDev:
         self.location = location
         self._device = None
         self._av_transport = None
+        self.name = name or location
 
     def _get_device(self):
         """获取 upnpclient.Device 对象"""
@@ -290,7 +291,7 @@ class DlnaDev:
 
         # 构建统一格式的状态字典
         status = {}
-        
+
         # 从 transport_info 获取 state 和 status
         if transport_code == 0:
             status["state"] = transport_info.get("transport_state", "UNKNOWN")  # PLAYING, STOPPED, etc.
@@ -298,7 +299,7 @@ class DlnaDev:
         else:
             status["state"] = "UNKNOWN"
             status["status"] = "ERROR"
-        
+
         # 从 position_info 获取 track, duration, position
         if position_code == 0:
             status["track"] = int(position_info.get("track", 0)) if position_info.get("track") else 0

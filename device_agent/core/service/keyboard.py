@@ -9,7 +9,7 @@ import time
 import traceback
 from typing import Dict, Optional, Callable
 from core.log_config import root_logger
-from core.config import get_config
+from core.config import config_mgr
 from core.utils import _send_http_request
 
 from pynput import keyboard
@@ -17,10 +17,7 @@ from pynput import keyboard
 log = root_logger()
 
 # F12~F19 的按键映射（pynput 使用 keyboard.Key.f12 等）
-KEY_CODES = {
-    f'F{i}': getattr(keyboard.Key, f'f{i}', None)
-    for i in range(12, 20)
-}
+KEY_CODES = {f'F{i}': getattr(keyboard.Key, f'f{i}', None) for i in range(12, 20)}
 # 过滤掉 None 值（如果某个键不存在）
 KEY_CODES = {k: v for k, v in KEY_CODES.items() if v is not None}
 
@@ -164,16 +161,16 @@ def create_key_handler(key: str) -> Callable:
     :param key: 按键名 (F13~F19)
     :return: 处理函数
     """
+
     def handler(key_name: str):
-        config = get_config()
-        url = config.get(_get_config_key(key_name, "url"))
+        url = config_mgr.get(_get_config_key(key_name, "url"))
 
         if not url:
             log.warning(f"[KEYBOARD] 按键 {key_name} 未配置 URL，跳过")
             return
 
-        method = config.get(_get_config_key(key_name, "method"), 'GET')
-        data_str = config.get(_get_config_key(key_name, "data"))
+        method = config_mgr.get(_get_config_key(key_name, "method"), 'GET')
+        data_str = config_mgr.get(_get_config_key(key_name, "data"))
         data = _parse_config_data(data_str)
 
         if data_str and data is None:
@@ -190,17 +187,15 @@ def create_key_handler(key: str) -> Callable:
 
 def _setup_default_config():
     """设置F12的默认配置"""
-    config = get_config()
-    f12_url = config.get(_get_config_key("F12", "url"))
+    f12_url = config_mgr.get(_get_config_key("F12", "url"))
 
     if not f12_url:
         # 设置F12的默认配置
         default_url = "http://localhost:8001/keyboard/status"
-        config.set(_get_config_key("F12", "url"), default_url)
-        config.set(_get_config_key("F12", "method"), "GET")
-        config.save_config()
+        config_mgr.set(_get_config_key("F12", "url"), default_url)
+        config_mgr.set(_get_config_key("F12", "method"), "GET")
+        config_mgr.save_config()
         log.info(f"[KEYBOARD] 已设置F12默认配置: GET {default_url}")
-
 
 
 def get_keyboard_status() -> Dict:
@@ -212,18 +207,14 @@ def get_keyboard_status() -> Dict:
     status = listener.get_status()
 
     # 添加配置信息
-    config = get_config()
+    config = config_mgr
     configs = {}
     for key in KEY_CODES.keys():
         url = config.get(_get_config_key(key, "url"))
         if url:
             data_str = config.get(_get_config_key(key, "data"))
             data = _parse_config_data(data_str)
-            configs[key] = {
-                "method": config.get(_get_config_key(key, "method"), "GET"),
-                "url": url,
-                "data": data
-            }
+            configs[key] = {"method": config.get(_get_config_key(key, "method"), "GET"), "url": url, "data": data}
 
     status["configs"] = configs
     return status
@@ -237,12 +228,11 @@ def start_keyboard_service():
     try:
         listener = get_keyboard_listener()
         # 设置所有已配置按键的处理函数
-        config = get_config()
         # 设置F12的默认配置（如果未配置）
         _setup_default_config()
 
         for key in KEY_CODES.keys():
-            url = config.get(_get_config_key(key, "url"))
+            url = config_mgr.get(_get_config_key(key, "url"))
             if url:
                 handler = create_key_handler(key)
                 listener.set_handler(key, handler)
@@ -283,23 +273,23 @@ def _parse_config_data(data_str: str) -> dict:
         return None
 
 
-def _build_key_config(config, key: str) -> dict:
+def _build_key_config(key: str) -> dict:
     """
     构建单个按键配置
     :param config: 配置对象
     :param key: 按键名
     :return: 配置字典
     """
-    url = config.get(_get_config_key(key, "url"))
+    url = config_mgr.get(_get_config_key(key, "url"))
     if not url:
         return {}
 
     result = {
-        "method": config.get(_get_config_key(key, "method"), "GET"),
+        "method": config_mgr.get(_get_config_key(key, "method"), "GET"),
         "url": url,
     }
 
-    data_str = config.get(_get_config_key(key, "data"))
+    data_str = config_mgr.get(_get_config_key(key, "data"))
     data = _parse_config_data(data_str)
     if data is not None:
         result["data"] = data
@@ -313,18 +303,17 @@ def get_key_config(key: str = None) -> dict:
     :param key: 按键名，如果为 None 则返回所有按键配置
     :return: 配置字典
     """
-    config = get_config()
 
     if key:
         # 返回单个按键配置
         if key not in KEY_CODES:
             return {}
-        return _build_key_config(config, key)
+        return _build_key_config(key)
     else:
         # 返回所有按键配置
         configs = {}
         for k in KEY_CODES.keys():
-            key_config = _build_key_config(config, k)
+            key_config = _build_key_config(k)
             if key_config:
                 configs[k] = key_config
         return configs
@@ -340,20 +329,19 @@ def save_key_config(key: str, url: str, method: str, data: dict = None) -> tuple
     :return: (success: bool, message: str, config_data: dict)
     """
     try:
-        config = get_config()
-        config.set(_get_config_key(key, "url"), url)
-        config.set(_get_config_key(key, "method"), method)
+        config_mgr.set(_get_config_key(key, "url"), url)
+        config_mgr.set(_get_config_key(key, "method"), method)
 
         # 保存数据（如果有）
         if data:
-            config.set(_get_config_key(key, "data"), json.dumps(data))
+            config_mgr.set(_get_config_key(key, "data"), json.dumps(data))
         else:
             # 清除旧数据
-            if config.get(_get_config_key(key, "data")):
-                config.set(_get_config_key(key, "data"), "")
+            if config_mgr.get(_get_config_key(key, "data")):
+                config_mgr.set(_get_config_key(key, "data"), "")
 
         # 保存配置到文件
-        if not config.save_config():
+        if not config_mgr.save_config():
             return False, "保存配置失败", {}
 
         # 如果服务正在运行，更新处理函数
@@ -377,13 +365,12 @@ def delete_key_config(key: str) -> tuple[bool, str]:
     :return: (success: bool, message: str)
     """
     try:
-        config = get_config()
         # 删除配置项
         for suffix in ["url", "method", "data"]:
-            config.set(_get_config_key(key, suffix), "")
+            config_mgr.set(_get_config_key(key, suffix), "")
 
         # 保存配置到文件
-        if not config.save_config():
+        if not config_mgr.save_config():
             return False, "保存配置失败"
 
         # 如果服务正在运行，移除处理函数
@@ -416,8 +403,7 @@ def simulate_key_press(key: str) -> tuple[bool, str, dict]:
 
         if not handler:
             # 如果没有处理函数，尝试设置
-            config = get_config()
-            url = config.get(_get_config_key(key, "url"))
+            url = config_mgr.get(_get_config_key(key, "url"))
             if not url:
                 return False, f"按键 {key} 未配置 URL，请先配置", {}
 

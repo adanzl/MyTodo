@@ -42,7 +42,7 @@ class MiDevice:
     """小米设备管理"""
     scanning = False
 
-    def __init__(self, address: str, username: str = None, password: str = None):
+    def __init__(self, address: str, username: str = None, password: str = None, name: str = ""):
         """
         初始化小米设备
         :param address: 设备ID或地址
@@ -52,6 +52,7 @@ class MiDevice:
         self.device_id = address  # 小米设备使用 deviceID 作为地址
         self.username = username or DEFAULT_MI_USERNAME
         self.password = password or DEFAULT_MI_PASSWORD
+        self.name = name or address
 
     @staticmethod
     async def scan_devices(username: str = None, password: str = None) -> List[Dict]:
@@ -92,6 +93,7 @@ class MiDevice:
         :param url: 媒体文件 URL (可以是 http://、file:// 或本地文件路径)
         :return: (错误码, 消息)
         """
+
         async def _play_async():
             session = None
             try:
@@ -126,6 +128,7 @@ class MiDevice:
         停止播放【OUT】
         :return: (错误码, 消息)
         """
+
         async def _stop_async():
             session = None
             try:
@@ -158,6 +161,7 @@ class MiDevice:
         获取播放状态信息
         :return: (错误码, 状态字典) 格式: {'state', 'status', 'track', 'duration', 'position'}
         """
+
         async def _get_status_async():
             session = None
             try:
@@ -173,18 +177,19 @@ class MiDevice:
                 ret = await mina_service.player_get_status(self.device_id)
                 if ret['code'] != 0:
                     return -1, {"error": ret['message']}
-                info = json.loads(ret['data']['info']) 
+                info = json.loads(ret['data']['info'])
                 state = 'STOPPED' if info['status'] == 1 else 'PLAYING'
                 play_song_detail = info['play_song_detail']
-                duration = format_time_str(play_song_detail['duration'] / 1000) if play_song_detail.get('duration') else '00:00:00'
+                duration = format_time_str(play_song_detail['duration'] /
+                                           1000) if play_song_detail.get('duration') else '00:00:00'
                 track_list = info.get('track_list', [])
                 audio_id = play_song_detail.get('audio_id')
                 position = play_song_detail.get('position', 0)  # 播放位置 单位：毫秒
-                
+
                 track = 0
                 if audio_id and track_list:
                     track = track_list.index(audio_id) + 1
-                
+
                 return 0, {
                     "state": state,  # PLAYING, STOPPED
                     "status": 'OK',  # OK, ERROR
@@ -204,6 +209,7 @@ class MiDevice:
         except Exception as e:
             log.error(f"[MiDevice] Get status error: {e}")
             return -1, {"error": f"获取播放状态信息失败: {str(e)}"}
+
 
 # 同步包装函数（用于在Flask路由中使用）
 

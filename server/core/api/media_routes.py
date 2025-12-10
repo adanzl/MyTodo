@@ -7,7 +7,7 @@ import os
 from flask import Blueprint, request, send_file, abort
 
 from core.log_config import root_logger
-from core.models.playlist import playlist_mgr
+from core.services.playlist_mgr import playlist_mgr
 from core.utils import get_media_url, get_media_duration, validate_and_normalize_path, _ok, _err
 
 log = root_logger()
@@ -36,7 +36,7 @@ def playlist_get():
     """
     try:
         args = request.args
-        log.info(f"===== [Playlist Get] {json.dumps(args)}")
+        # log.info(f"===== [Playlist Get] {json.dumps(args)}")
         playlist_id = args.get("id")
         
         # 如果 id 为空、None 或空字符串，返回整个播放列表集合

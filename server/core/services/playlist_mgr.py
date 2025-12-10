@@ -29,13 +29,13 @@ _TS = lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 def _create_device(node):
     ret = {"node": node, "obj": None}
     if node["type"] == "agent":
-        ret["obj"] = DeviceAgent(node["address"])
+        ret["obj"] = DeviceAgent(address=node["address"], name=node.get("name"))
     elif node["type"] == "bluetooth":
-        ret["obj"] = BluetoothDev(node["address"])
+        ret["obj"] = BluetoothDev(node["address"], name=node.get("name"))
     elif node["type"] == "dlna":
-        ret["obj"] = DlnaDev(node["address"])
+        ret["obj"] = DlnaDev(node["address"], name=node.get("name"))
     elif node["type"] == "mi":
-        ret["obj"] = MiDevice(node.get("address", ""))
+        ret["obj"] = MiDevice(node.get("address", ""), name=node.get("name"))
     return ret
 
 
@@ -617,4 +617,5 @@ class PlaylistMgr:
         log.info(f"[PlaylistMgr] 启动播放列表时长定时器: {id}, 将在 {duration_minutes} 分钟后停止播放")
 
 
+# 全局实例
 playlist_mgr = PlaylistMgr()

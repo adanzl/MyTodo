@@ -9,11 +9,8 @@ from core.log_config import root_logger
 
 log = root_logger()
 
-DEVICE_AGENT_HOST = os.getenv('DEVICE_AGENT_HOST', '192.168.50.184')
-DEVICE_AGENT_PORT = os.getenv('DEVICE_AGENT_PORT', '8000')
-
 # 完整的服务URL
-DEVICE_AGENT_BASE_URL = f"http://{DEVICE_AGENT_HOST}:{DEVICE_AGENT_PORT}"
+DEVICE_AGENT_BASE_URL = f"http://192.168.50.184:8000"
 
 # 请求超时时间（秒）
 DEVICE_AGENT_TIMEOUT = 30
@@ -22,14 +19,15 @@ DEVICE_AGENT_TIMEOUT = 30
 class DeviceAgent:
     """Device Agent HTTP 客户端"""
 
-    def __init__(self, base_url: str = None, timeout: int = None):
+    def __init__(self, address: str = None, name: str = None):
         """
         初始化客户端
-        :param base_url: 服务基础URL，默认使用配置中的值
-        :param timeout: 请求超时时间（秒），默认使用配置中的值
+        :param address: Agent 服务地址（IP:PORT 格式，如 "192.168.50.184:8000"），如果为 None 则使用默认配置
+        :param name: 设备名称
         """
-        self.base_url = base_url or DEVICE_AGENT_BASE_URL
-        self.timeout = timeout or DEVICE_AGENT_TIMEOUT
+        self.base_url = address or DEVICE_AGENT_BASE_URL
+        self.timeout = DEVICE_AGENT_TIMEOUT
+        self.name = name
 
     def _request(self,
                  method: str,

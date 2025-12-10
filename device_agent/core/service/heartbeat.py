@@ -2,13 +2,14 @@
 心跳上报服务
 每10秒向center服务器发送心跳，包含服务状态
 '''
+import socket
 import threading
 import time
 import traceback
 from typing import Dict, Optional, Tuple
 from core.log_config import root_logger
-from core.config import get_config
-from core.utils import _send_http_request
+from core.config import config_mgr
+from core.utils import _send_http_request, get_local_ip
 from core.service.keyboard import get_keyboard_status
 
 log = root_logger()
@@ -22,13 +23,33 @@ class HeartbeatService:
         self.thread: Optional[threading.Thread] = None
         self.interval = 10  # 10秒间隔
         self._center_url: Optional[str] = None  # 缓存中心服务器地址
+        self._port: Optional[int] = None  # 缓存端口
+        self._name: Optional[str] = None  # 缓存名称
 
     def _get_center_url(self) -> Optional[str]:
         """获取center服务器地址（带缓存）"""
         if self._center_url is None:
-            config = get_config()
-            self._center_url = config.get('center_server_url', '').strip()
+            self._center_url = config_mgr.get('center_server_url', '').strip()
         return self._center_url
+
+    def _get_port(self) -> int:
+        """获取服务端口（带缓存）"""
+        if self._port is None:
+            port_str = config_mgr.get('server_port')
+            if port_str:
+                try:
+                    self._port = int(port_str)
+                except ValueError:
+                    self._port = 8001
+            else:
+                self._port = 8001
+        return self._port
+
+    def _get_name(self) -> str:
+        """获取服务名称，如果配置中没有则使用主机名（带缓存）"""
+        if self._name is None:
+            self._name = config_mgr.get('agent_name', socket.gethostname()).strip()
+        return self._name
 
     def _collect_status(self) -> Dict:
         """
@@ -41,9 +62,16 @@ class HeartbeatService:
         except Exception as e:
             log.debug(f"[HEARTBEAT] 获取键盘状态失败: {e}")
             keyboard_status = {"error": str(e)}
-        
+
+        ip = get_local_ip()
+        port = self._get_port()
+        address = f"http://{ip}:{port}"
+
         status = {
             "timestamp": int(time.time()),
+            "address": address,
+            "name": self._get_name(),
+            "actions": ["bluetooth", "keyboard"],
             "keyboard": keyboard_status,
         }
         return status
@@ -78,7 +106,7 @@ class HeartbeatService:
         """心跳循环"""
         # 延迟第一次心跳，避免在应用启动时立即执行阻塞操作
         time.sleep(1)
-        
+
         while self.is_running:
             try:
                 self._send_heartbeat()
