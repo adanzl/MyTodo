@@ -172,6 +172,7 @@ async function createComponent() {
           device_type: validDeviceType,
           device: item?.device || { type: validDeviceType, address: item?.device_address || null, name: item?.device?.name || null },
           schedule: normalizedSchedule,
+          trigger_button: item?.trigger_button || "",
           updatedAt: item?.updatedAt || Date.now(),
           isPlaying: item?.isPlaying === true || item?.isPlaying === 1 || false,
         };
@@ -369,6 +370,7 @@ async function createComponent() {
               address: item.device_address || null,
             },
               schedule: normalizedSchedule,
+              trigger_button: item?.trigger_button || "",
               create_time: item.create_time,
               updated_time: item.updated_time,
               updatedAt: item.updated_time ? new Date(item.updated_time).getTime() : Date.now(),
@@ -1103,6 +1105,15 @@ async function createComponent() {
             playlistInfo.schedule = { enabled: 0, cron: "", duration: 0 };
           }
           playlistInfo.schedule.duration = duration || 0;
+          return playlistInfo;
+        });
+      };
+
+      // 更新播放列表的触发按钮
+      const handleUpdateTriggerButton = async (triggerButton) => {
+        if (!refData.playlistStatus.value) return;
+        await updateActivePlaylistData((playlistInfo) => {
+          playlistInfo.trigger_button = triggerButton || "";
           return playlistInfo;
         });
       };
@@ -2177,6 +2188,7 @@ async function createComponent() {
         handleUpdatePlaylistDuration,
         formatDurationMinutes,
         handlePreviewPlaylistCron,
+        handleUpdateTriggerButton,
         handleUpdatePlaylistDeviceType,
         handleUpdatePlaylistDeviceAddress,
         handleSelectBluetoothDevice,
