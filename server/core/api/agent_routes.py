@@ -33,7 +33,7 @@ def agent_heartbeat():
         args = request.get_json() or {}
         address = args.get('address')
         client_ip = _get_client_ip()
-        
+
         # 如果没有提供 address，使用客户端 IP + 默认端口
         if not address:
             return _err("address is required")
@@ -46,4 +46,29 @@ def agent_heartbeat():
         return _ok()
     except Exception as e:
         log.error(f"[Agent] Heartbeat error: {e}")
+        return _err(f'error: {str(e)}')
+
+
+@agent_bp.route("/agent/event", methods=['POST'])
+def agent_event():
+    """
+    触发事件接口
+    """
+    try:
+        args = request.get_json() or {}
+        client_ip = _get_client_ip()
+        log.info(f"===== [Agent Event] client_ip={client_ip}, {args}")
+
+        event = args.get('event')
+
+        agent = agent_mgr.handle_event(client_ip = client_ip, event = event)
+        code, msg = agent.trigger_event(event)
+        if code == 0:
+            return _ok()
+        else:
+            return _err(msg)
+    except KeyError:
+        return _err("agent not found")
+    except Exception as e:
+        log.error(f"[Agent] Trigger event error: {e}")
         return _err(f'error: {str(e)}')

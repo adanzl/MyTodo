@@ -30,7 +30,7 @@
 
 # F12 默认配置（如果未配置会自动设置）
 # keyboard.F12.url=http://localhost:8001/keyboard/status
-# keyboard.F12.method=GET
+# keyboard.F12.method=POST
 
 # F13 配置示例
 # keyboard.F13.url=http://example.com/api/action
@@ -39,7 +39,7 @@
 
 # F14 配置示例
 # keyboard.F14.url=http://example.com/api/trigger
-# keyboard.F14.method=GET
+# keyboard.F14.method=POST
 
 # 其他按键 (F15~F19) 配置方式相同
 # keyboard.F15.url=

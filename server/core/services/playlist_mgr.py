@@ -476,14 +476,14 @@ class PlaylistMgr:
                                                    in_pre_files=True,
                                                    pre_index=next_pre_index,
                                                    file_index=play_state["file_index"])
-            # pre_files 播放完了，开始播放 files
+            # pre_files 播放完了，开始播放 files（从保存的 file_index 开始）
             if files and play_state["file_index"] < len(files):
                 return self._update_index_and_play(id, in_pre_files=False, file_index=play_state["file_index"])
             return -1, "没有更多文件可播放"
         else:
-            # 播放 files 的下一首
-            next_file_index = play_state["file_index"] + 1
-            if next_file_index < len(files):
+            # 播放 files 的下一首（使用取余实现循环）
+            if files:
+                next_file_index = (play_state["file_index"] + 1) % len(files)
                 return self._update_index_and_play(id, file_index=next_file_index)
             return -1, "没有更多文件可播放"
 

@@ -9,19 +9,22 @@ import threading
 import time
 import traceback
 from typing import Dict, Optional, Callable, Tuple
+
 from core.log_config import root_logger
 from core.config import config_mgr
 from core.utils import _send_http_request
 
+log = root_logger()
+
+# ==================== 库导入 ====================
 PYNPUT_AVAILABLE = False
 keyboard = None
-# 尝试导入 pynput（跨平台）
 try:
     from pynput import keyboard
     PYNPUT_AVAILABLE = True
 except ImportError:
     pass
-# 尝试导入 evdev（仅 Linux）
+
 EVDEV_AVAILABLE = False
 evdev = None
 try:
@@ -30,8 +33,7 @@ try:
 except ImportError:
     pass
 
-log = root_logger()
-
+# ==================== 常量定义 ====================
 # F12~F19 按键名列表
 KEY_NAMES = [f'F{i}' for i in range(12, 20)]
 
@@ -39,18 +41,16 @@ KEY_NAMES = [f'F{i}' for i in range(12, 20)]
 KEY_CODES = {name: name for name in KEY_NAMES}
 
 # pynput 按键映射（如果可用）
-PYNPUT_KEY_CODES = {}
-PYNPUT_KEY_TO_NAME = {}
+PYNPUT_KEY_CODES: Dict[str, object] = {}
+PYNPUT_KEY_TO_NAME: Dict[object, str] = {}
 if PYNPUT_AVAILABLE and keyboard:
     PYNPUT_KEY_CODES = {f'F{i}': getattr(keyboard.Key, f'f{i}', None) for i in range(12, 20)}
     PYNPUT_KEY_CODES = {k: v for k, v in PYNPUT_KEY_CODES.items() if v is not None}
     PYNPUT_KEY_TO_NAME = {v: k for k, v in PYNPUT_KEY_CODES.items() if v is not None}
 
 # evdev 按键码映射（Linux 键盘扫描码）
-# F12-F19 对应的 Linux 输入事件键码
 EVDEV_KEY_CODES: Dict[str, int] = {}
 EVDEV_KEY_TO_NAME: Dict[int, str] = {}
-
 if EVDEV_AVAILABLE:
     EVDEV_KEY_CODES = {
         'F12': evdev.ecodes.KEY_F12,
@@ -62,8 +62,28 @@ if EVDEV_AVAILABLE:
         'F18': evdev.ecodes.KEY_F18,
         'F19': evdev.ecodes.KEY_F19,
     }
-
     EVDEV_KEY_TO_NAME = {v: k for k, v in EVDEV_KEY_CODES.items()}
+
+
+# ==================== 工具函数 ====================
+def _get_config_key(key_name: str, suffix: str) -> str:
+    """构建配置键名"""
+    return f"keyboard.{key_name}.{suffix}"
+
+
+def _parse_config_data(data_str: str) -> Dict:
+    """
+    解析配置数据
+    :param data_str: JSON 字符串
+    :return: 解析后的数据，如果解析失败返回 {}
+    """
+    if not data_str:
+        return {}
+    try:
+        return json.loads(data_str)
+    except json.JSONDecodeError:
+        log.warning(f"[KEYBOARD] 数据格式错误，忽略: {data_str}")
+    return {}
 
 
 def _find_keyboard_device() -> Optional[str]:
@@ -352,7 +372,9 @@ class KeyboardListener:
         }
 
 
-# 全局键盘监听器实例
+
+
+# ==================== 全局实例管理 ====================
 _keyboard_listener: Optional[KeyboardListener] = None
 
 
@@ -362,11 +384,6 @@ def get_keyboard_listener() -> KeyboardListener:
     if _keyboard_listener is None:
         _keyboard_listener = KeyboardListener()
     return _keyboard_listener
-
-
-def _get_config_key(key_name: str, suffix: str) -> str:
-    """构建配置键名"""
-    return f"keyboard.{key_name}.{suffix}"
 
 
 def create_key_handler(key: str) -> Callable:
@@ -386,10 +403,9 @@ def create_key_handler(key: str) -> Callable:
         method = config_mgr.get(_get_config_key(key_name, "method"), 'GET')
         data_str = config_mgr.get(_get_config_key(key_name, "data"))
         data = _parse_config_data(data_str)
-
-        if data_str and data is None:
-            log.warning(f"[KEYBOARD] 按键 {key_name} 的数据格式错误，忽略")
-
+        data["key"] = key_name
+        data["value"] = 1
+        data['type'] = 'keyboard'
         log.info(f"[KEYBOARD] 按键 {key_name} 触发，发送 {method} 请求到 {url}")
         result = _send_http_request(url, method=method, data=data, headers=None)
 
@@ -421,14 +437,17 @@ def get_keyboard_status() -> Dict:
     status = listener.get_status()
 
     # 添加配置信息
-    config = config_mgr
     configs = {}
     for key in KEY_NAMES:
-        url = config.get(_get_config_key(key, "url"))
+        url = config_mgr.get(_get_config_key(key, "url"))
         if url:
-            data_str = config.get(_get_config_key(key, "data"))
+            data_str = config_mgr.get(_get_config_key(key, "data"))
             data = _parse_config_data(data_str)
-            configs[key] = {"method": config.get(_get_config_key(key, "method"), "GET"), "url": url, "data": data}
+            configs[key] = {
+                "method": config_mgr.get(_get_config_key(key, "method"), "GET"),
+                "url": url,
+                "data": data
+            }
 
     status["configs"] = configs
     return status
@@ -473,21 +492,7 @@ def stop_keyboard_service() -> Tuple[bool, str]:
         return False, f"停止失败: {str(e)}"
 
 
-def _parse_config_data(data_str: str) -> dict:
-    """
-    解析配置数据
-    :param data_str: JSON 字符串
-    :return: 解析后的数据，如果解析失败返回 None
-    """
-    if not data_str:
-        return None
-    try:
-        return json.loads(data_str)
-    except json.JSONDecodeError:
-        return None
-
-
-def _build_key_config(key: str) -> dict:
+def _build_key_config(key: str) -> Dict:
     """
     构建单个按键配置
     :param key: 按键名
@@ -504,19 +509,18 @@ def _build_key_config(key: str) -> dict:
 
     data_str = config_mgr.get(_get_config_key(key, "data"))
     data = _parse_config_data(data_str)
-    if data is not None:
+    if data:
         result["data"] = data
 
     return result
 
 
-def get_key_config(key: str = None) -> dict:
+def get_key_config(key: Optional[str] = None) -> Dict:
     """
     获取按键配置
     :param key: 按键名，如果为 None 则返回所有按键配置
     :return: 配置字典
     """
-
     if key:
         # 返回单个按键配置
         if key not in KEY_NAMES:
