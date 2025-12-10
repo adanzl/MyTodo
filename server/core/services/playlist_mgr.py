@@ -5,9 +5,9 @@ import sys
 import time
 import threading
 from datetime import timedelta
-from typing import Any, Counter, Dict, List, Optional, Union
+from typing import Any, Counter, Dict, List, Optional
 
-from core.utils import get_media_duration
+from core.utils import get_media_duration, check_cron_will_trigger_today
 from core.db import rds_mgr
 from core.device.agent import DeviceAgent
 from core.device.bluetooth import BluetoothDev
@@ -124,6 +124,7 @@ class PlaylistMgr:
             self._needs_reload = True
             return -1
 
+    
     def _refresh_device_map(self):
         self._device_map = {}
         if self._playlist_raw and sys.platform == "linux":
@@ -542,6 +543,38 @@ class PlaylistMgr:
 
         # 停止播放
         return device_obj["obj"].stop()
+
+    def trigger_button(self, button: str, action: str) -> tuple[int, str]:
+        """
+        触发按钮操作
+        :param button: 按钮编号（"1", "2", "3"）
+        :param action: 操作类型（"play", "stop"）
+        :return: (错误码, 消息)
+        """
+        # 查找所有 trigger_button 匹配的播放列表
+        matching_playlists = []
+        for playlist_id, playlist_data in self._playlist_raw.items():
+            if playlist_data.get("trigger_button") == button:
+                schedule = playlist_data.get("schedule", {})
+                # 检查 cron 是否启用且今天会触发
+                if schedule.get("enabled") == 1 and schedule.get("cron"):
+                    cron_expression = schedule.get("cron", "").strip()
+                    if cron_expression and check_cron_will_trigger_today(cron_expression):
+                        matching_playlists.append((playlist_id, playlist_data))
+        
+        if not matching_playlists:
+            return -1, f"未找到触发按钮 {button} 对应的播放列表，或今天不会触发"
+        
+        # 选择第一个匹配的播放列表（今天会触发的第一条）
+        target_playlist_id = matching_playlists[0][0]
+        
+        # 根据 action 执行相应操作
+        if action == "play":
+            return self.play(target_playlist_id)
+        elif action == "stop":
+            return self.stop(target_playlist_id)
+        else:
+            return -1, f"不支持的操作: {action}"
 
     def _start_file_timer(self, id: str, duration_seconds: float):
         """

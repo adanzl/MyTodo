@@ -5,6 +5,7 @@
 import asyncio
 import os
 import subprocess
+from datetime import datetime, timedelta
 from urllib.parse import quote, unquote
 from typing import Optional, Tuple
 from core.log_config import root_logger
@@ -223,3 +224,111 @@ def get_media_url(local_path: str) -> str:
     except Exception as e:
         log.error(f"[MEDIA] Error converting path {local_path}: {e}")
         return local_path
+
+
+def convert_standard_cron_weekday_to_apscheduler(day_of_week: str) -> str:
+    """
+    将标准 cron 的周几映射转换为 APScheduler 的周几映射
+    
+    标准 cron: 0=周日, 1=周一, 2=周二, 3=周三, 4=周四, 5=周五, 6=周六
+    APScheduler: 0=周一, 1=周二, 2=周三, 3=周四, 4=周五, 5=周六, 6=周日
+    
+    转换公式: (标准cron + 6) % 7
+    
+    :param day_of_week: 标准 cron 的周几字段（可能是 *、数字、范围、列表等）
+    :return: 转换后的 APScheduler 周几字段
+    """
+    if day_of_week == '*':
+        return '*'
+
+    def convert_single_day(day_str: str) -> str:
+        """转换单个周几数字"""
+        try:
+            day_num = int(day_str)
+            # 转换公式: (标准cron + 6) % 7
+            apscheduler_day = (day_num + 6) % 7
+            return str(apscheduler_day)
+        except ValueError:
+            # 如果不是数字，可能是字符串别名或其他格式，直接返回
+            return day_str
+
+    # 处理范围表达式，如 "1-5"
+    if '-' in day_of_week:
+        parts = day_of_week.split('-')
+        if len(parts) == 2:
+            start = convert_single_day(parts[0])
+            end = convert_single_day(parts[1])
+            return f"{start}-{end}"
+
+    # 处理列表表达式，如 "1,3,5" 或 "*/2"
+    if ',' in day_of_week:
+        days = day_of_week.split(',')
+        converted_days = [convert_single_day(day.strip()) for day in days]
+        return ','.join(converted_days)
+
+    # 处理步进表达式，如 "*/2" 或 "1-5/2"
+    if '/' in day_of_week:
+        parts = day_of_week.split('/')
+        if len(parts) == 2:
+            base = parts[0]
+            step = parts[1]
+            converted_base = convert_standard_cron_weekday_to_apscheduler(base)
+            return f"{converted_base}/{step}"
+
+    # 单个数字
+    return convert_single_day(day_of_week)
+
+
+def check_cron_will_trigger_today(cron_expression: str) -> bool:
+    """
+    检查 cron 表达式是否会在今天触发
+    :param cron_expression: cron 表达式
+    :return: True 如果今天会触发，False 否则
+    """
+    if not cron_expression or not cron_expression.strip():
+        return False
+    
+    try:
+        from apscheduler.triggers.cron import CronTrigger
+        
+        # 创建 CronTrigger
+        parts = cron_expression.strip().split()
+        if len(parts) == 6:
+            second, minute, hour, day, month, day_of_week = parts
+            converted_day_of_week = convert_standard_cron_weekday_to_apscheduler(day_of_week)
+            trigger = CronTrigger(
+                second=second,
+                minute=minute,
+                hour=hour,
+                day=day,
+                month=month,
+                day_of_week=converted_day_of_week
+            )
+        elif len(parts) == 5:
+            minute, hour, day, month, day_of_week = parts
+            converted_day_of_week = convert_standard_cron_weekday_to_apscheduler(day_of_week)
+            trigger = CronTrigger(
+                minute=minute,
+                hour=hour,
+                day=day,
+                month=month,
+                day_of_week=converted_day_of_week
+            )
+        else:
+            return False
+        
+        # 获取下一次执行时间
+        now = datetime.now()
+        next_run = trigger.get_next_fire_time(None, now)
+        
+        if next_run is None:
+            return False
+        
+        # 判断下一次执行时间是否在今天
+        today_start = datetime(now.year, now.month, now.day)
+        today_end = today_start + timedelta(days=1)
+        
+        return today_start <= next_run < today_end
+    except Exception as e:
+        log.error(f"[Utils] 检查 cron 表达式失败: {cron_expression}, 错误: {e}")
+        return False

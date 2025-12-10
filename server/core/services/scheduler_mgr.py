@@ -11,6 +11,7 @@ from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 from datetime import datetime
 from typing import Callable, Optional
 from core.log_config import root_logger
+from core.utils import convert_standard_cron_weekday_to_apscheduler
 
 log = root_logger()
 
@@ -68,57 +69,6 @@ class SchedulerMgr:
             self.scheduler.shutdown(wait=wait)
             log.info("任务调度器已关闭")
 
-    def _convert_standard_cron_weekday_to_apscheduler(self, day_of_week: str) -> str:
-        """
-        将标准 cron 的周几映射转换为 APScheduler 的周几映射
-        
-        标准 cron: 0=周日, 1=周一, 2=周二, 3=周三, 4=周四, 5=周五, 6=周六
-        APScheduler: 0=周一, 1=周二, 2=周三, 3=周四, 4=周五, 5=周六, 6=周日
-        
-        转换公式: (标准cron + 6) % 7
-        
-        :param day_of_week: 标准 cron 的周几字段（可能是 *、数字、范围、列表等）
-        :return: 转换后的 APScheduler 周几字段
-        """
-        if day_of_week == '*':
-            return '*'
-
-        def convert_single_day(day_str: str) -> str:
-            """转换单个周几数字"""
-            try:
-                day_num = int(day_str)
-                # 转换公式: (标准cron + 6) % 7
-                apscheduler_day = (day_num + 6) % 7
-                return str(apscheduler_day)
-            except ValueError:
-                # 如果不是数字，可能是字符串别名或其他格式，直接返回
-                return day_str
-
-        # 处理范围表达式，如 "1-5"
-        if '-' in day_of_week:
-            parts = day_of_week.split('-')
-            if len(parts) == 2:
-                start = convert_single_day(parts[0])
-                end = convert_single_day(parts[1])
-                return f"{start}-{end}"
-
-        # 处理列表表达式，如 "1,3,5" 或 "*/2"
-        if ',' in day_of_week:
-            days = day_of_week.split(',')
-            converted_days = [convert_single_day(day.strip()) for day in days]
-            return ','.join(converted_days)
-
-        # 处理步进表达式，如 "*/2" 或 "1-5/2"
-        if '/' in day_of_week:
-            parts = day_of_week.split('/')
-            if len(parts) == 2:
-                base = parts[0]
-                step = parts[1]
-                converted_base = self._convert_standard_cron_weekday_to_apscheduler(base)
-                return f"{converted_base}/{step}"
-
-        # 单个数字
-        return convert_single_day(day_of_week)
 
     def add_cron_job(self, func: Callable, job_id: str, cron_expression: Optional[str] = None, **cron_kwargs):
         """
@@ -161,7 +111,7 @@ class SchedulerMgr:
                     # 6 字段格式：秒 分 时 日 月 周
                     second, minute, hour, day, month, day_of_week = parts
                     # 转换标准 cron 周几到 APScheduler 周几
-                    converted_day_of_week = self._convert_standard_cron_weekday_to_apscheduler(day_of_week)
+                    converted_day_of_week = convert_standard_cron_weekday_to_apscheduler(day_of_week)
                     trigger = CronTrigger(
                         second=second,
                         minute=minute,
@@ -175,7 +125,7 @@ class SchedulerMgr:
                     # 手动解析并转换，不使用 from_crontab()（因为它有 bug）
                     minute, hour, day, month, day_of_week = parts
                     # 转换标准 cron 周几到 APScheduler 周几
-                    converted_day_of_week = self._convert_standard_cron_weekday_to_apscheduler(day_of_week)
+                    converted_day_of_week = convert_standard_cron_weekday_to_apscheduler(day_of_week)
                     trigger = CronTrigger(
                         minute=minute,
                         hour=hour,

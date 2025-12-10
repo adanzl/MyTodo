@@ -6,11 +6,21 @@ import time
 from typing import Dict
 from core.device.agent import DeviceAgent
 from core.log_config import root_logger
+from core.services.playlist_mgr import playlist_mgr
 
 log = root_logger()
 
 # 心跳超时时间（秒）
 HEARTBEAT_TIMEOUT = 30
+
+BUTTON_MAP = {
+    "1": ("1", "play"),
+    "2": ("1", "stop"),
+    "3": ("2", "play"),
+    "4": ("2", "stop"),
+    "5": ("3", "play"),
+    "6": ("3", "stop"),
+}
 
 
 class AgentMgr:
@@ -109,6 +119,9 @@ class AgentMgr:
         _agent = self.get_agent(client_ip)
         if not _agent:
             return -1, "agent not found"
+        if action == "keyboard":
+            button, action = BUTTON_MAP.get(key, (0, ""))
+            playlist_mgr.trigger_button(button, action)
         return 0, "ok"
 
 
