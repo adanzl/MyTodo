@@ -13,15 +13,14 @@ from core.service.heartbeat import start_heartbeat_service
 
 log = root_logger()
 
+
 def create_app():
+    log.info(f"===== [create_app] ===== {os.path.dirname(os.path.dirname(os.path.abspath(__file__)))}")
     instance_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     # 明确指定 template_folder 路径
     template_folder = os.path.join(instance_path, 'templates')
-    app = Flask(__name__, 
-                instance_path=instance_path, 
-                instance_relative_config=True,
-                template_folder=template_folder)
-    
+    app = Flask(__name__, instance_path=instance_path, instance_relative_config=True, template_folder=template_folder)
+
     # 配置 JSON 返回时不转义中文字符
     app.config['JSON_AS_ASCII'] = False
 
@@ -43,5 +42,5 @@ def create_app():
     # 启动服务
     start_keyboard_service()
     start_heartbeat_service()
-    
+
     return app, socketio

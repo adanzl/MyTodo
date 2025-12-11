@@ -118,23 +118,23 @@ def _build_full_url(url: str) -> Optional[str]:
     """
     if not url:
         return None
-    
+
     url = url.strip()
-    
+
     # 如果以 http:// 或 https:// 开头，则认为是完整 URL
     if url.startswith(('http://', 'https://')):
         return url
-    
+
     # 否则，作为路径与 center_server_url 拼接
     base_url = _get_base_url()
     if not base_url:
         log.warning(f"[KEYBOARD] center_server_url 未配置，无法构建完整 URL: {url}")
         return None
-    
+
     # 确保 url 以 / 开头
     if not url.startswith('/'):
         url = '/' + url
-    
+
     return f"{base_url}{url}"
 
 
@@ -162,7 +162,7 @@ def _get_key_config_raw(key: str) -> Optional[Dict[str, str]]:
     url_config = config_mgr.get(_get_config_key(key, "url"))
     if not url_config:
         return None
-    
+
     return {
         "url": url_config,
         "method": config_mgr.get(_get_config_key(key, "method"), DEFAULT_HTTP_METHOD),
@@ -179,22 +179,22 @@ def _get_key_config(key: str) -> Optional[Dict]:
     raw_config = _get_key_config_raw(key)
     if not raw_config:
         return None
-    
+
     # 构建完整 URL
     full_url = _build_full_url(raw_config["url"])
     if not full_url:
         return None
-    
+
     result = {
         "method": raw_config["method"],
         "url": full_url,
     }
-    
+
     # 解析数据
     data = _parse_config_data(raw_config["data"])
     if data:
         result["data"] = data
-    
+
     return result
 
 
@@ -361,7 +361,7 @@ class KeyboardListener:
 
             # 只处理按键按下事件 (value=1 表示按下，0=释放，2=长按)
             if event.type == evdev.ecodes.EV_KEY and event.value == EVDEV_KEY_PRESS_VALUE:
-                    self._on_key_press_evdev(event.code)
+                self._on_key_press_evdev(event.code)
 
         except PermissionError:
             log.error("[KEYBOARD] 权限不足，无法访问键盘设备。请使用 root 运行或添加用户到 input 组: sudo usermod -a -G input $USER")
@@ -383,10 +383,10 @@ class KeyboardListener:
         """尝试启动 evdev 监听"""
         if platform.system() != 'Linux' or not EVDEV_AVAILABLE:
             return False
-        
+
         if not self._evdev_device_path:
             self._evdev_device_path = _find_keyboard_device()
-        
+
         if self._evdev_device_path:
             self._listen_loop_evdev()
             return True
@@ -520,7 +520,7 @@ def create_key_handler(key: str) -> Callable:
             "value": 1,
             "action": "keyboard"
         })
-        
+
         url = config["url"]
         method = config["method"]
         log.info(f"[KEYBOARD] 按键 {key_name} 触发，发送 {method} 请求到 {url}")
@@ -570,6 +570,7 @@ def start_keyboard_service() -> Tuple[bool, str]:
     :return: (success: bool, message: str)
     """
     try:
+        log.info(f"===== [Start keyboard service] =====")
         listener = get_keyboard_listener()
         # 设置所有已配置按键的处理函数
         # 设置F12的默认配置（如果未配置）
@@ -656,7 +657,7 @@ def save_key_config(key: str, url: str, method: str, data: dict = None) -> Tuple
 
         # 清除 URL 缓存（因为可能更新了 center_server_url）
         _clear_base_url_cache()
-        
+
         # 保存配置到文件
         if not config_mgr.save_config():
             return False, "保存配置失败", {}
