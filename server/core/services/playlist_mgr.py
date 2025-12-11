@@ -551,28 +551,54 @@ class PlaylistMgr:
         :param action: 操作类型（"play", "stop"）
         :return: (错误码, 消息)
         """
-        # 查找所有 trigger_button 匹配的播放列表
-        matching_playlists = []
-        for playlist_id, playlist_data in self._playlist_raw.items():
-            if playlist_data.get("trigger_button") == button:
-                schedule = playlist_data.get("schedule", {})
-                # 检查 cron 是否启用且今天会触发
-                if schedule.get("enabled") == 1 and schedule.get("cron"):
-                    cron_expression = schedule.get("cron", "").strip()
-                    if cron_expression and check_cron_will_trigger_today(cron_expression):
-                        matching_playlists.append((playlist_id, playlist_data))
+        if action == "stop":
+            # stop 操作：停止所有关联的列表播放（不需要检查 cron）
+            matching_playlists = []
+            for playlist_id, playlist_data in self._playlist_raw.items():
+                if playlist_data.get("trigger_button") == button:
+                    matching_playlists.append(playlist_id)
+            
+            if not matching_playlists:
+                return -1, f"未找到触发按钮 {button} 对应的播放列表"
+            
+            # 停止所有匹配的播放列表
+            stopped_count = 0
+            errors = []
+            for playlist_id in matching_playlists:
+                # 只停止正在播放的列表
+                if playlist_id in self._playing_playlists:
+                    code, msg = self.stop(playlist_id)
+                    if code == 0:
+                        stopped_count += 1
+                    else:
+                        errors.append(f"{playlist_id}: {msg}")
+            
+            if stopped_count > 0:
+                return 0, f"已停止 {stopped_count} 个播放列表"
+            elif errors:
+                return -1, f"停止失败: {', '.join(errors)}"
+            else:
+                return 0, "没有正在播放的列表需要停止"
         
-        if not matching_playlists:
-            return -1, f"未找到触发按钮 {button} 对应的播放列表，或今天不会触发"
-        
-        # 选择第一个匹配的播放列表（今天会触发的第一条）
-        target_playlist_id = matching_playlists[0][0]
-        
-        # 根据 action 执行相应操作
-        if action == "play":
+        elif action == "play":
+            # play 操作：需要检查 cron 是否今天会触发
+            matching_playlists = []
+            for playlist_id, playlist_data in self._playlist_raw.items():
+                if playlist_data.get("trigger_button") == button:
+                    schedule = playlist_data.get("schedule", {})
+                    # 检查 cron 是否启用且今天会触发
+                    if schedule.get("enabled") == 1 and schedule.get("cron"):
+                        cron_expression = schedule.get("cron", "").strip()
+                        if cron_expression and check_cron_will_trigger_today(cron_expression):
+                            matching_playlists.append((playlist_id, playlist_data))
+            
+            if not matching_playlists:
+                return -1, f"未找到触发按钮 {button} 对应的播放列表，或今天不会触发"
+            
+            # 选择第一个匹配的播放列表（今天会触发的第一条）
+            target_playlist_id = matching_playlists[0][0]
             return self.play(target_playlist_id)
-        elif action == "stop":
-            return self.stop(target_playlist_id)
+        
         else:
             return -1, f"不支持的操作: {action}"
 
