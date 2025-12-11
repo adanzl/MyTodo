@@ -643,6 +643,38 @@ async function createComponent() {
         }
       };
 
+      const handleTestAgentButton = async (agentId, key) => {
+        try {
+          // 设置按钮loading状态
+          const device = refData.agentList.value.find(d => d.agent_id === agentId);
+          if (device) {
+            device[`testing_${key}`] = true;
+          }
+
+          const response = await axios.post(getApiUrl() + "/agent/mock", {
+            agent_id: agentId,
+            action: "keyboard",
+            key: key,
+            value: "test"
+          });
+
+          if (response.data && response.data.code === 0) {
+            ElMessage.success(`测试按钮 ${key} 成功`);
+          } else {
+            ElMessage.error(response.data?.msg || `测试按钮 ${key} 失败`);
+          }
+        } catch (error) {
+          console.error(`测试按钮 ${key} 失败:`, error);
+          ElMessage.error(`测试按钮 ${key} 失败: ` + (error.message || "未知错误"));
+        } finally {
+          // 清除loading状态
+          const device = refData.agentList.value.find(d => d.agent_id === agentId);
+          if (device) {
+            device[`testing_${key}`] = false;
+          }
+        }
+      };
+
       const cronBuilderVisible = ref(false);
 
       const handleOpenCronBuilder = () => {
@@ -2234,6 +2266,7 @@ async function createComponent() {
         handleOpenAgentListDialog,
         handleCloseAgentListDialog,
         handleRefreshAgentList,
+        handleTestAgentButton,
       };
 
       updateFileBrowserCanNavigateUp();

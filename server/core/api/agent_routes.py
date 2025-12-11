@@ -115,6 +115,7 @@ def agent_mock():
     参数: agent_id, action, key, value
     """
     try:
+        log.info(f"===== [Agent Mock] {request.get_json()}")
         args = request.get_json() or {}
         agent_id = args.get('agent_id')
         action = args.get('action')

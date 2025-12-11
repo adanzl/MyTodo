@@ -183,8 +183,8 @@ def keyboard_set_config():
         return _err(msg=f'error: {str(e)}')
 
 
-@keyboard_bp.route("/keyboard/test", methods=['POST'])
-def keyboard_test():
+@keyboard_bp.route("/keyboard/mock", methods=['POST'])
+def keyboard_mock():
     """
     模拟按键触发
     POST /keyboard/test
@@ -194,6 +194,7 @@ def keyboard_test():
     """
     try:
         args = request.get_json() or {}
+        log.info(f"===== [Keyboard Mock] {args}")
         key = args.get('key')
 
         is_valid, error = _validate_key(key)

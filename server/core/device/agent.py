@@ -182,12 +182,12 @@ class DeviceAgent:
         :return: 响应结果
         """
         if action == "keyboard":
-            # 向 agent 的 /keyboard/test 发送 key 和 value
+            # 向 agent 的 /keyboard/mock 发送 key 和 value
             json_data = {}
             if key is not None:
                 json_data["key"] = key
             if value is not None:
                 json_data["value"] = value
-            return self._request("POST", "/keyboard/test", json_data=json_data)
+            return self._request("POST", "/keyboard/mock", json_data=json_data)
         else:
             return {"code": -1, "msg": f"不支持的 action: {action}"}
