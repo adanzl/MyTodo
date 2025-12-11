@@ -183,7 +183,6 @@ def start_heartbeat_service() -> Tuple[bool, str]:
     try:
         log.info(f"===== [Start heartbeat service] =====")   
         service = get_heartbeat_service()
-        log.info("[HEARTBEAT] 正在启动心跳服务...")
         center_url = service._get_center_url()
 
         success = service.start()
