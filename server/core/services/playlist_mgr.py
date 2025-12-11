@@ -149,15 +149,16 @@ class PlaylistMgr:
 
         def cron_play_task(pid=playlist_id):
             try:
+                p_name = self._playlist_raw.get(pid, {}).get("name", "未知播放列表")
                 # 定时任务使用 force=True 允许播放（即使正在播放也继续）
                 code, msg = self.play(pid, force=True)
                 if code == 0:
                     self._scheduled_play_start_times[pid] = datetime.datetime.now()
-                    log.info(f"[PlaylistMgr] 定时任务播放成功: {pid}")
+                    log.info(f"[PlaylistMgr] 定时任务播放成功: {pid} - {p_name}")
                 else:
-                    log.error(f"[PlaylistMgr] 定时任务播放失败: {pid}, {msg}")
+                    log.error(f"[PlaylistMgr] 定时任务播放失败: {pid} - {p_name}, {msg}")
             except Exception as e:
-                log.error(f"[PlaylistMgr] 定时任务执行异常: {pid}, {e}")
+                log.error(f"[PlaylistMgr] 定时任务执行异常: {pid} - {p_name}, {e}")
 
         success = scheduler.add_cron_job(func=cron_play_task, job_id=job_id, cron_expression=cron_expression)
         playlist_name = playlist_data.get("name", "未知播放列表")
@@ -664,11 +665,14 @@ class PlaylistMgr:
         """
         scheduler = scheduler_mgr
         job_id = f"playlist_duration_timer_{id}"
+        p_name = self._playlist_raw.get(id, {}).get("name", "未知播放列表")
 
         if scheduler.get_job(job_id):
             scheduler.remove_job(job_id)
 
         def stop_playlist_task(pid=id):
+            p_name = self._playlist_raw.get(pid, {}).get("name", "未知播放列表")
+            log.info(f"[PlaylistMgr] 播放列表时长定时器触发: {pid} - {p_name}")
             self._clear_timer(pid, self._playlist_duration_timers, "playlist_duration_timer_")
             self._scheduled_play_start_times.pop(pid, None)
             self.stop(pid)
@@ -677,7 +681,7 @@ class PlaylistMgr:
         run_date = datetime.datetime.now() + timedelta(minutes=duration_minutes)
         scheduler.add_date_job(func=stop_playlist_task, job_id=job_id, run_date=run_date)
         self._playlist_duration_timers[id] = job_id
-        log.info(f"[PlaylistMgr] 启动播放列表时长定时器: {id}, 将在 {duration_minutes} 分钟后停止播放")
+        log.info(f"[PlaylistMgr] 启动播放列表时长定时器: {id} - {p_name}, 将在 {duration_minutes} 分钟后停止播放")
 
 
 # 全局实例

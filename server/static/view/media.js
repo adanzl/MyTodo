@@ -2,7 +2,7 @@ import { bluetoothAction, playlistAction, getApiUrl } from "../js/net_util.js";
 import { createPlaylistId, formatDateTime, formatDuration, formatDurationMinutes, formatSize } from "../js/utils.js";
 const axios = window.axios;
 
-const { ref, onMounted, onUnmounted, nextTick } = window.Vue;
+const { ref, watch, onMounted, onUnmounted, nextTick } = window.Vue;
 const { ElMessage, ElMessageBox } = window.ElementPlus;
 let component = null;
 async function loadTemplate() {
@@ -2273,6 +2273,31 @@ async function createComponent() {
 
       // 定时器：每5秒刷新播放列表状态
       let statusRefreshTimer = null;
+      // Agent设备列表刷新定时器
+      let agentListRefreshTimer = null;
+
+      // 监听Agent设备列表弹窗状态，实现10秒定时刷新
+      watch(
+        () => refData.agentListDialogVisible.value,
+        (isVisible) => {
+          // 清除之前的定时器
+          if (agentListRefreshTimer) {
+            clearInterval(agentListRefreshTimer);
+            agentListRefreshTimer = null;
+          }
+          
+          // 如果弹窗显示，启动10秒定时刷新
+          if (isVisible) {
+            agentListRefreshTimer = setInterval(async () => {
+              try {
+                await handleRefreshAgentList();
+              } catch (error) {
+                console.error("定时刷新Agent设备列表失败:", error);
+              }
+            }, 10000); // 10秒刷新一次
+          }
+        }
+      );
 
       onMounted(async () => {
         await loadPlaylist();
@@ -2293,6 +2318,10 @@ async function createComponent() {
         if (statusRefreshTimer) {
           clearInterval(statusRefreshTimer);
           statusRefreshTimer = null;
+        }
+        if (agentListRefreshTimer) {
+          clearInterval(agentListRefreshTimer);
+          agentListRefreshTimer = null;
         }
       });
 

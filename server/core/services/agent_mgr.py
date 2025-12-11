@@ -14,12 +14,12 @@ log = root_logger()
 HEARTBEAT_TIMEOUT = 30
 
 BUTTON_MAP = {
-    "F13": ("1", "play"),
-    "F14": ("1", "stop"),
-    "F15": ("2", "play"),
-    "F16": ("2", "stop"),
-    "F17": ("3", "play"),
-    "F18": ("3", "stop"),
+    "F13": ("B1", "play"),
+    "F14": ("B1", "stop"),
+    "F15": ("B2", "play"),
+    "F16": ("B2", "stop"),
+    "F17": ("B3", "play"),
+    "F18": ("B3", "stop"),
 }
 
 
