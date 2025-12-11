@@ -624,22 +624,30 @@ async function createComponent() {
         refData.agentListDialogVisible.value = false;
       };
 
-      const handleRefreshAgentList = async () => {
+      const handleRefreshAgentList = async (showLoading = true) => {
         try {
-          refData.agentListLoading.value = true;
+          if (showLoading) {
+            refData.agentListLoading.value = true;
+          }
           const response = await axios.get(getApiUrl() + "/agent/list");
           if (response.data && response.data.code === 0) {
             refData.agentList.value = response.data.data || [];
           } else {
-            ElMessage.error(response.data?.msg || "获取设备列表失败");
+            if (showLoading) {
+              ElMessage.error(response.data?.msg || "获取设备列表失败");
+            }
             refData.agentList.value = [];
           }
         } catch (error) {
           console.error("获取Agent设备列表失败:", error);
-          ElMessage.error("获取设备列表失败: " + (error.message || "未知错误"));
+          if (showLoading) {
+            ElMessage.error("获取设备列表失败: " + (error.message || "未知错误"));
+          }
           refData.agentList.value = [];
         } finally {
-          refData.agentListLoading.value = false;
+          if (showLoading) {
+            refData.agentListLoading.value = false;
+          }
         }
       };
 
@@ -2290,7 +2298,8 @@ async function createComponent() {
           if (isVisible) {
             agentListRefreshTimer = setInterval(async () => {
               try {
-                await handleRefreshAgentList();
+                // 自动刷新时不显示loading图标
+                await handleRefreshAgentList(false);
               } catch (error) {
                 console.error("定时刷新Agent设备列表失败:", error);
               }
