@@ -25,7 +25,11 @@ class DeviceAgent:
         :param address: Agent 服务地址（IP:PORT 格式，如 "192.168.50.184:8000"），如果为 None 则使用默认配置
         :param name: 设备名称
         """
-        self.base_url = address or DEVICE_AGENT_BASE_URL
+        base_url = address or DEVICE_AGENT_BASE_URL
+        # 确保 base_url 有 http:// 前缀
+        if base_url and not base_url.startswith(('http://', 'https://')):
+            base_url = f"http://{base_url}"
+        self.base_url = base_url
         self.timeout = DEVICE_AGENT_TIMEOUT
         self.name = name
 
@@ -126,7 +130,7 @@ class DeviceAgent:
         return self._request("GET", "/bluetooth/paired")
 
 
-    # ========== 统一设备接口 ==========
+    # ========== 统一 Device 接口 ==========
     def play(self, url: str) -> tuple[int, str]:
         """
         播放媒体文件【OUT】
@@ -166,3 +170,24 @@ class DeviceAgent:
 
         # 如果接口不存在，返回未知状态
         return (-1, {"error": "设备不支持获取传输状态"})
+
+    # ========== Agent 接口 ==========
+    
+    def mock(self, action: str, key: str = None, value: str = None) -> Dict[str, Any]:
+        """
+        Mock接口，用于模拟设备操作
+        :param action: 操作类型，如 "keyboard"
+        :param key: 键值
+        :param value: 值
+        :return: 响应结果
+        """
+        if action == "keyboard":
+            # 向 agent 的 /keyboard/test 发送 key 和 value
+            json_data = {}
+            if key is not None:
+                json_data["key"] = key
+            if value is not None:
+                json_data["value"] = value
+            return self._request("POST", "/keyboard/test", json_data=json_data)
+        else:
+            return {"code": -1, "msg": f"不支持的 action: {action}"}

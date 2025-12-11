@@ -56,6 +56,9 @@ async function createComponent() {
         playlistLoading: ref(false),
         playlistRefreshing: ref(false),
         showMoreActions: ref(false),
+        agentListDialogVisible: ref(false),
+        agentList: ref([]),
+        agentListLoading: ref(false),
       };
       const pendingDeviceType = ref(null);
       const _formatDateTime = formatDateTime;
@@ -609,6 +612,35 @@ async function createComponent() {
 
       const handleCloseScanDialog = () => {
         refData.scanDialogVisible.value = false;
+      };
+
+      // Agent设备列表相关方法
+      const handleOpenAgentListDialog = async () => {
+        refData.agentListDialogVisible.value = true;
+        await handleRefreshAgentList();
+      };
+
+      const handleCloseAgentListDialog = () => {
+        refData.agentListDialogVisible.value = false;
+      };
+
+      const handleRefreshAgentList = async () => {
+        try {
+          refData.agentListLoading.value = true;
+          const response = await axios.get(getApiUrl() + "/agent/list");
+          if (response.data && response.data.code === 0) {
+            refData.agentList.value = response.data.data || [];
+          } else {
+            ElMessage.error(response.data?.msg || "获取设备列表失败");
+            refData.agentList.value = [];
+          }
+        } catch (error) {
+          console.error("获取Agent设备列表失败:", error);
+          ElMessage.error("获取设备列表失败: " + (error.message || "未知错误"));
+          refData.agentList.value = [];
+        } finally {
+          refData.agentListLoading.value = false;
+        }
       };
 
       const cronBuilderVisible = ref(false);
@@ -2199,6 +2231,9 @@ async function createComponent() {
         scanMiDevices,
         getPreFilesTotalDuration,
         getPlaylistTotalDuration,
+        handleOpenAgentListDialog,
+        handleCloseAgentListDialog,
+        handleRefreshAgentList,
       };
 
       updateFileBrowserCanNavigateUp();
