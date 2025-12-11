@@ -40,6 +40,24 @@ KEY_NAMES = [f'F{i}' for i in range(12, 20)]
 # 向后兼容：KEY_CODES 字典（用于 API 验证）
 KEY_CODES = {name: name for name in KEY_NAMES}
 
+# 配置键后缀
+CONFIG_SUFFIXES = ["url", "method", "data"]
+
+# 默认 HTTP 方法
+DEFAULT_HTTP_METHOD = "GET"
+
+# 默认 F12 URL
+DEFAULT_F12_URL = "http://localhost:8000/keyboard/status"
+
+# 线程等待超时时间（秒）
+THREAD_JOIN_TIMEOUT = 2
+
+# pynput 监听循环休眠间隔（秒）
+PYNPUT_SLEEP_INTERVAL = 0.1
+
+# evdev 按键按下事件值
+EVDEV_KEY_PRESS_VALUE = 1
+
 # pynput 按键映射（如果可用）
 PYNPUT_KEY_CODES: Dict[str, object] = {}
 PYNPUT_KEY_TO_NAME: Dict[object, str] = {}
@@ -71,6 +89,55 @@ def _get_config_key(key_name: str, suffix: str) -> str:
     return f"keyboard.{key_name}.{suffix}"
 
 
+# URL 构建缓存
+_base_url_cache: Optional[str] = None
+
+
+def _get_base_url() -> Optional[str]:
+    """获取并缓存 center_server_url 的基础 URL"""
+    global _base_url_cache
+    if _base_url_cache is None:
+        base_url = config_mgr.get('center_server_url', '').strip()
+        if base_url:
+            # 移除末尾的斜杠
+            _base_url_cache = base_url.rstrip('/')
+    return _base_url_cache
+
+
+def _clear_base_url_cache():
+    """清除 base_url 缓存（用于配置更新后）"""
+    global _base_url_cache
+    _base_url_cache = None
+
+
+def _build_full_url(url: str) -> Optional[str]:
+    """
+    构建完整的 URL
+    :param url: 配置的 URL（可能是完整 URL 或路径）
+    :return: 完整的 URL，如果无法构建则返回 None
+    """
+    if not url:
+        return None
+    
+    url = url.strip()
+    
+    # 如果以 http:// 或 https:// 开头，则认为是完整 URL
+    if url.startswith(('http://', 'https://')):
+        return url
+    
+    # 否则，作为路径与 center_server_url 拼接
+    base_url = _get_base_url()
+    if not base_url:
+        log.warning(f"[KEYBOARD] center_server_url 未配置，无法构建完整 URL: {url}")
+        return None
+    
+    # 确保 url 以 / 开头
+    if not url.startswith('/'):
+        url = '/' + url
+    
+    return f"{base_url}{url}"
+
+
 def _parse_config_data(data_str: str) -> Dict:
     """
     解析配置数据
@@ -84,6 +151,51 @@ def _parse_config_data(data_str: str) -> Dict:
     except json.JSONDecodeError:
         log.warning(f"[KEYBOARD] 数据格式错误，忽略: {data_str}")
     return {}
+
+
+def _get_key_config_raw(key: str) -> Optional[Dict[str, str]]:
+    """
+    获取按键的原始配置（不构建 URL）
+    :param key: 按键名
+    :return: 配置字典，包含 url, method, data，如果未配置则返回 None
+    """
+    url_config = config_mgr.get(_get_config_key(key, "url"))
+    if not url_config:
+        return None
+    
+    return {
+        "url": url_config,
+        "method": config_mgr.get(_get_config_key(key, "method"), DEFAULT_HTTP_METHOD),
+        "data": config_mgr.get(_get_config_key(key, "data"), "")
+    }
+
+
+def _get_key_config(key: str) -> Optional[Dict]:
+    """
+    获取按键配置（构建完整 URL）
+    :param key: 按键名
+    :return: 配置字典，包含 method, url（完整URL）, data，如果未配置或 URL 构建失败则返回 None
+    """
+    raw_config = _get_key_config_raw(key)
+    if not raw_config:
+        return None
+    
+    # 构建完整 URL
+    full_url = _build_full_url(raw_config["url"])
+    if not full_url:
+        return None
+    
+    result = {
+        "method": raw_config["method"],
+        "url": full_url,
+    }
+    
+    # 解析数据
+    data = _parse_config_data(raw_config["data"])
+    if data:
+        result["data"] = data
+    
+    return result
 
 
 def _find_keyboard_device() -> Optional[str]:
@@ -210,7 +322,7 @@ class KeyboardListener:
             self.listener.start()
 
             while self.is_running:
-                time.sleep(0.1)
+                time.sleep(PYNPUT_SLEEP_INTERVAL)
         except Exception as e:
             log.error(f"[KEYBOARD] pynput 监听循环出错: {e}")
             log.error(f"[KEYBOARD] Traceback: {traceback.format_exc()}")
@@ -247,8 +359,8 @@ class KeyboardListener:
                 if not self.is_running:
                     break
 
-                # 只处理按键按下事件 (value=1 表示按下，0=释放，2=长按)
-                if event.type == evdev.ecodes.EV_KEY and event.value == 1:
+            # 只处理按键按下事件 (value=1 表示按下，0=释放，2=长按)
+            if event.type == evdev.ecodes.EV_KEY and event.value == EVDEV_KEY_PRESS_VALUE:
                     self._on_key_press_evdev(event.code)
 
         except PermissionError:
@@ -267,19 +379,27 @@ class KeyboardListener:
             self.is_running = False
             log.info("[KEYBOARD] evdev 监听循环已退出")
 
+    def _try_start_evdev(self) -> bool:
+        """尝试启动 evdev 监听"""
+        if platform.system() != 'Linux' or not EVDEV_AVAILABLE:
+            return False
+        
+        if not self._evdev_device_path:
+            self._evdev_device_path = _find_keyboard_device()
+        
+        if self._evdev_device_path:
+            self._listen_loop_evdev()
+            return True
+        else:
+            log.error("[KEYBOARD] 未找到可用的键盘设备")
+            self.is_running = False
+            return False
+
     def _listen_loop(self):
         """监听循环（自动选择 pynput 或 evdev）"""
         # 如果已指定使用 evdev，直接使用
         if self._use_evdev:
-            if platform.system() == 'Linux' and EVDEV_AVAILABLE:
-                if not self._evdev_device_path:
-                    self._evdev_device_path = _find_keyboard_device()
-                if self._evdev_device_path:
-                    self._listen_loop_evdev()
-                else:
-                    log.error("[KEYBOARD] 未找到可用的键盘设备")
-                    self.is_running = False
-            else:
+            if not self._try_start_evdev():
                 log.error("[KEYBOARD] evdev 不可用")
                 self.is_running = False
             return
@@ -292,22 +412,16 @@ class KeyboardListener:
             except Exception as e:
                 error_msg = str(e)
                 # 如果是无 DISPLAY 错误，尝试 evdev
-                if any(keyword in error_msg for keyword in ['NoDisplay', 'DISPLAY', 'X11']):
+                display_keywords = ['NoDisplay', 'DISPLAY', 'X11']
+                if any(keyword in error_msg for keyword in display_keywords):
                     log.info("[KEYBOARD] pynput 需要图形界面，切换到 evdev 模式")
-                    self._use_evdev = True
                 else:
                     log.warning(f"[KEYBOARD] pynput 启动失败: {e}，尝试 evdev")
-                    self._use_evdev = True
+                self._use_evdev = True
 
         # 如果 pynput 失败，尝试使用 evdev（仅 Linux）
-        if self._use_evdev and platform.system() == 'Linux' and EVDEV_AVAILABLE:
-            if not self._evdev_device_path:
-                self._evdev_device_path = _find_keyboard_device()
-            if self._evdev_device_path:
-                self._listen_loop_evdev()
-            else:
-                log.error("[KEYBOARD] 未找到可用的键盘设备")
-                self.is_running = False
+        if self._use_evdev:
+            self._try_start_evdev()
         elif not PYNPUT_AVAILABLE and not EVDEV_AVAILABLE:
             log.error("[KEYBOARD] 无法启动键盘监听：pynput 和 evdev 都不可用")
             self.is_running = False
@@ -356,7 +470,7 @@ class KeyboardListener:
 
         # 等待线程结束
         if self.listener_thread:
-            self.listener_thread.join(timeout=2)
+            self.listener_thread.join(timeout=THREAD_JOIN_TIMEOUT)
             if self.listener_thread.is_alive():
                 log.warning("[KEYBOARD] 监听线程未在超时时间内结束")
 
@@ -394,18 +508,21 @@ def create_key_handler(key: str) -> Callable:
     """
 
     def handler(key_name: str):
-        url = config_mgr.get(_get_config_key(key_name, "url"))
-
-        if not url:
-            log.warning(f"[KEYBOARD] 按键 {key_name} 未配置 URL，跳过")
+        config = _get_key_config(key_name)
+        if not config:
+            log.warning(f"[KEYBOARD] 按键 {key_name} 未配置或 URL 构建失败，跳过")
             return
 
-        method = config_mgr.get(_get_config_key(key_name, "method"), 'GET')
-        data_str = config_mgr.get(_get_config_key(key_name, "data"))
-        data = _parse_config_data(data_str)
-        data["key"] = key_name
-        data["value"] = 1
-        data['action'] = 'keyboard'
+        # 准备请求数据
+        data = config.get("data", {}).copy()
+        data.update({
+            "key": key_name,
+            "value": 1,
+            "action": "keyboard"
+        })
+        
+        url = config["url"]
+        method = config["method"]
         log.info(f"[KEYBOARD] 按键 {key_name} 触发，发送 {method} 请求到 {url}")
         result = _send_http_request(url, method=method, data=data, headers=None)
 
@@ -417,15 +534,11 @@ def create_key_handler(key: str) -> Callable:
 
 def _setup_default_config():
     """设置F12的默认配置"""
-    f12_url = config_mgr.get(_get_config_key("F12", "url"))
-
-    if not f12_url:
-        # 设置F12的默认配置
-        default_url = "http://localhost:8000/keyboard/status"
-        config_mgr.set(_get_config_key("F12", "url"), default_url)
-        config_mgr.set(_get_config_key("F12", "method"), "GET")
+    if not config_mgr.get(_get_config_key("F12", "url")):
+        config_mgr.set(_get_config_key("F12", "url"), DEFAULT_F12_URL)
+        config_mgr.set(_get_config_key("F12", "method"), DEFAULT_HTTP_METHOD)
         config_mgr.save_config()
-        log.info(f"[KEYBOARD] 已设置F12默认配置: GET {default_url}")
+        log.info(f"[KEYBOARD] 已设置F12默认配置: {DEFAULT_HTTP_METHOD} {DEFAULT_F12_URL}")
 
 
 def get_keyboard_status() -> Dict:
@@ -439,14 +552,12 @@ def get_keyboard_status() -> Dict:
     # 添加配置信息
     configs = {}
     for key in KEY_NAMES:
-        url = config_mgr.get(_get_config_key(key, "url"))
-        if url:
-            data_str = config_mgr.get(_get_config_key(key, "data"))
-            data = _parse_config_data(data_str)
+        key_config = _get_key_config(key)
+        if key_config:
             configs[key] = {
-                "method": config_mgr.get(_get_config_key(key, "method"), "GET"),
-                "url": url,
-                "data": data
+                "method": key_config["method"],
+                "url": key_config["url"],
+                "data": key_config.get("data", {})
             }
 
     status["configs"] = configs
@@ -465,11 +576,11 @@ def start_keyboard_service() -> Tuple[bool, str]:
         _setup_default_config()
 
         for key in KEY_NAMES:
-            url = config_mgr.get(_get_config_key(key, "url"))
-            if url:
+            key_config = _get_key_config(key)
+            if key_config:
                 handler = create_key_handler(key)
                 listener.set_handler(key, handler)
-                log.info(f"[KEYBOARD] 已配置按键 {key} -> {url}")
+                log.info(f"[KEYBOARD] 已配置按键 {key} -> {key_config['url']}")
 
         listener.start()
         return True, "键盘监听服务已启动"
@@ -498,21 +609,7 @@ def _build_key_config(key: str) -> Dict:
     :param key: 按键名
     :return: 配置字典
     """
-    url = config_mgr.get(_get_config_key(key, "url"))
-    if not url:
-        return {}
-
-    result = {
-        "method": config_mgr.get(_get_config_key(key, "method"), "GET"),
-        "url": url,
-    }
-
-    data_str = config_mgr.get(_get_config_key(key, "data"))
-    data = _parse_config_data(data_str)
-    if data:
-        result["data"] = data
-
-    return result
+    return _get_key_config(key) or {}
 
 
 def get_key_config(key: Optional[str] = None) -> Dict:
@@ -557,6 +654,9 @@ def save_key_config(key: str, url: str, method: str, data: dict = None) -> Tuple
             if config_mgr.get(_get_config_key(key, "data")):
                 config_mgr.set(_get_config_key(key, "data"), "")
 
+        # 清除 URL 缓存（因为可能更新了 center_server_url）
+        _clear_base_url_cache()
+        
         # 保存配置到文件
         if not config_mgr.save_config():
             return False, "保存配置失败", {}
@@ -567,9 +667,14 @@ def save_key_config(key: str, url: str, method: str, data: dict = None) -> Tuple
             handler = create_key_handler(key)
             listener.set_handler(key, handler)
 
-        log.info(f"[KEYBOARD] 已配置按键 {key}: {method} {url}")
-
-        return True, f"按键 {key} 配置已保存", {"method": method, "url": url, "data": data}
+        # 构建完整 URL 用于日志和返回
+        full_url = _build_full_url(url)
+        if full_url:
+            log.info(f"[KEYBOARD] 已配置按键 {key}: {method} {full_url}")
+            return True, f"按键 {key} 配置已保存", {"method": method, "url": full_url, "data": data}
+        else:
+            log.warning(f"[KEYBOARD] 已保存按键 {key} 配置，但 URL 构建失败（请检查 center_server_url 配置）")
+            return True, f"按键 {key} 配置已保存（URL: {url}）", {"method": method, "url": url, "data": data}
     except Exception as e:
         log.error(f"[KEYBOARD] 配置失败: {e}")
         return False, f"配置失败: {str(e)}", {}
@@ -583,7 +688,7 @@ def delete_key_config(key: str) -> Tuple[bool, str]:
     """
     try:
         # 删除配置项
-        for suffix in ["url", "method", "data"]:
+        for suffix in CONFIG_SUFFIXES:
             config_mgr.set(_get_config_key(key, suffix), "")
 
         # 保存配置到文件
@@ -620,9 +725,9 @@ def simulate_key_press(key: str) -> Tuple[bool, str, dict]:
 
         if not handler:
             # 如果没有处理函数，尝试设置
-            url = config_mgr.get(_get_config_key(key, "url"))
-            if not url:
-                return False, f"按键 {key} 未配置 URL，请先配置", {}
+            key_config = _get_key_config(key)
+            if not key_config:
+                return False, f"按键 {key} 未配置 URL 或 URL 构建失败（请检查 center_server_url 配置）", {}
 
             # 设置处理函数
             handler = create_key_handler(key)

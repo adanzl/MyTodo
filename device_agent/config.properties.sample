@@ -10,7 +10,8 @@
 # ============================================
 # 心跳上报配置
 # ============================================
-# Center服务器地址（用于心跳上报）
+# Center服务器基础地址（用于心跳上报）
+# 只需配置基础URL（如：http://192.168.50.172:8848），路径会自动拼接为 /api/agent/heartbeat
 # 如果未配置，心跳服务不会启动
 # center_server_url=http://your-center-server.com:8080
 
@@ -24,21 +25,34 @@
 # 键盘按键配置 (F12~F19)
 # ============================================
 # 按键配置格式：
-# keyboard.{按键名}.url=请求URL
+# keyboard.{按键名}.url=请求URL或路径
 # keyboard.{按键名}.method=HTTP方法 (GET/POST/PUT/DELETE)
 # keyboard.{按键名}.data=JSON格式的请求数据（可选）
+#
+# URL 配置说明：
+# - 如果 URL 以 http:// 或 https:// 开头，则使用完整 URL
+# - 否则，将 URL 作为路径，与 center_server_url 的基础 URL 拼接
+#
+# 示例：
+# 1. 完整 URL（独立服务器）：
+#    keyboard.F13.url=http://example.com/api/action
+#
+# 2. 相对路径（使用 center_server_url）：
+#    keyboard.F13.url=/api/keyboard/action
+#    如果 center_server_url=http://192.168.50.172:8848
+#    则实际请求 URL 为：http://192.168.50.172:8848/api/keyboard/action
 
 # F12 默认配置（如果未配置会自动设置）
 # keyboard.F12.url=http://localhost:8001/keyboard/status
 # keyboard.F12.method=POST
 
-# F13 配置示例
+# F13 配置示例（完整 URL）
 # keyboard.F13.url=http://example.com/api/action
 # keyboard.F13.method=POST
 # keyboard.F13.data={"action": "test", "value": 123}
 
-# F14 配置示例
-# keyboard.F14.url=http://example.com/api/trigger
+# F14 配置示例（相对路径，需要配合 center_server_url 使用）
+# keyboard.F14.url=/api/keyboard/trigger
 # keyboard.F14.method=POST
 
 # 其他按键 (F15~F19) 配置方式相同

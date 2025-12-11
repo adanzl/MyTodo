@@ -29,8 +29,17 @@ class HeartbeatService:
     def _get_center_url(self) -> Optional[str]:
         """获取center服务器地址（带缓存）"""
         if self._center_url is None:
-            self._center_url = config_mgr.get('center_server_url', '').strip()
-        return self._center_url
+            base_url = config_mgr.get('center_server_url', '').strip()
+            if base_url:
+                # 拼接固定路径
+                fixed_path = '/api/agent/heartbeat'
+                # 确保base_url不以/结尾，fixed_path以/开头
+                if base_url.endswith('/'):
+                    base_url = base_url.rstrip('/')
+                self._center_url = f"{base_url}{fixed_path}"
+            else:
+                self._center_url = ''
+        return self._center_url if self._center_url else None
 
     def _get_port(self) -> int:
         """获取服务端口（带缓存）"""
