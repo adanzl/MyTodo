@@ -15,7 +15,7 @@ log = root_logger()
 
 
 def create_app():
-    log.info(f"===== [create_app] ===== {os.path.dirname(os.path.dirname(os.path.abspath(__file__)))}")
+    log.info(f"==> [Create app] -> {os.path.dirname(os.path.dirname(os.path.abspath(__file__)))}")
     instance_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     # 明确指定 template_folder 路径
     template_folder = os.path.join(instance_path, 'templates')
