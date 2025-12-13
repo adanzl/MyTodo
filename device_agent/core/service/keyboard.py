@@ -1,6 +1,6 @@
 '''
 键盘监听服务
-监听 F12~F19 按键并发送 HTTP 请求
+监听所有按键并输出日志，F12~F19 按键可配置发送 HTTP 请求
 '''
 import json
 import os
@@ -20,7 +20,7 @@ log = root_logger()
 PYNPUT_AVAILABLE = False
 keyboard = None
 try:
-    from pynput import keyboard
+    from pynput import keyboard  # pyright: ignore[reportMissingModuleSource]
     PYNPUT_AVAILABLE = True
 except ImportError:
     pass
@@ -287,10 +287,28 @@ class KeyboardListener:
         if not self.is_running:
             return False
 
-        # 检查是否是 F12~F19
-        if key in PYNPUT_KEY_TO_NAME:
-            key_name = PYNPUT_KEY_TO_NAME[key]
-            self._trigger_handler(key_name)
+        # 将按键转换为字符串名称
+        try:
+            if hasattr(key, 'name'):
+                # 特殊按键（如 Key.f12）
+                key_name = key.name
+            elif hasattr(key, 'char') and key.char:
+                # 普通字符按键
+                key_name = key.char
+            else:
+                # 其他情况，尝试转换为字符串
+                key_name = str(key)
+            
+            # 输出日志
+            log.info(f"[KEYBOARD] 按键按下: {key_name}")
+            
+            # 如果是 F12~F19，触发对应的处理函数
+            if key in PYNPUT_KEY_TO_NAME:
+                key_name_mapped = PYNPUT_KEY_TO_NAME[key]
+                self._trigger_handler(key_name_mapped)
+        except Exception as e:
+            log.error(f"[KEYBOARD] 处理按键事件时出错: {e}")
+        
         return True
 
     def _on_key_press_evdev(self, key_code: int):
@@ -298,9 +316,29 @@ class KeyboardListener:
         if not self.is_running:
             return
 
-        if key_code in EVDEV_KEY_TO_NAME:
-            key_name = EVDEV_KEY_TO_NAME[key_code]
-            self._trigger_handler(key_name)
+        # 获取按键名称
+        try:
+            if EVDEV_AVAILABLE:
+                # 尝试从 evdev.ecodes.KEY 获取按键名称（反向映射字典）
+                if hasattr(evdev.ecodes, 'KEY') and key_code in evdev.ecodes.KEY:
+                    key_name = evdev.ecodes.KEY[key_code]
+                    # 移除 KEY_ 前缀（如果存在）
+                    if key_name.startswith('KEY_'):
+                        key_name = key_name[4:]
+                else:
+                    key_name = f"UNKNOWN_{key_code}"
+            else:
+                key_name = f"KEY_{key_code}"
+            
+            # 输出日志
+            log.info(f"[KEYBOARD] 按键按下: {key_name} (code: {key_code})")
+            
+            # 如果是 F12~F19，触发对应的处理函数
+            if key_code in EVDEV_KEY_TO_NAME:
+                key_name_mapped = EVDEV_KEY_TO_NAME[key_code]
+                self._trigger_handler(key_name_mapped)
+        except Exception as e:
+            log.error(f"[KEYBOARD] 处理按键事件时出错: {e}")
 
     def _trigger_handler(self, key_name: str):
         """触发按键处理函数"""
@@ -359,9 +397,9 @@ class KeyboardListener:
                 if not self.is_running:
                     break
 
-            # 只处理按键按下事件 (value=1 表示按下，0=释放，2=长按)
-            if event.type == evdev.ecodes.EV_KEY and event.value == EVDEV_KEY_PRESS_VALUE:
-                self._on_key_press_evdev(event.code)
+                # 只处理按键按下事件 (value=1 表示按下，0=释放，2=长按)
+                if event.type == evdev.ecodes.EV_KEY and event.value == EVDEV_KEY_PRESS_VALUE:
+                    self._on_key_press_evdev(event.code)
 
         except PermissionError:
             log.error("[KEYBOARD] 权限不足，无法访问键盘设备。请使用 root 运行或添加用户到 input 组: sudo usermod -a -G input $USER")

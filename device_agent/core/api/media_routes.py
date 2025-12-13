@@ -2,7 +2,6 @@
 媒体管理路由
 '''
 import os
-import pwd
 import time
 from gevent import subprocess
 from flask import Blueprint, request
@@ -164,11 +163,11 @@ def play_media_file_with_mpg123(file_path, alsa_device=None):
 
         # 确保必要的环境变量存在
         try:
-            user_info = pwd.getpwuid(os.getuid())
             if 'XDG_RUNTIME_DIR' not in env:
                 env['XDG_RUNTIME_DIR'] = f"/run/user/{os.getuid()}"
             if 'HOME' not in env:
-                env['HOME'] = user_info.pw_dir
+                # 使用 os.path.expanduser 获取用户主目录，兼容 Windows 和 Linux
+                env['HOME'] = os.path.expanduser('~')
         except Exception:
             pass
 
