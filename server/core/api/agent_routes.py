@@ -70,6 +70,7 @@ def agent_event():
         if code == 0:
             return _ok()
         else:
+            log.error(f"[Agent] Trigger event error: {msg}")
             return _err(msg)
     except KeyError:
         return _err("agent not found")
