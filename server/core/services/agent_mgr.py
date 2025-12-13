@@ -113,9 +113,9 @@ class AgentMgr:
         :param type: 事件类型
         :return: 事件处理结果
         """
-        _devices = self._devices.get(client_ip)
-        if not _devices or action not in _devices.get('actions', []):
-            log.info(_devices)
+        _device = self._devices.get(client_ip)
+        if not _device or action not in _device.get('actions', []):
+            log.info(self._devices)
             return -1, f"device not found {client_ip} or action not supported {action}"
         _agent = self.get_agent(client_ip)
         if not _agent:
