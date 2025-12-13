@@ -1,3 +1,4 @@
+import os
 from flask import make_response
 from gevent import monkey
 
@@ -36,6 +37,7 @@ def null_application(environ, start_response):
 if __name__ == '__main__':
     PORT = 8001
     HOST = '127.0.0.1'
+    os.environ['GEVENT_SUPPORT'] = 'True'
     
     log.info(f"启动服务在 http://{HOST}:{PORT}")
     socketio.run(app, host=HOST, port=PORT, debug=False)
