@@ -271,7 +271,7 @@ class DlnaDev:
                 return -1, "AVTransport service not available"
 
             av_transport.Stop(InstanceID=0)
-            log.info(f"[DlnaDev] Stop playback")
+            log.info(f"[DlnaDev] Stop playback {self.name}")
             return 0, "停止成功"
         except Exception as e:
             log.error(f"[DlnaDev] Stop error: {e}")
