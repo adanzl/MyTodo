@@ -552,6 +552,7 @@ class PlaylistMgr:
         :param action: 操作类型（"play", "stop"）
         :return: (错误码, 消息)
         """
+        log.info(f"[PlaylistMgr] 触发按钮: {button}, {action}")
         if action == "stop":
             # stop 操作：停止所有关联的列表播放（不需要检查 cron）
             matching_playlists = []
