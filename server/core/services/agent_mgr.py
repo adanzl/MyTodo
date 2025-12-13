@@ -55,11 +55,11 @@ class AgentMgr:
         # 先清理过期设备
         self._cleanup_expired_devices()
 
-        if address not in self._devices:
+        agent_id = client_ip
+        if agent_id not in self._devices:
             # 注册新设备
-            agent_id = client_ip
             self._agents[agent_id] = DeviceAgent(address=address, name=name)
-            self._devices[address] = {
+            self._devices[agent_id] = {
                 'heartbeat_time': current_time,
                 'agent_id': agent_id,
                 'register_time': current_time,
@@ -70,12 +70,12 @@ class AgentMgr:
             log.info(f"[AgentMgr] 注册新设备: {address}, name={name}, actions={actions}")
         else:
             # 更新心跳时间和设备信息
-            self._devices[address]['heartbeat_time'] = current_time
-            self._devices[address]['name'] = name
-            self._devices[address]['actions'] = actions or []
-            log.debug(f"[AgentMgr] 更新设备心跳: {address}")
+            self._devices[agent_id]['heartbeat_time'] = current_time
+            self._devices[agent_id]['name'] = name
+            self._devices[agent_id]['actions'] = actions or []
+            log.debug(f"[agent_id] 更新设备心跳: {agent_id}")
 
-        return self._devices[address]
+        return self._devices[agent_id]
 
     def get_agent(self, agent_id: str) -> DeviceAgent:
         """
