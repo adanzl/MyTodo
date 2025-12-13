@@ -324,6 +324,11 @@ def check_cron_will_trigger_today(cron_expression: str) -> bool:
         if next_run is None:
             return False
         
+        # 处理时区问题：如果 next_run 是 timezone-aware，转换为 naive datetime
+        if next_run.tzinfo is not None:
+            # 转换为本地时区的 naive datetime
+            next_run = next_run.astimezone().replace(tzinfo=None)
+        
         # 判断下一次执行时间是否在今天
         today_start = datetime(now.year, now.month, now.day)
         today_end = today_start + timedelta(days=1)
