@@ -115,7 +115,8 @@ class AgentMgr:
         """
         _devices = self._devices.get(client_ip)
         if not _devices or action not in _devices.get('actions', []):
-            return -1, "device not found or action not supported"
+            log.info(_devices)
+            return -1, f"device not found {client_ip} or action not supported {action}"
         _agent = self.get_agent(client_ip)
         if not _agent:
             return -1, "agent not found"
