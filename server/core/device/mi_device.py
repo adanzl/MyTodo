@@ -5,7 +5,7 @@ import asyncio
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List
 
 from aiohttp import ClientSession
 from miservice import MiAccount, MiNAService
@@ -23,7 +23,6 @@ DEFAULT_MI_PASSWORD = os.getenv("MI_PASS", "")
 def _device_to_dict(device) -> Dict:
     """将 Device 对象转换为字典"""
     try:
-        print(type(device))
         return {
             "address": device.get('address', ''),
             "name": device.get('name', ''),
@@ -36,6 +35,24 @@ def _device_to_dict(device) -> Dict:
             "name": "Unknown",
             "deviceID": "",
         }
+
+
+async def _get_device_did_async(username: str, password: str, device_id: str) -> tuple[int, str]:
+    session = None
+    try:
+        session = ClientSession()
+        account = MiAccount(session, username, password, os.path.join(str(Path.home()), ".mi.token"))
+        mina_service = MiNAService(account)
+        device_list = await mina_service.device_list()
+        for device in device_list:
+            if device['deviceID'] == device_id:
+                return 0, device['miotDID']
+    except Exception as e:
+        log.error(f"[MiDevice] Get device did error: {e}")
+    finally:
+        if session:
+            await session.close()
+    return -1, "设备未找到"
 
 
 class MiDevice:
@@ -53,6 +70,7 @@ class MiDevice:
         self.username = username or DEFAULT_MI_USERNAME
         self.password = password or DEFAULT_MI_PASSWORD
         self.name = name or address
+        self.device_did = None
 
     @staticmethod
     async def scan_devices(username: str = None, password: str = None) -> List[Dict]:
@@ -86,6 +104,14 @@ class MiDevice:
         finally:
             MiDevice.scanning = False
 
+    def _create_account(self, session: ClientSession) -> MiAccount:
+        return MiAccount(
+            session,
+            self.username,
+            self.password,
+            os.path.join(str(Path.home()), ".mi.token"),
+        )
+
     # ========== 统一设备接口 ==========
     def play(self, url: str) -> tuple[int, str]:
         """
@@ -100,12 +126,7 @@ class MiDevice:
                 media_url = convert_to_http_url(url)
                 # 获取 MiNAService 对象
                 session = ClientSession()
-                account = MiAccount(
-                    session,
-                    self.username,
-                    self.password,
-                    os.path.join(str(Path.home()), ".mi.token"),
-                )
+                account = self._create_account(session)
                 mina_service = MiNAService(account)
                 await mina_service.play_by_url(self.device_id, media_url)
                 await mina_service.player_set_loop(self.device_id, 1)
@@ -134,12 +155,7 @@ class MiDevice:
             try:
                 # 获取 MiNAService 对象
                 session = ClientSession()
-                account = MiAccount(
-                    session,
-                    self.username,
-                    self.password,
-                    os.path.join(str(Path.home()), ".mi.token"),
-                )
+                account = self._create_account(session)
                 mina_service = MiNAService(account)
                 await mina_service.player_pause(self.device_id)
                 return 0, "ok"
@@ -167,12 +183,7 @@ class MiDevice:
             try:
                 # 获取 MiNAService 对象
                 session = ClientSession()
-                account = MiAccount(
-                    session,
-                    self.username,
-                    self.password,
-                    os.path.join(str(Path.home()), ".mi.token"),
-                )
+                account = self._create_account(session)
                 mina_service = MiNAService(account)
                 ret = await mina_service.player_get_status(self.device_id)
                 if ret['code'] != 0:
@@ -209,6 +220,86 @@ class MiDevice:
         except Exception as e:
             log.error(f"[MiDevice] Get status error: {e}")
             return -1, {"error": f"获取播放状态信息失败: {str(e)}"}
+
+    # ========== 设备功能接口 ==========
+    def get_volume(self) -> tuple[int, int]:
+        """
+        获取设备音量
+        :return: (错误码, 音量)
+        """
+
+        async def _get_status_async():
+            session = None
+            try:
+                # 获取 MiNAService 对象
+                session = ClientSession()
+                account = self._create_account(session)
+                mina_service = MiNAService(account)
+                ret = await mina_service.player_get_status(self.device_id)
+                if ret['code'] != 0:
+                    return -1, {"error": ret['message']}
+                info = json.loads(ret['data']['info'])
+                volume = info.get('volume', 0)
+
+                return 0, volume
+
+            except Exception as e:
+                log.error(f"[MiDevice] Get volume error: {e}")
+                return -1, -1
+            finally:
+                if session:
+                    await session.close()
+
+        try:
+            return run_async(_get_status_async(), timeout=5.0)
+        except Exception as e:
+            log.error(f"[MiDevice] Get volume error: {e}")
+            return -1, -1
+
+    def set_volume(self, volume: int) -> tuple[int, str]:
+        """
+        设置设备音量
+        :param volume: 音量
+        :return: (错误码, 消息)
+        """
+
+        async def _set_volume_async():
+            session = None
+            try:
+                # 获取 MiNAService 对象
+                session = ClientSession()
+                account = self._create_account(session)
+                mina_service = MiNAService(account)
+                await mina_service.player_set_volume(self.device_id, volume)
+                return 0, "ok"
+            except Exception as e:
+                log.error(f"[MiDevice] Set volume error: {e}")
+                return -1, f"设置音量失败: {str(e)}"
+            finally:
+                if session:
+                    await session.close()
+
+        try:
+            return run_async(_set_volume_async(), timeout=5.0)
+        except Exception as e:
+            log.error(f"[MiDevice] Set volume error: {e}")
+            return -1, -1
+
+    def get_device_did(self) -> tuple[int, str]:
+        """
+        获取设备did
+        :return: (错误码, did)
+        """
+        try:
+            if self.device_did is None:
+                code, self.device_did = run_async(_get_device_did_async(self.username, self.password, self.device_id),
+                                                  timeout=5.0)
+                if code != 0:
+                    return code, "设备未找到"
+            return 0, self.device_did
+        except Exception as e:
+            log.error(f"[MiDevice] Get device did error: {e}")
+            return -1, "设备未找到"
 
 
 # 同步包装函数（用于在Flask路由中使用）
