@@ -546,7 +546,6 @@ def create_key_handler(key: str) -> Callable:
     """
 
     def handler(key_name: str):
-        log.info(f"[KEYBOARD] 按键 {key_name} 触发")
         config = _get_key_config(key_name)
         if not config:
             log.warning(f"[KEYBOARD] 按键 {key_name} 未配置或 URL 构建失败，跳过")
