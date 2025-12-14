@@ -376,13 +376,14 @@ class PlaylistMgr:
         pre_files, files = playlist_data.get("pre_files", []), playlist_data.get("files", [])
 
         # 如果不是 force 模式，初始化播放状态（从头开始）
-        # 如果是 force 模式但没有播放状态，也初始化
+        # 如果是 force 模式，只有在状态不存在时才初始化（避免覆盖已更新的状态）
         if not force:
             self._init_play_state(id, playlist_data, pre_files)
         elif id not in self._play_state:
+            # force 模式且状态不存在时才初始化
             self._init_play_state(id, playlist_data, pre_files)
 
-        # 确保播放状态存在
+        # 确保播放状态存在（防御性编程）
         if id not in self._play_state:
             self._init_play_state(id, playlist_data, pre_files)
 
@@ -394,6 +395,8 @@ class PlaylistMgr:
         file_path = _get_file_uri(file_item)
         if not file_path:
             return -1, "文件路径无效"
+
+        log.info(f"[PlaylistMgr] play: 准备播放文件, id={id}, force={force}, 播放状态={play_state}, 文件路径={file_path}")
 
         # 获取并更新文件时长
         file_duration_seconds = self._update_file_duration(file_path, file_item)
@@ -466,6 +469,7 @@ class PlaylistMgr:
 
         # 如果没有播放状态，初始化并从头开始
         if id not in self._play_state:
+            log.info(f"[PlaylistMgr] play_next: 播放状态不存在，初始化状态: {id}")
             if pre_files:
                 return self._update_index_and_play(id,
                                                    in_pre_files=True,
@@ -623,6 +627,7 @@ class PlaylistMgr:
 
         def __play_next_task(pid=id):
             """定时器触发时，判断position，如果比duration小超过2s则等一下差值"""
+            log.info(f"[PlaylistMgr] 文件定时器触发: {pid}, 当前播放状态: {self._play_state.get(pid)}")
             device = self._device_map.get(pid, {}).get("obj")
             if device:
                 try:
@@ -631,6 +636,7 @@ class PlaylistMgr:
                         wait_seconds = time_to_seconds(status.get("duration", "00:00:00")) - \
                                      time_to_seconds(status.get("position", "00:00:00"))
                         if wait_seconds >= 2:
+                            log.info(f"[PlaylistMgr] 文件定时器触发，但播放尚未完成，等待 {wait_seconds} 秒: {pid}")
                             time.sleep(wait_seconds)
                 except Exception as e:
                     log.error(f"[PlaylistMgr] 检查播放状态异常: {pid}, {e}")
@@ -638,10 +644,12 @@ class PlaylistMgr:
             self._clear_timer(pid, self._file_timers, "playlist_file_timer_")
             # 确保播放状态存在，如果不存在则初始化
             if pid not in self._play_state:
+                log.warning(f"[PlaylistMgr] 文件定时器触发时播放状态丢失: {pid}，重新初始化")
                 playlist_data = self._playlist_raw.get(pid)
                 if playlist_data:
                     pre_files = playlist_data.get("pre_files", [])
                     self._init_play_state(pid, playlist_data, pre_files)
+            log.info(f"[PlaylistMgr] 文件定时器触发，准备播放下一首: {pid}, 当前播放状态: {self._play_state.get(pid)}")
             # 播放下一首
             result = self.play_next(pid)
             # 如果播放失败，记录错误但不抛出异常（避免影响定时器）

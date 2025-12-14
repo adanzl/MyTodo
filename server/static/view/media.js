@@ -1287,8 +1287,14 @@ async function createComponent() {
 
       // 刷新播放列表状态
       // @param {boolean} onlyCurrent - 如果为 true，只刷新当前激活的播放列表；如果为 false，刷新全部播放列表
-      const refreshPlaylistStatus = async (onlyCurrent = false) => {
+      // @param {boolean} isAutoRefresh - 是否为自动刷新（定时器触发），默认为 false
+      const refreshPlaylistStatus = async (onlyCurrent = false, isAutoRefresh = false) => {
         try {
+          // 如果正在编辑设备配置（pendingDeviceType 不为 null），且是自动刷新，则跳过刷新，避免覆盖未保存的更改
+          if (isAutoRefresh && onlyCurrent && pendingDeviceType.value !== null) {
+            return;
+          }
+          
           refData.playlistRefreshing.value = true;
           
           if (onlyCurrent) {
@@ -2315,7 +2321,7 @@ async function createComponent() {
         // 启动定时器，每5秒刷新一次当前播放列表状态
         statusRefreshTimer = setInterval(async () => {
           try {
-            await refreshPlaylistStatus(true);
+            await refreshPlaylistStatus(true, true); // 第二个参数 true 表示是自动刷新
           } catch (error) {
             console.error("定时刷新播放列表状态失败:", error);
           }
