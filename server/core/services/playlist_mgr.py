@@ -150,8 +150,13 @@ class PlaylistMgr:
         def cron_play_task(pid=playlist_id):
             try:
                 p_name = self._playlist_raw.get(pid, {}).get("name", "未知播放列表")
-                # 定时任务使用 force=True 允许播放（即使正在播放也继续）
-                code, msg = self.play(pid, force=True)
+                # 检查播放列表是否正在播放中，如果正在播放则跳过定时任务
+                if pid in self._playing_playlists:
+                    log.info(f"[PlaylistMgr] 定时任务触发时播放列表正在播放中，跳过播放任务: {pid} - {p_name}")
+                    return
+                
+                # 如果不在播放中，正常启动播放
+                code, msg = self.play(pid, force=False)
                 if code == 0:
                     self._scheduled_play_start_times[pid] = datetime.datetime.now()
                     log.info(f"[PlaylistMgr] 定时任务播放成功: {pid} - {p_name}")
