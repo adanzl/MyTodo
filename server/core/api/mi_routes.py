@@ -30,9 +30,9 @@ def mi_volume():
         device_id = request.args.get('device_id') or (request.json or {}).get('device_id')
         if not device_id:
             return _err('device_id is required')
-        
+
         device = MiDevice(device_id)
-        
+
         if request.method == 'GET':
             # 获取音量
             code, volume = device.get_volume()
@@ -45,11 +45,11 @@ def mi_volume():
             volume = (request.json or {}).get('volume')
             if volume is None:
                 return _err('volume is required')
-            
+
             volume = int(volume)
             if volume < 0 or volume > 100:
                 return _err('volume must be between 0 and 100')
-            
+
             code, msg = device.set_volume(volume)
             if code == 0:
                 return _ok({'volume': volume})
@@ -58,4 +58,3 @@ def mi_volume():
     except Exception as e:
         log.error(f"[MI] Volume error: {e}")
         return _err(f'error: {str(e)}')
-
