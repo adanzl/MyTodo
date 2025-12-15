@@ -51,113 +51,44 @@ def run_async(coroutine, timeout: float = None):
     :param timeout: 超时时间（秒），可选
     :return: 协程的返回值
     """
-    
+
     def run_in_thread():
         """在线程中运行异步函数"""
-        # 在线程中，完全清除事件循环引用，然后创建新的事件循环
+        # 使用 nest_asyncio 后，可以直接使用 run_until_complete
+        # 获取或创建事件循环
         try:
-            policy = asyncio.get_event_loop_policy()
-            policy.set_event_loop(None)
-        except Exception:
-            try:
-                asyncio.set_event_loop(None)
-            except Exception:
-                pass
-        
-        # 创建新的事件循环并运行
-        loop = None
-        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
             loop = asyncio.new_event_loop()
-            policy = asyncio.get_event_loop_policy()
-            policy.set_event_loop(loop)
-            
-            # 创建任务
-            cancelled = False
-            if timeout:
-                task = loop.create_task(coroutine)
-                
-                def cancel_task():
-                    nonlocal cancelled
-                    if not task.done():
-                        cancelled = True
-                        task.cancel()
-                
-                timeout_handle = loop.call_later(timeout, cancel_task)
-            else:
-                task = loop.create_task(coroutine)
-                timeout_handle = None
-            
-            # 使用 run_forever() 和 stop() 来避免 run_until_complete() 的检查
-            def stop_when_done(future):
-                if future.done():
-                    loop.stop()
-            
-            task.add_done_callback(stop_when_done)
-            loop.run_forever()
-            
-            # 获取结果
-            if task.done():
-                if cancelled:
-                    raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
-                result = task.result()
-                if timeout_handle and not timeout_handle.cancelled():
-                    timeout_handle.cancel()
-                return result
-            else:
-                if timeout_handle:
-                    timeout_handle.cancel()
-                if cancelled:
-                    raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
-                task.cancel()
-                raise RuntimeError("Task did not complete")
-                
-        except asyncio.CancelledError:
-            if cancelled:
-                raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
-            raise
-        finally:
-            if loop:
-                try:
-                    pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
-                    if pending:
-                        for task in pending:
-                            task.cancel()
-                except Exception:
-                    pass
-                try:
-                    loop.close()
-                except Exception:
-                    pass
-            try:
-                policy = asyncio.get_event_loop_policy()
-                policy.set_event_loop(None)
-            except Exception:
-                try:
-                    asyncio.set_event_loop(None)
-                except Exception:
-                    pass
-    
+            asyncio.set_event_loop(loop)
+
+        # 使用 nest_asyncio 后，可以直接运行
+        if timeout:
+            return loop.run_until_complete(asyncio.wait_for(coroutine, timeout=timeout))
+        else:
+            return loop.run_until_complete(coroutine)
+
     # 使用 gevent.spawn 在线程中运行
     import threading
-    
+
     result_container = {'result': None, 'exception': None}
-    
+
     def thread_wrapper():
         """线程包装函数"""
         try:
             result_container['result'] = run_in_thread()
         except Exception as e:
             result_container['exception'] = e
-    
+
     # 在线程中运行
     thread = threading.Thread(target=thread_wrapper)
     thread.start()
-    
+
     # 使用 gevent.spawn 等待线程完成（不阻塞其他 gevent 协程）
     def wait_for_thread():
         """等待线程完成的函数"""
         thread.join()
-    
+
     if timeout:
         try:
             with GeventTimeout(timeout + 1.0):  # 多给1秒缓冲
@@ -168,11 +99,11 @@ def run_async(coroutine, timeout: float = None):
     else:
         greenlet = spawn(wait_for_thread)
         greenlet.join()
-    
+
     # 检查结果
     if result_container['exception']:
         raise result_container['exception']
-    
+
     return result_container['result']
 
 
@@ -228,8 +159,10 @@ def get_media_duration(file_path):
     :return: 时长（秒），如果失败返回 None
     """
     try:
-        cmds = ['/usr/bin/ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of',
-            'default=noprint_wrappers=1:nokey=1', file_path]
+        cmds = [
+            '/usr/bin/ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of',
+            'default=noprint_wrappers=1:nokey=1', file_path
+        ]
         result = subprocess.run(cmds, capture_output=True, text=True, timeout=50)
         if result.returncode == 0 and result.stdout.strip():
             duration = float(result.stdout.strip())
@@ -264,7 +197,9 @@ def decode_url_path(path: str) -> str:
     return path
 
 
-def validate_and_normalize_path(file_path: str, base_dir: str = '/mnt', must_be_file: bool = True) -> Tuple[Optional[str], Optional[str]]:
+def validate_and_normalize_path(file_path: str,
+                                base_dir: str = '/mnt',
+                                must_be_file: bool = True) -> Tuple[Optional[str], Optional[str]]:
     """
     验证和规范化文件路径
     :param file_path: 文件路径
@@ -274,33 +209,33 @@ def validate_and_normalize_path(file_path: str, base_dir: str = '/mnt', must_be_
     """
     if not file_path:
         return None, "文件路径不能为空"
-    
+
     # URL 解码
     file_path = decode_url_path(file_path)
-    
+
     # 安全检查：防止路径遍历
     if '..' in file_path.split('/') or file_path.startswith('~'):
         return None, "Invalid path: Path traversal not allowed"
-    
+
     # 处理相对路径
     if not os.path.isabs(file_path):
         file_path = os.path.join(base_dir, file_path.lstrip('/'))
         file_path = os.path.abspath(file_path)
     else:
         file_path = os.path.abspath(file_path)
-    
+
     # 检查路径是否在允许的目录内
     if not file_path.startswith(base_dir):
         log.warning(f"Path {file_path} is outside allowed directory {base_dir}")
         return None, "文件路径不在允许的目录内"
-    
+
     # 检查文件是否存在
     if not os.path.exists(file_path):
         return None, "文件不存在"
-    
+
     if must_be_file and not os.path.isfile(file_path):
         return None, "路径不是文件"
-    
+
     return file_path, None
 
 
@@ -316,13 +251,13 @@ def get_media_url(local_path: str) -> str:
             filepath = local_path[1:]
         else:
             filepath = local_path
-        
+
         # URL 编码路径
         encoded_path = '/'.join(quote(part, safe='') for part in filepath.split('/'))
-        
+
         # 获取服务器URL（使用固定地址）
         base_url = _get_media_server_url()
-        
+
         # 根据 main.py 中的 DispatcherMiddleware 配置，应用挂载在 /api 下
         # 所以完整路径是 /api/media/files/
         media_url = f"{base_url}/api/media/files/{encoded_path}"
@@ -394,52 +329,44 @@ def check_cron_will_trigger_today(cron_expression: str) -> bool:
     """
     if not cron_expression or not cron_expression.strip():
         return False
-    
+
     try:
         from apscheduler.triggers.cron import CronTrigger
-        
+
         # 创建 CronTrigger
         parts = cron_expression.strip().split()
         if len(parts) == 6:
             second, minute, hour, day, month, day_of_week = parts
             converted_day_of_week = convert_standard_cron_weekday_to_apscheduler(day_of_week)
-            trigger = CronTrigger(
-                second=second,
-                minute=minute,
-                hour=hour,
-                day=day,
-                month=month,
-                day_of_week=converted_day_of_week
-            )
+            trigger = CronTrigger(second=second,
+                                  minute=minute,
+                                  hour=hour,
+                                  day=day,
+                                  month=month,
+                                  day_of_week=converted_day_of_week)
         elif len(parts) == 5:
             minute, hour, day, month, day_of_week = parts
             converted_day_of_week = convert_standard_cron_weekday_to_apscheduler(day_of_week)
-            trigger = CronTrigger(
-                minute=minute,
-                hour=hour,
-                day=day,
-                month=month,
-                day_of_week=converted_day_of_week
-            )
+            trigger = CronTrigger(minute=minute, hour=hour, day=day, month=month, day_of_week=converted_day_of_week)
         else:
             return False
-        
+
         # 获取下一次执行时间
         now = datetime.now()
         next_run = trigger.get_next_fire_time(None, now)
-        
+
         if next_run is None:
             return False
-        
+
         # 处理时区问题：如果 next_run 是 timezone-aware，转换为 naive datetime
         if next_run.tzinfo is not None:
             # 转换为本地时区的 naive datetime
             next_run = next_run.astimezone().replace(tzinfo=None)
-        
+
         # 判断下一次执行时间是否在今天
         today_start = datetime(now.year, now.month, now.day)
         today_end = today_start + timedelta(days=1)
-        
+
         return today_start <= next_run < today_end
     except Exception as e:
         log.error(f"[Utils] 检查 cron 表达式失败: {cron_expression}, 错误: {e}")
