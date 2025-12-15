@@ -55,19 +55,71 @@ def run_async(coroutine, timeout: float = None):
 
     def run_in_thread():
         """在线程中运行异步函数"""
-        # 使用 nest_asyncio 后，可以直接使用 run_until_complete
-        # 获取或创建事件循环
+        # 在线程中也需要应用 nest_asyncio（每个线程独立）
         try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        # 使用 nest_asyncio 后，可以直接运行
-        if timeout:
-            return loop.run_until_complete(asyncio.wait_for(coroutine, timeout=timeout))
-        else:
-            return loop.run_until_complete(coroutine)
+            import nest_asyncio
+            nest_asyncio.apply()
+        except Exception:
+            pass
+        
+        # 在线程中，必须创建完全独立的事件循环
+        # 清除可能存在的任何事件循环引用
+        try:
+            # 清除当前线程的事件循环
+            try:
+                policy = asyncio.get_event_loop_policy()
+                policy.set_event_loop(None)
+            except Exception:
+                try:
+                    asyncio.set_event_loop(None)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        
+        # 创建新的事件循环
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            # 使用 nest_asyncio 后，可以直接运行
+            if timeout:
+                result = loop.run_until_complete(asyncio.wait_for(coroutine, timeout=timeout))
+            else:
+                result = loop.run_until_complete(coroutine)
+            return result
+        finally:
+            # 清理事件循环
+            try:
+                # 取消所有待处理的任务
+                pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
+                if pending:
+                    for task in pending:
+                        if not task.done():
+                            task.cancel()
+                    # 等待取消完成
+                    if pending:
+                        try:
+                            loop.run_until_complete(
+                                asyncio.gather(*pending, return_exceptions=True)
+                            )
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+            try:
+                if not loop.is_closed():
+                    loop.close()
+            except Exception:
+                pass
+            try:
+                policy = asyncio.get_event_loop_policy()
+                policy.set_event_loop(None)
+            except Exception:
+                try:
+                    asyncio.set_event_loop(None)
+                except Exception:
+                    pass
 
     # 使用 gevent.spawn 在线程中运行
     import threading
