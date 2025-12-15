@@ -1210,11 +1210,22 @@
           <el-table-column label="功能" min-width="100">
             <template #default="{ row }">
               <div class="flex flex-col gap-1">
-                <div class="text-sm flex items-center">
+                <div class="text-sm flex items-center gap-2">
                   <span class="text-gray-600 inline-block w-16 flex-shrink-0">音量：</span>
                   <span class="text-gray-800"
                     >{{ row.volume !== undefined ? row.volume : '-' }}</span
                   >
+                  <el-button
+                    size="small"
+                    type="info"
+                    plain
+                    circle
+                    @click="getMiDeviceVolume(row)"
+                    :loading="row._volumeRefreshing"
+                    :disabled="row._volumeRefreshing || row._volumeChanging"
+                    title="刷新音量">
+                    <el-icon v-if="!row._volumeRefreshing"><Refresh /></el-icon>
+                  </el-button>
                 </div>
                 <div class="flex items-center gap-2">
                   <el-button
@@ -1223,7 +1234,7 @@
                     plain
                     @click="handleMiDeviceVolumeChange(row, 1)"
                     :loading="row._volumeChanging"
-                    :disabled="row._volumeChanging">
+                    :disabled="row._volumeChanging || row._volumeRefreshing">
                     +
                   </el-button>
                   <el-button
@@ -1232,7 +1243,7 @@
                     plain
                     @click="handleMiDeviceVolumeChange(row, -1)"
                     :loading="row._volumeChanging"
-                    :disabled="row._volumeChanging">
+                    :disabled="row._volumeChanging || row._volumeRefreshing">
                     -
                   </el-button>
                 </div>
