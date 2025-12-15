@@ -693,6 +693,7 @@ class PlaylistMgr:
                         # 如果设备状态是 STOPPED，说明文件已经播放完成，不需要等待
                         if device_state == "STOPPED":
                             log.info(f"[PlaylistMgr] 文件定时器触发，设备状态为 STOPPED，文件已播放完成，直接播放下一首: {pid}")
+                            device.stop()
                             wait_seconds = 0  # 不等待
                         elif wait_seconds >= 2:
                             log.info(f"[PlaylistMgr] 文件定时器触发，但播放尚未完成，等待 {wait_seconds} 秒: {pid}")

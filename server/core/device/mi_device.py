@@ -129,8 +129,8 @@ class MiDevice:
                 account = self._create_account(session)
                 mina_service = MiNAService(account)
                 await mina_service.play_by_url(self.device_id, media_url)
-                # 设置循环播放为0（不循环），避免文件播放完成后自动重播导致重复播放
-                await mina_service.player_set_loop(self.device_id, 0)
+                # 设置循环播放为1（不循环），避免文件播放完成后自动重播导致重复播放
+                await mina_service.player_set_loop(self.device_id, 1)
                 return 0, "ok"
             except Exception as e:
                 log.error(f"[MiDevice] Play error: {e}")
