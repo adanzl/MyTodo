@@ -12,7 +12,7 @@ mi_bp = Blueprint('mi', __name__)
 
 @mi_bp.route("/mi/scan", methods=['GET'])
 def mi_scan():
-    """扫描小米设备"""
+    """扫描小米设备（同步模式，gevent 不会阻塞其他请求）"""
     try:
         timeout = request.args.get('timeout', 5.0, type=float)
         log.info(f"===== [MI Scan] timeout={timeout}")

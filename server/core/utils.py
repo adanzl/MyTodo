@@ -10,6 +10,8 @@ import threading
 from datetime import datetime, timedelta
 from urllib.parse import quote, unquote
 from typing import Optional, Tuple
+from gevent import spawn
+from gevent import Timeout as GeventTimeout
 from core.log_config import root_logger
 
 log = root_logger()
@@ -43,91 +45,36 @@ def run_async(coroutine, timeout: float = None):
     在新的事件循环中运行协程
     用于在同步代码中调用异步函数
     
-    注意：在 gevent web 环境下，总是有运行中的事件循环，所以必须在独立线程中执行。
-    由于设置了 thread=False，ThreadPoolExecutor 会使用真正的操作系统线程，每个线程有独立的事件循环上下文。
+    使用 gevent.spawn 在线程中运行，避免阻塞其他 gevent 协程
     
     :param coroutine: 协程对象
     :param timeout: 超时时间（秒），可选
     :return: 协程的返回值
     """
+    
     def run_in_thread():
+        """在线程中运行异步函数"""
         # 在线程中，完全清除事件循环引用，然后创建新的事件循环
-        # 这是关键：确保当前线程没有任何事件循环引用
         try:
-            # 清除可能存在的任何事件循环引用
-            try:
-                policy = asyncio.get_event_loop_policy()
-                policy.set_event_loop(None)
-            except Exception:
-                try:
-                    asyncio.set_event_loop(None)
-                except Exception:
-                    pass
+            policy = asyncio.get_event_loop_policy()
+            policy.set_event_loop(None)
         except Exception:
-            pass
+            try:
+                asyncio.set_event_loop(None)
+            except Exception:
+                pass
         
-        # 尝试使用 asyncio.run() 如果可用（Python 3.7+）
-        # 它会自动处理事件循环的创建和清理
-        # 注意：不使用 asyncio.wait_for()，因为它可能检测到运行中的循环
-        try:
-            if hasattr(asyncio, 'run'):
-                # Python 3.7+ 有 asyncio.run()
-                if timeout:
-                    # 手动实现超时，不使用 wait_for
-                    # 注意：在 asyncio.run() 内部，我们可以安全地使用 get_running_loop()
-                    async def run_with_timeout():
-                        task = asyncio.create_task(coroutine)
-                        cancelled = False
-                        
-                        def cancel_task():
-                            nonlocal cancelled
-                            if not task.done():
-                                cancelled = True
-                                task.cancel()
-                        
-                        # 在 asyncio.run() 创建的循环中，get_running_loop() 是安全的
-                        try:
-                            loop = asyncio.get_running_loop()
-                            timeout_handle = loop.call_later(timeout, cancel_task)
-                        except RuntimeError:
-                            # 如果没有运行中的循环，直接运行任务
-                            return await task
-                        
-                        try:
-                            result = await task
-                            if timeout_handle and not timeout_handle.cancelled():
-                                timeout_handle.cancel()
-                            if cancelled:
-                                raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
-                            return result
-                        except asyncio.CancelledError:
-                            if cancelled:
-                                raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
-                            raise
-                    
-                    return asyncio.run(run_with_timeout())
-                else:
-                    return asyncio.run(coroutine)
-        except RuntimeError as e:
-            # 如果 asyncio.run() 检测到运行中的循环，回退到手动实现
-            if "cannot be called from a running event loop" not in str(e).lower() and "cannot run the event loop" not in str(e).lower():
-                raise
-        
-        # 回退到手动实现：创建新的事件循环并运行
+        # 创建新的事件循环并运行
         loop = None
         try:
-            # 创建新的事件循环
             loop = asyncio.new_event_loop()
-            # 设置事件循环策略
             policy = asyncio.get_event_loop_policy()
             policy.set_event_loop(loop)
             
-            # 如果指定了超时，手动实现超时逻辑
+            # 创建任务
+            cancelled = False
             if timeout:
-                # 手动实现超时：创建一个任务和超时回调
                 task = loop.create_task(coroutine)
-                timeout_handle = None
-                cancelled = False
                 
                 def cancel_task():
                     nonlocal cancelled
@@ -136,59 +83,51 @@ def run_async(coroutine, timeout: float = None):
                         task.cancel()
                 
                 timeout_handle = loop.call_later(timeout, cancel_task)
-                
-                try:
-                    # 使用 run_until_complete，但先确保没有运行中的循环
-                    # 通过创建一个包装协程来避免直接检查
-                    async def run_task():
-                        return await task
-                    
-                    result = loop.run_until_complete(run_task())
-                    
-                    # 取消超时回调
-                    if timeout_handle and not timeout_handle.cancelled():
-                        timeout_handle.cancel()
-                    if cancelled:
-                        raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
-                    return result
-                except asyncio.CancelledError:
-                    if cancelled:
-                        raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
-                    raise
             else:
-                # 使用 run_until_complete，但先确保没有运行中的循环
-                # 通过创建一个包装协程来避免直接检查
-                async def run_coro():
-                    return await coroutine
-                return loop.run_until_complete(run_coro())
+                task = loop.create_task(coroutine)
+                timeout_handle = None
+            
+            # 使用 run_forever() 和 stop() 来避免 run_until_complete() 的检查
+            def stop_when_done(future):
+                if future.done():
+                    loop.stop()
+            
+            task.add_done_callback(stop_when_done)
+            loop.run_forever()
+            
+            # 获取结果
+            if task.done():
+                if cancelled:
+                    raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
+                result = task.result()
+                if timeout_handle and not timeout_handle.cancelled():
+                    timeout_handle.cancel()
+                return result
+            else:
+                if timeout_handle:
+                    timeout_handle.cancel()
+                if cancelled:
+                    raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
+                task.cancel()
+                raise RuntimeError("Task did not complete")
                 
+        except asyncio.CancelledError:
+            if cancelled:
+                raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
+            raise
         finally:
-            # 清理事件循环
             if loop:
                 try:
-                    # 取消所有待处理的任务
-                    try:
-                        pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
-                        if pending:
-                            for task in pending:
-                                task.cancel()
-                            # 等待所有任务完成或取消
-                            if pending:
-                                async def gather_pending():
-                                    await asyncio.gather(*pending, return_exceptions=True)
-                                try:
-                                    loop.run_until_complete(gather_pending())
-                                except Exception:
-                                    pass
-                    except Exception:
-                        pass
+                    pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
+                    if pending:
+                        for task in pending:
+                            task.cancel()
                 except Exception:
                     pass
                 try:
                     loop.close()
                 except Exception:
                     pass
-            # 清除事件循环引用
             try:
                 policy = asyncio.get_event_loop_policy()
                 policy.set_event_loop(None)
@@ -198,13 +137,43 @@ def run_async(coroutine, timeout: float = None):
                 except Exception:
                     pass
     
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        future = executor.submit(run_in_thread)
-        total_timeout = (timeout + 5.0) if timeout else 30.0
+    # 使用 gevent.spawn 在线程中运行
+    import threading
+    
+    result_container = {'result': None, 'exception': None}
+    
+    def thread_wrapper():
+        """线程包装函数"""
         try:
-            return future.result(timeout=total_timeout)
-        except concurrent.futures.TimeoutError:
-            raise asyncio.TimeoutError("Operation timed out")
+            result_container['result'] = run_in_thread()
+        except Exception as e:
+            result_container['exception'] = e
+    
+    # 在线程中运行
+    thread = threading.Thread(target=thread_wrapper)
+    thread.start()
+    
+    # 使用 gevent.spawn 等待线程完成（不阻塞其他 gevent 协程）
+    def wait_for_thread():
+        """等待线程完成的函数"""
+        thread.join()
+    
+    if timeout:
+        try:
+            with GeventTimeout(timeout + 1.0):  # 多给1秒缓冲
+                greenlet = spawn(wait_for_thread)
+                greenlet.join()
+        except GeventTimeout:
+            raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
+    else:
+        greenlet = spawn(wait_for_thread)
+        greenlet.join()
+    
+    # 检查结果
+    if result_container['exception']:
+        raise result_container['exception']
+    
+    return result_container['result']
 
 
 def convert_to_http_url(url: str) -> str:
