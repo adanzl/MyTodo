@@ -2,16 +2,11 @@
 通用工具函数
 包含异步工具函数和其他通用工具函数
 """
-import asyncio
 import os
 import subprocess
-import threading
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
 from urllib.parse import quote, unquote
-
-from gevent import Timeout as GeventTimeout
-from gevent import spawn
 
 from core.log_config import root_logger
 
@@ -39,146 +34,6 @@ def err_response(message: str):
 # 为了保持向后兼容，提供别名
 _ok = ok_response
 _err = err_response
-
-
-def run_async(coroutine, timeout: float = None):
-    """
-    在新的事件循环中运行协程
-    用于在同步代码中调用异步函数
-    
-    使用 gevent.spawn 在线程中运行，避免阻塞其他 gevent 协程
-    
-    :param coroutine: 协程对象
-    :param timeout: 超时时间（秒），可选
-    :return: 协程的返回值
-    """
-
-    def run_in_thread():
-        """在线程中运行异步函数"""
-        # 在线程中也需要应用 nest_asyncio（每个线程独立）
-        try:
-            import nest_asyncio
-            nest_asyncio.apply()
-        except Exception:
-            pass
-        
-        # 在线程中，必须创建完全独立的事件循环
-        # 清除可能存在的任何事件循环引用
-        try:
-            # 清除当前线程的事件循环
-            try:
-                policy = asyncio.get_event_loop_policy()
-                policy.set_event_loop(None)
-            except Exception:
-                try:
-                    asyncio.set_event_loop(None)
-                except Exception:
-                    pass
-        except Exception:
-            pass
-        
-        # 创建新的事件循环
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-        try:
-            # 手动实现超时，避免使用 asyncio.wait_for（它需要运行中的循环）
-            if timeout:
-                task = loop.create_task(coroutine)
-                cancelled = False
-                
-                def cancel_task():
-                    nonlocal cancelled
-                    if not task.done():
-                        cancelled = True
-                        task.cancel()
-                
-                timeout_handle = loop.call_later(timeout, cancel_task)
-                
-                try:
-                    result = loop.run_until_complete(task)
-                    # 取消超时回调
-                    if timeout_handle and not timeout_handle.cancelled():
-                        timeout_handle.cancel()
-                    if cancelled:
-                        raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
-                    return result
-                except asyncio.CancelledError:
-                    if cancelled:
-                        raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
-                    raise
-            else:
-                return loop.run_until_complete(coroutine)
-        finally:
-            # 清理事件循环
-            try:
-                # 取消所有待处理的任务
-                pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
-                if pending:
-                    for task in pending:
-                        if not task.done():
-                            task.cancel()
-                    # 等待取消完成
-                    if pending:
-                        try:
-                            loop.run_until_complete(
-                                asyncio.gather(*pending, return_exceptions=True)
-                            )
-                        except Exception:
-                            pass
-            except Exception:
-                pass
-            try:
-                if not loop.is_closed():
-                    loop.close()
-            except Exception:
-                pass
-            try:
-                policy = asyncio.get_event_loop_policy()
-                policy.set_event_loop(None)
-            except Exception:
-                try:
-                    asyncio.set_event_loop(None)
-                except Exception:
-                    pass
-
-    # 使用 gevent.spawn 在线程中运行
-    import threading
-
-    result_container = {'result': None, 'exception': None}
-
-    def thread_wrapper():
-        """线程包装函数"""
-        try:
-            result_container['result'] = run_in_thread()
-        except Exception as e:
-            result_container['exception'] = e
-
-    # 在线程中运行
-    thread = threading.Thread(target=thread_wrapper)
-    thread.start()
-
-    # 使用 gevent.spawn 等待线程完成（不阻塞其他 gevent 协程）
-    def wait_for_thread():
-        """等待线程完成的函数"""
-        thread.join()
-
-    if timeout:
-        try:
-            with GeventTimeout(timeout + 1.0):  # 多给1秒缓冲
-                greenlet = spawn(wait_for_thread)
-                greenlet.join()
-        except GeventTimeout:
-            raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
-    else:
-        greenlet = spawn(wait_for_thread)
-        greenlet.join()
-
-    # 检查结果
-    if result_container['exception']:
-        raise result_container['exception']
-
-    return result_container['result']
 
 
 def convert_to_http_url(url: str) -> str:

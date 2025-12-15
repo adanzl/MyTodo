@@ -8,7 +8,8 @@ import os
 from typing import Dict, List
 from urllib.parse import urlparse
 from core.log_config import root_logger
-from core.utils import run_async, convert_to_http_url
+from core.async_util import run_async
+from core.utils import convert_to_http_url
 
 import upnpclient
 from ssdpy import SSDPClient

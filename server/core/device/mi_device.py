@@ -12,7 +12,8 @@ from aiohttp import ClientSession, TCPConnector
 from miservice import MiAccount, MiNAService
 
 from core.log_config import root_logger
-from core.utils import convert_to_http_url, format_time_str, run_async
+from core.async_util import run_async
+from core.utils import convert_to_http_url, format_time_str
 
 log = root_logger()
 
