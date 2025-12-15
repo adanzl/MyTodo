@@ -43,161 +43,47 @@ def run_async(coroutine, timeout: float = None):
     在新的事件循环中运行协程
     用于在同步代码中调用异步函数
     
-    注意：由于 gevent.monkey.patch_all() 会 patch asyncio，使得 asyncio 使用 gevent 的事件循环。
-    gevent 的事件循环是单线程的，不支持嵌套运行多个事件循环，所以必须在独立线程中执行。
+    注意：在 gevent web 环境下，总是有运行中的事件循环，所以必须在独立线程中执行。
+    由于设置了 thread=False，ThreadPoolExecutor 会使用真正的操作系统线程，每个线程有独立的事件循环上下文。
     
     :param coroutine: 协程对象
     :param timeout: 超时时间（秒），可选
     :return: 协程的返回值
     """
-    # 检测是否在 gevent 环境下
-    # gevent 通过 monkey.patch_all() patch 了 asyncio，导致无法创建新的事件循环
-    use_thread = False
-    try:
-        import sys
-        if 'gevent' in sys.modules:
-            use_thread = True
-    except Exception:
-        pass
-    
-    # 检查是否已有事件循环在运行
-    if not use_thread:
+    def run_in_thread():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         try:
-            asyncio.get_running_loop()
-            use_thread = True
-        except RuntimeError:
-            pass
-    
-    # 在 gevent 环境下或已有循环运行时，必须在独立线程中执行
-    # 因为 gevent 的事件循环不支持嵌套，且每个线程有独立的事件循环上下文
-    if use_thread:
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(_run_async_in_isolated_loop, coroutine, timeout, reset_loop=True)
-            total_timeout = (timeout + 5.0) if timeout else 30.0
+            if timeout:
+                return loop.run_until_complete(asyncio.wait_for(coroutine, timeout=timeout))
+            else:
+                return loop.run_until_complete(coroutine)
+        finally:
             try:
-                return future.result(timeout=total_timeout)
-            except concurrent.futures.TimeoutError:
-                raise asyncio.TimeoutError("Operation timed out")
-    else:
-        # 没有运行中的循环，直接在新循环中执行
-        return _run_async_in_isolated_loop(coroutine, timeout, reset_loop=False)
-
-
-def _run_async_in_isolated_loop(coroutine, timeout: float = None, reset_loop: bool = False):
-    """
-    在隔离的事件循环中运行协程
-    
-    :param coroutine: 协程对象
-    :param timeout: 超时时间（秒），可选
-    :param reset_loop: 是否重置当前线程的事件循环（用于线程中执行）
-    :return: 协程的返回值
-    """
-    # 如果需要重置循环（在线程中执行时）
-    if reset_loop:
-        _reset_event_loop()
-    
-    # 创建新的事件循环
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    
-    try:
-        # 执行协程
-        if timeout:
-            return loop.run_until_complete(asyncio.wait_for(coroutine, timeout=timeout))
-        else:
-            return loop.run_until_complete(coroutine)
-    except asyncio.TimeoutError:
-        raise
-    except RuntimeError as e:
-        # 如果是事件循环相关的错误，使用完全隔离的线程执行
-        if reset_loop and ("event loop" in str(e).lower() or "cannot run" in str(e).lower()):
-            return _run_in_completely_isolated_thread(coroutine, timeout)
-        raise
-    finally:
-        _cleanup_event_loop(loop)
-
-
-def _reset_event_loop():
-    """重置当前线程的事件循环状态"""
-    try:
-        current_loop = asyncio.get_event_loop()
-        if current_loop and not current_loop.is_closed():
-            try:
-                current_loop.close()
+                pending = asyncio.all_tasks(loop)
+                if pending:
+                    for task in pending:
+                        task.cancel()
+                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
             except Exception:
                 pass
-    except RuntimeError:
-        pass
-    finally:
-        try:
-            asyncio.set_event_loop(None)
-        except Exception:
-            pass
-
-
-def _cleanup_event_loop(loop):
-    """清理事件循环"""
-    try:
-        # 取消所有待处理的任务
-        pending = asyncio.all_tasks(loop)
-        for task in pending:
-            task.cancel()
-        if pending:
-            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-    except Exception:
-        pass
-    finally:
-        try:
-            loop.close()
-        except Exception:
-            pass
-        try:
-            asyncio.set_event_loop(None)
-        except Exception:
-            pass
-
-
-def _run_in_completely_isolated_thread(coroutine, timeout: float = None):
-    """
-    在完全隔离的线程中运行协程（最后的备选方案）
-    
-    在线程中执行可以避免 gevent 的事件循环冲突，因为：
-    1. 每个线程有独立的事件循环上下文
-    2. gevent 的 patch 主要影响主线程
-    3. 线程中的 asyncio 可以创建独立的事件循环
-    """
-    result_container = [None]
-    exception_container = [None]
-    
-    def run_in_thread():
-        try:
-            # 在线程中创建全新的事件循环
-            # 线程有独立的事件循环上下文，不受 gevent 主循环影响
-            new_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(new_loop)
-            try:
-                if timeout:
-                    result_container[0] = new_loop.run_until_complete(
-                        asyncio.wait_for(coroutine, timeout=timeout)
-                    )
-                else:
-                    result_container[0] = new_loop.run_until_complete(coroutine)
             finally:
-                _cleanup_event_loop(new_loop)
-        except Exception as e:
-            exception_container[0] = e
+                try:
+                    loop.close()
+                except Exception:
+                    pass
+                try:
+                    asyncio.set_event_loop(None)
+                except Exception:
+                    pass
     
-    thread = threading.Thread(target=run_in_thread, daemon=True)
-    thread.start()
-    thread.join(timeout=(timeout + 5.0) if timeout else 30.0)
-    
-    if thread.is_alive():
-        raise asyncio.TimeoutError("Operation timed out")
-    
-    if exception_container[0]:
-        raise exception_container[0]
-    
-    return result_container[0]
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future = executor.submit(run_in_thread)
+        total_timeout = (timeout + 5.0) if timeout else 30.0
+        try:
+            return future.result(timeout=total_timeout)
+        except concurrent.futures.TimeoutError:
+            raise asyncio.TimeoutError("Operation timed out")
 
 
 def convert_to_http_url(url: str) -> str:
@@ -268,7 +154,7 @@ def get_media_duration(file_path):
 def _get_media_server_url():
     """获取媒体文件服务器的完整URL"""
     # 返回固定的服务器地址和端口
-    return "http://192.168.50.172:8848"
+    return "http://mini:8848"
 
 
 def decode_url_path(path: str) -> str:
