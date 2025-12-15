@@ -226,9 +226,7 @@ class PlaylistMgr:
 
         success = scheduler.add_cron_job(func=cron_play_task, job_id=job_id, cron_expression=cron_expression)
         playlist_name = playlist_data.get("name", "未知播放列表")
-        if success:
-            log.info(f"[PlaylistMgr] 创建定时任务成功: {playlist_id}, {playlist_name}, cron: {cron_expression}")
-        else:
+        if not success:
             log.error(f"[PlaylistMgr] 创建定时任务失败: {playlist_id}, {playlist_name}, cron: {cron_expression}")
 
     def _cleanup_orphaned_cron_jobs(self):
@@ -529,7 +527,6 @@ class PlaylistMgr:
 
         # 如果没有播放状态，初始化并从头开始
         if id not in self._play_state:
-            log.info(f"[PlaylistMgr] play_next: 播放状态不存在，初始化状态: {id}")
             if pre_files:
                 return self._update_index_and_play(id,
                                                    in_pre_files=True,
@@ -687,7 +684,6 @@ class PlaylistMgr:
 
         def __play_next_task(pid=id):
             """定时器触发时，判断position，如果比duration小超过2s则等一下差值"""
-            log.info(f"[PlaylistMgr] 文件定时器触发: {pid}, 当前播放状态: {self._play_state.get(pid)}")
             device = self._device_map.get(pid, {}).get("obj")
             wait_seconds = 0
             if device:
@@ -697,16 +693,11 @@ class PlaylistMgr:
                         device_state = status.get("state", "")
                         wait_seconds = time_to_seconds(status.get("duration", "00:00:00")) - \
                                      time_to_seconds(status.get("position", "00:00:00"))
-                        log.info(
-                            f"[PlaylistMgr] 文件定时器触发时播放状态检查: {pid}, 剩余时长: {wait_seconds} 秒, 设备状态: {device_state}, 状态: {status}"
-                        )
                         # 如果设备状态是 STOPPED，说明文件已经播放完成，不需要等待
                         if device_state == "STOPPED":
-                            log.info(f"[PlaylistMgr] 文件定时器触发，设备状态为 STOPPED，文件已播放完成，直接播放下一首: {pid}")
                             device.stop()
-                            wait_seconds = 0  # 不等待
+                            wait_seconds = 0
                         elif wait_seconds >= 2:
-                            log.info(f"[PlaylistMgr] 文件定时器触发，但播放尚未完成，等待 {wait_seconds} 秒: {pid}")
                             time.sleep(wait_seconds)
                 except Exception as e:
                     log.error(f"[PlaylistMgr] 检查播放状态异常: {pid}, {e}")
@@ -719,18 +710,14 @@ class PlaylistMgr:
                 if playlist_data:
                     pre_files = playlist_data.get("pre_files", [])
                     self._init_play_state(pid, playlist_data, pre_files)
-            log.info(
-                f"[PlaylistMgr] 文件定时器触发，准备播放下一首: {pid}, 当前播放状态: {self._play_state.get(pid)}, 等待后剩余时长: {wait_seconds} 秒")
             # 在播放下一首之前，先停止当前播放，避免设备自动重播导致重复播放
             if device:
                 try:
                     stop_code, stop_msg = device.stop()
-                    if stop_code == 0:
-                        log.info(f"[PlaylistMgr] 文件定时器触发，已停止当前播放: {pid}")
-                    else:
-                        log.warning(f"[PlaylistMgr] 文件定时器触发，停止当前播放失败: {pid}, {stop_msg}")
+                    if stop_code != 0:
+                        log.warning(f"[PlaylistMgr] 停止当前播放失败: {pid}, {stop_msg}")
                 except Exception as e:
-                    log.warning(f"[PlaylistMgr] 文件定时器触发，停止当前播放异常: {pid}, {e}")
+                    log.warning(f"[PlaylistMgr] 停止当前播放异常: {pid}, {e}")
             # 播放下一首
             result = self.play_next(pid)
             # 如果播放失败，记录错误但不抛出异常（避免影响定时器）
