@@ -593,22 +593,31 @@ async function createComponent() {
         }
       };
 
+      // 工具函数：获取设备ID
+      const getMiDeviceId = (device) => device.deviceID || device.address;
+
+      // 工具函数：音量范围限制
+      const clampVolume = (volume) => Math.max(0, Math.min(100, volume));
+
+      // 扫描小米设备
       const scanMiDevices = async () => {
         try {
           refData.miScanning.value = true;
           const response = await fetch(`${getApiUrl()}/mi/scan?timeout=5`);
           const result = await response.json();
+          
           if (result.code === 0) {
-            refData.miDeviceList.value = (result.data || []).map(device => ({
+            const devices = (result.data || []).map(device => ({
               ...device,
               volume: undefined,
               _volumeChanging: false
             }));
-            // 为每个设备获取音量
-            refData.miDeviceList.value.forEach(device => {
-              getMiDeviceVolume(device);
-            });
-            ElMessage.success(`扫描到 ${refData.miDeviceList.value.length} 个小米设备`);
+            refData.miDeviceList.value = devices;
+            
+            // 并行获取所有设备的音量
+            await Promise.allSettled(devices.map(device => getMiDeviceVolume(device)));
+            
+            ElMessage.success(`扫描到 ${devices.length} 个小米设备`);
           } else {
             ElMessage.error(result.msg || "扫描小米设备失败");
           }
@@ -622,25 +631,33 @@ async function createComponent() {
 
       // 获取小米设备音量
       const getMiDeviceVolume = async (device) => {
+        const deviceId = getMiDeviceId(device);
+        if (!deviceId) return;
+        
         try {
-          const deviceId = device.deviceID || device.address;
-          if (!deviceId) return;
           const response = await fetch(`${getApiUrl()}/mi/volume?device_id=${encodeURIComponent(deviceId)}`);
           const result = await response.json();
+          
           if (result.code === 0) {
             device.volume = result.data?.volume ?? result.data ?? undefined;
           }
         } catch (error) {
-          console.error("获取小米设备音量失败:", error);
+          console.error(`获取设备 ${deviceId} 音量失败:`, error);
         }
       };
 
       // 设置小米设备音量
       const setMiDeviceVolume = async (device, volume) => {
+        const deviceId = getMiDeviceId(device);
+        if (!deviceId) {
+          ElMessage.error("设备ID无效");
+          return;
+        }
+        
+        const clampedVolume = clampVolume(volume);
+        device._volumeChanging = true;
+        
         try {
-          const deviceId = device.deviceID || device.address;
-          if (!deviceId) return;
-          device._volumeChanging = true;
           const response = await fetch(`${getApiUrl()}/mi/volume`, {
             method: 'POST',
             headers: {
@@ -648,12 +665,14 @@ async function createComponent() {
             },
             body: JSON.stringify({
               device_id: deviceId,
-              volume: volume
+              volume: clampedVolume
             })
           });
+          
           const result = await response.json();
+          
           if (result.code === 0) {
-            device.volume = volume;
+            device.volume = clampedVolume;
             ElMessage.success('音量设置成功');
           } else {
             ElMessage.error(result.msg || "设置音量失败");
@@ -669,7 +688,7 @@ async function createComponent() {
       // 处理小米设备音量变化
       const handleMiDeviceVolumeChange = async (device, delta) => {
         const currentVolume = device.volume ?? 0;
-        const newVolume = Math.max(0, Math.min(100, currentVolume + delta));
+        const newVolume = clampVolume(currentVolume + delta);
         await setMiDeviceVolume(device, newVolume);
       };
 

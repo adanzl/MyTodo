@@ -3,6 +3,7 @@
 包含异步工具函数和其他通用工具函数
 """
 import asyncio
+import concurrent.futures
 import os
 import subprocess
 from datetime import datetime, timedelta
@@ -40,10 +41,27 @@ def run_async(coroutine, timeout: float = None):
     """
     在新的事件循环中运行协程
     用于在同步代码中调用异步函数
+    如果已有事件循环在运行，则在单独的线程中执行
     
     :param coroutine: 协程对象
     :param timeout: 超时时间（秒），可选
     :return: 协程的返回值
+    """
+    # 检查是否已有事件循环在运行
+    try:
+        asyncio.get_running_loop()
+        # 如果已有循环在运行，在线程池中执行
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(_run_async_in_new_loop, coroutine, timeout)
+            return future.result(timeout=(timeout + 5.0) if timeout else None)
+    except RuntimeError:
+        # 没有运行中的循环，直接在新循环中执行
+        return _run_async_in_new_loop(coroutine, timeout)
+
+
+def _run_async_in_new_loop(coroutine, timeout: float = None):
+    """
+    在新的事件循环中运行协程（内部函数）
     """
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)

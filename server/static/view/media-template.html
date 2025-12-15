@@ -1214,8 +1214,9 @@
                     plain
                     circle
                     @click="handleMiDeviceVolumeChange(row, -1)"
-                    :loading="row._volumeChanging">
-                    <span>-</span>
+                    :loading="row._volumeChanging"
+                    :disabled="row._volumeChanging">
+                    -
                   </el-button>
                   <el-button
                     size="small"
@@ -1223,8 +1224,9 @@
                     plain
                     circle
                     @click="handleMiDeviceVolumeChange(row, 1)"
-                    :loading="row._volumeChanging">
-                    <span>+</span>
+                    :loading="row._volumeChanging"
+                    :disabled="row._volumeChanging">
+                    +
                   </el-button>
                 </div>
               </div>

@@ -94,6 +94,7 @@ class MiDevice:
                 )
                 mina_service = MiNAService(account)
                 result = await mina_service.device_list()
+                log.info(f"[MiDevice] Device list: {result}")
                 device_list = [_device_to_dict(device) for device in result]
                 log.info(f"[MiDevice] Found {len(device_list)} devices")
             return device_list
