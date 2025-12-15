@@ -133,12 +133,12 @@ class PlaylistMgr:
                 self._playlist_raw = json.loads(raw.decode("utf-8"))
             else:
                 self._playlist_raw = {}
-            
+
             # 清除所有播放列表的 isPlaying 状态（程序重启后，播放状态不应该保留）
             for playlist_id, playlist_data in self._playlist_raw.items():
                 if 'isPlaying' in playlist_data:
                     del playlist_data['isPlaying']
-            
+
             # 从 _playlist_raw 恢复游标状态到 _play_state，保留游标以便从上次位置继续
             # 只恢复那些在 _play_state 中不存在的播放列表（程序启动时的情况）
             # 如果 _play_state 中已有状态，则保留它（程序运行中的情况）
@@ -149,24 +149,32 @@ class PlaylistMgr:
                     pre_files = playlist_data.get("pre_files", [])
                     if pre_files:
                         # 如果有 pre_files，从 pre_files 开始（从头开始）
-                        self._play_state[playlist_id] = {"in_pre_files": True, "pre_index": 0, "file_index": current_index}
+                        self._play_state[playlist_id] = {
+                            "in_pre_files": True,
+                            "pre_index": 0,
+                            "file_index": current_index
+                        }
                     else:
                         # 如果没有 pre_files，从 files 的 current_index 开始
-                        self._play_state[playlist_id] = {"in_pre_files": False, "pre_index": 0, "file_index": current_index}
-            
+                        self._play_state[playlist_id] = {
+                            "in_pre_files": False,
+                            "pre_index": 0,
+                            "file_index": current_index
+                        }
+
             # 清除那些已不在 _playlist_raw 中的播放列表的状态
             playlist_ids_to_remove = [pid for pid in self._play_state.keys() if pid not in self._playlist_raw]
             for pid in playlist_ids_to_remove:
                 del self._play_state[pid]
-            
+
             # 清除运行时状态（这些状态不应该在重启后保留）
             self._playing_playlists.clear()
             self._scheduled_play_start_times.clear()
-            
+
             # 如果清除了 isPlaying 状态，保存回 RDS
             if self._playlist_raw:
                 self._save_playlist_to_rds()
-            
+
             self._refresh_device_map()
             self._needs_reload = False
             log.info(f"[PlaylistMgr] Load success: {len(self._playlist_raw)} playlists")
@@ -176,7 +184,6 @@ class PlaylistMgr:
             self._needs_reload = True
             return -1
 
-    
     def _refresh_device_map(self):
         self._device_map = {}
         if self._playlist_raw and sys.platform == "linux":
@@ -206,7 +213,7 @@ class PlaylistMgr:
                 if pid in self._playing_playlists:
                     log.info(f"[PlaylistMgr] 定时任务触发时播放列表正在播放中，跳过播放任务: {pid} - {p_name}")
                     return
-                
+
                 # 如果不在播放中，正常启动播放
                 code, msg = self.play(pid, force=False)
                 if code == 0:
@@ -466,7 +473,8 @@ class PlaylistMgr:
 
         # 启动文件定时器
         if file_duration_seconds and file_duration_seconds > 0:
-            self._start_file_timer(id, file_duration_seconds)
+            # 这个地方少1s，避免设备播放完成后自动重播导致重复播放
+            self._start_file_timer(id, min(file_duration_seconds - 1, 3))
 
         # 启动播放列表时长限制定时器
         schedule = playlist_data.get("schedule", {})
@@ -620,10 +628,10 @@ class PlaylistMgr:
             for playlist_id, playlist_data in self._playlist_raw.items():
                 if playlist_data.get("trigger_button") == button:
                     matching_playlists.append(playlist_id)
-            
+
             if not matching_playlists:
                 return -1, f"未找到触发按钮 {button} 对应的播放列表"
-            
+
             # 停止所有匹配的播放列表
             stopped_count = 0
             errors = []
@@ -635,14 +643,14 @@ class PlaylistMgr:
                         stopped_count += 1
                     else:
                         errors.append(f"{playlist_id}: {msg}")
-            
+
             if stopped_count > 0:
                 return 0, f"已停止 {stopped_count} 个播放列表"
             elif errors:
                 return -1, f"停止失败: {', '.join(errors)}"
             else:
                 return 0, "没有正在播放的列表需要停止"
-        
+
         elif action == "play":
             # play 操作：需要检查 cron 是否今天会触发
             matching_playlists = []
@@ -654,14 +662,14 @@ class PlaylistMgr:
                         cron_expression = schedule.get("cron", "").strip()
                         if cron_expression and check_cron_will_trigger_today(cron_expression):
                             matching_playlists.append((playlist_id, playlist_data))
-            
+
             if not matching_playlists:
                 return -1, f"未找到触发按钮 {button} 对应的播放列表，或今天不会触发"
-            
+
             # 选择第一个匹配的播放列表（今天会触发的第一条）
             target_playlist_id = matching_playlists[0][0]
             return self.play(target_playlist_id)
-        
+
         else:
             return -1, f"不支持的操作: {action}"
 
@@ -689,7 +697,9 @@ class PlaylistMgr:
                         device_state = status.get("state", "")
                         wait_seconds = time_to_seconds(status.get("duration", "00:00:00")) - \
                                      time_to_seconds(status.get("position", "00:00:00"))
-                        log.info(f"[PlaylistMgr] 文件定时器触发时播放状态检查: {pid}, 剩余时长: {wait_seconds} 秒, 设备状态: {device_state}, 状态: {status}")
+                        log.info(
+                            f"[PlaylistMgr] 文件定时器触发时播放状态检查: {pid}, 剩余时长: {wait_seconds} 秒, 设备状态: {device_state}, 状态: {status}"
+                        )
                         # 如果设备状态是 STOPPED，说明文件已经播放完成，不需要等待
                         if device_state == "STOPPED":
                             log.info(f"[PlaylistMgr] 文件定时器触发，设备状态为 STOPPED，文件已播放完成，直接播放下一首: {pid}")
@@ -709,7 +719,8 @@ class PlaylistMgr:
                 if playlist_data:
                     pre_files = playlist_data.get("pre_files", [])
                     self._init_play_state(pid, playlist_data, pre_files)
-            log.info(f"[PlaylistMgr] 文件定时器触发，准备播放下一首: {pid}, 当前播放状态: {self._play_state.get(pid)}, 等待后剩余时长: {wait_seconds} 秒")
+            log.info(
+                f"[PlaylistMgr] 文件定时器触发，准备播放下一首: {pid}, 当前播放状态: {self._play_state.get(pid)}, 等待后剩余时长: {wait_seconds} 秒")
             # 在播放下一首之前，先停止当前播放，避免设备自动重播导致重复播放
             if device:
                 try:
