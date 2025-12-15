@@ -130,6 +130,30 @@ class PlaylistMgr:
                 if 'isPlaying' in playlist_data:
                     del playlist_data['isPlaying']
             
+            # 从 _playlist_raw 恢复游标状态到 _play_state，保留游标以便从上次位置继续
+            # 只恢复那些在 _play_state 中不存在的播放列表（程序启动时的情况）
+            # 如果 _play_state 中已有状态，则保留它（程序运行中的情况）
+            for playlist_id, playlist_data in self._playlist_raw.items():
+                if playlist_id not in self._play_state:
+                    # 如果 _play_state 中没有该播放列表的状态，从 _playlist_raw 恢复游标
+                    current_index = playlist_data.get("current_index", 0)
+                    pre_files = playlist_data.get("pre_files", [])
+                    if pre_files:
+                        # 如果有 pre_files，从 pre_files 开始（从头开始）
+                        self._play_state[playlist_id] = {"in_pre_files": True, "pre_index": 0, "file_index": current_index}
+                    else:
+                        # 如果没有 pre_files，从 files 的 current_index 开始
+                        self._play_state[playlist_id] = {"in_pre_files": False, "pre_index": 0, "file_index": current_index}
+            
+            # 清除那些已不在 _playlist_raw 中的播放列表的状态
+            playlist_ids_to_remove = [pid for pid in self._play_state.keys() if pid not in self._playlist_raw]
+            for pid in playlist_ids_to_remove:
+                del self._play_state[pid]
+            
+            # 清除运行时状态（这些状态不应该在重启后保留）
+            self._playing_playlists.clear()
+            self._scheduled_play_start_times.clear()
+            
             # 如果清除了 isPlaying 状态，保存回 RDS
             if self._playlist_raw:
                 self._save_playlist_to_rds()
@@ -653,10 +677,15 @@ class PlaylistMgr:
                 try:
                     code, status = device.get_status()
                     if code == 0:
+                        device_state = status.get("state", "")
                         wait_seconds = time_to_seconds(status.get("duration", "00:00:00")) - \
                                      time_to_seconds(status.get("position", "00:00:00"))
-                        log.info(f"[PlaylistMgr] 文件定时器触发时播放状态检查: {pid}, 剩余时长: {wait_seconds} 秒, 状态: {status}")
-                        if wait_seconds >= 2:
+                        log.info(f"[PlaylistMgr] 文件定时器触发时播放状态检查: {pid}, 剩余时长: {wait_seconds} 秒, 设备状态: {device_state}, 状态: {status}")
+                        # 如果设备状态是 STOPPED，说明文件已经播放完成，不需要等待
+                        if device_state == "STOPPED":
+                            log.info(f"[PlaylistMgr] 文件定时器触发，设备状态为 STOPPED，文件已播放完成，直接播放下一首: {pid}")
+                            wait_seconds = 0  # 不等待
+                        elif wait_seconds >= 2:
                             log.info(f"[PlaylistMgr] 文件定时器触发，但播放尚未完成，等待 {wait_seconds} 秒: {pid}")
                             time.sleep(wait_seconds)
                 except Exception as e:
