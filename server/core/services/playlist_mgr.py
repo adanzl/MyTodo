@@ -66,6 +66,7 @@ class PlaylistMgr:
         :return: 播放列表字典，格式为 {playlist_id: playlist_data}
                  如果id为None，返回所有播放列表；如果id有值，返回只包含该播放列表的字典；如果不存在则返回空字典
                  如果播放列表中有 isPlaying 字段，表示正在播放
+                 如果正在播放 pre_files，会添加 pre_index 字段表示当前播放的 pre_file 索引
         """
         # 如果需要重新加载，再次尝试加载
         if self._needs_reload:
@@ -79,6 +80,14 @@ class PlaylistMgr:
             if playlist_data is None:
                 return {}
             result = {id: playlist_data}
+
+        # 为正在播放的列表添加播放状态信息
+        for playlist_id, playlist_data in result.items():
+            if playlist_id in self._play_state:
+                play_state = self._play_state[playlist_id]
+                if play_state.get("in_pre_files", False):
+                    # 正在播放 pre_files，添加 pre_index
+                    playlist_data["pre_index"] = play_state.get("pre_index", -1)
 
         # 汇总所有没有 duration 的文件，启动单例线程批量获取时长
         self._start_batch_duration_fetch(result)

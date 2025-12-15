@@ -137,8 +137,24 @@
             <span v-if="getPlaylistTotalDuration() > 0" class="mr-2">
               总时长：{{ formatDuration(getPlaylistTotalDuration()) }}
             </span>
-            共 {{ playlistStatus.total || 0 }} 首， 当前: {{ playlistStatus.current_index !==
-            undefined ? playlistStatus.current_index + 1 : '-' }} / {{ playlistStatus.total || 0 }}
+            <template v-if="playlistStatus">
+              <template v-if="(playlistStatus.pre_files?.length || 0) + (playlistStatus.playlist?.length || 0) > 0">
+                共 {{ (playlistStatus.pre_files?.length || 0) + (playlistStatus.playlist?.length || 0) }} 首， 当前: 
+                <template v-if="playlistStatus.pre_index !== undefined && playlistStatus.pre_index !== null && playlistStatus.pre_index >= 0">
+                  {{ playlistStatus.pre_index + 1 }}
+                </template>
+                <template v-else-if="playlistStatus.current_index !== undefined && playlistStatus.current_index !== null && playlistStatus.current_index >= 0">
+                  {{ (playlistStatus.pre_files?.length || 0) + playlistStatus.current_index + 1 }}
+                </template>
+                <template v-else>
+                  -
+                </template>
+                / {{ (playlistStatus.pre_files?.length || 0) + (playlistStatus.playlist?.length || 0) }}
+              </template>
+              <template v-else>
+                共 0 首， 当前: - / 0
+              </template>
+            </template>
           </div>
         </div>
         <div class="flex flex-wrap gap-2">
@@ -171,9 +187,19 @@
             type="plain"
             size="small"
             circle
+            @click="handlePlayPre"
+            :loading="playing"
+            :disabled="!playlistStatus || ((!playlistStatus.pre_files || playlistStatus.pre_files.length === 0) && (!playlistStatus.playlist || playlistStatus.playlist.length === 0))"
+            title="上一首">
+            <span v-if="!playing">⏮</span>
+          </el-button>
+          <el-button
+            type="plain"
+            size="small"
+            circle
             @click="handlePlayNext"
             :loading="playing"
-            :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0"
+            :disabled="!playlistStatus || ((!playlistStatus.pre_files || playlistStatus.pre_files.length === 0) && (!playlistStatus.playlist || playlistStatus.playlist.length === 0))"
             title="下一首">
             <span v-if="!playing">⏭</span>
           </el-button>
@@ -187,12 +213,13 @@
             <span v-if="!stopping">⏹</span>
           </el-button>
           <el-button
+            v-show="showMoreActions"
             type="plain"
             size="small"
             circle
             @click="handleClearPlaylist"
-            :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0 || playlistLoading"
-            title="清空列表">
+            :disabled="!playlistStatus || ((!playlistStatus.pre_files || playlistStatus.pre_files.length === 0) && (!playlistStatus.playlist || playlistStatus.playlist.length === 0)) || playlistLoading"
+            title="清空列表（包括前置文件和正式文件）">
             <el-icon><Delete /></el-icon>
           </el-button>
         </div>
@@ -207,23 +234,35 @@
               <span v-if="getPreFilesTotalDuration() > 0" class="ml-2 text-gray-500">
                 {{ formatDuration(getPreFilesTotalDuration()) }}
               </span>
+              <span v-if="playlistStatus.pre_files && playlistStatus.pre_files.length > 0" class="ml-2 text-gray-500">
+                共 {{ playlistStatus.pre_files.length }} 首， 当前: {{ playlistStatus.pre_index !== undefined && playlistStatus.pre_index !== null && playlistStatus.pre_index >= 0 ? playlistStatus.pre_index + 1 : '-' }} / {{ playlistStatus.pre_files.length }}
+              </span>
+              <el-tag
+                v-if="playlistStatus.isPlaying && playlistStatus.pre_index !== undefined && playlistStatus.pre_index !== null && playlistStatus.pre_index >= 0"
+                type="success"
+                size="small"
+                class="ml-2">
+                播放中
+              </el-tag>
             </div>
-            <div class="flex items-center gap-1">
+            <div class="flex items-center gap-1 pr-1">
+              <el-button
+                type="primary"
+                size="small"
+                plain
+                @click="handleOpenFileBrowserForPreFiles"
+                :disabled="!playlistStatus">
+                +
+              </el-button>
               <el-button
                 type="danger"
                 size="small"
                 circle
+                plain
                 @click="handleClearPreFiles"
                 :disabled="!playlistStatus || !playlistStatus.pre_files || playlistStatus.pre_files.length === 0 || playlistLoading"
                 title="清空列表">
                 <el-icon><Delete /></el-icon>
-              </el-button>
-              <el-button
-                type="primary"
-                size="small"
-                @click="handleOpenFileBrowserForPreFiles"
-                :disabled="!playlistStatus">
-                +
               </el-button>
             </div>
           </div>
@@ -231,9 +270,13 @@
             <div
               v-for="(file, index) in playlistStatus.pre_files"
               :key="'pre-' + index"
-              class="flex items-center gap-2 p-1 hover:bg-gray-100 rounded">
+              class="flex items-center gap-2 p-1 hover:bg-gray-100 rounded"
+              :class="{ 'bg-blue-50': playlistStatus.pre_index !== undefined && playlistStatus.pre_index !== null && index === playlistStatus.pre_index }">
               <span class="text-xs text-gray-500 w-8">{{ index + 1 }}</span>
-              <span class="flex-1 text-sm truncate" :title="file.uri">
+              <span
+                class="flex-1 text-sm truncate"
+                :class="{ 'text-blue-600': playlistStatus.pre_index !== undefined && playlistStatus.pre_index !== null && index === playlistStatus.pre_index }"
+                :title="file.uri">
                 {{ file.uri.split('/').pop() }}
               </span>
               <el-tag
@@ -294,6 +337,44 @@
         <div
           v-if="playlistStatus.playlist && playlistStatus.playlist.length > 0"
           class="border rounded p-2">
+          <div class="flex items-center justify-between mb-2 pr-1">
+            <div class="text-xs font-semibold text-gray-600">
+              正式文件（播放时记录进度）
+              <span v-if="getFilesTotalDuration() > 0" class="ml-2 text-gray-500">
+                {{ formatDuration(getFilesTotalDuration()) }}
+              </span>
+              <span v-if="playlistStatus.playlist && playlistStatus.playlist.length > 0" class="ml-2 text-gray-500">
+                共 {{ playlistStatus.playlist.length }} 首， 当前: {{ playlistStatus.current_index !== undefined ? playlistStatus.current_index + 1 : '-' }} / {{ playlistStatus.playlist.length }}
+              </span>
+              <el-tag
+                v-if="playlistStatus.isPlaying && (playlistStatus.pre_index === undefined || playlistStatus.pre_index === null || playlistStatus.pre_index < 0)"
+                type="success"
+                size="small"
+                class="ml-2">
+                播放中
+              </el-tag>
+            </div>
+            <div class="flex items-center gap-1">
+              <el-button
+                type="primary"
+                plain
+                size="small"
+                @click="handleOpenFileBrowser"
+                :disabled="!playlistStatus">
+                +
+              </el-button>
+              <el-button
+                type="danger"
+                size="small"
+                circle
+                plain
+                @click="handleClearPlaylist"
+                :disabled="!playlistStatus || ((!playlistStatus.pre_files || playlistStatus.pre_files.length === 0) && (!playlistStatus.playlist || playlistStatus.playlist.length === 0)) || playlistLoading"
+                title="清空列表（包括前置文件和正式文件）">
+                <el-icon><Delete /></el-icon>
+              </el-button>
+            </div>
+          </div>
           <div
             v-for="(file, index) in playlistStatus.playlist"
             :key="index"

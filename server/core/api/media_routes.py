@@ -107,6 +107,25 @@ def playlist_play_next():
         return _err(f'error: {str(e)}')
 
 
+@media_bp.route("/playlist/playPre", methods=['POST'])
+def playlist_play_pre():
+    """
+    播放上一首
+    """
+    try:
+        args = request.get_json()
+        id = args.get("id")
+        if id is None:
+            return _err("id is required")
+        ret, msg = playlist_mgr.play_pre(id)
+        if ret != 0:
+            return _err(f"播放上一首失败: {msg}")
+        return _ok()
+    except Exception as e:
+        log.error(f"[PLAYLIST] PlayPre error: {e}")
+        return _err(f'error: {str(e)}')
+
+
 @media_bp.route("/playlist/stop", methods=['POST'])
 def playlist_stop():
     """

@@ -96,6 +96,18 @@ async function createComponent() {
         }, 0);
       };
 
+      // 计算正式文件列表总时长（秒）
+      const getFilesTotalDuration = () => {
+        const status = refData.playlistStatus.value;
+        if (!status || !status.playlist || status.playlist.length === 0) {
+          return 0;
+        }
+        return status.playlist.reduce((total, file) => {
+          const duration = file?.duration;
+          return total + (typeof duration === 'number' && duration > 0 ? duration : 0);
+        }, 0);
+      };
+
       // 计算播放列表总时长（秒，包括前置文件和播放列表文件）
       const getPlaylistTotalDuration = () => {
         const status = refData.playlistStatus.value;
@@ -171,6 +183,10 @@ async function createComponent() {
           pre_files,
           total: playlist.length,
           current_index: currentIndex,
+          pre_index: typeof item?.pre_index === "number" 
+            ? item.pre_index 
+            : (item?.pre_index !== undefined && item?.pre_index !== null 
+                ? parseInt(item.pre_index, 10) : -1),
           device_address: item?.device_address || item?.device?.address || null,
           device_type: validDeviceType,
           device: item?.device || { type: validDeviceType, address: item?.device_address || null, name: item?.device?.name || null },
@@ -269,6 +285,10 @@ async function createComponent() {
           playlist: [...(active.playlist || [])],
           pre_files: [...(active.pre_files || [])],
           current_index: currentIndex,
+          pre_index: typeof active.pre_index === "number" 
+            ? active.pre_index 
+            : (active.pre_index !== undefined && active.pre_index !== null 
+                ? parseInt(active.pre_index, 10) : -1),
           isPlaying: active?.isPlaying === true || active?.isPlaying === 1 || false,
         };
       };
@@ -367,6 +387,10 @@ async function createComponent() {
                 : (item.current_index !== undefined && item.current_index !== null 
                     ? parseInt(item.current_index, 10) || 0 
                     : 0),
+              pre_index: typeof item.pre_index === "number" 
+                ? item.pre_index 
+                : (item.pre_index !== undefined && item.pre_index !== null 
+                    ? parseInt(item.pre_index, 10) : -1),
             device_address: item.device?.address || item.device_address || null,
             device_type: item.device?.type || item.device_type || "dlna",
             device: item.device || {
@@ -1414,6 +1438,36 @@ async function createComponent() {
         }
       };
 
+      const handlePlayPre = async () => {
+        const status = refData.playlistStatus.value;
+        if (!status || !status.id) {
+          ElMessage.warning("播放列表不存在");
+          return;
+        }
+        // 检查是否有可播放的内容（pre_files 或 playlist）
+        const hasPreFiles = status.pre_files && status.pre_files.length > 0;
+        const hasPlaylist = status.playlist && status.playlist.length > 0;
+        if (!hasPreFiles && !hasPlaylist) {
+          ElMessage.warning("播放列表为空，无法播放上一首");
+          return;
+        }
+        try {
+          refData.playing.value = true;
+          const response = await playlistAction("playPre", "POST", { id: status.id });
+          if (response.code !== 0) {
+            throw new Error(response.msg || "播放上一首失败");
+          }
+          await refreshPlaylistStatus();
+
+          ElMessage.success("已切换到上一首");
+        } catch (error) {
+          console.error("播放上一首失败:", error);
+          ElMessage.error("播放上一首失败: " + (error.message || "未知错误"));
+        } finally {
+          refData.playing.value = false;
+        }
+      };
+
       const handleStopPlaylist = async () => {
         const status = refData.playlistStatus.value;
         if (!status || !status.id) {
@@ -1564,11 +1618,23 @@ async function createComponent() {
       // 清空播放列表
       const handleClearPlaylist = async () => {
         const status = refData.playlistStatus.value;
-        if (!status || !status.playlist || status.playlist.length === 0) return;
+        if (!status) return;
+        
+        const preFilesCount = (status.pre_files && status.pre_files.length) || 0;
+        const filesCount = (status.playlist && status.playlist.length) || 0;
+        const totalCount = preFilesCount + filesCount;
+        
+        if (totalCount === 0) return;
 
         try {
+          const message = preFilesCount > 0 && filesCount > 0
+            ? `确定要清空播放列表 "${status.name}" 吗？此操作将删除所有 ${preFilesCount} 个前置文件和 ${filesCount} 个正式文件，共 ${totalCount} 个文件。`
+            : preFilesCount > 0
+            ? `确定要清空播放列表 "${status.name}" 吗？此操作将删除所有 ${preFilesCount} 个前置文件。`
+            : `确定要清空播放列表 "${status.name}" 吗？此操作将删除所有 ${filesCount} 个正式文件。`;
+          
           await ElMessageBox.confirm(
-            `确定要清空播放列表 "${status.name}" 吗？此操作将删除所有 ${status.playlist.length} 个文件。`,
+            message,
             "确认清空",
             {
               confirmButtonText: "确定",
@@ -1580,11 +1646,12 @@ async function createComponent() {
           refData.playlistLoading.value = true;
           await updateActivePlaylistData((playlistInfo) => {
             playlistInfo.playlist = [];
+            playlistInfo.pre_files = [];
             playlistInfo.total = 0;
             playlistInfo.current_index = 0;
             return playlistInfo;
           });
-          ElMessage.success("已清空播放列表");
+          ElMessage.success("已清空播放列表（包括前置文件和正式文件）");
         } catch (error) {
           if (error !== "cancel") {
             console.error("清空失败:", error);
@@ -2229,6 +2296,7 @@ async function createComponent() {
         refreshConnectedList,
         refreshPlaylistStatus,
         handlePlayPlaylist,
+        handlePlayPre,
         handlePlayNext,
         handleStopPlaylist,
         handleMovePlaylistItemUp,
@@ -2276,6 +2344,7 @@ async function createComponent() {
         scanDlnaDevices,
         scanMiDevices,
         getPreFilesTotalDuration,
+        getFilesTotalDuration,
         getPlaylistTotalDuration,
         handleOpenAgentListDialog,
         handleCloseAgentListDialog,
