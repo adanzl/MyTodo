@@ -124,6 +124,16 @@ class PlaylistMgr:
                 self._playlist_raw = json.loads(raw.decode("utf-8"))
             else:
                 self._playlist_raw = {}
+            
+            # 清除所有播放列表的 isPlaying 状态（程序重启后，播放状态不应该保留）
+            for playlist_id, playlist_data in self._playlist_raw.items():
+                if 'isPlaying' in playlist_data:
+                    del playlist_data['isPlaying']
+            
+            # 如果清除了 isPlaying 状态，保存回 RDS
+            if self._playlist_raw:
+                self._save_playlist_to_rds()
+            
             self._refresh_device_map()
             self._needs_reload = False
             log.info(f"[PlaylistMgr] Load success: {len(self._playlist_raw)} playlists")
