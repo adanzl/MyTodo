@@ -4,14 +4,15 @@
 import asyncio
 import json
 import os
+import traceback
 from pathlib import Path
 from typing import Dict, List
 
 from aiohttp import ClientSession
 from miservice import MiAccount, MiNAService
 
-from core.utils import run_async, convert_to_http_url, format_time_str
 from core.log_config import root_logger
+from core.utils import convert_to_http_url, format_time_str, run_async
 
 log = root_logger()
 
@@ -245,7 +246,7 @@ class MiDevice:
                 return 0, volume
 
             except Exception as e:
-                log.error(f"[MiDevice] Get volume error: {e}")
+                log.error(f"[MiDevice] Get volume traceback: {traceback.format_exc()}")
                 return -1, -1
             finally:
                 if session:
@@ -254,7 +255,7 @@ class MiDevice:
         try:
             return run_async(_get_status_async(), timeout=5.0)
         except Exception as e:
-            log.error(f"[MiDevice] Get volume error: {e}")
+            log.error(f"[MiDevice] Get volume traceback: {traceback.format_exc()}")
             return -1, -1
 
     def set_volume(self, volume: int) -> tuple[int, str]:
