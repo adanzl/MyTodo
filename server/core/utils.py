@@ -51,23 +51,49 @@ def run_async(coroutine, timeout: float = None):
     :return: 协程的返回值
     """
     def run_in_thread():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        # 在线程中，使用 asyncio.run() 的替代实现
+        # 先清除事件循环引用，避免 gevent 的干扰
         try:
-            if timeout:
-                return loop.run_until_complete(asyncio.wait_for(coroutine, timeout=timeout))
-            else:
-                return loop.run_until_complete(coroutine)
-        finally:
+            # 检查是否有正在运行的事件循环
             try:
-                pending = asyncio.all_tasks(loop)
-                if pending:
-                    for task in pending:
-                        task.cancel()
-                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                asyncio.get_running_loop()
+                # 如果有正在运行的循环，这是一个错误情况
+                # 在线程中不应该有正在运行的循环
+                log.warning(f"[Utils] Found running event loop in thread, clearing it")
+                asyncio.set_event_loop(None)
+            except RuntimeError:
+                # 没有正在运行的循环，这是正常的
+                pass
+            
+            # 清除可能存在的非运行状态的事件循环
+            # 直接清除事件循环引用，避免在 Python 3.10+ 中 get_event_loop() 自动创建新循环
+            try:
+                asyncio.set_event_loop(None)
             except Exception:
                 pass
+            
+            # 创建并运行新的事件循环
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            try:
+                if timeout:
+                    return loop.run_until_complete(asyncio.wait_for(coroutine, timeout=timeout))
+                else:
+                    return loop.run_until_complete(coroutine)
             finally:
+                # 清理事件循环
+                try:
+                    # 取消所有待处理的任务
+                    pending = asyncio.all_tasks(loop)
+                    if pending:
+                        for task in pending:
+                            if not task.done():
+                                task.cancel()
+                        # 等待所有任务完成或取消
+                        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                except Exception:
+                    pass
                 try:
                     loop.close()
                 except Exception:
@@ -76,6 +102,13 @@ def run_async(coroutine, timeout: float = None):
                     asyncio.set_event_loop(None)
                 except Exception:
                     pass
+        except Exception as e:
+            # 如果出现错误，确保清理
+            try:
+                asyncio.set_event_loop(None)
+            except Exception:
+                pass
+            raise
     
     with concurrent.futures.ThreadPoolExecutor() as executor:
         future = executor.submit(run_in_thread)
