@@ -289,6 +289,7 @@ async function createComponent() {
             ? active.pre_index 
             : (active.pre_index !== undefined && active.pre_index !== null 
                 ? parseInt(active.pre_index, 10) : -1),
+          in_pre_files: active?.in_pre_files === true || active?.in_pre_files === 1 || false,
           isPlaying: active?.isPlaying === true || active?.isPlaying === 1 || false,
         };
       };
@@ -391,6 +392,7 @@ async function createComponent() {
                 ? item.pre_index 
                 : (item.pre_index !== undefined && item.pre_index !== null 
                     ? parseInt(item.pre_index, 10) : -1),
+              in_pre_files: item?.in_pre_files === true || item?.in_pre_files === 1 || false,
             device_address: item.device?.address || item.device_address || null,
             device_type: item.device?.type || item.device_type || "dlna",
             device: item.device || {

@@ -231,7 +231,7 @@
                 共 {{ playlistStatus.pre_files.length }} 首， 当前: {{ playlistStatus.pre_index !== undefined && playlistStatus.pre_index !== null && playlistStatus.pre_index >= 0 ? playlistStatus.pre_index + 1 : '-' }} / {{ playlistStatus.pre_files.length }}
               </span>
               <el-tag
-                v-if="playlistStatus.isPlaying && playlistStatus.pre_index !== undefined && playlistStatus.pre_index !== null && playlistStatus.pre_index >= 0"
+                v-if="playlistStatus.isPlaying && playlistStatus.in_pre_files === true"
                 type="success"
                 size="small"
                 class="ml-2">
@@ -340,7 +340,7 @@
                 共 {{ playlistStatus.playlist.length }} 首， 当前: {{ playlistStatus.current_index !== undefined ? playlistStatus.current_index + 1 : '-' }} / {{ playlistStatus.playlist.length }}
               </span>
               <el-tag
-                v-if="playlistStatus.isPlaying && (playlistStatus.pre_index === undefined || playlistStatus.pre_index === null || playlistStatus.pre_index < 0)"
+                v-if="playlistStatus.isPlaying && playlistStatus.in_pre_files === false"
                 type="success"
                 size="small"
                 class="ml-2">

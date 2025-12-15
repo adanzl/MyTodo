@@ -85,9 +85,18 @@ class PlaylistMgr:
         for playlist_id, playlist_data in result.items():
             if playlist_id in self._play_state:
                 play_state = self._play_state[playlist_id]
+                # 添加 in_pre_files 状态，用于前端判断显示哪个列表的"播放中" tag
+                playlist_data["in_pre_files"] = play_state.get("in_pre_files", False)
                 if play_state.get("in_pre_files", False):
                     # 正在播放 pre_files，添加 pre_index
                     playlist_data["pre_index"] = play_state.get("pre_index", -1)
+                else:
+                    # 不在播放 pre_files，清除 pre_index（设置为 -1 表示无效）
+                    playlist_data["pre_index"] = -1
+            else:
+                # 播放列表不在播放状态，设置默认值
+                playlist_data["in_pre_files"] = False
+                playlist_data["pre_index"] = -1
 
         # 汇总所有没有 duration 的文件，启动单例线程批量获取时长
         self._start_batch_duration_fetch(result)
