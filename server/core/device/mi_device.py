@@ -8,7 +8,7 @@ import traceback
 from pathlib import Path
 from typing import Dict, List
 
-from aiohttp import ClientSession, TCPConnector
+from aiohttp import ClientSession
 from miservice import MiAccount, MiNAService
 
 from core.log_config import root_logger
@@ -235,8 +235,8 @@ class MiDevice:
             session = None
             try:
                 # 获取 MiNAService 对象
-                # 使用 TCPConnector 配置，避免 eager_start 问题
-                session = ClientSession(connector=TCPConnector(limit=10, limit_per_host=5))
+                # 使用普通的 ClientSession，与其他方法保持一致
+                session = ClientSession()
                 account = self._create_account(session)
                 mina_service = MiNAService(account)
                 ret = await mina_service.player_get_status(self.device_id)
