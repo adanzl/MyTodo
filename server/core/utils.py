@@ -66,7 +66,54 @@ def run_async(coroutine, timeout: float = None):
         except Exception:
             pass
         
-        # 创建新的事件循环并运行
+        # 尝试使用 asyncio.run() 如果可用（Python 3.7+）
+        # 它会自动处理事件循环的创建和清理
+        # 注意：不使用 asyncio.wait_for()，因为它可能检测到运行中的循环
+        try:
+            if hasattr(asyncio, 'run'):
+                # Python 3.7+ 有 asyncio.run()
+                if timeout:
+                    # 手动实现超时，不使用 wait_for
+                    # 注意：在 asyncio.run() 内部，我们可以安全地使用 get_running_loop()
+                    async def run_with_timeout():
+                        task = asyncio.create_task(coroutine)
+                        cancelled = False
+                        
+                        def cancel_task():
+                            nonlocal cancelled
+                            if not task.done():
+                                cancelled = True
+                                task.cancel()
+                        
+                        # 在 asyncio.run() 创建的循环中，get_running_loop() 是安全的
+                        try:
+                            loop = asyncio.get_running_loop()
+                            timeout_handle = loop.call_later(timeout, cancel_task)
+                        except RuntimeError:
+                            # 如果没有运行中的循环，直接运行任务
+                            return await task
+                        
+                        try:
+                            result = await task
+                            if timeout_handle and not timeout_handle.cancelled():
+                                timeout_handle.cancel()
+                            if cancelled:
+                                raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
+                            return result
+                        except asyncio.CancelledError:
+                            if cancelled:
+                                raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
+                            raise
+                    
+                    return asyncio.run(run_with_timeout())
+                else:
+                    return asyncio.run(coroutine)
+        except RuntimeError as e:
+            # 如果 asyncio.run() 检测到运行中的循环，回退到手动实现
+            if "cannot be called from a running event loop" not in str(e).lower() and "cannot run the event loop" not in str(e).lower():
+                raise
+        
+        # 回退到手动实现：创建新的事件循环并运行
         loop = None
         try:
             # 创建新的事件循环
@@ -91,7 +138,13 @@ def run_async(coroutine, timeout: float = None):
                 timeout_handle = loop.call_later(timeout, cancel_task)
                 
                 try:
-                    result = loop.run_until_complete(task)
+                    # 使用 run_until_complete，但先确保没有运行中的循环
+                    # 通过创建一个包装协程来避免直接检查
+                    async def run_task():
+                        return await task
+                    
+                    result = loop.run_until_complete(run_task())
+                    
                     # 取消超时回调
                     if timeout_handle and not timeout_handle.cancelled():
                         timeout_handle.cancel()
@@ -103,7 +156,11 @@ def run_async(coroutine, timeout: float = None):
                         raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
                     raise
             else:
-                return loop.run_until_complete(coroutine)
+                # 使用 run_until_complete，但先确保没有运行中的循环
+                # 通过创建一个包装协程来避免直接检查
+                async def run_coro():
+                    return await coroutine
+                return loop.run_until_complete(run_coro())
                 
         finally:
             # 清理事件循环
@@ -117,7 +174,12 @@ def run_async(coroutine, timeout: float = None):
                                 task.cancel()
                             # 等待所有任务完成或取消
                             if pending:
-                                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                                async def gather_pending():
+                                    await asyncio.gather(*pending, return_exceptions=True)
+                                try:
+                                    loop.run_until_complete(gather_pending())
+                                except Exception:
+                                    pass
                     except Exception:
                         pass
                 except Exception:
