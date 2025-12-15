@@ -198,12 +198,7 @@
             <el-icon v-if="playing" size="12" class="animate-spin"><Loading /></el-icon>
             <span v-else>⏭</span>
           </el-button>
-          <el-button
-            type="plain"
-            size="small"
-            circle
-            @click="handleStopPlaylist"
-            title="停止">
+          <el-button type="plain" size="small" circle @click="handleStopPlaylist" title="停止">
             <el-icon v-if="stopping" size="12" class="animate-spin"><Loading /></el-icon>
             <span v-else>⏹</span>
           </el-button>
@@ -1077,97 +1072,107 @@
             </el-button>
           </div>
         </div>
-        <el-table :data="agentList" stripe class="w-full" v-loading="agentListLoading" :height="240">
-      <el-table-column prop="name" label="设备名称" min-width="120" />
-      <el-table-column label="详情" min-width="250">
-        <template #default="{ row }">
-          <div class="flex flex-col gap-1">
-            <div class="text-sm flex items-start">
-              <span class="text-gray-600 inline-block w-12 flex-shrink-0">地址：</span>
-              <span class="text-gray-800">{{ row.address }}</span>
-            </div>
-            <div class="text-sm flex items-start">
-              <span class="text-gray-600 inline-block w-12 flex-shrink-0">ID：</span>
-              <span class="text-gray-800">{{ row.agent_id }}</span>
-            </div>
-          </div>
-        </template>
-      </el-table-column>
-      <el-table-column label="支持的操作" min-width="100">
-        <template #default="{ row }">
-          <el-tag v-for="action in row.actions" :key="action" size="small" type="info" class="mr-1">
-            {{ action }}
-          </el-tag>
-          <span v-if="!row.actions || row.actions.length === 0" class="text-xs text-gray-400"
-            >无</span
-          >
-        </template>
-      </el-table-column>
-      <el-table-column label="状态/心跳" width="90">
-        <template #default="{ row }">
-          <div class="flex flex-col items-center gap-1">
-            <el-tag :type="row.is_online ? 'success' : 'danger'" size="small">
-              {{ row.is_online ? '在线' : '离线' }}
-            </el-tag>
-            <span class="text-xs text-gray-500"> {{ row.last_heartbeat_ago }}秒前 </span>
-          </div>
-        </template>
-      </el-table-column>
-      <el-table-column label="测试按钮" width="180">
-        <template #default="{ row }">
-          <div class="flex flex-col gap-1">
-            <div class="flex gap-1 items-center">
-              <el-icon class="!w-4 !h-5"><Cpu /></el-icon>
-              <span class="text-[12px] mr-1 !w-4">B1</span>
-              <el-button
-                v-for="i in 2"
-                :key="i"
+        <el-table
+          :data="agentList"
+          stripe
+          class="w-full"
+          v-loading="agentListLoading"
+          :height="200">
+          <el-table-column prop="name" label="设备名称" min-width="150" />
+          <el-table-column label="详情" min-width="250">
+            <template #default="{ row }">
+              <div class="flex flex-col gap-1">
+                <div class="text-sm flex items-start">
+                  <span class="text-gray-600 inline-block w-12 flex-shrink-0">地址：</span>
+                  <span class="text-gray-800">{{ row.address }}</span>
+                </div>
+                <div class="text-sm flex items-start">
+                  <span class="text-gray-600 inline-block w-12 flex-shrink-0">ID：</span>
+                  <span class="text-gray-800">{{ row.agent_id }}</span>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="支持的操作" min-width="100">
+            <template #default="{ row }">
+              <el-tag
+                v-for="action in row.actions"
+                :key="action"
                 size="small"
-                type="primary"
-                plain
-                @click="handleTestAgentButton(row.agent_id, `F${12 + i}`)"
-                :loading="row[`testing_F${12 + i}`]"
-                class="flex-1">
-                F{{ 12 + i }}
-              </el-button>
-            </div>
-            <div class="flex gap-1 items-center">
-              <el-icon class="!w-4 !h-5"><Cpu /></el-icon>
-              <span class="text-[12px] mr-1 !w-4">B2</span>
-              <el-button
-                v-for="i in 2"
-                :key="i + 2"
-                size="small"
-                type="primary"
-                plain
-                @click="handleTestAgentButton(row.agent_id, `F${12 + i + 2}`)"
-                :loading="row[`testing_F${12 + i + 2}`]"
-                class="flex-1">
-                F{{ 12 + i + 2 }}
-              </el-button>
-            </div>
-            <div class="flex gap-1 items-center">
-              <el-icon class="!w-4 !h-5"><Cpu /></el-icon>
-              <span class="text-[12px] mr-1 !w-4">B3</span>
-              <el-button
-                v-for="i in 2"
-                :key="i + 4"
-                size="small"
-                type="primary"
-                plain
-                @click="handleTestAgentButton(row.agent_id, `F${12 + i + 4}`)"
-                :loading="row[`testing_F${12 + i + 4}`]"
-                class="flex-1">
-                F{{ 12 + i + 4 }}
-              </el-button>
-            </div>
-          </div>
-        </template>
-      </el-table-column>
-      <template #empty>
-        <div class="text-center text-gray-400 py-8">暂无设备，请等待设备注册</div>
-      </template>
-    </el-table>
+                type="info"
+                class="mr-1">
+                {{ action }}
+              </el-tag>
+              <span v-if="!row.actions || row.actions.length === 0" class="text-xs text-gray-400"
+                >无</span
+              >
+            </template>
+          </el-table-column>
+          <el-table-column label="状态/心跳" width="90">
+            <template #default="{ row }">
+              <div class="flex flex-col items-center gap-1">
+                <el-tag :type="row.is_online ? 'success' : 'danger'" size="small">
+                  {{ row.is_online ? '在线' : '离线' }}
+                </el-tag>
+                <span class="text-xs text-gray-500"> {{ row.last_heartbeat_ago }}秒前 </span>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="测试按钮" width="180">
+            <template #default="{ row }">
+              <div class="flex flex-col gap-1">
+                <div class="flex gap-1 items-center">
+                  <el-icon class="!w-4 !h-5"><Cpu /></el-icon>
+                  <span class="text-[12px] mr-1 !w-4">B1</span>
+                  <el-button
+                    v-for="i in 2"
+                    :key="i"
+                    size="small"
+                    type="primary"
+                    plain
+                    @click="handleTestAgentButton(row.agent_id, `F${12 + i}`)"
+                    :loading="row[`testing_F${12 + i}`]"
+                    class="flex-1">
+                    F{{ 12 + i }}
+                  </el-button>
+                </div>
+                <div class="flex gap-1 items-center">
+                  <el-icon class="!w-4 !h-5"><Cpu /></el-icon>
+                  <span class="text-[12px] mr-1 !w-4">B2</span>
+                  <el-button
+                    v-for="i in 2"
+                    :key="i + 2"
+                    size="small"
+                    type="primary"
+                    plain
+                    @click="handleTestAgentButton(row.agent_id, `F${12 + i + 2}`)"
+                    :loading="row[`testing_F${12 + i + 2}`]"
+                    class="flex-1">
+                    F{{ 12 + i + 2 }}
+                  </el-button>
+                </div>
+                <div class="flex gap-1 items-center">
+                  <el-icon class="!w-4 !h-5"><Cpu /></el-icon>
+                  <span class="text-[12px] mr-1 !w-4">B3</span>
+                  <el-button
+                    v-for="i in 2"
+                    :key="i + 4"
+                    size="small"
+                    type="primary"
+                    plain
+                    @click="handleTestAgentButton(row.agent_id, `F${12 + i + 4}`)"
+                    :loading="row[`testing_F${12 + i + 4}`]"
+                    class="flex-1">
+                    F{{ 12 + i + 4 }}
+                  </el-button>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="text-center text-gray-400 py-8">暂无设备，请等待设备注册</div>
+          </template>
+        </el-table>
       </div>
       <div>
         <div class="flex items-center justify-between mb-2">
@@ -1200,12 +1205,14 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="功能" min-width="150">
+          <el-table-column label="功能" min-width="100">
             <template #default="{ row }">
               <div class="flex flex-col gap-1">
                 <div class="text-sm flex items-center">
                   <span class="text-gray-600 inline-block w-16 flex-shrink-0">音量：</span>
-                  <span class="text-gray-800">{{ row.volume !== undefined ? row.volume : '-' }}</span>
+                  <span class="text-gray-800"
+                    >{{ row.volume !== undefined ? row.volume : '-' }}</span
+                  >
                 </div>
                 <div class="flex items-center gap-2">
                   <el-button
@@ -1240,4 +1247,3 @@
     </div>
   </el-dialog>
 </div>
-

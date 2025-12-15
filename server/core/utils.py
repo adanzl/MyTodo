@@ -52,11 +52,57 @@ def run_async(coroutine, timeout: float = None):
         asyncio.get_running_loop()
         # 如果已有循环在运行，在线程池中执行
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(_run_async_in_new_loop, coroutine, timeout)
-            return future.result(timeout=(timeout + 5.0) if timeout else None)
+            future = executor.submit(_run_async_in_thread, coroutine, timeout)
+            total_timeout = (timeout + 5.0) if timeout else 30.0
+            return future.result(timeout=total_timeout)
     except RuntimeError:
         # 没有运行中的循环，直接在新循环中执行
         return _run_async_in_new_loop(coroutine, timeout)
+    except concurrent.futures.TimeoutError:
+        raise asyncio.TimeoutError("Operation timed out")
+
+
+def _run_async_in_thread(coroutine, timeout: float = None):
+    """
+    在线程中运行异步函数，完全隔离事件循环
+    在线程中总是创建全新的事件循环，不检查现有循环
+    """
+    # 在线程中，直接创建全新的事件循环，不检查任何现有循环
+    # 这样可以避免与主线程的事件循环冲突
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    try:
+        if timeout:
+            return loop.run_until_complete(asyncio.wait_for(coroutine, timeout=timeout))
+        else:
+            return loop.run_until_complete(coroutine)
+    except asyncio.TimeoutError:
+        raise
+    except Exception as e:
+        # 如果是事件循环相关的错误，记录但不抛出，返回错误码
+        if "event loop" in str(e).lower():
+            raise RuntimeError(f"Event loop error in thread: {e}") from e
+        raise
+    finally:
+        try:
+            # 取消所有待处理的任务
+            pending = asyncio.all_tasks(loop)
+            for task in pending:
+                task.cancel()
+            if pending:
+                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+        except Exception:
+            pass
+        finally:
+            try:
+                loop.close()
+            except Exception:
+                pass
+            try:
+                asyncio.set_event_loop(None)
+            except Exception:
+                pass
 
 
 def _run_async_in_new_loop(coroutine, timeout: float = None):

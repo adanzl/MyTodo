@@ -27,14 +27,13 @@ def _device_to_dict(device) -> Dict:
             "address": device.get('address', ''),
             "name": device.get('name', ''),
             "deviceID": device.get('deviceID', ''),
+            "presence": device.get('presence', 'offline'),
+            "miotDID": device.get('miotDID', ''),
+            "mac": device.get('mac', ''),
         }
     except Exception as e:
         log.error(f"[MiDevice] Error converting device: {e}")
-        return {
-            "address": "",
-            "name": "Unknown",
-            "deviceID": "",
-        }
+        return {}
 
 
 async def _get_device_did_async(username: str, password: str, device_id: str) -> tuple[int, str]:
@@ -94,7 +93,7 @@ class MiDevice:
                 )
                 mina_service = MiNAService(account)
                 result = await mina_service.device_list()
-                log.info(f"[MiDevice] Device list: {result}")
+                # log.info(f"[MiDevice] Device list: {result}")
                 device_list = [_device_to_dict(device) for device in result]
                 log.info(f"[MiDevice] Found {len(device_list)} devices")
             return device_list
