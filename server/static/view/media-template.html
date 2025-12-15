@@ -1221,21 +1221,19 @@
                     size="small"
                     type="primary"
                     plain
-                    circle
-                    @click="handleMiDeviceVolumeChange(row, -1)"
+                    @click="handleMiDeviceVolumeChange(row, 1)"
                     :loading="row._volumeChanging"
                     :disabled="row._volumeChanging">
-                    -
+                    +
                   </el-button>
                   <el-button
                     size="small"
                     type="primary"
                     plain
-                    circle
-                    @click="handleMiDeviceVolumeChange(row, 1)"
+                    @click="handleMiDeviceVolumeChange(row, -1)"
                     :loading="row._volumeChanging"
                     :disabled="row._volumeChanging">
-                    +
+                    -
                   </el-button>
                 </div>
               </div>

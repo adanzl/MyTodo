@@ -42,25 +42,45 @@ def run_async(coroutine, timeout: float = None):
     """
     在新的事件循环中运行协程
     用于在同步代码中调用异步函数
-    如果已有事件循环在运行，则在单独的线程中执行
+    
+    注意：由于 gevent.monkey.patch_all() 会 patch asyncio，使得 asyncio 使用 gevent 的事件循环。
+    gevent 的事件循环是单线程的，不支持嵌套运行多个事件循环，所以必须在独立线程中执行。
     
     :param coroutine: 协程对象
     :param timeout: 超时时间（秒），可选
     :return: 协程的返回值
     """
-    # 检查是否已有事件循环在运行
+    # 检测是否在 gevent 环境下
+    # gevent 通过 monkey.patch_all() patch 了 asyncio，导致无法创建新的事件循环
+    use_thread = False
     try:
-        asyncio.get_running_loop()
-        # 如果已有循环在运行，在线程池中执行
+        import sys
+        if 'gevent' in sys.modules:
+            use_thread = True
+    except Exception:
+        pass
+    
+    # 检查是否已有事件循环在运行
+    if not use_thread:
+        try:
+            asyncio.get_running_loop()
+            use_thread = True
+        except RuntimeError:
+            pass
+    
+    # 在 gevent 环境下或已有循环运行时，必须在独立线程中执行
+    # 因为 gevent 的事件循环不支持嵌套，且每个线程有独立的事件循环上下文
+    if use_thread:
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future = executor.submit(_run_async_in_isolated_loop, coroutine, timeout, reset_loop=True)
             total_timeout = (timeout + 5.0) if timeout else 30.0
-            return future.result(timeout=total_timeout)
-    except RuntimeError:
+            try:
+                return future.result(timeout=total_timeout)
+            except concurrent.futures.TimeoutError:
+                raise asyncio.TimeoutError("Operation timed out")
+    else:
         # 没有运行中的循环，直接在新循环中执行
         return _run_async_in_isolated_loop(coroutine, timeout, reset_loop=False)
-    except concurrent.futures.TimeoutError:
-        raise asyncio.TimeoutError("Operation timed out")
 
 
 def _run_async_in_isolated_loop(coroutine, timeout: float = None, reset_loop: bool = False):
@@ -140,12 +160,19 @@ def _cleanup_event_loop(loop):
 def _run_in_completely_isolated_thread(coroutine, timeout: float = None):
     """
     在完全隔离的线程中运行协程（最后的备选方案）
+    
+    在线程中执行可以避免 gevent 的事件循环冲突，因为：
+    1. 每个线程有独立的事件循环上下文
+    2. gevent 的 patch 主要影响主线程
+    3. 线程中的 asyncio 可以创建独立的事件循环
     """
     result_container = [None]
     exception_container = [None]
     
     def run_in_thread():
         try:
+            # 在线程中创建全新的事件循环
+            # 线程有独立的事件循环上下文，不受 gevent 主循环影响
             new_loop = asyncio.new_event_loop()
             asyncio.set_event_loop(new_loop)
             try:
