@@ -474,7 +474,7 @@ class PlaylistMgr:
         # 启动文件定时器
         if file_duration_seconds and file_duration_seconds > 0:
             # 这个地方少1s，避免设备播放完成后自动重播导致重复播放
-            self._start_file_timer(id, min(file_duration_seconds - 1, 3))
+            self._start_file_timer(id, max(file_duration_seconds - 1, 3))
 
         # 启动播放列表时长限制定时器
         schedule = playlist_data.get("schedule", {})
