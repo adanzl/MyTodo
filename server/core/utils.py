@@ -6,6 +6,7 @@ import asyncio
 import concurrent.futures
 import os
 import subprocess
+import threading
 from datetime import datetime, timedelta
 from urllib.parse import quote, unquote
 from typing import Optional, Tuple
@@ -52,85 +53,124 @@ def run_async(coroutine, timeout: float = None):
         asyncio.get_running_loop()
         # 如果已有循环在运行，在线程池中执行
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(_run_async_in_thread, coroutine, timeout)
+            future = executor.submit(_run_async_in_isolated_loop, coroutine, timeout, reset_loop=True)
             total_timeout = (timeout + 5.0) if timeout else 30.0
             return future.result(timeout=total_timeout)
     except RuntimeError:
         # 没有运行中的循环，直接在新循环中执行
-        return _run_async_in_new_loop(coroutine, timeout)
+        return _run_async_in_isolated_loop(coroutine, timeout, reset_loop=False)
     except concurrent.futures.TimeoutError:
         raise asyncio.TimeoutError("Operation timed out")
 
 
-def _run_async_in_thread(coroutine, timeout: float = None):
+def _run_async_in_isolated_loop(coroutine, timeout: float = None, reset_loop: bool = False):
     """
-    在线程中运行异步函数，完全隔离事件循环
-    在线程中总是创建全新的事件循环，不检查现有循环
+    在隔离的事件循环中运行协程
+    
+    :param coroutine: 协程对象
+    :param timeout: 超时时间（秒），可选
+    :param reset_loop: 是否重置当前线程的事件循环（用于线程中执行）
+    :return: 协程的返回值
     """
-    # 在线程中，直接创建全新的事件循环，不检查任何现有循环
-    # 这样可以避免与主线程的事件循环冲突
+    # 如果需要重置循环（在线程中执行时）
+    if reset_loop:
+        _reset_event_loop()
+    
+    # 创建新的事件循环
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     
     try:
+        # 执行协程
         if timeout:
             return loop.run_until_complete(asyncio.wait_for(coroutine, timeout=timeout))
         else:
             return loop.run_until_complete(coroutine)
     except asyncio.TimeoutError:
         raise
-    except Exception as e:
-        # 如果是事件循环相关的错误，记录但不抛出，返回错误码
-        if "event loop" in str(e).lower():
-            raise RuntimeError(f"Event loop error in thread: {e}") from e
+    except RuntimeError as e:
+        # 如果是事件循环相关的错误，使用完全隔离的线程执行
+        if reset_loop and ("event loop" in str(e).lower() or "cannot run" in str(e).lower()):
+            return _run_in_completely_isolated_thread(coroutine, timeout)
         raise
     finally:
-        try:
-            # 取消所有待处理的任务
-            pending = asyncio.all_tasks(loop)
-            for task in pending:
-                task.cancel()
-            if pending:
-                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-        except Exception:
-            pass
-        finally:
-            try:
-                loop.close()
-            except Exception:
-                pass
-            try:
-                asyncio.set_event_loop(None)
-            except Exception:
-                pass
+        _cleanup_event_loop(loop)
 
 
-def _run_async_in_new_loop(coroutine, timeout: float = None):
-    """
-    在新的事件循环中运行协程（内部函数）
-    """
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+def _reset_event_loop():
+    """重置当前线程的事件循环状态"""
     try:
-        if timeout:
-            return loop.run_until_complete(asyncio.wait_for(coroutine, timeout=timeout))
-        else:
-            return loop.run_until_complete(coroutine)
-    except asyncio.TimeoutError:
-        raise
+        current_loop = asyncio.get_event_loop()
+        if current_loop and not current_loop.is_closed():
+            try:
+                current_loop.close()
+            except Exception:
+                pass
+    except RuntimeError:
+        pass
     finally:
         try:
-            # 取消所有待处理的任务
-            pending = asyncio.all_tasks(loop)
-            for task in pending:
-                task.cancel()
-            if pending:
-                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+            asyncio.set_event_loop(None)
         except Exception:
             pass
-        finally:
+
+
+def _cleanup_event_loop(loop):
+    """清理事件循环"""
+    try:
+        # 取消所有待处理的任务
+        pending = asyncio.all_tasks(loop)
+        for task in pending:
+            task.cancel()
+        if pending:
+            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+    except Exception:
+        pass
+    finally:
+        try:
             loop.close()
+        except Exception:
+            pass
+        try:
             asyncio.set_event_loop(None)
+        except Exception:
+            pass
+
+
+def _run_in_completely_isolated_thread(coroutine, timeout: float = None):
+    """
+    在完全隔离的线程中运行协程（最后的备选方案）
+    """
+    result_container = [None]
+    exception_container = [None]
+    
+    def run_in_thread():
+        try:
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            try:
+                if timeout:
+                    result_container[0] = new_loop.run_until_complete(
+                        asyncio.wait_for(coroutine, timeout=timeout)
+                    )
+                else:
+                    result_container[0] = new_loop.run_until_complete(coroutine)
+            finally:
+                _cleanup_event_loop(new_loop)
+        except Exception as e:
+            exception_container[0] = e
+    
+    thread = threading.Thread(target=run_in_thread, daemon=True)
+    thread.start()
+    thread.join(timeout=(timeout + 5.0) if timeout else 30.0)
+    
+    if thread.is_alive():
+        raise asyncio.TimeoutError("Operation timed out")
+    
+    if exception_container[0]:
+        raise exception_container[0]
+    
+    return result_container[0]
 
 
 def convert_to_http_url(url: str) -> str:
