@@ -700,6 +700,16 @@ class PlaylistMgr:
                     pre_files = playlist_data.get("pre_files", [])
                     self._init_play_state(pid, playlist_data, pre_files)
             log.info(f"[PlaylistMgr] 文件定时器触发，准备播放下一首: {pid}, 当前播放状态: {self._play_state.get(pid)}, 等待后剩余时长: {wait_seconds} 秒")
+            # 在播放下一首之前，先停止当前播放，避免设备自动重播导致重复播放
+            if device:
+                try:
+                    stop_code, stop_msg = device.stop()
+                    if stop_code == 0:
+                        log.info(f"[PlaylistMgr] 文件定时器触发，已停止当前播放: {pid}")
+                    else:
+                        log.warning(f"[PlaylistMgr] 文件定时器触发，停止当前播放失败: {pid}, {stop_msg}")
+                except Exception as e:
+                    log.warning(f"[PlaylistMgr] 文件定时器触发，停止当前播放异常: {pid}, {e}")
             # 播放下一首
             result = self.play_next(pid)
             # 如果播放失败，记录错误但不抛出异常（避免影响定时器）
