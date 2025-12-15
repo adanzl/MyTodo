@@ -82,12 +82,33 @@ def run_async(coroutine, timeout: float = None):
         asyncio.set_event_loop(loop)
         
         try:
-            # 使用 nest_asyncio 后，可以直接运行
+            # 手动实现超时，避免使用 asyncio.wait_for（它需要运行中的循环）
             if timeout:
-                result = loop.run_until_complete(asyncio.wait_for(coroutine, timeout=timeout))
+                task = loop.create_task(coroutine)
+                cancelled = False
+                
+                def cancel_task():
+                    nonlocal cancelled
+                    if not task.done():
+                        cancelled = True
+                        task.cancel()
+                
+                timeout_handle = loop.call_later(timeout, cancel_task)
+                
+                try:
+                    result = loop.run_until_complete(task)
+                    # 取消超时回调
+                    if timeout_handle and not timeout_handle.cancelled():
+                        timeout_handle.cancel()
+                    if cancelled:
+                        raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
+                    return result
+                except asyncio.CancelledError:
+                    if cancelled:
+                        raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
+                    raise
             else:
-                result = loop.run_until_complete(coroutine)
-            return result
+                return loop.run_until_complete(coroutine)
         finally:
             # 清理事件循环
             try:
