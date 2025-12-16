@@ -1051,7 +1051,7 @@
   <!-- 设备列表弹窗 -->
   <el-dialog
     v-model="agentListDialogVisible"
-    width="800"
+    width="810"
     :before-close="handleCloseAgentListDialog">
     <template #header>
       <div></div>
@@ -1060,7 +1060,7 @@
       <div>
         <div class="flex items-center justify-between mb-2">
           <div class="flex items-center gap-2">
-            <h4 class="text-base font-semibold">Agent设备</h4>
+            <h4 class="text-base font-semibold w-24">Agent设备</h4>
             <el-button
               type="primary"
               plain
@@ -1177,7 +1177,7 @@
       <div>
         <div class="flex items-center justify-between mb-2">
           <div class="flex items-center gap-2">
-            <h4 class="text-base font-semibold">小米设备</h4>
+            <h4 class="text-base font-semibold w-24">小米设备</h4>
             <el-button
               type="primary"
               plain
@@ -1189,7 +1189,7 @@
             </el-button>
           </div>
         </div>
-        <el-table :data="miDeviceList" stripe class="w-full" v-loading="miScanning" :height="240">
+        <el-table :data="miDeviceList" stripe class="w-full" v-loading="miScanning" :height="280">
           <el-table-column prop="name" label="设备名称" min-width="150" />
           <el-table-column label="详情" min-width="400">
             <template #default="{ row }">
@@ -1207,14 +1207,16 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="功能" min-width="100">
+          <el-table-column label="功能" min-width="200">
             <template #default="{ row }">
               <div class="flex flex-col gap-1">
                 <div class="text-sm flex items-center gap-2">
-                  <span class="text-gray-600 inline-block w-16 flex-shrink-0">音量：</span>
-                  <span class="text-gray-800"
-                    >{{ row.volume !== undefined ? row.volume : '-' }}</span
-                  >
+                  <span class="text-gray-600 inline-block w-12 flex-shrink-0">音量：</span>
+                  <span class="text-gray-800">
+                    {{ row.volume !== undefined ? row.volume : '-' }}
+                  </span>
+                </div>
+                <div class="flex items-center gap-1">
                   <el-button
                     size="small"
                     type="info"
@@ -1226,8 +1228,6 @@
                     title="刷新音量">
                     <el-icon v-if="!row._volumeRefreshing"><Refresh /></el-icon>
                   </el-button>
-                </div>
-                <div class="flex items-center gap-2">
                   <el-button
                     size="small"
                     type="primary"
