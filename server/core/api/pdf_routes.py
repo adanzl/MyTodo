@@ -21,6 +21,9 @@ PDF_UNLOCK_DIR = '/tmp/my_todo/pdf/unlock'
 # 允许的文件扩展名
 ALLOWED_EXTENSIONS = {'.pdf'}
 
+# 正在处理的文件集合（存储文件名）
+_processing_files = set()
+
 
 def _ensure_directories():
     """确保必要的目录存在"""
@@ -117,6 +120,10 @@ def pdf_decrypt():
         if not os.path.exists(input_path):
             return _err(f"文件不存在: {filename}")
         
+        # 检查是否正在处理中
+        if filename in _processing_files:
+            return _err("文件正在处理中，请稍候")
+        
         # 构建输出文件路径
         base_name, ext = os.path.splitext(filename)
         output_filename = f"{base_name}_unlocked{ext}"
@@ -126,18 +133,28 @@ def pdf_decrypt():
         if os.path.exists(output_path):
             os.remove(output_path)
         
-        # 执行解密
-        code, msg = decrypt_pdf(input_path, output_path, password=password)
+        # 添加到处理中集合
+        _processing_files.add(filename)
         
-        if code != 0:
-            return _err(msg)
-        
-        file_info = _get_file_info(output_path)
-        log.info(f"[PDF] 文件解密成功: {output_path}")
-        return _ok(file_info)
+        try:
+            # 执行解密
+            code, msg = decrypt_pdf(input_path, output_path, password=password)
+            
+            if code != 0:
+                return _err(msg)
+            
+            file_info = _get_file_info(output_path)
+            log.info(f"[PDF] 文件解密成功: {output_path}")
+            return _ok(file_info)
+        finally:
+            # 从处理中集合移除
+            _processing_files.discard(filename)
         
     except Exception as e:
         log.error(f"[PDF] 解密文件失败: {e}")
+        # 确保从处理中集合移除
+        if filename:
+            _processing_files.discard(filename)
         return _err(f"解密文件失败: {str(e)}")
 
 
@@ -189,7 +206,8 @@ def pdf_list():
             file_mapping.append({
                 "uploaded": uploaded,
                 "unlocked": unlocked_file,
-                "has_unlocked": unlocked_file is not None
+                "has_unlocked": unlocked_file is not None,
+                "_decrypting": uploaded_name in _processing_files
             })
         
         # 添加没有对应上传文件的已解密文件（可能是手动添加的）
@@ -206,7 +224,8 @@ def pdf_list():
                     file_mapping.append({
                         "uploaded": None,
                         "unlocked": unlocked,
-                        "has_unlocked": True
+                        "has_unlocked": True,
+                        "_decrypting": False
                     })
         
         return _ok({

@@ -1,151 +1,128 @@
-<div class="p-4">
-  <div class="mb-4">
-    <h2 class="text-xl font-semibold mb-4">PDF 解密工具</h2>
-    
-    <!-- 上传区域 -->
-    <el-card class="mb-4" shadow="hover">
-      <template #header>
-        <div class="flex items-center justify-between">
-          <span>上传 PDF 文件</span>
-        </div>
-      </template>
-      <div class="flex items-center gap-4">
-        <el-upload
-          :auto-upload="false"
-          :on-change="(file) => { uploadFile = file.raw; }"
-          :show-file-list="false"
-          accept=".pdf">
-          <template #trigger>
-            <el-button type="primary">选择文件</el-button>
-          </template>
-        </el-upload>
-        <span v-if="uploadFile" class="text-gray-600">{{ uploadFile.name }}</span>
+<div class="p-4 flex flex-col h-[calc(100vh-150px)]">
+  <h2 class="text-xl font-semibold mb-4">PDF 解密工具</h2>
+
+  <!-- 上传区域 -->
+  <div class="mb-4 flex-shrink-0 border rounded p-3 bg-gray-50">
+    <div class="flex items-center gap-3">
+      <div>
         <el-button
           type="success"
+          size="small"
           @click="handleUpload"
           :loading="loading"
           :disabled="!uploadFile">
           上传
         </el-button>
       </div>
-    </el-card>
+      <el-upload
+        :auto-upload="false"
+        :on-change="handleFileChange"
+        :show-file-list="false"
+        accept=".pdf">
+        <template #trigger>
+          <el-button type="primary" size="small" style="margin: 0">选择文件</el-button>
+        </template>
+      </el-upload>
+      <div v-if="uploadFile" class="flex-1 min-w-0">
+        <div class="text-sm text-gray-600 truncate" :title="uploadFilePath || uploadFile.name">
+          {{ uploadFilePath || uploadFile.name }}
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- 文件列表 -->
-  <el-card shadow="hover">
+  <el-card class="flex-1 flex flex-col overflow-hidden" shadow="hover">
     <template #header>
       <div class="flex items-center justify-between">
         <span>文件列表</span>
-        <el-button
-          type="info"
-          size="small"
-          plain
-          @click="loadFileList"
-          :loading="loading">
+        <el-button type="info" size="small" plain @click="loadFileList" :loading="loading">
           <el-icon v-if="!loading"><Refresh /></el-icon>
           刷新
         </el-button>
       </div>
     </template>
 
-    <el-table
-      :data="fileList"
-      v-loading="loading"
-      stripe
-      style="width: 100%">
-      <el-table-column prop="uploaded.name" label="文件名" min-width="200">
-        <template #default="{ row }">
-          <span v-if="row.uploaded">{{ row.uploaded.name }}</span>
-          <span v-else class="text-gray-400">-</span>
-        </template>
-      </el-table-column>
-      
-      <el-table-column label="上传文件" min-width="150">
-        <template #default="{ row }">
-          <div v-if="row.uploaded" class="flex flex-col gap-1">
-            <span class="text-sm">{{ formatFileSize(row.uploaded.size) }}</span>
-            <span class="text-xs text-gray-500">{{ formatTime(row.uploaded.modified) }}</span>
-          </div>
-          <span v-else class="text-gray-400">-</span>
-        </template>
-      </el-table-column>
+    <div class="flex-1 overflow-auto">
+      <el-table :data="fileList" v-loading="loading" stripe style="width: 100%">
+        <el-table-column prop="uploaded.name" label="文件名" min-width="200">
+          <template #default="{ row }">
+            <span
+              v-if="row.uploaded"
+              class="text-blue-600 cursor-pointer hover:underline"
+              @click="handleDownload(row, 'uploaded')">
+              {{ row.uploaded.name }}
+            </span>
+            <span v-else class="text-gray-400">-</span>
+          </template>
+        </el-table-column>
 
-      <el-table-column label="已解密文件" min-width="150">
-        <template #default="{ row }">
-          <div v-if="row.unlocked" class="flex flex-col gap-1">
-            <span class="text-sm">{{ formatFileSize(row.unlocked.size) }}</span>
-            <span class="text-xs text-gray-500">{{ formatTime(row.unlocked.modified) }}</span>
-          </div>
-          <span v-else class="text-gray-400">未解密</span>
-        </template>
-      </el-table-column>
+        <el-table-column label="上传文件" min-width="150">
+          <template #default="{ row }">
+            <div v-if="row.uploaded" class="flex flex-col gap-1">
+              <span class="text-sm">{{ formatFileSize(row.uploaded.size) }}</span>
+              <span class="text-xs text-gray-500">{{ formatTime(row.uploaded.modified) }}</span>
+            </div>
+            <span v-else class="text-gray-400">-</span>
+          </template>
+        </el-table-column>
 
-      <el-table-column label="状态" width="100">
-        <template #default="{ row }">
-          <el-tag v-if="row.has_unlocked" type="success" size="small">已解密</el-tag>
-          <el-tag v-else type="info" size="small">未解密</el-tag>
-        </template>
-      </el-table-column>
+        <el-table-column label="已解密文件" min-width="150">
+          <template #default="{ row }">
+            <div v-if="row.unlocked" class="flex flex-col gap-1">
+              <span class="text-sm">{{ formatFileSize(row.unlocked.size) }}</span>
+              <span class="text-xs text-gray-500">{{ formatTime(row.unlocked.modified) }}</span>
+            </div>
+            <span v-else class="text-gray-400">未解密</span>
+          </template>
+        </el-table-column>
 
-      <el-table-column label="操作" width="300" fixed="right">
-        <template #default="{ row }">
-          <div class="flex items-center gap-2">
-            <!-- 解密 -->
-            <div v-if="row.uploaded" class="flex items-center gap-2">
-              <el-input
-                v-model="password"
-                type="password"
-                placeholder="密码（可选）"
-                size="small"
-                style="width: 120px;"
-                show-password
-                clearable>
-              </el-input>
+        <el-table-column label="状态" width="120" align="center">
+          <template #default="{ row }">
+            <div class="flex flex-col gap-1 items-center">
+              <el-tag v-if="row.has_unlocked" type="success" size="small">已解密</el-tag>
+              <el-tag v-else type="info" size="small">未解密</el-tag>
+              <span
+                v-if="row.unlocked"
+                class="text-xs text-blue-600 cursor-pointer hover:underline"
+                @click="handleDownload(row, 'unlocked')">
+                下载
+              </span>
+            </div>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="操作" width="150" fixed="right">
+          <template #default="{ row }">
+            <div class="flex items-center gap-2">
+              <!-- 解密 -->
               <el-button
+                v-if="row.uploaded"
                 type="primary"
                 size="small"
                 @click="handleDecrypt(row)"
-                :loading="decrypting"
-                :disabled="decrypting">
+                :loading="row._decrypting"
+                :disabled="row._decrypting">
                 解密
               </el-button>
-            </div>
-            
-            <!-- 下载 -->
-            <el-button
-              v-if="row.uploaded"
-              type="info"
-              size="small"
-              plain
-              @click="handleDownload(row, 'uploaded')">
-              下载原文件
-            </el-button>
-            <el-button
-              v-if="row.unlocked"
-              type="success"
-              size="small"
-              plain
-              @click="handleDownload(row, 'unlocked')">
-              下载解密文件
-            </el-button>
-            
-            <!-- 删除 -->
-            <el-button
-              v-if="row.uploaded"
-              type="danger"
-              size="small"
-              plain
-              @click="handleDelete(row)">
-              删除
-            </el-button>
-          </div>
-        </template>
-      </el-table-column>
 
-      <template #empty>
-        <div class="text-center text-gray-400 py-8">暂无文件，请上传 PDF 文件</div>
-      </template>
-    </el-table>
+              <!-- 删除 -->
+              <el-button
+                v-if="row.uploaded"
+                type="danger"
+                size="small"
+                plain
+                @click="handleDelete(row)">
+                删除
+              </el-button>
+            </div>
+          </template>
+        </el-table-column>
+
+        <template #empty>
+          <div class="text-center text-gray-400 py-8">暂无文件，请上传 PDF 文件</div>
+        </template>
+      </el-table>
+    </div>
   </el-card>
 </div>
-

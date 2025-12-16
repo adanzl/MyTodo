@@ -16,21 +16,23 @@ async function createComponent() {
   
   component = {
     setup() {
-      const refData = {
-        loading: ref(false),
-        fileList: ref([]),
-        uploadFile: ref(null),
-        password: ref(""),
-        decrypting: ref(false),
-      };
+      const loading = ref(false);
+      const fileList = ref([]);
+      const uploadFile = ref(null);
+      const uploadFilePath = ref("");
 
       // 获取文件列表
       const loadFileList = async () => {
         try {
-          refData.loading.value = true;
+          loading.value = true;
           const response = await axios.get(`${getApiUrl()}/pdf/list`);
           if (response.data.code === 0) {
-            refData.fileList.value = response.data.data.mapping || [];
+            const mapping = response.data.data.mapping || [];
+            // 为每个文件项添加处理状态标记
+            fileList.value = mapping.map(item => ({
+              ...item,
+              _decrypting: item._decrypting || false
+            }));
           } else {
             ElMessage.error(response.data.msg || "获取文件列表失败");
           }
@@ -38,25 +40,32 @@ async function createComponent() {
           console.error("获取文件列表失败:", error);
           ElMessage.error("获取文件列表失败: " + (error.message || "未知错误"));
         } finally {
-          refData.loading.value = false;
+          loading.value = false;
         }
+      };
+
+      // 处理文件选择
+      const handleFileChange = (file) => {
+        uploadFile.value = file.raw;
+        // 只显示文件名，不显示路径
+        uploadFilePath.value = file.raw.name;
       };
 
       // 上传文件
       const handleUpload = async () => {
-        if (!refData.uploadFile.value) {
+        if (!uploadFile.value) {
           ElMessage.warning("请选择要上传的文件");
           return;
         }
 
-        const file = refData.uploadFile.value;
+        const file = uploadFile.value;
         if (!file.name.toLowerCase().endsWith('.pdf')) {
           ElMessage.error("只支持 PDF 文件");
           return;
         }
 
         try {
-          refData.loading.value = true;
+          loading.value = true;
           const formData = new FormData();
           formData.append('file', file);
 
@@ -68,7 +77,8 @@ async function createComponent() {
 
           if (response.data.code === 0) {
             ElMessage.success("文件上传成功");
-            refData.uploadFile.value = null;
+            uploadFile.value = null;
+            uploadFilePath.value = "";
             await loadFileList();
           } else {
             ElMessage.error(response.data.msg || "文件上传失败");
@@ -77,7 +87,7 @@ async function createComponent() {
           console.error("文件上传失败:", error);
           ElMessage.error("文件上传失败: " + (error.message || "未知错误"));
         } finally {
-          refData.loading.value = false;
+          loading.value = false;
         }
       };
 
@@ -85,6 +95,11 @@ async function createComponent() {
       const handleDecrypt = async (item) => {
         if (!item.uploaded) {
           ElMessage.warning("请先上传文件");
+          return;
+        }
+
+        // 如果正在处理中，不允许重复操作
+        if (item._decrypting) {
           return;
         }
 
@@ -102,15 +117,14 @@ async function createComponent() {
         }
 
         try {
-          refData.decrypting.value = true;
+          // 设置该文件为处理中状态
+          item._decrypting = true;
           const response = await axios.post(`${getApiUrl()}/pdf/decrypt`, {
             filename: item.uploaded.name,
-            password: refData.password.value || undefined,
           });
 
           if (response.data.code === 0) {
             ElMessage.success("文件解密成功");
-            refData.password.value = "";
             await loadFileList();
           } else {
             ElMessage.error(response.data.msg || "文件解密失败");
@@ -119,7 +133,8 @@ async function createComponent() {
           console.error("文件解密失败:", error);
           ElMessage.error("文件解密失败: " + (error.message || "未知错误"));
         } finally {
-          refData.decrypting.value = false;
+          // 清除处理中状态
+          item._decrypting = false;
         }
       };
 
@@ -159,7 +174,7 @@ async function createComponent() {
         if (!confirmed) return;
 
         try {
-          refData.loading.value = true;
+          loading.value = true;
           const response = await axios.post(`${getApiUrl()}/pdf/delete`, {
             filename: item.uploaded.name,
             type: 'both',
@@ -175,7 +190,7 @@ async function createComponent() {
           console.error("删除文件失败:", error);
           ElMessage.error("删除文件失败: " + (error.message || "未知错误"));
         } finally {
-          refData.loading.value = false;
+          loading.value = false;
         }
       };
 
@@ -198,8 +213,12 @@ async function createComponent() {
       });
 
       return {
-        ...refData,
+        loading,
+        fileList,
+        uploadFile,
+        uploadFilePath,
         loadFileList,
+        handleFileChange,
         handleUpload,
         handleDecrypt,
         handleDownload,

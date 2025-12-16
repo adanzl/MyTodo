@@ -76,7 +76,7 @@
           </el-scrollbar>
         </el-aside>
         <el-container v-if="curUser.bLogin">
-          <el-header class="flex justify-center items-center bg-blue-100">Header</el-header>
+          <el-header class="flex justify-center items-center bg-blue-50">哈哈哈</el-header>
           <el-main>
             <router-view></router-view>
           </el-main>
@@ -119,6 +119,6 @@
         </el-container>
       </el-container>
     </div>
-    <script defer src="js/app.js" type="module"></script>
+    <script defer src="js/app.js?t=${Date.now()}" type="module"></script>
   </body>
 </html>
