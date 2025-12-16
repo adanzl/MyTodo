@@ -92,9 +92,23 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="150" fixed="right">
+        <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
             <div class="flex items-center gap-2">
+              <!-- 密码输入框 -->
+              <el-input
+                v-if="row.uploaded"
+                v-model="row._password"
+                type="password"
+                size="small"
+                placeholder="密码（可选）"
+                show-password
+                clearable
+                style="width: 120px"
+                :disabled="row._decrypting"
+                @keyup.enter="handleDecrypt(row)">
+              </el-input>
+              
               <!-- 解密 -->
               <el-button
                 v-if="row.uploaded"

@@ -1,15 +1,20 @@
 """
 PDF 解密工具
 用于对有密码保护的 PDF 进行解密，包括能打开但不能编辑/打印的权限保护
+
+使用 pikepdf 实现（对加密 PDF 支持更好）
 """
 import os
 from typing import Optional, Tuple, Callable
 
-import pypdf
+import pikepdf
 
-from core.log_config import root_logger
-
-log = root_logger()
+try:
+    from core.log_config import root_logger
+    log = root_logger()
+except Exception as e:
+    import logging
+    log = logging.getLogger(__name__)
 
 
 def decrypt_pdf(input_path: str,
@@ -38,67 +43,60 @@ def decrypt_pdf(input_path: str,
         log.error(f"[PDF] {error_msg}")
         return -1, error_msg
 
-    # 检查输出文件是否已存在
-    if os.path.exists(output_path):
-        error_msg = f"输出文件已存在: {output_path}"
-        log.error(f"[PDF] {error_msg}")
-        return -1, error_msg
-
     try:
-        reader = pypdf.PdfReader(input_path)
-
-        # 判断是否加密
-        if reader.is_encrypted:
-            # 如果提供了密码，直接使用
-            if password:
-                decrypt_result = reader.decrypt(password)
-                if decrypt_result == 0:
-                    error_msg = "密码错误"
-                    log.error(f"[PDF] {error_msg}")
-                    return -1, error_msg
-            else:
-                # 需要密码，尝试读取第一页来确认是否需要密码
-                while True:
-                    try:
-                        _ = reader.pages[0]  # 尝试读取第一页
-                        break
-                    except Exception:
-                        # 需要密码
-                        if password_callback:
-                            password = password_callback()
-                        else:
-                            error_msg = "PDF 需要密码，但未提供密码或密码回调函数"
-                            log.error(f"[PDF] {error_msg}")
-                            return -1, error_msg
-
-                        if not password:
-                            error_msg = "未提供密码"
-                            log.error(f"[PDF] {error_msg}")
-                            return -1, error_msg
-
-                        decrypt_result = reader.decrypt(password)
-                        if decrypt_result == 0:
-                            log.warning("[PDF] 密码错误，请重试")
-                            continue
-                        else:
-                            break
-            # 获取页数
-        pages_cnt = len(reader.pages)
-        # 克隆整个文档结构（包括页面、书签、命名目标等）
-        writer = pypdf.PdfWriter()
-        writer.clone_reader_document_root(reader)
-
-        # 不调用 writer.encrypt(...)，因此输出是完全解密的
-        with open(output_path, "wb") as out_f:
-            writer.write(out_f)
-
-        log.info(f"[PDF] 解密后 总页数: {pages_cnt} 保存到: {output_path}")
-        return 0, "PDF 解密成功"
-
+        return _decrypt_with_pikepdf(input_path, output_path, password, password_callback)
     except Exception as e:
         error_msg = f"PDF 解密失败: {str(e)}"
         log.error(f"[PDF] {error_msg}")
         return -1, error_msg
+
+
+def _decrypt_with_pikepdf(
+    input_path: str,
+    output_path: str,
+    password: Optional[str] = None,
+    password_callback: Optional[Callable[[], str]] = None
+) -> Tuple[int, str]:
+    """使用 pikepdf 解密 PDF"""
+    # 如果明确提供了密码（包括空字符串），使用该密码
+    if password is not None:
+        try:
+            with pikepdf.open(input_path, password=password) as pdf:
+                pdf.save(output_path)
+        except pikepdf.PasswordError:
+            error_msg = "密码错误"
+            log.error(f"[PDF] {error_msg}")
+            return -1, error_msg
+    else:
+        # 先尝试无密码打开（处理无密码的 PDF）
+        try:
+            with pikepdf.open(input_path) as pdf:
+                pdf.save(output_path)
+        except pikepdf.PasswordError:
+            # PDF 需要密码，通过 callback 获取
+            if not password_callback:
+                error_msg = "PDF 需要密码，但未提供密码或密码回调函数"
+                log.error(f"[PDF] {error_msg}")
+                return -1, error_msg
+            
+            # 尝试解密，如果密码错误会抛出异常
+            while True:
+                password = password_callback()
+                if password is None:
+                    error_msg = "未提供密码"
+                    log.error(f"[PDF] {error_msg}")
+                    return -1, error_msg
+                
+                try:
+                    with pikepdf.open(input_path, password=password) as pdf:
+                        pdf.save(output_path)
+                    break
+                except pikepdf.PasswordError:
+                    log.warning("[PDF] 密码错误，请重试")
+                    continue
+    
+    log.info(f"[PDF] 解密成功，保存到: {output_path}")
+    return 0, "PDF 解密成功"
 
 
 if __name__ == '__main__':
@@ -109,7 +107,7 @@ if __name__ == '__main__':
     import sys
 
     # 默认文件路径（仅用于命令行工具）
-    default_input = "/Users/zhaolin/Downloads/MHE_RDG_Wonders_Teachers_Edition_Grade1_Unit3.pdf"
+    default_input = "/Users/zhaolin/Downloads/ico_o.pdf"
     default_output = "/Users/zhaolin/Downloads/t.pdf"
 
     print("=========== PDF 解密工具 ===========")
@@ -124,11 +122,11 @@ if __name__ == '__main__':
     if not output_path:
         output_path = default_output
 
-    # 定义密码获取回调函数
+    # 定义密码获取回调函数（仅在需要密码时调用）
     def get_password():
         return input("PDF 需要密码，请输入密码（按 Ctrl+C 退出）: ").strip()
 
-    # 执行解密
+    # 执行解密（先尝试无密码，如果需要密码会通过 callback 获取）
     code, msg = decrypt_pdf(input_path, output_path, password_callback=get_password)
 
     if code == 0:

@@ -28,10 +28,11 @@ async function createComponent() {
           const response = await axios.get(`${getApiUrl()}/pdf/list`);
           if (response.data.code === 0) {
             const mapping = response.data.data.mapping || [];
-            // 为每个文件项添加处理状态标记
+            // 为每个文件项添加处理状态标记和密码字段
             fileList.value = mapping.map(item => ({
               ...item,
-              _decrypting: item._decrypting || false
+              _decrypting: item._decrypting || false,
+              _password: item._password !== undefined ? item._password : ""
             }));
           } else {
             ElMessage.error(response.data.msg || "获取文件列表失败");
@@ -119,15 +120,33 @@ async function createComponent() {
         try {
           // 设置该文件为处理中状态
           item._decrypting = true;
-          const response = await axios.post(`${getApiUrl()}/pdf/decrypt`, {
+          
+          // 构建请求数据
+          const requestData = {
             filename: item.uploaded.name,
-          });
+          };
+          
+          // 从输入框获取密码
+          // 如果输入框有值（包括空字符串），添加到请求中
+          // 后端会处理：空字符串会先尝试无密码，非空字符串会使用该密码
+          if (item._password !== undefined && item._password !== null) {
+            requestData.password = item._password;
+          }
+
+          const response = await axios.post(`${getApiUrl()}/pdf/decrypt`, requestData);
 
           if (response.data.code === 0) {
             ElMessage.success("文件解密成功");
+            // 解密成功后清空密码输入框
+            item._password = "";
             await loadFileList();
           } else {
-            ElMessage.error(response.data.msg || "文件解密失败");
+            // 如果密码错误，提示用户
+            if (response.data.msg && response.data.msg.includes("密码")) {
+              ElMessage.error(response.data.msg || "密码错误，请重试");
+            } else {
+              ElMessage.error(response.data.msg || "文件解密失败");
+            }
           }
         } catch (error) {
           console.error("文件解密失败:", error);

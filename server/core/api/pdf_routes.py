@@ -129,10 +129,6 @@ def pdf_decrypt():
         output_filename = f"{base_name}_unlocked{ext}"
         output_path = os.path.join(PDF_UNLOCK_DIR, output_filename)
         
-        # 如果输出文件已存在，删除它
-        if os.path.exists(output_path):
-            os.remove(output_path)
-        
         # 添加到处理中集合
         _processing_files.add(filename)
         
