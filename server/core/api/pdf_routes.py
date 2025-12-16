@@ -159,6 +159,7 @@ def pdf_list():
     """
     列出 PDF 文件
     返回上传的文件和已解密的文件，并建立对应关系
+    如果文件超过30个，只保留最近的30个，删除超过的文件
     """
     try:
         # 确保目录存在
@@ -173,6 +174,35 @@ def pdf_list():
                     file_info = _get_file_info(file_path)
                     if file_info:
                         uploaded_files.append(file_info)
+        
+        # 按修改时间排序（最新的在前）
+        uploaded_files.sort(key=lambda x: x['modified'], reverse=True)
+        
+        # 如果文件超过30个，删除最旧的文件
+        MAX_FILES = 30
+        if len(uploaded_files) > MAX_FILES:
+            files_to_delete = uploaded_files[MAX_FILES:]
+            for file_info in files_to_delete:
+                file_path = file_info['path']
+                try:
+                    # 删除上传的文件
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                        log.info(f"[PDF] 删除旧文件: {file_path}")
+                    
+                    # 删除对应的已解密文件（如果存在）
+                    filename = file_info['name']
+                    base_name, ext = os.path.splitext(filename)
+                    unlocked_filename = f"{base_name}_unlocked{ext}"
+                    unlocked_path = os.path.join(PDF_UNLOCK_DIR, unlocked_filename)
+                    if os.path.exists(unlocked_path):
+                        os.remove(unlocked_path)
+                        log.info(f"[PDF] 删除对应的已解密文件: {unlocked_path}")
+                except Exception as e:
+                    log.error(f"[PDF] 删除文件失败 {file_path}: {e}")
+            
+            # 只保留最近的30个文件
+            uploaded_files = uploaded_files[:MAX_FILES]
         
         # 获取已解密的文件列表
         unlocked_files = []
