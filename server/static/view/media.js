@@ -615,6 +615,9 @@ async function createComponent() {
             }));
             refData.miDeviceList.value = devices;
             
+            // 并行获取所有设备的音量（使用响应式数组确保 Vue 能检测到变化）
+            await Promise.allSettled(refData.miDeviceList.value.map(device => getMiDeviceVolume(device)));
+            
             ElMessage.success(`扫描到 ${devices.length} 个小米设备`);
           } else {
             ElMessage.error(result.msg || "扫描小米设备失败");
@@ -632,23 +635,29 @@ async function createComponent() {
         const deviceId = getMiDeviceId(device);
         if (!deviceId) return;
         
+        // 在响应式数组中找到对应的设备对象
+        const deviceList = refData.miDeviceList.value;
+        const targetDevice = deviceList.find(d => getMiDeviceId(d) === deviceId);
+        if (!targetDevice) return;
+        
         // 设置刷新状态
-        device._volumeRefreshing = true;
+        targetDevice._volumeRefreshing = true;
         
         try {
           const response = await fetch(`${getApiUrl()}/mi/volume?device_id=${encodeURIComponent(deviceId)}`);
           const result = await response.json();
           
           if (result.code === 0) {
-            device.volume = result.data?.volume ?? result.data ?? undefined;
+            // 直接更新响应式数组中的设备对象
+            targetDevice.volume = result.data?.volume ?? result.data ?? undefined;
           } else {
-            ElMessage.error(result.msg || `获取设备 ${device.name || deviceId} 音量失败`);
+            ElMessage.error(result.msg || `获取设备 ${targetDevice.name || deviceId} 音量失败`);
           }
         } catch (error) {
           console.error(`获取设备 ${deviceId} 音量失败:`, error);
-          ElMessage.error(`获取设备 ${device.name || deviceId} 音量失败: ${error.message || "未知错误"}`);
+          ElMessage.error(`获取设备 ${targetDevice.name || deviceId} 音量失败: ${error.message || "未知错误"}`);
         } finally {
-          device._volumeRefreshing = false;
+          targetDevice._volumeRefreshing = false;
         }
       };
 

@@ -1209,14 +1209,12 @@
           </el-table-column>
           <el-table-column label="功能" min-width="200">
             <template #default="{ row }">
-              <div class="flex flex-col gap-1">
-                <div class="text-sm flex items-center gap-2">
+              <div class="flex flex-col gap-2">
+                <div class="flex items-center gap-2">
                   <span class="text-gray-600 inline-block w-12 flex-shrink-0">音量：</span>
-                  <span class="text-gray-800">
+                  <span class="text-gray-800 w-5">
                     {{ row.volume !== undefined ? row.volume : '-' }}
                   </span>
-                </div>
-                <div class="flex items-center gap-1">
                   <el-button
                     size="small"
                     type="info"
@@ -1225,27 +1223,23 @@
                     @click="getMiDeviceVolume(row)"
                     :loading="row._volumeRefreshing"
                     :disabled="row._volumeRefreshing || row._volumeChanging"
-                    title="刷新音量">
-                    <el-icon v-if="!row._volumeRefreshing"><Refresh /></el-icon>
+                    title="刷新音量"
+                    class="p-0.5 !w-[17px] !h-[17px]">
+                    <el-icon v-if="!row._volumeRefreshing" ><Refresh /></el-icon>
                   </el-button>
-                  <el-button
-                    size="small"
-                    type="primary"
-                    plain
-                    @click="handleMiDeviceVolumeChange(row, 1)"
-                    :loading="row._volumeChanging"
-                    :disabled="row._volumeChanging || row._volumeRefreshing">
-                    +
-                  </el-button>
-                  <el-button
-                    size="small"
-                    type="primary"
-                    plain
-                    @click="handleMiDeviceVolumeChange(row, -1)"
-                    :loading="row._volumeChanging"
-                    :disabled="row._volumeChanging || row._volumeRefreshing">
-                    -
-                  </el-button>
+                </div>
+                <div class="flex items-center gap-2">
+                  <el-slider
+                    :model-value="row.volume ?? 0"
+                    @input="(val) => { row.volume = val; }"
+                    @change="(val) => { setMiDeviceVolume(row, val); }"
+                    :min="5"
+                    :max="100"
+                    :step="1"
+                    :disabled="row._volumeChanging || row._volumeRefreshing || row.volume === undefined"
+                    size ="small"
+                    style="flex: 1; max-width: 200px;">
+                  </el-slider>
                 </div>
               </div>
             </template>
