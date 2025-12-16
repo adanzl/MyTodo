@@ -7,7 +7,7 @@
     </el-radio-group>
   </div>
   <el-table :data="recordList.data" v-loading="loading" stripe>
-    <el-table-column label="ID" prop="id" width="50"> </el-table-column>
+    <el-table-column label="ID" prop="id" width="60"> </el-table-column>
     <el-table-column label="user" width="60">
       <template #default="{ row, $index }">
         <template v-if="row.user">

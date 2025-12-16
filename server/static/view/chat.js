@@ -6,7 +6,7 @@ const { ElMessage } = window.ElementPlus;
 const CHAT_PAGE_SIZE = 3;
 let component = null;
 async function loadTemplate() {
-  const response = await fetch("./view/chat-template.html");
+  const response = await fetch(`./view/chat-template.html?t=${Date.now()}`);
   return await response.text(); // 获取模板内容
 }
 async function createComponent() {

@@ -14,7 +14,7 @@ const { ElMessage } = window.ElementPlus;
 let component = null;
 
 async function loadTemplate() {
-  const response = await fetch("./view/timetable-template.html");
+  const response = await fetch(`./view/timetable-template.html?t=${Date.now()}`);
   return await response.text();
 }
 
