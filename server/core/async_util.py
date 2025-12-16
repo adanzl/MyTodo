@@ -23,25 +23,81 @@ def _clear_event_loop() -> None:
             pass
 
 
+def _cleanup_event_loop(loop: asyncio.AbstractEventLoop) -> None:
+    """清理事件循环：取消所有待处理任务并关闭循环，释放资源"""
+    try:
+        pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
+        for task in pending:
+            task.cancel()
+        if pending:
+            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+    except Exception:
+        pass
+    
+    try:
+        if not loop.is_closed():
+            loop.close()
+    except Exception:
+        pass
+    
+    _clear_event_loop()
+
+
 def _run_in_thread(coroutine: Coroutine, timeout: Optional[float] = None) -> Any:
     """
     在线程中运行异步函数
     
-    使用 asyncio.run() 简化代码，对于超时情况使用 asyncio.wait_for() 包装
+    手动管理事件循环，确保 aiohttp 等库能正确获取运行中的事件循环
     """
     _clear_event_loop()
     
-    async def _run_coroutine():
-        if timeout:
-            return await asyncio.wait_for(coroutine, timeout=timeout)
-        else:
-            return await coroutine
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     
     try:
-        return asyncio.run(_run_coroutine())
-    except asyncio.TimeoutError as e:
-        # 重新抛出超时错误，保持错误信息一致
-        raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds") from e
+        task = loop.create_task(coroutine)
+        cancelled = False
+        timeout_handle = None
+        
+        if timeout:
+            def cancel_task() -> None:
+                nonlocal cancelled
+                if not task.done():
+                    cancelled = True
+                    task.cancel()
+            timeout_handle = loop.call_later(timeout, cancel_task)
+        
+        # 运行任务并获取结果
+        result = None
+        exception = None
+        
+        def set_result(future: asyncio.Task) -> None:
+            nonlocal result, exception
+            try:
+                result = future.result()
+            except Exception as e:
+                exception = e
+            loop.stop()
+        
+        task.add_done_callback(set_result)
+        loop.run_forever()
+        
+        # 取消超时回调
+        if timeout_handle and not timeout_handle.cancelled():
+            timeout_handle.cancel()
+        
+        # 处理结果
+        if cancelled:
+            raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
+        if exception:
+            raise exception
+        return result
+    except asyncio.CancelledError:
+        if cancelled:
+            raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
+        raise
+    finally:
+        _cleanup_event_loop(loop)
 
 
 # 使用线程池确保每次调用都在独立线程中运行（避免 gevent 单线程环境下的冲突）
