@@ -9,45 +9,14 @@ from werkzeug.utils import secure_filename
 
 from core.log_config import root_logger
 from core.services.pdf_mgr import decrypt_pdf
-from core.utils import _ok, _err
+from core.utils import _ok, _err, ensure_directory, get_file_info, is_allowed_pdf_file
+from core.models.const import PDF_UPLOAD_DIR, PDF_UNLOCK_DIR
 
 log = root_logger()
 pdf_bp = Blueprint('pdf', __name__)
 
-# 常量定义
-PDF_UPLOAD_DIR = '/tmp/my_todo/pdf'
-PDF_UNLOCK_DIR = '/tmp/my_todo/pdf/unlock'
-
-# 允许的文件扩展名
-ALLOWED_EXTENSIONS = {'.pdf'}
-
 # 正在处理的文件集合（存储文件名）
 _processing_files = set()
-
-
-def _ensure_directories():
-    """确保必要的目录存在"""
-    os.makedirs(PDF_UPLOAD_DIR, exist_ok=True)
-    os.makedirs(PDF_UNLOCK_DIR, exist_ok=True)
-
-
-def _allowed_file(filename: str) -> bool:
-    """检查文件扩展名是否允许"""
-    return os.path.splitext(filename)[1].lower() in ALLOWED_EXTENSIONS
-
-
-def _get_file_info(file_path: str) -> dict:
-    """获取文件信息"""
-    if not os.path.exists(file_path):
-        return None
-    
-    stat_info = os.stat(file_path)
-    return {
-        "name": os.path.basename(file_path),
-        "path": file_path,
-        "size": stat_info.st_size,
-        "modified": stat_info.st_mtime,
-    }
 
 
 @pdf_bp.route("/pdf/upload", methods=['POST'])
@@ -63,11 +32,12 @@ def pdf_upload():
         if file.filename == '':
             return _err("文件名不能为空")
         
-        if not _allowed_file(file.filename):
+        if not is_allowed_pdf_file(file.filename):
             return _err("只支持 PDF 文件")
         
         # 确保目录存在
-        _ensure_directories()
+        ensure_directory(PDF_UPLOAD_DIR)
+        ensure_directory(PDF_UNLOCK_DIR)
         
         # 使用安全文件名
         filename = secure_filename(file.filename)
@@ -87,7 +57,7 @@ def pdf_upload():
         file.save(file_path)
         log.info(f"[PDF] 文件上传成功: {file_path}")
         
-        file_info = _get_file_info(file_path)
+        file_info = get_file_info(file_path)
         return _ok(file_info)
         
     except Exception as e:
@@ -112,7 +82,8 @@ def pdf_decrypt():
             return _err("文件名不能为空")
         
         # 确保目录存在
-        _ensure_directories()
+        ensure_directory(PDF_UPLOAD_DIR)
+        ensure_directory(PDF_UNLOCK_DIR)
         
         # 构建文件路径
         input_path = os.path.join(PDF_UPLOAD_DIR, secure_filename(filename))
@@ -139,7 +110,7 @@ def pdf_decrypt():
             if code != 0:
                 return _err(msg)
             
-            file_info = _get_file_info(output_path)
+            file_info = get_file_info(output_path)
             log.info(f"[PDF] 文件解密成功: {output_path}")
             return _ok(file_info)
         finally:
@@ -163,15 +134,16 @@ def pdf_list():
     """
     try:
         # 确保目录存在
-        _ensure_directories()
+        ensure_directory(PDF_UPLOAD_DIR)
+        ensure_directory(PDF_UNLOCK_DIR)
         
         # 获取上传的文件列表
         uploaded_files = []
         if os.path.exists(PDF_UPLOAD_DIR):
             for filename in os.listdir(PDF_UPLOAD_DIR):
                 file_path = os.path.join(PDF_UPLOAD_DIR, filename)
-                if os.path.isfile(file_path) and _allowed_file(filename):
-                    file_info = _get_file_info(file_path)
+                if os.path.isfile(file_path) and is_allowed_pdf_file(filename):
+                    file_info = get_file_info(file_path)
                     if file_info:
                         uploaded_files.append(file_info)
         
@@ -209,8 +181,8 @@ def pdf_list():
         if os.path.exists(PDF_UNLOCK_DIR):
             for filename in os.listdir(PDF_UNLOCK_DIR):
                 file_path = os.path.join(PDF_UNLOCK_DIR, filename)
-                if os.path.isfile(file_path) and _allowed_file(filename):
-                    file_info = _get_file_info(file_path)
+                if os.path.isfile(file_path) and is_allowed_pdf_file(filename):
+                    file_info = get_file_info(file_path)
                     if file_info:
                         unlocked_files.append(file_info)
         

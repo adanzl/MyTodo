@@ -1,0 +1,164 @@
+<div class="p-4 flex flex-col h-[calc(100vh-150px)]">
+  <h2 class="text-xl font-semibold mb-4">媒体工具</h2>
+
+  <!-- 页签 -->
+  <el-tabs v-model="activeTab" class="flex-1 flex flex-col overflow-hidden">
+    <el-tab-pane label="音频合成" name="audio_merge">
+      <div class="flex flex-col h-full">
+        <!-- 任务操作栏 -->
+        <div class="mb-4 flex-shrink-0 border rounded p-3 bg-gray-50">
+          <div class="flex items-center gap-3">
+            <el-button
+              type="primary"
+              size="small"
+              @click="handleCreateTask"
+              :loading="loading">
+              新建任务
+            </el-button>
+            <el-button
+              type="info"
+              size="small"
+              plain
+              @click="loadTaskList"
+              :loading="loading">
+              <el-icon><Refresh /></el-icon>
+              刷新
+            </el-button>
+          </div>
+        </div>
+
+        <!-- 任务列表 -->
+        <el-card class="flex-1 flex flex-col overflow-hidden" shadow="hover">
+          <template #header>
+            <div class="flex items-center justify-between">
+              <span>任务列表</span>
+            </div>
+          </template>
+
+          <div class="flex-1 overflow-auto">
+            <el-table :data="taskList" v-loading="loading" stripe style="width: 100%">
+              <el-table-column prop="name" label="任务名称" min-width="150" />
+              
+              <el-table-column label="文件数量" width="100" align="center">
+                <template #default="{ row }">
+                  {{ row.files ? row.files.length : 0 }}
+                </template>
+              </el-table-column>
+
+              <el-table-column label="状态" width="120" align="center">
+                <template #default="{ row }">
+                  <el-tag v-if="row.status === 'pending'" type="info" size="small">等待中</el-tag>
+                  <el-tag v-else-if="row.status === 'processing'" type="warning" size="small">处理中</el-tag>
+                  <el-tag v-else-if="row.status === 'success'" type="success" size="small">成功</el-tag>
+                  <el-tag v-else-if="row.status === 'failed'" type="danger" size="small">失败</el-tag>
+                </template>
+              </el-table-column>
+
+              <el-table-column label="操作" width="200" fixed="right">
+                <template #default="{ row }">
+                  <div class="flex items-center gap-2">
+                    <el-button
+                      type="primary"
+                      size="small"
+                      @click="handleViewTask(row.task_id)"
+                      :disabled="row.status === 'processing'">
+                      查看
+                    </el-button>
+                    <el-button
+                      type="danger"
+                      size="small"
+                      plain
+                      @click="handleDeleteTask(row.task_id)"
+                      :disabled="row.status === 'processing'">
+                      删除
+                    </el-button>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <template #empty>
+                <div class="text-center text-gray-400 py-8">暂无任务，点击"新建任务"创建</div>
+              </template>
+            </el-table>
+          </div>
+        </el-card>
+      </div>
+    </el-tab-pane>
+  </el-tabs>
+
+  <!-- 任务详情对话框 -->
+  <el-dialog
+    v-model="taskDialogVisible"
+    :title="currentTask ? `任务: ${currentTask.name}` : '任务详情'"
+    width="80%"
+    :close-on-click-modal="false">
+    <div v-if="currentTask" class="flex flex-col gap-4">
+      <!-- 任务信息 -->
+      <div class="flex items-center gap-4">
+        <el-tag :type="getStatusTagType(currentTask.status)" size="large">
+          {{ getStatusText(currentTask.status) }}
+        </el-tag>
+        <span v-if="currentTask.error_message" class="text-red-500 text-sm">
+          错误: {{ currentTask.error_message }}
+        </span>
+      </div>
+
+      <!-- 文件列表 -->
+      <div class="border rounded p-3">
+        <div class="flex items-center justify-between mb-3">
+          <h4 class="text-sm font-semibold">文件列表</h4>
+          <el-upload
+            :auto-upload="false"
+            :on-change="handleFileChange"
+            :show-file-list="false"
+            accept=".mp3,.wav,.flac,.aac,.m4a,.ogg,.wma"
+            :disabled="currentTask.status === 'processing'">
+            <template #trigger>
+              <el-button type="primary" size="small" :disabled="currentTask.status === 'processing'">
+                添加文件
+              </el-button>
+            </template>
+          </el-upload>
+        </div>
+        <el-table :data="currentTask.files || []" stripe style="width: 100%">
+          <el-table-column type="index" label="序号" width="60" />
+          <el-table-column prop="name" label="文件名" min-width="200" />
+          <el-table-column label="文件大小" width="100">
+            <template #default="{ row }">
+              {{ formatFileSize(row.size) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="100" fixed="right">
+            <template #default="{ row, $index }">
+              <el-button
+                type="danger"
+                size="small"
+                plain
+                @click="handleRemoveFile($index)"
+                :disabled="currentTask.status === 'processing'">
+                删除
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+
+      <!-- 操作按钮 -->
+      <div class="flex items-center gap-2">
+        <el-button
+          type="success"
+          @click="handleStartMerge"
+          :disabled="!currentTask.files || currentTask.files.length === 0 || currentTask.status === 'processing'"
+          :loading="currentTask.status === 'processing'">
+          开始合成
+        </el-button>
+        <el-button
+          v-if="currentTask.status === 'success' && currentTask.result_file"
+          type="primary"
+          @click="handleDownloadResult">
+          下载结果
+        </el-button>
+      </div>
+    </div>
+  </el-dialog>
+</div>

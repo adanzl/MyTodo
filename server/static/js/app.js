@@ -15,11 +15,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     { path: "/lottery", component: () => import(`../view/lottery.js${timestamp}`).then((m) => m.default) },
     { path: "/info", component: Info },
     { path: "/chat", component: () => import(`../view/chat.js${timestamp}`).then((m) => m.default) },
-    { path: "/color", component: () => import(`../view/home.js${timestamp}`).then((m) => m.default) },
     { path: "/score", component: () => import(`../view/score.js${timestamp}`).then((m) => m.default) },
     { path: "/timetable", component: () => import(`../view/timetable.js${timestamp}`).then((m) => m.default) },
     { path: "/media", component: () => import(`../view/media.js${timestamp}`).then((m) => m.default) },
     { path: "/pdf_tool", component: () => import(`../view/pdf_tool.js${timestamp}`).then((m) => m.default) },
+    { path: "/media_tool", component: () => import(`../view/media_tool.js${timestamp}`).then((m) => m.default) },
   ];
   // 创建路由实例
   const router = window.VueRouter.createRouter({

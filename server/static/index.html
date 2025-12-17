@@ -48,10 +48,6 @@
                 <el-icon><el-icon-menu /></el-icon>
                 <template #title>Chat</template>
               </el-menu-item>
-              <el-menu-item index="/color" disabled>
-                <el-icon><Brush /></el-icon>
-                <template #title>Color</template>
-              </el-menu-item>
               <el-menu-item index="/info">
                 <el-icon><document /></el-icon>
                 <template #title>Info</template>
@@ -71,6 +67,10 @@
               <el-menu-item index="/pdf_tool">
                 <el-icon><Document /></el-icon>
                 <template #title>PDF 工具</template>
+              </el-menu-item>
+              <el-menu-item index="/media_tool">
+                <el-icon><VideoPlay /></el-icon>
+                <template #title>媒体工具</template>
               </el-menu-item>
             </el-menu>
           </el-scrollbar>
@@ -123,7 +123,7 @@
         </el-container>
       </el-container>
     </div>
-    <script defer src="js/app.js?t=${Date.now()}" type="module"></script>
+    <script defer src="js/app.js?1" type="module"></script>
     <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
 
   </body>

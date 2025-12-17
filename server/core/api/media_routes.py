@@ -4,11 +4,15 @@
 '''
 import json
 import os
+from datetime import datetime
 from flask import Blueprint, request, send_file, abort
+from werkzeug.utils import secure_filename
 
 from core.log_config import root_logger
 from core.services.playlist_mgr import playlist_mgr
-from core.utils import get_media_url, get_media_duration, validate_and_normalize_path, _ok, _err
+from core.services.media_tool_mgr import media_tool_mgr
+from core.models.const import get_media_task_dir, get_media_task_result_dir, ALLOWED_AUDIO_EXTENSIONS
+from core.utils import get_media_url, get_media_duration, validate_and_normalize_path, _ok, _err, ensure_directory, is_allowed_audio_file, get_file_info
 
 log = root_logger()
 media_bp = Blueprint('media', __name__)
@@ -163,7 +167,7 @@ def playlist_reload():
 
 # ========== 媒体文件服务接口（用于 DLNA 播放）==========
 
-@media_bp.route("/getDuration", methods=['GET'])
+@media_bp.route("/media/getDuration", methods=['GET'])
 def get_duration():
     """
     获取媒体文件的时长
@@ -221,3 +225,285 @@ def serve_media_file(filepath):
     except Exception as e:
         log.error(f"[MEDIA] Error serving file {filepath}: {e}")
         abort(500)
+
+
+# ========== 媒体工具接口（音频合成）==========
+
+@media_bp.route("/media/task/create", methods=['POST'])
+def create_media_task():
+    """
+    创建音频合成任务
+    参数：
+    - name: 任务名称
+    """
+    try:
+        data = request.get_json() or {}
+        # 如果没有提供名称，使用当前日期时间作为默认名称
+        name = data.get('name', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        
+        code, msg, task_id = media_tool_mgr.create_task(name)
+        
+        if code != 0:
+            return _err(msg)
+        
+        task_info = media_tool_mgr.get_task(task_id)
+        return _ok(task_info)
+        
+    except Exception as e:
+        log.error(f"[MediaTool] 创建任务失败: {e}")
+        return _err(f"创建任务失败: {str(e)}")
+
+
+@media_bp.route("/media/task/upload", methods=['POST'])
+def upload_file():
+    """
+    上传文件到任务
+    参数：
+    - task_id: 任务ID（form 参数或查询参数）
+    - file: 文件（multipart/form-data）
+    """
+    try:
+        # 从 form 参数或查询参数获取 task_id
+        task_id = request.form.get('task_id') or request.args.get('task_id')
+        if not task_id:
+            return _err("task_id 参数不能为空")
+        
+        if 'file' not in request.files:
+            return _err("未找到上传的文件")
+        
+        file = request.files['file']
+        if file.filename == '':
+            return _err("文件名不能为空")
+        
+        if not is_allowed_audio_file(file.filename):
+            return _err(f"不支持的文件类型，支持的格式: {', '.join(ALLOWED_AUDIO_EXTENSIONS)}")
+        
+        # 确保目录存在
+        from core.models.const import MEDIA_TASK_DIR
+        ensure_directory(MEDIA_TASK_DIR)
+        task_dir = get_media_task_dir(task_id)
+        ensure_directory(task_dir)
+        
+        # 保存文件
+        filename = secure_filename(file.filename)
+        file_path = os.path.join(task_dir, filename)
+        
+        # 如果文件已存在，添加序号
+        if os.path.exists(file_path):
+            base_name, ext = os.path.splitext(filename)
+            counter = 1
+            while os.path.exists(file_path):
+                new_filename = f"{base_name}_{counter}{ext}"
+                file_path = os.path.join(task_dir, new_filename)
+                counter += 1
+            filename = os.path.basename(file_path)
+        
+        file.save(file_path)
+        log.info(f"[MediaTool] 文件上传成功: {file_path}")
+        
+        # 添加到任务
+        code, msg = media_tool_mgr.add_file(task_id, file_path, filename)
+        if code != 0:
+            return _err(msg)
+        
+        file_info = get_file_info(file_path)
+        return _ok(file_info)
+        
+    except Exception as e:
+        log.error(f"[MediaTool] 上传文件失败: {e}")
+        return _err(f"上传文件失败: {str(e)}")
+
+
+@media_bp.route("/media/task/deleteFile", methods=['POST'])
+def delete_file():
+    """
+    从任务中删除文件
+    参数：
+    - task_id: 任务ID（JSON 或 form 参数）
+    - file_index: 文件索引（JSON 或 form 参数）
+    """
+    try:
+        data = request.get_json() or request.form.to_dict()
+        task_id = data.get('task_id')
+        file_index = data.get('file_index')
+        
+        if not task_id:
+            return _err("task_id 参数不能为空")
+        
+        if file_index is None:
+            return _err("file_index 参数不能为空")
+        
+        try:
+            file_index = int(file_index)
+        except (ValueError, TypeError):
+            return _err("file_index 必须是整数")
+        
+        code, msg = media_tool_mgr.remove_file(task_id, file_index)
+        if code != 0:
+            return _err(msg)
+        
+        return _ok({"message": msg})
+        
+    except Exception as e:
+        log.error(f"[MediaTool] 删除文件失败: {e}")
+        return _err(f"删除文件失败: {str(e)}")
+
+
+@media_bp.route("/media/task/reorderFiles", methods=['POST'])
+def reorder_files():
+    """
+    调整文件顺序
+    参数：
+    - task_id: 任务ID（JSON 或 form 参数）
+    - file_indices: 新的文件索引顺序列表（JSON 参数）
+    """
+    try:
+        data = request.get_json() or request.form.to_dict()
+        task_id = data.get('task_id')
+        file_indices = data.get('file_indices')
+        
+        if not task_id:
+            return _err("task_id 参数不能为空")
+        
+        if not file_indices:
+            return _err("file_indices 参数不能为空")
+        
+        if not isinstance(file_indices, list):
+            return _err("file_indices 必须是数组")
+        
+        try:
+            file_indices = [int(i) for i in file_indices]
+        except (ValueError, TypeError):
+            return _err("file_indices 必须都是整数")
+        
+        code, msg = media_tool_mgr.reorder_files(task_id, file_indices)
+        if code != 0:
+            return _err(msg)
+        
+        task_info = media_tool_mgr.get_task(task_id)
+        return _ok(task_info)
+        
+    except Exception as e:
+        log.error(f"[MediaTool] 调整文件顺序失败: {e}")
+        return _err(f"调整文件顺序失败: {str(e)}")
+
+
+@media_bp.route("/media/task/start", methods=['POST'])
+def start_task():
+    """
+    开始音频合成任务
+    参数：
+    - task_id: 任务ID（JSON 或 form 参数）
+    """
+    try:
+        data = request.get_json() or request.form.to_dict()
+        task_id = data.get('task_id')
+        
+        if not task_id:
+            return _err("task_id 参数不能为空")
+        
+        code, msg = media_tool_mgr.start_task(task_id)
+        if code != 0:
+            return _err(msg)
+        
+        task_info = media_tool_mgr.get_task(task_id)
+        return _ok(task_info)
+        
+    except Exception as e:
+        log.error(f"[MediaTool] 启动任务失败: {e}")
+        return _err(f"启动任务失败: {str(e)}")
+
+
+@media_bp.route("/media/task/get", methods=['POST'])
+def get_task_info():
+    """
+    获取任务信息
+    参数：
+    - task_id: 任务ID（JSON 或 form 参数）
+    """
+    try:
+        data = request.get_json() or request.form.to_dict()
+        task_id = data.get('task_id')
+        
+        if not task_id:
+            return _err("task_id 参数不能为空")
+        
+        task_info = media_tool_mgr.get_task(task_id)
+        if not task_info:
+            return _err("任务不存在")
+        
+        return _ok(task_info)
+        
+    except Exception as e:
+        log.error(f"[MediaTool] 获取任务信息失败: {e}")
+        return _err(f"获取任务信息失败: {str(e)}")
+
+
+@media_bp.route("/media/task/list", methods=['GET'])
+def list_all_tasks():
+    """
+    列出所有任务
+    """
+    try:
+        tasks = media_tool_mgr.list_tasks()
+        return _ok({"tasks": tasks})
+        
+    except Exception as e:
+        log.error(f"[MediaTool] 列出任务失败: {e}")
+        return _err(f"列出任务失败: {str(e)}")
+
+
+@media_bp.route("/media/task/delete", methods=['POST'])
+def delete_task():
+    """
+    删除任务
+    参数：
+    - task_id: 任务ID（JSON 或 form 参数）
+    """
+    try:
+        data = request.get_json() or request.form.to_dict()
+        task_id = data.get('task_id')
+        
+        if not task_id:
+            return _err("task_id 参数不能为空")
+        
+        code, msg = media_tool_mgr.delete_task(task_id)
+        if code != 0:
+            return _err(msg)
+        
+        return _ok({"message": msg})
+        
+    except Exception as e:
+        log.error(f"[MediaTool] 删除任务失败: {e}")
+        return _err(f"删除任务失败: {str(e)}")
+
+
+@media_bp.route("/media/task/download", methods=['GET'])
+def download_result():
+    """
+    下载合成结果文件
+    参数：
+    - task_id: 任务ID（查询参数）
+    """
+    try:
+        task_id = request.args.get('task_id')
+        
+        if not task_id:
+            return _err("task_id 参数不能为空")
+        
+        task_info = media_tool_mgr.get_task(task_id)
+        if not task_info:
+            return _err("任务不存在")
+        
+        if task_info['status'] != 'success' or not task_info.get('result_file'):
+            return _err("任务未完成或结果文件不存在")
+        
+        result_file = task_info['result_file']
+        if not os.path.exists(result_file):
+            return _err("结果文件不存在")
+        
+        return send_file(result_file, as_attachment=True, download_name='merged.mp3')
+        
+    except Exception as e:
+        log.error(f"[MediaTool] 下载文件失败: {e}")
+        return _err(f"下载文件失败: {str(e)}")

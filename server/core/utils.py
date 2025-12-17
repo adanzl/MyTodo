@@ -300,3 +300,63 @@ def check_cron_will_trigger_today(cron_expression: str) -> bool:
     except Exception as e:
         log.error(f"[Utils] 检查 cron 表达式失败: {cron_expression}, 错误: {e}")
         return False
+
+
+def ensure_directory(directory_path: str) -> None:
+    """
+    确保目录存在，如果不存在则创建
+    :param directory_path: 目录路径
+    """
+    try:
+        os.makedirs(directory_path, exist_ok=True)
+    except Exception as e:
+        log.error(f"[Utils] 创建目录失败: {directory_path}, 错误: {e}")
+        raise
+
+
+def is_allowed_audio_file(filename: str) -> bool:
+    """
+    检查音频文件扩展名是否允许
+    :param filename: 文件名
+    :return: True 如果文件扩展名在允许列表中，False 否则
+    """
+    from core.models.const import ALLOWED_AUDIO_EXTENSIONS
+    return os.path.splitext(filename)[1].lower() in ALLOWED_AUDIO_EXTENSIONS
+
+
+def is_allowed_pdf_file(filename: str) -> bool:
+    """
+    检查 PDF 文件扩展名是否允许
+    :param filename: 文件名
+    :return: True 如果文件扩展名在允许列表中，False 否则
+    """
+    from core.models.const import ALLOWED_PDF_EXTENSIONS
+    return os.path.splitext(filename)[1].lower() in ALLOWED_PDF_EXTENSIONS
+
+
+def is_allowed_file(filename: str, allowed_extensions: set) -> bool:
+    """
+    检查文件扩展名是否在允许的扩展名集合中
+    :param filename: 文件名
+    :param allowed_extensions: 允许的扩展名集合
+    :return: True 如果文件扩展名在允许列表中，False 否则
+    """
+    return os.path.splitext(filename)[1].lower() in allowed_extensions
+
+
+def get_file_info(file_path: str) -> Optional[dict]:
+    """
+    获取文件信息
+    :param file_path: 文件路径
+    :return: 包含文件信息的字典，如果文件不存在则返回 None
+    """
+    if not os.path.exists(file_path):
+        return None
+    
+    stat_info = os.stat(file_path)
+    return {
+        "name": os.path.basename(file_path),
+        "path": file_path,
+        "size": stat_info.st_size,
+        "modified": stat_info.st_mtime,
+    }
