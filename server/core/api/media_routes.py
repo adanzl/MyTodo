@@ -4,6 +4,7 @@
 '''
 import json
 import os
+import shutil
 from datetime import datetime
 from flask import Blueprint, request, send_file, abort
 from werkzeug.utils import secure_filename
@@ -555,3 +556,69 @@ def download_result():
     except Exception as e:
         log.error(f"[MediaTool] 下载文件失败: {e}")
         return _err(f"下载文件失败: {str(e)}")
+
+
+@media_bp.route("/media/task/save", methods=['POST'])
+def save_result():
+    """
+    转存合成结果文件到指定目录
+    参数：
+    - task_id: 任务ID（JSON 或 form 参数）
+    - target_path: 目标目录路径（JSON 或 form 参数）
+    """
+    try:
+        data = request.get_json() or request.form.to_dict()
+        task_id = data.get('task_id')
+        target_path = data.get('target_path')
+        
+        if not task_id:
+            return _err("task_id 参数不能为空")
+        
+        if not target_path:
+            return _err("target_path 参数不能为空")
+        
+        # 验证目标路径
+        normalized_path, error_msg = validate_and_normalize_path(target_path, must_be_file=False)
+        if error_msg or not normalized_path:
+            return _err(error_msg or "目标路径无效")
+        target_path = normalized_path
+        
+        if not os.path.exists(target_path):
+            return _err(f"目标目录不存在: {target_path}")
+        
+        if not os.path.isdir(target_path):
+            return _err(f"目标路径不是目录: {target_path}")
+        
+        # 获取任务信息
+        task_info = media_tool_mgr.get_task(task_id)
+        if not task_info:
+            return _err("任务不存在")
+        
+        if task_info['status'] != 'success' or not task_info.get('result_file'):
+            return _err("任务未完成或结果文件不存在")
+        
+        result_file = task_info['result_file']
+        if not os.path.exists(result_file):
+            return _err("结果文件不存在")
+        
+        # 复制文件到目标目录
+        filename = os.path.basename(result_file)
+        target_file = os.path.join(target_path, filename)
+        
+        # 如果目标文件已存在，添加序号
+        if os.path.exists(target_file):
+            base_name, ext = os.path.splitext(filename)
+            counter = 1
+            while os.path.exists(target_file):
+                new_filename = f"{base_name}_{counter}{ext}"
+                target_file = os.path.join(target_path, new_filename)
+                counter += 1
+        
+        shutil.copy2(result_file, target_file)
+        log.info(f"[MediaTool] 文件转存成功: {result_file} -> {target_file}")
+        
+        return _ok({"target_file": target_file, "message": "转存成功"})
+        
+    except Exception as e:
+        log.error(f"[MediaTool] 转存文件失败: {e}")
+        return _err(f"转存文件失败: {str(e)}")
