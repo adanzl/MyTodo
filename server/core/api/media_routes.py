@@ -334,9 +334,10 @@ def add_file_by_path():
             return _err("file_path 参数不能为空")
         
         # 验证文件路径
-        file_path = validate_and_normalize_path(file_path)
-        if not file_path:
-            return _err("文件路径无效")
+        normalized_path, error_msg = validate_and_normalize_path(file_path)
+        if error_msg or not normalized_path:
+            return _err(error_msg or "文件路径无效")
+        file_path = normalized_path
         
         if not os.path.exists(file_path):
             return _err(f"文件不存在: {file_path}")
