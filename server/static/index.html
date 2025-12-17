@@ -76,7 +76,11 @@
           </el-scrollbar>
         </el-aside>
         <el-container v-if="curUser.bLogin">
-          <el-header class="flex justify-center items-center bg-blue-50">哈哈哈</el-header>
+          <el-header class="flex justify-center items-center bg-blue-50">
+            <ion-icon name="heart"></ion-icon>
+            哈哈哈
+            <ion-icon name="heart"></ion-icon>
+          </el-header>
           <el-main>
             <router-view></router-view>
           </el-main>
@@ -120,5 +124,7 @@
       </el-container>
     </div>
     <script defer src="js/app.js?t=${Date.now()}" type="module"></script>
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+
   </body>
 </html>

@@ -47,7 +47,7 @@
             <div class="flex items-center gap-2 flex-shrink-0">
               <span class="text-xs text-gray-500 whitespace-nowrap flex items-center gap-1">
                 <el-icon><Headset class="!w-3 !h-3" /></el-icon>
-                {{ (playlist.playlist && playlist.playlist.length) || 0 }}
+                <span class="whitespace-nowrap w-5 flex items-center justify-center">{{ ((playlist.pre_files && playlist.pre_files.length) || 0) + ((playlist.playlist && playlist.playlist.length) || 0) }}</span>
               </span>
               <div class="flex items-center justify-center">
                 <el-dropdown
@@ -245,8 +245,19 @@
                 size="small"
                 plain
                 @click="handleOpenFileBrowserForPreFiles"
-                :disabled="!playlistStatus">
+                :disabled="!playlistStatus || preFilesDragMode">
                 +
+              </el-button>
+              <el-button
+                :type="preFilesDragMode ? 'success' : 'default'"
+                size="small"
+                plain
+                class="!w-8 !h-6"
+                @click="handleTogglePreFilesDragMode"
+                :disabled="!playlistStatus || !playlistStatus.pre_files || playlistStatus.pre_files.length === 0"
+                :title="preFilesDragMode ? '点击退出拖拽排序模式' : '点击进入拖拽排序模式'">
+                <el-icon v-if="preFilesDragMode"><Check /></el-icon>
+                <ion-icon v-else class="!w-3.5 !h-3.5" name="chevron-expand-sharp"></ion-icon>
               </el-button>
               <el-button
                 type="danger"
@@ -254,7 +265,7 @@
                 circle
                 plain
                 @click="handleClearPreFiles"
-                :disabled="!playlistStatus || !playlistStatus.pre_files || playlistStatus.pre_files.length === 0 || playlistLoading"
+                :disabled="!playlistStatus || !playlistStatus.pre_files || playlistStatus.pre_files.length === 0 || playlistLoading || preFilesDragMode"
                 title="清空列表">
                 <el-icon><Delete /></el-icon>
               </el-button>
@@ -265,7 +276,16 @@
               v-for="(file, index) in playlistStatus.pre_files"
               :key="'pre-' + index"
               class="flex items-center gap-2 p-1 hover:bg-gray-100 rounded"
-              :class="{ 'bg-blue-50': playlistStatus.pre_index !== undefined && playlistStatus.pre_index !== null && index === playlistStatus.pre_index }">
+              :class="{ 
+                'bg-blue-50': playlistStatus.pre_index !== undefined && playlistStatus.pre_index !== null && index === playlistStatus.pre_index
+              }"
+              :style="{ cursor: preFilesDragMode ? 'move' : 'default', userSelect: 'none' }"
+              :draggable="preFilesDragMode"
+              @dragstart="handlePreFileDragStart($event, index)"
+              @dragend="handlePreFileDragEnd($event)"
+              @dragover.prevent="handlePreFileDragOver($event)"
+              @dragleave="(e) => { if (e.currentTarget) { e.currentTarget.style.backgroundColor = ''; e.currentTarget.style.borderTop = ''; e.currentTarget.style.borderBottom = ''; } }"
+              @drop.prevent="handlePreFileDrop($event, index)">
               <span class="text-xs text-gray-500 w-8">{{ index + 1 }}</span>
               <span
                 class="flex-1 text-sm truncate"
@@ -281,33 +301,33 @@
                 {{ formatDuration(file.duration) }}
               </el-tag>
               <div v-else class="w-16"></div>
-              <div class="flex items-center gap-1">
+              <div class="flex items-center gap-1" @mousedown.stop @click.stop>
                 <el-button
-                  v-show="showMoreActions"
+                  v-show="showMoreActions && !preFilesDragMode"
                   type="plain"
                   size="small"
                   circle
-                  @click="handleMovePreFileUp(index)"
+                  @click.stop="handleMovePreFileUp(index)"
                   :disabled="index === 0 || playlistLoading"
                   title="上移">
                   ↑
                 </el-button>
                 <el-button
-                  v-show="showMoreActions"
+                  v-show="showMoreActions && !preFilesDragMode"
                   type="plain"
                   size="small"
                   circle
-                  @click="handleMovePreFileDown(index)"
+                  @click.stop="handleMovePreFileDown(index)"
                   :disabled="index === playlistStatus.pre_files.length - 1 || playlistLoading"
                   title="下移">
                   ↓
                 </el-button>
                 <el-button
-                  v-show="showMoreActions"
+                  v-show="showMoreActions && !preFilesDragMode"
                   type="plain"
                   size="small"
                   circle
-                  @click="handleCopyPreFile(index)"
+                  @click.stop="handleCopyPreFile(index)"
                   :disabled="playlistLoading"
                   title="复制到末尾">
                   <el-icon><DocumentCopy /></el-icon>
@@ -316,8 +336,8 @@
                   type="plain"
                   size="small"
                   circle
-                  @click="handleDeletePreFile(index)"
-                  :disabled="playlistLoading"
+                  @click.stop="handleDeletePreFile(index)"
+                  :disabled="playlistLoading || preFilesDragMode"
                   title="删除">
                   <el-icon><Minus /></el-icon>
                 </el-button>
@@ -329,7 +349,7 @@
 
         <!-- files 列表 -->
         <div
-          v-if="playlistStatus.playlist && playlistStatus.playlist.length > 0"
+          v-if="playlistStatus.playlist"
           class="border rounded p-2">
           <div class="flex items-center justify-between mb-2 pr-1">
             <div class="text-xs font-semibold text-gray-600">
@@ -357,87 +377,111 @@
                 type="primary"
                 plain
                 size="small"
+                class="!w-8 !h-6"
                 @click="handleOpenFileBrowser"
-                :disabled="!playlistStatus">
+                :disabled="!playlistStatus || filesDragMode">
                 +
               </el-button>
               <el-button
+                :type="filesDragMode ? 'success' : 'default'"
+                plain
+                size="small"
+                class="!w-8 !h-6"
+                @click="handleToggleFilesDragMode"
+                :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0"
+                :title="filesDragMode ? '点击退出拖拽排序模式' : '点击进入拖拽排序模式'">
+                <el-icon v-if="filesDragMode"><Check /></el-icon>
+                <ion-icon v-else class="!w-3.5 !h-3.5" name="chevron-expand-sharp"></ion-icon>
+              </el-button>
+              <el-button
                 type="danger"
+                plain
                 size="small"
                 circle
-                plain
-                @click="handleClearPlaylist"
-                :disabled="!playlistStatus || ((!playlistStatus.pre_files || playlistStatus.pre_files.length === 0) && (!playlistStatus.playlist || playlistStatus.playlist.length === 0)) || playlistLoading"
-                title="清空列表（包括前置文件和正式文件）">
+                @click="handleClearFiles"
+                :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0 || playlistLoading || filesDragMode"
+                title="清空正式文件列表">
                 <el-icon><Delete /></el-icon>
               </el-button>
             </div>
           </div>
-          <div
-            v-for="(file, index) in playlistStatus.playlist"
-            :key="index"
-            class="flex items-center gap-2 p-1 hover:bg-gray-100 rounded"
-            :class="{ 'bg-blue-50': index === playlistStatus.current_index }">
-            <span class="text-xs text-gray-500 w-8">{{ index + 1 }}</span>
-            <span
-              class="flex-1 text-sm truncate"
-              :class="{ 'text-blue-600': index === playlistStatus.current_index }"
-              :title="file.uri">
-              {{ file.uri.split('/').pop() }}
-            </span>
-            <el-tag
-              v-if="file.duration"
-              type="info"
-              size="small"
-              class="whitespace-nowrap w-16 text-center">
-              {{ formatDuration(file.duration) }}
-            </el-tag>
-            <div v-else class="w-16"></div>
-            <!-- <el-tag v-if="index === playlistStatus.current_index" type="success" size="small">
-              当前
-            </el-tag> -->
-            <div class="flex items-center gap-1">
-              <el-button
-                v-show="showMoreActions"
-                type="plain"
+          <div v-if="playlistStatus.playlist && playlistStatus.playlist.length > 0">
+            <div
+              v-for="(file, index) in playlistStatus.playlist"
+              :key="index"
+              class="flex items-center gap-2 p-1 hover:bg-gray-100 rounded"
+              :class="{ 
+                'bg-blue-50': index === playlistStatus.current_index
+              }"
+              :style="{ cursor: filesDragMode ? 'move' : 'default', userSelect: 'none' }"
+              :draggable="filesDragMode"
+              @dragstart="handleFileDragStart($event, index)"
+              @dragend="handleFileDragEnd($event)"
+              @dragover.prevent="handleFileDragOver($event)"
+              @dragleave="(e) => { if (e.currentTarget) { e.currentTarget.style.backgroundColor = ''; e.currentTarget.style.borderTop = ''; e.currentTarget.style.borderBottom = ''; } }"
+              @drop.prevent="handleFileDrop($event, index)">
+              <span class="text-xs text-gray-500 w-8">{{ index + 1 }}</span>
+              <span
+                class="flex-1 text-sm truncate"
+                :class="{ 'text-blue-600': index === playlistStatus.current_index }"
+                :title="file.uri">
+                {{ file.uri.split('/').pop() }}
+              </span>
+              <el-tag
+                v-if="file.duration"
+                type="info"
                 size="small"
-                circle
-                @click="handleMovePlaylistItemUp(index)"
-                :disabled="index === 0 || playlistLoading"
-                title="上移">
-                ↑
-              </el-button>
-              <el-button
-                v-show="showMoreActions"
-                type="plain"
-                size="small"
-                circle
-                @click="handleMovePlaylistItemDown(index)"
-                :disabled="index === playlistStatus.playlist.length - 1 || playlistLoading"
-                title="下移">
-                ↓
-              </el-button>
-              <el-button
-                v-show="showMoreActions"
-                type="plain"
-                size="small"
-                circle
-                @click="handleCopyPlaylistItem(index)"
-                :disabled="playlistLoading"
-                title="复制到末尾">
-                <el-icon><DocumentCopy /></el-icon>
-              </el-button>
-              <el-button
-                type="plain"
-                size="small"
-                circle
-                @click="handleDeletePlaylistItem(index)"
-                :disabled="playlistLoading"
-                title="删除">
-                <el-icon><Minus /></el-icon>
-              </el-button>
+                class="whitespace-nowrap w-16 text-center">
+                {{ formatDuration(file.duration) }}
+              </el-tag>
+              <div v-else class="w-16"></div>
+              <!-- <el-tag v-if="index === playlistStatus.current_index" type="success" size="small">
+                当前
+              </el-tag> -->
+              <div class="flex items-center gap-1" @mousedown.stop @click.stop>
+                <el-button
+                  v-show="showMoreActions && !filesDragMode"
+                  type="plain"
+                  size="small"
+                  circle
+                  @click.stop="handleMovePlaylistItemUp(index)"
+                  :disabled="index === 0 || playlistLoading"
+                  title="上移">
+                  ↑
+                </el-button>
+                <el-button
+                  v-show="showMoreActions && !filesDragMode"
+                  type="plain"
+                  size="small"
+                  circle
+                  @click.stop="handleMovePlaylistItemDown(index)"
+                  :disabled="index === playlistStatus.playlist.length - 1 || playlistLoading"
+                  title="下移">
+                  ↓
+                </el-button>
+                <el-button
+                  v-show="showMoreActions && !filesDragMode"
+                  type="plain"
+                  size="small"
+                  circle
+                  @click.stop="handleCopyPlaylistItem(index)"
+                  :disabled="playlistLoading"
+                  title="复制到末尾">
+                  <el-icon><DocumentCopy /></el-icon>
+                </el-button>
+                <el-button
+                  type="plain"
+                  size="small"
+                  circle
+                  @click.stop="handleDeletePlaylistItem(index)"
+                  :disabled="playlistLoading || filesDragMode"
+                  title="删除">
+                  <el-icon><Minus /></el-icon>
+                </el-button>
+              </div>
             </div>
           </div>
+          <div v-else class="text-sm text-gray-400 text-center py-1">正式文件列表为空</div>
         </div>
         <div
           v-else-if="(!playlistStatus.pre_files || playlistStatus.pre_files.length === 0)"

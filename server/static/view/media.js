@@ -60,6 +60,12 @@ async function createComponent() {
         agentList: ref([]),
         agentListLoading: ref(false),
         activeDeviceTab: ref('agent'),
+        preFilesSortOrder: ref(null), // null, 'name-asc', 'name-desc', 'duration-asc', 'duration-desc'
+        filesSortOrder: ref(null), // null, 'name-asc', 'name-desc', 'duration-asc', 'duration-desc'
+        preFilesDragMode: ref(false), // 前置文件拖拽排序模式
+        filesDragMode: ref(false), // 正式文件拖拽排序模式
+        preFilesOriginalOrder: ref(null), // 进入拖拽模式时的原始顺序
+        filesOriginalOrder: ref(null), // 进入拖拽模式时的原始顺序
       };
       const pendingDeviceType = ref(null);
       const _formatDateTime = formatDateTime;
@@ -1416,6 +1422,10 @@ async function createComponent() {
           if (isAutoRefresh && onlyCurrent && pendingDeviceType.value !== null) {
             return;
           }
+          // 如果是自动刷新，且处于拖拽排序模式，则跳过（避免覆盖拖拽结果）
+          if (isAutoRefresh && (refData.preFilesDragMode.value || refData.filesDragMode.value)) {
+            return;
+          }
           
           refData.playlistRefreshing.value = true;
           
@@ -1825,6 +1835,40 @@ async function createComponent() {
         }
       };
 
+      // 清空正式文件列表（只清空 files，不清空前置文件）
+      const handleClearFiles = async () => {
+        const status = refData.playlistStatus.value;
+        if (!status || !status.playlist || status.playlist.length === 0) return;
+
+        try {
+          await ElMessageBox.confirm(
+            `确定要清空正式文件列表吗？此操作将删除所有 ${status.playlist.length} 个正式文件。`,
+            "确认清空",
+            {
+              confirmButtonText: "确定",
+              cancelButtonText: "取消",
+              type: "warning",
+            }
+          );
+
+          refData.playlistLoading.value = true;
+          await updateActivePlaylistData((playlistInfo) => {
+            playlistInfo.playlist = [];
+            playlistInfo.total = 0;
+            playlistInfo.current_index = 0;
+            return playlistInfo;
+          });
+          ElMessage.success("已清空正式文件列表");
+        } catch (error) {
+          if (error !== "cancel") {
+            console.error("清空失败:", error);
+            ElMessage.error("清空失败: " + (error.message || "未知错误"));
+          }
+        } finally {
+          refData.playlistLoading.value = false;
+        }
+      };
+
       // 上移 pre_files 中的文件
       const handleMovePreFileUp = async (index) => {
         const status = refData.playlistStatus.value;
@@ -1896,6 +1940,146 @@ async function createComponent() {
         }
       };
 
+      // 排序前置文件列表
+      const handleSortPreFiles = async (sortType) => {
+        const status = refData.playlistStatus.value;
+        if (!status || !status.pre_files || status.pre_files.length === 0) return;
+
+        try {
+          refData.playlistLoading.value = true;
+          
+          // 切换排序顺序
+          const currentOrder = refData.preFilesSortOrder.value;
+          let newOrder = null;
+          if (currentOrder === `${sortType}-asc`) {
+            newOrder = `${sortType}-desc`;
+          } else if (currentOrder === `${sortType}-desc`) {
+            newOrder = null; // 取消排序
+          } else {
+            newOrder = `${sortType}-asc`;
+          }
+          refData.preFilesSortOrder.value = newOrder;
+
+          await updateActivePlaylistData((playlistInfo) => {
+            const list = [...(playlistInfo.pre_files || [])];
+            const oldPreIndex = playlistInfo.pre_index;
+            
+            if (newOrder) {
+              const [sortField, sortDir] = newOrder.split('-');
+              list.sort((a, b) => {
+                let aVal, bVal;
+                if (sortField === 'name') {
+                  aVal = getFileName(a).toLowerCase();
+                  bVal = getFileName(b).toLowerCase();
+                } else if (sortField === 'duration') {
+                  aVal = a.duration || 0;
+                  bVal = b.duration || 0;
+                } else {
+                  return 0;
+                }
+                
+                if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+                if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+                return 0;
+              });
+              
+              // 更新 pre_index
+              if (oldPreIndex !== undefined && oldPreIndex !== null && oldPreIndex >= 0) {
+                const oldFile = playlistInfo.pre_files[oldPreIndex];
+                const newIndex = list.findIndex(f => f.uri === oldFile.uri);
+                playlistInfo.pre_index = newIndex >= 0 ? newIndex : -1;
+              }
+            } else {
+              // 取消排序，恢复原始顺序（这里无法完全恢复，保持当前顺序）
+              // 如果需要完全恢复，需要保存原始顺序
+            }
+            
+            playlistInfo.pre_files = list;
+            return playlistInfo;
+          });
+          
+          if (newOrder) {
+            ElMessage.success(`已按${sortType === 'name' ? '文件名' : '时长'}${newOrder.includes('asc') ? '升序' : '降序'}排序`);
+          } else {
+            ElMessage.success("已取消排序");
+          }
+        } catch (error) {
+          console.error("排序失败:", error);
+          ElMessage.error("排序失败: " + (error.message || "未知错误"));
+        } finally {
+          refData.playlistLoading.value = false;
+        }
+      };
+
+      // 排序正式文件列表
+      const handleSortFiles = async (sortType) => {
+        const status = refData.playlistStatus.value;
+        if (!status || !status.playlist || status.playlist.length === 0) return;
+
+        try {
+          refData.playlistLoading.value = true;
+          
+          // 切换排序顺序
+          const currentOrder = refData.filesSortOrder.value;
+          let newOrder = null;
+          if (currentOrder === `${sortType}-asc`) {
+            newOrder = `${sortType}-desc`;
+          } else if (currentOrder === `${sortType}-desc`) {
+            newOrder = null; // 取消排序
+          } else {
+            newOrder = `${sortType}-asc`;
+          }
+          refData.filesSortOrder.value = newOrder;
+
+          await updateActivePlaylistData((playlistInfo) => {
+            const list = [...(playlistInfo.playlist || [])];
+            const oldCurrentIndex = playlistInfo.current_index;
+            
+            if (newOrder) {
+              const [sortField, sortDir] = newOrder.split('-');
+              list.sort((a, b) => {
+                let aVal, bVal;
+                if (sortField === 'name') {
+                  aVal = getFileName(a).toLowerCase();
+                  bVal = getFileName(b).toLowerCase();
+                } else if (sortField === 'duration') {
+                  aVal = a.duration || 0;
+                  bVal = b.duration || 0;
+                } else {
+                  return 0;
+                }
+                
+                if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+                if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+                return 0;
+              });
+              
+              // 更新 current_index
+              if (oldCurrentIndex !== undefined && oldCurrentIndex !== null && oldCurrentIndex >= 0) {
+                const oldFile = playlistInfo.playlist[oldCurrentIndex];
+                const newIndex = list.findIndex(f => f.uri === oldFile.uri);
+                playlistInfo.current_index = newIndex >= 0 ? newIndex : 0;
+              }
+            }
+            
+            playlistInfo.playlist = list;
+            playlistInfo.total = list.length;
+            return playlistInfo;
+          });
+          
+          if (newOrder) {
+            ElMessage.success(`已按${sortType === 'name' ? '文件名' : '时长'}${newOrder.includes('asc') ? '升序' : '降序'}排序`);
+          } else {
+            ElMessage.success("已取消排序");
+          }
+        } catch (error) {
+          console.error("排序失败:", error);
+          ElMessage.error("排序失败: " + (error.message || "未知错误"));
+        } finally {
+          refData.playlistLoading.value = false;
+        }
+      };
+
       const handleSelectPlaylist = async (playlistId) => {
         if (!playlistId || playlistId === refData.activePlaylistId.value) return;
         const exists = refData.playlistCollection.value.find((item) => item.id === playlistId);
@@ -1905,7 +2089,331 @@ async function createComponent() {
         saveActivePlaylistId(playlistId); // 保存选中的播放列表ID
         syncActivePlaylist(refData.playlistCollection.value);
         pendingDeviceType.value = null;
+        // 重置排序状态
+        refData.preFilesSortOrder.value = null;
+        refData.filesSortOrder.value = null;
+        refData.preFilesDragMode.value = false;
+        refData.filesDragMode.value = false;
+        refData.preFilesOriginalOrder.value = null;
+        refData.filesOriginalOrder.value = null;
         await refreshConnectedList();
+      };
+
+      // 检查两个数组的顺序是否相同
+      const isOrderChanged = (original, current) => {
+        if (!original || !current || original.length !== current.length) {
+          return true;
+        }
+        for (let i = 0; i < original.length; i++) {
+          const origUri = original[i]?.uri || original[i];
+          const currUri = current[i]?.uri || current[i];
+          if (origUri !== currUri) {
+            return true;
+          }
+        }
+        return false;
+      };
+
+      // 切换前置文件拖拽排序模式
+      const handleTogglePreFilesDragMode = async () => {
+        if (refData.preFilesDragMode.value) {
+          // 退出拖拽模式时，检查是否有变化
+          const status = refData.playlistStatus.value;
+          if (status && status.pre_files && status.pre_files.length > 0) {
+            const hasChanged = isOrderChanged(refData.preFilesOriginalOrder.value, status.pre_files);
+            if (hasChanged) {
+              try {
+                refData.playlistLoading.value = true;
+                await updateActivePlaylistData((playlistInfo) => {
+                  // 使用当前内存中的顺序
+                  playlistInfo.pre_files = [...(status.pre_files || [])];
+                  playlistInfo.pre_index = status.pre_index;
+                  return playlistInfo;
+                });
+                ElMessage.success("排序已保存");
+              } catch (error) {
+                console.error("保存排序失败:", error);
+                ElMessage.error("保存排序失败: " + (error.message || "未知错误"));
+              } finally {
+                refData.playlistLoading.value = false;
+              }
+            }
+            // 清除原始顺序
+            refData.preFilesOriginalOrder.value = null;
+          }
+        } else {
+          // 启用拖拽模式时，保存原始顺序并取消自动排序
+          const status = refData.playlistStatus.value;
+          if (status && status.pre_files && status.pre_files.length > 0) {
+            refData.preFilesOriginalOrder.value = [...(status.pre_files || [])];
+          }
+          refData.preFilesSortOrder.value = null;
+        }
+        refData.preFilesDragMode.value = !refData.preFilesDragMode.value;
+      };
+
+      // 切换正式文件拖拽排序模式
+      const handleToggleFilesDragMode = async () => {
+        if (refData.filesDragMode.value) {
+          // 退出拖拽模式时，检查是否有变化
+          const status = refData.playlistStatus.value;
+          if (status && status.playlist && status.playlist.length > 0) {
+            const hasChanged = isOrderChanged(refData.filesOriginalOrder.value, status.playlist);
+            if (hasChanged) {
+              try {
+                refData.playlistLoading.value = true;
+                await updateActivePlaylistData((playlistInfo) => {
+                  // 使用当前内存中的顺序
+                  playlistInfo.playlist = [...(status.playlist || [])];
+                  playlistInfo.current_index = status.current_index;
+                  playlistInfo.total = status.playlist.length;
+                  return playlistInfo;
+                });
+                ElMessage.success("排序已保存");
+              } catch (error) {
+                console.error("保存排序失败:", error);
+                ElMessage.error("保存排序失败: " + (error.message || "未知错误"));
+              } finally {
+                refData.playlistLoading.value = false;
+              }
+            }
+            // 清除原始顺序
+            refData.filesOriginalOrder.value = null;
+          }
+        } else {
+          // 启用拖拽模式时，保存原始顺序并取消自动排序
+          const status = refData.playlistStatus.value;
+          if (status && status.playlist && status.playlist.length > 0) {
+            refData.filesOriginalOrder.value = [...(status.playlist || [])];
+          }
+          refData.filesSortOrder.value = null;
+        }
+        refData.filesDragMode.value = !refData.filesDragMode.value;
+      };
+
+      // 处理前置文件拖拽开始
+      const handlePreFileDragStart = (event, index) => {
+        if (!refData.preFilesDragMode.value) {
+          event.preventDefault();
+          return false;
+        }
+        try {
+          event.dataTransfer.effectAllowed = 'move';
+          event.dataTransfer.setData('text/plain', index.toString());
+          // 不改变样式，保持和非拖拽时一致
+        } catch (e) {
+          console.error('拖拽开始失败:', e);
+        }
+      };
+
+      // 处理前置文件拖拽结束
+      const handlePreFileDragEnd = (event) => {
+        if (event.currentTarget) {
+          // 清除所有拖拽相关的样式
+          event.currentTarget.style.backgroundColor = '';
+          event.currentTarget.style.borderTop = '';
+          event.currentTarget.style.borderBottom = '';
+        }
+      };
+
+      // 处理前置文件拖拽悬停
+      const handlePreFileDragOver = (event) => {
+        if (!refData.preFilesDragMode.value) {
+          return;
+        }
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        // 使用和 hover 一致的样式（hover:bg-gray-100）
+        if (event.currentTarget) {
+          const rect = event.currentTarget.getBoundingClientRect();
+          const mouseY = event.clientY;
+          const elementCenterY = rect.top + rect.height / 2;
+          
+          // 清除之前的样式
+          event.currentTarget.style.backgroundColor = '';
+          event.currentTarget.style.borderTop = '';
+          event.currentTarget.style.borderBottom = '';
+          
+          // 根据鼠标位置决定插入位置（上方或下方）
+          if (mouseY < elementCenterY) {
+            // 插入到上方
+            event.currentTarget.style.borderTop = '2px solid #3b82f6';
+          } else {
+            // 插入到下方
+            event.currentTarget.style.borderBottom = '2px solid #3b82f6';
+          }
+        }
+      };
+
+      // 处理前置文件拖拽放置
+      const handlePreFileDrop = (event, targetIndex) => {
+        if (!refData.preFilesDragMode.value) {
+          return;
+        }
+        event.preventDefault();
+        // 清除所有拖拽相关的样式
+        if (event.currentTarget) {
+          event.currentTarget.style.backgroundColor = '';
+          event.currentTarget.style.borderTop = '';
+          event.currentTarget.style.borderBottom = '';
+        }
+        
+        const sourceIndex = parseInt(event.dataTransfer.getData('text/plain'), 10);
+        
+        if (sourceIndex === targetIndex || isNaN(sourceIndex)) {
+          return;
+        }
+
+        const status = refData.playlistStatus.value;
+        if (!status || !status.pre_files || sourceIndex < 0 || sourceIndex >= status.pre_files.length ||
+            targetIndex < 0 || targetIndex >= status.pre_files.length) {
+          return;
+        }
+        // 只在内存中更新，不保存到后端
+        const list = [...(status.pre_files || [])];
+        const [removed] = list.splice(sourceIndex, 1);
+        list.splice(targetIndex, 0, removed);
+        
+        // 计算新的 pre_index
+        let newPreIndex = status.pre_index;
+        if (status.pre_index !== undefined && status.pre_index !== null && status.pre_index >= 0) {
+          if (status.pre_index === sourceIndex) {
+            newPreIndex = targetIndex;
+          } else if (sourceIndex < status.pre_index && targetIndex >= status.pre_index) {
+            newPreIndex = status.pre_index - 1;
+          } else if (sourceIndex > status.pre_index && targetIndex <= status.pre_index) {
+            newPreIndex = status.pre_index + 1;
+          }
+        }
+        
+        // 更新 playlistCollection 中对应的项
+        const collection = refData.playlistCollection.value.map(item => {
+          if (item.id === status.id) {
+            return {
+              ...item,
+              pre_files: list,
+              pre_index: newPreIndex
+            };
+          }
+          return item;
+        });
+        refData.playlistCollection.value = collection;
+        
+        // 同步更新到状态中
+        syncActivePlaylist(collection);
+      };
+
+      // 处理正式文件拖拽开始
+      const handleFileDragStart = (event, index) => {
+        if (!refData.filesDragMode.value) {
+          event.preventDefault();
+          return false;
+        }
+        try {
+          event.dataTransfer.effectAllowed = 'move';
+          event.dataTransfer.setData('text/plain', index.toString());
+          // 不改变样式，保持和非拖拽时一致
+        } catch (e) {
+          console.error('拖拽开始失败:', e);
+        }
+      };
+
+      // 处理正式文件拖拽结束
+      const handleFileDragEnd = (event) => {
+        if (event.currentTarget) {
+          // 清除所有拖拽相关的样式
+          event.currentTarget.style.backgroundColor = '';
+          event.currentTarget.style.borderTop = '';
+          event.currentTarget.style.borderBottom = '';
+        }
+      };
+
+      // 处理正式文件拖拽悬停
+      const handleFileDragOver = (event) => {
+        if (!refData.filesDragMode.value) {
+          return;
+        }
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        // 使用和 hover 一致的样式（hover:bg-gray-100）
+        if (event.currentTarget) {
+          const rect = event.currentTarget.getBoundingClientRect();
+          const mouseY = event.clientY;
+          const elementCenterY = rect.top + rect.height / 2;
+          
+          // 清除之前的样式
+          event.currentTarget.style.backgroundColor = '';
+          event.currentTarget.style.borderTop = '';
+          event.currentTarget.style.borderBottom = '';
+          
+          // 根据鼠标位置决定插入位置（上方或下方）
+          if (mouseY < elementCenterY) {
+            // 插入到上方
+            event.currentTarget.style.borderTop = '2px solid #3b82f6';
+          } else {
+            // 插入到下方
+            event.currentTarget.style.borderBottom = '2px solid #3b82f6';
+          }
+        }
+      };
+
+      // 处理正式文件拖拽放置
+      const handleFileDrop = (event, targetIndex) => {
+        if (!refData.filesDragMode.value) {
+          return;
+        }
+        event.preventDefault();
+        // 清除所有拖拽相关的样式
+        if (event.currentTarget) {
+          event.currentTarget.style.backgroundColor = '';
+          event.currentTarget.style.borderTop = '';
+          event.currentTarget.style.borderBottom = '';
+        }
+        
+        const sourceIndex = parseInt(event.dataTransfer.getData('text/plain'), 10);
+        
+        if (sourceIndex === targetIndex || isNaN(sourceIndex)) {
+          return;
+        }
+
+        const status = refData.playlistStatus.value;
+        if (!status || !status.playlist || sourceIndex < 0 || sourceIndex >= status.playlist.length ||
+            targetIndex < 0 || targetIndex >= status.playlist.length) {
+          return;
+        }
+        // 只在内存中更新，不保存到后端
+        const list = [...(status.playlist || [])];
+        const [removed] = list.splice(sourceIndex, 1);
+        list.splice(targetIndex, 0, removed);
+        
+        // 计算新的 current_index
+        let newCurrentIndex = status.current_index;
+        if (status.current_index !== undefined && status.current_index !== null && status.current_index >= 0) {
+          if (status.current_index === sourceIndex) {
+            newCurrentIndex = targetIndex;
+          } else if (sourceIndex < status.current_index && targetIndex >= status.current_index) {
+            newCurrentIndex = status.current_index - 1;
+          } else if (sourceIndex > status.current_index && targetIndex <= status.current_index) {
+            newCurrentIndex = status.current_index + 1;
+          }
+        }
+        
+        // 更新 playlistCollection 中对应的项
+        const collection = refData.playlistCollection.value.map(item => {
+          if (item.id === status.id) {
+            return {
+              ...item,
+              playlist: list,
+              current_index: newCurrentIndex,
+              total: list.length
+            };
+          }
+          return item;
+        });
+        refData.playlistCollection.value = collection;
+        
+        // 同步更新到状态中
+        syncActivePlaylist(collection);
       };
 
       // 开始编辑播放列表名称
@@ -2404,9 +2912,24 @@ async function createComponent() {
         handleClearPlaylist,
         handleDeletePreFile,
         handleClearPreFiles,
+        handleClearFiles,
         handleMovePreFileUp,
         handleMovePreFileDown,
         handleCopyPreFile,
+        handleSortPreFiles,
+        handleSortFiles,
+        preFilesDragMode: refData.preFilesDragMode,
+        filesDragMode: refData.filesDragMode,
+        handleTogglePreFilesDragMode,
+        handleToggleFilesDragMode,
+        handlePreFileDragStart,
+        handlePreFileDragEnd,
+        handlePreFileDragOver,
+        handlePreFileDrop,
+        handleFileDragStart,
+        handleFileDragEnd,
+        handleFileDragOver,
+        handleFileDrop,
         handleSelectPlaylist,
         handleCreatePlaylist,
         handleDeletePlaylistGroup,
