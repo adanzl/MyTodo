@@ -21,6 +21,7 @@ from core.models.const import (
     get_media_task_result_dir,
     ALLOWED_AUDIO_EXTENSIONS
 )
+from core.utils import get_media_duration
 
 log = root_logger()
 
@@ -260,11 +261,15 @@ class MediaToolMgr:
             if error_msg:
                 return -1, error_msg
             
+            # 获取文件时长
+            duration = get_media_duration(file_path)
+            
             # 添加到文件列表
             file_info = {
                 'name': filename,
                 'path': file_path,
                 'size': os.path.getsize(file_path),
+                'duration': duration,  # 时长（秒）
                 'index': len(task.files)
             }
             task.files.append(file_info)

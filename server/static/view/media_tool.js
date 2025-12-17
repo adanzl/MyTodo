@@ -1,5 +1,5 @@
 import { getApiUrl } from "../js/net_util.js";
-import { formatSize } from "../js/utils.js";
+import { formatSize, formatDuration } from "../js/utils.js";
 import { createFileDialog } from "./file_dialog.js";
 const axios = window.axios;
 
@@ -31,6 +31,10 @@ async function createComponent() {
       
       // 文件浏览器对话框可见性
       const fileBrowserDialogVisible = ref(false);
+      
+      // 文件拖拽排序模式
+      const filesDragMode = ref(false);
+      const filesOriginalOrder = ref(null);
       
       // 处理文件选择确认
       const handleFileBrowserConfirm = async (filePaths) => {
@@ -155,7 +159,12 @@ async function createComponent() {
             ElMessage.success("任务删除成功");
             await loadTaskList();
             if (currentTask.value && currentTask.value.task_id === taskId) {
-              currentTask.value = null;
+              // 如果删除的是当前选中的任务，且任务列表不为空，则选中第一个任务
+              if (taskList.value && taskList.value.length > 0) {
+                await handleViewTask(taskList.value[0].task_id);
+              } else {
+                currentTask.value = null;
+              }
             }
           } else {
             ElMessage.error(response.data.msg || "删除任务失败");
@@ -328,6 +337,184 @@ async function createComponent() {
         return statusMap[status] || '未知';
       };
 
+      // 检查顺序是否改变
+      const isOrderChanged = (original, current) => {
+        if (!original || !current || original.length !== current.length) {
+          return true;
+        }
+        for (let i = 0; i < original.length; i++) {
+          const origPath = original[i]?.path || original[i]?.name;
+          const currPath = current[i]?.path || current[i]?.name;
+          if (origPath !== currPath) {
+            return true;
+          }
+        }
+        return false;
+      };
+
+      // 切换文件拖拽排序模式
+      const handleToggleFilesDragMode = async () => {
+        if (filesDragMode.value) {
+          // 退出拖拽模式时，检查是否有变化
+          if (currentTask.value && currentTask.value.files && currentTask.value.files.length > 0) {
+            const hasChanged = isOrderChanged(filesOriginalOrder.value, currentTask.value.files);
+            if (hasChanged) {
+              try {
+                loading.value = true;
+                // 获取当前文件顺序的索引数组
+                const fileIndices = currentTask.value.files.map((_, index) => index);
+                const response = await axios.post(`${getApiUrl()}/media/task/reorderFiles`, {
+                  task_id: currentTask.value.task_id,
+                  file_indices: fileIndices
+                });
+                
+                if (response.data.code === 0) {
+                  ElMessage.success("排序已保存");
+                  // 刷新任务信息
+                  await handleViewTask(currentTask.value.task_id);
+                } else {
+                  ElMessage.error(response.data.msg || "保存排序失败");
+                }
+              } catch (error) {
+                console.error("保存排序失败:", error);
+                ElMessage.error("保存排序失败: " + (error.message || "未知错误"));
+              } finally {
+                loading.value = false;
+              }
+            }
+            // 清除原始顺序
+            filesOriginalOrder.value = null;
+          }
+        } else {
+          // 启用拖拽模式时，保存原始顺序
+          if (currentTask.value && currentTask.value.files && currentTask.value.files.length > 0) {
+            filesOriginalOrder.value = [...(currentTask.value.files || [])];
+          }
+        }
+        filesDragMode.value = !filesDragMode.value;
+      };
+
+      // 处理文件拖拽开始
+      const handleFileDragStart = (event, index) => {
+        if (!filesDragMode.value) {
+          event.preventDefault();
+          return false;
+        }
+        try {
+          event.dataTransfer.effectAllowed = 'move';
+          event.dataTransfer.setData('text/plain', index.toString());
+        } catch (e) {
+          console.error('拖拽开始失败:', e);
+        }
+      };
+
+      // 处理文件拖拽结束
+      const handleFileDragEnd = (event) => {
+        if (event.currentTarget) {
+          event.currentTarget.style.backgroundColor = '';
+          event.currentTarget.style.borderTop = '';
+          event.currentTarget.style.borderBottom = '';
+        }
+      };
+
+      // 处理文件拖拽悬停
+      const handleFileDragOver = (event) => {
+        if (!filesDragMode.value) {
+          return;
+        }
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        if (event.currentTarget) {
+          const rect = event.currentTarget.getBoundingClientRect();
+          const mouseY = event.clientY;
+          const elementCenterY = rect.top + rect.height / 2;
+          
+          event.currentTarget.style.backgroundColor = '';
+          event.currentTarget.style.borderTop = '';
+          event.currentTarget.style.borderBottom = '';
+          
+          if (mouseY < elementCenterY) {
+            event.currentTarget.style.borderTop = '2px solid #3b82f6';
+          } else {
+            event.currentTarget.style.borderBottom = '2px solid #3b82f6';
+          }
+        }
+      };
+
+      // 处理文件拖拽放置
+      const handleFileDrop = (event, targetIndex) => {
+        if (!filesDragMode.value) {
+          return;
+        }
+        event.preventDefault();
+        // 清除所有拖拽相关的样式
+        if (event.currentTarget) {
+          event.currentTarget.style.backgroundColor = '';
+          event.currentTarget.style.borderTop = '';
+          event.currentTarget.style.borderBottom = '';
+        }
+        
+        // 清除所有列表项的样式
+        const allItems = event.currentTarget?.parentElement?.querySelectorAll('[draggable="true"]');
+        if (allItems) {
+          allItems.forEach(item => {
+            item.style.backgroundColor = '';
+            item.style.borderTop = '';
+            item.style.borderBottom = '';
+          });
+        }
+        
+        const sourceIndex = parseInt(event.dataTransfer.getData('text/plain'), 10);
+        
+        if (sourceIndex === targetIndex || isNaN(sourceIndex)) {
+          return;
+        }
+
+        if (!currentTask.value || !currentTask.value.files || 
+            sourceIndex < 0 || sourceIndex >= currentTask.value.files.length ||
+            targetIndex < 0 || targetIndex >= currentTask.value.files.length) {
+          return;
+        }
+        
+        // 根据鼠标位置决定插入位置（上方或下方）
+        let insertIndex = targetIndex;
+        if (event.currentTarget) {
+          const rect = event.currentTarget.getBoundingClientRect();
+          const mouseY = event.clientY;
+          const elementCenterY = rect.top + rect.height / 2;
+          
+          if (mouseY < elementCenterY) {
+            // 插入到上方
+            insertIndex = targetIndex;
+          } else {
+            // 插入到下方
+            insertIndex = targetIndex + 1;
+          }
+        }
+        
+        // 只在内存中更新，不保存到后端
+        const list = [...(currentTask.value.files || [])];
+        const [removed] = list.splice(sourceIndex, 1);
+        
+        // 调整插入位置（如果 sourceIndex < insertIndex，插入位置需要减1）
+        if (sourceIndex < insertIndex) {
+          insertIndex = insertIndex - 1;
+        }
+        
+        list.splice(insertIndex, 0, removed);
+        
+        // 更新文件索引
+        list.forEach((file, index) => {
+          file.index = index;
+        });
+        
+        // 更新当前任务的文件列表
+        currentTask.value = {
+          ...currentTask.value,
+          files: list
+        };
+      };
+
       onMounted(() => {
         loadTaskList();
       });
@@ -348,6 +535,7 @@ async function createComponent() {
         handleDownloadResultFromList,
         formatFileSize,
         formatSize,
+        formatDuration,
         getStatusTagType,
         getStatusText,
         // 文件浏览器
@@ -356,6 +544,13 @@ async function createComponent() {
         handleCloseFileBrowser: () => {
           fileBrowserDialogVisible.value = false;
         },
+        // 文件拖拽排序
+        filesDragMode,
+        handleToggleFilesDragMode,
+        handleFileDragStart,
+        handleFileDragEnd,
+        handleFileDragOver,
+        handleFileDrop,
       };
     },
     template,
