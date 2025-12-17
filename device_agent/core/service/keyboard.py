@@ -58,6 +58,12 @@ PYNPUT_SLEEP_INTERVAL = 0.1
 # evdev 按键按下事件值
 EVDEV_KEY_PRESS_VALUE = 1
 
+# evdev 设备重连间隔（秒）
+EVDEV_RECONNECT_INTERVAL = 2
+
+# evdev 设备重连最大尝试次数（0 表示无限重试）
+EVDEV_MAX_RECONNECT_ATTEMPTS = 0
+
 # pynput 按键映射（如果可用）
 PYNPUT_KEY_CODES: Dict[str, object] = {}
 PYNPUT_KEY_TO_NAME: Dict[object, str] = {}
@@ -374,48 +380,109 @@ class KeyboardListener:
             log.info("[KEYBOARD] pynput 监听循环已退出")
 
     def _listen_loop_evdev(self):
-        """evdev 监听循环"""
-        device = None
-        try:
-            device_path = self._evdev_device_path
-            if not device_path:
-                log.error("[KEYBOARD] 未找到键盘设备")
-                return
-
-            device = evdev.InputDevice(device_path)
-            log.info(f"[KEYBOARD] 开始监听设备: {device.path} ({device.name})")
-
-            # 将设备设置为独占模式（需要权限）
+        """evdev 监听循环（支持设备热插拔）"""
+        reconnect_count = 0
+        permanent_error = False
+        
+        while self.is_running and not permanent_error:
+            device = None
             try:
-                device.grab()
-                log.debug("[KEYBOARD] 设备已独占锁定")
-            except (PermissionError, OSError) as e:
-                log.warning(f"[KEYBOARD] 无法独占锁定设备（可能需要 root 权限或 input 组）: {e}")
+                # 每次循环都重新查找设备（支持热插拔）
+                device_path = _find_keyboard_device()
+                if not device_path:
+                    if reconnect_count == 0:
+                        log.warning("[KEYBOARD] 未找到键盘设备，等待设备插入...")
+                    reconnect_count += 1
+                    
+                    # 检查是否超过最大重连次数
+                    if EVDEV_MAX_RECONNECT_ATTEMPTS > 0 and reconnect_count > EVDEV_MAX_RECONNECT_ATTEMPTS:
+                        log.error(f"[KEYBOARD] 已达到最大重连次数 ({EVDEV_MAX_RECONNECT_ATTEMPTS})，停止监听")
+                        permanent_error = True
+                        break
+                    
+                    # 等待一段时间后重试
+                    for _ in range(int(EVDEV_RECONNECT_INTERVAL * 10)):
+                        if not self.is_running:
+                            return
+                        time.sleep(0.1)
+                    continue
 
-            # 监听事件
-            for event in device.read_loop():
-                if not self.is_running:
-                    break
+                # 找到设备，重置重连计数
+                if reconnect_count > 0:
+                    log.info(f"[KEYBOARD] 检测到键盘设备已插入: {device_path}")
+                    reconnect_count = 0
+                    self._evdev_device_path = device_path
 
-                # 只处理按键按下事件 (value=1 表示按下，0=释放，2=长按)
-                if event.type == evdev.ecodes.EV_KEY and event.value == EVDEV_KEY_PRESS_VALUE:
-                    self._on_key_press_evdev(event.code)
+                device = evdev.InputDevice(device_path)
+                log.info(f"[KEYBOARD] 开始监听设备: {device.path} ({device.name})")
 
-        except PermissionError:
-            log.error("[KEYBOARD] 权限不足，无法访问键盘设备。请使用 root 运行或添加用户到 input 组: sudo usermod -a -G input $USER")
-        except OSError as e:
-            log.error(f"[KEYBOARD] 设备访问错误: {e}")
-        except Exception as e:
-            log.error(f"[KEYBOARD] evdev 监听循环出错: {e}")
-            log.error(f"[KEYBOARD] Traceback: {traceback.format_exc()}")
-        finally:
-            if device:
+                # 将设备设置为独占模式（需要权限）
                 try:
-                    device.ungrab()
-                except Exception:
-                    pass
-            self.is_running = False
-            log.info("[KEYBOARD] evdev 监听循环已退出")
+                    device.grab()
+                    log.debug("[KEYBOARD] 设备已独占锁定")
+                except (PermissionError, OSError) as e:
+                    log.warning(f"[KEYBOARD] 无法独占锁定设备（可能需要 root 权限或 input 组）: {e}")
+
+                # 监听事件
+                for event in device.read_loop():
+                    if not self.is_running:
+                        break
+
+                    # 只处理按键按下事件 (value=1 表示按下，0=释放，2=长按)
+                    if event.type == evdev.ecodes.EV_KEY and event.value == EVDEV_KEY_PRESS_VALUE:
+                        self._on_key_press_evdev(event.code)
+
+            except PermissionError:
+                log.error("[KEYBOARD] 权限不足，无法访问键盘设备。请使用 root 运行或添加用户到 input 组: sudo usermod -a -G input $USER")
+                permanent_error = True
+                break
+            except OSError as e:
+                # 设备断开或不可用，尝试重连
+                error_msg = str(e).lower()
+                if any(keyword in error_msg for keyword in ['no such file', 'no such device', 'device disconnected', 'input/output error']):
+                    log.warning(f"[KEYBOARD] 键盘设备已断开: {e}，尝试重新连接...")
+                    reconnect_count += 1
+                    
+                    # 检查是否超过最大重连次数
+                    if EVDEV_MAX_RECONNECT_ATTEMPTS > 0 and reconnect_count > EVDEV_MAX_RECONNECT_ATTEMPTS:
+                        log.error(f"[KEYBOARD] 已达到最大重连次数 ({EVDEV_MAX_RECONNECT_ATTEMPTS})，停止监听")
+                        permanent_error = True
+                        break
+                    
+                    # 清理设备引用
+                    if device:
+                        try:
+                            device.ungrab()
+                        except Exception:
+                            pass
+                    
+                    # 清除设备路径，下次循环会重新查找
+                    self._evdev_device_path = None
+                    
+                    # 等待一段时间后重试
+                    for _ in range(int(EVDEV_RECONNECT_INTERVAL * 10)):
+                        if not self.is_running:
+                            return
+                        time.sleep(0.1)
+                else:
+                    # 其他 OSError，可能是永久性错误
+                    log.error(f"[KEYBOARD] 设备访问错误: {e}")
+                    permanent_error = True
+                    break
+            except Exception as e:
+                log.error(f"[KEYBOARD] evdev 监听循环出错: {e}")
+                log.error(f"[KEYBOARD] Traceback: {traceback.format_exc()}")
+                permanent_error = True
+                break
+            finally:
+                if device:
+                    try:
+                        device.ungrab()
+                    except Exception:
+                        pass
+        
+        self.is_running = False
+        log.info("[KEYBOARD] evdev 监听循环已退出")
 
     def _try_start_evdev(self) -> bool:
         """尝试启动 evdev 监听"""
