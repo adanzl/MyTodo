@@ -314,6 +314,53 @@ def upload_file():
         return _err(f"上传文件失败: {str(e)}")
 
 
+@media_bp.route("/media/task/addFileByPath", methods=['POST'])
+def add_file_by_path():
+    """
+    通过文件路径添加文件到任务
+    参数：
+    - task_id: 任务ID（JSON 或 form 参数）
+    - file_path: 文件路径（JSON 或 form 参数）
+    """
+    try:
+        data = request.get_json() or request.form.to_dict()
+        task_id = data.get('task_id')
+        file_path = data.get('file_path')
+        
+        if not task_id:
+            return _err("task_id 参数不能为空")
+        
+        if not file_path:
+            return _err("file_path 参数不能为空")
+        
+        # 验证文件路径
+        file_path = validate_and_normalize_path(file_path)
+        if not file_path:
+            return _err("文件路径无效")
+        
+        if not os.path.exists(file_path):
+            return _err(f"文件不存在: {file_path}")
+        
+        if not os.path.isfile(file_path):
+            return _err(f"路径不是文件: {file_path}")
+        
+        filename = os.path.basename(file_path)
+        if not is_allowed_audio_file(filename):
+            return _err(f"不支持的文件类型，支持的格式: {', '.join(ALLOWED_AUDIO_EXTENSIONS)}")
+        
+        # 添加到任务
+        code, msg = media_tool_mgr.add_file(task_id, file_path, filename)
+        if code != 0:
+            return _err(msg)
+        
+        file_info = get_file_info(file_path)
+        return _ok(file_info)
+        
+    except Exception as e:
+        log.error(f"[MediaTool] 添加文件失败: {e}")
+        return _err(f"添加文件失败: {str(e)}")
+
+
 @media_bp.route("/media/task/deleteFile", methods=['POST'])
 def delete_file():
     """

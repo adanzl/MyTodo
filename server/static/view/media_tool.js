@@ -1,4 +1,6 @@
 import { getApiUrl } from "../js/net_util.js";
+import { formatSize } from "../js/utils.js";
+import { createFileDialog } from "./file_dialog.js";
 const axios = window.axios;
 
 const { ref, onMounted } = window.Vue;
@@ -14,14 +16,57 @@ async function createComponent() {
   if (component) return component;
   const template = await loadTemplate();
   
+  // 加载文件对话框组件
+  const FileDialog = await createFileDialog();
+  
   component = {
+    components: {
+      FileDialog,
+    },
     setup() {
       const loading = ref(false);
       const activeTab = ref('audio_merge');
       const taskList = ref([]);
-      const taskDialogVisible = ref(false);
       const currentTask = ref(null);
-      const uploadFile = ref(null);
+      
+      // 文件浏览器对话框可见性
+      const fileBrowserDialogVisible = ref(false);
+      
+      // 处理文件选择确认
+      const handleFileBrowserConfirm = async (filePaths) => {
+        if (!currentTask.value) {
+          return;
+        }
+        
+        if (filePaths.length === 0) {
+          return;
+        }
+        
+        try {
+          loading.value = true;
+          // 批量添加文件
+          for (const filePath of filePaths) {
+            const response = await axios.post(`${getApiUrl()}/media/task/addFileByPath`, {
+              task_id: currentTask.value.task_id,
+              file_path: filePath
+            });
+            
+            if (response.data.code !== 0) {
+              ElMessage.error(`添加文件失败: ${response.data.msg || "未知错误"}`);
+              break;
+            }
+          }
+          
+          ElMessage.success(`成功添加 ${filePaths.length} 个文件`);
+          // 刷新任务信息
+          await handleViewTask(currentTask.value.task_id);
+        } catch (error) {
+          console.error("添加文件失败:", error);
+          ElMessage.error("添加文件失败: " + (error.message || "未知错误"));
+        } finally {
+          loading.value = false;
+        }
+      };
 
       // 加载任务列表
       const loadTaskList = async () => {
@@ -30,6 +75,10 @@ async function createComponent() {
           const response = await axios.get(`${getApiUrl()}/media/task/list`);
           if (response.data.code === 0) {
             taskList.value = response.data.data.tasks || [];
+            // 如果有任务列表且当前没有选中任务，默认选择第一个任务
+            if (taskList.value.length > 0 && !currentTask.value) {
+              await handleViewTask(taskList.value[0].task_id);
+            }
           } else {
             ElMessage.error(response.data.msg || "获取任务列表失败");
           }
@@ -44,26 +93,8 @@ async function createComponent() {
       // 创建任务
       const handleCreateTask = async () => {
         try {
-          const { value } = await ElMessageBox.prompt(
-            "请输入任务名称",
-            "新建任务",
-            {
-              confirmButtonText: "确定",
-              cancelButtonText: "取消",
-              inputPlaceholder: "任务名称",
-            }
-          ).catch(() => {
-            return { value: null };
-          });
-
-          if (!value || !value.trim()) {
-            return;
-          }
-
           loading.value = true;
-          const response = await axios.post(`${getApiUrl()}/media/task/create`, {
-            name: value.trim()
-          });
+          const response = await axios.post(`${getApiUrl()}/media/task/create`, {});
 
           if (response.data.code === 0) {
             ElMessage.success("任务创建成功");
@@ -90,7 +121,6 @@ async function createComponent() {
           });
           if (response.data.code === 0) {
             currentTask.value = response.data.data;
-            taskDialogVisible.value = true;
           } else {
             ElMessage.error(response.data.msg || "获取任务信息失败");
           }
@@ -125,7 +155,6 @@ async function createComponent() {
             ElMessage.success("任务删除成功");
             await loadTaskList();
             if (currentTask.value && currentTask.value.task_id === taskId) {
-              taskDialogVisible.value = false;
               currentTask.value = null;
             }
           } else {
@@ -139,62 +168,13 @@ async function createComponent() {
         }
       };
 
-      // 处理文件选择
-      const handleFileChange = async (file) => {
+      // 打开文件浏览器
+      const handleOpenFileBrowser = () => {
         if (!currentTask.value) {
           ElMessage.warning("请先创建或选择任务");
           return;
         }
-
-        uploadFile.value = file.raw;
-        await handleUploadFile();
-      };
-
-      // 上传文件
-      const handleUploadFile = async () => {
-        if (!uploadFile.value || !currentTask.value) {
-          return;
-        }
-
-        const file = uploadFile.value;
-        const allowedExtensions = ['.mp3', '.wav', '.flac', '.aac', '.m4a', '.ogg', '.wma'];
-        const ext = '.' + file.name.split('.').pop().toLowerCase();
-        if (!allowedExtensions.includes(ext)) {
-          ElMessage.error(`不支持的文件类型，支持的格式: ${allowedExtensions.join(', ')}`);
-          uploadFile.value = null;
-          return;
-        }
-
-        try {
-          loading.value = true;
-          const formData = new FormData();
-          formData.append('file', file);
-          formData.append('task_id', currentTask.value.task_id);
-
-          const response = await axios.post(
-            `${getApiUrl()}/media/task/upload`,
-            formData,
-            {
-              headers: {
-                'Content-Type': 'multipart/form-data',
-              },
-            }
-          );
-
-          if (response.data.code === 0) {
-            ElMessage.success("文件上传成功");
-            uploadFile.value = null;
-            // 刷新任务信息
-            await handleViewTask(currentTask.value.task_id);
-          } else {
-            ElMessage.error(response.data.msg || "文件上传失败");
-          }
-        } catch (error) {
-          console.error("文件上传失败:", error);
-          ElMessage.error("文件上传失败: " + (error.message || "未知错误"));
-        } finally {
-          loading.value = false;
-        }
+        fileBrowserDialogVisible.value = true;
       };
 
       // 移除文件
@@ -309,6 +289,15 @@ async function createComponent() {
         window.open(url, '_blank');
       };
 
+      // 从任务列表下载结果
+      const handleDownloadResultFromList = (task) => {
+        if (!task || !task.result_file) {
+          return;
+        }
+        const url = `${getApiUrl()}/media/task/download?task_id=${task.task_id}`;
+        window.open(url, '_blank');
+      };
+
       // 格式化文件大小
       const formatFileSize = (bytes) => {
         if (!bytes) return '-';
@@ -347,21 +336,26 @@ async function createComponent() {
         loading,
         activeTab,
         taskList,
-        taskDialogVisible,
         currentTask,
-        uploadFile,
         loadTaskList,
         handleCreateTask,
         handleViewTask,
         handleDeleteTask,
-        handleFileChange,
-        handleUploadFile,
+        handleOpenFileBrowser,
         handleRemoveFile,
         handleStartMerge,
         handleDownloadResult,
+        handleDownloadResultFromList,
         formatFileSize,
+        formatSize,
         getStatusTagType,
         getStatusText,
+        // 文件浏览器
+        fileBrowserDialogVisible,
+        handleFileBrowserConfirm,
+        handleCloseFileBrowser: () => {
+          fileBrowserDialogVisible.value = false;
+        },
       };
     },
     template,

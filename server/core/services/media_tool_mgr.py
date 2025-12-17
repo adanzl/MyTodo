@@ -195,14 +195,17 @@ class MediaToolMgr:
         random_str = ''.join(random.choices(string.ascii_lowercase + string.digits, k=4))
         return f"{timestamp}{random_str}"
     
-    def create_task(self, name: str) -> Tuple[int, str, Optional[str]]:
+    def create_task(self, name: Optional[str] = None) -> Tuple[int, str, Optional[str]]:
         """
         创建音频合成任务
         
-        :param name: 任务名称
+        :param name: 任务名称，如果为 None 则使用默认日期时间
         :return: (错误码, 消息, 任务ID)，0 表示成功
         """
         try:
+            # 如果没有提供名称，使用当前日期时间作为默认名称
+            if not name:
+                name = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             # 生成唯一任务ID
             task_id = self._generate_task_id()
             while task_id in self._tasks:
@@ -464,11 +467,14 @@ class MediaToolMgr:
     
     def list_tasks(self) -> List[Dict]:
         """
-        列出所有任务
+        列出所有任务，按创建时间倒序排列（最新的在上面）
         
         :return: 任务列表
         """
-        return [asdict(task) for task in self._tasks.values()]
+        tasks = [asdict(task) for task in self._tasks.values()]
+        # 按创建时间倒序排序，最新的在上面
+        tasks.sort(key=lambda x: x.get('create_time', 0), reverse=True)
+        return tasks
     
     def delete_task(self, task_id: str) -> Tuple[int, str]:
         """

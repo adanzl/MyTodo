@@ -1,5 +1,6 @@
 import { bluetoothAction, playlistAction, getApiUrl } from "../js/net_util.js";
 import { createPlaylistId, formatDateTime, formatDuration, formatDurationMinutes, formatSize } from "../js/utils.js";
+import { createFileDialog } from "./file_dialog.js";
 const axios = window.axios;
 
 const { ref, watch, onMounted, onUnmounted, nextTick } = window.Vue;
@@ -12,15 +13,18 @@ async function loadTemplate() {
 async function createComponent() {
   if (component) return component;
   const template = await loadTemplate();
+  
+  // 加载文件对话框组件
+  const FileDialog = await createFileDialog();
+  
   component = {
+    components: {
+      FileDialog,
+    },
     setup() {
       const refData = {
         scanDialogVisible: ref(false),
         fileBrowserDialogVisible: ref(false),
-        fileBrowserPath: ref("/mnt/ext_base"),
-        fileBrowserList: ref([]),
-        fileBrowserLoading: ref(false),
-        selectedFiles: ref([]),
         fileBrowserTarget: ref("files"), // "files" 或 "pre_files"
         cronBuilder: ref({
           second: "*",
@@ -257,8 +261,80 @@ async function createComponent() {
         return null;
       };
 
-      // 保存最后一次添加文件时的目录路径（内存中）
-      let lastFileBrowserPath = "/mnt/ext_base";
+      // 处理文件选择确认
+      const handleFileBrowserConfirm = async (filePaths) => {
+        if (filePaths.length === 0) {
+          return;
+        }
+        if (!refData.playlistStatus.value) {
+          ElMessage.warning("请先创建并选择一个播放列表");
+          return;
+        }
+
+        try {
+          refData.playlistLoading.value = true;
+
+          let deviceAddress = refData.playlistStatus.value.device_address;
+
+          // 如果没有设备地址，尝试获取已连接的设备
+          if (!deviceAddress && refData.connectedDeviceList.value.length > 0) {
+            const connectedDevice = refData.connectedDeviceList.value.find((d) => d.connected);
+            if (connectedDevice) {
+              deviceAddress = connectedDevice.address;
+            } else if (refData.connectedDeviceList.value.length > 0) {
+              deviceAddress = refData.connectedDeviceList.value[0].address;
+            }
+          }
+
+          await updateActivePlaylistData((playlistInfo) => {
+            const targetList = refData.fileBrowserTarget.value === "pre_files" 
+              ? (Array.isArray(playlistInfo.pre_files) ? [...playlistInfo.pre_files] : [])
+              : (Array.isArray(playlistInfo.playlist) ? [...playlistInfo.playlist] : []);
+            
+            // 获取已存在的 URI 集合
+            const existingUris = new Set();
+            targetList.forEach((item) => {
+              if (item?.uri) {
+                existingUris.add(item.uri);
+              }
+            });
+            
+            // 添加新文件，格式化为新格式 {"uri": "地址"}
+            for (const filePath of filePaths) {
+              if (!existingUris.has(filePath)) {
+                const fileItem = {
+                  uri: filePath,
+                };
+                targetList.push(fileItem);
+                existingUris.add(filePath);
+              }
+            }
+            
+            if (refData.fileBrowserTarget.value === "pre_files") {
+              playlistInfo.pre_files = targetList;
+            } else {
+              playlistInfo.playlist = targetList;
+              playlistInfo.total = targetList.length;
+              playlistInfo.device_address = deviceAddress || playlistInfo.device_address;
+              if (targetList.length === 0) {
+                playlistInfo.current_index = 0;
+              } else if (playlistInfo.current_index >= targetList.length) {
+                playlistInfo.current_index = targetList.length - 1;
+              }
+            }
+            return playlistInfo;
+          });
+
+          const targetName = refData.fileBrowserTarget.value === "pre_files" ? "前置列表" : "播放列表";
+          ElMessage.success(`成功添加 ${filePaths.length} 个文件到${targetName}`);
+          refData.fileBrowserDialogVisible.value = false;
+        } catch (error) {
+          console.error("添加文件到播放列表失败:", error);
+          ElMessage.error("添加文件到播放列表失败: " + (error.message || "未知错误"));
+        } finally {
+          refData.playlistLoading.value = false;
+        }
+      };
 
       const syncActivePlaylist = (collection) => {
         const list = Array.isArray(collection) ? collection : refData.playlistCollection.value;
@@ -2701,10 +2777,7 @@ async function createComponent() {
           return;
         }
         refData.fileBrowserDialogVisible.value = true;
-        refData.fileBrowserPath.value = lastFileBrowserPath;
-        refData.selectedFiles.value = [];
         refData.fileBrowserTarget.value = "files"; // 默认添加到 files
-        handleRefreshFileBrowser();
       };
 
       const handleOpenFileBrowserForPreFiles = () => {
@@ -2713,204 +2786,11 @@ async function createComponent() {
           return;
         }
         refData.fileBrowserDialogVisible.value = true;
-        refData.fileBrowserPath.value = lastFileBrowserPath;
-        refData.selectedFiles.value = [];
         refData.fileBrowserTarget.value = "pre_files"; // 默认添加到 pre_files
-        handleRefreshFileBrowser();
       };
 
       const handleCloseFileBrowser = () => {
         refData.fileBrowserDialogVisible.value = false;
-        refData.selectedFiles.value = [];
-      };
-
-      const handleRefreshFileBrowser = async () => {
-        try {
-          refData.fileBrowserLoading.value = true;
-          const path = refData.fileBrowserPath.value || "/mnt/ext_base";
-          const rsp = await axios.get(getApiUrl() + "/listDirectory", {
-            params: { path: path, extensions: "audio" },
-          });
-          if (rsp.data.code === 0) {
-            refData.fileBrowserList.value = rsp.data.data || [];
-            updateFileBrowserCanNavigateUp();
-          } else {
-            ElMessage.error(rsp.data.msg || "获取文件列表失败");
-          }
-        } catch (error) {
-          console.error("获取文件列表失败:", error);
-          ElMessage.error("获取文件列表失败: " + (error.message || "未知错误"));
-        } finally {
-          refData.fileBrowserLoading.value = false;
-        }
-      };
-
-      const handleFileBrowserNavigateUp = () => {
-        const path = refData.fileBrowserPath.value;
-        if (path && path !== "/mnt/ext_base" && path !== "/") {
-          const parts = String(path).split("/").filter((p) => p);
-          parts.pop();
-          refData.fileBrowserPath.value =
-            parts.length > 0 ? "/" + parts.join("/") : "/mnt/ext_base";
-          updateFileBrowserCanNavigateUp();
-          handleRefreshFileBrowser();
-        }
-      };
-
-      const handleFileBrowserGoToHome = () => {
-        refData.fileBrowserPath.value = "/mnt/ext_base";
-        updateFileBrowserCanNavigateUp();
-        handleRefreshFileBrowser();
-      };
-
-      const handleFileBrowserRowClick = (row) => {
-        if (row.isDirectory) {
-          const newPath =
-            refData.fileBrowserPath.value === "/"
-              ? `/${row.name}`
-              : `${refData.fileBrowserPath.value}/${row.name}`;
-          refData.fileBrowserPath.value = newPath;
-          updateFileBrowserCanNavigateUp();
-          handleRefreshFileBrowser();
-        } else {
-          handleToggleFileSelection(row);
-        }
-      };
-
-      const handleToggleFileSelection = (row) => {
-        if (row.isDirectory) return;
-        const filePath =
-          refData.fileBrowserPath.value === "/"
-            ? `/${row.name}`
-            : `${refData.fileBrowserPath.value}/${row.name}`;
-        const index = refData.selectedFiles.value.indexOf(filePath);
-        if (index > -1) {
-          refData.selectedFiles.value.splice(index, 1);
-        } else {
-          refData.selectedFiles.value.push(filePath);
-        }
-      };
-
-      // 检查文件是否被选中
-      const isFileSelected = (row) => {
-        if (row.isDirectory) return false;
-        const filePath =
-          refData.fileBrowserPath.value === "/"
-            ? `/${row.name}`
-            : `${refData.fileBrowserPath.value}/${row.name}`;
-        return refData.selectedFiles.value.includes(filePath);
-      };
-
-      // 全选当前目录下的所有文件
-      const handleSelectAllFiles = () => {
-        const currentPath = refData.fileBrowserPath.value;
-        refData.fileBrowserList.value.forEach((row) => {
-          if (!row.isDirectory) {
-            const filePath = currentPath === "/" ? `/${row.name}` : `${currentPath}/${row.name}`;
-            if (!refData.selectedFiles.value.includes(filePath)) {
-              refData.selectedFiles.value.push(filePath);
-            }
-          }
-        });
-      };
-
-      // 取消全选当前目录下的所有文件
-      const handleDeselectAllFiles = () => {
-        const currentPath = refData.fileBrowserPath.value;
-        const currentFiles = refData.fileBrowserList.value
-          .filter((row) => !row.isDirectory)
-          .map((row) => {
-            return currentPath === "/" ? `/${row.name}` : `${currentPath}/${row.name}`;
-          });
-
-        // 只移除当前目录下的文件，保留其他目录的文件
-        refData.selectedFiles.value = refData.selectedFiles.value.filter((filePath) => {
-          return !currentFiles.includes(filePath);
-        });
-      };
-
-      const fileBrowserCanNavigateUp = ref(false);
-      const updateFileBrowserCanNavigateUp = () => {
-        const path = refData.fileBrowserPath.value;
-        fileBrowserCanNavigateUp.value = path && path !== "/mnt/ext_base" && path !== "/";
-      };
-
-      // 添加文件到播放列表
-      const handleAddFilesToPlaylist = async () => {
-        if (refData.selectedFiles.value.length === 0) {
-          ElMessage.warning("请先选择要添加的文件");
-          return;
-        }
-        if (!refData.playlistStatus.value) {
-          ElMessage.warning("请先创建并选择一个播放列表");
-          return;
-        }
-
-        try {
-          refData.playlistLoading.value = true;
-
-          let deviceAddress = refData.playlistStatus.value.device_address;
-
-          // 如果没有设备地址，尝试获取已连接的设备
-          if (!deviceAddress && refData.connectedDeviceList.value.length > 0) {
-            const connectedDevice = refData.connectedDeviceList.value.find((d) => d.connected);
-            if (connectedDevice) {
-              deviceAddress = connectedDevice.address;
-            } else if (refData.connectedDeviceList.value.length > 0) {
-              deviceAddress = refData.connectedDeviceList.value[0].address;
-            }
-          }
-
-          await updateActivePlaylistData((playlistInfo) => {
-            const targetList = refData.fileBrowserTarget.value === "pre_files" 
-              ? (Array.isArray(playlistInfo.pre_files) ? [...playlistInfo.pre_files] : [])
-              : (Array.isArray(playlistInfo.playlist) ? [...playlistInfo.playlist] : []);
-            
-            // 获取已存在的 URI 集合
-            const existingUris = new Set();
-            targetList.forEach((item) => {
-              if (item?.uri) {
-                existingUris.add(item.uri);
-              }
-            });
-            
-            // 添加新文件，格式化为新格式 {"uri": "地址"}
-            for (const filePath of refData.selectedFiles.value) {
-              if (!existingUris.has(filePath)) {
-                const fileItem = {
-                  uri: filePath,
-                };
-                targetList.push(fileItem);
-                existingUris.add(filePath);
-              }
-            }
-            
-            if (refData.fileBrowserTarget.value === "pre_files") {
-              playlistInfo.pre_files = targetList;
-            } else {
-              playlistInfo.playlist = targetList;
-              playlistInfo.total = targetList.length;
-              playlistInfo.device_address = deviceAddress || playlistInfo.device_address;
-              if (targetList.length === 0) {
-                playlistInfo.current_index = 0;
-              } else if (playlistInfo.current_index >= targetList.length) {
-                playlistInfo.current_index = targetList.length - 1;
-              }
-            }
-            return playlistInfo;
-          });
-
-          const targetName = refData.fileBrowserTarget.value === "pre_files" ? "前置列表" : "播放列表";
-          ElMessage.success(`成功添加 ${refData.selectedFiles.value.length} 个文件到${targetName}`);
-          // 保存当前目录路径，以便下次打开时使用
-          lastFileBrowserPath = refData.fileBrowserPath.value;
-          handleCloseFileBrowser();
-        } catch (error) {
-          console.error("添加文件到播放列表失败:", error);
-          ElMessage.error("添加文件到播放列表失败: " + (error.message || "未知错误"));
-        } finally {
-          refData.playlistLoading.value = false;
-        }
       };
 
       const refMethods = {
@@ -2969,15 +2849,7 @@ async function createComponent() {
         handleOpenFileBrowser,
         handleOpenFileBrowserForPreFiles,
         handleCloseFileBrowser,
-        handleRefreshFileBrowser,
-        handleFileBrowserNavigateUp,
-        handleFileBrowserGoToHome,
-        handleFileBrowserRowClick,
-        handleToggleFileSelection,
-        isFileSelected,
-        handleSelectAllFiles,
-        handleDeselectAllFiles,
-        handleAddFilesToPlaylist,
+        handleFileBrowserConfirm,
         handleTogglePlaylistCronEnabled,
         handleUpdatePlaylistCron,
         handleUpdatePlaylistDuration,
@@ -3004,7 +2876,6 @@ async function createComponent() {
         handleTestAgentButton,
       };
 
-      updateFileBrowserCanNavigateUp();
 
       // 定时器：每5秒刷新播放列表状态
       let statusRefreshTimer = null;
@@ -3064,7 +2935,6 @@ async function createComponent() {
       return {
         ...refData,
         cronBuilderVisible,
-        fileBrowserCanNavigateUp,
         ...refMethods,
       };
     },

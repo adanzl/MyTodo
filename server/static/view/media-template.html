@@ -1004,94 +1004,22 @@
   </el-dialog>
 
   <!-- 文件浏览对话框 -->
-  <el-dialog
-    v-model="fileBrowserDialogVisible"
+  <!-- 文件对话框 -->
+  <file-dialog
+    :visible="fileBrowserDialogVisible"
+    @update:visible="fileBrowserDialogVisible = $event"
     title="选择文件添加到播放列表"
-    width="800"
-    :before-close="handleCloseFileBrowser">
-    <div class="m-4">
-      <div class="flex items-center gap-2 mb-2">
-        <el-input v-model="fileBrowserPath" placeholder="当前路径" readonly> </el-input>
-        <el-button type="primary" @click="handleRefreshFileBrowser" :loading="fileBrowserLoading">
-          刷新
-        </el-button>
-      </div>
-      <div class="flex items-center gap-2 mb-2">
-        <el-button
-          size="small"
-          @click="handleFileBrowserNavigateUp"
-          :disabled="!fileBrowserCanNavigateUp">
-          上一级
-        </el-button>
-        <el-button size="small" @click="handleFileBrowserGoToHome"> 首页 </el-button>
-        <el-button size="small" @click="handleSelectAllFiles"> 全选 </el-button>
-        <el-button size="small" @click="handleDeselectAllFiles"> 取消全选 </el-button>
-        <span v-if="selectedFiles.length > 0" class="text-sm text-blue-600 ml-2">
-          已选择 {{ selectedFiles.length }} 个文件
-        </span>
-      </div>
-    </div>
-    <el-table
-      :data="fileBrowserList"
-      stripe
-      class="w-full"
-      v-loading="fileBrowserLoading"
-      :height="400"
-      @row-click="handleFileBrowserRowClick">
-      <el-table-column width="55">
-        <template #default="{ row }">
-          <el-checkbox
-            v-if="!row.isDirectory"
-            :model-value="isFileSelected(row)"
-            @change="handleToggleFileSelection(row)"
-            @click.stop>
-          </el-checkbox>
-        </template>
-      </el-table-column>
-      <el-table-column prop="name" label="名称" min-width="200">
-        <template #default="{ row }">
-          <div class="flex items-center gap-2">
-            <span v-if="row.isDirectory">📁</span>
-            <span v-else>📄</span>
-            <span>{{ row.name }}</span>
-          </div>
-        </template>
-      </el-table-column>
-      <el-table-column prop="size" label="大小" width="100">
-        <template #default="{ row }">
-          <span v-if="!row.isDirectory">{{ formatSize(row.size) }}</span>
-          <span v-else>-</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="状态" width="100">
-        <template #default="{ row }">
-          <el-tag v-if="!row.isDirectory && isFileSelected(row)" type="success" size="small">
-            已选择
-          </el-tag>
-        </template>
-      </el-table-column>
-    </el-table>
-    <template #footer>
-      <div class="flex items-center justify-between">
-        <span class="text-sm text-gray-500"> 提示：点击文件可切换选择状态，双击目录可进入 </span>
-        <div class="flex gap-2 items-center">
-          <el-select v-model="fileBrowserTarget" size="small" style="width: 150px">
-            <el-option label="添加到主列表" value="files"></el-option>
-            <el-option label="添加到前置列表" value="pre_files"></el-option>
-          </el-select>
-          <el-button @click="handleCloseFileBrowser">取消</el-button>
-          <el-button
-            type="primary"
-            @click="handleAddFilesToPlaylist"
-            :loading="playlistLoading"
-            :disabled="selectedFiles.length === 0">
-            添加 ({{ selectedFiles.length }})
-          </el-button>
-        </div>
-      </div>
+    confirm-button-text="添加"
+    :confirm-loading="playlistLoading"
+    @confirm="handleFileBrowserConfirm"
+    @close="handleCloseFileBrowser">
+    <template #footer-prepend>
+      <el-select v-model="fileBrowserTarget" size="small" style="width: 150px">
+        <el-option label="添加到主列表" value="files"></el-option>
+        <el-option label="添加到前置列表" value="pre_files"></el-option>
+      </el-select>
     </template>
-  </el-dialog>
+  </file-dialog>
 
   <!-- 设备列表弹窗 -->
   <el-dialog

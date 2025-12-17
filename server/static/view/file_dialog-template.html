@@ -1,0 +1,87 @@
+<el-dialog
+  :model-value="visible"
+  @update:model-value="$emit('update:visible', $event)"
+  :title="title"
+  width="800"
+  :before-close="handleClose">
+  <div class="m-4">
+    <div class="flex items-center gap-2 mb-2">
+      <el-input :model-value="fileBrowserPath" placeholder="当前路径" readonly> </el-input>
+      <el-button type="primary" @click="handleRefresh" :loading="fileBrowserLoading">
+        刷新
+      </el-button>
+    </div>
+    <div class="flex items-center gap-2 mb-2">
+      <el-button
+        size="small"
+        @click="handleNavigateUp"
+        :disabled="!fileBrowserCanNavigateUp">
+        上一级
+      </el-button>
+      <el-button size="small" @click="handleGoToHome"> 首页 </el-button>
+      <el-button size="small" @click="handleSelectAll"> 全选 </el-button>
+      <el-button size="small" @click="handleDeselectAll"> 取消全选 </el-button>
+      <span v-if="selectedFiles.length > 0" class="text-sm text-blue-600 ml-2">
+        已选择 {{ selectedFiles.length }} 个文件
+      </span>
+    </div>
+  </div>
+  <el-table
+    :data="fileBrowserList"
+    stripe
+    class="w-full"
+    v-loading="fileBrowserLoading"
+    :height="400"
+    @row-click="handleRowClick">
+    <el-table-column width="55">
+      <template #default="{ row }">
+        <el-checkbox
+          v-if="!row.isDirectory"
+          :model-value="isFileSelected(row)"
+          @change="handleToggleSelection(row)"
+          @click.stop>
+        </el-checkbox>
+      </template>
+    </el-table-column>
+    <el-table-column prop="name" label="名称" min-width="200">
+      <template #default="{ row }">
+        <div class="flex items-center gap-2">
+          <span v-if="row.isDirectory">📁</span>
+          <span v-else>📄</span>
+          <span>{{ row.name }}</span>
+        </div>
+      </template>
+    </el-table-column>
+    <el-table-column prop="size" label="大小" width="100">
+      <template #default="{ row }">
+        <span v-if="!row.isDirectory">{{ formatSize(row.size) }}</span>
+        <span v-else>-</span>
+      </template>
+    </el-table-column>
+    <el-table-column label="状态" width="100">
+      <template #default="{ row }">
+        <el-tag v-if="!row.isDirectory && isFileSelected(row)" type="success" size="small">
+          已选择
+        </el-tag>
+      </template>
+    </el-table-column>
+  </el-table>
+  <template #footer>
+    <slot name="footer">
+      <div class="flex items-center justify-between">
+        <span class="text-sm text-gray-500"> 提示：点击文件可切换选择状态，双击目录可进入 </span>
+        <div class="flex gap-2 items-center">
+          <slot name="footer-prepend"></slot>
+          <el-button @click="handleClose">取消</el-button>
+          <el-button
+            type="primary"
+            @click="handleConfirm"
+            :loading="confirmLoading"
+            :disabled="selectedFiles.length === 0">
+            {{ confirmButtonText }} ({{ selectedFiles.length }})
+          </el-button>
+        </div>
+      </div>
+    </slot>
+  </template>
+</el-dialog>
