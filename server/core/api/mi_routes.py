@@ -58,3 +58,23 @@ def mi_volume():
     except Exception as e:
         log.error(f"[MI] Volume error: {e}")
         return _err(f'error: {str(e)}')
+
+
+@mi_bp.route("/mi/stop", methods=['POST'])
+def mi_stop():
+    """停止小米设备播放"""
+    try:
+        data = request.get_json() or {}
+        device_id = data.get('device_id')
+        if not device_id:
+            return _err('device_id is required')
+
+        device = MiDevice(device_id)
+        code, msg = device.stop()
+        if code == 0:
+            return _ok({'message': msg or '停止成功'})
+        else:
+            return _err(msg or '停止失败')
+    except Exception as e:
+        log.error(f"[MI] Stop error: {e}")
+        return _err(f'error: {str(e)}')

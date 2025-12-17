@@ -713,6 +713,33 @@ async function createComponent() {
         await setMiDeviceVolume(device, newVolume);
       };
 
+      // 停止小米设备播放
+      const handleStopMiDevice = async (device) => {
+        const deviceId = getMiDeviceId(device);
+        if (!deviceId) {
+          ElMessage.warning("设备ID无效");
+          return;
+        }
+
+        try {
+          device._stopping = true;
+          const response = await axios.post(`${getApiUrl()}/mi/stop`, {
+            device_id: deviceId
+          });
+
+          if (response.data.code === 0) {
+            ElMessage.success("停止播放成功");
+          } else {
+            ElMessage.error(response.data.msg || "停止播放失败");
+          }
+        } catch (error) {
+          console.error("停止小米设备播放失败:", error);
+          ElMessage.error("停止播放失败: " + (error.message || "未知错误"));
+        } finally {
+          device._stopping = false;
+        }
+      };
+
       const handleUpdateDeviceList = async () => {
         try {
           refData.loading.value = true;
@@ -2967,6 +2994,7 @@ async function createComponent() {
         handleMiDeviceVolumeChange,
         getMiDeviceVolume,
         setMiDeviceVolume,
+        handleStopMiDevice,
         getPreFilesTotalDuration,
         getFilesTotalDuration,
         getPlaylistTotalDuration,
