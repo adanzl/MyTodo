@@ -69,7 +69,10 @@
   <template #footer>
     <slot name="footer">
       <div class="flex items-center justify-between">
-        <span class="text-sm text-gray-500"> 提示：点击文件可切换选择状态，双击目录可进入 </span>
+        <span class="text-sm text-gray-500">
+          <span v-if="mode === 'file'">提示：点击文件可切换选择状态，双击目录可进入</span>
+          <span v-else>提示：选择目录作为转存目标，双击目录可进入</span>
+        </span>
         <div class="flex gap-2 items-center">
           <slot name="footer-prepend"></slot>
           <el-button @click="handleClose">取消</el-button>
@@ -77,8 +80,8 @@
             type="primary"
             @click="handleConfirm"
             :loading="confirmLoading"
-            :disabled="selectedFiles.length === 0">
-            {{ confirmButtonText }} ({{ selectedFiles.length }})
+            :disabled="isConfirmDisabled">
+            {{ confirmButtonText }}<span v-if="mode === 'file'"> ({{ selectedFiles.length }})</span>
           </el-button>
         </div>
       </div>

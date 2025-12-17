@@ -6,7 +6,7 @@ import { getApiUrl } from "../js/net_util.js";
 import { formatSize } from "../js/utils.js";
 
 const axios = window.axios;
-const { ref, watch } = window.Vue;
+const { ref, watch, computed } = window.Vue;
 const { ElMessage } = window.ElementPlus;
 
 /**
@@ -239,6 +239,10 @@ export async function createFileDialog() {
         type: Boolean,
         default: false,
       },
+      mode: {
+        type: String,
+        default: "file", // "file" 或 "directory"
+      },
     },
     emits: ["update:visible", "confirm", "close"],
     setup(props, { emit }) {
@@ -274,7 +278,22 @@ export async function createFileDialog() {
 
       // 处理确认
       const handleConfirm = () => {
-        fileBrowser.confirmSelection();
+        // 获取 mode 值
+        const modeValue = props.mode;
+        const modeStr = String(modeValue || 'file').toLowerCase().trim();
+        
+        if (modeStr === "directory") {
+          // 目录模式：传递当前路径
+          const currentPath = fileBrowser.fileBrowserPath.value || props.defaultPath || '/mnt/ext_base';
+          if (!currentPath || String(currentPath).trim() === '') {
+            ElMessage.warning("请先选择一个目录");
+            return;
+          }
+          emit("confirm", [String(currentPath)]);
+        } else {
+          // 文件模式：传递选中的文件
+          fileBrowser.confirmSelection();
+        }
       };
 
       // 处理关闭
@@ -282,6 +301,17 @@ export async function createFileDialog() {
         fileBrowser.closeFileBrowser();
         emit("close");
       };
+
+      // 计算按钮是否禁用
+      const isConfirmDisabled = computed(() => {
+        const modeValue = String(props.mode || 'file').toLowerCase().trim();
+        // 目录模式下，按钮始终可用
+        if (modeValue === 'directory') {
+          return false;
+        }
+        // 文件模式下，没有选中文件时禁用
+        return fileBrowser.selectedFiles.value.length === 0;
+      });
 
       return {
         fileBrowser,
@@ -302,6 +332,8 @@ export async function createFileDialog() {
         handleRowClick: fileBrowser.handleRowClick,
         handleToggleSelection: fileBrowser.toggleFileSelection,
         isFileSelected: fileBrowser.isFileSelected,
+        mode: props.mode,
+        isConfirmDisabled,
       };
     },
     template,

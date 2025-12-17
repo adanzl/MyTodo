@@ -3,7 +3,7 @@ import { formatSize, formatDuration } from "../js/utils.js";
 import { createFileDialog } from "./file_dialog.js";
 const axios = window.axios;
 
-const { ref, onMounted } = window.Vue;
+const { ref, onMounted, onUnmounted } = window.Vue;
 const { ElMessage, ElMessageBox } = window.ElementPlus;
 let component = null;
 
@@ -31,10 +31,20 @@ async function createComponent() {
       
       // 文件浏览器对话框可见性
       const fileBrowserDialogVisible = ref(false);
+      const saveResultDialogVisible = ref(false);
       
       // 文件拖拽排序模式
       const filesDragMode = ref(false);
       const filesOriginalOrder = ref(null);
+      
+      // 音频播放相关
+      const audioPlayer = ref(null);
+      const playingFileIndex = ref(null);
+      const isPlaying = ref(false);
+      
+      // 结果文件播放相关
+      const resultAudioPlayer = ref(null);
+      const isPlayingResult = ref(false);
       
       // 处理文件选择确认
       const handleFileBrowserConfirm = async (filePaths) => {
@@ -118,6 +128,10 @@ async function createComponent() {
 
       // 查看任务
       const handleViewTask = async (taskId) => {
+        // 如果切换任务，停止当前播放
+        if (currentTask.value && currentTask.value.task_id !== taskId) {
+          handleStopPlay();
+        }
         try {
           loading.value = true;
           const response = await axios.post(`${getApiUrl()}/media/task/get`, {
@@ -214,6 +228,13 @@ async function createComponent() {
             }
           );
           if (response.data.code === 0) {
+            // 如果删除的是正在播放的文件，停止播放
+            if (playingFileIndex.value === fileIndex) {
+              handleStopPlay();
+            } else if (playingFileIndex.value !== null && playingFileIndex.value > fileIndex) {
+              // 如果删除的文件在正在播放的文件之前，调整播放索引
+              playingFileIndex.value = playingFileIndex.value - 1;
+            }
             ElMessage.success("文件删除成功");
             // 刷新任务信息
             await handleViewTask(currentTask.value.task_id);
@@ -256,6 +277,8 @@ async function createComponent() {
           );
           if (response.data.code === 0) {
             ElMessage.success("合成任务已启动");
+            // 刷新任务列表
+            await loadTaskList();
             // 刷新任务信息
             await handleViewTask(currentTask.value.task_id);
             // 开始轮询任务状态
@@ -285,6 +308,8 @@ async function createComponent() {
             }
             return;
           }
+          // 刷新任务列表和当前任务详情
+          await loadTaskList();
           await handleViewTask(currentTask.value.task_id);
         }, 2000); // 每2秒轮询一次
       };
@@ -305,6 +330,191 @@ async function createComponent() {
         }
         const url = `${getApiUrl()}/media/task/download?task_id=${task.task_id}`;
         window.open(url, '_blank');
+      };
+
+      // 获取媒体文件 URL
+      const getMediaFileUrl = (filePath) => {
+        if (!filePath) return '';
+        // 移除路径开头的 /
+        const path = filePath.startsWith('/') ? filePath.slice(1) : filePath;
+        // URL 编码路径
+        const encodedPath = path.split('/').map(part => encodeURIComponent(part)).join('/');
+        return `${getApiUrl()}/media/files/${encodedPath}`;
+      };
+
+      // 播放/暂停文件
+      const handleTogglePlayFile = (index) => {
+        if (!currentTask.value || !currentTask.value.files || index < 0 || index >= currentTask.value.files.length) {
+          return;
+        }
+
+        const file = currentTask.value.files[index];
+        if (!file.path) {
+          ElMessage.warning("文件路径不存在");
+          return;
+        }
+
+        // 如果点击的是当前播放的文件，则暂停/继续
+        if (playingFileIndex.value === index && audioPlayer.value) {
+          if (isPlaying.value) {
+            audioPlayer.value.pause();
+            isPlaying.value = false;
+          } else {
+            audioPlayer.value.play();
+            isPlaying.value = true;
+          }
+          return;
+        }
+
+        // 停止当前播放
+        if (audioPlayer.value) {
+          audioPlayer.value.pause();
+          audioPlayer.value = null;
+        }
+
+        // 播放新文件
+        const audioUrl = getMediaFileUrl(file.path);
+        const audio = new Audio(audioUrl);
+        
+        audio.addEventListener('play', () => {
+          isPlaying.value = true;
+          playingFileIndex.value = index;
+        });
+        
+        audio.addEventListener('pause', () => {
+          isPlaying.value = false;
+        });
+        
+        audio.addEventListener('ended', () => {
+          isPlaying.value = false;
+          playingFileIndex.value = null;
+          audioPlayer.value = null;
+        });
+        
+        audio.addEventListener('error', (e) => {
+          console.error("音频播放失败:", e);
+          ElMessage.error("音频播放失败");
+          isPlaying.value = false;
+          playingFileIndex.value = null;
+          audioPlayer.value = null;
+        });
+
+        audioPlayer.value = audio;
+        audio.play();
+      };
+
+      // 停止播放
+      const handleStopPlay = () => {
+        if (audioPlayer.value) {
+          audioPlayer.value.pause();
+          audioPlayer.value.currentTime = 0;
+          audioPlayer.value = null;
+        }
+        isPlaying.value = false;
+        playingFileIndex.value = null;
+        
+        // 停止结果文件播放
+        if (resultAudioPlayer.value) {
+          resultAudioPlayer.value.pause();
+          resultAudioPlayer.value.currentTime = 0;
+          resultAudioPlayer.value = null;
+        }
+        isPlayingResult.value = false;
+      };
+
+      // 播放/暂停结果文件
+      const handleTogglePlayResult = () => {
+        if (!currentTask.value || !currentTask.value.result_file) {
+          ElMessage.warning("结果文件不存在");
+          return;
+        }
+
+        // 如果正在播放结果文件，则暂停/继续
+        if (resultAudioPlayer.value && isPlayingResult.value) {
+          resultAudioPlayer.value.pause();
+          isPlayingResult.value = false;
+          return;
+        }
+
+        // 停止当前播放的文件列表中的文件
+        if (audioPlayer.value) {
+          audioPlayer.value.pause();
+          audioPlayer.value.currentTime = 0;
+          audioPlayer.value = null;
+        }
+        isPlaying.value = false;
+        playingFileIndex.value = null;
+
+        // 播放结果文件
+        const audioUrl = getMediaFileUrl(currentTask.value.result_file);
+        const audio = new Audio(audioUrl);
+        
+        audio.addEventListener('play', () => {
+          isPlayingResult.value = true;
+        });
+        
+        audio.addEventListener('pause', () => {
+          isPlayingResult.value = false;
+        });
+        
+        audio.addEventListener('ended', () => {
+          isPlayingResult.value = false;
+          resultAudioPlayer.value = null;
+        });
+        
+        audio.addEventListener('error', (e) => {
+          console.error("音频播放失败:", e);
+          ElMessage.error("音频播放失败");
+          isPlayingResult.value = false;
+          resultAudioPlayer.value = null;
+        });
+
+        resultAudioPlayer.value = audio;
+        audio.play();
+      };
+
+      // 转存结果文件
+      const handleSaveResult = () => {
+        if (!currentTask.value || !currentTask.value.result_file) {
+          ElMessage.warning("结果文件不存在");
+          return;
+        }
+        saveResultDialogVisible.value = true;
+      };
+
+      // 处理转存确认
+      const handleSaveResultConfirm = async (filePaths) => {
+        if (!currentTask.value || !currentTask.value.result_file) {
+          return;
+        }
+        
+        if (filePaths.length === 0) {
+          ElMessage.warning("请选择转存目录");
+          return;
+        }
+        
+        // filePaths 应该是目录路径，取第一个
+        const targetDir = filePaths[0];
+        
+        try {
+          loading.value = true;
+          const response = await axios.post(`${getApiUrl()}/media/task/save`, {
+            task_id: currentTask.value.task_id,
+            target_path: targetDir
+          });
+          
+          if (response.data.code === 0) {
+            ElMessage.success("转存成功");
+            saveResultDialogVisible.value = false;
+          } else {
+            ElMessage.error(response.data.msg || "转存失败");
+          }
+        } catch (error) {
+          console.error("转存失败:", error);
+          ElMessage.error("转存失败: " + (error.message || "未知错误"));
+        } finally {
+          loading.value = false;
+        }
       };
 
       // 格式化文件大小
@@ -519,6 +729,16 @@ async function createComponent() {
         loadTaskList();
       });
 
+      onUnmounted(() => {
+        // 组件卸载时停止播放
+        handleStopPlay();
+        // 停止结果文件播放
+        if (resultAudioPlayer.value) {
+          resultAudioPlayer.value.pause();
+          resultAudioPlayer.value = null;
+        }
+      });
+
       return {
         loading,
         activeTab,
@@ -551,6 +771,18 @@ async function createComponent() {
         handleFileDragEnd,
         handleFileDragOver,
         handleFileDrop,
+        // 音频播放
+        playingFileIndex,
+        isPlaying,
+        handleTogglePlayFile,
+        handleStopPlay,
+        // 结果文件播放
+        isPlayingResult,
+        handleTogglePlayResult,
+        // 转存
+        saveResultDialogVisible,
+        handleSaveResult,
+        handleSaveResultConfirm,
       };
     },
     template,

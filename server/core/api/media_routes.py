@@ -18,6 +18,28 @@ from core.utils import get_media_url, get_media_duration, validate_and_normalize
 log = root_logger()
 media_bp = Blueprint('media', __name__)
 
+
+def _get_unique_filepath(directory: str, base_name: str, extension: str) -> str:
+    """
+    生成唯一的文件路径，如果文件已存在则添加序号
+    
+    :param directory: 目标目录
+    :param base_name: 基础文件名（不含扩展名）
+    :param extension: 文件扩展名（包含点号，如 '.mp3'）
+    :return: 唯一的文件路径
+    """
+    filename = f"{base_name}{extension}"
+    file_path = os.path.join(directory, filename)
+    
+    if os.path.exists(file_path):
+        counter = 1
+        while os.path.exists(file_path):
+            filename = f"{base_name}_{counter}{extension}"
+            file_path = os.path.join(directory, filename)
+            counter += 1
+    
+    return file_path
+
 # 常量定义
 DEFAULT_BASE_DIR = '/mnt'
 MIMETYPE_MAP = {
@@ -285,19 +307,11 @@ def upload_file():
         task_dir = get_media_task_dir(task_id)
         ensure_directory(task_dir)
         
-        # 保存文件
+        # 保存文件，如果文件已存在则添加序号
         filename = secure_filename(file.filename)
-        file_path = os.path.join(task_dir, filename)
-        
-        # 如果文件已存在，添加序号
-        if os.path.exists(file_path):
-            base_name, ext = os.path.splitext(filename)
-            counter = 1
-            while os.path.exists(file_path):
-                new_filename = f"{base_name}_{counter}{ext}"
-                file_path = os.path.join(task_dir, new_filename)
-                counter += 1
-            filename = os.path.basename(file_path)
+        base_name, ext = os.path.splitext(filename)
+        file_path = _get_unique_filepath(task_dir, base_name, ext)
+        filename = os.path.basename(file_path)
         
         file.save(file_path)
         log.info(f"[MediaTool] 文件上传成功: {file_path}")
@@ -601,19 +615,14 @@ def save_result():
         if not os.path.exists(result_file):
             return _err("结果文件不存在")
         
+        # 获取结果文件的扩展名，默认为 .mp3
+        _, ext = os.path.splitext(result_file)
+        ext = ext or '.mp3'
+        
+        # 生成唯一的目标文件路径：task_id + 扩展名，如果已存在则添加序号
+        target_file = _get_unique_filepath(target_path, task_id, ext)
+        
         # 复制文件到目标目录
-        filename = os.path.basename(result_file)
-        target_file = os.path.join(target_path, filename)
-        
-        # 如果目标文件已存在，添加序号
-        if os.path.exists(target_file):
-            base_name, ext = os.path.splitext(filename)
-            counter = 1
-            while os.path.exists(target_file):
-                new_filename = f"{base_name}_{counter}{ext}"
-                target_file = os.path.join(target_path, new_filename)
-                counter += 1
-        
         shutil.copy2(result_file, target_file)
         log.info(f"[MediaTool] 文件转存成功: {result_file} -> {target_file}")
         
