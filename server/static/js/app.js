@@ -19,7 +19,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     { path: "/timetable", component: () => import(`../view/timetable.js${timestamp}`).then((m) => m.default) },
     { path: "/media", component: () => import(`../view/media.js${timestamp}`).then((m) => m.default) },
     { path: "/tools", component: () => import(`../view/tools.js${timestamp}`).then((m) => m.default) },
-    { path: "/media_plan", component: () => import(`../view/media_plan.js${timestamp}`).then((m) => m.default) },
   ];
   // 创建路由实例
   const router = window.VueRouter.createRouter({

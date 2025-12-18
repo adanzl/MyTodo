@@ -23,8 +23,25 @@ DEVICE_TYPES = {"device_agent", "bluetooth", "dlna", "mi"}
 _TS = lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-def _get_file_uri(file_item):
-    return file_item.get("uri") or file_item.get("path") or file_item.get("file") or ""
+def _get_weekday_index():
+    """
+    获取当前星期对应的索引
+    返回: 0=周一, 1=周二, 2=周三, 3=周四, 4=周五, 5=周六, 6=周日
+    """
+    weekday = datetime.datetime.now().weekday()  # 0=周一, 6=周日
+    return weekday
+
+
+def _get_pre_list_for_today(pre_lists):
+    """
+    获取今天对应的前置文件列表
+    :param pre_lists: pre_lists 数组，固定7个元素，分别代表周一到周日
+    :return: 今天对应的前置文件列表
+    """
+    if not pre_lists or len(pre_lists) != 7:
+        return []
+    weekday_index = _get_weekday_index()
+    return pre_lists[weekday_index] if isinstance(pre_lists[weekday_index], list) else []
 
 
 class PlaylistMgr:
@@ -160,6 +177,21 @@ class PlaylistMgr:
             for playlist_id, playlist_data in self._playlist_raw.items():
                 if 'isPlaying' in playlist_data:
                     del playlist_data['isPlaying']
+                
+                # 迁移 pre_files 到 pre_lists（如果还没有 pre_lists）
+                if "pre_lists" not in playlist_data:
+                    pre_files = playlist_data.get("pre_files", [])
+                    # 创建 pre_lists，固定7个元素，分别代表周一到周日
+                    # 将 pre_files 复制到这7个列表中
+                    pre_lists = [list(pre_files) for _ in range(7)]  # 深拷贝到7个列表
+                    playlist_data["pre_lists"] = pre_lists
+                    log.info(f"[PlaylistMgr] 迁移 pre_files 到 pre_lists: {playlist_id}, 共 {len(pre_files)} 个文件")
+                elif not isinstance(playlist_data.get("pre_lists"), list) or len(playlist_data.get("pre_lists", [])) != 7:
+                    # 如果 pre_lists 存在但格式不正确，重新初始化
+                    pre_files = playlist_data.get("pre_files", [])
+                    pre_lists = [list(pre_files) for _ in range(7)]
+                    playlist_data["pre_lists"] = pre_lists
+                    log.info(f"[PlaylistMgr] 修复 pre_lists 格式: {playlist_id}")
 
             # 从 _playlist_raw 恢复游标状态到 _play_state，保留游标以便从上次位置继续
             # 只恢复那些在 _play_state 中不存在的播放列表（程序启动时的情况）
@@ -168,7 +200,8 @@ class PlaylistMgr:
                 if playlist_id not in self._play_state:
                     # 如果 _play_state 中没有该播放列表的状态，从 _playlist_raw 恢复游标
                     current_index = playlist_data.get("current_index", 0)
-                    pre_files = playlist_data.get("pre_files", [])
+                    pre_lists = playlist_data.get("pre_lists", [])
+                    pre_files = _get_pre_list_for_today(pre_lists)  # 获取今天对应的前置文件列表
                     if pre_files:
                         # 如果有 pre_files，从 pre_files 开始（从头开始）
                         self._play_state[playlist_id] = {
@@ -329,20 +362,24 @@ class PlaylistMgr:
         # 收集所有没有 duration 的文件 URI（去重），排除黑名单中失败超过3次的文件
         files_to_fetch = set()  # {file_uri, ...}
         for playlist_data in playlists.values():
-            # 检查 pre_files
-            for file_item in playlist_data.get("pre_files", []):
-                if not file_item.get("duration"):
-                    file_uri = _get_file_uri(file_item)
-                    if file_uri:
-                        # 检查黑名单，失败次数>=3则跳过
-                        failure_count = self._duration_blacklist.get(file_uri, 0)
-                        if failure_count < 3:
-                            files_to_fetch.add(file_uri)
+            # 检查 pre_lists（所有7天的列表）
+            pre_lists = playlist_data.get("pre_lists", [])
+            if isinstance(pre_lists, list) and len(pre_lists) == 7:
+                for pre_list in pre_lists:
+                    if isinstance(pre_list, list):
+                        for file_item in pre_list:
+                            if not file_item.get("duration"):
+                                file_uri = file_item.get("uri")
+                                if file_uri:
+                                    # 检查黑名单，失败次数>=3则跳过
+                                    failure_count = self._duration_blacklist.get(file_uri, 0)
+                                    if failure_count < 3:
+                                        files_to_fetch.add(file_uri)
 
             # 检查 files/playlist
             for file_item in playlist_data.get("files", []):
                 if not file_item.get("duration"):
-                    file_uri = _get_file_uri(file_item)
+                    file_uri = file_item.get("uri")
                     if file_uri:
                         # 检查黑名单，失败次数>=3则跳过
                         failure_count = self._duration_blacklist.get(file_uri, 0)
@@ -375,19 +412,22 @@ class PlaylistMgr:
                 # 反向更新所有播放列表中匹配的文件 duration
                 updated_count = 0
                 for _, playlist_data in self._playlist_raw.items():
-                    # 更新 pre_files
-                    pre_files = playlist_data.get("pre_files", [])
-                    for file_item in pre_files:
-                        file_uri = _get_file_uri(file_item)
-                        if file_uri in file_durations and not file_item.get("duration"):
-                            file_item["duration"] = file_durations[file_uri]
-                            updated_count += 1
+                    # 更新 pre_lists（所有7天的列表）
+                    pre_lists = playlist_data.get("pre_lists", [])
+                    if isinstance(pre_lists, list) and len(pre_lists) == 7:
+                        for pre_list in pre_lists:
+                            if isinstance(pre_list, list):
+                                for file_item in pre_list:
+                                    file_uri = file_item.get("uri")
+                                    if file_uri and file_uri in file_durations and not file_item.get("duration"):
+                                        file_item["duration"] = file_durations[file_uri]
+                                        updated_count += 1
 
                     # 更新 files/playlist
                     files = playlist_data.get("files", [])
                     for file_item in files:
-                        file_uri = _get_file_uri(file_item)
-                        if file_uri in file_durations and not file_item.get("duration"):
+                        file_uri = file_item.get("uri")
+                        if file_uri and file_uri in file_durations and not file_item.get("duration"):
                             file_item["duration"] = file_durations[file_uri]
                             updated_count += 1
 
@@ -418,7 +458,9 @@ class PlaylistMgr:
         if not self._playlist_raw or id not in self._playlist_raw:
             return None, -1, "播放列表不存在"
         playlist_data = self._playlist_raw[id]
-        pre_files, files = playlist_data.get("pre_files", []), playlist_data.get("files", [])
+        pre_lists = playlist_data.get("pre_lists", [])
+        pre_files = _get_pre_list_for_today(pre_lists)  # 获取今天对应的前置文件列表
+        files = playlist_data.get("files", [])
         if not files and not pre_files:
             return None, -1, "播放列表为空"
         device_obj = self._device_map.get(id)
@@ -433,6 +475,11 @@ class PlaylistMgr:
             self._play_state[id] = {"in_pre_files": True, "pre_index": 0, "file_index": current_index}
         else:
             self._play_state[id] = {"in_pre_files": False, "pre_index": 0, "file_index": current_index}
+    
+    def _get_pre_files_for_today(self, playlist_data: Dict[str, Any]) -> List:
+        """获取今天对应的前置文件列表"""
+        pre_lists = playlist_data.get("pre_lists", [])
+        return _get_pre_list_for_today(pre_lists)
 
     def _get_current_file(self, play_state: Dict[str, Any], pre_files: List, files: List) -> tuple[Any, str]:
         """获取当前要播放的文件"""
@@ -473,7 +520,8 @@ class PlaylistMgr:
         if code != 0:
             return code, msg
 
-        pre_files, files = playlist_data.get("pre_files", []), playlist_data.get("files", [])
+        pre_files = self._get_pre_files_for_today(playlist_data)  # 获取今天对应的前置文件列表
+        files = playlist_data.get("files", [])
 
         # 如果不是 force 模式，初始化播放状态（从头开始）
         # 如果是 force 模式，只有在状态不存在时才初始化（避免覆盖已更新的状态）
@@ -492,7 +540,7 @@ class PlaylistMgr:
         if error_msg:
             return -1, error_msg
 
-        file_path = _get_file_uri(file_item)
+        file_path = file_item.get("uri")
         if not file_path:
             return -1, "文件路径无效"
 
@@ -536,7 +584,8 @@ class PlaylistMgr:
         if code != 0:
             return code, msg
 
-        pre_files, files = playlist_data.get("pre_files", []), playlist_data.get("files", [])
+        pre_files = self._get_pre_files_for_today(playlist_data)  # 获取今天对应的前置文件列表
+        files = playlist_data.get("files", [])
 
         # 初始化播放状态（如果不存在）
         if id not in self._play_state:
@@ -566,7 +615,8 @@ class PlaylistMgr:
         if code != 0:
             return code, msg
 
-        pre_files, files = playlist_data.get("pre_files", []), playlist_data.get("files", [])
+        pre_files = self._get_pre_files_for_today(playlist_data)  # 获取今天对应的前置文件列表
+        files = playlist_data.get("files", [])
 
         # 如果没有播放状态，初始化并从头开始
         if id not in self._play_state:
@@ -604,7 +654,8 @@ class PlaylistMgr:
         if code != 0:
             return code, msg
 
-        pre_files, files = playlist_data.get("pre_files", []), playlist_data.get("files", [])
+        pre_files = self._get_pre_files_for_today(playlist_data)  # 获取今天对应的前置文件列表
+        files = playlist_data.get("files", [])
 
         # 如果没有播放状态，初始化
         if id not in self._play_state:
@@ -751,7 +802,7 @@ class PlaylistMgr:
                 log.warning(f"[PlaylistMgr] 文件定时器触发时播放状态丢失: {pid}，重新初始化")
                 playlist_data = self._playlist_raw.get(pid)
                 if playlist_data:
-                    pre_files = playlist_data.get("pre_files", [])
+                    pre_files = self._get_pre_files_for_today(playlist_data)  # 获取今天对应的前置文件列表
                     self._init_play_state(pid, playlist_data, pre_files)
             # 在播放下一首之前，先停止当前播放，避免设备自动重播导致重复播放
             if device:

@@ -70,9 +70,32 @@ async function createComponent() {
         filesDragMode: ref(false), // 正式文件拖拽排序模式
         preFilesOriginalOrder: ref(null), // 进入拖拽模式时的原始顺序
         filesOriginalOrder: ref(null), // 进入拖拽模式时的原始顺序
+        selectedWeekdayIndex: ref(null), // 选中的星期索引（0=周一，6=周日），null表示使用今天
       };
       const pendingDeviceType = ref(null);
       const _formatDateTime = formatDateTime;
+
+      // 获取当前星期对应的索引（0=周一，6=周日）
+      const getWeekdayIndex = () => {
+        const weekday = new Date().getDay(); // 0=周日，1=周一，...，6=周六
+        return weekday === 0 ? 6 : weekday - 1; // 转换为 0=周一，6=周日
+      };
+
+      // 获取当前选中的星期索引（如果未选择则使用今天）
+      const getSelectedWeekdayIndex = () => {
+        return refData.selectedWeekdayIndex.value !== null 
+          ? refData.selectedWeekdayIndex.value 
+          : getWeekdayIndex();
+      };
+
+      // 获取当前显示的前置文件列表
+      const getCurrentPreFiles = () => {
+        const status = refData.playlistStatus.value;
+        if (!status || !status.pre_lists) return [];
+        const weekdayIndex = getSelectedWeekdayIndex();
+        if (!Array.isArray(status.pre_lists) || status.pre_lists.length !== 7) return [];
+        return status.pre_lists[weekdayIndex] || [];
+      };
 
       // 规范化文件列表格式（对象格式）
       const normalizeFiles = (files, includeDuration = true) => {
@@ -97,11 +120,11 @@ async function createComponent() {
 
       // 计算前置文件列表总时长（秒）
       const getPreFilesTotalDuration = () => {
-        const status = refData.playlistStatus.value;
-        if (!status || !status.pre_files || status.pre_files.length === 0) {
+        const preFiles = getCurrentPreFiles();
+        if (!preFiles || preFiles.length === 0) {
           return 0;
         }
-        return status.pre_files.reduce((total, file) => {
+        return preFiles.reduce((total, file) => {
           const duration = file?.duration;
           return total + (typeof duration === 'number' && duration > 0 ? duration : 0);
         }, 0);
@@ -126,8 +149,9 @@ async function createComponent() {
         let total = 0;
         
         // 前置文件时长
-        if (status.pre_files && status.pre_files.length > 0) {
-          total += status.pre_files.reduce((sum, file) => {
+        const preFiles = getCurrentPreFiles();
+        if (preFiles && preFiles.length > 0) {
+          total += preFiles.reduce((sum, file) => {
             const duration = file?.duration;
             return sum + (typeof duration === 'number' && duration > 0 ? duration : 0);
           }, 0);
@@ -149,7 +173,7 @@ async function createComponent() {
         id: overrides.id || createPlaylistId(),
         name: overrides.name || "默认播放列表",
         playlist: overrides.playlist || [],
-        pre_files: overrides.pre_files || [],
+        pre_lists: overrides.pre_lists || (overrides.pre_files ? [Array(7).fill(null).map(() => [...(overrides.pre_files || [])])] : Array(7).fill(null).map(() => [])),
         current_index: overrides.current_index || 0,
         device_address: overrides.device_address || null,
         device_type: overrides.device_type || "dlna",
@@ -159,7 +183,15 @@ async function createComponent() {
 
       const normalizePlaylistItem = (item, fallbackName = "播放列表") => {
         const playlist = normalizeFiles(item?.playlist || item?.files || [], true);
-        const pre_files = normalizeFiles(item?.pre_files || [], true);
+        // 处理 pre_lists：如果存在则使用，否则从 pre_files 迁移
+        let pre_lists = item?.pre_lists;
+        if (!pre_lists || !Array.isArray(pre_lists) || pre_lists.length !== 7) {
+          const pre_files = normalizeFiles(item?.pre_files || [], true);
+          pre_lists = Array(7).fill(null).map(() => [...pre_files]); // 深拷贝到7个列表
+        } else {
+          // 规范化每个列表
+          pre_lists = pre_lists.map(pre_list => normalizeFiles(pre_list || [], true));
+        }
         
         let currentIndex = typeof item?.current_index === "number" 
           ? item.current_index 
@@ -191,7 +223,7 @@ async function createComponent() {
           id: item?.id || createPlaylistId(),
           name,
           playlist,
-          pre_files,
+          pre_lists,
           total: playlist.length,
           current_index: currentIndex,
           pre_index: typeof item?.pre_index === "number" 
@@ -287,8 +319,11 @@ async function createComponent() {
           }
 
           await updateActivePlaylistData((playlistInfo) => {
+            const weekdayIndex = getSelectedWeekdayIndex();
             const targetList = refData.fileBrowserTarget.value === "pre_files" 
-              ? (Array.isArray(playlistInfo.pre_files) ? [...playlistInfo.pre_files] : [])
+              ? (Array.isArray(playlistInfo.pre_lists) && playlistInfo.pre_lists.length === 7
+                  ? [...(playlistInfo.pre_lists[weekdayIndex] || [])]
+                  : [])
               : (Array.isArray(playlistInfo.playlist) ? [...playlistInfo.playlist] : []);
             
             // 获取已存在的 URI 集合
@@ -311,7 +346,11 @@ async function createComponent() {
             }
             
             if (refData.fileBrowserTarget.value === "pre_files") {
-              playlistInfo.pre_files = targetList;
+              // 确保 pre_lists 存在且格式正确
+              if (!playlistInfo.pre_lists || !Array.isArray(playlistInfo.pre_lists) || playlistInfo.pre_lists.length !== 7) {
+                playlistInfo.pre_lists = Array(7).fill(null).map(() => []);
+              }
+              playlistInfo.pre_lists[weekdayIndex] = targetList;
             } else {
               playlistInfo.playlist = targetList;
               playlistInfo.total = targetList.length;
@@ -363,10 +402,13 @@ async function createComponent() {
           currentIndex = 0;
         }
         
+        // 获取当前显示的前置文件列表
+        const currentPreFiles = getCurrentPreFiles();
         refData.playlistStatus.value = {
           ...active,
           playlist: [...(active.playlist || [])],
-          pre_files: [...(active.pre_files || [])],
+          pre_lists: active.pre_lists ? active.pre_lists.map(list => [...(list || [])]) : Array(7).fill(null).map(() => []),
+          pre_files: currentPreFiles, // 为了兼容，保留 pre_files 字段，但使用当前选中的日期列表
           current_index: currentIndex,
           pre_index: typeof active.pre_index === "number" 
             ? active.pre_index 
@@ -396,15 +438,23 @@ async function createComponent() {
             // 确定设备地址：优先使用 device.address，其次 device_address
             const deviceAddress = item.device?.address || item.device_address || "";
 
-            // 规范化 playlist 和 pre_files 格式：确保是新格式 {"uri": "地址"}，保留 duration
+            // 规范化 playlist 和 pre_lists 格式：确保是新格式 {"uri": "地址"}，保留 duration
             const normalizedFiles = normalizeFiles(item.playlist || [], true);
-            const normalizedPreFiles = normalizeFiles(item.pre_files || [], true);
+            // 处理 pre_lists
+            let normalizedPreLists = item.pre_lists;
+            if (!normalizedPreLists || !Array.isArray(normalizedPreLists) || normalizedPreLists.length !== 7) {
+              // 如果没有 pre_lists，从 pre_files 迁移（兼容旧格式）
+              const normalizedPreFiles = normalizeFiles(item.pre_files || [], true);
+              normalizedPreLists = Array(7).fill(null).map(() => [...normalizedPreFiles]);
+            } else {
+              normalizedPreLists = normalizedPreLists.map(pre_list => normalizeFiles(pre_list || [], true));
+            }
             
             playlistDict[item.id] = {
               id: item.id,
               name: item.name || "默认播放列表",
               files: normalizedFiles,
-              pre_files: normalizedPreFiles,
+              pre_lists: normalizedPreLists,
               current_index: item.current_index || 0,
               device: {
                 address: deviceAddress,
@@ -592,7 +642,9 @@ async function createComponent() {
         let collection = refData.playlistCollection.value.map((item) => ({
           ...item,
           playlist: Array.isArray(item.playlist) ? item.playlist.map(f => ({ ...f })) : [],
-          pre_files: Array.isArray(item.pre_files) ? item.pre_files.map(f => ({ ...f })) : [],
+          pre_lists: Array.isArray(item.pre_lists) && item.pre_lists.length === 7
+            ? item.pre_lists.map(list => list.map(f => ({ ...f })))
+            : Array(7).fill(null).map(() => []),
         }));
         if (collection.length === 0) {
           const defaultPlaylist = normalizePlaylistItem(createDefaultPlaylist());
@@ -609,7 +661,9 @@ async function createComponent() {
           mutator({
             ...currentItem,
             playlist: currentItem.playlist.map(f => ({ ...f })),
-            pre_files: (currentItem.pre_files || []).map(f => ({ ...f })),
+            pre_lists: Array.isArray(currentItem.pre_lists) && currentItem.pre_lists.length === 7
+              ? currentItem.pre_lists.map(list => list.map(f => ({ ...f })))
+              : Array(7).fill(null).map(() => []),
           }) || currentItem;
         collection[index] = normalizePlaylistItem(updatedItem, currentItem.name);
         refData.playlistCollection.value = collection;
@@ -1600,7 +1654,8 @@ async function createComponent() {
         const status = refData.playlistStatus.value;
         if (!status) return;
         
-        const preFilesCount = (status.pre_files && status.pre_files.length) || 0;
+        const preFiles = getCurrentPreFiles();
+        const preFilesCount = (preFiles && preFiles.length) || 0;
         const filesCount = (status.playlist && status.playlist.length) || 0;
         const totalCount = preFilesCount + filesCount;
         
@@ -1626,7 +1681,12 @@ async function createComponent() {
           refData.playlistLoading.value = true;
           await updateActivePlaylistData((playlistInfo) => {
             playlistInfo.playlist = [];
-            playlistInfo.pre_files = [];
+            // 清空所有7天的前置文件列表
+            if (!playlistInfo.pre_lists || !Array.isArray(playlistInfo.pre_lists) || playlistInfo.pre_lists.length !== 7) {
+              playlistInfo.pre_lists = Array(7).fill(null).map(() => []);
+            } else {
+              playlistInfo.pre_lists = playlistInfo.pre_lists.map(() => []);
+            }
             playlistInfo.total = 0;
             playlistInfo.current_index = 0;
             return playlistInfo;
@@ -1645,9 +1705,10 @@ async function createComponent() {
       // 删除 pre_files 中的文件
       const handleDeletePreFile = async (index) => {
         const status = refData.playlistStatus.value;
-        if (!status || !status.pre_files || index < 0 || index >= status.pre_files.length) return;
+        const preFiles = getCurrentPreFiles();
+        if (!status || !preFiles || index < 0 || index >= preFiles.length) return;
 
-        const fileItem = status.pre_files[index];
+        const fileItem = preFiles[index];
         const fileName = getFileName(fileItem);
 
         try {
@@ -1659,9 +1720,14 @@ async function createComponent() {
 
           refData.playlistLoading.value = true;
           await updateActivePlaylistData((playlistInfo) => {
-            const list = [...(playlistInfo.pre_files || [])];
+            const weekdayIndex = getSelectedWeekdayIndex();
+            // 确保 pre_lists 存在且格式正确
+            if (!playlistInfo.pre_lists || !Array.isArray(playlistInfo.pre_lists) || playlistInfo.pre_lists.length !== 7) {
+              playlistInfo.pre_lists = Array(7).fill(null).map(() => []);
+            }
+            const list = [...(playlistInfo.pre_lists[weekdayIndex] || [])];
             list.splice(index, 1);
-            playlistInfo.pre_files = list;
+            playlistInfo.pre_lists[weekdayIndex] = list;
             return playlistInfo;
           });
           ElMessage.success("已删除");
@@ -1678,11 +1744,12 @@ async function createComponent() {
       // 清空前置文件列表
       const handleClearPreFiles = async () => {
         const status = refData.playlistStatus.value;
-        if (!status || !status.pre_files || status.pre_files.length === 0) return;
+        const preFiles = getCurrentPreFiles();
+        if (!status || !preFiles || preFiles.length === 0) return;
 
         try {
           await ElMessageBox.confirm(
-            `确定要清空前置文件列表吗？此操作将删除所有 ${status.pre_files.length} 个前置文件。`,
+            `确定要清空前置文件列表吗？此操作将删除所有 ${preFiles.length} 个前置文件。`,
             "确认清空",
             {
               confirmButtonText: "确定",
@@ -1693,7 +1760,12 @@ async function createComponent() {
 
           refData.playlistLoading.value = true;
           await updateActivePlaylistData((playlistInfo) => {
-            playlistInfo.pre_files = [];
+            const weekdayIndex = getSelectedWeekdayIndex();
+            // 确保 pre_lists 存在且格式正确
+            if (!playlistInfo.pre_lists || !Array.isArray(playlistInfo.pre_lists) || playlistInfo.pre_lists.length !== 7) {
+              playlistInfo.pre_lists = Array(7).fill(null).map(() => []);
+            }
+            playlistInfo.pre_lists[weekdayIndex] = [];
             return playlistInfo;
           });
           ElMessage.success("已清空前置文件列表");
@@ -1744,14 +1816,20 @@ async function createComponent() {
       // 上移 pre_files 中的文件
       const handleMovePreFileUp = async (index) => {
         const status = refData.playlistStatus.value;
-        if (!status || !status.pre_files || index <= 0 || index >= status.pre_files.length) return;
+        const preFiles = getCurrentPreFiles();
+        if (!status || !preFiles || index <= 0 || index >= preFiles.length) return;
 
         try {
           refData.playlistLoading.value = true;
           await updateActivePlaylistData((playlistInfo) => {
-            const list = [...(playlistInfo.pre_files || [])];
+            const weekdayIndex = getSelectedWeekdayIndex();
+            // 确保 pre_lists 存在且格式正确
+            if (!playlistInfo.pre_lists || !Array.isArray(playlistInfo.pre_lists) || playlistInfo.pre_lists.length !== 7) {
+              playlistInfo.pre_lists = Array(7).fill(null).map(() => []);
+            }
+            const list = [...(playlistInfo.pre_lists[weekdayIndex] || [])];
             [list[index - 1], list[index]] = [list[index], list[index - 1]];
-            playlistInfo.pre_files = list;
+            playlistInfo.pre_lists[weekdayIndex] = list;
             return playlistInfo;
           });
         } catch (error) {
@@ -1765,9 +1843,10 @@ async function createComponent() {
       // 复制前置文件到播放列表末尾
       const handleCopyPreFile = async (index) => {
         const status = refData.playlistStatus.value;
-        if (!status || !status.pre_files || index < 0 || index >= status.pre_files.length) return;
+        const preFiles = getCurrentPreFiles();
+        if (!status || !preFiles || index < 0 || index >= preFiles.length) return;
 
-        const fileItem = status.pre_files[index];
+        const fileItem = preFiles[index];
         const fileName = getFileName(fileItem);
 
         try {
@@ -1794,14 +1873,20 @@ async function createComponent() {
       // 下移 pre_files 中的文件
       const handleMovePreFileDown = async (index) => {
         const status = refData.playlistStatus.value;
-        if (!status || !status.pre_files || index < 0 || index >= status.pre_files.length - 1) return;
+        const preFiles = getCurrentPreFiles();
+        if (!status || !preFiles || index < 0 || index >= preFiles.length - 1) return;
 
         try {
           refData.playlistLoading.value = true;
           await updateActivePlaylistData((playlistInfo) => {
-            const list = [...(playlistInfo.pre_files || [])];
+            const weekdayIndex = getSelectedWeekdayIndex();
+            // 确保 pre_lists 存在且格式正确
+            if (!playlistInfo.pre_lists || !Array.isArray(playlistInfo.pre_lists) || playlistInfo.pre_lists.length !== 7) {
+              playlistInfo.pre_lists = Array(7).fill(null).map(() => []);
+            }
+            const list = [...(playlistInfo.pre_lists[weekdayIndex] || [])];
             [list[index], list[index + 1]] = [list[index + 1], list[index]];
-            playlistInfo.pre_files = list;
+            playlistInfo.pre_lists[weekdayIndex] = list;
             return playlistInfo;
           });
         } catch (error) {
@@ -1815,7 +1900,8 @@ async function createComponent() {
       // 排序前置文件列表
       const handleSortPreFiles = async (sortType) => {
         const status = refData.playlistStatus.value;
-        if (!status || !status.pre_files || status.pre_files.length === 0) return;
+        const preFiles = getCurrentPreFiles();
+        if (!status || !preFiles || preFiles.length === 0) return;
 
         try {
           refData.playlistLoading.value = true;
@@ -1833,7 +1919,12 @@ async function createComponent() {
           refData.preFilesSortOrder.value = newOrder;
 
           await updateActivePlaylistData((playlistInfo) => {
-            const list = [...(playlistInfo.pre_files || [])];
+            const weekdayIndex = getSelectedWeekdayIndex();
+            // 确保 pre_lists 存在且格式正确
+            if (!playlistInfo.pre_lists || !Array.isArray(playlistInfo.pre_lists) || playlistInfo.pre_lists.length !== 7) {
+              playlistInfo.pre_lists = Array(7).fill(null).map(() => []);
+            }
+            const list = [...(playlistInfo.pre_lists[weekdayIndex] || [])];
             const oldPreIndex = playlistInfo.pre_index;
             
             if (newOrder) {
@@ -1857,7 +1948,7 @@ async function createComponent() {
               
               // 更新 pre_index
               if (oldPreIndex !== undefined && oldPreIndex !== null && oldPreIndex >= 0) {
-                const oldFile = playlistInfo.pre_files[oldPreIndex];
+                const oldFile = preFiles[oldPreIndex];
                 const newIndex = list.findIndex(f => f.uri === oldFile.uri);
                 playlistInfo.pre_index = newIndex >= 0 ? newIndex : -1;
               }
@@ -1866,7 +1957,7 @@ async function createComponent() {
               // 如果需要完全恢复，需要保存原始顺序
             }
             
-            playlistInfo.pre_files = list;
+            playlistInfo.pre_lists[weekdayIndex] = list;
             return playlistInfo;
           });
           
@@ -1991,14 +2082,20 @@ async function createComponent() {
         if (refData.preFilesDragMode.value) {
           // 退出拖拽模式时，检查是否有变化
           const status = refData.playlistStatus.value;
-          if (status && status.pre_files && status.pre_files.length > 0) {
-            const hasChanged = isOrderChanged(refData.preFilesOriginalOrder.value, status.pre_files);
+          const preFiles = getCurrentPreFiles();
+          if (status && preFiles && preFiles.length > 0) {
+            const hasChanged = isOrderChanged(refData.preFilesOriginalOrder.value, preFiles);
             if (hasChanged) {
               try {
                 refData.playlistLoading.value = true;
                 await updateActivePlaylistData((playlistInfo) => {
+                  const weekdayIndex = getSelectedWeekdayIndex();
+                  // 确保 pre_lists 存在且格式正确
+                  if (!playlistInfo.pre_lists || !Array.isArray(playlistInfo.pre_lists) || playlistInfo.pre_lists.length !== 7) {
+                    playlistInfo.pre_lists = Array(7).fill(null).map(() => []);
+                  }
                   // 使用当前内存中的顺序
-                  playlistInfo.pre_files = [...(status.pre_files || [])];
+                  playlistInfo.pre_lists[weekdayIndex] = [...preFiles];
                   playlistInfo.pre_index = status.pre_index;
                   return playlistInfo;
                 });
@@ -2016,8 +2113,9 @@ async function createComponent() {
         } else {
           // 启用拖拽模式时，保存原始顺序并取消自动排序
           const status = refData.playlistStatus.value;
-          if (status && status.pre_files && status.pre_files.length > 0) {
-            refData.preFilesOriginalOrder.value = [...(status.pre_files || [])];
+          const preFiles = getCurrentPreFiles();
+          if (status && preFiles && preFiles.length > 0) {
+            refData.preFilesOriginalOrder.value = [...preFiles];
           }
           refData.preFilesSortOrder.value = null;
         }
@@ -2137,12 +2235,14 @@ async function createComponent() {
         }
 
         const status = refData.playlistStatus.value;
-        if (!status || !status.pre_files || sourceIndex < 0 || sourceIndex >= status.pre_files.length ||
-            targetIndex < 0 || targetIndex >= status.pre_files.length) {
+        const preFiles = getCurrentPreFiles();
+        if (!status || !preFiles || sourceIndex < 0 || sourceIndex >= preFiles.length ||
+            targetIndex < 0 || targetIndex >= preFiles.length) {
           return;
         }
         // 只在内存中更新，不保存到后端
-        const list = [...(status.pre_files || [])];
+        const weekdayIndex = getSelectedWeekdayIndex();
+        const list = [...preFiles];
         const [removed] = list.splice(sourceIndex, 1);
         list.splice(targetIndex, 0, removed);
         
@@ -2161,9 +2261,13 @@ async function createComponent() {
         // 更新 playlistCollection 中对应的项
         const collection = refData.playlistCollection.value.map(item => {
           if (item.id === status.id) {
+            // 确保 pre_lists 存在且格式正确
+            if (!item.pre_lists || !Array.isArray(item.pre_lists) || item.pre_lists.length !== 7) {
+              item.pre_lists = Array(7).fill(null).map(() => []);
+            }
             return {
               ...item,
-              pre_files: list,
+              pre_lists: item.pre_lists.map((list, idx) => idx === weekdayIndex ? [...list] : list),
               pre_index: newPreIndex
             };
           }
@@ -2173,6 +2277,13 @@ async function createComponent() {
         
         // 同步更新到状态中
         syncActivePlaylist(collection);
+      };
+
+      // 切换星期按钮
+      const handleSelectWeekday = (weekdayIndex) => {
+        refData.selectedWeekdayIndex.value = weekdayIndex;
+        // 重新同步当前播放列表状态，以更新显示的 pre_files
+        syncActivePlaylist(refData.playlistCollection.value);
       };
 
       // 处理正式文件拖拽开始
@@ -2643,6 +2754,10 @@ async function createComponent() {
         handleCloseAgentListDialog,
         handleRefreshAgentList,
         handleTestAgentButton,
+        getCurrentPreFiles,
+        getSelectedWeekdayIndex,
+        getWeekdayIndex,
+        handleSelectWeekday,
       };
 
 
