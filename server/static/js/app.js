@@ -104,6 +104,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   for (const [name, component] of Object.entries(window.ElementPlusIconsVue)) {
     if (name === "Menu") {
       app.component("ElIconMenu", component); // 重命名为 ElMenuIcon
+    } else if (name === "VideoPlay") {
+      app.component("ElIconVideoPlay", component);
     } else {
       app.component(name, component);
     }

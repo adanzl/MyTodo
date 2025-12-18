@@ -918,7 +918,5 @@ async function createComponent() {
   return component;
 }
 
-export default async function () {
-  return await createComponent();
-}
+export default createComponent();
 
