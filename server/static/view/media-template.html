@@ -235,9 +235,8 @@
                   plain
                   @click="handleSelectWeekday(index)"
                   :title="day"
-                  class="!w-16"
-                  class="!w-8 !h-6 !p-0 text-xs">
-                  {{ day }}
+                  class="!w-16 !h-6 !p-0 text-xs">
+                  {{ day }}({{ getPreFilesCountForWeekday(index) }})
                 </el-button>
               </div>
             </div>

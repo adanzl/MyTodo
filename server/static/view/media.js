@@ -97,6 +97,15 @@ async function createComponent() {
         return status.pre_lists[weekdayIndex] || [];
       };
 
+      // 获取指定星期的前置文件数量
+      const getPreFilesCountForWeekday = (weekdayIndex) => {
+        const status = refData.playlistStatus.value;
+        if (!status || !status.pre_lists) return 0;
+        if (!Array.isArray(status.pre_lists) || status.pre_lists.length !== 7) return 0;
+        const preList = status.pre_lists[weekdayIndex];
+        return Array.isArray(preList) ? preList.length : 0;
+      };
+
       // 规范化文件列表格式（对象格式）
       const normalizeFiles = (files, includeDuration = true) => {
         if (!Array.isArray(files)) return [];
@@ -503,9 +512,17 @@ async function createComponent() {
         // 如果返回的是字典格式（多个播放列表，key 是 id）
         if (!Array.isArray(apiData) && Object.keys(apiData).length > 0) {
           const playlists = Object.values(apiData).map((item) => {
-            // 规范化 files 和 pre_files 格式：兼容旧格式（字符串数组）和新格式（对象数组）
+            // 规范化 files 和 pre_lists 格式：兼容旧格式（字符串数组）和新格式（对象数组）
             const normalizedFiles = normalizeFiles(item.files || [], true);
-            const normalizedPreFiles = normalizeFiles(item.pre_files || [], true);
+            // 处理 pre_lists
+            let normalizedPreLists = item.pre_lists;
+            if (!normalizedPreLists || !Array.isArray(normalizedPreLists) || normalizedPreLists.length !== 7) {
+              // 如果没有 pre_lists，从 pre_files 迁移（兼容旧格式）
+              const normalizedPreFiles = normalizeFiles(item.pre_files || [], true);
+              normalizedPreLists = Array(7).fill(null).map(() => [...normalizedPreFiles]);
+            } else {
+              normalizedPreLists = normalizedPreLists.map(pre_list => normalizeFiles(pre_list || [], true));
+            }
             
             // 规范化 schedule，确保 cron 是字符串类型
             const schedule = item.schedule || { enabled: 0, cron: "", duration: 0 };
@@ -519,7 +536,7 @@ async function createComponent() {
               id: item.id,
               name: item.name || "默认播放列表",
               playlist: normalizedFiles,
-              pre_files: normalizedPreFiles,
+              pre_lists: normalizedPreLists,
               current_index: typeof item.current_index === "number" 
                 ? item.current_index 
                 : (item.current_index !== undefined && item.current_index !== null 
@@ -660,15 +677,27 @@ async function createComponent() {
           refData.activePlaylistId.value = collection[0].id;
         }
         const currentItem = collection[index];
-        const updatedItem =
-          mutator({
-            ...currentItem,
-            playlist: currentItem.playlist.map(f => ({ ...f })),
-            pre_lists: Array.isArray(currentItem.pre_lists) && currentItem.pre_lists.length === 7
+        // 创建深拷贝，确保 mutator 修改的是新对象
+        const itemToMutate = {
+          ...currentItem,
+          playlist: currentItem.playlist.map(f => ({ ...f })),
+          pre_lists: Array.isArray(currentItem.pre_lists) && currentItem.pre_lists.length === 7
+            ? currentItem.pre_lists.map(list => [...list.map(f => ({ ...f }))])
+            : Array(7).fill(null).map(() => []),
+        };
+        const updatedItem = mutator(itemToMutate) || itemToMutate;
+        
+        // 确保 pre_lists 被正确保留（不经过 normalizePlaylistItem 的重新规范化，因为它可能会丢失数据）
+        const preservedPreLists = updatedItem.pre_lists && Array.isArray(updatedItem.pre_lists) && updatedItem.pre_lists.length === 7
+          ? updatedItem.pre_lists.map(list => Array.isArray(list) ? list.map(f => ({ ...f })) : [])
+          : (Array.isArray(currentItem.pre_lists) && currentItem.pre_lists.length === 7
               ? currentItem.pre_lists.map(list => list.map(f => ({ ...f })))
-              : Array(7).fill(null).map(() => []),
-          }) || currentItem;
-        collection[index] = normalizePlaylistItem(updatedItem, currentItem.name);
+              : Array(7).fill(null).map(() => []));
+        
+        const normalizedItem = normalizePlaylistItem(updatedItem, currentItem.name);
+        // 保留 mutator 修改后的 pre_lists
+        normalizedItem.pre_lists = preservedPreLists;
+        collection[index] = normalizedItem;
         refData.playlistCollection.value = collection;
         
         // 调用单个播放列表更新接口
@@ -1385,9 +1414,11 @@ async function createComponent() {
                 return {
                   ...item,
                   ...updatedPlaylist,
-                  // 保留原有的 playlist 和 pre_files 数组引用，只更新状态字段
+                  // 保留原有的 playlist 和 pre_lists 数组引用，只更新状态字段
                   playlist: updatedPlaylist.playlist || item.playlist,
-                  pre_files: updatedPlaylist.pre_files || item.pre_files,
+                  pre_lists: (updatedPlaylist.pre_lists && Array.isArray(updatedPlaylist.pre_lists) && updatedPlaylist.pre_lists.length === 7)
+                    ? updatedPlaylist.pre_lists.map(list => [...(list || [])])
+                    : item.pre_lists,
                   current_index: updatedPlaylist.current_index !== undefined 
                     ? updatedPlaylist.current_index 
                     : item.current_index,
@@ -2761,6 +2792,7 @@ async function createComponent() {
         getSelectedWeekdayIndex,
         getWeekdayIndex,
         handleSelectWeekday,
+        getPreFilesCountForWeekday,
       };
 
 
