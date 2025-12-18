@@ -1,0 +1,577 @@
+<div class="p-1">
+  <!-- 3列布局：计划列表 | 文件列表 | 配置详情 -->
+  <div class="flex gap-4 h-[calc(100vh-150px)]">
+    <!-- 第一列：计划列表 -->
+    <div class="w-64 border rounded p-3 flex flex-col">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-base font-semibold">媒体计划</h3>
+        <div class="flex items-center gap-1">
+          <el-button
+            type="primary"
+            size="small"
+            plain
+            @click="refreshPlanStatus"
+            :loading="planRefreshing"
+            class="!w-8 !h-6 !p-0">
+            <el-icon v-if="!planRefreshing"><Refresh /></el-icon>
+          </el-button>
+          <el-button
+            type="success"
+            size="small"
+            @click="handleCreatePlan"
+            class="!w-8 !h-6 !p-0">
+            <el-icon><Plus /></el-icon>
+          </el-button>
+        </div>
+      </div>
+      <div
+        v-if="planCollection && planCollection.length > 0"
+        class="flex-1 overflow-y-auto space-y-2 pr-1">
+        <div
+          v-for="plan in planCollection"
+          :key="plan.id"
+          class="border rounded px-3 py-2 cursor-pointer hover:bg-gray-50 group min-h-[60px] flex flex-col justify-between"
+          :class="{ 'border-blue-500 bg-blue-50': plan.id === activePlanId }"
+          @click="handleSelectPlan(plan.id)">
+          <div class="flex items-center justify-between gap-2">
+            <div class="text-sm font-medium truncate flex-1 min-w-0">{{ plan.name }}</div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <el-dropdown
+                trigger="click"
+                @command="(command) => handlePlanMenuCommand(command, plan.id)"
+                @click.stop>
+                <el-button
+                  type="default"
+                  size="small"
+                  plain
+                  circle
+                  class="!w-5 !h-5 !min-w-5 !p-0 text-xs">
+                  <span style="font-size: 16px; line-height: 1" class="mb-1">»</span>
+                </el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="copy">复制</el-dropdown-item>
+                    <el-dropdown-item
+                      v-if="planCollection.length > 1"
+                      command="delete"
+                      divided>
+                      <span style="color: #f56c6c">删除</span>
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
+          </div>
+          <div class="text-[10px] text-blue-600 min-h-[14px] flex items-center justify-between">
+            <span v-if="getPlanNextCronTime(plan)" class="flex items-center gap-1">
+              <el-icon class="!w-3 !h-4"><VideoPlay /></el-icon>
+              {{ getPlanNextCronTime(plan) }}
+            </span>
+            <span v-else class="invisible">占位</span>
+            <el-switch
+              :model-value="plan.enabled === 1"
+              @change="(val) => handleTogglePlanEnabled(plan.id, val)"
+              @click.stop
+              size="small"
+              class="!scale-75">
+            </el-switch>
+          </div>
+        </div>
+      </div>
+      <div v-else class="flex-1 flex items-center justify-center text-sm text-gray-400">
+        暂无计划，请点击"新建"创建
+      </div>
+    </div>
+
+    <!-- 第二列：文件列表 -->
+    <div class="flex-1 border rounded p-3 flex flex-col">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex-1 min-w-0">
+          <div v-if="planStatus" class="flex items-center gap-2 mb-1">
+            <div
+              v-if="editingPlanId !== activePlanId"
+              class="flex items-center gap-2 flex-1 min-w-0">
+              <h3 class="text-lg font-semibold truncate">{{ planStatus.name }}</h3>
+              <el-button
+                type="plain"
+                size="small"
+                circle
+                @click="handleStartEditPlanName(activePlanId)"
+                title="编辑名称">
+                <el-icon><Edit /></el-icon>
+              </el-button>
+            </div>
+            <div v-else class="flex items-center gap-2 flex-1 min-w-0">
+              <el-input
+                :model-value="editingPlanName"
+                @input="(val) => editingPlanName = val"
+                @blur="handleSavePlanName(activePlanId)"
+                @keyup.enter="handleSavePlanName(activePlanId)"
+                @keyup.esc="handleCancelEditPlanName"
+                size="small"
+                class="flex-1"
+                ref="editPlanNameInput">
+              </el-input>
+            </div>
+          </div>
+          <div v-else>
+            <h3 class="text-lg font-semibold">计划文件</h3>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <el-button
+            type="primary"
+            size="small"
+            @click="handlePlayPlan"
+            :disabled="!planStatus || playing">
+            <el-icon v-if="playing" size="12" class="animate-spin"><Loading /></el-icon>
+            <span v-else>播放</span>
+          </el-button>
+          <el-button type="plain" size="small" circle @click="handleStopPlan" title="停止">
+            <el-icon v-if="stopping" size="12" class="animate-spin"><Loading /></el-icon>
+            <span v-else>⏹</span>
+          </el-button>
+        </div>
+      </div>
+
+      <div v-if="planStatus" class="flex-1 overflow-y-auto">
+        <!-- 前置列表 -->
+        <div class="border rounded p-2 mb-2">
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-xs font-semibold text-gray-600">前置列表</div>
+            <el-button
+              type="primary"
+              size="small"
+              plain
+              @click="handleAddPreList">
+              + 添加前置列表
+            </el-button>
+          </div>
+          <div v-if="planStatus.pre_lists && planStatus.pre_lists.length > 0" class="space-y-2">
+            <div
+              v-for="(preList, preListIndex) in planStatus.pre_lists"
+              :key="'pre-list-' + preListIndex"
+              class="border rounded p-2">
+              <div class="flex items-center justify-between mb-2">
+                <div class="text-xs font-medium">前置列表 {{ preListIndex + 1 }}</div>
+                <div class="flex items-center gap-1">
+                  <el-button
+                    type="danger"
+                    size="small"
+                    circle
+                    plain
+                    @click="handleDeletePreList(preListIndex)"
+                    title="删除">
+                    <el-icon><Delete /></el-icon>
+                  </el-button>
+                </div>
+              </div>
+              <!-- 星期选择 -->
+              <div class="mb-2">
+                <div class="text-xs text-gray-600 mb-1">开启星期</div>
+                <div class="flex items-center gap-1">
+                  <el-checkbox
+                    v-for="day in [1,2,3,4,5,6,7]"
+                    :key="day"
+                    :model-value="preList.weekdays && preList.weekdays.includes(day)"
+                    @change="(val) => handleTogglePreListWeekday(preListIndex, day, val)"
+                    size="small">
+                    {{ ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'][day] }}
+                  </el-checkbox>
+                </div>
+              </div>
+              <!-- 文件列表 -->
+              <div class="space-y-1">
+                <div
+                  v-for="(file, fileIndex) in preList.files"
+                  :key="'pre-file-' + preListIndex + '-' + fileIndex"
+                  class="flex items-center gap-2 p-1 hover:bg-gray-100 rounded">
+                  <span class="text-xs text-gray-500 w-6">{{ fileIndex + 1 }}</span>
+                  <span class="flex-1 text-xs truncate" :title="file.uri">
+                    {{ file.uri.split('/').pop() }}
+                  </span>
+                  <el-tag v-if="file.duration" type="info" size="small" class="w-12 text-center">
+                    {{ formatDuration(file.duration) }}
+                  </el-tag>
+                  <el-button
+                    type="plain"
+                    size="small"
+                    circle
+                    @click="handleDeletePreListFile(preListIndex, fileIndex)"
+                    title="删除">
+                    <el-icon><Minus /></el-icon>
+                  </el-button>
+                </div>
+                <el-button
+                  type="primary"
+                  size="small"
+                  plain
+                  @click="handleOpenFileBrowserForPreList(preListIndex)"
+                  class="w-full">
+                  + 添加文件
+                </el-button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 正式列表 -->
+        <div class="border rounded p-2">
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-xs font-semibold text-gray-600">正式列表</div>
+            <el-button
+              type="primary"
+              size="small"
+              plain
+              @click="handleOpenFileBrowserForMainList">
+              + 添加文件
+            </el-button>
+          </div>
+          <div v-if="planStatus.main_list && planStatus.main_list.files && planStatus.main_list.files.length > 0" class="space-y-1">
+            <div
+              v-for="(file, fileIndex) in planStatus.main_list.files"
+              :key="'main-file-' + fileIndex"
+              class="flex items-center gap-2 p-1 hover:bg-gray-100 rounded"
+              :class="{ 'bg-blue-50': fileIndex === planStatus.file_index }">
+              <span class="text-xs text-gray-500 w-6">{{ fileIndex + 1 }}</span>
+              <span
+                class="flex-1 text-xs truncate"
+                :class="{ 'text-blue-600': fileIndex === planStatus.file_index }"
+                :title="file.uri">
+                {{ file.uri.split('/').pop() }}
+              </span>
+              <el-tag v-if="file.duration" type="info" size="small" class="w-12 text-center">
+                {{ formatDuration(file.duration) }}
+              </el-tag>
+              <el-button
+                type="plain"
+                size="small"
+                circle
+                @click="handleDeleteMainListFile(fileIndex)"
+                title="删除">
+                <el-icon><Minus /></el-icon>
+              </el-button>
+            </div>
+          </div>
+          <div v-else class="text-xs text-gray-400 text-center py-2">正式列表为空</div>
+        </div>
+      </div>
+      <div v-else class="flex-1 flex items-center justify-center text-sm text-gray-400">
+        请先在左侧选择一个计划查看详情
+      </div>
+    </div>
+
+    <!-- 第三列：配置详情（Cron + 设备） -->
+    <div class="w-80 border rounded p-3 flex flex-col">
+      <h3 class="text-lg font-semibold mb-3">配置详情</h3>
+
+      <div v-if="planStatus" class="flex-1 overflow-y-auto space-y-4">
+        <!-- Cron 定时任务配置 -->
+        <div class="border rounded p-3">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="text-sm font-semibold">定时任务 (Cron)</h4>
+            <el-switch
+              :model-value="planStatus.schedule?.enabled === 1"
+              @change="(val) => handleTogglePlanCronEnabled(val)"
+              active-text="开启"
+              inactive-text="关闭">
+            </el-switch>
+          </div>
+
+          <div class="space-y-2">
+            <div>
+              <div class="text-xs text-gray-600 mb-1">Cron 表达式</div>
+              <div class="flex items-center gap-2">
+                <el-input
+                  :model-value="planStatus.schedule?.cron || ''"
+                  @input="(val) => handleUpdatePlanCron(val)"
+                  placeholder="例如: 0 0 * * *"
+                  size="small"
+                  :disabled="planStatus.schedule?.enabled !== 1">
+                </el-input>
+                <el-button
+                  type="info"
+                  size="small"
+                  @click="handleOpenCronBuilder"
+                  :disabled="planStatus.schedule?.enabled !== 1">
+                  助手
+                </el-button>
+              </div>
+            </div>
+
+            <div>
+              <div class="text-xs text-gray-600 mb-1">持续时间（分钟）</div>
+              <el-input-number
+                :model-value="planStatus.schedule?.duration || 0"
+                @change="handleUpdatePlanDuration"
+                :min="0"
+                :max="1440"
+                :step="1"
+                size="small"
+                :disabled="planStatus.schedule?.enabled !== 1"
+                class="w-full">
+              </el-input-number>
+              <div class="text-xs text-gray-500 mt-1">0表示不自动停止</div>
+            </div>
+
+            <div v-if="planStatus.schedule?.cron && planStatus.schedule?.enabled === 1">
+              <el-button
+                type="success"
+                size="small"
+                @click="handlePreviewPlanCron"
+                class="w-full">
+                预览执行时间
+              </el-button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 设备配置 -->
+        <div class="border rounded p-3">
+          <h4 class="text-sm font-semibold mb-2">设备配置</h4>
+
+          <div class="space-y-2">
+            <div>
+              <div class="text-xs text-gray-600 mb-1">设备类型</div>
+              <el-select
+                :model-value="planStatus.device?.type || planStatus.device_type || ''"
+                @change="handleUpdatePlanDeviceType"
+                placeholder="选择设备类型"
+                size="small"
+                class="w-full">
+                <el-option label="蓝牙" value="bluetooth" />
+                <el-option label="DLNA" value="dlna" />
+                <el-option label="设备代理" value="agent" />
+                <el-option label="小米设备" value="mi" />
+              </el-select>
+            </div>
+
+            <div>
+              <div class="text-xs text-gray-600 mb-1 flex items-center gap-2">
+                <span>设备地址</span>
+                <span v-if="planStatus.device?.name" class="text-xs text-gray-500">
+                  {{ planStatus.device.name }}
+                </span>
+              </div>
+              <div class="flex items-center gap-2">
+                <el-input
+                  :model-value="planStatus.device?.address || planStatus.device_address || ''"
+                  @input="(val) => handleUpdatePlanDeviceAddress(val)"
+                  placeholder="设备地址"
+                  size="small"
+                  class="flex-1">
+                </el-input>
+                <el-button
+                  size="small"
+                  type="danger"
+                  plain
+                  @click="handleUpdatePlanDeviceAddress('')"
+                  :disabled="!planStatus.device?.address && !planStatus.device_address"
+                  title="清空设备地址">
+                  清空
+                </el-button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 设备列表 -->
+          <div class="mt-3">
+            <div class="flex items-center justify-between mb-2">
+              <h5 class="text-xs font-semibold text-gray-700">设备列表</h5>
+              <el-button
+                type="primary"
+                size="small"
+                @click="handleOpenScanDialog">
+                扫描设备
+              </el-button>
+            </div>
+            <div class="space-y-2 max-h-[200px] overflow-y-auto" v-loading="loading">
+              <div
+                v-for="device in connectedDeviceList"
+                :key="device.address"
+                class="flex items-center gap-2 p-2 border rounded hover:bg-gray-50">
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm font-medium truncate">{{ device.name }}</div>
+                  <div class="text-xs text-gray-500 truncate">{{ device.address }}</div>
+                </div>
+                <el-button
+                  size="small"
+                  type="primary"
+                  @click="handleSelectDevice(device)"
+                  :disabled="device.address === (planStatus.device?.address || planStatus.device_address)">
+                  选择
+                </el-button>
+              </div>
+              <div
+                v-if="connectedDeviceList.length === 0"
+                class="text-xs text-gray-400 text-center py-4">
+                暂无设备
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-else class="flex-1 flex items-center justify-center text-sm text-gray-400">
+        请先选择一个计划查看配置
+      </div>
+    </div>
+  </div>
+
+  <!-- Cron 构建器对话框 -->
+  <el-dialog v-model="cronBuilderVisible" title="Cron 表达式构建器" width="600px">
+    <!-- Cron 构建器内容，参考 media.js 中的实现 -->
+    <div class="space-y-4">
+      <div>
+        <div class="text-sm font-semibold mb-2">秒</div>
+        <el-radio-group v-model="cronBuilder.second" @change="updateCronExpression">
+          <el-radio label="*">每秒</el-radio>
+          <el-radio label="0">0秒</el-radio>
+          <el-radio label="custom">自定义</el-radio>
+        </el-radio-group>
+        <el-input
+          v-if="cronBuilder.second === 'custom'"
+          v-model="cronBuilder.secondCustom"
+          @input="updateCronExpression"
+          placeholder="例如: 0,30 或 */30"
+          size="small"
+          class="mt-2">
+        </el-input>
+      </div>
+      <!-- 类似地添加分钟、小时、日、月、周 -->
+      <div>
+        <div class="text-sm font-semibold mb-2">分钟</div>
+        <el-radio-group v-model="cronBuilder.minute" @change="updateCronExpression">
+          <el-radio label="*">每分钟</el-radio>
+          <el-radio label="0">0分</el-radio>
+          <el-radio label="custom">自定义</el-radio>
+        </el-radio-group>
+        <el-input
+          v-if="cronBuilder.minute === 'custom'"
+          v-model="cronBuilder.minuteCustom"
+          @input="updateCronExpression"
+          placeholder="例如: 0,30 或 */30"
+          size="small"
+          class="mt-2">
+        </el-input>
+      </div>
+      <div>
+        <div class="text-sm font-semibold mb-2">小时</div>
+        <el-radio-group v-model="cronBuilder.hour" @change="updateCronExpression">
+          <el-radio label="*">每小时</el-radio>
+          <el-radio label="0">0点</el-radio>
+          <el-radio label="custom">自定义</el-radio>
+        </el-radio-group>
+        <el-input
+          v-if="cronBuilder.hour === 'custom'"
+          v-model="cronBuilder.hourCustom"
+          @input="updateCronExpression"
+          placeholder="例如: 8,12,18"
+          size="small"
+          class="mt-2">
+        </el-input>
+      </div>
+      <div>
+        <div class="text-sm font-semibold mb-2">日</div>
+        <el-radio-group v-model="cronBuilder.day" @change="updateCronExpression">
+          <el-radio label="*">每天</el-radio>
+          <el-radio label="custom">自定义</el-radio>
+        </el-radio-group>
+        <el-input
+          v-if="cronBuilder.day === 'custom'"
+          v-model="cronBuilder.dayCustom"
+          @input="updateCronExpression"
+          placeholder="例如: 1,15"
+          size="small"
+          class="mt-2">
+        </el-input>
+      </div>
+      <div>
+        <div class="text-sm font-semibold mb-2">月</div>
+        <el-radio-group v-model="cronBuilder.month" @change="updateCronExpression">
+          <el-radio label="*">每月</el-radio>
+          <el-radio label="custom">自定义</el-radio>
+        </el-radio-group>
+        <el-input
+          v-if="cronBuilder.month === 'custom'"
+          v-model="cronBuilder.monthCustom"
+          @input="updateCronExpression"
+          placeholder="例如: 1,6,12"
+          size="small"
+          class="mt-2">
+        </el-input>
+      </div>
+      <div>
+        <div class="text-sm font-semibold mb-2">周</div>
+        <el-radio-group v-model="cronBuilder.weekday" @change="updateCronExpression">
+          <el-radio label="*">每天</el-radio>
+          <el-radio label="1-5">工作日</el-radio>
+          <el-radio label="0,6">周末</el-radio>
+          <el-radio label="custom">自定义</el-radio>
+        </el-radio-group>
+        <el-input
+          v-if="cronBuilder.weekday === 'custom'"
+          v-model="cronBuilder.weekdayCustom"
+          @input="updateCronExpression"
+          placeholder="例如: 1,3,5"
+          size="small"
+          class="mt-2">
+        </el-input>
+      </div>
+      <div>
+        <div class="text-sm font-semibold mb-2">生成的 Cron 表达式</div>
+        <el-input
+          v-model="cronBuilder.generated"
+          readonly
+          size="small">
+        </el-input>
+      </div>
+    </div>
+    <template #footer>
+      <el-button @click="handleCloseCronBuilder">取消</el-button>
+      <el-button type="primary" @click="handleApplyCronExpression">应用</el-button>
+      <el-button type="success" @click="handlePreviewGeneratedCron">预览</el-button>
+    </template>
+  </el-dialog>
+
+  <!-- Cron 预览对话框 -->
+  <el-dialog v-model="cronPreviewVisible" title="Cron 执行时间预览" width="500px">
+    <div class="space-y-2">
+      <div
+        v-for="(time, index) in cronPreviewTimes"
+        :key="index"
+        class="p-2 border rounded">
+        {{ time }}
+      </div>
+    </div>
+  </el-dialog>
+
+  <!-- 文件浏览器对话框 -->
+  <FileDialog
+    v-if="fileBrowserDialogVisible"
+    :visible="fileBrowserDialogVisible"
+    @close="handleCloseFileBrowser"
+    @select="handleFileSelected">
+  </FileDialog>
+
+  <!-- 设备扫描对话框 -->
+  <el-dialog v-model="scanDialogVisible" title="扫描设备" width="500px">
+    <!-- 设备扫描内容 -->
+    <div class="space-y-2" v-loading="loading">
+      <div
+        v-for="device in deviceList"
+        :key="device.address"
+        class="flex items-center gap-2 p-2 border rounded hover:bg-gray-50">
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-medium truncate">{{ device.name }}</div>
+          <div class="text-xs text-gray-500 truncate">{{ device.address }}</div>
+        </div>
+        <el-button
+          size="small"
+          type="primary"
+          @click="handleSelectScannedDevice(device)">
+          选择
+        </el-button>
+      </div>
+    </div>
+  </el-dialog>
+</div>

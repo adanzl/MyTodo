@@ -82,17 +82,48 @@ def playlist_get():
 @media_bp.route("/playlist/update", methods=['POST'])
 def playlist_update():
     """
-    更新播放列表
+    更新单个播放列表
+    传入单个播放列表数据，必须包含 id 字段
     """
     try:
         log.info("===== [Playlist Update]")
         args = request.get_json(silent=True) or {}
-        ret = playlist_mgr.save_playlist(args)
+        
+        if not args:
+            return _err("请求数据不能为空")
+        
+        playlist_id = args.get("id")
+        if not playlist_id:
+            return _err("播放列表 id 不能为空")
+        
+        ret = playlist_mgr.update_single_playlist(args)
         if ret != 0:
             return _err("更新播放列表失败")
         return _ok()
     except Exception as e:
         log.error(f"[PLAYLIST] Update error: {e}")
+        return _err(f'error: {str(e)}')
+
+
+@media_bp.route("/playlist/updateAll", methods=['POST'])
+def playlist_update_all():
+    """
+    更新整个播放列表集合（覆盖）
+    传入字典格式 {playlist_id: playlist_data, ...}
+    """
+    try:
+        log.info("===== [Playlist Update All]")
+        args = request.get_json(silent=True) or {}
+        
+        if not args:
+            return _err("请求数据不能为空")
+        
+        ret = playlist_mgr.save_playlist(args)
+        if ret != 0:
+            return _err("更新播放列表集合失败")
+        return _ok()
+    except Exception as e:
+        log.error(f"[PLAYLIST] UpdateAll error: {e}")
         return _err(f'error: {str(e)}')
 
 

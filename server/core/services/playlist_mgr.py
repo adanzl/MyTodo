@@ -9,10 +9,7 @@ from typing import Any, Counter, Dict, List, Optional
 
 from core.utils import get_media_duration, check_cron_will_trigger_today
 from core.db import rds_mgr
-from core.device.agent import DeviceAgent
-from core.device.bluetooth import BluetoothDev
-from core.device.dlna import DlnaDev
-from core.device.mi_device import MiDevice
+from core.device import create_device
 from core.log_config import root_logger
 from core.services.scheduler_mgr import scheduler_mgr
 from core.utils import time_to_seconds
@@ -24,19 +21,6 @@ DEFAULT_PLAYLIST_NAME = "默认播放列表"
 DEVICE_TYPES = {"device_agent", "bluetooth", "dlna", "mi"}
 
 _TS = lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-
-def _create_device(node):
-    ret = {"node": node, "obj": None}
-    if node["type"] == "agent":
-        ret["obj"] = DeviceAgent(address=node["address"], name=node.get("name"))
-    elif node["type"] == "bluetooth":
-        ret["obj"] = BluetoothDev(node["address"], name=node.get("name"))
-    elif node["type"] == "dlna":
-        ret["obj"] = DlnaDev(node["address"], name=node.get("name"))
-    elif node["type"] == "mi":
-        ret["obj"] = MiDevice(node.get("address", ""), name=node.get("name"))
-    return ret
 
 
 def _get_file_uri(file_item):
@@ -108,10 +92,48 @@ class PlaylistMgr:
         rds_mgr.set(PLAYLIST_RDS_FULL_KEY, json.dumps(self._playlist_raw, ensure_ascii=False))
 
     def save_playlist(self, collection: Dict[str, Any]) -> int:
+        """
+        保存整个播放列表集合
+        :param collection: 播放列表集合字典，格式为 {playlist_id: playlist_data}
+        """
         self._playlist_raw = collection
         self._save_playlist_to_rds()
         # 更新设备映射
         self._refresh_device_map()
+        return 0
+
+    def update_single_playlist(self, playlist_data: Dict[str, Any]) -> int:
+        """
+        更新单个播放列表
+        :param playlist_data: 播放列表数据，必须包含 id 字段
+        :return: 0 表示成功，-1 表示失败
+        """
+        if not playlist_data or not isinstance(playlist_data, dict):
+            return -1
+        
+        playlist_id = playlist_data.get("id")
+        if not playlist_id:
+            log.error("[PlaylistMgr] 更新单个播放列表失败: playlist_data 中缺少 id 字段")
+            return -1
+        
+        # 如果播放列表不存在，创建新播放列表
+        if playlist_id not in self._playlist_raw:
+            log.info(f"[PlaylistMgr] 播放列表 {playlist_id} 不存在，将创建新播放列表")
+        
+        # 更新播放列表数据（合并现有数据）
+        if playlist_id in self._playlist_raw:
+            # 合并更新，保留原有字段
+            existing_playlist = self._playlist_raw[playlist_id]
+            existing_playlist.update(playlist_data)
+            self._playlist_raw[playlist_id] = existing_playlist
+        else:
+            # 新播放列表
+            self._playlist_raw[playlist_id] = playlist_data
+        
+        self._save_playlist_to_rds()
+        # 只更新当前播放列表的设备映射和定时任务
+        self._refresh_single_device_map(playlist_id, self._playlist_raw[playlist_id])
+        self._refresh_cron_job(playlist_id, self._playlist_raw[playlist_id])
         return 0
 
     def reload(self) -> int:
@@ -185,13 +207,34 @@ class PlaylistMgr:
             return -1
 
     def _refresh_device_map(self):
+        """刷新所有播放列表的设备映射"""
         self._device_map = {}
         if self._playlist_raw and sys.platform == "linux":
             for p_id in self._playlist_raw:
                 playlist_data = self._playlist_raw[p_id]
-                self._device_map[p_id] = _create_device(playlist_data.get("device", {}))
+                self._device_map[p_id] = create_device(playlist_data.get("device", {}))
                 self._refresh_cron_job(p_id, playlist_data)
         self._cleanup_orphaned_cron_jobs()
+
+    def _refresh_single_device_map(self, playlist_id: str, playlist_data: Dict[str, Any]):
+        """只更新单个播放列表的设备映射"""
+        if sys.platform != "linux":
+            return
+        device = playlist_data.get("device", {})
+        if device and device.get("address"):
+            device_type = device.get("type") or playlist_data.get("device_type", "dlna")
+            if device_type in DEVICE_TYPES:
+                self._device_map[playlist_id] = create_device({
+                    "type": device_type,
+                    "address": device.get("address"),
+                    "name": device.get("name")
+                })
+            else:
+                # 如果设备类型无效，从映射中移除
+                self._device_map.pop(playlist_id, None)
+        else:
+            # 如果没有设备地址，从映射中移除
+            self._device_map.pop(playlist_id, None)
 
     def _refresh_cron_job(self, playlist_id: str, playlist_data: Dict[str, Any]):
         scheduler = scheduler_mgr
