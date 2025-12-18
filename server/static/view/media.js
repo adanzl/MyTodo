@@ -402,8 +402,11 @@ async function createComponent() {
           currentIndex = 0;
         }
         
-        // 获取当前显示的前置文件列表
-        const currentPreFiles = getCurrentPreFiles();
+        // 获取当前显示的前置文件列表（从 active 对象中获取，而不是从 playlistStatus）
+        const weekdayIndex = getSelectedWeekdayIndex();
+        const currentPreFiles = (active.pre_lists && Array.isArray(active.pre_lists) && active.pre_lists.length === 7)
+          ? (active.pre_lists[weekdayIndex] || [])
+          : [];
         refData.playlistStatus.value = {
           ...active,
           playlist: [...(active.playlist || [])],
@@ -2267,7 +2270,7 @@ async function createComponent() {
             }
             return {
               ...item,
-              pre_lists: item.pre_lists.map((list, idx) => idx === weekdayIndex ? [...list] : list),
+              pre_lists: item.pre_lists.map((oldList, idx) => idx === weekdayIndex ? list : oldList),
               pre_index: newPreIndex
             };
           }

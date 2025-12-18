@@ -48,8 +48,9 @@
               <span class="text-xs text-gray-500 whitespace-nowrap flex items-center gap-1">
                 <el-icon><Headset class="!w-3 !h-3" /></el-icon>
                 <span class="whitespace-nowrap w-5 flex items-center justify-center">
-                  {{ ((playlist.pre_lists && playlist.pre_lists[getWeekdayIndex()] && playlist.pre_lists[getWeekdayIndex()].length) || 0) + ((playlist.playlist
-                  && playlist.playlist.length) || 0) }}
+                  {{ ((playlist.pre_lists && playlist.pre_lists[getWeekdayIndex()] &&
+                  playlist.pre_lists[getWeekdayIndex()].length) || 0) + ((playlist.playlist &&
+                  playlist.playlist.length) || 0) }}
                 </span>
               </span>
               <div class="flex items-center justify-center">
@@ -143,8 +144,8 @@
             <template v-if="playlistStatus">
               <template
                 v-if="(getCurrentPreFiles()?.length || 0) + (playlistStatus.playlist?.length || 0) > 0">
-                共 {{ (getCurrentPreFiles()?.length || 0) + (playlistStatus.playlist?.length ||
-                0) }} 首， 当前:
+                共 {{ (getCurrentPreFiles()?.length || 0) + (playlistStatus.playlist?.length || 0)
+                }} 首， 当前:
                 <template
                   v-if="playlistStatus.pre_index !== undefined && playlistStatus.pre_index !== null && playlistStatus.pre_index >= 0">
                   {{ playlistStatus.pre_index + 1 }}
@@ -154,22 +155,13 @@
                   {{ (getCurrentPreFiles()?.length || 0) + playlistStatus.current_index + 1 }}
                 </template>
                 <template v-else> - </template>
-                / {{ (getCurrentPreFiles()?.length || 0) + (playlistStatus.playlist?.length ||
-                0) }}
+                / {{ (getCurrentPreFiles()?.length || 0) + (playlistStatus.playlist?.length || 0) }}
               </template>
               <template v-else> 共 0 首， 当前: - / 0 </template>
             </template>
           </div>
         </div>
         <div class="flex flex-wrap gap-2">
-          <el-button
-            type="plain"
-            size="small"
-            circle
-            @click="showMoreActions = !showMoreActions"
-            title="更多">
-            <el-icon><el-icon-menu /></el-icon>
-          </el-button>
           <el-button
             type="plain"
             size="small"
@@ -215,21 +207,50 @@
             title="清空列表（包括前置文件和正式文件）">
             <el-icon><Delete /></el-icon>
           </el-button>
+          <el-button
+            type="plain"
+            size="small"
+            circle
+            @click="showMoreActions = !showMoreActions"
+            title="更多">
+            <el-icon><el-icon-menu /></el-icon>
+          </el-button>
         </div>
       </div>
 
       <div v-if="playlistStatus" class="flex-1 overflow-y-auto">
         <!-- pre_files 列表 -->
         <div class="border rounded p-2 mb-2">
+          <!-- 第一行：标题和星期选择按钮 -->
           <div class="flex items-center justify-between mb-2">
-            <div class="text-xs font-semibold text-gray-600">
-              前置文件（播放时优先播放）
-              <span v-if="getPreFilesTotalDuration() > 0" class="ml-2 text-gray-500">
-                {{ formatDuration(getPreFilesTotalDuration()) }}
+            <div class="text-xs font-semibold text-gray-600 w-39">前置文件（播放时优先播放）</div>
+            <div class="flex items-center gap-1">
+              <!-- 星期选择按钮 -->
+              <div class="flex items-center gap-1">
+                <el-button
+                  v-for="(day, index) in ['周一', '周二', '周三', '周四', '周五', '周六', '周日']"
+                  :key="index"
+                  :type="selectedWeekdayIndex === index || (selectedWeekdayIndex === null && getWeekdayIndex() === index) ? 'primary' : 'default'"
+                  size="small"
+                  plain
+                  @click="handleSelectWeekday(index)"
+                  :title="day"
+                  class="!w-16"
+                  class="!w-8 !h-6 !p-0 text-xs">
+                  {{ day }}
+                </el-button>
+              </div>
+            </div>
+          </div>
+          <!-- 第二行：统计信息和操作按钮 -->
+          <div class="flex items-center justify-between text-xs text-gray-500 mb-2">
+            <div class="flex items-center">
+              <span v-if="getPreFilesTotalDuration() > 0">
+                总时长：{{ formatDuration(getPreFilesTotalDuration()) }}
               </span>
               <span
                 v-if="getCurrentPreFiles() && getCurrentPreFiles().length > 0"
-                class="ml-2 text-gray-500">
+                :class="getPreFilesTotalDuration() > 0 ? 'ml-2' : ''">
                 共 {{ getCurrentPreFiles().length }} 首， 当前: {{ playlistStatus.pre_index !==
                 undefined && playlistStatus.pre_index !== null && playlistStatus.pre_index >= 0 ?
                 playlistStatus.pre_index + 1 : '-' }} / {{ getCurrentPreFiles().length }}
@@ -242,21 +263,7 @@
                 播放中
               </el-tag>
             </div>
-            <div class="flex items-center gap-1 pr-1">
-              <!-- 星期选择按钮 -->
-              <div class="flex items-center gap-1 mr-2 border-r pr-2">
-                <el-button
-                  v-for="(day, index) in ['周一', '周二', '周三', '周四', '周五', '周六', '周日']"
-                  :key="index"
-                  :type="selectedWeekdayIndex === index || (selectedWeekdayIndex === null && getWeekdayIndex() === index) ? 'primary' : 'default'"
-                  size="small"
-                  plain
-                  @click="handleSelectWeekday(index)"
-                  :title="day"
-                  class="!w-8 !h-6 !p-0 text-xs">
-                  {{ day }}
-                </el-button>
-              </div>
+            <div class="flex items-center gap-1">
               <el-button
                 type="primary"
                 size="small"
@@ -277,10 +284,11 @@
                 <ion-icon v-else class="!w-3.5 !h-3.5" name="chevron-expand-sharp"></ion-icon>
               </el-button>
               <el-button
-                type="danger"
+                type="default"
                 size="small"
-                circle
                 plain
+                class="!w-8 !h-6"
+                v-show="showMoreActions"
                 @click="handleClearPreFiles"
                 :disabled="!playlistStatus || !getCurrentPreFiles() || getCurrentPreFiles().length === 0 || playlistLoading || preFilesDragMode"
                 title="清空列表">
@@ -366,7 +374,7 @@
 
         <!-- files 列表 -->
         <div v-if="playlistStatus.playlist" class="border rounded p-2">
-          <div class="flex items-center justify-between mb-2 pr-1">
+          <div class="flex items-center justify-between mb-2">
             <div class="text-xs font-semibold text-gray-600">
               正式文件（播放时记录进度）
               <span v-if="getFilesTotalDuration() > 0" class="ml-2 text-gray-500">
@@ -409,10 +417,11 @@
                 <ion-icon v-else class="!w-3.5 !h-3.5" name="chevron-expand-sharp"></ion-icon>
               </el-button>
               <el-button
-                type="danger"
+                type="default"
                 plain
                 size="small"
-                circle
+                class="!w-8 !h-6"
+                v-show="showMoreActions"
                 @click="handleClearFiles"
                 :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0 || playlistLoading || filesDragMode"
                 title="清空正式文件列表">
