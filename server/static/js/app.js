@@ -18,8 +18,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     { path: "/score", component: () => import(`../view/score.js${timestamp}`).then((m) => m.default) },
     { path: "/timetable", component: () => import(`../view/timetable.js${timestamp}`).then((m) => m.default) },
     { path: "/media", component: () => import(`../view/media.js${timestamp}`).then((m) => m.default) },
-    { path: "/pdf_tool", component: () => import(`../view/pdf_tool.js${timestamp}`).then((m) => m.default) },
-    { path: "/media_tool", component: () => import(`../view/media_tool.js${timestamp}`).then((m) => m.default) },
+    { path: "/tools", component: () => import(`../view/tools.js${timestamp}`).then((m) => m.default) },
   ];
   // 创建路由实例
   const router = window.VueRouter.createRouter({

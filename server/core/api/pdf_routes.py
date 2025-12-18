@@ -190,14 +190,32 @@ def pdf_list():
         # 已解密的文件名格式：原文件名_unlocked.pdf
         file_mapping = []
         for uploaded in uploaded_files:
+            # 确保 uploaded 文件信息完整
+            if not uploaded or 'name' not in uploaded or 'path' not in uploaded:
+                continue
+                
             uploaded_name = uploaded['name']
+            uploaded_path = uploaded['path']
+            
+            # 重新验证文件是否存在，并获取最新信息
+            if not os.path.exists(uploaded_path):
+                # 文件已被删除，跳过
+                continue
+            
+            # 重新获取文件信息以确保完整性
+            current_file_info = get_file_info(uploaded_path)
+            if not current_file_info:
+                # 无法获取文件信息，跳过
+                continue
+            
+            uploaded = current_file_info
             base_name, ext = os.path.splitext(uploaded_name)
             unlocked_name = f"{base_name}_unlocked{ext}"
             
             # 查找对应的已解密文件
             unlocked_file = None
             for unlocked in unlocked_files:
-                if unlocked['name'] == unlocked_name:
+                if unlocked and unlocked.get('name') == unlocked_name:
                     unlocked_file = unlocked
                     break
             
