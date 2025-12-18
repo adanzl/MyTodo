@@ -1,4 +1,4 @@
-import { getList, setData, getRdsData, getRdsList, getApiUrl } from "../js/net_util.js";
+import { getList, setData, getRdsData, getRdsList, getApiUrl } from "../../js/net_util.js";
 
 const { ref, onMounted, nextTick } = window.Vue;
 const _ = window._;

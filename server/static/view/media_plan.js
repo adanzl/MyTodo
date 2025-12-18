@@ -3,7 +3,7 @@ import { createPlaylistId, formatDuration, calculateNextCronTimes, generateCronE
 import { createFileDialog } from "./common/file_dialog.js";
 const axios = window.axios;
 
-const { ref, watch, onMounted, onUnmounted, nextTick } = window.Vue;
+const { ref, watch, onMounted, nextTick } = window.Vue;
 const { ElMessage, ElMessageBox } = window.ElementPlus;
 let component = null;
 
@@ -921,3 +921,4 @@ async function createComponent() {
 export default async function () {
   return await createComponent();
 }
+

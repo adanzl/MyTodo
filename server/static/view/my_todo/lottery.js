@@ -1,5 +1,5 @@
-import { getData, getList, setData, delData, getRdsData, setRdsData } from "../js/net_util.js";
-import { compressImageToBase64 } from "../js/image_util.js";
+import { getData, getList, setData, delData, getRdsData, setRdsData } from "../../js/net_util.js";
+import { compressImageToBase64 } from "../../js/image_util.js";
 const _ = window._;
 const { ref, onMounted } = window.Vue;
 const { ElMessage } = window.ElementPlus;

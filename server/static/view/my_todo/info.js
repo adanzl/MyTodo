@@ -1,5 +1,5 @@
-import { getSave } from "../js/net_util.js";
-import { UserData, S_TS } from "../js/user_data.js";
+import { getSave } from "../../js/net_util.js";
+import { UserData, S_TS } from "../../js/user_data.js";
 
 const { ref } = window.Vue;
 const { ElMessage } = window.ElementPlus;

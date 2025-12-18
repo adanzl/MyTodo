@@ -1,4 +1,4 @@
-import { getList } from "../js/net_util.js";
+import { getList } from "../../js/net_util.js";
 
 const { ref, onMounted } = window.Vue;
 const _ = window._;
