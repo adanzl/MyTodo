@@ -2,8 +2,8 @@
  * 文件对话框组件
  * 可复用的文件选择对话框
  */
-import { getApiUrl } from "../js/net_util.js";
-import { formatSize } from "../js/utils.js";
+import { getApiUrl } from "../../js/net_util.js";
+import { formatSize } from "../../js/utils.js";
 
 const axios = window.axios;
 const { ref, watch, computed } = window.Vue;
