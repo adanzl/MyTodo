@@ -5,7 +5,7 @@ const _ = window._;
 const dayjs = window.dayjs;
 let component = null;
 async function loadTemplate() {
-  const response = await fetch(`./view/score-template.html?t=${Date.now()}`);
+  const response = await fetch(`./view/my_todo/score-template.html?t=${Date.now()}`);
   return await response.text(); // 获取模板内容
 }
 async function createComponent() {

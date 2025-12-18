@@ -1,6 +1,6 @@
 import { bluetoothAction, playlistAction, getApiUrl } from "../js/net_util.js";
 import { createPlaylistId, formatDateTime, formatDuration, formatDurationMinutes, formatSize } from "../js/utils.js";
-import { createFileDialog } from "./file_dialog.js";
+import { createFileDialog } from "./common/file_dialog.js";
 const axios = window.axios;
 
 const { ref, watch, onMounted, onUnmounted, nextTick } = window.Vue;

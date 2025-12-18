@@ -7,15 +7,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   // 添加时间戳避免缓存
   const timestamp = `?t=${Date.now()}`;
   
-  const { default: Info } = await import(`../view/info.js${timestamp}`);
+  const { default: Info } = await import(`../view/my_todo/info.js${timestamp}`);
 
   const routes = [
     { path: "/", redirect: "/home" },
     { path: "/home", component: () => import(`../view/home.js${timestamp}`).then((m) => m.default) },
-    { path: "/lottery", component: () => import(`../view/lottery.js${timestamp}`).then((m) => m.default) },
+    { path: "/lottery", component: () => import(`../view/my_todo/lottery.js${timestamp}`).then((m) => m.default) },
     { path: "/info", component: Info },
-    { path: "/chat", component: () => import(`../view/chat.js${timestamp}`).then((m) => m.default) },
-    { path: "/score", component: () => import(`../view/score.js${timestamp}`).then((m) => m.default) },
+    { path: "/chat", component: () => import(`../view/my_todo/chat.js${timestamp}`).then((m) => m.default) },
+    { path: "/score", component: () => import(`../view/my_todo/score.js${timestamp}`).then((m) => m.default) },
     { path: "/timetable", component: () => import(`../view/timetable.js${timestamp}`).then((m) => m.default) },
     { path: "/media", component: () => import(`../view/media.js${timestamp}`).then((m) => m.default) },
     { path: "/tools", component: () => import(`../view/tools.js${timestamp}`).then((m) => m.default) },

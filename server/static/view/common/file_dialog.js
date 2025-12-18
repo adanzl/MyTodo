@@ -206,7 +206,7 @@ function createFileBrowser(options = {}) {
 export { createFileBrowser };
 
 async function loadTemplate() {
-  const response = await fetch(`./view/file_dialog-template.html?t=${Date.now()}`);
+  const response = await fetch(`./view/common/file_dialog-template.html?t=${Date.now()}`);
   return await response.text();
 }
 

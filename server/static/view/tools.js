@@ -1,6 +1,6 @@
 import { getApiUrl } from "../js/net_util.js";
 import { formatSize, formatDuration } from "../js/utils.js";
-import { createFileDialog } from "./file_dialog.js";
+import { createFileDialog } from "./common/file_dialog.js";
 const axios = window.axios;
 
 const { ref, onMounted, onUnmounted } = window.Vue;
