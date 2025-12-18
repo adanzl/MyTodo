@@ -81,10 +81,10 @@ def translate_text(text):
 class ChatMgr:
 
     def __init__(self):
-        log.info("[CHAT] ChatMgr init")
         self.clients: dict[str, ClientContext] = {}  # sid -> ClientContext
 
     def init(self, socketio):
+        log.info("[CHAT] ChatMgr init")
         self.socketio = socketio
         self._register_events()
 
