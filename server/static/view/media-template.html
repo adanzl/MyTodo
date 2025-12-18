@@ -86,7 +86,7 @@
           <!-- 第二行：下次运行时间（始终存在，保持固定高度） -->
           <div class="text-[10px] text-blue-600 min-h-[14px] flex items-center justify-between">
             <span v-if="getPlaylistNextCronTime(playlist)" class="flex items-center gap-1">
-              <el-icon class="!w-3 !h-4"><CaretRight /></el-icon> {{
+              <el-icon class="!w-3 !h-4"><el-icon-video-play /></el-icon> {{
               getPlaylistNextCronTime(playlist) }}
             </span>
             <span v-else class="invisible">占位</span>
