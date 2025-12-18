@@ -3,7 +3,7 @@ import { createPlaylistId, formatDuration, calculateNextCronTimes, generateCronE
 import { createFileDialog } from "./common/file_dialog.js";
 const axios = window.axios;
 
-const { ref, watch, onMounted, nextTick } = window.Vue;
+const { ref, watch, onMounted } = window.Vue;
 const { ElMessage, ElMessageBox } = window.ElementPlus;
 let component = null;
 
@@ -46,8 +46,6 @@ async function createComponent() {
         cronBuilderVisible: ref(false),
         cronPreviewVisible: ref(false),
         cronPreviewTimes: ref([]),
-        editingPlanId: ref(null),
-        editingPlanName: ref(""),
         loading: ref(false),
         deviceList: ref([]),
         connectedDeviceList: ref([]),
@@ -58,6 +56,11 @@ async function createComponent() {
         planStatus: ref(null),
         planLoading: ref(false),
         planRefreshing: ref(false),
+        selectedWeekday: ref(null), // 选中的星期几，null 表示使用当前日期
+        preFilesDragMode: ref(false), // 前置文件拖拽排序模式
+        mainFilesDragMode: ref(false), // 正式文件拖拽排序模式
+        preFilesOriginalOrder: ref(null), // 前置文件原始顺序
+        mainFilesOriginalOrder: ref(null), // 正式文件原始顺序
       };
       const pendingDeviceType = ref(null);
 
@@ -74,17 +77,31 @@ async function createComponent() {
       };
 
       // 创建默认计划
-      const createDefaultPlan = (overrides = {}) => ({
-        id: overrides.id || createPlaylistId(),
-        name: overrides.name || "默认计划",
-        enabled: overrides.enabled || 0,
-        pre_lists: overrides.pre_lists || [],
-        main_list: overrides.main_list || { files: [] },
-        device_address: overrides.device_address || null,
-        device_type: overrides.device_type || "dlna",
-        device: overrides.device || { type: "dlna", address: null, name: null },
-        schedule: overrides.schedule || { enabled: 0, cron: "", duration: 0 },
-      });
+      const createDefaultPlan = (overrides = {}) => {
+        // 确保有7个前置列表（周一到周日）
+        let pre_lists = overrides.pre_lists || [];
+        if (!Array.isArray(pre_lists) || pre_lists.length === 0) {
+          pre_lists = Array(7).fill(null).map(() => ({ files: [] }));
+        } else {
+          // 确保有7个，不足的补齐
+          while (pre_lists.length < 7) {
+            pre_lists.push({ files: [] });
+          }
+          // 如果超过7个，只取前7个
+          pre_lists = pre_lists.slice(0, 7);
+        }
+        return {
+          id: overrides.id || createPlaylistId(),
+          name: overrides.name || "默认计划",
+          enabled: overrides.enabled || 0,
+          pre_lists,
+          main_list: overrides.main_list || { files: [] },
+          device_address: overrides.device_address || null,
+          device_type: overrides.device_type || "dlna",
+          device: overrides.device || { type: "dlna", address: null, name: null },
+          schedule: overrides.schedule || { enabled: 0, cron: "", duration: 0 },
+        };
+      };
 
       // 规范化计划项
       const normalizePlanItem = (item, fallbackName = "计划") => {
@@ -100,14 +117,26 @@ async function createComponent() {
           duration: schedule.duration || 0,
         };
 
+        // 规范化前置列表，确保有7个（周一到周日，索引0-6对应星期1-7）
+        let pre_lists = item?.pre_lists || [];
+        if (!Array.isArray(pre_lists) || pre_lists.length === 0) {
+          pre_lists = Array(7).fill(null).map(() => ({ files: [] }));
+        } else {
+          // 确保有7个，不足的补齐，超过的截取
+          pre_lists = pre_lists.map(preList => ({
+            files: normalizeFiles(preList?.files || []),
+          }));
+          while (pre_lists.length < 7) {
+            pre_lists.push({ files: [] });
+          }
+          pre_lists = pre_lists.slice(0, 7);
+        }
+
         return {
           id: item?.id || createPlaylistId(),
           name,
           enabled: item?.enabled || 0,
-          pre_lists: (item?.pre_lists || []).map(preList => ({
-            weekdays: preList.weekdays || [],
-            files: normalizeFiles(preList.files || []),
-          })),
+          pre_lists,
           main_list: {
             files: normalizeFiles(item?.main_list?.files || []),
           },
@@ -159,6 +188,35 @@ async function createComponent() {
           console.warn("恢复选中计划ID失败:", error);
         }
         return null;
+      };
+
+      // 保存/恢复选中的星期几
+      const saveSelectedWeekday = (weekday) => {
+        try {
+          if (weekday !== null && weekday >= 1 && weekday <= 7) {
+            localStorage.setItem('selected_weekday', String(weekday));
+          } else {
+            localStorage.removeItem('selected_weekday');
+          }
+        } catch (error) {
+          console.warn("保存星期几失败:", error);
+        }
+      };
+
+      const restoreSelectedWeekday = () => {
+        try {
+          const saved = localStorage.getItem('selected_weekday');
+          if (saved) {
+            const weekday = parseInt(saved, 10);
+            if (weekday >= 1 && weekday <= 7) {
+              return weekday;
+            }
+          }
+          return null;
+        } catch (error) {
+          console.warn("恢复星期几失败:", error);
+          return null;
+        }
       };
 
       // 更新活动计划数据（单个计划更新）
@@ -231,6 +289,12 @@ async function createComponent() {
             } else if (normalized.plans.length > 0) {
               refData.activePlanId.value = normalized.plans[0].id;
               saveActivePlanId(normalized.plans[0].id);
+            }
+            
+            // 恢复选中的星期几
+            const savedWeekday = restoreSelectedWeekday();
+            if (savedWeekday !== null) {
+              refData.selectedWeekday.value = savedWeekday;
             }
             
             // 同步活动计划状态
@@ -393,53 +457,59 @@ async function createComponent() {
       };
 
       // 编辑计划名称
-      const handleStartEditPlanName = (planId) => {
+      // 改名计划（使用弹窗）
+      const handleStartEditPlanName = async (planId) => {
         const plan = refData.planCollection.value.find(p => p.id === planId);
-        if (plan) {
-          refData.editingPlanId.value = planId;
-          refData.editingPlanName.value = plan.name;
-          nextTick(() => {
-            const input = refData.editPlanNameInput;
-            if (input && input.$el) {
-              input.$el.querySelector('input')?.focus();
-            }
+        if (!plan) return;
+        
+        try {
+          const { value } = await ElMessageBox.prompt("请输入计划名称", "修改计划名称", {
+            confirmButtonText: "确定",
+            cancelButtonText: "取消",
+            inputValue: plan.name,
+            inputPlaceholder: plan.name,
+            inputValidator: (val) => (!!val && val.trim().length > 0) || "名称不能为空",
           });
+          const newName = (value || plan.name).trim();
+          
+          await updateActivePlanData((planInfo) => {
+            planInfo.name = newName;
+            return planInfo;
+          });
+          
+          // 更新 planCollection 中的名称
+          const planIndex = refData.planCollection.value.findIndex(p => p.id === planId);
+          if (planIndex >= 0) {
+            refData.planCollection.value[planIndex].name = newName;
+          }
+          
+          ElMessage.success("计划名称已修改");
+        } catch (error) {
+          if (error === "cancel") return;
+          console.error("修改计划名称失败:", error);
+          ElMessage.error("修改计划名称失败: " + (error.message || "未知错误"));
         }
       };
 
-      const handleSavePlanName = async (planId) => {
-        if (refData.editingPlanId.value !== planId) return;
-        const newName = (refData.editingPlanName.value || "").trim();
-        if (!newName) {
-          ElMessage.warning("名称不能为空");
-          return;
-        }
-        await updateActivePlanData((planInfo) => {
-          planInfo.name = newName;
-          return planInfo;
-        });
-        refData.editingPlanId.value = null;
-        refData.editingPlanName.value = "";
+      const handleSavePlanName = async () => {
+        // 已废弃，使用 handleStartEditPlanName 的弹窗方式
+        // 保留函数以避免模板中的引用错误
       };
 
       const handleCancelEditPlanName = () => {
-        refData.editingPlanId.value = null;
-        refData.editingPlanName.value = "";
+        // 已废弃，使用 handleStartEditPlanName 的弹窗方式
       };
 
-      // 添加前置列表
-      const handleAddPreList = async () => {
-        if (!refData.planStatus.value) return;
-        await updateActivePlanData((planInfo) => {
-          if (!planInfo.pre_lists) {
-            planInfo.pre_lists = [];
-          }
-          planInfo.pre_lists.push({
-            weekdays: [],
-            files: [],
-          });
-          return planInfo;
-        });
+      // 添加前置列表（打开文件对话框，添加到当前选中日期）
+      const handleAddPreList = () => {
+        if (!refData.planStatus.value) {
+          ElMessage.warning("请先选择一个计划");
+          return;
+        }
+        const currentWeekday = getCurrentWeekday();
+        const preListIndex = currentWeekday - 1; // 星期1-7转换为索引0-6
+        refData.fileBrowserDialogVisible.value = true;
+        refData.fileBrowserTarget.value = `pre_list_${preListIndex}`; // 添加到对应日期的前置列表
       };
 
       // 删除前置列表
@@ -453,30 +523,16 @@ async function createComponent() {
         });
       };
 
-      // 切换前置列表星期
-      const handleTogglePreListWeekday = async (preListIndex, weekday, checked) => {
-        if (!refData.planStatus.value) return;
-        await updateActivePlanData((planInfo) => {
-          if (!planInfo.pre_lists || !planInfo.pre_lists[preListIndex]) return planInfo;
-          const preList = planInfo.pre_lists[preListIndex];
-          if (!preList.weekdays) {
-            preList.weekdays = [];
-          }
-          if (checked) {
-            if (!preList.weekdays.includes(weekday)) {
-              preList.weekdays.push(weekday);
-              preList.weekdays.sort();
-            }
-          } else {
-            preList.weekdays = preList.weekdays.filter(w => w !== weekday);
-          }
-          return planInfo;
-        });
+      // 切换前置列表星期（已废弃，现在每个日期有固定的前置列表）
+      const handleTogglePreListWeekday = async () => {
+        // 此功能已废弃，保留函数以避免错误
+        ElMessage.info("现在每个日期有固定的前置列表，无需切换星期");
       };
 
-      // 打开文件浏览器（前置列表）
-      const handleOpenFileBrowserForPreList = (preListIndex) => {
+      // 打开文件浏览器（前置列表，preListIndex 是星期几 1-7）
+      const handleOpenFileBrowserForPreList = (weekday) => {
         if (!refData.planStatus.value) return;
+        const preListIndex = weekday - 1; // 星期1-7转换为索引0-6
         refData.fileBrowserTarget.value = `pre_list_${preListIndex}`;
         refData.fileBrowserDialogVisible.value = true;
       };
@@ -526,9 +582,16 @@ async function createComponent() {
                 }
               });
             } else if (target && target.startsWith("pre_list_")) {
-              // 添加到前置列表
+              // 添加到指定日期的前置列表（索引0-6对应星期1-7）
               const preListIndex = parseInt(target.replace("pre_list_", ""));
-              if (planInfo.pre_lists && planInfo.pre_lists[preListIndex]) {
+              // 确保有7个前置列表
+              if (!planInfo.pre_lists) {
+                planInfo.pre_lists = Array(7).fill(null).map(() => ({ files: [] }));
+              }
+              while (planInfo.pre_lists.length < 7) {
+                planInfo.pre_lists.push({ files: [] });
+              }
+              if (preListIndex >= 0 && preListIndex < 7) {
                 const preList = planInfo.pre_lists[preListIndex];
                 if (!preList.files) {
                   preList.files = [];
@@ -545,7 +608,8 @@ async function createComponent() {
           });
           
           handleCloseFileBrowser();
-          ElMessage.success(`已添加 ${filePaths.length} 个文件`);
+          const targetName = target === "main_list" ? "正式列表" : target === "new_pre_list" ? "前置列表" : "列表";
+          ElMessage.success(`已添加 ${filePaths.length} 个文件到${targetName}`);
         } catch (error) {
           console.error("添加文件失败:", error);
           ElMessage.error("添加文件失败: " + (error.message || "未知错误"));
@@ -554,11 +618,18 @@ async function createComponent() {
         }
       };
 
-      // 删除前置列表文件
-      const handleDeletePreListFile = async (preListIndex, fileIndex) => {
+      // 删除前置列表文件（preListIndex 是星期几 1-7）
+      const handleDeletePreListFile = async (weekday, fileIndex) => {
         if (!refData.planStatus.value) return;
         await updateActivePlanData((planInfo) => {
-          if (planInfo.pre_lists && planInfo.pre_lists[preListIndex] && planInfo.pre_lists[preListIndex].files) {
+          if (!planInfo.pre_lists) {
+            planInfo.pre_lists = Array(7).fill(null).map(() => ({ files: [] }));
+          }
+          while (planInfo.pre_lists.length < 7) {
+            planInfo.pre_lists.push({ files: [] });
+          }
+          const preListIndex = weekday - 1; // 星期1-7转换为索引0-6
+          if (preListIndex >= 0 && preListIndex < 7 && planInfo.pre_lists[preListIndex] && planInfo.pre_lists[preListIndex].files) {
             planInfo.pre_lists[preListIndex].files.splice(fileIndex, 1);
           }
           return planInfo;
@@ -574,6 +645,376 @@ async function createComponent() {
           }
           return planInfo;
         });
+      };
+
+      // 清空前置列表（当前选中星期几的前置列表文件）
+      const handleClearPreLists = async () => {
+        if (!refData.planStatus.value) return;
+        const weekday = getCurrentWeekday();
+        const preListIndex = weekday - 1; // 星期1-7转换为索引0-6
+        const fileCount = getPreListFileCountForWeekday(weekday);
+        
+        if (fileCount === 0) {
+          ElMessage.info("当前日期无前置列表文件");
+          return;
+        }
+
+        try {
+          await ElMessageBox.confirm(
+            `确定要清空当前日期（${['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'][weekday]}）的前置列表文件吗？此操作将删除 ${fileCount} 个文件。`,
+            "确认清空",
+            {
+              confirmButtonText: "确定",
+              cancelButtonText: "取消",
+              type: "warning",
+            }
+          );
+
+          await updateActivePlanData((planInfo) => {
+            if (!planInfo.pre_lists) {
+              planInfo.pre_lists = Array(7).fill(null).map(() => ({ files: [] }));
+            }
+            while (planInfo.pre_lists.length < 7) {
+              planInfo.pre_lists.push({ files: [] });
+            }
+            if (preListIndex >= 0 && preListIndex < 7) {
+              planInfo.pre_lists[preListIndex].files = [];
+            }
+            return planInfo;
+          });
+          ElMessage.success("已清空前置列表文件");
+        } catch (error) {
+          if (error !== "cancel") {
+            console.error("清空失败:", error);
+            ElMessage.error("清空失败: " + (error.message || "未知错误"));
+          }
+        }
+      };
+
+      // 清空正式列表
+      const handleClearMainList = async () => {
+        if (!refData.planStatus.value) return;
+        const filesCount = (refData.planStatus.value.main_list?.files?.length || 0);
+        
+        if (filesCount === 0) {
+          ElMessage.info("正式列表已为空");
+          return;
+        }
+
+        try {
+          await ElMessageBox.confirm(
+            `确定要清空正式列表吗？此操作将删除所有 ${filesCount} 个文件。`,
+            "确认清空",
+            {
+              confirmButtonText: "确定",
+              cancelButtonText: "取消",
+              type: "warning",
+            }
+          );
+
+          await updateActivePlanData((planInfo) => {
+            if (planInfo.main_list) {
+              planInfo.main_list.files = [];
+            }
+            return planInfo;
+          });
+          ElMessage.success("已清空正式列表");
+        } catch (error) {
+          if (error !== "cancel") {
+            console.error("清空失败:", error);
+            ElMessage.error("清空失败: " + (error.message || "未知错误"));
+          }
+        }
+      };
+
+      // 检查两个数组的顺序是否相同
+      const isOrderChanged = (original, current) => {
+        if (!original || !current || original.length !== current.length) {
+          return true;
+        }
+        for (let i = 0; i < original.length; i++) {
+          const origUri = original[i]?.uri || original[i];
+          const currUri = current[i]?.uri || current[i];
+          if (origUri !== currUri) {
+            return true;
+          }
+        }
+        return false;
+      };
+
+      // 切换前置文件拖拽排序模式
+      const handleTogglePreFilesDragMode = async () => {
+        if (refData.preFilesDragMode.value) {
+          // 退出拖拽模式时，检查是否有变化
+          const currentWeekday = getCurrentWeekday();
+          const preListIndex = currentWeekday - 1;
+          const preList = refData.planStatus.value?.pre_lists?.[preListIndex];
+          if (preList && preList.files && preList.files.length > 0) {
+            const hasChanged = isOrderChanged(refData.preFilesOriginalOrder.value, preList.files);
+            if (hasChanged) {
+              try {
+                refData.planLoading.value = true;
+                await updateActivePlanData((planInfo) => {
+                  // 使用当前内存中的顺序
+                  if (planInfo.pre_lists && planInfo.pre_lists[preListIndex]) {
+                    planInfo.pre_lists[preListIndex].files = [...(preList.files || [])];
+                  }
+                  return planInfo;
+                });
+                ElMessage.success("排序已保存");
+              } catch (error) {
+                console.error("保存排序失败:", error);
+                ElMessage.error("保存排序失败: " + (error.message || "未知错误"));
+              } finally {
+                refData.planLoading.value = false;
+              }
+            }
+            // 清除原始顺序
+            refData.preFilesOriginalOrder.value = null;
+          }
+        } else {
+          // 启用拖拽模式时，保存原始顺序
+          const currentWeekday = getCurrentWeekday();
+          const preListIndex = currentWeekday - 1;
+          const preList = refData.planStatus.value?.pre_lists?.[preListIndex];
+          if (preList && preList.files && preList.files.length > 0) {
+            refData.preFilesOriginalOrder.value = [...(preList.files || [])];
+          }
+        }
+        refData.preFilesDragMode.value = !refData.preFilesDragMode.value;
+      };
+
+      // 切换正式文件拖拽排序模式
+      const handleToggleMainFilesDragMode = async () => {
+        if (refData.mainFilesDragMode.value) {
+          // 退出拖拽模式时，检查是否有变化
+          const mainList = refData.planStatus.value?.main_list;
+          if (mainList && mainList.files && mainList.files.length > 0) {
+            const hasChanged = isOrderChanged(refData.mainFilesOriginalOrder.value, mainList.files);
+            if (hasChanged) {
+              try {
+                refData.planLoading.value = true;
+                await updateActivePlanData((planInfo) => {
+                  // 使用当前内存中的顺序
+                  if (planInfo.main_list) {
+                    planInfo.main_list.files = [...(mainList.files || [])];
+                  }
+                  return planInfo;
+                });
+                ElMessage.success("排序已保存");
+              } catch (error) {
+                console.error("保存排序失败:", error);
+                ElMessage.error("保存排序失败: " + (error.message || "未知错误"));
+              } finally {
+                refData.planLoading.value = false;
+              }
+            }
+            // 清除原始顺序
+            refData.mainFilesOriginalOrder.value = null;
+          }
+        } else {
+          // 启用拖拽模式时，保存原始顺序
+          const mainList = refData.planStatus.value?.main_list;
+          if (mainList && mainList.files && mainList.files.length > 0) {
+            refData.mainFilesOriginalOrder.value = [...(mainList.files || [])];
+          }
+        }
+        refData.mainFilesDragMode.value = !refData.mainFilesDragMode.value;
+      };
+
+      // 处理前置文件拖拽开始
+      const handlePreFileDragStart = (event, fileIndex) => {
+        if (!refData.preFilesDragMode.value) {
+          event.preventDefault();
+          return false;
+        }
+        try {
+          event.dataTransfer.effectAllowed = 'move';
+          event.dataTransfer.setData('text/plain', fileIndex.toString());
+        } catch (e) {
+          console.error('拖拽开始失败:', e);
+        }
+      };
+
+      // 处理前置文件拖拽结束
+      const handlePreFileDragEnd = (event) => {
+        if (event.currentTarget) {
+          event.currentTarget.style.backgroundColor = '';
+          event.currentTarget.style.borderTop = '';
+          event.currentTarget.style.borderBottom = '';
+        }
+      };
+
+      // 处理前置文件拖拽悬停
+      const handlePreFileDragOver = (event) => {
+        if (!refData.preFilesDragMode.value) {
+          return;
+        }
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        if (event.currentTarget) {
+          const rect = event.currentTarget.getBoundingClientRect();
+          const mouseY = event.clientY;
+          const elementCenterY = rect.top + rect.height / 2;
+          
+          event.currentTarget.style.backgroundColor = '';
+          event.currentTarget.style.borderTop = '';
+          event.currentTarget.style.borderBottom = '';
+          
+          if (mouseY < elementCenterY) {
+            event.currentTarget.style.borderTop = '2px solid #3b82f6';
+          } else {
+            event.currentTarget.style.borderBottom = '2px solid #3b82f6';
+          }
+        }
+      };
+
+      // 处理前置文件拖拽放置
+      const handlePreFileDrop = (event, targetIndex) => {
+        if (!refData.preFilesDragMode.value) {
+          return;
+        }
+        event.preventDefault();
+        if (event.currentTarget) {
+          event.currentTarget.style.backgroundColor = '';
+          event.currentTarget.style.borderTop = '';
+          event.currentTarget.style.borderBottom = '';
+        }
+        
+        const sourceIndex = parseInt(event.dataTransfer.getData('text/plain'), 10);
+        if (sourceIndex === targetIndex || isNaN(sourceIndex)) {
+          return;
+        }
+
+        const currentWeekday = getCurrentWeekday();
+        const preListIndex = currentWeekday - 1;
+        const preList = refData.planStatus.value?.pre_lists?.[preListIndex];
+        if (!preList || !preList.files || sourceIndex < 0 || sourceIndex >= preList.files.length ||
+            targetIndex < 0 || targetIndex >= preList.files.length) {
+          return;
+        }
+
+        // 只在内存中更新，不保存到后端
+        const list = [...(preList.files || [])];
+        const [removed] = list.splice(sourceIndex, 1);
+        list.splice(targetIndex, 0, removed);
+        
+        // 更新 planStatus
+        refData.planStatus.value.pre_lists[preListIndex].files = list;
+        
+        // 更新 planCollection
+        const collection = refData.planCollection.value.map(item => {
+          if (item.id === refData.activePlanId.value) {
+            const updatedPreLists = [...(item.pre_lists || [])];
+            updatedPreLists[preListIndex] = { ...updatedPreLists[preListIndex], files: list };
+            return { ...item, pre_lists: updatedPreLists };
+          }
+          return item;
+        });
+        refData.planCollection.value = collection;
+        syncActivePlan(collection);
+      };
+
+      // 处理正式文件拖拽开始
+      const handleMainFileDragStart = (event, fileIndex) => {
+        if (!refData.mainFilesDragMode.value) {
+          event.preventDefault();
+          return false;
+        }
+        try {
+          event.dataTransfer.effectAllowed = 'move';
+          event.dataTransfer.setData('text/plain', fileIndex.toString());
+        } catch (e) {
+          console.error('拖拽开始失败:', e);
+        }
+      };
+
+      // 处理正式文件拖拽结束
+      const handleMainFileDragEnd = (event) => {
+        if (event.currentTarget) {
+          event.currentTarget.style.backgroundColor = '';
+          event.currentTarget.style.borderTop = '';
+          event.currentTarget.style.borderBottom = '';
+        }
+      };
+
+      // 处理正式文件拖拽悬停
+      const handleMainFileDragOver = (event) => {
+        if (!refData.mainFilesDragMode.value) {
+          return;
+        }
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        if (event.currentTarget) {
+          const rect = event.currentTarget.getBoundingClientRect();
+          const mouseY = event.clientY;
+          const elementCenterY = rect.top + rect.height / 2;
+          
+          event.currentTarget.style.backgroundColor = '';
+          event.currentTarget.style.borderTop = '';
+          event.currentTarget.style.borderBottom = '';
+          
+          if (mouseY < elementCenterY) {
+            event.currentTarget.style.borderTop = '2px solid #3b82f6';
+          } else {
+            event.currentTarget.style.borderBottom = '2px solid #3b82f6';
+          }
+        }
+      };
+
+      // 处理正式文件拖拽放置
+      const handleMainFileDrop = (event, targetIndex) => {
+        if (!refData.mainFilesDragMode.value) {
+          return;
+        }
+        event.preventDefault();
+        if (event.currentTarget) {
+          event.currentTarget.style.backgroundColor = '';
+          event.currentTarget.style.borderTop = '';
+          event.currentTarget.style.borderBottom = '';
+        }
+        
+        const sourceIndex = parseInt(event.dataTransfer.getData('text/plain'), 10);
+        if (sourceIndex === targetIndex || isNaN(sourceIndex)) {
+          return;
+        }
+
+        const mainList = refData.planStatus.value?.main_list;
+        if (!mainList || !mainList.files || sourceIndex < 0 || sourceIndex >= mainList.files.length ||
+            targetIndex < 0 || targetIndex >= mainList.files.length) {
+          return;
+        }
+
+        // 只在内存中更新，不保存到后端
+        const list = [...(mainList.files || [])];
+        const [removed] = list.splice(sourceIndex, 1);
+        list.splice(targetIndex, 0, removed);
+        
+        // 计算新的 file_index
+        let newFileIndex = refData.planStatus.value.file_index;
+        if (refData.planStatus.value.file_index !== undefined && refData.planStatus.value.file_index !== null && refData.planStatus.value.file_index >= 0) {
+          if (refData.planStatus.value.file_index === sourceIndex) {
+            newFileIndex = targetIndex;
+          } else if (sourceIndex < refData.planStatus.value.file_index && targetIndex >= refData.planStatus.value.file_index) {
+            newFileIndex = refData.planStatus.value.file_index - 1;
+          } else if (sourceIndex > refData.planStatus.value.file_index && targetIndex <= refData.planStatus.value.file_index) {
+            newFileIndex = refData.planStatus.value.file_index + 1;
+          }
+        }
+        
+        // 更新 planStatus
+        refData.planStatus.value.main_list.files = list;
+        refData.planStatus.value.file_index = newFileIndex;
+        
+        // 更新 planCollection
+        const collection = refData.planCollection.value.map(item => {
+          if (item.id === refData.activePlanId.value) {
+            return { ...item, main_list: { files: list } };
+          }
+          return item;
+        });
+        refData.planCollection.value = collection;
+        syncActivePlan(collection);
       };
 
       // 播放计划
@@ -862,6 +1303,73 @@ async function createComponent() {
         }
       };
 
+      // 获取当前星期几（1-7，周一=1，周日=7）
+      const getCurrentWeekday = () => {
+        if (refData.selectedWeekday.value !== null) {
+          return refData.selectedWeekday.value;
+        }
+        const today = new Date();
+        const weekday = today.getDay(); // 0=周日, 1=周一, ..., 6=周六
+        return weekday === 0 ? 7 : weekday; // 转换为 1-7（周一=1，周日=7）
+      };
+
+      // 获取指定星期几的前置列表（索引0-6对应星期1-7）
+      const getActivePreListsForWeekday = (weekday) => {
+        if (!refData.planStatus.value || !refData.planStatus.value.pre_lists) {
+          return [];
+        }
+        const preListIndex = weekday - 1; // 星期1-7转换为索引0-6
+        if (preListIndex >= 0 && preListIndex < refData.planStatus.value.pre_lists.length) {
+          const preList = refData.planStatus.value.pre_lists[preListIndex];
+          return preList && preList.files && preList.files.length > 0 ? [preList] : [];
+        }
+        return [];
+      };
+
+      // 获取指定星期几的前置列表文件总数（索引0-6对应星期1-7）
+      const getPreListFileCountForWeekday = (weekday) => {
+        if (!refData.planStatus.value || !refData.planStatus.value.pre_lists) {
+          return 0;
+        }
+        const preListIndex = weekday - 1; // 星期1-7转换为索引0-6
+        if (preListIndex >= 0 && preListIndex < refData.planStatus.value.pre_lists.length) {
+          const preList = refData.planStatus.value.pre_lists[preListIndex];
+          return preList?.files?.length || 0;
+        }
+        return 0;
+      };
+
+      // 判断文件是否正在播放（用于前置列表，weekday 是星期几 1-7）
+      const isPreListFilePlaying = (weekday, fileIndex) => {
+        if (!refData.planStatus.value || !refData.planStatus.value.in_pre_files) {
+          return false;
+        }
+        // 现在每个日期只有一个前置列表，直接比较索引
+        const currentWeekday = getCurrentWeekday();
+        if (weekday !== currentWeekday) {
+          return false;
+        }
+        // 检查是否正在播放当前日期的前置列表，且文件索引匹配
+        // pre_list_index 应该对应星期几的索引（0-6对应星期1-7）
+        const preListIndex = weekday - 1;
+        if (refData.planStatus.value.pre_list_index === preListIndex && 
+            refData.planStatus.value.file_index === fileIndex) {
+          return true;
+        }
+        return false;
+      };
+
+      // 选择星期几
+      const handleSelectWeekday = (day) => {
+        const currentWeekday = getCurrentWeekday();
+        if (day === currentWeekday && refData.selectedWeekday.value === null) {
+          // 如果点击的是当前日期且没有手动选择，则不做任何操作
+          return;
+        }
+        refData.selectedWeekday.value = day;
+        saveSelectedWeekday(day); // 保存到本地存储
+      };
+
       // 监听活动计划ID变化
       watch(() => refData.activePlanId.value, (newId) => {
         if (newId) {
@@ -894,6 +1402,18 @@ async function createComponent() {
         handleFileSelected,
         handleDeletePreListFile,
         handleDeleteMainListFile,
+        handleClearPreLists,
+        handleClearMainList,
+        handleTogglePreFilesDragMode,
+        handleToggleMainFilesDragMode,
+        handlePreFileDragStart,
+        handlePreFileDragEnd,
+        handlePreFileDragOver,
+        handlePreFileDrop,
+        handleMainFileDragStart,
+        handleMainFileDragEnd,
+        handleMainFileDragOver,
+        handleMainFileDrop,
         handlePlayPlan,
         handleStopPlan,
         updateCronExpression,
@@ -911,6 +1431,11 @@ async function createComponent() {
         handleSelectDevice,
         handleSelectScannedDevice,
         getPlanNextCronTime,
+        getCurrentWeekday,
+        getActivePreListsForWeekday,
+        getPreListFileCountForWeekday,
+        handleSelectWeekday,
+        isPreListFilePlaying,
       };
     },
     template,

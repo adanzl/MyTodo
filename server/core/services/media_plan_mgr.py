@@ -4,6 +4,7 @@ import sys
 import threading
 from datetime import timedelta
 from typing import Any, Dict, List, Optional
+from collections import Counter
 
 from core.utils import get_media_duration, check_cron_will_trigger_today
 from core.db import rds_mgr
@@ -21,6 +22,10 @@ DEVICE_TYPES = {"device_agent", "bluetooth", "dlna", "mi"}
 _TS = lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _get_file_uri(file_item):
+    return file_item.get("uri") or file_item.get("path") or file_item.get("file") or ""
+
+
 class MediaPlanMgr:
 
     def __init__(self):
@@ -31,6 +36,9 @@ class MediaPlanMgr:
         self._plan_raw = {}  # 计划数据
         self._device_map = {}  # 设备映射
         self._play_state = {}  # 播放状态跟踪 {plan_id: {'pre_list_index': int, 'file_index': int}}
+        self._duration_fetch_thread = None  # 批量获取时长的单例线程
+        self._duration_fetch_lock = threading.Lock()  # 线程锁
+        self._duration_blacklist = Counter()  # 获取时长失败的黑名单 {file_uri: failure_count}
         self._needs_reload = False  # 标记是否需要重新从 RDS 加载
         self.reload()
 
@@ -54,13 +62,22 @@ class MediaPlanMgr:
 
         # 为正在播放的计划添加播放状态信息
         for plan_id, plan_data in result.items():
+            is_playing = plan_id in self._playing_plans
+            plan_data["isPlaying"] = is_playing
+            
             if plan_id in self._play_state:
                 play_state = self._play_state[plan_id]
                 plan_data["pre_list_index"] = play_state.get("pre_list_index", -1)
                 plan_data["file_index"] = play_state.get("file_index", -1)
+                # 判断是否正在播放前置列表
+                plan_data["in_pre_files"] = plan_data["pre_list_index"] >= 0
             else:
                 plan_data["pre_list_index"] = -1
                 plan_data["file_index"] = -1
+                plan_data["in_pre_files"] = False
+
+        # 汇总所有没有 duration 的文件，启动单例线程批量获取时长
+        self._start_batch_duration_fetch(result)
 
         return result
 
@@ -397,6 +414,108 @@ class MediaPlanMgr:
         scheduler.add_date_job(func=stop_plan_task, job_id=job_id, run_date=run_date)
         self._plan_duration_timers[id] = job_id
         log.info(f"[MediaPlanMgr] 启动计划时长定时器: {id} - {p_name}, 将在 {duration_minutes} 分钟后停止播放")
+
+    def _start_batch_duration_fetch(self, plans: Dict[str, Dict[str, Any]]):
+        """
+        汇总所有没有 duration 的文件，启动单例线程批量获取时长
+        :param plans: 计划字典
+        """
+        # 检查是否有正在运行的线程
+        with self._duration_fetch_lock:
+            if self._duration_fetch_thread is not None and self._duration_fetch_thread.is_alive():
+                log.debug("[MediaPlanMgr] 批量获取时长的线程正在运行，跳过本次启动")
+                return
+
+        # 收集所有没有 duration 的文件 URI（去重），排除黑名单中失败超过3次的文件
+        files_to_fetch = set()  # {file_uri, ...}
+        for plan_data in plans.values():
+            # 检查 pre_lists
+            pre_lists = plan_data.get("pre_lists", [])
+            for pre_list in pre_lists:
+                for file_item in pre_list.get("files", []):
+                    if not file_item.get("duration"):
+                        file_uri = _get_file_uri(file_item)
+                        if file_uri:
+                            # 检查黑名单，失败次数>=3则跳过
+                            failure_count = self._duration_blacklist.get(file_uri, 0)
+                            if failure_count < 3:
+                                files_to_fetch.add(file_uri)
+
+            # 检查 main_list
+            main_list = plan_data.get("main_list", {})
+            for file_item in main_list.get("files", []):
+                if not file_item.get("duration"):
+                    file_uri = _get_file_uri(file_item)
+                    if file_uri:
+                        # 检查黑名单，失败次数>=3则跳过
+                        failure_count = self._duration_blacklist.get(file_uri, 0)
+                        if failure_count < 3:
+                            files_to_fetch.add(file_uri)
+
+        if not files_to_fetch:
+            return
+
+        log.info(f"[MediaPlanMgr] 发现 {len(files_to_fetch)} 个文件需要获取时长，启动批量获取线程")
+
+        def _batch_fetch_durations():
+            """批量获取文件时长的线程函数"""
+            file_durations = {}  # {file_uri: duration_seconds, ...}
+            failed_count = 0
+            failed_uris = []
+            try:
+                for file_uri in files_to_fetch:
+                    try:
+                        duration = get_media_duration(file_uri)
+                        file_durations[file_uri] = int(duration)
+                        # 成功获取，从黑名单中移除（如果存在）
+                        self._duration_blacklist.pop(file_uri, None)
+                    except Exception as e:
+                        failed_count += 1
+                        failed_uris.append(file_uri)
+                        # 获取异常，更新黑名单
+                        self._duration_blacklist[file_uri] += 1
+
+                # 反向更新所有计划中匹配的文件 duration
+                updated_count = 0
+                for _, plan_data in self._plan_raw.items():
+                    # 更新 pre_lists
+                    pre_lists = plan_data.get("pre_lists", [])
+                    for pre_list in pre_lists:
+                        for file_item in pre_list.get("files", []):
+                            file_uri = _get_file_uri(file_item)
+                            if file_uri in file_durations and not file_item.get("duration"):
+                                file_item["duration"] = file_durations[file_uri]
+                                updated_count += 1
+
+                    # 更新 main_list
+                    main_list = plan_data.get("main_list", {})
+                    for file_item in main_list.get("files", []):
+                        file_uri = _get_file_uri(file_item)
+                        if file_uri in file_durations and not file_item.get("duration"):
+                            file_item["duration"] = file_durations[file_uri]
+                            updated_count += 1
+
+                # 统一保存到 RDS
+                if updated_count > 0:
+                    self._save_plan_to_rds()
+                    log.info(f"[MediaPlanMgr] 批量获取时长完成: 成功 {updated_count} 个, 失败 {failed_count} 个, 失败文件: {failed_uris}")
+            except Exception as e:
+                log.error(f"[MediaPlanMgr] 批量获取时长线程异常: {e}")
+            finally:
+                # 清理线程引用
+                with self._duration_fetch_lock:
+                    self._duration_fetch_thread = None
+
+        # 启动单例线程
+        with self._duration_fetch_lock:
+            if self._duration_fetch_thread is not None and self._duration_fetch_thread.is_alive():
+                log.debug("[MediaPlanMgr] 批量获取时长的线程正在运行，跳过本次启动")
+                return
+
+            self._duration_fetch_thread = threading.Thread(target=_batch_fetch_durations,
+                                                           daemon=True,
+                                                           name="MediaPlanDurationFetcher")
+            self._duration_fetch_thread.start()
 
 
 # 全局实例
