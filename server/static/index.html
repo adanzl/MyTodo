@@ -40,22 +40,28 @@
                 <el-icon><home-filled /></el-icon>
                 <template #title>Home</template>
               </el-menu-item>
-              <el-menu-item index="/lottery" @click="handleMenuSelect">
-                <el-icon><present /></el-icon>
-                <template #title>抽奖设置</template>
-              </el-menu-item>
-              <el-menu-item index="/chat">
-                <el-icon><el-icon-menu /></el-icon>
-                <template #title>Chat</template>
-              </el-menu-item>
-              <el-menu-item index="/info">
-                <el-icon><document /></el-icon>
-                <template #title>Info</template>
-              </el-menu-item>
-              <el-menu-item index="/score">
-                <el-icon><Star /></el-icon>
-                <template #title>Score</template>
-              </el-menu-item>
+              <el-sub-menu index="mytodo">
+                <template #title>
+                  <el-icon><Promotion /></el-icon>
+                  <span>MyTodo</span>
+                </template>
+                <el-menu-item index="/lottery" @click="handleMenuSelect">
+                  <el-icon><present /></el-icon>
+                  <template #title>抽奖设置</template>
+                </el-menu-item>
+                <el-menu-item index="/chat">
+                  <el-icon><el-icon-menu /></el-icon>
+                  <template #title>Chat</template>
+                </el-menu-item>
+                <el-menu-item index="/info">
+                  <el-icon><document /></el-icon>
+                  <template #title>Info</template>
+                </el-menu-item>
+                <el-menu-item index="/score">
+                  <el-icon><Star /></el-icon>
+                  <template #title>Score</template>
+                </el-menu-item>
+              </el-sub-menu>
               <el-menu-item index="/timetable">
                 <el-icon><Calendar /></el-icon>
                 <template #title>课程表</template>
