@@ -1,5 +1,18 @@
 import { bluetoothAction, playlistAction, getApiUrl } from "../js/net_util.js";
-import { createPlaylistId, formatDateTime, formatDuration, formatDurationMinutes, formatSize, calculateNextCronTimes, generateCronExpression } from "../js/utils.js";
+import { 
+  createPlaylistId, 
+  formatDateTime, 
+  formatDuration, 
+  formatDurationMinutes, 
+  formatSize, 
+  calculateNextCronTimes, 
+  generateCronExpression,
+  getWeekdayIndex as getWeekdayIndexUtil,
+  getFileName as getFileNameUtil,
+  normalizeFiles as normalizeFilesUtil,
+  calculateFilesTotalDuration,
+  getMediaFileUrl as getMediaFileUrlUtil
+} from "../js/utils.js?";
 import { createFileDialog } from "./common/file_dialog.js";
 const axios = window.axios;
 
@@ -71,15 +84,16 @@ async function createComponent() {
         preFilesOriginalOrder: ref(null), // 进入拖拽模式时的原始顺序
         filesOriginalOrder: ref(null), // 进入拖拽模式时的原始顺序
         selectedWeekdayIndex: ref(null), // 选中的星期索引（0=周一，6=周日），null表示使用今天
+        replaceFileInfo: ref(null), // 替换文件信息 {type: 'pre_files' | 'files', index: number}，null表示添加模式
+        browserAudioPlayer: ref(null), // 浏览器音频播放器实例
+        browserPlayingFilePath: ref(null), // 当前正在播放的文件路径
+        preFilesExpanded: ref(false), // 前置文件列表是否展开
       };
       const pendingDeviceType = ref(null);
       const _formatDateTime = formatDateTime;
 
       // 获取当前星期对应的索引（0=周一，6=周日）
-      const getWeekdayIndex = () => {
-        const weekday = new Date().getDay(); // 0=周日，1=周一，...，6=周六
-        return weekday === 0 ? 6 : weekday - 1; // 转换为 0=周一，6=周日
-      };
+      const getWeekdayIndex = () => getWeekdayIndexUtil();
 
       // 获取当前选中的星期索引（如果未选择则使用今天）
       const getSelectedWeekdayIndex = () => {
@@ -107,36 +121,92 @@ async function createComponent() {
       };
 
       // 规范化文件列表格式（对象格式）
-      const normalizeFiles = (files, includeDuration = true) => {
-        if (!Array.isArray(files)) return [];
-        return files.map((fileItem) => {
-          if (!fileItem || typeof fileItem !== "object") return null;
-          const normalized = {
-            uri: fileItem.uri || fileItem.path || fileItem.file || "",
-          };
-          if (includeDuration) {
-            normalized.duration = fileItem.duration || null;
-          }
-          return normalized;
-        }).filter((item) => item !== null);
-      };
+      const normalizeFiles = normalizeFilesUtil;
 
       // 获取文件名
-      const getFileName = (fileItem) => {
+      const getFileName = getFileNameUtil;
+
+      // 获取媒体文件的播放URL
+      const getMediaFileUrl = (filePath) => getMediaFileUrlUtil(filePath, getApiUrl);
+
+      // 在浏览器中播放文件
+      const handlePlayFileInBrowser = (fileItem) => {
         const filePath = fileItem?.uri || fileItem?.path || '';
-        return filePath ? String(filePath).split("/").pop() || filePath : '';
+        if (!filePath) {
+          ElMessage.warning("文件路径无效");
+          return;
+        }
+
+        // 如果点击的是正在播放的文件，则停止播放
+        if (refData.browserPlayingFilePath.value === filePath && 
+            refData.browserAudioPlayer.value && 
+            !refData.browserAudioPlayer.value.paused) {
+          refData.browserAudioPlayer.value.pause();
+          refData.browserAudioPlayer.value = null;
+          refData.browserPlayingFilePath.value = null;
+          ElMessage.info("已停止播放");
+          return;
+        }
+
+        // 如果已有播放器正在播放，先停止
+        if (refData.browserAudioPlayer.value) {
+          refData.browserAudioPlayer.value.pause();
+          refData.browserAudioPlayer.value = null;
+        }
+
+        const mediaUrl = getMediaFileUrl(filePath);
+        const audio = new Audio(mediaUrl);
+        
+        audio.addEventListener('play', () => {
+          refData.browserPlayingFilePath.value = filePath;
+          ElMessage.success("开始播放");
+        });
+        
+        audio.addEventListener('pause', () => {
+          // 只有在非用户主动暂停时才清除状态（比如播放结束）
+          if (audio.ended) {
+            refData.browserPlayingFilePath.value = null;
+          }
+        });
+        
+        audio.addEventListener('error', (e) => {
+          console.error("音频播放失败:", e);
+          ElMessage.error("音频播放失败");
+          refData.browserAudioPlayer.value = null;
+          refData.browserPlayingFilePath.value = null;
+        });
+        
+        audio.addEventListener('ended', () => {
+          refData.browserAudioPlayer.value = null;
+          refData.browserPlayingFilePath.value = null;
+        });
+
+        refData.browserAudioPlayer.value = audio;
+        audio.play().catch((error) => {
+          console.error("播放失败:", error);
+          ElMessage.error("播放失败: " + (error.message || "未知错误"));
+          refData.browserAudioPlayer.value = null;
+          refData.browserPlayingFilePath.value = null;
+        });
+      };
+
+      // 检查文件是否正在播放
+      const isFilePlaying = (fileItem) => {
+        const filePath = fileItem?.uri || fileItem?.path || '';
+        return refData.browserPlayingFilePath.value === filePath && 
+               refData.browserAudioPlayer.value && 
+               !refData.browserAudioPlayer.value.paused;
+      };
+
+      // 切换前置文件列表展开/折叠
+      const handleTogglePreFilesExpand = () => {
+        refData.preFilesExpanded.value = !refData.preFilesExpanded.value;
       };
 
       // 计算前置文件列表总时长（秒）
       const getPreFilesTotalDuration = () => {
         const preFiles = getCurrentPreFiles();
-        if (!preFiles || preFiles.length === 0) {
-          return 0;
-        }
-        return preFiles.reduce((total, file) => {
-          const duration = file?.duration;
-          return total + (typeof duration === 'number' && duration > 0 ? duration : 0);
-        }, 0);
+        return calculateFilesTotalDuration(preFiles);
       };
 
       // 计算正式文件列表总时长（秒）
@@ -145,37 +215,23 @@ async function createComponent() {
         if (!status || !status.playlist || status.playlist.length === 0) {
           return 0;
         }
-        return status.playlist.reduce((total, file) => {
-          const duration = file?.duration;
-          return total + (typeof duration === 'number' && duration > 0 ? duration : 0);
-        }, 0);
+        return calculateFilesTotalDuration(status.playlist);
       };
 
       // 计算播放列表总时长（秒，包括前置文件和播放列表文件）
       const getPlaylistTotalDuration = () => {
         const status = refData.playlistStatus.value;
         if (!status) return 0;
-        let total = 0;
         
         // 前置文件时长
         const preFiles = getCurrentPreFiles();
-        if (preFiles && preFiles.length > 0) {
-          total += preFiles.reduce((sum, file) => {
-            const duration = file?.duration;
-            return sum + (typeof duration === 'number' && duration > 0 ? duration : 0);
-          }, 0);
-        }
+        const preFilesDuration = calculateFilesTotalDuration(preFiles);
         
         // 播放列表文件时长
         const files = status.playlist || status.files || [];
-        if (files.length > 0) {
-          total += files.reduce((sum, file) => {
-            const duration = file?.duration;
-            return sum + (typeof duration === 'number' && duration > 0 ? duration : 0);
-          }, 0);
-        }
+        const filesDuration = calculateFilesTotalDuration(files);
         
-        return total;
+        return preFilesDuration + filesDuration;
       };
 
       const createDefaultPlaylist = (overrides = {}) => ({
@@ -327,34 +383,54 @@ async function createComponent() {
             }
           }
 
+          // 检查是否是替换模式
+          const isReplaceMode = refData.replaceFileInfo.value !== null;
+          const replaceInfo = refData.replaceFileInfo.value;
+
           await updateActivePlaylistData((playlistInfo) => {
             const weekdayIndex = getSelectedWeekdayIndex();
-            const targetList = refData.fileBrowserTarget.value === "pre_files" 
+            // 如果是替换模式，使用 replaceInfo 中的类型；否则使用 fileBrowserTarget
+            const targetType = isReplaceMode && replaceInfo ? replaceInfo.type : refData.fileBrowserTarget.value;
+            const targetList = targetType === "pre_files" 
               ? (Array.isArray(playlistInfo.pre_lists) && playlistInfo.pre_lists.length === 7
                   ? [...(playlistInfo.pre_lists[weekdayIndex] || [])]
                   : [])
               : (Array.isArray(playlistInfo.playlist) ? [...playlistInfo.playlist] : []);
             
-            // 获取已存在的 URI 集合
-            const existingUris = new Set();
-            targetList.forEach((item) => {
-              if (item?.uri) {
-                existingUris.add(item.uri);
-              }
-            });
-            
-            // 添加新文件，格式化为新格式 {"uri": "地址"}
-            for (const filePath of filePaths) {
-              if (!existingUris.has(filePath)) {
-                const fileItem = {
-                  uri: filePath,
+            if (isReplaceMode && replaceInfo) {
+              // 替换模式：删除当前文件，在相同位置插入新文件
+              const replaceIndex = replaceInfo.index;
+              if (replaceIndex >= 0 && replaceIndex < targetList.length) {
+                // 删除旧文件
+                targetList.splice(replaceIndex, 1);
+                // 在相同位置插入新文件（只取第一个文件）
+                const newFileItem = {
+                  uri: filePaths[0],
                 };
-                targetList.push(fileItem);
-                existingUris.add(filePath);
+                targetList.splice(replaceIndex, 0, newFileItem);
+              }
+            } else {
+              // 添加模式：获取已存在的 URI 集合
+              const existingUris = new Set();
+              targetList.forEach((item) => {
+                if (item?.uri) {
+                  existingUris.add(item.uri);
+                }
+              });
+              
+              // 添加新文件，格式化为新格式 {"uri": "地址"}
+              for (const filePath of filePaths) {
+                if (!existingUris.has(filePath)) {
+                  const fileItem = {
+                    uri: filePath,
+                  };
+                  targetList.push(fileItem);
+                  existingUris.add(filePath);
+                }
               }
             }
             
-            if (refData.fileBrowserTarget.value === "pre_files") {
+            if (targetType === "pre_files") {
               // 确保 pre_lists 存在且格式正确
               if (!playlistInfo.pre_lists || !Array.isArray(playlistInfo.pre_lists) || playlistInfo.pre_lists.length !== 7) {
                 playlistInfo.pre_lists = Array(7).fill(null).map(() => []);
@@ -373,12 +449,20 @@ async function createComponent() {
             return playlistInfo;
           });
 
-          const targetName = refData.fileBrowserTarget.value === "pre_files" ? "前置列表" : "播放列表";
-          ElMessage.success(`成功添加 ${filePaths.length} 个文件到${targetName}`);
+          const targetName = (isReplaceMode && replaceInfo && replaceInfo.type === "pre_files") || (!isReplaceMode && refData.fileBrowserTarget.value === "pre_files") 
+            ? "前置列表" 
+            : "播放列表";
+          if (isReplaceMode) {
+            ElMessage.success(`成功替换${targetName}中的文件`);
+          } else {
+            ElMessage.success(`成功添加 ${filePaths.length} 个文件到${targetName}`);
+          }
           refData.fileBrowserDialogVisible.value = false;
+          refData.replaceFileInfo.value = null; // 清除替换信息
         } catch (error) {
           console.error("添加文件到播放列表失败:", error);
           ElMessage.error("添加文件到播放列表失败: " + (error.message || "未知错误"));
+          refData.replaceFileInfo.value = null; // 清除替换信息
         } finally {
           refData.playlistLoading.value = false;
         }
@@ -1654,33 +1738,18 @@ async function createComponent() {
         }
       };
 
-      // 复制播放列表项到末尾
-      const handleCopyPlaylistItem = async (index) => {
+      // 替换播放列表项
+      const handleReplacePlaylistItem = async (index) => {
         const status = refData.playlistStatus.value;
         if (!status || index < 0 || index >= status.playlist.length) return;
 
-        const fileItem = status.playlist[index];
-        const fileName = getFileName(fileItem);
-
-        try {
-          refData.playlistLoading.value = true;
-          await updateActivePlaylistData((playlistInfo) => {
-            const list = [...playlistInfo.playlist];
-            // 复制文件项（深拷贝）
-            const copiedItem = { ...fileItem };
-            // 添加到列表末尾
-            list.push(copiedItem);
-            playlistInfo.playlist = list;
-            playlistInfo.total = list.length;
-            return playlistInfo;
-          });
-          ElMessage.success(`已复制 "${fileName}" 到列表末尾`);
-        } catch (error) {
-          console.error("复制失败:", error);
-          ElMessage.error("复制失败: " + (error.message || "未知错误"));
-        } finally {
-          refData.playlistLoading.value = false;
-        }
+        // 设置替换模式
+        refData.replaceFileInfo.value = {
+          type: 'files',
+          index: index
+        };
+        refData.fileBrowserTarget.value = "files";
+        refData.fileBrowserDialogVisible.value = true;
       };
 
       // 清空播放列表
@@ -1874,34 +1943,19 @@ async function createComponent() {
         }
       };
 
-      // 复制前置文件到播放列表末尾
-      const handleCopyPreFile = async (index) => {
+      // 替换前置文件
+      const handleReplacePreFile = async (index) => {
         const status = refData.playlistStatus.value;
         const preFiles = getCurrentPreFiles();
         if (!status || !preFiles || index < 0 || index >= preFiles.length) return;
 
-        const fileItem = preFiles[index];
-        const fileName = getFileName(fileItem);
-
-        try {
-          refData.playlistLoading.value = true;
-          await updateActivePlaylistData((playlistInfo) => {
-            const list = [...(playlistInfo.playlist || [])];
-            // 复制文件项（深拷贝）
-            const copiedItem = { ...fileItem };
-            // 添加到列表末尾
-            list.push(copiedItem);
-            playlistInfo.playlist = list;
-            playlistInfo.total = list.length;
-            return playlistInfo;
-          });
-          ElMessage.success(`已复制 "${fileName}" 到列表末尾`);
-        } catch (error) {
-          console.error("复制失败:", error);
-          ElMessage.error("复制失败: " + (error.message || "未知错误"));
-        } finally {
-          refData.playlistLoading.value = false;
-        }
+        // 设置替换模式
+        refData.replaceFileInfo.value = {
+          type: 'pre_files',
+          index: index
+        };
+        refData.fileBrowserTarget.value = "pre_files";
+        refData.fileBrowserDialogVisible.value = true;
       };
 
       // 下移 pre_files 中的文件
@@ -2705,6 +2759,7 @@ async function createComponent() {
 
       const handleCloseFileBrowser = () => {
         refData.fileBrowserDialogVisible.value = false;
+        refData.replaceFileInfo.value = null; // 清除替换信息
       };
 
       const refMethods = {
@@ -2729,14 +2784,14 @@ async function createComponent() {
         handleMovePlaylistItemUp,
         handleMovePlaylistItemDown,
         handleDeletePlaylistItem,
-        handleCopyPlaylistItem,
+        handleReplacePlaylistItem,
         handleClearPlaylist,
         handleDeletePreFile,
         handleClearPreFiles,
         handleClearFiles,
         handleMovePreFileUp,
         handleMovePreFileDown,
-        handleCopyPreFile,
+        handleReplacePreFile,
         handleSortPreFiles,
         handleSortFiles,
         preFilesDragMode: refData.preFilesDragMode,
@@ -2793,6 +2848,9 @@ async function createComponent() {
         getWeekdayIndex,
         handleSelectWeekday,
         getPreFilesCountForWeekday,
+        handlePlayFileInBrowser,
+        isFilePlaying,
+        handleTogglePreFilesExpand,
       };
 
 

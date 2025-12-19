@@ -349,3 +349,75 @@ export function generateCronExpression(builder) {
 
   return `${second} ${minute} ${hour} ${day} ${month} ${weekday}`;
 }
+
+/**
+ * 获取当前星期对应的索引（0=周一，6=周日）
+ * @returns {number} 星期索引，0表示周一，6表示周日
+ */
+export function getWeekdayIndex() {
+  const weekday = new Date().getDay(); // 0=周日，1=周一，...，6=周六
+  return weekday === 0 ? 6 : weekday - 1; // 转换为 0=周一，6=周日
+}
+
+/**
+ * 从文件项中提取文件名
+ * @param {Object} fileItem - 文件项对象，可能包含 uri、path 或 file 属性
+ * @returns {string} 文件名
+ */
+export function getFileName(fileItem) {
+  const filePath = fileItem?.uri || fileItem?.path || fileItem?.file || '';
+  return filePath ? String(filePath).split("/").pop() || filePath : '';
+}
+
+/**
+ * 规范化文件列表格式（对象格式）
+ * @param {Array} files - 文件列表
+ * @param {boolean} includeDuration - 是否包含时长信息，默认 true
+ * @returns {Array} 规范化后的文件列表
+ */
+export function normalizeFiles(files, includeDuration = true) {
+  if (!Array.isArray(files)) return [];
+  return files.map((fileItem) => {
+    if (!fileItem || typeof fileItem !== "object") return null;
+    const normalized = {
+      uri: fileItem.uri || fileItem.path || fileItem.file || "",
+    };
+    if (includeDuration) {
+      normalized.duration = fileItem.duration || null;
+    }
+    return normalized;
+  }).filter((item) => item !== null);
+}
+
+/**
+ * 计算文件列表总时长（秒）
+ * @param {Array} files - 文件列表
+ * @returns {number} 总时长（秒）
+ */
+export function calculateFilesTotalDuration(files) {
+  if (!Array.isArray(files) || files.length === 0) {
+    return 0;
+  }
+  return files.reduce((total, file) => {
+    const duration = file?.duration;
+    return total + (typeof duration === 'number' && duration > 0 ? duration : 0);
+  }, 0);
+}
+
+/**
+ * 获取媒体文件的播放URL
+ * @param {string} filePath - 本地文件路径
+ * @param {Function} getApiUrl - 获取API基础URL的函数
+ * @returns {string} HTTP URL
+ */
+export function getMediaFileUrl(filePath, getApiUrl) {
+  if (!filePath) return '';
+  if (!getApiUrl || typeof getApiUrl !== 'function') {
+    console.warn('getMediaFileUrl: getApiUrl 函数未提供');
+    return '';
+  }
+  
+  const path = filePath.startsWith('/') ? filePath.slice(1) : filePath;
+  const encodedPath = path.split('/').map(part => encodeURIComponent(part)).join('/');
+  return `${getApiUrl()}/media/files/${encodedPath}`;
+}

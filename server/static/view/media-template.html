@@ -236,13 +236,13 @@
                   @click="handleSelectWeekday(index)"
                   :title="day"
                   class="!w-16 !h-6 !p-0 text-xs">
-                  {{ day }}({{ getPreFilesCountForWeekday(index) }})
+                  {{ day }}<span class="text-[10px]">[{{ getPreFilesCountForWeekday(index) }}]</span>
                 </el-button>
               </div>
             </div>
           </div>
           <!-- 第二行：统计信息和操作按钮 -->
-          <div class="flex items-center justify-between text-xs text-gray-500 mb-2">
+          <div class="flex items-center justify-between text-xs text-gray-500 mb-2 pr-2.5">
             <div class="flex items-center">
               <span v-if="getPreFilesTotalDuration() > 0">
                 总时长：{{ formatDuration(getPreFilesTotalDuration()) }}
@@ -295,13 +295,16 @@
               </el-button>
             </div>
           </div>
-          <div v-if="getCurrentPreFiles() && getCurrentPreFiles().length > 0">
+          <div
+            v-if="getCurrentPreFiles() && getCurrentPreFiles().length > 0"
+            class="overflow-y-scroll scrollbar-overlay"
+            :class="{ 'max-h-[192px]': !preFilesExpanded }">
             <div
               v-for="(file, index) in getCurrentPreFiles()"
               :key="'pre-' + index"
               class="flex items-center gap-2 p-1 hover:bg-gray-100 rounded"
               :class="{ 
-                'bg-blue-50': playlistStatus.pre_index !== undefined && playlistStatus.pre_index !== null && index === playlistStatus.pre_index
+                'bg-blue-50': playlistStatus.pre_index === index
               }"
               :style="{ cursor: preFilesDragMode ? 'move' : 'default', userSelect: 'none' }"
               :draggable="preFilesDragMode"
@@ -313,7 +316,7 @@
               <span class="text-xs text-gray-500 w-8">{{ index + 1 }}</span>
               <span
                 class="flex-1 text-sm truncate"
-                :class="{ 'text-blue-600': playlistStatus.pre_index !== undefined && playlistStatus.pre_index !== null && index === playlistStatus.pre_index }"
+                :class="{ 'text-blue-600': playlistStatus.pre_index === index }"
                 :title="file.uri">
                 {{ file.uri.split('/').pop() }}
               </span>
@@ -326,6 +329,16 @@
               </el-tag>
               <div v-else class="w-16"></div>
               <div class="flex items-center gap-1" @mousedown.stop @click.stop>
+                <el-button
+                  type="plain"
+                  size="small"
+                  circle
+                  @click.stop="handlePlayFileInBrowser(file)"
+                  :disabled="playlistLoading"
+                  :title="isFilePlaying(file) ? '停止播放' : '在浏览器中播放'">
+                  <el-icon v-if="isFilePlaying(file)"><VideoPause /></el-icon>
+                  <el-icon v-else><Headset /></el-icon>
+                </el-button>
                 <el-button
                   v-show="showMoreActions && !preFilesDragMode"
                   type="plain"
@@ -351,10 +364,10 @@
                   type="plain"
                   size="small"
                   circle
-                  @click.stop="handleCopyPreFile(index)"
+                  @click.stop="handleReplacePreFile(index)"
                   :disabled="playlistLoading"
-                  title="复制到末尾">
-                  <el-icon><DocumentCopy /></el-icon>
+                  title="替换">
+                  <el-icon><Refresh /></el-icon>
                 </el-button>
                 <el-button
                   type="plain"
@@ -368,12 +381,23 @@
               </div>
             </div>
           </div>
+          <div v-if="getCurrentPreFiles() && getCurrentPreFiles().length > 0" class="w-full border-t border-gray-200">
+            <el-button
+              type="plain"
+              size="small"
+              class="!w-full !h-4 !p-0 !text-xs"
+              @click="handleTogglePreFilesExpand"
+              :title="preFilesExpanded ? '折叠' : '展开'">
+              <el-icon v-if="preFilesExpanded"><ArrowUp /></el-icon>
+              <el-icon v-else><ArrowDown /></el-icon>
+            </el-button>
+          </div>
           <div v-else class="text-sm text-gray-400 text-center py-1">前置文件列表为空</div>
         </div>
 
         <!-- files 列表 -->
         <div v-if="playlistStatus.playlist" class="border rounded p-2">
-          <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center justify-between mb-2 pr-2.5">
             <div class="text-xs font-semibold text-gray-600">
               正式文件（播放时记录进度）
               <span v-if="getFilesTotalDuration() > 0" class="ml-2 text-gray-500">
@@ -428,7 +452,9 @@
               </el-button>
             </div>
           </div>
-          <div v-if="playlistStatus.playlist && playlistStatus.playlist.length > 0">
+          <div
+            v-if="playlistStatus.playlist && playlistStatus.playlist.length > 0"
+            class="overflow-y-scroll scrollbar-overlay">
             <div
               v-for="(file, index) in playlistStatus.playlist"
               :key="index"
@@ -463,6 +489,16 @@
               </el-tag> -->
               <div class="flex items-center gap-1" @mousedown.stop @click.stop>
                 <el-button
+                  type="plain"
+                  size="small"
+                  circle
+                  @click.stop="handlePlayFileInBrowser(file)"
+                  :disabled="playlistLoading"
+                  :title="isFilePlaying(file) ? '停止播放' : '在浏览器中播放'">
+                  <el-icon v-if="isFilePlaying(file)"><VideoPause /></el-icon>
+                  <el-icon v-else><Headset /></el-icon>
+                </el-button>
+                <el-button
                   v-show="showMoreActions && !filesDragMode"
                   type="plain"
                   size="small"
@@ -487,10 +523,10 @@
                   type="plain"
                   size="small"
                   circle
-                  @click.stop="handleCopyPlaylistItem(index)"
+                  @click.stop="handleReplacePlaylistItem(index)"
                   :disabled="playlistLoading"
-                  title="复制到末尾">
-                  <el-icon><DocumentCopy /></el-icon>
+                  title="替换">
+                  <el-icon><Refresh /></el-icon>
                 </el-button>
                 <el-button
                   type="plain"

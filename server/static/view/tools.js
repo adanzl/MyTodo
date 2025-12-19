@@ -1,5 +1,5 @@
 import { getApiUrl } from "../js/net_util.js";
-import { formatSize, formatDuration } from "../js/utils.js";
+import { formatSize, formatDuration, getMediaFileUrl as getMediaFileUrlUtil } from "../js/utils.js";
 import { createFileDialog } from "./common/file_dialog.js";
 const axios = window.axios;
 
@@ -522,12 +522,7 @@ async function createComponent() {
       };
 
       // 获取媒体文件 URL
-      const getMediaFileUrl = (filePath) => {
-        if (!filePath) return '';
-        const path = filePath.startsWith('/') ? filePath.slice(1) : filePath;
-        const encodedPath = path.split('/').map(part => encodeURIComponent(part)).join('/');
-        return `${getApiUrl()}/media/files/${encodedPath}`;
-      };
+      const getMediaFileUrl = (filePath) => getMediaFileUrlUtil(filePath, getApiUrl);
 
       // 播放/暂停媒体文件
       const handleMediaTogglePlayFile = (index) => {
