@@ -140,7 +140,7 @@ class MiDevice:
                     await session.close()
 
         try:
-            return run_async(_play_async(), timeout=10.0)
+            return run_async(_play_async(), timeout=20.0)
         except Exception as e:
             log.error(f"[MiDevice] Play error: {e}")
             return -1, f"播放失败: {str(e)}"

@@ -160,7 +160,6 @@ class MediaToolMgr:
                     
                     self._tasks[task_id] = task
                     loaded_count += 1
-                    log.info(f"[MediaTool] 加载历史任务: {task_id}, 名称: {task.name}, 状态: {task.status}")
                     
                 except Exception as e:
                     log.error(f"[MediaTool] 加载任务失败 {task_id}: {e}")

@@ -7,7 +7,7 @@ Requests==2.32.3
 websocket_client==1.8.0
 gevent>=23.9.1
 gevent-websocket>=0.10.1
-bleak==0.21.1
+bleak>=0.22.3
 APScheduler==3.10.4
 upnpclient>=0.0.8
 ssdpy>=0.4.0
@@ -16,3 +16,4 @@ miservice_fork>=0.1.0
 python-dotenv>=1.0.0
 nest_asyncio>=1.5.6
 pikepdf>=8.0.0
+lxml>=5.0.0
