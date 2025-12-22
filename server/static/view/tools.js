@@ -1,7 +1,8 @@
 import { getApiUrl } from "../js/net_util.js";
 import { formatSize, formatDuration, getMediaFileUrl, logAndNoticeError } from "../js/utils.js";
 import { createFileDialog } from "./common/file_dialog.js";
-import { createMediaPlayer } from "./common/media_player.js";
+import { createMediaPlayerComponent } from "./common/media_player.js";
+import { createAudioPlayer } from "./common/audio_player.js";
 const axios = window.axios;
 
 const { ref, onMounted, onUnmounted } = window.Vue;
@@ -20,7 +21,7 @@ async function createComponent() {
   // 加载文件对话框组件
   const FileDialog = await createFileDialog();
   // 加载媒体播放器组件
-  const MediaPlayer = await createMediaPlayer();
+  const MediaPlayer = await createMediaPlayerComponent();
 
   component = {
     components: {
@@ -45,13 +46,21 @@ async function createComponent() {
       const mediaSaveResultDialogVisible = ref(false);
       const mediaFilesDragMode = ref(false);
       const mediaFilesOriginalOrder = ref(null);
-      const mediaAudioPlayer = ref(null);
-      const mediaPlayingFileIndex = ref(null);
-      const mediaIsPlaying = ref(false);
       // 统一的播放器相关状态（用于文件列表和结果文件）
-      const mediaPlayingFilePath = ref(null); // 当前正在播放的文件路径（文件路径或 'result' 表示结果文件）
-      const mediaPlayProgress = ref(0); // 播放进度（0-100）
-      const mediaDuration = ref(0); // 音频总时长（秒）
+      const mediaPlayer = createAudioPlayer({
+        callbacks: {
+          onPlay: () => {
+            ElMessage.success("开始播放");
+          },
+          onError: () => {
+            logAndNoticeError(new Error("音频播放失败"), "播放失败");
+            clearBrowserAudioPlayer();
+          },
+          onEnded: () => {
+            clearBrowserAudioPlayer();
+          },
+        },
+      });
 
       // ========== 工具函数 ==========
 
@@ -435,10 +444,10 @@ async function createComponent() {
             }
           );
           if (response.data.code === 0) {
-            if (mediaPlayingFileIndex.value === fileIndex) {
+            if (mediaPlayer.playingFileIndex.value === fileIndex) {
               handleMediaStopPlay();
-            } else if (mediaPlayingFileIndex.value !== null && mediaPlayingFileIndex.value > fileIndex) {
-              mediaPlayingFileIndex.value = mediaPlayingFileIndex.value - 1;
+            } else if (mediaPlayer.playingFileIndex.value !== null && mediaPlayer.playingFileIndex.value > fileIndex) {
+              mediaPlayer.playingFileIndex.value = mediaPlayer.playingFileIndex.value - 1;
             }
             ElMessage.success("文件删除成功");
             await handleMediaViewTask(mediaCurrentTask.value.task_id);
@@ -533,87 +542,46 @@ async function createComponent() {
 
       // 清理浏览器音频播放器状态（统一清理所有播放）
       const clearBrowserAudioPlayer = () => {
-        if (mediaAudioPlayer.value) {
-          mediaAudioPlayer.value.pause();
-          mediaAudioPlayer.value = null;
-        }
-        mediaPlayingFilePath.value = null;
-        mediaPlayProgress.value = 0;
-        mediaDuration.value = 0;
-        mediaIsPlaying.value = false;
-        mediaPlayingFileIndex.value = null;
+        mediaPlayer.clear();
       };
 
-      // 检查文件是否正在播放（支持文件列表和结果文件）
+      // 检查文件是否正在播放
       const isFilePlaying = (fileItem) => {
         if (!fileItem) {
-          // 检查结果文件
-          return mediaPlayingFilePath.value === 'result' &&
-            mediaAudioPlayer.value &&
-            !mediaAudioPlayer.value.paused;
+          return false;
         }
         const filePath = fileItem?.path || fileItem?.name || '';
-        return mediaPlayingFilePath.value === filePath &&
-          mediaAudioPlayer.value &&
-          !mediaAudioPlayer.value.paused;
+        return mediaPlayer.isFilePlaying(filePath);
       };
 
-      // 获取文件播放进度（支持文件列表和结果文件）
+      // 获取文件播放进度
       const getFilePlayProgress = (fileItem) => {
         if (!fileItem) {
-          // 结果文件
-          if (mediaPlayingFilePath.value === 'result' && mediaAudioPlayer.value) {
-            return mediaPlayProgress.value;
-          }
           return 0;
         }
         const filePath = fileItem?.path || fileItem?.name || '';
-        if (mediaPlayingFilePath.value === filePath && mediaAudioPlayer.value) {
-          return mediaPlayProgress.value;
-        }
-        return 0;
+        return mediaPlayer.getFilePlayProgress(filePath);
       };
 
-      // 获取文件时长（支持文件列表和结果文件）
+      // 获取文件时长
       const getFileDuration = (fileItem) => {
         if (!fileItem) {
-          // 结果文件
-          if (mediaPlayingFilePath.value === 'result') {
-            return mediaDuration.value;
-          }
           return 0;
         }
         const filePath = fileItem?.path || fileItem?.name || '';
-        if (mediaPlayingFilePath.value === filePath) {
-          return mediaDuration.value;
+        // 确定回退值：优先使用文件本身的duration属性，对于结果文件则使用任务中的 result_duration
+        let fallbackDuration = fileItem.duration;
+        if (fallbackDuration === undefined && mediaCurrentTask.value?.result_file === filePath) {
+          fallbackDuration = mediaCurrentTask.value?.result_duration;
         }
-        // 如果文件不在播放，尝试使用文件本身的duration属性
-        return fileItem?.duration || 0;
+        return mediaPlayer.getFileDuration(filePath, fallbackDuration || 0);
       };
 
-      // 处理进度条拖拽（支持文件列表和结果文件）
+      // 处理文件进度条拖拽
       const handleSeekFile = (fileItem, percentage) => {
-        if (!mediaAudioPlayer.value) return;
-
-        const audio = mediaAudioPlayer.value;
-        if (audio.duration > 0 && isFinite(audio.duration) && isFinite(percentage)) {
-          // 检查是否是当前播放的文件
-          let isCurrentFile = false;
-          if (!fileItem) {
-            // 结果文件
-            isCurrentFile = mediaPlayingFilePath.value === 'result';
-          } else {
-            const filePath = fileItem?.path || fileItem?.name || '';
-            isCurrentFile = mediaPlayingFilePath.value === filePath;
-          }
-
-          if (isCurrentFile) {
-            const targetTime = (percentage / 100) * audio.duration;
-            audio.currentTime = Math.max(0, Math.min(targetTime, audio.duration));
-            // 立即更新显示
-            mediaPlayProgress.value = percentage;
-          }
-        }
+        if (!fileItem) return;
+        const filePath = fileItem?.path || fileItem?.name || '';
+        mediaPlayer.seekFile(filePath, percentage);
       };
 
       // 播放/暂停媒体文件
@@ -630,15 +598,10 @@ async function createComponent() {
         }
 
         // 如果点击的是正在播放的文件，则停止播放
-        if (mediaPlayingFilePath.value === filePath && mediaAudioPlayer.value && !mediaAudioPlayer.value.paused) {
+        if (mediaPlayer.playingFilePath.value === filePath && mediaPlayer.audio && !mediaPlayer.audio.paused) {
           clearBrowserAudioPlayer();
           ElMessage.info("已停止播放");
           return;
-        }
-
-        // 如果已有播放器正在播放（文件列表或结果文件），先停止
-        if (mediaAudioPlayer.value) {
-          clearBrowserAudioPlayer();
         }
 
         const audioUrl = getMediaFileUrl(filePath, getApiUrl);
@@ -646,62 +609,17 @@ async function createComponent() {
           ElMessage.error("无法生成媒体文件URL");
           return;
         }
-        const audio = new Audio(audioUrl);
 
-        audio.addEventListener('play', () => {
-          mediaPlayingFilePath.value = filePath;
-          mediaIsPlaying.value = true;
-          mediaPlayingFileIndex.value = index;
-          ElMessage.success("开始播放");
+        // 加载/更换播放文件
+        mediaPlayer.load(audioUrl, {
+          playingFilePath: filePath,
+          playingFileIndex: index,
         });
 
-        audio.addEventListener('loadedmetadata', () => {
-          if (audio.duration > 0 && isFinite(audio.duration)) {
-            mediaDuration.value = audio.duration;
-          }
-        });
-
-        audio.addEventListener('loadeddata', () => {
-          if (audio.duration > 0 && isFinite(audio.duration)) {
-            mediaDuration.value = audio.duration;
-          }
-        });
-
-        audio.addEventListener('timeupdate', () => {
-          if (audio.duration > 0 && isFinite(audio.duration)) {
-            if (mediaDuration.value === 0 || mediaDuration.value !== audio.duration) {
-              mediaDuration.value = audio.duration;
-            }
-            mediaPlayProgress.value = (audio.currentTime / audio.duration) * 100;
-          }
-        });
-
-        audio.addEventListener('pause', () => {
-          if (audio.ended) {
-            clearBrowserAudioPlayer();
-          }
-        });
-
-        audio.addEventListener('error', (e) => {
-          console.error("音频播放失败:", e, "URL:", audioUrl);
-          ElMessage.error("音频播放失败");
-          clearBrowserAudioPlayer();
-          mediaIsPlaying.value = false;
-          mediaPlayingFileIndex.value = null;
-        });
-
-        audio.addEventListener('ended', () => {
-          clearBrowserAudioPlayer();
-          mediaIsPlaying.value = false;
-          mediaPlayingFileIndex.value = null;
-        });
-
-        mediaAudioPlayer.value = audio;
-        audio.play().catch((error) => {
+        // 开始播放
+        mediaPlayer.play().catch((error) => {
           logAndNoticeError(error, "播放失败");
           clearBrowserAudioPlayer();
-          mediaIsPlaying.value = false;
-          mediaPlayingFileIndex.value = null;
         });
       };
 
@@ -717,69 +635,28 @@ async function createComponent() {
           return;
         }
 
+        const resultFilePath = mediaCurrentTask.value.result_file;
+
         // 如果点击的是正在播放的结果文件，则停止播放
-        if (mediaPlayingFilePath.value === 'result' && mediaAudioPlayer.value && !mediaAudioPlayer.value.paused) {
+        if (mediaPlayer.playingFilePath.value === resultFilePath && mediaPlayer.audio && !mediaPlayer.audio.paused) {
           clearBrowserAudioPlayer();
           ElMessage.info("已停止播放");
           return;
         }
 
-        // 如果已有播放器正在播放（文件列表或结果文件），先停止
-        if (mediaAudioPlayer.value) {
-          clearBrowserAudioPlayer();
-        }
-
-        const audioUrl = getMediaFileUrl(mediaCurrentTask.value.result_file, getApiUrl);
+        const audioUrl = getMediaFileUrl(resultFilePath, getApiUrl);
         if (!audioUrl) {
           ElMessage.error("无法生成媒体文件URL");
           return;
         }
-        const audio = new Audio(audioUrl);
 
-        audio.addEventListener('play', () => {
-          mediaPlayingFilePath.value = 'result';
-          ElMessage.success("开始播放");
+        // 加载/更换播放文件
+        mediaPlayer.load(audioUrl, {
+          playingFilePath: resultFilePath,
         });
 
-        audio.addEventListener('loadedmetadata', () => {
-          if (audio.duration > 0 && isFinite(audio.duration)) {
-            mediaDuration.value = audio.duration;
-          }
-        });
-
-        audio.addEventListener('loadeddata', () => {
-          if (audio.duration > 0 && isFinite(audio.duration)) {
-            mediaDuration.value = audio.duration;
-          }
-        });
-
-        audio.addEventListener('timeupdate', () => {
-          if (audio.duration > 0 && isFinite(audio.duration)) {
-            if (mediaDuration.value === 0 || mediaDuration.value !== audio.duration) {
-              mediaDuration.value = audio.duration;
-            }
-            mediaPlayProgress.value = (audio.currentTime / audio.duration) * 100;
-          }
-        });
-
-        audio.addEventListener('pause', () => {
-          if (audio.ended) {
-            clearBrowserAudioPlayer();
-          }
-        });
-
-        audio.addEventListener('error', (e) => {
-          console.error("结果文件播放失败:", e, "URL:", audioUrl);
-          ElMessage.error("结果文件播放失败");
-          clearBrowserAudioPlayer();
-        });
-
-        audio.addEventListener('ended', () => {
-          clearBrowserAudioPlayer();
-        });
-
-        mediaAudioPlayer.value = audio;
-        audio.play().catch((error) => {
+        // 开始播放
+        mediaPlayer.play().catch((error) => {
           logAndNoticeError(error, "播放失败");
           clearBrowserAudioPlayer();
         });
@@ -1029,8 +906,6 @@ async function createComponent() {
         mediaSaveResultDialogVisible,
         mediaFilesDragMode,
         mediaFilesOriginalOrder,
-        mediaPlayingFileIndex,
-        mediaIsPlaying,
         loadMediaTaskList,
         handleMediaCreateTask,
         handleMediaViewTask,

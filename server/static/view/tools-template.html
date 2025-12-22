@@ -265,13 +265,13 @@
                 </el-tag>
                 <media-player
                   v-if="mediaCurrentTask.result_file && mediaCurrentTask.status === 'success'"
-                  :file="null"
-                  :is-playing="isFilePlaying(null)"
-                  :progress="getFilePlayProgress(null)"
-                  :duration="getFileDuration(null)"
+                  :file="{ path: mediaCurrentTask.result_file }"
+                  :is-playing="isFilePlaying({ path: mediaCurrentTask.result_file })"
+                  :progress="getFilePlayProgress({ path: mediaCurrentTask.result_file })"
+                  :duration="getFileDuration({ path: mediaCurrentTask.result_file })"
                   :disabled="mediaFilesDragMode"
                   @play="handleMediaTogglePlayResult"
-                  @seek="(file, val) => handleSeekFile(null, val)">
+                  @seek="(file, val) => handleSeekFile({ path: mediaCurrentTask.result_file }, val)">
                 </media-player>
                 <el-button
                   type="primary"

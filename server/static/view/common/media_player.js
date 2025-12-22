@@ -15,7 +15,7 @@ async function loadTemplate() {
  * 创建媒体播放器组件
  * @returns {Promise<Object>} Vue 组件对象
  */
-export async function createMediaPlayer() {
+export async function createMediaPlayerComponent() {
     const template = await loadTemplate();
 
     return {
