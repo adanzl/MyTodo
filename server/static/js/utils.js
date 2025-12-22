@@ -26,15 +26,53 @@ export function formatDateTime() {
 }
 
 /**
+ * 格式化日期时间，包含星期
+ * @param {string} dateStr - 日期时间字符串，格式：YYYY-MM-DD HH:mm:ss
+ * @returns {string|null} 格式化的日期时间字符串，包含星期，如 "2024-01-01 周一 12:00:00"
+ */
+export function formatDateTimeWithWeekday(dateStr) {
+  if (!dateStr) return null;
+  try {
+    // 解析格式: "YYYY-MM-DD HH:mm:ss"
+    const parts = dateStr.match(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
+    if (!parts) return dateStr;
+
+    const year = parseInt(parts[1], 10);
+    const month = parseInt(parts[2], 10) - 1; // 月份从0开始
+    const day = parseInt(parts[3], 10);
+    const hours = parseInt(parts[4], 10);
+    const minutes = parseInt(parts[5], 10);
+    const seconds = parseInt(parts[6], 10);
+
+    const date = new Date(year, month, day, hours, minutes, seconds);
+    const weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+    const weekday = weekdays[date.getDay()];
+
+    return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(
+      2,
+      "0"
+    )} ${weekday} ${String(hours).padStart(2, "0")}:${String(minutes).padStart(
+      2,
+      "0"
+    )}:${String(seconds).padStart(2, "0")}`;
+  } catch (error) {
+    console.error("格式化日期时间失败:", error);
+    return dateStr;
+  }
+}
+
+/**
  * 格式化时长（秒）为可读格式
  * @param {number} seconds - 秒数
  * @returns {string} 格式化的时长字符串，如 "3:45" 或 "1:23:45"
  */
 export function formatDuration(seconds) {
   if (!seconds || seconds <= 0) return "";
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
+  // 确保秒数是整数，避免显示小数
+  const totalSeconds = Math.floor(seconds);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
   if (hours > 0) {
     return `${hours}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
   }
@@ -380,7 +418,7 @@ export function normalizeFiles(files, includeDuration = true) {
   return files.map((fileItem) => {
     if (!fileItem || typeof fileItem !== "object") return null;
     const normalized = {
-      uri: fileItem.uri || fileItem.path || fileItem.file || "",
+      uri: fileItem.uri,
     };
     if (includeDuration) {
       normalized.duration = fileItem.duration || null;
@@ -416,7 +454,7 @@ export function getMediaFileUrl(filePath, getApiUrl) {
     console.warn('getMediaFileUrl: getApiUrl 函数未提供');
     return '';
   }
-  
+
   const path = filePath.startsWith('/') ? filePath.slice(1) : filePath;
   const encodedPath = path.split('/').map(part => encodeURIComponent(part)).join('/');
   return `${getApiUrl()}/media/files/${encodedPath}`;

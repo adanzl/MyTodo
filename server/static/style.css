@@ -48,3 +48,10 @@
 .scrollbar-overlay::-webkit-scrollbar-thumb:hover {
   background-color: rgb(156 163 175 / 0.7); /* 对应 Tailwind 的 bg-gray-400/70 */
 }
+
+/* 播放器滑块样式 */
+.player-slider {
+  --el-slider-button-size: 10px;
+  --el-slider-button-wrapper-size: 20px;
+  --el-slider-button-wrapper-offset: -9px;
+}

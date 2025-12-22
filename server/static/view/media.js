@@ -1,18 +1,19 @@
-import { bluetoothAction, playlistAction, getApiUrl } from "../js/net_util.js";
-import { 
-  createPlaylistId, 
-  formatDateTime, 
-  formatDuration, 
-  formatDurationMinutes, 
-  formatSize, 
-  calculateNextCronTimes, 
-  generateCronExpression,
-  getWeekdayIndex as getWeekdayIndexUtil,
-  getFileName as getFileNameUtil,
-  normalizeFiles as normalizeFilesUtil,
+import { bluetoothAction, getApiUrl, playlistAction } from "../js/net_util.js";
+import {
   calculateFilesTotalDuration,
-  getMediaFileUrl as getMediaFileUrlUtil
-} from "../js/utils.js?";
+  calculateNextCronTimes,
+  createPlaylistId,
+  formatDateTime,
+  formatDateTimeWithWeekday,
+  formatDuration,
+  formatDurationMinutes,
+  formatSize,
+  getFileName,
+  getMediaFileUrl,
+  getWeekdayIndex,
+  normalizeFiles
+} from "../js/utils.js";
+import { createCronBuilder } from "./common/cron_builder.js";
 import { createFileDialog } from "./common/file_dialog.js";
 const axios = window.axios;
 
@@ -26,34 +27,22 @@ async function loadTemplate() {
 async function createComponent() {
   if (component) return component;
   const template = await loadTemplate();
-  
+
   // 加载文件对话框组件
   const FileDialog = await createFileDialog();
-  
+  // 加载 Cron 生成器组件
+  const CronBuilder = await createCronBuilder();
+
   component = {
     components: {
       FileDialog,
+      CronBuilder,
     },
     setup() {
       const refData = {
         scanDialogVisible: ref(false),
         fileBrowserDialogVisible: ref(false),
         fileBrowserTarget: ref("files"), // "files" 或 "pre_files"
-        cronBuilder: ref({
-          second: "*",
-          secondCustom: "",
-          minute: "*",
-          minuteCustom: "",
-          hour: "*",
-          hourCustom: "",
-          day: "*",
-          dayCustom: "",
-          month: "*",
-          monthCustom: "",
-          weekday: "*",
-          weekdayCustom: "",
-          generated: "",
-        }),
         cronPreviewVisible: ref(false),
         cronPreviewTimes: ref([]),
         editingPlaylistId: ref(null),
@@ -93,12 +82,11 @@ async function createComponent() {
       const _formatDateTime = formatDateTime;
 
       // 获取当前星期对应的索引（0=周一，6=周日）
-      const getWeekdayIndex = () => getWeekdayIndexUtil();
 
       // 获取当前选中的星期索引（如果未选择则使用今天）
       const getSelectedWeekdayIndex = () => {
-        return refData.selectedWeekdayIndex.value !== null 
-          ? refData.selectedWeekdayIndex.value 
+        return refData.selectedWeekdayIndex.value !== null
+          ? refData.selectedWeekdayIndex.value
           : getWeekdayIndex();
       };
 
@@ -120,15 +108,6 @@ async function createComponent() {
         return Array.isArray(preList) ? preList.length : 0;
       };
 
-      // 规范化文件列表格式（对象格式）
-      const normalizeFiles = normalizeFilesUtil;
-
-      // 获取文件名
-      const getFileName = getFileNameUtil;
-
-      // 获取媒体文件的播放URL
-      const getMediaFileUrl = (filePath) => getMediaFileUrlUtil(filePath, getApiUrl);
-
       // 在浏览器中播放文件
       const handlePlayFileInBrowser = (fileItem) => {
         const filePath = fileItem?.uri || fileItem?.path || '';
@@ -138,9 +117,9 @@ async function createComponent() {
         }
 
         // 如果点击的是正在播放的文件，则停止播放
-        if (refData.browserPlayingFilePath.value === filePath && 
-            refData.browserAudioPlayer.value && 
-            !refData.browserAudioPlayer.value.paused) {
+        if (refData.browserPlayingFilePath.value === filePath &&
+          refData.browserAudioPlayer.value &&
+          !refData.browserAudioPlayer.value.paused) {
           refData.browserAudioPlayer.value.pause();
           refData.browserAudioPlayer.value = null;
           refData.browserPlayingFilePath.value = null;
@@ -156,26 +135,26 @@ async function createComponent() {
 
         const mediaUrl = getMediaFileUrl(filePath);
         const audio = new Audio(mediaUrl);
-        
+
         audio.addEventListener('play', () => {
           refData.browserPlayingFilePath.value = filePath;
           ElMessage.success("开始播放");
         });
-        
+
         audio.addEventListener('pause', () => {
           // 只有在非用户主动暂停时才清除状态（比如播放结束）
           if (audio.ended) {
             refData.browserPlayingFilePath.value = null;
           }
         });
-        
+
         audio.addEventListener('error', (e) => {
           console.error("音频播放失败:", e);
           ElMessage.error("音频播放失败");
           refData.browserAudioPlayer.value = null;
           refData.browserPlayingFilePath.value = null;
         });
-        
+
         audio.addEventListener('ended', () => {
           refData.browserAudioPlayer.value = null;
           refData.browserPlayingFilePath.value = null;
@@ -193,9 +172,9 @@ async function createComponent() {
       // 检查文件是否正在播放
       const isFilePlaying = (fileItem) => {
         const filePath = fileItem?.uri || fileItem?.path || '';
-        return refData.browserPlayingFilePath.value === filePath && 
-               refData.browserAudioPlayer.value && 
-               !refData.browserAudioPlayer.value.paused;
+        return refData.browserPlayingFilePath.value === filePath &&
+          refData.browserAudioPlayer.value &&
+          !refData.browserAudioPlayer.value.paused;
       };
 
       // 切换前置文件列表展开/折叠
@@ -222,15 +201,15 @@ async function createComponent() {
       const getPlaylistTotalDuration = () => {
         const status = refData.playlistStatus.value;
         if (!status) return 0;
-        
+
         // 前置文件时长
         const preFiles = getCurrentPreFiles();
         const preFilesDuration = calculateFilesTotalDuration(preFiles);
-        
+
         // 播放列表文件时长
         const files = status.playlist || status.files || [];
         const filesDuration = calculateFilesTotalDuration(files);
-        
+
         return preFilesDuration + filesDuration;
       };
 
@@ -257,12 +236,12 @@ async function createComponent() {
           // 规范化每个列表
           pre_lists = pre_lists.map(pre_list => normalizeFiles(pre_list || [], true));
         }
-        
-        let currentIndex = typeof item?.current_index === "number" 
-          ? item.current_index 
-          : (item?.current_index !== undefined && item?.current_index !== null 
-              ? parseInt(item.current_index, 10) || 0 
-              : 0);
+
+        let currentIndex = typeof item?.current_index === "number"
+          ? item.current_index
+          : (item?.current_index !== undefined && item?.current_index !== null
+            ? parseInt(item.current_index, 10) || 0
+            : 0);
         if (playlist.length === 0) {
           currentIndex = 0;
         } else {
@@ -283,7 +262,7 @@ async function createComponent() {
           cron: (schedule.cron !== undefined && schedule.cron !== null) ? String(schedule.cron) : "",
           duration: schedule.duration || 0,
         };
-        
+
         return {
           id: item?.id || createPlaylistId(),
           name,
@@ -291,10 +270,10 @@ async function createComponent() {
           pre_lists,
           total: playlist.length,
           current_index: currentIndex,
-          pre_index: typeof item?.pre_index === "number" 
-            ? item.pre_index 
-            : (item?.pre_index !== undefined && item?.pre_index !== null 
-                ? parseInt(item.pre_index, 10) : -1),
+          pre_index: typeof item?.pre_index === "number"
+            ? item.pre_index
+            : (item?.pre_index !== undefined && item?.pre_index !== null
+              ? parseInt(item.pre_index, 10) : -1),
           device_address: item?.device_address || item?.device?.address || null,
           device_type: validDeviceType,
           device: item?.device || { type: validDeviceType, address: item?.device_address || null, name: item?.device?.name || null },
@@ -391,12 +370,12 @@ async function createComponent() {
             const weekdayIndex = getSelectedWeekdayIndex();
             // 如果是替换模式，使用 replaceInfo 中的类型；否则使用 fileBrowserTarget
             const targetType = isReplaceMode && replaceInfo ? replaceInfo.type : refData.fileBrowserTarget.value;
-            const targetList = targetType === "pre_files" 
+            const targetList = targetType === "pre_files"
               ? (Array.isArray(playlistInfo.pre_lists) && playlistInfo.pre_lists.length === 7
-                  ? [...(playlistInfo.pre_lists[weekdayIndex] || [])]
-                  : [])
+                ? [...(playlistInfo.pre_lists[weekdayIndex] || [])]
+                : [])
               : (Array.isArray(playlistInfo.playlist) ? [...playlistInfo.playlist] : []);
-            
+
             if (isReplaceMode && replaceInfo) {
               // 替换模式：删除当前文件，在相同位置插入新文件
               const replaceIndex = replaceInfo.index;
@@ -417,7 +396,7 @@ async function createComponent() {
                   existingUris.add(item.uri);
                 }
               });
-              
+
               // 添加新文件，格式化为新格式 {"uri": "地址"}
               for (const filePath of filePaths) {
                 if (!existingUris.has(filePath)) {
@@ -429,7 +408,7 @@ async function createComponent() {
                 }
               }
             }
-            
+
             if (targetType === "pre_files") {
               // 确保 pre_lists 存在且格式正确
               if (!playlistInfo.pre_lists || !Array.isArray(playlistInfo.pre_lists) || playlistInfo.pre_lists.length !== 7) {
@@ -449,8 +428,8 @@ async function createComponent() {
             return playlistInfo;
           });
 
-          const targetName = (isReplaceMode && replaceInfo && replaceInfo.type === "pre_files") || (!isReplaceMode && refData.fileBrowserTarget.value === "pre_files") 
-            ? "前置列表" 
+          const targetName = (isReplaceMode && replaceInfo && replaceInfo.type === "pre_files") || (!isReplaceMode && refData.fileBrowserTarget.value === "pre_files")
+            ? "前置列表"
             : "播放列表";
           if (isReplaceMode) {
             ElMessage.success(`成功替换${targetName}中的文件`);
@@ -479,14 +458,14 @@ async function createComponent() {
         const active = list.find((item) => item.id === activeId) || list[0];
         activeId = active.id;
         refData.activePlaylistId.value = activeId;
-        
+
         // 确保 current_index 是数字类型，直接使用 API 返回的值
-        let currentIndex = typeof active.current_index === "number" 
-          ? active.current_index 
-          : (active.current_index !== undefined && active.current_index !== null 
-              ? parseInt(active.current_index, 10) || 0 
-              : 0);
-        
+        let currentIndex = typeof active.current_index === "number"
+          ? active.current_index
+          : (active.current_index !== undefined && active.current_index !== null
+            ? parseInt(active.current_index, 10) || 0
+            : 0);
+
         // 确保 current_index 在有效范围内
         if (active.playlist && active.playlist.length > 0) {
           if (currentIndex < 0) currentIndex = 0;
@@ -494,7 +473,7 @@ async function createComponent() {
         } else {
           currentIndex = 0;
         }
-        
+
         // 获取当前显示的前置文件列表（从 active 对象中获取，而不是从 playlistStatus）
         const weekdayIndex = getSelectedWeekdayIndex();
         const currentPreFiles = (active.pre_lists && Array.isArray(active.pre_lists) && active.pre_lists.length === 7)
@@ -506,10 +485,10 @@ async function createComponent() {
           pre_lists: active.pre_lists ? active.pre_lists.map(list => [...(list || [])]) : Array(7).fill(null).map(() => []),
           pre_files: currentPreFiles, // 为了兼容，保留 pre_files 字段，但使用当前选中的日期列表
           current_index: currentIndex,
-          pre_index: typeof active.pre_index === "number" 
-            ? active.pre_index 
-            : (active.pre_index !== undefined && active.pre_index !== null 
-                ? parseInt(active.pre_index, 10) : -1),
+          pre_index: typeof active.pre_index === "number"
+            ? active.pre_index
+            : (active.pre_index !== undefined && active.pre_index !== null
+              ? parseInt(active.pre_index, 10) : -1),
           in_pre_files: active?.in_pre_files === true || active?.in_pre_files === 1 || false,
           isPlaying: active?.isPlaying === true || active?.isPlaying === 1 || false,
         };
@@ -545,7 +524,7 @@ async function createComponent() {
             } else {
               normalizedPreLists = normalizedPreLists.map(pre_list => normalizeFiles(pre_list || [], true));
             }
-            
+
             playlistDict[item.id] = {
               id: item.id,
               name: item.name || "默认播放列表",
@@ -589,7 +568,7 @@ async function createComponent() {
       };
 
       const transformApiDataToPlaylistFormat = (apiData) => {
-        if (!apiData || typeof apiData !== "object") {
+        if (!apiData) {
           return null;
         }
 
@@ -607,36 +586,29 @@ async function createComponent() {
             } else {
               normalizedPreLists = normalizedPreLists.map(pre_list => normalizeFiles(pre_list || [], true));
             }
-            
-            // 规范化 schedule，确保 cron 是字符串类型
+
+            // 规范化 schedule
             const schedule = item.schedule || { enabled: 0, cron: "", duration: 0 };
             const normalizedSchedule = {
               enabled: schedule.enabled || 0,
-              cron: (schedule.cron !== undefined && schedule.cron !== null) ? String(schedule.cron) : "",
+              cron: schedule.cron || "",
               duration: schedule.duration || 0,
             };
-            
+
             return {
               id: item.id,
               name: item.name || "默认播放列表",
               playlist: normalizedFiles,
               pre_lists: normalizedPreLists,
-              current_index: typeof item.current_index === "number" 
-                ? item.current_index 
-                : (item.current_index !== undefined && item.current_index !== null 
-                    ? parseInt(item.current_index, 10) || 0 
-                    : 0),
-              pre_index: typeof item.pre_index === "number" 
-                ? item.pre_index 
-                : (item.pre_index !== undefined && item.pre_index !== null 
-                    ? parseInt(item.pre_index, 10) : -1),
+              current_index: item.current_index || 0,
+              pre_index: item.pre_index ?? -1,
               in_pre_files: item?.in_pre_files === true || item?.in_pre_files === 1 || false,
-            device_address: item.device?.address || item.device_address || null,
-            device_type: item.device?.type || item.device_type || "dlna",
-            device: item.device || {
-              type: item.device_type || "dlna",
-              address: item.device_address || null,
-            },
+              device_address: item.device?.address || item.device_address || null,
+              device_type: item.device?.type || item.device_type || "dlna",
+              device: item.device || {
+                type: item.device_type || "dlna",
+                address: item.device_address || null,
+              },
               schedule: normalizedSchedule,
               trigger_button: item?.trigger_button || "",
               create_time: item.create_time,
@@ -689,7 +661,7 @@ async function createComponent() {
           const parsed = transformApiDataToPlaylistFormat(response.data);
           const normalized = normalizePlaylistCollection(parsed);
           refData.playlistCollection.value = normalized.playlists;
-          
+
           // 从 localStorage 恢复选中的播放列表ID
           const savedPlaylistId = restoreActivePlaylistId();
           if (savedPlaylistId && normalized.playlists.some(p => p.id === savedPlaylistId)) {
@@ -697,14 +669,14 @@ async function createComponent() {
           } else {
             refData.activePlaylistId.value = normalized.activePlaylistId;
           }
-          
+
           syncActivePlaylist(normalized.playlists);
           return normalized;
         } catch (error) {
           console.error("从接口加载播放列表失败:", error);
           const fallback = normalizePlaylistCollection(null);
           refData.playlistCollection.value = fallback.playlists;
-          
+
           // 从 localStorage 恢复选中的播放列表ID
           const savedPlaylistId = restoreActivePlaylistId();
           if (savedPlaylistId && fallback.playlists.some(p => p.id === savedPlaylistId)) {
@@ -712,7 +684,7 @@ async function createComponent() {
           } else {
             refData.activePlaylistId.value = fallback.activePlaylistId;
           }
-          
+
           syncActivePlaylist(fallback.playlists);
           return fallback;
         }
@@ -770,20 +742,20 @@ async function createComponent() {
             : Array(7).fill(null).map(() => []),
         };
         const updatedItem = mutator(itemToMutate) || itemToMutate;
-        
+
         // 确保 pre_lists 被正确保留（不经过 normalizePlaylistItem 的重新规范化，因为它可能会丢失数据）
         const preservedPreLists = updatedItem.pre_lists && Array.isArray(updatedItem.pre_lists) && updatedItem.pre_lists.length === 7
           ? updatedItem.pre_lists.map(list => Array.isArray(list) ? list.map(f => ({ ...f })) : [])
           : (Array.isArray(currentItem.pre_lists) && currentItem.pre_lists.length === 7
-              ? currentItem.pre_lists.map(list => list.map(f => ({ ...f })))
-              : Array(7).fill(null).map(() => []));
-        
+            ? currentItem.pre_lists.map(list => list.map(f => ({ ...f })))
+            : Array(7).fill(null).map(() => []));
+
         const normalizedItem = normalizePlaylistItem(updatedItem, currentItem.name);
         // 保留 mutator 修改后的 pre_lists
         normalizedItem.pre_lists = preservedPreLists;
         collection[index] = normalizedItem;
         refData.playlistCollection.value = collection;
-        
+
         // 调用单个播放列表更新接口
         await updateSinglePlaylist(collection[index]);
         syncActivePlaylist(collection);
@@ -882,7 +854,7 @@ async function createComponent() {
           refData.miScanning.value = true;
           const response = await fetch(`${getApiUrl()}/mi/scan?timeout=5`);
           const result = await response.json();
-          
+
           if (result.code === 0) {
             const devices = (result.data || []).map(device => ({
               ...device,
@@ -891,10 +863,10 @@ async function createComponent() {
               _volumeRefreshing: false
             }));
             refData.miDeviceList.value = devices;
-            
+
             // 并行获取所有设备的音量（使用响应式数组确保 Vue 能检测到变化）
             await Promise.allSettled(refData.miDeviceList.value.map(device => getMiDeviceVolume(device)));
-            
+
             ElMessage.success(`扫描到 ${devices.length} 个小米设备`);
           } else {
             ElMessage.error(result.msg || "扫描小米设备失败");
@@ -911,19 +883,19 @@ async function createComponent() {
       const getMiDeviceVolume = async (device) => {
         const deviceId = getMiDeviceId(device);
         if (!deviceId) return;
-        
+
         // 在响应式数组中找到对应的设备对象
         const deviceList = refData.miDeviceList.value;
         const targetDevice = deviceList.find(d => getMiDeviceId(d) === deviceId);
         if (!targetDevice) return;
-        
+
         // 设置刷新状态
         targetDevice._volumeRefreshing = true;
-        
+
         try {
           const response = await fetch(`${getApiUrl()}/mi/volume?device_id=${encodeURIComponent(deviceId)}`);
           const result = await response.json();
-          
+
           if (result.code === 0) {
             // 直接更新响应式数组中的设备对象
             targetDevice.volume = result.data?.volume ?? result.data ?? undefined;
@@ -945,10 +917,10 @@ async function createComponent() {
           ElMessage.error("设备ID无效");
           return;
         }
-        
+
         const clampedVolume = clampVolume(volume);
         device._volumeChanging = true;
-        
+
         try {
           const response = await fetch(`${getApiUrl()}/mi/volume`, {
             method: 'POST',
@@ -960,9 +932,9 @@ async function createComponent() {
               volume: clampedVolume
             })
           });
-          
+
           const result = await response.json();
-          
+
           if (result.code === 0) {
             device.volume = clampedVolume;
             ElMessage.success('音量设置成功');
@@ -1110,209 +1082,31 @@ async function createComponent() {
       };
 
       const cronBuilderVisible = ref(false);
+      const initialCronExpr = ref("");
 
       const handleOpenCronBuilder = () => {
+        const cronExpr = refData.playlistStatus.value?.schedule?.cron || "";
+        initialCronExpr.value = cronExpr;
         cronBuilderVisible.value = true;
-        const cronExpr = refData.playlistStatus.value?.schedule?.cron;
-        if (cronExpr) {
-          parseCronExpression(cronExpr);
-        } else {
-          resetCronBuilder();
-        }
       };
 
       const handleCloseCronBuilder = () => {
         cronBuilderVisible.value = false;
       };
 
-      const resetCronBuilder = () => {
-        refData.cronBuilder.value = {
-          second: "*",
-          secondCustom: "",
-          minute: "*",
-          minuteCustom: "",
-          hour: "*",
-          hourCustom: "",
-          day: "*",
-          dayCustom: "",
-          month: "*",
-          monthCustom: "",
-          weekday: "*",
-          weekdayCustom: "",
-          generated: "",
-        };
-        updateCronExpression();
-      };
-
-      const parseCronExpression = (cronExpr) => {
-        try {
-          if (!cronExpr || typeof cronExpr !== 'string') {
-            resetCronBuilder();
-            return;
-          }
-          const parts = String(cronExpr).trim().split(/\s+/);
-          let sec, min, hour, day, month, weekday;
-
-          if (parts.length === 5) {
-            const [first, second, third, fourth, fifth] = parts;
-            if (first === "0" && second && second.startsWith("*/")) {
-              sec = "0";
-              min = second;
-              hour = third || "*";
-              day = fourth || "*";
-              month = fifth || "*";
-              weekday = "*";
-            } else {
-              min = first;
-              hour = second;
-              day = third;
-              month = fourth;
-              weekday = fifth;
-              sec = "0";
-            }
-          } else if (parts.length === 6) {
-            [sec, min, hour, day, month, weekday] = parts;
-          } else {
-            console.warn("Cron 表达式格式错误，部分数量:", parts.length);
-            resetCronBuilder();
-            return;
-          }
-
-          if (parts.length === 5 || parts.length === 6) {
-            if (sec === "*") {
-              refData.cronBuilder.value.second = "*";
-              refData.cronBuilder.value.secondCustom = "";
-            } else if (sec === "0") {
-              refData.cronBuilder.value.second = "0";
-              refData.cronBuilder.value.secondCustom = "";
-            } else {
-              refData.cronBuilder.value.second = "custom";
-              refData.cronBuilder.value.secondCustom = sec;
-            }
-
-            // 解析分
-            if (min === "*") {
-              refData.cronBuilder.value.minute = "*";
-              refData.cronBuilder.value.minuteCustom = "";
-            } else if (min === "0") {
-              refData.cronBuilder.value.minute = "0";
-              refData.cronBuilder.value.minuteCustom = "";
-            } else if (min.startsWith("*/")) {
-              // 处理步长格式：*/30, */15 等
-              refData.cronBuilder.value.minute = "custom";
-              refData.cronBuilder.value.minuteCustom = min;
-            } else {
-              refData.cronBuilder.value.minute = "custom";
-              refData.cronBuilder.value.minuteCustom = min;
-            }
-
-            // 解析时
-            if (hour === "*") {
-              refData.cronBuilder.value.hour = "*";
-              refData.cronBuilder.value.hourCustom = "";
-            } else if (hour === "0") {
-              refData.cronBuilder.value.hour = "0";
-              refData.cronBuilder.value.hourCustom = "";
-            } else {
-              refData.cronBuilder.value.hour = "custom";
-              refData.cronBuilder.value.hourCustom = hour;
-            }
-
-            // 解析日
-            if (day === "*") {
-              refData.cronBuilder.value.day = "*";
-              refData.cronBuilder.value.dayCustom = "";
-            } else {
-              refData.cronBuilder.value.day = "custom";
-              refData.cronBuilder.value.dayCustom = day;
-            }
-
-            // 解析月
-            if (month === "*") {
-              refData.cronBuilder.value.month = "*";
-              refData.cronBuilder.value.monthCustom = "";
-            } else {
-              refData.cronBuilder.value.month = "custom";
-              refData.cronBuilder.value.monthCustom = month;
-            }
-
-            // 解析周
-            if (weekday === "*") {
-              refData.cronBuilder.value.weekday = "*";
-              refData.cronBuilder.value.weekdayCustom = "";
-            } else if (weekday === "1-5") {
-              refData.cronBuilder.value.weekday = "1-5";
-              refData.cronBuilder.value.weekdayCustom = "";
-            } else if (weekday === "0,6" || weekday === "6,0") {
-              refData.cronBuilder.value.weekday = "0,6";
-              refData.cronBuilder.value.weekdayCustom = "";
-            } else {
-              refData.cronBuilder.value.weekday = "custom";
-              refData.cronBuilder.value.weekdayCustom = weekday;
-            }
-
-            // 立即更新生成的表达式
-            updateCronExpression();
-          } else {
-            console.warn("Cron 表达式格式错误，部分数量:", parts.length);
-            resetCronBuilder();
-          }
-        } catch (error) {
-          console.error("解析 Cron 表达式失败:", error);
-          resetCronBuilder();
-        }
-      };
-
-      // 更新生成的 Cron 表达式
-      const updateCronExpression = () => {
-        refData.cronBuilder.value.generated = generateCronExpression(refData.cronBuilder.value);
-      };
-
-      const handleApplyCronExpression = () => {
-        if (!refData.cronBuilder.value.generated) return;
-        const cronExpr = refData.cronBuilder.value.generated;
+      const handleCronBuilderApply = (cronExpr) => {
+        if (!cronExpr) return;
         if (refData.playlistStatus.value) {
           handleUpdatePlaylistCron(cronExpr);
-          handleCloseCronBuilder();
           ElMessage.success("Cron 表达式已应用到当前播放列表");
         } else {
           ElMessage.warning("请先选择一个播放列表");
         }
       };
 
-      const applyExample = (example) => {
-        try {
-          parseCronExpression(example);
-          nextTick(() => {
-            if (refData.cronBuilder.value.generated && refData.playlistStatus.value) {
-              handleUpdatePlaylistCron(refData.cronBuilder.value.generated);
-              ElMessage.success("示例已应用到当前播放列表");
-            } else if (refData.cronBuilder.value.generated) {
-              ElMessage.warning("请先选择一个播放列表");
-            }
-          });
-        } catch (error) {
-          console.error("应用示例失败:", error);
-          ElMessage.error("应用示例失败: " + error.message);
-        }
-      };
-
-
-      // 预览生成的 Cron 表达式
-      const handlePreviewGeneratedCron = () => {
-        const cronExpr = refData.cronBuilder.value.generated;
-        if (!cronExpr) {
-          ElMessage.warning("请先生成 Cron 表达式");
-          return;
-        }
-        try {
-          const times = calculateNextCronTimes(cronExpr, 5);
-          refData.cronPreviewTimes.value = times;
-          refData.cronPreviewVisible.value = true;
-        } catch (error) {
-          ElMessage.error("预览失败: " + (error.message || "无效的 Cron 表达式"));
-          refData.cronPreviewTimes.value = [];
-        }
+      const handleCronBuilderPreview = (times) => {
+        refData.cronPreviewTimes.value = times;
+        refData.cronPreviewVisible.value = true;
       };
 
       // 预览 Cron 表达式
@@ -1468,16 +1262,16 @@ async function createComponent() {
           if (isAutoRefresh && (refData.preFilesDragMode.value || refData.filesDragMode.value)) {
             return;
           }
-          
+
           refData.playlistRefreshing.value = true;
-          
+
           if (onlyCurrent) {
             // 只刷新当前激活的播放列表状态
             const activeId = refData.activePlaylistId.value;
             if (!activeId) {
               return;
             }
-            
+
             // 只获取当前激活的播放列表
             const response = await playlistAction("get", "GET", { id: activeId });
             if (response.code !== 0) {
@@ -1491,7 +1285,7 @@ async function createComponent() {
             }
 
             const updatedPlaylist = parsed.playlists[0];
-            
+
             // 更新 playlistCollection 中对应的项
             const collection = refData.playlistCollection.value.map((item) => {
               if (item.id === activeId) {
@@ -1503,17 +1297,17 @@ async function createComponent() {
                   pre_lists: (updatedPlaylist.pre_lists && Array.isArray(updatedPlaylist.pre_lists) && updatedPlaylist.pre_lists.length === 7)
                     ? updatedPlaylist.pre_lists.map(list => [...(list || [])])
                     : item.pre_lists,
-                  current_index: updatedPlaylist.current_index !== undefined 
-                    ? updatedPlaylist.current_index 
+                  current_index: updatedPlaylist.current_index !== undefined
+                    ? updatedPlaylist.current_index
                     : item.current_index,
                   isPlaying: updatedPlaylist?.isPlaying === true || updatedPlaylist?.isPlaying === 1 || false,
                 };
               }
               return item;
             });
-            
+
             refData.playlistCollection.value = collection;
-            
+
             // 同步更新当前激活的播放列表状态
             syncActivePlaylist(collection);
           } else {
@@ -1545,7 +1339,7 @@ async function createComponent() {
             playlistInfo.total = list.length;
             return playlistInfo;
           });
-          
+
           const response = await playlistAction("play", "POST", { id: status.id });
           if (response.code !== 0) {
             throw new Error(response.msg || "播放失败");
@@ -1756,21 +1550,21 @@ async function createComponent() {
       const handleClearPlaylist = async () => {
         const status = refData.playlistStatus.value;
         if (!status) return;
-        
+
         const preFiles = getCurrentPreFiles();
         const preFilesCount = (preFiles && preFiles.length) || 0;
         const filesCount = (status.playlist && status.playlist.length) || 0;
         const totalCount = preFilesCount + filesCount;
-        
+
         if (totalCount === 0) return;
 
         try {
           const message = preFilesCount > 0 && filesCount > 0
             ? `确定要清空播放列表 "${status.name}" 吗？此操作将删除所有 ${preFilesCount} 个前置文件和 ${filesCount} 个正式文件，共 ${totalCount} 个文件。`
             : preFilesCount > 0
-            ? `确定要清空播放列表 "${status.name}" 吗？此操作将删除所有 ${preFilesCount} 个前置文件。`
-            : `确定要清空播放列表 "${status.name}" 吗？此操作将删除所有 ${filesCount} 个正式文件。`;
-          
+              ? `确定要清空播放列表 "${status.name}" 吗？此操作将删除所有 ${preFilesCount} 个前置文件。`
+              : `确定要清空播放列表 "${status.name}" 吗？此操作将删除所有 ${filesCount} 个正式文件。`;
+
           await ElMessageBox.confirm(
             message,
             "确认清空",
@@ -1993,7 +1787,7 @@ async function createComponent() {
 
         try {
           refData.playlistLoading.value = true;
-          
+
           // 切换排序顺序
           const currentOrder = refData.preFilesSortOrder.value;
           let newOrder = null;
@@ -2014,7 +1808,7 @@ async function createComponent() {
             }
             const list = [...(playlistInfo.pre_lists[weekdayIndex] || [])];
             const oldPreIndex = playlistInfo.pre_index;
-            
+
             if (newOrder) {
               const [sortField, sortDir] = newOrder.split('-');
               list.sort((a, b) => {
@@ -2028,12 +1822,12 @@ async function createComponent() {
                 } else {
                   return 0;
                 }
-                
+
                 if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
                 if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
                 return 0;
               });
-              
+
               // 更新 pre_index
               if (oldPreIndex !== undefined && oldPreIndex !== null && oldPreIndex >= 0) {
                 const oldFile = preFiles[oldPreIndex];
@@ -2044,11 +1838,11 @@ async function createComponent() {
               // 取消排序，恢复原始顺序（这里无法完全恢复，保持当前顺序）
               // 如果需要完全恢复，需要保存原始顺序
             }
-            
+
             playlistInfo.pre_lists[weekdayIndex] = list;
             return playlistInfo;
           });
-          
+
           if (newOrder) {
             ElMessage.success(`已按${sortType === 'name' ? '文件名' : '时长'}${newOrder.includes('asc') ? '升序' : '降序'}排序`);
           } else {
@@ -2069,7 +1863,7 @@ async function createComponent() {
 
         try {
           refData.playlistLoading.value = true;
-          
+
           // 切换排序顺序
           const currentOrder = refData.filesSortOrder.value;
           let newOrder = null;
@@ -2085,7 +1879,7 @@ async function createComponent() {
           await updateActivePlaylistData((playlistInfo) => {
             const list = [...(playlistInfo.playlist || [])];
             const oldCurrentIndex = playlistInfo.current_index;
-            
+
             if (newOrder) {
               const [sortField, sortDir] = newOrder.split('-');
               list.sort((a, b) => {
@@ -2099,12 +1893,12 @@ async function createComponent() {
                 } else {
                   return 0;
                 }
-                
+
                 if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
                 if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
                 return 0;
               });
-              
+
               // 更新 current_index
               if (oldCurrentIndex !== undefined && oldCurrentIndex !== null && oldCurrentIndex >= 0) {
                 const oldFile = playlistInfo.playlist[oldCurrentIndex];
@@ -2112,12 +1906,12 @@ async function createComponent() {
                 playlistInfo.current_index = newIndex >= 0 ? newIndex : 0;
               }
             }
-            
+
             playlistInfo.playlist = list;
             playlistInfo.total = list.length;
             return playlistInfo;
           });
-          
+
           if (newOrder) {
             ElMessage.success(`已按${sortType === 'name' ? '文件名' : '时长'}${newOrder.includes('asc') ? '升序' : '降序'}排序`);
           } else {
@@ -2135,7 +1929,7 @@ async function createComponent() {
         if (!playlistId || playlistId === refData.activePlaylistId.value) return;
         const exists = refData.playlistCollection.value.find((item) => item.id === playlistId);
         if (!exists) return;
-        
+
         refData.activePlaylistId.value = playlistId;
         saveActivePlaylistId(playlistId); // 保存选中的播放列表ID
         syncActivePlaylist(refData.playlistCollection.value);
@@ -2286,12 +2080,12 @@ async function createComponent() {
           const rect = event.currentTarget.getBoundingClientRect();
           const mouseY = event.clientY;
           const elementCenterY = rect.top + rect.height / 2;
-          
+
           // 清除之前的样式
           event.currentTarget.style.backgroundColor = '';
           event.currentTarget.style.borderTop = '';
           event.currentTarget.style.borderBottom = '';
-          
+
           // 根据鼠标位置决定插入位置（上方或下方）
           if (mouseY < elementCenterY) {
             // 插入到上方
@@ -2315,9 +2109,9 @@ async function createComponent() {
           event.currentTarget.style.borderTop = '';
           event.currentTarget.style.borderBottom = '';
         }
-        
+
         const sourceIndex = parseInt(event.dataTransfer.getData('text/plain'), 10);
-        
+
         if (sourceIndex === targetIndex || isNaN(sourceIndex)) {
           return;
         }
@@ -2325,7 +2119,7 @@ async function createComponent() {
         const status = refData.playlistStatus.value;
         const preFiles = getCurrentPreFiles();
         if (!status || !preFiles || sourceIndex < 0 || sourceIndex >= preFiles.length ||
-            targetIndex < 0 || targetIndex >= preFiles.length) {
+          targetIndex < 0 || targetIndex >= preFiles.length) {
           return;
         }
         // 只在内存中更新，不保存到后端
@@ -2333,7 +2127,7 @@ async function createComponent() {
         const list = [...preFiles];
         const [removed] = list.splice(sourceIndex, 1);
         list.splice(targetIndex, 0, removed);
-        
+
         // 计算新的 pre_index
         let newPreIndex = status.pre_index;
         if (status.pre_index !== undefined && status.pre_index !== null && status.pre_index >= 0) {
@@ -2345,7 +2139,7 @@ async function createComponent() {
             newPreIndex = status.pre_index + 1;
           }
         }
-        
+
         // 更新 playlistCollection 中对应的项
         const collection = refData.playlistCollection.value.map(item => {
           if (item.id === status.id) {
@@ -2362,7 +2156,7 @@ async function createComponent() {
           return item;
         });
         refData.playlistCollection.value = collection;
-        
+
         // 同步更新到状态中
         syncActivePlaylist(collection);
       };
@@ -2411,12 +2205,12 @@ async function createComponent() {
           const rect = event.currentTarget.getBoundingClientRect();
           const mouseY = event.clientY;
           const elementCenterY = rect.top + rect.height / 2;
-          
+
           // 清除之前的样式
           event.currentTarget.style.backgroundColor = '';
           event.currentTarget.style.borderTop = '';
           event.currentTarget.style.borderBottom = '';
-          
+
           // 根据鼠标位置决定插入位置（上方或下方）
           if (mouseY < elementCenterY) {
             // 插入到上方
@@ -2440,23 +2234,23 @@ async function createComponent() {
           event.currentTarget.style.borderTop = '';
           event.currentTarget.style.borderBottom = '';
         }
-        
+
         const sourceIndex = parseInt(event.dataTransfer.getData('text/plain'), 10);
-        
+
         if (sourceIndex === targetIndex || isNaN(sourceIndex)) {
           return;
         }
 
         const status = refData.playlistStatus.value;
         if (!status || !status.playlist || sourceIndex < 0 || sourceIndex >= status.playlist.length ||
-            targetIndex < 0 || targetIndex >= status.playlist.length) {
+          targetIndex < 0 || targetIndex >= status.playlist.length) {
           return;
         }
         // 只在内存中更新，不保存到后端
         const list = [...(status.playlist || [])];
         const [removed] = list.splice(sourceIndex, 1);
         list.splice(targetIndex, 0, removed);
-        
+
         // 计算新的 current_index
         let newCurrentIndex = status.current_index;
         if (status.current_index !== undefined && status.current_index !== null && status.current_index >= 0) {
@@ -2468,7 +2262,7 @@ async function createComponent() {
             newCurrentIndex = status.current_index + 1;
           }
         }
-        
+
         // 更新 playlistCollection 中对应的项
         const collection = refData.playlistCollection.value.map(item => {
           if (item.id === status.id) {
@@ -2482,7 +2276,7 @@ async function createComponent() {
           return item;
         });
         refData.playlistCollection.value = collection;
-        
+
         // 同步更新到状态中
         syncActivePlaylist(collection);
       };
@@ -2551,36 +2345,6 @@ async function createComponent() {
         refData.editingPlaylistName.value = "";
       };
 
-      // 格式化日期时间，包含星期
-      const formatDateTimeWithWeekday = (dateStr) => {
-        if (!dateStr) return null;
-        try {
-          // 解析格式: "YYYY-MM-DD HH:mm:ss"
-          const parts = dateStr.match(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
-          if (!parts) return dateStr;
-
-          const year = parseInt(parts[1], 10);
-          const month = parseInt(parts[2], 10) - 1; // 月份从0开始
-          const day = parseInt(parts[3], 10);
-          const hours = parseInt(parts[4], 10);
-          const minutes = parseInt(parts[5], 10);
-          const seconds = parseInt(parts[6], 10);
-
-          const date = new Date(year, month, day, hours, minutes, seconds);
-          const weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
-          const weekday = weekdays[date.getDay()];
-
-          return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(
-            2,
-            "0"
-          )} ${weekday} ${String(hours).padStart(2, "0")}:${String(minutes).padStart(
-            2,
-            "0"
-          )}:${String(seconds).padStart(2, "0")}`;
-        } catch (error) {
-          return dateStr;
-        }
-      };
 
       // 获取播放列表的下次 Cron 运行时间
       const getPlaylistNextCronTime = (playlist) => {
@@ -2655,7 +2419,7 @@ async function createComponent() {
         if (!playlistId) return;
         const sourcePlaylist = refData.playlistCollection.value.find((item) => item.id === playlistId);
         if (!sourcePlaylist) return;
-        
+
         try {
           const defaultName = `${sourcePlaylist.name}_副本`;
           const { value } = await ElMessageBox.prompt("请输入播放列表名称", "复制播放列表", {
@@ -2666,9 +2430,9 @@ async function createComponent() {
             inputValidator: (val) => (!!val && val.trim().length > 0) || "名称不能为空",
           });
           const playlistName = (value || defaultName).trim();
-          
+
           // 复制播放列表内容（深拷贝）
-          const copiedPlaylist = sourcePlaylist.playlist 
+          const copiedPlaylist = sourcePlaylist.playlist
             ? sourcePlaylist.playlist.map(file => ({ ...file }))
             : [];
           const newPlaylist = normalizePlaylistItem(
@@ -2684,7 +2448,7 @@ async function createComponent() {
             },
             playlistName
           );
-          
+
           const updated = [...refData.playlistCollection.value, newPlaylist];
           refData.playlistCollection.value = updated;
           refData.activePlaylistId.value = newPlaylist.id;
@@ -2715,20 +2479,20 @@ async function createComponent() {
           });
           const updated = refData.playlistCollection.value.filter((item) => item.id !== playlistId);
           refData.playlistCollection.value = updated;
-          
+
           // 如果删除的是当前选中的播放列表，切换到第一个
           if (playlistId === refData.activePlaylistId.value && updated.length > 0) {
             refData.activePlaylistId.value = updated[0].id;
             saveActivePlaylistId(updated[0].id);
           }
-          
+
           // 清理已删除播放列表的localStorage数据
           try {
             localStorage.removeItem(`playlist_index_${playlistId}`);
           } catch (e) {
             console.warn("清理播放列表索引失败:", e);
           }
-          
+
           syncActivePlaylist(updated);
           await savePlaylist(updated);
           ElMessage.success("播放列表已删除");
@@ -2768,10 +2532,8 @@ async function createComponent() {
         handleCloseScanDialog,
         handleOpenCronBuilder,
         handleCloseCronBuilder,
-        updateCronExpression,
-        handleApplyCronExpression,
-        applyExample,
-        handlePreviewGeneratedCron,
+        handleCronBuilderApply,
+        handleCronBuilderPreview,
         formatSize,
         formatDuration,
         handleConnectDevice,
@@ -2794,8 +2556,6 @@ async function createComponent() {
         handleReplacePreFile,
         handleSortPreFiles,
         handleSortFiles,
-        preFilesDragMode: refData.preFilesDragMode,
-        filesDragMode: refData.filesDragMode,
         handleTogglePreFilesDragMode,
         handleToggleFilesDragMode,
         handlePreFileDragStart,
@@ -2868,7 +2628,7 @@ async function createComponent() {
             clearInterval(agentListRefreshTimer);
             agentListRefreshTimer = null;
           }
-          
+
           // 如果弹窗显示，启动10秒定时刷新
           if (isVisible) {
             agentListRefreshTimer = setInterval(async () => {
@@ -2886,7 +2646,7 @@ async function createComponent() {
       onMounted(async () => {
         await loadPlaylist();
         await refreshConnectedList();
-        
+
         // 启动定时器，每5秒刷新一次当前播放列表状态
         statusRefreshTimer = setInterval(async () => {
           try {
@@ -2912,6 +2672,7 @@ async function createComponent() {
       return {
         ...refData,
         cronBuilderVisible,
+        initialCronExpr,
         ...refMethods,
       };
     },
