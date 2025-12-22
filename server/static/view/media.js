@@ -76,6 +76,9 @@ async function createComponent() {
         replaceFileInfo: ref(null), // 替换文件信息 {type: 'pre_files' | 'files', index: number}，null表示添加模式
         browserAudioPlayer: ref(null), // 浏览器音频播放器实例
         browserPlayingFilePath: ref(null), // 当前正在播放的文件路径
+        browserPlayProgress: ref(0), // 浏览器播放进度（0-100）
+        browserCurrentTime: ref(0), // 浏览器当前播放时间（秒）
+        browserDuration: ref(0), // 浏览器音频总时长（秒）
         preFilesExpanded: ref(false), // 前置文件列表是否展开
       };
       const pendingDeviceType = ref(null);
@@ -116,24 +119,37 @@ async function createComponent() {
           return;
         }
 
+        // 清理浏览器音频播放器状态
+        const clearBrowserAudioPlayer = () => {
+          if (refData.browserAudioPlayer.value) {
+            refData.browserAudioPlayer.value.pause();
+            refData.browserAudioPlayer.value = null;
+          }
+          refData.browserPlayingFilePath.value = null;
+          refData.browserPlayProgress.value = 0;
+          refData.browserCurrentTime.value = 0;
+          refData.browserDuration.value = 0;
+        };
+
         // 如果点击的是正在播放的文件，则停止播放
         if (refData.browserPlayingFilePath.value === filePath &&
           refData.browserAudioPlayer.value &&
           !refData.browserAudioPlayer.value.paused) {
-          refData.browserAudioPlayer.value.pause();
-          refData.browserAudioPlayer.value = null;
-          refData.browserPlayingFilePath.value = null;
+          clearBrowserAudioPlayer();
           ElMessage.info("已停止播放");
           return;
         }
 
         // 如果已有播放器正在播放，先停止
         if (refData.browserAudioPlayer.value) {
-          refData.browserAudioPlayer.value.pause();
-          refData.browserAudioPlayer.value = null;
+          clearBrowserAudioPlayer();
         }
 
-        const mediaUrl = getMediaFileUrl(filePath);
+        const mediaUrl = getMediaFileUrl(filePath, getApiUrl);
+        if (!mediaUrl) {
+          ElMessage.error("无法生成媒体文件URL");
+          return;
+        }
         const audio = new Audio(mediaUrl);
 
         audio.addEventListener('play', () => {
@@ -141,23 +157,61 @@ async function createComponent() {
           ElMessage.success("开始播放");
         });
 
+        audio.addEventListener('loadedmetadata', () => {
+          if (audio.duration > 0 && isFinite(audio.duration)) {
+            refData.browserDuration.value = audio.duration;
+          }
+        });
+
+        audio.addEventListener('loadeddata', () => {
+          if (audio.duration > 0 && isFinite(audio.duration)) {
+            refData.browserDuration.value = audio.duration;
+          }
+        });
+
+        audio.addEventListener('timeupdate', () => {
+          if (audio.duration > 0 && isFinite(audio.duration)) {
+            if (refData.browserDuration.value === 0 || refData.browserDuration.value !== audio.duration) {
+              refData.browserDuration.value = audio.duration;
+            }
+            refData.browserCurrentTime.value = audio.currentTime;
+            refData.browserPlayProgress.value = (audio.currentTime / audio.duration) * 100;
+          }
+        });
+
         audio.addEventListener('pause', () => {
-          // 只有在非用户主动暂停时才清除状态（比如播放结束）
           if (audio.ended) {
-            refData.browserPlayingFilePath.value = null;
+            clearBrowserAudioPlayer();
           }
         });
 
         audio.addEventListener('error', (e) => {
-          console.error("音频播放失败:", e);
-          ElMessage.error("音频播放失败");
-          refData.browserAudioPlayer.value = null;
-          refData.browserPlayingFilePath.value = null;
+          console.error("音频播放失败:", e, "URL:", mediaUrl, "Error:", audio.error);
+          let errorMsg = "音频播放失败";
+          if (audio.error) {
+            switch (audio.error.code) {
+              case MediaError.MEDIA_ERR_ABORTED:
+                errorMsg = "播放被中止";
+                break;
+              case MediaError.MEDIA_ERR_NETWORK:
+                errorMsg = "网络错误，无法加载音频";
+                break;
+              case MediaError.MEDIA_ERR_DECODE:
+                errorMsg = "音频解码失败，文件格式可能不支持";
+                break;
+              case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                errorMsg = "音频格式不支持或文件路径无效";
+                break;
+              default:
+                errorMsg = `播放失败: ${audio.error.message || '未知错误'}`;
+            }
+          }
+          ElMessage.error(errorMsg);
+          clearBrowserAudioPlayer();
         });
 
         audio.addEventListener('ended', () => {
-          refData.browserAudioPlayer.value = null;
-          refData.browserPlayingFilePath.value = null;
+          clearBrowserAudioPlayer();
         });
 
         refData.browserAudioPlayer.value = audio;
@@ -175,6 +229,51 @@ async function createComponent() {
         return refData.browserPlayingFilePath.value === filePath &&
           refData.browserAudioPlayer.value &&
           !refData.browserAudioPlayer.value.paused;
+      };
+
+      // 获取文件播放进度
+      const getFilePlayProgress = (fileItem) => {
+        const filePath = fileItem?.uri || fileItem?.path || '';
+        if (refData.browserPlayingFilePath.value === filePath &&
+          refData.browserAudioPlayer.value) {
+          return refData.browserPlayProgress.value;
+        }
+        return 0;
+      };
+
+      // 获取文件当前播放时间
+      const getFileCurrentTime = (fileItem) => {
+        const filePath = fileItem?.uri || fileItem?.path || '';
+        if (refData.browserPlayingFilePath.value === filePath) {
+          return refData.browserCurrentTime.value;
+        }
+        return 0;
+      };
+
+      // 获取文件时长
+      const getFileDuration = (fileItem) => {
+        const filePath = fileItem?.uri || fileItem?.path || '';
+        if (refData.browserPlayingFilePath.value === filePath) {
+          return refData.browserDuration.value;
+        }
+        // 如果文件不在播放，尝试使用文件本身的duration属性
+        return fileItem?.duration || 0;
+      };
+
+      // 处理进度条拖拽
+      const handleSeekFile = (fileItem, percentage) => {
+        const filePath = fileItem?.uri || fileItem?.path || '';
+        if (refData.browserPlayingFilePath.value === filePath &&
+          refData.browserAudioPlayer.value) {
+          const audio = refData.browserAudioPlayer.value;
+          if (audio.duration > 0 && isFinite(audio.duration) && isFinite(percentage)) {
+            const targetTime = (percentage / 100) * audio.duration;
+            audio.currentTime = Math.max(0, Math.min(targetTime, audio.duration));
+            // 立即更新显示，避免等待 timeupdate 事件
+            refData.browserCurrentTime.value = audio.currentTime;
+            refData.browserPlayProgress.value = percentage;
+          }
+        }
       };
 
       // 切换前置文件列表展开/折叠
@@ -2610,6 +2709,10 @@ async function createComponent() {
         getPreFilesCountForWeekday,
         handlePlayFileInBrowser,
         isFilePlaying,
+        getFilePlayProgress,
+        getFileCurrentTime,
+        getFileDuration,
+        handleSeekFile,
         handleTogglePreFilesExpand,
       };
 
