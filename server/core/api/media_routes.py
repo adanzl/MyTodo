@@ -30,15 +30,16 @@ def _get_unique_filepath(directory: str, base_name: str, extension: str) -> str:
     """
     filename = f"{base_name}{extension}"
     file_path = os.path.join(directory, filename)
-    
+
     if os.path.exists(file_path):
         counter = 1
         while os.path.exists(file_path):
             filename = f"{base_name}_{counter}{extension}"
             file_path = os.path.join(directory, filename)
             counter += 1
-    
+
     return file_path
+
 
 # 常量定义
 DEFAULT_BASE_DIR = '/mnt'
@@ -53,8 +54,8 @@ MIMETYPE_MAP = {
     '.mkv': 'video/x-matroska',
 }
 
-
 # ========== 播放列表本地存储（RDS）接口 ==========
+
 
 @media_bp.route("/playlist/get", methods=['GET'])
 def playlist_get():
@@ -65,7 +66,7 @@ def playlist_get():
         args = request.args
         # log.info(f"===== [Playlist Get] {json.dumps(args)}")
         playlist_id = args.get("id")
-        
+
         # 如果 id 为空、None 或空字符串，返回整个播放列表集合
         if playlist_id is None or playlist_id in ("None", "null", ""):
             ret = playlist_mgr.get_playlist(None)
@@ -88,14 +89,14 @@ def playlist_update():
     try:
         log.info("===== [Playlist Update]")
         args = request.get_json(silent=True) or {}
-        
+
         if not args:
             return _err("请求数据不能为空")
-        
+
         playlist_id = args.get("id")
         if not playlist_id:
             return _err("播放列表 id 不能为空")
-        
+
         ret = playlist_mgr.update_single_playlist(args)
         if ret != 0:
             return _err("更新播放列表失败")
@@ -114,10 +115,10 @@ def playlist_update_all():
     try:
         log.info("===== [Playlist Update All]")
         args = request.get_json(silent=True) or {}
-        
+
         if not args:
             return _err("请求数据不能为空")
-        
+
         ret = playlist_mgr.save_playlist(args)
         if ret != 0:
             return _err("更新播放列表集合失败")
@@ -221,6 +222,7 @@ def playlist_reload():
 
 # ========== 媒体文件服务接口（用于 DLNA 播放）==========
 
+
 @media_bp.route("/media/getDuration", methods=['GET'])
 def get_duration():
     """
@@ -229,12 +231,12 @@ def get_duration():
     """
     try:
         file_path = request.args.get('path', '')
-        
+
         # 验证和规范化路径
         normalized_path, error_msg = validate_and_normalize_path(file_path, DEFAULT_BASE_DIR, must_be_file=True)
         if error_msg:
             return _err(error_msg)
-        
+
         # 获取媒体文件时长
         duration = get_media_duration(normalized_path)
         if duration is not None:
@@ -260,20 +262,20 @@ def serve_media_file(filepath):
     try:
         # 安全处理：移除路径中的危险字符
         filepath = filepath.replace('../', '').replace('..\\', '')
-        
+
         # 如果路径不是以 / 开头，添加 /
         if not filepath.startswith('/'):
             filepath = '/' + filepath
-        
+
         # 检查文件是否存在
         if not os.path.exists(filepath) or not os.path.isfile(filepath):
             log.warning(f"[MEDIA] File not found: {filepath}")
             abort(404)
-        
+
         # 获取文件扩展名以确定 Content-Type
         ext = os.path.splitext(filepath)[1].lower()
         mimetype = MIMETYPE_MAP.get(ext, 'application/octet-stream')
-        
+
         log.info(f"[MEDIA] Serving file: {filepath} (MIME: {mimetype})")
         return send_file(filepath, mimetype=mimetype)
     except Exception as e:
@@ -282,6 +284,7 @@ def serve_media_file(filepath):
 
 
 # ========== 媒体工具接口（音频合成）==========
+
 
 @media_bp.route("/media/task/create", methods=['POST'])
 def create_media_task():
@@ -294,15 +297,15 @@ def create_media_task():
         data = request.get_json() or {}
         # 如果没有提供名称，使用当前日期时间作为默认名称
         name = data.get('name', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        
+
         code, msg, task_id = media_tool_mgr.create_task(name)
-        
+
         if code != 0:
             return _err(msg)
-        
+
         task_info = media_tool_mgr.get_task(task_id)
         return _ok(task_info)
-        
+
     except Exception as e:
         log.error(f"[MediaTool] 创建任务失败: {e}")
         return _err(f"创建任务失败: {str(e)}")
@@ -321,40 +324,38 @@ def upload_file():
         task_id = request.form.get('task_id') or request.args.get('task_id')
         if not task_id:
             return _err("task_id 参数不能为空")
-        
+
         if 'file' not in request.files:
             return _err("未找到上传的文件")
-        
+
         file = request.files['file']
         if file.filename == '':
             return _err("文件名不能为空")
-        
+
         if not is_allowed_audio_file(file.filename):
             return _err(f"不支持的文件类型，支持的格式: {', '.join(ALLOWED_AUDIO_EXTENSIONS)}")
-        
-        # 确保目录存在
-        from core.models.const import MEDIA_TASK_DIR
-        ensure_directory(MEDIA_TASK_DIR)
+
+        # 确保任务目录存在
         task_dir = get_media_task_dir(task_id)
         ensure_directory(task_dir)
-        
+
         # 保存文件，如果文件已存在则添加序号
         filename = secure_filename(file.filename)
         base_name, ext = os.path.splitext(filename)
         file_path = _get_unique_filepath(task_dir, base_name, ext)
         filename = os.path.basename(file_path)
-        
+
         file.save(file_path)
         log.info(f"[MediaTool] 文件上传成功: {file_path}")
-        
+
         # 添加到任务
         code, msg = media_tool_mgr.add_file(task_id, file_path, filename)
         if code != 0:
             return _err(msg)
-        
+
         file_info = get_file_info(file_path)
         return _ok(file_info)
-        
+
     except Exception as e:
         log.error(f"[MediaTool] 上传文件失败: {e}")
         return _err(f"上传文件失败: {str(e)}")
@@ -372,37 +373,37 @@ def add_file_by_path():
         data = request.get_json() or request.form.to_dict()
         task_id = data.get('task_id')
         file_path = data.get('file_path')
-        
+
         if not task_id:
             return _err("task_id 参数不能为空")
-        
+
         if not file_path:
             return _err("file_path 参数不能为空")
-        
+
         # 验证文件路径
         normalized_path, error_msg = validate_and_normalize_path(file_path)
         if error_msg or not normalized_path:
             return _err(error_msg or "文件路径无效")
         file_path = normalized_path
-        
+
         if not os.path.exists(file_path):
             return _err(f"文件不存在: {file_path}")
-        
+
         if not os.path.isfile(file_path):
             return _err(f"路径不是文件: {file_path}")
-        
+
         filename = os.path.basename(file_path)
         if not is_allowed_audio_file(filename):
             return _err(f"不支持的文件类型，支持的格式: {', '.join(ALLOWED_AUDIO_EXTENSIONS)}")
-        
+
         # 添加到任务
         code, msg = media_tool_mgr.add_file(task_id, file_path, filename)
         if code != 0:
             return _err(msg)
-        
+
         file_info = get_file_info(file_path)
         return _ok(file_info)
-        
+
     except Exception as e:
         log.error(f"[MediaTool] 添加文件失败: {e}")
         return _err(f"添加文件失败: {str(e)}")
@@ -420,24 +421,24 @@ def delete_file():
         data = request.get_json() or request.form.to_dict()
         task_id = data.get('task_id')
         file_index = data.get('file_index')
-        
+
         if not task_id:
             return _err("task_id 参数不能为空")
-        
+
         if file_index is None:
             return _err("file_index 参数不能为空")
-        
+
         try:
             file_index = int(file_index)
         except (ValueError, TypeError):
             return _err("file_index 必须是整数")
-        
+
         code, msg = media_tool_mgr.remove_file(task_id, file_index)
         if code != 0:
             return _err(msg)
-        
+
         return _ok({"message": msg})
-        
+
     except Exception as e:
         log.error(f"[MediaTool] 删除文件失败: {e}")
         return _err(f"删除文件失败: {str(e)}")
@@ -455,28 +456,28 @@ def reorder_files():
         data = request.get_json() or request.form.to_dict()
         task_id = data.get('task_id')
         file_indices = data.get('file_indices')
-        
+
         if not task_id:
             return _err("task_id 参数不能为空")
-        
+
         if not file_indices:
             return _err("file_indices 参数不能为空")
-        
+
         if not isinstance(file_indices, list):
             return _err("file_indices 必须是数组")
-        
+
         try:
             file_indices = [int(i) for i in file_indices]
         except (ValueError, TypeError):
             return _err("file_indices 必须都是整数")
-        
+
         code, msg = media_tool_mgr.reorder_files(task_id, file_indices)
         if code != 0:
             return _err(msg)
-        
+
         task_info = media_tool_mgr.get_task(task_id)
         return _ok(task_info)
-        
+
     except Exception as e:
         log.error(f"[MediaTool] 调整文件顺序失败: {e}")
         return _err(f"调整文件顺序失败: {str(e)}")
@@ -492,17 +493,17 @@ def start_task():
     try:
         data = request.get_json() or request.form.to_dict()
         task_id = data.get('task_id')
-        
+
         if not task_id:
             return _err("task_id 参数不能为空")
-        
+
         code, msg = media_tool_mgr.start_task(task_id)
         if code != 0:
             return _err(msg)
-        
+
         task_info = media_tool_mgr.get_task(task_id)
         return _ok(task_info)
-        
+
     except Exception as e:
         log.error(f"[MediaTool] 启动任务失败: {e}")
         return _err(f"启动任务失败: {str(e)}")
@@ -518,16 +519,16 @@ def get_task_info():
     try:
         data = request.get_json() or request.form.to_dict()
         task_id = data.get('task_id')
-        
+
         if not task_id:
             return _err("task_id 参数不能为空")
-        
+
         task_info = media_tool_mgr.get_task(task_id)
         if not task_info:
             return _err("任务不存在")
-        
+
         return _ok(task_info)
-        
+
     except Exception as e:
         log.error(f"[MediaTool] 获取任务信息失败: {e}")
         return _err(f"获取任务信息失败: {str(e)}")
@@ -541,7 +542,7 @@ def list_all_tasks():
     try:
         tasks = media_tool_mgr.list_tasks()
         return _ok({"tasks": tasks})
-        
+
     except Exception as e:
         log.error(f"[MediaTool] 列出任务失败: {e}")
         return _err(f"列出任务失败: {str(e)}")
@@ -557,16 +558,16 @@ def delete_task():
     try:
         data = request.get_json() or request.form.to_dict()
         task_id = data.get('task_id')
-        
+
         if not task_id:
             return _err("task_id 参数不能为空")
-        
+
         code, msg = media_tool_mgr.delete_task(task_id)
         if code != 0:
             return _err(msg)
-        
+
         return _ok({"message": msg})
-        
+
     except Exception as e:
         log.error(f"[MediaTool] 删除任务失败: {e}")
         return _err(f"删除任务失败: {str(e)}")
@@ -581,23 +582,23 @@ def download_result():
     """
     try:
         task_id = request.args.get('task_id')
-        
+
         if not task_id:
             return _err("task_id 参数不能为空")
-        
+
         task_info = media_tool_mgr.get_task(task_id)
         if not task_info:
             return _err("任务不存在")
-        
+
         if task_info['status'] != 'success' or not task_info.get('result_file'):
             return _err("任务未完成或结果文件不存在")
-        
+
         result_file = task_info['result_file']
         if not os.path.exists(result_file):
             return _err("结果文件不存在")
-        
+
         return send_file(result_file, as_attachment=True, download_name='merged.mp3')
-        
+
     except Exception as e:
         log.error(f"[MediaTool] 下载文件失败: {e}")
         return _err(f"下载文件失败: {str(e)}")
@@ -615,50 +616,50 @@ def save_result():
         data = request.get_json() or request.form.to_dict()
         task_id = data.get('task_id')
         target_path = data.get('target_path')
-        
+
         if not task_id:
             return _err("task_id 参数不能为空")
-        
+
         if not target_path:
             return _err("target_path 参数不能为空")
-        
+
         # 验证目标路径
         normalized_path, error_msg = validate_and_normalize_path(target_path, must_be_file=False)
         if error_msg or not normalized_path:
             return _err(error_msg or "目标路径无效")
         target_path = normalized_path
-        
+
         if not os.path.exists(target_path):
             return _err(f"目标目录不存在: {target_path}")
-        
+
         if not os.path.isdir(target_path):
             return _err(f"目标路径不是目录: {target_path}")
-        
+
         # 获取任务信息
         task_info = media_tool_mgr.get_task(task_id)
         if not task_info:
             return _err("任务不存在")
-        
+
         if task_info['status'] != 'success' or not task_info.get('result_file'):
             return _err("任务未完成或结果文件不存在")
-        
+
         result_file = task_info['result_file']
         if not os.path.exists(result_file):
             return _err("结果文件不存在")
-        
+
         # 获取结果文件的扩展名，默认为 .mp3
         _, ext = os.path.splitext(result_file)
         ext = ext or '.mp3'
-        
+
         # 生成唯一的目标文件路径：task_id + 扩展名，如果已存在则添加序号
         target_file = _get_unique_filepath(target_path, task_id, ext)
-        
+
         # 复制文件到目标目录
         shutil.copy2(result_file, target_file)
         log.info(f"[MediaTool] 文件转存成功: {result_file} -> {target_file}")
-        
+
         return _ok({"target_file": target_file, "message": "转存成功"})
-        
+
     except Exception as e:
         log.error(f"[MediaTool] 转存文件失败: {e}")
         return _err(f"转存文件失败: {str(e)}")

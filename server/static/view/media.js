@@ -11,10 +11,12 @@ import {
   getFileName,
   getMediaFileUrl,
   getWeekdayIndex,
-  normalizeFiles
+  normalizeFiles,
+  logAndNoticeError
 } from "../js/utils.js";
 import { createCronBuilder } from "./common/cron_builder.js";
 import { createFileDialog } from "./common/file_dialog.js";
+import { createMediaPlayer } from "./common/media_player.js";
 const axios = window.axios;
 
 const { ref, watch, onMounted, onUnmounted, nextTick } = window.Vue;
@@ -32,11 +34,14 @@ async function createComponent() {
   const FileDialog = await createFileDialog();
   // 加载 Cron 生成器组件
   const CronBuilder = await createCronBuilder();
+  // 加载媒体播放器组件
+  const MediaPlayer = await createMediaPlayer();
 
   component = {
     components: {
       FileDialog,
       CronBuilder,
+      MediaPlayer,
     },
     setup() {
       const refData = {
@@ -216,8 +221,7 @@ async function createComponent() {
 
         refData.browserAudioPlayer.value = audio;
         audio.play().catch((error) => {
-          console.error("播放失败:", error);
-          ElMessage.error("播放失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "播放失败");
           refData.browserAudioPlayer.value = null;
           refData.browserPlayingFilePath.value = null;
         });
@@ -538,8 +542,7 @@ async function createComponent() {
           refData.fileBrowserDialogVisible.value = false;
           refData.replaceFileInfo.value = null; // 清除替换信息
         } catch (error) {
-          console.error("添加文件到播放列表失败:", error);
-          ElMessage.error("添加文件到播放列表失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "添加文件到播放列表失败");
           refData.replaceFileInfo.value = null; // 清除替换信息
         } finally {
           refData.playlistLoading.value = false;
@@ -661,8 +664,7 @@ async function createComponent() {
             throw new Error(response.msg || "保存播放列表集合失败");
           }
         } catch (error) {
-          console.error("保存播放列表集合失败:", error);
-          ElMessage.error("保存播放列表集合失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "保存播放列表集合失败");
         }
       };
 
@@ -806,8 +808,7 @@ async function createComponent() {
           }
           return true;
         } catch (error) {
-          console.error("更新播放列表失败:", error);
-          ElMessage.error("更新播放列表失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "更新播放列表失败");
           return false;
         }
       };
@@ -934,8 +935,7 @@ async function createComponent() {
             ElMessage.error(result.msg || "扫描 DLNA 设备失败");
           }
         } catch (error) {
-          console.error("扫描 DLNA 设备失败:", error);
-          ElMessage.error("扫描 DLNA 设备失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "扫描 DLNA 设备失败");
         } finally {
           refData.dlnaScanning.value = false;
         }
@@ -971,8 +971,7 @@ async function createComponent() {
             ElMessage.error(result.msg || "扫描小米设备失败");
           }
         } catch (error) {
-          console.error("扫描小米设备失败:", error);
-          ElMessage.error("扫描小米设备失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "扫描小米设备失败");
         } finally {
           refData.miScanning.value = false;
         }
@@ -1002,8 +1001,7 @@ async function createComponent() {
             ElMessage.error(result.msg || `获取设备 ${targetDevice.name || deviceId} 音量失败`);
           }
         } catch (error) {
-          console.error(`获取设备 ${deviceId} 音量失败:`, error);
-          ElMessage.error(`获取设备 ${targetDevice.name || deviceId} 音量失败: ${error.message || "未知错误"}`);
+          logAndNoticeError(error, `获取设备 ${targetDevice.name || deviceId} 音量失败`);
         } finally {
           targetDevice._volumeRefreshing = false;
         }
@@ -1041,8 +1039,7 @@ async function createComponent() {
             ElMessage.error(result.msg || "设置音量失败");
           }
         } catch (error) {
-          console.error("设置小米设备音量失败:", error);
-          ElMessage.error("设置音量失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "设置小米设备音量失败");
         } finally {
           device._volumeChanging = false;
         }
@@ -1075,8 +1072,7 @@ async function createComponent() {
             ElMessage.error(response.data.msg || "停止播放失败");
           }
         } catch (error) {
-          console.error("停止小米设备播放失败:", error);
-          ElMessage.error("停止播放失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "停止小米设备播放失败");
         } finally {
           device._stopping = false;
         }
@@ -1138,7 +1134,7 @@ async function createComponent() {
         } catch (error) {
           console.error("获取Agent设备列表失败:", error);
           if (showLoading) {
-            ElMessage.error("获取设备列表失败: " + (error.message || "未知错误"));
+            logAndNoticeError(error, "获取设备列表失败");
           }
           refData.agentList.value = [];
         } finally {
@@ -1169,8 +1165,7 @@ async function createComponent() {
             ElMessage.error(response.data?.msg || `测试按钮 ${key} 失败`);
           }
         } catch (error) {
-          console.error(`测试按钮 ${key} 失败:`, error);
-          ElMessage.error(`测试按钮 ${key} 失败: ` + (error.message || "未知错误"));
+          logAndNoticeError(error, `测试按钮 ${key} 失败`);
         } finally {
           // 清除loading状态
           const device = refData.agentList.value.find(d => d.agent_id === agentId);
@@ -1273,7 +1268,7 @@ async function createComponent() {
             ElMessage.warning("无法解析 Cron 表达式");
           }
         } catch (error) {
-          ElMessage.error("预览失败: " + error.message);
+          logAndNoticeError(error, "预览失败");
         }
       };
 
@@ -1449,8 +1444,7 @@ async function createComponent() {
 
           ElMessage.success("开始播放");
         } catch (error) {
-          console.error("播放失败:", error);
-          ElMessage.error("播放失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "播放失败");
         } finally {
           refData.playing.value = false;
         }
@@ -1476,8 +1470,7 @@ async function createComponent() {
 
           ElMessage.success("已切换到下一首");
         } catch (error) {
-          console.error("播放下一首失败:", error);
-          ElMessage.error("播放下一首失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "播放下一首失败");
         } finally {
           refData.playing.value = false;
         }
@@ -1506,8 +1499,7 @@ async function createComponent() {
 
           ElMessage.success("已切换到上一首");
         } catch (error) {
-          console.error("播放上一首失败:", error);
-          ElMessage.error("播放上一首失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "播放上一首失败");
         } finally {
           refData.playing.value = false;
         }
@@ -1529,8 +1521,7 @@ async function createComponent() {
 
           ElMessage.success("已停止播放");
         } catch (error) {
-          console.error("停止播放列表失败:", error);
-          ElMessage.error("停止播放列表失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "停止播放列表失败");
         } finally {
           refData.stopping.value = false;
         }
@@ -1556,8 +1547,7 @@ async function createComponent() {
           });
           ElMessage.success("已上移");
         } catch (error) {
-          console.error("上移失败:", error);
-          ElMessage.error("上移失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "上移失败");
         } finally {
           refData.playlistLoading.value = false;
         }
@@ -1583,8 +1573,7 @@ async function createComponent() {
           });
           ElMessage.success("已下移");
         } catch (error) {
-          console.error("下移失败:", error);
-          ElMessage.error("下移失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "下移失败");
         } finally {
           refData.playlistLoading.value = false;
         }
@@ -1623,8 +1612,7 @@ async function createComponent() {
           ElMessage.success("已删除");
         } catch (error) {
           if (error !== "cancel") {
-            console.error("删除失败:", error);
-            ElMessage.error("删除失败: " + (error.message || "未知错误"));
+            logAndNoticeError(error, "删除失败");
           }
         } finally {
           refData.playlistLoading.value = false;
@@ -1690,8 +1678,7 @@ async function createComponent() {
           ElMessage.success("已清空播放列表（包括前置文件和正式文件）");
         } catch (error) {
           if (error !== "cancel") {
-            console.error("清空失败:", error);
-            ElMessage.error("清空失败: " + (error.message || "未知错误"));
+            logAndNoticeError(error, "清空失败");
           }
         } finally {
           refData.playlistLoading.value = false;
@@ -1729,8 +1716,7 @@ async function createComponent() {
           ElMessage.success("已删除");
         } catch (error) {
           if (error !== "cancel") {
-            console.error("删除失败:", error);
-            ElMessage.error("删除失败: " + (error.message || "未知错误"));
+            logAndNoticeError(error, "删除失败");
           }
         } finally {
           refData.playlistLoading.value = false;
@@ -1767,8 +1753,7 @@ async function createComponent() {
           ElMessage.success("已清空前置文件列表");
         } catch (error) {
           if (error !== "cancel") {
-            console.error("清空失败:", error);
-            ElMessage.error("清空失败: " + (error.message || "未知错误"));
+            logAndNoticeError(error, "清空失败");
           }
         } finally {
           refData.playlistLoading.value = false;
@@ -1801,8 +1786,7 @@ async function createComponent() {
           ElMessage.success("已清空正式文件列表");
         } catch (error) {
           if (error !== "cancel") {
-            console.error("清空失败:", error);
-            ElMessage.error("清空失败: " + (error.message || "未知错误"));
+            logAndNoticeError(error, "清空失败");
           }
         } finally {
           refData.playlistLoading.value = false;
@@ -1829,8 +1813,7 @@ async function createComponent() {
             return playlistInfo;
           });
         } catch (error) {
-          console.error("上移失败:", error);
-          ElMessage.error("上移失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "上移失败");
         } finally {
           refData.playlistLoading.value = false;
         }
@@ -1871,8 +1854,7 @@ async function createComponent() {
             return playlistInfo;
           });
         } catch (error) {
-          console.error("下移失败:", error);
-          ElMessage.error("下移失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "下移失败");
         } finally {
           refData.playlistLoading.value = false;
         }
@@ -1948,8 +1930,7 @@ async function createComponent() {
             ElMessage.success("已取消排序");
           }
         } catch (error) {
-          console.error("排序失败:", error);
-          ElMessage.error("排序失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "排序失败");
         } finally {
           refData.playlistLoading.value = false;
         }
@@ -2017,8 +1998,7 @@ async function createComponent() {
             ElMessage.success("已取消排序");
           }
         } catch (error) {
-          console.error("排序失败:", error);
-          ElMessage.error("排序失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "排序失败");
         } finally {
           refData.playlistLoading.value = false;
         }
@@ -2082,8 +2062,7 @@ async function createComponent() {
                 });
                 ElMessage.success("排序已保存");
               } catch (error) {
-                console.error("保存排序失败:", error);
-                ElMessage.error("保存排序失败: " + (error.message || "未知错误"));
+                logAndNoticeError(error, "保存排序失败");
               } finally {
                 refData.playlistLoading.value = false;
               }
@@ -2122,8 +2101,7 @@ async function createComponent() {
                 });
                 ElMessage.success("排序已保存");
               } catch (error) {
-                console.error("保存排序失败:", error);
-                ElMessage.error("保存排序失败: " + (error.message || "未知错误"));
+                logAndNoticeError(error, "保存排序失败");
               } finally {
                 refData.playlistLoading.value = false;
               }
@@ -2161,9 +2139,7 @@ async function createComponent() {
       const handlePreFileDragEnd = (event) => {
         if (event.currentTarget) {
           // 清除所有拖拽相关的样式
-          event.currentTarget.style.backgroundColor = '';
-          event.currentTarget.style.borderTop = '';
-          event.currentTarget.style.borderBottom = '';
+          event.currentTarget.classList.remove('bg-gray-100', 'border-t-2', 'border-b-2', 'border-blue-500');
         }
       };
 
@@ -2181,17 +2157,15 @@ async function createComponent() {
           const elementCenterY = rect.top + rect.height / 2;
 
           // 清除之前的样式
-          event.currentTarget.style.backgroundColor = '';
-          event.currentTarget.style.borderTop = '';
-          event.currentTarget.style.borderBottom = '';
+          event.currentTarget.classList.remove('bg-gray-100', 'border-t-2', 'border-b-2', 'border-blue-500');
 
           // 根据鼠标位置决定插入位置（上方或下方）
           if (mouseY < elementCenterY) {
             // 插入到上方
-            event.currentTarget.style.borderTop = '2px solid #3b82f6';
+            event.currentTarget.classList.add('border-t-2', 'border-blue-500');
           } else {
             // 插入到下方
-            event.currentTarget.style.borderBottom = '2px solid #3b82f6';
+            event.currentTarget.classList.add('border-b-2', 'border-blue-500');
           }
         }
       };
@@ -2204,9 +2178,7 @@ async function createComponent() {
         event.preventDefault();
         // 清除所有拖拽相关的样式
         if (event.currentTarget) {
-          event.currentTarget.style.backgroundColor = '';
-          event.currentTarget.style.borderTop = '';
-          event.currentTarget.style.borderBottom = '';
+          event.currentTarget.classList.remove('bg-gray-100', 'border-t-2', 'border-b-2', 'border-blue-500');
         }
 
         const sourceIndex = parseInt(event.dataTransfer.getData('text/plain'), 10);
@@ -2286,9 +2258,7 @@ async function createComponent() {
       const handleFileDragEnd = (event) => {
         if (event.currentTarget) {
           // 清除所有拖拽相关的样式
-          event.currentTarget.style.backgroundColor = '';
-          event.currentTarget.style.borderTop = '';
-          event.currentTarget.style.borderBottom = '';
+          event.currentTarget.classList.remove('bg-gray-100', 'border-t-2', 'border-b-2', 'border-blue-500');
         }
       };
 
@@ -2306,17 +2276,15 @@ async function createComponent() {
           const elementCenterY = rect.top + rect.height / 2;
 
           // 清除之前的样式
-          event.currentTarget.style.backgroundColor = '';
-          event.currentTarget.style.borderTop = '';
-          event.currentTarget.style.borderBottom = '';
+          event.currentTarget.classList.remove('bg-gray-100', 'border-t-2', 'border-b-2', 'border-blue-500');
 
           // 根据鼠标位置决定插入位置（上方或下方）
           if (mouseY < elementCenterY) {
             // 插入到上方
-            event.currentTarget.style.borderTop = '2px solid #3b82f6';
+            event.currentTarget.classList.add('border-t-2', 'border-blue-500');
           } else {
             // 插入到下方
-            event.currentTarget.style.borderBottom = '2px solid #3b82f6';
+            event.currentTarget.classList.add('border-b-2', 'border-blue-500');
           }
         }
       };
@@ -2329,9 +2297,7 @@ async function createComponent() {
         event.preventDefault();
         // 清除所有拖拽相关的样式
         if (event.currentTarget) {
-          event.currentTarget.style.backgroundColor = '';
-          event.currentTarget.style.borderTop = '';
-          event.currentTarget.style.borderBottom = '';
+          event.currentTarget.classList.remove('bg-gray-100', 'border-t-2', 'border-b-2', 'border-blue-500');
         }
 
         const sourceIndex = parseInt(event.dataTransfer.getData('text/plain'), 10);
@@ -2433,8 +2399,7 @@ async function createComponent() {
           refData.editingPlaylistId.value = null;
           ElMessage.success("播放列表名称已更新");
         } catch (error) {
-          console.error("更新播放列表名称失败:", error);
-          ElMessage.error("更新播放列表名称失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "更新播放列表名称失败");
         }
       };
 
@@ -2501,8 +2466,7 @@ async function createComponent() {
           ElMessage.success("播放列表已创建");
         } catch (error) {
           if (error === "cancel") return;
-          console.error("创建播放列表失败:", error);
-          ElMessage.error("创建播放列表失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "创建播放列表失败");
         }
       };
 
@@ -2557,8 +2521,7 @@ async function createComponent() {
           ElMessage.success("播放列表已复制");
         } catch (error) {
           if (error === "cancel") return;
-          console.error("复制播放列表失败:", error);
-          ElMessage.error("复制播放列表失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "复制播放列表失败");
         }
       };
 
@@ -2597,8 +2560,7 @@ async function createComponent() {
           ElMessage.success("播放列表已删除");
         } catch (error) {
           if (error === "cancel") return;
-          console.error("删除播放列表失败:", error);
-          ElMessage.error("删除播放列表失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "删除播放列表失败");
         }
       };
 

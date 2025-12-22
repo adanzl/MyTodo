@@ -1,6 +1,7 @@
 import { getApiUrl } from "../js/net_util.js";
-import { formatSize, formatDuration, getMediaFileUrl as getMediaFileUrlUtil } from "../js/utils.js";
+import { formatSize, formatDuration, getMediaFileUrl, logAndNoticeError } from "../js/utils.js";
 import { createFileDialog } from "./common/file_dialog.js";
+import { createMediaPlayer } from "./common/media_player.js";
 const axios = window.axios;
 
 const { ref, onMounted, onUnmounted } = window.Vue;
@@ -15,18 +16,21 @@ async function loadTemplate() {
 async function createComponent() {
   if (component) return component;
   const template = await loadTemplate();
-  
+
   // 加载文件对话框组件
   const FileDialog = await createFileDialog();
-  
+  // 加载媒体播放器组件
+  const MediaPlayer = await createMediaPlayer();
+
   component = {
     components: {
       FileDialog,
+      MediaPlayer,
     },
     setup() {
       // 主页签控制
       const activeMainTab = ref('pdf_tool');
-      
+
       // PDF 工具相关状态
       const pdfLoading = ref(false);
       const pdfFileList = ref([]);
@@ -44,11 +48,33 @@ async function createComponent() {
       const mediaAudioPlayer = ref(null);
       const mediaPlayingFileIndex = ref(null);
       const mediaIsPlaying = ref(false);
-      const mediaResultAudioPlayer = ref(null);
-      const mediaIsPlayingResult = ref(false);
+      // 统一的播放器相关状态（用于文件列表和结果文件）
+      const mediaPlayingFilePath = ref(null); // 当前正在播放的文件路径（文件路径或 'result' 表示结果文件）
+      const mediaPlayProgress = ref(0); // 播放进度（0-100）
+      const mediaDuration = ref(0); // 音频总时长（秒）
+
+      // ========== 工具函数 ==========
+
+      // 拖拽样式类名常量
+      const DRAG_STYLE_CLASSES = ['bg-gray-100', 'border-t-2', 'border-b-2', 'border-blue-500'];
+
+      // 清除拖拽样式
+      const clearDragStyles = (element) => {
+        if (element) {
+          element.classList.remove(...DRAG_STYLE_CLASSES);
+        }
+      };
+
+      // 清除所有拖拽项的样式
+      const clearAllDragStyles = (parentElement) => {
+        if (!parentElement) return;
+        const allItems = parentElement.querySelectorAll('[draggable="true"]');
+        allItems.forEach(item => clearDragStyles(item));
+      };
+
 
       // ========== PDF 工具相关方法 ==========
-      
+
       // 获取 PDF 文件列表
       const loadPdfFileList = async () => {
         try {
@@ -65,8 +91,7 @@ async function createComponent() {
             ElMessage.error(response.data.msg || "获取文件列表失败");
           }
         } catch (error) {
-          console.error("获取文件列表失败:", error);
-          ElMessage.error("获取文件列表失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "获取文件列表失败");
         } finally {
           pdfLoading.value = false;
         }
@@ -111,8 +136,7 @@ async function createComponent() {
             ElMessage.error(response.data.msg || "文件上传失败");
           }
         } catch (error) {
-          console.error("文件上传失败:", error);
-          ElMessage.error("文件上传失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "文件上传失败");
         } finally {
           pdfLoading.value = false;
         }
@@ -144,11 +168,11 @@ async function createComponent() {
 
         try {
           item._decrypting = true;
-          
+
           const requestData = {
             filename: item.uploaded.name,
           };
-          
+
           if (item._password !== undefined && item._password !== null) {
             requestData.password = item._password;
           }
@@ -167,8 +191,7 @@ async function createComponent() {
             }
           }
         } catch (error) {
-          console.error("文件解密失败:", error);
-          ElMessage.error("文件解密失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "文件解密失败");
         } finally {
           item._decrypting = false;
         }
@@ -185,8 +208,7 @@ async function createComponent() {
           const url = `${getApiUrl()}/pdf/download/${encodeURIComponent(item[type].name)}?type=${type}`;
           window.open(url, '_blank');
         } catch (error) {
-          console.error("下载文件失败:", error);
-          ElMessage.error("下载文件失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "下载文件失败");
         }
       };
 
@@ -223,20 +245,14 @@ async function createComponent() {
             ElMessage.error(response.data.msg || "文件删除失败");
           }
         } catch (error) {
-          console.error("删除文件失败:", error);
-          ElMessage.error("删除文件失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "删除文件失败");
         } finally {
           pdfLoading.value = false;
         }
       };
 
-      // 格式化 PDF 文件大小
-      const formatPdfFileSize = (bytes) => {
-        if (!bytes) return '-';
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
-        return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-      };
+      // 格式化 PDF 文件大小（使用统一的 formatSize 函数）
+      const formatPdfFileSize = formatSize;
 
       // 格式化 PDF 时间
       const formatPdfTime = (timestamp) => {
@@ -247,17 +263,17 @@ async function createComponent() {
       // ========== 媒体工具相关方法 ==========
       // 这里需要将 media_tool.js 中的所有方法复制过来
       // 为了简化，我会创建一个辅助函数来加载媒体工具的逻辑
-      
+
       // 处理媒体工具文件选择确认
       const handleMediaFileBrowserConfirm = async (filePaths) => {
         if (!mediaCurrentTask.value) {
           return;
         }
-        
+
         if (filePaths.length === 0) {
           return;
         }
-        
+
         try {
           mediaLoading.value = true;
           for (const filePath of filePaths) {
@@ -265,18 +281,17 @@ async function createComponent() {
               task_id: mediaCurrentTask.value.task_id,
               file_path: filePath
             });
-            
+
             if (response.data.code !== 0) {
               ElMessage.error(`添加文件失败: ${response.data.msg || "未知错误"}`);
               break;
             }
           }
-          
+
           ElMessage.success(`成功添加 ${filePaths.length} 个文件`);
           await handleMediaViewTask(mediaCurrentTask.value.task_id);
         } catch (error) {
-          console.error("添加文件失败:", error);
-          ElMessage.error("添加文件失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "添加文件失败");
         } finally {
           mediaLoading.value = false;
         }
@@ -296,8 +311,7 @@ async function createComponent() {
             ElMessage.error(response.data.msg || "获取任务列表失败");
           }
         } catch (error) {
-          console.error("获取任务列表失败:", error);
-          ElMessage.error("获取任务列表失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "获取任务列表失败");
         } finally {
           mediaLoading.value = false;
         }
@@ -317,8 +331,7 @@ async function createComponent() {
             ElMessage.error(response.data.msg || "创建任务失败");
           }
         } catch (error) {
-          console.error("创建任务失败:", error);
-          ElMessage.error("创建任务失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "创建任务失败");
         } finally {
           mediaLoading.value = false;
         }
@@ -340,8 +353,7 @@ async function createComponent() {
             ElMessage.error(response.data.msg || "获取任务信息失败");
           }
         } catch (error) {
-          console.error("获取任务信息失败:", error);
-          ElMessage.error("获取任务信息失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "获取任务信息失败");
         } finally {
           mediaLoading.value = false;
         }
@@ -380,8 +392,7 @@ async function createComponent() {
             ElMessage.error(response.data.msg || "删除任务失败");
           }
         } catch (error) {
-          console.error("删除任务失败:", error);
-          ElMessage.error("删除任务失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "删除任务失败");
         } finally {
           mediaLoading.value = false;
         }
@@ -435,8 +446,7 @@ async function createComponent() {
             ElMessage.error(response.data.msg || "删除文件失败");
           }
         } catch (error) {
-          console.error("删除文件失败:", error);
-          ElMessage.error("删除文件失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "删除文件失败");
         } finally {
           mediaLoading.value = false;
         }
@@ -477,8 +487,7 @@ async function createComponent() {
             ElMessage.error(response.data.msg || "启动任务失败");
           }
         } catch (error) {
-          console.error("启动任务失败:", error);
-          ElMessage.error("启动任务失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "启动任务失败");
         } finally {
           mediaLoading.value = false;
         }
@@ -503,26 +512,109 @@ async function createComponent() {
         }, 2000);
       };
 
+      // 下载媒体结果（通用函数）
+      const downloadMediaResult = (taskId) => {
+        if (!taskId) return;
+        const url = `${getApiUrl()}/media/task/download?task_id=${taskId}`;
+        window.open(url, '_blank');
+      };
+
       // 下载媒体结果
       const handleMediaDownloadResult = () => {
-        if (!mediaCurrentTask.value || !mediaCurrentTask.value.result_file) {
-          return;
-        }
-        const url = `${getApiUrl()}/media/task/download?task_id=${mediaCurrentTask.value.task_id}`;
-        window.open(url, '_blank');
+        if (!mediaCurrentTask.value?.result_file) return;
+        downloadMediaResult(mediaCurrentTask.value.task_id);
       };
 
       // 从任务列表下载媒体结果
       const handleMediaDownloadResultFromList = (task) => {
-        if (!task || !task.result_file) {
-          return;
-        }
-        const url = `${getApiUrl()}/media/task/download?task_id=${task.task_id}`;
-        window.open(url, '_blank');
+        if (!task?.result_file) return;
+        downloadMediaResult(task.task_id);
       };
 
-      // 获取媒体文件 URL
-      const getMediaFileUrl = (filePath) => getMediaFileUrlUtil(filePath, getApiUrl);
+      // 清理浏览器音频播放器状态（统一清理所有播放）
+      const clearBrowserAudioPlayer = () => {
+        if (mediaAudioPlayer.value) {
+          mediaAudioPlayer.value.pause();
+          mediaAudioPlayer.value = null;
+        }
+        mediaPlayingFilePath.value = null;
+        mediaPlayProgress.value = 0;
+        mediaDuration.value = 0;
+        mediaIsPlaying.value = false;
+        mediaPlayingFileIndex.value = null;
+      };
+
+      // 检查文件是否正在播放（支持文件列表和结果文件）
+      const isFilePlaying = (fileItem) => {
+        if (!fileItem) {
+          // 检查结果文件
+          return mediaPlayingFilePath.value === 'result' &&
+            mediaAudioPlayer.value &&
+            !mediaAudioPlayer.value.paused;
+        }
+        const filePath = fileItem?.path || fileItem?.name || '';
+        return mediaPlayingFilePath.value === filePath &&
+          mediaAudioPlayer.value &&
+          !mediaAudioPlayer.value.paused;
+      };
+
+      // 获取文件播放进度（支持文件列表和结果文件）
+      const getFilePlayProgress = (fileItem) => {
+        if (!fileItem) {
+          // 结果文件
+          if (mediaPlayingFilePath.value === 'result' && mediaAudioPlayer.value) {
+            return mediaPlayProgress.value;
+          }
+          return 0;
+        }
+        const filePath = fileItem?.path || fileItem?.name || '';
+        if (mediaPlayingFilePath.value === filePath && mediaAudioPlayer.value) {
+          return mediaPlayProgress.value;
+        }
+        return 0;
+      };
+
+      // 获取文件时长（支持文件列表和结果文件）
+      const getFileDuration = (fileItem) => {
+        if (!fileItem) {
+          // 结果文件
+          if (mediaPlayingFilePath.value === 'result') {
+            return mediaDuration.value;
+          }
+          return 0;
+        }
+        const filePath = fileItem?.path || fileItem?.name || '';
+        if (mediaPlayingFilePath.value === filePath) {
+          return mediaDuration.value;
+        }
+        // 如果文件不在播放，尝试使用文件本身的duration属性
+        return fileItem?.duration || 0;
+      };
+
+      // 处理进度条拖拽（支持文件列表和结果文件）
+      const handleSeekFile = (fileItem, percentage) => {
+        if (!mediaAudioPlayer.value) return;
+
+        const audio = mediaAudioPlayer.value;
+        if (audio.duration > 0 && isFinite(audio.duration) && isFinite(percentage)) {
+          // 检查是否是当前播放的文件
+          let isCurrentFile = false;
+          if (!fileItem) {
+            // 结果文件
+            isCurrentFile = mediaPlayingFilePath.value === 'result';
+          } else {
+            const filePath = fileItem?.path || fileItem?.name || '';
+            isCurrentFile = mediaPlayingFilePath.value === filePath;
+          }
+
+          if (isCurrentFile) {
+            const targetTime = (percentage / 100) * audio.duration;
+            audio.currentTime = Math.max(0, Math.min(targetTime, audio.duration));
+            // 立即更新显示
+            mediaPlayProgress.value = percentage;
+          }
+        }
+      };
 
       // 播放/暂停媒体文件
       const handleMediaTogglePlayFile = (index) => {
@@ -531,121 +623,166 @@ async function createComponent() {
         }
 
         const file = mediaCurrentTask.value.files[index];
-        if (!file.path) {
+        const filePath = file.path || file.name || '';
+        if (!filePath) {
           ElMessage.warning("文件路径不存在");
           return;
         }
 
-        if (mediaPlayingFileIndex.value === index && mediaAudioPlayer.value) {
-          if (mediaIsPlaying.value) {
-            mediaAudioPlayer.value.pause();
-            mediaIsPlaying.value = false;
-          } else {
-            mediaAudioPlayer.value.play();
-            mediaIsPlaying.value = true;
-          }
+        // 如果点击的是正在播放的文件，则停止播放
+        if (mediaPlayingFilePath.value === filePath && mediaAudioPlayer.value && !mediaAudioPlayer.value.paused) {
+          clearBrowserAudioPlayer();
+          ElMessage.info("已停止播放");
           return;
         }
 
+        // 如果已有播放器正在播放（文件列表或结果文件），先停止
         if (mediaAudioPlayer.value) {
-          mediaAudioPlayer.value.pause();
-          mediaAudioPlayer.value = null;
+          clearBrowserAudioPlayer();
         }
 
-        const audioUrl = getMediaFileUrl(file.path);
+        const audioUrl = getMediaFileUrl(filePath, getApiUrl);
+        if (!audioUrl) {
+          ElMessage.error("无法生成媒体文件URL");
+          return;
+        }
         const audio = new Audio(audioUrl);
-        
+
         audio.addEventListener('play', () => {
+          mediaPlayingFilePath.value = filePath;
           mediaIsPlaying.value = true;
           mediaPlayingFileIndex.value = index;
+          ElMessage.success("开始播放");
         });
-        
+
+        audio.addEventListener('loadedmetadata', () => {
+          if (audio.duration > 0 && isFinite(audio.duration)) {
+            mediaDuration.value = audio.duration;
+          }
+        });
+
+        audio.addEventListener('loadeddata', () => {
+          if (audio.duration > 0 && isFinite(audio.duration)) {
+            mediaDuration.value = audio.duration;
+          }
+        });
+
+        audio.addEventListener('timeupdate', () => {
+          if (audio.duration > 0 && isFinite(audio.duration)) {
+            if (mediaDuration.value === 0 || mediaDuration.value !== audio.duration) {
+              mediaDuration.value = audio.duration;
+            }
+            mediaPlayProgress.value = (audio.currentTime / audio.duration) * 100;
+          }
+        });
+
         audio.addEventListener('pause', () => {
-          mediaIsPlaying.value = false;
+          if (audio.ended) {
+            clearBrowserAudioPlayer();
+          }
         });
-        
-        audio.addEventListener('ended', () => {
-          mediaIsPlaying.value = false;
-          mediaPlayingFileIndex.value = null;
-          mediaAudioPlayer.value = null;
-        });
-        
+
         audio.addEventListener('error', (e) => {
-          console.error("音频播放失败:", e);
+          console.error("音频播放失败:", e, "URL:", audioUrl);
           ElMessage.error("音频播放失败");
+          clearBrowserAudioPlayer();
           mediaIsPlaying.value = false;
           mediaPlayingFileIndex.value = null;
-          mediaAudioPlayer.value = null;
+        });
+
+        audio.addEventListener('ended', () => {
+          clearBrowserAudioPlayer();
+          mediaIsPlaying.value = false;
+          mediaPlayingFileIndex.value = null;
         });
 
         mediaAudioPlayer.value = audio;
-        audio.play();
+        audio.play().catch((error) => {
+          logAndNoticeError(error, "播放失败");
+          clearBrowserAudioPlayer();
+          mediaIsPlaying.value = false;
+          mediaPlayingFileIndex.value = null;
+        });
       };
 
-      // 停止媒体播放
+      // 停止媒体播放（统一清理所有播放）
       const handleMediaStopPlay = () => {
-        if (mediaAudioPlayer.value) {
-          mediaAudioPlayer.value.pause();
-          mediaAudioPlayer.value.currentTime = 0;
-          mediaAudioPlayer.value = null;
-        }
-        mediaIsPlaying.value = false;
-        mediaPlayingFileIndex.value = null;
-        
-        if (mediaResultAudioPlayer.value) {
-          mediaResultAudioPlayer.value.pause();
-          mediaResultAudioPlayer.value.currentTime = 0;
-          mediaResultAudioPlayer.value = null;
-        }
-        mediaIsPlayingResult.value = false;
+        clearBrowserAudioPlayer();
       };
 
-      // 播放/暂停媒体结果文件
+      // 播放/暂停媒体结果文件（使用统一的播放器）
       const handleMediaTogglePlayResult = () => {
         if (!mediaCurrentTask.value || !mediaCurrentTask.value.result_file) {
           ElMessage.warning("结果文件不存在");
           return;
         }
 
-        if (mediaResultAudioPlayer.value && mediaIsPlayingResult.value) {
-          mediaResultAudioPlayer.value.pause();
-          mediaIsPlayingResult.value = false;
+        // 如果点击的是正在播放的结果文件，则停止播放
+        if (mediaPlayingFilePath.value === 'result' && mediaAudioPlayer.value && !mediaAudioPlayer.value.paused) {
+          clearBrowserAudioPlayer();
+          ElMessage.info("已停止播放");
           return;
         }
 
+        // 如果已有播放器正在播放（文件列表或结果文件），先停止
         if (mediaAudioPlayer.value) {
-          mediaAudioPlayer.value.pause();
-          mediaAudioPlayer.value.currentTime = 0;
-          mediaAudioPlayer.value = null;
+          clearBrowserAudioPlayer();
         }
-        mediaIsPlaying.value = false;
-        mediaPlayingFileIndex.value = null;
 
-        const audioUrl = getMediaFileUrl(mediaCurrentTask.value.result_file);
+        const audioUrl = getMediaFileUrl(mediaCurrentTask.value.result_file, getApiUrl);
+        if (!audioUrl) {
+          ElMessage.error("无法生成媒体文件URL");
+          return;
+        }
         const audio = new Audio(audioUrl);
-        
+
         audio.addEventListener('play', () => {
-          mediaIsPlayingResult.value = true;
-        });
-        
-        audio.addEventListener('pause', () => {
-          mediaIsPlayingResult.value = false;
-        });
-        
-        audio.addEventListener('ended', () => {
-          mediaIsPlayingResult.value = false;
-          mediaResultAudioPlayer.value = null;
-        });
-        
-        audio.addEventListener('error', (e) => {
-          console.error("音频播放失败:", e);
-          ElMessage.error("音频播放失败");
-          mediaIsPlayingResult.value = false;
-          mediaResultAudioPlayer.value = null;
+          mediaPlayingFilePath.value = 'result';
+          ElMessage.success("开始播放");
         });
 
-        mediaResultAudioPlayer.value = audio;
-        audio.play();
+        audio.addEventListener('loadedmetadata', () => {
+          if (audio.duration > 0 && isFinite(audio.duration)) {
+            mediaDuration.value = audio.duration;
+          }
+        });
+
+        audio.addEventListener('loadeddata', () => {
+          if (audio.duration > 0 && isFinite(audio.duration)) {
+            mediaDuration.value = audio.duration;
+          }
+        });
+
+        audio.addEventListener('timeupdate', () => {
+          if (audio.duration > 0 && isFinite(audio.duration)) {
+            if (mediaDuration.value === 0 || mediaDuration.value !== audio.duration) {
+              mediaDuration.value = audio.duration;
+            }
+            mediaPlayProgress.value = (audio.currentTime / audio.duration) * 100;
+          }
+        });
+
+        audio.addEventListener('pause', () => {
+          if (audio.ended) {
+            clearBrowserAudioPlayer();
+          }
+        });
+
+        audio.addEventListener('error', (e) => {
+          console.error("结果文件播放失败:", e, "URL:", audioUrl);
+          ElMessage.error("结果文件播放失败");
+          clearBrowserAudioPlayer();
+        });
+
+        audio.addEventListener('ended', () => {
+          clearBrowserAudioPlayer();
+        });
+
+        mediaAudioPlayer.value = audio;
+        audio.play().catch((error) => {
+          logAndNoticeError(error, "播放失败");
+          clearBrowserAudioPlayer();
+        });
       };
 
       // 转存媒体结果文件
@@ -662,21 +799,21 @@ async function createComponent() {
         if (!mediaCurrentTask.value || !mediaCurrentTask.value.result_file) {
           return;
         }
-        
+
         if (filePaths.length === 0) {
           ElMessage.warning("请选择转存目录");
           return;
         }
-        
+
         const targetDir = filePaths[0];
-        
+
         try {
           mediaLoading.value = true;
           const response = await axios.post(`${getApiUrl()}/media/task/save`, {
             task_id: mediaCurrentTask.value.task_id,
             target_path: targetDir
           });
-          
+
           if (response.data.code === 0) {
             ElMessage.success("转存成功");
             mediaSaveResultDialogVisible.value = false;
@@ -684,41 +821,31 @@ async function createComponent() {
             ElMessage.error(response.data.msg || "转存失败");
           }
         } catch (error) {
-          console.error("转存失败:", error);
-          ElMessage.error("转存失败: " + (error.message || "未知错误"));
+          logAndNoticeError(error, "转存失败");
         } finally {
           mediaLoading.value = false;
         }
       };
 
-      // 格式化媒体文件大小
-      const formatMediaFileSize = (bytes) => {
-        if (!bytes) return '-';
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
-        return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+      // 格式化媒体文件大小（使用统一的 formatSize 函数）
+      const formatMediaFileSize = formatSize;
+
+      // 媒体状态映射
+      const MEDIA_STATUS_MAP = {
+        'pending': { tag: 'info', text: '等待中' },
+        'processing': { tag: 'warning', text: '处理中' },
+        'success': { tag: 'success', text: '成功' },
+        'failed': { tag: 'danger', text: '失败' }
       };
 
       // 获取媒体状态标签类型
       const getMediaStatusTagType = (status) => {
-        const statusMap = {
-          'pending': 'info',
-          'processing': 'warning',
-          'success': 'success',
-          'failed': 'danger'
-        };
-        return statusMap[status] || 'info';
+        return MEDIA_STATUS_MAP[status]?.tag || 'info';
       };
 
       // 获取媒体状态文本
       const getMediaStatusText = (status) => {
-        const statusMap = {
-          'pending': '等待中',
-          'processing': '处理中',
-          'success': '成功',
-          'failed': '失败'
-        };
-        return statusMap[status] || '未知';
+        return MEDIA_STATUS_MAP[status]?.text || '未知';
       };
 
       // 检查媒体文件顺序是否改变
@@ -726,14 +853,11 @@ async function createComponent() {
         if (!original || !current || original.length !== current.length) {
           return true;
         }
-        for (let i = 0; i < original.length; i++) {
-          const origPath = original[i]?.path || original[i]?.name;
+        return original.some((item, i) => {
+          const origPath = item?.path || item?.name;
           const currPath = current[i]?.path || current[i]?.name;
-          if (origPath !== currPath) {
-            return true;
-          }
-        }
-        return false;
+          return origPath !== currPath;
+        });
       };
 
       // 切换媒体文件拖拽排序模式
@@ -749,7 +873,7 @@ async function createComponent() {
                   task_id: mediaCurrentTask.value.task_id,
                   file_indices: fileIndices
                 });
-                
+
                 if (response.data.code === 0) {
                   ElMessage.success("排序已保存");
                   await handleMediaViewTask(mediaCurrentTask.value.task_id);
@@ -757,8 +881,7 @@ async function createComponent() {
                   ElMessage.error(response.data.msg || "保存排序失败");
                 }
               } catch (error) {
-                console.error("保存排序失败:", error);
-                ElMessage.error("保存排序失败: " + (error.message || "未知错误"));
+                logAndNoticeError(error, "保存排序失败");
               } finally {
                 mediaLoading.value = false;
               }
@@ -789,11 +912,7 @@ async function createComponent() {
 
       // 处理媒体文件拖拽结束
       const handleMediaFileDragEnd = (event) => {
-        if (event.currentTarget) {
-          event.currentTarget.style.backgroundColor = '';
-          event.currentTarget.style.borderTop = '';
-          event.currentTarget.style.borderBottom = '';
-        }
+        clearDragStyles(event.currentTarget);
       };
 
       // 处理媒体文件拖拽悬停
@@ -807,15 +926,13 @@ async function createComponent() {
           const rect = event.currentTarget.getBoundingClientRect();
           const mouseY = event.clientY;
           const elementCenterY = rect.top + rect.height / 2;
-          
-          event.currentTarget.style.backgroundColor = '';
-          event.currentTarget.style.borderTop = '';
-          event.currentTarget.style.borderBottom = '';
-          
+
+          clearDragStyles(event.currentTarget);
+
           if (mouseY < elementCenterY) {
-            event.currentTarget.style.borderTop = '2px solid #3b82f6';
+            event.currentTarget.classList.add('border-t-2', 'border-blue-500');
           } else {
-            event.currentTarget.style.borderBottom = '2px solid #3b82f6';
+            event.currentTarget.classList.add('border-b-2', 'border-blue-500');
           }
         }
       };
@@ -826,59 +943,33 @@ async function createComponent() {
           return;
         }
         event.preventDefault();
-        if (event.currentTarget) {
-          event.currentTarget.style.backgroundColor = '';
-          event.currentTarget.style.borderTop = '';
-          event.currentTarget.style.borderBottom = '';
-        }
-        
-        const allItems = event.currentTarget?.parentElement?.querySelectorAll('[draggable="true"]');
-        if (allItems) {
-          allItems.forEach(item => {
-            item.style.backgroundColor = '';
-            item.style.borderTop = '';
-            item.style.borderBottom = '';
-          });
-        }
-        
+        clearDragStyles(event.currentTarget);
+        clearAllDragStyles(event.currentTarget?.parentElement);
+
         const sourceIndex = parseInt(event.dataTransfer.getData('text/plain'), 10);
-        
+
         if (sourceIndex === targetIndex || isNaN(sourceIndex)) {
           return;
         }
 
-        if (!mediaCurrentTask.value || !mediaCurrentTask.value.files || 
-            sourceIndex < 0 || sourceIndex >= mediaCurrentTask.value.files.length ||
-            targetIndex < 0 || targetIndex >= mediaCurrentTask.value.files.length) {
+        if (!mediaCurrentTask.value || !mediaCurrentTask.value.files ||
+          sourceIndex < 0 || sourceIndex >= mediaCurrentTask.value.files.length ||
+          targetIndex < 0 || targetIndex >= mediaCurrentTask.value.files.length) {
           return;
         }
-        
-        let insertIndex = targetIndex;
-        if (event.currentTarget) {
-          const rect = event.currentTarget.getBoundingClientRect();
-          const mouseY = event.clientY;
-          const elementCenterY = rect.top + rect.height / 2;
-          
-          if (mouseY < elementCenterY) {
-            insertIndex = targetIndex;
-          } else {
-            insertIndex = targetIndex + 1;
-          }
-        }
-        
+
+        // 计算插入位置
+        const rect = event.currentTarget?.getBoundingClientRect();
+        const mouseY = event.clientY;
+        const elementCenterY = rect ? rect.top + rect.height / 2 : 0;
+        const insertIndex = mouseY < elementCenterY ? targetIndex : targetIndex + 1;
+
+        // 重新排序文件列表
         const list = [...(mediaCurrentTask.value.files || [])];
         const [removed] = list.splice(sourceIndex, 1);
-        
-        if (sourceIndex < insertIndex) {
-          insertIndex = insertIndex - 1;
-        }
-        
-        list.splice(insertIndex, 0, removed);
-        
-        list.forEach((file, index) => {
-          file.index = index;
-        });
-        
+        const adjustedIndex = sourceIndex < insertIndex ? insertIndex - 1 : insertIndex;
+        list.splice(adjustedIndex, 0, removed);
+
         mediaCurrentTask.value = {
           ...mediaCurrentTask.value,
           files: list
@@ -896,10 +987,6 @@ async function createComponent() {
 
       onUnmounted(() => {
         handleMediaStopPlay();
-        if (mediaResultAudioPlayer.value) {
-          mediaResultAudioPlayer.value.pause();
-          mediaResultAudioPlayer.value = null;
-        }
         if (mediaPollingTimer) {
           clearInterval(mediaPollingTimer);
           mediaPollingTimer = null;
@@ -919,7 +1006,7 @@ async function createComponent() {
         // 主页签
         activeMainTab,
         handleTabChange,
-        
+
         // PDF 工具
         pdfLoading,
         pdfFileList,
@@ -933,7 +1020,7 @@ async function createComponent() {
         handlePdfDelete,
         formatPdfFileSize,
         formatPdfTime,
-        
+
         // 音频合成
         mediaLoading,
         mediaTaskList,
@@ -944,7 +1031,6 @@ async function createComponent() {
         mediaFilesOriginalOrder,
         mediaPlayingFileIndex,
         mediaIsPlaying,
-        mediaIsPlayingResult,
         loadMediaTaskList,
         handleMediaCreateTask,
         handleMediaViewTask,
@@ -973,6 +1059,10 @@ async function createComponent() {
         handleMediaTogglePlayResult,
         handleMediaSaveResult,
         handleMediaSaveResultConfirm,
+        isFilePlaying,
+        getFilePlayProgress,
+        getFileDuration,
+        handleSeekFile,
       };
     },
     template,

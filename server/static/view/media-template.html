@@ -65,7 +65,7 @@
                     circle
                     class="!w-5 !h-5 !min-w-5 !p-0 text-xs"
                     title="更多">
-                    <span style="font-size: 16px; line-height: 1" class="mb-1">»</span>
+                    <span class="text-base leading-none mb-1">»</span>
                   </el-button>
                   <template #dropdown>
                     <el-dropdown-menu>
@@ -76,7 +76,7 @@
                         v-if="playlistCollection.length > 1"
                         command="delete"
                         divided>
-                        <span style="color: #f56c6c">删除</span>
+                        <span class="text-[#f56c6c]">删除</span>
                       </el-dropdown-item>
                     </el-dropdown-menu>
                   </template>
@@ -309,12 +309,12 @@
               :class="{ 
                 'bg-blue-50': playlistStatus.pre_index === index
               }"
-              :style="{ cursor: preFilesDragMode ? 'move' : 'default', userSelect: 'none' }"
+              :class="{ 'cursor-move': preFilesDragMode, 'cursor-default': !preFilesDragMode, 'select-none': true }"
               :draggable="preFilesDragMode"
               @dragstart="handlePreFileDragStart($event, index)"
               @dragend="handlePreFileDragEnd($event)"
               @dragover.prevent="handlePreFileDragOver($event)"
-              @dragleave="(e) => { if (e.currentTarget) { e.currentTarget.style.backgroundColor = ''; e.currentTarget.style.borderTop = ''; e.currentTarget.style.borderBottom = ''; } }"
+              @dragleave="(e) => { if (e.currentTarget) { e.currentTarget.classList.remove('bg-gray-100', 'border-t-2', 'border-b-2', 'border-blue-500'); } }"
               @drop.prevent="handlePreFileDrop($event, index)">
               <span class="text-xs text-gray-500 w-8">{{ index + 1 }}</span>
               <span
@@ -325,36 +325,15 @@
                 {{ file.uri.split('/').pop() }}
               </span>
               <div class="flex items-center gap-1 flex-shrink-0" @mousedown.stop @click.stop>
-                <div
-                  id="pre-player-slider"
-                  class="flex items-center gap-1.5 bg-gray-50 rounded border-gray-500 w-32 pr-1">
-                  <el-button
-                    type="plain"
-                    size="small"
-                    circle
-                    @click.stop="handlePlayFileInBrowser(file)"
-                    :disabled="playlistLoading"
-                    class="!w-6 !h-6 !p-0 flex-shrink-0 mr-1">
-                    <span v-if="isFilePlaying(file)">⏹</span>
-                    <el-icon v-else class="!w-3 !h-3"><Headset /></el-icon>
-                  </el-button>
-                  <el-slider
-                    :model-value="getFilePlayProgress(file)"
-                    :min="0"
-                    :max="100"
-                    :step="0.1"
-                    size="small"
-                    class="flex-1 min-width-[10px] player-slider"
-                    :show-tooltip="false"
-                    :disabled="!isFilePlaying(file)"
-                    @change="(val) => handleSeekFile(file, val)"
-                    @input="(val) => handleSeekFile(file, val)"
-                    @click.stop>
-                  </el-slider>
-                  <span class="text-xs text-gray-600 flex-shrink-0" class="min-width-[35px]">
-                    {{ formatDuration(getFileDuration(file)) }}
-                  </span>
-                </div>
+                <media-player
+                  :file="file"
+                  :is-playing="isFilePlaying(file)"
+                  :progress="getFilePlayProgress(file)"
+                  :duration="getFileDuration(file)"
+                  :disabled="playlistLoading"
+                  @play="handlePlayFileInBrowser(file)"
+                  @seek="(file, val) => handleSeekFile(file, val)">
+                </media-player>
                 <el-button
                   v-show="showMoreActions && !preFilesDragMode"
                   type="plain"
@@ -480,12 +459,12 @@
               :class="{ 
                 'bg-blue-50': index === playlistStatus.current_index
               }"
-              :style="{ cursor: filesDragMode ? 'move' : 'default', userSelect: 'none' }"
+              :class="{ 'cursor-move': filesDragMode, 'cursor-default': !filesDragMode, 'select-none': true }"
               :draggable="filesDragMode"
               @dragstart="handleFileDragStart($event, index)"
               @dragend="handleFileDragEnd($event)"
               @dragover.prevent="handleFileDragOver($event)"
-              @dragleave="(e) => { if (e.currentTarget) { e.currentTarget.style.backgroundColor = ''; e.currentTarget.style.borderTop = ''; e.currentTarget.style.borderBottom = ''; } }"
+              @dragleave="(e) => { if (e.currentTarget) { e.currentTarget.classList.remove('bg-gray-100', 'border-t-2', 'border-b-2', 'border-blue-500'); } }"
               @drop.prevent="handleFileDrop($event, index)">
               <span class="text-xs text-gray-500 w-8">{{ index + 1 }}</span>
               <span
@@ -494,36 +473,16 @@
                 :title="file.uri">
                 {{ file.uri.split('/').pop() }}
               </span>
-              <div class="flex items-center gap-1 flex-shrink-0" @mousedown.stop @click.stop\>
-                <div class="flex items-center gap-1.5 bg-gray-50 rounded border-gray-500 w-32 pr-1">
-                  <el-button
-                    type="plain"
-                    size="small"
-                    circle
-                    @click.stop="handlePlayFileInBrowser(file)"
-                    :disabled="playlistLoading"
-                    class="!w-6 !h-6 !p-0 flex-shrink-0 mr-1">
-                    <span v-if="isFilePlaying(file)">⏹</span>
-                    <el-icon v-else class="!w-3 !h-3"><Headset /></el-icon>
-                  </el-button>
-                  <el-slider
-                    :model-value="getFilePlayProgress(file)"
-                    :min="0"
-                    :max="100"
-                    :step="0.1"
-                    size="small"
-                    class="flex-1 min-width-[10px] player-slider"
-                    :show-tooltip="false"
-                    :disabled="!isFilePlaying(file)"
-                    @change="(val) => handleSeekFile(file, val)"
-                    @input="(val) => handleSeekFile(file, val)"
-                    @click.stop
-                    class="player-slider">
-                  </el-slider>
-                  <span class="text-xs text-gray-600 flex-shrink-0" class="min-width-[35px]">
-                    {{ formatDuration(getFileDuration(file)) }}
-                  </span>
-                </div>
+              <div class="flex items-center gap-1 flex-shrink-0" @mousedown.stop @click.stop>
+                <media-player
+                  :file="file"
+                  :is-playing="isFilePlaying(file)"
+                  :progress="getFilePlayProgress(file)"
+                  :duration="getFileDuration(file)"
+                  :disabled="playlistLoading"
+                  @play="handlePlayFileInBrowser(file)"
+                  @seek="(file, val) => handleSeekFile(file, val)">
+                </media-player>
                 <el-button
                   v-show="showMoreActions && !filesDragMode"
                   type="plain"
@@ -934,7 +893,7 @@
     @confirm="handleFileBrowserConfirm"
     @close="handleCloseFileBrowser">
     <template #footer-prepend>
-      <el-select v-model="fileBrowserTarget" size="small" style="width: 150px">
+      <el-select v-model="fileBrowserTarget" size="small" class="w-[150px]">
         <el-option label="添加到主列表" value="files"></el-option>
         <el-option label="添加到前置列表" value="pre_files"></el-option>
       </el-select>
@@ -1140,7 +1099,7 @@
                     :step="1"
                     :disabled="row._volumeChanging || row._volumeRefreshing || row.volume === undefined"
                     size="small"
-                    style="flex: 1; max-width: 200px">
+                    class="flex-1 max-w-[200px]">
                   </el-slider>
                 </div>
               </div>

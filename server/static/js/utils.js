@@ -3,6 +3,23 @@
  */
 
 /**
+ * 处理 API 错误
+ * @param {Error} error - 错误对象
+ * @param {string} defaultMessage - 默认错误消息
+ * @param {Object} options - 可选参数
+ * @param {string} options.context - 额外的上下文信息（用于 console.error）
+ */
+export function logAndNoticeError(error, defaultMessage, options = {}) {
+  const { context } = options;
+  const errorContext = context ? `${defaultMessage} (${context})` : defaultMessage;
+  console.error(errorContext, error);
+
+  const { ElMessage } = window.ElementPlus;
+  const errorMessage = error?.response?.data?.msg || error?.message || "未知错误";
+  ElMessage.error(`${defaultMessage}: ${errorMessage}`);
+}
+
+/**
  * 创建播放列表ID
  * @returns {string} 播放列表ID
  */

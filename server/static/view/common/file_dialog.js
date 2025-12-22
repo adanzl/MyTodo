@@ -3,7 +3,7 @@
  * 可复用的文件选择对话框
  */
 import { getApiUrl } from "../../js/net_util.js";
-import { formatSize } from "../../js/utils.js";
+import { formatSize, logAndNoticeError } from "../../js/utils.js";
 
 const axios = window.axios;
 const { ref, watch, computed } = window.Vue;
@@ -68,8 +68,7 @@ function createFileBrowser(options = {}) {
         ElMessage.error(rsp.data.msg || "获取文件列表失败");
       }
     } catch (error) {
-      console.error("获取文件列表失败:", error);
-      ElMessage.error("获取文件列表失败: " + (error.message || "未知错误"));
+      logAndNoticeError(error, "获取文件列表失败");
     } finally {
       fileBrowserLoading.value = false;
     }
@@ -169,11 +168,11 @@ function createFileBrowser(options = {}) {
       ElMessage.warning("请先选择要添加的文件");
       return;
     }
-    
+
     if (onFilesSelected && typeof onFilesSelected === "function") {
       onFilesSelected([...selectedFiles.value]);
     }
-    
+
     lastFileBrowserPath = fileBrowserPath.value;
     closeFileBrowser();
   };
@@ -186,7 +185,7 @@ function createFileBrowser(options = {}) {
     fileBrowserLoading,
     selectedFiles,
     fileBrowserCanNavigateUp,
-    
+
     // 方法
     openFileBrowser,
     closeFileBrowser,
@@ -212,7 +211,7 @@ async function loadTemplate() {
 
 export async function createFileDialog() {
   const template = await loadTemplate();
-  
+
   return {
     props: {
       visible: {
@@ -281,7 +280,7 @@ export async function createFileDialog() {
         // 获取 mode 值
         const modeValue = props.mode;
         const modeStr = String(modeValue || 'file').toLowerCase().trim();
-        
+
         if (modeStr === "directory") {
           // 目录模式：传递当前路径
           const currentPath = fileBrowser.fileBrowserPath.value || props.defaultPath || '/mnt/ext_base';

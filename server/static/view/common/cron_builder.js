@@ -2,7 +2,7 @@
  * Cron 表达式生成器组件
  * 可复用的 Cron 表达式可视化生成器
  */
-import { generateCronExpression, calculateNextCronTimes } from "../../js/utils.js";
+import { generateCronExpression, calculateNextCronTimes, logAndNoticeError } from "../../js/utils.js";
 
 const { ref, watch, nextTick } = window.Vue;
 const { ElMessage } = window.ElementPlus;
@@ -244,7 +244,7 @@ export async function createCronBuilder() {
                     const times = calculateNextCronTimes(cronExpr, 5);
                     emit("preview", times);
                 } catch (error) {
-                    ElMessage.error("预览失败: " + (error.message || "无效的 Cron 表达式"));
+                    logAndNoticeError(error, "预览失败");
                 }
             };
 
@@ -260,8 +260,7 @@ export async function createCronBuilder() {
                         }
                     });
                 } catch (error) {
-                    console.error("应用示例失败:", error);
-                    ElMessage.error("应用示例失败: " + error.message);
+                    logAndNoticeError(error, "应用示例失败");
                 }
             };
 

@@ -14,12 +14,12 @@ PDF_UNLOCK_DIR = os.path.join(PDF_BASE_DIR, 'unlock')
 
 # 媒体工具相关目录
 MEDIA_BASE_DIR = os.path.join(BASE_TMP_DIR, 'media')
-MEDIA_TASK_DIR = MEDIA_BASE_DIR  # 任务目录：/tmp/my_todo/media/{task_id}/
+# 任务目录：/tmp/my_todo/media/{task_id}/
 MEDIA_RESULT_DIR_SUFFIX = 'result'  # 结果目录后缀：{task_dir}/result/
 
 def get_media_task_dir(task_id: str) -> str:
     """获取媒体任务目录"""
-    return os.path.join(MEDIA_TASK_DIR, task_id)
+    return os.path.join(MEDIA_BASE_DIR, task_id)
 
 def get_media_task_result_dir(task_id: str) -> str:
     """获取媒体任务结果目录"""
