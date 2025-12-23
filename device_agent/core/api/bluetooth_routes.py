@@ -83,8 +83,27 @@ def bluetooth_get_paired():
     """
     try:
         log.info("===== [Bluetooth Get Paired Devices]")
-        devices = bluetooth_mgr.get_system_paired_devices()
+        devices = bluetooth_mgr.get_paired_devices()
         return _ok(data=devices)
+    except Exception as e:
+        log.error(e)
+        return _err(msg=f'error: {str(e)}')
+
+
+@bluetooth_bp.route("/bluetooth/info", methods=['GET'])
+def bluetooth_get_info():
+    """
+    获取指定蓝牙设备的信息
+    GET /bluetooth/info?address=XX:XX:XX:XX:XX:XX
+    """
+    try:
+        address = request.args.get('address')
+        if not address:
+            return _err(msg="address 参数是必需的")
+        
+        log.info(f"===== [Bluetooth Get Info] address={address}")
+        result = bluetooth_mgr.get_info(address)
+        return _convert_result(result)
     except Exception as e:
         log.error(e)
         return _err(msg=f'error: {str(e)}')
@@ -105,7 +124,7 @@ def bluetooth_get_default():
         # 尝试获取设备详细信息
         device_info = None
         try:
-            devices = bluetooth_mgr.get_system_paired_devices()
+            devices = bluetooth_mgr.get_paired_devices()
             device_info = next(
                 (d for d in devices if d.get('address', '').upper() == default_address.upper()),
                 None

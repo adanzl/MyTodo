@@ -17,7 +17,7 @@ if __name__ == "__main__":
     for device in devices:
         print(f"【{device['address']}】{device['name']}")
     # 测试获取系统已连接的设备
-    connected_devices = bluetooth_mgr.get_system_paired_devices()
+    connected_devices = bluetooth_mgr.get_paired_devices()
     print(f"Found {len(connected_devices)} connected devices")
     for device in connected_devices:
         print(f"【{device.get('address', 'N/A')}】{device.get('name', 'Unknown')}")

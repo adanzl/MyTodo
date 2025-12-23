@@ -3,17 +3,17 @@
 '''
 import asyncio
 import os
-from typing import Dict, List, Optional
-
-from core.log_config import root_logger
-from core.utils import find_command, run_async, run_subprocess_safe
-
-log = root_logger()
+import re
+from typing import Dict, List, Optional, Any
 
 from bleak import BleakClient, BleakScanner
 from bleak.backends.scanner import AdvertisementData
 
 from core.device.bluetooth_dev import BluetoothDev
+from core.log_config import root_logger
+from core.utils import find_command, run_async, run_subprocess_safe
+
+log = root_logger()
 
 
 class BluetoothMgr:
@@ -238,84 +238,6 @@ class BluetoothMgr:
             log.error(f"[BLUETOOTH] Disconnect error: {e}")
             return {"code": -1, "msg": f"Disconnect failed: {str(e)}"}
 
-    def get_system_paired_devices(self) -> List[Dict]:
-        """
-        获取系统已配对的蓝牙设备列表 (Linux Only)
-        :return: 已配对设备列表
-        """
-        paired_devices_list = []
-
-        try:
-            # 使用 bluetoothctl 获取已配对设备，并检查连接状态
-            try:
-                # 先获取所有已配对设备
-                result_code, stdout, stderr = run_subprocess_safe(["bluetoothctl", "devices", "Paired"],
-                                                                  timeout=10, log_prefix="BLUETOOTH")
-                if result_code == 0:
-                    paired_devices = {}
-                    # 解析 bluetoothctl 输出格式: "Device XX:XX:XX:XX:XX:XX Device Name"
-                    for line in stdout.strip().split('\n'):
-                        if line.strip() and line.startswith('Device'):
-                            parts = line.split(' ', 2)
-                            if len(parts) >= 2:
-                                address = parts[1]
-                                name = parts[2] if len(parts) > 2 else address
-                                paired_devices[address] = name
-
-                    # 对每个已配对设备使用 bluetoothctl info 查询连接状态
-                    for address, name in paired_devices.items():
-                        is_connected = False
-                        try:
-                            result_code, stdout, stderr = run_subprocess_safe(["bluetoothctl", "info", address],
-                                                                              timeout=5, log_prefix="BLUETOOTH")
-                            if result_code == 0:
-                                # 解析输出，查找 "Connected: yes" 或 "Connected: no"
-                                for line in stdout.split('\n'):
-                                    line = line.strip()
-                                    if line.startswith('Connected:'):
-                                        # 格式: "Connected: yes" 或 "Connected: no"
-                                        value = line.split(':', 1)[1].strip().lower()
-                                        is_connected = (value == 'yes')
-                                        break
-                        except Exception as e:
-                            log.debug(f"[BLUETOOTH] Failed to get info for {address}: {e}")
-
-                        device_info = {
-                            "address": address,
-                            "name": name,
-                            "connected": is_connected,
-                        }
-                        paired_devices_list.append(device_info)
-
-            except FileNotFoundError:
-                # 如果没有 bluetoothctl，尝试使用 hcitool
-                log.warning("[BLUETOOTH] bluetoothctl not found, trying hcitool")
-                try:
-                    # hcitool con 只返回已连接的设备
-                    result_code, stdout, stderr = run_subprocess_safe(["hcitool", "con"], timeout=10, log_prefix="BLUETOOTH")
-                    if result_code == 0:
-                        # 解析 hcitool 输出
-                        for line in stdout.split('\n'):
-                            if '>' in line:
-                                parts = line.split()
-                                if len(parts) >= 2:
-                                    address = parts[1]
-                                    device_info = {
-                                        "address": address,
-                                        "name": address,  # hcitool 不提供名称
-                                        "connected": True,
-                                    }
-                                    paired_devices_list.append(device_info)
-                except FileNotFoundError:
-                    log.warning("[BLUETOOTH] hcitool not found either")
-
-            log.info(f"[BLUETOOTH] Found {len(paired_devices_list)} system paired devices")
-            return paired_devices_list
-
-        except Exception as e:
-            log.error(f"[BLUETOOTH] Error getting system paired devices: {e}")
-            return []
-
     async def read_characteristic(self, address: str, characteristic_uuid: str) -> Dict:
         """
         读取特征值
@@ -376,44 +298,194 @@ class BluetoothMgr:
             log.error(f"[BLUETOOTH] Scan error: {e}")
             return []
 
+    def _parse_device_line(self, line: str) -> Optional[Dict[str, str]]:
+        """
+        解析 bluetoothctl devices 输出的一行
+        :param line: 输出行，格式: "Device XX:XX:XX:XX:XX:XX Device Name"
+        :return: {"address": "...", "name": "..."} 或 None
+        """
+        if not line.strip() or not line.startswith('Device'):
+            return None
+        
+        parts = line.split(' ', 2)
+        if len(parts) >= 2:
+            return {
+                "address": parts[1],
+                "name": parts[2] if len(parts) > 2 else parts[1]
+            }
+        return None
+
+    def _get_device_with_mgr_info(self, address: str, default_info: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        获取设备信息，优先使用 BluetoothMgr 中的信息
+        :param address: 设备地址
+        :param default_info: 默认设备信息
+        :return: 设备信息字典
+        """
+        address_upper = address.upper()
+        if address_upper in self.devices:
+            device = self.devices[address_upper]
+            mgr_info = device.to_dict()
+            # 合并信息，管理器中的信息优先（但保留 default_info 中管理器没有的字段）
+            mgr_info.update(default_info)
+            return mgr_info
+        return default_info
+
+    def get_paired_devices(self) -> List[Dict]:
+        """
+        获取系统已配对的蓝牙设备列表 (Linux Only)
+        :return: 已配对设备列表
+        """
+        paired_devices_list = []
+
+        try:
+            # 使用 bluetoothctl 获取已配对设备，并检查连接状态
+            try:
+                # 先获取所有已配对设备
+                result_code, stdout, stderr = run_subprocess_safe(["bluetoothctl", "devices", "Paired"],
+                                                                  timeout=10,
+                                                                  log_prefix="BLUETOOTH")
+                if result_code == 0:
+                    paired_devices = {}
+                    # 解析 bluetoothctl 输出格式: "Device XX:XX:XX:XX:XX:XX Device Name"
+                    for line in stdout.strip().split('\n'):
+                        device_data = self._parse_device_line(line)
+                        if device_data:
+                            paired_devices[device_data["address"]] = device_data["name"]
+
+                    # 对每个已配对设备使用 bluetoothctl info 查询完整信息
+                    for address, name in paired_devices.items():
+                        device_info = {
+                            "address": address,
+                            "name": name,
+                            "connected": False,
+                        }
+                        
+                        try:
+                            result_code, stdout, stderr = run_subprocess_safe(["bluetoothctl", "info", address],
+                                                                              timeout=5,
+                                                                              log_prefix="BLUETOOTH")
+                            if result_code == 0:
+                                # 使用统一的解析方法
+                                info = self._parse_bluetoothctl_info(stdout)
+                                if info:
+                                    device_info.update(info)
+                        except Exception as e:
+                            log.debug(f"[BLUETOOTH] Failed to get info for {address}: {e}")
+
+                        paired_devices_list.append(device_info)
+
+            except FileNotFoundError:
+                # 如果没有 bluetoothctl，尝试使用 hcitool
+                log.warning("[BLUETOOTH] bluetoothctl not found, trying hcitool")
+                try:
+                    # hcitool con 只返回已连接的设备
+                    result_code, stdout, stderr = run_subprocess_safe(["hcitool", "con"],
+                                                                      timeout=10,
+                                                                      log_prefix="BLUETOOTH")
+                    if result_code == 0:
+                        # 解析 hcitool 输出
+                        for line in stdout.split('\n'):
+                            if '>' in line:
+                                parts = line.split()
+                                if len(parts) >= 2:
+                                    address = parts[1]
+                                    device_info = {
+                                        "address": address,
+                                        "name": address,  # hcitool 不提供名称
+                                        "connected": True,
+                                    }
+                                    paired_devices_list.append(device_info)
+                except FileNotFoundError:
+                    log.warning("[BLUETOOTH] hcitool not found either")
+
+            log.info(f"[BLUETOOTH] Found {len(paired_devices_list)} system paired devices")
+            return paired_devices_list
+
+        except Exception as e:
+            log.error(f"[BLUETOOTH] Error getting system paired devices: {e}")
+            return []
+
     def get_connected_devices(self) -> List[Dict]:
         """
-        获取所有已连接的设备（包括通过 BluetoothMgr 连接的和系统级别连接的）
+        获取所有已连接的设备（使用 bluetoothctl devices Connected 命令）
         :return: 已连接设备列表
         """
-        # 获取通过 BluetoothMgr 连接的设备（使用大写地址作为键）
-        mgr_connected = {}
-        for address, device in self.devices.items():
-            if device.connected:
-                device_dict = device.to_dict()
-                address_upper = device_dict.get('address', '').upper()
-                mgr_connected[address_upper] = device_dict
-        
-        # 获取系统级别已连接的设备（从已配对设备中筛选）
-        paired_devices = self.get_system_paired_devices()
-        system_connected = [device for device in paired_devices if device.get('connected', False)]
-        
-        # 合并列表，优先使用 BluetoothMgr 中的设备信息（更详细）
-        all_connected = []
-        system_addresses = set()
-        
-        # 先添加系统连接的设备
-        for device in system_connected:
-            address = device.get('address', '').upper()
-            system_addresses.add(address)
-            if address in mgr_connected:
-                # 如果也在 BluetoothMgr 中，使用更详细的信息
-                all_connected.append(mgr_connected[address])
-            else:
-                all_connected.append(device)
-        
-        # 添加只在 BluetoothMgr 中连接的设备
-        for address, device in mgr_connected.items():
-            if address not in system_addresses:
-                all_connected.append(device)
-        
-        log.info(f"[BLUETOOTH] Found {len(all_connected)} total connected devices")
-        return all_connected
+        connected_devices_list = []
+
+        try:
+            # 使用 bluetoothctl 获取已连接的设备
+            try:
+                result_code, stdout, stderr = run_subprocess_safe(["bluetoothctl", "devices", "Connected"],
+                                                                  timeout=10,
+                                                                  log_prefix="BLUETOOTH")
+                if result_code == 0:
+                    # 解析 bluetoothctl 输出格式: "Device XX:XX:XX:XX:XX:XX Device Name"
+                    # 示例: "Device 90:FB:5D:E9:F0:9B 小爱音箱-3647"
+                    for line in stdout.strip().split('\n'):
+                        device_data = self._parse_device_line(line)
+                        if device_data:
+                            address = device_data["address"]
+                            name = device_data["name"]
+                            
+                            # 构建基础设备信息
+                            default_info = {
+                                "address": address,
+                                "name": name,
+                                "connected": True
+                            }
+                            
+                            # 优先使用 BluetoothMgr 中的设备信息（更详细）
+                            address_upper = address.upper()
+                            if address_upper in self.devices:
+                                device = self.devices[address_upper]
+                                if device.connected:
+                                    device_dict = device.to_dict()
+                                    # 确保 connected 状态正确
+                                    device_dict["connected"] = True
+                                    connected_devices_list.append(device_dict)
+                                else:
+                                    # 设备在管理器中但未连接，使用系统信息
+                                    connected_devices_list.append(default_info)
+                            else:
+                                # 设备不在管理器中，使用系统信息
+                                connected_devices_list.append(default_info)
+
+            except FileNotFoundError:
+                # 如果没有 bluetoothctl，尝试使用 hcitool
+                log.warning("[BLUETOOTH] bluetoothctl not found, trying hcitool")
+                try:
+                    result_code, stdout, stderr = run_subprocess_safe(["hcitool", "con"], timeout=10, log_prefix="BLUETOOTH")
+                    if result_code == 0:
+                        # 解析 hcitool 输出
+                        for line in stdout.split('\n'):
+                            if '>' in line:
+                                parts = line.split()
+                                if len(parts) >= 2:
+                                    address = parts[1]
+                                    default_info = {
+                                        "address": address,
+                                        "name": address,
+                                        "connected": True
+                                    }
+                                    device_info = self._get_device_with_mgr_info(address, default_info)
+                                    if device_info.get("connected"):
+                                        connected_devices_list.append(device_info)
+                except FileNotFoundError:
+                    log.warning("[BLUETOOTH] hcitool not found either")
+
+            # 添加只在 BluetoothMgr 中连接但不在系统连接列表中的设备
+            mgr_addresses = {d.get('address', '').upper() for d in connected_devices_list}
+            for address, device in self.devices.items():
+                if device.connected and address.upper() not in mgr_addresses:
+                    connected_devices_list.append(device.to_dict())
+
+            log.info(f"[BLUETOOTH] Found {len(connected_devices_list)} connected devices")
+            return connected_devices_list
+
+        except Exception as e:
+            log.error(f"[BLUETOOTH] Error getting connected devices: {e}")
+            return []
 
     def connect_device_sync(self, address: str, timeout: float = 10.0) -> Dict:
         """同步连接设备"""
@@ -447,10 +519,7 @@ class BluetoothMgr:
         if device_address:
             # 查找指定地址的设备
             addr_upper = device_address.upper()
-            target_device = next(
-                (d for d in paired_devices if d.get('address', '').upper() == addr_upper),
-                None
-            )
+            target_device = next((d for d in paired_devices if d.get('address', '').upper() == addr_upper), None)
             if not target_device:
                 log.warning(f"[BLUETOOTH] Bluetooth device not found: {device_address}")
                 # 即使没找到设备信息，仍然尝试构造 ALSA 设备名
@@ -474,7 +543,7 @@ class BluetoothMgr:
         :return: ALSA 设备名称，例如 "bluealsa:HCI=hci0,DEV=XX:XX:XX:XX:XX:XX,PROFILE=a2dp"
         """
         try:
-            paired_devices = self.get_system_paired_devices()
+            paired_devices = self.get_paired_devices()
             if not paired_devices:
                 log.warning("[BLUETOOTH] No paired bluetooth devices found")
                 return None
@@ -501,6 +570,154 @@ class BluetoothMgr:
         except Exception as e:
             log.error(f"[BLUETOOTH] Error getting ALSA device: {e}")
             return None
+
+    def _parse_bluetoothctl_info(self, stdout: str) -> Dict[str, Any]:
+        """
+        解析 bluetoothctl info 命令的输出
+        :param stdout: 命令输出
+        :return: 解析后的设备信息字典
+        """
+        info = {}
+        uuids = []
+        
+        for line in stdout.split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+            
+            # 解析第一行: "Device XX:XX:XX:XX:XX:XX (public)"
+            if line.startswith('Device'):
+                parts = line.split(' ', 1)
+                if len(parts) >= 2:
+                    address_part = parts[1].split(' ', 1)[0]  # 提取地址，忽略后面的 (public)
+                    info['address'] = address_part
+                continue
+            
+            # 解析格式: "Key: value"
+            if ':' in line:
+                parts = line.split(':', 1)
+                key = parts[0].strip()
+                value = parts[1].strip() if len(parts) > 1 else ""
+                
+                key_lower = key.lower()
+                
+                # 处理 UUID（可能有多个）
+                if key_lower == 'uuid':
+                    # UUID 格式: "UUID: Service Name (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)"
+                    uuid_match = None
+                    if '(' in value and ')' in value:
+                        # 提取括号中的 UUID
+                        start = value.find('(')
+                        end = value.find(')')
+                        if start != -1 and end != -1:
+                            uuid_match = value[start+1:end]
+                    elif value.strip():
+                        # 如果没有括号，尝试提取 UUID 格式的字符串
+                        uuid_pattern = r'([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})'
+                        match = re.search(uuid_pattern, value)
+                        if match:
+                            uuid_match = match.group(1)
+                    
+                    if uuid_match:
+                        uuid_info = {
+                            'uuid': uuid_match,
+                            'name': value.split('(')[0].strip() if '(' in value else value.strip()
+                        }
+                        uuids.append(uuid_info)
+                    continue
+                
+                # 转换布尔值
+                if value.lower() in ('yes', 'no'):
+                    value = value.lower() == 'yes'
+                
+                # 解析 Class（十六进制值）
+                if key_lower == 'class':
+                    # 格式: "0x00244008 (2375688)"
+                    if '(' in value:
+                        hex_part = value.split('(')[0].strip()
+                        try:
+                            info['class'] = int(hex_part, 16)
+                        except ValueError:
+                            info['class'] = value
+                    else:
+                        try:
+                            info['class'] = int(value, 16) if value.startswith('0x') else int(value)
+                        except ValueError:
+                            info['class'] = value
+                    continue
+                
+                # 标准化键名
+                if key_lower == 'name':
+                    info['name'] = value
+                elif key_lower == 'alias':
+                    info['alias'] = value
+                elif key_lower == 'connected':
+                    info['connected'] = value
+                elif key_lower == 'paired':
+                    info['paired'] = value
+                elif key_lower == 'bonded':
+                    info['bonded'] = value
+                elif key_lower == 'trusted':
+                    info['trusted'] = value
+                elif key_lower == 'blocked':
+                    info['blocked'] = value
+                elif key_lower == 'legacypairing':
+                    info['legacy_pairing'] = value
+                elif key_lower == 'icon':
+                    info['icon'] = value
+                elif key_lower == 'modalias':
+                    info['modalias'] = value
+                elif key_lower == 'rssi':
+                    try:
+                        info['rssi'] = int(value)
+                    except ValueError:
+                        pass
+                else:
+                    # 保留其他字段（使用原始键名）
+                    info[key.lower()] = value
+        
+        # 添加 UUID 列表
+        if uuids:
+            info['uuids'] = uuids
+        
+        return info
+
+    def get_info(self, address: str) -> Dict:
+        """
+        获取指定设备的信息（使用 bluetoothctl info 命令）
+        :param address: 设备地址
+        :return: 设备信息字典
+        """
+        try:
+            address_upper = address.upper()
+            
+            # 使用 bluetoothctl info 命令获取设备信息
+            try:
+                result_code, stdout, stderr = run_subprocess_safe(["bluetoothctl", "info", address],
+                                                                  timeout=5,
+                                                                  log_prefix="BLUETOOTH")
+                if result_code == 0:
+                    device_info = self._parse_bluetoothctl_info(stdout)
+                    if device_info:
+                        # 如果设备在 BluetoothMgr 中管理，合并管理器中的信息（更详细）
+                        device_info = self._get_device_with_mgr_info(address, device_info)
+                        return {"code": 0, "msg": "Device found", "data": device_info}
+                    else:
+                        return {"code": -1, "msg": f"Device not found: {address}"}
+                else:
+                    return {"code": -1, "msg": f"Failed to get device info: {stderr or 'Unknown error'}"}
+            except FileNotFoundError:
+                log.warning("[BLUETOOTH] bluetoothctl not found")
+                # 回退到从已配对设备中查找
+                paired_devices = self.get_paired_devices()
+                for device in paired_devices:
+                    if device.get('address', '').upper() == address_upper:
+                        return {"code": 0, "msg": "Device found", "data": device}
+                return {"code": -1, "msg": f"Device not found: {address}"}
+            
+        except Exception as e:
+            log.error(f"[BLUETOOTH] Error getting device info: {e}")
+            return {"code": -1, "msg": f"Failed to get device info: {str(e)}"}
 
 
 # 全局实例
