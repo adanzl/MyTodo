@@ -8,8 +8,8 @@ from core.api.bluetooth_routes import bluetooth_bp
 from core.api.media_routes import media_bp
 from core.api.keyboard_routes import keyboard_bp
 from core.log_config import root_logger
-from core.service.keyboard import start_keyboard_service
-from core.service.heartbeat import start_heartbeat_service
+from core.service.keyboard_mgr import keyboard_mgr
+from core.service.heartbeat_mgr import heartbeat_mgr
 
 log = root_logger()
 
@@ -40,7 +40,7 @@ def create_app():
     app.register_blueprint(keyboard_bp, url_prefix='/')
 
     # 启动服务
-    start_keyboard_service()
-    start_heartbeat_service()
+    keyboard_mgr.start_service()
+    heartbeat_mgr.start_service()
 
     return app, socketio

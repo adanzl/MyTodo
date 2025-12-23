@@ -161,8 +161,12 @@ device_agent/
 │   │   ├── routes.py      # 通用路由
 │   │   ├── bluetooth_routes.py  # 蓝牙相关路由
 │   │   └── media_routes.py      # 媒体播放路由
+│   ├── service/
+│   │   ├── bluetooth_mgr.py  # 蓝牙设备管理器
+│   │   ├── keyboard.py        # 键盘监听服务
+│   │   └── heartbeat.py      # 心跳服务
 │   └── device/
-│       └── bluetooth.py   # 蓝牙设备管理
+│       └── bluetooth_dev.py   # 蓝牙设备类
 └── templates/
     ├── image.html         # 图片显示页面
     └── server_log.html    # 日志查看页面

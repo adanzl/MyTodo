@@ -5,12 +5,7 @@ from flask import Blueprint, json, request
 from core.log_config import root_logger
 from core.config import config_mgr
 from core.utils import _ok, _err, _convert_result
-from core.device.bluetooth import (
-    scan_devices_sync,
-    connect_device_sync,
-    disconnect_device_sync,
-    get_system_paired_devices_sync,
-)
+from core.service.bluetooth_mgr import bluetooth_mgr
 
 log = root_logger()
 bluetooth_bp = Blueprint('bluetooth', __name__)
@@ -24,7 +19,7 @@ def bluetooth_scan():
     try:
         timeout = request.args.get('timeout', 5.0, type=float)
         log.info(f"===== [Bluetooth Scan] timeout={timeout}")
-        devices = scan_devices_sync(timeout)
+        devices = bluetooth_mgr.scan_devices_sync(timeout)
         return _ok(data=devices)
     except Exception as e:
         log.error(e)
@@ -42,7 +37,7 @@ def bluetooth_connect():
         address = args.get('address')
         if not address:
             return _err(msg="address is required")
-        result = connect_device_sync(address)
+        result = bluetooth_mgr.connect_device_sync(address)
         return _convert_result(result)
     except Exception as e:
         log.error(e)
@@ -60,7 +55,7 @@ def bluetooth_disconnect():
         address = args.get('address')
         if not address:
             return _err(msg="address is required")
-        result = disconnect_device_sync(address)
+        result = bluetooth_mgr.disconnect_device_sync(address)
         return _convert_result(result)
     except Exception as e:
         log.error(e)
@@ -70,11 +65,11 @@ def bluetooth_disconnect():
 @bluetooth_bp.route("/bluetooth/connected", methods=['GET'])
 def bluetooth_get_connected():
     """
-    获取系统已连接的蓝牙设备列表
+    获取所有已连接的蓝牙设备列表（包括通过 BluetoothMgr 连接的和系统级别连接的）
     """
     try:
         log.info("===== [Bluetooth Get Connected Devices]")
-        devices = get_system_paired_devices_sync()
+        devices = bluetooth_mgr.get_connected_devices()
         return _ok(data=devices)
     except Exception as e:
         log.error(e)
@@ -88,7 +83,7 @@ def bluetooth_get_paired():
     """
     try:
         log.info("===== [Bluetooth Get Paired Devices]")
-        devices = get_system_paired_devices_sync()
+        devices = bluetooth_mgr.get_system_paired_devices()
         return _ok(data=devices)
     except Exception as e:
         log.error(e)
@@ -110,7 +105,7 @@ def bluetooth_get_default():
         # 尝试获取设备详细信息
         device_info = None
         try:
-            devices = get_system_paired_devices_sync()
+            devices = bluetooth_mgr.get_system_paired_devices()
             device_info = next(
                 (d for d in devices if d.get('address', '').upper() == default_address.upper()),
                 None

@@ -10,15 +10,16 @@ from typing import Dict, Optional, Tuple
 from core.log_config import root_logger
 from core.config import config_mgr
 from core.utils import _send_http_request, get_local_ip
-from core.service.keyboard import get_keyboard_status
+from core.service.keyboard_mgr import keyboard_mgr
 
 log = root_logger()
 
 
-class HeartbeatService:
-    """心跳上报服务"""
+class HeartbeatMgr:
+    """心跳上报服务管理器"""
 
     def __init__(self):
+        log.info("[HEARTBEAT] HeartbeatMgr init")
         self.is_running = False
         self.thread: Optional[threading.Thread] = None
         self.interval = 10  # 10秒间隔
@@ -61,7 +62,7 @@ class HeartbeatService:
         """
         # 使用 try-except 避免获取状态时阻塞
         try:
-            keyboard_status = get_keyboard_status()
+            keyboard_status = keyboard_mgr.get_keyboard_status()
         except Exception as e:
             log.debug(f"[HEARTBEAT] 获取键盘状态失败: {e}")
             keyboard_status = {"error": str(e)}
@@ -140,7 +141,7 @@ class HeartbeatService:
 
         # 先创建线程，再设置 is_running，确保线程启动时能正确读取状态
         self.is_running = True
-        self.thread = threading.Thread(target=self._heartbeat_loop, daemon=True, name="HeartbeatService")
+        self.thread = threading.Thread(target=self._heartbeat_loop, daemon=True, name="HeartbeatMgr")
         self.thread.start()
         log.info(f"[HEARTBEAT] 心跳服务已启动，上报地址: {center_url}，间隔: {self.interval}秒")
         return True
@@ -162,35 +163,26 @@ class HeartbeatService:
         """
         return {"is_running": self.is_running, "interval": self.interval, "center_url": self._get_center_url()}
 
+    def start_service(self) -> Tuple[bool, str]:
+        """
+        启动心跳服务（包装方法，用于API调用）
+        :return: (success: bool, message: str)
+        """
+        try:
+            log.info(f"===== [Start heartbeat service] =====")   
+            center_url = self._get_center_url()
 
-# 全局心跳服务实例
-_heartbeat_service: Optional[HeartbeatService] = None
+            success = self.start()
+            if success:
+                return True, f"心跳服务已启动，上报地址: {center_url}"
+            else:
+                log.warning("[HEARTBEAT] 心跳服务启动失败")
+                return False, "心跳服务启动失败"
+        except Exception as e:
+            log.error(f"[HEARTBEAT] 启动服务失败 Traceback: {traceback.format_exc()}")
+            return False, f"启动失败: {str(e)}"
 
 
-def get_heartbeat_service() -> HeartbeatService:
-    """获取全局心跳服务实例"""
-    global _heartbeat_service
-    if _heartbeat_service is None:
-        _heartbeat_service = HeartbeatService()
-    return _heartbeat_service
+# 全局实例
+heartbeat_mgr = HeartbeatMgr()
 
-
-def start_heartbeat_service() -> Tuple[bool, str]:
-    """
-    启动心跳服务
-    :return: (success: bool, message: str)
-    """
-    try:
-        log.info(f"===== [Start heartbeat service] =====")   
-        service = get_heartbeat_service()
-        center_url = service._get_center_url()
-
-        success = service.start()
-        if success:
-            return True, f"心跳服务已启动，上报地址: {center_url}"
-        else:
-            log.warning("[HEARTBEAT] 心跳服务启动失败")
-            return False, "心跳服务启动失败"
-    except Exception as e:
-        log.error(f"[HEARTBEAT] 启动服务失败 Traceback: {traceback.format_exc()}")
-        return False, f"启动失败: {str(e)}"

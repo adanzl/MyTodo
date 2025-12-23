@@ -2,59 +2,18 @@
 蓝牙设备管理 (Linux Only)
 '''
 import asyncio
-import shutil
 import os
 from typing import Dict, List, Optional
-try:
-    from core.log_config import root_logger
-    log = root_logger()
-except ImportError:
-    import logging
-    log = logging.getLogger()
-    rds_mgr = None
 
-# 使用 gevent.subprocess（通过 monkey.patch_all 自动替换）
-from gevent import subprocess, spawn
+from core.log_config import root_logger
+from core.utils import find_command, run_async, run_subprocess_safe
 
+log = root_logger()
 
-from bleak import BleakScanner, BleakClient
+from bleak import BleakClient, BleakScanner
 from bleak.backends.scanner import AdvertisementData
 
-
-class BluetoothDevice:
-    """蓝牙设备类"""
-
-    def __init__(self, address: str, name: str = "", metadata: dict = None):
-        self.address = address
-        self.name = name or address
-        self.metadata = metadata or {}
-        self.connected = False
-        self.client: Optional[BleakClient] = None
-
-    def to_dict(self):
-        """转换为字典，确保所有数据都是 JSON 可序列化的"""
-        return {
-            "address": str(self.address),
-            "name": str(self.name) if self.name else str(self.address),
-            "connected": bool(self.connected),
-            "metadata": self._ensure_json_serializable(self.metadata)
-        }
-
-    def _ensure_json_serializable(self, obj):
-        """递归确保对象是 JSON 可序列化的"""
-        if isinstance(obj, bytes):
-            return {
-                'hex': obj.hex(),
-                'length': len(obj)
-            }
-        elif isinstance(obj, dict):
-            return {str(k): self._ensure_json_serializable(v) for k, v in obj.items()}
-        elif isinstance(obj, (list, tuple)):
-            return [self._ensure_json_serializable(item) for item in obj]
-        elif hasattr(obj, '__str__') and not isinstance(obj, (str, int, float, bool, type(None))):
-            return str(obj)
-        else:
-            return obj
+from core.device.bluetooth_dev import BluetoothDev
 
 
 class BluetoothMgr:
@@ -62,7 +21,7 @@ class BluetoothMgr:
 
     def __init__(self):
         log.info("[BLUETOOTH] BluetoothMgr init")
-        self.devices: Dict[str, BluetoothDevice] = {}  # address -> BluetoothDevice
+        self.devices: Dict[str, BluetoothDev] = {}  # address -> BluetoothDev
         self.scanning = False
         self._scan_task = None
 
@@ -96,7 +55,8 @@ class BluetoothMgr:
                     friendly_name = device.name
                 else:
                     # 使用地址的后6位作为标识
-                    addr_short = device.address.replace('-', '')[-6:].upper() if '-' in device.address else device.address[-6:].upper()
+                    addr_short = device.address.replace(
+                        '-', '')[-6:].upper() if '-' in device.address else device.address[-6:].upper()
                     friendly_name = f"Unknown Device ({addr_short})"
 
                 # 构建 metadata（从 advertisement_data 中提取）
@@ -128,10 +88,7 @@ class BluetoothMgr:
                                             continue
 
                                 # 构建返回数据
-                                result = {
-                                    'hex': data_bytes.hex(),
-                                    'length': len(data_bytes)
-                                }
+                                result = {'hex': data_bytes.hex(), 'length': len(data_bytes)}
                                 if decoded_str:
                                     result['decoded'] = decoded_str
 
@@ -153,10 +110,7 @@ class BluetoothMgr:
                             service_data_dict = {}
                             for service_uuid, data in advertisement_data.service_data.items():
                                 if isinstance(data, bytes):
-                                    service_data_dict[str(service_uuid)] = {
-                                        'hex': data.hex(),
-                                        'length': len(data)
-                                    }
+                                    service_data_dict[str(service_uuid)] = {'hex': data.hex(), 'length': len(data)}
                                 else:
                                     service_data_dict[str(service_uuid)] = data
                             metadata['service_data'] = service_data_dict
@@ -174,20 +128,14 @@ class BluetoothMgr:
                     if hasattr(advertisement_data, 'tx_power'):
                         metadata['tx_power'] = advertisement_data.tx_power
 
-                device_info = {
-                    "address": device.address,
-                    "name": friendly_name,
-                    "metadata": metadata
-                }
+                device_info = {"address": device.address, "name": friendly_name, "metadata": metadata}
                 device_list.append(device_info)
 
                 # 更新设备列表
                 if device.address not in self.devices:
-                    self.devices[device.address] = BluetoothDevice(
-                        address=device.address,
-                        name=friendly_name,
-                        metadata=metadata
-                    )
+                    self.devices[device.address] = BluetoothDev(address=device.address,
+                                                                name=friendly_name,
+                                                                metadata=metadata)
                 else:
                     # 更新现有设备信息
                     self.devices[device.address].name = friendly_name
@@ -243,7 +191,7 @@ class BluetoothMgr:
             await client.connect()
 
             if address not in self.devices:
-                self.devices[address] = BluetoothDevice(address=address)
+                self.devices[address] = BluetoothDev(address=address)
 
             device = self.devices[address]
             device.client = client
@@ -290,77 +238,6 @@ class BluetoothMgr:
             log.error(f"[BLUETOOTH] Disconnect error: {e}")
             return {"code": -1, "msg": f"Disconnect failed: {str(e)}"}
 
-    def _find_command(self, cmd_name):
-        """
-        查找命令的完整路径
-        """
-        # 首先尝试使用 shutil.which
-        cmd_path = shutil.which(cmd_name)
-        if cmd_path:
-            return cmd_path
-
-        # 如果找不到，尝试常见路径
-        common_paths = [
-            "/usr/bin",
-            "/usr/local/bin",
-            "/bin",
-            "/sbin",
-            "/usr/sbin",
-        ]
-        for path in common_paths:
-            full_path = os.path.join(path, cmd_name)
-            if os.path.exists(full_path) and os.access(full_path, os.X_OK):
-                return full_path
-
-        return None
-
-    def _run_subprocess_safe(self, cmd, timeout=10, env=None):
-        """
-        在 gevent 环境中安全地运行 subprocess
-        """
-        def _run():
-            try:
-                # 如果是字符串命令，尝试查找完整路径
-                if isinstance(cmd, list) and len(cmd) > 0:
-                    cmd_name = cmd[0]
-                    cmd_path = self._find_command(cmd_name)
-                    if cmd_path:
-                        cmd[0] = cmd_path
-
-                # 设置环境变量，确保包含系统 PATH
-                process_env = os.environ.copy()
-                if env:
-                    process_env.update(env)
-                # 确保 PATH 包含常见路径
-                if 'PATH' not in process_env or not process_env['PATH']:
-                    process_env['PATH'] = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
-                else:
-                    # 确保常见路径在 PATH 中
-                    common_paths = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
-                    if common_paths not in process_env['PATH']:
-                        process_env['PATH'] = f"{process_env['PATH']}:{common_paths}"
-
-                process = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    env=process_env
-                )
-                stdout, stderr = process.communicate(timeout=timeout)
-                return process.returncode, stdout, stderr
-            except FileNotFoundError as e:
-                # 命令不存在
-                log.warning(f"[BLUETOOTH] Command not found: {cmd[0] if isinstance(cmd, list) else cmd}")
-                return -2, "", str(e)
-            except Exception as e:
-                log.error(f"[BLUETOOTH] Subprocess error: {e}")
-                return -1, "", str(e)
-
-        # 在独立的 greenlet 中运行，避免阻塞 gevent 事件循环
-        greenlet = spawn(_run)
-        return greenlet.get(timeout=timeout + 2)
-
     def get_system_paired_devices(self) -> List[Dict]:
         """
         获取系统已配对的蓝牙设备列表 (Linux Only)
@@ -372,10 +249,8 @@ class BluetoothMgr:
             # 使用 bluetoothctl 获取已配对设备，并检查连接状态
             try:
                 # 先获取所有已配对设备
-                result_code, stdout, stderr = self._run_subprocess_safe(
-                    ["bluetoothctl", "devices", "Paired"],
-                    timeout=10
-                )
+                result_code, stdout, stderr = run_subprocess_safe(["bluetoothctl", "devices", "Paired"],
+                                                                  timeout=10, log_prefix="BLUETOOTH")
                 if result_code == 0:
                     paired_devices = {}
                     # 解析 bluetoothctl 输出格式: "Device XX:XX:XX:XX:XX:XX Device Name"
@@ -386,15 +261,13 @@ class BluetoothMgr:
                                 address = parts[1]
                                 name = parts[2] if len(parts) > 2 else address
                                 paired_devices[address] = name
-                    
+
                     # 对每个已配对设备使用 bluetoothctl info 查询连接状态
                     for address, name in paired_devices.items():
                         is_connected = False
                         try:
-                            result_code, stdout, stderr = self._run_subprocess_safe(
-                                ["bluetoothctl", "info", address],
-                                timeout=5
-                            )
+                            result_code, stdout, stderr = run_subprocess_safe(["bluetoothctl", "info", address],
+                                                                              timeout=5, log_prefix="BLUETOOTH")
                             if result_code == 0:
                                 # 解析输出，查找 "Connected: yes" 或 "Connected: no"
                                 for line in stdout.split('\n'):
@@ -406,23 +279,20 @@ class BluetoothMgr:
                                         break
                         except Exception as e:
                             log.debug(f"[BLUETOOTH] Failed to get info for {address}: {e}")
-                        
+
                         device_info = {
                             "address": address,
                             "name": name,
                             "connected": is_connected,
                         }
                         paired_devices_list.append(device_info)
-                        
+
             except FileNotFoundError:
                 # 如果没有 bluetoothctl，尝试使用 hcitool
                 log.warning("[BLUETOOTH] bluetoothctl not found, trying hcitool")
                 try:
                     # hcitool con 只返回已连接的设备
-                    result_code, stdout, stderr = self._run_subprocess_safe(
-                        ["hcitool", "con"],
-                        timeout=10
-                    )
+                    result_code, stdout, stderr = run_subprocess_safe(["hcitool", "con"], timeout=10, log_prefix="BLUETOOTH")
                     if result_code == 0:
                         # 解析 hcitool 输出
                         for line in stdout.split('\n'):
@@ -491,136 +361,147 @@ class BluetoothMgr:
             log.error(f"[BLUETOOTH] Write error: {e}")
             return {"code": -1, "msg": f"Write failed: {str(e)}"}
 
+    def scan_devices_sync(self, timeout: float = 5.0) -> List[Dict]:
+        """
+        同步扫描设备（在事件循环中运行）
+        :param timeout: 扫描超时时间（秒）
+        :return: 设备列表
+        """
+        try:
+            return run_async(self.scan_devices(timeout), timeout=timeout, log_prefix="BLUETOOTH")
+        except asyncio.TimeoutError:
+            log.error(f"[BLUETOOTH] Scan timeout after {timeout}s")
+            return []
+        except Exception as e:
+            log.error(f"[BLUETOOTH] Scan error: {e}")
+            return []
+
+    def get_connected_devices(self) -> List[Dict]:
+        """
+        获取所有已连接的设备（包括通过 BluetoothMgr 连接的和系统级别连接的）
+        :return: 已连接设备列表
+        """
+        # 获取通过 BluetoothMgr 连接的设备（使用大写地址作为键）
+        mgr_connected = {}
+        for address, device in self.devices.items():
+            if device.connected:
+                device_dict = device.to_dict()
+                address_upper = device_dict.get('address', '').upper()
+                mgr_connected[address_upper] = device_dict
+        
+        # 获取系统级别已连接的设备（从已配对设备中筛选）
+        paired_devices = self.get_system_paired_devices()
+        system_connected = [device for device in paired_devices if device.get('connected', False)]
+        
+        # 合并列表，优先使用 BluetoothMgr 中的设备信息（更详细）
+        all_connected = []
+        system_addresses = set()
+        
+        # 先添加系统连接的设备
+        for device in system_connected:
+            address = device.get('address', '').upper()
+            system_addresses.add(address)
+            if address in mgr_connected:
+                # 如果也在 BluetoothMgr 中，使用更详细的信息
+                all_connected.append(mgr_connected[address])
+            else:
+                all_connected.append(device)
+        
+        # 添加只在 BluetoothMgr 中连接的设备
+        for address, device in mgr_connected.items():
+            if address not in system_addresses:
+                all_connected.append(device)
+        
+        log.info(f"[BLUETOOTH] Found {len(all_connected)} total connected devices")
+        return all_connected
+
+    def connect_device_sync(self, address: str, timeout: float = 10.0) -> Dict:
+        """同步连接设备"""
+        try:
+            return run_async(self.connect_device(address), timeout=timeout, log_prefix="BLUETOOTH")
+        except asyncio.TimeoutError:
+            log.error(f"[BLUETOOTH] Connect timeout after {timeout}s")
+            return {"code": -1, "msg": f"Connection timeout after {timeout}s"}
+        except Exception as e:
+            log.error(f"[BLUETOOTH] Connect error: {e}")
+            return {"code": -1, "msg": f"Connection failed: {str(e)}"}
+
+    def disconnect_device_sync(self, address: str, timeout: float = 5.0) -> Dict:
+        """同步断开设备"""
+        try:
+            return run_async(self.disconnect_device(address), timeout=timeout, log_prefix="BLUETOOTH")
+        except asyncio.TimeoutError:
+            log.error(f"[BLUETOOTH] Disconnect timeout after {timeout}s")
+            return {"code": -1, "msg": f"Disconnect timeout after {timeout}s"}
+        except Exception as e:
+            log.error(f"[BLUETOOTH] Disconnect error: {e}")
+            return {"code": -1, "msg": f"Disconnect failed: {str(e)}"}
+
+    def _find_target_device(self, device_address: Optional[str], paired_devices: List[Dict]) -> Optional[Dict]:
+        """
+        查找目标蓝牙设备
+        :param device_address: 设备地址（可选）
+        :param paired_devices: 已配对设备列表
+        :return: 目标设备字典
+        """
+        if device_address:
+            # 查找指定地址的设备
+            addr_upper = device_address.upper()
+            target_device = next(
+                (d for d in paired_devices if d.get('address', '').upper() == addr_upper),
+                None
+            )
+            if not target_device:
+                log.warning(f"[BLUETOOTH] Bluetooth device not found: {device_address}")
+                # 即使没找到设备信息，仍然尝试构造 ALSA 设备名
+                return {'address': device_address, 'name': device_address, 'connected': False}
+            return target_device
+        else:
+            # 使用第一个已连接的设备
+            target_device = next((d for d in paired_devices if d.get('connected')), None)
+            if not target_device:
+                log.warning("[BLUETOOTH] No connected bluetooth devices found")
+                # 如果没有已连接的，使用第一个已配对的
+                target_device = paired_devices[0]
+                log.info(f"[BLUETOOTH] Using first paired device: {target_device.get('name')}")
+            return target_device
+
+    def get_alsa_name(self, device_address: Optional[str] = None, hci_adapter: str = 'hci0') -> Optional[str]:
+        """
+        获取 ALSA 蓝牙音频设备名称（直接根据 MAC 地址构造）
+        :param device_address: 蓝牙设备地址（可选）
+        :param hci_adapter: HCI 适配器名称，默认为 hci0
+        :return: ALSA 设备名称，例如 "bluealsa:HCI=hci0,DEV=XX:XX:XX:XX:XX:XX,PROFILE=a2dp"
+        """
+        try:
+            paired_devices = self.get_system_paired_devices()
+            if not paired_devices:
+                log.warning("[BLUETOOTH] No paired bluetooth devices found")
+                return None
+
+            target_device = self._find_target_device(device_address, paired_devices)
+            if not target_device:
+                return None
+
+            device_address = target_device.get('address')
+            device_name = target_device.get('name', device_address)
+            is_connected = target_device.get('connected', False)
+
+            # 记录设备状态
+            if is_connected:
+                log.info(f"[BLUETOOTH] Target bluetooth device: {device_name} ({device_address})")
+            else:
+                log.warning(f"[BLUETOOTH] Bluetooth device not connected: {device_name} ({device_address})")
+
+            # 格式: bluealsa:HCI=hci0,DEV=XX:XX:XX:XX:XX:XX,PROFILE=a2dp
+            alsa_device = f"bluealsa:HCI={hci_adapter},DEV={device_address.upper()},PROFILE=a2dp"
+            log.info(f"[BLUETOOTH] Using ALSA device: {alsa_device}")
+            return alsa_device
+
+        except Exception as e:
+            log.error(f"[BLUETOOTH] Error getting ALSA device: {e}")
+            return None
 
 
 # 全局实例
-_bluetooth_mgr: Optional[BluetoothMgr] = None
-
-
-def get_bluetooth_mgr() -> BluetoothMgr:
-    """获取蓝牙管理器实例"""
-    global _bluetooth_mgr
-    if _bluetooth_mgr is None:
-        _bluetooth_mgr = BluetoothMgr()
-    return _bluetooth_mgr
-
-
-# 同步包装函数（用于在Flask路由中使用）
-def scan_devices_sync(timeout: float = 5.0) -> List[Dict]:
-    """
-    同步扫描设备（在事件循环中运行）
-    :param timeout: 扫描超时时间（秒）
-    :return: 设备列表
-    """
-    import concurrent.futures
-    try:
-        # 尝试获取正在运行的事件循环
-        asyncio.get_running_loop()
-        # 如果有运行中的循环，需要在新线程中运行
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(_run_async, get_bluetooth_mgr().scan_devices(timeout))
-            # 设置超时时间，比扫描超时多5秒
-            return future.result(timeout=timeout + 5.0)
-    except RuntimeError:
-        # 没有运行中的循环，创建新的事件循环
-        return _run_async(get_bluetooth_mgr().scan_devices(timeout))
-    except concurrent.futures.TimeoutError:
-        log.error(f"[BLUETOOTH] Scan timeout after {timeout + 5.0}s")
-        return []
-    except Exception as e:
-        log.error(f"[BLUETOOTH] Scan error: {e}")
-        return []
-
-
-def get_system_paired_devices_sync() -> List[Dict]:
-    """
-    同步获取系统已配对的蓝牙设备列表
-    :return: 已配对设备列表
-    """
-    try:
-        return get_bluetooth_mgr().get_system_paired_devices()
-    except Exception as e:
-        log.error(f"[BLUETOOTH] Get system paired devices error: {e}")
-        return []
-
-
-def connect_device_sync(address: str, timeout: float = 10.0) -> Dict:
-    """同步连接设备"""
-    import concurrent.futures
-    try:
-        asyncio.get_running_loop()
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(_run_async, get_bluetooth_mgr().connect_device(address), timeout=timeout)
-            result = future.result(timeout=timeout + 5.0)
-    except RuntimeError:
-        result = _run_async(get_bluetooth_mgr().connect_device(address), timeout=timeout)
-    except concurrent.futures.TimeoutError:
-        log.error(f"[BLUETOOTH] Connect timeout after {timeout + 5.0}s")
-        return {"code": -1, "msg": f"Connection timeout after {timeout}s"}
-    except Exception as e:
-        log.error(f"[BLUETOOTH] Connect error: {e}")
-        return {"code": -1, "msg": f"Connection failed: {str(e)}"}
-
-    return result
-
-
-def disconnect_device_sync(address: str, timeout: float = 5.0) -> Dict:
-    """同步断开设备"""
-    import concurrent.futures
-    try:
-        asyncio.get_running_loop()
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(_run_async, get_bluetooth_mgr().disconnect_device(address), timeout=timeout)
-            result = future.result(timeout=timeout + 2.0)
-    except RuntimeError:
-        result = _run_async(get_bluetooth_mgr().disconnect_device(address), timeout=timeout)
-    except concurrent.futures.TimeoutError:
-        log.error(f"[BLUETOOTH] Disconnect timeout after {timeout + 2.0}s")
-        return {"code": -1, "msg": f"Disconnect timeout after {timeout}s"}
-    except Exception as e:
-        log.error(f"[BLUETOOTH] Disconnect error: {e}")
-        return {"code": -1, "msg": f"Disconnect failed: {str(e)}"}
-
-    return result
-
-
-def _run_async(coro, timeout: float = None):
-    """在新的事件循环中运行协程"""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        if timeout:
-            return loop.run_until_complete(asyncio.wait_for(coro, timeout=timeout))
-        else:
-            return loop.run_until_complete(coro)
-    except asyncio.TimeoutError:
-        log.error(f"[BLUETOOTH] Async operation timeout after {timeout}s")
-        raise
-    finally:
-        try:
-            # 取消所有待处理的任务
-            pending = asyncio.all_tasks(loop)
-            for task in pending:
-                task.cancel()
-            if pending:
-                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-        except Exception:
-            pass
-        finally:
-            loop.close()
-            asyncio.set_event_loop(None)
-
-
-if __name__ == "__main__":
-    # 测试代码
-    print("Bluetooth Manager Test")
-    # 测试扫描
-    devices = scan_devices_sync(timeout=3.0)
-    print(f"Found {len(devices)} devices")
-    for device in devices:
-        print(f"【{device['address']}】{device['name']}")
-    # 测试获取系统已连接的设备
-    connected_devices = get_system_paired_devices_sync()
-    print(f"Found {len(connected_devices)} connected devices")
-    for device in connected_devices:
-        print(f"【{device.get('address', 'N/A')}】{device.get('name', 'Unknown')}")
+bluetooth_mgr = BluetoothMgr()
