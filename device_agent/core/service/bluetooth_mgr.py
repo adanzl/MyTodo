@@ -2,7 +2,6 @@
 蓝牙设备管理 (Linux Only)
 '''
 import asyncio
-import os
 import re
 from typing import Dict, List, Optional, Any
 
@@ -150,65 +149,81 @@ class BluetoothMgr:
         finally:
             self.scanning = False
 
-    async def _get_device_name_from_gatt(self, client: BleakClient) -> Optional[str]:
-        """
-        尝试从 GATT 服务读取设备名称
-        :param client: 已连接的 BleakClient
-        :return: 设备名称，如果无法获取则返回 None
-        """
-        try:
-            # 设备名称特征 UUID: 0x2A00
-            device_name_uuid = "00002a00-0000-1000-8000-00805f9b34fb"
-            name_bytes = await client.read_gatt_char(device_name_uuid)
-            if name_bytes:
-                # 尝试 UTF-8 解码
-                try:
-                    return name_bytes.decode('utf-8').strip('\x00')
-                except UnicodeDecodeError:
-                    # 尝试其他编码
-                    try:
-                        return name_bytes.decode('gbk').strip('\x00')
-                    except UnicodeDecodeError:
-                        return None
-        except Exception as e:
-            log.debug(f"[BLUETOOTH] Could not read device name from GATT: {e}")
-            return None
-
-    async def connect_device(self, address: str, fetch_name: bool = True) -> Dict:
+    async def connect_device(self, address: str) -> Dict:
         """
         连接蓝牙设备
         :param address: 设备地址
-        :param fetch_name: 是否尝试从 GATT 获取设备名称
         :return: 连接结果
         """
-
+        # 统一地址格式为大写
+        address_upper = address.upper()
+        
         try:
-            if address in self.devices and self.devices[address].connected:
-                return {"code": 0, "msg": "Already connected", "data": self.devices[address].to_dict()}
+            # 检查设备是否已连接
+            if self._check_device_connected(address_upper):
+                log.info(f"[BLUETOOTH] Device {address_upper} is already connected")
+                
+                # 确保设备在管理器中，并同步状态
+                if address_upper not in self.devices:
+                    # 获取系统信息并添加到管理器
+                    result = self.get_info(address_upper)
+                    if result.get('code') == 0:
+                        device_info = result.get('data', {})
+                        self.devices[address_upper] = BluetoothDev(
+                            address=device_info.get('address', address_upper),
+                            name=device_info.get('name', address_upper),
+                            metadata=device_info.get('metadata', {})
+                        )
+                    else:
+                        # 如果获取信息失败，创建基础设备对象
+                        self.devices[address_upper] = BluetoothDev(
+                            address=address_upper,
+                            name=address_upper
+                        )
+                
+                # 更新设备连接状态
+                device = self.devices[address_upper]
+                device.connected = True
+                
+                return {"code": 0, "msg": "Already connected", "data": device.to_dict()}
 
-            log.info(f"[BLUETOOTH] Connecting to device: {address}")
-            client = BleakClient(address)
+            # 执行连接
+            log.info(f"[BLUETOOTH] Connecting to device: {address_upper}")
+            client = BleakClient(address_upper)
             await client.connect()
 
-            if address not in self.devices:
-                self.devices[address] = BluetoothDev(address=address)
+            # 确保设备在管理器中
+            if address_upper not in self.devices:
+                # 尝试获取设备信息
+                result = self.get_info(address_upper)
+                if result.get('code') == 0:
+                    device_info = result.get('data', {})
+                    self.devices[address_upper] = BluetoothDev(
+                        address=device_info.get('address', address_upper),
+                        name=device_info.get('name', address_upper),
+                        metadata=device_info.get('metadata', {})
+                    )
+                else:
+                    # 如果获取信息失败，创建基础设备对象
+                    self.devices[address_upper] = BluetoothDev(
+                        address=address_upper,
+                        name=address_upper
+                    )
 
-            device = self.devices[address]
+            # 更新设备连接状态和客户端
+            device = self.devices[address_upper]
             device.client = client
             device.connected = True
 
-            # 尝试从 GATT 获取设备名称
-            if fetch_name and (not device.name or device.name == address):
-                gatt_name = await self._get_device_name_from_gatt(client)
-                if gatt_name:
-                    device.name = gatt_name
-                    log.info(f"[BLUETOOTH] Got device name from GATT: {gatt_name}")
-
-            log.info(f"[BLUETOOTH] Connected to device: {address}")
+            log.info(f"[BLUETOOTH] Connected to device: {address_upper}")
             return {"code": 0, "msg": "Connected", "data": device.to_dict()}
 
         except Exception as e:
-            log.error(f"[BLUETOOTH] Connect error: {e}")
+            log.error(f"[BLUETOOTH] Connect error for {address_upper}: {e}")
+            # 连接失败时，确保设备状态正确
+            if address_upper in self.devices:
+                self.devices[address_upper].connected = False
+                self.devices[address_upper].client = None
             return {"code": -1, "msg": f"Connection failed: {str(e)}"}
 
     async def disconnect_device(self, address: str) -> Dict:
@@ -217,25 +232,70 @@ class BluetoothMgr:
         :param address: 设备地址
         :return: 断开结果
         """
-
+        # 统一地址格式为大写
+        address_upper = address.upper()
+        
         try:
-            if address not in self.devices:
-                return {"code": -1, "msg": "Device not found"}
-
-            device = self.devices[address]
-            if not device.connected or device.client is None:
+            # 检查设备是否已断开
+            if not self._check_device_connected(address_upper):
+                log.info(f"[BLUETOOTH] Device {address_upper} is already disconnected")
+                # 确保管理器中的设备状态正确
+                if address_upper in self.devices:
+                    device = self.devices[address_upper]
+                    device.connected = False
+                    device.client = None
                 return {"code": 0, "msg": "Already disconnected"}
 
-            log.info(f"[BLUETOOTH] Disconnecting device: {address}")
-            await device.client.disconnect()
-            device.connected = False
-            device.client = None
+            # 优先使用管理器中的客户端断开连接
+            if address_upper in self.devices:
+                device = self.devices[address_upper]
+                if device.client is not None:
+                    try:
+                        log.info(f"[BLUETOOTH] Disconnecting device via client: {address_upper}")
+                        await device.client.disconnect()
+                    except Exception as e:
+                        log.warning(f"[BLUETOOTH] Error disconnecting client for {address_upper}: {e}")
+                        # 即使客户端断开失败，也尝试使用系统命令断开
+                        result_code, stdout, stderr = run_subprocess_safe(
+                            ["bluetoothctl", "disconnect", address_upper],
+                            timeout=5,
+                            log_prefix="BLUETOOTH"
+                        )
+                        if result_code != 0:
+                            log.warning(f"[BLUETOOTH] System disconnect also failed: {stderr or 'Unknown error'}")
+                    finally:
+                        # 无论成功与否，都更新设备状态
+                        device.connected = False
+                        device.client = None
+                        log.info(f"[BLUETOOTH] Disconnected device: {address_upper}")
+                        return {"code": 0, "msg": "Disconnected", "data": device.to_dict()}
 
-            log.info(f"[BLUETOOTH] Disconnected device: {address}")
-            return {"code": 0, "msg": "Disconnected", "data": device.to_dict()}
+            # 如果设备不在管理器中或没有客户端，使用系统命令断开
+            log.info(f"[BLUETOOTH] Disconnecting device via system: {address_upper}")
+            result_code, stdout, stderr = run_subprocess_safe(
+                ["bluetoothctl", "disconnect", address_upper],
+                timeout=5,
+                log_prefix="BLUETOOTH"
+            )
+            
+            # 更新管理器状态（如果设备在管理器中）
+            if address_upper in self.devices:
+                device = self.devices[address_upper]
+                device.connected = False
+                device.client = None
+            
+            if result_code == 0:
+                return {"code": 0, "msg": "Disconnected"}
+            else:
+                return {"code": -1, "msg": f"Disconnect failed: {stderr or 'Unknown error'}"}
 
         except Exception as e:
-            log.error(f"[BLUETOOTH] Disconnect error: {e}")
+            log.error(f"[BLUETOOTH] Disconnect error for {address_upper}: {e}")
+            # 确保设备状态正确
+            if address_upper in self.devices:
+                device = self.devices[address_upper]
+                device.connected = False
+                device.client = None
             return {"code": -1, "msg": f"Disconnect failed: {str(e)}"}
 
     async def read_characteristic(self, address: str, characteristic_uuid: str) -> Dict:
@@ -297,6 +357,22 @@ class BluetoothMgr:
         except Exception as e:
             log.error(f"[BLUETOOTH] Scan error: {e}")
             return []
+
+    def _check_device_connected(self, address: str) -> bool:
+        """
+        通过 get_info 检查设备是否已连接
+        :param address: 设备地址
+        :return: 是否已连接
+        """
+        try:
+            result = self.get_info(address)
+            if result.get('code') == 0:
+                device_info = result.get('data', {})
+                return device_info.get('connected', False)
+            return False
+        except Exception as e:
+            log.debug(f"[BLUETOOTH] Failed to check connection status for {address}: {e}")
+            return False
 
     def _parse_device_line(self, line: str) -> Optional[Dict[str, str]]:
         """
