@@ -63,10 +63,8 @@ class BluetoothMgr:
         :return: ObjectManager 接口
         """
         if bus not in self._dbus_managers:
-            self._dbus_managers[bus] = dbus.Interface(
-                bus.get_object(BLUEZ_SERVICE, BLUEZ_ROOT_PATH),
-                OBJECT_MANAGER_INTERFACE
-            )
+            self._dbus_managers[bus] = dbus.Interface(bus.get_object(BLUEZ_SERVICE, BLUEZ_ROOT_PATH),
+                                                      OBJECT_MANAGER_INTERFACE)
         return self._dbus_managers[bus]
 
     def _find_adapter_path(self, adapter_name: str, objects: Dict) -> Optional[str]:
@@ -82,12 +80,12 @@ class BluetoothMgr:
                 adapter_props = interfaces[ADAPTER_INTERFACE]
                 if adapter_props.get('Name', '') == adapter_name:
                     return path
-        
+
         # 如果没找到指定适配器，返回第一个适配器
         for path, interfaces in objects.items():
             if ADAPTER_INTERFACE in interfaces:
                 return path
-        
+
         return None
 
     def _get_adapter_info(self, adapter: str = None) -> Optional[Dict[str, Any]]:
@@ -109,7 +107,7 @@ class BluetoothMgr:
         try:
             # 创建 DBus 连接
             bus = dbus.SystemBus()
-            
+
             # 查找适配器路径
             manager = self._get_dbus_manager(bus)
             objects = manager.GetManagedObjects()
@@ -129,11 +127,7 @@ class BluetoothMgr:
             self._adapter_interfaces[adapter] = adapter_interface
 
             log.info(f"[BLUETOOTH] Initialized adapter: {adapter} at {adapter_path}")
-            return {
-                'bus': bus,
-                'path': adapter_path,
-                'interface': adapter_interface
-            }
+            return {'bus': bus, 'path': adapter_path, 'interface': adapter_interface}
 
         except dbus.exceptions.DBusException as e:
             log.error(f"[BLUETOOTH] DBus error for adapter {adapter}: {e}")
@@ -225,11 +219,7 @@ class BluetoothMgr:
         """
         address_upper = address.upper()
         if address_upper not in self.devices:
-            self.devices[address_upper] = BluetoothDev(
-                address=address_upper,
-                name=name,
-                metadata=metadata
-            )
+            self.devices[address_upper] = BluetoothDev(address=address_upper, name=name, metadata=metadata)
         else:
             # 更新现有设备信息
             self.devices[address_upper].name = name
@@ -327,7 +317,8 @@ class BluetoothMgr:
             return device.name
         else:
             # 使用地址的后6位作为标识
-            addr_short = device.address.replace('-', '')[-6:].upper() if '-' in device.address else device.address[-6:].upper()
+            addr_short = device.address.replace(
+                '-', '')[-6:].upper() if '-' in device.address else device.address[-6:].upper()
             return f"Unknown Device ({addr_short})"
 
     async def scan_devices(self, timeout: float = 5.0, adapter: str = None) -> List[Dict]:
@@ -369,15 +360,20 @@ class BluetoothMgr:
             # 停止扫描
             try:
                 adapter_interface.StopDiscovery()
-                log.info(f"[BLUETOOTH] Stopped discovery on {adapter}")
+                log.info(f"[BLUETOOTH] Stopped discovery on {adapter} after {timeout}s")
             except dbus.exceptions.DBusException as e:
                 log.warning(f"[BLUETOOTH] Failed to stop discovery: {e}")
 
             # 获取扫描到的设备
             devices = self._get_devices_from_dbus(adapter)
-            
+
+            # 只返回未配对的设备（即扫描到的新设备）
             device_list = []
             for device in devices:
+                # 跳过已配对的设备，只返回扫描到的新设备
+                if device.get('paired', False):
+                    continue
+
                 address = device['address']
                 device_info = {
                     "address": address,
@@ -394,13 +390,12 @@ class BluetoothMgr:
                 device_list.append(device_info)
 
                 # 更新设备列表
-                self._update_or_create_device(
-                    address=address,
-                    name=device_info["name"],
-                    metadata=device_info.get("metadata", {})
-                )
+                self._update_or_create_device(address=address,
+                                              name=device_info["name"],
+                                              metadata=device_info.get("metadata", {}))
 
-            log.info(f"[BLUETOOTH] Found {len(device_list)} classic bluetooth devices")
+            log.info(
+                f"[BLUETOOTH] Found {len(device_list)} scanned classic bluetooth devices (excluding paired devices)")
             return device_list
 
         except Exception as e:
@@ -431,7 +426,7 @@ class BluetoothMgr:
             for device, advertisement_data in devices_dict.values():
                 # 获取友好名称
                 friendly_name = self._get_friendly_name(device, advertisement_data)
-                
+
                 # 构建 metadata
                 metadata = self._build_ble_metadata(advertisement_data)
 
@@ -439,11 +434,7 @@ class BluetoothMgr:
                 device_list.append(device_info)
 
                 # 更新设备列表
-                self._update_or_create_device(
-                    address=device.address,
-                    name=friendly_name,
-                    metadata=metadata
-                )
+                self._update_or_create_device(address=device.address, name=friendly_name, metadata=metadata)
 
             log.info(f"[BLUETOOTH] Found {len(device_list)} BLE devices")
             return device_list
@@ -463,7 +454,7 @@ class BluetoothMgr:
         """
         address_upper = address.upper()
         adapter = adapter or self._default_adapter
-        
+
         try:
             # 获取适配器信息
             adapter_info = self._get_adapter_info(adapter)
@@ -479,11 +470,9 @@ class BluetoothMgr:
                 if device_info.get('connected'):
                     log.info(f"[BLUETOOTH] Device {address_upper} is already connected")
                     # 确保设备在管理器中
-                    device = self._update_or_create_device(
-                        address=address_upper,
-                        name=device_info.get('name', address_upper),
-                        metadata=device_info
-                    )
+                    device = self._update_or_create_device(address=address_upper,
+                                                           name=device_info.get('name', address_upper),
+                                                           metadata=device_info)
                     device.connected = True
                     return {"code": 0, "msg": "Already connected", "data": device.to_dict()}
 
@@ -494,16 +483,14 @@ class BluetoothMgr:
             if result.get('code') == 0:
                 # 等待连接完成
                 await asyncio.sleep(CONNECTION_WAIT_TIME)
-                
+
                 # 获取设备信息并更新管理器
                 device_info_result = self._get_device_info_from_dbus(address_upper, bus, adapter)
                 if device_info_result.get('code') == 0:
                     device_info = device_info_result.get('data', {})
-                    device = self._update_or_create_device(
-                        address=address_upper,
-                        name=device_info.get('name', address_upper),
-                        metadata=device_info
-                    )
+                    device = self._update_or_create_device(address=address_upper,
+                                                           name=device_info.get('name', address_upper),
+                                                           metadata=device_info)
                     device.connected = True
                     return {"code": 0, "msg": "Connected", "data": device.to_dict()}
                 else:
@@ -526,7 +513,7 @@ class BluetoothMgr:
         """
         address_upper = address.upper()
         adapter = adapter or self._default_adapter
-        
+
         try:
             # 获取适配器信息
             adapter_info = self._get_adapter_info(adapter)
@@ -580,7 +567,7 @@ class BluetoothMgr:
         """
         address_upper = address.upper()
         adapter = adapter or self._default_adapter
-        
+
         try:
             adapter_info = self._get_adapter_info(adapter)
             if not adapter_info:
@@ -588,7 +575,7 @@ class BluetoothMgr:
 
             bus = adapter_info['bus']
             device_path = self._get_device_path(address_upper, adapter)
-            
+
             if not device_path:
                 return {"code": -1, "msg": f"Device {address_upper} not found"}
 
@@ -652,7 +639,6 @@ class BluetoothMgr:
             device_interface = dbus.Interface(device_obj, DEVICE_INTERFACE)
             device_interface.Connect()
 
-            log.info(f"[BLUETOOTH] Connected to device: {address}")
             return {"code": 0, "msg": "Connected"}
         except dbus.exceptions.DBusException as e:
             error_name = e.get_dbus_name()
@@ -762,13 +748,10 @@ class BluetoothMgr:
         """
         if not line.strip() or not line.startswith('Device'):
             return None
-        
+
         parts = line.split(' ', 2)
         if len(parts) >= 2:
-            return {
-                "address": parts[1],
-                "name": parts[2] if len(parts) > 2 else parts[1]
-            }
+            return {"address": parts[1], "name": parts[2] if len(parts) > 2 else parts[1]}
         return None
 
     def _get_device_with_mgr_info(self, address: str, default_info: Dict[str, Any]) -> Dict[str, Any]:
@@ -929,12 +912,12 @@ class BluetoothMgr:
         """
         info = {}
         uuids = []
-        
+
         for line in stdout.split('\n'):
             line = line.strip()
             if not line:
                 continue
-            
+
             # 解析第一行: "Device XX:XX:XX:XX:XX:XX (public)"
             if line.startswith('Device'):
                 parts = line.split(' ', 1)
@@ -942,15 +925,15 @@ class BluetoothMgr:
                     address_part = parts[1].split(' ', 1)[0]  # 提取地址，忽略后面的 (public)
                     info['address'] = address_part
                 continue
-            
+
             # 解析格式: "Key: value"
             if ':' in line:
                 parts = line.split(':', 1)
                 key = parts[0].strip()
                 value = parts[1].strip() if len(parts) > 1 else ""
-                
+
                 key_lower = key.lower()
-                
+
                 # 处理 UUID（可能有多个）
                 if key_lower == 'uuid':
                     # UUID 格式: "UUID: Service Name (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)"
@@ -960,14 +943,14 @@ class BluetoothMgr:
                         start = value.find('(')
                         end = value.find(')')
                         if start != -1 and end != -1:
-                            uuid_match = value[start+1:end]
+                            uuid_match = value[start + 1:end]
                     elif value.strip():
                         # 如果没有括号，尝试提取 UUID 格式的字符串
                         uuid_pattern = r'([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})'
                         match = re.search(uuid_pattern, value)
                         if match:
                             uuid_match = match.group(1)
-                    
+
                     if uuid_match:
                         uuid_info = {
                             'uuid': uuid_match,
@@ -975,11 +958,11 @@ class BluetoothMgr:
                         }
                         uuids.append(uuid_info)
                     continue
-                
+
                 # 转换布尔值
                 if value.lower() in ('yes', 'no'):
                     value = value.lower() == 'yes'
-                
+
                 # 解析 Class（十六进制值）
                 if key_lower == 'class':
                     # 格式: "0x00244008 (2375688)"
@@ -995,7 +978,7 @@ class BluetoothMgr:
                         except ValueError:
                             info['class'] = value
                     continue
-                
+
                 # 标准化键名
                 if key_lower == 'name':
                     info['name'] = value
@@ -1025,11 +1008,11 @@ class BluetoothMgr:
                 else:
                     # 保留其他字段（使用原始键名）
                     info[key.lower()] = value
-        
+
         # 添加 UUID 列表
         if uuids:
             info['uuids'] = uuids
-        
+
         return info
 
     def get_info(self, address: str, adapter: str = None) -> Dict:
@@ -1047,7 +1030,7 @@ class BluetoothMgr:
 
             bus = adapter_info['bus']
             result = self._get_device_info_from_dbus(address_upper, bus, adapter)
-            
+
             # 如果设备在 BluetoothMgr 中管理，合并管理器中的信息
             if result.get('code') == 0 and address_upper in self.devices:
                 device_info = result.get('data', {})
