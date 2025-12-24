@@ -19,6 +19,17 @@ pynput==1.7.6
 # If you have pyobjc-core 12.x, upgrade bleak: pip install --upgrade bleak
 bleak>=0.22.0
 
+# Bluetooth Classic Control (Linux - Ubuntu)
+# DBus interface for BlueZ (推荐，功能最全)
+dbus-python>=1.2.18
+
+# Audio Playback Control
+# VLC player (推荐，支持完整播放控制)
+python-vlc>=3.0.20123
+
+# ALSA Audio Control (可选)
+pyalsaaudio>=0.9.0
+
 # Other dependencies (if any)
 # Add your other dependencies here
 

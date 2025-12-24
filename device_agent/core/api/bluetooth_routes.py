@@ -62,6 +62,24 @@ def bluetooth_disconnect():
         return _err(msg=f'error: {str(e)}')
 
 
+@bluetooth_bp.route("/bluetooth/trust", methods=['POST'])
+def bluetooth_trust():
+    """
+    信任蓝牙设备
+    """
+    try:
+        args = request.get_json()
+        log.info("===== [Bluetooth Trust] " + json.dumps(args))
+        address = args.get('address')
+        if not address:
+            return _err(msg="address is required")
+        result = bluetooth_mgr.trust_device(address)
+        return _convert_result(result)
+    except Exception as e:
+        log.error(e)
+        return _err(msg=f'error: {str(e)}')
+
+
 @bluetooth_bp.route("/bluetooth/connected", methods=['GET'])
 def bluetooth_get_connected():
     """
