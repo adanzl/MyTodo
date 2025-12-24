@@ -169,8 +169,7 @@ class VLCPlayer:
             time_ms = self.media_player.get_time()  # 毫秒
             length_ms = self.media_player.get_length()  # 毫秒
 
-            return {
-                "code": 0,
+            status_data = {
                 "state": state_map.get(state, 'unknown'),
                 "position": position,  # 0.0-1.0
                 "time": time_ms / 1000.0 if time_ms > 0 else 0.0,  # 秒
@@ -178,6 +177,12 @@ class VLCPlayer:
                 "volume": self.media_player.audio_get_volume(),
                 "file": os.path.basename(self.current_file) if self.current_file else None,
                 "alsa_device": self.alsa_device,
+            }
+
+            return {
+                "code": 0,
+                "data": status_data,
+                "msg": "ok"
             }
         except Exception as e:
             log.error(f"[VLC] Get status error: {e}")

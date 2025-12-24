@@ -41,7 +41,12 @@ class MediaMgr:
                 # 返回所有设备的状态
                 all_status = {}
                 for addr, player in self._players.items():
-                    all_status[addr] = player.get_status()
+                    status_result = player.get_status()
+                    # player.get_status() 返回 {"code": 0, "data": {...}, "msg": "ok"}
+                    if status_result.get("code") == 0:
+                        all_status[addr] = status_result.get("data", {})
+                    else:
+                        all_status[addr] = status_result
                 return {"code": 0, "data": all_status}
         except Exception as e:
             log.error(f"[MEDIA] Error getting status: {e}")
@@ -183,14 +188,15 @@ class MediaMgr:
         :param hci_adapter: HCI 适配器名称
         :return: ALSA 设备名称
         """
+        # 如果直接指定了 ALSA 设备，直接返回
         if alsa_device:
             return alsa_device
         
+        # 如果提供了设备地址，直接构造 ALSA 设备名，不需要查询配对设备列表
         if device_address:
-            alsa_device = bluetooth_mgr.get_alsa_name(device_address, hci_adapter)
-            if alsa_device:
-                log.info(f"[MEDIA] Found ALSA device: {alsa_device}")
-                return alsa_device
+            alsa_device = f"bluealsa:HCI={hci_adapter},DEV={device_address.upper()},PROFILE=a2dp"
+            log.info(f"[MEDIA] Using ALSA device: {alsa_device}")
+            return alsa_device
         
         # 没有指定任何设备，尝试获取第一个蓝牙设备
         alsa_device = bluetooth_mgr.get_alsa_name(None, hci_adapter)
@@ -206,6 +212,14 @@ class MediaMgr:
         """
         if not device_address:
             return None
+
+        # 先检查设备是否已连接，避免不必要的连接操作
+        if bluetooth_mgr._check_device_connected(device_address):
+            # 设备已连接，获取设备信息
+            device_info_result = bluetooth_mgr.get_info(device_address)
+            if device_info_result.get('code') == 0:
+                return device_info_result.get('data', {})
+            # 如果获取信息失败，继续尝试连接
 
         connect_result = bluetooth_mgr.connect_device_sync(device_address, timeout=10.0)
         if connect_result.get('code') == 0:
