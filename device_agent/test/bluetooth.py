@@ -1,5 +1,6 @@
 import sys
 import os
+from time import sleep
 
 # 添加项目根目录到 Python 路径
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -10,7 +11,7 @@ from core.service.bluetooth_mgr import bluetooth_mgr
 
 if __name__ == "__main__":
     # 测试代码
-    print("Bluetooth Manager Test")
+    print("======================== Bluetooth Manager Test ================================")
     # 测试扫描
     # devices = bluetooth_mgr.scan_devices_sync(timeout=3.0)
     # print(f"Found {len(devices)} devices")
@@ -27,6 +28,7 @@ if __name__ == "__main__":
     print(bluetooth_mgr.disconnect_device_sync(device_address))
     info = bluetooth_mgr.get_info(device_address)
     print(f"{device_address} connected: {info['data']['connected']}")
-    # bluetooth_mgr.connect_device_sync(device_address)
-    # info = bluetooth_mgr.get_info(device_address)
-    # print(info['data'])
+    sleep(5)
+    print(bluetooth_mgr.connect_device_sync(device_address))
+    info = bluetooth_mgr.get_info(device_address)
+    print(f"{device_address} connected: {info['data']['connected']}")
