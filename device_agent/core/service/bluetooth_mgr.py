@@ -2,7 +2,6 @@
 蓝牙设备管理 (Linux Only) - 使用 DBus + BlueZ
 '''
 import asyncio
-import re
 from typing import Dict, List, Optional, Any
 
 import dbus
@@ -74,11 +73,16 @@ class BluetoothMgr:
         :param objects: GetManagedObjects() 返回的对象字典
         :return: 适配器路径，如果未找到返回 None
         """
-        # 首先尝试查找指定名称的适配器
+        # 首先尝试通过路径查找适配器（路径格式：/org/bluez/hci0）
         for path, interfaces in objects.items():
             if ADAPTER_INTERFACE in interfaces:
-                adapter_props = interfaces[ADAPTER_INTERFACE]
-                if adapter_props.get('Name', '') == adapter_name:
+                # 从路径中提取 hci 名称
+                if path.startswith('/org/bluez/'):
+                    path_hci = path.split('/')[-1]
+                    if path_hci == adapter_name:
+                        return path
+                # 备用方案：检查路径中是否包含适配器名称
+                elif adapter_name in path:
                     return path
 
         # 如果没找到指定适配器，返回第一个适配器
@@ -89,72 +93,64 @@ class BluetoothMgr:
         return None
 
     def get_adapters(self) -> List[Dict[str, Any]]:
-        """
-        获取所有可用的蓝牙适配器列表
-        :return: 适配器列表，每个适配器包含 name, path, powered, discoverable, pairable 等信息
-        """
+        """获取所有可用的蓝牙适配器列表"""
         try:
             bus = dbus.SystemBus()
             manager = self._get_dbus_manager(bus)
             objects = manager.GetManagedObjects()
-
+            default_adapter = self._default_adapter
             adapters = []
+            
             for path, interfaces in objects.items():
-                if ADAPTER_INTERFACE in interfaces:
-                    adapter_props = interfaces[ADAPTER_INTERFACE]
-                    adapter_name = adapter_props.get('Name', '')
-                    adapter_info = {
-                        'name': adapter_name,
-                        'path': path,
-                        'powered': bool(adapter_props.get('Powered', False)),
-                        'discoverable': bool(adapter_props.get('Discoverable', False)),
-                        'pairable': bool(adapter_props.get('Pairable', False)),
-                        'discovering': bool(adapter_props.get('Discovering', False)),
-                        'address': adapter_props.get('Address', ''),
-                    }
-                    # 添加 Class（如果可用）
-                    if 'Class' in adapter_props:
-                        adapter_info['class'] = int(adapter_props['Class'])
-                    adapters.append(adapter_info)
+                if ADAPTER_INTERFACE not in interfaces:
+                    continue
+                    
+                adapter_props = interfaces[ADAPTER_INTERFACE]
+                system_name = adapter_props.get('Name', '')
+                
+                # 从路径中提取 hci 名称（如 /org/bluez/hci0 -> hci0）
+                hci_name = path.split('/')[-1] if path.startswith('/org/bluez/') else \
+                           next((p for p in reversed(path.split('/')) if p.startswith('hci')), system_name or 'unknown')
+                
+                adapter_info = {
+                    'name': hci_name,
+                    'system_name': system_name,
+                    'path': path,
+                    'powered': bool(adapter_props.get('Powered', False)),
+                    'discoverable': bool(adapter_props.get('Discoverable', False)),
+                    'pairable': bool(adapter_props.get('Pairable', False)),
+                    'discovering': bool(adapter_props.get('Discovering', False)),
+                    'address': adapter_props.get('Address', ''),
+                    'is_default': hci_name == default_adapter,
+                }
+                if 'Class' in adapter_props:
+                    adapter_info['class'] = int(adapter_props['Class'])
+                adapters.append(adapter_info)
 
-            log.info(f"[BLUETOOTH] Found {len(adapters)} adapters")
+            log.info(f"[BLUETOOTH] Found {len(adapters)} adapters, default: {default_adapter}")
             return adapters
         except Exception as e:
             log.error(f"[BLUETOOTH] Failed to get adapters: {e}")
             return []
 
     def get_default_adapter(self) -> str:
-        """
-        获取默认适配器名称
-        :return: 适配器名称（如 hci0）
-        """
+        """获取默认适配器名称"""
         return self._default_adapter
 
     def set_default_adapter(self, adapter: str) -> Dict[str, Any]:
-        """
-        设置默认适配器
-        :param adapter: 适配器名称（如 hci0）
-        :return: 设置结果
-        """
+        """设置默认适配器"""
         try:
-            # 验证适配器是否存在
             adapters = self.get_adapters()
             adapter_names = [a.get('name') for a in adapters]
-            
             if adapter not in adapter_names:
-                return {"code": -1, "msg": f"Adapter {adapter} not found. Available adapters: {', '.join(adapter_names)}"}
+                return {"code": -1, "msg": f"Adapter {adapter} not found. Available: {', '.join(adapter_names)}"}
             
-            # 设置默认适配器
             old_adapter = self._default_adapter
             self._default_adapter = adapter
             
-            # 清除旧适配器的缓存，强制重新初始化
-            if old_adapter in self._adapter_interfaces:
-                del self._adapter_interfaces[old_adapter]
-            if old_adapter in self._adapter_buses:
-                del self._adapter_buses[old_adapter]
-            if old_adapter in self._adapter_paths:
-                del self._adapter_paths[old_adapter]
+            # 清除旧适配器的缓存
+            for cache_dict in [self._adapter_interfaces, self._adapter_buses, self._adapter_paths]:
+                cache_dict.pop(old_adapter, None)
             
             log.info(f"[BLUETOOTH] Default adapter changed from {old_adapter} to {adapter}")
             return {"code": 0, "msg": f"Default adapter set to {adapter}", "data": {"adapter": adapter}}
@@ -163,11 +159,7 @@ class BluetoothMgr:
             return {"code": -1, "msg": f"Failed to set default adapter: {str(e)}"}
 
     def _get_adapter_info(self, adapter: str = None) -> Optional[Dict[str, Any]]:
-        """
-        获取适配器的 DBus 信息
-        :param adapter: HCI 适配器名称，默认为 hci0
-        :return: 包含 bus, path, interface 的字典，如果失败返回 None
-        """
+        """获取适配器的 DBus 信息"""
         adapter = adapter or self._default_adapter
 
         # 如果已经初始化过，直接返回
@@ -212,12 +204,7 @@ class BluetoothMgr:
             return None
 
     def _get_device_path(self, address: str, adapter: str = None) -> Optional[str]:
-        """
-        获取设备路径
-        :param address: 设备地址
-        :param adapter: HCI 适配器名称，默认为 hci0
-        :return: 设备路径，如果未找到返回 None
-        """
+        """获取设备路径"""
         try:
             adapter_info = self._get_adapter_info(adapter)
             if not adapter_info:
@@ -241,11 +228,7 @@ class BluetoothMgr:
             return None
 
     def _get_devices_from_dbus(self, adapter: str = None) -> List[Dict[str, Any]]:
-        """
-        从 DBus 获取所有设备
-        :param adapter: HCI 适配器名称，默认为 hci0
-        :return: 设备列表
-        """
+        """从 DBus 获取所有设备"""
         try:
             adapter_info = self._get_adapter_info(adapter)
             if not adapter_info:
@@ -396,13 +379,7 @@ class BluetoothMgr:
             return f"Unknown Device ({addr_short})"
 
     async def scan_devices(self, timeout: float = 5.0, adapter: str = None) -> List[Dict]:
-        """
-        扫描传统蓝牙设备（Classic Bluetooth）
-        使用 DBus + BlueZ 扫描
-        :param timeout: 扫描超时时间（秒）
-        :param adapter: HCI 适配器名称，默认为 hci0
-        :return: 设备列表
-        """
+        """扫描传统蓝牙设备（使用 DBus + BlueZ）"""
         if self.scanning:
             log.warning("[BLUETOOTH] Already scanning")
             return []
@@ -479,12 +456,7 @@ class BluetoothMgr:
             self.scanning = False
 
     async def scan_ble_devices(self, timeout: float = 5.0) -> List[Dict]:
-        """
-        扫描 BLE 蓝牙设备（低功耗蓝牙）
-        使用 BleakScanner 扫描
-        :param timeout: 扫描超时时间（秒）
-        :return: 设备列表
-        """
+        """扫描 BLE 蓝牙设备（使用 BleakScanner）"""
         if self.scanning:
             log.warning("[BLUETOOTH] Already scanning")
             return []
@@ -498,16 +470,10 @@ class BluetoothMgr:
             device_list = []
 
             for device, advertisement_data in devices_dict.values():
-                # 获取友好名称
                 friendly_name = self._get_friendly_name(device, advertisement_data)
-
-                # 构建 metadata
                 metadata = self._build_ble_metadata(advertisement_data)
-
                 device_info = {"address": device.address, "name": friendly_name, "metadata": metadata}
                 device_list.append(device_info)
-
-                # 更新设备列表
                 self._update_or_create_device(address=device.address, name=friendly_name, metadata=metadata)
 
             log.info(f"[BLUETOOTH] Found {len(device_list)} BLE devices")
@@ -520,12 +486,7 @@ class BluetoothMgr:
             self.scanning = False
 
     async def connect_device(self, address: str, adapter: str = None) -> Dict:
-        """
-        连接蓝牙设备（使用 DBus + BlueZ）
-        :param address: 设备地址
-        :param adapter: HCI 适配器名称，默认为 hci0
-        :return: 连接结果
-        """
+        """连接蓝牙设备（使用 DBus + BlueZ）"""
         address_upper = address.upper()
         adapter = adapter or self._default_adapter
 
@@ -579,12 +540,7 @@ class BluetoothMgr:
             return {"code": -1, "msg": f"Connection failed: {str(e)}"}
 
     async def disconnect_device(self, address: str, adapter: str = None) -> Dict:
-        """
-        断开蓝牙设备（使用 DBus + BlueZ）
-        :param address: 设备地址
-        :param adapter: HCI 适配器名称，默认为 hci0
-        :return: 断开结果
-        """
+        """断开蓝牙设备（使用 DBus + BlueZ）"""
         address_upper = address.upper()
         adapter = adapter or self._default_adapter
 
@@ -598,13 +554,11 @@ class BluetoothMgr:
 
             # 检查设备是否已断开
             device_info_result = self._get_device_info_from_dbus(address_upper, bus, adapter)
-            if device_info_result.get('code') == 0:
-                device_info = device_info_result.get('data', {})
-                if not device_info.get('connected'):
-                    log.info(f"[BLUETOOTH] Device {address_upper} is already disconnected")
-                    if address_upper in self.devices:
-                        self.devices[address_upper].connected = False
-                    return {"code": 0, "msg": "Already disconnected"}
+            if device_info_result.get('code') == 0 and not device_info_result.get('data', {}).get('connected'):
+                log.info(f"[BLUETOOTH] Device {address_upper} is already disconnected")
+                if address_upper in self.devices:
+                    self.devices[address_upper].connected = False
+                return {"code": 0, "msg": "Already disconnected"}
 
             # 执行断开
             log.info(f"[BLUETOOTH] Disconnecting device: {address_upper} on {adapter}")
@@ -616,15 +570,10 @@ class BluetoothMgr:
                 self.devices[address_upper].client = None
 
             if result.get('code') == 0:
-                # 获取设备信息
-                device_info_result = self._get_device_info_from_dbus(address_upper, bus, adapter)
-                if device_info_result.get('code') == 0:
-                    device_info = device_info_result.get('data', {})
-                    if address_upper in self.devices:
-                        return {"code": 0, "msg": "Disconnected", "data": self.devices[address_upper].to_dict()}
+                if address_upper in self.devices:
+                    return {"code": 0, "msg": "Disconnected", "data": self.devices[address_upper].to_dict()}
                 return {"code": 0, "msg": "Disconnected"}
-            else:
-                return result
+            return result
 
         except Exception as e:
             log.error(f"[BLUETOOTH] Disconnect error for {address_upper}: {e}")
@@ -633,12 +582,7 @@ class BluetoothMgr:
             return {"code": -1, "msg": f"Disconnect failed: {str(e)}"}
 
     def trust_device(self, address: str, adapter: str = None) -> Dict:
-        """
-        信任蓝牙设备（使用 DBus + BlueZ）
-        :param address: 设备地址
-        :param adapter: HCI 适配器名称，默认为 hci0
-        :return: 信任结果
-        """
+        """信任蓝牙设备（使用 DBus + BlueZ）"""
         address_upper = address.upper()
         adapter = adapter or self._default_adapter
 
@@ -698,13 +642,7 @@ class BluetoothMgr:
             return []
 
     def _connect_device_via_dbus(self, address: str, bus: dbus.SystemBus, adapter: str = None) -> Dict[str, Any]:
-        """
-        通过 DBus 连接设备
-        :param address: 设备地址
-        :param bus: DBus 系统总线
-        :param adapter: HCI 适配器名称（用于查找设备路径）
-        :return: 连接结果
-        """
+        """通过 DBus 连接设备"""
         try:
             device_path = self._get_device_path(address, adapter)
             if not device_path:
@@ -726,13 +664,7 @@ class BluetoothMgr:
             return {"code": -1, "msg": f"Connection failed: {str(e)}"}
 
     def _disconnect_device_via_dbus(self, address: str, bus: dbus.SystemBus, adapter: str = None) -> Dict[str, Any]:
-        """
-        通过 DBus 断开设备
-        :param address: 设备地址
-        :param bus: DBus 系统总线
-        :param adapter: HCI 适配器名称（用于查找设备路径）
-        :return: 断开结果
-        """
+        """通过 DBus 断开设备"""
         try:
             device_path = self._get_device_path(address, adapter)
             if not device_path:
@@ -741,12 +673,10 @@ class BluetoothMgr:
             device_obj = bus.get_object(BLUEZ_SERVICE, device_path)
             device_interface = dbus.Interface(device_obj, DEVICE_INTERFACE)
             device_interface.Disconnect()
-
             log.info(f"[BLUETOOTH] Disconnected device: {address}")
             return {"code": 0, "msg": "Disconnected"}
         except dbus.exceptions.DBusException as e:
-            error_name = e.get_dbus_name()
-            if 'org.bluez.Error.NotConnected' in error_name:
+            if 'org.bluez.Error.NotConnected' in e.get_dbus_name():
                 return {"code": 0, "msg": "Already disconnected"}
             log.error(f"[BLUETOOTH] Failed to disconnect device {address}: {e}")
             return {"code": -1, "msg": f"Disconnect failed: {str(e)}"}
@@ -755,13 +685,7 @@ class BluetoothMgr:
             return {"code": -1, "msg": f"Disconnect failed: {str(e)}"}
 
     def _get_device_info_from_dbus(self, address: str, bus: dbus.SystemBus, adapter: str = None) -> Dict[str, Any]:
-        """
-        从 DBus 获取设备详细信息
-        :param address: 设备地址
-        :param bus: DBus 系统总线
-        :param adapter: HCI 适配器名称（用于查找设备路径）
-        :return: 设备信息字典
-        """
+        """从 DBus 获取设备详细信息"""
         try:
             device_path = self._get_device_path(address, adapter)
             if not device_path:
@@ -794,103 +718,46 @@ class BluetoothMgr:
             return {"code": -1, "msg": f"Failed to get device info: {str(e)}"}
 
     def _check_device_connected(self, address: str, adapter: str = None) -> bool:
-        """
-        检查设备是否已连接（使用 DBus）
-        :param address: 设备地址
-        :param adapter: HCI 适配器名称，默认为 hci0
-        :return: 是否已连接
-        """
+        """检查设备是否已连接"""
         try:
             adapter_info = self._get_adapter_info(adapter)
             if not adapter_info:
                 return False
-
-            bus = adapter_info['bus']
-            device_info_result = self._get_device_info_from_dbus(address, bus, adapter)
-            if device_info_result.get('code') == 0:
-                device_info = device_info_result.get('data', {})
-                return device_info.get('connected', False)
-            return False
+            result = self._get_device_info_from_dbus(address, adapter_info['bus'], adapter)
+            return result.get('code') == 0 and result.get('data', {}).get('connected', False)
         except Exception as e:
             log.debug(f"[BLUETOOTH] Failed to check connection status for {address}: {e}")
             return False
 
-    def _parse_device_line(self, line: str) -> Optional[Dict[str, str]]:
-        """
-        解析 bluetoothctl devices 输出的一行
-        :param line: 输出行，格式: "Device XX:XX:XX:XX:XX:XX Device Name"
-        :return: {"address": "...", "name": "..."} 或 None
-        """
-        if not line.strip() or not line.startswith('Device'):
-            return None
-
-        parts = line.split(' ', 2)
-        if len(parts) >= 2:
-            return {"address": parts[1], "name": parts[2] if len(parts) > 2 else parts[1]}
-        return None
-
-    def _get_device_with_mgr_info(self, address: str, default_info: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        获取设备信息，优先使用 BluetoothMgr 中的信息
-        :param address: 设备地址
-        :param default_info: 默认设备信息
-        :return: 设备信息字典
-        """
-        address_upper = address.upper()
-        if address_upper in self.devices:
-            device = self.devices[address_upper]
-            mgr_info = device.to_dict()
-            # 合并信息，管理器中的信息优先（但保留 default_info 中管理器没有的字段）
-            mgr_info.update(default_info)
-            return mgr_info
-        return default_info
-
     def get_paired_devices(self, adapter: str = None) -> List[Dict]:
-        """
-        获取系统已配对的蓝牙设备列表（使用 DBus + BlueZ）
-        :param adapter: HCI 适配器名称，默认为 hci0
-        :return: 已配对设备列表
-        """
+        """获取系统已配对的蓝牙设备列表"""
         try:
             devices = self._get_devices_from_dbus(adapter)
-            # 过滤出已配对的设备
             paired_devices = [d for d in devices if d.get('paired', False)]
-
-            adapter = adapter or self._default_adapter
-            log.info(f"[BLUETOOTH] Found {len(paired_devices)} paired devices on {adapter}")
+            adapter_name = adapter or self._default_adapter
+            log.info(f"[BLUETOOTH] Found {len(paired_devices)} paired devices on {adapter_name}")
             return paired_devices
-
         except Exception as e:
             log.error(f"[BLUETOOTH] Error getting paired devices: {e}")
             return []
 
     def get_connected_devices(self, adapter: str = None) -> List[Dict]:
-        """
-        获取所有已连接的设备（使用 DBus + BlueZ）
-        :param adapter: HCI 适配器名称，默认为 hci0
-        :return: 已连接设备列表
-        """
+        """获取所有已连接的设备"""
         try:
             devices = self._get_devices_from_dbus(adapter)
-            # 过滤出已连接的设备
             connected_devices = [d for d in devices if d.get('connected', False)]
-
-            # 合并管理器中的设备信息
             result = []
             for device in connected_devices:
                 address = device['address']
                 if address in self.devices:
-                    mgr_device = self.devices[address]
-                    device_dict = mgr_device.to_dict()
+                    device_dict = self.devices[address].to_dict()
                     device_dict["connected"] = True
                     result.append(device_dict)
                 else:
                     result.append(device)
-
-            adapter = adapter or self._default_adapter
-            log.info(f"[BLUETOOTH] Found {len(result)} connected devices on {adapter}")
+            adapter_name = adapter or self._default_adapter
+            log.info(f"[BLUETOOTH] Found {len(result)} connected devices on {adapter_name}")
             return result
-
         except Exception as e:
             log.error(f"[BLUETOOTH] Error getting connected devices: {e}")
             return []
@@ -899,57 +766,40 @@ class BluetoothMgr:
         """同步连接设备"""
         try:
             return run_async(self.connect_device(address, adapter), timeout=timeout, log_prefix="BLUETOOTH")
-        except asyncio.TimeoutError:
-            log.error(f"[BLUETOOTH] Connect timeout after {timeout}s")
-            return {"code": -1, "msg": f"Connection timeout after {timeout}s"}
-        except Exception as e:
+        except (asyncio.TimeoutError, Exception) as e:
+            msg = f"Connection timeout after {timeout}s" if isinstance(e, asyncio.TimeoutError) else f"Connection failed: {str(e)}"
             log.error(f"[BLUETOOTH] Connect error: {e}")
-            return {"code": -1, "msg": f"Connection failed: {str(e)}"}
+            return {"code": -1, "msg": msg}
 
     def disconnect_device_sync(self, address: str, timeout: float = 5.0, adapter: str = None) -> Dict:
         """同步断开设备"""
         try:
             return run_async(self.disconnect_device(address, adapter), timeout=timeout, log_prefix="BLUETOOTH")
-        except asyncio.TimeoutError:
-            log.error(f"[BLUETOOTH] Disconnect timeout after {timeout}s")
-            return {"code": -1, "msg": f"Disconnect timeout after {timeout}s"}
-        except Exception as e:
+        except (asyncio.TimeoutError, Exception) as e:
+            msg = f"Disconnect timeout after {timeout}s" if isinstance(e, asyncio.TimeoutError) else f"Disconnect failed: {str(e)}"
             log.error(f"[BLUETOOTH] Disconnect error: {e}")
-            return {"code": -1, "msg": f"Disconnect failed: {str(e)}"}
+            return {"code": -1, "msg": msg}
 
     def _find_target_device(self, device_address: Optional[str], paired_devices: List[Dict]) -> Optional[Dict]:
-        """
-        查找目标蓝牙设备
-        :param device_address: 设备地址（可选）
-        :param paired_devices: 已配对设备列表
-        :return: 目标设备字典
-        """
+        """查找目标蓝牙设备"""
         if device_address:
-            # 查找指定地址的设备
             addr_upper = device_address.upper()
-            target_device = next((d for d in paired_devices if d.get('address', '').upper() == addr_upper), None)
-            if not target_device:
+            target = next((d for d in paired_devices if d.get('address', '').upper() == addr_upper), None)
+            if not target:
                 log.warning(f"[BLUETOOTH] Bluetooth device not found: {device_address}")
-                # 即使没找到设备信息，仍然尝试构造 ALSA 设备名
                 return {'address': device_address, 'name': device_address, 'connected': False}
-            return target_device
+            return target
         else:
-            # 使用第一个已连接的设备
-            target_device = next((d for d in paired_devices if d.get('connected')), None)
-            if not target_device:
+            target = next((d for d in paired_devices if d.get('connected')), None)
+            if not target:
                 log.warning("[BLUETOOTH] No connected bluetooth devices found")
-                # 如果没有已连接的，使用第一个已配对的
-                target_device = paired_devices[0]
-                log.info(f"[BLUETOOTH] Using first paired device: {target_device.get('name')}")
-            return target_device
+                target = paired_devices[0] if paired_devices else None
+                if target:
+                    log.info(f"[BLUETOOTH] Using first paired device: {target.get('name')}")
+            return target
 
     def get_alsa_name(self, device_address: Optional[str] = None, hci_adapter: str = 'hci0') -> Optional[str]:
-        """
-        获取 ALSA 蓝牙音频设备名称（直接根据 MAC 地址构造）
-        :param device_address: 蓝牙设备地址（可选）
-        :param hci_adapter: HCI 适配器名称，默认为 hci0
-        :return: ALSA 设备名称，例如 "bluealsa:HCI=hci0,DEV=XX:XX:XX:XX:XX:XX,PROFILE=a2dp"
-        """
+        """获取 ALSA 蓝牙音频设备名称"""
         try:
             paired_devices = self.get_paired_devices(hci_adapter)
             if not paired_devices:
@@ -960,163 +810,39 @@ class BluetoothMgr:
             if not target_device:
                 return None
 
-            device_address = target_device.get('address')
-            device_name = target_device.get('name', device_address)
+            addr = target_device.get('address')
+            name = target_device.get('name', addr)
             is_connected = target_device.get('connected', False)
 
-            # 记录设备状态
             if is_connected:
-                log.info(f"[BLUETOOTH] Target bluetooth device: {device_name} ({device_address})")
+                log.info(f"[BLUETOOTH] Target bluetooth device: {name} ({addr})")
             else:
-                log.warning(f"[BLUETOOTH] Bluetooth device not connected: {device_name} ({device_address})")
+                log.warning(f"[BLUETOOTH] Bluetooth device not connected: {name} ({addr})")
 
-            # 格式: bluealsa:HCI=hci0,DEV=XX:XX:XX:XX:XX:XX,PROFILE=a2dp
-            alsa_device = f"bluealsa:HCI={hci_adapter},DEV={device_address.upper()},PROFILE=a2dp"
+            alsa_device = f"bluealsa:HCI={hci_adapter},DEV={addr.upper()},PROFILE=a2dp"
             log.info(f"[BLUETOOTH] Using ALSA device: {alsa_device}")
             return alsa_device
-
         except Exception as e:
             log.error(f"[BLUETOOTH] Error getting ALSA device: {e}")
             return None
 
-    def _parse_bluetoothctl_info(self, stdout: str) -> Dict[str, Any]:
-        """
-        解析 bluetoothctl info 命令的输出
-        :param stdout: 命令输出
-        :return: 解析后的设备信息字典
-        """
-        info = {}
-        uuids = []
-
-        for line in stdout.split('\n'):
-            line = line.strip()
-            if not line:
-                continue
-
-            # 解析第一行: "Device XX:XX:XX:XX:XX:XX (public)"
-            if line.startswith('Device'):
-                parts = line.split(' ', 1)
-                if len(parts) >= 2:
-                    address_part = parts[1].split(' ', 1)[0]  # 提取地址，忽略后面的 (public)
-                    info['address'] = address_part
-                continue
-
-            # 解析格式: "Key: value"
-            if ':' in line:
-                parts = line.split(':', 1)
-                key = parts[0].strip()
-                value = parts[1].strip() if len(parts) > 1 else ""
-
-                key_lower = key.lower()
-
-                # 处理 UUID（可能有多个）
-                if key_lower == 'uuid':
-                    # UUID 格式: "UUID: Service Name (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)"
-                    uuid_match = None
-                    if '(' in value and ')' in value:
-                        # 提取括号中的 UUID
-                        start = value.find('(')
-                        end = value.find(')')
-                        if start != -1 and end != -1:
-                            uuid_match = value[start + 1:end]
-                    elif value.strip():
-                        # 如果没有括号，尝试提取 UUID 格式的字符串
-                        uuid_pattern = r'([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})'
-                        match = re.search(uuid_pattern, value)
-                        if match:
-                            uuid_match = match.group(1)
-
-                    if uuid_match:
-                        uuid_info = {
-                            'uuid': uuid_match,
-                            'name': value.split('(')[0].strip() if '(' in value else value.strip()
-                        }
-                        uuids.append(uuid_info)
-                    continue
-
-                # 转换布尔值
-                if value.lower() in ('yes', 'no'):
-                    value = value.lower() == 'yes'
-
-                # 解析 Class（十六进制值）
-                if key_lower == 'class':
-                    # 格式: "0x00244008 (2375688)"
-                    if '(' in value:
-                        hex_part = value.split('(')[0].strip()
-                        try:
-                            info['class'] = int(hex_part, 16)
-                        except ValueError:
-                            info['class'] = value
-                    else:
-                        try:
-                            info['class'] = int(value, 16) if value.startswith('0x') else int(value)
-                        except ValueError:
-                            info['class'] = value
-                    continue
-
-                # 标准化键名
-                if key_lower == 'name':
-                    info['name'] = value
-                elif key_lower == 'alias':
-                    info['alias'] = value
-                elif key_lower == 'connected':
-                    info['connected'] = value
-                elif key_lower == 'paired':
-                    info['paired'] = value
-                elif key_lower == 'bonded':
-                    info['bonded'] = value
-                elif key_lower == 'trusted':
-                    info['trusted'] = value
-                elif key_lower == 'blocked':
-                    info['blocked'] = value
-                elif key_lower == 'legacypairing':
-                    info['legacy_pairing'] = value
-                elif key_lower == 'icon':
-                    info['icon'] = value
-                elif key_lower == 'modalias':
-                    info['modalias'] = value
-                elif key_lower == 'rssi':
-                    try:
-                        info['rssi'] = int(value)
-                    except ValueError:
-                        pass
-                else:
-                    # 保留其他字段（使用原始键名）
-                    info[key.lower()] = value
-
-        # 添加 UUID 列表
-        if uuids:
-            info['uuids'] = uuids
-
-        return info
-
     def get_info(self, address: str, adapter: str = None) -> Dict:
-        """
-        获取指定设备的信息（使用 DBus + BlueZ）
-        :param address: 设备地址
-        :param adapter: HCI 适配器名称，默认为 hci0
-        :return: 设备信息字典
-        """
+        """获取指定设备的信息"""
         try:
             address_upper = address.upper()
             adapter_info = self._get_adapter_info(adapter)
             if not adapter_info:
                 return {"code": -1, "msg": f"Failed to get adapter info for {adapter}"}
 
-            bus = adapter_info['bus']
-            result = self._get_device_info_from_dbus(address_upper, bus, adapter)
+            result = self._get_device_info_from_dbus(address_upper, adapter_info['bus'], adapter)
 
-            # 如果设备在 BluetoothMgr 中管理，合并管理器中的信息
+            # 如果设备在管理器中，合并信息
             if result.get('code') == 0 and address_upper in self.devices:
-                device_info = result.get('data', {})
-                mgr_device = self.devices[address_upper]
-                # 合并信息，管理器中的信息优先
-                merged_info = mgr_device.to_dict()
-                merged_info.update(device_info)
+                merged_info = self.devices[address_upper].to_dict()
+                merged_info.update(result.get('data', {}))
                 result['data'] = merged_info
 
             return result
-
         except Exception as e:
             log.error(f"[BLUETOOTH] Error getting device info: {e}")
             return {"code": -1, "msg": f"Failed to get device info: {str(e)}"}
