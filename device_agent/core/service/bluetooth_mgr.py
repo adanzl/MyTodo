@@ -88,6 +88,80 @@ class BluetoothMgr:
 
         return None
 
+    def get_adapters(self) -> List[Dict[str, Any]]:
+        """
+        获取所有可用的蓝牙适配器列表
+        :return: 适配器列表，每个适配器包含 name, path, powered, discoverable, pairable 等信息
+        """
+        try:
+            bus = dbus.SystemBus()
+            manager = self._get_dbus_manager(bus)
+            objects = manager.GetManagedObjects()
+
+            adapters = []
+            for path, interfaces in objects.items():
+                if ADAPTER_INTERFACE in interfaces:
+                    adapter_props = interfaces[ADAPTER_INTERFACE]
+                    adapter_name = adapter_props.get('Name', '')
+                    adapter_info = {
+                        'name': adapter_name,
+                        'path': path,
+                        'powered': bool(adapter_props.get('Powered', False)),
+                        'discoverable': bool(adapter_props.get('Discoverable', False)),
+                        'pairable': bool(adapter_props.get('Pairable', False)),
+                        'discovering': bool(adapter_props.get('Discovering', False)),
+                        'address': adapter_props.get('Address', ''),
+                    }
+                    # 添加 Class（如果可用）
+                    if 'Class' in adapter_props:
+                        adapter_info['class'] = int(adapter_props['Class'])
+                    adapters.append(adapter_info)
+
+            log.info(f"[BLUETOOTH] Found {len(adapters)} adapters")
+            return adapters
+        except Exception as e:
+            log.error(f"[BLUETOOTH] Failed to get adapters: {e}")
+            return []
+
+    def get_default_adapter(self) -> str:
+        """
+        获取默认适配器名称
+        :return: 适配器名称（如 hci0）
+        """
+        return self._default_adapter
+
+    def set_default_adapter(self, adapter: str) -> Dict[str, Any]:
+        """
+        设置默认适配器
+        :param adapter: 适配器名称（如 hci0）
+        :return: 设置结果
+        """
+        try:
+            # 验证适配器是否存在
+            adapters = self.get_adapters()
+            adapter_names = [a.get('name') for a in adapters]
+            
+            if adapter not in adapter_names:
+                return {"code": -1, "msg": f"Adapter {adapter} not found. Available adapters: {', '.join(adapter_names)}"}
+            
+            # 设置默认适配器
+            old_adapter = self._default_adapter
+            self._default_adapter = adapter
+            
+            # 清除旧适配器的缓存，强制重新初始化
+            if old_adapter in self._adapter_interfaces:
+                del self._adapter_interfaces[old_adapter]
+            if old_adapter in self._adapter_buses:
+                del self._adapter_buses[old_adapter]
+            if old_adapter in self._adapter_paths:
+                del self._adapter_paths[old_adapter]
+            
+            log.info(f"[BLUETOOTH] Default adapter changed from {old_adapter} to {adapter}")
+            return {"code": 0, "msg": f"Default adapter set to {adapter}", "data": {"adapter": adapter}}
+        except Exception as e:
+            log.error(f"[BLUETOOTH] Failed to set default adapter: {e}")
+            return {"code": -1, "msg": f"Failed to set default adapter: {str(e)}"}
+
     def _get_adapter_info(self, adapter: str = None) -> Optional[Dict[str, Any]]:
         """
         获取适配器的 DBus 信息
@@ -592,14 +666,15 @@ class BluetoothMgr:
             log.error(f"[BLUETOOTH] Trust error for {address_upper}: {e}")
             return {"code": -1, "msg": f"Trust failed: {str(e)}"}
 
-    def scan_devices_sync(self, timeout: float = 5.0) -> List[Dict]:
+    def scan_devices_sync(self, timeout: float = 5.0, adapter: str = None) -> List[Dict]:
         """
         同步扫描传统蓝牙设备（在事件循环中运行）
         :param timeout: 扫描超时时间（秒）
+        :param adapter: HCI 适配器名称，默认为默认适配器
         :return: 设备列表
         """
         try:
-            return run_async(self.scan_devices(timeout), timeout=timeout + 2, log_prefix="BLUETOOTH")
+            return run_async(self.scan_devices(timeout, adapter), timeout=timeout + 2, log_prefix="BLUETOOTH")
         except asyncio.TimeoutError:
             log.error(f"[BLUETOOTH] Classic bluetooth scan timeout after {timeout}s")
             return []

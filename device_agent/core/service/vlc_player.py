@@ -19,6 +19,10 @@ class VLCPlayer:
         :param alsa_device: ALSA 设备名称，例如 "bluealsa:HCI=hci0,DEV=XX:XX:XX:XX:XX:XX,PROFILE=a2dp"
         :param hci_adapter: HCI 适配器名称（用于日志）
         """
+        # 验证必须是 bluealsa 格式
+        if not alsa_device.startswith('bluealsa:'):
+            raise ValueError(f"ALSA device must be bluealsa format, got: {alsa_device}")
+        
         self.alsa_device = alsa_device
         self.hci_adapter = hci_adapter
         self.instance = None
