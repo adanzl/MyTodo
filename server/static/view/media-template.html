@@ -163,6 +163,14 @@
         </div>
         <div class="flex flex-wrap gap-2">
           <el-button
+            type="primary"
+            size="small"
+            plain
+            @click="handleOpenBatchManager"
+            title="批量模式">
+            <el-icon><DocumentCopy /></el-icon>
+          </el-button>
+          <el-button
             type="plain"
             size="small"
             circle
@@ -1174,4 +1182,12 @@
       </div>
     </div>
   </el-dialog>
+
+  <!-- 批量模式管理器 -->
+  <batch-manager
+    v-if="batchManagerVisible && BatchManager"
+    :visible="batchManagerVisible"
+    :playlist-collection="playlistCollection"
+    @update:visible="batchManagerVisible = $event">
+  </batch-manager>
 </div>
