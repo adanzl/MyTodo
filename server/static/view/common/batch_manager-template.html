@@ -17,22 +17,15 @@
         <div
           v-for="batch in batchList"
           :key="batch.id"
-          class="border rounded px-3 py-2 cursor-pointer hover:bg-gray-50"
-          :class="{ 'border-blue-500 bg-blue-50': batch.id === selectedBatchId }"
-          @click="handleSelectBatch(batch.id)">
-          <div class="text-sm font-medium truncate">{{ batch.name }}</div>
-          <div class="text-xs text-gray-500 mt-1">
-            {{ batch.files ? batch.files.length : 0 }} 个文件
+          class="border rounded px-3 py-2 hover:bg-gray-50 flex items-center gap-2"
+          :class="{ 'border-blue-500 bg-blue-50': batch.id === selectedBatchId }">
+          <div class="flex-1 cursor-pointer" @click="handleSelectBatch(batch.id)">
+            <div class="text-sm font-medium truncate">{{ batch.name }}</div>
+            <div class="text-xs text-gray-500 mt-1">
+              {{ batch.files ? batch.files.length : 0 }} 个文件
+            </div>
           </div>
-          <div class="flex items-center gap-1 mt-2">
-            <el-button
-              type="plain"
-              size="small"
-              circle
-              @click.stop="handleEditBatch(batch.id)"
-              title="编辑">
-              <el-icon><Edit /></el-icon>
-            </el-button>
+          <div class="flex items-center gap-1 flex-shrink-0">
             <el-button
               type="plain"
               size="small"
@@ -52,39 +45,93 @@
     <!-- 第二列：文件列表 -->
     <div class="flex-1 border rounded p-3 flex flex-col">
       <div class="mb-3 flex items-center justify-between">
-        <h3 class="text-base font-semibold">
-          {{ selectedBatch ? selectedBatch.name : '请选择一个Batch' }}
-        </h3>
-        <el-button
-          v-if="selectedBatch"
-          type="primary"
-          size="small"
-          @click="handleOpenFileBrowser"
-          plain>
-          <el-icon><Plus /></el-icon>
-          添加文件
-        </el-button>
+        <div class="flex items-center gap-2">
+          <h3 class="text-base font-semibold">
+            {{ selectedBatch ? selectedBatch.name : '请选择一个Batch' }}
+          </h3>
+          <el-button
+            v-if="selectedBatch"
+            type="plain"
+            size="small"
+            circle
+            @click="handleEditBatch(selectedBatch.id)"
+            title="编辑">
+            <el-icon><Edit /></el-icon>
+          </el-button>
+        </div>
+        <div v-if="selectedBatch" class="flex items-center gap-2">
+          <el-button
+            v-show="!batchDeleteMode"
+            type="primary"
+            size="small"
+            @click="handleOpenFileBrowser"
+            plain>
+            <el-icon><Plus /></el-icon>
+          </el-button>
+          <el-button
+            type="default"
+            size="small"
+            @click="handleToggleBatchDeleteMode"
+            :disabled="!selectedBatch || !selectedBatch.files || selectedBatch.files.length === 0"
+            plain>
+            <el-icon v-if="batchDeleteMode"><Check /></el-icon>
+            <el-icon v-else><Delete /></el-icon>
+          </el-button>
+          <el-button
+            v-show="batchDeleteMode"
+            type="danger"
+            size="small"
+            @click="handleBatchDeleteFiles"
+            :disabled="selectedFileIndices.length === 0"
+            plain>
+            <el-icon><Delete /></el-icon>
+          </el-button>
+          <el-button
+            v-show="!batchDeleteMode"
+            type="default"
+            size="small"
+            @click="handleClearBatchFiles"
+            :disabled="!selectedBatch || !selectedBatch.files || selectedBatch.files.length === 0"
+            plain>
+            <el-icon><CircleClose /></el-icon>
+          </el-button>
+        </div>
       </div>
       <div class="flex-1 overflow-y-auto">
         <div
           v-if="selectedBatch && selectedBatch.files && selectedBatch.files.length > 0"
           class="space-y-1">
+          <!-- 文件列表 -->
           <div
             v-for="(file, index) in selectedBatch.files"
             :key="index"
-            class="flex items-center gap-2 p-2 border rounded hover:bg-gray-50">
+            class="flex items-center gap-2 p-2 border rounded hover:bg-gray-50"
+            :class="{ 
+              'bg-blue-50': batchDeleteMode && selectedFileIndices.includes(index),
+              'cursor-pointer': batchDeleteMode
+            }"
+            @click="batchDeleteMode ? handleToggleFileSelection(index) : null">
             <span class="text-xs text-gray-500 w-8">{{ index + 1 }}</span>
             <span class="flex-1 text-sm truncate" :title="file.uri || file">
               {{ (file.uri || file).split('/').pop() }}
             </span>
-            <el-button
-              type="plain"
-              size="small"
-              circle
-              @click="handleRemoveFileFromBatch(index)"
-              title="删除">
-              <el-icon><Minus /></el-icon>
-            </el-button>
+            <div class="flex items-center gap-1 flex-shrink-0" @mousedown.stop @click.stop>
+              <el-checkbox
+                v-show="batchDeleteMode"
+                :model-value="selectedFileIndices.includes(index)"
+                @change="handleToggleFileSelection(index)"
+                size="small">
+              </el-checkbox>
+              <el-button
+                v-show="!batchDeleteMode"
+                type="plain"
+                size="small"
+                circle
+                @click="handleRemoveFileFromBatch(index)"
+                title="删除">
+                <el-icon><Minus /></el-icon>
+              </el-button>
+            </div>
           </div>
         </div>
         <div v-else class="text-sm text-gray-400 text-center py-8">
@@ -100,20 +147,18 @@
         <div class="flex gap-2 mb-3">
           <el-button
             type="default"
-            size="small"
             @click="handleAddFilesToPlaylist"
             :disabled="!selectedBatch || !selectedPlaylistId || selectedBatch.files.length === 0 || !hasSelectedLists"
             plain>
-            <el-icon><Plus /></el-icon>
+            <el-icon class="mr-1"><Plus /></el-icon>
             添加到播放列表
           </el-button>
           <el-button
             type="default"
-            size="small"
             @click="handleRemoveFilesFromPlaylist"
             :disabled="!selectedBatch || !selectedPlaylistId || selectedBatch.files.length === 0 || !hasSelectedLists"
             plain>
-            <el-icon><Delete /></el-icon>
+            <el-icon class="mr-1"><Delete /></el-icon>
             从播放列表删除
           </el-button>
         </div>

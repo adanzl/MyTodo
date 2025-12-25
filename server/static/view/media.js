@@ -113,12 +113,8 @@ async function createComponent() {
                   }
                   preLists.forEach(weekdayIndex => {
                     const preList = playlistInfo.pre_lists[weekdayIndex] || [];
-                    const existingUris = new Set(preList.map(f => f.uri || f));
                     files.forEach(fileUri => {
-                      if (!existingUris.has(fileUri)) {
-                        preList.push({ uri: fileUri });
-                        existingUris.add(fileUri);
-                      }
+                      preList.push({ uri: fileUri });
                     });
                     playlistInfo.pre_lists[weekdayIndex] = preList;
                   });
@@ -127,12 +123,8 @@ async function createComponent() {
                 // 添加文件到正式文件列表
                 if (filesList) {
                   const fileList = playlistInfo.playlist || [];
-                  const existingUris = new Set(fileList.map(f => f.uri || f));
                   files.forEach(fileUri => {
-                    if (!existingUris.has(fileUri)) {
-                      fileList.push({ uri: fileUri });
-                      existingUris.add(fileUri);
-                    }
+                    fileList.push({ uri: fileUri });
                   });
                   playlistInfo.playlist = fileList;
                   playlistInfo.total = fileList.length;
