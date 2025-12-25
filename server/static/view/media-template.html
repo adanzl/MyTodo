@@ -270,7 +270,7 @@
                 size="small"
                 plain
                 @click="handleOpenFileBrowserForPreFiles"
-                :disabled="!playlistStatus || preFilesDragMode">
+                :disabled="!playlistStatus || preFilesDragMode || preFilesBatchDeleteMode">
                 +
               </el-button>
               <el-button
@@ -279,21 +279,43 @@
                 plain
                 class="!w-8 !h-6"
                 @click="handleTogglePreFilesDragMode"
-                :disabled="!playlistStatus || !getCurrentPreFiles() || getCurrentPreFiles().length === 0"
+                :disabled="!playlistStatus || !getCurrentPreFiles() || getCurrentPreFiles().length === 0 || preFilesBatchDeleteMode"
                 :title="preFilesDragMode ? '点击退出拖拽排序模式' : '点击进入拖拽排序模式'">
                 <el-icon v-if="preFilesDragMode"><Check /></el-icon>
                 <ion-icon v-else class="!w-3.5 !h-3.5" name="chevron-expand-sharp"></ion-icon>
+              </el-button>
+              <el-button
+                :type="preFilesBatchDeleteMode ? 'success' : 'default'"
+                size="small"
+                plain
+                class="!w-8 !h-6"
+                @click="handleTogglePreFilesBatchDeleteMode"
+                :disabled="!playlistStatus || !getCurrentPreFiles() || getCurrentPreFiles().length === 0 || preFilesDragMode"
+                :title="preFilesBatchDeleteMode ? '点击退出批量删除模式' : '点击进入批量删除模式'">
+                <el-icon v-if="preFilesBatchDeleteMode"><Check /></el-icon>
+                <el-icon v-else><Delete /></el-icon>
+              </el-button>
+              <el-button
+                v-show="preFilesBatchDeleteMode"
+                type="danger"
+                size="small"
+                plain
+                class="!w-8 !h-6"
+                @click="handleBatchDeletePreFiles"
+                :disabled="playlistLoading || selectedPreFileIndices.length === 0"
+                :title="`删除选中的 ${selectedPreFileIndices.length} 项`">
+                <el-icon><Delete /></el-icon>
               </el-button>
               <el-button
                 type="default"
                 size="small"
                 plain
                 class="!w-8 !h-6"
-                v-show="showMoreActions"
+                v-show="showMoreActions && !preFilesBatchDeleteMode"
                 @click="handleClearPreFiles"
                 :disabled="!playlistStatus || !getCurrentPreFiles() || getCurrentPreFiles().length === 0 || playlistLoading || preFilesDragMode"
                 title="清空列表">
-                <el-icon><Delete /></el-icon>
+                <el-icon><CircleClose /></el-icon>
               </el-button>
             </div>
           </div>
@@ -326,6 +348,7 @@
               </span>
               <div class="flex items-center gap-1 flex-shrink-0" @mousedown.stop @click.stop>
                 <media-player
+                  v-show="!preFilesBatchDeleteMode"
                   :file="file"
                   :is-playing="isFilePlaying(file)"
                   :progress="getFilePlayProgress(file)"
@@ -334,8 +357,15 @@
                   @play="handlePlayFileInBrowser(file)"
                   @seek="(file, val) => handleSeekFile(file, val)">
                 </media-player>
+                <el-checkbox
+                  v-show="preFilesBatchDeleteMode"
+                  class="!h-6"
+                  :model-value="selectedPreFileIndices.includes(index)"
+                  @change="handleTogglePreFileSelection(index)"
+                  @click.stop>
+                </el-checkbox>
                 <el-button
-                  v-show="showMoreActions && !preFilesDragMode"
+                  v-show="showMoreActions && !preFilesDragMode && !preFilesBatchDeleteMode"
                   type="plain"
                   size="small"
                   circle
@@ -345,7 +375,7 @@
                   ↑
                 </el-button>
                 <el-button
-                  v-show="showMoreActions && !preFilesDragMode"
+                  v-show="showMoreActions && !preFilesDragMode && !preFilesBatchDeleteMode"
                   type="plain"
                   size="small"
                   circle
@@ -355,7 +385,7 @@
                   ↓
                 </el-button>
                 <el-button
-                  v-show="showMoreActions && !preFilesDragMode"
+                  v-show="showMoreActions && !preFilesDragMode && !preFilesBatchDeleteMode"
                   type="plain"
                   size="small"
                   circle
@@ -365,6 +395,7 @@
                   <el-icon><Refresh /></el-icon>
                 </el-button>
                 <el-button
+                  v-show="!preFilesBatchDeleteMode"
                   type="plain"
                   size="small"
                   circle
@@ -422,7 +453,7 @@
                 size="small"
                 class="!w-8 !h-6"
                 @click="handleOpenFileBrowser"
-                :disabled="!playlistStatus || filesDragMode">
+                :disabled="!playlistStatus || filesDragMode || filesBatchDeleteMode">
                 +
               </el-button>
               <el-button
@@ -431,21 +462,43 @@
                 size="small"
                 class="!w-8 !h-6"
                 @click="handleToggleFilesDragMode"
-                :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0"
+                :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0 || filesBatchDeleteMode"
                 :title="filesDragMode ? '点击退出拖拽排序模式' : '点击进入拖拽排序模式'">
                 <el-icon v-if="filesDragMode"><Check /></el-icon>
                 <ion-icon v-else class="!w-3.5 !h-3.5" name="chevron-expand-sharp"></ion-icon>
+              </el-button>
+              <el-button
+                :type="filesBatchDeleteMode ? 'success' : 'default'"
+                plain
+                size="small"
+                class="!w-8 !h-6"
+                @click="handleToggleFilesBatchDeleteMode"
+                :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0 || filesDragMode"
+                :title="filesBatchDeleteMode ? '点击退出批量删除模式' : '点击进入批量删除模式'">
+                <el-icon v-if="filesBatchDeleteMode"><Check /></el-icon>
+                <el-icon v-else><Delete /></el-icon>
+              </el-button>
+              <el-button
+                v-show="filesBatchDeleteMode"
+                type="danger"
+                plain
+                size="small"
+                class="!w-8 !h-6"
+                @click="handleBatchDeleteFiles"
+                :disabled="playlistLoading || selectedFileIndices.length === 0"
+                :title="`删除选中的 ${selectedFileIndices.length} 项`">
+                <el-icon><Delete /></el-icon>
               </el-button>
               <el-button
                 type="default"
                 plain
                 size="small"
                 class="!w-8 !h-6"
-                v-show="showMoreActions"
+                v-show="showMoreActions && !filesBatchDeleteMode"
                 @click="handleClearFiles"
                 :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0 || playlistLoading || filesDragMode"
                 title="清空正式文件列表">
-                <el-icon><Delete /></el-icon>
+                <el-icon><CircleClose /></el-icon>
               </el-button>
             </div>
           </div>
@@ -475,6 +528,7 @@
               </span>
               <div class="flex items-center gap-1 flex-shrink-0" @mousedown.stop @click.stop>
                 <media-player
+                  v-show="!filesBatchDeleteMode"
                   :file="file"
                   :is-playing="isFilePlaying(file)"
                   :progress="getFilePlayProgress(file)"
@@ -483,8 +537,15 @@
                   @play="handlePlayFileInBrowser(file)"
                   @seek="(file, val) => handleSeekFile(file, val)">
                 </media-player>
+                <el-checkbox
+                  v-show="filesBatchDeleteMode"
+                  class="!h-6"
+                  :model-value="selectedFileIndices.includes(index)"
+                  @change="handleToggleFileSelection(index)"
+                  @click.stop>
+                </el-checkbox>
                 <el-button
-                  v-show="showMoreActions && !filesDragMode"
+                  v-show="showMoreActions && !filesDragMode && !filesBatchDeleteMode"
                   type="plain"
                   size="small"
                   circle
@@ -494,7 +555,7 @@
                   ↑
                 </el-button>
                 <el-button
-                  v-show="showMoreActions && !filesDragMode"
+                  v-show="showMoreActions && !filesDragMode && !filesBatchDeleteMode"
                   type="plain"
                   size="small"
                   circle
@@ -504,7 +565,7 @@
                   ↓
                 </el-button>
                 <el-button
-                  v-show="showMoreActions && !filesDragMode"
+                  v-show="showMoreActions && !filesDragMode && !filesBatchDeleteMode"
                   type="plain"
                   size="small"
                   circle
@@ -514,6 +575,7 @@
                   <el-icon><Refresh /></el-icon>
                 </el-button>
                 <el-button
+                  v-show="!filesBatchDeleteMode"
                   type="plain"
                   size="small"
                   circle

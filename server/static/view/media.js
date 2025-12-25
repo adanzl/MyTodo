@@ -81,6 +81,10 @@ async function createComponent() {
         selectedWeekdayIndex: ref(null), // 选中的星期索引（0=周一，6=周日），null表示使用今天
         replaceFileInfo: ref(null), // 替换文件信息 {type: 'pre_files' | 'files', index: number}，null表示添加模式
         preFilesExpanded: ref(false), // 前置文件列表是否展开
+        preFilesBatchDeleteMode: ref(false), // 前置文件批量删除模式
+        filesBatchDeleteMode: ref(false), // 正式文件批量删除模式
+        selectedPreFileIndices: ref([]), // 选中的前置文件索引数组
+        selectedFileIndices: ref([]), // 选中的正式文件索引数组
       };
       // 创建音频管理器
       const audioPlayer = createAudioPlayer({
@@ -1664,6 +1668,161 @@ async function createComponent() {
         }
       };
 
+      // 切换前置文件批量删除模式
+      const handleTogglePreFilesBatchDeleteMode = () => {
+        refData.preFilesBatchDeleteMode.value = !refData.preFilesBatchDeleteMode.value;
+        if (!refData.preFilesBatchDeleteMode.value) {
+          // 退出批量删除模式时清空选中项
+          refData.selectedPreFileIndices.value = [];
+        }
+      };
+
+      // 切换正式文件批量删除模式
+      const handleToggleFilesBatchDeleteMode = () => {
+        refData.filesBatchDeleteMode.value = !refData.filesBatchDeleteMode.value;
+        if (!refData.filesBatchDeleteMode.value) {
+          // 退出批量删除模式时清空选中项
+          refData.selectedFileIndices.value = [];
+        }
+      };
+
+      // 切换前置文件选中状态
+      const handleTogglePreFileSelection = (index) => {
+        const indices = refData.selectedPreFileIndices.value;
+        const pos = indices.indexOf(index);
+        if (pos > -1) {
+          indices.splice(pos, 1);
+        } else {
+          indices.push(index);
+        }
+      };
+
+      // 切换正式文件选中状态
+      const handleToggleFileSelection = (index) => {
+        const indices = refData.selectedFileIndices.value;
+        const pos = indices.indexOf(index);
+        if (pos > -1) {
+          indices.splice(pos, 1);
+        } else {
+          indices.push(index);
+        }
+      };
+
+      // 批量删除前置文件
+      const handleBatchDeletePreFiles = async () => {
+        const status = refData.playlistStatus.value;
+        const preFiles = getCurrentPreFiles();
+        const selectedIndices = refData.selectedPreFileIndices.value;
+        if (!status || !preFiles || selectedIndices.length === 0) return;
+
+        const selectedCount = selectedIndices.length;
+        try {
+          await ElMessageBox.confirm(
+            `确定要删除选中的 ${selectedCount} 个前置文件吗？`,
+            "确认批量删除",
+            {
+              confirmButtonText: "确定",
+              cancelButtonText: "取消",
+              type: "warning",
+            }
+          );
+
+          refData.playlistLoading.value = true;
+          // 去重并排序（从大到小，避免删除时索引变化）
+          const indicesToDelete = [...new Set(selectedIndices)].sort((a, b) => b - a);
+
+          await updateActivePlaylistData((playlistInfo) => {
+            const weekdayIndex = getSelectedWeekdayIndex();
+            // 确保 pre_lists 存在且格式正确
+            if (!playlistInfo.pre_lists || !Array.isArray(playlistInfo.pre_lists) || playlistInfo.pre_lists.length !== 7) {
+              playlistInfo.pre_lists = Array(7).fill(null).map(() => []);
+            }
+            const list = [...(playlistInfo.pre_lists[weekdayIndex] || [])];
+            // 从后往前删除，避免索引变化
+            indicesToDelete.forEach(index => {
+              if (index >= 0 && index < list.length) {
+                list.splice(index, 1);
+              }
+            });
+            playlistInfo.pre_lists[weekdayIndex] = list;
+            return playlistInfo;
+          });
+
+          // 清空选中项并退出批量删除模式
+          refData.selectedPreFileIndices.value = [];
+          refData.preFilesBatchDeleteMode.value = false;
+          ElMessage.success(`已删除 ${selectedCount} 个前置文件`);
+        } catch (error) {
+          if (error !== "cancel") {
+            logAndNoticeError(error, "批量删除失败");
+          }
+        } finally {
+          refData.playlistLoading.value = false;
+        }
+      };
+
+      // 批量删除正式文件
+      const handleBatchDeleteFiles = async () => {
+        const status = refData.playlistStatus.value;
+        const selectedIndices = refData.selectedFileIndices.value;
+        if (!status || !status.playlist || selectedIndices.length === 0) return;
+
+        const selectedCount = selectedIndices.length;
+        try {
+          await ElMessageBox.confirm(
+            `确定要删除选中的 ${selectedCount} 个正式文件吗？`,
+            "确认批量删除",
+            {
+              confirmButtonText: "确定",
+              cancelButtonText: "取消",
+              type: "warning",
+            }
+          );
+
+          refData.playlistLoading.value = true;
+          // 去重并排序（从大到小，避免删除时索引变化）
+          const indicesToDelete = [...new Set(selectedIndices)].sort((a, b) => b - a);
+
+          await updateActivePlaylistData((playlistInfo) => {
+            const list = [...playlistInfo.playlist];
+            // 从后往前删除，避免索引变化
+            indicesToDelete.forEach(index => {
+              if (index >= 0 && index < list.length) {
+                list.splice(index, 1);
+              }
+            });
+            playlistInfo.playlist = list;
+            if (list.length === 0) {
+              playlistInfo.current_index = 0;
+            } else {
+              // 更新 current_index，如果删除的项在当前播放项之前，需要调整索引
+              let newCurrentIndex = playlistInfo.current_index;
+              indicesToDelete.forEach(index => {
+                if (index < playlistInfo.current_index) {
+                  newCurrentIndex = Math.max(0, newCurrentIndex - 1);
+                } else if (index === playlistInfo.current_index) {
+                  newCurrentIndex = Math.min(newCurrentIndex, list.length - 1);
+                }
+              });
+              playlistInfo.current_index = newCurrentIndex;
+            }
+            playlistInfo.total = list.length;
+            return playlistInfo;
+          });
+
+          // 清空选中项并退出批量删除模式
+          refData.selectedFileIndices.value = [];
+          refData.filesBatchDeleteMode.value = false;
+          ElMessage.success(`已删除 ${selectedCount} 个正式文件`);
+        } catch (error) {
+          if (error !== "cancel") {
+            logAndNoticeError(error, "批量删除失败");
+          }
+        } finally {
+          refData.playlistLoading.value = false;
+        }
+      };
+
       // 清空前置文件列表
       const handleClearPreFiles = async () => {
         const status = refData.playlistStatus.value;
@@ -1961,6 +2120,11 @@ async function createComponent() {
         refData.filesDragMode.value = false;
         refData.preFilesOriginalOrder.value = null;
         refData.filesOriginalOrder.value = null;
+        // 重置批量删除状态
+        refData.preFilesBatchDeleteMode.value = false;
+        refData.filesBatchDeleteMode.value = false;
+        refData.selectedPreFileIndices.value = [];
+        refData.selectedFileIndices.value = [];
         await refreshConnectedList();
       };
 
@@ -2617,6 +2781,12 @@ async function createComponent() {
         getFileDuration,
         handleSeekFile,
         handleTogglePreFilesExpand,
+        handleTogglePreFilesBatchDeleteMode,
+        handleToggleFilesBatchDeleteMode,
+        handleTogglePreFileSelection,
+        handleToggleFileSelection,
+        handleBatchDeletePreFiles,
+        handleBatchDeleteFiles,
       };
 
 
