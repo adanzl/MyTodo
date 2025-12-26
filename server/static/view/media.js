@@ -86,6 +86,105 @@ async function createComponent() {
         selectedPreFileIndices: ref([]), // 选中的前置文件索引数组
         selectedFileIndices: ref([]), // 选中的正式文件索引数组
         batchManagerVisible: ref(false), // 批量模式浮层显示状态
+        playlistSelectorVisible: ref(false), // 应用到列表选择器显示状态
+        playlistSelectorSelectedFiles: ref([]), // 应用到列表选择器选中的文件
+      };
+
+      // 应用到列表选择器组件（延迟创建）
+      const playlistSelectorRef = ref(null);
+      const initPlaylistSelector = async () => {
+        if (!playlistSelectorRef.value) {
+          // 动态导入并添加时间戳防止缓存
+          const { createPlaylistSelector } = await import(`./common/playlist_selector.js?t=${Date.now()}`);
+          const PlaylistSelectorComponent = await createPlaylistSelector({
+            onCopy: async (params) => {
+              // 复制文件到播放列表
+              const { playlistId, files, preLists, filesList } = params;
+              if (!files || files.length === 0) return;
+
+              // 切换到目标播放列表
+              if (refData.activePlaylistId.value !== playlistId) {
+                await handleSelectPlaylist(playlistId);
+              }
+
+              await updateActivePlaylistData((playlistInfo) => {
+                // 添加文件到前置列表
+                if (preLists && preLists.length > 0) {
+                  if (!playlistInfo.pre_lists || !Array.isArray(playlistInfo.pre_lists) || playlistInfo.pre_lists.length !== 7) {
+                    playlistInfo.pre_lists = Array(7).fill(null).map(() => []);
+                  }
+                  preLists.forEach(weekdayIndex => {
+                    const preList = playlistInfo.pre_lists[weekdayIndex] || [];
+                    files.forEach(fileUri => {
+                      preList.push({ uri: fileUri });
+                    });
+                    playlistInfo.pre_lists[weekdayIndex] = preList;
+                  });
+                }
+
+                // 添加文件到正式文件列表
+                if (filesList) {
+                  const fileList = playlistInfo.playlist || [];
+                  files.forEach(fileUri => {
+                    fileList.push({ uri: fileUri });
+                  });
+                  playlistInfo.playlist = fileList;
+                  playlistInfo.total = fileList.length;
+                }
+
+                return playlistInfo;
+              });
+
+              // 刷新播放列表状态
+              await refreshPlaylistStatus(true);
+            },
+            onRemove: async (params) => {
+              // 从播放列表删除文件
+              const { playlistId, files, preLists, filesList } = params;
+              if (!files || files.length === 0) return;
+
+              const fileUriSet = new Set(files);
+
+              // 切换到目标播放列表
+              if (refData.activePlaylistId.value !== playlistId) {
+                await handleSelectPlaylist(playlistId);
+              }
+
+              await updateActivePlaylistData((playlistInfo) => {
+                // 从前置列表删除文件
+                if (preLists && preLists.length > 0) {
+                  if (playlistInfo.pre_lists && Array.isArray(playlistInfo.pre_lists) && playlistInfo.pre_lists.length === 7) {
+                    preLists.forEach(weekdayIndex => {
+                      const preList = playlistInfo.pre_lists[weekdayIndex] || [];
+                      playlistInfo.pre_lists[weekdayIndex] = preList.filter(f => !fileUriSet.has(f.uri || f));
+                    });
+                  }
+                }
+
+                // 从正式文件列表删除文件
+                if (filesList) {
+                  const fileList = playlistInfo.playlist || [];
+                  playlistInfo.playlist = fileList.filter(f => !fileUriSet.has(f.uri || f));
+                  playlistInfo.total = playlistInfo.playlist.length;
+
+                  // 更新current_index
+                  if (playlistInfo.current_index >= playlistInfo.playlist.length) {
+                    playlistInfo.current_index = Math.max(0, playlistInfo.playlist.length - 1);
+                  }
+                }
+
+                return playlistInfo;
+              });
+
+              // 刷新播放列表状态
+              await refreshPlaylistStatus(true);
+            },
+          });
+          // 动态注册组件
+          component.components.PlaylistSelector = PlaylistSelectorComponent;
+          playlistSelectorRef.value = PlaylistSelectorComponent;
+        }
+        return playlistSelectorRef.value;
       };
 
       // 批量模式管理器组件（延迟创建）
@@ -2890,6 +2989,38 @@ async function createComponent() {
           await initBatchManager();
           refData.batchManagerVisible.value = true;
         },
+        handleOpenPlaylistSelectorForPreFile: async (file) => {
+          try {
+            if (!file) {
+              ElMessage.warning('文件信息无效');
+              return;
+            }
+            // 只选中当前文件
+            const fileUri = file.uri || file;
+            refData.playlistSelectorSelectedFiles.value = [fileUri];
+            await initPlaylistSelector();
+            refData.playlistSelectorVisible.value = true;
+          } catch (error) {
+            console.error('打开应用到列表对话框失败:', error);
+            ElMessage.error('打开对话框失败: ' + error.message);
+          }
+        },
+        handleOpenPlaylistSelectorForFile: async (file) => {
+          try {
+            if (!file) {
+              ElMessage.warning('文件信息无效');
+              return;
+            }
+            // 只选中当前文件
+            const fileUri = file.uri || file;
+            refData.playlistSelectorSelectedFiles.value = [fileUri];
+            await initPlaylistSelector();
+            refData.playlistSelectorVisible.value = true;
+          } catch (error) {
+            console.error('打开应用到列表对话框失败:', error);
+            ElMessage.error('打开对话框失败: ' + error.message);
+          }
+        },
       };
 
 
@@ -2954,6 +3085,8 @@ async function createComponent() {
         initialCronExpr,
         BatchManager: batchManagerRef, // 响应式引用，将在打开时初始化
         initBatchManager,
+        PlaylistSelector: playlistSelectorRef, // 响应式引用，将在打开时初始化
+        initPlaylistSelector,
         ...refMethods,
       };
     },

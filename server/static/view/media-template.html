@@ -163,12 +163,13 @@
         </div>
         <div class="flex flex-wrap gap-2">
           <el-button
-            type="primary"
+            type="default"
             size="small"
             plain
+            circle
             @click="handleOpenBatchManager"
             title="批量模式">
-            <el-icon><DocumentCopy /></el-icon>
+            <el-icon><Collection /></el-icon>
           </el-button>
           <el-button
             type="plain"
@@ -337,10 +338,12 @@
               :key="'pre-' + index"
               class="flex items-center gap-2 p-1 hover:bg-gray-100 rounded"
               :class="{ 
-                'bg-blue-50': playlistStatus.pre_index === index
+                'bg-blue-50': playlistStatus.pre_index === index,
+                'bg-blue-100': preFilesBatchDeleteMode && selectedPreFileIndices.includes(index)
               }"
-              :class="{ 'cursor-move': preFilesDragMode, 'cursor-default': !preFilesDragMode, 'select-none': true }"
+              :class="{ 'cursor-move': preFilesDragMode, 'cursor-pointer': preFilesBatchDeleteMode && !preFilesDragMode, 'cursor-default': !preFilesDragMode && !preFilesBatchDeleteMode, 'select-none': true }"
               :draggable="preFilesDragMode"
+              @click="preFilesBatchDeleteMode && !preFilesDragMode ? handleTogglePreFileSelection(index) : null"
               @dragstart="handlePreFileDragStart($event, index)"
               @dragend="handlePreFileDragEnd($event)"
               @dragover.prevent="handlePreFileDragOver($event)"
@@ -403,6 +406,17 @@
                   <el-icon><Refresh /></el-icon>
                 </el-button>
                 <el-button
+                  v-show="!preFilesBatchDeleteMode && !preFilesDragMode"
+                  type="info"
+                  size="small"
+                  plain
+                  circle
+                  @click.stop="handleOpenPlaylistSelectorForPreFile(file)"
+                  :disabled="playlistLoading"
+                  title="应用到列表">
+                  <el-icon><DocumentCopy /></el-icon>
+                </el-button>
+                <el-button
                   v-show="!preFilesBatchDeleteMode"
                   type="plain"
                   size="small"
@@ -437,7 +451,7 @@
             <div class="text-xs font-semibold text-gray-600">
               正式文件（播放时记录进度）
               <span v-if="getFilesTotalDuration() > 0" class="ml-2 text-gray-500">
-                {{ formatDuration(getFilesTotalDuration()) }}
+                总时长：{{ formatDuration(getFilesTotalDuration()) }}
               </span>
               <span
                 v-if="playlistStatus.playlist && playlistStatus.playlist.length > 0"
@@ -518,10 +532,12 @@
               :key="index"
               class="flex items-center gap-2 p-1 hover:bg-gray-100 rounded"
               :class="{ 
-                'bg-blue-50': index === playlistStatus.current_index
+                'bg-blue-50': index === playlistStatus.current_index,
+                'bg-blue-100': filesBatchDeleteMode && selectedFileIndices.includes(index)
               }"
-              :class="{ 'cursor-move': filesDragMode, 'cursor-default': !filesDragMode, 'select-none': true }"
+              :class="{ 'cursor-move': filesDragMode, 'cursor-pointer': filesBatchDeleteMode && !filesDragMode, 'cursor-default': !filesDragMode && !filesBatchDeleteMode, 'select-none': true }"
               :draggable="filesDragMode"
+              @click="filesBatchDeleteMode && !filesDragMode ? handleToggleFileSelection(index) : null"
               @dragstart="handleFileDragStart($event, index)"
               @dragend="handleFileDragEnd($event)"
               @dragover.prevent="handleFileDragOver($event)"
@@ -581,6 +597,17 @@
                   :disabled="playlistLoading"
                   title="替换">
                   <el-icon><Refresh /></el-icon>
+                </el-button>
+                <el-button
+                  v-show="!filesBatchDeleteMode && !filesDragMode"
+                  type="info"
+                  size="small"
+                  plain
+                  circle
+                  @click.stop="handleOpenPlaylistSelectorForFile(file)"
+                  :disabled="playlistLoading"
+                  title="应用到列表">
+                  <el-icon><DocumentCopy /></el-icon>
                 </el-button>
                 <el-button
                   v-show="!filesBatchDeleteMode"
@@ -1190,4 +1217,13 @@
     :playlist-collection="playlistCollection"
     @update:visible="batchManagerVisible = $event">
   </batch-manager>
+
+  <!-- 应用到列表选择器 -->
+  <playlist-selector
+    v-if="playlistSelectorVisible && PlaylistSelector"
+    :visible="playlistSelectorVisible"
+    :playlist-collection="playlistCollection"
+    :selected-files="playlistSelectorSelectedFiles"
+    @update:visible="playlistSelectorVisible = $event">
+  </playlist-selector>
 </div>
