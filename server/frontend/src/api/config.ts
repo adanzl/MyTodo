@@ -5,7 +5,7 @@ import axios from "axios";
 
 // 与原版保持一致：支持远程和本地配置
 const REMOTE = {
-  url: "https://leo-zhao.natapp4.cc/api",
+  url: "https://leo-zhao.natapp4.cc/",
   available: true,
 };
 

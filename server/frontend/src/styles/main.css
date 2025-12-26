@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 /**
  * 公共样式文件 - 使用 Tailwind CSS 兼容的样式值

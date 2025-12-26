@@ -20,7 +20,7 @@
               class="absolute -right-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center text-black"
               @click="btnAudioClk(msg)">
               <MdiStopCircleOutline width="24" height="24" v-if="msg.playing" />
-              <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
+              <i-ion-volume-medium-outline class="w-6 h-6" v-else />
             </div>
           </div>
           <!-- 对方消息 -->
@@ -33,7 +33,7 @@
               class="absolute -left-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center"
               @click="btnAudioClk(msg)">
               <MdiStopCircleOutline width="24" height="24" v-if="msg.playing" />
-              <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
+              <i-ion-volume-medium-outline class="w-6 h-6" v-else />
             </div> -->
             </div>
           </div>

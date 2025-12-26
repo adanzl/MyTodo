@@ -8,7 +8,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/home",
     name: "Home",
-    component: () => import("@/views/Home/index.vue"),
+    component: () => import("@/views/Home.vue"),
   },
   {
     path: "/lottery",
@@ -33,17 +33,17 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/timetable",
     name: "Timetable",
-    component: () => import("@/views/Timetable/index.vue"),
+    component: () => import("@/views/Timetable.vue"),
   },
   {
     path: "/media",
     name: "Media",
-    component: () => import("@/views/Media/index.vue"),
+    component: () => import("@/views/Media.vue"),
   },
   {
     path: "/tools",
     name: "Tools",
-    component: () => import("@/views/Tools/index.vue"),
+    component: () => import("@/views/Tools.vue"),
   },
 ];
 

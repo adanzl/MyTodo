@@ -331,7 +331,9 @@
                     :disabled="!mediaCurrentTask || !mediaCurrentTask.files || mediaCurrentTask.files.length === 0 || mediaCurrentTask.status === 'processing'"
                     :title="mediaFilesDragMode ? '点击退出拖拽排序模式' : '点击进入拖拽排序模式'">
                     <el-icon v-if="mediaFilesDragMode"><Check /></el-icon>
-                    <ion-icon v-else class="!w-3.5 !h-3.5" name="chevron-expand-sharp"></ion-icon>
+                    <i-ion-chevron-expand-sharp
+                      v-else
+                      class="!w-3.5 !h-3.5"></i-ion-chevron-expand-sharp>
                   </el-button>
                 </div>
               </div>

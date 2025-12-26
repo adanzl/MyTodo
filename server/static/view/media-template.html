@@ -294,7 +294,9 @@
                 :disabled="!playlistStatus || !getCurrentPreFiles() || getCurrentPreFiles().length === 0 || preFilesBatchDeleteMode"
                 :title="preFilesDragMode ? '点击退出拖拽排序模式' : '点击进入拖拽排序模式'">
                 <el-icon v-if="preFilesDragMode"><Check /></el-icon>
-                <ion-icon v-else class="!w-3.5 !h-3.5" name="chevron-expand-sharp"></ion-icon>
+                <i-ion-chevron-expand-sharp
+                  v-else
+                  class="!w-3.5 !h-3.5"></i-ion-chevron-expand-sharp>
               </el-button>
               <el-button
                 :type="preFilesBatchDeleteMode ? 'success' : 'default'"
@@ -490,7 +492,9 @@
                 :disabled="!playlistStatus || !playlistStatus.playlist || playlistStatus.playlist.length === 0 || filesBatchDeleteMode"
                 :title="filesDragMode ? '点击退出拖拽排序模式' : '点击进入拖拽排序模式'">
                 <el-icon v-if="filesDragMode"><Check /></el-icon>
-                <ion-icon v-else class="!w-3.5 !h-3.5" name="chevron-expand-sharp"></ion-icon>
+                <i-ion-chevron-expand-sharp
+                  v-else
+                  class="!w-3.5 !h-3.5"></i-ion-chevron-expand-sharp>
               </el-button>
               <el-button
                 :type="filesBatchDeleteMode ? 'success' : 'default'"

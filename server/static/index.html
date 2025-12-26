@@ -87,9 +87,9 @@
         </el-aside>
         <el-container v-if="curUser.bLogin">
           <el-header class="flex justify-center items-center bg-blue-50">
-            <ion-icon name="heart"></ion-icon>
+            <i-ion-heart class="w-6 h-6"></i-ion-heart>
             哈哈哈
-            <ion-icon name="heart"></ion-icon>
+            <i-ion-heart class="w-6 h-6"></i-ion-heart>
           </el-header>
           <el-main>
             <router-view></router-view>
@@ -134,8 +134,5 @@
       </el-container>
     </div>
     <script defer src="js/app.js?2" type="module"></script>
-    <script
-      type="module"
-      src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
   </body>
 </html>
