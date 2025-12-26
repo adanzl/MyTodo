@@ -1,0 +1,61 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "启动后端服务",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "main.py"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "focus": false
+            },
+            "isBackground": true,
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "启动前端开发服务器",
+            "type": "shell",
+            "command": "npm",
+            "args": [
+                "run",
+                "dev"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/frontend"
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "focus": false
+            },
+            "isBackground": true,
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "启动前后端（组合）",
+            "dependsOn": [
+                "启动后端服务",
+                "启动前端开发服务器"
+            ],
+            "dependsOrder": "parallel",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        }
+    ]
+}
