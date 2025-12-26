@@ -86,9 +86,21 @@ export function createAudioPlayer(options = {}) {
      */
     const removeEventListeners = () => {
         if (!audio) return;
-        // 清空 src 并重新加载，移除所有事件监听器
-        audio.src = '';
-        audio.load();
+
+        // 先暂停播放并重置位置，避免在清理过程中触发加载
+        try {
+            if (!audio.paused) {
+                audio.pause();
+            }
+            audio.currentTime = 0;
+            // 停止所有网络请求
+            audio.removeAttribute('src');
+        } catch (e) {
+            // 忽略错误，继续清理
+        }
+
+        // 不调用 load()，避免触发新的网络请求
+        // 直接设置为 null，让浏览器自然清理
         audio = null;
     };
 
@@ -99,25 +111,31 @@ export function createAudioPlayer(options = {}) {
         if (!audio) return;
 
         // 播放开始事件
-        audio.addEventListener('play', () => {
+        audio.addEventListener('play', (e) => {
+            const audioElement = e.target || e.currentTarget;
+            if (!audioElement || audio !== audioElement) return;
             resetPlaybackPosition();
             isPlaying.value = true;
-            callbacksRef.onPlay(audio);
+            callbacksRef.onPlay(audioElement);
         });
 
         // 元数据/数据加载完成（包含时长信息）
-        const handleMediaLoaded = () => {
+        const handleMediaLoaded = (e) => {
+            const audioElement = e.target || e.currentTarget;
+            if (!audioElement || audio !== audioElement) return;
             resetPlaybackPosition();
-            updateDuration(audio.duration);
+            updateDuration(audioElement.duration);
         };
         audio.addEventListener('loadedmetadata', handleMediaLoaded);
         audio.addEventListener('loadeddata', handleMediaLoaded);
 
         // 时间更新事件
-        audio.addEventListener('timeupdate', () => {
-            if (audio.duration > 0 && isFinite(audio.duration)) {
-                const current = audio.currentTime;
-                const dur = audio.duration;
+        audio.addEventListener('timeupdate', (e) => {
+            const audioElement = e.target || e.currentTarget;
+            if (!audioElement || audio !== audioElement) return;
+            const dur = audioElement.duration;
+            if (dur > 0 && isFinite(dur)) {
+                const current = audioElement.currentTime;
                 const progress = (current / dur) * 100;
                 currentTime.value = current;
                 playProgress.value = progress;
@@ -130,26 +148,32 @@ export function createAudioPlayer(options = {}) {
         });
 
         // 暂停事件
-        audio.addEventListener('pause', () => {
+        audio.addEventListener('pause', (e) => {
+            const audioElement = e.target || e.currentTarget;
+            if (!audioElement || audio !== audioElement) return;
             isPlaying.value = false;
-            if (audio.ended) {
-                callbacksRef.onEnded(audio);
+            if (audioElement.ended) {
+                callbacksRef.onEnded(audioElement);
             } else {
-                callbacksRef.onPause(audio);
+                callbacksRef.onPause(audioElement);
             }
         });
 
         // 错误事件
         audio.addEventListener('error', (e) => {
+            const audioElement = e.target || e.currentTarget;
+            if (!audioElement || audio !== audioElement) return;
             console.error("音频播放失败:", e, "URL:", currentAudioUrl);
             isPlaying.value = false;
             callbacksRef.onError(e, currentAudioUrl);
         });
 
         // 播放结束事件
-        audio.addEventListener('ended', () => {
+        audio.addEventListener('ended', (e) => {
+            const audioElement = e.target || e.currentTarget;
+            if (!audioElement || audio !== audioElement) return;
             isPlaying.value = false;
-            callbacksRef.onEnded(audio);
+            callbacksRef.onEnded(audioElement);
         });
     };
 
@@ -161,9 +185,24 @@ export function createAudioPlayer(options = {}) {
      * @param {number} fileInfo.playingFileIndex - 文件索引
      */
     const load = (audioUrl, fileInfo = {}) => {
-        if (!audioUrl) {
-            console.error("音频URL不能为空");
+        if (!audioUrl || typeof audioUrl !== 'string' || audioUrl.trim() === '') {
+            console.error("音频URL不能为空或无效:", audioUrl);
             return;
+        }
+
+        // 验证 URL 格式
+        try {
+            const url = new URL(audioUrl, window.location.origin);
+            if (!url.pathname || url.pathname === '/' || url.pathname.endsWith('.html')) {
+                console.error("音频URL格式无效，可能是HTML页面:", audioUrl);
+                return;
+            }
+        } catch (e) {
+            // 如果 URL 解析失败，尝试相对路径验证
+            if (audioUrl.includes('index.html') || audioUrl.endsWith('.html')) {
+                console.error("音频URL格式无效，可能是HTML页面:", audioUrl);
+                return;
+            }
         }
 
         // 如果已有音频在播放，先清理
@@ -239,10 +278,17 @@ export function createAudioPlayer(options = {}) {
      */
     const clear = () => {
         if (audio) {
-            // 内联 clearAudioPlayer 逻辑：先暂停并重置位置
-            audio.pause();
-            audio.currentTime = INITIAL_TIME;
-            // 然后清理事件监听器（会清空 src 和 load）
+            // 先暂停并重置位置，停止所有播放活动
+            try {
+                if (!audio.paused) {
+                    audio.pause();
+                }
+                audio.currentTime = INITIAL_TIME;
+            } catch (e) {
+                // 忽略错误，继续清理
+            }
+
+            // 然后清理事件监听器（会移除 src）
             removeEventListeners();
         }
         currentAudioUrl = null;

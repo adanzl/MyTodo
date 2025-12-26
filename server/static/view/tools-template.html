@@ -263,7 +263,7 @@
                   class="w-16 text-center">
                   {{ getMediaStatusText(mediaCurrentTask.status) }}
                 </el-tag>
-                <media-player
+                <media-component
                   v-if="mediaCurrentTask.result_file && mediaCurrentTask.status === 'success'"
                   :file="{ path: mediaCurrentTask.result_file }"
                   :is-playing="isFilePlaying({ path: mediaCurrentTask.result_file })"
@@ -272,7 +272,7 @@
                   :disabled="mediaFilesDragMode"
                   @play="handleMediaTogglePlayResult"
                   @seek="(file, val) => handleSeekFile({ path: mediaCurrentTask.result_file }, val)">
-                </media-player>
+                </media-component>
                 <el-button
                   type="primary"
                   size="small"
@@ -359,7 +359,7 @@
                     </span>
                     <div v-else class="w-20"></div>
                     <div class="flex items-center gap-1 flex-shrink-0" @mousedown.stop @click.stop>
-                      <media-player
+                      <media-component
                         :file="file"
                         :is-playing="isFilePlaying(file)"
                         :progress="getFilePlayProgress(file)"
@@ -367,7 +367,7 @@
                         :disabled="mediaCurrentTask.status === 'processing' || mediaFilesDragMode"
                         @play="() => handleMediaTogglePlayFile(index)"
                         @seek="(file, val) => handleSeekFile(file, val)">
-                      </media-player>
+                      </media-component>
                       <el-button
                         type="info"
                         size="small"

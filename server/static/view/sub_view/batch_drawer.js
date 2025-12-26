@@ -9,8 +9,13 @@ import { createFileDialog } from "./file_dialog.js";
 const { ref, watch, computed, onMounted } = window.Vue;
 const { ElMessage, ElMessageBox } = window.ElementPlus;
 
+// 常量
+const RDS_TABLE = 't_batch_list';
+const RDS_ID = '0';
+const PRE_LISTS_COUNT = 7; // 前置文件列表数量
+
 async function loadTemplate() {
-    const response = await fetch(`./view/common/batch_manager-template.html?t=${Date.now()}`);
+    const response = await fetch(`./view/sub_view/batch_drawer-template.html?t=${Date.now()}`);
     return await response.text();
 }
 
@@ -22,7 +27,7 @@ async function loadTemplate() {
  * @param {Array} options.playlistCollection - 播放列表集合
  * @returns {Object} Vue组件
  */
-export async function createBatchManager(options = {}) {
+export async function createBatchDrawer(options = {}) {
     const {
         onAddFiles = null,
         onRemoveFiles = null,
@@ -47,6 +52,7 @@ export async function createBatchManager(options = {}) {
         },
         emits: ['update:visible', 'refresh'],
         setup(props, { emit }) {
+            // 状态
             const batchList = ref([]);
             const selectedBatchId = ref(null);
             const selectedPlaylistId = ref(null);
@@ -56,10 +62,6 @@ export async function createBatchManager(options = {}) {
             const fileBrowserDialogVisible = ref(false);
             const fileBrowserLoading = ref(false);
             const loading = ref(false);
-
-            // RDS表名和ID
-            const RDS_TABLE = 't_batch_list';
-            const RDS_ID = '0';
 
             // 计算属性
             const selectedBatch = computed(() => {
@@ -74,210 +76,233 @@ export async function createBatchManager(options = {}) {
                 return selectedPreLists.value.length > 0 || selectedFilesList.value;
             });
 
-            // 计算是否有选中的文件
             const hasSelectedFiles = computed(() => {
                 return selectedFileIndices.value.length > 0;
             });
 
-            // 计算是否全选
             const isAllFilesSelected = computed(() => {
-                if (!selectedBatch.value || !selectedBatch.value.files || selectedBatch.value.files.length === 0) {
-                    return false;
-                }
+                if (!selectedBatch.value?.files?.length) return false;
                 return selectedFileIndices.value.length === selectedBatch.value.files.length && selectedFileIndices.value.length > 0;
             });
 
-            // 获取前置文件数量
+            // ========== 辅助函数 ==========
+
+            /**
+             * 获取文件的URI
+             */
+            const getFileUri = (file) => file?.uri || file;
+
+            /**
+             * 获取选中的文件对象数组
+             */
+            const getSelectedFiles = () => {
+                if (!selectedBatch.value?.files) return [];
+                return selectedFileIndices.value
+                    .map(index => selectedBatch.value.files[index])
+                    .filter(f => f !== null);
+            };
+
+            /**
+             * 获取选中文件的URI集合
+             */
+            const getSelectedFileUris = () => {
+                return new Set(getSelectedFiles().map(getFileUri));
+            };
+
+            /**
+             * 验证播放列表的前置文件列表结构
+             */
+            const isValidPreLists = (playlist) => {
+                return playlist?.pre_lists &&
+                    Array.isArray(playlist.pre_lists) &&
+                    playlist.pre_lists.length === PRE_LISTS_COUNT;
+            };
+
+            /**
+             * 验证播放列表的正式文件列表结构
+             */
+            const isValidFilesList = (playlist) => {
+                return playlist?.playlist && Array.isArray(playlist.playlist);
+            };
+
+            /**
+             * 计算列表中匹配的文件数量
+             */
+            const countMatchedFiles = (fileList, uriSet) => {
+                if (!Array.isArray(fileList)) return 0;
+                let count = 0;
+                fileList.forEach(file => {
+                    if (uriSet.has(getFileUri(file))) {
+                        count++;
+                    }
+                });
+                return count;
+            };
+
+            /**
+             * 选择第一个Batch并全选文件
+             */
+            const selectFirstBatchAndFiles = () => {
+                if (batchList.value.length === 0 || selectedBatchId.value) return;
+
+                const firstBatch = batchList.value[0];
+                selectedBatchId.value = firstBatch.id;
+
+                if (firstBatch?.files?.length > 0) {
+                    selectedFileIndices.value = firstBatch.files.map((_, index) => index);
+                }
+            };
+
+            /**
+             * 切换数组中的元素（存在则移除，不存在则添加）
+             */
+            const toggleArrayItem = (array, item) => {
+                const index = array.indexOf(item);
+                if (index > -1) {
+                    array.splice(index, 1);
+                } else {
+                    array.push(item);
+                }
+            };
+
+            // ========== 获取函数 ==========
+
+            /**
+             * 获取前置文件数量
+             */
             const getPreFilesCount = (weekdayIndex) => {
                 const playlist = selectedPlaylist.value;
-                if (!playlist || !playlist.pre_lists || !Array.isArray(playlist.pre_lists) || playlist.pre_lists.length !== 7) {
-                    return 0;
-                }
+                if (!isValidPreLists(playlist)) return 0;
                 const preList = playlist.pre_lists[weekdayIndex];
                 return Array.isArray(preList) ? preList.length : 0;
             };
 
-            // 获取前置文件列表中符合条件的文件数（只统计选中的文件）
+            /**
+             * 获取前置文件列表中符合条件的文件数（只统计选中的文件）
+             */
             const getPreMatchedFileCount = (weekdayIndex) => {
                 if (!selectedBatch.value || !selectedPlaylist.value) return 0;
-                const selectedFiles = selectedFileIndices.value.map(index => {
-                    if (selectedBatch.value.files && selectedBatch.value.files[index]) {
-                        return selectedBatch.value.files[index];
-                    }
-                    return null;
-                }).filter(f => f !== null);
-
-                if (selectedFiles.length === 0) return 0;
+                const uriSet = getSelectedFileUris();
+                if (uriSet.size === 0) return 0;
 
                 const playlist = selectedPlaylist.value;
-                if (!playlist || !playlist.pre_lists || !Array.isArray(playlist.pre_lists) || playlist.pre_lists.length !== 7) {
-                    return 0;
-                }
+                if (!isValidPreLists(playlist)) return 0;
 
                 const preList = playlist.pre_lists[weekdayIndex];
-                if (!Array.isArray(preList)) return 0;
-
-                const batchUriSet = new Set(selectedFiles.map(f => f.uri || f));
-                let matchedCount = 0;
-                preList.forEach(file => {
-                    const uri = file.uri || file;
-                    if (batchUriSet.has(uri)) {
-                        matchedCount++;
-                    }
-                });
-                return matchedCount;
+                return countMatchedFiles(preList, uriSet);
             };
 
-            // 获取正式文件数量
+            /**
+             * 获取正式文件数量
+             */
             const getFilesListCount = () => {
                 const playlist = selectedPlaylist.value;
-                if (!playlist || !playlist.playlist || !Array.isArray(playlist.playlist)) {
-                    return 0;
-                }
+                if (!isValidFilesList(playlist)) return 0;
                 return playlist.playlist.length;
             };
 
-            // 获取正式文件列表中符合条件的文件数（只统计选中的文件）
+            /**
+             * 获取正式文件列表中符合条件的文件数（只统计选中的文件）
+             */
             const getFilesListMatchedCount = () => {
                 if (!selectedBatch.value || !selectedPlaylist.value) return 0;
-                const selectedFiles = selectedFileIndices.value.map(index => {
-                    if (selectedBatch.value.files && selectedBatch.value.files[index]) {
-                        return selectedBatch.value.files[index];
-                    }
-                    return null;
-                }).filter(f => f !== null);
-
-                if (selectedFiles.length === 0) return 0;
+                const uriSet = getSelectedFileUris();
+                if (uriSet.size === 0) return 0;
 
                 const playlist = selectedPlaylist.value;
-                if (!playlist || !playlist.playlist || !Array.isArray(playlist.playlist)) {
-                    return 0;
-                }
+                if (!isValidFilesList(playlist)) return 0;
 
-                const batchUriSet = new Set(selectedFiles.map(f => f.uri || f));
-                let matchedCount = 0;
-                playlist.playlist.forEach(file => {
-                    const uri = file.uri || file;
-                    if (batchUriSet.has(uri)) {
-                        matchedCount++;
-                    }
-                });
-                return matchedCount;
+                return countMatchedFiles(playlist.playlist, uriSet);
             };
 
-            // 获取播放列表的总文件数（前置文件+正式文件）
+            /**
+             * 获取播放列表的总文件数（前置文件+正式文件）
+             */
             const getPlaylistTotalFileCount = (playlist) => {
                 if (!playlist) return 0;
                 let count = 0;
+
                 // 前置文件（7个列表的总和）
-                if (playlist.pre_lists && Array.isArray(playlist.pre_lists) && playlist.pre_lists.length === 7) {
+                if (isValidPreLists(playlist)) {
                     playlist.pre_lists.forEach(preList => {
                         if (Array.isArray(preList)) {
                             count += preList.length;
                         }
                     });
                 }
+
                 // 正式文件
-                if (playlist.playlist && Array.isArray(playlist.playlist)) {
+                if (isValidFilesList(playlist)) {
                     count += playlist.playlist.length;
                 }
+
                 return count;
             };
 
-            // 获取播放列表中命中当前Batch选中文件的文件数
+            /**
+             * 获取播放列表中命中当前Batch选中文件的文件数
+             */
             const getMatchedFileCount = (playlist) => {
                 if (!selectedBatch.value || !playlist) return 0;
-                const selectedFiles = selectedFileIndices.value.map(index => {
-                    if (selectedBatch.value.files && selectedBatch.value.files[index]) {
-                        return selectedBatch.value.files[index];
-                    }
-                    return null;
-                }).filter(f => f !== null);
+                const uriSet = getSelectedFileUris();
+                if (uriSet.size === 0) return 0;
 
-                if (selectedFiles.length === 0) return 0;
-
-                const batchUriSet = new Set(selectedFiles.map(f => f.uri || f));
                 let matchedCount = 0;
 
                 // 检查前置文件
-                if (playlist.pre_lists && Array.isArray(playlist.pre_lists) && playlist.pre_lists.length === 7) {
+                if (isValidPreLists(playlist)) {
                     playlist.pre_lists.forEach(preList => {
-                        if (Array.isArray(preList)) {
-                            preList.forEach(file => {
-                                const uri = file.uri || file;
-                                if (batchUriSet.has(uri)) {
-                                    matchedCount++;
-                                }
-                            });
-                        }
+                        matchedCount += countMatchedFiles(preList, uriSet);
                     });
                 }
 
                 // 检查正式文件
-                if (playlist.playlist && Array.isArray(playlist.playlist)) {
-                    playlist.playlist.forEach(file => {
-                        const uri = file.uri || file;
-                        if (batchUriSet.has(uri)) {
-                            matchedCount++;
-                        }
-                    });
+                if (isValidFilesList(playlist)) {
+                    matchedCount += countMatchedFiles(playlist.playlist, uriSet);
                 }
 
                 return matchedCount;
             };
 
-            // 从RDS加载Batch列表
+            // ========== 数据操作 ==========
+
+            /**
+             * 从RDS加载Batch列表
+             */
             const loadBatchList = async () => {
                 try {
                     loading.value = true;
                     const data = await getRdsData(RDS_TABLE, RDS_ID);
 
-                    // 检查数据是否存在且不为空字符串
-                    if (data !== null && data !== undefined && typeof data === 'string' && data.trim() !== '') {
-                        try {
-                            const parsed = JSON.parse(data);
-                            if (Array.isArray(parsed)) {
-                                batchList.value = parsed;
-                                // 默认选择第一个Batch
-                                if (batchList.value.length > 0 && !selectedBatchId.value) {
-                                    const firstBatchId = batchList.value[0].id;
-                                    selectedBatchId.value = firstBatchId;
-                                    // 默认全选所有文件
-                                    const firstBatch = batchList.value[0];
-                                    if (firstBatch && firstBatch.files && firstBatch.files.length > 0) {
-                                        selectedFileIndices.value = firstBatch.files.map((_, index) => index);
-                                    }
-                                }
-                            } else {
-                                batchList.value = [];
+                    let parsedList = [];
+
+                    // 解析数据
+                    if (data !== null && data !== undefined) {
+                        if (typeof data === 'string' && data.trim() !== '') {
+                            try {
+                                const parsed = JSON.parse(data);
+                                parsedList = Array.isArray(parsed) ? parsed : [];
+                            } catch (e) {
+                                parsedList = [];
                             }
-                        } catch (e) {
-                            batchList.value = [];
+                        } else if (Array.isArray(data)) {
+                            parsedList = data;
                         }
-                    } else if (Array.isArray(data)) {
-                        // 如果后端直接返回数组（虽然不太可能）
-                        batchList.value = data;
-                        // 默认选择第一个Batch
-                        if (batchList.value.length > 0 && !selectedBatchId.value) {
-                            const firstBatchId = batchList.value[0].id;
-                            selectedBatchId.value = firstBatchId;
-                            // 默认全选所有文件
-                            const firstBatch = batchList.value[0];
-                            if (firstBatch && firstBatch.files && firstBatch.files.length > 0) {
-                                selectedFileIndices.value = firstBatch.files.map((_, index) => index);
-                            }
-                        }
-                    } else {
-                        batchList.value = [];
                     }
+
+                    batchList.value = parsedList;
+                    selectFirstBatchAndFiles();
                 } catch (error) {
                     batchList.value = [];
+                    logAndNoticeError(error, '加载Batch列表失败');
                 } finally {
                     loading.value = false;
                 }
             };
 
-            // 保存Batch列表到RDS
+            /**
+             * 保存Batch列表到RDS
+             */
             const saveBatchList = async () => {
                 try {
                     const dataToSave = JSON.stringify(batchList.value);
@@ -288,7 +313,11 @@ export async function createBatchManager(options = {}) {
                 }
             };
 
-            // 创建Batch
+            // ========== Batch操作 ==========
+
+            /**
+             * 创建Batch
+             */
             const handleCreateBatch = async () => {
                 try {
                     const { value } = await ElMessageBox.prompt(
@@ -319,7 +348,9 @@ export async function createBatchManager(options = {}) {
                 }
             };
 
-            // 编辑Batch名称
+            /**
+             * 编辑Batch名称
+             */
             const handleEditBatch = async (batchId) => {
                 const batch = batchList.value.find(b => b.id === batchId);
                 if (!batch) return;
@@ -345,7 +376,9 @@ export async function createBatchManager(options = {}) {
                 }
             };
 
-            // 删除Batch
+            /**
+             * 删除Batch
+             */
             const handleDeleteBatch = async (batchId) => {
                 const batch = batchList.value.find(b => b.id === batchId);
                 if (!batch) return;
@@ -375,30 +408,31 @@ export async function createBatchManager(options = {}) {
                 }
             };
 
-            // 选择Batch
+            /**
+             * 选择Batch
+             */
             const handleSelectBatch = (batchId) => {
                 selectedBatchId.value = batchId;
-                // 切换Batch时默认全选所有文件
                 const batch = batchList.value.find(b => b.id === batchId);
-                if (batch && batch.files && batch.files.length > 0) {
+                if (batch?.files?.length > 0) {
                     selectedFileIndices.value = batch.files.map((_, index) => index);
                 } else {
                     selectedFileIndices.value = [];
                 }
             };
 
-            // 切换文件选中状态
+            // ========== 文件操作 ==========
+
+            /**
+             * 切换文件选中状态
+             */
             const handleToggleFileSelection = (index) => {
-                const indices = selectedFileIndices.value;
-                const pos = indices.indexOf(index);
-                if (pos > -1) {
-                    indices.splice(pos, 1);
-                } else {
-                    indices.push(index);
-                }
+                toggleArrayItem(selectedFileIndices.value, index);
             };
 
-            // 删除所选文件
+            /**
+             * 删除所选文件
+             */
             const handleDeleteSelectedFiles = async () => {
                 if (!selectedBatch.value || selectedFileIndices.value.length === 0) {
                     return;
@@ -437,40 +471,9 @@ export async function createBatchManager(options = {}) {
                 }
             };
 
-            // 选择播放列表
-            const handleSelectPlaylist = (playlistId) => {
-                // 如果点击的是已选中的播放列表，则取消选中
-                if (selectedPlaylistId.value === playlistId) {
-                    selectedPlaylistId.value = null;
-                } else {
-                    selectedPlaylistId.value = playlistId;
-                }
-                // 重置选中状态
-                selectedPreLists.value = [];
-                selectedFilesList.value = false;
-            };
-
-            // 切换前置文件列表选中状态
-            const handleTogglePreList = (weekdayIndex) => {
-                const index = selectedPreLists.value.indexOf(weekdayIndex);
-                if (index > -1) {
-                    selectedPreLists.value.splice(index, 1);
-                } else {
-                    selectedPreLists.value.push(weekdayIndex);
-                }
-            };
-
-            // 切换正式文件列表选中状态
-            const handleToggleFilesList = (checked) => {
-                // 如果传入了参数，使用参数值；否则切换状态
-                if (checked !== undefined) {
-                    selectedFilesList.value = checked;
-                } else {
-                    selectedFilesList.value = !selectedFilesList.value;
-                }
-            };
-
-            // 打开文件浏览器
+            /**
+             * 打开文件浏览器
+             */
             const handleOpenFileBrowser = () => {
                 if (!selectedBatch.value) {
                     ElMessage.warning('请先选择一个Batch');
@@ -479,32 +482,29 @@ export async function createBatchManager(options = {}) {
                 fileBrowserDialogVisible.value = true;
             };
 
-            // 文件浏览器确认
+            /**
+             * 文件浏览器确认
+             */
             const handleFileBrowserConfirm = async (filePaths) => {
                 if (!selectedBatch.value || filePaths.length === 0) return;
                 try {
                     fileBrowserLoading.value = true;
                     const batch = selectedBatch.value;
-                    const existingUris = new Set();
-                    batch.files.forEach(file => {
-                        const uri = file.uri || file;
-                        existingUris.add(uri);
-                    });
+                    const existingUris = new Set(batch.files.map(getFileUri));
 
                     // 添加新文件，去重
-                    filePaths.forEach(filePath => {
-                        if (!existingUris.has(filePath)) {
-                            batch.files.push({ uri: filePath });
-                            existingUris.add(filePath);
-                        }
-                    });
+                    const newFiles = filePaths
+                        .filter(filePath => !existingUris.has(filePath))
+                        .map(filePath => ({ uri: filePath }));
+
+                    batch.files.push(...newFiles);
 
                     await saveBatchList();
                     // 添加文件后，默认全选所有文件
-                    if (batch.files && batch.files.length > 0) {
+                    if (batch.files.length > 0) {
                         selectedFileIndices.value = batch.files.map((_, index) => index);
                     }
-                    ElMessage.success(`成功添加 ${filePaths.length} 个文件`);
+                    ElMessage.success(`成功添加 ${newFiles.length} 个文件`);
                     fileBrowserDialogVisible.value = false;
                 } catch (error) {
                     logAndNoticeError(error, '添加文件失败');
@@ -513,12 +513,16 @@ export async function createBatchManager(options = {}) {
                 }
             };
 
-            // 关闭文件浏览器
+            /**
+             * 关闭文件浏览器
+             */
             const handleCloseFileBrowser = () => {
                 fileBrowserDialogVisible.value = false;
             };
 
-            // 从Batch中删除文件
+            /**
+             * 从Batch中删除文件
+             */
             const handleRemoveFileFromBatch = async (index) => {
                 if (!selectedBatch.value) return;
                 try {
@@ -541,22 +545,52 @@ export async function createBatchManager(options = {}) {
                 }
             };
 
-            // 添加文件到播放列表（只添加选中的文件）
-            const handleAddFilesToPlaylist = async () => {
+            // ========== 播放列表操作 ==========
+
+            /**
+             * 选择播放列表
+             */
+            const handleSelectPlaylist = (playlistId) => {
+                // 如果点击的是已选中的播放列表，则取消选中
+                selectedPlaylistId.value = selectedPlaylistId.value === playlistId ? null : playlistId;
+                // 重置选中状态
+                selectedPreLists.value = [];
+                selectedFilesList.value = false;
+            };
+
+            /**
+             * 切换前置文件列表选中状态
+             */
+            const handleTogglePreList = (weekdayIndex) => {
+                toggleArrayItem(selectedPreLists.value, weekdayIndex);
+            };
+
+            /**
+             * 切换正式文件列表选中状态
+             */
+            const handleToggleFilesList = (checked) => {
+                selectedFilesList.value = checked !== undefined ? checked : !selectedFilesList.value;
+            };
+
+            /**
+             * 验证操作条件
+             */
+            const validateOperation = () => {
                 if (!selectedBatch.value || !selectedPlaylistId.value || selectedFileIndices.value.length === 0 || !hasSelectedLists.value) {
                     ElMessage.warning('请选择Batch、播放列表和目标列表，并至少选中一个文件');
-                    return;
+                    return false;
                 }
+                return true;
+            };
+
+            /**
+             * 添加文件到播放列表（只添加选中的文件）
+             */
+            const handleAddFilesToPlaylist = async () => {
+                if (!validateOperation()) return;
 
                 try {
-                    const selectedFiles = selectedFileIndices.value.map(index => {
-                        if (selectedBatch.value.files && selectedBatch.value.files[index]) {
-                            return selectedBatch.value.files[index];
-                        }
-                        return null;
-                    }).filter(f => f !== null);
-
-                    const fileUris = selectedFiles.map(f => f.uri || f);
+                    const fileUris = getSelectedFiles().map(getFileUri);
 
                     await ElMessageBox.confirm(
                         `确定要将选中的 ${fileUris.length} 个文件添加到选中的列表吗？`,
@@ -584,22 +618,14 @@ export async function createBatchManager(options = {}) {
                 }
             };
 
-            // 从播放列表删除文件（只删除选中的文件）
+            /**
+             * 从播放列表删除文件（只删除选中的文件）
+             */
             const handleRemoveFilesFromPlaylist = async () => {
-                if (!selectedBatch.value || !selectedPlaylistId.value || selectedFileIndices.value.length === 0 || !hasSelectedLists.value) {
-                    ElMessage.warning('请选择Batch、播放列表和目标列表，并至少选中一个文件');
-                    return;
-                }
+                if (!validateOperation()) return;
 
                 try {
-                    const selectedFiles = selectedFileIndices.value.map(index => {
-                        if (selectedBatch.value.files && selectedBatch.value.files[index]) {
-                            return selectedBatch.value.files[index];
-                        }
-                        return null;
-                    }).filter(f => f !== null);
-
-                    const fileUris = selectedFiles.map(f => f.uri || f);
+                    const fileUris = getSelectedFiles().map(getFileUri);
 
                     await ElMessageBox.confirm(
                         `确定要从选中的列表中删除选中的 ${fileUris.length} 个文件吗？`,
@@ -627,14 +653,47 @@ export async function createBatchManager(options = {}) {
                 }
             };
 
-            // 关闭浮层
+            /**
+             * 关闭浮层
+             */
             const handleClose = () => {
                 emit('update:visible', false);
             };
 
+            /**
+             * 重置选择状态
+             */
+            const resetSelection = () => {
+                selectedPreLists.value = [];
+                selectedFilesList.value = false;
+                selectedFileIndices.value = [];
+            };
+
+            /**
+             * 清空所有选择
+             */
+            const clearAllSelection = () => {
+                selectedBatchId.value = null;
+                selectedPlaylistId.value = null;
+                resetSelection();
+            };
+
+            /**
+             * 初始化播放列表选择
+             */
+            const initPlaylistSelection = () => {
+                if (props.playlistCollection?.length > 0) {
+                    selectedPlaylistId.value = props.playlistCollection[0].id;
+                } else {
+                    selectedPlaylistId.value = null;
+                }
+            };
+
+            // ========== 监听器 ==========
+
             // 监听播放列表集合变化，默认选择第一个
             watch(() => props.playlistCollection, (newCollection) => {
-                if (newCollection && newCollection.length > 0 && !selectedPlaylistId.value) {
+                if (newCollection?.length > 0 && !selectedPlaylistId.value) {
                     selectedPlaylistId.value = newCollection[0].id;
                 }
             }, { immediate: true });
@@ -642,31 +701,16 @@ export async function createBatchManager(options = {}) {
             // 监听visible变化，加载数据
             watch(() => props.visible, (newVal) => {
                 if (newVal) {
-                    // 先重置其他选择状态，但保留selectedBatchId（让loadBatchList自动选择第一个）
-                    selectedPreLists.value = [];
-                    selectedFilesList.value = false;
-                    selectedFileIndices.value = [];
-                    // 默认选择第一个播放列表
-                    if (props.playlistCollection && props.playlistCollection.length > 0) {
-                        selectedPlaylistId.value = props.playlistCollection[0].id;
-                    } else {
-                        selectedPlaylistId.value = null;
-                    }
-                    // 加载数据（加载完成后会自动选择第一个Batch）
+                    resetSelection();
+                    initPlaylistSelection();
                     loadBatchList();
                 } else {
-                    // 关闭时清空所有选择
-                    selectedBatchId.value = null;
-                    selectedPlaylistId.value = null;
-                    selectedPreLists.value = [];
-                    selectedFilesList.value = false;
-                    selectedFileIndices.value = [];
+                    clearAllSelection();
                 }
             }, { immediate: true });
 
             // 组件挂载时也加载数据（如果visible为true）
             onMounted(() => {
-                // 无论visible是否为true，都尝试加载一次（因为watch可能没有触发）
                 loadBatchList();
             });
 
@@ -690,7 +734,7 @@ export async function createBatchManager(options = {}) {
                 getFilesListMatchedCount,
                 getPlaylistTotalFileCount,
                 getMatchedFileCount,
-                loadBatchList, // 暴露出来以便调试
+                loadBatchList,
                 handleCreateBatch,
                 handleEditBatch,
                 handleDeleteBatch,
@@ -712,4 +756,3 @@ export async function createBatchManager(options = {}) {
         template,
     };
 }
-

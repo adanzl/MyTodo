@@ -1,7 +1,7 @@
 import { getApiUrl } from "../js/net_util.js";
 import { formatSize, formatDuration, getMediaFileUrl, logAndNoticeError } from "../js/utils.js";
-import { createFileDialog } from "./common/file_dialog.js";
-import { createMediaPlayerComponent } from "./common/media_player.js";
+import { createFileDialog } from "./sub_view/file_dialog.js";
+import { createMediaComponent } from "./common/media_component.js";
 import { createAudioPlayer } from "./common/audio_player.js";
 const axios = window.axios;
 
@@ -21,12 +21,12 @@ async function createComponent() {
   // 加载文件对话框组件
   const FileDialog = await createFileDialog();
   // 加载媒体播放器组件
-  const MediaPlayer = await createMediaPlayerComponent();
+  const MediaComponent = await createMediaComponent();
 
   component = {
     components: {
       FileDialog,
-      MediaPlayer,
+      MediaComponent,
     },
     setup() {
       // 主页签控制

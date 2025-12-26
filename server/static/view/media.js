@@ -14,13 +14,14 @@ import {
   normalizeFiles,
   logAndNoticeError
 } from "../js/utils.js";
-import { createCronBuilder } from "./common/cron_builder.js";
-import { createFileDialog } from "./common/file_dialog.js";
-import { createMediaPlayerComponent } from "./common/media_player.js";
+import { createCronDialog } from "./sub_view/cron_dialog.js";
+import { createCronPreviewDialog } from "./sub_view/cron_preview_dialog.js";
+import { createFileDialog } from "./sub_view/file_dialog.js";
+import { createMediaComponent } from "./common/media_component.js";
 import { createAudioPlayer } from "./common/audio_player.js";
 const axios = window.axios;
 
-const { ref, watch, onMounted, onUnmounted, nextTick } = window.Vue;
+const { ref, onMounted, onUnmounted, nextTick } = window.Vue;
 const { ElMessage, ElMessageBox } = window.ElementPlus;
 let component = null;
 async function loadTemplate() {
@@ -34,16 +35,20 @@ async function createComponent() {
   // 加载文件对话框组件
   const FileDialog = await createFileDialog();
   // 加载 Cron 生成器组件
-  const CronBuilder = await createCronBuilder();
+  const CronDialog = await createCronDialog();
+  // 加载 Cron 预览弹窗组件
+  const CronPreviewDialog = await createCronPreviewDialog();
   // 加载媒体播放器组件
-  const MediaPlayer = await createMediaPlayerComponent();
+  const MediaComponent = await createMediaComponent();
 
   component = {
     components: {
       FileDialog,
-      CronBuilder,
-      MediaPlayer,
+      CronDialog,
+      CronPreviewDialog,
+      MediaComponent,
     },
+    // DevicesDialog 将在打开时动态加载
     setup() {
       const refData = {
         scanDialogVisible: ref(false),
@@ -58,8 +63,8 @@ async function createComponent() {
         connectedDeviceList: ref([]),
         dlnaDeviceList: ref([]),
         dlnaScanning: ref(false),
-        miDeviceList: ref([]),
-        miScanning: ref(false),
+        miDeviceList: ref([]), // 小米设备列表
+        miScanning: ref(false), // 小米设备扫描状态
         playing: ref(false),
         stopping: ref(false),
         playlistCollection: ref([]),
@@ -69,8 +74,6 @@ async function createComponent() {
         playlistRefreshing: ref(false),
         showMoreActions: ref(false),
         agentListDialogVisible: ref(false),
-        agentList: ref([]),
-        agentListLoading: ref(false),
         activeDeviceTab: ref('agent'),
         preFilesSortOrder: ref(null), // null, 'name-asc', 'name-desc', 'duration-asc', 'duration-desc'
         filesSortOrder: ref(null), // null, 'name-asc', 'name-desc', 'duration-asc', 'duration-desc'
@@ -85,9 +88,23 @@ async function createComponent() {
         filesBatchDeleteMode: ref(false), // 正式文件批量删除模式
         selectedPreFileIndices: ref([]), // 选中的前置文件索引数组
         selectedFileIndices: ref([]), // 选中的正式文件索引数组
-        batchManagerVisible: ref(false), // 批量模式浮层显示状态
+        batchDrawerVisible: ref(false), // 批量模式浮层显示状态
         playlistSelectorVisible: ref(false), // 应用到列表选择器显示状态
         playlistSelectorSelectedFiles: ref([]), // 应用到列表选择器选中的文件
+      };
+
+      // 设备列表弹窗组件（延迟创建）
+      const devicesDialogRef = ref(null);
+      const initDevicesDialog = async () => {
+        if (!devicesDialogRef.value) {
+          // 动态导入并添加时间戳防止缓存
+          const { createDevicesDialog } = await import(`./sub_view/devices_dialog.js?t=${Date.now()}`);
+          const DevicesDialogComponent = await createDevicesDialog();
+          // 动态注册组件
+          component.components.DevicesDialog = DevicesDialogComponent;
+          devicesDialogRef.value = DevicesDialogComponent;
+        }
+        return devicesDialogRef.value;
       };
 
       // 应用到列表选择器组件（延迟创建）
@@ -95,7 +112,7 @@ async function createComponent() {
       const initPlaylistSelector = async () => {
         if (!playlistSelectorRef.value) {
           // 动态导入并添加时间戳防止缓存
-          const { createPlaylistSelector } = await import(`./common/playlist_selector.js?t=${Date.now()}`);
+          const { createPlaylistSelector } = await import(`./sub_view/playlist_select_dialog.js?t=${Date.now()}`);
           const PlaylistSelectorComponent = await createPlaylistSelector({
             onCopy: async (params) => {
               // 复制文件到播放列表
@@ -188,12 +205,12 @@ async function createComponent() {
       };
 
       // 批量模式管理器组件（延迟创建）
-      const batchManagerRef = ref(null);
-      const initBatchManager = async () => {
-        if (!batchManagerRef.value) {
+      const batchDrawerRef = ref(null);
+      const initBatchDrawer = async () => {
+        if (!batchDrawerRef.value) {
           // 动态导入并添加时间戳防止缓存
-          const { createBatchManager } = await import(`./common/batch_manager.js?t=${Date.now()}`);
-          const BatchManagerComponent = await createBatchManager({
+          const { createBatchDrawer } = await import(`./sub_view/batch_drawer.js?t=${Date.now()}`);
+          const BatchDrawerComponent = await createBatchDrawer({
             onAddFiles: async (params) => {
               // 添加文件到播放列表
               const { playlistId, files, preLists, filesList } = params;
@@ -278,10 +295,10 @@ async function createComponent() {
             },
           });
           // 动态注册组件
-          component.components.BatchManager = BatchManagerComponent;
-          batchManagerRef.value = BatchManagerComponent;
+          component.components.BatchDrawer = BatchDrawerComponent;
+          batchDrawerRef.value = BatchDrawerComponent;
         }
-        return batchManagerRef.value;
+        return batchDrawerRef.value;
       };
 
       // 创建音频管理器
@@ -359,8 +376,9 @@ async function createComponent() {
       // 在浏览器中播放文件
       const handlePlayFileInBrowser = (fileItem) => {
         const filePath = fileItem?.uri || fileItem?.path || '';
-        if (!filePath) {
+        if (!filePath || typeof filePath !== 'string' || filePath.trim() === '') {
           ElMessage.warning("文件路径无效");
+          console.warn("handlePlayFileInBrowser: 文件路径无效", fileItem);
           return;
         }
 
@@ -374,10 +392,20 @@ async function createComponent() {
         }
 
         const mediaUrl = getMediaFileUrl(filePath, getApiUrl);
-        if (!mediaUrl) {
+        if (!mediaUrl || typeof mediaUrl !== 'string' || mediaUrl.trim() === '') {
           ElMessage.error("无法生成媒体文件URL");
+          console.error("handlePlayFileInBrowser: 无法生成媒体文件URL", { filePath, mediaUrl });
           return;
         }
+
+        // 验证生成的 URL 是否有效
+        if (mediaUrl.includes('index.html') || mediaUrl.endsWith('.html')) {
+          ElMessage.error("生成的媒体URL无效，可能是HTML页面");
+          console.error("handlePlayFileInBrowser: 生成的URL无效", { filePath, mediaUrl });
+          return;
+        }
+
+        console.log("加载音频文件:", { filePath, mediaUrl });
 
         // 加载/更换播放文件
         audioPlayer.load(mediaUrl, {
@@ -596,7 +624,7 @@ async function createComponent() {
         try {
           refData.playlistLoading.value = true;
 
-          let deviceAddress = refData.playlistStatus.value.device_address;
+          let deviceAddress = refData.playlistStatus.value?.device_address;
 
           // 如果没有设备地址，尝试获取已连接的设备
           if (!deviceAddress && refData.connectedDeviceList.value.length > 0) {
@@ -1022,7 +1050,7 @@ async function createComponent() {
           refData.loading.value = true;
           let rspData = null;
           if (deviceType === "agent") {
-            const rsp = await axios.get(getApiUrl() + "/agent/paired");
+            const rsp = await axios.get(getApiUrl() + "/agent/list");
             rspData = rsp.data;
           } else {
             rspData = await bluetoothAction("paired", "GET");
@@ -1127,6 +1155,7 @@ async function createComponent() {
 
         // 在响应式数组中找到对应的设备对象
         const deviceList = refData.miDeviceList.value;
+        if (!Array.isArray(deviceList)) return;
         const targetDevice = deviceList.find(d => getMiDeviceId(d) === deviceId);
         if (!targetDevice) return;
 
@@ -1252,70 +1281,12 @@ async function createComponent() {
 
       // Agent设备列表相关方法
       const handleOpenAgentListDialog = async () => {
+        await initDevicesDialog();
         refData.agentListDialogVisible.value = true;
-        await handleRefreshAgentList();
       };
 
       const handleCloseAgentListDialog = () => {
         refData.agentListDialogVisible.value = false;
-      };
-
-      const handleRefreshAgentList = async (showLoading = true) => {
-        try {
-          if (showLoading) {
-            refData.agentListLoading.value = true;
-          }
-          const response = await axios.get(getApiUrl() + "/agent/list");
-          if (response.data && response.data.code === 0) {
-            refData.agentList.value = response.data.data || [];
-          } else {
-            if (showLoading) {
-              ElMessage.error(response.data?.msg || "获取设备列表失败");
-            }
-            refData.agentList.value = [];
-          }
-        } catch (error) {
-          console.error("获取Agent设备列表失败:", error);
-          if (showLoading) {
-            logAndNoticeError(error, "获取设备列表失败");
-          }
-          refData.agentList.value = [];
-        } finally {
-          if (showLoading) {
-            refData.agentListLoading.value = false;
-          }
-        }
-      };
-
-      const handleTestAgentButton = async (agentId, key) => {
-        try {
-          // 设置按钮loading状态
-          const device = refData.agentList.value.find(d => d.agent_id === agentId);
-          if (device) {
-            device[`testing_${key}`] = true;
-          }
-
-          const response = await axios.post(getApiUrl() + "/agent/mock", {
-            agent_id: agentId,
-            action: "keyboard",
-            key: key,
-            value: "test"
-          });
-
-          if (response.data && response.data.code === 0) {
-            ElMessage.success(`测试按钮 ${key} 成功`);
-          } else {
-            ElMessage.error(response.data?.msg || `测试按钮 ${key} 失败`);
-          }
-        } catch (error) {
-          logAndNoticeError(error, `测试按钮 ${key} 失败`);
-        } finally {
-          // 清除loading状态
-          const device = refData.agentList.value.find(d => d.agent_id === agentId);
-          if (device) {
-            device[`testing_${key}`] = false;
-          }
-        }
       };
 
       const cronBuilderVisible = ref(false);
@@ -1419,6 +1390,11 @@ async function createComponent() {
       const handleUpdatePlaylistDeviceType = async (deviceType) => {
         if (!refData.playlistStatus.value) return;
 
+        // 处理空值情况
+        if (!deviceType || deviceType === '') {
+          return;
+        }
+
         const validDeviceTypes = ["agent", "dlna", "bluetooth", "mi"];
         if (!validDeviceTypes.includes(deviceType)) {
           ElMessage.error(`无效的设备类型: ${deviceType}`);
@@ -1492,7 +1468,7 @@ async function createComponent() {
       const refreshPlaylistStatus = async (onlyCurrent = false, isAutoRefresh = false) => {
         try {
           // 如果正在编辑设备配置（pendingDeviceType 不为 null），且是自动刷新，则跳过刷新，避免覆盖未保存的更改
-          if (isAutoRefresh && onlyCurrent && pendingDeviceType.value !== null) {
+          if (isAutoRefresh && pendingDeviceType.value !== null) {
             return;
           }
           // 如果是自动刷新，且处于拖拽排序模式，则跳过（避免覆盖拖拽结果）
@@ -2965,8 +2941,6 @@ async function createComponent() {
         getPlaylistTotalDuration,
         handleOpenAgentListDialog,
         handleCloseAgentListDialog,
-        handleRefreshAgentList,
-        handleTestAgentButton,
         getCurrentPreFiles,
         getSelectedWeekdayIndex,
         getWeekdayIndex,
@@ -2985,9 +2959,9 @@ async function createComponent() {
         handleToggleFileSelection,
         handleBatchDeletePreFiles,
         handleBatchDeleteFiles,
-        handleOpenBatchManager: async () => {
-          await initBatchManager();
-          refData.batchManagerVisible.value = true;
+        handleOpenBatchDrawer: async () => {
+          await initBatchDrawer();
+          refData.batchDrawerVisible.value = true;
         },
         handleOpenPlaylistSelectorForPreFile: async (file) => {
           try {
@@ -3026,46 +3000,21 @@ async function createComponent() {
 
       // 定时器：每5秒刷新播放列表状态
       let statusRefreshTimer = null;
-      // Agent设备列表刷新定时器
-      let agentListRefreshTimer = null;
-
-      // 监听Agent设备列表弹窗状态，实现10秒定时刷新
-      watch(
-        () => refData.agentListDialogVisible.value,
-        (isVisible) => {
-          // 清除之前的定时器
-          if (agentListRefreshTimer) {
-            clearInterval(agentListRefreshTimer);
-            agentListRefreshTimer = null;
-          }
-
-          // 如果弹窗显示，启动10秒定时刷新
-          if (isVisible) {
-            agentListRefreshTimer = setInterval(async () => {
-              try {
-                // 自动刷新时不显示loading图标
-                await handleRefreshAgentList(false);
-              } catch (error) {
-                console.error("定时刷新Agent设备列表失败:", error);
-              }
-            }, 10000); // 10秒刷新一次
-          }
-        }
-      );
 
       onMounted(async () => {
         await loadPlaylist();
         await refreshConnectedList();
 
         // 启动定时器，每5秒刷新一次当前播放列表状态
-        // 已禁用自动刷新，避免影响性能
-        // statusRefreshTimer = setInterval(async () => {
-        //   try {
-        //     await refreshPlaylistStatus(true, true); // 第二个参数 true 表示是自动刷新
-        //   } catch (error) {
-        //     console.error("定时刷新播放列表状态失败:", error);
-        //   }
-        // }, 5000);
+        statusRefreshTimer = setInterval(async () => {
+          try {
+            // 只刷新当前播放列表状态，第二个参数 true 表示是自动刷新
+            // 如果正在编辑设备配置（pendingDeviceType 不为 null），会自动跳过刷新
+            await refreshPlaylistStatus(true, true);
+          } catch (error) {
+            console.error("定时刷新播放列表状态失败:", error);
+          }
+        }, 5000);
       });
 
       onUnmounted(() => {
@@ -3074,20 +3023,18 @@ async function createComponent() {
           clearInterval(statusRefreshTimer);
           statusRefreshTimer = null;
         }
-        if (agentListRefreshTimer) {
-          clearInterval(agentListRefreshTimer);
-          agentListRefreshTimer = null;
-        }
       });
 
       return {
         ...refData,
         cronBuilderVisible,
         initialCronExpr,
-        BatchManager: batchManagerRef, // 响应式引用，将在打开时初始化
-        initBatchManager,
+        BatchDrawer: batchDrawerRef, // 响应式引用，将在打开时初始化
+        initBatchDrawer,
         PlaylistSelector: playlistSelectorRef, // 响应式引用，将在打开时初始化
         initPlaylistSelector,
+        DevicesDialog: devicesDialogRef, // 响应式引用，将在打开时初始化
+        initDevicesDialog,
         ...refMethods,
       };
     },

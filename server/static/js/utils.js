@@ -466,13 +466,40 @@ export function calculateFilesTotalDuration(files) {
  * @returns {string} HTTP URL
  */
 export function getMediaFileUrl(filePath, getApiUrl) {
-  if (!filePath) return '';
+  if (!filePath || typeof filePath !== 'string' || filePath.trim() === '') {
+    console.warn('getMediaFileUrl: 文件路径无效', filePath);
+    return '';
+  }
   if (!getApiUrl || typeof getApiUrl !== 'function') {
     console.warn('getMediaFileUrl: getApiUrl 函数未提供');
     return '';
   }
 
-  const path = filePath.startsWith('/') ? filePath.slice(1) : filePath;
-  const encodedPath = path.split('/').map(part => encodeURIComponent(part)).join('/');
-  return `${getApiUrl()}/media/files/${encodedPath}`;
+  try {
+    const apiUrl = getApiUrl();
+    if (!apiUrl || typeof apiUrl !== 'string') {
+      console.warn('getMediaFileUrl: API URL无效', apiUrl);
+      return '';
+    }
+
+    const path = filePath.startsWith('/') ? filePath.slice(1) : filePath;
+    if (!path || path.trim() === '') {
+      console.warn('getMediaFileUrl: 处理后的路径为空', filePath);
+      return '';
+    }
+
+    const encodedPath = path.split('/').map(part => encodeURIComponent(part)).join('/');
+    const mediaUrl = `${apiUrl}/media/files/${encodedPath}`;
+
+    // 验证生成的 URL
+    if (mediaUrl.includes('index.html') || mediaUrl.endsWith('.html')) {
+      console.error('getMediaFileUrl: 生成的URL包含HTML页面', { filePath, mediaUrl });
+      return '';
+    }
+
+    return mediaUrl;
+  } catch (error) {
+    console.error('getMediaFileUrl: 生成URL时出错', error, { filePath });
+    return '';
+  }
 }

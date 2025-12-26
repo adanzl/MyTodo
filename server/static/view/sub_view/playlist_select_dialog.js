@@ -8,7 +8,7 @@ const { ref, computed, watch, onMounted } = window.Vue;
 const { ElMessage, ElMessageBox } = window.ElementPlus;
 
 async function loadTemplate() {
-    const response = await fetch(`./view/common/playlist_selector-template.html?t=${Date.now()}`);
+    const response = await fetch(`./view/sub_view/playlist_select_dialog-template.html?t=${Date.now()}`);
     return await response.text();
 }
 

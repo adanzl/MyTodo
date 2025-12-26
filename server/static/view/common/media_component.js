@@ -7,7 +7,7 @@ import { formatDuration } from "../../js/utils.js";
 const { computed } = window.Vue;
 
 async function loadTemplate() {
-    const response = await fetch(`./view/common/media_player-template.html?t=${Date.now()}`);
+    const response = await fetch(`./view/common/media_component-template.html?t=${Date.now()}`);
     return await response.text();
 }
 
@@ -15,11 +15,11 @@ async function loadTemplate() {
  * 创建媒体播放器组件
  * @returns {Promise<Object>} Vue 组件对象
  */
-export async function createMediaPlayerComponent() {
+export async function createMediaComponent() {
     const template = await loadTemplate();
 
     return {
-        name: "MediaPlayer",
+        name: "MediaComponent",
         props: {
             // 文件项对象
             file: {

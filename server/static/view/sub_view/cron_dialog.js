@@ -8,7 +8,7 @@ const { ref, watch, nextTick } = window.Vue;
 const { ElMessage } = window.ElementPlus;
 
 async function loadTemplate() {
-    const response = await fetch(`./view/common/cron_builder-template.html?t=${Date.now()}`);
+    const response = await fetch(`./view/sub_view/cron_dialog-template.html?t=${Date.now()}`);
     return await response.text();
 }
 
@@ -153,7 +153,7 @@ function resetCronBuilder(cronBuilder) {
     cronBuilder.generated = "";
 }
 
-export async function createCronBuilder() {
+export async function createCronDialog() {
     const template = await loadTemplate();
 
     return {
