@@ -212,9 +212,15 @@ class DlnaDev:
             return -1, "AVTransport service not available"
 
         try:
-            av_transport.Stop(InstanceID=0)
+            # 使用 gevent Timeout 包装 UPnP 调用，避免阻塞
+            from gevent import Timeout
+            with Timeout(5.0):  # 5秒超时
+                av_transport.Stop(InstanceID=0)
             log.info(f"[DlnaDev] Stop playback {self.name}")
             return 0, "停止成功"
+        except Timeout:
+            log.warning(f"[DlnaDev] Stop timeout after 5 seconds for {self.name}")
+            return -1, "停止超时：设备无响应"
         except Exception as e:
             log.error(f"[DlnaDev] Stop error: {e}")
             return -1, f"停止失败: {str(e)}"
