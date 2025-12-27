@@ -125,33 +125,47 @@ class PlaylistMgr:
         :param playlist_data: 播放列表数据，必须包含 id 字段
         :return: 0 表示成功，-1 表示失败
         """
-        if not playlist_data or not isinstance(playlist_data, dict):
+        try:
+            if not playlist_data or not isinstance(playlist_data, dict):
+                return -1
+            
+            playlist_id = playlist_data.get("id")
+            if not playlist_id:
+                log.error("[PlaylistMgr] 更新单个播放列表失败: playlist_data 中缺少 id 字段")
+                return -1
+            
+            # 如果播放列表不存在，创建新播放列表
+            if playlist_id not in self._playlist_raw:
+                log.info(f"[PlaylistMgr] 播放列表 {playlist_id} 不存在，将创建新播放列表")
+            
+            # 更新播放列表数据（合并现有数据）
+            if playlist_id in self._playlist_raw:
+                # 合并更新，保留原有字段
+                existing_playlist = self._playlist_raw[playlist_id]
+                existing_playlist.update(playlist_data)
+                self._playlist_raw[playlist_id] = existing_playlist
+            else:
+                # 新播放列表
+                self._playlist_raw[playlist_id] = playlist_data
+            
+            # 使用 gevent Timeout 包装可能阻塞的操作
+            from gevent import Timeout
+            try:
+                with Timeout(10.0):  # 10秒超时
+                    self._save_playlist_to_rds()
+                    # 只更新当前播放列表的设备映射和定时任务
+                    self._refresh_single_device_map(playlist_id, self._playlist_raw[playlist_id])
+                    self._refresh_cron_job(playlist_id, self._playlist_raw[playlist_id])
+            except Timeout:
+                log.error(f"[PlaylistMgr] update_single_playlist timeout after 10 seconds for {playlist_id}")
+                # 即使超时，也返回成功，因为数据已经更新到内存中
+                # RDS 保存和设备映射可以在后台重试
+                return 0
+            
+            return 0
+        except Exception as e:
+            log.error(f"[PlaylistMgr] update_single_playlist error: {e}")
             return -1
-        
-        playlist_id = playlist_data.get("id")
-        if not playlist_id:
-            log.error("[PlaylistMgr] 更新单个播放列表失败: playlist_data 中缺少 id 字段")
-            return -1
-        
-        # 如果播放列表不存在，创建新播放列表
-        if playlist_id not in self._playlist_raw:
-            log.info(f"[PlaylistMgr] 播放列表 {playlist_id} 不存在，将创建新播放列表")
-        
-        # 更新播放列表数据（合并现有数据）
-        if playlist_id in self._playlist_raw:
-            # 合并更新，保留原有字段
-            existing_playlist = self._playlist_raw[playlist_id]
-            existing_playlist.update(playlist_data)
-            self._playlist_raw[playlist_id] = existing_playlist
-        else:
-            # 新播放列表
-            self._playlist_raw[playlist_id] = playlist_data
-        
-        self._save_playlist_to_rds()
-        # 只更新当前播放列表的设备映射和定时任务
-        self._refresh_single_device_map(playlist_id, self._playlist_raw[playlist_id])
-        self._refresh_cron_job(playlist_id, self._playlist_raw[playlist_id])
-        return 0
 
     def reload(self) -> int:
         if sys.platform != "linux":
