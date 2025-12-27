@@ -87,22 +87,32 @@ def playlist_update():
     传入单个播放列表数据，必须包含 id 字段
     """
     try:
-        log.info("===== [Playlist Update]")
+        log.info("===== [Playlist Update] START")
+        log.info("===== [Playlist Update] STEP1: 解析 JSON 数据")
         args = request.get_json(silent=True) or {}
+        log.info(f"===== [Playlist Update] STEP1 SUCCESS: args keys={list(args.keys()) if args else 'empty'}")
 
         if not args:
+            log.warning("===== [Playlist Update] STEP1 FAILED: 请求数据为空")
             return _err("请求数据不能为空")
 
         playlist_id = args.get("id")
         if not playlist_id:
+            log.warning(f"===== [Playlist Update] STEP2 FAILED: 播放列表 id 为空")
             return _err("播放列表 id 不能为空")
+        log.info(f"===== [Playlist Update] STEP2 SUCCESS: playlist_id={playlist_id}")
 
+        log.info(f"===== [Playlist Update] STEP3: 调用 update_single_playlist playlist_id={playlist_id}")
         ret = playlist_mgr.update_single_playlist(args)
+        log.info(f"===== [Playlist Update] STEP3 SUCCESS: ret={ret}")
+        
         if ret != 0:
+            log.warning(f"===== [Playlist Update] STEP4 FAILED: 更新播放列表失败 ret={ret}")
             return _err("更新播放列表失败")
+        log.info("===== [Playlist Update] END: SUCCESS")
         return _ok()
     except Exception as e:
-        log.error(f"[PLAYLIST] Update error: {e}")
+        log.error(f"[PLAYLIST] Update error: {e}", exc_info=True)
         return _err(f'error: {str(e)}')
 
 

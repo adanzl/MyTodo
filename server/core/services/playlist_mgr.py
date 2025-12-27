@@ -106,7 +106,19 @@ class PlaylistMgr:
 
     def _save_playlist_to_rds(self):
         """保存播放列表到 RDS"""
-        rds_mgr.set(PLAYLIST_RDS_FULL_KEY, json.dumps(self._playlist_raw, ensure_ascii=False))
+        log.info(f"[PlaylistMgr] _save_playlist_to_rds START: playlists count={len(self._playlist_raw)}")
+        try:
+            log.info(f"[PlaylistMgr] _save_playlist_to_rds STEP1: json.dumps")
+            json_str = json.dumps(self._playlist_raw, ensure_ascii=False)
+            log.info(f"[PlaylistMgr] _save_playlist_to_rds STEP1 SUCCESS: json length={len(json_str)}")
+            
+            log.info(f"[PlaylistMgr] _save_playlist_to_rds STEP2: rds_mgr.set")
+            rds_mgr.set(PLAYLIST_RDS_FULL_KEY, json_str)
+            log.info(f"[PlaylistMgr] _save_playlist_to_rds STEP2 SUCCESS")
+            log.info(f"[PlaylistMgr] _save_playlist_to_rds END: SUCCESS")
+        except Exception as e:
+            log.error(f"[PlaylistMgr] _save_playlist_to_rds EXCEPTION: {e}", exc_info=True)
+            raise
 
     def save_playlist(self, collection: Dict[str, Any]) -> int:
         """
@@ -273,64 +285,88 @@ class PlaylistMgr:
 
     def _refresh_single_device_map(self, playlist_id: str, playlist_data: Dict[str, Any]):
         """只更新单个播放列表的设备映射"""
-        if sys.platform != "linux":
-            return
-        device = playlist_data.get("device", {})
-        if device and device.get("address"):
-            device_type = device.get("type") or playlist_data.get("device_type", "dlna")
-            if device_type in DEVICE_TYPES:
-                self._device_map[playlist_id] = create_device({
-                    "type": device_type,
-                    "address": device.get("address"),
-                    "name": device.get("name")
-                })
+        log.info(f"[PlaylistMgr] _refresh_single_device_map START: id={playlist_id}")
+        try:
+            if sys.platform != "linux":
+                log.info(f"[PlaylistMgr] _refresh_single_device_map SKIP: 非 Linux 平台")
+                return
+            device = playlist_data.get("device", {})
+            if device and device.get("address"):
+                device_type = device.get("type") or playlist_data.get("device_type", "dlna")
+                log.info(f"[PlaylistMgr] _refresh_single_device_map STEP1: 创建设备 id={playlist_id}, type={device_type}")
+                if device_type in DEVICE_TYPES:
+                    self._device_map[playlist_id] = create_device({
+                        "type": device_type,
+                        "address": device.get("address"),
+                        "name": device.get("name")
+                    })
+                    log.info(f"[PlaylistMgr] _refresh_single_device_map STEP1 SUCCESS: id={playlist_id}")
+                else:
+                    # 如果设备类型无效，从映射中移除
+                    log.warning(f"[PlaylistMgr] _refresh_single_device_map STEP1: 设备类型无效 id={playlist_id}, type={device_type}")
+                    self._device_map.pop(playlist_id, None)
             else:
-                # 如果设备类型无效，从映射中移除
+                # 如果没有设备地址，从映射中移除
+                log.info(f"[PlaylistMgr] _refresh_single_device_map STEP1: 无设备地址，移除映射 id={playlist_id}")
                 self._device_map.pop(playlist_id, None)
-        else:
-            # 如果没有设备地址，从映射中移除
-            self._device_map.pop(playlist_id, None)
+            log.info(f"[PlaylistMgr] _refresh_single_device_map END: SUCCESS id={playlist_id}")
+        except Exception as e:
+            log.error(f"[PlaylistMgr] _refresh_single_device_map EXCEPTION: id={playlist_id}, error={e}", exc_info=True)
+            raise
 
     def _refresh_cron_job(self, playlist_id: str, playlist_data: Dict[str, Any]):
-        scheduler = scheduler_mgr
-        job_id = f"playlist_cron_{playlist_id}"
-        schedule = playlist_data.get("schedule", {})
-        enabled = schedule.get("enabled", 0)
-        cron_expression = schedule.get("cron", "").strip()
+        log.info(f"[PlaylistMgr] _refresh_cron_job START: id={playlist_id}")
+        try:
+            scheduler = scheduler_mgr
+            job_id = f"playlist_cron_{playlist_id}"
+            schedule = playlist_data.get("schedule", {})
+            enabled = schedule.get("enabled", 0)
+            cron_expression = schedule.get("cron", "").strip()
 
-        if scheduler.get_job(job_id):
-            scheduler.remove_job(job_id)
+            log.info(f"[PlaylistMgr] _refresh_cron_job STEP1: 检查现有任务 id={playlist_id}, job_id={job_id}")
+            if scheduler.get_job(job_id):
+                log.info(f"[PlaylistMgr] _refresh_cron_job STEP1: 移除现有任务 id={playlist_id}")
+                scheduler.remove_job(job_id)
+            log.info(f"[PlaylistMgr] _refresh_cron_job STEP1 SUCCESS: id={playlist_id}")
 
-        if enabled != 1 or not cron_expression:
-            return
+            if enabled != 1 or not cron_expression:
+                log.info(f"[PlaylistMgr] _refresh_cron_job SKIP: 定时任务未启用 id={playlist_id}, enabled={enabled}, cron={cron_expression}")
+                return
 
-        def cron_play_task(pid=playlist_id):
-            try:
-                p_name = self._playlist_raw.get(pid, {}).get("name", "未知播放列表")
-                # 检查播放列表是否正在播放中，如果正在播放则跳过定时任务
-                if pid in self._playing_playlists:
-                    log.info(f"[PlaylistMgr] 定时任务触发时播放列表正在播放中，跳过播放任务: {pid} - {p_name}")
-                    return
+            def cron_play_task(pid=playlist_id):
+                try:
+                    p_name = self._playlist_raw.get(pid, {}).get("name", "未知播放列表")
+                    # 检查播放列表是否正在播放中，如果正在播放则跳过定时任务
+                    if pid in self._playing_playlists:
+                        log.info(f"[PlaylistMgr] 定时任务触发时播放列表正在播放中，跳过播放任务: {pid} - {p_name}")
+                        return
 
-                # 如果不在播放中，正常启动播放
-                code, msg = self.play(pid, force=False)
-                if code == 0:
-                    self._scheduled_play_start_times[pid] = datetime.datetime.now()
-                    log.info(f"[PlaylistMgr] 定时任务播放成功: {pid} - {p_name}")
-                else:
-                    log.error(f"[PlaylistMgr] 定时任务播放失败: {pid} - {p_name}, {msg}")
-            except Exception as e:
-                # 捕获 gevent 相关的异常，避免影响线程池 worker
-                import gevent
-                if isinstance(e, gevent.exceptions.LoopExit):
-                    log.warning(f"[PlaylistMgr] 定时任务执行后发生 gevent LoopExit (可忽略): {pid} - {p_name}")
-                else:
-                    log.error(f"[PlaylistMgr] 定时任务执行异常: {pid} - {p_name}, {e}")
+                    # 如果不在播放中，正常启动播放
+                    code, msg = self.play(pid, force=False)
+                    if code == 0:
+                        self._scheduled_play_start_times[pid] = datetime.datetime.now()
+                        log.info(f"[PlaylistMgr] 定时任务播放成功: {pid} - {p_name}")
+                    else:
+                        log.error(f"[PlaylistMgr] 定时任务播放失败: {pid} - {p_name}, {msg}")
+                except Exception as e:
+                    # 捕获 gevent 相关的异常，避免影响线程池 worker
+                    import gevent
+                    if isinstance(e, gevent.exceptions.LoopExit):
+                        log.warning(f"[PlaylistMgr] 定时任务执行后发生 gevent LoopExit (可忽略): {pid} - {p_name}")
+                    else:
+                        log.error(f"[PlaylistMgr] 定时任务执行异常: {pid} - {p_name}, {e}")
 
-        success = scheduler.add_cron_job(func=cron_play_task, job_id=job_id, cron_expression=cron_expression)
-        playlist_name = playlist_data.get("name", "未知播放列表")
-        if not success:
-            log.error(f"[PlaylistMgr] 创建定时任务失败: {playlist_id}, {playlist_name}, cron: {cron_expression}")
+            log.info(f"[PlaylistMgr] _refresh_cron_job STEP2: 添加定时任务 id={playlist_id}, cron={cron_expression}")
+            success = scheduler.add_cron_job(func=cron_play_task, job_id=job_id, cron_expression=cron_expression)
+            playlist_name = playlist_data.get("name", "未知播放列表")
+            if not success:
+                log.error(f"[PlaylistMgr] _refresh_cron_job STEP2 FAILED: 创建定时任务失败: {playlist_id}, {playlist_name}, cron: {cron_expression}")
+            else:
+                log.info(f"[PlaylistMgr] _refresh_cron_job STEP2 SUCCESS: id={playlist_id}")
+            log.info(f"[PlaylistMgr] _refresh_cron_job END: SUCCESS id={playlist_id}")
+        except Exception as e:
+            log.error(f"[PlaylistMgr] _refresh_cron_job EXCEPTION: id={playlist_id}, error={e}", exc_info=True)
+            raise
 
     def _cleanup_orphaned_cron_jobs(self):
         """清理孤立的定时任务和状态"""
