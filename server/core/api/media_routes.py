@@ -89,12 +89,37 @@ def playlist_update():
     try:
         log.info("===== [Playlist Update] START")
         log.info(f"===== [Playlist Update] STEP0: 请求信息 Content-Length={request.content_length}, Content-Type={request.content_type}")
-        log.info("===== [Playlist Update] STEP1: 解析 JSON 数据")
+        
+        # 尝试直接读取原始数据，避免 request.get_json() 可能的问题
+        log.info("===== [Playlist Update] STEP1: 读取请求数据")
         import time
+        import json as json_lib
         start_time = time.time()
-        args = request.get_json(silent=True) or {}
-        elapsed = time.time() - start_time
-        log.info(f"===== [Playlist Update] STEP1 SUCCESS: 耗时={elapsed:.3f}s, args keys={list(args.keys()) if args else 'empty'}, args size={len(str(args)) if args else 0}")
+        
+        try:
+            # 先尝试直接读取原始数据
+            raw_data = request.get_data(as_text=False)
+            log.info(f"===== [Playlist Update] STEP1.1: 读取原始数据成功, size={len(raw_data)}")
+            
+            if raw_data:
+                # 手动解析 JSON
+                log.info("===== [Playlist Update] STEP1.2: 解析 JSON")
+                args = json_lib.loads(raw_data.decode('utf-8'))
+                elapsed = time.time() - start_time
+                log.info(f"===== [Playlist Update] STEP1 SUCCESS: 耗时={elapsed:.3f}s, args keys={list(args.keys()) if args else 'empty'}")
+            else:
+                # 如果没有原始数据，尝试使用 request.get_json()
+                log.info("===== [Playlist Update] STEP1.2: 使用 request.get_json()")
+                args = request.get_json(silent=True) or {}
+                elapsed = time.time() - start_time
+                log.info(f"===== [Playlist Update] STEP1 SUCCESS: 耗时={elapsed:.3f}s, args keys={list(args.keys()) if args else 'empty'}")
+        except Exception as e:
+            log.error(f"===== [Playlist Update] STEP1 EXCEPTION: {e}", exc_info=True)
+            # 降级到 request.get_json()
+            log.info("===== [Playlist Update] STEP1: 降级使用 request.get_json()")
+            args = request.get_json(silent=True) or {}
+            elapsed = time.time() - start_time
+            log.info(f"===== [Playlist Update] STEP1 SUCCESS: 耗时={elapsed:.3f}s, args keys={list(args.keys()) if args else 'empty'}")
 
         if not args:
             log.warning("===== [Playlist Update] STEP1 FAILED: 请求数据为空")
