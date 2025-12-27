@@ -3,6 +3,11 @@ from flask_cors import CORS
 from flask_socketio import SocketIO
 from flask_sqlalchemy import SQLAlchemy
 
+# 必须在导入任何使用 miservice 的模块之前 patch fake_useragent
+# 避免 fake_useragent 的 ThreadPoolExecutor 在 gevent 环境中导致 LoopExit
+from core.tools.useragent_fix import patch_fake_useragent
+patch_fake_useragent()
+
 import core.ai.ai_mgr as ai_mgr
 from core.api.routes import api_bp
 from core.api.agent_routes import agent_bp

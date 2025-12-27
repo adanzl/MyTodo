@@ -1,6 +1,10 @@
 '''
 小米设备管理
 '''
+# 必须在导入 miservice 之前 patch fake_useragent，避免 ThreadPoolExecutor 导致的 LoopExit
+from core.tools.useragent_fix import patch_fake_useragent
+patch_fake_useragent()
+
 import asyncio
 import json
 import os
@@ -12,7 +16,7 @@ from aiohttp import ClientSession
 from miservice import MiAccount, MiNAService
 
 from core.log_config import root_logger
-from core.async_util import run_async
+from core.tools.async_util import run_async
 from core.utils import convert_to_http_url, format_time_str
 
 log = root_logger()
@@ -101,6 +105,11 @@ class MiDevice:
             return device_list
 
         except Exception as e:
+            # 捕获 gevent LoopExit 异常（可能由 fake_useragent 的线程池操作引起）
+            import gevent
+            if isinstance(e, gevent.exceptions.LoopExit):
+                log.warning(f"[MiDevice] Scan: gevent LoopExit (可忽略)")
+                return []
             log.error(f"[MiDevice] Scan error: {e}")
             return []
         finally:
@@ -133,6 +142,17 @@ class MiDevice:
                 await mina_service.play_by_url(self.device_id, media_url)
                 return 0, "ok"
             except Exception as e:
+                # 捕获 gevent LoopExit 异常（可能由 fake_useragent 的线程池操作引起）
+                import gevent
+                if isinstance(e, gevent.exceptions.LoopExit):
+                    log.warning(f"[MiDevice] Play: gevent LoopExit (可忽略), 重试播放")
+                    # 重试一次
+                    try:
+                        await mina_service.play_by_url(self.device_id, media_url)
+                        return 0, "ok"
+                    except Exception as e2:
+                        log.error(f"[MiDevice] Play retry error: {e2}")
+                        return -1, f"播放失败: {str(e2)}"
                 log.error(f"[MiDevice] Play error: {e}")
                 return -1, f"播放失败: {str(e)}"
             finally:
@@ -142,6 +162,11 @@ class MiDevice:
         try:
             return run_async(_play_async(), timeout=20.0)
         except Exception as e:
+            # 捕获 gevent LoopExit 异常
+            import gevent
+            if isinstance(e, gevent.exceptions.LoopExit):
+                log.warning(f"[MiDevice] Play: gevent LoopExit (可忽略)")
+                return -1, "播放失败: gevent LoopExit"
             log.error(f"[MiDevice] Play error: {e}")
             return -1, f"播放失败: {str(e)}"
 

@@ -76,7 +76,7 @@ def run_async(coroutine: Coroutine, timeout: Optional[float] = None) -> Any:
     :raises asyncio.TimeoutError: 如果操作超时
     """
     if timeout is None:
-        timeout = 10.0  # 默认30秒超时，避免无限等待
+        timeout = 10.0  # 默认超时时间，避免无限等待
     
     # 使用 Queue 传递结果和异常（threading.Queue 不会被 gevent patch，因为 thread=False）
     result_queue = Queue()
@@ -162,3 +162,4 @@ def run_async(coroutine: Coroutine, timeout: Optional[float] = None) -> Any:
     except Exception as e:
         # 直接抛出异常（包括其他异常）
         raise
+
