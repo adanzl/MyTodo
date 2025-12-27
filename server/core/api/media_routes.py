@@ -90,22 +90,46 @@ def playlist_update():
         log.info("===== [Playlist Update] START")
         log.info(f"===== [Playlist Update] STEP0: 请求信息 Content-Length={request.content_length}, Content-Type={request.content_type}")
         
-        # 直接使用 request.get_json()，添加详细日志
-        log.info("===== [Playlist Update] STEP1: 准备调用 request.get_json()")
+        # 使用 request.stream 手动读取数据，避免 request.get_json() 阻塞
+        log.info("===== [Playlist Update] STEP1: 使用 stream 读取请求数据")
         import time
+        import json as json_lib
         start_time = time.time()
         
         try:
-            log.info("===== [Playlist Update] STEP1.1: 调用 request.get_json(silent=True)")
-            args = request.get_json(silent=True) or {}
-            elapsed = time.time() - start_time
-            log.info(f"===== [Playlist Update] STEP1 SUCCESS: 耗时={elapsed:.3f}s, args type={type(args)}, args keys count={len(args) if isinstance(args, dict) else 0}")
-            if isinstance(args, dict) and args:
-                log.info(f"===== [Playlist Update] STEP1 SUCCESS: 前5个keys={list(args.keys())[:5]}")
+            log.info("===== [Playlist Update] STEP1.1: 读取 request.stream")
+            # 使用 request.stream 读取原始数据
+            content_length = request.content_length or 0
+            if content_length > 0:
+                raw_data = request.stream.read(content_length)
+                log.info(f"===== [Playlist Update] STEP1.1 SUCCESS: 读取了 {len(raw_data)} 字节")
+            else:
+                # 如果没有 Content-Length，尝试读取所有数据
+                log.info("===== [Playlist Update] STEP1.1: Content-Length 为 0，尝试读取所有数据")
+                raw_data = request.stream.read()
+                log.info(f"===== [Playlist Update] STEP1.1 SUCCESS: 读取了 {len(raw_data)} 字节")
+            
+            log.info("===== [Playlist Update] STEP1.2: 解析 JSON")
+            if raw_data:
+                args = json_lib.loads(raw_data.decode('utf-8'))
+                elapsed = time.time() - start_time
+                log.info(f"===== [Playlist Update] STEP1 SUCCESS: 耗时={elapsed:.3f}s, args type={type(args)}, args keys count={len(args) if isinstance(args, dict) else 0}")
+                if isinstance(args, dict) and args:
+                    log.info(f"===== [Playlist Update] STEP1 SUCCESS: 前5个keys={list(args.keys())[:5]}")
+            else:
+                log.warning("===== [Playlist Update] STEP1 FAILED: 没有读取到数据")
+                args = {}
         except Exception as e:
             elapsed = time.time() - start_time
             log.error(f"===== [Playlist Update] STEP1 EXCEPTION: 耗时={elapsed:.3f}s, error={e}", exc_info=True)
-            args = {}
+            # 降级到 request.get_json()
+            try:
+                log.info("===== [Playlist Update] STEP1 FALLBACK: 尝试使用 request.get_json()")
+                args = request.get_json(silent=True) or {}
+                log.info(f"===== [Playlist Update] STEP1 FALLBACK SUCCESS: args keys count={len(args) if isinstance(args, dict) else 0}")
+            except Exception as e2:
+                log.error(f"===== [Playlist Update] STEP1 FALLBACK EXCEPTION: {e2}", exc_info=True)
+                args = {}
 
         if not args:
             log.warning("===== [Playlist Update] STEP1 FAILED: 请求数据为空")

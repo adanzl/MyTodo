@@ -229,7 +229,15 @@ export async function playlistAction(action, method, params = {}) {
       params: params,
     });
   } else {
-    rsp = await axios.post(API_URL + "/playlist/" + action, params);
+    // 确保使用 JSON 格式发送，并添加超时设置
+    const jsonData = JSON.stringify(params);
+    console.log(`[playlistAction] POST ${action}, data size: ${jsonData.length} bytes`);
+    rsp = await axios.post(API_URL + "/playlist/" + action, params, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      timeout: 30000, // 30秒超时
+    });
   }
   return rsp.data;
 }
