@@ -109,6 +109,7 @@ def time_to_seconds(time_str: str) -> int:
 def get_media_duration(file_path):
     """
     使用 ffprobe 获取媒体文件的时长
+    在 gevent 环境中安全使用 subprocess，避免事件循环问题
     :param file_path: 文件路径
     :return: 时长（秒），如果失败返回 None
     """
@@ -117,14 +118,31 @@ def get_media_duration(file_path):
             '/usr/bin/ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of',
             'default=noprint_wrappers=1:nokey=1', file_path
         ]
-        result = subprocess.run(cmds, capture_output=True, text=True, timeout=50)
-        if result.returncode == 0 and result.stdout.strip():
-            duration = float(result.stdout.strip())
-            return int(duration) if duration else None
-    except (FileNotFoundError, subprocess.TimeoutExpired, ValueError) as e:
-        log.warning(f"Failed to get media duration with ffprobe {' '.join(cmds)} error: {e}")
+        
+        # 在 gevent 环境中，使用 Popen 并手动管理进程，避免事件循环问题
+        # 这样可以避免 "child watchers are only available on the default loop" 错误
+        import subprocess as sp
+        process = sp.Popen(cmds, stdout=sp.PIPE, stderr=sp.PIPE, text=True)
+        try:
+            stdout, stderr = process.communicate(timeout=50)
+            if process.returncode == 0 and stdout.strip():
+                duration = float(stdout.strip())
+                return int(duration) if duration else None
+        except sp.TimeoutExpired:
+            process.kill()
+            process.wait()
+            log.warning(f"ffprobe timeout after 50s for {file_path}")
+        except Exception as e:
+            process.kill()
+            process.wait()
+            raise
+        
+    except FileNotFoundError as e:
+        log.warning(f"ffprobe not found: {e}")
+    except ValueError as e:
+        log.warning(f"Invalid duration value from ffprobe for {file_path}: {e}")
     except Exception as e:
-        log.warning(f"Error getting media duration: {e}")
+        log.warning(f"Error getting media duration for {file_path}: {e}")
     return None
 
 
