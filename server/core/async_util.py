@@ -3,14 +3,15 @@
 用于在同步代码中调用异步函数
 """
 import asyncio
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+import threading
 from typing import Optional, Any, Coroutine
+from queue import Queue, Empty
 
 from gevent import Timeout as GeventTimeout
 from gevent import spawn
 
-# 全局线程池
-thread_pool = ThreadPoolExecutor(max_workers=10)
+# 使用 threading.Thread 而不是 ThreadPoolExecutor，避免与 gevent 的队列冲突
+# 因为 main.py 中设置了 thread=False，threading 模块不会被 gevent patch
 
 
 def _clear_event_loop() -> None:
@@ -26,7 +27,7 @@ def _clear_event_loop() -> None:
             pass
 
 
-def _run_in_thread(coroutine: Coroutine, timeout: Optional[float] = None) -> Any:
+def _run_in_thread(coroutine: Coroutine, timeout: Optional[float] = None, result_queue: Queue = None, error_queue: Queue = None) -> None:
     """
     在线程中运行异步函数
     
@@ -41,10 +42,21 @@ def _run_in_thread(coroutine: Coroutine, timeout: Optional[float] = None) -> Any
             return await coroutine
     
     try:
-        return asyncio.run(_run_coroutine())
+        result = asyncio.run(_run_coroutine())
+        if result_queue is not None:
+            result_queue.put(result)
     except asyncio.TimeoutError as e:
         # 重新抛出超时错误，保持错误信息一致
-        raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds") from e
+        timeout_error = asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
+        if error_queue is not None:
+            error_queue.put(timeout_error)
+        else:
+            raise timeout_error from e
+    except Exception as e:
+        if error_queue is not None:
+            error_queue.put(e)
+        else:
+            raise
 
 
 def run_async(coroutine: Coroutine, timeout: Optional[float] = None) -> Any:
@@ -52,7 +64,7 @@ def run_async(coroutine: Coroutine, timeout: Optional[float] = None) -> Any:
     在新的事件循环中运行协程
     用于在同步代码中调用异步函数
     
-    使用线程池在线程中运行，确保每次调用都在独立线程中
+    使用 threading.Thread 在线程中运行，避免与 gevent 的队列冲突
     使用 gevent.spawn 等待线程完成，避免阻塞其他 gevent 协程
     
     :param coroutine: 协程对象
@@ -60,27 +72,68 @@ def run_async(coroutine: Coroutine, timeout: Optional[float] = None) -> Any:
     :return: 协程的返回值
     :raises asyncio.TimeoutError: 如果操作超时
     """
-    future = thread_pool.submit(_run_in_thread, coroutine, timeout)
+    # 使用 Queue 传递结果和异常（threading.Queue 不会被 gevent patch，因为 thread=False）
+    result_queue = Queue()
+    error_queue = Queue()
     
-    def wait_for_future() -> Any:
-        """等待 future 完成（在 gevent greenlet 中运行）"""
+    # 创建线程并启动
+    thread = threading.Thread(
+        target=_run_in_thread,
+        args=(coroutine, timeout, result_queue, error_queue),
+        daemon=True
+    )
+    thread.start()
+    
+    def wait_for_thread() -> Any:
+        """等待线程完成（在 gevent greenlet 中运行）"""
+        import time
+        start_time = time.time()
+        wait_timeout = (timeout + 1.0) if timeout else None
+        
+        # 使用 gevent.sleep 轮询，避免阻塞 gevent hub
+        while thread.is_alive():
+            # 检查是否超时
+            if wait_timeout and (time.time() - start_time) > wait_timeout:
+                raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
+            
+            # 检查是否有错误
+            try:
+                error = error_queue.get_nowait()
+                raise error
+            except Empty:
+                pass
+            
+            # 检查是否有结果
+            try:
+                return result_queue.get_nowait()
+            except Empty:
+                pass
+            
+            # 让出控制权给其他 greenlet
+            from gevent import sleep
+            sleep(0.01)  # 10ms 轮询间隔
+        
+        # 线程已完成，检查结果或错误
         try:
-            wait_timeout = (timeout + 1.0) if timeout else None
-            return future.result(timeout=wait_timeout)
-        except FuturesTimeoutError:
-            future.cancel()
-            raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
+            error = error_queue.get_nowait()
+            raise error
+        except Empty:
+            pass
+        
+        try:
+            return result_queue.get_nowait()
+        except Empty:
+            raise RuntimeError("Thread completed but no result or error was returned")
     
     # 使用 gevent.spawn 等待，避免阻塞其他 gevent 协程
     try:
         if timeout:
             with GeventTimeout(timeout + 1.0):  # 多给1秒缓冲
-                result = spawn(wait_for_future).get()
+                result = spawn(wait_for_thread).get()
         else:
-            result = spawn(wait_for_future).get()
+            result = spawn(wait_for_thread).get()
         return result
     except GeventTimeout:
-        future.cancel()
         raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
     except Exception as e:
         # 直接抛出异常（包括 asyncio.TimeoutError）
