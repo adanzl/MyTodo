@@ -9,6 +9,9 @@ from queue import Queue, Empty
 
 from gevent import Timeout as GeventTimeout
 from gevent import spawn
+from core.log_config import root_logger
+
+log = root_logger()
 
 # 使用 threading.Thread 而不是 ThreadPoolExecutor，避免与 gevent 的队列冲突
 # 因为 main.py 中设置了 thread=False，threading 模块不会被 gevent patch
@@ -72,6 +75,9 @@ def run_async(coroutine: Coroutine, timeout: Optional[float] = None) -> Any:
     :return: 协程的返回值
     :raises asyncio.TimeoutError: 如果操作超时
     """
+    if timeout is None:
+        timeout = 10.0  # 默认30秒超时，避免无限等待
+    
     # 使用 Queue 传递结果和异常（threading.Queue 不会被 gevent patch，因为 thread=False）
     result_queue = Queue()
     error_queue = Queue()
@@ -87,16 +93,25 @@ def run_async(coroutine: Coroutine, timeout: Optional[float] = None) -> Any:
     def wait_for_thread() -> Any:
         """等待线程完成（在 gevent greenlet 中运行）"""
         import time
+        from gevent import sleep
+        
         start_time = time.time()
-        wait_timeout = (timeout + 1.0) if timeout else None
+        wait_timeout = timeout + 1.0  # 多给1秒缓冲
+        max_iterations = int(wait_timeout * 100)  # 最多轮询次数（10ms间隔）
+        iteration = 0
         
         # 使用 gevent.sleep 轮询，避免阻塞 gevent hub
-        while thread.is_alive():
+        while thread.is_alive() and iteration < max_iterations:
+            iteration += 1
+            
             # 检查是否超时
-            if wait_timeout and (time.time() - start_time) > wait_timeout:
+            elapsed = time.time() - start_time
+            if elapsed > wait_timeout:
+                # 超时了，记录日志并抛出异常
+                log.warning(f"[async_util] Operation timed out after {timeout} seconds, thread still alive")
                 raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
             
-            # 检查是否有错误
+            # 检查是否有错误（优先检查错误）
             try:
                 error = error_queue.get_nowait()
                 raise error
@@ -110,8 +125,13 @@ def run_async(coroutine: Coroutine, timeout: Optional[float] = None) -> Any:
                 pass
             
             # 让出控制权给其他 greenlet
-            from gevent import sleep
             sleep(0.01)  # 10ms 轮询间隔
+        
+        # 如果循环退出，检查线程状态
+        if thread.is_alive():
+            # 线程还在运行，说明超时了
+            log.warning(f"[async_util] Thread still alive after {wait_timeout} seconds, raising timeout")
+            raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
         
         # 线程已完成，检查结果或错误
         try:
@@ -123,18 +143,22 @@ def run_async(coroutine: Coroutine, timeout: Optional[float] = None) -> Any:
         try:
             return result_queue.get_nowait()
         except Empty:
+            # 线程已完成但没有结果或错误，可能是异常退出
+            log.warning("[async_util] Thread completed but no result or error was returned")
             raise RuntimeError("Thread completed but no result or error was returned")
     
     # 使用 gevent.spawn 等待，避免阻塞其他 gevent 协程
+    # 使用 GeventTimeout 确保即使 wait_for_thread 卡住也能超时返回
     try:
-        if timeout:
-            with GeventTimeout(timeout + 1.0):  # 多给1秒缓冲
-                result = spawn(wait_for_thread).get()
-        else:
+        with GeventTimeout(timeout + 2.0):  # 多给2秒缓冲，确保超时能够触发
             result = spawn(wait_for_thread).get()
         return result
     except GeventTimeout:
+        log.error(f"[async_util] GeventTimeout after {timeout + 2.0} seconds")
         raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
+    except asyncio.TimeoutError:
+        # 重新抛出超时错误
+        raise
     except Exception as e:
-        # 直接抛出异常（包括 asyncio.TimeoutError）
+        # 直接抛出异常（包括其他异常）
         raise
