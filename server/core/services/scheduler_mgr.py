@@ -3,11 +3,12 @@
 负责管理和执行后台 cron 定时任务
 """
 import logging
-from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.gevent import GeventScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.date import DateTrigger
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
+from apscheduler.executors.gevent import GeventExecutor
 from datetime import datetime
 from typing import Callable, Optional
 from core.log_config import root_logger
@@ -39,8 +40,13 @@ class SchedulerMgr:
         if self._initialized:
             return
 
-        self.scheduler = BackgroundScheduler(
+        # 在 gevent 环境中使用 GeventScheduler 和 GeventExecutor
+        # 这样可以避免与 gevent hub 的冲突，确保定时任务能够正常执行和退出
+        executor = GeventExecutor()
+        
+        self.scheduler = GeventScheduler(
             timezone='Asia/Shanghai',  # 设置时区
+            executors={'default': executor},
             job_defaults={
                 'coalesce': True,  # 合并错过的任务
                 'max_instances': 1  # 每个任务同时只允许一个实例
@@ -50,7 +56,7 @@ class SchedulerMgr:
         self.scheduler.add_listener(self._job_executed_listener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
 
         self._initialized = True
-        log.info("任务调度器初始化成功")
+        log.info("任务调度器初始化成功 (使用 GeventScheduler)")
 
     def start(self):
         """启动调度器"""
@@ -298,7 +304,12 @@ class SchedulerMgr:
         :param event: 事件对象
         """
         if event.exception:
-            log.error(f"任务执行失败: {event.job_id}, 异常: {event.exception}")
+            # 捕获 gevent 相关的异常，避免影响线程池 worker
+            import gevent
+            if isinstance(event.exception, gevent.exceptions.LoopExit):
+                log.warning(f"任务执行后发生 gevent LoopExit (可忽略): {event.job_id}, 异常: {event.exception}")
+            else:
+                log.error(f"任务执行失败: {event.job_id}, 异常: {event.exception}")
 
 
 # 全局调度器实例

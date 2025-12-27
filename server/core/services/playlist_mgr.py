@@ -298,7 +298,12 @@ class PlaylistMgr:
                 else:
                     log.error(f"[PlaylistMgr] 定时任务播放失败: {pid} - {p_name}, {msg}")
             except Exception as e:
-                log.error(f"[PlaylistMgr] 定时任务执行异常: {pid} - {p_name}, {e}")
+                # 捕获 gevent 相关的异常，避免影响线程池 worker
+                import gevent
+                if isinstance(e, gevent.exceptions.LoopExit):
+                    log.warning(f"[PlaylistMgr] 定时任务执行后发生 gevent LoopExit (可忽略): {pid} - {p_name}")
+                else:
+                    log.error(f"[PlaylistMgr] 定时任务执行异常: {pid} - {p_name}, {e}")
 
         success = scheduler.add_cron_job(func=cron_play_task, job_id=job_id, cron_expression=cron_expression)
         playlist_name = playlist_data.get("name", "未知播放列表")
