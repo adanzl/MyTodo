@@ -88,9 +88,13 @@ def playlist_update():
     """
     try:
         log.info("===== [Playlist Update] START")
+        log.info(f"===== [Playlist Update] STEP0: 请求信息 Content-Length={request.content_length}, Content-Type={request.content_type}")
         log.info("===== [Playlist Update] STEP1: 解析 JSON 数据")
+        import time
+        start_time = time.time()
         args = request.get_json(silent=True) or {}
-        log.info(f"===== [Playlist Update] STEP1 SUCCESS: args keys={list(args.keys()) if args else 'empty'}")
+        elapsed = time.time() - start_time
+        log.info(f"===== [Playlist Update] STEP1 SUCCESS: 耗时={elapsed:.3f}s, args keys={list(args.keys()) if args else 'empty'}, args size={len(str(args)) if args else 0}")
 
         if not args:
             log.warning("===== [Playlist Update] STEP1 FAILED: 请求数据为空")
