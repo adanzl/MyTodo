@@ -106,18 +106,11 @@ class PlaylistMgr:
 
     def _save_playlist_to_rds(self):
         """保存播放列表到 RDS"""
-        log.info(f"[PlaylistMgr] _save_playlist_to_rds START: playlists count={len(self._playlist_raw)}")
         try:
-            log.info(f"[PlaylistMgr] _save_playlist_to_rds STEP1: json.dumps")
             json_str = json.dumps(self._playlist_raw, ensure_ascii=False)
-            log.info(f"[PlaylistMgr] _save_playlist_to_rds STEP1 SUCCESS: json length={len(json_str)}")
-            
-            log.info(f"[PlaylistMgr] _save_playlist_to_rds STEP2: rds_mgr.set")
             rds_mgr.set(PLAYLIST_RDS_FULL_KEY, json_str)
-            log.info(f"[PlaylistMgr] _save_playlist_to_rds STEP2 SUCCESS")
-            log.info(f"[PlaylistMgr] _save_playlist_to_rds END: SUCCESS")
         except Exception as e:
-            log.error(f"[PlaylistMgr] _save_playlist_to_rds EXCEPTION: {e}", exc_info=True)
+            log.error(f"[PlaylistMgr] _save_playlist_to_rds error: {e}", exc_info=True)
             raise
 
     def save_playlist(self, collection: Dict[str, Any]) -> int:
@@ -137,26 +130,20 @@ class PlaylistMgr:
         :param playlist_data: 播放列表数据，必须包含 id 字段
         :return: 0 表示成功，-1 表示失败
         """
-        playlist_id = playlist_data.get("id") if playlist_data else None
-        log.info(f"[PlaylistMgr] update_single_playlist START: id={playlist_id}")
         try:
-            log.info(f"[PlaylistMgr] update_single_playlist STEP1: 验证数据 id={playlist_id}")
             if not playlist_data or not isinstance(playlist_data, dict):
-                log.warning(f"[PlaylistMgr] update_single_playlist STEP1 FAILED: 数据无效")
                 return -1
             
             playlist_id = playlist_data.get("id")
             if not playlist_id:
-                log.error("[PlaylistMgr] update_single_playlist STEP1 FAILED: playlist_data 中缺少 id 字段")
+                log.error("[PlaylistMgr] update_single_playlist: playlist_data 中缺少 id 字段")
                 return -1
-            log.info(f"[PlaylistMgr] update_single_playlist STEP1 SUCCESS: id={playlist_id}")
             
             # 如果播放列表不存在，创建新播放列表
             if playlist_id not in self._playlist_raw:
-                log.info(f"[PlaylistMgr] update_single_playlist STEP2: 创建新播放列表 id={playlist_id}")
+                log.info(f"[PlaylistMgr] 创建新播放列表: {playlist_id}")
             
             # 更新播放列表数据（合并现有数据）
-            log.info(f"[PlaylistMgr] update_single_playlist STEP3: 更新播放列表数据 id={playlist_id}")
             if playlist_id in self._playlist_raw:
                 # 合并更新，保留原有字段
                 existing_playlist = self._playlist_raw[playlist_id]
@@ -165,26 +152,15 @@ class PlaylistMgr:
             else:
                 # 新播放列表
                 self._playlist_raw[playlist_id] = playlist_data
-            log.info(f"[PlaylistMgr] update_single_playlist STEP3 SUCCESS: id={playlist_id}")
             
             # 保存到 RDS 和更新设备映射
-            log.info(f"[PlaylistMgr] update_single_playlist STEP4: 保存到 RDS 和更新设备映射 id={playlist_id}")
-            log.info(f"[PlaylistMgr] update_single_playlist STEP4.1: 保存到 RDS id={playlist_id}")
             self._save_playlist_to_rds()
-            log.info(f"[PlaylistMgr] update_single_playlist STEP4.1 SUCCESS: id={playlist_id}")
-            
-            log.info(f"[PlaylistMgr] update_single_playlist STEP4.2: 更新设备映射 id={playlist_id}")
             self._refresh_single_device_map(playlist_id, self._playlist_raw[playlist_id])
-            log.info(f"[PlaylistMgr] update_single_playlist STEP4.2 SUCCESS: id={playlist_id}")
-            
-            log.info(f"[PlaylistMgr] update_single_playlist STEP4.3: 更新定时任务 id={playlist_id}")
             self._refresh_cron_job(playlist_id, self._playlist_raw[playlist_id])
-            log.info(f"[PlaylistMgr] update_single_playlist STEP4.3 SUCCESS: id={playlist_id}")
             
-            log.info(f"[PlaylistMgr] update_single_playlist END: SUCCESS id={playlist_id}")
             return 0
         except Exception as e:
-            log.error(f"[PlaylistMgr] update_single_playlist EXCEPTION: id={playlist_id}, error={e}", exc_info=True)
+            log.error(f"[PlaylistMgr] update_single_playlist error: id={playlist_id}, {e}", exc_info=True)
             return -1
 
     def reload(self) -> int:
@@ -285,37 +261,30 @@ class PlaylistMgr:
 
     def _refresh_single_device_map(self, playlist_id: str, playlist_data: Dict[str, Any]):
         """只更新单个播放列表的设备映射"""
-        log.info(f"[PlaylistMgr] _refresh_single_device_map START: id={playlist_id}")
         try:
             if sys.platform != "linux":
-                log.info(f"[PlaylistMgr] _refresh_single_device_map SKIP: 非 Linux 平台")
                 return
             device = playlist_data.get("device", {})
             if device and device.get("address"):
                 device_type = device.get("type") or playlist_data.get("device_type", "dlna")
-                log.info(f"[PlaylistMgr] _refresh_single_device_map STEP1: 创建设备 id={playlist_id}, type={device_type}")
                 if device_type in DEVICE_TYPES:
                     self._device_map[playlist_id] = create_device({
                         "type": device_type,
                         "address": device.get("address"),
                         "name": device.get("name")
                     })
-                    log.info(f"[PlaylistMgr] _refresh_single_device_map STEP1 SUCCESS: id={playlist_id}")
                 else:
                     # 如果设备类型无效，从映射中移除
-                    log.warning(f"[PlaylistMgr] _refresh_single_device_map STEP1: 设备类型无效 id={playlist_id}, type={device_type}")
+                    log.warning(f"[PlaylistMgr] 设备类型无效: {playlist_id}, type={device_type}")
                     self._device_map.pop(playlist_id, None)
             else:
                 # 如果没有设备地址，从映射中移除
-                log.info(f"[PlaylistMgr] _refresh_single_device_map STEP1: 无设备地址，移除映射 id={playlist_id}")
                 self._device_map.pop(playlist_id, None)
-            log.info(f"[PlaylistMgr] _refresh_single_device_map END: SUCCESS id={playlist_id}")
         except Exception as e:
-            log.error(f"[PlaylistMgr] _refresh_single_device_map EXCEPTION: id={playlist_id}, error={e}", exc_info=True)
+            log.error(f"[PlaylistMgr] _refresh_single_device_map error: id={playlist_id}, {e}", exc_info=True)
             raise
 
     def _refresh_cron_job(self, playlist_id: str, playlist_data: Dict[str, Any]):
-        log.info(f"[PlaylistMgr] _refresh_cron_job START: id={playlist_id}")
         try:
             scheduler = scheduler_mgr
             job_id = f"playlist_cron_{playlist_id}"
@@ -323,14 +292,10 @@ class PlaylistMgr:
             enabled = schedule.get("enabled", 0)
             cron_expression = schedule.get("cron", "").strip()
 
-            log.info(f"[PlaylistMgr] _refresh_cron_job STEP1: 检查现有任务 id={playlist_id}, job_id={job_id}")
             if scheduler.get_job(job_id):
-                log.info(f"[PlaylistMgr] _refresh_cron_job STEP1: 移除现有任务 id={playlist_id}")
                 scheduler.remove_job(job_id)
-            log.info(f"[PlaylistMgr] _refresh_cron_job STEP1 SUCCESS: id={playlist_id}")
 
             if enabled != 1 or not cron_expression:
-                log.info(f"[PlaylistMgr] _refresh_cron_job SKIP: 定时任务未启用 id={playlist_id}, enabled={enabled}, cron={cron_expression}")
                 return
 
             def cron_play_task(pid=playlist_id):
@@ -356,16 +321,12 @@ class PlaylistMgr:
                     else:
                         log.error(f"[PlaylistMgr] 定时任务执行异常: {pid} - {p_name}, {e}")
 
-            log.info(f"[PlaylistMgr] _refresh_cron_job STEP2: 添加定时任务 id={playlist_id}, cron={cron_expression}")
             success = scheduler.add_cron_job(func=cron_play_task, job_id=job_id, cron_expression=cron_expression)
             playlist_name = playlist_data.get("name", "未知播放列表")
             if not success:
-                log.error(f"[PlaylistMgr] _refresh_cron_job STEP2 FAILED: 创建定时任务失败: {playlist_id}, {playlist_name}, cron: {cron_expression}")
-            else:
-                log.info(f"[PlaylistMgr] _refresh_cron_job STEP2 SUCCESS: id={playlist_id}")
-            log.info(f"[PlaylistMgr] _refresh_cron_job END: SUCCESS id={playlist_id}")
+                log.error(f"[PlaylistMgr] 创建定时任务失败: {playlist_id}, {playlist_name}, cron: {cron_expression}")
         except Exception as e:
-            log.error(f"[PlaylistMgr] _refresh_cron_job EXCEPTION: id={playlist_id}, error={e}", exc_info=True)
+            log.error(f"[PlaylistMgr] _refresh_cron_job error: id={playlist_id}, {e}", exc_info=True)
             raise
 
     def _cleanup_orphaned_cron_jobs(self):
@@ -618,24 +579,17 @@ class PlaylistMgr:
         if not file_path:
             return -1, "文件路径无效"
 
-        log.info(f"[PlaylistMgr] play: 准备播放文件, id={id}, force={force}, 播放状态={play_state}, 文件路径={file_path}")
+        log.info(f"[PlaylistMgr] play: id={id}, force={force}, file={file_path}")
 
-        # 获取并更新文件时长（带超时保护）
-        log.info(f"[PlaylistMgr] play STEP1: 获取文件时长 id={id}, file_path={file_path}")
+        # 获取并更新文件时长
         file_duration_seconds = self._update_file_duration(file_path, file_item)
-        log.info(f"[PlaylistMgr] play STEP1 SUCCESS: id={id}, duration={file_duration_seconds}")
 
         # 播放文件
-        log.info(f"[PlaylistMgr] play STEP2: 获取设备对象 id={id}")
         device = self._device_map[id]["obj"]
-        log.info(f"[PlaylistMgr] play STEP2 SUCCESS: id={id}, device={type(device).__name__}")
-        
-        log.info(f"[PlaylistMgr] play STEP3: 调用设备 play 方法 id={id}, file_path={file_path}")
         code, msg = device.play(file_path)
-        log.info(f"[PlaylistMgr] play STEP3 SUCCESS: id={id}, code={code}, msg={msg}")
         
         if code != 0:
-            log.warning(f"[PlaylistMgr] play STEP3 FAILED: id={id}, code={code}, msg={msg}")
+            log.warning(f"[PlaylistMgr] play failed: id={id}, code={code}, msg={msg}")
             return code, msg
 
         # 标记为正在播放
@@ -663,27 +617,18 @@ class PlaylistMgr:
                                pre_index: int = None,
                                file_index: int = None) -> tuple[int, str]:
         """更新播放索引并播放"""
-        log.info(f"[PlaylistMgr] _update_index_and_play START: id={id}, in_pre_files={in_pre_files}, pre_index={pre_index}, file_index={file_index}")
         try:
-            log.info(f"[PlaylistMgr] _update_index_and_play STEP1: 验证播放列表 id={id}")
             playlist_data, code, msg = self._validate_playlist(id)
             if code != 0:
-                log.warning(f"[PlaylistMgr] _update_index_and_play STEP1 FAILED: id={id}, code={code}, msg={msg}")
                 return code, msg
-            log.info(f"[PlaylistMgr] _update_index_and_play STEP1 SUCCESS: id={id}")
 
-            log.info(f"[PlaylistMgr] _update_index_and_play STEP2: 获取文件列表 id={id}")
             pre_files = self._get_pre_files_for_today(playlist_data)  # 获取今天对应的前置文件列表
             files = playlist_data.get("files", [])
-            log.info(f"[PlaylistMgr] _update_index_and_play STEP2 SUCCESS: id={id}")
 
             # 初始化播放状态（如果不存在）
             if id not in self._play_state:
-                log.info(f"[PlaylistMgr] _update_index_and_play STEP3: 初始化播放状态 id={id}")
                 self._init_play_state(id, playlist_data, pre_files)
-                log.info(f"[PlaylistMgr] _update_index_and_play STEP3 SUCCESS: id={id}")
 
-            log.info(f"[PlaylistMgr] _update_index_and_play STEP4: 更新播放状态 id={id}")
             play_state = self._play_state[id]
 
             # 更新状态
@@ -693,97 +638,66 @@ class PlaylistMgr:
                 play_state["pre_index"] = pre_index
             if file_index is not None:
                 play_state["file_index"] = file_index
-            log.info(f"[PlaylistMgr] _update_index_and_play STEP4 SUCCESS: id={id}, play_state={play_state}")
 
             # 更新播放列表的 current_index（只对 files 生效）
             if not play_state["in_pre_files"] and files:
-                log.info(f"[PlaylistMgr] _update_index_and_play STEP5: 更新 current_index id={id}")
                 playlist_data["current_index"] = play_state["file_index"]
                 playlist_data["updated_time"] = _TS()
                 # RDS 保存改为异步，避免阻塞播放操作
                 from gevent import spawn
                 def save_async():
                     try:
-                        log.info(f"[PlaylistMgr] _update_index_and_play STEP5: 异步保存 RDS START id={id}")
                         self._save_playlist_to_rds()
-                        log.info(f"[PlaylistMgr] _update_index_and_play STEP5: 异步保存 RDS SUCCESS id={id}")
                     except Exception as e:
                         log.warning(f"[PlaylistMgr] Async save current_index error: {e}")
                 spawn(save_async)
-                log.info(f"[PlaylistMgr] _update_index_and_play STEP5 SUCCESS: id={id}")
 
-            log.info(f"[PlaylistMgr] _update_index_and_play STEP6: 调用 play 方法 id={id}")
-            result = self.play(id, force=True)
-            log.info(f"[PlaylistMgr] _update_index_and_play END: id={id}, result={result}")
-            return result
+            return self.play(id, force=True)
         except Exception as e:
-            log.error(f"[PlaylistMgr] _update_index_and_play EXCEPTION: id={id}, error={e}", exc_info=True)
+            log.error(f"[PlaylistMgr] _update_index_and_play error: id={id}, {e}", exc_info=True)
             raise
 
     def play_next(self, id: str) -> tuple[int, str]:
         """播放下一首"""
-        log.info(f"[PlaylistMgr] play_next START: id={id}")
         try:
-            log.info(f"[PlaylistMgr] play_next STEP1: 验证播放列表 id={id}")
             playlist_data, code, msg = self._validate_playlist(id)
             if code != 0:
-                log.warning(f"[PlaylistMgr] play_next STEP1 FAILED: id={id}, code={code}, msg={msg}")
                 return code, msg
-            log.info(f"[PlaylistMgr] play_next STEP1 SUCCESS: id={id}")
 
-            log.info(f"[PlaylistMgr] play_next STEP2: 获取文件列表 id={id}")
             pre_files = self._get_pre_files_for_today(playlist_data)  # 获取今天对应的前置文件列表
             files = playlist_data.get("files", [])
-            log.info(f"[PlaylistMgr] play_next STEP2 SUCCESS: id={id}, pre_files={len(pre_files)}, files={len(files)}")
 
             # 如果没有播放状态，初始化并从头开始
             if id not in self._play_state:
-                log.info(f"[PlaylistMgr] play_next STEP3: 初始化播放状态 id={id}")
                 if pre_files:
-                    result = self._update_index_and_play(id,
+                    return self._update_index_and_play(id,
                                                        in_pre_files=True,
                                                        pre_index=0,
                                                        file_index=playlist_data.get("current_index", 0))
-                    log.info(f"[PlaylistMgr] play_next END: id={id}, result={result}")
-                    return result
-                result = self._update_index_and_play(id, file_index=playlist_data.get("current_index", 0))
-                log.info(f"[PlaylistMgr] play_next END: id={id}, result={result}")
-                return result
+                return self._update_index_and_play(id, file_index=playlist_data.get("current_index", 0))
 
-            log.info(f"[PlaylistMgr] play_next STEP4: 获取播放状态 id={id}")
             play_state = self._play_state[id]
-            log.info(f"[PlaylistMgr] play_next STEP4 SUCCESS: id={id}, play_state={play_state}")
 
             if play_state["in_pre_files"]:
                 # 播放 pre_files 的下一首
-                log.info(f"[PlaylistMgr] play_next STEP5: 播放 pre_files 下一首 id={id}")
                 next_pre_index = play_state["pre_index"] + 1
                 if next_pre_index < len(pre_files):
-                    result = self._update_index_and_play(id,
+                    return self._update_index_and_play(id,
                                                        in_pre_files=True,
                                                        pre_index=next_pre_index,
                                                        file_index=play_state["file_index"])
-                    log.info(f"[PlaylistMgr] play_next END: id={id}, result={result}")
-                    return result
                 # pre_files 播放完了，开始播放 files（从保存的 file_index 开始）
                 if files and play_state["file_index"] < len(files):
-                    result = self._update_index_and_play(id, in_pre_files=False, file_index=play_state["file_index"])
-                    log.info(f"[PlaylistMgr] play_next END: id={id}, result={result}")
-                    return result
-                log.warning(f"[PlaylistMgr] play_next END: 没有更多文件可播放 id={id}")
+                    return self._update_index_and_play(id, in_pre_files=False, file_index=play_state["file_index"])
                 return -1, "没有更多文件可播放"
             else:
                 # 播放 files 的下一首（使用取余实现循环）
-                log.info(f"[PlaylistMgr] play_next STEP5: 播放 files 下一首 id={id}")
                 if files:
                     next_file_index = (play_state["file_index"] + 1) % len(files)
-                    result = self._update_index_and_play(id, file_index=next_file_index)
-                    log.info(f"[PlaylistMgr] play_next END: id={id}, result={result}")
-                    return result
-                log.warning(f"[PlaylistMgr] play_next END: 没有更多文件可播放 id={id}")
+                    return self._update_index_and_play(id, file_index=next_file_index)
                 return -1, "没有更多文件可播放"
         except Exception as e:
-            log.error(f"[PlaylistMgr] play_next EXCEPTION: id={id}, error={e}", exc_info=True)
+            log.error(f"[PlaylistMgr] play_next error: id={id}, {e}", exc_info=True)
             raise
 
     def play_pre(self, id: str) -> tuple[int, str]:

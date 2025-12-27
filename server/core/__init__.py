@@ -39,7 +39,7 @@ def create_app():
     app.register_blueprint(mi_bp, url_prefix='/')
     app.register_blueprint(pdf_bp, url_prefix='/')
 
-    # chat_mgr.init(socketio)
+    chat_mgr.init(socketio)
     db_mgr.init(app)
     ai_mgr.init()
 
