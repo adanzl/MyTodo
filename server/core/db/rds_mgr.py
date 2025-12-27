@@ -1,12 +1,27 @@
 import redis
+from gevent import Timeout
 
 rds = redis.Redis(
     host='mini',  # Redis服务器地址，默认为localhost
     port=6379,  # Redis服务器端口，默认为6379
     db=0,  # 使用的数据库编号，默认为0
     password=None,  # 如果Redis设置了密码，则在这里填写
+    socket_connect_timeout=5,  # 连接超时时间（秒）
+    socket_timeout=5,  # 操作超时时间（秒）
+    retry_on_timeout=True,  # 超时后重试
     # decode_responses=True  # 是否将返回的数据自动解码为字符串
 )
+
+
+def _safe_redis_operation(operation, timeout=3.0):
+    """安全执行 Redis 操作，带超时保护"""
+    try:
+        with Timeout(timeout):
+            return operation()
+    except Timeout:
+        raise redis.TimeoutError(f"Redis operation timeout after {timeout} seconds")
+    except Exception as e:
+        raise
 
 
 def get_str(key) -> str:
@@ -17,11 +32,13 @@ def get_str(key) -> str:
 
 
 def get(key):
-    return rds.get(key)
+    """获取 Redis 键值，带超时保护"""
+    return _safe_redis_operation(lambda: rds.get(key), timeout=3.0)
 
 
 def set(key, value):
-    rds.set(key, value)
+    """设置 Redis 键值，带超时保护"""
+    return _safe_redis_operation(lambda: rds.set(key, value), timeout=3.0)
 
 
 def append_value(key, value):

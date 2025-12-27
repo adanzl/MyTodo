@@ -3058,13 +3058,14 @@ async function createComponent() {
         await refreshConnectedList();
 
         // 启动定时器，每5秒刷新一次当前播放列表状态
-        statusRefreshTimer = setInterval(async () => {
-          try {
-            await refreshPlaylistStatus(true, true); // 第二个参数 true 表示是自动刷新
-          } catch (error) {
-            console.error("定时刷新播放列表状态失败:", error);
-          }
-        }, 5000);
+        // 已禁用自动刷新，避免影响性能
+        // statusRefreshTimer = setInterval(async () => {
+        //   try {
+        //     await refreshPlaylistStatus(true, true); // 第二个参数 true 表示是自动刷新
+        //   } catch (error) {
+        //     console.error("定时刷新播放列表状态失败:", error);
+        //   }
+        // }, 5000);
       });
 
       onUnmounted(() => {
