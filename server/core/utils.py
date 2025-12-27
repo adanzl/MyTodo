@@ -116,107 +116,40 @@ def get_media_duration(file_path):
     :return: 时长（秒），如果失败返回 None
     """
     def _run_ffprobe_in_thread(result_queue, error_queue):
-        """在独立线程中运行 ffprobe，使用 subprocess.Popen 但设置 preexec_fn 避免事件循环问题"""
-        import time
-        import sys
-        import signal
-        
+        """在独立线程中运行 ffprobe，使用 os.popen 完全避免 subprocess 的事件循环问题"""
         try:
-            cmds = [
-                '/usr/bin/ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of',
-                'default=noprint_wrappers=1:nokey=1', file_path
-            ]
+            # 使用 os.popen 避免 subprocess 模块的事件循环检查
+            # 构建命令字符串，使用单引号包裹文件路径以处理特殊字符
+            import shlex
+            escaped_path = shlex.quote(file_path)
+            cmd_str = f"/usr/bin/ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 {escaped_path}"
             
-            # 设置 preexec_fn 来避免事件循环检查（仅在 Unix 系统上）
-            # 在 Windows 上，preexec_fn 不可用，但 Windows 上通常不会有这个问题
-            kwargs = {
-                'stdout': subprocess.PIPE,
-                'stderr': subprocess.PIPE,
-                'text': True,
-            }
-            
-            # 仅在 Unix 系统上设置 preexec_fn
-            if sys.platform != 'win32':
-                try:
-                    kwargs['preexec_fn'] = os.setsid  # 创建新进程组，避免事件循环检查
-                except AttributeError:
-                    pass  # 如果 os.setsid 不可用，跳过
-            
-            process = subprocess.Popen(cmds, **kwargs)
-            
-            stdout_data = []
-            stderr_data = []
-            start_time = time.time()
-            timeout = 50.0
-            
-            # 手动读取输出，避免使用 communicate() 触发事件循环检查
-            while process.poll() is None:
-                if time.time() - start_time > timeout:
-                    # 超时，终止进程
-                    try:
-                        if sys.platform != 'win32':
-                            os.killpg(os.getpgid(process.pid), signal.SIGTERM)
-                        else:
-                            process.terminate()
-                    except Exception:
-                        try:
-                            process.kill()
-                        except Exception:
-                            pass
-                    process.wait()
-                    error_queue.put(TimeoutError(f"ffprobe timeout after {timeout}s for {file_path}"))
-                    return
+            # 使用 os.popen 执行命令，完全避免 subprocess 的事件循环检查
+            pipe = os.popen(cmd_str)
+            try:
+                stdout = pipe.read()
+                returncode = pipe.close()
                 
-                # 读取 stdout
-                if process.stdout:
-                    try:
-                        # 使用非阻塞读取
-                        import select
-                        if sys.platform != 'win32':
-                            if select.select([process.stdout], [], [], 0.1)[0]:
-                                chunk = process.stdout.read(4096)
-                                if chunk:
-                                    stdout_data.append(chunk)
-                        else:
-                            # Windows 上使用简单的读取
-                            chunk = process.stdout.read(4096)
-                            if chunk:
-                                stdout_data.append(chunk)
-                            else:
-                                time.sleep(0.01)
-                    except Exception:
-                        time.sleep(0.01)
+                # os.popen 返回 None 表示成功，否则返回退出码
+                if returncode is None and stdout.strip():
+                    duration = float(stdout.strip())
+                    result_queue.put(int(duration) if duration else None)
                 else:
-                    time.sleep(0.01)
-            
-            # 等待进程完成
-            process.wait()
-            
-            # 读取剩余输出
-            if process.stdout:
+                    error_queue.put(RuntimeError(f"ffprobe returned non-zero exit code: {returncode}, output: {stdout}"))
+            except ValueError as e:
+                # 如果解析失败，尝试关闭管道
                 try:
-                    remaining = process.stdout.read()
-                    if remaining:
-                        stdout_data.append(remaining)
+                    pipe.close()
                 except Exception:
                     pass
-            
-            if process.stderr:
+                error_queue.put(ValueError(f"Invalid duration value from ffprobe: {e}"))
+            except Exception as e:
+                # 如果读取失败，尝试关闭管道
                 try:
-                    stderr_chunk = process.stderr.read()
-                    if stderr_chunk:
-                        stderr_data.append(stderr_chunk)
+                    pipe.close()
                 except Exception:
                     pass
-            
-            stdout = ''.join(stdout_data)
-            stderr = ''.join(stderr_data)
-            
-            if process.returncode == 0 and stdout.strip():
-                duration = float(stdout.strip())
-                result_queue.put(int(duration) if duration else None)
-            else:
-                error_queue.put(RuntimeError(f"ffprobe returned non-zero exit code: {process.returncode}, stderr: {stderr}"))
+                error_queue.put(e)
                 
         except FileNotFoundError as e:
             error_queue.put(FileNotFoundError(f"ffprobe not found: {e}"))
