@@ -4,7 +4,7 @@
 '''
 from flask import Blueprint, json, request
 from core.log_config import root_logger
-from core.utils import _ok, _err
+from core.utils import _ok, _err, read_json_from_request
 from core.device.bluetooth import (
     scan_devices_sync,
     connect_device_sync,
@@ -56,7 +56,7 @@ def bluetooth_connect():
     连接蓝牙设备（通过 device_agent 服务）
     """
     try:
-        args = request.get_json()
+        args = read_json_from_request()
         log.info(f"===== [Bluetooth Connect] {json.dumps(args)}")
         address = args.get('address')
         if not address:
@@ -77,7 +77,7 @@ def bluetooth_disconnect():
     断开蓝牙设备（通过 device_agent 服务）
     """
     try:
-        args = request.get_json()
+        args = read_json_from_request()
         log.info(f"===== [Bluetooth Disconnect] {json.dumps(args)}")
         address = args.get('address')
         if not address:

@@ -4,7 +4,7 @@ from core.log_config import root_logger
 from flask import Blueprint, json, jsonify, render_template, request
 import core.db.rds_mgr as rds_mgr
 from core.ai.ai_local import AILocal
-from core.utils import get_media_duration
+from core.utils import get_media_duration, read_json_from_request
 import random
 import os
 import re
@@ -74,7 +74,7 @@ def get_save():
 
 @api_bp.route("/setSave", methods=['POST'])
 def set_save():
-    args = request.get_json()
+    args = read_json_from_request()
     log.info("===== [Set Save] " + json.dumps(args))
     id = args.get('id')
     user = args.get('user')
@@ -112,7 +112,7 @@ def get_data():
 
 @api_bp.route("/setData", methods=['POST'])
 def set_data():
-    args = request.get_json()
+    args = read_json_from_request()
     log.info("===== [Set Data] " + len(args))
     table = args.get('table')
     data = args.get('data')
@@ -121,7 +121,7 @@ def set_data():
 
 @api_bp.route("/delData", methods=['POST'])
 def del_data():
-    args = request.get_json()
+    args = read_json_from_request()
     log.info("===== [Del Data] " + json.dumps(args))
     table = args.get('table')
     id = args.get('id')
@@ -130,7 +130,7 @@ def del_data():
 
 @api_bp.route("/query", methods=['POST'])
 def query():
-    args = request.get_json()
+    args = read_json_from_request()
     log.info("===== [Query Data] " + json.dumps(args))
     sql = args.get('sql')
     return db_mgr.query(sql)
@@ -200,7 +200,7 @@ def get_rds_list():
 @api_bp.route("/setRdsData", methods=['POST'])
 def set_rds_data():
     try:
-        args = request.get_json()
+        args = read_json_from_request()
         log.info("===== [Set rds Data] " + json.dumps(args))
         table = args.get('table')
         data = args.get('data')
@@ -234,7 +234,7 @@ def route_index():
 
 @api_bp.route("/addScore", methods=['POST'])
 def add_score():
-    args = request.get_json()
+    args = read_json_from_request()
     log.info("===== [Add Score] " + json.dumps(args))
     user = args.get('user')
     value = args.get('value')
@@ -249,7 +249,7 @@ def do_lottery():
     执行抽奖
     """
     try:
-        args = request.get_json()
+        args = read_json_from_request()
         log.info("===== [Do Lottery] " + json.dumps(args))
 
         user_id = args.get('user_id')
@@ -305,7 +305,7 @@ def add_rds_list():
     支持在列表头部或尾部插入数据
     """
     try:
-        args = request.get_json()
+        args = read_json_from_request()
         log.info("===== [Add Rds List] " + json.dumps(args))
 
         key = args.get('key')

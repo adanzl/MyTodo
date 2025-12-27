@@ -4,9 +4,11 @@
 """
 import os
 import subprocess
+import json
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
 from urllib.parse import quote, unquote
+from flask import request
 
 from core.log_config import root_logger
 
@@ -34,6 +36,29 @@ def err_response(message: str):
 # 为了保持向后兼容，提供别名
 _ok = ok_response
 _err = err_response
+
+
+def read_json_from_request():
+    """
+    从请求中读取 JSON 数据，使用 stream 方式避免 gevent 环境中的阻塞问题
+    :return: 解析后的 JSON 数据（dict），如果失败返回 {}
+    """
+    try:
+        content_length = request.content_length or 0
+        if content_length > 0:
+            raw_data = request.stream.read(content_length)
+        else:
+            raw_data = request.stream.read()
+        
+        if raw_data:
+            return json.loads(raw_data.decode('utf-8'))
+        return {}
+    except Exception as e:
+        log.warning(f"[read_json_from_request] 读取 JSON 失败，降级到 request.get_json(): {e}")
+        try:
+            return request.get_json(silent=True) or {}
+        except Exception:
+            return {}
 
 
 def convert_to_http_url(url: str) -> str:
@@ -360,3 +385,25 @@ def get_file_info(file_path: str) -> Optional[dict]:
         "size": stat_info.st_size,
         "modified": stat_info.st_mtime,
     }
+
+
+def get_unique_filepath(directory: str, base_name: str, extension: str) -> str:
+    """
+    生成唯一的文件路径，如果文件已存在则添加序号
+    
+    :param directory: 目标目录
+    :param base_name: 基础文件名（不含扩展名）
+    :param extension: 文件扩展名（包含点号，如 '.mp3'）
+    :return: 唯一的文件路径
+    """
+    filename = f"{base_name}{extension}"
+    file_path = os.path.join(directory, filename)
+
+    if os.path.exists(file_path):
+        counter = 1
+        while os.path.exists(file_path):
+            filename = f"{base_name}_{counter}{extension}"
+            file_path = os.path.join(directory, filename)
+            counter += 1
+
+    return file_path

@@ -4,7 +4,7 @@
 from flask import Blueprint, request
 from core.log_config import root_logger
 from core.device.mi_device import scan_devices_sync, MiDevice
-from core.utils import _ok, _err
+from core.utils import _ok, _err, read_json_from_request
 
 log = root_logger()
 mi_bp = Blueprint('mi', __name__)
@@ -64,7 +64,7 @@ def mi_volume():
 def mi_stop():
     """停止小米设备播放"""
     try:
-        data = request.get_json() or {}
+        data = read_json_from_request()
         device_id = data.get('device_id')
         if not device_id:
             return _err('device_id is required')

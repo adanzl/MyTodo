@@ -13,32 +13,10 @@ from core.log_config import root_logger
 from core.services.playlist_mgr import playlist_mgr
 from core.services.media_tool_mgr import media_tool_mgr
 from core.models.const import get_media_task_dir, get_media_task_result_dir, ALLOWED_AUDIO_EXTENSIONS
-from core.utils import get_media_url, get_media_duration, validate_and_normalize_path, _ok, _err, ensure_directory, is_allowed_audio_file, get_file_info
+from core.utils import get_media_url, get_media_duration, validate_and_normalize_path, _ok, _err, ensure_directory, is_allowed_audio_file, get_file_info, read_json_from_request, get_unique_filepath
 
 log = root_logger()
 media_bp = Blueprint('media', __name__)
-
-
-def _get_unique_filepath(directory: str, base_name: str, extension: str) -> str:
-    """
-    生成唯一的文件路径，如果文件已存在则添加序号
-    
-    :param directory: 目标目录
-    :param base_name: 基础文件名（不含扩展名）
-    :param extension: 文件扩展名（包含点号，如 '.mp3'）
-    :return: 唯一的文件路径
-    """
-    filename = f"{base_name}{extension}"
-    file_path = os.path.join(directory, filename)
-
-    if os.path.exists(file_path):
-        counter = 1
-        while os.path.exists(file_path):
-            filename = f"{base_name}_{counter}{extension}"
-            file_path = os.path.join(directory, filename)
-            counter += 1
-
-    return file_path
 
 
 # 常量定义
@@ -90,46 +68,7 @@ def playlist_update():
         log.info("===== [Playlist Update] START")
         log.info(f"===== [Playlist Update] STEP0: 请求信息 Content-Length={request.content_length}, Content-Type={request.content_type}")
         
-        # 使用 request.stream 手动读取数据，避免 request.get_json() 阻塞
-        log.info("===== [Playlist Update] STEP1: 使用 stream 读取请求数据")
-        import time
-        import json as json_lib
-        start_time = time.time()
-        
-        try:
-            log.info("===== [Playlist Update] STEP1.1: 读取 request.stream")
-            # 使用 request.stream 读取原始数据
-            content_length = request.content_length or 0
-            if content_length > 0:
-                raw_data = request.stream.read(content_length)
-                log.info(f"===== [Playlist Update] STEP1.1 SUCCESS: 读取了 {len(raw_data)} 字节")
-            else:
-                # 如果没有 Content-Length，尝试读取所有数据
-                log.info("===== [Playlist Update] STEP1.1: Content-Length 为 0，尝试读取所有数据")
-                raw_data = request.stream.read()
-                log.info(f"===== [Playlist Update] STEP1.1 SUCCESS: 读取了 {len(raw_data)} 字节")
-            
-            log.info("===== [Playlist Update] STEP1.2: 解析 JSON")
-            if raw_data:
-                args = json_lib.loads(raw_data.decode('utf-8'))
-                elapsed = time.time() - start_time
-                log.info(f"===== [Playlist Update] STEP1 SUCCESS: 耗时={elapsed:.3f}s, args type={type(args)}, args keys count={len(args) if isinstance(args, dict) else 0}")
-                if isinstance(args, dict) and args:
-                    log.info(f"===== [Playlist Update] STEP1 SUCCESS: 前5个keys={list(args.keys())[:5]}")
-            else:
-                log.warning("===== [Playlist Update] STEP1 FAILED: 没有读取到数据")
-                args = {}
-        except Exception as e:
-            elapsed = time.time() - start_time
-            log.error(f"===== [Playlist Update] STEP1 EXCEPTION: 耗时={elapsed:.3f}s, error={e}", exc_info=True)
-            # 降级到 request.get_json()
-            try:
-                log.info("===== [Playlist Update] STEP1 FALLBACK: 尝试使用 request.get_json()")
-                args = request.get_json(silent=True) or {}
-                log.info(f"===== [Playlist Update] STEP1 FALLBACK SUCCESS: args keys count={len(args) if isinstance(args, dict) else 0}")
-            except Exception as e2:
-                log.error(f"===== [Playlist Update] STEP1 FALLBACK EXCEPTION: {e2}", exc_info=True)
-                args = {}
+        args = read_json_from_request()
 
         if not args:
             log.warning("===== [Playlist Update] STEP1 FAILED: 请求数据为空")
@@ -163,7 +102,7 @@ def playlist_update_all():
     """
     try:
         log.info("===== [Playlist Update All]")
-        args = request.get_json(silent=True) or {}
+        args = read_json_from_request()
 
         if not args:
             return _err("请求数据不能为空")
@@ -183,7 +122,7 @@ def playlist_play():
     播放播放列表
     """
     try:
-        args = request.get_json()
+        args = read_json_from_request()
         id = args.get("id")
         if id is None:
             return _err("id is required")
@@ -202,7 +141,7 @@ def playlist_play_next():
     播放下一首
     """
     try:
-        args = request.get_json()
+        args = read_json_from_request()
         id = args.get("id")
         if id is None:
             return _err("id is required")
@@ -221,7 +160,7 @@ def playlist_play_pre():
     播放上一首
     """
     try:
-        args = request.get_json()
+        args = read_json_from_request()
         id = args.get("id")
         if id is None:
             return _err("id is required")
@@ -240,7 +179,7 @@ def playlist_stop():
     停止播放
     """
     try:
-        args = request.get_json()
+        args = read_json_from_request()
         id = args.get("id")
         if id is None:
             return _err("id is required")
@@ -343,7 +282,7 @@ def create_media_task():
     - name: 任务名称
     """
     try:
-        data = request.get_json() or {}
+        data = read_json_from_request()
         # 如果没有提供名称，使用当前日期时间作为默认名称
         name = data.get('name', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
@@ -391,7 +330,7 @@ def upload_file():
         # 保存文件，如果文件已存在则添加序号
         filename = secure_filename(file.filename)
         base_name, ext = os.path.splitext(filename)
-        file_path = _get_unique_filepath(task_dir, base_name, ext)
+        file_path = get_unique_filepath(task_dir, base_name, ext)
         filename = os.path.basename(file_path)
 
         file.save(file_path)
@@ -419,7 +358,7 @@ def add_file_by_path():
     - file_path: 文件路径（JSON 或 form 参数）
     """
     try:
-        data = request.get_json() or request.form.to_dict()
+        data = read_json_from_request() or request.form.to_dict()
         task_id = data.get('task_id')
         file_path = data.get('file_path')
 
@@ -467,7 +406,7 @@ def delete_file():
     - file_index: 文件索引（JSON 或 form 参数）
     """
     try:
-        data = request.get_json() or request.form.to_dict()
+        data = read_json_from_request() or request.form.to_dict()
         task_id = data.get('task_id')
         file_index = data.get('file_index')
 
@@ -502,7 +441,7 @@ def reorder_files():
     - file_indices: 新的文件索引顺序列表（JSON 参数）
     """
     try:
-        data = request.get_json() or request.form.to_dict()
+        data = read_json_from_request() or request.form.to_dict()
         task_id = data.get('task_id')
         file_indices = data.get('file_indices')
 
@@ -540,7 +479,7 @@ def start_task():
     - task_id: 任务ID（JSON 或 form 参数）
     """
     try:
-        data = request.get_json() or request.form.to_dict()
+        data = read_json_from_request() or request.form.to_dict()
         task_id = data.get('task_id')
 
         if not task_id:
@@ -566,7 +505,7 @@ def get_task_info():
     - task_id: 任务ID（JSON 或 form 参数）
     """
     try:
-        data = request.get_json() or request.form.to_dict()
+        data = read_json_from_request() or request.form.to_dict()
         task_id = data.get('task_id')
 
         if not task_id:
@@ -605,7 +544,7 @@ def delete_task():
     - task_id: 任务ID（JSON 或 form 参数）
     """
     try:
-        data = request.get_json() or request.form.to_dict()
+        data = read_json_from_request() or request.form.to_dict()
         task_id = data.get('task_id')
 
         if not task_id:
@@ -662,7 +601,7 @@ def save_result():
     - target_path: 目标目录路径（JSON 或 form 参数）
     """
     try:
-        data = request.get_json() or request.form.to_dict()
+        data = read_json_from_request() or request.form.to_dict()
         task_id = data.get('task_id')
         target_path = data.get('target_path')
 
@@ -701,7 +640,7 @@ def save_result():
         ext = ext or '.mp3'
 
         # 生成唯一的目标文件路径：task_id + 扩展名，如果已存在则添加序号
-        target_file = _get_unique_filepath(target_path, task_id, ext)
+        target_file = get_unique_filepath(target_path, task_id, ext)
 
         # 复制文件到目标目录
         shutil.copy2(result_file, target_file)

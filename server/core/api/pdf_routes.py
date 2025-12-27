@@ -8,7 +8,7 @@ from werkzeug.utils import secure_filename
 
 from core.log_config import root_logger
 from core.services.pdf_mgr import pdf_mgr
-from core.utils import _ok, _err
+from core.utils import _ok, _err, read_json_from_request
 from core.models.const import PDF_UPLOAD_DIR, PDF_UNLOCK_DIR
 
 log = root_logger()
@@ -48,7 +48,7 @@ def pdf_decrypt():
     - password: 密码（可选，如果 PDF 需要密码）
     """
     try:
-        data = request.get_json() or {}
+        data = read_json_from_request()
         filename = data.get('filename')
         password = data.get('password')
         
@@ -118,7 +118,7 @@ def pdf_delete():
     - type: 文件类型，'uploaded' 或 'unlocked' 或 'both'（默认 'both'）
     """
     try:
-        data = request.get_json() or {}
+        data = read_json_from_request()
         filename = data.get('filename')
         file_type = data.get('type', 'both')
         

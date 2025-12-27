@@ -8,7 +8,7 @@ from flask import Blueprint, request
 
 from core.log_config import root_logger
 from core.services.agent_mgr import agent_mgr
-from core.utils import _err, _ok
+from core.utils import _err, _ok, read_json_from_request
 
 log = root_logger()
 agent_bp = Blueprint('agent', __name__)
@@ -33,7 +33,7 @@ def agent_heartbeat():
     心跳接口（用于设备注册和心跳更新）
     """
     try:
-        args = request.get_json() or {}
+        args = read_json_from_request()
         address = args.get('address')
         client_ip = _get_client_ip()
 
@@ -58,7 +58,7 @@ def agent_event():
     触发事件接口
     """
     try:
-        args = request.get_json() or {}
+        args = read_json_from_request()
         client_ip = _get_client_ip()
         log.info(f"===== [Agent Event] client_ip={client_ip}, {args}")
 
@@ -116,8 +116,8 @@ def agent_mock():
     参数: agent_id, action, key, value
     """
     try:
-        log.info(f"===== [Agent Mock] {request.get_json()}")
-        args = request.get_json() or {}
+        args = read_json_from_request()
+        log.info(f"===== [Agent Mock] {args}")
         agent_id = args.get('agent_id')
         action = args.get('action')
         key = args.get('key')
