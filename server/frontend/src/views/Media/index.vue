@@ -166,6 +166,37 @@
     >
     </DevicesDialog>
 
+    <!-- 播放列表选择器弹窗 -->
+    <PlaylistSelectDialog
+      :visible="playlistSelectorVisible"
+      :playlist-collection="playlistCollection"
+      :selected-files="playlistSelectorSelectedFiles"
+      @update:visible="playlistSelectorVisible = $event"
+    >
+    </PlaylistSelectDialog>
+
+    <!-- 编辑名称对话框 -->
+    <el-dialog
+      v-model="editNameDialogVisible"
+      title="编辑播放列表名称"
+      width="400"
+      @close="handleCancelEditPlaylistName"
+    >
+      <el-input
+        v-model="editNameDialogName"
+        placeholder="请输入播放列表名称"
+        @keyup.enter="handleSavePlaylistName"
+        @keyup.esc="handleCancelEditPlaylistName"
+        clearable
+        autofocus
+      >
+      </el-input>
+      <template #footer>
+        <el-button @click="handleCancelEditPlaylistName">取消</el-button>
+        <el-button type="primary" @click="handleSavePlaylistName">确定</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 批量操作抽屉 -->
     <BatchDrawer
       :visible="batchDrawerVisible"
@@ -191,6 +222,7 @@ import FileListPanel from "./FileListPanel.vue";
 import ConfigPanel from "./ConfigPanel.vue";
 import ScanDeviceDialog from "./ScanDeviceDialog.vue";
 import DevicesDialog from "@/components/dialogs/DevicesDialog.vue";
+import PlaylistSelectDialog from "@/components/dialogs/PlaylistSelectDialog.vue";
 import BatchDrawer from "@/components/drawers/BatchDrawer.vue";
 import { getWeekdayIndex } from "@/utils/date";
 import { usePlaylistState } from "./composables/usePlaylistState";
@@ -361,15 +393,20 @@ const {
 );
 
 // 播放列表名称编辑 - 使用 composable
-const { handleStartEditPlaylistName, handleSavePlaylistName, handleCancelEditPlaylistName } =
-  usePlaylistNameEdit(
-    playlistCollection,
-    activePlaylistId,
-    editingPlaylistId,
-    editingPlaylistName,
-    savePlaylist,
-    syncActivePlaylist
-  );
+const {
+  editNameDialogVisible,
+  editNameDialogName,
+  handleStartEditPlaylistName,
+  handleSavePlaylistName,
+  handleCancelEditPlaylistName,
+} = usePlaylistNameEdit(
+  playlistCollection,
+  activePlaylistId,
+  editingPlaylistId,
+  editingPlaylistName,
+  savePlaylist,
+  syncActivePlaylist
+);
 
 // Cron 管理 - 使用 composable
 const {

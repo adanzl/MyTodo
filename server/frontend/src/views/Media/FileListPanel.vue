@@ -3,7 +3,7 @@
     <div class="flex items-center justify-between mb-3">
       <div class="flex-1">
         <div v-if="playlistStatus" class="flex items-center gap-2 mb-1">
-          <div v-if="editingPlaylistId !== activePlaylistId" class="flex items-center gap-2 flex-1">
+          <div class="flex items-center gap-2 flex-1">
             <h3 class="text-lg font-semibold truncate">{{ playlistStatus.name }}</h3>
             <el-button
               type="default"
@@ -15,19 +15,6 @@
             >
               <el-icon><Edit /></el-icon>
             </el-button>
-          </div>
-          <div v-else class="flex items-center gap-2 flex-1">
-            <el-input
-              :model-value="editingPlaylistName"
-              @update:model-value="$emit('update:editingPlaylistName', $event)"
-              @blur="$emit('save-name', activePlaylistId)"
-              @keyup.enter="$emit('save-name', activePlaylistId)"
-              @keyup.esc="$emit('cancel-edit-name')"
-              size="small"
-              class="flex-1"
-              :data-playlist-id="activePlaylistId"
-            >
-            </el-input>
           </div>
         </div>
         <div v-else>

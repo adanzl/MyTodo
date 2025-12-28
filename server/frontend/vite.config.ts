@@ -12,7 +12,9 @@ export default defineConfig({
     vue(),
     Components({
       resolvers: [
-        ElementPlusResolver(),
+        ElementPlusResolver({
+          importStyle: false, // 禁用自动导入样式，因为已经在 main.ts 中全量导入了
+        }),
         IconsResolver({
           prefix: "i",
           enabledCollections: ["ion", "mdi"],
@@ -28,6 +30,10 @@ export default defineConfig({
     alias: {
       "@": resolve(__dirname, "src"),
     },
+  },
+  optimizeDeps: {
+    include: ["element-plus"],
+    exclude: [],
   },
   server: {
     proxy: {
