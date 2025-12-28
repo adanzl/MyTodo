@@ -1,7 +1,7 @@
 /**
  * 文件相关工具函数
  */
-import { getApiUrl } from "@/api/config";
+import { api } from "@/api/config";
 
 interface FileItem {
   uri?: string;
@@ -26,13 +26,10 @@ export function getFileName(fileItem: FileItem | null | undefined): string {
 /**
  * 规范化文件列表格式（对象格式）
  */
-export function normalizeFiles(
-  files: FileItem[],
-  includeDuration = true
-): NormalizedFile[] {
+export function normalizeFiles(files: FileItem[], includeDuration = true): NormalizedFile[] {
   if (!Array.isArray(files)) return [];
   return files
-    .map((fileItem) => {
+    .map(fileItem => {
       if (!fileItem || typeof fileItem !== "object") return null;
       const normalized: NormalizedFile = {
         uri: fileItem.uri || "",
@@ -68,9 +65,9 @@ export function getMediaFileUrl(filePath: string): string {
   }
 
   try {
-    const apiUrl = getApiUrl();
-    if (!apiUrl || typeof apiUrl !== "string") {
-      console.warn("getMediaFileUrl: API URL无效", apiUrl);
+    const baseURL = api.defaults.baseURL || "";
+    if (!baseURL || typeof baseURL !== "string") {
+      console.warn("getMediaFileUrl: API baseURL无效", baseURL);
       return "";
     }
 
@@ -80,8 +77,11 @@ export function getMediaFileUrl(filePath: string): string {
       return "";
     }
 
-    const encodedPath = path.split("/").map((part) => encodeURIComponent(part)).join("/");
-    const mediaUrl = `${apiUrl}/media/files/${encodedPath}`;
+    const encodedPath = path
+      .split("/")
+      .map(part => encodeURIComponent(part))
+      .join("/");
+    const mediaUrl = `${baseURL}/media/files/${encodedPath}`;
 
     // 验证生成的 URL
     if (mediaUrl.includes("index.html") || mediaUrl.endsWith(".html")) {
@@ -95,5 +95,3 @@ export function getMediaFileUrl(filePath: string): string {
     return "";
   }
 }
-
-

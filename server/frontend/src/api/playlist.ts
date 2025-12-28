@@ -13,13 +13,11 @@ export async function playlistAction(
 ): Promise<any> {
   let rsp;
   if (method === "GET") {
-    rsp = await api.get(`/api/playlist/${action}`, {
+    rsp = await api.get(`/playlist/${action}`, {
       params: params,
     });
   } else {
-    rsp = await api.post(`/api/playlist/${action}`, params);
+    rsp = await api.post(`/playlist/${action}`, params);
   }
   return rsp.data;
 }
-
-

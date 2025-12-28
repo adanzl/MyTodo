@@ -17,7 +17,7 @@ export async function getRdsList<T = any>(
   startId: number,
   pageSize: number
 ): Promise<T> {
-  const rsp = await api.get<ApiResponse<T>>("/api/getRdsList", {
+  const rsp = await api.get<ApiResponse<T>>("/getRdsList", {
     params: { key: key, pageSize: pageSize, startId: startId },
   });
   if (rsp.data.code !== 0) {
@@ -29,11 +29,8 @@ export async function getRdsList<T = any>(
 /**
  * 获取rds数据
  */
-export async function getRdsData<T = any>(
-  table: string,
-  id: number | string
-): Promise<T> {
-  const rsp = await api.get<ApiResponse<T>>("/api/getRdsData", {
+export async function getRdsData<T = any>(table: string, id: number | string): Promise<T> {
+  const rsp = await api.get<ApiResponse<T>>("/getRdsData", {
     params: { table: table, id: id },
   });
   // console.log("getRdsData", rsp.data);
@@ -51,7 +48,7 @@ export async function setRdsData<T = any>(
   id: number | string,
   value: any
 ): Promise<T> {
-  const rsp = await api.post<ApiResponse<T>>("/api/setRdsData", {
+  const rsp = await api.post<ApiResponse<T>>("/setRdsData", {
     table: table,
     data: {
       id: id,
@@ -64,5 +61,3 @@ export async function setRdsData<T = any>(
   }
   return rsp.data.data;
 }
-
-

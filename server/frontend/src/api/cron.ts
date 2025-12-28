@@ -13,13 +13,11 @@ export async function cronAction(
 ): Promise<any> {
   let rsp;
   if (method === "GET") {
-    rsp = await api.get(`/api/cron/${action}`, {
+    rsp = await api.get(`/cron/${action}`, {
       params: params,
     });
   } else {
-    rsp = await api.post(`/api/cron/${action}`, params);
+    rsp = await api.post(`/cron/${action}`, params);
   }
   return rsp.data;
 }
-
-

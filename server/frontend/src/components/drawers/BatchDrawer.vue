@@ -30,7 +30,8 @@
             </div>
             <div class="flex items-center gap-1 flex-shrink-0">
               <el-button
-                type="plain"
+                type="default"
+                plain
                 size="small"
                 circle
                 @click.stop="handleDeleteBatch(batch.id)"
@@ -55,7 +56,8 @@
             </h3>
             <el-button
               v-if="selectedBatch"
-              type="plain"
+              type="default"
+              plain
               size="small"
               circle
               @click="handleEditBatch(selectedBatch.id)"

@@ -23,7 +23,7 @@ export async function getList<T = any>(
   if (pageNum) params.pageNum = pageNum;
   if (pageSize) params.pageSize = pageSize;
 
-  const response = await api.get("/api/getAll", { params });
+  const response = await api.get("/getAll", { params });
   if (response.data.code !== 0) {
     throw new Error(response.data.msg);
   }
@@ -41,7 +41,7 @@ export async function getData<T = any>(
   const params: Record<string, any> = { table, id };
   if (fields) params.fields = fields;
 
-  const response = await api.get("/api/getData", { params });
+  const response = await api.get("/getData", { params });
   if (response.data.code !== 0) {
     throw new Error(response.data.msg);
   }
@@ -51,14 +51,11 @@ export async function getData<T = any>(
 /**
  * 设置数据（新增或更新）
  */
-export async function setData<T = any>(
-  table: string,
-  data: Record<string, any>
-): Promise<T> {
+export async function setData<T = any>(table: string, data: Record<string, any>): Promise<T> {
   if (data.id === -1) {
     data.id = null;
   }
-  const response = await api.post("/api/setData", { table, data });
+  const response = await api.post("/setData", { table, data });
   if (response.data.code !== 0) {
     throw new Error(response.data.msg);
   }
@@ -69,11 +66,9 @@ export async function setData<T = any>(
  * 删除数据
  */
 export async function delData(table: string, id: number | string): Promise<any> {
-  const response = await api.post("/api/delData", { table, id });
+  const response = await api.post("/delData", { table, id });
   if (response.data.code !== 0) {
     throw new Error(response.data.msg);
   }
   return response.data.data;
 }
-
-

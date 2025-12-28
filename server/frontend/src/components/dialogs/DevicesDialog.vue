@@ -233,7 +233,7 @@
 import { ref, watch, onUnmounted, onMounted } from "vue";
 import { ElMessage } from "element-plus";
 import { Refresh, Cpu, Loading } from "@element-plus/icons-vue";
-import { api, getApiUrl } from "@/api/config";
+import { api } from "@/api/config";
 import { logAndNoticeError } from "@/utils";
 
 interface AgentDevice {
@@ -349,8 +349,10 @@ const handleTestAgentButton = async (agentId: string, key: string) => {
 const scanMiDevices = async () => {
   try {
     miScanning.value = true;
-    const response = await fetch(`${getApiUrl()}/mi/scan?timeout=5`);
-    const result = await response.json();
+    const response = await api.get("/mi/scan", {
+      params: { timeout: 5 },
+    });
+    const result = response.data;
 
     if (result.code === 0) {
       const devices: MiDevice[] = (result.data || []).map((device: any) => ({
@@ -385,10 +387,10 @@ const getMiDeviceVolume = async (device: MiDevice) => {
   targetDevice._volumeRefreshing = true;
 
   try {
-    const response = await fetch(
-      `${getApiUrl()}/mi/volume?device_id=${encodeURIComponent(deviceId)}`
-    );
-    const result = await response.json();
+    const response = await api.get("/mi/volume", {
+      params: { device_id: deviceId },
+    });
+    const result = response.data;
 
     if (result.code === 0) {
       targetDevice.volume = result.data?.volume ?? result.data ?? undefined;
@@ -414,18 +416,11 @@ const setMiDeviceVolume = async (device: MiDevice, volume: number) => {
   device._volumeChanging = true;
 
   try {
-    const response = await fetch(`${getApiUrl()}/mi/volume`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        device_id: deviceId,
-        volume: clampedVolume,
-      }),
+    const response = await api.post("/mi/volume", {
+      device_id: deviceId,
+      volume: clampedVolume,
     });
-
-    const result = await response.json();
+    const result = response.data;
 
     if (result.code === 0) {
       device.volume = clampedVolume;

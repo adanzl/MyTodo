@@ -4,8 +4,7 @@
  */
 import { ref, type Ref } from "vue";
 import { ElMessage } from "element-plus";
-import axios from "axios";
-import { getApiUrl } from "@/api/config";
+import { api } from "@/api/config";
 import { logAndNoticeError } from "@/utils";
 
 export interface FileBrowserOptions {
@@ -80,7 +79,7 @@ export function useFileBrowser(options: FileBrowserOptions = {}): UseFileBrowser
     try {
       fileBrowserLoading.value = true;
       const path = fileBrowserPath.value || defaultPath;
-      const rsp = await axios.get(getApiUrl() + "/listDirectory", {
+      const rsp = await api.get("/listDirectory", {
         params: { path: path, extensions: extensions },
       });
       if (rsp.data.code === 0) {

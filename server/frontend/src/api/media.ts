@@ -13,11 +13,11 @@ export async function mediaAction(
 ): Promise<any> {
   let rsp;
   if (method === "GET") {
-    rsp = await api.get(`/api/media/${action}`, {
+    rsp = await api.get(`/media/${action}`, {
       params: params,
     });
   } else {
-    rsp = await api.post(`/api/media/${action}`, params);
+    rsp = await api.post(`/media/${action}`, params);
   }
   return rsp.data;
 }
@@ -30,7 +30,7 @@ export async function mediaAction(
  * 获取媒体任务列表
  */
 export async function getMediaTaskList() {
-  const response = await api.get("/api/media/task/list");
+  const response = await api.get("/media/task/list");
   return response.data;
 }
 
@@ -38,7 +38,7 @@ export async function getMediaTaskList() {
  * 创建媒体任务
  */
 export async function createMediaTask() {
-  const response = await api.post("/api/media/task/create", {});
+  const response = await api.post("/media/task/create", {});
   return response.data;
 }
 
@@ -46,7 +46,7 @@ export async function createMediaTask() {
  * 获取媒体任务详情
  */
 export async function getMediaTask(taskId: string) {
-  const response = await api.post("/api/media/task/get", {
+  const response = await api.post("/media/task/get", {
     task_id: taskId,
   });
   return response.data;
@@ -56,7 +56,7 @@ export async function getMediaTask(taskId: string) {
  * 删除媒体任务
  */
 export async function deleteMediaTask(taskId: string) {
-  const response = await api.post("/api/media/task/delete", {
+  const response = await api.post("/media/task/delete", {
     task_id: taskId,
   });
   return response.data;
@@ -66,7 +66,7 @@ export async function deleteMediaTask(taskId: string) {
  * 添加文件到媒体任务
  */
 export async function addFileToMediaTask(taskId: string, filePath: string) {
-  const response = await api.post("/api/media/task/addFileByPath", {
+  const response = await api.post("/media/task/addFileByPath", {
     task_id: taskId,
     file_path: filePath,
   });
@@ -77,7 +77,7 @@ export async function addFileToMediaTask(taskId: string, filePath: string) {
  * 从媒体任务删除文件
  */
 export async function deleteFileFromMediaTask(taskId: string, fileIndex: number) {
-  const response = await api.post("/api/media/task/deleteFile", {
+  const response = await api.post("/media/task/deleteFile", {
     task_id: taskId,
     file_index: fileIndex,
   });
@@ -88,7 +88,7 @@ export async function deleteFileFromMediaTask(taskId: string, fileIndex: number)
  * 开始媒体任务合成
  */
 export async function startMediaTask(taskId: string) {
-  const response = await api.post("/api/media/task/start", {
+  const response = await api.post("/media/task/start", {
     task_id: taskId,
   });
   return response.data;
@@ -98,7 +98,7 @@ export async function startMediaTask(taskId: string) {
  * 重新排序媒体任务文件
  */
 export async function reorderMediaTaskFiles(taskId: string, fileIndices: number[]) {
-  const response = await api.post("/api/media/task/reorderFiles", {
+  const response = await api.post("/media/task/reorderFiles", {
     task_id: taskId,
     file_indices: fileIndices,
   });
@@ -108,17 +108,17 @@ export async function reorderMediaTaskFiles(taskId: string, fileIndices: number[
 /**
  * 获取媒体任务下载 URL
  */
-import { getApiUrl } from "./config";
-
 export function getMediaTaskDownloadUrl(taskId: string): string {
-  return `${getApiUrl()}/api/media/task/download?task_id=${taskId}`;
+  // 使用 api 实例的 baseURL，然后拼接路径
+  const baseURL = api.defaults.baseURL || "";
+  return `${baseURL}/media/task/download?task_id=${taskId}`;
 }
 
 /**
  * 转存媒体任务结果文件
  */
 export async function saveMediaTaskResult(taskId: string, targetPath: string) {
-  const response = await api.post("/api/media/task/save", {
+  const response = await api.post("/media/task/save", {
     task_id: taskId,
     target_path: targetPath,
   });

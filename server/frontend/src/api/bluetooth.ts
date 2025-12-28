@@ -14,13 +14,11 @@ export async function bluetoothAction(
   let rsp;
   const routePrefix = "bluetooth";
   if (method === "GET") {
-    rsp = await api.get(`/api/${routePrefix}/${action}`, {
+    rsp = await api.get(`/${routePrefix}/${action}`, {
       params: params,
     });
   } else {
-    rsp = await api.post(`/api/${routePrefix}/${action}`, params);
+    rsp = await api.post(`/${routePrefix}/${action}`, params);
   }
   return rsp.data;
 }
-
-

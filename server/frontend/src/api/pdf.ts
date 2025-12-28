@@ -7,7 +7,7 @@ import { api } from "./config";
  * 获取 PDF 文件列表
  */
 export async function getPdfList() {
-  const response = await api.get("/api/pdf/list");
+  const response = await api.get("/pdf/list");
   return response.data;
 }
 
@@ -17,7 +17,7 @@ export async function getPdfList() {
 export async function uploadPdf(file: File) {
   const formData = new FormData();
   formData.append("file", file);
-  const response = await api.post("/api/pdf/upload", formData, {
+  const response = await api.post("/pdf/upload", formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
@@ -33,27 +33,26 @@ export async function decryptPdf(filename: string, password?: string) {
   if (password !== undefined && password !== null) {
     data.password = password;
   }
-  const response = await api.post("/api/pdf/decrypt", data);
+  const response = await api.post("/pdf/decrypt", data);
   return response.data;
 }
 
 /**
  * 下载 PDF 文件
  */
-import { getApiUrl } from "./config";
-
 export function getPdfDownloadUrl(filename: string, type: "uploaded" | "unlocked"): string {
-  return `${getApiUrl()}/api/pdf/download/${encodeURIComponent(filename)}?type=${type}`;
+  // 使用 api 实例的 baseURL，然后拼接路径
+  const baseURL = api.defaults.baseURL || "";
+  return `${baseURL}/pdf/download/${encodeURIComponent(filename)}?type=${type}`;
 }
 
 /**
  * 删除 PDF 文件
  */
 export async function deletePdf(filename: string, type: "both" | "uploaded" | "unlocked" = "both") {
-  const response = await api.post("/api/pdf/delete", {
+  const response = await api.post("/pdf/delete", {
     filename,
     type,
   });
   return response.data;
 }
-

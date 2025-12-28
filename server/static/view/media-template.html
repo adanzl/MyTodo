@@ -115,8 +115,9 @@
               class="flex items-center gap-2 flex-1 min-w-0">
               <h3 class="text-lg font-semibold truncate">{{ playlistStatus.name }}</h3>
               <el-button
-                type="plain"
+                type="default"
                 size="small"
+                plain
                 circle
                 @click="handleStartEditPlaylistName(activePlaylistId)"
                 title="编辑名称">
@@ -175,8 +176,9 @@
             <el-icon><Collection /></el-icon>
           </el-button>
           <el-button
-            type="plain"
+            type="default"
             size="small"
+            plain
             circle
             @click="handlePlayPlaylist"
             class="items-center justify-center"
@@ -186,8 +188,9 @@
             <span v-else>▶</span>
           </el-button>
           <el-button
-            type="plain"
+            type="default"
             size="small"
+            plain
             circle
             @click="handlePlayPre"
             :disabled="!playlistStatus || ((!getCurrentPreFiles() || getCurrentPreFiles().length === 0) && (!playlistStatus.playlist || playlistStatus.playlist.length === 0))"
@@ -196,8 +199,9 @@
             <span v-else>⏮</span>
           </el-button>
           <el-button
-            type="plain"
+            type="default"
             size="small"
+            plain
             circle
             @click="handlePlayNext"
             :disabled="!playlistStatus || ((!getCurrentPreFiles() || getCurrentPreFiles().length === 0) && (!playlistStatus.playlist || playlistStatus.playlist.length === 0))"
@@ -205,14 +209,15 @@
             <el-icon v-if="playing" size="12" class="animate-spin"><Loading /></el-icon>
             <span v-else>⏭</span>
           </el-button>
-          <el-button type="plain" size="small" circle @click="handleStopPlaylist" title="停止">
+          <el-button type="default" size="small" plain circle @click="handleStopPlaylist" title="停止">
             <el-icon v-if="stopping" size="12" class="animate-spin"><Loading /></el-icon>
             <span v-else>⏹</span>
           </el-button>
           <el-button
             v-show="showMoreActions"
-            type="plain"
+            type="default"
             size="small"
+            plain
             circle
             @click="handleClearPlaylist"
             :disabled="!playlistStatus || ((!playlistStatus.pre_files || playlistStatus.pre_files.length === 0) && (!playlistStatus.playlist || playlistStatus.playlist.length === 0)) || playlistLoading"
@@ -220,8 +225,9 @@
             <el-icon><Delete /></el-icon>
           </el-button>
           <el-button
-            type="plain"
+            type="default"
             size="small"
+            plain
             circle
             @click="showMoreActions = !showMoreActions"
             title="更多">
@@ -382,8 +388,9 @@
                 </el-checkbox>
                 <el-button
                   v-show="showMoreActions && !preFilesDragMode && !preFilesBatchDeleteMode"
-                  type="plain"
+                  type="default"
                   size="small"
+                  plain
                   circle
                   @click.stop="handleMovePreFileUp(index)"
                   :disabled="index === 0 || playlistLoading"
@@ -392,8 +399,9 @@
                 </el-button>
                 <el-button
                   v-show="showMoreActions && !preFilesDragMode && !preFilesBatchDeleteMode"
-                  type="plain"
+                  type="default"
                   size="small"
+                  plain
                   circle
                   @click.stop="handleMovePreFileDown(index)"
                   :disabled="index === getCurrentPreFiles().length - 1 || playlistLoading"
@@ -402,8 +410,9 @@
                 </el-button>
                 <el-button
                   v-show="showMoreActions && !preFilesDragMode && !preFilesBatchDeleteMode"
-                  type="plain"
+                  type="default"
                   size="small"
+                  plain
                   circle
                   @click.stop="handleReplacePreFile(index)"
                   :disabled="playlistLoading"
@@ -423,8 +432,9 @@
                 </el-button>
                 <el-button
                   v-show="!preFilesBatchDeleteMode"
-                  type="plain"
+                  type="default"
                   size="small"
+                  plain
                   circle
                   @click.stop="handleDeletePreFile(index)"
                   :disabled="playlistLoading || preFilesDragMode"
@@ -438,8 +448,9 @@
             v-if="getCurrentPreFiles() && getCurrentPreFiles().length > 0"
             class="w-full border-t border-gray-200">
             <el-button
-              type="plain"
+              type="default"
               size="small"
+              plain
               class="!w-full !h-4 !p-0 !text-xs"
               @click="handleTogglePreFilesExpand"
               :title="preFilesExpanded ? '折叠' : '展开'">
@@ -577,8 +588,9 @@
                 </el-checkbox>
                 <el-button
                   v-show="showMoreActions && !filesDragMode && !filesBatchDeleteMode"
-                  type="plain"
+                  type="default"
                   size="small"
+                  plain
                   circle
                   @click.stop="handleMovePlaylistItemUp(index)"
                   :disabled="index === 0 || playlistLoading"
@@ -587,8 +599,9 @@
                 </el-button>
                 <el-button
                   v-show="showMoreActions && !filesDragMode && !filesBatchDeleteMode"
-                  type="plain"
+                  type="default"
                   size="small"
+                  plain
                   circle
                   @click.stop="handleMovePlaylistItemDown(index)"
                   :disabled="index === playlistStatus.playlist.length - 1 || playlistLoading"
@@ -597,8 +610,9 @@
                 </el-button>
                 <el-button
                   v-show="showMoreActions && !filesDragMode && !filesBatchDeleteMode"
-                  type="plain"
+                  type="default"
                   size="small"
+                  plain
                   circle
                   @click.stop="handleReplacePlaylistItem(index)"
                   :disabled="playlistLoading"
@@ -618,8 +632,9 @@
                 </el-button>
                 <el-button
                   v-show="!filesBatchDeleteMode"
-                  type="plain"
+                  type="default"
                   size="small"
+                  plain
                   circle
                   @click.stop="handleDeletePlaylistItem(index)"
                   :disabled="playlistLoading || filesDragMode"
