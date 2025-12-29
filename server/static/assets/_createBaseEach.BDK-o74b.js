@@ -1,1 +1,0 @@
-import{cg as h}from"./index.Bk_h8V15.js";function g(f){return function(a,r,t){for(var u=-1,e=Object(a),n=t(a),i=n.length;i--;){var s=n[f?i:++u];if(r(e[s],s,e)===!1)break}return a}}function p(f,a){return function(r,t){if(r==null)return r;if(!h(r))return f(r,t);for(var u=r.length,e=a?u:-1,n=Object(r);(a?e--:++e<u)&&t(n[e],e,n)!==!1;);return r}}export{p as a,g as c};

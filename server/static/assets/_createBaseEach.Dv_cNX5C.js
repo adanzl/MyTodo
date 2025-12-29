@@ -1,0 +1,1 @@
+import{ch as h}from"./index.KrHQqm_N.js";function p(f){return function(a,r,t){for(var u=-1,e=Object(a),n=t(a),i=n.length;i--;){var s=n[f?i:++u];if(r(e[s],s,e)===!1)break}return a}}function g(f,a){return function(r,t){if(r==null)return r;if(!h(r))return f(r,t);for(var u=r.length,e=a?u:-1,n=Object(r);(a?e--:++e<u)&&t(n[e],e,n)!==!1;);return r}}export{g as a,p as c};

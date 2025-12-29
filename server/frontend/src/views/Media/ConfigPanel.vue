@@ -264,6 +264,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { Monitor } from "@element-plus/icons-vue";
 import { MAX_PLAYLIST_DURATION, TRIGGER_BUTTONS } from "@/constants/playlist";
 import type { PlaylistStatus } from "@/types/playlist";
 import type { BluetoothDevice, DlnaDevice, MiDevice, AgentDevice } from "@/types/device";
