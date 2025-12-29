@@ -88,9 +88,7 @@
           <MediaComponent
             v-show="!filesBatchDeleteMode"
             :file="file"
-            :is-playing="isFilePlaying(file)"
-            :progress="getFilePlayProgress(file)"
-            :duration="getFileDuration(file)"
+            :player="audioPlayer"
             :disabled="playlistLoading"
             @play="emit('play-file', file)"
             @seek="handleSeek"
@@ -173,9 +171,7 @@ interface Props {
   selectedFileIndices: number[];
   playlistLoading: boolean;
   showMoreActions: boolean;
-  isFilePlaying: (file: MediaFile) => boolean;
-  getFilePlayProgress: (file: MediaFile) => number;
-  getFileDuration: (file: MediaFile) => number;
+  audioPlayer: ReturnType<typeof import("@/composables/useAudioPlayer").useAudioPlayer>;
 }
 
 const props = defineProps<Props>();

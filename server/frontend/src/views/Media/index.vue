@@ -33,9 +33,7 @@
         :playing="playing"
         :stopping="stopping"
         :show-more-actions="showMoreActions"
-        :is-file-playing="isFilePlaying"
-        :get-file-play-progress="getFilePlayProgress"
-        :get-file-duration="getFileDuration"
+        :audio-player="audioPlayer"
         @start-edit-name="handleStartEditPlaylistName"
         @save-name="handleSavePlaylistName"
         @cancel-edit-name="handleCancelEditPlaylistName"
@@ -283,13 +281,7 @@ const {
 } = usePlaylistState();
 
 // 音频播放 - 使用 composable
-const {
-  handlePlayFileInBrowser,
-  isFilePlaying,
-  getFilePlayProgress,
-  getFileDuration,
-  handleSeekFile,
-} = useAudioPlayback();
+const { audioPlayer, handlePlayFileInBrowser, handleSeekFile } = useAudioPlayback();
 
 // 工具函数
 const getSelectedWeekdayIndex = () => {

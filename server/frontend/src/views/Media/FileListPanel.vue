@@ -1,5 +1,5 @@
 <template>
-  <div class="flex-1 border rounded p-3 flex flex-col ">
+  <div class="flex-1 border rounded p-3 flex flex-col">
     <div class="flex items-center justify-between mb-3">
       <div class="flex-1">
         <div v-if="playlistStatus" class="flex items-center gap-2 mb-1">
@@ -163,9 +163,7 @@
         :pre-files-expanded="preFilesExpanded"
         :playlist-loading="playlistLoading"
         :show-more-actions="showMoreActions"
-        :is-file-playing="isFilePlaying"
-        :get-file-play-progress="getFilePlayProgress"
-        :get-file-duration="getFileDuration"
+        :audio-player="audioPlayer"
         @select-weekday="$emit('select-weekday', $event)"
         @open-file-browser="$emit('open-file-browser-for-pre-files')"
         @toggle-drag-mode="$emit('toggle-pre-files-drag-mode')"
@@ -195,9 +193,7 @@
         :selected-file-indices="selectedFileIndices"
         :playlist-loading="playlistLoading"
         :show-more-actions="showMoreActions"
-        :is-file-playing="isFilePlaying"
-        :get-file-play-progress="getFilePlayProgress"
-        :get-file-duration="getFileDuration"
+        :audio-player="audioPlayer"
         @open-file-browser="$emit('open-file-browser')"
         @toggle-drag-mode="$emit('toggle-files-drag-mode')"
         @toggle-batch-delete-mode="$emit('toggle-files-batch-delete-mode')"
@@ -261,9 +257,7 @@ interface Props {
   playing: boolean;
   stopping: boolean;
   showMoreActions: boolean;
-  isFilePlaying: (file: MediaFile) => boolean;
-  getFilePlayProgress: (file: MediaFile) => number;
-  getFileDuration: (file: MediaFile) => number;
+  audioPlayer: ReturnType<typeof import("@/composables/useAudioPlayer").useAudioPlayer>;
 }
 
 const props = defineProps<Props>();

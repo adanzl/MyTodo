@@ -105,9 +105,7 @@
             <MediaComponent
               v-if="resultFile"
               :file="resultFileObject"
-              :is-playing="isResultFilePlaying"
-              :progress="resultFilePlayProgress"
-              :duration="resultFileDuration"
+              :player="mediaPlayer"
               :disabled="mediaFilesDragMode"
               @play="handleMediaTogglePlayResult"
               @seek="handleResultFileSeek"
@@ -205,9 +203,7 @@
                 <div class="flex items-center gap-1 flex-shrink-0" @mousedown.stop @click.stop>
                   <MediaComponent
                     :file="file"
-                    :is-playing="isFilePlaying(file)"
-                    :progress="getFilePlayProgress(file)"
-                    :duration="getFileDuration(file)"
+                    :player="mediaPlayer"
                     :disabled="isFileOperationDisabled"
                     @play="() => handleMediaTogglePlayFile(Number(index))"
                     @seek="handleSeekFile"
@@ -591,37 +587,8 @@ const clearBrowserAudioPlayer = () => {
   mediaPlayer.clear();
 };
 
-// 检查文件是否正在播放
-const isFilePlaying = (fileItem: MediaFile): boolean => {
-  if (!fileItem) {
-    return false;
-  }
-  const filePath = fileItem?.path || fileItem?.name || "";
-  return mediaPlayer.isFilePlaying(filePath);
-};
-
-// 获取文件播放进度
-const getFilePlayProgress = (fileItem: MediaFile): number => {
-  if (!fileItem) {
-    return 0;
-  }
-  const filePath = fileItem?.path || fileItem?.name || "";
-  return mediaPlayer.getFilePlayProgress(filePath);
-};
-
-// 获取文件时长
-const getFileDuration = (fileItem: MediaFile): number => {
-  if (!fileItem) {
-    return 0;
-  }
-  const filePath = fileItem?.path || fileItem?.name || "";
-  // 确定回退值：优先使用文件本身的duration属性，对于结果文件则使用任务中的 result_duration
-  let fallbackDuration = fileItem.duration;
-  if (fallbackDuration === undefined && mediaCurrentTask.value?.result_file === filePath) {
-    fallbackDuration = mediaCurrentTask.value?.result_duration;
-  }
-  return mediaPlayer.getFileDuration(filePath, fallbackDuration || 0);
-};
+// 注意：这些函数已不再使用，因为 MediaComponent 现在直接使用 player 对象
+// 保留它们是为了向后兼容，如果其他代码还在使用的话
 
 // 处理文件进度条拖拽
 const handleSeekFile = (fileItem: MediaFile, percentage: number) => {
@@ -807,18 +774,6 @@ const dragModeButtonTitle = computed(() =>
   mediaFilesDragMode.value ? "点击退出拖拽排序模式" : "点击进入拖拽排序模式"
 );
 const resultFileObject = computed(() => ({ path: resultFile.value || "" }));
-const isResultFilePlaying = computed(() => {
-  if (!resultFile.value) return false;
-  return isFilePlaying({ path: resultFile.value });
-});
-const resultFilePlayProgress = computed(() => {
-  if (!resultFile.value) return 0;
-  return getFilePlayProgress({ path: resultFile.value });
-});
-const resultFileDuration = computed(() => {
-  if (!resultFile.value) return 0;
-  return getFileDuration({ path: resultFile.value });
-});
 
 // 检查媒体文件顺序是否改变
 const isMediaOrderChanged = (original: MediaFile[], current: MediaFile[]): boolean => {

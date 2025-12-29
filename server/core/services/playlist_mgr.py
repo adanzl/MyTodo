@@ -386,6 +386,84 @@ class PlaylistMgr:
         spawn(save_async)
         return file_duration_seconds
 
+    def _collect_files_without_duration(self, playlist_data: Dict[str, Any], check_blacklist: bool = True) -> set:
+        """
+        收集播放列表中没有 duration 的文件 URI
+        :param playlist_data: 播放列表数据
+        :param check_blacklist: 是否检查黑名单
+        :return: 文件 URI 集合
+        """
+        files_to_fetch = set()
+
+        # 检查 pre_lists（所有7天的列表）
+        pre_lists = playlist_data.get("pre_lists", [])
+        if isinstance(pre_lists, list) and len(pre_lists) == 7:
+            for pre_list in pre_lists:
+                if isinstance(pre_list, list):
+                    for file_item in pre_list:
+                        if not file_item.get("duration"):
+                            file_uri = file_item.get("uri")
+                            if file_uri:
+                                if check_blacklist:
+                                    failure_count = self._duration_blacklist.get(file_uri, 0)
+                                    if failure_count < 3:
+                                        files_to_fetch.add(file_uri)
+                                else:
+                                    files_to_fetch.add(file_uri)
+
+        # 检查 files/playlist
+        for file_item in playlist_data.get("files", []):
+            if not file_item.get("duration"):
+                file_uri = file_item.get("uri")
+                if file_uri:
+                    if check_blacklist:
+                        failure_count = self._duration_blacklist.get(file_uri, 0)
+                        if failure_count < 3:
+                            files_to_fetch.add(file_uri)
+                    else:
+                        files_to_fetch.add(file_uri)
+
+        return files_to_fetch
+
+    def _update_files_duration(self, playlist_data: Dict[str, Any], file_durations: Dict[str, int]) -> int:
+        """
+        更新播放列表中匹配文件的 duration
+        :param playlist_data: 播放列表数据
+        :param file_durations: 文件 duration 字典 {file_uri: duration_seconds, ...}
+        :return: 更新的文件数量
+        """
+        updated_count = 0
+
+        # 更新 pre_lists（所有7天的列表）
+        pre_lists = playlist_data.get("pre_lists", [])
+        if isinstance(pre_lists, list) and len(pre_lists) == 7:
+            for pre_list in pre_lists:
+                if isinstance(pre_list, list):
+                    for file_item in pre_list:
+                        file_uri = file_item.get("uri")
+                        if file_uri and file_uri in file_durations and not file_item.get("duration"):
+                            file_item["duration"] = file_durations[file_uri]
+                            updated_count += 1
+
+        # 更新 pre_files（旧格式，兼容性处理）
+        pre_files = playlist_data.get("pre_files", [])
+        if isinstance(pre_files, list):
+            for file_item in pre_files:
+                file_uri = file_item.get("uri")
+                if file_uri and file_uri in file_durations and not file_item.get("duration"):
+                    file_item["duration"] = file_durations[file_uri]
+                    updated_count += 1
+
+        # 更新 files/playlist
+        files = playlist_data.get("files", [])
+        for file_item in files:
+            file_uri = file_item.get("uri")
+            if file_uri and file_uri in file_durations and not file_item.get("duration"):
+                file_item["duration"] = file_durations[file_uri]
+                updated_count += 1
+
+        return updated_count
+
     def _start_batch_duration_fetch(self, playlists: Dict[str, Dict[str, Any]]):
         """
         汇总所有没有 duration 的文件，启动单例线程批量获取时长
@@ -400,29 +478,7 @@ class PlaylistMgr:
         # 收集所有没有 duration 的文件 URI（去重），排除黑名单中失败超过3次的文件
         files_to_fetch = set()  # {file_uri, ...}
         for playlist_data in playlists.values():
-            # 检查 pre_lists（所有7天的列表）
-            pre_lists = playlist_data.get("pre_lists", [])
-            if isinstance(pre_lists, list) and len(pre_lists) == 7:
-                for pre_list in pre_lists:
-                    if isinstance(pre_list, list):
-                        for file_item in pre_list:
-                            if not file_item.get("duration"):
-                                file_uri = file_item.get("uri")
-                                if file_uri:
-                                    # 检查黑名单，失败次数>=3则跳过
-                                    failure_count = self._duration_blacklist.get(file_uri, 0)
-                                    if failure_count < 3:
-                                        files_to_fetch.add(file_uri)
-
-            # 检查 files/playlist
-            for file_item in playlist_data.get("files", []):
-                if not file_item.get("duration"):
-                    file_uri = file_item.get("uri")
-                    if file_uri:
-                        # 检查黑名单，失败次数>=3则跳过
-                        failure_count = self._duration_blacklist.get(file_uri, 0)
-                        if failure_count < 3:
-                            files_to_fetch.add(file_uri)
+            files_to_fetch.update(self._collect_files_without_duration(playlist_data, check_blacklist=True))
 
         if not files_to_fetch:
             return
@@ -450,24 +506,7 @@ class PlaylistMgr:
                 # 反向更新所有播放列表中匹配的文件 duration
                 updated_count = 0
                 for _, playlist_data in self._playlist_raw.items():
-                    # 更新 pre_lists（所有7天的列表）
-                    pre_lists = playlist_data.get("pre_lists", [])
-                    if isinstance(pre_lists, list) and len(pre_lists) == 7:
-                        for pre_list in pre_lists:
-                            if isinstance(pre_list, list):
-                                for file_item in pre_list:
-                                    file_uri = file_item.get("uri")
-                                    if file_uri and file_uri in file_durations and not file_item.get("duration"):
-                                        file_item["duration"] = file_durations[file_uri]
-                                        updated_count += 1
-
-                    # 更新 files/playlist
-                    files = playlist_data.get("files", [])
-                    for file_item in files:
-                        file_uri = file_item.get("uri")
-                        if file_uri and file_uri in file_durations and not file_item.get("duration"):
-                            file_item["duration"] = file_durations[file_uri]
-                            updated_count += 1
+                    updated_count += self._update_files_duration(playlist_data, file_durations)
 
                 # 统一保存到 RDS
                 if updated_count > 0:

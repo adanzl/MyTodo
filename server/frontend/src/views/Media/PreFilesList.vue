@@ -180,14 +180,11 @@
           <MediaComponent
             v-show="!preFilesBatchDeleteMode"
             :file="file"
-            :is-playing="isFilePlaying(file)"
-            :progress="getFilePlayProgress(file)"
-            :duration="getFileDuration(file)"
+            :player="audioPlayer"
             :disabled="playlistLoading"
             @play="$emit('play-file', file)"
             @seek="(file, val) => $emit('seek-file', file, val)"
-          >
-          </MediaComponent>
+          />
           <el-checkbox
             v-show="preFilesBatchDeleteMode"
             class="!h-6"
@@ -306,9 +303,7 @@ interface Props {
   preFilesExpanded: boolean;
   playlistLoading: boolean;
   showMoreActions: boolean;
-  isFilePlaying: (file: MediaFile) => boolean;
-  getFilePlayProgress: (file: MediaFile) => number;
-  getFileDuration: (file: MediaFile) => number;
+  audioPlayer: ReturnType<typeof import("@/composables/useAudioPlayer").useAudioPlayer>;
 }
 
 const props = defineProps<Props>();

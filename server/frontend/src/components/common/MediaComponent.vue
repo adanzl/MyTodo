@@ -40,14 +40,33 @@
 import { computed, ref, watch } from "vue";
 import { Headset } from "@element-plus/icons-vue";
 import { formatDuration } from "@/utils/format";
+import type { Ref } from "vue";
 
 interface FileItem {
   uri?: string;
+  path?: string;
+  name?: string;
+  duration?: number | null;
   [key: string]: unknown;
+}
+
+// useAudioPlayer 返回对象的类型
+interface AudioPlayer {
+  playingFilePath: Ref<string | null>;
+  playProgress: Ref<number>;
+  duration: Ref<number>;
+  isPlaying: Ref<boolean>;
+  isFilePlaying: (filePath: string) => boolean;
+  getFilePlayProgress: (filePath: string) => number;
+  getFileDuration: (filePath: string, fallbackDuration?: number) => number;
+  seekFile: (filePath: string, percentage: number) => void;
 }
 
 interface Props {
   file: FileItem;
+  // 如果提供了 player，则使用 player 的方法获取状态
+  player?: AudioPlayer;
+  // 如果没有提供 player，则使用这些 props（向后兼容）
   isPlaying?: boolean;
   progress?: number;
   duration?: number;
@@ -68,12 +87,45 @@ const emit = defineEmits<{
   seek: [file: FileItem, value: number];
 }>();
 
+// 从 file 对象中提取文件路径
+const getFilePath = (file: FileItem): string => {
+  return file?.uri || file?.path || file?.name || "";
+};
+
 // 加载状态：点击播放后，在媒体文件准备好之前锁定按钮
 const isLoading = ref(false);
 
+// 使用 player 或 props 获取播放状态
+const isPlaying = computed(() => {
+  if (props.player) {
+    const filePath = getFilePath(props.file);
+    return props.player.isFilePlaying(filePath);
+  }
+  return props.isPlaying;
+});
+
+// 使用 player 或 props 获取播放进度
+const progress = computed(() => {
+  if (props.player) {
+    const filePath = getFilePath(props.file);
+    return props.player.getFilePlayProgress(filePath);
+  }
+  return props.progress;
+});
+
+// 使用 player 或 props 获取时长
+const duration = computed(() => {
+  if (props.player) {
+    const filePath = getFilePath(props.file);
+    const fallbackDuration = props.file?.duration || props.duration;
+    return props.player.getFileDuration(filePath, fallbackDuration);
+  }
+  return props.duration;
+});
+
 // 格式化时长显示
 const formattedDuration = computed(() => {
-  return formatDuration(props.duration);
+  return formatDuration(duration.value);
 });
 
 // 计算按钮是否应该禁用
@@ -88,7 +140,7 @@ const handlePlayClick = () => {
   }
 
   // 如果正在播放，直接停止（不需要锁定）
-  if (props.isPlaying) {
+  if (isPlaying.value) {
     emit("play", props.file);
     return;
   }
@@ -100,17 +152,22 @@ const handlePlayClick = () => {
 
 // 处理进度条变化
 const handleSeek = (value: number) => {
-  if (!props.disabled && props.isPlaying) {
+  if (!props.disabled && isPlaying.value) {
+    // 如果提供了 player，直接使用 player 的 seekFile 方法
+    if (props.player) {
+      const filePath = getFilePath(props.file);
+      props.player.seekFile(filePath, value);
+    }
     emit("seek", props.file, value);
   }
 };
 
 // 监听播放状态和时长变化，当媒体准备好时解除锁定
 watch(
-  [() => props.isPlaying, () => props.duration],
-  ([isPlaying, duration]) => {
+  [isPlaying, duration],
+  ([playing, dur]) => {
     // 如果正在播放且有时长（大于0），说明媒体已准备好
-    if (isPlaying && duration > 0) {
+    if (playing && dur > 0) {
       isLoading.value = false;
     }
   },
