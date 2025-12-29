@@ -368,6 +368,7 @@ class PlaylistMgr:
             return file_item.get("duration")
 
         duration = get_media_duration(file_path)
+        log.info(f"[PlaylistMgr] 获取文件时长: {file_path}, {duration}")
         if duration is None:
             return None
 
