@@ -487,12 +487,20 @@ class PlaylistMgr:
                     try:
                         duration = get_media_duration(file_uri)
                         log.info(f"[PlaylistMgr] 获取文件时长: {file_uri}, {duration}")
-                        file_durations[file_uri] = int(duration)
-                        # 成功获取，从黑名单中移除（如果存在）
-                        self._duration_blacklist.pop(file_uri, None)
+                        if duration is not None:
+                            file_durations[file_uri] = int(duration)
+                            # 成功获取，从黑名单中移除（如果存在）
+                            self._duration_blacklist.pop(file_uri, None)
+                        else:
+                            # duration 为 None，记录警告但不计入失败（可能是超时或其他原因）
+                            log.warning(f"[PlaylistMgr] 获取文件时长失败: {file_uri}, duration=None")
+                            failed_count += 1
+                            failed_uris.append(file_uri)
+                            self._duration_blacklist[file_uri] += 1
                     except Exception as e:
                         failed_count += 1
                         failed_uris.append(file_uri)
+                        log.warning(f"[PlaylistMgr] 获取文件时长异常: {file_uri}, {e}")
                         # 获取异常，更新黑名单
                         self._duration_blacklist[file_uri] += 1
 

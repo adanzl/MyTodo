@@ -214,16 +214,25 @@ def get_media_duration(file_path):
             stdout = ''.join(stdout_data)
             stderr = ''.join(stderr_data)
             
+            log.info(f"[Utils] ffprobe result for {file_path}: returncode={returncode}, stdout_len={len(stdout)}, stderr_len={len(stderr)}")
+            if stdout:
+                log.debug(f"[Utils] ffprobe stdout: {stdout[:100]}")
+            if stderr:
+                log.debug(f"[Utils] ffprobe stderr: {stderr[:200]}")
+            
             if returncode == 0 and stdout.strip():
                 try:
                     duration = float(stdout.strip())
-                    result_queue.put(int(duration) if duration else None)
+                    duration_int = int(duration) if duration else None
+                    log.info(f"[Utils] ffprobe success for {file_path}: duration={duration_int} seconds")
+                    result_queue.put(duration_int)
                 except (ValueError, TypeError) as e:
+                    log.warning(f"[Utils] Invalid duration value from ffprobe for {file_path}: stdout={stdout.strip()}, error={e}")
                     error_queue.put(ValueError(f"Invalid duration value from ffprobe: {stdout.strip()}, error: {e}"))
             else:
                 # 记录详细的错误信息，包括stderr
                 error_msg = stderr[:500] if stderr else "No error message"
-                log.warning(f"[Utils] ffprobe failed for {file_path}: returncode={returncode}, stderr={error_msg}")
+                log.warning(f"[Utils] ffprobe failed for {file_path}: returncode={returncode}, stdout={stdout[:100]}, stderr={error_msg}")
                 error_queue.put(RuntimeError(f"ffprobe returned non-zero exit code: {returncode}, stderr: {error_msg}"))
                 
         except FileNotFoundError as e:
@@ -274,9 +283,10 @@ def get_media_duration(file_path):
         # 获取结果
         try:
             result = result_queue.get_nowait()
+            log.info(f"[Utils] get_media_duration success for {file_path}: {result}")
             return result
         except Empty:
-            log.warning(f"No result from ffprobe for {file_path}")
+            log.warning(f"[Utils] No result from ffprobe for {file_path} (result queue is empty)")
             return None
             
     except ValueError as e:
