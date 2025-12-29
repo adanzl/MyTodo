@@ -22,8 +22,8 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
 import { StarFilled } from "@element-plus/icons-vue";
-import Sidebar from "@/components/layout/Sidebar.vue";
-import Login from "@/components/layout/Login.vue";
+import Sidebar from "@/views/Sidebar.vue";
+import Login from "@/views/Login.vue";
 import { useUserStore } from "@/stores/user";
 
 // 使用 Pinia Store

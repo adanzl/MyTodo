@@ -251,7 +251,7 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import { Plus, Delete, Edit } from "@element-plus/icons-vue";
 import { getRdsData, setRdsData } from "@/api/rds";
 import { logAndNoticeError } from "@/utils";
-import FileDialog from "@/components/dialogs/FileDialog.vue";
+import FileDialog from "@/views/dialogs/FileDialog.vue";
 
 import type { PlaylistItem } from "@/types/playlist";
 
@@ -798,3 +798,4 @@ onMounted(() => {
   loadBatchList();
 });
 </script>
+

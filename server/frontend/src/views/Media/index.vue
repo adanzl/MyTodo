@@ -7,10 +7,11 @@
         :playlist-collection="playlistCollection"
         :active-playlist-id="activePlaylistId"
         :refreshing="playlistRefreshing"
+        :auto-refresh-enabled="autoRefreshEnabled"
         @select="handleSelectPlaylist"
         @create="handleCreatePlaylist"
         @refresh="refreshPlaylistStatus"
-        @open-device-list="handleOpenAgentListDialog"
+        @toggle-auto-refresh="handleToggleAutoRefresh"
         @menu-command="handlePlaylistMenuCommand"
       >
       </PlaylistList>
@@ -104,6 +105,7 @@
         :on-scan-dlna-devices="scanDlnaDevices"
         :on-scan-mi-devices="scanMiDevices"
         :on-open-scan-dialog="handleOpenScanDialog"
+        :on-open-device-list="handleOpenAgentListDialog"
       ></ConfigPanel>
     </div>
 
@@ -209,19 +211,19 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import { ElMessage } from "element-plus";
 import { logAndNoticeError } from "@/utils/error";
-import FileDialog from "@/components/dialogs/FileDialog.vue";
-import CronDialog from "@/components/dialogs/CronDialog.vue";
-import CronPreviewDialog from "@/components/dialogs/CronPreviewDialog.vue";
+import FileDialog from "@/views/dialogs/FileDialog.vue";
+import CronDialog from "@/views/dialogs/CronDialog.vue";
+import CronPreviewDialog from "@/views/dialogs/CronPreviewDialog.vue";
 import PlaylistList from "./PlaylistList.vue";
 import FileListPanel from "./FileListPanel.vue";
 import ConfigPanel from "./ConfigPanel.vue";
-import ScanDeviceDialog from "./ScanDeviceDialog.vue";
-import DevicesDialog from "@/components/dialogs/DevicesDialog.vue";
-import PlaylistSelectDialog from "@/components/dialogs/PlaylistSelectDialog.vue";
-import BatchDrawer from "@/components/drawers/BatchDrawer.vue";
+import ScanDeviceDialog from "@/views/dialogs/ScanDeviceDialog.vue";
+import DevicesDialog from "@/views/dialogs/DevicesDialog.vue";
+import PlaylistSelectDialog from "@/views/dialogs/PlaylistSelectDialog.vue";
+import BatchDrawer from "@/views/dialogs/BatchDrawer.vue";
 import { getWeekdayIndex } from "@/utils/date";
 import { usePlaylistState } from "./composables/usePlaylistState";
 import { usePlaylistData } from "./composables/usePlaylistData";
@@ -670,6 +672,9 @@ const handleSelectWeekday = (weekdayIndex: number) => {
   syncActivePlaylist(playlistCollection.value);
 };
 
+// 自动刷新状态
+const autoRefreshEnabled = ref(true);
+
 // 定时器 - 每5秒刷新一次当前播放列表状态
 import { useInterval } from "@/composables/useInterval";
 import { PLAYLIST_REFRESH_INTERVAL } from "@/constants/playlist";
@@ -682,14 +687,26 @@ const { start: startStatusRefresh, stop: stopStatusRefresh } = useInterval(
   { immediate: false, autoCleanup: true }
 );
 
+// 切换自动刷新
+const handleToggleAutoRefresh = (enabled: boolean) => {
+  autoRefreshEnabled.value = enabled;
+  if (enabled) {
+    startStatusRefresh();
+  } else {
+    stopStatusRefresh();
+  }
+};
+
 // 初始化
 onMounted(async () => {
   await loadPlaylist();
 
   await refreshConnectedList();
 
-  // 启动定时器
-  startStatusRefresh();
+  // 如果自动刷新开启，启动定时器
+  if (autoRefreshEnabled.value) {
+    startStatusRefresh();
+  }
 });
 
 onUnmounted(() => {

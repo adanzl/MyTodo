@@ -2,6 +2,14 @@
   <div class="w-80 min-w-75 border rounded p-3 flex flex-col">
     <h3 class="text-lg font-semibold mb-3">配置详情</h3>
 
+    <!-- 功能按钮区域 -->
+    <div v-if="playlistStatus" class="mb-3 flex items-center gap-2 flex-wrap">
+      <el-button type="default" @click="onOpenDeviceList" title="打开设备列表">
+        <el-icon><Monitor /></el-icon>
+        <span class="ml-1">设备列表</span>
+      </el-button>
+    </div>
+
     <div v-if="playlistStatus" class="flex-1 overflow-y-auto space-y-4">
       <!-- Cron 定时任务配置 -->
       <div class="border rounded p-3">
@@ -134,35 +142,7 @@
 
         <!-- 设备列表 -->
         <div class="mt-3">
-          <div class="flex items-center justify-between mb-2">
-            <h5 class="text-xs font-semibold text-gray-700">{{ deviceListTitle }}</h5>
-            <el-button
-              v-if="isDlna"
-              type="primary"
-              size="small"
-              @click="onScanDlnaDevices"
-              :loading="dlnaScanning"
-            >
-              扫描设备
-            </el-button>
-            <el-button
-              v-if="isMi"
-              type="primary"
-              size="small"
-              @click="onScanMiDevices"
-              :loading="miScanning"
-            >
-              扫描设备
-            </el-button>
-            <el-button
-              v-if="isAgentOrBluetooth"
-              type="primary"
-              size="small"
-              @click="onOpenScanDialog"
-            >
-              扫描设备
-            </el-button>
-          </div>
+          <h5 class="text-xs font-semibold text-gray-700 mb-2">{{ deviceListTitle }}</h5>
 
           <!-- 设备代理类型：显示已配对设备 -->
           <div v-if="isAgentOrBluetooth">
@@ -311,6 +291,7 @@ interface Props {
   onScanDlnaDevices: () => void;
   onScanMiDevices: () => void;
   onOpenScanDialog: () => void;
+  onOpenDeviceList: () => void;
 }
 
 const props = defineProps<Props>();

@@ -1,8 +1,5 @@
 <template>
   <el-dialog v-model="internalVisible" width="810" :before-close="handleClose">
-    <template #header>
-      <div></div>
-    </template>
     <div class="flex flex-col gap-4">
       <div>
         <div class="flex items-center justify-between mb-2">
@@ -69,52 +66,24 @@
           <el-table-column label="测试按钮" width="180">
             <template #default="{ row }">
               <div class="flex flex-col gap-1">
-                <div class="flex gap-1 items-center">
+                <div
+                  v-for="(buttonGroup, groupIndex) in buttonGroups"
+                  :key="groupIndex"
+                  class="flex gap-1 items-center"
+                >
                   <el-icon class="!w-4 !h-5"><Cpu /></el-icon>
-                  <span class="text-[12px] mr-1 !w-4">B1</span>
+                  <span class="text-[12px] mr-1 !w-4">{{ buttonGroup.label }}</span>
                   <el-button
-                    v-for="i in 2"
-                    :key="i"
+                    v-for="(key, btnIndex) in buttonGroup.keys"
+                    :key="btnIndex"
                     size="small"
                     type="primary"
                     plain
-                    @click="handleTestAgentButton(row.agent_id, `F${12 + i}`)"
-                    :loading="row[`testing_F${12 + i}`]"
+                    @click="handleTestAgentButton(row.agent_id, key)"
+                    :loading="row[`testing_${key}`]"
                     class="flex-1"
                   >
-                    F{{ 12 + i }}
-                  </el-button>
-                </div>
-                <div class="flex gap-1 items-center">
-                  <el-icon class="!w-4 !h-5"><Cpu /></el-icon>
-                  <span class="text-[12px] mr-1 !w-4">B2</span>
-                  <el-button
-                    v-for="i in 2"
-                    :key="i + 2"
-                    size="small"
-                    type="primary"
-                    plain
-                    @click="handleTestAgentButton(row.agent_id, `F${12 + i + 2}`)"
-                    :loading="row[`testing_F${12 + i + 2}`]"
-                    class="flex-1"
-                  >
-                    F{{ 12 + i + 2 }}
-                  </el-button>
-                </div>
-                <div class="flex gap-1 items-center">
-                  <el-icon class="!w-4 !h-5"><Cpu /></el-icon>
-                  <span class="text-[12px] mr-1 !w-4">B3</span>
-                  <el-button
-                    v-for="i in 2"
-                    :key="i + 4"
-                    size="small"
-                    type="primary"
-                    plain
-                    @click="handleTestAgentButton(row.agent_id, `F${12 + i + 4}`)"
-                    :loading="row[`testing_F${12 + i + 4}`]"
-                    class="flex-1"
-                  >
-                    F{{ 12 + i + 4 }}
+                    {{ key }}
                   </el-button>
                 </div>
               </div>
@@ -196,16 +165,8 @@
                 <div class="flex items-center gap-2">
                   <el-slider
                     :model-value="row.volume ?? 0"
-                    @input="
-                      (val: number) => {
-                        row.volume = val;
-                      }
-                    "
-                    @change="
-                      (val: number) => {
-                        setMiDeviceVolume(row, val);
-                      }
-                    "
+                    @input="(val: number) => (row.volume = val)"
+                    @change="(val: number) => setMiDeviceVolume(row, val)"
                     :min="5"
                     :max="100"
                     :step="1"
@@ -235,9 +196,8 @@ import { ElMessage } from "element-plus";
 import { Refresh, Cpu, Loading } from "@element-plus/icons-vue";
 import { api } from "@/api/config";
 import { logAndNoticeError } from "@/utils";
-import { DEVICE_SCAN_TIMEOUT } from "@/constants/device";
-import { useAgentDevice } from "@/composables/useAgentDevice";
-import type { MiDevice } from "@/types/device";
+import { DEVICE_SCAN_TIMEOUT, AGENT_LIST_REFRESH_INTERVAL } from "@/constants/device";
+import type { MiDevice, AgentDevice } from "@/types/device/device";
 
 interface Props {
   visible?: boolean;
@@ -252,28 +212,116 @@ const emit = defineEmits<{
 }>();
 
 const internalVisible = ref(props.visible);
+
+// 小米设备相关状态
 const miDeviceList = ref<MiDevice[]>([]);
 const miScanning = ref(false);
 
-// 使用 useAgentDevice composable
-const {
-  agentList,
-  loading: agentListLoading,
-  refreshAgentList,
-  testAgentButton,
-  startRefresh,
-  stopRefresh,
-} = useAgentDevice();
+// Agent设备相关状态
+const agentList = ref<AgentDevice[]>([]);
+const agentListLoading = ref(false);
+let agentRefreshTimer: ReturnType<typeof setInterval> | null = null;
 
-// 刷新Agent设备列表（包装函数以保持接口一致）
-const handleRefreshAgentList = async () => {
-  await refreshAgentList(true, false);
+// 测试按钮组配置
+const buttonGroups = [
+  { label: "B1", keys: ["F13", "F14"] },
+  { label: "B2", keys: ["F15", "F16"] },
+  { label: "B3", keys: ["F17", "F18"] },
+];
+
+// 刷新Agent设备列表
+const refreshAgentList = async (showLoading = true, showMessage = false) => {
+  try {
+    if (showLoading) {
+      agentListLoading.value = true;
+    }
+
+    const response = await api.get("/agent/list");
+    const result = response.data;
+
+    if (result?.code === 0) {
+      agentList.value = result.data || [];
+      if (showMessage) {
+        ElMessage.success(`已获取 ${agentList.value.length} 个 Agent 设备`);
+      }
+    } else {
+      const shouldShowError = showMessage || showLoading;
+      if (shouldShowError) {
+        ElMessage.error(result?.msg || "获取设备列表失败");
+      }
+      agentList.value = [];
+    }
+  } catch (error) {
+    console.error("获取Agent设备列表失败:", error);
+    const shouldShowError = showMessage || showLoading;
+    if (shouldShowError) {
+      logAndNoticeError(error as Error, "获取设备列表失败");
+    }
+    agentList.value = [];
+  } finally {
+    if (showLoading) {
+      agentListLoading.value = false;
+    }
+  }
 };
 
-// 测试Agent按钮（包装函数以保持接口一致）
-const handleTestAgentButton = async (agentId: string, key: string) => {
-  await testAgentButton(agentId, key);
+// 测试Agent按钮
+const testAgentButton = async (agentId: string, key: string) => {
+  const device = agentList.value.find(d => d.agent_id === agentId);
+  if (!device) {
+    ElMessage.error("设备不存在");
+    return;
+  }
+
+  // 设置测试状态
+  const testingKey = `testing_${key}`;
+  const deviceWithState = device as AgentDevice & Record<string, boolean>;
+  deviceWithState[testingKey] = true;
+
+  try {
+    const response = await api.post("/agent/mock", {
+      agent_id: agentId,
+      action: "keyboard",
+      key: key,
+      value: "test",
+    });
+
+    const result = response.data;
+
+    if (result?.code === 0) {
+      ElMessage.success(`测试按钮 ${key} 成功`);
+    } else {
+      ElMessage.error(result?.msg || `测试按钮 ${key} 失败`);
+    }
+  } catch (error) {
+    logAndNoticeError(error as Error, `测试按钮 ${key} 失败`);
+  } finally {
+    deviceWithState[testingKey] = false;
+  }
 };
+
+// 启动自动刷新
+const startRefresh = () => {
+  refreshAgentList(true, false);
+  stopRefresh(); // 确保先清除旧的定时器
+  agentRefreshTimer = setInterval(() => {
+    refreshAgentList(false, false);
+  }, AGENT_LIST_REFRESH_INTERVAL);
+};
+
+// 停止自动刷新
+const stopRefresh = () => {
+  if (agentRefreshTimer) {
+    clearInterval(agentRefreshTimer);
+    agentRefreshTimer = null;
+  }
+};
+
+// 刷新Agent设备列表
+const handleRefreshAgentList = () => refreshAgentList(true, false);
+
+// 测试Agent按钮
+const handleTestAgentButton = (agentId: string, key: string) => testAgentButton(agentId, key);
 
 // 辅助函数
 const getMiDeviceId = (device: MiDevice): string => {
@@ -282,6 +330,16 @@ const getMiDeviceId = (device: MiDevice): string => {
 
 const clampVolume = (volume: number): number => {
   return Math.max(0, Math.min(100, volume));
+};
+
+// 初始化小米设备状态
+const initMiDeviceState = (device: Partial<MiDevice>): MiDevice => {
+  return {
+    ...device,
+    volume: undefined,
+    _volumeChanging: false,
+    _volumeRefreshing: false,
+  } as MiDevice;
 };
 
 // 扫描小米设备
@@ -293,20 +351,18 @@ const scanMiDevices = async () => {
     });
     const result = response.data;
 
-    if (result.code === 0) {
-      const devices: MiDevice[] = (result.data || []).map((device: Partial<MiDevice>) => ({
-        ...device,
-        volume: undefined,
-        _volumeChanging: false,
-        _volumeRefreshing: false,
-      }));
+    if (result?.code === 0) {
+      const devices = (result.data || []).map((device: Partial<MiDevice>) =>
+        initMiDeviceState(device)
+      );
       miDeviceList.value = devices;
 
-      await Promise.allSettled(miDeviceList.value.map(device => getMiDeviceVolume(device)));
+      // 并行获取所有设备的音量
+      await Promise.allSettled(devices.map((device: MiDevice) => getMiDeviceVolume(device)));
 
       ElMessage.success(`扫描到 ${devices.length} 个小米设备`);
     } else {
-      ElMessage.error(result.msg || "扫描小米设备失败");
+      ElMessage.error(result?.msg || "扫描小米设备失败");
     }
   } catch (error) {
     logAndNoticeError(error as Error, "扫描小米设备失败");
@@ -331,13 +387,15 @@ const getMiDeviceVolume = async (device: MiDevice) => {
     });
     const result = response.data;
 
-    if (result.code === 0) {
+    if (result?.code === 0) {
       targetDevice.volume = result.data?.volume ?? result.data ?? undefined;
     } else {
-      ElMessage.error(result.msg || `获取设备 ${targetDevice.name || deviceId} 音量失败`);
+      const deviceName = targetDevice.name || deviceId;
+      ElMessage.error(result?.msg || `获取设备 ${deviceName} 音量失败`);
     }
   } catch (error) {
-    logAndNoticeError(error as Error, `获取设备 ${targetDevice.name || deviceId} 音量失败`);
+    const deviceName = targetDevice.name || deviceId;
+    logAndNoticeError(error as Error, `获取设备 ${deviceName} 音量失败`);
   } finally {
     targetDevice._volumeRefreshing = false;
   }
@@ -361,11 +419,11 @@ const setMiDeviceVolume = async (device: MiDevice, volume: number) => {
     });
     const result = response.data;
 
-    if (result.code === 0) {
+    if (result?.code === 0) {
       device.volume = clampedVolume;
       ElMessage.success("音量设置成功");
     } else {
-      ElMessage.error(result.msg || "设置音量失败");
+      ElMessage.error(result?.msg || "设置音量失败");
     }
   } catch (error) {
     logAndNoticeError(error as Error, "设置小米设备音量失败");
@@ -387,11 +445,12 @@ const handleStopMiDevice = async (device: MiDevice) => {
     const response = await api.post("/mi/stop", {
       device_id: deviceId,
     });
+    const result = response.data;
 
-    if (response.data.code === 0) {
+    if (result?.code === 0) {
       ElMessage.success("停止播放成功");
     } else {
-      ElMessage.error(response.data.msg || "停止播放失败");
+      ElMessage.error(result?.msg || "停止播放失败");
     }
   } catch (error) {
     logAndNoticeError(error as Error, "停止小米设备播放失败");
@@ -432,7 +491,6 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  // 停止自动刷新
   stopRefresh();
 });
 </script>

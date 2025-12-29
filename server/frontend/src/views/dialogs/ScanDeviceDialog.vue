@@ -70,3 +70,4 @@ const handleConnect = (device: BluetoothDevice) => {
   emit("connect", device);
 };
 </script>
+

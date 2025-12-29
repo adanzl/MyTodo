@@ -44,7 +44,7 @@ export function useDeviceManagement(
       loading.value = true;
       let rspData = null;
       if (deviceType === "agent") {
-        // 使用 useAgentDevice 的逻辑来获取设备列表
+        // 获取 Agent 设备列表
         const response = await api.get("/agent/list");
         rspData = response.data;
       } else {

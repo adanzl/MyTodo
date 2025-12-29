@@ -105,13 +105,15 @@ class DlnaDev:
         self.location = location
         self._device = None
         self._av_transport = None
+        self._rendering_control = None
         self.name = name or location
 
     def _get_device(self):
         """获取 upnpclient.Device 对象"""
         if self._device is None:
             try:
-                if not self.location or not (self.location.startswith('http://') or self.location.startswith('https://')):
+                if not self.location or not (self.location.startswith('http://')
+                                             or self.location.startswith('https://')):
                     log.error(f"[DlnaDev] Invalid location URL: {self.location}")
                     return None
 
@@ -142,6 +144,27 @@ class DlnaDev:
                 log.error(f"[DlnaDev] Error getting AVTransport: {e}")
 
         return self._av_transport
+
+    def _get_rendering_control(self):
+        """获取 RenderingControl 服务"""
+        device = self._get_device()
+        if device is None:
+            return None
+
+        if self._rendering_control is None:
+            try:
+                for service in device.services:
+                    if 'RenderingControl' in service.service_type:
+                        self._rendering_control = service
+                        log.debug(f"[DlnaDev] Found RenderingControl service: {service.service_id}")
+                        break
+
+                if self._rendering_control is None:
+                    log.warning("[DlnaDev] RenderingControl service not found")
+            except Exception as e:
+                log.error(f"[DlnaDev] Error getting RenderingControl: {e}")
+
+        return self._rendering_control
 
     def _get_transport_info(self) -> tuple[int, dict]:
         """获取传输状态信息"""
@@ -243,3 +266,73 @@ class DlnaDev:
 
         return_code = 0 if (transport_code == 0 or position_code == 0) else -1
         return return_code, status
+
+    # ========== 设备功能接口 ==========
+    def get_volume(self) -> tuple[int, int]:
+        """
+        获取设备音量
+        :return: (错误码, 音量) 音量范围通常是 0-100
+        """
+        rendering_control = self._get_rendering_control()
+        if rendering_control is None:
+            log.warning("[DlnaDev] RenderingControl service not available, cannot get volume")
+            return -1, -1
+
+        try:
+            from gevent import Timeout
+            with Timeout(5.0):  # 5秒超时
+                result = rendering_control.GetVolume(InstanceID=0, Channel="Master")
+                volume = result.get('CurrentVolume', 0)
+                # 有些设备返回的音量范围是 0-100，有些可能是 0-255，统一转换为 0-100
+                # 如果音量大于 100，假设是 0-255 范围，进行转换
+                if volume > 100:
+                    volume = int((volume / 255) * 100)
+                log.debug(f"[DlnaDev] Get volume: {volume}")
+                return 0, volume
+        except Timeout:
+            log.warning(f"[DlnaDev] Get volume timeout after 5 seconds for {self.name}")
+            return -1, -1
+        except Exception as e:
+            log.error(f"[DlnaDev] Get volume error: {e}")
+            log.error(traceback.format_exc())
+            return -1, -1
+
+    def set_volume(self, volume: int) -> tuple[int, str]:
+        """
+        设置设备音量
+        :param volume: 音量 (0-100)
+        :return: (错误码, 消息)
+        """
+        rendering_control = self._get_rendering_control()
+        if rendering_control is None:
+            log.warning("[DlnaDev] RenderingControl service not available, cannot set volume")
+            return -1, "RenderingControl service not available"
+
+        # 限制音量范围在 0-100
+        volume = max(0, min(100, volume))
+
+        try:
+            from gevent import Timeout
+            with Timeout(5.0):  # 5秒超时
+                # 有些设备可能需要 0-255 范围的音量值，先尝试直接设置
+                # 如果设备不支持，可能需要转换
+                rendering_control.SetVolume(InstanceID=0, Channel="Master", DesiredVolume=volume)
+                log.info(f"[DlnaDev] Set volume to {volume} for {self.name}")
+                return 0, "ok"
+        except Timeout:
+            log.warning(f"[DlnaDev] Set volume timeout after 5 seconds for {self.name}")
+            return -1, "设置音量超时：设备无响应"
+        except Exception as e:
+            log.error(f"[DlnaDev] Set volume error: {e}")
+            log.error(traceback.format_exc())
+            # 如果直接设置失败，尝试转换为 0-255 范围
+            try:
+                volume_255 = int((volume / 100) * 255)
+                from gevent import Timeout
+                with Timeout(5.0):
+                    rendering_control.SetVolume(InstanceID=0, Channel="Master", DesiredVolume=volume_255)
+                    log.info(f"[DlnaDev] Set volume to {volume_255} (converted from {volume}) for {self.name}")
+                    return 0, "ok"
+            except Exception as e2:
+                log.error(f"[DlnaDev] Set volume (converted) error: {e2}")
+                return -1, f"设置音量失败: {str(e)}"

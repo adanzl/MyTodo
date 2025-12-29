@@ -292,7 +292,7 @@ import { getWeekdayIndex } from "@/utils/date";
 import { calculateFilesTotalDuration } from "@/utils/file";
 import type { MediaFile } from "@/types/tools";
 import type { PlaylistStatus } from "@/types/playlist";
-import MediaComponent from "@/components/common/MediaComponent.vue";
+import MediaComponent from "@/components/MediaComponent.vue";
 
 interface Props {
   playlistStatus: PlaylistStatus | null;

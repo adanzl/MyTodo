@@ -64,7 +64,7 @@ declare module 'vue' {
     IIonVolumeMediumOutline: typeof import('~icons/ion/volume-medium-outline')['default']
     IMdiStopCircleOutline: typeof import('~icons/mdi/stop-circle-outline')['default']
     Login: typeof import('./src/components/layout/Login.vue')['default']
-    MediaComponent: typeof import('./src/components/common/MediaComponent.vue')['default']
+    MediaComponent: typeof import('./src/components/MediaComponent.vue')['default']
     PlaylistSelectDialog: typeof import('./src/components/dialogs/PlaylistSelectDialog.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']

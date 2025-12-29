@@ -269,8 +269,8 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Refresh, Plus, Document, Delete, Check, Minus } from "@element-plus/icons-vue";
-import FileDialog from "@/components/dialogs/FileDialog.vue";
-import MediaComponent from "@/components/common/MediaComponent.vue";
+import FileDialog from "@/views/dialogs/FileDialog.vue";
+import MediaComponent from "@/components/MediaComponent.vue";
 import { formatSize } from "@/utils/format";
 import { getMediaFileUrl } from "@/utils/file";
 import { logAndNoticeError } from "@/utils/error";

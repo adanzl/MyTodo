@@ -3,16 +3,16 @@
     <div class="flex items-center justify-between mb-3">
       <h3 class="text-base font-semibold">播放列表</h3>
       <div class="flex items-center gap-1">
-        <el-button
-          type="info"
+        <el-switch
+          :model-value="autoRefreshEnabled"
+          @update:model-value="(value: boolean) => $emit('toggle-auto-refresh', value)"
+          active-text=""
+          inactive-text=""
+          active-color="#409eff"
           size="small"
-          plain
-          @click="$emit('open-device-list')"
-          title="设备列表"
-          class="!w-8 !h-6 !p-0"
-        >
-          <el-icon><Monitor /></el-icon>
-        </el-button>
+          title="自动刷新"
+          class="mr-1"
+        />
         <el-button
           type="primary"
           size="small"
@@ -111,7 +111,7 @@
 </template>
 
 <script setup lang="ts">
-import { Monitor, Refresh, Plus, Headset, VideoPlay, Cpu } from "@element-plus/icons-vue";
+import { Refresh, Plus, Headset, VideoPlay, Cpu } from "@element-plus/icons-vue";
 import { getWeekdayIndex } from "@/utils/date";
 import { calculateNextCronTimes } from "@/utils/cron";
 import { formatDateTimeWithWeekday } from "@/utils/date";
@@ -121,6 +121,7 @@ interface Props {
   playlistCollection: Playlist[];
   activePlaylistId: string;
   refreshing: boolean;
+  autoRefreshEnabled: boolean;
 }
 
 defineProps<Props>();
@@ -129,7 +130,7 @@ defineEmits<{
   select: [playlistId: string];
   create: [];
   refresh: [];
-  "open-device-list": [];
+  "toggle-auto-refresh": [enabled: boolean];
   "menu-command": [command: string, playlistId: string];
 }>();
 
