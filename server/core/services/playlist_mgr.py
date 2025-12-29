@@ -477,7 +477,6 @@ class PlaylistMgr:
         log.info(f"[PlaylistMgr] 发现 {len(files_to_fetch)} 个文件需要获取时长，启动批量获取线程")
 
         def _batch_fetch_durations():
-            log.info(f"[PlaylistMgr] 批量获取时长线程启动: {len(files_to_fetch)} 个文件")
             """批量获取文件时长的线程函数"""
             file_durations = {}  # {file_uri: duration_seconds, ...}
             failed_count = 0
