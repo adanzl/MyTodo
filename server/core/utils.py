@@ -112,163 +112,86 @@ def time_to_seconds(time_str: str) -> int:
 def get_media_duration(file_path):
     """
     使用 ffprobe 获取媒体文件的时长
-    在 gevent 环境中使用 os.system 避免 subprocess 被 gevent 拦截
+    在独立线程中使用 os.system 执行命令，避免 gevent 事件循环和 child watchers 问题
     :param file_path: 文件路径
     :return: 时长（秒），如果失败返回 None
     """
     import tempfile
     import shlex
     
-    def _run_ffprobe_in_thread(result_queue, error_queue):
-        """在独立线程中运行 ffprobe，使用 subprocess.Popen 并手动读取输出"""
-        import time
-        
+    # 使用共享变量存储结果
+    result_container = {'duration': None, 'error': None}
+    
+    def _run_ffprobe_in_thread():
+        """在独立线程中运行 ffprobe"""
         try:
-            # 使用列表形式传递参数，文件路径中的单引号等特殊字符会被正确处理
-            cmds = [
-                '/usr/bin/ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of',
-                'default=noprint_wrappers=1:nokey=1', file_path
-            ]
+            # 创建临时文件存储输出
+            with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.txt') as tmp_file:
+                tmp_path = tmp_file.name
             
-            log.info(f"[Utils] ffprobe command: {cmds}")
-            
-            # 使用 subprocess.Popen，设置 close_fds=True 来避免事件循环检查
-            # 在 Unix 系统上，还可以设置 start_new_session=True
-            kwargs = {
-                'stdout': subprocess.PIPE,
-                'stderr': subprocess.PIPE,
-                'text': True,
-                'close_fds': True,  # 关闭文件描述符，避免事件循环检查
-            }
-            
-            if sys.platform != 'win32':
-                kwargs['start_new_session'] = True  # 创建新会话，避免事件循环检查
-            
-            log.info(f"[Utils] Starting ffprobe process for {file_path}")
-            process = subprocess.Popen(cmds, **kwargs)
-            log.info(f"[Utils] ffprobe process started, PID: {process.pid}")
-            
-            # 等待进程完成，使用超时保护
-            timeout = 50.0
             try:
-                returncode = process.wait(timeout=timeout)
-                log.info(f"[Utils] ffprobe process completed for {file_path}, returncode={returncode}")
-            except subprocess.TimeoutExpired:
-                log.warning(f"[Utils] ffprobe timeout for {file_path}, killing process")
+                # 构建命令，将输出重定向到临时文件
+                cmd_str = f"/usr/bin/ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 {shlex.quote(file_path)} > {shlex.quote(tmp_path)} 2>&1"
+                
+                # 使用 os.system 执行命令（返回退出码）
+                returncode = os.system(cmd_str)
+                # os.system 返回值的处理：
+                # - 正常情况：返回 (退出码 << 8)，需要右移8位获取退出码
+                # - 异常情况：可能返回 -1（进程被信号中断等）
+                if returncode == -1:
+                    # 返回 -1 可能是进程被信号中断，但命令可能已经成功执行
+                    # 尝试读取输出，如果输出有效则忽略返回码
+                    returncode = 0  # 假设成功，后续通过输出判断
+                else:
+                    returncode = returncode >> 8 if returncode else 0  # 提取退出码
+                
+                # 读取输出（即使返回码非0也尝试读取，因为某些情况下命令可能成功但返回非0）
                 try:
-                    process.kill()
-                    process.wait(timeout=2)
+                    with open(tmp_path, 'r') as f:
+                        stdout = f.read().strip()
+                except Exception:
+                    stdout = ""
+                
+                # 如果输出有效，尝试解析时长（即使返回码非0）
+                if stdout:
+                    try:
+                        duration = float(stdout)
+                        result_container['duration'] = int(duration) if duration else None
+                        # 如果成功解析，即使返回码非0也认为成功
+                        return
+                    except (ValueError, TypeError):
+                        result_container['error'] = f"Invalid duration value: {stdout}"
+                else:
+                    # 没有输出且返回码非0，认为失败
+                    result_container['error'] = f"ffprobe failed: returncode={returncode}, no output"
+                    
+            finally:
+                # 清理临时文件
+                try:
+                    os.unlink(tmp_path)
                 except Exception:
                     pass
-                error_queue.put(TimeoutError(f"ffprobe timeout after {timeout}s for {file_path}"))
-                return
-            
-            # 进程已完成，读取所有输出
-            stdout = ''
-            stderr = ''
-            try:
-                if process.stdout:
-                    stdout_bytes = process.stdout.read()
-                    stdout = stdout_bytes.decode('utf-8') if isinstance(stdout_bytes, bytes) else stdout_bytes
-                    log.info(f"[Utils] Read stdout for {file_path}, length={len(stdout)}")
-            except Exception as e:
-                log.warning(f"[Utils] Error reading stdout for {file_path}: {e}")
-            
-            try:
-                if process.stderr:
-                    stderr_bytes = process.stderr.read()
-                    stderr = stderr_bytes.decode('utf-8') if isinstance(stderr_bytes, bytes) else stderr_bytes
-                    log.info(f"[Utils] Read stderr for {file_path}, length={len(stderr)}")
-            except Exception as e:
-                log.warning(f"[Utils] Error reading stderr for {file_path}: {e}")
-            
-            log.info(f"[Utils] ffprobe result for {file_path}: returncode={returncode}, stdout_len={len(stdout)}, stderr_len={len(stderr)}")
-            if stdout:
-                log.info(f"[Utils] ffprobe stdout: {stdout[:100]}")
-            if stderr:
-                log.info(f"[Utils] ffprobe stderr: {stderr[:200]}")
-            
-            if returncode == 0 and stdout.strip():
-                try:
-                    duration = float(stdout.strip())
-                    duration_int = int(duration) if duration else None
-                    log.info(f"[Utils] ffprobe success for {file_path}: duration={duration_int} seconds")
-                    result_queue.put(duration_int)
-                except (ValueError, TypeError) as e:
-                    log.warning(f"[Utils] Invalid duration value from ffprobe for {file_path}: stdout={stdout.strip()}, error={e}")
-                    error_queue.put(ValueError(f"Invalid duration value from ffprobe: {stdout.strip()}, error: {e}"))
-            else:
-                # 记录详细的错误信息，包括stderr
-                error_msg = stderr[:500] if stderr else "No error message"
-                log.warning(f"[Utils] ffprobe failed for {file_path}: returncode={returncode}, stdout={stdout[:100]}, stderr={error_msg}")
-                error_queue.put(RuntimeError(f"ffprobe returned non-zero exit code: {returncode}, stderr: {error_msg}"))
-                
+                    
         except FileNotFoundError as e:
-            log.warning(f"[Utils] FileNotFoundError in ffprobe thread for {file_path}: {e}")
-            error_queue.put(FileNotFoundError(f"ffprobe not found: {e}"))
-        except ValueError as e:
-            log.warning(f"[Utils] ValueError in ffprobe thread for {file_path}: {e}")
-            error_queue.put(ValueError(f"Invalid duration value from ffprobe: {e}"))
+            result_container['error'] = f"ffprobe not found: {e}"
         except Exception as e:
-            log.error(f"[Utils] Unexpected exception in ffprobe thread for {file_path}: {e}", exc_info=True)
-            error_queue.put(e)
+            result_container['error'] = str(e)
     
-    try:
-        result_queue = Queue()
-        error_queue = Queue()
-        
-        # 在独立线程中运行 subprocess，完全避免事件循环问题
-        thread = threading.Thread(
-            target=_run_ffprobe_in_thread,
-            args=(result_queue, error_queue),
-            daemon=True
-        )
-        thread.start()
-        log.info(f"[Utils] ffprobe thread started for {file_path}")
-        thread.join(timeout=55)  # 等待线程完成，超时时间稍长于 subprocess 超时
-        
-        if thread.is_alive():
-            log.warning(f"[Utils] ffprobe thread timeout for {file_path} (thread still alive)")
-            return None
-        
-        log.info(f"[Utils] ffprobe thread completed for {file_path}")
-        
-        # 检查是否有错误
-        try:
-            error = error_queue.get_nowait()
-            # 忽略事件循环相关的错误，只记录其他错误
-            error_str = str(error)
-            if 'child watchers' in error_str or 'default loop' in error_str:
-                # 这是事件循环相关的错误，在 gevent 环境中可以忽略
-                log.info(f"[Utils] Event loop error (ignored) for {file_path}: {error}")
-            elif isinstance(error, TimeoutError):
-                log.warning(f"[Utils] Timeout getting media duration for {file_path}: {error}")
-            elif isinstance(error, FileNotFoundError):
-                log.warning(f"[Utils] ffprobe not found: {error}")
-            elif isinstance(error, RuntimeError):
-                # RuntimeError 通常包含详细的 stderr 信息，已经在上面的代码中记录了
-                log.warning(f"[Utils] ffprobe error for {file_path}: {error}")
-            else:
-                log.warning(f"[Utils] Error getting media duration for {file_path}: {error}")
-            return None
-        except Empty:
-            log.info(f"[Utils] No error in error_queue for {file_path}")
-            pass
-        
-        # 获取结果
-        try:
-            result = result_queue.get_nowait()
-            log.info(f"[Utils] get_media_duration success for {file_path}: {result}")
-            return result
-        except Empty:
-            log.warning(f"[Utils] No result from ffprobe for {file_path} (result queue is empty)")
-            return None
-            
-    except ValueError as e:
-        log.warning(f"Invalid duration value from ffprobe for {file_path}: {e}")
-    except Exception as e:
-        log.warning(f"Error getting media duration for {file_path}: {e}")
-    return None
+    # 在独立线程中运行
+    thread = threading.Thread(target=_run_ffprobe_in_thread, daemon=True)
+    thread.start()
+    thread.join(timeout=55)  # 等待线程完成
+    
+    if thread.is_alive():
+        log.warning(f"[Utils] ffprobe thread timeout for {file_path}")
+        return None
+    
+    # 检查结果
+    if result_container['error']:
+        log.warning(f"[Utils] Error getting media duration for {file_path}: {result_container['error']}")
+        return None
+    
+    return result_container['duration']
 
 
 def _get_media_server_url():
