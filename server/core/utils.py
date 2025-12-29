@@ -5,6 +5,7 @@
 import os
 import subprocess
 import json
+import sys
 import threading
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
@@ -111,14 +112,16 @@ def time_to_seconds(time_str: str) -> int:
 def get_media_duration(file_path):
     """
     使用 ffprobe 获取媒体文件的时长
-    在 gevent 环境中安全使用 subprocess，通过独立线程避免事件循环问题
+    在 gevent 环境中使用 os.system 避免 subprocess 被 gevent 拦截
     :param file_path: 文件路径
     :return: 时长（秒），如果失败返回 None
     """
+    import tempfile
+    import shlex
+    
     def _run_ffprobe_in_thread(result_queue, error_queue):
         """在独立线程中运行 ffprobe，使用 subprocess.Popen 并手动读取输出"""
         import time
-        import sys
         
         try:
             # 使用列表形式传递参数，文件路径中的单引号等特殊字符会被正确处理
