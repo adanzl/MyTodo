@@ -57,3 +57,23 @@ def dlna_volume():
     except Exception as e:
         log.error(f"[DLNA] Volume error: {e}")
         return _err(f'error: {str(e)}')
+
+
+@dlna_bp.route("/dlna/stop", methods=['POST'])
+def dlna_stop():
+    """停止DLNA设备播放"""
+    try:
+        data = read_json_from_request()
+        location = data.get('location')
+        if not location:
+            return _err('location is required')
+
+        device = DlnaDev(location)
+        code, msg = device.stop()
+        if code == 0:
+            return _ok({'message': msg or '停止成功'})
+        else:
+            return _err(msg or '停止失败')
+    except Exception as e:
+        log.error(f"[DLNA] Stop error: {e}")
+        return _err(f'error: {str(e)}')

@@ -26,6 +26,9 @@ log = root_logger()
 DEFAULT_MI_USERNAME = os.getenv("MI_USER", "")
 DEFAULT_MI_PASSWORD = os.getenv("MI_PASS", "")
 
+# Token 文件路径
+TOKEN_FILE = os.path.join(str(Path.home()), ".mi.token")
+
 
 def _device_to_dict(device) -> Dict:
     """将 Device 对象转换为字典"""
@@ -47,7 +50,7 @@ async def _get_device_did_async(username: str, password: str, device_id: str) ->
     session = None
     try:
         session = ClientSession()
-        account = MiAccount(session, username, password, os.path.join(str(Path.home()), ".mi.token"))
+        account = MiAccount(session, username, password, TOKEN_FILE)
         mina_service = MiNAService(account)
         device_list = await mina_service.device_list()
         for device in device_list:
@@ -96,7 +99,7 @@ class MiDevice:
                     session,
                     username,
                     password,
-                    os.path.join(str(Path.home()), ".mi.token"),
+                    TOKEN_FILE,
                 )
                 mina_service = MiNAService(account)
                 result = await mina_service.device_list()
@@ -117,12 +120,7 @@ class MiDevice:
             MiDevice.scanning = False
 
     def _create_account(self, session: ClientSession) -> MiAccount:
-        return MiAccount(
-            session,
-            self.username,
-            self.password,
-            os.path.join(str(Path.home()), ".mi.token"),
-        )
+        return MiAccount(session, self.username, self.password, TOKEN_FILE)
 
     # ========== 统一设备接口 ==========
     def play(self, url: str) -> tuple[int, str]:

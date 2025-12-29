@@ -159,12 +159,12 @@
     >
     </ScanDeviceDialog>
 
-    <!-- Agent设备列表弹窗 -->
-    <DevicesDialog
+    <!-- 设备管理抽屉 -->
+    <DevicesDrawer
       :visible="agentListDialogVisible"
       @update:visible="agentListDialogVisible = $event"
     >
-    </DevicesDialog>
+    </DevicesDrawer>
 
     <!-- 播放列表选择器弹窗 -->
     <PlaylistSelectDialog
@@ -212,7 +212,7 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from "vue";
-import { ElMessage } from "element-plus";
+// ElMessage 已通过自动导入插件自动导入，无需手动导入
 import { logAndNoticeError } from "@/utils/error";
 import FileDialog from "@/views/dialogs/FileDialog.vue";
 import CronDialog from "@/views/dialogs/CronDialog.vue";
@@ -221,7 +221,7 @@ import PlaylistList from "./PlaylistList.vue";
 import FileListPanel from "./FileListPanel.vue";
 import ConfigPanel from "./ConfigPanel.vue";
 import ScanDeviceDialog from "@/views/dialogs/ScanDeviceDialog.vue";
-import DevicesDialog from "@/views/dialogs/DevicesDialog.vue";
+import DevicesDrawer from "@/views/dialogs/DevicesDrawer.vue";
 import PlaylistSelectDialog from "@/views/dialogs/PlaylistSelectDialog.vue";
 import BatchDrawer from "@/views/dialogs/BatchDrawer.vue";
 import { getWeekdayIndex } from "@/utils/date";

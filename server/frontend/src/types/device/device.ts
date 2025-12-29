@@ -52,6 +52,30 @@ export interface DlnaDevice extends BaseDevice {
    */
   location?: string;
   /**
+   * 制造商
+   */
+  manufacturer?: string;
+  /**
+   * 型号名称
+   */
+  model_name?: string;
+  /**
+   * 音量（0-100）
+   */
+  volume?: number;
+  /**
+   * 是否正在改变音量（内部状态）
+   */
+  _volumeChanging?: boolean;
+  /**
+   * 是否正在刷新音量（内部状态）
+   */
+  _volumeRefreshing?: boolean;
+  /**
+   * 是否正在停止（内部状态）
+   */
+  _stopping?: boolean;
+  /**
    * 设备类型
    */
   type?: "dlna";

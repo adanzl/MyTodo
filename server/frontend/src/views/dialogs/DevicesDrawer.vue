@@ -1,6 +1,14 @@
 <template>
-  <el-dialog v-model="internalVisible" width="810" :before-close="handleClose">
-    <div class="flex flex-col gap-4">
+  <el-drawer
+    v-model="internalVisible"
+    :size="900"
+    direction="rtl"
+    :before-close="handleClose"
+    title="设备管理"
+    header-class="h-12 !mb-1"
+  >
+    <div class="flex flex-col gap-4 h-full overflow-y-auto">
+      <!-- Agent设备区域 -->
       <div>
         <div class="flex items-center justify-between mb-2">
           <div class="flex items-center gap-2">
@@ -94,6 +102,8 @@
           </template>
         </el-table>
       </div>
+
+      <!-- 小米设备区域 -->
       <div>
         <div class="flex items-center justify-between mb-2">
           <div class="flex items-center gap-2">
@@ -186,18 +196,120 @@
           </template>
         </el-table>
       </div>
+
+      <!-- DLNA设备区域 -->
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            <h4 class="text-base font-semibold w-24">DLNA设备</h4>
+            <el-button
+              type="primary"
+              plain
+              size="small"
+              @click="scanDlnaDevices"
+              :loading="dlnaScanning"
+            >
+              <el-icon v-if="!dlnaScanning"><Refresh /></el-icon>
+              <span class="ml-1">扫描</span>
+            </el-button>
+          </div>
+        </div>
+        <el-table
+          :data="dlnaDeviceList"
+          stripe
+          class="w-full"
+          v-loading="dlnaScanning"
+          :height="280"
+        >
+          <el-table-column prop="name" label="设备名称" min-width="150" />
+          <el-table-column label="详情" min-width="400">
+            <template #default="{ row }">
+              <div class="flex flex-col gap-1">
+                <div class="text-sm flex items-start">
+                  <span class="text-gray-600 inline-block w-12 flex-shrink-0">位置：</span>
+                  <span class="text-gray-800 flex-1 truncate" :title="row.location">
+                    {{ row.location || "-" }}
+                  </span>
+                </div>
+                <div v-if="row.manufacturer || row.model_name" class="text-sm flex items-start">
+                  <span class="text-gray-600 inline-block w-12 flex-shrink-0">型号：</span>
+                  <span class="text-gray-800">
+                    {{ row.manufacturer || "" }} {{ row.model_name || "" }}
+                  </span>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="功能" min-width="200">
+            <template #default="{ row }">
+              <div class="flex flex-col gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="text-gray-600 inline-block w-11 flex-shrink-0">音量：</span>
+                  <span class="text-gray-800 w-5">
+                    {{ row.volume !== undefined ? row.volume : "-" }}
+                  </span>
+                  <el-button
+                    size="small"
+                    type="info"
+                    plain
+                    circle
+                    @click="getDlnaDeviceVolume(row)"
+                    :loading="row._volumeRefreshing"
+                    :disabled="row._volumeRefreshing || row._volumeChanging"
+                    title="刷新音量"
+                    class="p-0.5 !w-[17px] !h-[17px]"
+                  >
+                    <el-icon v-if="!row._volumeRefreshing"><Refresh /></el-icon>
+                  </el-button>
+                  <el-button
+                    size="small"
+                    class="!w-8 !h-6"
+                    type="danger"
+                    plain
+                    @click="handleStopDlnaDevice(row)"
+                    :disabled="row._stopping"
+                    title="停止播放"
+                  >
+                    <el-icon v-if="row._stopping" class="animate-spin"> <Loading /> </el-icon>
+                    <span v-else>⏹</span>
+                  </el-button>
+                </div>
+                <div class="flex items-center gap-2">
+                  <el-slider
+                    :model-value="row.volume ?? 0"
+                    @input="(val: number) => (row.volume = val)"
+                    @change="(val: number) => setDlnaDeviceVolume(row, val)"
+                    :min="5"
+                    :max="100"
+                    :step="1"
+                    :disabled="
+                      row._volumeChanging || row._volumeRefreshing || row.volume === undefined
+                    "
+                    size="small"
+                    class="flex-1 max-w-[200px]"
+                  >
+                  </el-slider>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="text-center text-gray-400 py-8">暂无设备，点击"扫描设备"开始扫描</div>
+          </template>
+        </el-table>
+      </div>
     </div>
-  </el-dialog>
+  </el-drawer>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, onUnmounted, onMounted } from "vue";
-import { ElMessage } from "element-plus";
+// ElMessage 已通过自动导入插件自动导入，无需手动导入
 import { Refresh, Cpu, Loading } from "@element-plus/icons-vue";
 import { api } from "@/api/config";
 import { logAndNoticeError } from "@/utils";
 import { DEVICE_SCAN_TIMEOUT, AGENT_LIST_REFRESH_INTERVAL } from "@/constants/device";
-import type { MiDevice, AgentDevice } from "@/types/device/device";
+import type { MiDevice, AgentDevice, DlnaDevice } from "@/types/device/device";
 
 interface Props {
   visible?: boolean;
@@ -217,6 +329,10 @@ const internalVisible = ref(props.visible);
 const miDeviceList = ref<MiDevice[]>([]);
 const miScanning = ref(false);
 
+// DLNA设备相关状态
+const dlnaDeviceList = ref<DlnaDevice[]>([]);
+const dlnaScanning = ref(false);
+
 // Agent设备相关状态
 const agentList = ref<AgentDevice[]>([]);
 const agentListLoading = ref(false);
@@ -229,6 +345,7 @@ const buttonGroups = [
   { label: "B3", keys: ["F17", "F18"] },
 ];
 
+// ========== Agent设备相关方法 ==========
 // 刷新Agent设备列表
 const refreshAgentList = async (showLoading = true, showMessage = false) => {
   try {
@@ -323,6 +440,7 @@ const handleRefreshAgentList = () => refreshAgentList(true, false);
 // 测试Agent按钮
 const handleTestAgentButton = (agentId: string, key: string) => testAgentButton(agentId, key);
 
+// ========== 小米设备相关方法 ==========
 // 辅助函数
 const getMiDeviceId = (device: MiDevice): string => {
   return device.deviceID || device.address || "";
@@ -459,12 +577,146 @@ const handleStopMiDevice = async (device: MiDevice) => {
   }
 };
 
-// 关闭对话框
+// ========== DLNA设备相关方法 ==========
+// 获取DLNA设备标识
+const getDlnaDeviceLocation = (device: DlnaDevice): string => {
+  return device.location || device.address || "";
+};
+
+// 初始化DLNA设备状态
+const initDlnaDeviceState = (device: Partial<DlnaDevice>): DlnaDevice => {
+  return {
+    ...device,
+    volume: undefined,
+    _volumeChanging: false,
+    _volumeRefreshing: false,
+  } as DlnaDevice;
+};
+
+// 扫描DLNA设备
+const scanDlnaDevices = async () => {
+  try {
+    dlnaScanning.value = true;
+    const response = await api.get("/dlna/scan", {
+      params: { timeout: DEVICE_SCAN_TIMEOUT },
+    });
+    const result = response.data;
+
+    if (result?.code === 0) {
+      const devices = (result.data || []).map((device: Partial<DlnaDevice>) =>
+        initDlnaDeviceState(device)
+      );
+      dlnaDeviceList.value = devices;
+
+      // 并行获取所有设备的音量
+      await Promise.allSettled(devices.map((device: DlnaDevice) => getDlnaDeviceVolume(device)));
+
+      ElMessage.success(`扫描到 ${devices.length} 个 DLNA 设备`);
+    } else {
+      ElMessage.error(result?.msg || "扫描 DLNA 设备失败");
+    }
+  } catch (error) {
+    logAndNoticeError(error as Error, "扫描 DLNA 设备失败");
+  } finally {
+    dlnaScanning.value = false;
+  }
+};
+
+// 获取DLNA设备音量
+const getDlnaDeviceVolume = async (device: DlnaDevice) => {
+  const location = getDlnaDeviceLocation(device);
+  if (!location) return;
+
+  const targetDevice = dlnaDeviceList.value.find(d => getDlnaDeviceLocation(d) === location);
+  if (!targetDevice) return;
+
+  targetDevice._volumeRefreshing = true;
+
+  try {
+    const response = await api.get("/dlna/volume", {
+      params: { location: location },
+    });
+    const result = response.data;
+
+    if (result?.code === 0) {
+      targetDevice.volume = result.data?.volume ?? result.data ?? undefined;
+    } else {
+      const deviceName = targetDevice.name || location;
+      ElMessage.error(result?.msg || `获取设备 ${deviceName} 音量失败`);
+    }
+  } catch (error) {
+    const deviceName = targetDevice.name || location;
+    logAndNoticeError(error as Error, `获取设备 ${deviceName} 音量失败`);
+  } finally {
+    targetDevice._volumeRefreshing = false;
+  }
+};
+
+// 设置DLNA设备音量
+const setDlnaDeviceVolume = async (device: DlnaDevice, volume: number) => {
+  const location = getDlnaDeviceLocation(device);
+  if (!location) {
+    ElMessage.error("设备位置无效");
+    return;
+  }
+
+  const clampedVolume = clampVolume(volume);
+  device._volumeChanging = true;
+
+  try {
+    const response = await api.post("/dlna/volume", {
+      location: location,
+      volume: clampedVolume,
+    });
+    const result = response.data;
+
+    if (result?.code === 0) {
+      device.volume = clampedVolume;
+      ElMessage.success("音量设置成功");
+    } else {
+      ElMessage.error(result?.msg || "设置音量失败");
+    }
+  } catch (error) {
+    logAndNoticeError(error as Error, "设置 DLNA 设备音量失败");
+  } finally {
+    device._volumeChanging = false;
+  }
+};
+
+// 停止DLNA设备播放
+const handleStopDlnaDevice = async (device: DlnaDevice) => {
+  const location = getDlnaDeviceLocation(device);
+  if (!location) {
+    ElMessage.warning("设备位置无效");
+    return;
+  }
+
+  try {
+    device._stopping = true;
+    const response = await api.post("/dlna/stop", {
+      location: location,
+    });
+    const result = response.data;
+
+    if (result?.code === 0) {
+      ElMessage.success("停止播放成功");
+    } else {
+      ElMessage.error(result?.msg || "停止播放失败");
+    }
+  } catch (error) {
+    logAndNoticeError(error as Error, "停止 DLNA 设备播放失败");
+  } finally {
+    device._stopping = false;
+  }
+};
+
+// ========== 通用方法 ==========
+// 关闭抽屉
 const handleClose = () => {
   internalVisible.value = false;
 };
 
-// 监听对话框显示状态
+// 监听抽屉显示状态
 watch(
   () => props.visible,
   isVisible => {

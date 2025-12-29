@@ -11,10 +11,6 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
-    BatchDrawer: typeof import('./src/components/drawers/BatchDrawer.vue')['default']
-    CronDialog: typeof import('./src/components/dialogs/CronDialog.vue')['default']
-    CronPreviewDialog: typeof import('./src/components/dialogs/CronPreviewDialog.vue')['default']
-    DevicesDialog: typeof import('./src/components/dialogs/DevicesDialog.vue')['default']
     ElAside: typeof import('element-plus/es')['ElAside']
     ElAvatar: typeof import('element-plus/es')['ElAvatar']
     ElButton: typeof import('element-plus/es')['ElButton']
@@ -59,16 +55,12 @@ declare module 'vue' {
     ElTimeline: typeof import('element-plus/es')['ElTimeline']
     ElTimelineItem: typeof import('element-plus/es')['ElTimelineItem']
     ElUpload: typeof import('element-plus/es')['ElUpload']
-    FileDialog: typeof import('./src/components/dialogs/FileDialog.vue')['default']
     IIonChevronExpandSharp: typeof import('~icons/ion/chevron-expand-sharp')['default']
     IIonVolumeMediumOutline: typeof import('~icons/ion/volume-medium-outline')['default']
     IMdiStopCircleOutline: typeof import('~icons/mdi/stop-circle-outline')['default']
-    Login: typeof import('./src/components/layout/Login.vue')['default']
     MediaComponent: typeof import('./src/components/MediaComponent.vue')['default']
-    PlaylistSelectDialog: typeof import('./src/components/dialogs/PlaylistSelectDialog.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
-    Sidebar: typeof import('./src/components/layout/Sidebar.vue')['default']
   }
   export interface GlobalDirectives {
     vLoading: typeof import('element-plus/es')['ElLoadingDirective']
