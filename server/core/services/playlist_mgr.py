@@ -445,15 +445,6 @@ class PlaylistMgr:
                             file_item["duration"] = file_durations[file_uri]
                             updated_count += 1
 
-        # 更新 pre_files（旧格式，兼容性处理）
-        pre_files = playlist_data.get("pre_files", [])
-        if isinstance(pre_files, list):
-            for file_item in pre_files:
-                file_uri = file_item.get("uri")
-                if file_uri and file_uri in file_durations and not file_item.get("duration"):
-                    file_item["duration"] = file_durations[file_uri]
-                    updated_count += 1
-
         # 更新 files/playlist
         files = playlist_data.get("files", [])
         for file_item in files:
@@ -486,6 +477,7 @@ class PlaylistMgr:
         log.info(f"[PlaylistMgr] 发现 {len(files_to_fetch)} 个文件需要获取时长，启动批量获取线程")
 
         def _batch_fetch_durations():
+            log.info(f"[PlaylistMgr] 批量获取时长线程启动: {len(files_to_fetch)} 个文件")
             """批量获取文件时长的线程函数"""
             file_durations = {}  # {file_uri: duration_seconds, ...}
             failed_count = 0
