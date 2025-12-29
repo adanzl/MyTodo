@@ -24,7 +24,7 @@ export default defineConfig({
     Components({
       resolvers: [
         ElementPlusResolver({
-          importStyle: "sass", // 按需导入样式
+          importStyle: false, // 禁用按需导入样式，改用全量导入（在 main.ts 中）
         }),
         IconsResolver({
           prefix: "i",
@@ -43,7 +43,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ["element-plus"],
+    include: ["element-plus", "element-plus/es"],
     exclude: [],
   },
   server: {

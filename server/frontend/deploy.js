@@ -3,7 +3,7 @@
 /**
  * 部署脚本：将构建产物复制到 static 目录
  */
-import { readFileSync, writeFileSync, copyFileSync, existsSync, cpSync } from "fs";
+import { readFileSync, writeFileSync, copyFileSync, existsSync, cpSync, rmSync, readdirSync, statSync, mkdirSync } from "fs";
 import { join, dirname, basename } from "path";
 import { fileURLToPath } from "url";
 
@@ -22,6 +22,35 @@ console.log(`📁 目标目录: ${staticDir}`);
 if (!existsSync(distDir)) {
     console.error("❌ 错误: 构建目录不存在，请先运行 npm run build");
     process.exit(1);
+}
+
+// 清空 static 目录（保留目录结构，只删除文件）
+if (existsSync(staticDir)) {
+    console.log("🧹 清空 static 目录...");
+    try {
+        const clearDir = (dirPath) => {
+            const items = readdirSync(dirPath);
+            for (const item of items) {
+                const itemPath = join(dirPath, item);
+                const stat = statSync(itemPath);
+                if (stat.isDirectory()) {
+                    clearDir(itemPath);
+                    rmSync(itemPath, { recursive: true, force: true });
+                } else {
+                    rmSync(itemPath, { force: true });
+                }
+            }
+        };
+        clearDir(staticDir);
+        console.log("✅ static 目录已清空");
+    } catch (error) {
+        console.error(`❌ 清空 static 目录失败: ${error.message}`);
+        process.exit(1);
+    }
+} else {
+    // 如果 static 目录不存在，创建它
+    mkdirSync(staticDir, { recursive: true });
+    console.log("✅ 已创建 static 目录");
 }
 
 // 读取构建后的 index.html
