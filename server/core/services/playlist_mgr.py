@@ -133,16 +133,16 @@ class PlaylistMgr:
         try:
             if not playlist_data or not isinstance(playlist_data, dict):
                 return -1
-            
+
             playlist_id = playlist_data.get("id")
             if not playlist_id:
                 log.error("[PlaylistMgr] update_single_playlist: playlist_data 中缺少 id 字段")
                 return -1
-            
+
             # 如果播放列表不存在，创建新播放列表
             if playlist_id not in self._playlist_raw:
                 log.info(f"[PlaylistMgr] 创建新播放列表: {playlist_id}")
-            
+
             # 更新播放列表数据（合并现有数据）
             if playlist_id in self._playlist_raw:
                 # 合并更新，保留原有字段
@@ -152,12 +152,12 @@ class PlaylistMgr:
             else:
                 # 新播放列表
                 self._playlist_raw[playlist_id] = playlist_data
-            
+
             # 保存到 RDS 和更新设备映射
             self._save_playlist_to_rds()
             self._refresh_single_device_map(playlist_id, self._playlist_raw[playlist_id])
             self._refresh_cron_job(playlist_id, self._playlist_raw[playlist_id])
-            
+
             return 0
         except Exception as e:
             log.error(f"[PlaylistMgr] update_single_playlist error: id={playlist_id}, {e}", exc_info=True)
@@ -187,7 +187,7 @@ class PlaylistMgr:
             for playlist_id, playlist_data in self._playlist_raw.items():
                 if 'isPlaying' in playlist_data:
                     del playlist_data['isPlaying']
-                
+
                 # 迁移 pre_files 到 pre_lists（如果还没有 pre_lists）
                 if "pre_lists" not in playlist_data:
                     pre_files = playlist_data.get("pre_files", [])
@@ -196,7 +196,8 @@ class PlaylistMgr:
                     pre_lists = [list(pre_files) for _ in range(7)]  # 深拷贝到7个列表
                     playlist_data["pre_lists"] = pre_lists
                     log.info(f"[PlaylistMgr] 迁移 pre_files 到 pre_lists: {playlist_id}, 共 {len(pre_files)} 个文件")
-                elif not isinstance(playlist_data.get("pre_lists"), list) or len(playlist_data.get("pre_lists", [])) != 7:
+                elif not isinstance(playlist_data.get("pre_lists"), list) or len(playlist_data.get("pre_lists",
+                                                                                                   [])) != 7:
                     # 如果 pre_lists 存在但格式不正确，重新初始化
                     pre_files = playlist_data.get("pre_files", [])
                     pre_lists = [list(pre_files) for _ in range(7)]
@@ -375,11 +376,13 @@ class PlaylistMgr:
         file_item["duration"] = file_duration_seconds
         # RDS 保存改为异步，避免阻塞
         from gevent import spawn
+
         def save_async():
             try:
                 self._save_playlist_to_rds()
             except Exception as e:
                 log.warning(f"[PlaylistMgr] Async save duration error: {e}")
+
         spawn(save_async)
         return file_duration_seconds
 
@@ -510,7 +513,7 @@ class PlaylistMgr:
             self._play_state[id] = {"in_pre_files": True, "pre_index": 0, "file_index": current_index}
         else:
             self._play_state[id] = {"in_pre_files": False, "pre_index": 0, "file_index": current_index}
-    
+
     def _get_pre_files_for_today(self, playlist_data: Dict[str, Any]) -> List:
         """获取今天对应的前置文件列表"""
         pre_lists = playlist_data.get("pre_lists", [])
@@ -587,7 +590,7 @@ class PlaylistMgr:
         # 播放文件
         device = self._device_map[id]["obj"]
         code, msg = device.play(file_path)
-        
+
         if code != 0:
             log.warning(f"[PlaylistMgr] play failed: id={id}, code={code}, msg={msg}")
             return code, msg
@@ -645,11 +648,13 @@ class PlaylistMgr:
                 playlist_data["updated_time"] = _TS()
                 # RDS 保存改为异步，避免阻塞播放操作
                 from gevent import spawn
+
                 def save_async():
                     try:
                         self._save_playlist_to_rds()
                     except Exception as e:
                         log.warning(f"[PlaylistMgr] Async save current_index error: {e}")
+
                 spawn(save_async)
 
             return self.play(id, force=True)
@@ -837,18 +842,36 @@ class PlaylistMgr:
                     code, status = device.get_status()
                     if code == 0:
                         device_state = status.get("state", "")
-                        wait_seconds = time_to_seconds(status.get("duration", "00:00:00")) - \
-                                     time_to_seconds(status.get("position", "00:00:00"))
+                        duration_str = status.get("duration", "00:00:00")
+                        position_str = status.get("position", "00:00:00")
+                        # 安全计算等待时间
+                        try:
+                            wait_seconds = time_to_seconds(duration_str) - time_to_seconds(position_str)
+                        except (ValueError, AttributeError) as e:
+                            log.warning(
+                                f"[PlaylistMgr] 计算等待时间失败: {pid}, duration={duration_str}, position={position_str}, {e}")
+                            wait_seconds = 0
+
                         # 如果设备状态是 STOPPED，说明文件已经播放完成，不需要等待
                         if device_state == "STOPPED":
-                            device.stop()
+                            try:
+                                device.stop()
+                            except Exception as e:
+                                log.warning(f"[PlaylistMgr] 停止已停止的设备异常: {pid}, {e}")
                             wait_seconds = 0
                         elif wait_seconds >= 2:
+                            # 如果还有剩余时间，等待一下（最多等待5秒，避免等待过久）
+                            wait_seconds = min(wait_seconds, 5)
                             time.sleep(wait_seconds)
+                    else:
+                        # 获取状态失败，记录警告但继续执行切换下一首
+                        log.warning(f"[PlaylistMgr] 获取设备状态失败: {pid}, {status.get('error', '未知错误')}")
                 except Exception as e:
                     log.error(f"[PlaylistMgr] 检查播放状态异常: {pid}, {e}")
+
             # 清除定时器（避免重复触发）
             self._clear_timer(pid, self._file_timers, "playlist_file_timer_")
+
             # 确保播放状态存在，如果不存在则初始化
             if pid not in self._play_state:
                 log.warning(f"[PlaylistMgr] 文件定时器触发时播放状态丢失: {pid}，重新初始化")
@@ -856,6 +879,10 @@ class PlaylistMgr:
                 if playlist_data:
                     pre_files = self._get_pre_files_for_today(playlist_data)  # 获取今天对应的前置文件列表
                     self._init_play_state(pid, playlist_data, pre_files)
+                else:
+                    log.error(f"[PlaylistMgr] 文件定时器触发时播放列表数据不存在: {pid}")
+                    return
+
             # 在播放下一首之前，先停止当前播放，避免设备自动重播导致重复播放
             if device:
                 try:
@@ -864,11 +891,15 @@ class PlaylistMgr:
                         log.warning(f"[PlaylistMgr] 停止当前播放失败: {pid}, {stop_msg}")
                 except Exception as e:
                     log.warning(f"[PlaylistMgr] 停止当前播放异常: {pid}, {e}")
+
             # 播放下一首
-            result = self.play_next(pid)
-            # 如果播放失败，记录错误但不抛出异常（避免影响定时器）
-            if result[0] != 0:
-                log.warning(f"[PlaylistMgr] 定时器触发播放下一首失败: {pid}, {result[1]}")
+            try:
+                result = self.play_next(pid)
+                # 如果播放失败，记录错误但不抛出异常（避免影响定时器）
+                if result[0] != 0:
+                    log.warning(f"[PlaylistMgr] 定时器触发播放下一首失败: {pid}, {result[1]}")
+            except Exception as e:
+                log.error(f"[PlaylistMgr] 定时器触发播放下一首异常: {pid}, {e}", exc_info=True)
 
         # 使用 DateTrigger 在指定时间后执行
         run_date = datetime.datetime.now() + timedelta(seconds=duration_seconds)

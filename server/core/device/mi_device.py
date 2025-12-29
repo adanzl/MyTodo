@@ -3,6 +3,7 @@
 '''
 # 必须在导入 miservice 之前 patch fake_useragent，避免 ThreadPoolExecutor 导致的 LoopExit
 from core.tools.useragent_fix import patch_fake_useragent
+
 patch_fake_useragent()
 
 import asyncio
@@ -216,8 +217,20 @@ class MiDevice:
                 if ret['code'] != 0:
                     return -1, {"error": ret['message']}
                 info = json.loads(ret['data']['info'])
-                state = 'STOPPED' if info['status'] == 1 else 'PLAYING'
-                play_song_detail = info['play_song_detail']
+                state = 'STOPPED' if info.get('status') == 1 else 'PLAYING'
+
+                # 安全访问 play_song_detail，如果不存在则返回默认值
+                play_song_detail = info.get('play_song_detail', {})
+                if not play_song_detail:
+                    # 如果没有播放详情，返回基本状态
+                    return 0, {
+                        "state": state,
+                        "status": 'OK',
+                        "track": 0,
+                        "duration": "00:00:00",
+                        "position": "00:00:00"
+                    }
+
                 duration = format_time_str(play_song_detail['duration'] /
                                            1000) if play_song_detail.get('duration') else '00:00:00'
                 track_list = info.get('track_list', [])
@@ -226,7 +239,10 @@ class MiDevice:
 
                 track = 0
                 if audio_id and track_list:
-                    track = track_list.index(audio_id) + 1
+                    try:
+                        track = track_list.index(audio_id) + 1
+                    except ValueError:
+                        track = 0
 
                 return 0, {
                     "state": state,  # PLAYING, STOPPED
