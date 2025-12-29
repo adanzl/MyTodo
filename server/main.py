@@ -1,7 +1,7 @@
 from gevent import monkey
 # 不 patch thread，使用真正的操作系统线程，避免与 asyncio 事件循环冲突
 # thread=False 表示不 patch threading 模块，这样 ThreadPoolExecutor 会使用真正的线程
-monkey.patch_all(subprocess=True, thread=False,queue=False)  # 在导入其他模块之前进行 patch，包括 subprocess，但不包括 thread
+monkey.patch_all(subprocess=True, thread=False, queue=False)  # 在导入其他模块之前进行 patch，包括 subprocess，但不包括 thread
 
 # 在导入其他模块之前加载环境变量
 from dotenv import load_dotenv

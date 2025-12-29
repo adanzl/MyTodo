@@ -4,7 +4,7 @@
  * 部署脚本：将构建产物复制到 static 目录
  */
 import { readFileSync, writeFileSync, copyFileSync, existsSync, cpSync, rmSync, readdirSync, statSync, mkdirSync } from "fs";
-import { join, dirname, basename } from "path";
+import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -62,11 +62,12 @@ if (!existsSync(indexPath)) {
 
 let indexHtml = readFileSync(indexPath, "utf-8");
 
-// 修复资源路径：将 /assets/ 改为 assets/（相对路径）
-// 因为 static 目录挂载在 /web 路径下，需要使用相对路径
-indexHtml = indexHtml.replace(/\/assets\//g, "assets/");
-// 修复 favicon 路径：将 /favicon.ico 改为 favicon.ico（相对路径）
-indexHtml = indexHtml.replace(/href="\/favicon\.ico"/g, 'href="favicon.ico"');
+// 由于 vite.config.ts 中设置了 base: "/web/"，资源路径应该是 /web/assets/...
+// 确保路径正确（不需要修改，因为 base: "/web/" 已经处理了）
+// 但如果构建后的 HTML 中有错误的路径，这里可以修复
+indexHtml = indexHtml.replace(/src="\/assets\//g, 'src="/web/assets/');
+indexHtml = indexHtml.replace(/href="\/assets\//g, 'href="/web/assets/');
+indexHtml = indexHtml.replace(/href="\/favicon\.ico"/g, 'href="/web/favicon.ico"');
 
 // 保存修复后的 index.html 到 static 目录
 const staticIndexPath = join(staticDir, "index.html");

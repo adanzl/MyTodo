@@ -9,6 +9,7 @@ import AutoImport from "unplugin-auto-import/vite";
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: "/web/", // 使用 /web/ 作为基础路径，匹配服务器配置
   plugins: [
     vue(),
     // 自动导入 Element Plus API（ElMessage, ElNotification 等）
@@ -58,44 +59,47 @@ export default defineConfig({
     outDir: "dist",
     assetsDir: "assets",
     chunkSizeWarningLimit: 500, // 提高警告阈值到1MB
+    // 确保 chunk 加载顺序正确
+    commonjsOptions: {
+      include: [/node_modules/],
+    },
     rollupOptions: {
       output: {
         // 确保资源路径正确
         assetFileNames: "assets/[name].[hash].[ext]",
         chunkFileNames: "assets/[name].[hash].js",
         entryFileNames: "assets/[name].[hash].js",
-        // 手动分割chunk，优化加载性能
-        manualChunks(id) {
-          // 将Vue相关库单独打包
-          if (id.includes("vue") || id.includes("vue-router") || id.includes("pinia")) {
-            return "vue-vendor";
-          }
-          // 将Element Plus单独打包
-          if (id.includes("element-plus")) {
-            return "element-plus";
-          }
-          // 将Element Plus Icons单独打包
-          if (id.includes("@element-plus/icons-vue")) {
-            return "element-plus-icons";
-          }
-          // 将工具库单独打包
-          if (
-            id.includes("axios") ||
-            id.includes("lodash-es") ||
-            id.includes("crypto-js") ||
-            id.includes("dayjs")
-          ) {
-            return "utils";
-          }
-          // 将Socket.io单独打包
-          if (id.includes("socket.io-client")) {
-            return "socket";
-          }
-          // 将node_modules中的其他依赖打包
-          if (id.includes("node_modules")) {
-            return "vendor";
-          }
-        },
+        // 暂时禁用手动代码分割，让 Vite 自动处理以避免模块加载顺序问题
+        // 如果打包体积过大，可以后续再优化
+        // manualChunks(id) {
+        //   if (!id.includes("node_modules")) {
+        //     return;
+        //   }
+        //   if (id.includes("vue") || id.includes("vue-router") || id.includes("pinia")) {
+        //     return "vue-vendor";
+        //   }
+        //   if (id.includes("element-plus") && !id.includes("@element-plus/icons-vue")) {
+        //     return "element-plus";
+        //   }
+        //   if (id.includes("@element-plus/icons-vue")) {
+        //     return "element-plus-icons";
+        //   }
+        //   if (
+        //     id.includes("axios") ||
+        //     id.includes("lodash-es") ||
+        //     id.includes("crypto-js") ||
+        //     id.includes("dayjs")
+        //   ) {
+        //     return "utils";
+        //   }
+        //   if (id.includes("socket.io-client")) {
+        //     return "socket";
+        //   }
+        //   if (id.includes("vant")) {
+        //     return "vant";
+        //   }
+        //   return "vendor";
+        // },
       },
     },
   },
