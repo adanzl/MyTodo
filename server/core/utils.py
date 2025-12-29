@@ -121,10 +121,13 @@ def get_media_duration(file_path):
         import sys
         
         try:
+            # 使用列表形式传递参数，文件路径中的单引号等特殊字符会被正确处理
             cmds = [
                 '/usr/bin/ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of',
                 'default=noprint_wrappers=1:nokey=1', file_path
             ]
+            
+            log.debug(f"[Utils] ffprobe command: {cmds}")
             
             # 使用 subprocess.Popen，设置 close_fds=True 来避免事件循环检查
             # 在 Unix 系统上，还可以设置 start_new_session=True
@@ -142,6 +145,7 @@ def get_media_duration(file_path):
             
             # 手动读取输出，避免使用 communicate() 触发事件循环检查
             stdout_data = []
+            stderr_data = []
             start_time = time.time()
             timeout = 50.0
             
@@ -151,9 +155,9 @@ def get_media_duration(file_path):
                     # 超时，终止进程
                     try:
                         process.kill()
+                        process.wait(timeout=2)
                     except Exception:
                         pass
-                    process.wait()
                     error_queue.put(TimeoutError(f"ffprobe timeout after {timeout}s for {file_path}"))
                     return
                 
@@ -168,43 +172,59 @@ def get_media_duration(file_path):
                                 stdout_data.append(remaining)
                         except Exception:
                             pass
+                    if process.stderr:
+                        try:
+                            remaining_stderr = process.stderr.read()
+                            if remaining_stderr:
+                                stderr_data.append(remaining_stderr)
+                        except Exception:
+                            pass
                     break
                 
-                # 尝试读取输出
-                if process.stdout:
-                    try:
-                        # 使用非阻塞读取
-                        import select
-                        if sys.platform != 'win32':
-                            # Unix 系统使用 select
-                            if select.select([process.stdout], [], [], 0.1)[0]:
+                # 尝试读取输出和错误
+                try:
+                    import select
+                    if sys.platform != 'win32':
+                        # Unix 系统使用 select 进行非阻塞读取
+                        readable, _, _ = select.select([process.stdout, process.stderr], [], [], 0.1)
+                        for stream in readable:
+                            if stream == process.stdout:
                                 chunk = process.stdout.read(4096)
                                 if chunk:
                                     stdout_data.append(chunk)
-                        else:
-                            # Windows 系统使用简单的读取
+                            elif stream == process.stderr:
+                                chunk = process.stderr.read(4096)
+                                if chunk:
+                                    stderr_data.append(chunk)
+                    else:
+                        # Windows 系统使用简单的读取
+                        if process.stdout:
                             chunk = process.stdout.read(4096)
                             if chunk:
                                 stdout_data.append(chunk)
-                    except Exception:
-                        pass
+                        if process.stderr:
+                            chunk = process.stderr.read(4096)
+                            if chunk:
+                                stderr_data.append(chunk)
+                except Exception:
+                    pass
                 
                 time.sleep(0.01)  # 短暂休眠
             
             stdout = ''.join(stdout_data)
+            stderr = ''.join(stderr_data)
             
             if returncode == 0 and stdout.strip():
-                duration = float(stdout.strip())
-                result_queue.put(int(duration) if duration else None)
+                try:
+                    duration = float(stdout.strip())
+                    result_queue.put(int(duration) if duration else None)
+                except (ValueError, TypeError) as e:
+                    error_queue.put(ValueError(f"Invalid duration value from ffprobe: {stdout.strip()}, error: {e}"))
             else:
-                # 读取 stderr 用于错误信息
-                stderr = ''
-                if process.stderr:
-                    try:
-                        stderr = process.stderr.read()[:200]
-                    except Exception:
-                        pass
-                error_queue.put(RuntimeError(f"ffprobe returned non-zero exit code: {returncode}, stderr: {stderr}"))
+                # 记录详细的错误信息，包括stderr
+                error_msg = stderr[:500] if stderr else "No error message"
+                log.warning(f"[Utils] ffprobe failed for {file_path}: returncode={returncode}, stderr={error_msg}")
+                error_queue.put(RuntimeError(f"ffprobe returned non-zero exit code: {returncode}, stderr: {error_msg}"))
                 
         except FileNotFoundError as e:
             error_queue.put(FileNotFoundError(f"ffprobe not found: {e}"))
@@ -238,8 +258,13 @@ def get_media_duration(file_path):
             if 'child watchers' in error_str or 'default loop' in error_str:
                 # 这是事件循环相关的错误，在 gevent 环境中可以忽略
                 log.debug(f"Event loop error (ignored) for {file_path}: {error}")
-            elif isinstance(error, (FileNotFoundError, TimeoutError)):
-                log.warning(f"Error getting media duration for {file_path}: {error}")
+            elif isinstance(error, TimeoutError):
+                log.warning(f"Timeout getting media duration for {file_path}: {error}")
+            elif isinstance(error, FileNotFoundError):
+                log.warning(f"ffprobe not found: {error}")
+            elif isinstance(error, RuntimeError):
+                # RuntimeError 通常包含详细的 stderr 信息，已经在上面的代码中记录了
+                log.warning(f"ffprobe error for {file_path}: {error}")
             else:
                 log.warning(f"Error getting media duration for {file_path}: {error}")
             return None
