@@ -127,7 +127,7 @@ def get_media_duration(file_path):
                 'default=noprint_wrappers=1:nokey=1', file_path
             ]
             
-            log.debug(f"[Utils] ffprobe command: {cmds}")
+            log.info(f"[Utils] ffprobe command: {cmds}")
             
             # 使用 subprocess.Popen，设置 close_fds=True 来避免事件循环检查
             # 在 Unix 系统上，还可以设置 start_new_session=True
