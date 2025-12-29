@@ -81,14 +81,13 @@ const handleLogin = async () => {
 
   const uu = _.find(userList.value, { id: user.value.id });
   if (uu && (uu.pwd === null || uu.pwd === CryptoJS.MD5(user.value.password).toString())) {
-    const userInfo = {
-      bLogin: true,
+    // 使用 Pinia store 设置当前用户
+    userStore.setCurUser(uu);
+    emit("login-success", {
       id: uu.id,
       name: uu.name,
-      ico: uu.icon,
-    };
-    localStorage.setItem("user_id", uu.id);
-    emit("login-success", userInfo);
+      icon: uu.icon,
+    });
   } else {
     ElMessage.error("用户名或密码错误");
   }

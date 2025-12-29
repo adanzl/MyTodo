@@ -128,34 +128,12 @@ const refreshRecordList = async (userId: number, pageNum: number, pageSize: numb
     }
     const response = await getList<ScoreHistory>("t_score_history", filter, pageNum, pageSize);
     if (response && response.data) {
-      // response.data 是 ScoreHistory[] 数组
-      // 但实际 API 可能返回 { data: ScoreHistory[], pageNum, pageSize, ... } 格式
-      const responseData = response.data as unknown as
-        | ScoreHistory[]
-        | {
-            data: ScoreHistory[];
-            pageNum?: number;
-            pageSize?: number;
-            totalCount?: number;
-            totalPage?: number;
-          };
-
-      const d = Array.isArray(responseData) ? responseData : responseData.data || [];
-      const paginationInfo = Array.isArray(responseData)
-        ? { pageNum, pageSize, totalCount: response.total || 0, totalPage: 0 }
-        : {
-            pageNum: responseData.pageNum ?? response.pageNum ?? pageNum,
-            pageSize: responseData.pageSize ?? response.pageSize ?? pageSize,
-            totalCount: responseData.totalCount ?? response.total ?? 0,
-            totalPage: responseData.totalPage ?? 0,
-          };
-
-      console.log(response);
+      const d = response.data.data || [];
       recordList.value.data = [];
-      recordList.value.pageNum = paginationInfo.pageNum;
-      recordList.value.pageSize = paginationInfo.pageSize;
-      recordList.value.totalCount = paginationInfo.totalCount;
-      recordList.value.totalPage = paginationInfo.totalPage;
+      recordList.value.pageNum = response.data.pageNum ?? pageNum;
+      recordList.value.pageSize = response.data.pageSize ?? pageSize;
+      recordList.value.totalCount = response.data.totalCount ?? 0;
+      recordList.value.totalPage = response.data.totalPage ?? 0;
 
       _.forEach(d, (item: ScoreHistory) => {
         item.user = getUserInfo(item.user_id);

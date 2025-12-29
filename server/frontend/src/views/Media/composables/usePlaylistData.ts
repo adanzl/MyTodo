@@ -9,8 +9,22 @@ import { formatDateTime } from "@/utils/date";
 import { logAndNoticeError } from "@/utils/error";
 import { createPlaylistId } from "@/utils/playlist";
 import { logger } from "@/utils/logger";
-import { WEEKDAYS_COUNT, DEFAULT_PLAYLIST_NAME } from "@/constants/playlist";
-import type { Playlist, PlaylistStatus, PlaylistItem, PlaylistCollection, PlaylistApiData } from "@/types/playlist";
+import {
+  WEEKDAYS_COUNT,
+  DEFAULT_PLAYLIST_NAME,
+  VALID_DEVICE_TYPES,
+  DEFAULT_DEVICE_TYPE,
+  STORAGE_KEY_ACTIVE_PLAYLIST_ID,
+} from "@/constants/playlist";
+import type {
+  Playlist,
+  PlaylistStatus,
+  PlaylistItem,
+  PlaylistCollection,
+  PlaylistApiData,
+  PlaylistSchedule,
+} from "@/types/playlist";
+import type { DeviceType } from "@/constants/device";
 
 export function usePlaylistData(
   playlistCollection: Ref<Playlist[]>,
@@ -20,47 +34,138 @@ export function usePlaylistData(
   pendingDeviceType: Ref<string | null>,
   preFilesDragMode: Ref<boolean>,
   filesDragMode: Ref<boolean>,
-  getSelectedWeekdayIndex: () => number
+  _getSelectedWeekdayIndex: () => number // 保留参数以保持接口兼容性，但当前未使用
 ) {
-  // 规范化播放列表项
+  // ========== 辅助函数 ==========
+
+  /**
+   * 将 NormalizedFile[] 转换为 PlaylistItem[]
+   */
+  const toPlaylistItems = (files: ReturnType<typeof normalizeFiles>): PlaylistItem[] => {
+    return files.map(f => ({ ...f })) as PlaylistItem[];
+  };
+
+  /**
+   * 从 item 中获取文件列表（支持 playlist 或 files 属性）
+   */
+  const getFilesFromItem = (item: Partial<PlaylistApiData> | Partial<Playlist>): PlaylistItem[] => {
+    const filesData =
+      ("playlist" in item && Array.isArray(item.playlist) && item.playlist) ||
+      ("files" in item && Array.isArray(item.files) && item.files) ||
+      [];
+    return toPlaylistItems(normalizeFiles(filesData, true));
+  };
+
+  /**
+   * 规范化前置文件列表
+   */
+  const normalizePreLists = (
+    item: Partial<PlaylistApiData> | Partial<Playlist>
+  ): PlaylistItem[][] => {
+    // 如果已有有效的 pre_lists，直接规范化返回
+    if (
+      item.pre_lists &&
+      Array.isArray(item.pre_lists) &&
+      item.pre_lists.length === WEEKDAYS_COUNT
+    ) {
+      return item.pre_lists.map(pre_list =>
+        toPlaylistItems(normalizeFiles(pre_list || [], true))
+      ) as PlaylistItem[][];
+    }
+
+    // 否则从 pre_files 创建，复制到7天
+    const preFilesData =
+      ("pre_files" in item && Array.isArray(item.pre_files) && item.pre_files) || [];
+    const preFiles = toPlaylistItems(normalizeFiles(preFilesData, true));
+    return Array(WEEKDAYS_COUNT)
+      .fill(null)
+      .map(() => [...preFiles]) as PlaylistItem[][];
+  };
+
+  /**
+   * 验证并规范化设备类型
+   */
+  const normalizeDeviceType = (type: string | undefined | null): DeviceType => {
+    return (
+      VALID_DEVICE_TYPES.includes(type as DeviceType) ? type : DEFAULT_DEVICE_TYPE
+    ) as DeviceType;
+  };
+
+  /**
+   * 规范化 Schedule
+   */
+  const normalizeSchedule = (schedule?: Partial<PlaylistSchedule>): PlaylistSchedule => {
+    return {
+      enabled: (schedule?.enabled === 1 ? 1 : 0) as 0 | 1,
+      cron: schedule?.cron ? String(schedule.cron) : "",
+      duration: schedule?.duration || 0,
+    };
+  };
+
+  /**
+   * 解析索引值（支持 number 或 string）
+   */
+  const parseIndex = (value: number | string | undefined | null, defaultValue: number): number => {
+    if (typeof value === "number") return value;
+    if (value == null) return defaultValue;
+    const parsed = parseInt(String(value), 10);
+    return isNaN(parsed) ? defaultValue : parsed;
+  };
+
+  /**
+   * 规范化 isPlaying 值
+   */
+  const normalizeIsPlaying = (value: boolean | number | undefined | null): boolean => {
+    return value === true || value === 1;
+  };
+
+  /**
+   * 规范化 current_index，确保在有效范围内
+   */
+  const normalizeCurrentIndex = (
+    index: number | string | undefined | null,
+    playlistLength: number
+  ): number => {
+    if (playlistLength === 0) return 0;
+    const currentIndex = parseIndex(index, 0);
+    return Math.max(0, Math.min(currentIndex, playlistLength - 1));
+  };
+
+  /**
+   * 创建空的 pre_lists 数组
+   */
+  const createEmptyPreLists = (): PlaylistItem[][] => {
+    return Array(WEEKDAYS_COUNT)
+      .fill(null)
+      .map(() => []) as PlaylistItem[][];
+  };
+
+  /**
+   * 检查 pre_lists 是否有效
+   */
+  const isValidPreLists = (preLists: unknown): preLists is PlaylistItem[][] => {
+    return (
+      Array.isArray(preLists) &&
+      preLists.length === WEEKDAYS_COUNT &&
+      preLists.every(list => Array.isArray(list))
+    );
+  };
+
+  // ========== 主要函数 ==========
+
+  /**
+   * 规范化播放列表项
+   */
   const normalizePlaylistItem = (
     item: Partial<PlaylistApiData> | Partial<Playlist>,
     fallbackName = "播放列表"
   ): Playlist => {
-    const playlist = normalizeFiles(item?.playlist || item?.files || [], true);
-    let pre_lists = item?.pre_lists;
-    if (!pre_lists || !Array.isArray(pre_lists) || pre_lists.length !== WEEKDAYS_COUNT) {
-      const pre_files = normalizeFiles(item?.pre_files || [], true);
-      pre_lists = Array(WEEKDAYS_COUNT)
-        .fill(null)
-        .map(() => [...pre_files]);
-    } else {
-      pre_lists = pre_lists.map((pre_list: PlaylistItem[]) => normalizeFiles(pre_list || [], true));
-    }
-
-    let currentIndex =
-      typeof item?.current_index === "number"
-        ? item.current_index
-        : item?.current_index !== undefined && item?.current_index !== null
-          ? parseInt(item.current_index, 10) || 0
-          : 0;
-    if (playlist.length === 0) {
-      currentIndex = 0;
-    } else {
-      if (currentIndex < 0) currentIndex = 0;
-      if (currentIndex >= playlist.length) currentIndex = playlist.length - 1;
-    }
+    const playlist = getFilesFromItem(item);
+    const pre_lists = normalizePreLists(item);
+    const currentIndex = normalizeCurrentIndex(item?.current_index, playlist.length);
     const name = (item?.name && String(item.name).trim()) || fallbackName;
-    const deviceType = item?.device?.type || item?.device_type || "dlna";
-    const validDeviceType = ["agent", "dlna", "bluetooth", "mi"].includes(deviceType)
-      ? deviceType
-      : "dlna";
-    const schedule = item?.schedule || { enabled: 0, cron: "", duration: 0 };
-    const normalizedSchedule = {
-      enabled: schedule.enabled || 0,
-      cron: schedule.cron !== undefined && schedule.cron !== null ? String(schedule.cron) : "",
-      duration: schedule.duration || 0,
-    };
+    const deviceType = normalizeDeviceType(item?.device?.type || item?.device_type);
+    const deviceAddress = item?.device_address || item?.device?.address || null;
 
     return {
       id: item?.id || createPlaylistId(),
@@ -69,207 +174,164 @@ export function usePlaylistData(
       pre_lists,
       total: playlist.length,
       current_index: currentIndex,
-      pre_index:
-        typeof item?.pre_index === "number"
-          ? item.pre_index
-          : item?.pre_index !== undefined && item?.pre_index !== null
-            ? parseInt(item.pre_index, 10)
-            : -1,
-      device_address: item?.device_address || item?.device?.address || null,
-      device_type: validDeviceType,
+      pre_index: parseIndex(item?.pre_index, -1),
+      device_address: deviceAddress,
+      device_type: deviceType,
       device: item?.device || {
-        type: validDeviceType,
-        address: item?.device_address || null,
+        type: deviceType,
+        address: deviceAddress,
         name: item?.device?.name || null,
       },
-      schedule: normalizedSchedule,
+      schedule: normalizeSchedule(item?.schedule),
       trigger_button: item?.trigger_button || "",
-      updatedAt: item?.updatedAt || Date.now(),
-      isPlaying: item?.isPlaying === true || item?.isPlaying === 1 || false,
+      updatedAt:
+        "updatedAt" in item && typeof item.updatedAt === "number" ? item.updatedAt : Date.now(),
+      isPlaying: normalizeIsPlaying(item?.isPlaying),
     };
   };
 
-  // 规范化播放列表集合
+  /**
+   * 规范化播放列表数组
+   */
+  const normalizePlaylistArray = (list: PlaylistApiData[] | Playlist[]): Playlist[] => {
+    if (!Array.isArray(list) || list.length === 0) {
+      return [normalizePlaylistItem({ name: DEFAULT_PLAYLIST_NAME })];
+    }
+    return list.map((item, index) => {
+      // 如果已经是 Playlist 类型，直接返回
+      if ("playlist" in item && "total" in item) {
+        return item as Playlist;
+      }
+      // 否则作为 PlaylistApiData 处理
+      return normalizePlaylistItem(item as PlaylistApiData, item?.name || `播放列表${index + 1}`);
+    });
+  };
+
+  /**
+   * 规范化播放列表集合
+   */
   const normalizePlaylistCollection = (
     raw: PlaylistCollection | PlaylistApiData | PlaylistApiData[] | null
   ): PlaylistCollection => {
-    const ensureList = (list: PlaylistApiData[]) => {
-      if (!Array.isArray(list) || list.length === 0) {
-        return [normalizePlaylistItem({ name: DEFAULT_PLAYLIST_NAME })];
-      }
-      return list.map((item, index) =>
-        normalizePlaylistItem(item, item?.name || `播放列表${index + 1}`)
+    // 类型守卫：检查是否是 PlaylistCollection
+    if (raw && "playlists" in raw && Array.isArray(raw.playlists)) {
+      const collection = raw as PlaylistCollection;
+      const playlists = normalizePlaylistArray(
+        collection.playlists as PlaylistApiData[] | Playlist[]
       );
-    };
-
-    if (raw && Array.isArray(raw.playlists)) {
-      const playlists = ensureList(raw.playlists);
-      const activeId = playlists.some(item => item.id === raw.activePlaylistId)
-        ? raw.activePlaylistId
-        : playlists[0].id;
+      const activeId = playlists.some(item => item.id === collection.activePlaylistId)
+        ? (collection.activePlaylistId as string | null)
+        : playlists[0]?.id || null;
       return { playlists, activePlaylistId: activeId };
     }
 
-    if (raw && Array.isArray(raw.playlist)) {
+    // 类型守卫：检查是否是单个 PlaylistApiData（有 playlist 或 files 属性）
+    if (raw && !Array.isArray(raw) && ("playlist" in raw || "files" in raw)) {
+      const apiData = raw as PlaylistApiData;
+      const playlistData =
+        ("playlist" in apiData && Array.isArray(apiData.playlist) && apiData.playlist) ||
+        ("files" in apiData && Array.isArray(apiData.files) && apiData.files) ||
+        [];
       const migrated = normalizePlaylistItem({
-        id: raw.id || raw.playlist_id,
-        name: raw.name || "默认播放列表",
-        playlist: raw.playlist,
-        current_index: raw.current_index,
-        device_address: raw.device_address,
+        id: apiData.id || (apiData as any).playlist_id,
+        name: apiData.name || DEFAULT_PLAYLIST_NAME,
+        files: playlistData,
+        current_index: apiData.current_index,
+        device_address: apiData.device_address,
       });
       return { playlists: [migrated], activePlaylistId: migrated.id };
     }
 
-    const defaultPlaylist = normalizePlaylistItem({ name: "默认播放列表" });
+    // 默认情况
+    const defaultPlaylist = normalizePlaylistItem({ name: DEFAULT_PLAYLIST_NAME });
     return { playlists: [defaultPlaylist], activePlaylistId: defaultPlaylist.id };
   };
 
-  // 转换 API 数据格式
+  /**
+   * 转换 API 数据格式为播放列表集合
+   */
   const transformApiDataToPlaylistFormat = (
     apiData: PlaylistApiData | PlaylistApiData[] | Record<string, PlaylistApiData> | null
   ): PlaylistCollection | null => {
-    if (!apiData) {
-      return null;
-    }
+    if (!apiData) return null;
 
+    // Record<string, PlaylistApiData> 格式
     if (!Array.isArray(apiData) && Object.keys(apiData).length > 0) {
-      const playlists = Object.values(apiData).map((item: PlaylistApiData) => {
-        const normalizedFiles = normalizeFiles(item.files || [], true);
-        let normalizedPreLists = item.pre_lists;
-        if (
-          !normalizedPreLists ||
-          !Array.isArray(normalizedPreLists) ||
-          normalizedPreLists.length !== WEEKDAYS_COUNT
-        ) {
-          const normalizedPreFiles = normalizeFiles(item.pre_files || [], true);
-          normalizedPreLists = Array(WEEKDAYS_COUNT)
-            .fill(null)
-            .map(() => [...normalizedPreFiles]);
-        } else {
-          normalizedPreLists = normalizedPreLists.map((pre_list: PlaylistItem[]) =>
-            normalizeFiles(pre_list || [], true)
-          );
-        }
-
-        const schedule = item.schedule || { enabled: 0, cron: "", duration: 0 };
-        const normalizedSchedule = {
-          enabled: schedule.enabled || 0,
-          cron: schedule.cron || "",
-          duration: schedule.duration || 0,
-        };
-
-        return {
-          id: item.id,
-          name: item.name || "默认播放列表",
-          playlist: normalizedFiles,
-          pre_lists: normalizedPreLists,
-          current_index: item.current_index || 0,
-          pre_index: item.pre_index ?? -1,
-          in_pre_files: item?.in_pre_files === true || item?.in_pre_files === 1 || false,
-          device_address: item.device?.address || item.device_address || null,
-          device_type: item.device?.type || item.device_type || "dlna",
-          device: item.device || {
-            type: item.device_type || "dlna",
-            address: item.device_address || null,
-          },
-          schedule: normalizedSchedule,
-          trigger_button: item?.trigger_button || "",
-          create_time: item.create_time,
-          updated_time: item.updated_time,
-          updatedAt: item.updated_time ? new Date(item.updated_time).getTime() : Date.now(),
-          isPlaying: item?.isPlaying === true || item?.isPlaying === 1 || false,
-        };
-      });
-
+      const playlists = Object.values(apiData).map(item =>
+        normalizePlaylistItem(item, item.name || DEFAULT_PLAYLIST_NAME)
+      );
       return {
-        playlists: playlists,
+        playlists: playlists as Playlist[],
         activePlaylistId: playlists[0]?.id || null,
       };
     }
 
+    // PlaylistApiData[] 格式
     if (Array.isArray(apiData)) {
+      const playlists = apiData.map(item =>
+        normalizePlaylistItem(item, item.name || DEFAULT_PLAYLIST_NAME)
+      );
       return {
-        playlists: apiData.map(item => ({
-          ...item,
-          playlist: normalizeFiles(item.files || item.playlist || [], false),
-        })),
-        activePlaylistId: apiData[0]?.id || null,
+        playlists: playlists as Playlist[],
+        activePlaylistId: playlists[0]?.id || null,
       };
     }
 
-    if (apiData.id) {
+    // 单个 PlaylistApiData 格式
+    if (!Array.isArray(apiData) && "id" in apiData && typeof apiData.id === "string") {
+      const apiDataItem = apiData as PlaylistApiData;
+      const playlist = normalizePlaylistItem(
+        apiDataItem,
+        apiDataItem.name || DEFAULT_PLAYLIST_NAME
+      );
       return {
-        playlists: [
-          {
-            ...apiData,
-            playlist: normalizeFiles(apiData.files || apiData.playlist || [], true),
-          },
-        ],
-        activePlaylistId: apiData.id,
+        playlists: [playlist],
+        activePlaylistId: apiDataItem.id,
       };
     }
 
     return null;
   };
 
-  // 转换前端格式为 API 格式
+  /**
+   * 转换前端格式为 API 格式
+   */
   const transformPlaylistToApiFormat = (
     collection: Playlist[]
   ): Record<string, PlaylistApiData> => {
     const playlistDict: Record<string, PlaylistApiData> = {};
+
     collection.forEach(item => {
-      if (item.id) {
-        let deviceType = "dlna";
-        if (item.device?.type && ["agent", "dlna", "bluetooth", "mi"].includes(item.device.type)) {
-          deviceType = item.device.type;
-        } else if (
-          item.device_type &&
-          ["agent", "dlna", "bluetooth", "mi"].includes(item.device_type)
-        ) {
-          deviceType = item.device_type;
-        }
+      if (!item.id) return;
 
-        const deviceAddress = item.device?.address || item.device_address || "";
-        const normalizedFiles = normalizeFiles(item.playlist || [], true);
-        let normalizedPreLists = item.pre_lists;
-        if (
-          !normalizedPreLists ||
-          !Array.isArray(normalizedPreLists) ||
-          normalizedPreLists.length !== WEEKDAYS_COUNT
-        ) {
-          const normalizedPreFiles = normalizeFiles(item.pre_files || [], true);
-          normalizedPreLists = Array(WEEKDAYS_COUNT)
-            .fill(null)
-            .map(() => [...normalizedPreFiles]);
-        } else {
-          normalizedPreLists = normalizedPreLists.map((pre_list: PlaylistItem[]) =>
-            normalizeFiles(pre_list || [], true)
-          );
-        }
+      const deviceType = normalizeDeviceType(item.device?.type || item.device_type);
+      const normalizedFiles = normalizeFiles(item.playlist || [], true);
+      const normalizedPreLists = normalizePreLists(item);
 
-        playlistDict[item.id] = {
-          id: item.id,
-          name: item.name || "默认播放列表",
-          files: normalizedFiles,
-          pre_lists: normalizedPreLists,
-          current_index: item.current_index || 0,
-          device: {
-            address: deviceAddress,
-            type: deviceType,
-            name: item.device?.name || null,
-          },
-          schedule: item.schedule || { enabled: 0, cron: "" },
-          trigger_button: item.trigger_button || "",
-          create_time: item.create_time || formatDateTime(),
-          updated_time: formatDateTime(),
-        };
-      }
+      playlistDict[item.id] = {
+        id: item.id,
+        name: item.name || DEFAULT_PLAYLIST_NAME,
+        files: normalizedFiles,
+        pre_lists: normalizedPreLists,
+        current_index: item.current_index || 0,
+        device: {
+          address: item.device?.address || item.device_address || "",
+          type: deviceType,
+          name: item.device?.name || null,
+        },
+        schedule: item.schedule || { enabled: 0, cron: "", duration: 0 },
+        trigger_button: item.trigger_button || "",
+        create_time: item.create_time || formatDateTime(),
+        updated_time: formatDateTime(),
+      } as PlaylistApiData;
     });
+
     return playlistDict;
   };
 
-  // 保存播放列表
+  /**
+   * 保存播放列表
+   */
   const savePlaylist = async (collectionOverride?: Playlist[]) => {
     try {
       const collection = (collectionOverride || playlistCollection.value || []).map(item => ({
@@ -288,20 +350,28 @@ export function usePlaylistData(
     }
   };
 
-  // 更新单个播放列表
+  /**
+   * 更新单个播放列表
+   */
   const updateSinglePlaylist = async (playlistData: Playlist) => {
     try {
       const playlistDict = transformPlaylistToApiFormat([playlistData]);
-      const playlistId = playlistData.id;
-      const singlePlaylistData = playlistDict[playlistId];
+      const singlePlaylistData = playlistDict[playlistData.id];
+
       if (!singlePlaylistData) {
         throw new Error("播放列表数据格式错误");
       }
-      singlePlaylistData.id = playlistId;
-      const response = await playlistAction("update", "POST", singlePlaylistData);
+
+      const response = await playlistAction(
+        "update",
+        "POST",
+        singlePlaylistData as unknown as Record<string, unknown>
+      );
+
       if (response.code !== 0) {
         throw new Error(response.msg || "更新播放列表失败");
       }
+
       return true;
     } catch (error) {
       logAndNoticeError(error as Error, "更新播放列表失败");
@@ -309,114 +379,82 @@ export function usePlaylistData(
     }
   };
 
-  // 同步激活的播放列表
+  /**
+   * 同步激活的播放列表
+   */
   const syncActivePlaylist = (collection: Playlist[]) => {
     const list = Array.isArray(collection) ? collection : playlistCollection.value;
+
     if (!list || list.length === 0) {
       playlistStatus.value = null;
       activePlaylistId.value = "";
       return;
     }
-    let activeId = activePlaylistId.value;
-    const active = list.find(item => item.id === activeId) || list[0];
-    activeId = active.id;
-    activePlaylistId.value = activeId;
 
-    let currentIndex =
-      typeof active.current_index === "number"
-        ? active.current_index
-        : active.current_index !== undefined && active.current_index !== null
-          ? parseInt(active.current_index, 10) || 0
-          : 0;
+    const active = list.find(item => item.id === activePlaylistId.value) || list[0];
+    activePlaylistId.value = active.id;
 
-    if (active.playlist && active.playlist.length > 0) {
-      if (currentIndex < 0) currentIndex = 0;
-      if (currentIndex >= active.playlist.length) currentIndex = active.playlist.length - 1;
-    } else {
-      currentIndex = 0;
-    }
+    const currentIndex = normalizeCurrentIndex(active.current_index, active.playlist?.length || 0);
+    const pre_lists = isValidPreLists(active.pre_lists)
+      ? active.pre_lists.map(list => [...(list || [])])
+      : createEmptyPreLists();
 
-    const weekdayIndex = getSelectedWeekdayIndex();
-    const currentPreFiles =
-      active.pre_lists &&
-      Array.isArray(active.pre_lists) &&
-      active.pre_lists.length === WEEKDAYS_COUNT
-        ? active.pre_lists[weekdayIndex] || []
-        : [];
     playlistStatus.value = {
       ...active,
       playlist: [...(active.playlist || [])],
-      pre_lists: active.pre_lists
-        ? active.pre_lists.map((list: PlaylistItem[]) => [...(list || [])])
-        : Array(WEEKDAYS_COUNT)
-            .fill(null)
-            .map(() => []),
-      pre_files: currentPreFiles,
+      pre_lists,
       current_index: currentIndex,
-      pre_index:
-        typeof active.pre_index === "number"
-          ? active.pre_index
-          : active.pre_index !== undefined && active.pre_index !== null
-            ? parseInt(active.pre_index, 10)
-            : -1,
-      in_pre_files: active?.in_pre_files === true || active?.in_pre_files === 1 || false,
-      isPlaying: active?.isPlaying === true || active?.isPlaying === 1 || false,
+      pre_index: parseIndex(active.pre_index, -1),
+      in_pre_files: false, // PlaylistStatus 的 in_pre_files 是计算属性
+      isPlaying: normalizeIsPlaying(active.isPlaying),
     };
   };
 
-  // 更新激活播放列表数据
+  /**
+   * 深拷贝播放列表项（避免直接修改原对象）
+   */
+  const clonePlaylistItem = (item: Playlist): Playlist => {
+    return {
+      ...item,
+      playlist: item.playlist.map(f => ({ ...f })),
+      pre_lists: isValidPreLists(item.pre_lists)
+        ? item.pre_lists.map(list => list.map(f => ({ ...f })))
+        : createEmptyPreLists(),
+    };
+  };
+
+  /**
+   * 更新激活播放列表数据
+   */
   const updateActivePlaylistData = async (
     mutator: (playlistInfo: Playlist) => Playlist
   ): Promise<PlaylistStatus | null> => {
     if (typeof mutator !== "function") return null;
-    let collection = playlistCollection.value.map(item => ({
-      ...item,
-      playlist: Array.isArray(item.playlist) ? item.playlist.map((f: PlaylistItem) => ({ ...f })) : [],
-      pre_lists:
-        Array.isArray(item.pre_lists) && item.pre_lists.length === WEEKDAYS_COUNT
-          ? item.pre_lists.map((list: PlaylistItem[]) => list.map((f: PlaylistItem) => ({ ...f })))
-          : Array(WEEKDAYS_COUNT)
-              .fill(null)
-              .map(() => []),
-    }));
-    if (collection.length === 0) {
-      const defaultPlaylist = normalizePlaylistItem({ name: DEFAULT_PLAYLIST_NAME });
-      collection = [defaultPlaylist];
-      activePlaylistId.value = defaultPlaylist.id;
-    }
+
+    // 确保集合不为空
+    let collection =
+      playlistCollection.value.length > 0
+        ? playlistCollection.value.map(clonePlaylistItem)
+        : [normalizePlaylistItem({ name: DEFAULT_PLAYLIST_NAME })];
+
+    // 确保有激活的播放列表
     let index = collection.findIndex(item => item.id === activePlaylistId.value);
     if (index === -1) {
       index = 0;
       activePlaylistId.value = collection[0].id;
     }
+
     const currentItem = collection[index];
-    const itemToMutate = {
-      ...currentItem,
-      playlist: currentItem.playlist.map((f: PlaylistItem) => ({ ...f })),
-      pre_lists:
-        Array.isArray(currentItem.pre_lists) && currentItem.pre_lists.length === WEEKDAYS_COUNT
-          ? currentItem.pre_lists.map((list: PlaylistItem[]) => [...list.map((f: PlaylistItem) => ({ ...f }))])
-          : Array(WEEKDAYS_COUNT)
-              .fill(null)
-              .map(() => []),
-    };
-    const updatedItem = mutator(itemToMutate) || itemToMutate;
-
-    const preservedPreLists =
-      updatedItem.pre_lists &&
-      Array.isArray(updatedItem.pre_lists) &&
-      updatedItem.pre_lists.length === WEEKDAYS_COUNT
-        ? updatedItem.pre_lists.map((list: PlaylistItem[]) =>
-            Array.isArray(list) ? list.map((f: PlaylistItem) => ({ ...f })) : []
-          )
-        : Array.isArray(currentItem.pre_lists) && currentItem.pre_lists.length === WEEKDAYS_COUNT
-          ? currentItem.pre_lists.map((list: PlaylistItem[]) => list.map((f: PlaylistItem) => ({ ...f })))
-          : Array(WEEKDAYS_COUNT)
-              .fill(null)
-              .map(() => []);
-
+    const updatedItem = mutator(clonePlaylistItem(currentItem)) || currentItem;
     const normalizedItem = normalizePlaylistItem(updatedItem, currentItem.name);
-    normalizedItem.pre_lists = preservedPreLists;
+
+    // 保留原有的 pre_lists（如果更新后的无效）
+    if (!isValidPreLists(normalizedItem.pre_lists)) {
+      normalizedItem.pre_lists = isValidPreLists(currentItem.pre_lists)
+        ? currentItem.pre_lists.map(list => list.map(f => ({ ...f })))
+        : createEmptyPreLists();
+    }
+
     collection[index] = normalizedItem;
     playlistCollection.value = collection;
 
@@ -425,7 +463,21 @@ export function usePlaylistData(
     return playlistStatus.value;
   };
 
-  // 加载播放列表
+  /**
+   * 从 localStorage 恢复或设置激活的播放列表ID
+   */
+  const restoreOrSetActivePlaylistId = (playlists: Playlist[], defaultId: string | null) => {
+    const savedPlaylistId = localStorage.getItem(STORAGE_KEY_ACTIVE_PLAYLIST_ID);
+    if (savedPlaylistId && playlists.some(p => p.id === savedPlaylistId)) {
+      activePlaylistId.value = savedPlaylistId;
+    } else {
+      activePlaylistId.value = defaultId || "";
+    }
+  };
+
+  /**
+   * 加载播放列表
+   */
   const loadPlaylist = async () => {
     try {
       const response = await playlistAction("get", "GET", {});
@@ -433,45 +485,52 @@ export function usePlaylistData(
         throw new Error(response.msg || "获取播放列表失败");
       }
 
-      const parsed = transformApiDataToPlaylistFormat(response.data);
-      const normalized = normalizePlaylistCollection(parsed);
+      const parsed = transformApiDataToPlaylistFormat(
+        response.data as
+          | PlaylistApiData
+          | PlaylistApiData[]
+          | Record<string, PlaylistApiData>
+          | null
+      );
+      const normalized = parsed
+        ? normalizePlaylistCollection(parsed)
+        : normalizePlaylistCollection(null);
+
       playlistCollection.value = normalized.playlists;
-
-      const savedPlaylistId = localStorage.getItem("active_playlist_id");
-      if (savedPlaylistId && normalized.playlists.some((p: Playlist) => p.id === savedPlaylistId)) {
-        activePlaylistId.value = savedPlaylistId;
-      } else {
-        activePlaylistId.value = normalized.activePlaylistId;
-      }
-
+      restoreOrSetActivePlaylistId(normalized.playlists, normalized.activePlaylistId);
       syncActivePlaylist(normalized.playlists);
+
       return normalized;
     } catch (error) {
       logger.error("从接口加载播放列表失败:", error);
       const fallback = normalizePlaylistCollection(null);
+
       playlistCollection.value = fallback.playlists;
-
-      const savedPlaylistId = localStorage.getItem("active_playlist_id");
-      if (savedPlaylistId && fallback.playlists.some((p: Playlist) => p.id === savedPlaylistId)) {
-        activePlaylistId.value = savedPlaylistId;
-      } else {
-        activePlaylistId.value = fallback.activePlaylistId;
-      }
-
+      restoreOrSetActivePlaylistId(fallback.playlists, fallback.activePlaylistId);
       syncActivePlaylist(fallback.playlists);
+
       return fallback;
     }
   };
 
-  // 刷新播放列表状态
+  /**
+   * 检查是否应该跳过自动刷新
+   */
+  const shouldSkipAutoRefresh = (isAutoRefresh: boolean): boolean => {
+    if (!isAutoRefresh) return false;
+    // 正在编辑设备配置时跳过
+    if (pendingDeviceType.value !== null) return true;
+    // 处于拖拽排序模式时跳过
+    if (preFilesDragMode.value || filesDragMode.value) return true;
+    return false;
+  };
+
+  /**
+   * 刷新播放列表状态
+   */
   const refreshPlaylistStatus = async (onlyCurrent = false, isAutoRefresh = false) => {
     try {
-      // 如果正在编辑设备配置（pendingDeviceType 不为 null），且是自动刷新，则跳过刷新，避免覆盖未保存的更改
-      if (isAutoRefresh && pendingDeviceType.value !== null) {
-        return;
-      }
-      // 如果是自动刷新，且处于拖拽排序模式，则跳过（避免覆盖拖拽结果）
-      if (isAutoRefresh && (preFilesDragMode.value || filesDragMode.value)) {
+      if (shouldSkipAutoRefresh(isAutoRefresh)) {
         return;
       }
 
@@ -488,34 +547,35 @@ export function usePlaylistData(
           throw new Error(response.msg || "获取播放列表状态失败");
         }
 
-        const parsed = transformApiDataToPlaylistFormat(response.data);
-        if (!parsed || !parsed.playlists || parsed.playlists.length === 0) {
+        const parsed = transformApiDataToPlaylistFormat(
+          response.data as
+            | PlaylistApiData
+            | PlaylistApiData[]
+            | Record<string, PlaylistApiData>
+            | null
+        );
+
+        if (!parsed?.playlists?.length) {
           return;
         }
 
         const updatedPlaylist = parsed.playlists[0];
-
         const collection = playlistCollection.value.map(item => {
-          if (item.id === activeId) {
-            return {
-              ...item,
-              ...updatedPlaylist,
-              playlist: updatedPlaylist.playlist || item.playlist,
-              pre_lists:
-                updatedPlaylist.pre_lists &&
-                Array.isArray(updatedPlaylist.pre_lists) &&
-                updatedPlaylist.pre_lists.length === WEEKDAYS_COUNT
-                  ? updatedPlaylist.pre_lists.map((list: PlaylistItem[]) => [...(list || [])])
-                  : item.pre_lists,
-              current_index:
-                updatedPlaylist.current_index !== undefined
-                  ? updatedPlaylist.current_index
-                  : item.current_index,
-              isPlaying:
-                updatedPlaylist?.isPlaying === true || updatedPlaylist?.isPlaying === 1 || false,
-            };
-          }
-          return item;
+          if (item.id !== activeId) return item;
+
+          return {
+            ...item,
+            ...updatedPlaylist,
+            playlist: updatedPlaylist.playlist || item.playlist,
+            pre_lists: isValidPreLists(updatedPlaylist.pre_lists)
+              ? updatedPlaylist.pre_lists.map(list => [...(list || [])])
+              : item.pre_lists,
+            current_index:
+              updatedPlaylist.current_index !== undefined
+                ? updatedPlaylist.current_index
+                : item.current_index,
+            isPlaying: normalizeIsPlaying(updatedPlaylist?.isPlaying),
+          };
         });
 
         playlistCollection.value = collection;

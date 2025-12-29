@@ -7,20 +7,17 @@
         <div class="flex items-center gap-1">
           <el-button
             type="info"
-            size="small"
-            plain
+            v-bind="smallIconButtonProps"
             @click="loadMediaTaskList"
             :loading="mediaLoading"
-            class="!w-8 !h-6 !p-0"
           >
             <el-icon v-if="!mediaLoading"><Refresh /></el-icon>
           </el-button>
           <el-button
             type="success"
-            size="small"
+            v-bind="smallIconButtonProps"
             @click="handleMediaCreateTask"
             :loading="mediaLoading"
-            class="!w-8 !h-6 !p-0"
           >
             <el-icon><Plus /></el-icon>
           </el-button>
@@ -65,20 +62,16 @@
               <el-button
                 v-if="task.status === 'success' && task.result_file"
                 type="primary"
-                size="small"
-                plain
+                v-bind="smallTextButtonProps"
                 @click.stop="handleMediaDownloadResultFromList(task)"
-                class="!h-5 !text-xs !px-2"
               >
                 下载
               </el-button>
               <el-button
                 type="danger"
-                size="small"
-                plain
+                v-bind="smallTextButtonProps"
                 @click.stop="handleMediaDeleteTask(task.task_id)"
                 :disabled="task.status === 'processing'"
-                class="!h-5 !text-xs !px-2"
               >
                 <el-icon><Delete /></el-icon>
               </el-button>
@@ -95,9 +88,7 @@
     <div class="flex-1 border rounded p-3 flex flex-col max-w-2xl" v-if="mediaCurrentTask">
       <div class="flex items-center justify-between mb-3 flex-shrink-0">
         <h3 class="text-base font-semibold">任务详情: {{ mediaCurrentTask.name }}</h3>
-        <span class="text-sm text-gray-500">
-          共 {{ (mediaCurrentTask.files || []).length }} 个文件
-        </span>
+        <span class="text-sm text-gray-500"> 共 {{ filesCount }} 个文件 </span>
       </div>
 
       <div class="flex-1 overflow-auto flex flex-col gap-3">
@@ -112,44 +103,28 @@
               {{ getMediaStatusText(mediaCurrentTask.status) }}
             </el-tag>
             <MediaComponent
-              v-if="mediaCurrentTask.result_file && mediaCurrentTask.status === 'success'"
-              :file="{ path: mediaCurrentTask.result_file }"
-              :is-playing="isFilePlaying({ path: mediaCurrentTask.result_file })"
-              :progress="getFilePlayProgress({ path: mediaCurrentTask.result_file })"
-              :duration="getFileDuration({ path: mediaCurrentTask.result_file })"
+              v-if="resultFile"
+              :file="resultFileObject"
+              :is-playing="isResultFilePlaying"
+              :progress="resultFilePlayProgress"
+              :duration="resultFileDuration"
               :disabled="mediaFilesDragMode"
               @play="handleMediaTogglePlayResult"
-              @seek="
-                (_file, val) =>
-                  mediaCurrentTask && handleSeekFile({ path: mediaCurrentTask.result_file }, val)
-              "
-            >
-            </MediaComponent>
+              @seek="handleResultFileSeek"
+            />
             <el-button
               type="primary"
-              size="small"
-              plain
+              v-bind="mediumTextButtonProps"
               @click="handleMediaDownloadResult"
-              :disabled="
-                !mediaCurrentTask.result_file ||
-                mediaCurrentTask.status !== 'success' ||
-                mediaFilesDragMode
-              "
-              class="!h-7 !text-xs"
+              :disabled="isResultActionDisabled"
             >
               下载
             </el-button>
             <el-button
               type="success"
-              size="small"
-              plain
+              v-bind="mediumTextButtonProps"
               @click="handleMediaSaveResult"
-              :disabled="
-                !mediaCurrentTask.result_file ||
-                mediaCurrentTask.status !== 'success' ||
-                mediaFilesDragMode
-              "
-              class="!h-7 !text-xs"
+              :disabled="isResultActionDisabled"
             >
               转存
             </el-button>
@@ -160,16 +135,10 @@
           <div class="flex items-center gap-2">
             <el-button
               type="success"
-              size="small"
+              v-bind="mediumTextButtonProps"
               @click="handleMediaStartMerge"
-              :disabled="
-                !mediaCurrentTask.files ||
-                mediaCurrentTask.files.length === 0 ||
-                mediaCurrentTask.status === 'processing' ||
-                mediaFilesDragMode
-              "
-              :loading="mediaCurrentTask.status === 'processing'"
-              class="!h-7 !text-xs"
+              :disabled="isStartMergeDisabled"
+              :loading="isTaskProcessing"
             >
               开始合成
             </el-button>
@@ -183,27 +152,18 @@
             <div class="flex items-center gap-1 pr-1">
               <el-button
                 type="primary"
-                plain
-                size="small"
-                :disabled="mediaCurrentTask.status === 'processing' || mediaFilesDragMode"
+                v-bind="smallTextButtonProps"
+                :disabled="isFileOperationDisabled"
                 @click="handleMediaOpenFileBrowser"
-                class="!h-6 !text-xs"
               >
                 +
               </el-button>
               <el-button
                 :type="mediaFilesDragMode ? 'success' : 'default'"
-                size="small"
-                plain
-                class="!w-8 !h-6"
+                v-bind="smallIconButtonProps"
                 @click="handleMediaToggleFilesDragMode"
-                :disabled="
-                  !mediaCurrentTask ||
-                  !mediaCurrentTask.files ||
-                  mediaCurrentTask.files.length === 0 ||
-                  mediaCurrentTask.status === 'processing'
-                "
-                :title="mediaFilesDragMode ? '点击退出拖拽排序模式' : '点击进入拖拽排序模式'"
+                :disabled="isDragModeButtonDisabled"
+                :title="dragModeButtonTitle"
               >
                 <el-icon v-if="mediaFilesDragMode"><Check /></el-icon>
                 <i-ion-chevron-expand-sharp
@@ -214,7 +174,7 @@
             </div>
           </div>
           <div class="flex-1 overflow-auto">
-            <div v-if="mediaCurrentTask.files && mediaCurrentTask.files.length > 0">
+            <div v-if="hasFiles">
               <div
                 v-for="(file, index) in mediaCurrentTask.files"
                 :key="index"
@@ -228,18 +188,7 @@
                 @dragstart="handleMediaFileDragStart($event, Number(index))"
                 @dragend="handleMediaFileDragEnd($event)"
                 @dragover.prevent="handleMediaFileDragOver($event)"
-                @dragleave="
-                  (e: DragEvent) => {
-                    if (e.currentTarget) {
-                      (e.currentTarget as HTMLElement).classList.remove(
-                        'bg-gray-100',
-                        'border-t-2',
-                        'border-b-2',
-                        'border-blue-500'
-                      );
-                    }
-                  }
-                "
+                @dragleave="handleMediaFileDragLeave"
                 @drop.prevent="handleMediaFileDrop($event, Number(index))"
               >
                 <span class="text-xs text-gray-500 w-8">{{ Number(index) + 1 }}</span>
@@ -259,18 +208,17 @@
                     :is-playing="isFilePlaying(file)"
                     :progress="getFilePlayProgress(file)"
                     :duration="getFileDuration(file)"
-                    :disabled="mediaCurrentTask.status === 'processing' || mediaFilesDragMode"
+                    :disabled="isFileOperationDisabled"
                     @play="() => handleMediaTogglePlayFile(Number(index))"
-                    @seek="(_file, val) => handleSeekFile(_file, val)"
-                  >
-                  </MediaComponent>
+                    @seek="handleSeekFile"
+                  />
                   <el-button
                     type="info"
                     size="small"
                     plain
                     circle
                     @click.stop="handleMediaRemoveFile(Number(index))"
-                    :disabled="mediaCurrentTask.status === 'processing' || mediaFilesDragMode"
+                    :disabled="isFileOperationDisabled"
                     class="!h-6 !text-xs"
                   >
                     <el-icon><Minus /></el-icon>
@@ -322,7 +270,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Refresh, Plus, Document, Delete, Check, Minus } from "@element-plus/icons-vue";
 import FileDialog from "@/components/dialogs/FileDialog.vue";
@@ -372,6 +320,11 @@ const mediaPlayer = useAudioPlayer({
     },
   },
 });
+
+// 按钮公共属性
+const smallIconButtonProps = { size: "small" as const, plain: true, class: "!w-8 !h-6 !p-0" };
+const smallTextButtonProps = { size: "small" as const, plain: true, class: "!h-5 !text-xs !px-2" };
+const mediumTextButtonProps = { size: "small" as const, plain: true, class: "!h-7 !text-xs" };
 
 // 拖拽样式类名常量
 const DRAG_STYLE_CLASSES = ["bg-gray-100", "border-t-2", "border-b-2", "border-blue-500"];
@@ -567,7 +520,7 @@ const handleMediaStartMerge = async () => {
   }
 
   const confirmed = await ElMessageBox.confirm(
-    `确定要开始合成吗？将合并 ${(mediaCurrentTask.value.files || []).length} 个音频文件。`,
+    `确定要开始合成吗？将合并 ${filesCount.value} 个音频文件。`,
     "确认合成",
     {
       confirmButtonText: "确定",
@@ -675,6 +628,12 @@ const handleSeekFile = (fileItem: MediaFile, percentage: number) => {
   if (!fileItem) return;
   const filePath = fileItem?.path || fileItem?.name || "";
   mediaPlayer.seekFile(filePath, percentage);
+};
+
+// 处理结果文件进度条拖拽
+const handleResultFileSeek = (_file: MediaFile, percentage: number) => {
+  if (!mediaCurrentTask.value?.result_file) return;
+  handleSeekFile({ path: mediaCurrentTask.value.result_file }, percentage);
 };
 
 // 播放/暂停媒体文件
@@ -828,6 +787,39 @@ const getMediaStatusText = (status: string): string => {
   return MEDIA_STATUS_MAP[status]?.text || "未知";
 };
 
+// 计算属性
+const isTaskProcessing = computed(() => mediaCurrentTask.value?.status === "processing");
+const hasFiles = computed(() => (mediaCurrentTask.value?.files || []).length > 0);
+const filesCount = computed(() => (mediaCurrentTask.value?.files || []).length);
+const resultFile = computed(() => mediaCurrentTask.value?.result_file);
+const isResultActionDisabled = computed(
+  () =>
+    !resultFile.value || mediaCurrentTask.value?.status !== "success" || mediaFilesDragMode.value
+);
+const isStartMergeDisabled = computed(
+  () => !hasFiles.value || isTaskProcessing.value || mediaFilesDragMode.value
+);
+const isFileOperationDisabled = computed(() => isTaskProcessing.value || mediaFilesDragMode.value);
+const isDragModeButtonDisabled = computed(
+  () => !mediaCurrentTask.value || !hasFiles.value || isTaskProcessing.value
+);
+const dragModeButtonTitle = computed(() =>
+  mediaFilesDragMode.value ? "点击退出拖拽排序模式" : "点击进入拖拽排序模式"
+);
+const resultFileObject = computed(() => ({ path: resultFile.value || "" }));
+const isResultFilePlaying = computed(() => {
+  if (!resultFile.value) return false;
+  return isFilePlaying({ path: resultFile.value });
+});
+const resultFilePlayProgress = computed(() => {
+  if (!resultFile.value) return 0;
+  return getFilePlayProgress({ path: resultFile.value });
+});
+const resultFileDuration = computed(() => {
+  if (!resultFile.value) return 0;
+  return getFileDuration({ path: resultFile.value });
+});
+
 // 检查媒体文件顺序是否改变
 const isMediaOrderChanged = (original: MediaFile[], current: MediaFile[]): boolean => {
   if (!original || !current || original.length !== current.length) {
@@ -902,6 +894,13 @@ const handleMediaFileDragStart = (event: DragEvent, index: number) => {
 
 // 处理媒体文件拖拽结束
 const handleMediaFileDragEnd = (event: DragEvent) => {
+  if (event.currentTarget) {
+    clearDragStyles(event.currentTarget as HTMLElement);
+  }
+};
+
+// 处理媒体文件拖拽离开
+const handleMediaFileDragLeave = (event: DragEvent) => {
   if (event.currentTarget) {
     clearDragStyles(event.currentTarget as HTMLElement);
   }

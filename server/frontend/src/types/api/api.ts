@@ -22,20 +22,47 @@ export interface ApiResponse<T = unknown> {
 }
 
 /**
- * 分页响应接口
+ * 分页数据对象
  * @template T - 列表项的类型
  */
-export interface PaginatedResponse<T> extends ApiResponse<T[]> {
+export interface PaginatedData<T> {
+  /**
+   * 数据列表
+   */
+  data: T[];
   /**
    * 总记录数
    */
-  total?: number;
+  totalCount?: number;
   /**
    * 当前页码
    */
   pageNum?: number;
   /**
    * 每页大小
+   */
+  pageSize?: number;
+  /**
+   * 总页数
+   */
+  totalPage?: number;
+}
+
+/**
+ * 分页响应接口
+ * @template T - 列表项的类型
+ */
+export interface PaginatedResponse<T> extends ApiResponse<PaginatedData<T>> {
+  /**
+   * 总记录数（兼容字段）
+   */
+  total?: number;
+  /**
+   * 当前页码（兼容字段）
+   */
+  pageNum?: number;
+  /**
+   * 每页大小（兼容字段）
    */
   pageSize?: number;
 }

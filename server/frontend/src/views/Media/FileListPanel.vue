@@ -1,5 +1,5 @@
 <template>
-  <div class="flex-1 border rounded p-3 flex flex-col">
+  <div class="flex-1 border rounded p-3 flex flex-col ">
     <div class="flex items-center justify-between mb-3">
       <div class="flex-1">
         <div v-if="playlistStatus" class="flex items-center gap-2 mb-1">
@@ -153,7 +153,7 @@
       </div>
     </div>
 
-    <div v-if="playlistStatus" class="flex-1 overflow-y-auto">
+    <div v-if="playlistStatus" class="flex-1 overflow-y-scroll scrollbar-overlay">
       <PreFilesList
         :playlist-status="playlistStatus"
         :selected-weekday-index="selectedWeekdayIndex"
@@ -333,7 +333,7 @@ const getPlaylistTotalDuration = () => {
   if (!status) return 0;
   const preFiles = getCurrentPreFiles();
   const preFilesDuration = calculateFilesTotalDuration(preFiles);
-  const files = status.playlist || status.files || [];
+  const files = status.playlist || [];
   const filesDuration = calculateFilesTotalDuration(files);
   return preFilesDuration + filesDuration;
 };

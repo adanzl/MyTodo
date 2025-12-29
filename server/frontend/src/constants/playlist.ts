@@ -1,6 +1,8 @@
 /**
  * 播放列表相关常量
  */
+import type { DeviceType } from "./device";
+import { DEVICE_TYPES } from "./device";
 
 /**
  * 播放列表刷新间隔（毫秒）
@@ -23,6 +25,21 @@ export const MAX_PLAYLIST_DURATION = 1440;
  * 用于 pre_lists 数组长度
  */
 export const WEEKDAYS_COUNT = 7;
+
+/**
+ * 有效的设备类型列表
+ */
+export const VALID_DEVICE_TYPES: DeviceType[] = [...DEVICE_TYPES];
+
+/**
+ * 默认设备类型
+ */
+export const DEFAULT_DEVICE_TYPE: DeviceType = "dlna";
+
+/**
+ * localStorage 中存储激活播放列表ID的键名
+ */
+export const STORAGE_KEY_ACTIVE_PLAYLIST_ID = "active_playlist_id";
 
 /**
  * 默认 Cron 表达式示例

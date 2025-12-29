@@ -2,7 +2,7 @@
  * AgentDevice 管理 Composable
  * 专门处理 AgentDevice 相关的逻辑，包括列表获取、刷新、测试按钮等
  */
-import { ref, type Ref } from "vue";
+import { ref } from "vue";
 import { ElMessage } from "element-plus";
 import { api } from "@/api/config";
 import { logAndNoticeError } from "@/utils/error";

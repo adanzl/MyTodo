@@ -38,7 +38,7 @@
         >
           共 {{ getCurrentPreFiles().length }} 首， 当前:
           {{
-            playlistStatus.pre_index !== undefined &&
+            playlistStatus?.pre_index !== undefined &&
             playlistStatus.pre_index !== null &&
             playlistStatus.pre_index >= 0
               ? playlistStatus.pre_index + 1
@@ -47,7 +47,7 @@
           / {{ getCurrentPreFiles().length }}
         </span>
         <el-tag
-          v-if="playlistStatus.isPlaying && playlistStatus.in_pre_files === true"
+          v-if="playlistStatus?.isPlaying && playlistStatus.in_pre_files === true"
           type="success"
           size="small"
           class="ml-2"
@@ -142,7 +142,7 @@
         :key="'pre-' + index"
         class="flex items-center gap-2 p-1 hover:bg-gray-100 rounded"
         :class="{
-          'bg-blue-50': Number(playlistStatus.pre_index) === index,
+          'bg-blue-50': Number(playlistStatus?.pre_index) === index,
           'bg-blue-100': preFilesBatchDeleteMode && selectedPreFileIndices.includes(Number(index)),
           'cursor-move': preFilesDragMode,
           'cursor-pointer': preFilesBatchDeleteMode && !preFilesDragMode,
@@ -160,7 +160,7 @@
         @dragover.prevent="(e: DragEvent) => $emit('drag-over', e)"
         @dragleave="
           (e: DragEvent) => {
-            const target = e.currentTarget as HTMLElement;
+            const target = e.currentTarget as HTMLElement | null;
             if (target) {
               target.classList.remove('bg-gray-100', 'border-t-2', 'border-b-2', 'border-blue-500');
             }
@@ -171,10 +171,10 @@
         <span class="text-xs text-gray-500 w-8">{{ Number(index) + 1 }}</span>
         <span
           class="flex-1 text-sm truncate"
-          :class="{ 'text-blue-600': Number(playlistStatus.pre_index) === index }"
-          :title="file.uri"
+          :class="{ 'text-blue-600': Number(playlistStatus?.pre_index) === index }"
+          :title="file.uri || ''"
         >
-          {{ file.uri.split("/").pop() }}
+          {{ file.uri ? file.uri.split("/").pop() : "" }}
         </span>
         <div class="flex items-center gap-1 flex-shrink-0" @mousedown.stop @click.stop>
           <MediaComponent

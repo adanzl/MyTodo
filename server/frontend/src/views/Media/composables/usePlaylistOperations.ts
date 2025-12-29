@@ -7,6 +7,7 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import { playlistAction } from "@/api/playlist";
 import { logAndNoticeError } from "@/utils/error";
 import { logger } from "@/utils/logger";
+import { STORAGE_KEY_ACTIVE_PLAYLIST_ID } from "@/constants/playlist";
 import type { Playlist, PlaylistStatus, PlaylistItem } from "@/types/playlist";
 
 export function usePlaylistOperations(
@@ -16,7 +17,9 @@ export function usePlaylistOperations(
   playing: Ref<boolean>,
   stopping: Ref<boolean>,
   syncActivePlaylist: (collection: Playlist[]) => void,
-  updateActivePlaylistData: (mutator: (playlistInfo: Playlist) => Playlist) => Promise<PlaylistStatus | null>,
+  updateActivePlaylistData: (
+    mutator: (playlistInfo: Playlist) => Playlist
+  ) => Promise<PlaylistStatus | null>,
   refreshPlaylistStatus: (onlyCurrent?: boolean, isAutoRefresh?: boolean) => Promise<void>,
   getCurrentPreFiles: () => PlaylistItem[]
 ) {
@@ -41,7 +44,7 @@ export function usePlaylistOperations(
     if (!exists) return;
 
     activePlaylistId.value = playlistId;
-    localStorage.setItem("active_playlist_id", playlistId);
+    localStorage.setItem(STORAGE_KEY_ACTIVE_PLAYLIST_ID, playlistId);
     syncActivePlaylist(playlistCollection.value);
   };
 

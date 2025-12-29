@@ -7,18 +7,14 @@ import { ElMessage } from "element-plus";
 import { bluetoothAction } from "@/api/bluetooth";
 import { api } from "@/api/config";
 import { logAndNoticeError } from "@/utils/error";
-import type {
-  BluetoothDevice,
-  DlnaDevice,
-  MiDevice,
-  AgentDevice,
-} from "@/types/device";
+import type { BluetoothDevice, DlnaDevice, MiDevice, AgentDevice } from "@/types/device";
 import type { Playlist, PlaylistStatus } from "@/types/playlist";
+import type { DeviceType } from "@/constants/device";
 
 export function useDeviceManagement(
   playlistStatus: Ref<PlaylistStatus | null>,
   pendingDeviceType: Ref<string | null>,
-  connectedDeviceList: Ref<BluetoothDevice[] | AgentDevice[]>,
+  connectedDeviceList: Ref<(BluetoothDevice | AgentDevice)[]>,
   dlnaDeviceList: Ref<DlnaDevice[]>,
   miDeviceList: Ref<MiDevice[]>,
   deviceList: Ref<BluetoothDevice[]>,
@@ -27,9 +23,10 @@ export function useDeviceManagement(
   miScanning: Ref<boolean>,
   scanDialogVisible: Ref<boolean>,
   agentListDialogVisible: Ref<boolean>,
-  updateActivePlaylistData: (mutator: (playlistInfo: Playlist) => Playlist) => Promise<PlaylistStatus | null>
+  updateActivePlaylistData: (
+    mutator: (playlistInfo: Playlist) => Playlist
+  ) => Promise<PlaylistStatus | null>
 ) {
-
   // 获取小米设备 ID
   const getMiDeviceId = (device: MiDevice): string => device.deviceID || device.address || "";
 
@@ -177,12 +174,14 @@ export function useDeviceManagement(
       const rsp = await bluetoothAction("scan", "GET");
       if (rsp.code === 0) {
         const devices = Array.isArray(rsp.data) ? rsp.data : [];
-        deviceList.value = devices.map((device: Partial<BluetoothDevice>): BluetoothDevice => ({
-          name: device.name || "",
-          address: device.address || "",
-          ...device,
-          connecting: false,
-        }));
+        deviceList.value = devices.map(
+          (device: Partial<BluetoothDevice>): BluetoothDevice => ({
+            name: device.name || "",
+            address: device.address || "",
+            ...device,
+            connecting: false,
+          })
+        );
         ElMessage.success(`扫描完成，找到 ${deviceList.value.length} 个设备`);
       } else {
         ElMessage.error(rsp.msg || "扫描失败");
@@ -213,19 +212,20 @@ export function useDeviceManagement(
       return;
     }
 
-    const validDeviceTypes = ["agent", "dlna", "bluetooth", "mi"];
-    if (!validDeviceTypes.includes(deviceType)) {
+    const validDeviceTypes: DeviceType[] = ["agent", "dlna", "bluetooth", "mi"];
+    if (!validDeviceTypes.includes(deviceType as DeviceType)) {
       ElMessage.error(`无效的设备类型: ${deviceType}`);
       return;
     }
 
-    pendingDeviceType.value = deviceType;
+    const typedDeviceType = deviceType as DeviceType;
+    pendingDeviceType.value = typedDeviceType;
     const status = playlistStatus.value;
-    status.device_type = deviceType;
+    status.device_type = typedDeviceType;
     if (!status.device) {
-      status.device = { type: deviceType, address: "", name: null };
+      status.device = { type: typedDeviceType, address: "", name: null };
     } else {
-      status.device.type = deviceType;
+      status.device.type = typedDeviceType;
     }
 
     await refreshConnectedList();
@@ -235,8 +235,11 @@ export function useDeviceManagement(
   const handleUpdatePlaylistDeviceAddress = async (address: string, name: string | null = null) => {
     if (!playlistStatus.value) return;
     await updateActivePlaylistData(playlistInfo => {
-      const finalType =
-        pendingDeviceType.value || playlistInfo.device?.type || playlistInfo.device_type || "dlna";
+      const finalType: DeviceType =
+        (pendingDeviceType.value as DeviceType) ||
+        playlistInfo.device?.type ||
+        playlistInfo.device_type ||
+        "dlna";
 
       if (!playlistInfo.device) {
         playlistInfo.device = { address: "", type: finalType, name: null };

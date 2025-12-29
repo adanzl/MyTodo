@@ -123,7 +123,7 @@ export interface AgentDevice extends BaseDevice {
    * 测试按钮状态（动态字段）
    * 格式：testing_F{number}
    */
-  [key: `testing_F${number}`]?: boolean;
+  [key: `testing_F${number}`]: boolean | undefined;
 }
 
 /**
@@ -149,4 +149,3 @@ export function isMiDevice(device: Device): device is MiDevice {
 export function isAgentDevice(device: Device): device is AgentDevice {
   return device.type === "agent" || "agent_id" in device;
 }
-

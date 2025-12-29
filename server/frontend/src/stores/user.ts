@@ -13,24 +13,38 @@ export interface UserWithExtras extends User {
   wish_list?: string;
 }
 
+export interface CurUser {
+  bLogin: boolean;
+  id: number | null;
+  name: string | null;
+  ico: string | null;
+}
+
 export const useUserStore = defineStore("user", () => {
   // 状态
   const userList = ref<UserWithExtras[]>([]);
   const loading = ref(false);
   const lastFetchTime = ref<number | null>(null);
+  const curUser = ref<CurUser>({ bLogin: false, id: null, name: null, ico: null });
 
   // 缓存时间（毫秒），5分钟内不重复请求
   const CACHE_DURATION = 5 * 60 * 1000;
 
+  // localStorage key
+  const KEY_USER_ID = "user_id";
+
   // Getters
   const getUserById = (id: number | string) => {
-      return userList.value.find(user => String(user.id) === String(id));
-    };
+    return userList.value.find(user => String(user.id) === String(id));
+  };
 
   const isDataFresh = computed(() => {
     if (!lastFetchTime.value) return false;
     return Date.now() - lastFetchTime.value < CACHE_DURATION;
   });
+
+  // 当前用户是否已登录
+  const isLoggedIn = computed(() => curUser.value.bLogin);
 
   // Actions
   /**
@@ -47,11 +61,7 @@ export const useUserStore = defineStore("user", () => {
     try {
       const response = await getList<UserWithExtras>("t_user");
       if (response && response.data) {
-        // API 返回的是分页格式，用户数组在 response.data 中（PaginatedResponse 的 data 就是数组）
-        // 但实际 API 可能返回 { data: { data: [...] } } 格式，需要兼容处理
-        const data = response.data as unknown as { data?: UserWithExtras[] } | UserWithExtras[];
-        const users = Array.isArray(data) ? data : (data as { data?: UserWithExtras[] }).data || [];
-        userList.value = Array.isArray(users) ? users : [];
+        userList.value = response.data.data || [];
         lastFetchTime.value = Date.now();
       } else {
         userList.value = [];
@@ -72,16 +82,68 @@ export const useUserStore = defineStore("user", () => {
     lastFetchTime.value = null;
   };
 
+  /**
+   * 设置当前用户（登录）
+   */
+  const setCurUser = (user: UserWithExtras) => {
+    curUser.value = {
+      bLogin: true,
+      id: user.id,
+      name: user.name,
+      ico: user.icon || null,
+    };
+    localStorage.setItem(KEY_USER_ID, String(user.id));
+  };
+
+  /**
+   * 清除当前用户（登出）
+   */
+  const clearCurUser = () => {
+    curUser.value = { bLogin: false, id: null, name: null, ico: null };
+    localStorage.removeItem(KEY_USER_ID);
+  };
+
+  /**
+   * 从 localStorage 恢复当前用户
+   */
+  const restoreCurUser = async () => {
+    const uId = localStorage.getItem(KEY_USER_ID);
+    if (uId) {
+      // 确保用户列表已加载
+      if (userList.value.length === 0) {
+        await refreshUserList();
+      }
+      const u = getUserById(uId);
+      if (u) {
+        setCurUser(u);
+      }
+    }
+  };
+
+  /**
+   * 获取当前用户的完整信息
+   */
+  const getCurUserFullInfo = (): UserWithExtras | null => {
+    if (!curUser.value.id) return null;
+    return getUserById(curUser.value.id) || null;
+  };
+
   return {
     // 状态
     userList,
     loading,
     lastFetchTime,
+    curUser,
     // Getters
     getUserById,
     isDataFresh,
+    isLoggedIn,
     // Actions
     refreshUserList,
     clearCache,
+    setCurUser,
+    clearCurUser,
+    restoreCurUser,
+    getCurUserFullInfo,
   };
 });

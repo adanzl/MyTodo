@@ -260,6 +260,15 @@ interface Gift {
   edited?: boolean;
 }
 
+interface GiftApiData {
+  id: number;
+  name: string;
+  image: string;
+  cate_id: number;
+  cost: number;
+  enable: number;
+}
+
 interface GiftCategory {
   id: number;
   name: string;
@@ -295,10 +304,9 @@ const lotteryCatPopList = ref<GiftCategory[]>([]);
 
 const refreshCateList = async () => {
   try {
-    const response = await getList("t_gift_category");
+    const response = await getList<GiftCategory>("t_gift_category");
     if (response && response.data) {
-      const users = response.data.data || response.data;
-      const d = Array.isArray(users) ? users : [];
+      const d = response.data.data || [];
       lotteryCatList.value = [...d];
       lotteryCatList.value.unshift({ id: 0, name: "全部" });
       if (selectedCateId.value === 0 && lotteryCatList.value.length > 0) {
@@ -329,29 +337,18 @@ const refreshGiftList = async (cateId: number, pageNum: number, pageSize: number
     if (cateId && cateId !== 0) {
       filter = { cate_id: cateId };
     }
-    const response = await getList<{
-      pageNum: number;
-      pageSize: number;
-      totalCount: number;
-      totalPage: number;
-      data: Array<{
-        id: number;
-        name: string;
-        image: string;
-        cate_id: number;
-        cost: number;
-        enable: number;
-      }>;
-    }>("t_gift", filter, pageNum, pageSize);
+    const response = await getList<GiftApiData>("t_gift", filter, pageNum, pageSize);
     if (response && response.data) {
-      const d = response.data.data || response.data;
+      const d = response.data.data || [];
       giftList.value.data = [];
-      giftList.value.pageNum = response.data.pageNum || pageNum;
-      giftList.value.pageSize = response.data.pageSize || pageSize;
-      giftList.value.totalCount = response.data.totalCount || 0;
-      giftList.value.totalPage = response.data.totalPage || 0;
+      giftList.value.pageNum = response.data.pageNum ?? pageNum;
+      giftList.value.pageSize = response.data.pageSize ?? pageSize;
+      giftList.value.totalCount = response.data.totalCount ?? 0;
+      giftList.value.totalPage =
+        response.data.totalPage ??
+        Math.ceil((response.data.totalCount ?? 0) / (response.data.pageSize ?? pageSize));
 
-      _.forEach(d, (item) => {
+      _.forEach(d, item => {
         giftList.value.data.push({
           id: item.id,
           name: item.name,
@@ -420,7 +417,7 @@ const handleGiftCancel = async (item: Gift, idx: number) => {
   } else {
     item.edited = false;
     try {
-      const data = await getData("t_gift", item.id);
+      const data = await getData<GiftApiData>("t_gift", item.id);
       Object.assign(item, {
         id: data.id,
         name: data.name,
@@ -454,7 +451,7 @@ const handleGiftSave = async (item: Gift) => {
 };
 
 const handleImageChange = async (file: UploadFile, row: Gift) => {
-  if (file) {
+  if (file && file.raw) {
     try {
       const base64 = await compressImageToBase64(file.raw, { quality: 0.5 });
       console.log("压缩后的base64", base64.length);

@@ -228,7 +228,7 @@ import { getWeekdayIndex } from "@/utils/date";
 import { usePlaylistState } from "./composables/usePlaylistState";
 import { usePlaylistData } from "./composables/usePlaylistData";
 import { usePlaylistOperations } from "./composables/usePlaylistOperations";
-import type { PlaylistItem } from "@/types/playlist";
+import type { PlaylistItem, Playlist } from "@/types/playlist";
 import { useCronManagement } from "./composables/useCronManagement";
 import { useDeviceManagement } from "./composables/useDeviceManagement";
 import { useAudioPlayback } from "./composables/useAudioPlayback";
@@ -322,6 +322,13 @@ const {
   getSelectedWeekdayIndex
 );
 
+// 包装 updateActivePlaylistData 以匹配期望的返回类型
+const updateActivePlaylistDataVoid = async (
+  updater: (playlistInfo: Playlist) => Playlist
+): Promise<void> => {
+  await updateActivePlaylistData(updater);
+};
+
 // 文件操作 - 使用 composable
 const {
   handleOpenFileBrowser,
@@ -359,7 +366,7 @@ const {
   filesBatchDeleteMode,
   selectedPreFileIndices,
   selectedFileIndices,
-  updateActivePlaylistData,
+  updateActivePlaylistDataVoid,
   getCurrentPreFiles,
   playlistSelectorVisible,
   playlistSelectorSelectedFiles
@@ -388,7 +395,7 @@ const {
   preFilesOriginalOrder,
   filesOriginalOrder,
   selectedWeekdayIndex,
-  updateActivePlaylistData,
+  updateActivePlaylistDataVoid,
   syncActivePlaylist,
   getCurrentPreFiles
 );
@@ -543,8 +550,8 @@ const handleBatchAddFiles = async (data: {
         data.preLists.forEach(weekdayIndex => {
           if (weekdayIndex >= 0 && weekdayIndex < 7) {
             const existingUris = new Set(
-              (playlistInfo.pre_lists[weekdayIndex] || []).map((item: PlaylistItem | string) => 
-                typeof item === 'string' ? item : item?.uri || ''
+              (playlistInfo.pre_lists[weekdayIndex] || []).map((item: PlaylistItem | string) =>
+                typeof item === "string" ? item : item?.uri || ""
               )
             );
             data.files.forEach(fileUri => {
@@ -564,9 +571,11 @@ const handleBatchAddFiles = async (data: {
         if (!Array.isArray(playlistInfo.playlist)) {
           playlistInfo.playlist = [];
         }
-        const existingUris = new Set(playlistInfo.playlist.map((item: PlaylistItem | string) => 
-          typeof item === 'string' ? item : item?.uri || ''
-        ));
+        const existingUris = new Set(
+          playlistInfo.playlist.map((item: PlaylistItem | string) =>
+            typeof item === "string" ? item : item?.uri || ""
+          )
+        );
         data.files.forEach(fileUri => {
           if (!existingUris.has(fileUri)) {
             playlistInfo.playlist.push({ uri: fileUri });
@@ -621,7 +630,7 @@ const handleBatchRemoveFiles = async (data: {
             if (weekdayIndex >= 0 && weekdayIndex < 7 && playlistInfo.pre_lists[weekdayIndex]) {
               playlistInfo.pre_lists[weekdayIndex] = playlistInfo.pre_lists[weekdayIndex].filter(
                 (item: PlaylistItem | string) => {
-                  const uri = typeof item === 'string' ? item : item?.uri || '';
+                  const uri = typeof item === "string" ? item : item?.uri || "";
                   return !fileUriSet.has(uri);
                 }
               );
@@ -632,12 +641,10 @@ const handleBatchRemoveFiles = async (data: {
 
       // 从正式列表删除文件
       if (data.filesList && Array.isArray(playlistInfo.playlist)) {
-        playlistInfo.playlist = playlistInfo.playlist.filter(
-          (item: PlaylistItem | string) => {
-            const uri = typeof item === 'string' ? item : item?.uri || '';
-            return !fileUriSet.has(uri);
-          }
-        );
+        playlistInfo.playlist = playlistInfo.playlist.filter((item: PlaylistItem | string) => {
+          const uri = typeof item === "string" ? item : item?.uri || "";
+          return !fileUriSet.has(uri);
+        });
         playlistInfo.total = playlistInfo.playlist.length;
         if (playlistInfo.playlist.length === 0) {
           playlistInfo.current_index = 0;

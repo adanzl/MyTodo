@@ -74,12 +74,7 @@
           </div>
 
           <div v-if="playlistStatus.schedule?.cron && playlistStatus.schedule?.enabled === 1">
-            <el-button
-              type="success"
-              size="small"
-              @click="onPreviewCron"
-              class="w-full"
-            >
+            <el-button type="success" size="small" @click="onPreviewCron" class="w-full">
               预览执行时间
             </el-button>
           </div>
@@ -94,7 +89,7 @@
           <div>
             <div class="text-xs text-gray-600 mb-1">设备类型</div>
             <el-select
-              :model-value="playlistStatus.device?.type || playlistStatus.device_type || null"
+              :model-value="deviceType"
               @change="onUpdateDeviceType"
               placeholder="选择设备类型"
               size="small"
@@ -116,7 +111,7 @@
             </div>
             <div class="flex items-center gap-2">
               <el-input
-                :model-value="playlistStatus.device?.address || playlistStatus.device_address || ''"
+                :model-value="deviceAddress"
                 @input="(val: string) => onUpdateDeviceAddress(val)"
                 placeholder="设备地址"
                 size="small"
@@ -128,7 +123,7 @@
                 type="danger"
                 plain
                 @click="onUpdateDeviceAddress('')"
-                :disabled="!playlistStatus.device?.address && !playlistStatus.device_address"
+                :disabled="!deviceAddress"
                 title="清空设备地址"
               >
                 清空
@@ -140,35 +135,9 @@
         <!-- 设备列表 -->
         <div class="mt-3">
           <div class="flex items-center justify-between mb-2">
-            <h5 class="text-xs font-semibold text-gray-700">
-              <span
-                v-if="
-                  playlistStatus.device?.type === 'agent' ||
-                  playlistStatus.device_type === 'agent' ||
-                  playlistStatus.device?.type === 'bluetooth' ||
-                  playlistStatus.device_type === 'bluetooth'
-                "
-              >
-                已配对的设备
-              </span>
-              <span
-                v-else-if="
-                  playlistStatus.device?.type === 'dlna' || playlistStatus.device_type === 'dlna'
-                "
-              >
-                DLNA 设备
-              </span>
-              <span
-                v-else-if="playlistStatus.device?.type === 'mi' || playlistStatus.device_type === 'mi'"
-              >
-                小米设备
-              </span>
-              <span v-else>设备列表</span>
-            </h5>
+            <h5 class="text-xs font-semibold text-gray-700">{{ deviceListTitle }}</h5>
             <el-button
-              v-if="
-                playlistStatus.device?.type === 'dlna' || playlistStatus.device_type === 'dlna'
-              "
+              v-if="isDlna"
               type="primary"
               size="small"
               @click="onScanDlnaDevices"
@@ -177,7 +146,7 @@
               扫描设备
             </el-button>
             <el-button
-              v-if="playlistStatus.device?.type === 'mi' || playlistStatus.device_type === 'mi'"
+              v-if="isMi"
               type="primary"
               size="small"
               @click="onScanMiDevices"
@@ -186,12 +155,7 @@
               扫描设备
             </el-button>
             <el-button
-              v-if="
-                playlistStatus.device?.type === 'agent' ||
-                playlistStatus.device_type === 'agent' ||
-                playlistStatus.device?.type === 'bluetooth' ||
-                playlistStatus.device_type === 'bluetooth'
-              "
+              v-if="isAgentOrBluetooth"
               type="primary"
               size="small"
               @click="onOpenScanDialog"
@@ -201,14 +165,7 @@
           </div>
 
           <!-- 设备代理类型：显示已配对设备 -->
-          <div
-            v-if="
-              playlistStatus.device?.type === 'agent' ||
-              playlistStatus.device_type === 'agent' ||
-              playlistStatus.device?.type === 'bluetooth' ||
-              playlistStatus.device_type === 'bluetooth'
-            "
-          >
+          <div v-if="isAgentOrBluetooth">
             <div class="space-y-2 max-h-[200px] overflow-y-auto" v-loading="loading">
               <div
                 v-for="device in connectedDeviceList"
@@ -224,32 +181,27 @@
                     size="small"
                     type="primary"
                     @click="
-                      playlistStatus.device?.type === 'agent' ||
-                      playlistStatus.device_type === 'agent'
-                        ? onSelectAgentDevice(device)
+                      deviceType === 'agent'
+                        ? onSelectAgentDevice(device as AgentDevice)
                         : onSelectBluetoothDevice(device.address)
                     "
-                    :disabled="
-                      device.address ===
-                      (playlistStatus.device?.address || playlistStatus.device_address)
-                    "
+                    :disabled="device.address === deviceAddress"
                   >
                     选择
                   </el-button>
                 </div>
               </div>
-              <div v-if="connectedDeviceList.length === 0" class="text-xs text-gray-400 text-center py-4">
+              <div
+                v-if="connectedDeviceList.length === 0"
+                class="text-xs text-gray-400 text-center py-4"
+              >
                 暂无设备
               </div>
             </div>
           </div>
 
           <!-- DLNA 类型：显示 DLNA 设备 -->
-          <div
-            v-else-if="
-              playlistStatus.device?.type === 'dlna' || playlistStatus.device_type === 'dlna'
-            "
-          >
+          <div v-else-if="isDlna">
             <div class="space-y-2 max-h-[200px] overflow-y-auto" v-loading="dlnaScanning">
               <div
                 v-for="device in dlnaDeviceList"
@@ -266,11 +218,10 @@
                   <el-button
                     size="small"
                     type="primary"
-                    @click="onUpdateDeviceAddress(device.location, device.name)"
-                    :disabled="
-                      device.location ===
-                      (playlistStatus.device?.address || playlistStatus.device_address)
+                    @click="
+                      onUpdateDeviceAddress(device.location || device.address || '', device.name)
                     "
+                    :disabled="(device.location || device.address) === deviceAddress"
                   >
                     选择
                   </el-button>
@@ -286,9 +237,7 @@
           </div>
 
           <!-- 小米设备类型：显示小米设备 -->
-          <div
-            v-else-if="playlistStatus.device?.type === 'mi' || playlistStatus.device_type === 'mi'"
-          >
+          <div v-else-if="isMi">
             <div class="space-y-2 max-h-[200px] overflow-y-auto" v-loading="miScanning">
               <div
                 v-for="device in miDeviceList"
@@ -309,10 +258,7 @@
                     size="small"
                     type="primary"
                     @click="onSelectMiDevice(device)"
-                    :disabled="
-                      (device.deviceID || device.address) ===
-                      (playlistStatus.device?.address || playlistStatus.device_address)
-                    "
+                    :disabled="(device.deviceID || device.address) === deviceAddress"
                   >
                     选择
                   </el-button>
@@ -337,9 +283,11 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import { MAX_PLAYLIST_DURATION, TRIGGER_BUTTONS } from "@/constants/playlist";
 import type { PlaylistStatus } from "@/types/playlist";
 import type { BluetoothDevice, DlnaDevice, MiDevice, AgentDevice } from "@/types/device";
+import type { DeviceType } from "@/constants/device";
 
 interface Props {
   playlistStatus: PlaylistStatus | null;
@@ -365,5 +313,34 @@ interface Props {
   onOpenScanDialog: () => void;
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
+
+// 获取设备类型
+const deviceType = computed<DeviceType | null>(() => {
+  return props.playlistStatus?.device?.type || props.playlistStatus?.device_type || null;
+});
+
+// 获取设备地址
+const deviceAddress = computed(() => {
+  return props.playlistStatus?.device?.address || props.playlistStatus?.device_address || "";
+});
+
+// 判断是否为指定设备类型
+const isDeviceType = (type: DeviceType) => computed(() => deviceType.value === type);
+
+const isAgentOrBluetooth = computed(() => {
+  const type = deviceType.value;
+  return type === "agent" || type === "bluetooth";
+});
+
+const isDlna = isDeviceType("dlna");
+const isMi = isDeviceType("mi");
+
+// 设备列表标题
+const deviceListTitle = computed(() => {
+  if (isAgentOrBluetooth.value) return "已配对的设备";
+  if (isDlna.value) return "DLNA 设备";
+  if (isMi.value) return "小米设备";
+  return "设备列表";
+});
 </script>

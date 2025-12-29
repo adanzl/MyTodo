@@ -1,7 +1,7 @@
 <template>
   <el-container :loading="userStore.loading" class="h-screen">
     <Sidebar />
-    <el-container v-if="curUser.bLogin">
+    <el-container v-if="userStore.curUser.bLogin">
       <el-header class="flex justify-center items-center bg-blue-50">
         <el-icon><StarFilled /></el-icon>
         哈哈哈
@@ -20,72 +20,37 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, provide, computed } from "vue";
+import { onMounted } from "vue";
 import { StarFilled } from "@element-plus/icons-vue";
 import Sidebar from "@/components/layout/Sidebar.vue";
 import Login from "@/components/layout/Login.vue";
-import { useUserStore, type UserWithExtras } from "@/stores/user";
-
-interface CurUser {
-  bLogin: boolean;
-  id: number | null;
-  name: string | null;
-  ico: string | null;
-}
-
-interface WindowWithCurUser extends Window {
-  curUser?: UserWithExtras;
-}
-
-const KEY_USER_ID = "user_id";
-const curUser = ref<CurUser>({ bLogin: false, id: null, name: null, ico: null });
+import { useUserStore } from "@/stores/user";
 
 // 使用 Pinia Store
 const userStore = useUserStore();
-
-// 提供给子组件使用（保持向后兼容）
-provide("curUser", curUser);
-provide(
-  "userList",
-  computed(() => userStore.userList)
-);
 
 const handleLoginSuccess = (userInfo: { id: number; name: string; icon: string }) => {
   // 从 Store 中获取完整的用户信息
   const fullUserInfo = userStore.getUserById(userInfo.id);
   if (fullUserInfo) {
-    curUser.value = {
-      bLogin: true,
-      id: fullUserInfo.id,
-      name: fullUserInfo.name,
-      ico: fullUserInfo.icon,
-    };
-    (window as WindowWithCurUser).curUser = fullUserInfo;
+    userStore.setCurUser(fullUserInfo);
   } else {
-    // 如果 Store 中没有，使用传入的信息
-  curUser.value = {
-    bLogin: true,
-    id: userInfo.id,
-    name: userInfo.name,
-    ico: userInfo.icon,
-  };
+    // 如果 Store 中没有，创建一个临时用户对象
+    // 这种情况理论上不应该发生，因为登录时用户列表应该已经加载
+    console.warn("用户信息未找到，使用传入的信息");
+    userStore.setCurUser({
+      id: userInfo.id,
+      name: userInfo.name,
+      icon: userInfo.icon,
+    } as any);
   }
 };
 
 onMounted(async () => {
   // 使用 store 刷新用户列表
   await userStore.refreshUserList();
-  const uId = localStorage.getItem(KEY_USER_ID);
-  if (uId) {
-    const u = userStore.getUserById(uId);
-    if (u) {
-      curUser.value.bLogin = true;
-      curUser.value.id = u.id;
-      curUser.value.name = u.name;
-      curUser.value.ico = u.icon;
-      (window as WindowWithCurUser).curUser = u;
-    }
-  }
+  // 从 localStorage 恢复当前用户
+  await userStore.restoreCurUser();
 });
 </script>
 

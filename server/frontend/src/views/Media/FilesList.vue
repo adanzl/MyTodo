@@ -1,51 +1,30 @@
 <template>
-  <div v-if="playlistStatus.playlist" class="border rounded p-2">
+  <div v-if="playlistStatus?.playlist" class="border rounded p-2">
     <div class="flex items-center justify-between mb-2 pr-2.5">
       <div class="text-xs font-semibold text-gray-600">
         正式文件（播放时记录进度）
-        <span v-if="getFilesTotalDuration() > 0" class="ml-2 text-gray-500">
-          总时长：{{ formatDuration(getFilesTotalDuration()) }}
+        <span v-if="filesTotalDuration > 0" class="ml-2 text-gray-500">
+          总时长：{{ formatDuration(filesTotalDuration) }}
         </span>
-        <span
-          v-if="playlistStatus.playlist && playlistStatus.playlist.length > 0"
-          class="ml-2 text-gray-500"
-        >
-          共 {{ playlistStatus.playlist.length }} 首， 当前:
-          {{ playlistStatus.current_index !== undefined ? playlistStatus.current_index + 1 : "-" }}
-          / {{ playlistStatus.playlist.length }}
+        <span v-if="hasFiles" class="ml-2 text-gray-500">
+          共 {{ playlistLength }} 首， 当前: {{ currentIndexDisplay }} / {{ playlistLength }}
         </span>
-        <el-tag
-          v-if="playlistStatus.isPlaying && playlistStatus.in_pre_files === false"
-          type="success"
-          size="small"
-          class="ml-2"
-        >
-          播放中
-        </el-tag>
+        <el-tag v-if="isPlaying" type="success" size="small" class="ml-2"> 播放中 </el-tag>
       </div>
       <div class="flex items-center gap-1">
         <el-button
           type="primary"
-          plain
-          size="small"
-          class="!w-8 !h-6"
-          @click="$emit('open-file-browser')"
-          :disabled="!playlistStatus || filesDragMode || filesBatchDeleteMode"
+          v-bind="buttonBaseProps"
+          @click="emit('open-file-browser')"
+          :disabled="isAddButtonDisabled"
         >
           +
         </el-button>
         <el-button
           :type="filesDragMode ? 'success' : 'default'"
-          plain
-          size="small"
-          class="!w-8 !h-6"
-          @click="$emit('toggle-drag-mode')"
-          :disabled="
-            !playlistStatus ||
-            !playlistStatus.playlist ||
-            playlistStatus.playlist.length === 0 ||
-            filesBatchDeleteMode
-          "
+          v-bind="buttonBaseProps"
+          @click="emit('toggle-drag-mode')"
+          :disabled="isDragButtonDisabled"
           :title="filesDragMode ? '点击退出拖拽排序模式' : '点击进入拖拽排序模式'"
         >
           <el-icon v-if="filesDragMode"><Check /></el-icon>
@@ -53,16 +32,9 @@
         </el-button>
         <el-button
           :type="filesBatchDeleteMode ? 'success' : 'default'"
-          plain
-          size="small"
-          class="!w-8 !h-6"
-          @click="$emit('toggle-batch-delete-mode')"
-          :disabled="
-            !playlistStatus ||
-            !playlistStatus.playlist ||
-            playlistStatus.playlist.length === 0 ||
-            filesDragMode
-          "
+          v-bind="buttonBaseProps"
+          @click="emit('toggle-batch-delete-mode')"
+          :disabled="isBatchDeleteButtonDisabled"
           :title="filesBatchDeleteMode ? '点击退出批量删除模式' : '点击进入批量删除模式'"
         >
           <el-icon v-if="filesBatchDeleteMode"><Check /></el-icon>
@@ -71,75 +43,46 @@
         <el-button
           v-show="filesBatchDeleteMode"
           type="danger"
-          plain
-          size="small"
-          class="!w-8 !h-6"
-          @click="$emit('batch-delete')"
-          :disabled="playlistLoading || selectedFileIndices.length === 0"
-          :title="`删除选中的 ${selectedFileIndices.length} 项`"
+          v-bind="buttonBaseProps"
+          @click="emit('batch-delete')"
+          :disabled="isBatchDeleteDisabled"
+          :title="batchDeleteTitle"
         >
           <el-icon><Delete /></el-icon>
         </el-button>
         <el-button
+          v-show="showClearButton"
           type="default"
-          plain
-          size="small"
-          class="!w-8 !h-6"
-          v-show="showMoreActions && !filesBatchDeleteMode"
-          @click="$emit('clear')"
-          :disabled="
-            !playlistStatus ||
-            !playlistStatus.playlist ||
-            playlistStatus.playlist.length === 0 ||
-            playlistLoading ||
-            filesDragMode
-          "
+          v-bind="buttonBaseProps"
+          @click="emit('clear')"
+          :disabled="isClearButtonDisabled"
           title="清空正式文件列表"
         >
           <el-icon><Delete /></el-icon>
         </el-button>
       </div>
     </div>
-    <div
-      v-if="playlistStatus.playlist && playlistStatus.playlist.length > 0"
-      class="overflow-y-scroll scrollbar-overlay"
-    >
+    <div v-if="hasFiles" class="overflow-y-scroll scrollbar-overlay">
       <div
-        v-for="(file, index) in playlistStatus.playlist"
-        :key="index"
-        class="flex items-center gap-2 p-1 hover:bg-gray-100 rounded"
-        :class="{
-          'bg-blue-50': Number(index) === playlistStatus.current_index,
-          'bg-blue-100': filesBatchDeleteMode && selectedFileIndices.includes(Number(index)),
-          'cursor-move': filesDragMode,
-          'cursor-pointer': filesBatchDeleteMode && !filesDragMode,
-          'cursor-default': !filesDragMode && !filesBatchDeleteMode,
-          'select-none': true,
-        }"
+        v-for="(file, index) in playlist"
+        :key="file.uri || index"
+        class="flex items-center gap-2 p-1 hover:bg-gray-100 rounded select-none"
+        :class="getFileItemClass(index)"
         :draggable="filesDragMode"
-        @click="
-          filesBatchDeleteMode && !filesDragMode ? emit('toggle-selection', Number(index)) : null
-        "
-        @dragstart="(e: DragEvent) => emit('drag-start', e, Number(index))"
-        @dragend="(e: DragEvent) => emit('drag-end', e)"
-        @dragover.prevent="(e: DragEvent) => emit('drag-over', e)"
-        @dragleave="
-          (e: DragEvent) => {
-            const target = e.currentTarget as HTMLElement | null;
-            if (target && 'classList' in target) {
-              target.classList.remove('bg-gray-100', 'border-t-2', 'border-b-2', 'border-blue-500');
-            }
-          }
-        "
-        @drop.prevent="(e: DragEvent) => emit('drop', e, Number(index))"
+        @click="handleFileItemClick(index)"
+        @dragstart="handleDragStart($event, index)"
+        @dragend="handleDragEnd"
+        @dragover.prevent="handleDragOver"
+        @dragleave="handleDragLeave"
+        @drop.prevent="handleDrop($event, index)"
       >
-        <span class="text-xs text-gray-500 w-8">{{ Number(index) + 1 }}</span>
+        <span class="text-xs text-gray-500 w-8">{{ index + 1 }}</span>
         <span
           class="flex-1 text-sm truncate"
-          :class="{ 'text-blue-600': Number(index) === playlistStatus.current_index }"
-          :title="file.uri"
+          :class="{ 'text-blue-600': isCurrent(index) }"
+          :title="file.uri || ''"
         >
-          {{ file.uri.split("/").pop() }}
+          {{ getFileName(file.uri) }}
         </span>
         <div class="flex items-center gap-1 flex-shrink-0" @mousedown.stop @click.stop>
           <MediaComponent
@@ -150,55 +93,44 @@
             :duration="getFileDuration(file)"
             :disabled="playlistLoading"
             @play="emit('play-file', file)"
-            @seek="(file, val) => emit('seek-file', file, val)"
-          >
-          </MediaComponent>
+            @seek="handleSeek"
+          />
           <el-checkbox
             v-show="filesBatchDeleteMode"
             class="!h-6"
-            :model-value="selectedFileIndices.includes(Number(index))"
-            @change="emit('toggle-selection', Number(index))"
+            :model-value="isSelected(index)"
+            @change="emit('toggle-selection', index)"
             @click.stop
-          >
-          </el-checkbox>
+          />
           <el-button
-            v-show="showMoreActions && !filesDragMode && !filesBatchDeleteMode"
-            type="default"
-            size="small"
-            plain
-            circle
-            @click.stop="emit('move-up', Number(index))"
-            :disabled="Number(index) === 0 || playlistLoading"
+            v-show="showMoreButtons"
+            v-bind="circleButtonProps"
+            @click.stop="emit('move-up', index)"
+            :disabled="index === 0 || playlistLoading"
             title="上移"
           >
             ↑
           </el-button>
           <el-button
-            v-show="showMoreActions && !filesDragMode && !filesBatchDeleteMode"
-            type="default"
-            size="small"
-            plain
-            circle
-            @click.stop="emit('move-down', Number(index))"
-            :disabled="Number(index) === playlistStatus.playlist.length - 1 || playlistLoading"
+            v-show="showMoreButtons"
+            v-bind="circleButtonProps"
+            @click.stop="emit('move-down', index)"
+            :disabled="index === playlistLength - 1 || playlistLoading"
             title="下移"
           >
             ↓
           </el-button>
           <el-button
-            v-show="showMoreActions && !filesDragMode && !filesBatchDeleteMode"
-            type="default"
-            size="small"
-            plain
-            circle
-            @click.stop="emit('replace', Number(index))"
+            v-show="showMoreButtons"
+            v-bind="circleButtonProps"
+            @click.stop="emit('replace', index)"
             :disabled="playlistLoading"
             title="替换"
           >
             <el-icon><Refresh /></el-icon>
           </el-button>
           <el-button
-            v-show="!filesBatchDeleteMode && !filesDragMode"
+            v-show="showPlaylistSelectorButton"
             type="info"
             size="small"
             plain
@@ -211,12 +143,9 @@
           </el-button>
           <el-button
             v-show="!filesBatchDeleteMode"
-            type="default"
-            size="small"
-            plain
-            circle
-            @click.stop="emit('delete', Number(index))"
-            :disabled="playlistLoading || filesDragMode"
+            v-bind="circleButtonProps"
+            @click.stop="emit('delete', index)"
+            :disabled="isDeleteButtonDisabled"
             title="删除"
           >
             <el-icon><Minus /></el-icon>
@@ -229,6 +158,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import { Check, Delete, Menu, Refresh, DocumentCopy, Minus } from "@element-plus/icons-vue";
 import { formatDuration } from "@/utils/format";
 import { calculateFilesTotalDuration } from "@/utils/file";
@@ -270,11 +200,104 @@ const emit = defineEmits<{
   delete: [index: number];
 }>();
 
-const getFilesTotalDuration = () => {
-  const status = props.playlistStatus;
-  if (!status || !status.playlist || status.playlist.length === 0) {
-    return 0;
+// 按钮公共属性
+const buttonBaseProps = { plain: true, size: "small" as const, class: "!w-8 !h-6" };
+const circleButtonProps = {
+  type: "default" as const,
+  size: "small" as const,
+  plain: true,
+  circle: true,
+};
+
+// 计算属性
+const playlist = computed(() => props.playlistStatus?.playlist || []);
+const playlistLength = computed(() => playlist.value.length);
+const currentIndex = computed(() => props.playlistStatus?.current_index ?? -1);
+const currentIndexDisplay = computed(() =>
+  currentIndex.value >= 0 ? currentIndex.value + 1 : "-"
+);
+const isPlaying = computed(
+  () => props.playlistStatus?.isPlaying && !props.playlistStatus.in_pre_files
+);
+const hasFiles = computed(() => playlistLength.value > 0);
+const filesTotalDuration = computed(() => {
+  if (!hasFiles.value) return 0;
+  return calculateFilesTotalDuration(playlist.value);
+});
+
+const canBatchDelete = computed(
+  () => props.filesBatchDeleteMode && hasFiles.value && !props.filesDragMode
+);
+const showMoreButtons = computed(
+  () => props.showMoreActions && !props.filesDragMode && !props.filesBatchDeleteMode
+);
+const showClearButton = computed(() => props.showMoreActions && !props.filesBatchDeleteMode);
+const showPlaylistSelectorButton = computed(
+  () => !props.filesBatchDeleteMode && !props.filesDragMode
+);
+
+// 按钮禁用状态
+const isAddButtonDisabled = computed(
+  () => !props.playlistStatus || props.filesDragMode || props.filesBatchDeleteMode
+);
+const isDragButtonDisabled = computed(() => !hasFiles.value || props.filesBatchDeleteMode);
+const isBatchDeleteButtonDisabled = computed(() => !hasFiles.value || props.filesDragMode);
+const isBatchDeleteDisabled = computed(
+  () => props.playlistLoading || props.selectedFileIndices.length === 0
+);
+const batchDeleteTitle = computed(() => `删除选中的 ${props.selectedFileIndices.length} 项`);
+const isClearButtonDisabled = computed(
+  () => !hasFiles.value || props.playlistLoading || props.filesDragMode
+);
+
+// 辅助函数
+const getFileName = (uri?: string) => (uri ? uri.split("/").pop() : "");
+const isSelected = (index: number) => props.selectedFileIndices.includes(index);
+const isCurrent = (index: number) => index === currentIndex.value;
+
+const getFileItemClass = (index: number) => {
+  return {
+    "bg-blue-50": isCurrent(index),
+    "bg-blue-100": canBatchDelete.value && isSelected(index),
+    "cursor-move": props.filesDragMode,
+    "cursor-pointer": canBatchDelete.value,
+    "cursor-default": !props.filesDragMode && !props.filesBatchDeleteMode,
+  };
+};
+
+const isDeleteButtonDisabled = computed(() => props.playlistLoading || props.filesDragMode);
+
+// 事件处理函数
+const handleFileItemClick = (index: number) => {
+  if (canBatchDelete.value) {
+    emit("toggle-selection", index);
   }
-  return calculateFilesTotalDuration(status.playlist);
+};
+
+const handleDragStart = (e: DragEvent, index: number) => {
+  emit("drag-start", e, index);
+};
+
+const handleDragEnd = (e: DragEvent) => {
+  emit("drag-end", e);
+};
+
+const handleDragOver = (e: DragEvent) => {
+  emit("drag-over", e);
+};
+
+const handleDragLeave = (e: DragEvent) => {
+  const target = e.currentTarget as HTMLElement | null;
+  if (target?.classList) {
+    target.classList.remove("bg-gray-100", "border-t-2", "border-b-2", "border-blue-500");
+  }
+};
+
+const handleDrop = (e: DragEvent, index: number) => {
+  emit("drop", e, index);
+};
+
+const handleSeek = (file: MediaFile, percentage: number) => {
+  emit("seek-file", file, percentage);
 };
 </script>

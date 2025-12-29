@@ -2,16 +2,12 @@
   <el-aside width="200px" class="w-48">
     <el-scrollbar>
       <div class="flex justify-between items-center p-5">
-        <el-avatar :src="curUser.ico"></el-avatar>
-        <el-button v-if="curUser.bLogin" @click="handleLogout" size="small">
+        <el-avatar :src="userStore.curUser.ico"></el-avatar>
+        <el-button v-if="userStore.curUser.bLogin" @click="handleLogout" size="small">
           注销
         </el-button>
       </div>
-      <el-menu
-        :default-active="$route.path"
-        :collapse="isCollapse"
-        unique-opened
-        router>
+      <el-menu :default-active="route.path" :collapse="isCollapse" unique-opened router>
         <el-menu-item index="/home" @click="handleMenuSelect">
           <el-icon><HomeFilled /></el-icon>
           <template #title>Home</template>
@@ -55,9 +51,9 @@
   </el-aside>
 </template>
 
-<script setup>
-import { ref, inject } from "vue";
-import { useRouter } from "vue-router";
+<script setup lang="ts">
+import { ref } from "vue";
+import { useRouter, useRoute } from "vue-router";
 import {
   HomeFilled,
   Promotion,
@@ -69,23 +65,19 @@ import {
   Platform,
   Setting,
 } from "@element-plus/icons-vue";
+import { useUserStore } from "@/stores/user";
 
 const router = useRouter();
+const route = useRoute();
+const userStore = useUserStore();
 const isCollapse = ref(false);
-const curUser = inject("curUser", ref({ bLogin: false, ico: null }));
-
-// 如果没有注入，创建一个默认的响应式对象
-if (!curUser.value) {
-  curUser.value = { bLogin: false, ico: null };
-}
 
 const handleMenuSelect = () => {
   // 菜单选择处理
 };
 
 const handleLogout = () => {
-  localStorage.removeItem("user_id");
-  curUser.value.bLogin = false;
+  userStore.clearCurUser();
   router.push("/");
 };
 </script>
@@ -93,4 +85,3 @@ const handleLogout = () => {
 <style scoped>
 /* 样式将在后续迁移中完善 */
 </style>
-

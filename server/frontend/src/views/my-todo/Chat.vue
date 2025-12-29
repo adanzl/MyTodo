@@ -62,7 +62,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick, inject, onUnmounted, computed, type Ref } from "vue";
+import { ref, onMounted, nextTick, onUnmounted, computed } from "vue";
 import { ElMessage } from "element-plus";
 import { ArrowUp } from "@element-plus/icons-vue";
 import { io, type Socket } from "socket.io-client";
@@ -71,13 +71,6 @@ import { getRdsData, getRdsList } from "@/api/rds";
 import { getApiUrl } from "@/api/config";
 import { useUserStore } from "@/stores/user";
 import type { User } from "@/types/user";
-
-interface CurUser {
-  bLogin: boolean;
-  id: number | null;
-  name: string | null;
-  ico: string | null;
-}
 
 interface ChatMessage {
   id: string;
@@ -89,15 +82,7 @@ interface ChatMessage {
   playing?: boolean;
 }
 
-interface WindowWithCurUser extends Window {
-  curUser?: CurUser;
-}
-
 const CHAT_PAGE_SIZE = 3;
-const curUser = inject<Ref<CurUser>>(
-  "curUser",
-  ref({ bLogin: false, id: null, name: null, ico: null })
-);
 
 // 使用 Pinia Store
 const userStore = useUserStore();
@@ -105,7 +90,7 @@ const userList = computed(() => userStore.userList as User[]);
 
 // 获取当前用户 ID
 const currentUserId = computed(() => {
-  return (window as WindowWithCurUser).curUser?.id || curUser.value?.id;
+  return userStore.curUser.id;
 });
 
 const loading = ref(false);
@@ -141,7 +126,7 @@ function initSocket() {
       key: "123456",
       ttsAuto: false,
       chatRoomId: chatSetting.value.chatRoomId,
-      user: (window as WindowWithCurUser).curUser?.name || curUser.value?.name || "",
+      user: userStore.curUser.name || "",
     };
     console.log("Connected to the server. Send handshake...", chatConfig);
     socketRef.value?.emit("handshake", chatConfig);
@@ -186,7 +171,7 @@ const refreshUserList = async () => {
 
 const getChatSetting = async () => {
   try {
-    const userId = currentUserId.value;
+    const userId = userStore.curUser.id;
     if (userId === null || userId === undefined) {
       return;
     }
@@ -244,11 +229,15 @@ const onSendBtnClick = () => {
   if (!textInput.value) {
     return;
   }
-  const userId = (window as WindowWithCurUser).curUser?.id || curUser.value?.id;
+  const userId = userStore.curUser.id;
+  if (!userId) {
+    ElMessage.warning("请先登录");
+    return;
+  }
   chatMessages.value.push({
     id: "_",
     content: textInput.value,
-    role: userId || 0,
+    role: userId,
     type: "text",
   });
   const message = JSON.stringify({
