@@ -35,7 +35,9 @@
       :before-close="handleDialogClose"
     >
       <span>输入的积分会作用在当前积分上，输入负数则会减少积分</span>
-      <div>{{ dialogForm.data.name }} 当前积分: {{ dialogForm.data.score }}</div>
+      <div v-if="dialogForm.data">
+        {{ dialogForm.data.name }} 当前积分: {{ dialogForm.data.score }}
+      </div>
       <div class="flex mt-4">
         <el-input v-model="dialogForm.value" style="width: 240px" placeholder="Please input" />
 
@@ -46,39 +48,34 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { ElMessage } from "element-plus";
-import { getList } from "@/api/common";
 import { setUserInfo, addScore } from "@/api/user";
+import { useUserStore, type UserWithExtras } from "@/stores/user";
 
-const userList = ref<any[]>([]);
-const dialogForm = ref({
+// 使用 Pinia Store
+const userStore = useUserStore();
+
+// 从 store 获取用户列表（响应式）
+const userList = computed(() => userStore.userList);
+const loading = computed(() => userStore.loading);
+
+const dialogForm = ref<{
+  visible: boolean;
+  data: UserWithExtras | null;
+  value: number;
+}>({
   visible: false,
-  data: null as any,
+  data: null,
   value: 0,
 });
-const loading = ref(false);
 
 const refreshUserList = async () => {
-  loading.value = true;
-  try {
-    const response = await getList("t_user");
-    if (response && response.data) {
-      // API 返回的是分页格式，用户数组在 response.data.data 中
-      const users = response.data.data || response.data;
-      userList.value = Array.isArray(users) ? users : [];
-    } else {
-      userList.value = [];
-    }
-  } catch (error) {
-    console.error("获取用户列表失败:", error);
-    ElMessage.error("获取用户列表失败");
-  } finally {
-    loading.value = false;
-  }
+  // 使用 store 刷新用户列表（会自动处理缓存）
+  await userStore.refreshUserList();
 };
 
-const handleUpdateUser = async (item: any) => {
+const handleUpdateUser = async (item: UserWithExtras) => {
   try {
     const data = {
       id: item.id,
@@ -93,12 +90,16 @@ const handleUpdateUser = async (item: any) => {
   }
 };
 
-const onAddScoreBtnClick = (item: any) => {
+const onAddScoreBtnClick = (item: UserWithExtras) => {
   dialogForm.value.visible = true;
   dialogForm.value.data = item;
 };
 
 const handleAddScore = async () => {
+  if (!dialogForm.value.data) {
+    ElMessage.warning("请选择用户");
+    return;
+  }
   try {
     await addScore(dialogForm.value.data.id, "pcAdmin", dialogForm.value.value, "管理后台变更");
     await refreshUserList();
@@ -116,6 +117,8 @@ const handleDialogClose = () => {
 };
 
 onMounted(async () => {
+  // 如果 Store 已经有数据且数据新鲜，就不需要重复请求
+  // Store 的 refreshUserList 会自动处理缓存
   await refreshUserList();
 });
 </script>

@@ -6,6 +6,7 @@ import { ElMessage } from "element-plus";
 import { useAudioPlayer } from "@/composables/useAudioPlayer";
 import { getMediaFileUrl } from "@/utils/file";
 import { logAndNoticeError } from "@/utils/error";
+import type { MediaFile } from "@/types/tools";
 
 export function useAudioPlayback() {
   // 音频播放器
@@ -30,7 +31,7 @@ export function useAudioPlayback() {
   };
 
   // 在浏览器中播放文件
-  const handlePlayFileInBrowser = (fileItem: any) => {
+  const handlePlayFileInBrowser = (fileItem: MediaFile) => {
     const filePath = fileItem?.uri || fileItem?.path || "";
     if (!filePath || typeof filePath !== "string" || filePath.trim() === "") {
       ElMessage.warning("文件路径无效");
@@ -73,26 +74,26 @@ export function useAudioPlayback() {
   };
 
   // 检查文件是否正在播放
-  const isFilePlaying = (fileItem: any) => {
+  const isFilePlaying = (fileItem: MediaFile) => {
     const filePath = fileItem?.uri || fileItem?.path || "";
     return audioPlayer.isFilePlaying(filePath);
   };
 
   // 获取文件播放进度
-  const getFilePlayProgress = (fileItem: any) => {
+  const getFilePlayProgress = (fileItem: MediaFile) => {
     const filePath = fileItem?.uri || fileItem?.path || "";
     return audioPlayer.getFilePlayProgress(filePath);
   };
 
   // 获取文件时长
-  const getFileDuration = (fileItem: any) => {
+  const getFileDuration = (fileItem: MediaFile) => {
     const filePath = fileItem?.uri || fileItem?.path || "";
     const fallbackDuration = fileItem?.duration || 0;
     return audioPlayer.getFileDuration(filePath, fallbackDuration);
   };
 
   // 处理进度条拖拽
-  const handleSeekFile = (fileItem: any, percentage: number) => {
+  const handleSeekFile = (fileItem: MediaFile, percentage: number) => {
     const filePath = fileItem?.uri || fileItem?.path || "";
     audioPlayer.seekFile(filePath, percentage);
   };

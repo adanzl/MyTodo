@@ -37,16 +37,18 @@
 </template>
 
 <script setup lang="ts">
+import type { BluetoothDevice } from "@/types/device";
+
 interface Props {
   visible: boolean;
-  deviceList: any[];
+  deviceList: BluetoothDevice[];
   loading: boolean;
 }
 
 interface Emits {
   (e: "update:visible", value: boolean): void;
   (e: "refresh"): void;
-  (e: "connect", device: any): void;
+  (e: "connect", device: BluetoothDevice): void;
   (e: "close"): void;
 }
 
@@ -64,7 +66,7 @@ const handleRefresh = () => {
   emit("refresh");
 };
 
-const handleConnect = (device: any) => {
+const handleConnect = (device: BluetoothDevice) => {
   emit("connect", device);
 };
 </script>

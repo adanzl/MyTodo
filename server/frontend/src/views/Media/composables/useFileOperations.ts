@@ -6,10 +6,16 @@ import { type Ref } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { logAndNoticeError } from "@/utils/error";
 import { getWeekdayIndex } from "@/utils/date";
+import { logger } from "@/utils/logger";
+import type { Playlist, PlaylistStatus, PlaylistItem } from "@/types/playlist";
+import type { MediaFile } from "@/types/tools";
+
+// 文件输入类型（支持多种格式）
+type FileInput = MediaFile | PlaylistItem | string;
 
 export function useFileOperations(
-  _playlistCollection: Ref<any[]>,
-  playlistStatus: Ref<any>,
+  _playlistCollection: Ref<Playlist[]>,
+  playlistStatus: Ref<PlaylistStatus | null>,
   playlistLoading: Ref<boolean>,
   fileBrowserDialogVisible: Ref<boolean>,
   fileBrowserTarget: Ref<"files" | "pre_files">,
@@ -19,21 +25,63 @@ export function useFileOperations(
   filesBatchDeleteMode: Ref<boolean>,
   selectedPreFileIndices: Ref<number[]>,
   selectedFileIndices: Ref<number[]>,
-  updateActivePlaylistData: (updater: (playlistInfo: any) => any) => Promise<void>,
-  getCurrentPreFiles: () => any[],
+  updateActivePlaylistData: (updater: (playlistInfo: Playlist) => Playlist) => Promise<void>,
+  getCurrentPreFiles: () => PlaylistItem[],
   playlistSelectorVisible?: Ref<boolean>,
-  playlistSelectorSelectedFiles?: Ref<any[]>
+  playlistSelectorSelectedFiles?: Ref<PlaylistItem[]>
 ) {
   const getSelectedWeekdayIndex = () => {
     return selectedWeekdayIndex.value !== null ? selectedWeekdayIndex.value : getWeekdayIndex();
   };
 
+  // 确保 pre_lists 已初始化（7天的数组）
+  const ensurePreListsInitialized = (playlistInfo: Playlist): PlaylistItem[][] => {
+    if (
+      !playlistInfo.pre_lists ||
+      !Array.isArray(playlistInfo.pre_lists) ||
+      playlistInfo.pre_lists.length !== 7
+    ) {
+      playlistInfo.pre_lists = Array(7)
+        .fill(null)
+        .map(() => []);
+    }
+    return playlistInfo.pre_lists;
+  };
+
+  // 验证播放列表状态
+  const validatePlaylistStatus = (message = "请先选择一个播放列表"): boolean => {
+    if (!playlistStatus.value) {
+      ElMessage.warning(message);
+      return false;
+    }
+    return true;
+  };
+
+  // 统一错误处理包装器（忽略取消操作）
+  const handleOperationError = (error: unknown, errorMessage: string): void => {
+    if (error !== "cancel") {
+      logAndNoticeError(error as Error, errorMessage);
+    }
+  };
+
+  // 执行带加载状态的异步操作
+  const executeWithLoading = async (
+    operation: () => Promise<void>,
+    errorMessage: string
+  ): Promise<void> => {
+    try {
+      playlistLoading.value = true;
+      await operation();
+    } catch (error) {
+      handleOperationError(error, errorMessage);
+    } finally {
+      playlistLoading.value = false;
+    }
+  };
+
   // 打开文件浏览器（添加到正式文件列表）
   const handleOpenFileBrowser = () => {
-    if (!playlistStatus.value) {
-      ElMessage.warning("请先选择一个播放列表");
-      return;
-    }
+    if (!validatePlaylistStatus()) return;
     fileBrowserDialogVisible.value = true;
     fileBrowserTarget.value = "files";
     replaceFileInfo.value = null;
@@ -41,10 +89,7 @@ export function useFileOperations(
 
   // 打开文件浏览器（添加到前置文件列表）
   const handleOpenFileBrowserForPreFiles = () => {
-    if (!playlistStatus.value) {
-      ElMessage.warning("请先选择一个播放列表");
-      return;
-    }
+    if (!validatePlaylistStatus()) return;
     fileBrowserDialogVisible.value = true;
     fileBrowserTarget.value = "pre_files";
     replaceFileInfo.value = null;
@@ -75,8 +120,8 @@ export function useFileOperations(
               ? [...playlistInfo.playlist]
               : [];
 
-        const existingUris = new Set();
-        targetList.forEach((item: any) => {
+        const existingUris = new Set<string>();
+        targetList.forEach((item: PlaylistItem) => {
           if (item?.uri) {
             existingUris.add(item.uri);
           }
@@ -86,15 +131,7 @@ export function useFileOperations(
         if (replaceFileInfo.value && filePaths.length > 0) {
           const replaceIndex = replaceFileInfo.value.index;
           if (replaceFileInfo.value.type === "pre_files") {
-            if (
-              !playlistInfo.pre_lists ||
-              !Array.isArray(playlistInfo.pre_lists) ||
-              playlistInfo.pre_lists.length !== 7
-            ) {
-              playlistInfo.pre_lists = Array(7)
-                .fill(null)
-                .map(() => []);
-            }
+            ensurePreListsInitialized(playlistInfo);
             const list = [...(playlistInfo.pre_lists[weekdayIndex] || [])];
             if (replaceIndex >= 0 && replaceIndex < list.length) {
               list[replaceIndex] = { uri: filePaths[0] };
@@ -124,15 +161,7 @@ export function useFileOperations(
         }
 
         if (targetType === "pre_files") {
-          if (
-            !playlistInfo.pre_lists ||
-            !Array.isArray(playlistInfo.pre_lists) ||
-            playlistInfo.pre_lists.length !== 7
-          ) {
-            playlistInfo.pre_lists = Array(7)
-              .fill(null)
-              .map(() => []);
-          }
+          ensurePreListsInitialized(playlistInfo);
           playlistInfo.pre_lists[weekdayIndex] = targetList;
         } else {
           playlistInfo.playlist = targetList;
@@ -274,29 +303,16 @@ export function useFileOperations(
     const preFiles = getCurrentPreFiles();
     if (!status || !preFiles || index <= 0 || index >= preFiles.length) return;
 
-    try {
-      playlistLoading.value = true;
+    await executeWithLoading(async () => {
       await updateActivePlaylistData(playlistInfo => {
         const weekdayIndex = getSelectedWeekdayIndex();
-        if (
-          !playlistInfo.pre_lists ||
-          !Array.isArray(playlistInfo.pre_lists) ||
-          playlistInfo.pre_lists.length !== 7
-        ) {
-          playlistInfo.pre_lists = Array(7)
-            .fill(null)
-            .map(() => []);
-        }
+        ensurePreListsInitialized(playlistInfo);
         const list = [...(playlistInfo.pre_lists[weekdayIndex] || [])];
         [list[index - 1], list[index]] = [list[index], list[index - 1]];
         playlistInfo.pre_lists[weekdayIndex] = list;
         return playlistInfo;
       });
-    } catch (error) {
-      logAndNoticeError(error as Error, "上移失败");
-    } finally {
-      playlistLoading.value = false;
-    }
+    }, "上移失败");
   };
 
   // 下移前置文件
@@ -305,29 +321,16 @@ export function useFileOperations(
     const preFiles = getCurrentPreFiles();
     if (!status || !preFiles || index < 0 || index >= preFiles.length - 1) return;
 
-    try {
-      playlistLoading.value = true;
+    await executeWithLoading(async () => {
       await updateActivePlaylistData(playlistInfo => {
         const weekdayIndex = getSelectedWeekdayIndex();
-        if (
-          !playlistInfo.pre_lists ||
-          !Array.isArray(playlistInfo.pre_lists) ||
-          playlistInfo.pre_lists.length !== 7
-        ) {
-          playlistInfo.pre_lists = Array(7)
-            .fill(null)
-            .map(() => []);
-        }
+        ensurePreListsInitialized(playlistInfo);
         const list = [...(playlistInfo.pre_lists[weekdayIndex] || [])];
         [list[index], list[index + 1]] = [list[index + 1], list[index]];
         playlistInfo.pre_lists[weekdayIndex] = list;
         return playlistInfo;
       });
-    } catch (error) {
-      logAndNoticeError(error as Error, "下移失败");
-    } finally {
-      playlistLoading.value = false;
-    }
+    }, "下移失败");
   };
 
   // 删除前置文件
@@ -346,30 +349,19 @@ export function useFileOperations(
         type: "warning",
       });
 
-      playlistLoading.value = true;
-      await updateActivePlaylistData(playlistInfo => {
-        const weekdayIndex = getSelectedWeekdayIndex();
-        if (
-          !playlistInfo.pre_lists ||
-          !Array.isArray(playlistInfo.pre_lists) ||
-          playlistInfo.pre_lists.length !== 7
-        ) {
-          playlistInfo.pre_lists = Array(7)
-            .fill(null)
-            .map(() => []);
-        }
-        const list = [...(playlistInfo.pre_lists[weekdayIndex] || [])];
-        list.splice(index, 1);
-        playlistInfo.pre_lists[weekdayIndex] = list;
-        return playlistInfo;
-      });
-      ElMessage.success("已删除");
+      await executeWithLoading(async () => {
+        await updateActivePlaylistData(playlistInfo => {
+          const weekdayIndex = getSelectedWeekdayIndex();
+          ensurePreListsInitialized(playlistInfo);
+          const list = [...(playlistInfo.pre_lists[weekdayIndex] || [])];
+          list.splice(index, 1);
+          playlistInfo.pre_lists[weekdayIndex] = list;
+          return playlistInfo;
+        });
+        ElMessage.success("已删除");
+      }, "删除失败");
     } catch (error) {
-      if (error !== "cancel") {
-        logAndNoticeError(error as Error, "删除失败");
-      }
-    } finally {
-      playlistLoading.value = false;
+      handleOperationError(error, "删除失败");
     }
   };
 
@@ -444,39 +436,28 @@ export function useFileOperations(
         }
       );
 
-      playlistLoading.value = true;
-      const indicesToDelete = [...new Set(selectedIndices)].sort((a, b) => b - a);
+      await executeWithLoading(async () => {
+        const indicesToDelete = [...new Set(selectedIndices)].sort((a, b) => b - a);
 
-      await updateActivePlaylistData(playlistInfo => {
-        const weekdayIndex = getSelectedWeekdayIndex();
-        if (
-          !playlistInfo.pre_lists ||
-          !Array.isArray(playlistInfo.pre_lists) ||
-          playlistInfo.pre_lists.length !== 7
-        ) {
-          playlistInfo.pre_lists = Array(7)
-            .fill(null)
-            .map(() => []);
-        }
-        const list = [...(playlistInfo.pre_lists[weekdayIndex] || [])];
-        indicesToDelete.forEach(index => {
-          if (index >= 0 && index < list.length) {
-            list.splice(index, 1);
-          }
+        await updateActivePlaylistData(playlistInfo => {
+          const weekdayIndex = getSelectedWeekdayIndex();
+          ensurePreListsInitialized(playlistInfo);
+          const list = [...(playlistInfo.pre_lists[weekdayIndex] || [])];
+          indicesToDelete.forEach(index => {
+            if (index >= 0 && index < list.length) {
+              list.splice(index, 1);
+            }
+          });
+          playlistInfo.pre_lists[weekdayIndex] = list;
+          return playlistInfo;
         });
-        playlistInfo.pre_lists[weekdayIndex] = list;
-        return playlistInfo;
-      });
 
-      selectedPreFileIndices.value = [];
-      preFilesBatchDeleteMode.value = false;
-      ElMessage.success(`已删除 ${selectedCount} 个前置文件`);
+        selectedPreFileIndices.value = [];
+        preFilesBatchDeleteMode.value = false;
+        ElMessage.success(`已删除 ${selectedCount} 个前置文件`);
+      }, "批量删除失败");
     } catch (error) {
-      if (error !== "cancel") {
-        logAndNoticeError(error as Error, "批量删除失败");
-      }
-    } finally {
-      playlistLoading.value = false;
+      handleOperationError(error, "批量删除失败");
     }
   };
 
@@ -498,43 +479,40 @@ export function useFileOperations(
         }
       );
 
-      playlistLoading.value = true;
-      const indicesToDelete = [...new Set(selectedIndices)].sort((a, b) => b - a);
+      await executeWithLoading(async () => {
+        const indicesToDelete = [...new Set(selectedIndices)].sort((a, b) => b - a);
 
-      await updateActivePlaylistData(playlistInfo => {
-        const list = [...playlistInfo.playlist];
-        indicesToDelete.forEach(index => {
-          if (index >= 0 && index < list.length) {
-            list.splice(index, 1);
-          }
-        });
-        playlistInfo.playlist = list;
-        if (list.length === 0) {
-          playlistInfo.current_index = 0;
-        } else {
-          let newCurrentIndex = playlistInfo.current_index;
+        await updateActivePlaylistData(playlistInfo => {
+          const list = [...playlistInfo.playlist];
           indicesToDelete.forEach(index => {
-            if (index < playlistInfo.current_index) {
-              newCurrentIndex = Math.max(0, newCurrentIndex - 1);
-            } else if (index === playlistInfo.current_index) {
-              newCurrentIndex = Math.min(newCurrentIndex, list.length - 1);
+            if (index >= 0 && index < list.length) {
+              list.splice(index, 1);
             }
           });
-          playlistInfo.current_index = newCurrentIndex;
-        }
-        playlistInfo.total = list.length;
-        return playlistInfo;
-      });
+          playlistInfo.playlist = list;
+          if (list.length === 0) {
+            playlistInfo.current_index = 0;
+          } else {
+            let newCurrentIndex = playlistInfo.current_index;
+            indicesToDelete.forEach(index => {
+              if (index < playlistInfo.current_index) {
+                newCurrentIndex = Math.max(0, newCurrentIndex - 1);
+              } else if (index === playlistInfo.current_index) {
+                newCurrentIndex = Math.min(newCurrentIndex, list.length - 1);
+              }
+            });
+            playlistInfo.current_index = newCurrentIndex;
+          }
+          playlistInfo.total = list.length;
+          return playlistInfo;
+        });
 
-      selectedFileIndices.value = [];
-      filesBatchDeleteMode.value = false;
-      ElMessage.success(`已删除 ${selectedCount} 个正式文件`);
+        selectedFileIndices.value = [];
+        filesBatchDeleteMode.value = false;
+        ElMessage.success(`已删除 ${selectedCount} 个正式文件`);
+      }, "批量删除失败");
     } catch (error) {
-      if (error !== "cancel") {
-        logAndNoticeError(error as Error, "批量删除失败");
-      }
-    } finally {
-      playlistLoading.value = false;
+      handleOperationError(error, "批量删除失败");
     }
   };
 
@@ -555,28 +533,17 @@ export function useFileOperations(
         }
       );
 
-      playlistLoading.value = true;
-      await updateActivePlaylistData(playlistInfo => {
-        const weekdayIndex = getSelectedWeekdayIndex();
-        if (
-          !playlistInfo.pre_lists ||
-          !Array.isArray(playlistInfo.pre_lists) ||
-          playlistInfo.pre_lists.length !== 7
-        ) {
-          playlistInfo.pre_lists = Array(7)
-            .fill(null)
-            .map(() => []);
-        }
-        playlistInfo.pre_lists[weekdayIndex] = [];
-        return playlistInfo;
-      });
-      ElMessage.success("已清空前置文件列表");
+      await executeWithLoading(async () => {
+        await updateActivePlaylistData(playlistInfo => {
+          const weekdayIndex = getSelectedWeekdayIndex();
+          ensurePreListsInitialized(playlistInfo);
+          playlistInfo.pre_lists[weekdayIndex] = [];
+          return playlistInfo;
+        });
+        ElMessage.success("已清空前置文件列表");
+      }, "清空失败");
     } catch (error) {
-      if (error !== "cancel") {
-        logAndNoticeError(error as Error, "清空失败");
-      }
-    } finally {
-      playlistLoading.value = false;
+      handleOperationError(error, "清空失败");
     }
   };
 
@@ -596,20 +563,17 @@ export function useFileOperations(
         }
       );
 
-      playlistLoading.value = true;
-      await updateActivePlaylistData(playlistInfo => {
-        playlistInfo.playlist = [];
-        playlistInfo.total = 0;
-        playlistInfo.current_index = 0;
-        return playlistInfo;
-      });
-      ElMessage.success("已清空正式文件列表");
+      await executeWithLoading(async () => {
+        await updateActivePlaylistData(playlistInfo => {
+          playlistInfo.playlist = [];
+          playlistInfo.total = 0;
+          playlistInfo.current_index = 0;
+          return playlistInfo;
+        });
+        ElMessage.success("已清空正式文件列表");
+      }, "清空失败");
     } catch (error) {
-      if (error !== "cancel") {
-        logAndNoticeError(error as Error, "清空失败");
-      }
-    } finally {
-      playlistLoading.value = false;
+      handleOperationError(error, "清空失败");
     }
   };
 
@@ -639,72 +603,70 @@ export function useFileOperations(
         type: "warning",
       });
 
-      playlistLoading.value = true;
-      await updateActivePlaylistData(playlistInfo => {
-        playlistInfo.playlist = [];
-        if (
-          !playlistInfo.pre_lists ||
-          !Array.isArray(playlistInfo.pre_lists) ||
-          playlistInfo.pre_lists.length !== 7
-        ) {
-          playlistInfo.pre_lists = Array(7)
-            .fill(null)
-            .map(() => []);
-        } else {
+      await executeWithLoading(async () => {
+        await updateActivePlaylistData(playlistInfo => {
+          playlistInfo.playlist = [];
+          ensurePreListsInitialized(playlistInfo);
           playlistInfo.pre_lists = playlistInfo.pre_lists.map(() => []);
-        }
-        playlistInfo.total = 0;
-        playlistInfo.current_index = 0;
-        return playlistInfo;
-      });
-      ElMessage.success("已清空播放列表（包括前置文件和正式文件）");
+          playlistInfo.total = 0;
+          playlistInfo.current_index = 0;
+          return playlistInfo;
+        });
+        ElMessage.success("已清空播放列表（包括前置文件和正式文件）");
+      }, "清空失败");
     } catch (error) {
-      if (error !== "cancel") {
-        logAndNoticeError(error as Error, "清空失败");
-      }
-    } finally {
-      playlistLoading.value = false;
+      handleOperationError(error, "清空失败");
     }
   };
 
+  // 将文件输入转换为 PlaylistItem
+  const convertToPlaylistItem = (file: FileInput): PlaylistItem => {
+    if (typeof file === "string") {
+      return { uri: file };
+    }
+    return { ...file, uri: file.uri || "" };
+  };
+
   // 打开播放列表选择器（前置文件）
-  const handleOpenPlaylistSelectorForPreFile = async (file: any) => {
+  const handleOpenPlaylistSelectorForPreFile = async (file: FileInput) => {
     try {
       if (!file) {
         ElMessage.warning("文件信息无效");
         return;
       }
-      const fileUri = file.uri || file;
       if (playlistSelectorSelectedFiles && playlistSelectorVisible) {
-        playlistSelectorSelectedFiles.value = [fileUri];
+        const playlistItem = convertToPlaylistItem(file);
+        playlistSelectorSelectedFiles.value = [playlistItem];
         playlistSelectorVisible.value = true;
       } else {
-        // 如果没有提供选择器状态，则静默处理或使用文件浏览器
         ElMessage.info("请使用文件浏览器添加文件到播放列表");
       }
     } catch (error) {
-      console.error("打开播放列表选择器失败:", error);
+      logger.error("打开播放列表选择器失败:", error);
       ElMessage.error("打开对话框失败");
     }
   };
 
   // 打开播放列表选择器（正式文件）
-  const handleOpenPlaylistSelectorForFile = async (file: any) => {
+  const handleOpenPlaylistSelectorForFile = async (file: FileInput) => {
     try {
       if (!file) {
         ElMessage.warning("文件信息无效");
         return;
       }
-      const fileUri = file.uri || file;
+      const playlistItem = convertToPlaylistItem(file);
+      if (!playlistItem.uri) {
+        ElMessage.warning("文件URI无效");
+        return;
+      }
       if (playlistSelectorSelectedFiles && playlistSelectorVisible) {
-        playlistSelectorSelectedFiles.value = [fileUri];
+        playlistSelectorSelectedFiles.value = [playlistItem];
         playlistSelectorVisible.value = true;
       } else {
-        // 如果没有提供选择器状态，则静默处理或使用文件浏览器
         ElMessage.info("请使用文件浏览器添加文件到播放列表");
       }
     } catch (error) {
-      console.error("打开播放列表选择器失败:", error);
+      logger.error("打开播放列表选择器失败:", error);
       ElMessage.error("打开对话框失败");
     }
   };

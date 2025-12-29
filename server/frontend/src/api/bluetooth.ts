@@ -2,6 +2,7 @@
  * 蓝牙相关 API
  */
 import { api } from "./config";
+import type { ApiResponse } from "@/types/api";
 
 /**
  * 蓝牙操作接口
@@ -9,8 +10,8 @@ import { api } from "./config";
 export async function bluetoothAction(
   action: string,
   method: "GET" | "POST",
-  params?: Record<string, any>
-): Promise<any> {
+  params?: Record<string, unknown>
+): Promise<ApiResponse<unknown>> {
   let rsp;
   const routePrefix = "bluetooth";
   if (method === "GET") {

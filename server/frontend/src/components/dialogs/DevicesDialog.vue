@@ -235,29 +235,9 @@ import { ElMessage } from "element-plus";
 import { Refresh, Cpu, Loading } from "@element-plus/icons-vue";
 import { api } from "@/api/config";
 import { logAndNoticeError } from "@/utils";
-
-interface AgentDevice {
-  agent_id: string;
-  name: string;
-  address: string;
-  actions?: string[];
-  is_online?: boolean;
-  last_heartbeat_ago?: number;
-  [key: string]: any;
-}
-
-interface MiDevice {
-  deviceID?: string;
-  address?: string;
-  name?: string;
-  mac?: string;
-  miotDID?: string;
-  volume?: number;
-  _volumeChanging?: boolean;
-  _volumeRefreshing?: boolean;
-  _stopping?: boolean;
-  [key: string]: any;
-}
+import { DEVICE_SCAN_TIMEOUT } from "@/constants/device";
+import { useAgentDevice } from "@/composables/useAgentDevice";
+import type { MiDevice } from "@/types/device";
 
 interface Props {
   visible?: boolean;
@@ -272,11 +252,28 @@ const emit = defineEmits<{
 }>();
 
 const internalVisible = ref(props.visible);
-const agentList = ref<AgentDevice[]>([]);
-const agentListLoading = ref(false);
 const miDeviceList = ref<MiDevice[]>([]);
 const miScanning = ref(false);
-let agentListRefreshTimer: ReturnType<typeof setInterval> | null = null;
+
+// 使用 useAgentDevice composable
+const {
+  agentList,
+  loading: agentListLoading,
+  refreshAgentList,
+  testAgentButton,
+  startRefresh,
+  stopRefresh,
+} = useAgentDevice();
+
+// 刷新Agent设备列表（包装函数以保持接口一致）
+const handleRefreshAgentList = async () => {
+  await refreshAgentList(true, false);
+};
+
+// 测试Agent按钮（包装函数以保持接口一致）
+const handleTestAgentButton = async (agentId: string, key: string) => {
+  await testAgentButton(agentId, key);
+};
 
 // 辅助函数
 const getMiDeviceId = (device: MiDevice): string => {
@@ -287,75 +284,17 @@ const clampVolume = (volume: number): number => {
   return Math.max(0, Math.min(100, volume));
 };
 
-// 刷新Agent设备列表
-const handleRefreshAgentList = async (showLoading = true) => {
-  try {
-    if (showLoading) {
-      agentListLoading.value = true;
-    }
-    const response = await api.get("/agent/list");
-    if (response.data && response.data.code === 0) {
-      agentList.value = response.data.data || [];
-    } else {
-      if (showLoading) {
-        ElMessage.error(response.data?.msg || "获取设备列表失败");
-      }
-      agentList.value = [];
-    }
-  } catch (error) {
-    console.error("获取Agent设备列表失败:", error);
-    if (showLoading) {
-      logAndNoticeError(error as Error, "获取设备列表失败");
-    }
-    agentList.value = [];
-  } finally {
-    if (showLoading) {
-      agentListLoading.value = false;
-    }
-  }
-};
-
-// 测试Agent按钮
-const handleTestAgentButton = async (agentId: string, key: string) => {
-  try {
-    const device = agentList.value.find(d => d.agent_id === agentId);
-    if (device) {
-      device[`testing_${key}`] = true;
-    }
-
-    const response = await api.post("/agent/mock", {
-      agent_id: agentId,
-      action: "keyboard",
-      key: key,
-      value: "test",
-    });
-
-    if (response.data && response.data.code === 0) {
-      ElMessage.success(`测试按钮 ${key} 成功`);
-    } else {
-      ElMessage.error(response.data?.msg || `测试按钮 ${key} 失败`);
-    }
-  } catch (error) {
-    logAndNoticeError(error as Error, `测试按钮 ${key} 失败`);
-  } finally {
-    const device = agentList.value.find(d => d.agent_id === agentId);
-    if (device) {
-      device[`testing_${key}`] = false;
-    }
-  }
-};
-
 // 扫描小米设备
 const scanMiDevices = async () => {
   try {
     miScanning.value = true;
     const response = await api.get("/mi/scan", {
-      params: { timeout: 5 },
+      params: { timeout: DEVICE_SCAN_TIMEOUT },
     });
     const result = response.data;
 
     if (result.code === 0) {
-      const devices: MiDevice[] = (result.data || []).map((device: any) => ({
+      const devices: MiDevice[] = (result.data || []).map((device: Partial<MiDevice>) => ({
         ...device,
         volume: undefined,
         _volumeChanging: false,
@@ -466,40 +405,15 @@ const handleClose = () => {
   internalVisible.value = false;
 };
 
-// 启动自动刷新
-const startAutoRefresh = () => {
-  if (agentListRefreshTimer) {
-    clearInterval(agentListRefreshTimer);
-    agentListRefreshTimer = null;
-  }
-
-  handleRefreshAgentList(true);
-  agentListRefreshTimer = setInterval(async () => {
-    try {
-      await handleRefreshAgentList(false);
-    } catch (error) {
-      console.error("定时刷新Agent设备列表失败:", error);
-    }
-  }, 10000);
-};
-
-// 停止自动刷新
-const stopAutoRefresh = () => {
-  if (agentListRefreshTimer) {
-    clearInterval(agentListRefreshTimer);
-    agentListRefreshTimer = null;
-  }
-};
-
 // 监听对话框显示状态
 watch(
   () => props.visible,
   isVisible => {
     internalVisible.value = isVisible;
     if (isVisible) {
-      startAutoRefresh();
+      startRefresh();
     } else {
-      stopAutoRefresh();
+      stopRefresh();
     }
   },
   { immediate: true }
@@ -513,14 +427,12 @@ watch(internalVisible, newVal => {
 
 onMounted(() => {
   if (props.visible) {
-    startAutoRefresh();
+    startRefresh();
   }
 });
 
 onUnmounted(() => {
-  if (agentListRefreshTimer) {
-    clearInterval(agentListRefreshTimer);
-    agentListRefreshTimer = null;
-  }
+  // 停止自动刷新
+  stopRefresh();
 });
 </script>

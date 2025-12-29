@@ -2,18 +2,7 @@
  * 文件相关工具函数
  */
 import { api } from "@/api/config";
-
-interface FileItem {
-  uri?: string;
-  path?: string;
-  file?: string;
-  duration?: number | null;
-}
-
-interface NormalizedFile {
-  uri: string;
-  duration?: number | null;
-}
+import type { FileItem, NormalizedFile } from "@/types/tools";
 
 /**
  * 从文件项中提取文件名

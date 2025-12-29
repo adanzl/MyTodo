@@ -2,17 +2,12 @@
  * Redis 数据相关 API
  */
 import { api } from "./config";
-
-interface ApiResponse<T = any> {
-  code: number;
-  msg?: string;
-  data: T;
-}
+import type { ApiResponse } from "@/types/api";
 
 /**
  * 获取rds列表数据
  */
-export async function getRdsList<T = any>(
+export async function getRdsList<T = unknown>(
   key: string,
   startId: number,
   pageSize: number
@@ -29,7 +24,7 @@ export async function getRdsList<T = any>(
 /**
  * 获取rds数据
  */
-export async function getRdsData<T = any>(table: string, id: number | string): Promise<T> {
+export async function getRdsData<T = unknown>(table: string, id: number | string): Promise<T> {
   const rsp = await api.get<ApiResponse<T>>("/getRdsData", {
     params: { table: table, id: id },
   });
@@ -43,10 +38,10 @@ export async function getRdsData<T = any>(table: string, id: number | string): P
 /**
  * 设置rds数据
  */
-export async function setRdsData<T = any>(
+export async function setRdsData<T = unknown>(
   table: string,
   id: number | string,
-  value: any
+  value: unknown
 ): Promise<T> {
   const rsp = await api.post<ApiResponse<T>>("/setRdsData", {
     table: table,

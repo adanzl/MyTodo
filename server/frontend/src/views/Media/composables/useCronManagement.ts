@@ -6,14 +6,15 @@ import { type Ref } from "vue";
 import { ElMessage } from "element-plus";
 import { calculateNextCronTimes } from "@/utils/cron";
 import { logAndNoticeError } from "@/utils/error";
+import type { Playlist, PlaylistStatus } from "@/types/playlist";
 
 export function useCronManagement(
-  playlistStatus: Ref<any>,
+  playlistStatus: Ref<PlaylistStatus | null>,
   cronBuilderVisible: Ref<boolean>,
   cronPreviewVisible: Ref<boolean>,
   cronPreviewTimes: Ref<string[]>,
   initialCronExpr: Ref<string>,
-  updateActivePlaylistData: (mutator: (playlistInfo: any) => any) => Promise<any>
+  updateActivePlaylistData: (mutator: (playlistInfo: Playlist) => Playlist) => Promise<PlaylistStatus | null>
 ) {
   // 打开 Cron 构建器
   const handleOpenCronBuilder = () => {

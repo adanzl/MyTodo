@@ -2,6 +2,11 @@
  * 媒体相关 API
  */
 import { api } from "./config";
+import type { ApiResponse } from "@/types/api";
+import type { MediaTask, MediaTaskDetail, MediaTaskFile } from "@/types/tools";
+
+// 导出类型供外部使用
+export type { MediaTask, MediaTaskDetail, MediaTaskFile };
 
 /**
  * 媒体操作接口
@@ -9,8 +14,8 @@ import { api } from "./config";
 export async function mediaAction(
   action: string,
   method: "GET" | "POST",
-  params: Record<string, any> = {}
-): Promise<any> {
+  params: Record<string, unknown> = {}
+): Promise<ApiResponse<unknown>> {
   let rsp;
   if (method === "GET") {
     rsp = await api.get(`/media/${action}`, {
@@ -29,24 +34,24 @@ export async function mediaAction(
 /**
  * 获取媒体任务列表
  */
-export async function getMediaTaskList() {
-  const response = await api.get("/media/task/list");
+export async function getMediaTaskList(): Promise<ApiResponse<{ tasks: MediaTask[] }>> {
+  const response = await api.get<ApiResponse<{ tasks: MediaTask[] }>>("/media/task/list");
   return response.data;
 }
 
 /**
  * 创建媒体任务
  */
-export async function createMediaTask() {
-  const response = await api.post("/media/task/create", {});
+export async function createMediaTask(): Promise<ApiResponse<{ task_id: string }>> {
+  const response = await api.post<ApiResponse<{ task_id: string }>>("/media/task/create", {});
   return response.data;
 }
 
 /**
  * 获取媒体任务详情
  */
-export async function getMediaTask(taskId: string) {
-  const response = await api.post("/media/task/get", {
+export async function getMediaTask(taskId: string): Promise<ApiResponse<MediaTaskDetail>> {
+  const response = await api.post<ApiResponse<MediaTaskDetail>>("/media/task/get", {
     task_id: taskId,
   });
   return response.data;
@@ -55,8 +60,8 @@ export async function getMediaTask(taskId: string) {
 /**
  * 删除媒体任务
  */
-export async function deleteMediaTask(taskId: string) {
-  const response = await api.post("/media/task/delete", {
+export async function deleteMediaTask(taskId: string): Promise<ApiResponse<{ success: boolean }>> {
+  const response = await api.post<ApiResponse<{ success: boolean }>>("/media/task/delete", {
     task_id: taskId,
   });
   return response.data;
@@ -65,8 +70,11 @@ export async function deleteMediaTask(taskId: string) {
 /**
  * 添加文件到媒体任务
  */
-export async function addFileToMediaTask(taskId: string, filePath: string) {
-  const response = await api.post("/media/task/addFileByPath", {
+export async function addFileToMediaTask(
+  taskId: string,
+  filePath: string
+): Promise<ApiResponse<{ success: boolean }>> {
+  const response = await api.post<ApiResponse<{ success: boolean }>>("/media/task/addFileByPath", {
     task_id: taskId,
     file_path: filePath,
   });
@@ -76,8 +84,11 @@ export async function addFileToMediaTask(taskId: string, filePath: string) {
 /**
  * 从媒体任务删除文件
  */
-export async function deleteFileFromMediaTask(taskId: string, fileIndex: number) {
-  const response = await api.post("/media/task/deleteFile", {
+export async function deleteFileFromMediaTask(
+  taskId: string,
+  fileIndex: number
+): Promise<ApiResponse<{ success: boolean }>> {
+  const response = await api.post<ApiResponse<{ success: boolean }>>("/media/task/deleteFile", {
     task_id: taskId,
     file_index: fileIndex,
   });
@@ -87,8 +98,8 @@ export async function deleteFileFromMediaTask(taskId: string, fileIndex: number)
 /**
  * 开始媒体任务合成
  */
-export async function startMediaTask(taskId: string) {
-  const response = await api.post("/media/task/start", {
+export async function startMediaTask(taskId: string): Promise<ApiResponse<{ success: boolean }>> {
+  const response = await api.post<ApiResponse<{ success: boolean }>>("/media/task/start", {
     task_id: taskId,
   });
   return response.data;
@@ -97,8 +108,11 @@ export async function startMediaTask(taskId: string) {
 /**
  * 重新排序媒体任务文件
  */
-export async function reorderMediaTaskFiles(taskId: string, fileIndices: number[]) {
-  const response = await api.post("/media/task/reorderFiles", {
+export async function reorderMediaTaskFiles(
+  taskId: string,
+  fileIndices: number[]
+): Promise<ApiResponse<{ success: boolean }>> {
+  const response = await api.post<ApiResponse<{ success: boolean }>>("/media/task/reorderFiles", {
     task_id: taskId,
     file_indices: fileIndices,
   });
@@ -117,8 +131,11 @@ export function getMediaTaskDownloadUrl(taskId: string): string {
 /**
  * 转存媒体任务结果文件
  */
-export async function saveMediaTaskResult(taskId: string, targetPath: string) {
-  const response = await api.post("/media/task/save", {
+export async function saveMediaTaskResult(
+  taskId: string,
+  targetPath: string
+): Promise<ApiResponse<{ success: boolean }>> {
+  const response = await api.post<ApiResponse<{ success: boolean }>>("/media/task/save", {
     task_id: taskId,
     target_path: targetPath,
   });

@@ -293,10 +293,12 @@ import {
 import { formatDuration } from "@/utils/format";
 import { getWeekdayIndex } from "@/utils/date";
 import { calculateFilesTotalDuration } from "@/utils/file";
+import type { MediaFile } from "@/types/tools";
+import type { PlaylistStatus } from "@/types/playlist";
 import MediaComponent from "@/components/common/MediaComponent.vue";
 
 interface Props {
-  playlistStatus: any;
+  playlistStatus: PlaylistStatus | null;
   selectedWeekdayIndex: number | null;
   preFilesDragMode: boolean;
   preFilesBatchDeleteMode: boolean;
@@ -304,9 +306,9 @@ interface Props {
   preFilesExpanded: boolean;
   playlistLoading: boolean;
   showMoreActions: boolean;
-  isFilePlaying: (file: any) => boolean;
-  getFilePlayProgress: (file: any) => number;
-  getFileDuration: (file: any) => number;
+  isFilePlaying: (file: MediaFile) => boolean;
+  getFilePlayProgress: (file: MediaFile) => number;
+  getFileDuration: (file: MediaFile) => number;
 }
 
 const props = defineProps<Props>();
@@ -324,12 +326,12 @@ defineEmits<{
   "drag-end": [event: DragEvent];
   "drag-over": [event: DragEvent];
   drop: [event: DragEvent, index: number];
-  "play-file": [file: any];
-  "seek-file": [file: any, percentage: number];
+  "play-file": [file: MediaFile];
+  "seek-file": [file: MediaFile, percentage: number];
   "move-up": [index: number];
   "move-down": [index: number];
   replace: [index: number];
-  "open-playlist-selector": [file: any];
+  "open-playlist-selector": [file: MediaFile];
   delete: [index: number];
 }>();
 

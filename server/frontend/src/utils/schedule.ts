@@ -58,7 +58,8 @@ export function getNextRepeatDate(
   }
   let ret: Dayjs | null = null;
   if (_.includes([1, 2, 3, 4], repeat.id)) {
-    ret = date.add(1, repeat.tag as any);
+    // repeat.tag 是 "day" | "week" | "month" | "year"，符合 dayjs.ManipulateType
+    ret = date.add(1, repeat.tag as "day" | "week" | "month" | "year");
   } else if (repeat.id === 5) {
     // 工作日
     const week = date.day();

@@ -253,11 +253,13 @@ import { getRdsData, setRdsData } from "@/api/rds";
 import { logAndNoticeError } from "@/utils";
 import FileDialog from "@/components/dialogs/FileDialog.vue";
 
+import type { PlaylistItem } from "@/types/playlist";
+
 interface Playlist {
   id: string;
   name: string;
-  pre_lists?: any[][];
-  playlist?: any[];
+  pre_lists?: PlaylistItem[][];
+  playlist?: PlaylistItem[];
 }
 
 interface Batch {
@@ -269,7 +271,7 @@ interface Batch {
 
 interface FileItem {
   uri?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface Props {
@@ -358,7 +360,7 @@ const isValidFilesList = (playlist: Playlist | null): boolean => {
   return !!(playlist?.playlist && Array.isArray(playlist.playlist));
 };
 
-const countMatchedFiles = (fileList: any[], uriSet: Set<string>): number => {
+const countMatchedFiles = (fileList: PlaylistItem[], uriSet: Set<string>): number => {
   if (!Array.isArray(fileList)) return 0;
   let count = 0;
   fileList.forEach(file => {

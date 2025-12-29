@@ -8,11 +8,14 @@ import { normalizeFiles } from "@/utils/file";
 import { formatDateTime } from "@/utils/date";
 import { logAndNoticeError } from "@/utils/error";
 import { createPlaylistId } from "@/utils/playlist";
+import { logger } from "@/utils/logger";
+import { WEEKDAYS_COUNT, DEFAULT_PLAYLIST_NAME } from "@/constants/playlist";
+import type { Playlist, PlaylistStatus, PlaylistItem, PlaylistCollection, PlaylistApiData } from "@/types/playlist";
 
 export function usePlaylistData(
-  playlistCollection: Ref<any[]>,
+  playlistCollection: Ref<Playlist[]>,
   activePlaylistId: Ref<string>,
-  playlistStatus: Ref<any>,
+  playlistStatus: Ref<PlaylistStatus | null>,
   playlistRefreshing: Ref<boolean>,
   pendingDeviceType: Ref<string | null>,
   preFilesDragMode: Ref<boolean>,
@@ -20,16 +23,19 @@ export function usePlaylistData(
   getSelectedWeekdayIndex: () => number
 ) {
   // 规范化播放列表项
-  const normalizePlaylistItem = (item: any, fallbackName = "播放列表") => {
+  const normalizePlaylistItem = (
+    item: Partial<PlaylistApiData> | Partial<Playlist>,
+    fallbackName = "播放列表"
+  ): Playlist => {
     const playlist = normalizeFiles(item?.playlist || item?.files || [], true);
     let pre_lists = item?.pre_lists;
-    if (!pre_lists || !Array.isArray(pre_lists) || pre_lists.length !== 7) {
+    if (!pre_lists || !Array.isArray(pre_lists) || pre_lists.length !== WEEKDAYS_COUNT) {
       const pre_files = normalizeFiles(item?.pre_files || [], true);
-      pre_lists = Array(7)
+      pre_lists = Array(WEEKDAYS_COUNT)
         .fill(null)
         .map(() => [...pre_files]);
     } else {
-      pre_lists = pre_lists.map((pre_list: any) => normalizeFiles(pre_list || [], true));
+      pre_lists = pre_lists.map((pre_list: PlaylistItem[]) => normalizeFiles(pre_list || [], true));
     }
 
     let currentIndex =
@@ -84,10 +90,12 @@ export function usePlaylistData(
   };
 
   // 规范化播放列表集合
-  const normalizePlaylistCollection = (raw: any) => {
-    const ensureList = (list: any[]) => {
+  const normalizePlaylistCollection = (
+    raw: PlaylistCollection | PlaylistApiData | PlaylistApiData[] | null
+  ): PlaylistCollection => {
+    const ensureList = (list: PlaylistApiData[]) => {
       if (!Array.isArray(list) || list.length === 0) {
-        return [normalizePlaylistItem({ name: "默认播放列表" })];
+        return [normalizePlaylistItem({ name: DEFAULT_PLAYLIST_NAME })];
       }
       return list.map((item, index) =>
         normalizePlaylistItem(item, item?.name || `播放列表${index + 1}`)
@@ -118,26 +126,28 @@ export function usePlaylistData(
   };
 
   // 转换 API 数据格式
-  const transformApiDataToPlaylistFormat = (apiData: any) => {
+  const transformApiDataToPlaylistFormat = (
+    apiData: PlaylistApiData | PlaylistApiData[] | Record<string, PlaylistApiData> | null
+  ): PlaylistCollection | null => {
     if (!apiData) {
       return null;
     }
 
     if (!Array.isArray(apiData) && Object.keys(apiData).length > 0) {
-      const playlists = Object.values(apiData).map((item: any) => {
+      const playlists = Object.values(apiData).map((item: PlaylistApiData) => {
         const normalizedFiles = normalizeFiles(item.files || [], true);
         let normalizedPreLists = item.pre_lists;
         if (
           !normalizedPreLists ||
           !Array.isArray(normalizedPreLists) ||
-          normalizedPreLists.length !== 7
+          normalizedPreLists.length !== WEEKDAYS_COUNT
         ) {
           const normalizedPreFiles = normalizeFiles(item.pre_files || [], true);
-          normalizedPreLists = Array(7)
+          normalizedPreLists = Array(WEEKDAYS_COUNT)
             .fill(null)
             .map(() => [...normalizedPreFiles]);
         } else {
-          normalizedPreLists = normalizedPreLists.map((pre_list: any) =>
+          normalizedPreLists = normalizedPreLists.map((pre_list: PlaylistItem[]) =>
             normalizeFiles(pre_list || [], true)
           );
         }
@@ -204,8 +214,10 @@ export function usePlaylistData(
   };
 
   // 转换前端格式为 API 格式
-  const transformPlaylistToApiFormat = (collection: any[]) => {
-    const playlistDict: Record<string, any> = {};
+  const transformPlaylistToApiFormat = (
+    collection: Playlist[]
+  ): Record<string, PlaylistApiData> => {
+    const playlistDict: Record<string, PlaylistApiData> = {};
     collection.forEach(item => {
       if (item.id) {
         let deviceType = "dlna";
@@ -224,14 +236,14 @@ export function usePlaylistData(
         if (
           !normalizedPreLists ||
           !Array.isArray(normalizedPreLists) ||
-          normalizedPreLists.length !== 7
+          normalizedPreLists.length !== WEEKDAYS_COUNT
         ) {
           const normalizedPreFiles = normalizeFiles(item.pre_files || [], true);
-          normalizedPreLists = Array(7)
+          normalizedPreLists = Array(WEEKDAYS_COUNT)
             .fill(null)
             .map(() => [...normalizedPreFiles]);
         } else {
-          normalizedPreLists = normalizedPreLists.map((pre_list: any) =>
+          normalizedPreLists = normalizedPreLists.map((pre_list: PlaylistItem[]) =>
             normalizeFiles(pre_list || [], true)
           );
         }
@@ -258,7 +270,7 @@ export function usePlaylistData(
   };
 
   // 保存播放列表
-  const savePlaylist = async (collectionOverride?: any[]) => {
+  const savePlaylist = async (collectionOverride?: Playlist[]) => {
     try {
       const collection = (collectionOverride || playlistCollection.value || []).map(item => ({
         ...item,
@@ -277,7 +289,7 @@ export function usePlaylistData(
   };
 
   // 更新单个播放列表
-  const updateSinglePlaylist = async (playlistData: any) => {
+  const updateSinglePlaylist = async (playlistData: Playlist) => {
     try {
       const playlistDict = transformPlaylistToApiFormat([playlistData]);
       const playlistId = playlistData.id;
@@ -298,7 +310,7 @@ export function usePlaylistData(
   };
 
   // 同步激活的播放列表
-  const syncActivePlaylist = (collection: any[]) => {
+  const syncActivePlaylist = (collection: Playlist[]) => {
     const list = Array.isArray(collection) ? collection : playlistCollection.value;
     if (!list || list.length === 0) {
       playlistStatus.value = null;
@@ -326,15 +338,17 @@ export function usePlaylistData(
 
     const weekdayIndex = getSelectedWeekdayIndex();
     const currentPreFiles =
-      active.pre_lists && Array.isArray(active.pre_lists) && active.pre_lists.length === 7
+      active.pre_lists &&
+      Array.isArray(active.pre_lists) &&
+      active.pre_lists.length === WEEKDAYS_COUNT
         ? active.pre_lists[weekdayIndex] || []
         : [];
     playlistStatus.value = {
       ...active,
       playlist: [...(active.playlist || [])],
       pre_lists: active.pre_lists
-        ? active.pre_lists.map((list: any) => [...(list || [])])
-        : Array(7)
+        ? active.pre_lists.map((list: PlaylistItem[]) => [...(list || [])])
+        : Array(WEEKDAYS_COUNT)
             .fill(null)
             .map(() => []),
       pre_files: currentPreFiles,
@@ -351,20 +365,22 @@ export function usePlaylistData(
   };
 
   // 更新激活播放列表数据
-  const updateActivePlaylistData = async (mutator: (playlistInfo: any) => any) => {
+  const updateActivePlaylistData = async (
+    mutator: (playlistInfo: Playlist) => Playlist
+  ): Promise<PlaylistStatus | null> => {
     if (typeof mutator !== "function") return null;
     let collection = playlistCollection.value.map(item => ({
       ...item,
-      playlist: Array.isArray(item.playlist) ? item.playlist.map((f: any) => ({ ...f })) : [],
+      playlist: Array.isArray(item.playlist) ? item.playlist.map((f: PlaylistItem) => ({ ...f })) : [],
       pre_lists:
-        Array.isArray(item.pre_lists) && item.pre_lists.length === 7
-          ? item.pre_lists.map((list: any) => list.map((f: any) => ({ ...f })))
-          : Array(7)
+        Array.isArray(item.pre_lists) && item.pre_lists.length === WEEKDAYS_COUNT
+          ? item.pre_lists.map((list: PlaylistItem[]) => list.map((f: PlaylistItem) => ({ ...f })))
+          : Array(WEEKDAYS_COUNT)
               .fill(null)
               .map(() => []),
     }));
     if (collection.length === 0) {
-      const defaultPlaylist = normalizePlaylistItem({ name: "默认播放列表" });
+      const defaultPlaylist = normalizePlaylistItem({ name: DEFAULT_PLAYLIST_NAME });
       collection = [defaultPlaylist];
       activePlaylistId.value = defaultPlaylist.id;
     }
@@ -376,11 +392,11 @@ export function usePlaylistData(
     const currentItem = collection[index];
     const itemToMutate = {
       ...currentItem,
-      playlist: currentItem.playlist.map((f: any) => ({ ...f })),
+      playlist: currentItem.playlist.map((f: PlaylistItem) => ({ ...f })),
       pre_lists:
-        Array.isArray(currentItem.pre_lists) && currentItem.pre_lists.length === 7
-          ? currentItem.pre_lists.map((list: any) => [...list.map((f: any) => ({ ...f }))])
-          : Array(7)
+        Array.isArray(currentItem.pre_lists) && currentItem.pre_lists.length === WEEKDAYS_COUNT
+          ? currentItem.pre_lists.map((list: PlaylistItem[]) => [...list.map((f: PlaylistItem) => ({ ...f }))])
+          : Array(WEEKDAYS_COUNT)
               .fill(null)
               .map(() => []),
     };
@@ -389,13 +405,13 @@ export function usePlaylistData(
     const preservedPreLists =
       updatedItem.pre_lists &&
       Array.isArray(updatedItem.pre_lists) &&
-      updatedItem.pre_lists.length === 7
-        ? updatedItem.pre_lists.map((list: any) =>
-            Array.isArray(list) ? list.map((f: any) => ({ ...f })) : []
+      updatedItem.pre_lists.length === WEEKDAYS_COUNT
+        ? updatedItem.pre_lists.map((list: PlaylistItem[]) =>
+            Array.isArray(list) ? list.map((f: PlaylistItem) => ({ ...f })) : []
           )
-        : Array.isArray(currentItem.pre_lists) && currentItem.pre_lists.length === 7
-          ? currentItem.pre_lists.map((list: any) => list.map((f: any) => ({ ...f })))
-          : Array(7)
+        : Array.isArray(currentItem.pre_lists) && currentItem.pre_lists.length === WEEKDAYS_COUNT
+          ? currentItem.pre_lists.map((list: PlaylistItem[]) => list.map((f: PlaylistItem) => ({ ...f })))
+          : Array(WEEKDAYS_COUNT)
               .fill(null)
               .map(() => []);
 
@@ -422,7 +438,7 @@ export function usePlaylistData(
       playlistCollection.value = normalized.playlists;
 
       const savedPlaylistId = localStorage.getItem("active_playlist_id");
-      if (savedPlaylistId && normalized.playlists.some((p: any) => p.id === savedPlaylistId)) {
+      if (savedPlaylistId && normalized.playlists.some((p: Playlist) => p.id === savedPlaylistId)) {
         activePlaylistId.value = savedPlaylistId;
       } else {
         activePlaylistId.value = normalized.activePlaylistId;
@@ -431,12 +447,12 @@ export function usePlaylistData(
       syncActivePlaylist(normalized.playlists);
       return normalized;
     } catch (error) {
-      console.error("从接口加载播放列表失败:", error);
+      logger.error("从接口加载播放列表失败:", error);
       const fallback = normalizePlaylistCollection(null);
       playlistCollection.value = fallback.playlists;
 
       const savedPlaylistId = localStorage.getItem("active_playlist_id");
-      if (savedPlaylistId && fallback.playlists.some((p: any) => p.id === savedPlaylistId)) {
+      if (savedPlaylistId && fallback.playlists.some((p: Playlist) => p.id === savedPlaylistId)) {
         activePlaylistId.value = savedPlaylistId;
       } else {
         activePlaylistId.value = fallback.activePlaylistId;
@@ -488,8 +504,8 @@ export function usePlaylistData(
               pre_lists:
                 updatedPlaylist.pre_lists &&
                 Array.isArray(updatedPlaylist.pre_lists) &&
-                updatedPlaylist.pre_lists.length === 7
-                  ? updatedPlaylist.pre_lists.map((list: any) => [...(list || [])])
+                updatedPlaylist.pre_lists.length === WEEKDAYS_COUNT
+                  ? updatedPlaylist.pre_lists.map((list: PlaylistItem[]) => [...(list || [])])
                   : item.pre_lists,
               current_index:
                 updatedPlaylist.current_index !== undefined
@@ -508,7 +524,7 @@ export function usePlaylistData(
         await loadPlaylist();
       }
     } catch (error) {
-      console.error("刷新播放列表状态失败:", error);
+      logger.error("刷新播放列表状态失败:", error);
     } finally {
       playlistRefreshing.value = false;
     }

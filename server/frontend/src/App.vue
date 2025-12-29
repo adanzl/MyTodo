@@ -1,5 +1,5 @@
 <template>
-  <el-container :loading="loading" class="h-screen">
+  <el-container :loading="userStore.loading" class="h-screen">
     <Sidebar />
     <el-container v-if="curUser.bLogin">
       <el-header class="flex justify-center items-center bg-blue-50">
@@ -19,57 +19,71 @@
   </el-container>
 </template>
 
-<script setup>
-import { ref, onMounted, provide } from "vue";
+<script setup lang="ts">
+import { ref, onMounted, provide, computed } from "vue";
 import { StarFilled } from "@element-plus/icons-vue";
-import _ from "lodash-es";
 import Sidebar from "@/components/layout/Sidebar.vue";
 import Login from "@/components/layout/Login.vue";
-import { getList } from "@/api/common";
+import { useUserStore, type UserWithExtras } from "@/stores/user";
+
+interface CurUser {
+  bLogin: boolean;
+  id: number | null;
+  name: string | null;
+  ico: string | null;
+}
+
+interface WindowWithCurUser extends Window {
+  curUser?: UserWithExtras;
+}
 
 const KEY_USER_ID = "user_id";
-const loading = ref(false);
-const curUser = ref({ bLogin: false, id: null, name: null, ico: null });
-const userList = ref([]);
+const curUser = ref<CurUser>({ bLogin: false, id: null, name: null, ico: null });
 
-// 提供给子组件使用
+// 使用 Pinia Store
+const userStore = useUserStore();
+
+// 提供给子组件使用（保持向后兼容）
 provide("curUser", curUser);
+provide(
+  "userList",
+  computed(() => userStore.userList)
+);
 
-const handleLoginSuccess = userInfo => {
-  curUser.value = { ...userInfo, bLogin: true };
-  window.curUser = curUser.value;
-};
-
-const refreshUserList = async () => {
-  loading.value = true;
-  try {
-    const response = await getList("t_user");
-    if (response && response.data) {
-      // API 返回的是分页格式，用户数组在 response.data.data 中
-      const users = response.data.data || response.data;
-      userList.value = Array.isArray(users) ? users : [];
-    } else {
-      userList.value = [];
-    }
-  } catch (error) {
-    console.error("获取用户列表失败:", error);
-    userList.value = [];
-  } finally {
-    loading.value = false;
+const handleLoginSuccess = (userInfo: { id: number; name: string; icon: string }) => {
+  // 从 Store 中获取完整的用户信息
+  const fullUserInfo = userStore.getUserById(userInfo.id);
+  if (fullUserInfo) {
+    curUser.value = {
+      bLogin: true,
+      id: fullUserInfo.id,
+      name: fullUserInfo.name,
+      ico: fullUserInfo.icon,
+    };
+    (window as WindowWithCurUser).curUser = fullUserInfo;
+  } else {
+    // 如果 Store 中没有，使用传入的信息
+  curUser.value = {
+    bLogin: true,
+    id: userInfo.id,
+    name: userInfo.name,
+    ico: userInfo.icon,
+  };
   }
 };
 
 onMounted(async () => {
-  await refreshUserList();
+  // 使用 store 刷新用户列表
+  await userStore.refreshUserList();
   const uId = localStorage.getItem(KEY_USER_ID);
   if (uId) {
-    const u = _.find(userList.value, item => item.id == uId);
+    const u = userStore.getUserById(uId);
     if (u) {
       curUser.value.bLogin = true;
       curUser.value.id = u.id;
       curUser.value.name = u.name;
       curUser.value.ico = u.icon;
-      window.curUser = curUser.value;
+      (window as WindowWithCurUser).curUser = u;
     }
   }
 });

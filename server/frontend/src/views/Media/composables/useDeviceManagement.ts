@@ -7,23 +7,31 @@ import { ElMessage } from "element-plus";
 import { bluetoothAction } from "@/api/bluetooth";
 import { api } from "@/api/config";
 import { logAndNoticeError } from "@/utils/error";
+import type {
+  BluetoothDevice,
+  DlnaDevice,
+  MiDevice,
+  AgentDevice,
+} from "@/types/device";
+import type { Playlist, PlaylistStatus } from "@/types/playlist";
 
 export function useDeviceManagement(
-  playlistStatus: Ref<any>,
+  playlistStatus: Ref<PlaylistStatus | null>,
   pendingDeviceType: Ref<string | null>,
-  connectedDeviceList: Ref<any[]>,
-  dlnaDeviceList: Ref<any[]>,
-  miDeviceList: Ref<any[]>,
-  deviceList: Ref<any[]>,
+  connectedDeviceList: Ref<BluetoothDevice[] | AgentDevice[]>,
+  dlnaDeviceList: Ref<DlnaDevice[]>,
+  miDeviceList: Ref<MiDevice[]>,
+  deviceList: Ref<BluetoothDevice[]>,
   loading: Ref<boolean>,
   dlnaScanning: Ref<boolean>,
   miScanning: Ref<boolean>,
   scanDialogVisible: Ref<boolean>,
   agentListDialogVisible: Ref<boolean>,
-  updateActivePlaylistData: (mutator: (playlistInfo: any) => any) => Promise<any>
+  updateActivePlaylistData: (mutator: (playlistInfo: Playlist) => Playlist) => Promise<PlaylistStatus | null>
 ) {
+
   // 获取小米设备 ID
-  const getMiDeviceId = (device: any) => device.deviceID || device.address;
+  const getMiDeviceId = (device: MiDevice): string => device.deviceID || device.address || "";
 
   // 刷新已连接设备列表
   const refreshConnectedList = async () => {
@@ -39,8 +47,9 @@ export function useDeviceManagement(
       loading.value = true;
       let rspData = null;
       if (deviceType === "agent") {
-        const rsp = await api.get("/agent/list");
-        rspData = rsp.data;
+        // 使用 useAgentDevice 的逻辑来获取设备列表
+        const response = await api.get("/agent/list");
+        rspData = response.data;
       } else {
         rspData = await bluetoothAction("paired", "GET");
       }
@@ -59,7 +68,7 @@ export function useDeviceManagement(
   };
 
   // 连接设备
-  const handleConnectDevice = async (device: any) => {
+  const handleConnectDevice = async (device: BluetoothDevice) => {
     try {
       device.connecting = true;
       const rsp = await bluetoothAction("connect", "POST", {
@@ -101,13 +110,13 @@ export function useDeviceManagement(
   };
 
   // 获取小米设备音量
-  const getMiDeviceVolume = async (device: any) => {
+  const getMiDeviceVolume = async (device: MiDevice) => {
     const deviceId = getMiDeviceId(device);
     if (!deviceId) return;
 
     const deviceList = miDeviceList.value;
     if (!Array.isArray(deviceList)) return;
-    const targetDevice = deviceList.find((d: any) => getMiDeviceId(d) === deviceId);
+    const targetDevice = deviceList.find((d: MiDevice) => getMiDeviceId(d) === deviceId);
     if (!targetDevice) return;
 
     targetDevice._volumeRefreshing = true;
@@ -138,7 +147,7 @@ export function useDeviceManagement(
       });
 
       if (response.data.code === 0) {
-        const devices = (response.data.data || []).map((device: any) => ({
+        const devices = (response.data.data || []).map((device: Partial<MiDevice>) => ({
           ...device,
           volume: undefined,
           _volumeChanging: false,
@@ -147,7 +156,7 @@ export function useDeviceManagement(
         miDeviceList.value = devices;
 
         await Promise.allSettled(
-          miDeviceList.value.map((device: any) => getMiDeviceVolume(device))
+          miDeviceList.value.map((device: MiDevice) => getMiDeviceVolume(device))
         );
 
         ElMessage.success(`扫描到 ${devices.length} 个小米设备`);
@@ -167,7 +176,10 @@ export function useDeviceManagement(
       loading.value = true;
       const rsp = await bluetoothAction("scan", "GET");
       if (rsp.code === 0) {
-        deviceList.value = (rsp.data || []).map((device: any) => ({
+        const devices = Array.isArray(rsp.data) ? rsp.data : [];
+        deviceList.value = devices.map((device: Partial<BluetoothDevice>): BluetoothDevice => ({
+          name: device.name || "",
+          address: device.address || "",
           ...device,
           connecting: false,
         }));
@@ -243,20 +255,22 @@ export function useDeviceManagement(
 
   // 选择蓝牙设备
   const handleSelectBluetoothDevice = async (address: string) => {
-    const device = connectedDeviceList.value.find((d: any) => d.address === address);
+    const device = connectedDeviceList.value.find(
+      (d: BluetoothDevice | AgentDevice) => d.address === address
+    );
     const name = device ? device.name : null;
     await handleUpdatePlaylistDeviceAddress(address, name);
   };
 
   // 选择设备代理设备
-  const handleSelectAgentDevice = async (device: any) => {
+  const handleSelectAgentDevice = async (device: AgentDevice | string) => {
     const address = typeof device === "string" ? device : device.address;
     const name = typeof device === "string" ? null : device.name;
     await handleUpdatePlaylistDeviceAddress(address, name);
   };
 
   // 选择小米设备
-  const handleSelectMiDevice = async (device: any) => {
+  const handleSelectMiDevice = async (device: MiDevice) => {
     const address = device.deviceID || device.address || "";
     const name = device.name || "";
     await handleUpdatePlaylistDeviceAddress(address, name);

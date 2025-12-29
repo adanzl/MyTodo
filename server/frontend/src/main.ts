@@ -1,4 +1,5 @@
 import { createApp } from "vue";
+import { createPinia } from "pinia";
 import App from "./App.vue";
 import router from "./router";
 import ElementPlus from "element-plus";
@@ -10,6 +11,7 @@ import "@vant/touch-emulator"; // 在桌面浏览器中模拟移动端触摸事�
 import "./styles/main.css";
 
 const app = createApp(App);
+const pinia = createPinia();
 
 // 注册 Element Plus Icons
 for (const [name, component] of Object.entries(ElementPlusIconsVue)) {
@@ -22,6 +24,7 @@ for (const [name, component] of Object.entries(ElementPlusIconsVue)) {
   }
 }
 
+app.use(pinia);
 app.use(router);
 app.use(ElementPlus);
 app.use(Vant);

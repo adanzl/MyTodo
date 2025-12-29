@@ -6,17 +6,19 @@ import { type Ref } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { playlistAction } from "@/api/playlist";
 import { logAndNoticeError } from "@/utils/error";
+import { logger } from "@/utils/logger";
+import type { Playlist, PlaylistStatus, PlaylistItem } from "@/types/playlist";
 
 export function usePlaylistOperations(
-  playlistCollection: Ref<any[]>,
+  playlistCollection: Ref<Playlist[]>,
   activePlaylistId: Ref<string>,
-  playlistStatus: Ref<any>,
+  playlistStatus: Ref<PlaylistStatus | null>,
   playing: Ref<boolean>,
   stopping: Ref<boolean>,
-  syncActivePlaylist: (collection: any[]) => void,
-  updateActivePlaylistData: (mutator: (playlistInfo: any) => any) => Promise<any>,
+  syncActivePlaylist: (collection: Playlist[]) => void,
+  updateActivePlaylistData: (mutator: (playlistInfo: Playlist) => Playlist) => Promise<PlaylistStatus | null>,
   refreshPlaylistStatus: (onlyCurrent?: boolean, isAutoRefresh?: boolean) => Promise<void>,
-  getCurrentPreFiles: () => any[]
+  getCurrentPreFiles: () => PlaylistItem[]
 ) {
   // 加载播放列表
   const loadPlaylist = async () => {
@@ -27,7 +29,7 @@ export function usePlaylistOperations(
       }
       return response.data;
     } catch (error) {
-      console.error("从接口加载播放列表失败:", error);
+      logger.error("从接口加载播放列表失败:", error);
       throw error;
     }
   };

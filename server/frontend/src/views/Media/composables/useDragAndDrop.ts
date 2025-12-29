@@ -6,28 +6,29 @@ import { type Ref } from "vue";
 import { ElMessage } from "element-plus";
 import { logAndNoticeError } from "@/utils/error";
 import { getWeekdayIndex } from "@/utils/date";
+import type { Playlist, PlaylistStatus, PlaylistItem } from "@/types/playlist";
 
 export function useDragAndDrop(
-  playlistCollection: Ref<any[]>,
-  playlistStatus: Ref<any>,
+  playlistCollection: Ref<Playlist[]>,
+  playlistStatus: Ref<PlaylistStatus | null>,
   playlistLoading: Ref<boolean>,
   preFilesDragMode: Ref<boolean>,
   filesDragMode: Ref<boolean>,
   preFilesSortOrder: Ref<string | null>,
   filesSortOrder: Ref<string | null>,
-  preFilesOriginalOrder: Ref<any[] | null>,
-  filesOriginalOrder: Ref<any[] | null>,
+  preFilesOriginalOrder: Ref<PlaylistItem[] | null>,
+  filesOriginalOrder: Ref<PlaylistItem[] | null>,
   selectedWeekdayIndex: Ref<number | null>,
-  updateActivePlaylistData: (updater: (playlistInfo: any) => any) => Promise<void>,
-  syncActivePlaylist: (collection: any[]) => void,
-  getCurrentPreFiles: () => any[]
+  updateActivePlaylistData: (updater: (playlistInfo: Playlist) => Playlist) => Promise<void>,
+  syncActivePlaylist: (collection: Playlist[]) => void,
+  getCurrentPreFiles: () => PlaylistItem[]
 ) {
   const getSelectedWeekdayIndex = () => {
     return selectedWeekdayIndex.value !== null ? selectedWeekdayIndex.value : getWeekdayIndex();
   };
 
   // 检查两个数组的顺序是否相同
-  const isOrderChanged = (original: any[], current: any[]) => {
+  const isOrderChanged = (original: PlaylistItem[], current: PlaylistItem[]) => {
     if (!original || !current || original.length !== current.length) {
       return true;
     }
@@ -229,7 +230,7 @@ export function useDragAndDrop(
         }
         return {
           ...item,
-          pre_lists: item.pre_lists.map((oldList: any, idx: number) =>
+          pre_lists: item.pre_lists.map((oldList: PlaylistItem[], idx: number) =>
             idx === weekdayIndex ? list : oldList
           ),
           pre_index: newPreIndex,

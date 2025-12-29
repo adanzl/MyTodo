@@ -43,43 +43,36 @@
   </el-card>
 </template>
 
-<script setup>
-import { ref, onMounted, inject } from "vue";
+<script setup lang="ts">
+import { ref, onMounted, computed } from "vue";
 import { ElMessage } from "element-plus";
 import CryptoJS from "crypto-js";
-import _ from "lodash-es";
-import { getList } from "@/api/common";
+import * as _ from "lodash-es";
+import { useUserStore } from "@/stores/user";
 
-const emit = defineEmits(["login-success"]);
+const emit = defineEmits<{
+  "login-success": [userInfo: { id: number; name: string; icon: string }];
+}>();
 
-const userList = ref([]);
-const loading = ref(false);
-const user = ref({
+// 使用 Pinia Store
+const userStore = useUserStore();
+const userList = computed(() => userStore.userList);
+const loading = computed(() => userStore.loading);
+
+const user = ref<{
+  id: number | null;
+  password: string;
+}>({
   id: null,
   password: "",
 });
 
 const refreshUserList = async () => {
-  loading.value = true;
-  try {
-    const response = await getList("t_user");
-    if (response && response.data) {
-      // API 返回的是分页格式，用户数组在 response.data.data 中
-      const users = response.data.data || response.data;
-      userList.value = Array.isArray(users) ? users : [];
-      if (userList.value.length === 0) {
-        ElMessage.warning("用户列表为空，请检查数据库");
-      }
-    } else {
-      userList.value = [];
-      ElMessage.error("获取用户列表失败：数据格式错误");
-    }
-  } catch (error) {
-    userList.value = [];
-    const errorMsg = error?.response?.data?.msg || error?.message || String(error);
-    ElMessage.error(`获取用户列表失败: ${errorMsg}`);
-  } finally {
-    loading.value = false;
+  // 使用 Pinia Store（会自动处理缓存）
+  await userStore.refreshUserList();
+  // userList 已经是 computed，会自动响应 Store 的变化
+  if (userList.value.length === 0) {
+    ElMessage.warning("用户列表为空，请检查数据库");
   }
 };
 

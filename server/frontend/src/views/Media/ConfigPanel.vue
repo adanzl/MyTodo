@@ -46,7 +46,7 @@
                 :model-value="playlistStatus.schedule?.duration || 0"
                 @change="onUpdateDuration"
                 :min="0"
-                :max="1440"
+                :max="MAX_PLAYLIST_DURATION"
                 :step="1"
                 size="small"
                 :disabled="playlistStatus.schedule?.enabled !== 1"
@@ -65,10 +65,10 @@
                 class="w-full"
                 clearable
               >
-                <el-option label="空" value="" />
-                <el-option label="按钮对-1" value="B1" />
-                <el-option label="按钮对-2" value="B2" />
-                <el-option label="按钮对-3" value="B3" />
+                <el-option label="空" :value="TRIGGER_BUTTONS.NONE" />
+                <el-option label="按钮对-1" :value="TRIGGER_BUTTONS.BUTTON_1" />
+                <el-option label="按钮对-2" :value="TRIGGER_BUTTONS.BUTTON_2" />
+                <el-option label="按钮对-3" :value="TRIGGER_BUTTONS.BUTTON_3" />
               </el-select>
             </div>
           </div>
@@ -337,11 +337,15 @@
 </template>
 
 <script setup lang="ts">
+import { MAX_PLAYLIST_DURATION, TRIGGER_BUTTONS } from "@/constants/playlist";
+import type { PlaylistStatus } from "@/types/playlist";
+import type { BluetoothDevice, DlnaDevice, MiDevice, AgentDevice } from "@/types/device";
+
 interface Props {
-  playlistStatus: any;
-  connectedDeviceList: any[];
-  dlnaDeviceList: any[];
-  miDeviceList: any[];
+  playlistStatus: PlaylistStatus | null;
+  connectedDeviceList: (BluetoothDevice | AgentDevice)[];
+  dlnaDeviceList: DlnaDevice[];
+  miDeviceList: MiDevice[];
   loading: boolean;
   dlnaScanning: boolean;
   miScanning: boolean;
@@ -354,8 +358,8 @@ interface Props {
   onUpdateDeviceType: (deviceType: string) => void;
   onUpdateDeviceAddress: (address: string, name?: string | null) => void;
   onSelectBluetoothDevice: (address: string) => void;
-  onSelectAgentDevice: (device: any) => void;
-  onSelectMiDevice: (device: any) => void;
+  onSelectAgentDevice: (device: AgentDevice | string) => void;
+  onSelectMiDevice: (device: MiDevice) => void;
   onScanDlnaDevices: () => void;
   onScanMiDevices: () => void;
   onOpenScanDialog: () => void;

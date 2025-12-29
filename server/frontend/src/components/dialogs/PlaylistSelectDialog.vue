@@ -130,17 +130,18 @@
 import { ref, computed, watch, onMounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { logAndNoticeError } from "@/utils";
+import type { PlaylistItem } from "@/types/playlist";
 
 interface Playlist {
   id: string;
   name: string;
-  pre_lists?: any[][];
-  playlist?: any[];
+  pre_lists?: PlaylistItem[][];
+  playlist?: PlaylistItem[];
 }
 
 interface FileItem {
   uri?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface Props {

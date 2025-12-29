@@ -261,12 +261,12 @@
               :key="id"
               class="w-8 h-8 rounded-full border-2 cursor-pointer transition-all"
               :class="[
-                parseInt(id as string) == editingCourse.colorId
+                parseInt(id as string) === editingCourse.colorId
                   ? 'border-gray-800 scale-110'
                   : 'border-gray-300',
-                getCourseColor({ colorId: id }).bg,
+                getCourseColor({ colorId: parseInt(id as string) as CourseColorId }).bg,
               ]"
-              @click="editingCourse.colorId = parseInt(id as string)"
+              @click="editingCourse.colorId = parseInt(id as string) as CourseColorId"
               :title="color"
             ></div>
           </div>
@@ -288,9 +288,19 @@ import { ref, onMounted } from "vue";
 import { ElMessage } from "element-plus";
 import { InfoFilled } from "@element-plus/icons-vue";
 import { getRdsData, setRdsData } from "@/api/rds";
+import { logger } from "@/utils/logger";
+import type {
+  Course,
+  EditingCourse,
+  TimetableData,
+  FilterChild,
+  Weekday,
+  CourseColorId,
+  CourseColor,
+} from "@/types/timetable";
 
 // 课程颜色常量
-const COURSE_COLORS: Record<number, { bg: string; border: string; hover: string }> = {
+const COURSE_COLORS: Record<CourseColorId, CourseColor> = {
   1: { bg: "bg-blue-300", border: "border-blue-400", hover: "hover:bg-blue-400" },
   2: { bg: "bg-green-300", border: "border-green-400", hover: "hover:bg-green-400" },
   3: { bg: "bg-purple-300", border: "border-purple-400", hover: "hover:bg-purple-400" },
@@ -299,21 +309,13 @@ const COURSE_COLORS: Record<number, { bg: string; border: string; hover: string 
 };
 
 // 响应式数据
-const timetableData = ref<Record<string, any[]>>({}); // { '周一-zhaozhao': [ { startTime, name, duration } ] }
+const timetableData = ref<TimetableData>({});
 const loading = ref(false);
 const showEditModal = ref(false);
-const filterChild = ref("all"); // 筛选功能：all, zhaozhao, cancan
-const editingCourse = ref<{
-  day: string;
-  child: string;
-  startTime: string;
-  name: string;
-  duration: number;
-  colorId?: number;
-  originalStartTime?: string | null;
-}>({
+const filterChild = ref<FilterChild>("all");
+const editingCourse = ref<EditingCourse>({
   day: "",
-  child: "",
+  child: "zhaozhao",
   startTime: "",
   name: "",
   duration: 10,
@@ -321,7 +323,7 @@ const editingCourse = ref<{
 });
 
 // 星期
-const weekDays = ref(["周一", "周二", "周三", "周四", "周五", "周六", "周日"]);
+const weekDays = ref<Weekday[]>(["周一", "周二", "周三", "周四", "周五", "周六", "周日"]);
 
 // 生成小时数组（08:00~22:00）
 const hourSlots = ref<string[]>([]);
@@ -340,13 +342,13 @@ for (let hour = 8; hour <= 22; hour++) {
 }
 
 // 获取课程颜色
-const getCourseColor = (course: any) => {
-  const colorId = course.colorId || 1; // 默认使用颜色1
+const getCourseColor = (course: Course | { colorId?: CourseColorId }): CourseColor => {
+  const colorId = (course.colorId || 1) as CourseColorId;
   return COURSE_COLORS[colorId] || COURSE_COLORS[1];
 };
 
 // 计算课程结束时间
-const getEndTime = (course: any) => {
+const getEndTime = (course: Course): string => {
   const [h, m] = course.startTime.split(":").map(Number);
   let endMin = m + course.duration;
   let endHour = h;
@@ -358,12 +360,12 @@ const getEndTime = (course: any) => {
 };
 
 // 获取某天某孩子某小时的课程
-const getCoursesForHour = (day: string, child: string, hour: string) => {
+const getCoursesForHour = (day: Weekday, child: "zhaozhao" | "cancan", hour: string): Course[] => {
   const key = `${day}-${child}`;
   const courses = timetableData.value[key] || [];
 
   const filteredCourses = courses
-    .filter(c => {
+    .filter((c: Course) => {
       // 检查课程是否在当前小时内有显示部分
       const courseStart = c.startTime;
       const courseEnd = getEndTime(c);
@@ -383,13 +385,13 @@ const getCoursesForHour = (day: string, child: string, hour: string) => {
 
       return shouldInclude;
     })
-    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+    .sort((a: Course, b: Course) => a.startTime.localeCompare(b.startTime));
 
   return filteredCourses;
 };
 
 // 计算课程块样式 - 超过60分钟的课程显示为连续色块
-const getCourseBlockStyle = (course: any, hour: string) => {
+const getCourseBlockStyle = (course: Course, hour: string): Record<string, string> => {
   const [h] = course.startTime.split(":").map(Number);
   const currentHour = parseInt(hour.split(":")[0]);
 
@@ -412,12 +414,12 @@ const getCourseBlockStyle = (course: any, hour: string) => {
     height: `${totalHeight}%`,
     position: "absolute",
     width: "100%",
-    zIndex: 10,
+    zIndex: "10",
   };
 };
 
 // 判断是否应该显示课程名称 - 只在开始的小时块显示
-const shouldShowCourseName = (course: any, hour: string) => {
+const shouldShowCourseName = (course: Course, hour: string): boolean => {
   const [h] = course.startTime.split(":").map(Number);
   const currentHour = parseInt(hour.split(":")[0]);
 
@@ -426,14 +428,18 @@ const shouldShowCourseName = (course: any, hour: string) => {
 };
 
 // 计算指定小时块内可以开始的最早时间
-const getEarliestAvailableTime = (day: string, child: string, hour: string) => {
+const getEarliestAvailableTime = (
+  day: Weekday,
+  child: "zhaozhao" | "cancan",
+  hour: string
+): string | null => {
   const key = `${day}-${child}`;
   const existingCourses = timetableData.value[key] || [];
   const hourNum = parseInt(hour.split(":")[0]);
 
   // 获取所有影响当前小时块的课程（包括跨小时的课程）
   const allRelevantCourses = existingCourses
-    .filter(course => {
+    .filter((course: Course) => {
       const courseStart = parseInt(course.startTime.split(":")[0]);
       const courseEnd = new Date(`2000-01-01 ${course.startTime}`);
       courseEnd.setMinutes(courseEnd.getMinutes() + course.duration);
@@ -442,7 +448,7 @@ const getEarliestAvailableTime = (day: string, child: string, hour: string) => {
       // 包括：1. 在当前小时开始的课程 2. 从上一小时开始但延续到当前小时的课程
       return courseStart === hourNum || (courseStart < hourNum && courseEndHour >= hourNum);
     })
-    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+    .sort((a: Course, b: Course) => a.startTime.localeCompare(b.startTime));
 
   // 如果没有课程，返回整点时间
   if (allRelevantCourses.length === 0) {
@@ -500,7 +506,7 @@ const getEarliestAvailableTime = (day: string, child: string, hour: string) => {
 };
 
 // 点击小时格子新建课程
-const onHourCellClick = (day: string, child: string, hour: string) => {
+const onHourCellClick = (day: Weekday, child: "zhaozhao" | "cancan", hour: string) => {
   // 计算该小时块内可以开始的最早时间
   const earliestTime = getEarliestAvailableTime(day, child, hour);
 
@@ -523,9 +529,9 @@ const onHourCellClick = (day: string, child: string, hour: string) => {
 };
 
 // 编辑课程
-const editCourse = (day: string, child: string, startTime: string) => {
+const editCourse = (day: Weekday, child: "zhaozhao" | "cancan", startTime: string) => {
   const key = `${day}-${child}`;
-  const course = (timetableData.value[key] || []).find(c => c.startTime === startTime);
+  const course = (timetableData.value[key] || []).find((c: Course) => c.startTime === startTime);
   if (course) {
     editingCourse.value = {
       day,
@@ -590,17 +596,18 @@ const saveCourse = () => {
   // 如果是编辑，删除原有同startTime的课程
   if (editingCourse.value.originalStartTime) {
     timetableData.value[key] = timetableData.value[key].filter(
-      c => c.startTime !== editingCourse.value.originalStartTime
+      (c: Course) => c.startTime !== editingCourse.value.originalStartTime
     );
   }
 
   // 添加新课程
-  timetableData.value[key].push({
+  const newCourse: Course = {
     startTime: cleanTimeFormat(startTime),
     name: name.trim(),
     duration: parseInt(duration.toString()),
-    colorId: editingCourse.value.colorId || 1,
-  });
+    colorId: (editingCourse.value.colorId || 1) as CourseColorId,
+  };
+  timetableData.value[key].push(newCourse);
 
   showEditModal.value = false;
 };
@@ -610,7 +617,7 @@ const deleteCourse = () => {
   const { day, child, startTime } = editingCourse.value;
   const key = `${day}-${child}`;
   timetableData.value[key] = (timetableData.value[key] || []).filter(
-    c => c.startTime !== startTime
+    (c: Course) => c.startTime !== startTime
   );
   showEditModal.value = false;
   ElMessage.success("课程删除成功");
@@ -628,7 +635,7 @@ const reloadTimetable = async () => {
     await loadTimetableData();
     ElMessage.success("课程表数据已重新加载！");
   } catch (error) {
-    console.error("重新加载失败:", error);
+    logger.error("重新加载失败:", error);
     ElMessage.error("重新加载失败，请重试");
   } finally {
     loading.value = false;
@@ -666,7 +673,7 @@ const saveTimetable = async () => {
     await setRdsData("t_timetable", 0, jsonData);
     ElMessage.success("课程表保存成功！");
   } catch (error) {
-    console.error("保存失败:", error);
+    logger.error("保存失败:", error);
     ElMessage.error("保存失败，请重试");
   } finally {
     loading.value = false;
@@ -717,7 +724,7 @@ const printTimetable = () => {
           ${hourSlots.value
             .map(hour => {
               const row = [hour];
-              weekDays.value.forEach(day => {
+              weekDays.value.forEach((day: Weekday) => {
                 const zhaozhaoCourses = getCoursesForHour(day, "zhaozhao", hour);
                 const cancanCourses = getCoursesForHour(day, "cancan", hour);
 
@@ -792,13 +799,17 @@ const loadTimetableData = async () => {
     loading.value = true;
     const data = await getRdsData("t_timetable", 0);
     if (data) {
-      const rawData = JSON.parse(data as string);
+      const rawData = JSON.parse(data as string) as TimetableData;
       // 清理所有课程的开始时间格式
       Object.keys(rawData).forEach(key => {
         if (Array.isArray(rawData[key])) {
-          rawData[key].forEach((course: any) => {
+          rawData[key].forEach((course: Course) => {
             if (course.startTime) {
               course.startTime = cleanTimeFormat(course.startTime);
+            }
+            // 确保 colorId 是有效的 CourseColorId
+            if (course.colorId && (course.colorId < 1 || course.colorId > 5)) {
+              course.colorId = 1;
             }
           });
         }
@@ -806,7 +817,7 @@ const loadTimetableData = async () => {
       timetableData.value = rawData;
     }
   } catch (error) {
-    console.error("加载数据失败:", error);
+    logger.error("加载数据失败:", error);
     timetableData.value = {};
   } finally {
     loading.value = false;

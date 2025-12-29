@@ -3,13 +3,15 @@
  * 管理所有播放列表相关的状态变量
  */
 import { ref } from "vue";
+import type { Playlist, PlaylistStatus, PlaylistItem } from "@/types/playlist";
+import type { BluetoothDevice, DlnaDevice, MiDevice, AgentDevice } from "@/types/device";
 
 export function usePlaylistState() {
   const refData = {
     // 播放列表数据
-    playlistCollection: ref<any[]>([]),
+    playlistCollection: ref<Playlist[]>([]),
     activePlaylistId: ref<string>(""),
-    playlistStatus: ref<any>(null),
+    playlistStatus: ref<PlaylistStatus | null>(null),
     playlistLoading: ref(false),
     playlistRefreshing: ref(false),
 
@@ -45,7 +47,7 @@ export function usePlaylistState() {
 
     // 播放列表选择器
     playlistSelectorVisible: ref(false),
-    playlistSelectorSelectedFiles: ref<any[]>([]),
+    playlistSelectorSelectedFiles: ref<PlaylistItem[]>([]),
 
     // 批量抽屉
     batchDrawerVisible: ref(false),
@@ -60,19 +62,19 @@ export function usePlaylistState() {
     agentListDialogVisible: ref(false),
     scanDialogVisible: ref(false),
     loading: ref(false),
-    deviceList: ref<any[]>([]),
-    connectedDeviceList: ref<any[]>([]),
-    dlnaDeviceList: ref<any[]>([]),
+    deviceList: ref<BluetoothDevice[]>([]),
+    connectedDeviceList: ref<(BluetoothDevice | AgentDevice)[]>([]),
+    dlnaDeviceList: ref<DlnaDevice[]>([]),
     dlnaScanning: ref(false),
-    miDeviceList: ref<any[]>([]),
+    miDeviceList: ref<MiDevice[]>([]),
     miScanning: ref(false),
     pendingDeviceType: ref<string | null>(null),
 
     // 排序相关
     preFilesSortOrder: ref<string | null>(null),
     filesSortOrder: ref<string | null>(null),
-    preFilesOriginalOrder: ref<any[] | null>(null),
-    filesOriginalOrder: ref<any[] | null>(null),
+    preFilesOriginalOrder: ref<PlaylistItem[] | null>(null),
+    filesOriginalOrder: ref<PlaylistItem[] | null>(null),
   };
 
   return {

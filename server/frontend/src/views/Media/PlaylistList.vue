@@ -115,19 +115,7 @@ import { Monitor, Refresh, Plus, Headset, VideoPlay, Cpu } from "@element-plus/i
 import { getWeekdayIndex } from "@/utils/date";
 import { calculateNextCronTimes } from "@/utils/cron";
 import { formatDateTimeWithWeekday } from "@/utils/date";
-
-interface Playlist {
-  id: string;
-  name: string;
-  pre_lists?: any[][];
-  playlist?: any[];
-  schedule?: {
-    enabled: number;
-    cron: string;
-    duration: number;
-  };
-  trigger_button?: string;
-}
+import type { Playlist } from "@/types/playlist";
 
 interface Props {
   playlistCollection: Playlist[];

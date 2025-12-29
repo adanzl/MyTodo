@@ -2,22 +2,24 @@
  * PDF 相关 API
  */
 import { api } from "./config";
+import type { ApiResponse } from "@/types/api";
+import type { PdfFile } from "@/types/tools";
 
 /**
  * 获取 PDF 文件列表
  */
-export async function getPdfList() {
-  const response = await api.get("/pdf/list");
+export async function getPdfList(): Promise<ApiResponse<{ files: PdfFile[] }>> {
+  const response = await api.get<ApiResponse<{ files: PdfFile[] }>>("/pdf/list");
   return response.data;
 }
 
 /**
  * 上传 PDF 文件
  */
-export async function uploadPdf(file: File) {
+export async function uploadPdf(file: File): Promise<ApiResponse<{ filename: string }>> {
   const formData = new FormData();
   formData.append("file", file);
-  const response = await api.post("/pdf/upload", formData, {
+  const response = await api.post<ApiResponse<{ filename: string }>>("/pdf/upload", formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
@@ -28,12 +30,15 @@ export async function uploadPdf(file: File) {
 /**
  * 解密 PDF 文件
  */
-export async function decryptPdf(filename: string, password?: string) {
+export async function decryptPdf(
+  filename: string,
+  password?: string
+): Promise<ApiResponse<{ success: boolean }>> {
   const data: { filename: string; password?: string } = { filename };
   if (password !== undefined && password !== null) {
     data.password = password;
   }
-  const response = await api.post("/pdf/decrypt", data);
+  const response = await api.post<ApiResponse<{ success: boolean }>>("/pdf/decrypt", data);
   return response.data;
 }
 

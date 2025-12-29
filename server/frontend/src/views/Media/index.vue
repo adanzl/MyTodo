@@ -228,6 +228,7 @@ import { getWeekdayIndex } from "@/utils/date";
 import { usePlaylistState } from "./composables/usePlaylistState";
 import { usePlaylistData } from "./composables/usePlaylistData";
 import { usePlaylistOperations } from "./composables/usePlaylistOperations";
+import type { PlaylistItem } from "@/types/playlist";
 import { useCronManagement } from "./composables/useCronManagement";
 import { useDeviceManagement } from "./composables/useDeviceManagement";
 import { useAudioPlayback } from "./composables/useAudioPlayback";
@@ -542,7 +543,9 @@ const handleBatchAddFiles = async (data: {
         data.preLists.forEach(weekdayIndex => {
           if (weekdayIndex >= 0 && weekdayIndex < 7) {
             const existingUris = new Set(
-              (playlistInfo.pre_lists[weekdayIndex] || []).map((item: any) => item?.uri || item)
+              (playlistInfo.pre_lists[weekdayIndex] || []).map((item: PlaylistItem | string) => 
+                typeof item === 'string' ? item : item?.uri || ''
+              )
             );
             data.files.forEach(fileUri => {
               if (!existingUris.has(fileUri)) {
@@ -561,7 +564,9 @@ const handleBatchAddFiles = async (data: {
         if (!Array.isArray(playlistInfo.playlist)) {
           playlistInfo.playlist = [];
         }
-        const existingUris = new Set(playlistInfo.playlist.map((item: any) => item?.uri || item));
+        const existingUris = new Set(playlistInfo.playlist.map((item: PlaylistItem | string) => 
+          typeof item === 'string' ? item : item?.uri || ''
+        ));
         data.files.forEach(fileUri => {
           if (!existingUris.has(fileUri)) {
             playlistInfo.playlist.push({ uri: fileUri });
@@ -615,7 +620,10 @@ const handleBatchRemoveFiles = async (data: {
           data.preLists.forEach(weekdayIndex => {
             if (weekdayIndex >= 0 && weekdayIndex < 7 && playlistInfo.pre_lists[weekdayIndex]) {
               playlistInfo.pre_lists[weekdayIndex] = playlistInfo.pre_lists[weekdayIndex].filter(
-                (item: any) => !fileUriSet.has(item?.uri || item)
+                (item: PlaylistItem | string) => {
+                  const uri = typeof item === 'string' ? item : item?.uri || '';
+                  return !fileUriSet.has(uri);
+                }
               );
             }
           });
@@ -625,7 +633,10 @@ const handleBatchRemoveFiles = async (data: {
       // 从正式列表删除文件
       if (data.filesList && Array.isArray(playlistInfo.playlist)) {
         playlistInfo.playlist = playlistInfo.playlist.filter(
-          (item: any) => !fileUriSet.has(item?.uri || item)
+          (item: PlaylistItem | string) => {
+            const uri = typeof item === 'string' ? item : item?.uri || '';
+            return !fileUriSet.has(uri);
+          }
         );
         playlistInfo.total = playlistInfo.playlist.length;
         if (playlistInfo.playlist.length === 0) {
@@ -660,8 +671,17 @@ const handleSelectWeekday = (weekdayIndex: number) => {
   syncActivePlaylist(playlistCollection.value);
 };
 
-// 定时器
-let statusRefreshTimer: any = null;
+// 定时器 - 每5秒刷新一次当前播放列表状态
+import { useInterval } from "@/composables/useInterval";
+import { PLAYLIST_REFRESH_INTERVAL } from "@/constants/playlist";
+
+const { start: startStatusRefresh, stop: stopStatusRefresh } = useInterval(
+  async () => {
+    await refreshPlaylistStatus(true, true);
+  },
+  PLAYLIST_REFRESH_INTERVAL,
+  { immediate: false, autoCleanup: true }
+);
 
 // 初始化
 onMounted(async () => {
@@ -669,20 +689,12 @@ onMounted(async () => {
 
   await refreshConnectedList();
 
-  // 启动定时器，每5秒刷新一次当前播放列表状态
-  statusRefreshTimer = setInterval(async () => {
-    try {
-      await refreshPlaylistStatus(true, true);
-    } catch (error) {
-      console.error("定时刷新播放列表状态失败:", error);
-    }
-  }, 5000);
+  // 启动定时器
+  startStatusRefresh();
 });
 
 onUnmounted(() => {
-  if (statusRefreshTimer) {
-    clearInterval(statusRefreshTimer);
-    statusRefreshTimer = null;
-  }
+  // useInterval 会自动清理，但显式调用更安全
+  stopStatusRefresh();
 });
 </script>

@@ -5,14 +5,15 @@
 import { type Ref, ref } from "vue";
 import { ElMessage } from "element-plus";
 import { logAndNoticeError } from "@/utils/error";
+import type { Playlist } from "@/types/playlist";
 
 export function usePlaylistNameEdit(
-  playlistCollection: Ref<any[]>,
+  playlistCollection: Ref<Playlist[]>,
   activePlaylistId: Ref<string>,
   _editingPlaylistId: Ref<string | null>,
   _editingPlaylistName: Ref<string>,
-  savePlaylist: (collection: any[]) => Promise<void>,
-  syncActivePlaylist: (collection: any[]) => void
+  savePlaylist: (collection: Playlist[]) => Promise<void>,
+  syncActivePlaylist: (collection: Playlist[]) => void
 ) {
   // 对话框显示状态
   const editNameDialogVisible = ref(false);

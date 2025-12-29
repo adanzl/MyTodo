@@ -43,7 +43,7 @@ import { formatDuration } from "@/utils/format";
 
 interface FileItem {
   uri?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface Props {

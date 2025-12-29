@@ -2,13 +2,8 @@
  * 用户相关 API
  */
 import { api } from "./config";
-import { UData, type UserData } from "@/models";
-
-interface ApiResponse<T = any> {
-  code: number;
-  msg?: string;
-  data: T;
-}
+import { UData, type UserData } from "@/types";
+import type { ApiResponse } from "@/types/api";
 
 /**
  * 获取用户数据（日程）
@@ -33,8 +28,11 @@ export async function getSave(id: number | string): Promise<UserData> {
 /**
  * 设置用户信息
  */
-export async function setUserInfo(id: number | string, score: number): Promise<any> {
-  const rsp = await api.post<ApiResponse>("/setData", {
+export async function setUserInfo(
+  id: number | string,
+  score: number
+): Promise<{ id: number; score: number }> {
+  const rsp = await api.post<ApiResponse<{ id: number; score: number }>>("/setData", {
     table: "t_user",
     data: { id, score },
   });
@@ -70,8 +68,8 @@ export async function addScore(
   action: string,
   value: number,
   msg: string
-): Promise<any> {
-  const rsp = await api.post<ApiResponse>("/addScore", {
+): Promise<{ success: boolean }> {
+  const rsp = await api.post<ApiResponse<{ success: boolean }>>("/addScore", {
     user,
     action,
     value,

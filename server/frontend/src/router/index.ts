@@ -13,22 +13,22 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/lottery",
     name: "Lottery",
-    component: () => import("@/views/MyTodo/Lottery.vue"),
+    component: () => import("@/views/my-todo/Lottery.vue"),
   },
   {
     path: "/info",
     name: "Info",
-    component: () => import("@/views/MyTodo/Info.vue"),
+    component: () => import("@/views/my-todo/Info.vue"),
   },
   {
     path: "/chat",
     name: "Chat",
-    component: () => import("@/views/MyTodo/Chat.vue"),
+    component: () => import("@/views/my-todo/Chat.vue"),
   },
   {
     path: "/score",
     name: "Score",
-    component: () => import("@/views/MyTodo/Score.vue"),
+    component: () => import("@/views/my-todo/Score.vue"),
   },
   {
     path: "/timetable",
@@ -38,12 +38,12 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/media",
     name: "Media",
-    component: () => import("@/views/Media/index.vue"),
+    component: () => import("@/views/media/index.vue"),
   },
   {
     path: "/tools",
     name: "Tools",
-    component: () => import("@/views/Tools.vue"),
+    component: () => import("@/views/tools/index.vue"),
   },
 ];
 

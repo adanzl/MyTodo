@@ -239,11 +239,13 @@ import { Edit, Collection, Loading, Delete, Menu } from "@element-plus/icons-vue
 import { formatDuration } from "@/utils/format";
 import { getWeekdayIndex } from "@/utils/date";
 import { calculateFilesTotalDuration } from "@/utils/file";
+import type { MediaFile } from "@/types/tools";
+import type { PlaylistStatus } from "@/types/playlist";
 import PreFilesList from "./PreFilesList.vue";
 import FilesList from "./FilesList.vue";
 
 interface Props {
-  playlistStatus: any;
+  playlistStatus: PlaylistStatus | null;
   activePlaylistId: string;
   editingPlaylistId: string | null;
   editingPlaylistName: string;
@@ -259,9 +261,9 @@ interface Props {
   playing: boolean;
   stopping: boolean;
   showMoreActions: boolean;
-  isFilePlaying: (file: any) => boolean;
-  getFilePlayProgress: (file: any) => number;
-  getFileDuration: (file: any) => number;
+  isFilePlaying: (file: MediaFile) => boolean;
+  getFilePlayProgress: (file: MediaFile) => number;
+  getFileDuration: (file: MediaFile) => number;
 }
 
 const props = defineProps<Props>();
@@ -300,17 +302,17 @@ defineEmits<{
   "file-drag-end": [event: DragEvent];
   "file-drag-over": [event: DragEvent];
   "file-drop": [event: DragEvent, index: number];
-  "play-file": [file: any];
-  "seek-file": [file: any, percentage: number];
+  "play-file": [file: MediaFile];
+  "seek-file": [file: MediaFile, percentage: number];
   "move-pre-file-up": [index: number];
   "move-pre-file-down": [index: number];
   "replace-pre-file": [index: number];
-  "open-playlist-selector-for-pre-file": [file: any];
+  "open-playlist-selector-for-pre-file": [file: MediaFile];
   "delete-pre-file": [index: number];
   "move-file-up": [index: number];
   "move-file-down": [index: number];
   "replace-file": [index: number];
-  "open-playlist-selector-for-file": [file: any];
+  "open-playlist-selector-for-file": [file: MediaFile];
   "delete-file": [index: number];
 }>();
 
