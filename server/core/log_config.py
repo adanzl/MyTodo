@@ -15,8 +15,10 @@ if sys.platform == "linux":
 class HandlerFilter(logging.Filter):
 
     def filter(self, record):
-        # 只过滤 handler.py 相关日志
-        return record.filename != "handler.py" or record.levelno > logging.INFO
+        # 过滤 handler.py 的 INFO 级别日志（HTTP 请求日志）
+        if record.filename == "handler.py" and record.levelno == logging.INFO:
+            return False
+        return True
 
 
 def root_logger() -> logging.Logger:
@@ -37,11 +39,14 @@ def root_logger() -> logging.Logger:
     logger.setLevel(logging.INFO)
     logger.addHandler(std_handler)
 
+    handler_filter = HandlerFilter()
     for h in logger.handlers:
-        h.addFilter(HandlerFilter())
+        h.addFilter(handler_filter)
+
     if IS_PRODUCTION:
         file_handler = TimedRotatingFileHandler(log_file, when="midnight", backupCount=3, encoding="utf-8")
         file_handler.setFormatter(formatter)
+        file_handler.addFilter(handler_filter)
         logger.addHandler(file_handler)
         logger.info(f'Root log: logs/app.log (rotating daily, keeping 3 days)')
     else:
@@ -73,5 +78,8 @@ def access_logger(is_production: bool = False) -> logging.Logger:
         access_formatter = logging.Formatter('%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
         access_handler.setFormatter(access_formatter)
         access_logger.addHandler(access_handler)
+    else:
+        # 开发环境：创建一个空的日志记录器，不输出任何日志
+        access_logger.setLevel(logging.CRITICAL)  # 设置为 CRITICAL 级别，几乎不记录任何日志
 
     return access_logger
