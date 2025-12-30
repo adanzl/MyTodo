@@ -64,42 +64,63 @@ export default defineConfig({
       include: [/node_modules/],
     },
     rollupOptions: {
+      // 确保入口点的签名，帮助 Rollup 正确分析依赖关系
+      preserveEntrySignatures: "strict",
       output: {
-        // 确保资源路径正确
-        assetFileNames: "assets/[name].[hash].[ext]",
-        chunkFileNames: "assets/[name].[hash].js",
-        entryFileNames: "assets/[name].[hash].js",
-        // 暂时禁用手动代码分割，让 Vite 自动处理以避免模块加载顺序问题
-        // 如果打包体积过大，可以后续再优化
-        // manualChunks(id) {
-        //   if (!id.includes("node_modules")) {
-        //     return;
-        //   }
-        //   if (id.includes("vue") || id.includes("vue-router") || id.includes("pinia")) {
-        //     return "vue-vendor";
-        //   }
-        //   if (id.includes("element-plus") && !id.includes("@element-plus/icons-vue")) {
-        //     return "element-plus";
-        //   }
-        //   if (id.includes("@element-plus/icons-vue")) {
-        //     return "element-plus-icons";
-        //   }
-        //   if (
-        //     id.includes("axios") ||
-        //     id.includes("lodash-es") ||
-        //     id.includes("crypto-js") ||
-        //     id.includes("dayjs")
-        //   ) {
-        //     return "utils";
-        //   }
-        //   if (id.includes("socket.io-client")) {
-        //     return "socket";
-        //   }
-        //   if (id.includes("vant")) {
-        //     return "vant";
-        //   }
-        //   return "vendor";
-        // },
+        // 使用 contenthash 而不是 hash，只有内容改变时才会改变文件名
+        // 使用更短的哈希（8位）以减少文件名长度，同时保持唯一性
+        assetFileNames: assetInfo => {
+          const info = assetInfo.name?.split(".") || [];
+          const ext = info[info.length - 1];
+          // 图片等静态资源使用更稳定的命名
+          if (/\.(png|jpe?g|gif|svg|webp|ico)$/.test(assetInfo.name || "")) {
+            return `assets/images/[name]-[hash:8].[ext]`;
+          }
+          // CSS 文件
+          if (ext === "css") {
+            return `assets/css/[name]-[hash:8].[ext]`;
+          }
+          // 其他资源
+          return `assets/[name]-[hash:8].[ext]`;
+        },
+        chunkFileNames: "assets/js/[name]-[hash:8].js",
+        entryFileNames: "assets/js/[name]-[hash:8].js",
+        // 启用代码分割，将第三方库和业务代码分离
+        // 这样只有业务代码改变时，vendor 文件不会改变
+        manualChunks(id) {
+          // 业务代码不分割，保持在一个文件中
+          if (!id.includes("node_modules")) {
+            return;
+          }
+          // Vue 核心库必须最先加载（Element Plus 依赖它）
+          if (id.includes("vue") || id.includes("vue-router") || id.includes("pinia")) {
+            return "vue-vendor";
+          }
+          // Element Plus 单独分割，但它会依赖 vue-vendor
+          // Rollup 会自动处理依赖关系，确保 vue-vendor 先加载
+          if (id.includes("element-plus") || id.includes("@element-plus/icons-vue")) {
+            return "element-plus";
+          }
+          // 工具库
+          if (
+            id.includes("axios") ||
+            id.includes("lodash-es") ||
+            id.includes("crypto-js") ||
+            id.includes("dayjs")
+          ) {
+            return "utils";
+          }
+          // Socket.io
+          if (id.includes("socket.io-client")) {
+            return "socket";
+          }
+          // Vant UI 库
+          if (id.includes("vant")) {
+            return "vant";
+          }
+          // 其他第三方库
+          return "vendor";
+        },
       },
     },
   },
