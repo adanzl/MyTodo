@@ -2,11 +2,11 @@
 DLNA设备管理路由
 '''
 from flask import Blueprint, request
-from core.log_config import root_logger
+from core.log_config import app_logger
 from core.device.dlna import scan_devices_sync, DlnaDev
 from core.utils import _ok, _err, read_json_from_request
 
-log = root_logger
+log = app_logger
 dlna_bp = Blueprint('dlna', __name__)
 
 

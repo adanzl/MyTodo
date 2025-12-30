@@ -9,15 +9,14 @@ from datetime import datetime
 from flask import Blueprint, request, send_file, abort
 from werkzeug.utils import secure_filename
 
-from core.log_config import root_logger
+from core.log_config import app_logger
 from core.services.playlist_mgr import playlist_mgr
 from core.services.media_tool_mgr import media_tool_mgr
 from core.models.const import get_media_task_dir, get_media_task_result_dir, ALLOWED_AUDIO_EXTENSIONS
 from core.utils import get_media_url, get_media_duration, validate_and_normalize_path, _ok, _err, ensure_directory, is_allowed_audio_file, get_file_info, read_json_from_request, get_unique_filepath
 
-log = root_logger
+log = app_logger
 media_bp = Blueprint('media', __name__)
-
 
 # 常量定义
 DEFAULT_BASE_DIR = '/mnt'

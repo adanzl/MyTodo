@@ -11,10 +11,10 @@ from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 from apscheduler.executors.gevent import GeventExecutor
 from datetime import datetime
 from typing import Callable, Optional
-from core.log_config import root_logger
+from core.log_config import app_logger
 from core.utils import convert_standard_cron_weekday_to_apscheduler
 
-log = root_logger
+log = app_logger
 
 # 设置 APScheduler 的日志级别为 WARNING，减少任务执行的 INFO 日志
 logging.getLogger('apscheduler').setLevel(logging.WARNING)
@@ -43,7 +43,7 @@ class SchedulerMgr:
         # 在 gevent 环境中使用 GeventScheduler 和 GeventExecutor
         # 这样可以避免与 gevent hub 的冲突，确保定时任务能够正常执行和退出
         executor = GeventExecutor()
-        
+
         self.scheduler = GeventScheduler(
             timezone='Asia/Shanghai',  # 设置时区
             executors={'default': executor},
@@ -74,7 +74,6 @@ class SchedulerMgr:
         if self.scheduler.running:
             self.scheduler.shutdown(wait=wait)
             log.info("任务调度器已关闭")
-
 
     def add_cron_job(self, func: Callable, job_id: str, cron_expression: Optional[str] = None, **cron_kwargs):
         """
@@ -118,27 +117,23 @@ class SchedulerMgr:
                     second, minute, hour, day, month, day_of_week = parts
                     # 转换标准 cron 周几到 APScheduler 周几
                     converted_day_of_week = convert_standard_cron_weekday_to_apscheduler(day_of_week)
-                    trigger = CronTrigger(
-                        second=second,
-                        minute=minute,
-                        hour=hour,
-                        day=day,
-                        month=month,
-                        day_of_week=converted_day_of_week
-                    )
+                    trigger = CronTrigger(second=second,
+                                          minute=minute,
+                                          hour=hour,
+                                          day=day,
+                                          month=month,
+                                          day_of_week=converted_day_of_week)
                 elif len(parts) == 5:
                     # 5 字段格式：分 时 日 月 周（标准 cron）
                     # 手动解析并转换，不使用 from_crontab()（因为它有 bug）
                     minute, hour, day, month, day_of_week = parts
                     # 转换标准 cron 周几到 APScheduler 周几
                     converted_day_of_week = convert_standard_cron_weekday_to_apscheduler(day_of_week)
-                    trigger = CronTrigger(
-                        minute=minute,
-                        hour=hour,
-                        day=day,
-                        month=month,
-                        day_of_week=converted_day_of_week
-                    )
+                    trigger = CronTrigger(minute=minute,
+                                          hour=hour,
+                                          day=day,
+                                          month=month,
+                                          day_of_week=converted_day_of_week)
                 else:
                     raise ValueError(f"不支持的 cron 表达式格式，字段数量: {len(parts)}，期望 5 或 6 个字段")
             else:
@@ -314,6 +309,7 @@ class SchedulerMgr:
 
 # 全局调度器实例
 scheduler_mgr = SchedulerMgr()
+
 
 # 示例任务函数
 def example_task():

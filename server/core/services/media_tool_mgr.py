@@ -14,12 +14,11 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
-from core.log_config import root_logger
-from core.models.const import (ALLOWED_AUDIO_EXTENSIONS, MEDIA_BASE_DIR, get_media_task_dir,
-                               get_media_task_result_dir)
+from core.log_config import app_logger
+from core.models.const import (ALLOWED_AUDIO_EXTENSIONS, MEDIA_BASE_DIR, get_media_task_dir, get_media_task_result_dir)
 from core.utils import get_media_duration, ensure_directory
 
-log = root_logger
+log = app_logger
 
 # 任务状态
 TASK_STATUS_PENDING = 'pending'  # 等待中

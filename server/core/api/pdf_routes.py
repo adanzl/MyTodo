@@ -6,12 +6,12 @@ import os
 from flask import Blueprint, request, send_file
 from werkzeug.utils import secure_filename
 
-from core.log_config import root_logger
+from core.log_config import app_logger
 from core.services.pdf_mgr import pdf_mgr
 from core.utils import _ok, _err, read_json_from_request
 from core.models.const import PDF_UPLOAD_DIR, PDF_UNLOCK_DIR
 
-log = root_logger
+log = app_logger
 pdf_bp = Blueprint('pdf', __name__)
 
 

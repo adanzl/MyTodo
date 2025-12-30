@@ -12,12 +12,12 @@ load_dotenv()
 
 from flask import make_response
 from core import create_app
-from core.log_config import root_logger, access_logger
+from core.log_config import app_logger, access_logger
 
 # 生产环境判断
 IS_PRODUCTION = os.environ.get('ENV', 'development').lower() == 'production'
 
-log = root_logger
+log = app_logger
 
 app = create_app()
 
@@ -61,7 +61,6 @@ if __name__ == '__main__':
             resp.headers['Pragma'] = 'no-cache'
             resp.headers['Expires'] = '0'
             return resp
-
 
     try:
         from werkzeug.middleware.dispatcher import DispatcherMiddleware

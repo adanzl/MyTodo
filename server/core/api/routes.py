@@ -1,6 +1,6 @@
 from core.db.db_mgr import db_mgr
 
-from core.log_config import root_logger
+from core.log_config import app_logger
 from flask import Blueprint, json, jsonify, render_template, request
 import core.db.rds_mgr as rds_mgr
 from core.ai.ai_local import AILocal
@@ -11,7 +11,7 @@ import re
 import subprocess
 import urllib.parse
 
-log = root_logger
+log = app_logger
 api_bp = Blueprint('api', __name__)
 
 

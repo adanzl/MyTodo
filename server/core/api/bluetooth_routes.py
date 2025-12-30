@@ -3,11 +3,11 @@
 通过调用 device_agent 服务接口实现
 '''
 from flask import Blueprint, json, request
-from core.log_config import root_logger
+from core.log_config import app_logger
 from core.utils import _ok, _err, read_json_from_request
 from core.services.bluetooth_mgr import bluetooth_mgr
 
-log = root_logger
+log = app_logger
 bluetooth_bp = Blueprint('bluetooth', __name__)
 
 

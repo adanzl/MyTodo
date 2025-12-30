@@ -12,9 +12,9 @@ from bleak.backends.scanner import AdvertisementData
 
 from core.device.bluetooth import BluetoothDev
 from core.tools.async_util import run_async
-from core.log_config import root_logger
+from core.log_config import app_logger
 
-log = root_logger
+log = app_logger
 
 # 常量
 DEVICE_NAME_UUID = "00002a00-0000-1000-8000-00805f9b34fb"

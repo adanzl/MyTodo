@@ -6,11 +6,11 @@ import time
 
 from flask import Blueprint, request
 
-from core.log_config import root_logger
+from core.log_config import app_logger
 from core.services.agent_mgr import agent_mgr
 from core.utils import _err, _ok, read_json_from_request
 
-log = root_logger
+log = app_logger
 agent_bp = Blueprint('agent', __name__)
 
 
@@ -93,14 +93,24 @@ def agent_list():
         device_list = []
         for address, device_info in devices.items():
             device_data = {
-                'address': device_info.get('address', address),
-                'name': device_info.get('name', address),
-                'agent_id': device_info.get('agent_id', ''),
-                'actions': device_info.get('actions', []),
-                'register_time': device_info.get('register_time', 0),
-                'heartbeat_time': device_info.get('heartbeat_time', 0),
-                'last_heartbeat_ago': int(current_time - device_info.get('heartbeat_time', 0)) if device_info.get('heartbeat_time', 0) > 0 else 0,
-                'is_online': (current_time - device_info.get('heartbeat_time', 0)) < 30 if device_info.get('heartbeat_time', 0) > 0 else False
+                'address':
+                device_info.get('address', address),
+                'name':
+                device_info.get('name', address),
+                'agent_id':
+                device_info.get('agent_id', ''),
+                'actions':
+                device_info.get('actions', []),
+                'register_time':
+                device_info.get('register_time', 0),
+                'heartbeat_time':
+                device_info.get('heartbeat_time', 0),
+                'last_heartbeat_ago':
+                int(current_time -
+                    device_info.get('heartbeat_time', 0)) if device_info.get('heartbeat_time', 0) > 0 else 0,
+                'is_online':
+                (current_time -
+                 device_info.get('heartbeat_time', 0)) < 30 if device_info.get('heartbeat_time', 0) > 0 else False
             }
             device_list.append(device_data)
         return _ok(device_list)
@@ -133,7 +143,7 @@ def agent_mock():
 
         # 调用 mock 方法
         result = agent.mock(action=action, key=key, value=value)
-        
+
         if result.get("code") == 0:
             return _ok(result.get("data"))
         else:

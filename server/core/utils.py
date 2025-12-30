@@ -13,9 +13,9 @@ from urllib.parse import quote, unquote
 from flask import request
 from queue import Queue, Empty
 
-from core.log_config import root_logger
+from core.log_config import app_logger
 
-log = root_logger
+log = app_logger
 
 
 def ok_response(data=None):
@@ -52,7 +52,7 @@ def read_json_from_request():
             raw_data = request.stream.read(content_length)
         else:
             raw_data = request.stream.read()
-        
+
         if raw_data:
             return json.loads(raw_data.decode('utf-8'))
         return {}
@@ -118,21 +118,21 @@ def get_media_duration(file_path):
     """
     import tempfile
     import shlex
-    
+
     # 使用共享变量存储结果
     result_container = {'duration': None, 'error': None}
-    
+
     def _run_ffprobe_in_thread():
         """在独立线程中运行 ffprobe"""
         try:
             # 创建临时文件存储输出
             with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.txt') as tmp_file:
                 tmp_path = tmp_file.name
-            
+
             try:
                 # 构建命令，将输出重定向到临时文件
                 cmd_str = f"/usr/bin/ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 {shlex.quote(file_path)} > {shlex.quote(tmp_path)} 2>&1"
-                
+
                 # 使用 os.system 执行命令（返回退出码）
                 returncode = os.system(cmd_str)
                 # os.system 返回值的处理：
@@ -144,14 +144,14 @@ def get_media_duration(file_path):
                     returncode = 0  # 假设成功，后续通过输出判断
                 else:
                     returncode = returncode >> 8 if returncode else 0  # 提取退出码
-                
+
                 # 读取输出（即使返回码非0也尝试读取，因为某些情况下命令可能成功但返回非0）
                 try:
                     with open(tmp_path, 'r') as f:
                         stdout = f.read().strip()
                 except Exception:
                     stdout = ""
-                
+
                 # 如果输出有效，尝试解析时长（即使返回码非0）
                 if stdout:
                     try:
@@ -164,33 +164,33 @@ def get_media_duration(file_path):
                 else:
                     # 没有输出且返回码非0，认为失败
                     result_container['error'] = f"ffprobe failed: returncode={returncode}, no output"
-                    
+
             finally:
                 # 清理临时文件
                 try:
                     os.unlink(tmp_path)
                 except Exception:
                     pass
-                    
+
         except FileNotFoundError as e:
             result_container['error'] = f"ffprobe not found: {e}"
         except Exception as e:
             result_container['error'] = str(e)
-    
+
     # 在独立线程中运行
     thread = threading.Thread(target=_run_ffprobe_in_thread, daemon=True)
     thread.start()
     thread.join(timeout=55)  # 等待线程完成
-    
+
     if thread.is_alive():
         log.warning(f"[Utils] ffprobe thread timeout for {file_path}")
         return None
-    
+
     # 检查结果
     if result_container['error']:
         log.warning(f"[Utils] Error getting media duration for {file_path}: {result_container['error']}")
         return None
-    
+
     return result_container['duration']
 
 
@@ -443,7 +443,7 @@ def get_file_info(file_path: str) -> Optional[dict]:
     """
     if not os.path.exists(file_path):
         return None
-    
+
     stat_info = os.stat(file_path)
     return {
         "name": os.path.basename(file_path),

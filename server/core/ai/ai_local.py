@@ -1,9 +1,9 @@
 import json
 
 import requests
-from core.log_config import root_logger
+from core.log_config import app_logger
 
-log = root_logger
+log = app_logger
 API_URL = "http://192.168.50.171:9098/v1"
 # cSpell: disable-next-line
 API_KEY = "app-dLf0axfqNnVHwWjFqs0EVo8H"
@@ -14,9 +14,9 @@ HEADERS = {
     "Authorization": f"Bearer {API_KEY}",
 }
 
+
 class AILocal:
 
-    
     def __init__(self, on_msg=None, on_err=None):
         self.aiConversationId = ""
         self.user = 'user'
@@ -91,9 +91,9 @@ class AILocal:
                 "limit": limit,
             }
             with requests.get(
-                f"{API_URL}/messages",
-                headers=HEADERS,
-                params=payload,
+                    f"{API_URL}/messages",
+                    headers=HEADERS,
+                    params=payload,
             ) as r:
                 r.raise_for_status()
                 data = r.json()
@@ -101,6 +101,7 @@ class AILocal:
         except Exception as e:
             log.error(f"请求失败: {str(e)}")
             return None
+
 
 if __name__ == "__main__":
 

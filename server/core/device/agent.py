@@ -5,9 +5,9 @@ Device Agent HTTP 客户端
 import os
 import requests
 from typing import Optional, Dict, Any
-from core.log_config import root_logger
+from core.log_config import app_logger
 
-log = root_logger
+log = app_logger
 
 # 完整的服务URL
 DEVICE_AGENT_BASE_URL = f"http://192.168.50.184:8000"

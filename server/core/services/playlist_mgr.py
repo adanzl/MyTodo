@@ -12,11 +12,11 @@ from gevent import spawn
 from core.utils import get_media_duration, check_cron_will_trigger_today
 from core.db import rds_mgr
 from core.device import create_device
-from core.log_config import root_logger
+from core.log_config import app_logger
 from core.services.scheduler_mgr import scheduler_mgr
 from core.utils import time_to_seconds
 
-log = root_logger
+log = app_logger
 
 PLAYLIST_RDS_FULL_KEY = "schedule_play:playlist_collection"
 DEFAULT_PLAYLIST_NAME = "默认播放列表"
@@ -113,7 +113,7 @@ class PlaylistMgr:
         """启动 Redis 保存操作的 worker greenlet"""
         if self._rds_save_greenlet is not None and not self._rds_save_greenlet.dead:
             return  # 已经启动
-        
+
         def _rds_save_worker():
             """在 gevent 环境中处理 Redis 保存操作"""
             from gevent import sleep
@@ -132,7 +132,7 @@ class PlaylistMgr:
                 except Exception as e:
                     log.error(f"[PlaylistMgr] Redis 保存 worker 异常: {e}", exc_info=True)
                     sleep(1.0)  # 出错后等待更长时间
-        
+
         self._rds_save_greenlet = spawn(_rds_save_worker)
 
     def _save_playlist_to_rds(self):
@@ -544,7 +544,7 @@ class PlaylistMgr:
                 if updated_count > 0:
                     # 在线程中不能直接调用 Redis，使用队列将保存操作传递到 gevent 环境
                     self._rds_save_queue.put(('save_playlist', None))
-                    
+
                     log.info(f"[PlaylistMgr] 批量获取时长完成: 成功 {updated_count} 个, 失败 {failed_count} 个, 失败文件: {failed_uris}")
             except Exception as e:
                 log.error(f"[PlaylistMgr] 批量获取时长线程异常: {e}")

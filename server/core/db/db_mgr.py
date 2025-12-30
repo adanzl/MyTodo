@@ -4,13 +4,13 @@ import datetime
 from datetime import timezone, timedelta
 
 from core.db import db_obj
-from core.log_config import root_logger
+from core.log_config import app_logger
 from sqlalchemy import func
 from sqlalchemy import MetaData, Table, select, text
 from core.models.user import User
 from core.models.score_history import ScoreHistory
 
-log = root_logger
+log = app_logger
 
 DB_NAME = "data.db"
 TABLE_SAVE = "t_user_save"

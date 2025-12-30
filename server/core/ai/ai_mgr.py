@@ -1,9 +1,9 @@
 import json
 
 import requests
-from core.log_config import root_logger
+from core.log_config import app_logger
 
-log = root_logger
+log = app_logger
 API_URL = "https://ark.cn-beijing.volces.com"
 DOU_BAO_AK = '91cd8756-4fd8-4235-a2bd-777949576205'
 # 这里需要根据实际的 API 路径进行修改

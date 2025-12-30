@@ -9,9 +9,9 @@ from queue import Queue, Empty
 
 from gevent import Timeout as GeventTimeout
 from gevent import spawn
-from core.log_config import root_logger
+from core.log_config import app_logger
 
-log = root_logger
+log = app_logger
 
 # 使用 threading.Thread 而不是 ThreadPoolExecutor，避免与 gevent 的队列冲突
 # 因为 main.py 中设置了 thread=False，threading 模块不会被 gevent patch
@@ -30,20 +30,23 @@ def _clear_event_loop() -> None:
             pass
 
 
-def _run_in_thread(coroutine: Coroutine, timeout: Optional[float] = None, result_queue: Queue = None, error_queue: Queue = None) -> None:
+def _run_in_thread(coroutine: Coroutine,
+                   timeout: Optional[float] = None,
+                   result_queue: Queue = None,
+                   error_queue: Queue = None) -> None:
     """
     在线程中运行异步函数
     
     使用 asyncio.run() 简化代码，对于超时情况使用 asyncio.wait_for() 包装
     """
     _clear_event_loop()
-    
+
     async def _run_coroutine():
         if timeout:
             return await asyncio.wait_for(coroutine, timeout=timeout)
         else:
             return await coroutine
-    
+
     try:
         result = asyncio.run(_run_coroutine())
         if result_queue is not None:
@@ -77,76 +80,72 @@ def run_async(coroutine: Coroutine, timeout: Optional[float] = None) -> Any:
     """
     if timeout is None:
         timeout = 10.0  # 默认超时时间，避免无限等待
-    
+
     # 使用 Queue 传递结果和异常（threading.Queue 不会被 gevent patch，因为 thread=False）
     result_queue = Queue()
     error_queue = Queue()
-    
+
     # 创建线程并启动
-    thread = threading.Thread(
-        target=_run_in_thread,
-        args=(coroutine, timeout, result_queue, error_queue),
-        daemon=True
-    )
+    thread = threading.Thread(target=_run_in_thread, args=(coroutine, timeout, result_queue, error_queue), daemon=True)
     thread.start()
-    
+
     def wait_for_thread() -> Any:
         """等待线程完成（在 gevent greenlet 中运行）"""
         import time
         from gevent import sleep
-        
+
         start_time = time.time()
         wait_timeout = timeout + 1.0  # 多给1秒缓冲
         max_iterations = int(wait_timeout * 100)  # 最多轮询次数（10ms间隔）
         iteration = 0
-        
+
         # 使用 gevent.sleep 轮询，避免阻塞 gevent hub
         while thread.is_alive() and iteration < max_iterations:
             iteration += 1
-            
+
             # 检查是否超时
             elapsed = time.time() - start_time
             if elapsed > wait_timeout:
                 # 超时了，记录日志并抛出异常
                 log.warning(f"[async_util] Operation timed out after {timeout} seconds, thread still alive")
                 raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
-            
+
             # 检查是否有错误（优先检查错误）
             try:
                 error = error_queue.get_nowait()
                 raise error
             except Empty:
                 pass
-            
+
             # 检查是否有结果
             try:
                 return result_queue.get_nowait()
             except Empty:
                 pass
-            
+
             # 让出控制权给其他 greenlet
             sleep(0.01)  # 10ms 轮询间隔
-        
+
         # 如果循环退出，检查线程状态
         if thread.is_alive():
             # 线程还在运行，说明超时了
             log.warning(f"[async_util] Thread still alive after {wait_timeout} seconds, raising timeout")
             raise asyncio.TimeoutError(f"Operation timed out after {timeout} seconds")
-        
+
         # 线程已完成，检查结果或错误
         try:
             error = error_queue.get_nowait()
             raise error
         except Empty:
             pass
-        
+
         try:
             return result_queue.get_nowait()
         except Empty:
             # 线程已完成但没有结果或错误，可能是异常退出
             log.warning("[async_util] Thread completed but no result or error was returned")
             raise RuntimeError("Thread completed but no result or error was returned")
-    
+
     # 使用 gevent.spawn 等待，避免阻塞其他 gevent 协程
     # 使用 GeventTimeout 确保即使 wait_for_thread 卡住也能超时返回
     try:
@@ -162,4 +161,3 @@ def run_async(coroutine: Coroutine, timeout: Optional[float] = None) -> Any:
     except Exception as e:
         # 直接抛出异常（包括其他异常）
         raise
-

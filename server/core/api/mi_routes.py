@@ -2,11 +2,11 @@
 小米设备管理路由
 '''
 from flask import Blueprint, request
-from core.log_config import root_logger
+from core.log_config import app_logger
 from core.device.mi_device import scan_devices_sync, MiDevice
 from core.utils import _ok, _err, read_json_from_request
 
-log = root_logger
+log = app_logger
 mi_bp = Blueprint('mi', __name__)
 
 
