@@ -3,13 +3,13 @@
  */
 import { api } from "./config";
 import type { ApiResponse } from "@/types/api";
-import type { PdfFile } from "@/types/tools";
+import type { PdfTask } from "@/types/tools";
 
 /**
- * 获取 PDF 文件列表
+ * 获取 PDF 任务列表
  */
-export async function getPdfList(): Promise<ApiResponse<{ files: PdfFile[] }>> {
-  const response = await api.get<ApiResponse<{ files: PdfFile[] }>>("/pdf/list");
+export async function getPdfList(): Promise<ApiResponse<PdfTask[]>> {
+  const response = await api.get<ApiResponse<PdfTask[]>>("/pdf/list");
   return response.data;
 }
 
@@ -28,17 +28,25 @@ export async function uploadPdf(file: File): Promise<ApiResponse<{ filename: str
 }
 
 /**
- * 解密 PDF 文件
+ * 解密 PDF 文件（异步处理）
  */
 export async function decryptPdf(
-  filename: string,
+  task_id: string,
   password?: string
-): Promise<ApiResponse<{ success: boolean }>> {
-  const data: { filename: string; password?: string } = { filename };
-  if (password !== undefined && password !== null) {
+): Promise<ApiResponse<{ message: string }>> {
+  const data: { task_id: string; password?: string } = { task_id };
+  if (password !== undefined && password !== null && password !== "") {
     data.password = password;
   }
-  const response = await api.post<ApiResponse<{ success: boolean }>>("/pdf/decrypt", data);
+  const response = await api.post<ApiResponse<{ message: string }>>("/pdf/decrypt", data);
+  return response.data;
+}
+
+/**
+ * 获取任务状态
+ */
+export async function getTaskStatus(task_id: string): Promise<ApiResponse<PdfTask>> {
+  const response = await api.get<ApiResponse<PdfTask>>(`/pdf/task/${encodeURIComponent(task_id)}`);
   return response.data;
 }
 
@@ -52,12 +60,11 @@ export function getPdfDownloadUrl(filename: string, type: "uploaded" | "unlocked
 }
 
 /**
- * 删除 PDF 文件
+ * 删除 PDF 任务
  */
-export async function deletePdf(filename: string, type: "both" | "uploaded" | "unlocked" = "both") {
-  const response = await api.post("/pdf/delete", {
-    filename,
-    type,
+export async function deletePdf(task_id: string): Promise<ApiResponse<{ message: string }>> {
+  const response = await api.post<ApiResponse<{ message: string }>>("/pdf/delete", {
+    task_id,
   });
   return response.data;
 }

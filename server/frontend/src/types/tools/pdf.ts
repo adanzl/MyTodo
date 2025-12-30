@@ -3,13 +3,9 @@
  */
 
 /**
- * PDF 文件接口
+ * PDF 文件信息接口
  */
-export interface PdfFile {
-  /**
-   * 文件ID
-   */
-  id: number;
+export interface PdfFileInfo {
   /**
    * 文件名
    */
@@ -23,31 +19,45 @@ export interface PdfFile {
    */
   size?: number;
   /**
-   * 是否已上传
+   * 修改时间戳
    */
-  uploaded?: boolean;
+  modified?: number;
+}
+
+/**
+ * PDF 任务接口
+ */
+export interface PdfTask {
   /**
-   * 是否已解锁（解密）
+   * 任务ID（文件名）
    */
-  unlocked?: boolean;
+  task_id: string;
   /**
-   * 上传文件路径
+   * 文件名
    */
-  uploaded_path?: string;
+  filename: string;
   /**
-   * 已解锁文件路径
+   * 任务状态：uploaded, pending, processing, success, failed
    */
-  unlocked_path?: string;
+  status: string;
+  /**
+   * 上传文件信息
+   */
+  uploaded_info: PdfFileInfo;
+  /**
+   * 已解密文件信息（如果存在）
+   */
+  unlocked_info?: PdfFileInfo | null;
+  /**
+   * 错误信息（如果失败）
+   */
+  error_message?: string | null;
   /**
    * 创建时间戳
    */
-  create_time?: number;
+  create_time: number;
   /**
    * 更新时间戳
    */
-  update_time?: number;
-  /**
-   * 允许扩展字段
-   */
-  [key: string]: unknown;
+  update_time: number;
 }

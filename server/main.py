@@ -12,7 +12,10 @@ load_dotenv()
 
 from flask import make_response
 from core import create_app
-from core.log_config import root_logger
+from core.log_config import root_logger, access_logger
+
+# 生产环境判断
+IS_PRODUCTION = os.environ.get('ENV', 'development').lower() == 'production'
 
 log = root_logger()
 
@@ -48,9 +51,6 @@ if __name__ == '__main__':
     PORT = int(os.environ.get('PORT', 8000))
     HOST = os.environ.get('HOST', '127.0.0.1')
 
-    # 生产环境判断
-    IS_PRODUCTION = os.environ.get('ENV', 'development').lower() == 'production'
-
     # 只在开发环境禁用浏览器缓存
     if not IS_PRODUCTION:
 
@@ -61,6 +61,7 @@ if __name__ == '__main__':
             resp.headers['Pragma'] = 'no-cache'
             resp.headers['Expires'] = '0'
             return resp
+
 
     try:
         from werkzeug.middleware.dispatcher import DispatcherMiddleware
@@ -79,7 +80,8 @@ if __name__ == '__main__':
         http_server = WSGIServer(
             (HOST, PORT),
             application,
-            log=None,
+            log=access_logger(),  # 使用访问日志记录器
+            error_log=log,  # 错误日志使用应用日志
             handler_class=WebSocketHandler,
         )
         env_info = 'production' if IS_PRODUCTION else 'development'

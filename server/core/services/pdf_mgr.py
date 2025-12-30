@@ -1,10 +1,11 @@
 """
 PDF 管理服务
 提供 PDF 文件上传、解密、列表等功能
+采用任务模式，每个文件对应一个任务，支持异步解密处理
 """
 import os
 import json
-import shutil
+import threading
 from typing import Optional, Tuple, Dict, List
 from dataclasses import dataclass, asdict
 from datetime import datetime
@@ -18,120 +19,188 @@ from core.utils import ensure_directory, get_file_info, is_allowed_pdf_file
 
 log = root_logger()
 
+# 任务状态
+TASK_STATUS_PENDING = 'pending'  # 等待中
+TASK_STATUS_PROCESSING = 'processing'  # 处理中
+TASK_STATUS_SUCCESS = 'success'  # 成功（已解密）
+TASK_STATUS_FAILED = 'failed'  # 失败
+TASK_STATUS_UPLOADED = 'uploaded'  # 已上传（未解密）
+
 
 @dataclass
-class PdfFileRecord:
-    """PDF 文件记录"""
+class PdfTask:
+    """PDF 任务"""
+    task_id: str  # 任务ID（使用文件名）
     filename: str  # 文件名
+    status: str  # 任务状态：uploaded, pending, processing, success, failed
     uploaded_path: str  # 上传文件路径
     uploaded_info: Dict  # 上传文件信息（name, path, size, modified）
     unlocked_path: Optional[str] = None  # 已解密文件路径
     unlocked_info: Optional[Dict] = None  # 已解密文件信息
-    has_unlocked: bool = False  # 是否有已解密文件
+    error_message: Optional[str] = None  # 错误信息
     create_time: float = 0  # 创建时间戳
     update_time: float = 0  # 更新时间戳
 
 
 class PdfMgr:
-    """PDF 管理器"""
-    
-    RECORD_FILE = 'pdf.json'  # 记录文件名
-    MAX_FILES = 30  # 最大保留文件数
-    
+    """PDF 管理器（任务模式）"""
+
+    TASK_META_FILE = 'tasks.json'  # 任务元数据文件名
+
     def __init__(self):
         """初始化管理器"""
-        self._files: Dict[str, PdfFileRecord] = {}  # key: filename
-        self._processing_files: set = set()  # 正在处理的文件集合
-        self._load_history_records()
-    
-    def _load_history_records(self):
-        """加载历史记录"""
+        self._tasks: Dict[str, PdfTask] = {}  # key: task_id (filename)
+        self._task_lock = threading.Lock()  # 任务操作锁
+        self._load_history_tasks()
+
+    def _get_task(self, task_id: str) -> Optional[PdfTask]:
+        """获取任务对象，不存在返回 None"""
+        return self._tasks.get(task_id)
+
+    def _task_to_dict(self, task: PdfTask) -> Dict:
+        """将任务对象转换为字典"""
+        return {
+            "task_id": task.task_id,
+            "filename": task.filename,
+            "status": task.status,
+            "uploaded_info": task.uploaded_info,
+            "unlocked_info": task.unlocked_info,
+            "error_message": task.error_message,
+            "create_time": task.create_time,
+            "update_time": task.update_time
+        }
+
+    def _get_unlocked_path(self, task_id: str) -> str:
+        """获取已解密文件路径"""
+        base_name, ext = os.path.splitext(task_id)
+        unlocked_filename = f"{base_name}_unlocked{ext}"
+        return os.path.join(PDF_UNLOCK_DIR, unlocked_filename)
+
+    def _update_unlocked_file_info(self, task: PdfTask):
+        """更新任务的已解密文件信息"""
+        if task.unlocked_path and os.path.exists(task.unlocked_path):
+            unlocked_info = get_file_info(task.unlocked_path)
+            if unlocked_info:
+                task.unlocked_info = unlocked_info
+                if task.status != TASK_STATUS_PROCESSING:
+                    task.status = TASK_STATUS_SUCCESS
+            else:
+                task.unlocked_path = None
+                task.unlocked_info = None
+                if task.status == TASK_STATUS_SUCCESS:
+                    task.status = TASK_STATUS_UPLOADED
+        else:
+            # 检查是否有对应的已解密文件
+            unlocked_path = self._get_unlocked_path(task.task_id)
+            if os.path.exists(unlocked_path):
+                unlocked_info = get_file_info(unlocked_path)
+                if unlocked_info:
+                    task.unlocked_path = unlocked_path
+                    task.unlocked_info = unlocked_info
+                    if task.status != TASK_STATUS_PROCESSING:
+                        task.status = TASK_STATUS_SUCCESS
+            else:
+                task.unlocked_path = None
+                task.unlocked_info = None
+                if task.status == TASK_STATUS_SUCCESS:
+                    task.status = TASK_STATUS_UPLOADED
+
+    def _load_history_tasks(self):
+        """加载历史任务"""
         try:
             if not os.path.exists(PDF_BASE_DIR):
                 return
-            
-            record_file = os.path.join(PDF_BASE_DIR, self.RECORD_FILE)
-            if not os.path.exists(record_file):
+
+            task_meta_file = os.path.join(PDF_BASE_DIR, self.TASK_META_FILE)
+            if not os.path.exists(task_meta_file):
                 return
-            
-            with open(record_file, 'r', encoding='utf-8') as f:
-                all_records_data = json.load(f)
-            
-            if not isinstance(all_records_data, dict):
-                log.warning("[PDF] pdf.json 格式错误，应为字典格式")
+
+            with open(task_meta_file, 'r', encoding='utf-8') as f:
+                all_tasks_data = json.load(f)
+
+            if not isinstance(all_tasks_data, dict):
+                log.warning("[PDF] tasks.json 格式错误，应为字典格式")
                 return
-            
+
             loaded_count = 0
-            for filename, record_data in all_records_data.items():
+            for task_id, task_data in all_tasks_data.items():
                 try:
                     # 验证上传文件是否存在
-                    uploaded_path = record_data.get('uploaded_path')
+                    uploaded_path = task_data.get('uploaded_path')
                     if not uploaded_path or not os.path.exists(uploaded_path):
-                        log.warning(f"[PDF] 上传文件不存在: {filename}")
+                        log.warning(f"[PDF] 上传文件不存在: {task_id}")
                         continue
-                    
+
                     # 重新获取上传文件信息
                     uploaded_info = get_file_info(uploaded_path)
                     if not uploaded_info:
-                        log.warning(f"[PDF] 无法获取上传文件信息: {filename}")
+                        log.warning(f"[PDF] 无法获取上传文件信息: {task_id}")
                         continue
-                    
+
                     # 验证已解密文件是否存在
-                    unlocked_path = record_data.get('unlocked_path')
+                    unlocked_path = task_data.get('unlocked_path')
                     unlocked_info = None
-                    has_unlocked = False
+                    status = task_data.get('status', TASK_STATUS_UPLOADED)
                     if unlocked_path and os.path.exists(unlocked_path):
                         unlocked_info = get_file_info(unlocked_path)
-                        has_unlocked = unlocked_info is not None
-                    
-                    # 创建记录对象
-                    record = PdfFileRecord(
-                        filename=filename,
-                        uploaded_path=uploaded_path,
-                        uploaded_info=uploaded_info,
-                        unlocked_path=unlocked_path if has_unlocked else None,
-                        unlocked_info=unlocked_info,
-                        has_unlocked=has_unlocked,
-                        create_time=record_data.get('create_time', 0),
-                        update_time=record_data.get('update_time', 0)
-                    )
-                    
-                    self._files[filename] = record
+                        if unlocked_info:
+                            status = TASK_STATUS_SUCCESS
+                        else:
+                            status = TASK_STATUS_UPLOADED
+                    elif status == TASK_STATUS_PROCESSING:
+                        # 如果之前是处理中状态，重置为已上传
+                        status = TASK_STATUS_UPLOADED
+
+                    # 创建任务对象
+                    task = PdfTask(task_id=task_id,
+                                   filename=task_data.get('filename', task_id),
+                                   status=status,
+                                   uploaded_path=uploaded_path,
+                                   uploaded_info=uploaded_info,
+                                   unlocked_path=unlocked_path if unlocked_info else None,
+                                   unlocked_info=unlocked_info,
+                                   error_message=task_data.get('error_message'),
+                                   create_time=task_data.get('create_time', 0),
+                                   update_time=task_data.get('update_time', 0))
+
+                    self._tasks[task_id] = task
                     loaded_count += 1
-                    log.info(f"[PDF] 加载历史记录: {filename}")
-                    
+                    log.info(f"[PDF] 加载历史任务: {task_id}")
+
                 except Exception as e:
-                    log.error(f"[PDF] 加载记录失败 {filename}: {e}")
+                    log.error(f"[PDF] 加载任务失败 {task_id}: {e}")
                     continue
-            
-            log.info(f"[PDF] 共加载 {loaded_count} 个历史记录")
-            
+
+            log.info(f"[PDF] 共加载 {loaded_count} 个历史任务")
+
         except json.JSONDecodeError as e:
-            log.error(f"[PDF] 解析 pdf.json 失败: {e}")
+            log.error(f"[PDF] 解析 tasks.json 失败: {e}")
         except Exception as e:
-            log.error(f"[PDF] 加载历史记录失败: {e}")
-    
-    def _save_all_records(self):
-        """保存所有记录到统一的 pdf.json 文件"""
+            log.error(f"[PDF] 加载历史任务失败: {e}")
+
+    def _save_all_tasks(self):
+        """保存所有任务到统一的 tasks.json 文件"""
         try:
-            record_file = os.path.join(PDF_BASE_DIR, self.RECORD_FILE)
+            task_meta_file = os.path.join(PDF_BASE_DIR, self.TASK_META_FILE)
             os.makedirs(PDF_BASE_DIR, exist_ok=True)
-            
-            all_records_data = {
-                filename: asdict(record)
-                for filename, record in self._files.items()
-            }
-            
-            with open(record_file, 'w', encoding='utf-8') as f:
-                json.dump(all_records_data, f, ensure_ascii=False, indent=2)
-            
+
+            all_tasks_data = {task_id: asdict(task) for task_id, task in self._tasks.items()}
+
+            with open(task_meta_file, 'w', encoding='utf-8') as f:
+                json.dump(all_tasks_data, f, ensure_ascii=False, indent=2)
+
         except Exception as e:
-            log.error(f"[PDF] 保存所有记录失败: {e}")
-    
-    def _update_record_time(self, record: PdfFileRecord):
-        """更新记录的更新时间"""
-        record.update_time = datetime.now().timestamp()
-    
+            log.error(f"[PDF] 保存所有任务失败: {e}")
+
+    def _update_task_time(self, task: PdfTask):
+        """更新任务的更新时间"""
+        task.update_time = datetime.now().timestamp()
+
+    def _save_task_and_update_time(self, task: PdfTask):
+        """更新任务时间并保存"""
+        self._update_task_time(task)
+        self._save_all_tasks()
+
     def upload_file(self, file_obj, filename: str) -> Tuple[int, str, Optional[Dict]]:
         """
         上传 PDF 文件
@@ -143,15 +212,15 @@ class PdfMgr:
         try:
             if not is_allowed_pdf_file(filename):
                 return -1, "只支持 PDF 文件", None
-            
+
             # 确保目录存在
             ensure_directory(PDF_UPLOAD_DIR)
             ensure_directory(PDF_UNLOCK_DIR)
-            
+
             # 使用安全文件名
             safe_filename = secure_filename(filename)
             file_path = os.path.join(PDF_UPLOAD_DIR, safe_filename)
-            
+
             # 如果文件已存在，添加序号
             if os.path.exists(file_path):
                 base_name, ext = os.path.splitext(safe_filename)
@@ -161,150 +230,155 @@ class PdfMgr:
                     file_path = os.path.join(PDF_UPLOAD_DIR, new_filename)
                     counter += 1
                 safe_filename = os.path.basename(file_path)
-            
+
             # 保存文件
             file_obj.save(file_path)
             log.info(f"[PDF] 文件上传成功: {file_path}")
-            
+
             # 获取文件信息
             file_info = get_file_info(file_path)
             if not file_info:
                 return -1, "无法获取文件信息", None
-            
-            # 创建或更新记录
+
+            # 创建或更新任务
             now = datetime.now().timestamp()
-            if safe_filename in self._files:
-                record = self._files[safe_filename]
-                record.uploaded_path = file_path
-                record.uploaded_info = file_info
-                record.update_time = now
-            else:
-                record = PdfFileRecord(
-                    filename=safe_filename,
-                    uploaded_path=file_path,
-                    uploaded_info=file_info,
-                    create_time=now,
-                    update_time=now
-                )
-                self._files[safe_filename] = record
-            
-            # 限制文件数量
-            self._limit_files()
-            
-            # 保存记录
-            self._save_all_records()
-            
+            with self._task_lock:
+                if safe_filename in self._tasks:
+                    task = self._tasks[safe_filename]
+                    task.uploaded_path = file_path
+                    task.uploaded_info = file_info
+                    task.status = TASK_STATUS_UPLOADED
+                    task.update_time = now
+                else:
+                    task = PdfTask(task_id=safe_filename,
+                                   filename=safe_filename,
+                                   status=TASK_STATUS_UPLOADED,
+                                   uploaded_path=file_path,
+                                   uploaded_info=file_info,
+                                   create_time=now,
+                                   update_time=now)
+                    self._tasks[safe_filename] = task
+
+            # 保存任务
+            self._save_all_tasks()
+
             return 0, "文件上传成功", file_info
-            
+
         except Exception as e:
             log.error(f"[PDF] 上传文件失败: {e}")
             return -1, f"上传文件失败: {str(e)}", None
-    
-    def _limit_files(self):
-        """限制文件数量，删除最旧的文件"""
-        if len(self._files) <= self.MAX_FILES:
-            return
-        
-        # 按更新时间排序
-        sorted_files = sorted(
-            self._files.items(),
-            key=lambda x: x[1].update_time,
-            reverse=True
-        )
-        
-        # 删除最旧的文件
-        files_to_delete = sorted_files[self.MAX_FILES:]
-        for filename, record in files_to_delete:
-            try:
-                # 删除上传文件
-                if record.uploaded_path and os.path.exists(record.uploaded_path):
-                    os.remove(record.uploaded_path)
-                    log.info(f"[PDF] 删除旧文件: {record.uploaded_path}")
-                
-                # 删除已解密文件
-                if record.unlocked_path and os.path.exists(record.unlocked_path):
-                    os.remove(record.unlocked_path)
-                    log.info(f"[PDF] 删除对应的已解密文件: {record.unlocked_path}")
-                
-                # 从记录中移除
-                del self._files[filename]
-                
-            except Exception as e:
-                log.error(f"[PDF] 删除文件失败 {filename}: {e}")
-    
-    def decrypt_file(self, filename: str, password: Optional[str] = None) -> Tuple[int, str]:
+
+    def decrypt(self, task_id: str, password: Optional[str] = None) -> Tuple[int, str]:
         """
-        解密 PDF 文件
+        解密 PDF 文件（异步处理）
         
-        :param filename: 文件名
+        :param task_id: 任务ID（文件名）
         :param password: 密码（可选）
-        :return: (错误码, 消息)，0 表示成功
+        :return: (错误码, 消息)，0 表示成功（任务已提交）
         """
         try:
-            # 检查记录是否存在
-            if filename not in self._files:
-                return -1, f"文件不存在: {filename}"
-            
-            record = self._files[filename]
-            
-            # 检查文件是否存在
-            if not os.path.exists(record.uploaded_path):
-                return -1, f"上传文件不存在: {filename}"
-            
-            # 检查是否正在处理中
-            if filename in self._processing_files:
-                return -1, "文件正在处理中，请稍候"
-            
-            # 构建输出文件路径
-            base_name, ext = os.path.splitext(filename)
-            output_filename = f"{base_name}_unlocked{ext}"
-            output_path = os.path.join(PDF_UNLOCK_DIR, output_filename)
-            
-            # 添加到处理中集合
-            self._processing_files.add(filename)
-            
-            try:
-                # 执行解密
-                code, msg = self._decrypt_with_pikepdf(
-                    record.uploaded_path,
-                    output_path,
-                    password
-                )
-                
-                if code != 0:
-                    return code, msg
-                
-                # 获取已解密文件信息
-                unlocked_info = get_file_info(output_path)
-                if not unlocked_info:
-                    return -1, "无法获取已解密文件信息"
-                
-                # 更新记录
-                record.unlocked_path = output_path
-                record.unlocked_info = unlocked_info
-                record.has_unlocked = True
-                self._update_record_time(record)
-                self._save_all_records()
-                
-                log.info(f"[PDF] 文件解密成功: {output_path}")
-                return 0, "PDF 解密成功"
-                
-            finally:
-                # 从处理中集合移除
-                self._processing_files.discard(filename)
-                
+            with self._task_lock:
+                task = self._get_task(task_id)
+                if not task:
+                    return -1, f"任务不存在: {task_id}"
+
+                # 检查文件是否存在
+                if not os.path.exists(task.uploaded_path):
+                    return -1, f"上传文件不存在: {task_id}"
+
+                # 检查任务状态
+                if task.status == TASK_STATUS_PROCESSING:
+                    return -1, "任务正在处理中，请稍候"
+
+                if task.status == TASK_STATUS_SUCCESS:
+                    return 0, "文件已解密，无需重复处理"
+
+                # 构建输出文件路径
+                output_path = self._get_unlocked_path(task_id)
+
+                # 更新任务状态为等待处理
+                task.status = TASK_STATUS_PENDING
+                task.error_message = None
+                self._save_task_and_update_time(task)
+
+            # 在后台线程中异步执行解密
+            thread = threading.Thread(target=self._decrypt_file_async,
+                                      args=(task_id, task.uploaded_path, output_path, password),
+                                      daemon=True)
+            thread.start()
+
+            log.info(f"[PDF] 已提交解密任务: {task_id}")
+            return 0, "解密任务已提交，正在后台处理"
+
         except Exception as e:
-            log.error(f"[PDF] 解密文件失败: {e}")
-            if filename in self._processing_files:
-                self._processing_files.discard(filename)
-            return -1, f"解密文件失败: {str(e)}"
-    
-    def _decrypt_with_pikepdf(
-        self,
-        input_path: str,
-        output_path: str,
-        password: Optional[str] = None
-    ) -> Tuple[int, str]:
+            log.error(f"[PDF] 提交解密任务失败: {e}")
+            return -1, f"提交解密任务失败: {str(e)}"
+
+    def _decrypt_file_async(self, task_id: str, input_path: str, output_path: str, password: Optional[str]):
+        """
+        异步解密文件（在后台线程中执行）
+        
+        :param task_id: 任务ID（文件名）
+        :param input_path: 输入文件路径
+        :param output_path: 输出文件路径
+        :param password: 密码（可选）
+        """
+        try:
+            with self._task_lock:
+                task = self._get_task(task_id)
+                if not task:
+                    log.error(f"[PDF] 任务不存在: {task_id}")
+                    return
+                task.status = TASK_STATUS_PROCESSING
+                task.error_message = None
+                self._save_task_and_update_time(task)
+
+            log.info(f"[PDF] 开始解密文件: {task_id}")
+
+            # 执行解密
+            code, msg = self._decrypt_with_pikepdf(input_path, output_path, password)
+
+            with self._task_lock:
+                task = self._get_task(task_id)
+                if not task:
+                    log.error(f"[PDF] 任务不存在: {task_id}")
+                    return
+
+                if code != 0:
+                    # 解密失败
+                    task.status = TASK_STATUS_FAILED
+                    task.error_message = msg
+                    log.error(f"[PDF] 文件解密失败 {task_id}: {msg}")
+                else:
+                    # 获取已解密文件信息
+                    unlocked_info = get_file_info(output_path)
+                    if not unlocked_info:
+                        task.status = TASK_STATUS_FAILED
+                        task.error_message = "无法获取已解密文件信息"
+                        log.error(f"[PDF] 无法获取已解密文件信息: {task_id}")
+                    else:
+                        # 解密成功
+                        task.status = TASK_STATUS_SUCCESS
+                        task.unlocked_path = output_path
+                        task.unlocked_info = unlocked_info
+                        task.error_message = None
+                        log.info(f"[PDF] 文件解密成功: {output_path}")
+
+                self._save_task_and_update_time(task)
+
+        except Exception as e:
+            log.error(f"[PDF] 异步解密文件失败 {task_id}: {e}")
+            with self._task_lock:
+                task = self._get_task(task_id)
+                if task:
+                    task.status = TASK_STATUS_FAILED
+                    task.error_message = f"解密失败: {str(e)}"
+                    self._save_task_and_update_time(task)
+
+    def _decrypt_with_pikepdf(self,
+                              input_path: str,
+                              output_path: str,
+                              password: Optional[str] = None) -> Tuple[int, str]:
         """使用 pikepdf 解密 PDF"""
         try:
             if password is not None:
@@ -321,183 +395,129 @@ class PdfMgr:
                         pdf.save(output_path)
                 except pikepdf.PasswordError:
                     return -1, "PDF 需要密码，但未提供密码"
-            
+
             return 0, "PDF 解密成功"
-            
+
         except Exception as e:
             log.error(f"[PDF] pikepdf 解密失败: {e}")
             return -1, f"PDF 解密失败: {str(e)}"
-    
-    def list_files(self) -> Dict:
+
+    def list(self) -> List[Dict]:
         """
-        列出所有 PDF 文件
+        列出所有 PDF 转换任务详情
         
-        :return: 包含 uploaded, unlocked, mapping 的字典
+        :return: 任务详情列表
         """
         try:
             # 确保目录存在
             ensure_directory(PDF_UPLOAD_DIR)
             ensure_directory(PDF_UNLOCK_DIR)
-            
-            # 扫描上传目录，添加不在记录中的文件
-            if os.path.exists(PDF_UPLOAD_DIR):
-                for filename in os.listdir(PDF_UPLOAD_DIR):
-                    file_path = os.path.join(PDF_UPLOAD_DIR, filename)
-                    if os.path.isfile(file_path) and is_allowed_pdf_file(filename):
-                        if filename not in self._files:
-                            # 新文件，添加到记录
-                            file_info = get_file_info(file_path)
-                            if file_info:
-                                now = datetime.now().timestamp()
-                                record = PdfFileRecord(
-                                    filename=filename,
-                                    uploaded_path=file_path,
-                                    uploaded_info=file_info,
-                                    create_time=now,
-                                    update_time=now
-                                )
-                                self._files[filename] = record
-            
-            # 重新验证文件是否存在，更新记录
-            files_to_remove = []
-            for filename, record in self._files.items():
-                # 验证上传文件
-                if not os.path.exists(record.uploaded_path):
-                    files_to_remove.append(filename)
-                    continue
-                
-                # 重新获取上传文件信息
-                uploaded_info = get_file_info(record.uploaded_path)
-                if uploaded_info:
-                    record.uploaded_info = uploaded_info
-                else:
-                    files_to_remove.append(filename)
-                    continue
-                
-                # 验证已解密文件
-                if record.unlocked_path and os.path.exists(record.unlocked_path):
-                    unlocked_info = get_file_info(record.unlocked_path)
-                    if unlocked_info:
-                        record.unlocked_info = unlocked_info
-                        record.has_unlocked = True
+
+            with self._task_lock:
+                # 重新验证文件是否存在，更新任务
+                tasks_to_remove = []
+                for task_id, task in self._tasks.items():
+                    # 验证上传文件
+                    if not os.path.exists(task.uploaded_path):
+                        tasks_to_remove.append(task_id)
+                        continue
+
+                    # 重新获取上传文件信息
+                    uploaded_info = get_file_info(task.uploaded_path)
+                    if uploaded_info:
+                        task.uploaded_info = uploaded_info
                     else:
-                        record.unlocked_path = None
-                        record.unlocked_info = None
-                        record.has_unlocked = False
-                else:
-                    # 检查是否有对应的已解密文件
-                    base_name, ext = os.path.splitext(filename)
-                    unlocked_filename = f"{base_name}_unlocked{ext}"
-                    unlocked_path = os.path.join(PDF_UNLOCK_DIR, unlocked_filename)
-                    if os.path.exists(unlocked_path):
-                        unlocked_info = get_file_info(unlocked_path)
-                        if unlocked_info:
-                            record.unlocked_path = unlocked_path
-                            record.unlocked_info = unlocked_info
-                            record.has_unlocked = True
-                    else:
-                        record.unlocked_path = None
-                        record.unlocked_info = None
-                        record.has_unlocked = False
-            
-            # 移除不存在的文件记录
-            for filename in files_to_remove:
-                del self._files[filename]
-            
-            if files_to_remove or len(files_to_remove) != len(self._files):
-                self._save_all_records()
-            
-            # 限制文件数量
-            self._limit_files()
-            
+                        tasks_to_remove.append(task_id)
+                        continue
+
+                    # 更新已解密文件信息
+                    self._update_unlocked_file_info(task)
+
+                # 移除不存在的文件任务
+                for task_id in tasks_to_remove:
+                    del self._tasks[task_id]
+
+                if tasks_to_remove:
+                    self._save_all_tasks()
+
             # 按更新时间排序（最新的在前）
-            sorted_records = sorted(
-                self._files.values(),
-                key=lambda x: x.update_time,
-                reverse=True
-            )
-            
-            # 构建返回数据
-            uploaded_files = [record.uploaded_info for record in sorted_records]
-            unlocked_files = [
-                record.unlocked_info
-                for record in sorted_records
-                if record.unlocked_info
-            ]
-            
-            file_mapping = []
-            for record in sorted_records:
-                file_mapping.append({
-                    "uploaded": record.uploaded_info,
-                    "unlocked": record.unlocked_info if record.has_unlocked else None,
-                    "has_unlocked": record.has_unlocked,
-                    "_decrypting": record.filename in self._processing_files
-                })
-            
-            return {
-                "uploaded": uploaded_files,
-                "unlocked": unlocked_files,
-                "mapping": file_mapping
-            }
-            
+            sorted_tasks = sorted(self._tasks.values(), key=lambda x: x.update_time, reverse=True)
+
+            # 构建任务详情列表
+            return [self._task_to_dict(task) for task in sorted_tasks]
+
         except Exception as e:
-            log.error(f"[PDF] 列出文件失败: {e}")
-            return {
-                "uploaded": [],
-                "unlocked": [],
-                "mapping": []
-            }
-    
-    def delete_file(self, filename: str, file_type: str = 'both') -> Tuple[int, str]:
+            log.error(f"[PDF] 列出任务失败: {e}")
+            return []
+
+    def get_task_status(self, task_id: str) -> Tuple[int, str, Optional[Dict]]:
         """
-        删除 PDF 文件
+        获取任务状态
         
-        :param filename: 文件名
-        :param file_type: 文件类型，'uploaded' 或 'unlocked' 或 'both'（默认 'both'）
+        :param task_id: 任务ID（文件名）
+        :return: (错误码, 消息, 任务信息)，0 表示成功
+        """
+        try:
+            with self._task_lock:
+                task = self._get_task(task_id)
+                if not task:
+                    return -1, "任务不存在", None
+
+                return 0, "获取任务状态成功", self._task_to_dict(task)
+
+        except Exception as e:
+            log.error(f"[PDF] 获取任务状态失败: {e}")
+            return -1, f"获取任务状态失败: {str(e)}", None
+
+    def delete(self, task_id: str) -> Tuple[int, str]:
+        """
+        删除 PDF 任务
+        
+        :param task_id: 任务ID（文件名）
         :return: (错误码, 消息)，0 表示成功
         """
         try:
-            if filename not in self._files:
-                return -1, f"文件不存在: {filename}"
-            
-            record = self._files[filename]
-            deleted_files = []
-            
-            if file_type in ('uploaded', 'both'):
-                if record.uploaded_path and os.path.exists(record.uploaded_path):
-                    os.remove(record.uploaded_path)
-                    deleted_files.append(record.uploaded_path)
-                    log.info(f"[PDF] 删除上传文件: {record.uploaded_path}")
-            
-            if file_type in ('unlocked', 'both'):
-                if record.unlocked_path and os.path.exists(record.unlocked_path):
-                    os.remove(record.unlocked_path)
-                    deleted_files.append(record.unlocked_path)
-                    log.info(f"[PDF] 删除已解密文件: {record.unlocked_path}")
-                    record.unlocked_path = None
-                    record.unlocked_info = None
-                    record.has_unlocked = False
-            
-            if not deleted_files:
-                return -1, "文件不存在"
-            
-            # 如果删除的是 both，移除记录
-            if file_type == 'both':
-                del self._files[filename]
-            
-            # 保存记录
-            self._save_all_records()
-            
-            return 0, "文件删除成功"
-            
+            with self._task_lock:
+                task = self._get_task(task_id)
+                if not task:
+                    return -1, f"任务不存在: {task_id}"
+
+                # 如果正在处理中，不允许删除
+                if task.status == TASK_STATUS_PROCESSING:
+                    return -1, "任务正在处理中，无法删除"
+
+                deleted_files = []
+
+                # 删除上传文件
+                if task.uploaded_path and os.path.exists(task.uploaded_path):
+                    os.remove(task.uploaded_path)
+                    deleted_files.append(task.uploaded_path)
+                    log.info(f"[PDF] 删除上传文件: {task.uploaded_path}")
+
+                # 删除已解密文件
+                if task.unlocked_path and os.path.exists(task.unlocked_path):
+                    os.remove(task.unlocked_path)
+                    deleted_files.append(task.unlocked_path)
+                    log.info(f"[PDF] 删除已解密文件: {task.unlocked_path}")
+
+                if not deleted_files:
+                    return -1, "文件不存在"
+
+                # 移除任务
+                del self._tasks[task_id]
+
+                # 保存任务
+                self._save_all_tasks()
+
+            return 0, "任务删除成功"
+
         except Exception as e:
-            log.error(f"[PDF] 删除文件失败: {e}")
-            return -1, f"删除文件失败: {str(e)}"
+            log.error(f"[PDF] 删除任务失败: {e}")
+            return -1, f"删除任务失败: {str(e)}"
 
 
 # 创建全局实例
 pdf_mgr = PdfMgr()
-
 
 if __name__ == '__main__':
     """
