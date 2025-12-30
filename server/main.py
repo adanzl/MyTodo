@@ -1,7 +1,7 @@
 from gevent import monkey
 # 不 patch thread，使用真正的操作系统线程，避免与 asyncio 事件循环冲突
 # thread=False 表示不 patch threading 模块，这样 ThreadPoolExecutor 会使用真正的线程
-monkey.patch_all(subprocess=True, thread=False, queue=False) 
+monkey.patch_all(subprocess=True, thread=False, queue=False)
 
 # 在导入其他模块之前加载环境变量
 from dotenv import load_dotenv
@@ -44,17 +44,23 @@ def null_application(environ, start_response):
 if __name__ == '__main__':
     import os
 
-    PORT = 8000
-    HOST = '127.0.0.1'
+    # 支持环境变量配置
+    PORT = int(os.environ.get('PORT', 8000))
+    HOST = os.environ.get('HOST', '127.0.0.1')
 
-    # 只在直接运行时禁用浏览器缓存
-    @app.after_request
-    def disable_cache(resp):
-        resp = make_response(resp)
-        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-        resp.headers['Pragma'] = 'no-cache'
-        resp.headers['Expires'] = '0'
-        return resp
+    # 生产环境判断
+    IS_PRODUCTION = os.environ.get('ENV', 'development').lower() == 'production'
+
+    # 只在开发环境禁用浏览器缓存
+    if not IS_PRODUCTION:
+
+        @app.after_request
+        def disable_cache(resp):
+            resp = make_response(resp)
+            resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+            resp.headers['Pragma'] = 'no-cache'
+            resp.headers['Expires'] = '0'
+            return resp
 
     try:
         from werkzeug.middleware.dispatcher import DispatcherMiddleware
@@ -76,7 +82,8 @@ if __name__ == '__main__':
             log=None,
             handler_class=WebSocketHandler,
         )
-        log.info(f'Server started on http://{HOST}:{PORT} (using gevent)')
+        env_info = 'production' if IS_PRODUCTION else 'development'
+        log.info(f'Server started on http://{HOST}:{PORT} (using gevent, env={env_info})')
         http_server.serve_forever()
     except ImportError as e:
         log.error(f'Gevent 相关模块导入失败: {e}')
