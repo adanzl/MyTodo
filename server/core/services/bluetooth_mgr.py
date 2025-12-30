@@ -417,10 +417,6 @@ class BluetoothMgr:
             log.error(f"[BLUETOOTH] Error getting paired devices: {e}")
             return []
 
-    def get_system_paired_devices(self) -> List[Dict]:
-        """获取系统已配对的蓝牙设备（兼容性方法）"""
-        return self.get_paired_devices()
-
     def scan_devices_sync(self, timeout: float = 5.0) -> List[Dict]:
         """
         同步扫描传统蓝牙设备（在事件循环中运行）

@@ -91,6 +91,8 @@ def _create_access_logger() -> logging.Logger:
         app_logger.info(
             f'Access logger configured: {access_logger.name}, handlers: {len(access_logger.handlers)}, propagate: {access_logger.propagate}, level: {access_logger.level}'
         )
+        # 测试 access_logger 是否能正常写入
+        access_logger.info('Access logger test message - if you see this, the logger is working')
     else:
         # 开发环境：创建一个空的日志记录器，不输出任何日志
         access_logger.setLevel(logging.CRITICAL)  # 设置为 CRITICAL 级别，几乎不记录任何日志

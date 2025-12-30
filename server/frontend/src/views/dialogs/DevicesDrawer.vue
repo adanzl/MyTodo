@@ -9,17 +9,26 @@
     <template #header>
       <div class="flex items-center gap-3 w-full pr-4">
         <span class="text-lg font-semibold">设备管理</span>
-        <el-button
-          v-if="activeTab === 'agent' || activeTab === 'bluetooth'"
-          type="primary"
-          plain
-          size="small"
-          @click="handleRefreshButton"
-          :loading="getRefreshLoadingState"
-        >
-          <el-icon v-if="!getRefreshLoadingState"><Refresh /></el-icon>
-          <span class="ml-1">刷新</span>
-        </el-button>
+        <template v-if="activeTab === 'agent' || activeTab === 'bluetooth'">
+          <el-button
+            type="primary"
+            plain
+            size="small"
+            @click="handleRefreshButton"
+            :loading="getRefreshLoadingState"
+          >
+            <el-icon v-if="!getRefreshLoadingState"><Refresh /></el-icon>
+            <span class="ml-1">刷新</span>
+          </el-button>
+          <el-switch
+            v-if="activeTab === 'agent'"
+            v-model="autoRefreshEnabled"
+            size="small"
+            active-text="自动刷新"
+            inactive-text=""
+            @change="handleAutoRefreshToggle"
+          />
+        </template>
         <el-button
           v-else
           type="primary"
@@ -139,11 +148,53 @@
             <el-table-column label="状态" width="100">
               <template #default="{ row }">
                 <el-tag
-                  :type="row.connecting ? 'warning' : row.rssi !== undefined ? 'success' : 'info'"
+                  :type="
+                    row.connecting || row.disconnecting
+                      ? 'warning'
+                      : row.connected
+                        ? 'success'
+                        : row.rssi !== undefined
+                          ? 'info'
+                          : 'info'
+                  "
                   size="small"
                 >
-                  {{ row.connecting ? "连接中" : row.rssi !== undefined ? "已发现" : "未知" }}
+                  {{
+                    row.connecting
+                      ? "连接中"
+                      : row.disconnecting
+                        ? "断开中"
+                        : row.connected
+                          ? "已连接"
+                          : row.rssi !== undefined
+                            ? "已发现"
+                            : "未知"
+                  }}
                 </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="120" fixed="right">
+              <template #default="{ row }">
+                <el-button
+                  v-if="!row.connected"
+                  type="primary"
+                  size="small"
+                  @click="handleConnectBluetoothDevice(row)"
+                  :loading="row.connecting"
+                  :disabled="row.connecting || row.disconnecting"
+                >
+                  连接
+                </el-button>
+                <el-button
+                  v-else
+                  type="danger"
+                  size="small"
+                  @click="handleDisconnectBluetoothDevice(row)"
+                  :loading="row.disconnecting"
+                  :disabled="row.connecting || row.disconnecting"
+                >
+                  断开
+                </el-button>
               </template>
             </el-table-column>
             <template #empty>
@@ -354,6 +405,7 @@ const activeTab = ref("agent");
 // Agent设备相关状态
 const agentList = ref<AgentDevice[]>([]);
 const agentListLoading = ref(false);
+const autoRefreshEnabled = ref(false);
 let agentRefreshTimer: ReturnType<typeof setInterval> | null = null;
 
 // 蓝牙设备相关状态
@@ -449,6 +501,9 @@ const testAgentButton = async (agentId: string, key: string) => {
 
 // 启动自动刷新
 const startRefresh = () => {
+  if (!autoRefreshEnabled.value) {
+    return;
+  }
   refreshAgentList(true, false);
   stopRefresh(); // 确保先清除旧的定时器
   agentRefreshTimer = setInterval(() => {
@@ -461,6 +516,15 @@ const stopRefresh = () => {
   if (agentRefreshTimer) {
     clearInterval(agentRefreshTimer);
     agentRefreshTimer = null;
+  }
+};
+
+// 处理自动刷新切换
+const handleAutoRefreshToggle = (enabled: boolean) => {
+  if (enabled) {
+    startRefresh();
+  } else {
+    stopRefresh();
   }
 };
 
@@ -485,6 +549,8 @@ const refreshBluetoothPairedDevices = async () => {
           address: device.address || "",
           ...device,
           connecting: false,
+          disconnecting: false,
+          connected: device.connected ?? false,
         })
       );
       ElMessage.success(`已获取 ${bluetoothDeviceList.value.length} 个已配对蓝牙设备`);
@@ -495,6 +561,62 @@ const refreshBluetoothPairedDevices = async () => {
     logAndNoticeError(error as Error, "获取已配对设备列表失败");
   } finally {
     bluetoothScanning.value = false;
+  }
+};
+
+// 连接蓝牙设备
+const handleConnectBluetoothDevice = async (device: BluetoothDevice) => {
+  if (!device.address) {
+    ElMessage.error("设备地址无效");
+    return;
+  }
+
+  try {
+    device.connecting = true;
+    const response = await bluetoothAction("connect", "POST", {
+      address: device.address,
+    });
+
+    if (response?.code === 0) {
+      ElMessage.success(`成功连接到设备: ${device.name}`);
+      device.connected = true;
+      // 刷新设备列表以更新状态
+      await refreshBluetoothPairedDevices();
+    } else {
+      ElMessage.error(response?.msg || "连接设备失败");
+    }
+  } catch (error) {
+    logAndNoticeError(error as Error, "连接设备失败");
+  } finally {
+    device.connecting = false;
+  }
+};
+
+// 断开蓝牙设备
+const handleDisconnectBluetoothDevice = async (device: BluetoothDevice) => {
+  if (!device.address) {
+    ElMessage.error("设备地址无效");
+    return;
+  }
+
+  try {
+    device.disconnecting = true;
+    const response = await bluetoothAction("disconnect", "POST", {
+      address: device.address,
+    });
+
+    if (response?.code === 0) {
+      ElMessage.success(`已断开设备: ${device.name}`);
+      device.connected = false;
+      // 刷新设备列表以更新状态
+      await refreshBluetoothPairedDevices();
+    } else {
+      ElMessage.error(response?.msg || "断开设备失败");
+    }
+  } catch (error) {
+    logAndNoticeError(error as Error, "断开设备失败");
+  } finally {
+    device.disconnecting = false;
   }
 };
 
@@ -826,7 +948,7 @@ watch(
   () => props.visible,
   isVisible => {
     internalVisible.value = isVisible;
-    if (isVisible) {
+    if (isVisible && autoRefreshEnabled.value) {
       startRefresh();
     } else {
       stopRefresh();
@@ -843,15 +965,25 @@ watch(internalVisible, newVal => {
 
 // 监听页签切换，切换到蓝牙页签时自动刷新
 watch(activeTab, (newTab, oldTab) => {
+  // 如果从 agent 页签切换到其他页签，停止自动刷新
+  if (oldTab === "agent" && newTab !== "agent") {
+    stopRefresh();
+  }
+  // 如果切换到 agent 页签且启用了自动刷新，启动自动刷新
+  if (newTab === "agent" && oldTab !== "agent" && autoRefreshEnabled.value) {
+    startRefresh();
+  }
+  // 切换到蓝牙页签时自动执行一次刷新
   if (newTab === "bluetooth" && oldTab !== "bluetooth") {
-    // 切换到蓝牙页签时自动执行一次刷新
     handleRefreshBluetoothPaired();
   }
 });
 
 onMounted(() => {
   if (props.visible) {
-    startRefresh();
+    if (autoRefreshEnabled.value && activeTab.value === "agent") {
+      startRefresh();
+    }
     // 如果初始页签是蓝牙页签，也执行一次刷新
     if (activeTab.value === "bluetooth") {
       handleRefreshBluetoothPaired();

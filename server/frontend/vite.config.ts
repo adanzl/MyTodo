@@ -64,8 +64,8 @@ export default defineConfig({
       include: [/node_modules/],
     },
     rollupOptions: {
-      // 确保入口点的签名，帮助 Rollup 正确分析依赖关系
-      preserveEntrySignatures: "strict",
+      // 使用 false 减少入口点签名导致的 chunk 边界变化，提高文件名稳定性
+      preserveEntrySignatures: false,
       output: {
         // 使用 contenthash 而不是 hash，只有内容改变时才会改变文件名
         // 使用更短的哈希（8位）以减少文件名长度，同时保持唯一性
@@ -86,40 +86,69 @@ export default defineConfig({
         chunkFileNames: "assets/js/[name]-[hash:8].js",
         entryFileNames: "assets/js/[name]-[hash:8].js",
         // 启用代码分割，将第三方库和业务代码分离
-        // 这样只有业务代码改变时，vendor 文件不会改变
         manualChunks(id) {
-          // 业务代码不分割，保持在一个文件中
-          if (!id.includes("node_modules")) {
-            return;
+          // 第三方库分割 - 使用更严格的匹配，确保只匹配 node_modules
+          if (id.includes("node_modules")) {
+            // Vue 核心库必须最先加载（Element Plus 依赖它）
+            // 使用更精确的匹配，避免误匹配业务代码
+            if (
+              id.includes("node_modules/vue/") ||
+              id.includes("node_modules/vue-router/") ||
+              id.includes("node_modules/pinia/") ||
+              id.includes("node_modules/@vue/")
+            ) {
+              return "vue-vendor";
+            }
+            // Element Plus 单独分割
+            if (
+              id.includes("node_modules/element-plus/") ||
+              id.includes("node_modules/@element-plus/")
+            ) {
+              return "element-plus";
+            }
+            // 工具库
+            if (
+              id.includes("node_modules/axios/") ||
+              id.includes("node_modules/lodash-es/") ||
+              id.includes("node_modules/crypto-js/") ||
+              id.includes("node_modules/dayjs/")
+            ) {
+              return "utils";
+            }
+            // Socket.io
+            if (id.includes("node_modules/socket.io-client/")) {
+              return "socket";
+            }
+            // Vant UI 库
+            if (id.includes("node_modules/vant/")) {
+              return "vant";
+            }
+            // 其他第三方库
+            return "vendor";
           }
-          // Vue 核心库必须最先加载（Element Plus 依赖它）
-          if (id.includes("vue") || id.includes("vue-router") || id.includes("pinia")) {
-            return "vue-vendor";
+
+          // 将共享的业务模块单独分割，避免修改一个文件影响其他 chunk
+          // API 层：所有 /api/ 下的共享模块
+          if (id.includes("/api/") && !id.includes("/views/")) {
+            return "api-shared";
           }
-          // Element Plus 单独分割，但它会依赖 vue-vendor
-          // Rollup 会自动处理依赖关系，确保 vue-vendor 先加载
-          if (id.includes("element-plus") || id.includes("@element-plus/icons-vue")) {
-            return "element-plus";
+
+          // 工具层：所有 /utils/ 下的工具函数
+          if (id.includes("/utils/") && !id.includes("node_modules")) {
+            return "utils-shared";
           }
-          // 工具库
-          if (
-            id.includes("axios") ||
-            id.includes("lodash-es") ||
-            id.includes("crypto-js") ||
-            id.includes("dayjs")
-          ) {
-            return "utils";
+
+          // 类型层：所有 /types/ 下的类型定义
+          if (id.includes("/types/") && !id.includes("node_modules")) {
+            return "types-shared";
           }
-          // Socket.io
-          if (id.includes("socket.io-client")) {
-            return "socket";
+
+          // 常量层：所有 /constants/ 下的常量定义
+          if (id.includes("/constants/") && !id.includes("node_modules")) {
+            return "constants-shared";
           }
-          // Vant UI 库
-          if (id.includes("vant")) {
-            return "vant";
-          }
-          // 其他第三方库
-          return "vendor";
+
+          // 业务代码让 Vite 自动处理（按路由分割）
         },
       },
     },

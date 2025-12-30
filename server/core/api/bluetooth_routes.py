@@ -94,7 +94,7 @@ def bluetooth_get_paired():
     """
     try:
         log.info("===== [Bluetooth Get Paired Devices]")
-        devices = bluetooth_mgr.get_system_paired_devices()
+        devices = bluetooth_mgr.get_paired_devices()
         return _ok(devices)
     except Exception as e:
         log.error(f"[Bluetooth] Get paired devices error: {e}")
