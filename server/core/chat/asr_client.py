@@ -5,7 +5,7 @@ import time
 import websocket
 from core.log_config import root_logger
 
-log = root_logger()
+log = root_logger
 
 # ASR_SERVER = "ws://127.0.0.1:9095"
 ASR_SERVER = "ws://192.168.50.171:9096"

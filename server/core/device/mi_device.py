@@ -20,7 +20,7 @@ from core.log_config import root_logger
 from core.tools.async_util import run_async
 from core.utils import convert_to_http_url, format_time_str
 
-log = root_logger()
+log = root_logger
 
 # 从环境变量读取小米账号信息，如果没有则使用默认值
 DEFAULT_MI_USERNAME = os.getenv("MI_USER", "")

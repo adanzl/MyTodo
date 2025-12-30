@@ -17,7 +17,7 @@ from core.log_config import root_logger, access_logger
 # 生产环境判断
 IS_PRODUCTION = os.environ.get('ENV', 'development').lower() == 'production'
 
-log = root_logger()
+log = root_logger
 
 app = create_app()
 
@@ -80,7 +80,7 @@ if __name__ == '__main__':
         http_server = WSGIServer(
             (HOST, PORT),
             application,
-            log=access_logger(),  # 使用访问日志记录器
+            log=access_logger,  # 使用访问日志记录器
             error_log=log,  # 错误日志使用应用日志
             handler_class=WebSocketHandler,
         )

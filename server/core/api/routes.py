@@ -11,7 +11,7 @@ import re
 import subprocess
 import urllib.parse
 
-log = root_logger()
+log = root_logger
 api_bp = Blueprint('api', __name__)
 
 

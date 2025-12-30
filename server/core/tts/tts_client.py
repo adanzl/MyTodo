@@ -3,7 +3,7 @@ import traceback
 import dashscope
 from core.log_config import root_logger
 
-log = root_logger()
+log = root_logger
 FASTAPI_URL = "http://192.168.50.171:9099/inference_zero_shot"  # FastAPI 服务器地址
 import core.db.rds_mgr as rds_mgr
 from dashscope.audio.tts_v2 import *

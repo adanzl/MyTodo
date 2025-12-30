@@ -11,7 +11,7 @@ from gevent import Timeout as GeventTimeout
 from gevent import spawn
 from core.log_config import root_logger
 
-log = root_logger()
+log = root_logger
 
 # 使用 threading.Thread 而不是 ThreadPoolExecutor，避免与 gevent 的队列冲突
 # 因为 main.py 中设置了 thread=False，threading 模块不会被 gevent patch

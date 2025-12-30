@@ -7,7 +7,7 @@ import requests
 from typing import Optional, Dict, Any
 from core.log_config import root_logger
 
-log = root_logger()
+log = root_logger
 
 # 完整的服务URL
 DEVICE_AGENT_BASE_URL = f"http://192.168.50.184:8000"
@@ -129,7 +129,6 @@ class DeviceAgent:
         """
         return self._request("GET", "/bluetooth/paired")
 
-
     # ========== 统一 Device 接口 ==========
     def play(self, url: str) -> tuple[int, str]:
         """
@@ -172,7 +171,7 @@ class DeviceAgent:
         return (-1, {"error": "设备不支持获取传输状态"})
 
     # ========== Agent 接口 ==========
-    
+
     def mock(self, action: str, key: str = None, value: str = None) -> Dict[str, Any]:
         """
         Mock接口，用于模拟设备操作

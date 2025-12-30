@@ -8,7 +8,7 @@ from core.device.agent import DeviceAgent
 from core.log_config import root_logger
 from core.services.playlist_mgr import playlist_mgr
 
-log = root_logger()
+log = root_logger
 
 # 心跳超时时间（秒）
 HEARTBEAT_TIMEOUT = 30

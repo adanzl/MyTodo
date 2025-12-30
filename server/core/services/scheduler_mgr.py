@@ -14,7 +14,7 @@ from typing import Callable, Optional
 from core.log_config import root_logger
 from core.utils import convert_standard_cron_weekday_to_apscheduler
 
-log = root_logger()
+log = root_logger
 
 # 设置 APScheduler 的日志级别为 WARNING，减少任务执行的 INFO 日志
 logging.getLogger('apscheduler').setLevel(logging.WARNING)

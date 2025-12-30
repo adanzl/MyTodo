@@ -3,7 +3,7 @@ import json
 import requests
 from core.log_config import root_logger
 
-log = root_logger()
+log = root_logger
 API_URL = "http://192.168.50.171:9098/v1"
 # cSpell: disable-next-line
 API_KEY = "app-dLf0axfqNnVHwWjFqs0EVo8H"

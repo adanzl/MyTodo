@@ -6,7 +6,7 @@ from core.log_config import root_logger
 from core.device.dlna import scan_devices_sync, DlnaDev
 from core.utils import _ok, _err, read_json_from_request
 
-log = root_logger()
+log = root_logger
 dlna_bp = Blueprint('dlna', __name__)
 
 

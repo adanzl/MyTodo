@@ -11,7 +11,7 @@ from ssdpy import SSDPClient
 from core.log_config import root_logger
 from core.utils import convert_to_http_url
 
-log = root_logger()
+log = root_logger
 
 
 def _device_to_dict(device) -> Dict:

@@ -16,7 +16,7 @@ from core.log_config import root_logger
 from core.services.scheduler_mgr import scheduler_mgr
 from core.utils import time_to_seconds
 
-log = root_logger()
+log = root_logger
 
 PLAYLIST_RDS_FULL_KEY = "schedule_play:playlist_collection"
 DEFAULT_PLAYLIST_NAME = "默认播放列表"

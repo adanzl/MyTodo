@@ -18,10 +18,16 @@ class HandlerFilter(logging.Filter):
         # 过滤 handler.py 的 INFO 级别日志（HTTP 请求日志）
         if record.filename == "handler.py" and record.levelno == logging.INFO:
             return False
+        # 过滤 gevent.access 日志记录器的日志，避免写入 root_logger
+        if record.name == "gevent.access":
+            return False
         return True
 
 
-def root_logger() -> logging.Logger:
+handler_filter = HandlerFilter()
+
+
+def _create_root_logger() -> logging.Logger:
     """
     配置根日志记录器
     
@@ -39,7 +45,6 @@ def root_logger() -> logging.Logger:
     logger.setLevel(logging.INFO)
     logger.addHandler(std_handler)
 
-    handler_filter = HandlerFilter()
     for h in logger.handlers:
         h.addFilter(handler_filter)
 
@@ -54,11 +59,13 @@ def root_logger() -> logging.Logger:
     return logger
 
 
-def access_logger(is_production: bool = False) -> logging.Logger:
+root_logger = _create_root_logger()
+
+
+def _create_access_logger() -> logging.Logger:
     """
     配置访问日志记录器
     
-    :param is_production: 是否为生产环境
     :return: 配置好的访问日志记录器
     """
     access_logger = logging.getLogger('gevent.access')
@@ -66,7 +73,7 @@ def access_logger(is_production: bool = False) -> logging.Logger:
     access_logger.propagate = False  # 不传播到根日志记录器
 
     # 仅在 Linux 平台且生产环境创建访问日志文件，保留3天
-    if is_production:
+    if IS_PRODUCTION:
         # 确保 logs 目录存在
         log_file = f"{LOG_DIR}/access.log"
 
@@ -83,3 +90,6 @@ def access_logger(is_production: bool = False) -> logging.Logger:
         access_logger.setLevel(logging.CRITICAL)  # 设置为 CRITICAL 级别，几乎不记录任何日志
 
     return access_logger
+
+
+access_logger = _create_access_logger()

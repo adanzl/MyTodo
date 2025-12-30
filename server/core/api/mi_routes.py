@@ -6,7 +6,7 @@ from core.log_config import root_logger
 from core.device.mi_device import scan_devices_sync, MiDevice
 from core.utils import _ok, _err, read_json_from_request
 
-log = root_logger()
+log = root_logger
 mi_bp = Blueprint('mi', __name__)
 
 

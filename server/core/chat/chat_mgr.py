@@ -8,7 +8,7 @@ from core.log_config import root_logger
 from flask import json, request
 import core.db.rds_mgr as rds_mgr
 
-log = root_logger()
+log = root_logger
 
 MSG_TYPE_ERROR = "error"
 

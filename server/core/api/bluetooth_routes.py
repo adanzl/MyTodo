@@ -7,7 +7,7 @@ from core.log_config import root_logger
 from core.utils import _ok, _err, read_json_from_request
 from core.services.bluetooth_mgr import bluetooth_mgr
 
-log = root_logger()
+log = root_logger
 bluetooth_bp = Blueprint('bluetooth', __name__)
 
 

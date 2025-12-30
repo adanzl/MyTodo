@@ -14,7 +14,7 @@ from core.device.bluetooth import BluetoothDev
 from core.tools.async_util import run_async
 from core.log_config import root_logger
 
-log = root_logger()
+log = root_logger
 
 # 常量
 DEVICE_NAME_UUID = "00002a00-0000-1000-8000-00805f9b34fb"

@@ -17,7 +17,7 @@ from core.log_config import root_logger
 from core.models.const import PDF_BASE_DIR, PDF_UPLOAD_DIR, PDF_UNLOCK_DIR, ALLOWED_PDF_EXTENSIONS
 from core.utils import ensure_directory, get_file_info, is_allowed_pdf_file
 
-log = root_logger()
+log = root_logger
 
 # 任务状态
 TASK_STATUS_PENDING = 'pending'  # 等待中

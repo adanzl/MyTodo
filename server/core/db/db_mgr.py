@@ -10,17 +10,26 @@ from sqlalchemy import MetaData, Table, select, text
 from core.models.user import User
 from core.models.score_history import ScoreHistory
 
-log = root_logger()
+log = root_logger
 
 DB_NAME = "data.db"
 TABLE_SAVE = "t_user_save"
 
+
 class DbMgr:
 
+    def __init__(self):
+        self._initialized = False
+
     def init(self, app):
+        # 防止重复初始化
+        if self._initialized:
+            return
+
         app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///./' + DB_NAME  # SQLite 数据库
         app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # 关闭修改跟踪（减少内存消耗）
         db_obj.init_app(app)
+        self._initialized = True
         log.info("DbMgr init")
 
     def set_save(self, id, user_name, data) -> dict:

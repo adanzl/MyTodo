@@ -19,7 +19,7 @@ from core.models.const import (ALLOWED_AUDIO_EXTENSIONS, MEDIA_BASE_DIR, get_med
                                get_media_task_result_dir)
 from core.utils import get_media_duration, ensure_directory
 
-log = root_logger()
+log = root_logger
 
 # 任务状态
 TASK_STATUS_PENDING = 'pending'  # 等待中

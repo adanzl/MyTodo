@@ -11,7 +11,7 @@ from core.services.pdf_mgr import pdf_mgr
 from core.utils import _ok, _err, read_json_from_request
 from core.models.const import PDF_UPLOAD_DIR, PDF_UNLOCK_DIR
 
-log = root_logger()
+log = root_logger
 pdf_bp = Blueprint('pdf', __name__)
 
 

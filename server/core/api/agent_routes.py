@@ -10,7 +10,7 @@ from core.log_config import root_logger
 from core.services.agent_mgr import agent_mgr
 from core.utils import _err, _ok, read_json_from_request
 
-log = root_logger()
+log = root_logger
 agent_bp = Blueprint('agent', __name__)
 
 

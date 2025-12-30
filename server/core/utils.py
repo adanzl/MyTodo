@@ -15,7 +15,7 @@ from queue import Queue, Empty
 
 from core.log_config import root_logger
 
-log = root_logger()
+log = root_logger
 
 
 def ok_response(data=None):
