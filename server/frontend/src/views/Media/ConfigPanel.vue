@@ -142,7 +142,23 @@
 
         <!-- 设备列表 -->
         <div class="mt-3">
-          <h5 class="text-xs font-semibold text-gray-700 mb-2">{{ deviceListTitle }}</h5>
+          <div class="flex items-center justify-between mb-2">
+            <h5 class="text-xs font-semibold text-gray-700">{{ deviceListTitle }}</h5>
+            <!-- 扫描设备按钮（聚合） -->
+            <el-button
+              v-if="deviceType"
+              size="small"
+              type="primary"
+              plain
+              @click="handleScanDevices"
+              :loading="isScanning"
+              :disabled="isScanning"
+              :title="scanButtonTitle"
+            >
+              <el-icon v-if="!isScanning"><Refresh /></el-icon>
+              <span class="ml-1">扫描设备</span>
+            </el-button>
+          </div>
 
           <!-- 设备代理类型：显示已配对设备 -->
           <div v-if="isAgentOrBluetooth">
@@ -264,7 +280,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { Monitor } from "@element-plus/icons-vue";
+import { Monitor, Refresh } from "@element-plus/icons-vue";
 import { MAX_PLAYLIST_DURATION, TRIGGER_BUTTONS } from "@/constants/playlist";
 import type { PlaylistStatus } from "@/types/playlist";
 import type { BluetoothDevice, DlnaDevice, MiDevice, AgentDevice } from "@/types/device";
@@ -325,4 +341,28 @@ const deviceListTitle = computed(() => {
   if (isMi.value) return "小米设备";
   return "设备列表";
 });
+
+// 扫描按钮标题
+const scanButtonTitle = computed(() => {
+  if (isAgentOrBluetooth.value) return "扫描设备";
+  if (isDlna.value) return "扫描 DLNA 设备";
+  if (isMi.value) return "扫描小米设备";
+  return "扫描设备";
+});
+
+// 是否正在扫描
+const isScanning = computed(() => {
+  return props.dlnaScanning || props.miScanning;
+});
+
+// 统一的扫描设备处理函数
+const handleScanDevices = () => {
+  if (isAgentOrBluetooth.value) {
+    props.onOpenScanDialog();
+  } else if (isDlna.value) {
+    props.onScanDlnaDevices();
+  } else if (isMi.value) {
+    props.onScanMiDevices();
+  }
+};
 </script>

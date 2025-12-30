@@ -1,7 +1,7 @@
 <template>
   <el-drawer
     v-model="internalVisible"
-    :size="900"
+    :size="1200"
     direction="rtl"
     :before-close="handleClose"
     title="设备管理"

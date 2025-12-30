@@ -58,7 +58,7 @@ export default defineConfig({
   build: {
     outDir: "dist",
     assetsDir: "assets",
-    chunkSizeWarningLimit: 500, // 提高警告阈值到1MB
+    chunkSizeWarningLimit: 1000, // 提高警告阈值到1MB
     // 确保 chunk 加载顺序正确
     commonjsOptions: {
       include: [/node_modules/],

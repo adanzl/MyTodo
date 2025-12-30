@@ -4,6 +4,7 @@
     title="批量模式"
     :size="1200"
     direction="rtl"
+    header-class="h-12 !mb-1"
     :before-close="handleClose"
   >
     <div class="flex gap-4 h-full">
@@ -67,7 +68,25 @@
             </el-button>
           </div>
           <div v-if="selectedBatch" class="flex items-center gap-2">
-            <el-button type="primary" size="small" @click="handleOpenFileBrowser" plain>
+            <el-button
+              type="default"
+              size="small"
+              @click="handleToggleSelectAll(!isAllFilesSelected)"
+              :class="{ '!text-blue-600': isAllFilesSelected || isIndeterminate }"
+              plain
+              class="!w-20"
+            >
+              <el-icon v-if="isAllFilesSelected" class="mr-1"><Check /></el-icon>
+              <el-icon v-else-if="isIndeterminate" class="mr-1"><Minus /></el-icon>
+              <span class="text-xs">全选</span>
+            </el-button>
+            <el-button
+              type="primary"
+              size="small"
+              @click="handleOpenFileBrowser"
+              plain
+              class="!w-20"
+            >
               <el-icon><Plus /></el-icon>
             </el-button>
             <el-button
@@ -76,9 +95,12 @@
               @click="handleDeleteSelectedFiles"
               :disabled="selectedFileIndices.length === 0"
               plain
+              class="!w-20"
             >
               <el-icon><Delete /></el-icon>
-              ({{ selectedFileIndices.length }})
+              <span v-if="selectedFileIndices.length > 0" class="ml-1 text-xs"
+                >({{ selectedFileIndices.length }})</span
+              >
             </el-button>
           </div>
         </div>
@@ -248,7 +270,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { Plus, Delete, Edit } from "@element-plus/icons-vue";
+import { Plus, Delete, Edit, Check, Minus } from "@element-plus/icons-vue";
 import { getRdsData, setRdsData } from "@/api/rds";
 import { logAndNoticeError } from "@/utils";
 import FileDialog from "@/views/dialogs/FileDialog.vue";
@@ -329,6 +351,30 @@ const selectedPlaylist = computed(() => {
 
 const hasSelectedLists = computed(() => {
   return selectedPreLists.value.length > 0 || selectedFilesList.value;
+});
+
+const isAllFilesSelected = computed(() => {
+  if (
+    !selectedBatch.value ||
+    !selectedBatch.value.files ||
+    selectedBatch.value.files.length === 0
+  ) {
+    return false;
+  }
+  return selectedFileIndices.value.length === selectedBatch.value.files.length;
+});
+
+const isIndeterminate = computed(() => {
+  if (
+    !selectedBatch.value ||
+    !selectedBatch.value.files ||
+    selectedBatch.value.files.length === 0
+  ) {
+    return false;
+  }
+  const selectedCount = selectedFileIndices.value.length;
+  const totalCount = selectedBatch.value.files.length;
+  return selectedCount > 0 && selectedCount < totalCount;
 });
 
 // 辅助函数
@@ -579,6 +625,18 @@ const handleToggleFileSelection = (index: number) => {
   toggleArrayItem(selectedFileIndices.value, index);
 };
 
+const handleToggleSelectAll = (checked: boolean) => {
+  if (!selectedBatch.value || !selectedBatch.value.files) return;
+
+  if (checked) {
+    // 全选：选中所有文件
+    selectedFileIndices.value = selectedBatch.value.files.map((_, index) => index);
+  } else {
+    // 取消全选：清空选中
+    selectedFileIndices.value = [];
+  }
+};
+
 const handleDeleteSelectedFiles = async () => {
   if (!selectedBatch.value || selectedFileIndices.value.length === 0) {
     return;
@@ -798,4 +856,3 @@ onMounted(() => {
   loadBatchList();
 });
 </script>
-
