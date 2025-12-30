@@ -28,7 +28,7 @@ def get_str(key) -> str:
     v = rds.get(key)
     if v is None:
         return ''
-    return rds.get(key).decode('utf-8')
+    return v.decode('utf-8')
 
 
 def get(key):

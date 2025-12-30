@@ -5,16 +5,11 @@
 from flask import Blueprint, json, request
 from core.log_config import root_logger
 from core.utils import _ok, _err, read_json_from_request
-from core.device.bluetooth import (
-    scan_devices_sync,
-    connect_device_sync,
-    disconnect_device_sync,
-    bluetooth_mgr,
-    get_system_paired_devices_sync,
-)
+from core.services.bluetooth_mgr import bluetooth_mgr
 
 log = root_logger()
 bluetooth_bp = Blueprint('bluetooth', __name__)
+
 
 @bluetooth_bp.route("/bluetooth/scan", methods=['GET'])
 def bluetooth_scan():
@@ -24,7 +19,7 @@ def bluetooth_scan():
     try:
         timeout = request.args.get('timeout', 5.0, type=float)
         log.info(f"===== [Bluetooth Scan] timeout={timeout}")
-        devices = scan_devices_sync(timeout)
+        devices = bluetooth_mgr.scan_devices_sync(timeout)
         return _ok(devices)
     except Exception as e:
         log.error(f"[Bluetooth] Scan error: {e}")
@@ -61,7 +56,7 @@ def bluetooth_connect():
         address = args.get('address')
         if not address:
             return _err("address is required")
-        result = connect_device_sync(address)
+        result = bluetooth_mgr.connect_device_sync(address)
         # 如果 result 已经是标准格式，直接返回；否则包装
         if isinstance(result, dict) and 'code' in result:
             return result
@@ -82,7 +77,7 @@ def bluetooth_disconnect():
         address = args.get('address')
         if not address:
             return _err("address is required")
-        result = disconnect_device_sync(address)
+        result = bluetooth_mgr.disconnect_device_sync(address)
         # 如果 result 已经是标准格式，直接返回；否则包装
         if isinstance(result, dict) and 'code' in result:
             return result
@@ -99,7 +94,7 @@ def bluetooth_get_paired():
     """
     try:
         log.info("===== [Bluetooth Get Paired Devices]")
-        devices = get_system_paired_devices_sync()
+        devices = bluetooth_mgr.get_system_paired_devices()
         return _ok(devices)
     except Exception as e:
         log.error(f"[Bluetooth] Get paired devices error: {e}")

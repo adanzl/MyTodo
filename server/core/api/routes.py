@@ -68,7 +68,7 @@ def view_pic():
 @api_bp.route("/getSave", methods=['GET'])
 def get_save():
     id = request.args.get('id')
-    log.info("===== [Get Save] ", id)
+    log.info(f"===== [Get Save] id={id}")
     return db_mgr.get_save(id)
 
 
