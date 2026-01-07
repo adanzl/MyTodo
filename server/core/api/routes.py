@@ -8,7 +8,6 @@ from core.utils import get_media_duration, read_json_from_request
 import random
 import os
 import re
-import subprocess
 import urllib.parse
 
 log = app_logger

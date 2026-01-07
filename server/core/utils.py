@@ -7,8 +7,9 @@ import subprocess
 import json
 import sys
 import threading
+import queue
 from datetime import datetime, timedelta
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List, Dict, Any
 from urllib.parse import quote, unquote
 from flask import request
 from queue import Queue, Empty
@@ -473,3 +474,72 @@ def get_unique_filepath(directory: str, base_name: str, extension: str) -> str:
             counter += 1
 
     return file_path
+
+
+def run_subprocess_safe(
+    cmd: List[str],
+    timeout: float = 30.0,
+    env: Optional[Dict[str, str]] = None,
+    cwd: Optional[str] = None
+) -> Tuple[int, str, str]:
+    """
+    在线程中安全地运行 subprocess，避免 gevent 与 asyncio 冲突
+    
+    由于 gevent.monkey.patch_all(subprocess=True) 会 patch subprocess 模块，
+    可能导致 "child watchers are only available on the default loop" 错误。
+    使用 threading.Thread 隔离 subprocess 调用可以避免这个问题。
+    
+    :param cmd: 要执行的命令列表
+    :param timeout: 超时时间（秒），默认 30 秒
+    :param env: 环境变量字典，可选
+    :param cwd: 工作目录，可选
+    :return: (returncode, stdout, stderr) 元组
+    :raises TimeoutError: 如果命令执行超时
+    :raises FileNotFoundError: 如果命令未找到
+    :raises Exception: 其他执行错误
+    """
+    result_queue = queue.Queue()
+    error_queue = queue.Queue()
+    
+    def _run():
+        """在线程中运行 subprocess，避免 gevent 冲突"""
+        try:
+            process_env = os.environ.copy()
+            if env:
+                process_env.update(env)
+            
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                env=process_env if env else None,
+                cwd=cwd
+            )
+            try:
+                stdout, stderr = process.communicate(timeout=timeout)
+                result_queue.put((process.returncode, stdout, stderr))
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+                error_queue.put(TimeoutError(f"命令执行超时: {' '.join(cmd)}"))
+        except FileNotFoundError as e:
+            error_queue.put(FileNotFoundError(f"命令未找到: {cmd[0] if cmd else 'unknown'}"))
+        except Exception as e:
+            error_queue.put(e)
+    
+    # 在独立线程中运行
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
+    thread.join(timeout=timeout + 5)  # 给一些额外时间
+    
+    # 检查是否有错误
+    if not error_queue.empty():
+        error = error_queue.get()
+        raise error
+    
+    # 检查是否有结果
+    if result_queue.empty():
+        raise TimeoutError(f"命令执行超时或进程异常退出: {' '.join(cmd)}")
+    
+    return result_queue.get()

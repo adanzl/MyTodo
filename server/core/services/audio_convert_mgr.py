@@ -15,7 +15,7 @@ from typing import Dict, List, Optional, Tuple
 from core.log_config import app_logger
 from core.models.const import (MEDIA_BASE_DIR, FFMPEG_PATH, FFMPEG_TIMEOUT, TASK_STATUS_PENDING, TASK_STATUS_PROCESSING,
                                TASK_STATUS_SUCCESS, TASK_STATUS_FAILED)
-from core.utils import ensure_directory
+from core.utils import ensure_directory, run_subprocess_safe
 
 log = app_logger
 
@@ -251,9 +251,23 @@ class AudioConvertMgr:
             ]
 
             log.info(f"[AudioConvert] 执行 ffmpeg 命令: {' '.join(cmds)}")
-            result = subprocess.run(cmds, capture_output=True, text=True, timeout=FFMPEG_TIMEOUT)
-
-            if result.returncode == 0:
+            # 使用公共方法安全地运行 subprocess，避免 gevent 与 asyncio 冲突
+            try:
+                returncode, stdout, stderr = run_subprocess_safe(cmds, timeout=FFMPEG_TIMEOUT)
+            except TimeoutError as e:
+                error_msg = "转换超时"
+                log.error(f"[AudioConvert] {error_msg}: {e}")
+                return False, error_msg
+            except FileNotFoundError as e:
+                error_msg = "ffmpeg 未找到，请确保已安装 ffmpeg"
+                log.error(f"[AudioConvert] {error_msg}: {e}")
+                return False, error_msg
+            except Exception as e:
+                error_msg = f"转换失败: {str(e)}"
+                log.error(f"[AudioConvert] {error_msg}")
+                return False, error_msg
+            
+            if returncode == 0:
                 if os.path.exists(output_file):
                     log.info(f"[AudioConvert] 转换成功: {input_file} -> {output_file}")
                     return True, None
@@ -262,8 +276,8 @@ class AudioConvertMgr:
                     log.error(f"[AudioConvert] {error_msg}")
                     return False, error_msg
             else:
-                error_msg = result.stderr or result.stdout or '未知错误'
-                log.error(f"[AudioConvert] ffmpeg 执行失败 (返回码: {result.returncode}): {error_msg}")
+                error_msg = stderr or stdout or '未知错误'
+                log.error(f"[AudioConvert] ffmpeg 执行失败 (返回码: {returncode}): {error_msg}")
                 return False, error_msg
 
         except subprocess.TimeoutExpired:

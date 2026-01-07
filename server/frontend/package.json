@@ -24,6 +24,8 @@
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
+    "@iconify-json/ion": "^1.2.6",
+    "@iconify-json/mdi": "^1.2.3",
     "@tailwindcss/postcss": "^4.1.18",
     "@types/crypto-js": "^4.2.2",
     "@types/lodash-es": "^4.17.12",

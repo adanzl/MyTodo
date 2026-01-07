@@ -29,9 +29,7 @@
       ]
     },
     /* Vue specific */
-    "types": [
-      "vite/client"
-    ]
+    "types": []
   },
   "include": [
     "src/**/*.ts",

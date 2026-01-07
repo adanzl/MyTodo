@@ -18,7 +18,7 @@ from core.log_config import app_logger
 from core.models.const import (ALLOWED_AUDIO_EXTENSIONS, MEDIA_BASE_DIR, FFMPEG_PATH, FFMPEG_TIMEOUT,
                                get_media_task_dir, get_media_task_result_dir, TASK_STATUS_PENDING,
                                TASK_STATUS_PROCESSING, TASK_STATUS_SUCCESS, TASK_STATUS_FAILED)
-from core.utils import get_media_duration, ensure_directory
+from core.utils import get_media_duration, ensure_directory, run_subprocess_safe
 
 log = app_logger
 
@@ -427,9 +427,13 @@ class AudioMergeMgr:
         """
         try:
             cmds = [FFMPEG_PATH, '-i', file_path, '-f', 'null', '-']
-            result = subprocess.run(cmds, capture_output=True, text=True, timeout=self.FFMPEG_DURATION_TIMEOUT)
+            # 使用公共方法安全地运行 subprocess，避免 gevent 与 asyncio 冲突
+            try:
+                returncode, stdout, stderr = run_subprocess_safe(cmds, timeout=self.FFMPEG_DURATION_TIMEOUT)
+            except (TimeoutError, FileNotFoundError, Exception):
+                return None
             # ffmpeg 会将信息输出到 stderr
-            return self._parse_duration_from_ffmpeg_output(result.stderr)
+            return self._parse_duration_from_ffmpeg_output(stderr)
         except Exception as e:
             log.warning(f"[AudioMerge] 使用 ffmpeg 获取文件时长失败 {file_path}: {e}")
             return None
@@ -478,15 +482,23 @@ class AudioMergeMgr:
             cmds = [FFMPEG_PATH, '-f', 'concat', '-safe', '0', '-i', file_list_path, '-c', 'copy', '-y', result_file]
 
             log.info(f"[AudioMerge] 执行 ffmpeg 命令: {' '.join(cmds)}")
-            result = subprocess.run(cmds, capture_output=True, text=True, timeout=FFMPEG_TIMEOUT)
+            # 使用公共方法安全地运行 subprocess，避免 gevent 与 asyncio 冲突
+            try:
+                returncode, stdout, stderr = run_subprocess_safe(cmds, timeout=FFMPEG_TIMEOUT)
+            except TimeoutError:
+                log.error(f"[AudioMerge] ffmpeg 执行超时")
+                return None, None
+            except Exception as e:
+                log.error(f"[AudioMerge] ffmpeg 执行失败: {e}")
+                return None, None
 
-            if result.returncode == 0 and os.path.exists(result_file):
+            if returncode == 0 and os.path.exists(result_file):
                 # 从 ffmpeg 输出中解析时长，如果失败则使用 ffmpeg 快速获取
-                duration = self._parse_duration_from_ffmpeg_output(result.stderr)
+                duration = self._parse_duration_from_ffmpeg_output(stderr)
                 duration = self._get_result_duration(result_file, duration)
                 return result_file, duration
 
-            error_msg = result.stderr if result.returncode != 0 else '文件不存在'
+            error_msg = stderr if returncode != 0 else '文件不存在'
             log.error(f"[AudioMerge] ffmpeg 执行失败: {error_msg}")
             return None, None
 

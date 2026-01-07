@@ -13,12 +13,12 @@
 
       <!-- 音频合成页签 -->
       <el-tab-pane label="音频合成" name="audio_merge">
-        <MediaTool />
+        <AudioMerge />
       </el-tab-pane>
 
       <!-- 音频转码页签 -->
       <el-tab-pane label="音频转码" name="audio_convert">
-        <AudioConvertTool />
+        <AudioConvert />
       </el-tab-pane>
     </el-tabs>
   </div>
@@ -27,8 +27,8 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import PdfTool from "./PdfTool.vue";
-import MediaTool from "./MediaTool.vue";
-import AudioConvertTool from "./AudioConvertTool.vue";
+import AudioMerge from "./AudioMerge.vue";
+import AudioConvert from "./AudioConvert.vue";
 
 // 主页签控制
 const activeMainTab = ref("pdf_tool");
