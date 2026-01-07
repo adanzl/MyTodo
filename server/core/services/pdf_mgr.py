@@ -254,8 +254,15 @@ class PdfMgr:
                                    update_time=now)
                     self._tasks[safe_filename] = task
 
-            # 保存任务
-            self._save_all_tasks()
+            # 异步保存任务，避免阻塞响应
+            def save_tasks_async():
+                try:
+                    self._save_all_tasks()
+                except Exception as e:
+                    log.error(f"[PDF] 异步保存任务失败: {e}")
+            
+            thread = threading.Thread(target=save_tasks_async, daemon=True)
+            thread.start()
 
             return 0, "文件上传成功", file_info
 

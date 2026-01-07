@@ -3,7 +3,7 @@ PDF 管理路由
 提供 PDF 文件上传、解密、列表等功能
 """
 import os
-from flask import Blueprint, request, send_file
+from flask import Blueprint, request, send_file, jsonify
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 
@@ -23,24 +23,24 @@ def pdf_upload():
     """
     try:
         if 'file' not in request.files:
-            return _err("未找到上传的文件")
+            return jsonify(_err("未找到上传的文件"))
 
         file = request.files['file']
         if file.filename == '':
-            return _err("文件名不能为空")
+            return jsonify(_err("文件名不能为空"))
 
         code, msg, file_info = pdf_mgr.upload_file(file, file.filename)
         if code != 0:
-            return _err(msg)
+            return jsonify(_err(msg))
 
-        return _ok(file_info)
+        return jsonify(_ok(file_info))
 
     except RequestEntityTooLarge:
         log.error(f"[PDF] 上传文件失败: 文件太大，超过服务器限制（最大 2000MB）")
-        return _err("文件太大，超过服务器限制（最大 2000MB）")
+        return jsonify(_err("文件太大，超过服务器限制（最大 2000MB）"))
     except Exception as e:
         log.error(f"[PDF] 上传文件失败: {e}")
-        return _err(f"上传文件失败: {str(e)}")
+        return jsonify(_err(f"上传文件失败: {str(e)}"))
 
 
 @pdf_bp.route("/pdf/decrypt", methods=['POST'])
@@ -57,17 +57,17 @@ def pdf_decrypt():
         password = data.get('password')
 
         if not task_id:
-            return _err("任务ID不能为空")
+            return jsonify(_err("任务ID不能为空"))
 
         code, msg = pdf_mgr.decrypt(task_id, password)
         if code != 0:
-            return _err(msg)
+            return jsonify(_err(msg))
 
-        return _ok({"message": msg})
+        return jsonify(_ok({"message": msg}))
 
     except Exception as e:
         log.error(f"[PDF] 提交解密任务失败: {e}")
-        return _err(f"提交解密任务失败: {str(e)}")
+        return jsonify(_err(f"提交解密任务失败: {str(e)}"))
 
 
 @pdf_bp.route("/pdf/task/<path:task_id>", methods=['GET'])
@@ -80,13 +80,13 @@ def pdf_task_status(task_id):
     try:
         code, msg, task_info = pdf_mgr.get_task_status(task_id)
         if code != 0:
-            return _err(msg)
+            return jsonify(_err(msg))
 
-        return _ok(task_info)
+        return jsonify(_ok(task_info))
 
     except Exception as e:
         log.error(f"[PDF] 获取任务状态失败: {e}")
-        return _err(f"获取任务状态失败: {str(e)}")
+        return jsonify(_err(f"获取任务状态失败: {str(e)}"))
 
 
 @pdf_bp.route("/pdf/list", methods=['GET'])
@@ -97,11 +97,11 @@ def pdf_list():
     """
     try:
         result = pdf_mgr.list()
-        return _ok(result)
+        return jsonify(_ok(result))
 
     except Exception as e:
         log.error(f"[PDF] 列出文件失败: {e}")
-        return _err(f"列出文件失败: {str(e)}")
+        return jsonify(_err(f"列出文件失败: {str(e)}"))
 
 
 @pdf_bp.route("/pdf/download/<path:filename>", methods=['GET'])
@@ -120,16 +120,16 @@ def pdf_download(filename):
         elif file_type == 'unlocked':
             file_path = os.path.join(PDF_UNLOCK_DIR, secure_filename(filename))
         else:
-            return _err("无效的文件类型")
+            return jsonify(_err("无效的文件类型"))
 
         if not os.path.exists(file_path):
-            return _err("文件不存在")
+            return jsonify(_err("文件不存在"))
 
         return send_file(file_path, as_attachment=True, download_name=filename)
 
     except Exception as e:
         log.error(f"[PDF] 下载文件失败: {e}")
-        return _err(f"下载文件失败: {str(e)}")
+        return jsonify(_err(f"下载文件失败: {str(e)}"))
 
 
 @pdf_bp.route("/pdf/delete", methods=['POST'])
@@ -144,14 +144,14 @@ def pdf_delete():
         task_id = data.get('task_id')
 
         if not task_id:
-            return _err("任务ID不能为空")
+            return jsonify(_err("任务ID不能为空"))
 
         code, msg = pdf_mgr.delete(task_id)
         if code != 0:
-            return _err(msg)
+            return jsonify(_err(msg))
 
-        return _ok({"message": msg})
+        return jsonify(_ok({"message": msg}))
 
     except Exception as e:
         log.error(f"[PDF] 删除任务失败: {e}")
-        return _err(f"删除任务失败: {str(e)}")
+        return jsonify(_err(f"删除任务失败: {str(e)}"))
