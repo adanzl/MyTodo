@@ -228,13 +228,22 @@ class PdfMgr:
 
             # 保存文件
             file_obj.save(file_path)
-            log.info(f"[PDF] 文件上传成功: {file_path}")
+            log.info(f"[PDF] 文件保存完成: {file_path}")
+            
+            # 确保文件完全写入磁盘
+            try:
+                fd = os.open(file_path, os.O_RDONLY)
+                os.fsync(fd)
+                os.close(fd)
+            except Exception as e:
+                log.warning(f"[PDF] 同步文件到磁盘失败: {e}")
 
             # 获取文件信息
             file_info = get_file_info(file_path)
             if not file_info:
                 return -1, "无法获取文件信息", None
 
+            log.info(f"[PDF] 开始创建/更新任务: {safe_filename}")
             # 创建或更新任务
             now = datetime.now().timestamp()
             with self._task_lock:
@@ -254,15 +263,10 @@ class PdfMgr:
                                    update_time=now)
                     self._tasks[safe_filename] = task
 
-            # 异步保存任务，避免阻塞响应
-            def save_tasks_async():
-                try:
-                    self._save_all_tasks()
-                except Exception as e:
-                    log.error(f"[PDF] 异步保存任务失败: {e}")
-            
-            thread = threading.Thread(target=save_tasks_async, daemon=True)
-            thread.start()
+            log.info(f"[PDF] 开始保存任务元数据")
+            # 保存任务
+            self._save_all_tasks()
+            log.info(f"[PDF] 任务元数据保存完成，准备返回响应")
 
             return 0, "文件上传成功", file_info
 
