@@ -144,6 +144,10 @@ export interface ConvertTask {
    */
   overwrite?: boolean;
   /**
+   * 可处理的文件总数
+   */
+  total_files?: number;
+  /**
    * 错误消息
    */
   error_message?: string;

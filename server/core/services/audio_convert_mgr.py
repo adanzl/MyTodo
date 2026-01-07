@@ -29,6 +29,7 @@ class AudioConvertTask:
     directory: Optional[str] = None  # 转码目录
     output_dir: str = 'mp3'  # 输出目录名称，默认为 mp3
     overwrite: bool = True  # 是否覆盖同名文件，默认为 True
+    total_files: Optional[int] = None  # 可处理的文件总数
     error_message: Optional[str] = None  # 错误信息
     progress: Optional[Dict] = None  # 转码进度 {total: int, processed: int, current_file: str}
     create_time: float = 0  # 创建时间戳
@@ -162,11 +163,17 @@ class AudioConvertMgr:
                 if not os.path.isdir(directory):
                     return -1, "路径不是目录"
                 task.directory = directory
+                # 更新目录后，重新计算文件数量
+                if task.directory:
+                    task.total_files = len(self._scan_media_files(task.directory, task.output_dir))
                 updated = True
             if output_dir is not None:
                 if not output_dir.strip():
                     return -1, "输出目录名称不能为空"
                 task.output_dir = output_dir.strip()
+                # 更新输出目录后，重新计算文件数量
+                if task.directory:
+                    task.total_files = len(self._scan_media_files(task.directory, task.output_dir))
                 updated = True
             if overwrite is not None:
                 task.overwrite = bool(overwrite)
@@ -182,36 +189,12 @@ class AudioConvertMgr:
             log.error(f"[AudioConvert] 更新任务失败: {e}")
             return -1, f"更新任务失败: {str(e)}"
 
-    def _scan_audio_files(self, directory: str, output_dir: str) -> List[str]:
+    def _scan_media_files(self, directory: str, output_dir: str) -> List[str]:
         """扫描目录下的所有媒体文件（音频和视频）"""
-        # 所有支持的媒体文件扩展名（音频 + 视频）
-        # 所有支持的媒体文件扩展名（音频 + 视频）
         media_extensions = {
-            '.mp3',
-            '.wav',
-            '.flac',
-            '.aac',
-            '.m4a',
-            '.ogg',
-            '.wma',  # 音频格式
-            '.mp4',
-            '.avi',
-            '.mkv',
-            '.mov',
-            '.wmv',
-            '.flv',
-            '.webm',
-            '.m4v',
-            '.3gp',
-            '.asf',
-            '.rm',
-            '.rmvb',
-            '.vob',
-            '.ts',
-            '.mts',
-            '.m2ts'  # 视频格式
+            '.mp3', '.wav', '.flac', '.aac', '.m4a', '.ogg', '.wma', '.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv',
+            '.webm', '.m4v', '.3gp', '.asf', '.rm', '.rmvb', '.vob', '.ts', '.mts', '.m2ts'
         }
-
         media_files = []
         for root, _, files in os.walk(directory):
             if output_dir in root:
@@ -234,7 +217,24 @@ class AudioConvertMgr:
         try:
             # 确保输出目录存在
             output_dir = os.path.dirname(output_file)
-            os.makedirs(output_dir, exist_ok=True)
+            try:
+                if os.path.exists(output_dir):
+                    # 目录已存在，检查写权限
+                    if not os.access(output_dir, os.W_OK):
+                        error_msg = f"输出目录无写权限: {output_dir}"
+                        log.error(f"[AudioConvert] {error_msg}")
+                        return False, error_msg
+                else:
+                    # 目录不存在，尝试创建
+                    os.makedirs(output_dir, exist_ok=True)
+            except PermissionError as e:
+                error_msg = f"无法创建输出目录，权限不足: {output_dir}"
+                log.error(f"[AudioConvert] {error_msg}: {e}")
+                return False, error_msg
+            except OSError as e:
+                error_msg = f"无法创建输出目录: {output_dir}"
+                log.error(f"[AudioConvert] {error_msg}: {e}")
+                return False, error_msg
 
             # 使用 ffmpeg 转换（支持音频和视频文件）
             cmds = [
@@ -293,31 +293,58 @@ class AudioConvertMgr:
                 self._update_task_status(task, TASK_STATUS_FAILED, "目录不存在")
                 return
 
-            audio_files = self._scan_audio_files(task.directory, task.output_dir)
-            total = len(audio_files)
+            media_files = self._scan_media_files(task.directory, task.output_dir)
+            total = len(media_files)
             task.progress['total'] = total
             self._save_task(task)
 
             if total == 0:
                 self._update_task_status(task, TASK_STATUS_SUCCESS, None, {'processed': 0})
-                log.info(f"[AudioConvert] 任务 {task.task_id} 完成：目录中没有音频文件")
+                log.info(f"[AudioConvert] 任务 {task.task_id} 完成：目录中没有媒体文件")
                 return
 
             output_dir_path = os.path.join(task.directory, task.output_dir)
-            os.makedirs(output_dir_path, exist_ok=True)
+            # 检查并创建输出目录
+            try:
+                if os.path.exists(output_dir_path):
+                    # 目录已存在，检查写权限
+                    if not os.access(output_dir_path, os.W_OK):
+                        error_msg = f"输出目录无写权限: {output_dir_path}"
+                        log.error(f"[AudioConvert] {error_msg}")
+                        self._update_task_status(task, TASK_STATUS_FAILED, error_msg)
+                        return
+                else:
+                    # 目录不存在，尝试创建
+                    try:
+                        os.makedirs(output_dir_path, exist_ok=True)
+                    except PermissionError as e:
+                        error_msg = f"无法创建输出目录，权限不足: {output_dir_path}"
+                        log.error(f"[AudioConvert] {error_msg}: {e}")
+                        self._update_task_status(task, TASK_STATUS_FAILED, error_msg)
+                        return
+                    except OSError as e:
+                        error_msg = f"无法创建输出目录: {output_dir_path}"
+                        log.error(f"[AudioConvert] {error_msg}: {e}")
+                        self._update_task_status(task, TASK_STATUS_FAILED, error_msg)
+                        return
+            except Exception as e:
+                error_msg = f"检查输出目录时出错: {output_dir_path}"
+                log.error(f"[AudioConvert] {error_msg}: {e}")
+                self._update_task_status(task, TASK_STATUS_FAILED, error_msg)
+                return
 
             processed = 0
             failed_files = []
-            for audio_file in audio_files:
+            for media_file in media_files:
                 if self._stop_flags.get(task.task_id, False):
                     self._update_task_status(task, TASK_STATUS_FAILED, "任务已被停止", {'current_file': ''})
                     log.info(f"[AudioConvert] 任务 {task.task_id} 被停止")
                     return
 
-                task.progress['current_file'] = os.path.basename(audio_file)
+                task.progress['current_file'] = os.path.basename(media_file)
                 self._save_task(task)
 
-                base_name = os.path.splitext(os.path.basename(audio_file))[0]
+                base_name = os.path.splitext(os.path.basename(media_file))[0]
                 output_file = os.path.join(output_dir_path, f"{base_name}.mp3")
 
                 if os.path.exists(output_file) and not task.overwrite:
@@ -326,13 +353,13 @@ class AudioConvertMgr:
                     self._save_task(task)
                     continue
 
-                success, error = self._convert_file_to_mp3(audio_file, output_file)
+                success, error = self._convert_file_to_mp3(media_file, output_file)
                 if success:
                     processed += 1
                     task.progress['processed'] = processed
                     self._save_task(task)
                 else:
-                    failed_files.append(f"{os.path.basename(audio_file)}: {error}")
+                    failed_files.append(f"{os.path.basename(media_file)}: {error}")
 
             if self._stop_flags.get(task.task_id, False):
                 self._update_task_status(task, TASK_STATUS_FAILED, "任务已被停止", {'current_file': ''})

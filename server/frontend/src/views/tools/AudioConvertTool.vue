@@ -143,13 +143,23 @@
           </div>
           <div
             v-if="convertCurrentTask.directory"
-            class="text-sm text-gray-600 truncate"
-            :title="convertCurrentTask.directory"
+            class="text-sm text-gray-600 flex flex-col gap-1"
           >
-            {{ convertCurrentTask.directory }}
+            <div class="truncate" :title="convertCurrentTask.directory">
+              {{ convertCurrentTask.directory }}
+            </div>
+            <div
+              v-if="
+                convertCurrentTask.total_files !== null &&
+                convertCurrentTask.total_files !== undefined
+              "
+              class="text-xs text-gray-500"
+            >
+              可处理文件数: {{ convertCurrentTask.total_files }}
+            </div>
           </div>
           <div v-else class="text-sm text-gray-400">
-            请选择一个目录，该目录下的所有音频文件将被转换为 MP3 格式
+            请选择一个目录，该目录下的所有媒体文件将被转换为 MP3 格式
           </div>
         </div>
 
