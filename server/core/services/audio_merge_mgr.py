@@ -1,6 +1,6 @@
 """
-媒体工具管理服务
-提供音频合成等功能
+音频合成管理服务
+提供音频文件合并等功能
 """
 import json
 import os
@@ -15,7 +15,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 from core.log_config import app_logger
-from core.models.const import (ALLOWED_AUDIO_EXTENSIONS, MEDIA_BASE_DIR, get_media_task_dir, get_media_task_result_dir)
+from core.models.const import (ALLOWED_AUDIO_EXTENSIONS, MEDIA_BASE_DIR, FFMPEG_PATH, get_media_task_dir, get_media_task_result_dir)
 from core.utils import get_media_duration, ensure_directory
 
 log = app_logger
@@ -41,14 +41,13 @@ class AudioMergeTask:
     update_time: float = 0  # 更新时间戳
 
 
-class MediaToolMgr:
-    """媒体工具管理器"""
+class AudioMergeMgr:
+    """音频合成管理器"""
 
     TASK_META_FILE = 'task.json'  # 任务元数据文件名
     MERGED_FILENAME = 'merged.mp3'  # 合并后的文件名
     FFMPEG_TIMEOUT = 300  # ffmpeg 超时时间（秒）
     FFMPEG_DURATION_TIMEOUT = 10  # 获取文件时长的超时时间（秒）
-    FFMPEG_PATH = '/usr/bin/ffmpeg'  # ffmpeg 路径
 
     # 编译正则表达式以提高性能
     _DURATION_PATTERN = re.compile(r'Duration:\s*(\d{2}):(\d{2}):(\d{2})\.(\d{2})')
@@ -132,7 +131,7 @@ class MediaToolMgr:
                 all_tasks_data = json.load(f)
 
             if not isinstance(all_tasks_data, dict):
-                log.warning("[MediaTool] task.json 格式错误，应为字典格式")
+                log.warning("[AudioMerge] task.json 格式错误，应为字典格式")
                 return
 
             loaded_count = 0
@@ -140,7 +139,7 @@ class MediaToolMgr:
                 try:
                     task_dir = get_media_task_dir(task_id)
                     if not os.path.exists(task_dir):
-                        log.warning(f"[MediaTool] 任务目录不存在: {task_id}")
+                        log.warning(f"[AudioMerge] 任务目录不存在: {task_id}")
                         continue
 
                     # 重建文件列表（检查文件是否存在）
@@ -169,15 +168,15 @@ class MediaToolMgr:
                     loaded_count += 1
 
                 except Exception as e:
-                    log.error(f"[MediaTool] 加载任务失败 {task_id}: {e}")
+                    log.error(f"[AudioMerge] 加载任务失败 {task_id}: {e}")
                     continue
 
-            log.info(f"[MediaTool] 共加载 {loaded_count} 个历史任务")
+            log.info(f"[AudioMerge] 共加载 {loaded_count} 个历史任务")
 
         except json.JSONDecodeError as e:
-            log.error(f"[MediaTool] 解析 task.json 失败: {e}")
+            log.error(f"[AudioMerge] 解析 task.json 失败: {e}")
         except Exception as e:
-            log.error(f"[MediaTool] 加载历史任务失败: {e}")
+            log.error(f"[AudioMerge] 加载历史任务失败: {e}")
 
     def _save_all_tasks(self):
         """保存所有任务到统一的 task.json 文件"""
@@ -191,7 +190,7 @@ class MediaToolMgr:
                 json.dump(all_tasks_data, f, ensure_ascii=False, indent=2)
 
         except Exception as e:
-            log.error(f"[MediaTool] 保存所有任务失败: {e}")
+            log.error(f"[AudioMerge] 保存所有任务失败: {e}")
 
     def _generate_task_id(self) -> str:
         """生成短任务ID"""
@@ -232,12 +231,12 @@ class MediaToolMgr:
             self._tasks[task_id] = task
             self._save_all_tasks()
 
-            log.info(f"[MediaTool] 创建音频合成任务: {task_id}, 名称: {name}")
+            log.info(f"[AudioMerge] 创建音频合成任务: {task_id}, 名称: {name}")
             return 0, "任务创建成功", task_id
 
         except Exception as e:
             error_msg = f"创建任务失败: {str(e)}"
-            log.error(f"[MediaTool] {error_msg}")
+            log.error(f"[AudioMerge] {error_msg}")
             return -1, error_msg, None
 
     def add_file(self, task_id: str, file_path: str, filename: str) -> Tuple[int, str]:
@@ -276,12 +275,12 @@ class MediaToolMgr:
             task.files.append(file_info)
             self._save_task_and_update_time(task)
 
-            log.info(f"[MediaTool] 添加文件到任务 {task_id}: {filename}")
+            log.info(f"[AudioMerge] 添加文件到任务 {task_id}: {filename}")
             return 0, "文件添加成功"
 
         except Exception as e:
             error_msg = f"添加文件失败: {str(e)}"
-            log.error(f"[MediaTool] {error_msg}")
+            log.error(f"[AudioMerge] {error_msg}")
             return -1, error_msg
 
     def remove_file(self, task_id: str, file_index: int) -> Tuple[int, str]:
@@ -308,12 +307,12 @@ class MediaToolMgr:
             self._update_file_indices(task.files)
             self._save_task_and_update_time(task)
 
-            log.info(f"[MediaTool] 从任务 {task_id} 移除文件: {removed_file['name']}")
+            log.info(f"[AudioMerge] 从任务 {task_id} 移除文件: {removed_file['name']}")
             return 0, "文件移除成功"
 
         except Exception as e:
             error_msg = f"移除文件失败: {str(e)}"
-            log.error(f"[MediaTool] {error_msg}")
+            log.error(f"[AudioMerge] {error_msg}")
             return -1, error_msg
 
     def reorder_files(self, task_id: str, file_indices: List[int]) -> Tuple[int, str]:
@@ -344,12 +343,12 @@ class MediaToolMgr:
             self._update_file_indices(task.files)
             self._save_task_and_update_time(task)
 
-            log.info(f"[MediaTool] 调整任务 {task_id} 的文件顺序")
+            log.info(f"[AudioMerge] 调整任务 {task_id} 的文件顺序")
             return 0, "文件顺序调整成功"
 
         except Exception as e:
             error_msg = f"调整文件顺序失败: {str(e)}"
-            log.error(f"[MediaTool] {error_msg}")
+            log.error(f"[AudioMerge] {error_msg}")
             return -1, error_msg
 
     def start_task(self, task_id: str) -> Tuple[int, str]:
@@ -386,19 +385,19 @@ class MediaToolMgr:
                             try:
                                 result_duration = get_media_duration(result_file)
                             except Exception as e:
-                                log.warning(f"[MediaTool] 任务 {task_id} 获取结果文件时长失败: {e}")
+                                log.warning(f"[AudioMerge] 任务 {task_id} 获取结果文件时长失败: {e}")
                         task.result_duration = result_duration
-                        log.info(f"[MediaTool] 任务 {task_id} 合成成功: {result_file}, 时长: {task.result_duration}秒")
+                        log.info(f"[AudioMerge] 任务 {task_id} 合成成功: {result_file}, 时长: {task.result_duration}秒")
                     else:
                         task.status = TASK_STATUS_FAILED
                         task.error_message = "合成失败"
                         task.result_duration = None
-                        log.error(f"[MediaTool] 任务 {task_id} 合成失败")
+                        log.error(f"[AudioMerge] 任务 {task_id} 合成失败")
                 except Exception as e:
                     task.status = TASK_STATUS_FAILED
                     task.error_message = str(e)
                     task.result_duration = None
-                    log.error(f"[MediaTool] 任务 {task_id} 合成异常: {e}")
+                    log.error(f"[AudioMerge] 任务 {task_id} 合成异常: {e}")
                 finally:
                     self._save_task_and_update_time(task)
 
@@ -408,7 +407,7 @@ class MediaToolMgr:
 
         except Exception as e:
             error_msg = f"启动任务失败: {str(e)}"
-            log.error(f"[MediaTool] {error_msg}")
+            log.error(f"[AudioMerge] {error_msg}")
             return -1, error_msg
 
     def _parse_duration_from_ffmpeg_output(self, output: str) -> Optional[float]:
@@ -432,12 +431,12 @@ class MediaToolMgr:
         :return: 时长（秒），失败返回 None
         """
         try:
-            cmds = [self.FFMPEG_PATH, '-i', file_path, '-f', 'null', '-']
+            cmds = [FFMPEG_PATH, '-i', file_path, '-f', 'null', '-']
             result = subprocess.run(cmds, capture_output=True, text=True, timeout=self.FFMPEG_DURATION_TIMEOUT)
             # ffmpeg 会将信息输出到 stderr
             return self._parse_duration_from_ffmpeg_output(result.stderr)
         except Exception as e:
-            log.warning(f"[MediaTool] 使用 ffmpeg 获取文件时长失败 {file_path}: {e}")
+            log.warning(f"[AudioMerge] 使用 ffmpeg 获取文件时长失败 {file_path}: {e}")
             return None
 
     def _get_result_duration(self, result_file: str, fallback_duration: Optional[float] = None) -> Optional[float]:
@@ -482,10 +481,10 @@ class MediaToolMgr:
 
             # 使用 ffmpeg 合并
             cmds = [
-                self.FFMPEG_PATH, '-f', 'concat', '-safe', '0', '-i', file_list_path, '-c', 'copy', '-y', result_file
+                FFMPEG_PATH, '-f', 'concat', '-safe', '0', '-i', file_list_path, '-c', 'copy', '-y', result_file
             ]
 
-            log.info(f"[MediaTool] 执行 ffmpeg 命令: {' '.join(cmds)}")
+            log.info(f"[AudioMerge] 执行 ffmpeg 命令: {' '.join(cmds)}")
             result = subprocess.run(cmds, capture_output=True, text=True, timeout=self.FFMPEG_TIMEOUT)
 
             if result.returncode == 0 and os.path.exists(result_file):
@@ -495,14 +494,14 @@ class MediaToolMgr:
                 return result_file, duration
 
             error_msg = result.stderr if result.returncode != 0 else '文件不存在'
-            log.error(f"[MediaTool] ffmpeg 执行失败: {error_msg}")
+            log.error(f"[AudioMerge] ffmpeg 执行失败: {error_msg}")
             return None, None
 
         except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-            log.error(f"[MediaTool] ffmpeg 执行失败: {e}")
+            log.error(f"[AudioMerge] ffmpeg 执行失败: {e}")
             return None, None
         except Exception as e:
-            log.error(f"[MediaTool] 合并音频文件失败: {e}")
+            log.error(f"[AudioMerge] 合并音频文件失败: {e}")
             return None, None
 
     def get_task(self, task_id: str) -> Optional[Dict]:
@@ -522,9 +521,9 @@ class MediaToolMgr:
                 task.result_duration = self._get_result_duration(task.result_file)
                 if task.result_duration is not None:
                     self._save_task_and_update_time(task)
-                    log.info(f"[MediaTool] 任务 {task_id} 补全结果文件时长: {task.result_duration}秒")
+                    log.info(f"[AudioMerge] 任务 {task_id} 补全结果文件时长: {task.result_duration}秒")
             except Exception as e:
-                log.warning(f"[MediaTool] 任务 {task_id} 补全结果文件时长失败: {e}")
+                log.warning(f"[AudioMerge] 任务 {task_id} 补全结果文件时长失败: {e}")
 
         return asdict(task)
 
@@ -563,14 +562,14 @@ class MediaToolMgr:
             del self._tasks[task_id]
             self._save_all_tasks()  # 更新 task.json
 
-            log.info(f"[MediaTool] 删除任务: {task_id}")
+            log.info(f"[AudioMerge] 删除任务: {task_id}")
             return 0, "任务删除成功"
 
         except Exception as e:
             error_msg = f"删除任务失败: {str(e)}"
-            log.error(f"[MediaTool] {error_msg}")
+            log.error(f"[AudioMerge] {error_msg}")
             return -1, error_msg
 
 
 # 创建全局实例
-media_tool_mgr = MediaToolMgr()
+audio_merge_mgr = AudioMergeMgr()

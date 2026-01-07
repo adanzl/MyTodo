@@ -290,7 +290,7 @@ import {
   getMediaTaskDownloadUrl,
   saveMediaTaskResult,
   type MediaTask,
-} from "@/api/media";
+} from "@/api/audioMerge";
 
 // 音频合成相关状态
 const mediaLoading = ref(false);

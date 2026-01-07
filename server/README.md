@@ -79,7 +79,7 @@ server/
 │   │   └── mi_device.py    # 小米设备
 │   ├── services/           # 业务服务模块
 │   │   ├── agent_mgr.py    # Agent 管理器
-│   │   ├── media_tool_mgr.py  # 媒体工具管理器
+│   │   ├── audio_merge_mgr.py  # 音频合成管理器
 │   │   ├── pdf_mgr.py      # PDF 管理器
 │   │   ├── playlist_mgr.py # 播放列表管理器
 │   │   └── scheduler_mgr.py # 定时任务调度器
@@ -152,7 +152,7 @@ server/
 
 - `core/api/media_routes.py` - 媒体路由
 - `core/services/playlist_mgr.py` - 播放列表管理器
-- `core/services/media_tool_mgr.py` - 媒体工具管理器
+- `core/services/audio_merge_mgr.py` - 音频合成管理器
 
 ### 5. 智能设备控制
 

@@ -96,3 +96,55 @@ export interface MediaTaskFile extends MediaFile {
    */
   index?: number;
 }
+
+/**
+ * 转码任务进度信息
+ */
+export interface ConvertTaskProgress {
+  /**
+   * 总文件数
+   */
+  total?: number;
+  /**
+   * 已处理文件数
+   */
+  processed?: number;
+  /**
+   * 当前正在处理的文件
+   */
+  current_file?: string;
+}
+
+/**
+ * 音频转码任务接口
+ */
+export interface ConvertTask {
+  /**
+   * 任务ID
+   */
+  task_id: string;
+  /**
+   * 任务名称
+   */
+  name: string;
+  /**
+   * 任务状态
+   */
+  status: string;
+  /**
+   * 转码目录
+   */
+  directory?: string;
+  /**
+   * 输出目录名称，默认为 'mp3'
+   */
+  output_dir?: string;
+  /**
+   * 错误消息
+   */
+  error_message?: string;
+  /**
+   * 转码进度
+   */
+  progress?: ConvertTaskProgress;
+}

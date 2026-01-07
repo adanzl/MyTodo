@@ -15,6 +15,11 @@
       <el-tab-pane label="音频合成" name="audio_merge">
         <MediaTool />
       </el-tab-pane>
+
+      <!-- 音频转码页签 -->
+      <el-tab-pane label="音频转码" name="audio_convert">
+        <AudioConvertTool />
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -23,6 +28,7 @@
 import { ref } from "vue";
 import PdfTool from "./PdfTool.vue";
 import MediaTool from "./MediaTool.vue";
+import AudioConvertTool from "./AudioConvertTool.vue";
 
 // 主页签控制
 const activeMainTab = ref("pdf_tool");
@@ -33,4 +39,3 @@ const handleTabChange = (tabName: string) => {
   console.log("切换到页签:", tabName);
 };
 </script>
-

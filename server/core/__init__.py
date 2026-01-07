@@ -15,6 +15,7 @@ from core.api.agent_routes import agent_bp
 from core.api.bluetooth_routes import bluetooth_bp
 from core.api.dlna_routes import dlna_bp
 from core.api.media_routes import media_bp
+from core.api.playlist_routes import playlist_bp
 from core.api.mi_routes import mi_bp
 from core.api.pdf_routes import pdf_bp
 from core.chat.chat_mgr import chat_mgr
@@ -41,6 +42,7 @@ def create_app():
     app.register_blueprint(agent_bp, url_prefix='/')
     app.register_blueprint(bluetooth_bp, url_prefix='/')
     app.register_blueprint(media_bp, url_prefix='/')
+    app.register_blueprint(playlist_bp, url_prefix='/')
     app.register_blueprint(dlna_bp, url_prefix='/')
     app.register_blueprint(mi_bp, url_prefix='/')
     app.register_blueprint(pdf_bp, url_prefix='/')

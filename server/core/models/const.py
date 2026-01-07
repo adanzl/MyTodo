@@ -16,6 +16,7 @@ PDF_UNLOCK_DIR = os.path.join(PDF_BASE_DIR, 'unlock')
 MEDIA_BASE_DIR = os.path.join(BASE_TMP_DIR, 'media')
 # 任务目录：/tmp/my_todo/media/{task_id}/
 MEDIA_RESULT_DIR_SUFFIX = 'result'  # 结果目录后缀：{task_dir}/result/
+FFMPEG_PATH = '/usr/bin/ffmpeg'  # ffmpeg 路径
 
 def get_media_task_dir(task_id: str) -> str:
     """获取媒体任务目录"""

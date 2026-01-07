@@ -1,11 +1,21 @@
 import traceback
 
 import dashscope
-from core.log_config import app_logger
+from dotenv import load_dotenv
+import os
+load_dotenv()
 
-log = app_logger
+try:
+    from core.log_config import app_logger
+
+    log = app_logger
+    import core.db.rds_mgr as rds_mgr
+except:
+    import logging
+    log = logging.getLogger()
+    rds_mgr = None
+
 FASTAPI_URL = "http://192.168.50.171:9099/inference_zero_shot"  # FastAPI 服务器地址
-import core.db.rds_mgr as rds_mgr
 from dashscope.audio.tts_v2 import *
 
 ROLE_MAP = {
@@ -26,6 +36,7 @@ MODEL_MAP = {
     'loongbella_v2': 'cosyvoice-v2',
     'longxiaochun_v2': 'cosyvoice-v2',
     'longxiaoxia_v2': 'cosyvoice-v2',
+    'longwan_v3': 'cosyvoice-v3-flash',
 }
 # cSpell: enable
 
@@ -35,7 +46,7 @@ class TTSClient(ResultCallback):
     def __init__(self, on_msg=None, on_err=None):
         self.on_msg = on_msg or (lambda x, y: None)
         self.on_err = on_err or (lambda x: None)
-        dashscope.api_key = "sk-b7b302bad3b3410a9e21ca2294de4a08"
+        dashscope.api_key = os.getenv('ALI_KEY')
         self.synthesizer = None
         self.role = DEFAULT_ROLE
         self.speed = 1.0
@@ -122,9 +133,10 @@ class TTSClient(ResultCallback):
     def on_data(self, data: bytes) -> None:
         # log.info("[TTS] result length: " + str(len(data)))
         try:
-            key = f"audio:{self.id}:{self.role}"
-            rds_mgr.append_value(key, data)
-            self.on_msg(data)
+            if rds_mgr is not None:
+                key = f"audio:{self.id}:{self.role}"
+                rds_mgr.append_value(key, data)
+            self.on_msg(data, 0)
         except Exception as e:
             log.error(f">>[TTS]{e}")
             traceback.print_stack()
@@ -137,20 +149,28 @@ def test_tts():
     def on_data(data, type=0):
         nonlocal f
         if type == 0:
-            log.info(f">>[TTS] Data: {len(data)}")
-            if f is None:
-                f = open("output.mp3", "wb")
-            f.write(data)
+            # type=0 表示音频数据
+            if isinstance(data, bytes):
+                log.info(f">>[TTS] Data: {len(data)} bytes")
+                if f is None:
+                    f = open("output.mp3", "wb")
+                f.write(data)
+            else:
+                log.info(f">>[TTS] Data: {data}")
         else:
-            log.info(">>[TTS] Message END")
-            f.close()
-            f = None
+            # type=1 表示完成消息
+            log.info(f">>[TTS] Message END: {data}")
+            if f is not None:
+                f.close()
+                f = None
 
-    tts = TTSClient(on_msg=on_data)
+    def on_err(err):
+        log.error(f">>[TTS] Error: {err}")
+
+    tts = TTSClient(on_msg=on_data, on_err=on_err)
     text = '可可……你这突如其来的表白让我眼泪都快下来了！😍 当然好啊！愿意，一千个一万个愿意！和你在一起的每一天都是我最珍贵的时光。这么多年的等待和错过，终于等来了这一刻。以后的日子里，不管是去故宫划船还是公园散步，我都想牵着你的手一起走。亲爱的，这一生一世，我都是你的楠楠啦～'
-    tts.process_msg(text)
+    tts.process_msg(text, 'longwan_v3')
 
 
 if __name__ == "__main__":
-    # export PYTHONPATH=/Users/zhaolin/Documents/Projects/MyTodo/server:$PYTHONPATH
     test_tts()

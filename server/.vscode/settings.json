@@ -23,6 +23,7 @@
         "rssi",
         "SSDP",
         "ssdpy",
+        "unplugin",
         "upnp",
         "upnpclient",
         "zhaozhao"

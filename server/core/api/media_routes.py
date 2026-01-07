@@ -2,7 +2,6 @@
 媒体管理路由
 通过调用 device_agent 服务接口实现
 '''
-import json
 import os
 import shutil
 from datetime import datetime
@@ -10,8 +9,8 @@ from flask import Blueprint, request, send_file, abort
 from werkzeug.utils import secure_filename
 
 from core.log_config import app_logger
-from core.services.playlist_mgr import playlist_mgr
-from core.services.media_tool_mgr import media_tool_mgr
+from core.services.audio_merge_mgr import audio_merge_mgr
+from core.services.audio_convert_mgr import audio_convert_mgr
 from core.models.const import get_media_task_dir, get_media_task_result_dir, ALLOWED_AUDIO_EXTENSIONS
 from core.utils import get_media_url, get_media_duration, validate_and_normalize_path, _ok, _err, ensure_directory, is_allowed_audio_file, get_file_info, read_json_from_request, get_unique_filepath
 
@@ -30,170 +29,6 @@ MIMETYPE_MAP = {
     '.avi': 'video/x-msvideo',
     '.mkv': 'video/x-matroska',
 }
-
-# ========== 播放列表本地存储（RDS）接口 ==========
-
-
-@media_bp.route("/playlist/get", methods=['GET'])
-def playlist_get():
-    """
-    获取当前存储的播放列表集合，支持通过 id 只返回单个列表
-    """
-    try:
-        args = request.args
-        # log.info(f"===== [Playlist Get] {json.dumps(args)}")
-        playlist_id = args.get("id")
-
-        # 如果 id 为空、None 或空字符串，返回整个播放列表集合
-        if playlist_id is None or playlist_id in ("None", "null", ""):
-            ret = playlist_mgr.get_playlist(None)
-        else:
-            ret = playlist_mgr.get_playlist(playlist_id)
-            if not ret:
-                return _err(f"未找到标识为 {playlist_id} 的播放列表")
-        return _ok(ret)
-    except Exception as e:
-        log.error(f"[PLAYLIST] Get error: {e}")
-        return _err(f'error: {str(e)}')
-
-
-@media_bp.route("/playlist/update", methods=['POST'])
-def playlist_update():
-    """
-    更新单个播放列表
-    传入单个播放列表数据，必须包含 id 字段
-    """
-    try:
-        args = read_json_from_request()
-
-        if not args:
-            return _err("请求数据不能为空")
-
-        playlist_id = args.get("id")
-        if not playlist_id:
-            return _err("播放列表 id 不能为空")
-
-        ret = playlist_mgr.update_single_playlist(args)
-        if ret != 0:
-            return _err("更新播放列表失败")
-        return _ok()
-    except Exception as e:
-        log.error(f"[PLAYLIST] Update error: {e}", exc_info=True)
-        return _err(f'error: {str(e)}')
-
-
-@media_bp.route("/playlist/updateAll", methods=['POST'])
-def playlist_update_all():
-    """
-    更新整个播放列表集合（覆盖）
-    传入字典格式 {playlist_id: playlist_data, ...}
-    """
-    try:
-        args = read_json_from_request()
-
-        if not args:
-            return _err("请求数据不能为空")
-
-        ret = playlist_mgr.save_playlist(args)
-        if ret != 0:
-            return _err("更新播放列表集合失败")
-        return _ok()
-    except Exception as e:
-        log.error(f"[PLAYLIST] UpdateAll error: {e}")
-        return _err(f'error: {str(e)}')
-
-
-@media_bp.route("/playlist/play", methods=['POST'])
-def playlist_play():
-    """
-    播放播放列表
-    """
-    try:
-        args = read_json_from_request()
-        id = args.get("id")
-        if id is None:
-            return _err("id is required")
-        ret, msg = playlist_mgr.play(id)
-        if ret != 0:
-            return _err(f"播放播放列表 {id} 失败: {msg}")
-        return _ok()
-    except Exception as e:
-        log.error(f"[PLAYLIST] Play error: {e}")
-        return _err(f'error: {str(e)}')
-
-
-@media_bp.route("/playlist/playNext", methods=['POST'])
-def playlist_play_next():
-    """
-    播放下一首
-    """
-    try:
-        args = read_json_from_request()
-        id = args.get("id")
-        if id is None:
-            return _err("id is required")
-        ret, msg = playlist_mgr.play_next(id)
-        if ret != 0:
-            return _err(f"播放下一首失败: {msg}")
-        return _ok()
-    except Exception as e:
-        log.error(f"[PLAYLIST] PlayNext error: {e}")
-        return _err(f'error: {str(e)}')
-
-
-@media_bp.route("/playlist/playPre", methods=['POST'])
-def playlist_play_pre():
-    """
-    播放上一首
-    """
-    try:
-        args = read_json_from_request()
-        id = args.get("id")
-        if id is None:
-            return _err("id is required")
-        ret, msg = playlist_mgr.play_pre(id)
-        if ret != 0:
-            return _err(f"播放上一首失败: {msg}")
-        return _ok()
-    except Exception as e:
-        log.error(f"[PLAYLIST] PlayPre error: {e}")
-        return _err(f'error: {str(e)}')
-
-
-@media_bp.route("/playlist/stop", methods=['POST'])
-def playlist_stop():
-    """
-    停止播放
-    """
-    try:
-        args = read_json_from_request()
-        id = args.get("id")
-        if id is None:
-            return _err("id is required")
-        ret, msg = playlist_mgr.stop(id)
-        if ret != 0:
-            return _err(f"停止播放失败: {msg}")
-        return _ok()
-    except Exception as e:
-        log.error(f"[PLAYLIST] Stop error: {e}")
-        return _err(f'error: {str(e)}')
-
-
-@media_bp.route("/playlist/reload", methods=['POST'])
-def playlist_reload():
-    """
-    重新从 RDS 中加载 playlist 数据
-    """
-    try:
-        log.info("===== [Playlist Reload]")
-        ret = playlist_mgr.reload()
-        if ret != 0:
-            return _err("重新加载播放列表失败")
-        return _ok()
-    except Exception as e:
-        log.error(f"[PLAYLIST] Reload error: {e}")
-        return _err(f'error: {str(e)}')
-
 
 # ========== 媒体文件服务接口（用于 DLNA 播放）==========
 
@@ -258,10 +93,10 @@ def serve_media_file(filepath):
         abort(500)
 
 
-# ========== 媒体工具接口（音频合成）==========
+# ========== 音频合成接口 ==========
 
 
-@media_bp.route("/media/task/create", methods=['POST'])
+@media_bp.route("/media/merge/create", methods=['POST'])
 def create_media_task():
     """
     创建音频合成任务
@@ -273,20 +108,20 @@ def create_media_task():
         # 如果没有提供名称，使用当前日期时间作为默认名称
         name = data.get('name', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
-        code, msg, task_id = media_tool_mgr.create_task(name)
+        code, msg, task_id = audio_merge_mgr.create_task(name)
 
         if code != 0:
             return _err(msg)
 
-        task_info = media_tool_mgr.get_task(task_id)
+        task_info = audio_merge_mgr.get_task(task_id)
         return _ok(task_info)
 
     except Exception as e:
-        log.error(f"[MediaTool] 创建任务失败: {e}")
+        log.error(f"[AudioMerge] 创建任务失败: {e}")
         return _err(f"创建任务失败: {str(e)}")
 
 
-@media_bp.route("/media/task/upload", methods=['POST'])
+@media_bp.route("/media/merge/upload", methods=['POST'])
 def upload_file():
     """
     上传文件到任务
@@ -321,10 +156,10 @@ def upload_file():
         filename = os.path.basename(file_path)
 
         file.save(file_path)
-        log.info(f"[MediaTool] 文件上传成功: {file_path}")
+        log.info(f"[AudioMerge] 文件上传成功: {file_path}")
 
         # 添加到任务
-        code, msg = media_tool_mgr.add_file(task_id, file_path, filename)
+        code, msg = audio_merge_mgr.add_file(task_id, file_path, filename)
         if code != 0:
             return _err(msg)
 
@@ -332,11 +167,11 @@ def upload_file():
         return _ok(file_info)
 
     except Exception as e:
-        log.error(f"[MediaTool] 上传文件失败: {e}")
+        log.error(f"[AudioMerge] 上传文件失败: {e}")
         return _err(f"上传文件失败: {str(e)}")
 
 
-@media_bp.route("/media/task/addFileByPath", methods=['POST'])
+@media_bp.route("/media/merge/addFileByPath", methods=['POST'])
 def add_file_by_path():
     """
     通过文件路径添加文件到任务
@@ -372,7 +207,7 @@ def add_file_by_path():
             return _err(f"不支持的文件类型，支持的格式: {', '.join(ALLOWED_AUDIO_EXTENSIONS)}")
 
         # 添加到任务
-        code, msg = media_tool_mgr.add_file(task_id, file_path, filename)
+        code, msg = audio_merge_mgr.add_file(task_id, file_path, filename)
         if code != 0:
             return _err(msg)
 
@@ -380,11 +215,11 @@ def add_file_by_path():
         return _ok(file_info)
 
     except Exception as e:
-        log.error(f"[MediaTool] 添加文件失败: {e}")
+        log.error(f"[AudioMerge] 添加文件失败: {e}")
         return _err(f"添加文件失败: {str(e)}")
 
 
-@media_bp.route("/media/task/deleteFile", methods=['POST'])
+@media_bp.route("/media/merge/deleteFile", methods=['POST'])
 def delete_file():
     """
     从任务中删除文件
@@ -408,18 +243,18 @@ def delete_file():
         except (ValueError, TypeError):
             return _err("file_index 必须是整数")
 
-        code, msg = media_tool_mgr.remove_file(task_id, file_index)
+        code, msg = audio_merge_mgr.remove_file(task_id, file_index)
         if code != 0:
             return _err(msg)
 
         return _ok({"message": msg})
 
     except Exception as e:
-        log.error(f"[MediaTool] 删除文件失败: {e}")
+        log.error(f"[AudioMerge] 删除文件失败: {e}")
         return _err(f"删除文件失败: {str(e)}")
 
 
-@media_bp.route("/media/task/reorderFiles", methods=['POST'])
+@media_bp.route("/media/merge/reorderFiles", methods=['POST'])
 def reorder_files():
     """
     调整文件顺序
@@ -446,19 +281,19 @@ def reorder_files():
         except (ValueError, TypeError):
             return _err("file_indices 必须都是整数")
 
-        code, msg = media_tool_mgr.reorder_files(task_id, file_indices)
+        code, msg = audio_merge_mgr.reorder_files(task_id, file_indices)
         if code != 0:
             return _err(msg)
 
-        task_info = media_tool_mgr.get_task(task_id)
+        task_info = audio_merge_mgr.get_task(task_id)
         return _ok(task_info)
 
     except Exception as e:
-        log.error(f"[MediaTool] 调整文件顺序失败: {e}")
+        log.error(f"[AudioMerge] 调整文件顺序失败: {e}")
         return _err(f"调整文件顺序失败: {str(e)}")
 
 
-@media_bp.route("/media/task/start", methods=['POST'])
+@media_bp.route("/media/merge/start", methods=['POST'])
 def start_task():
     """
     开始音频合成任务
@@ -472,19 +307,19 @@ def start_task():
         if not task_id:
             return _err("task_id 参数不能为空")
 
-        code, msg = media_tool_mgr.start_task(task_id)
+        code, msg = audio_merge_mgr.start_task(task_id)
         if code != 0:
             return _err(msg)
 
-        task_info = media_tool_mgr.get_task(task_id)
+        task_info = audio_merge_mgr.get_task(task_id)
         return _ok(task_info)
 
     except Exception as e:
-        log.error(f"[MediaTool] 启动任务失败: {e}")
+        log.error(f"[AudioMerge] 启动任务失败: {e}")
         return _err(f"启动任务失败: {str(e)}")
 
 
-@media_bp.route("/media/task/get", methods=['POST'])
+@media_bp.route("/media/merge/get", methods=['POST'])
 def get_task_info():
     """
     获取任务信息
@@ -498,32 +333,32 @@ def get_task_info():
         if not task_id:
             return _err("task_id 参数不能为空")
 
-        task_info = media_tool_mgr.get_task(task_id)
+        task_info = audio_merge_mgr.get_task(task_id)
         if not task_info:
             return _err("任务不存在")
 
         return _ok(task_info)
 
     except Exception as e:
-        log.error(f"[MediaTool] 获取任务信息失败: {e}")
+        log.error(f"[AudioMerge] 获取任务信息失败: {e}")
         return _err(f"获取任务信息失败: {str(e)}")
 
 
-@media_bp.route("/media/task/list", methods=['GET'])
+@media_bp.route("/media/merge/list", methods=['GET'])
 def list_all_tasks():
     """
     列出所有任务
     """
     try:
-        tasks = media_tool_mgr.list_tasks()
+        tasks = audio_merge_mgr.list_tasks()
         return _ok({"tasks": tasks})
 
     except Exception as e:
-        log.error(f"[MediaTool] 列出任务失败: {e}")
+        log.error(f"[AudioMerge] 列出任务失败: {e}")
         return _err(f"列出任务失败: {str(e)}")
 
 
-@media_bp.route("/media/task/delete", methods=['POST'])
+@media_bp.route("/media/merge/delete", methods=['POST'])
 def delete_task():
     """
     删除任务
@@ -537,18 +372,18 @@ def delete_task():
         if not task_id:
             return _err("task_id 参数不能为空")
 
-        code, msg = media_tool_mgr.delete_task(task_id)
+        code, msg = audio_merge_mgr.delete_task(task_id)
         if code != 0:
             return _err(msg)
 
         return _ok({"message": msg})
 
     except Exception as e:
-        log.error(f"[MediaTool] 删除任务失败: {e}")
+        log.error(f"[AudioMerge] 删除任务失败: {e}")
         return _err(f"删除任务失败: {str(e)}")
 
 
-@media_bp.route("/media/task/download", methods=['GET'])
+@media_bp.route("/media/merge/download", methods=['GET'])
 def download_result():
     """
     下载合成结果文件
@@ -561,7 +396,7 @@ def download_result():
         if not task_id:
             return _err("task_id 参数不能为空")
 
-        task_info = media_tool_mgr.get_task(task_id)
+        task_info = audio_merge_mgr.get_task(task_id)
         if not task_info:
             return _err("任务不存在")
 
@@ -575,11 +410,11 @@ def download_result():
         return send_file(result_file, as_attachment=True, download_name='merged.mp3')
 
     except Exception as e:
-        log.error(f"[MediaTool] 下载文件失败: {e}")
+        log.error(f"[AudioMerge] 下载文件失败: {e}")
         return _err(f"下载文件失败: {str(e)}")
 
 
-@media_bp.route("/media/task/save", methods=['POST'])
+@media_bp.route("/media/merge/save", methods=['POST'])
 def save_result():
     """
     转存合成结果文件到指定目录
@@ -611,7 +446,7 @@ def save_result():
             return _err(f"目标路径不是目录: {target_path}")
 
         # 获取任务信息
-        task_info = media_tool_mgr.get_task(task_id)
+        task_info = audio_merge_mgr.get_task(task_id)
         if not task_info:
             return _err("任务不存在")
 
@@ -631,10 +466,171 @@ def save_result():
 
         # 复制文件到目标目录
         shutil.copy2(result_file, target_file)
-        log.info(f"[MediaTool] 文件转存成功: {result_file} -> {target_file}")
+        log.info(f"[AudioMerge] 文件转存成功: {result_file} -> {target_file}")
 
         return _ok({"target_file": target_file, "message": "转存成功"})
 
     except Exception as e:
-        log.error(f"[MediaTool] 转存文件失败: {e}")
+        log.error(f"[AudioMerge] 转存文件失败: {e}")
         return _err(f"转存文件失败: {str(e)}")
+
+
+# ========== 音频转码接口 ==========
+
+
+@media_bp.route("/media/convert/list", methods=['GET'])
+def list_convert_tasks():
+    """
+    获取所有音频转码任务列表
+    """
+    try:
+        tasks = audio_convert_mgr.get_task_list()
+        return _ok({"tasks": tasks})
+    except Exception as e:
+        log.error(f"[AudioConvert] 列出任务失败: {e}")
+        return _err(f"列出任务失败: {str(e)}")
+
+
+@media_bp.route("/media/convert/create", methods=['POST'])
+def create_convert_task():
+    """
+    创建音频转码任务
+    参数：
+    - name: 任务名称（可选）
+    - output_dir: 输出目录名称（可选，默认为 'mp3'）
+    """
+    try:
+        data = read_json_from_request()
+        # 如果没有提供名称，使用当前日期时间作为默认名称
+        name = data.get('name', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        output_dir = data.get('output_dir')
+
+        code, msg, task_id = audio_convert_mgr.create_task(name, output_dir=output_dir)
+
+        if code != 0:
+            return _err(msg)
+
+        task_info = audio_convert_mgr.get_task(task_id)
+        return _ok(task_info)
+
+    except Exception as e:
+        log.error(f"[AudioConvert] 创建任务失败: {e}")
+        return _err(f"创建任务失败: {str(e)}")
+
+
+@media_bp.route("/media/convert/get", methods=['POST'])
+def get_convert_task_info():
+    """
+    获取音频转码任务详情
+    参数：
+    - task_id: 任务ID（JSON 或 form 参数）
+    """
+    try:
+        data = read_json_from_request() or request.form.to_dict()
+        task_id = data.get('task_id')
+
+        if not task_id:
+            return _err("task_id 参数不能为空")
+
+        task_info = audio_convert_mgr.get_task(task_id)
+        if not task_info:
+            return _err("任务不存在")
+
+        return _ok(task_info)
+
+    except Exception as e:
+        log.error(f"[AudioConvert] 获取任务信息失败: {e}")
+        return _err(f"获取任务信息失败: {str(e)}")
+
+
+@media_bp.route("/media/convert/delete", methods=['POST'])
+def delete_convert_task():
+    """
+    删除音频转码任务
+    参数：
+    - task_id: 任务ID（JSON 或 form 参数）
+    """
+    try:
+        data = read_json_from_request() or request.form.to_dict()
+        task_id = data.get('task_id')
+
+        if not task_id:
+            return _err("task_id 参数不能为空")
+
+        code, msg = audio_convert_mgr.delete_task(task_id)
+        if code != 0:
+            return _err(msg)
+
+        return _ok({"success": True})
+
+    except Exception as e:
+        log.error(f"[AudioConvert] 删除任务失败: {e}")
+        return _err(f"删除任务失败: {str(e)}")
+
+
+@media_bp.route("/media/convert/update", methods=['POST'])
+def update_convert_task():
+    """
+    更新音频转码任务信息
+    参数：
+    - task_id: 任务ID（JSON 或 form 参数，必填）
+    - name: 任务名称（JSON 或 form 参数，可选）
+    - directory: 目录路径（JSON 或 form 参数，可选）
+    """
+    try:
+        data = read_json_from_request() or request.form.to_dict()
+        task_id = data.get('task_id')
+        name = data.get('name')
+        directory = data.get('directory')
+
+        if not task_id:
+            return _err("task_id 参数不能为空")
+
+        # 至少需要提供一个要更新的字段
+        output_dir = data.get('output_dir')
+        if name is None and directory is None and output_dir is None:
+            return _err("至少需要提供一个要更新的字段（name、directory 或 output_dir）")
+
+        # 验证目录路径（如果提供了）
+        if directory is not None:
+            normalized_path, error_msg = validate_and_normalize_path(directory, must_be_file=False)
+            if error_msg or not normalized_path:
+                return _err(error_msg or "目录路径无效")
+            directory = normalized_path
+
+        code, msg = audio_convert_mgr.update_task(task_id, name=name, directory=directory, output_dir=output_dir)
+        if code != 0:
+            return _err(msg)
+
+        task_info = audio_convert_mgr.get_task(task_id)
+        return _ok(task_info)
+
+    except Exception as e:
+        log.error(f"[AudioConvert] 更新任务失败: {e}")
+        return _err(f"更新任务失败: {str(e)}")
+
+
+@media_bp.route("/media/convert/start", methods=['POST'])
+def start_convert_task():
+    """
+    开始音频转码任务
+    参数：
+    - task_id: 任务ID（JSON 或 form 参数）
+    """
+    try:
+        data = read_json_from_request() or request.form.to_dict()
+        task_id = data.get('task_id')
+
+        if not task_id:
+            return _err("task_id 参数不能为空")
+
+        code, msg = audio_convert_mgr.start_task(task_id)
+        if code != 0:
+            return _err(msg)
+
+        task_info = audio_convert_mgr.get_task(task_id)
+        return _ok(task_info)
+
+    except Exception as e:
+        log.error(f"[AudioConvert] 启动任务失败: {e}")
+        return _err(f"启动任务失败: {str(e)}")
