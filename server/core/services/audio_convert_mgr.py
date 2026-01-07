@@ -5,7 +5,6 @@
 import json
 import os
 import random
-import shutil
 import string
 import subprocess
 import threading
@@ -16,7 +15,7 @@ from typing import Dict, List, Optional, Tuple
 from core.log_config import app_logger
 from core.models.const import (MEDIA_BASE_DIR, FFMPEG_PATH, FFMPEG_TIMEOUT, TASK_STATUS_PENDING, TASK_STATUS_PROCESSING,
                                TASK_STATUS_SUCCESS, TASK_STATUS_FAILED)
-from core.utils import ensure_directory, is_allowed_audio_file
+from core.utils import ensure_directory
 
 log = app_logger
 
@@ -184,13 +183,45 @@ class AudioConvertMgr:
             return -1, f"更新任务失败: {str(e)}"
 
     def _scan_audio_files(self, directory: str, output_dir: str) -> List[str]:
-        """扫描目录下的所有音频文件"""
-        audio_files = []
+        """扫描目录下的所有媒体文件（音频和视频）"""
+        # 所有支持的媒体文件扩展名（音频 + 视频）
+        # 所有支持的媒体文件扩展名（音频 + 视频）
+        media_extensions = {
+            '.mp3',
+            '.wav',
+            '.flac',
+            '.aac',
+            '.m4a',
+            '.ogg',
+            '.wma',  # 音频格式
+            '.mp4',
+            '.avi',
+            '.mkv',
+            '.mov',
+            '.wmv',
+            '.flv',
+            '.webm',
+            '.m4v',
+            '.3gp',
+            '.asf',
+            '.rm',
+            '.rmvb',
+            '.vob',
+            '.ts',
+            '.mts',
+            '.m2ts'  # 视频格式
+        }
+
+        media_files = []
         for root, _, files in os.walk(directory):
             if output_dir in root:
                 continue
-            audio_files.extend(os.path.join(root, f) for f in files if is_allowed_audio_file(os.path.join(root, f)))
-        return audio_files
+            for f in files:
+                file_path = os.path.join(root, f)
+                ext = os.path.splitext(f)[1].lower()
+                if ext in media_extensions:
+                    media_files.append(file_path)
+        return media_files
 
     def _convert_file_to_mp3(self, input_file: str, output_file: str) -> Tuple[bool, Optional[str]]:
         """
@@ -205,11 +236,12 @@ class AudioConvertMgr:
             output_dir = os.path.dirname(output_file)
             os.makedirs(output_dir, exist_ok=True)
 
-            # 使用 ffmpeg 转换
+            # 使用 ffmpeg 转换（支持音频和视频文件）
             cmds = [
                 FFMPEG_PATH,
                 '-i',
                 input_file,
+                '-vn',  # 不处理视频流，只处理音频
                 '-codec:a',
                 'libmp3lame',
                 '-q:a',
@@ -221,11 +253,17 @@ class AudioConvertMgr:
             log.info(f"[AudioConvert] 执行 ffmpeg 命令: {' '.join(cmds)}")
             result = subprocess.run(cmds, capture_output=True, text=True, timeout=FFMPEG_TIMEOUT)
 
-            if result.returncode == 0 and os.path.exists(output_file):
-                return True, None
+            if result.returncode == 0:
+                if os.path.exists(output_file):
+                    log.info(f"[AudioConvert] 转换成功: {input_file} -> {output_file}")
+                    return True, None
+                else:
+                    error_msg = f"输出文件不存在: {output_file}"
+                    log.error(f"[AudioConvert] {error_msg}")
+                    return False, error_msg
             else:
-                error_msg = result.stderr if result.returncode != 0 else '文件不存在'
-                log.error(f"[AudioConvert] ffmpeg 执行失败: {error_msg}")
+                error_msg = result.stderr or result.stdout or '未知错误'
+                log.error(f"[AudioConvert] ffmpeg 执行失败 (返回码: {result.returncode}): {error_msg}")
                 return False, error_msg
 
         except subprocess.TimeoutExpired:

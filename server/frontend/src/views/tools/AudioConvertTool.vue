@@ -65,7 +65,10 @@
           </div>
         </div>
       </div>
-      <div v-else class="flex-1 flex items-center justify-center text-sm text-gray-400">
+      <div
+        v-else
+        class="flex-1 flex items-center justify-center text-sm text-gray-400 min-h-[400px]"
+      >
         暂无任务，请点击"新建"创建
       </div>
     </div>
@@ -73,7 +76,20 @@
     <!-- 右侧：任务详情 -->
     <div class="flex-1 border rounded p-3 flex flex-col max-w-2xl" v-if="convertCurrentTask">
       <div class="flex items-center justify-between mb-3 flex-shrink-0">
-        <h3 class="text-base font-semibold">任务详情: {{ convertCurrentTask.name }}</h3>
+        <div class="flex items-center gap-2 flex-1">
+          <h3 class="text-base font-semibold">任务详情: {{ convertCurrentTask.name }}</h3>
+          <el-button
+            type="default"
+            size="small"
+            plain
+            circle
+            :disabled="isDirectoryOperationDisabled"
+            @click="handleConvertRenameTask"
+            title="编辑名称"
+          >
+            <el-icon><Edit /></el-icon>
+          </el-button>
+        </div>
       </div>
 
       <div class="flex-1 overflow-auto flex flex-col gap-3">
@@ -91,7 +107,15 @@
               错误: {{ convertCurrentTask.error_message }}
             </span>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-gray-600">覆盖同名文件</span>
+              <el-switch
+                v-model="convertOverwrite"
+                :disabled="isDirectoryOperationDisabled"
+                @change="handleConvertOverwriteChange"
+              />
+            </div>
             <el-button
               type="success"
               v-bind="mediumTextButtonProps"
@@ -153,21 +177,6 @@
           </div>
           <div class="text-xs text-gray-400">
             转码后的文件将保存在转码目录下的此文件夹中，默认为 "mp3"
-          </div>
-        </div>
-
-        <!-- 覆盖选项 -->
-        <div class="border rounded p-3 flex flex-col gap-2">
-          <div class="flex items-center justify-between">
-            <h4 class="text-sm font-semibold">覆盖选项</h4>
-            <el-switch
-              v-model="convertOverwrite"
-              :disabled="isDirectoryOperationDisabled"
-              @change="handleConvertOverwriteChange"
-            />
-          </div>
-          <div class="text-xs text-gray-400">
-            {{ convertOverwrite ? "已启用：转码时会覆盖同名文件" : "已禁用：转码时会跳过同名文件" }}
           </div>
         </div>
 
@@ -238,18 +247,67 @@
       title="选择转码目录"
       confirm-button-text="确定"
       mode="directory"
+      :default-path="convertCurrentTask?.directory || undefined"
       :confirm-loading="convertLoading"
       @confirm="handleConvertDirectoryConfirm"
       @close="handleConvertCloseDirectoryBrowser"
     >
     </FileDialog>
+
+    <!-- 创建任务对话框 -->
+    <el-dialog
+      v-model="convertCreateTaskDialogVisible"
+      title="创建转码任务"
+      width="400px"
+      @close="convertNewTaskName = ''"
+    >
+      <el-form>
+        <el-form-item label="任务名称">
+          <el-input
+            v-model="convertNewTaskName"
+            placeholder="请输入任务名称"
+            @keyup.enter="handleConvertCreateTaskConfirm"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="convertCreateTaskDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleConvertCreateTaskConfirm" :loading="convertLoading">
+          确定
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 改名对话框 -->
+    <el-dialog
+      v-model="convertRenameTaskDialogVisible"
+      title="重命名任务"
+      width="400px"
+      @close="convertRenameTaskName = ''"
+    >
+      <el-form>
+        <el-form-item label="任务名称">
+          <el-input
+            v-model="convertRenameTaskName"
+            placeholder="请输入任务名称"
+            @keyup.enter="handleConvertRenameTaskConfirm"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="convertRenameTaskDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleConvertRenameTaskConfirm" :loading="convertLoading">
+          确定
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { Refresh, Plus, Delete } from "@element-plus/icons-vue";
+import { Refresh, Plus, Delete, Edit } from "@element-plus/icons-vue";
 import FileDialog from "@/views/dialogs/FileDialog.vue";
 import { logAndNoticeError } from "@/utils/error";
 import { useControllableInterval } from "@/composables/useInterval";
@@ -273,6 +331,10 @@ const convertOutputDir = ref("mp3");
 const convertOutputDirChanged = ref(false);
 const convertOverwrite = ref(true);
 const convertOverwriteChanged = ref(false);
+const convertCreateTaskDialogVisible = ref(false);
+const convertNewTaskName = ref("");
+const convertRenameTaskDialogVisible = ref(false);
+const convertRenameTaskName = ref("");
 
 // 按钮公共属性
 const smallIconButtonProps = { size: "small" as const, plain: true, class: "!w-8 !h-6 !p-0" };
@@ -299,14 +361,29 @@ const loadConvertTaskList = async () => {
   }
 };
 
-// 创建转码任务
-const handleConvertCreateTask = async () => {
+// 打开创建任务对话框
+const handleConvertCreateTask = () => {
+  convertNewTaskName.value = "";
+  convertCreateTaskDialogVisible.value = true;
+};
+
+// 确认创建任务
+const handleConvertCreateTaskConfirm = async () => {
+  if (!convertNewTaskName.value.trim()) {
+    ElMessage.warning("请输入任务名称");
+    return;
+  }
+
   try {
     convertLoading.value = true;
-    const response = await createConvertTask();
+    const response = await createConvertTask({
+      name: convertNewTaskName.value.trim(),
+    });
 
     if (response.code === 0) {
       ElMessage.success("任务创建成功");
+      convertCreateTaskDialogVisible.value = false;
+      convertNewTaskName.value = "";
       await loadConvertTaskList();
       handleConvertViewTask(response.data.task_id);
     } else {
@@ -314,6 +391,47 @@ const handleConvertCreateTask = async () => {
     }
   } catch (error) {
     logAndNoticeError(error as Error, "创建任务失败");
+  } finally {
+    convertLoading.value = false;
+  }
+};
+
+// 打开改名对话框
+const handleConvertRenameTask = () => {
+  if (!convertCurrentTask.value) {
+    return;
+  }
+  convertRenameTaskName.value = convertCurrentTask.value.name;
+  convertRenameTaskDialogVisible.value = true;
+};
+
+// 确认改名
+const handleConvertRenameTaskConfirm = async () => {
+  if (!convertCurrentTask.value) {
+    return;
+  }
+
+  if (!convertRenameTaskName.value.trim()) {
+    ElMessage.warning("请输入任务名称");
+    return;
+  }
+
+  try {
+    convertLoading.value = true;
+    const response = await updateConvertTask(convertCurrentTask.value.task_id, {
+      name: convertRenameTaskName.value.trim(),
+    });
+
+    if (response.code === 0) {
+      ElMessage.success("任务名称修改成功");
+      convertRenameTaskDialogVisible.value = false;
+      convertRenameTaskName.value = "";
+      await handleConvertViewTask(convertCurrentTask.value.task_id);
+    } else {
+      ElMessage.error(response.msg || "修改任务名称失败");
+    }
+  } catch (error) {
+    logAndNoticeError(error as Error, "修改任务名称失败");
   } finally {
     convertLoading.value = false;
   }

@@ -517,7 +517,7 @@ class PlaylistMgr:
                 for file_uri in files_to_fetch:
                     try:
                         duration = get_media_duration(file_uri)
-                        log.info(f"[PlaylistMgr] 获取文件时长: {file_uri}, {duration}")
+                        # log.info(f"[PlaylistMgr] 获取文件时长: {file_uri}, {duration}")
                         if duration is not None:
                             file_durations[file_uri] = int(duration)
                             # 成功获取，从黑名单中移除（如果存在）

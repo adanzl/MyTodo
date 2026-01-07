@@ -35,8 +35,9 @@
     >
       <el-table-column width="55">
         <template #default="{ row }">
+          <!-- 目录模式下，文件不显示 checkbox -->
           <el-checkbox
-            v-if="!row.isDirectory"
+            v-if="mode !== 'directory' && !row.isDirectory"
             :model-value="isFileSelected(row)"
             @change="handleToggleSelection(row)"
             @click.stop
@@ -61,7 +62,12 @@
       </el-table-column>
       <el-table-column label="状态" width="100">
         <template #default="{ row }">
-          <el-tag v-if="!row.isDirectory && isFileSelected(row)" type="success" size="small">
+          <!-- 目录模式下，文件不显示状态 -->
+          <el-tag
+            v-if="mode !== 'directory' && !row.isDirectory && isFileSelected(row)"
+            type="success"
+            size="small"
+          >
             已选择
           </el-tag>
         </template>
@@ -151,9 +157,14 @@ const refreshFileBrowser = async () => {
   try {
     fileBrowserLoading.value = true;
     const path = fileBrowserPath.value || props.defaultPath;
-    const response = await api.get("/listDirectory", {
-      params: { path: path, extensions: props.extensions },
-    });
+    // 目录模式下，传递 extensions="all" 显示所有文件
+    const params: Record<string, string> = { path: path };
+    if (props.mode === "directory") {
+      params.extensions = "all";
+    } else {
+      params.extensions = props.extensions;
+    }
+    const response = await api.get("/listDirectory", { params });
     if (response.data.code === 0) {
       fileBrowserList.value = response.data.data || [];
       updateFileBrowserCanNavigateUp();
@@ -197,7 +208,10 @@ const handleRowClick = (row: FileBrowserItem) => {
     updateFileBrowserCanNavigateUp();
     refreshFileBrowser();
   } else {
-    handleToggleSelection(row);
+    // 目录模式下，点击文件不做任何操作
+    if (props.mode !== "directory") {
+      handleToggleSelection(row);
+    }
   }
 };
 
@@ -301,7 +315,9 @@ watch(
   () => props.visible,
   newVal => {
     if (newVal) {
-      fileBrowserPath.value = lastFileBrowserPath;
+      // 如果提供了 defaultPath，优先使用它；否则使用上次的路径
+      fileBrowserPath.value = props.defaultPath || lastFileBrowserPath;
+      lastFileBrowserPath = fileBrowserPath.value;
       selectedFiles.value = [];
       refreshFileBrowser();
     } else {
@@ -315,4 +331,3 @@ watch(fileBrowserPath, () => {
   refreshFileBrowser();
 });
 </script>
-
