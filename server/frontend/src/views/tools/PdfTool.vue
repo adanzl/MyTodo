@@ -1,5 +1,5 @@
 <template>
-  <div class="p-4 flex flex-col h-full">
+  <div class="p-4 flex flex-col h-[calc(100vh-250px)]">
     <h2 class="text-xl font-semibold mb-4">PDF 解密工具</h2>
 
     <!-- 上传区域 -->
