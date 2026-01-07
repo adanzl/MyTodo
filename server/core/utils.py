@@ -487,7 +487,7 @@ def run_subprocess_safe(
     
     由于 gevent.monkey.patch_all(subprocess=True) 会 patch subprocess 模块，
     可能导致 "child watchers are only available on the default loop" 错误。
-    使用 threading.Thread 隔离 subprocess 调用可以避免这个问题。
+    使用 threading.Thread + subprocess.Popen 但设置进程隔离参数来避免 gevent 的影响。
     
     :param cmd: 要执行的命令列表
     :param timeout: 超时时间（秒），默认 30 秒
@@ -502,36 +502,172 @@ def run_subprocess_safe(
     error_queue = queue.Queue()
     
     def _run():
-        """在线程中运行 subprocess，避免 gevent 冲突"""
+        """在线程中运行 subprocess，通过设置进程隔离参数避免 gevent 冲突"""
         try:
             process_env = os.environ.copy()
             if env:
                 process_env.update(env)
             
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                env=process_env if env else None,
-                cwd=cwd
-            )
+            # 尝试使用 subprocess.Popen，但捕获 gevent 相关的错误
             try:
-                stdout, stderr = process.communicate(timeout=timeout)
-                result_queue.put((process.returncode, stdout, stderr))
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait()
-                error_queue.put(TimeoutError(f"命令执行超时: {' '.join(cmd)}"))
+                # 准备 subprocess.Popen 的参数
+                popen_kwargs = {
+                    'args': cmd,
+                    'stdout': subprocess.PIPE,
+                    'stderr': subprocess.PIPE,
+                    'text': True,
+                    'env': process_env if env else None,
+                    'cwd': cwd,
+                    'close_fds': True,  # 关闭所有文件描述符（除了标准输入/输出/错误）
+                }
+                
+                # 在 Unix 系统上，设置 start_new_session 来创建新的进程组
+                # 这样可以完全隔离进程，避免 gevent 的监控
+                if sys.platform != 'win32':
+                    popen_kwargs['start_new_session'] = True
+                
+                # 在 Windows 上，使用 CREATE_NEW_PROCESS_GROUP 标志
+                if sys.platform == 'win32':
+                    import subprocess as sp
+                    popen_kwargs['creationflags'] = sp.CREATE_NEW_PROCESS_GROUP
+                
+                # 创建进程
+                process = subprocess.Popen(**popen_kwargs)
+                
+                try:
+                    stdout, stderr = process.communicate(timeout=timeout)
+                    result_queue.put((process.returncode, stdout, stderr))
+                except subprocess.TimeoutExpired:
+                    # 超时：终止进程
+                    try:
+                        if sys.platform == 'win32':
+                            # Windows: 使用 taskkill 强制终止进程树
+                            import subprocess as sp
+                            sp.Popen(['taskkill', '/F', '/T', '/PID', str(process.pid)],
+                                    stdout=sp.DEVNULL, stderr=sp.DEVNULL)
+                        else:
+                            # Unix: 终止进程组
+                            os.killpg(os.getpgid(process.pid), 9)
+                    except Exception:
+                        # 如果终止失败，尝试普通 kill
+                        try:
+                            process.kill()
+                        except Exception:
+                            pass
+                    try:
+                        process.wait(timeout=1)
+                    except Exception:
+                        pass
+                    error_queue.put(TimeoutError(f"命令执行超时: {' '.join(cmd)}"))
+            except (RuntimeError, AttributeError) as e:
+                # 捕获 gevent 相关的错误："child watchers are only available on the default loop"
+                # 如果出现这个错误，使用 os.system + 临时文件作为降级方案
+                if 'child watchers' in str(e) or 'default loop' in str(e):
+                    log.warning(f"[run_subprocess_safe] 检测到 gevent 冲突，使用降级方案: {e}")
+                    _run_with_os_system(cmd, timeout, env, cwd, result_queue, error_queue)
+                else:
+                    raise
         except FileNotFoundError as e:
             error_queue.put(FileNotFoundError(f"命令未找到: {cmd[0] if cmd else 'unknown'}"))
         except Exception as e:
             error_queue.put(e)
     
+    def _run_with_os_system(cmd_list, timeout_val, env_dict, cwd_path, result_q, error_q):
+        """使用 os.system + 临时文件的降级方案"""
+        import tempfile
+        import shlex
+        import time
+        
+        try:
+            # 创建临时文件用于捕获输出
+            with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.stdout') as tmp_stdout:
+                stdout_path = tmp_stdout.name
+            with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.stderr') as tmp_stderr:
+                stderr_path = tmp_stderr.name
+            with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.returncode') as tmp_rc:
+                returncode_path = tmp_rc.name
+            
+            try:
+                # 构建命令字符串
+                quoted_cmd = ' '.join(shlex.quote(arg) for arg in cmd_list)
+                
+                # 设置环境变量
+                env_str = ''
+                if env_dict:
+                    if sys.platform == 'win32':
+                        env_parts = [f'{k}={v}' for k, v in env_dict.items()]
+                        env_str = ' '.join(env_parts) + ' '
+                    else:
+                        env_parts = [f'{k}={shlex.quote(v)}' for k, v in env_dict.items()]
+                        env_str = ' '.join(env_parts) + ' '
+                
+                # 构建完整的命令
+                if sys.platform == 'win32':
+                    full_cmd = f'cd /d {shlex.quote(cwd_path)} && ' if cwd_path else ''
+                    full_cmd += f'{env_str}{quoted_cmd} > {shlex.quote(stdout_path)} 2> {shlex.quote(stderr_path)} && echo 0 > {shlex.quote(returncode_path)} || echo %ERRORLEVEL% > {shlex.quote(returncode_path)}'
+                    shell_cmd = f'cmd /c "{full_cmd}"'
+                else:
+                    cd_cmd = f'cd {shlex.quote(cwd_path)} && ' if cwd_path else ''
+                    full_cmd = f'{cd_cmd}{env_str}{quoted_cmd} > {shlex.quote(stdout_path)} 2> {shlex.quote(stderr_path)}; echo $? > {shlex.quote(returncode_path)}'
+                    shell_cmd = f'sh -c {shlex.quote(full_cmd)}'
+                
+                # 使用 threading 和 os.system 来实现超时
+                import threading as th
+                system_result = {'returncode': None, 'done': False}
+                
+                def run_cmd():
+                    system_result['returncode'] = os.system(shell_cmd)
+                    system_result['done'] = True
+                
+                cmd_thread = th.Thread(target=run_cmd, daemon=True)
+                cmd_thread.start()
+                cmd_thread.join(timeout=timeout_val)
+                
+                if not system_result['done']:
+                    error_q.put(TimeoutError(f"命令执行超时: {' '.join(cmd_list)}"))
+                    return
+                
+                # 读取返回码
+                try:
+                    with open(returncode_path, 'r') as f:
+                        returncode_str = f.read().strip()
+                        returncode = int(returncode_str) if returncode_str.isdigit() else (system_result['returncode'] >> 8 if system_result['returncode'] else 0)
+                except Exception:
+                    returncode = system_result['returncode'] >> 8 if system_result['returncode'] else 0
+                
+                # 读取输出
+                try:
+                    with open(stdout_path, 'r', encoding='utf-8', errors='replace') as f:
+                        stdout = f.read()
+                except Exception:
+                    stdout = ''
+                
+                try:
+                    with open(stderr_path, 'r', encoding='utf-8', errors='replace') as f:
+                        stderr = f.read()
+                except Exception:
+                    stderr = ''
+                
+                result_q.put((returncode, stdout, stderr))
+                
+            finally:
+                # 清理临时文件
+                for tmp_file in [stdout_path, stderr_path, returncode_path]:
+                    try:
+                        os.unlink(tmp_file)
+                    except Exception:
+                        pass
+        except Exception as e:
+            error_q.put(e)
+    
     # 在独立线程中运行
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()
     thread.join(timeout=timeout + 5)  # 给一些额外时间
+    
+    # 检查线程是否还在运行（超时）
+    if thread.is_alive():
+        error_queue.put(TimeoutError(f"命令执行超时: {' '.join(cmd)}"))
     
     # 检查是否有错误
     if not error_queue.empty():
