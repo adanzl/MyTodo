@@ -4,6 +4,7 @@ PDF 管理路由
 """
 import os
 from flask import Blueprint, request, send_file
+from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 
 from core.log_config import app_logger
@@ -34,6 +35,9 @@ def pdf_upload():
 
         return _ok(file_info)
 
+    except RequestEntityTooLarge:
+        log.error(f"[PDF] 上传文件失败: 文件太大，超过服务器限制（最大 2000MB）")
+        return _err("文件太大，超过服务器限制（最大 2000MB）")
     except Exception as e:
         log.error(f"[PDF] 上传文件失败: {e}")
         return _err(f"上传文件失败: {str(e)}")

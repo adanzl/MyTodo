@@ -28,6 +28,9 @@ def create_app():
     instance_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     app = Flask(__name__, instance_path=instance_path, instance_relative_config=True)
 
+    # 配置允许上传大文件（最大 1000MB = 2000 * 1024 * 1024 字节）
+    app.config['MAX_CONTENT_LENGTH'] = 2000 * 1024 * 1024  
+
     CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})
     # 创建 SocketIO 实例并与 Flask 应用关联
     socketio = SocketIO(

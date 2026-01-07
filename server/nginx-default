@@ -5,6 +5,9 @@ server {
 
     root /mnt/data/project/MyTodo/dist;
     index index.html index.htm index.nginx-debian.html;
+    
+    # 全局设置允许上传大文件（最大 1000MB），所有 location 继承此设置
+    client_max_body_size 1000m;
 
     ssl_certificate /etc/ssl/self-signed/selfsigned.crt;
     ssl_certificate_key /etc/ssl/self-signed/selfsigned.key;
@@ -49,10 +52,22 @@ server {
     proxy_buffers 8 4k;
     proxy_busy_buffers_size 8k;
 
-    # 处理跨域问题
-    #add_header 'Access-Control-Allow-Origin' '*';
-    add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS';
-    add_header 'Access-Control-Allow-Headers' 'DNT,X-Mx-ReqToken,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization';
+    # 全局 CORS 配置
+    add_header 'Access-Control-Allow-Origin' '*' always;
+    add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
+    add_header 'Access-Control-Allow-Headers' 'DNT,X-Mx-ReqToken,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization' always;
+    add_header 'Access-Control-Allow-Credentials' 'true' always;
+    
+    # 全局处理 OPTIONS 预检请求
+    if ($request_method = 'OPTIONS') {
+        add_header 'Access-Control-Allow-Origin' '*';
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS';
+        add_header 'Access-Control-Allow-Headers' 'DNT,X-Mx-ReqToken,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization';
+        add_header 'Access-Control-Max-Age' 1728000;
+        add_header 'Content-Type' 'text/plain charset=UTF-8';
+        add_header 'Content-Length' 0;
+        return 204;
+    }
     
     # 使用 types 指令确保正确的 MIME 类型
     types {
@@ -119,9 +134,17 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         
-        # API 可能需要更短的超时，可以覆盖全局设置
-        proxy_read_timeout 30s;
-        # 其他超时和缓冲区继承全局配置
+        # CORS 配置已在全局设置，此处无需重复
+        
+        # 大文件上传需要更长的超时时间（30分钟）
+        proxy_connect_timeout 1800s;
+        proxy_send_timeout 1800s;
+        proxy_read_timeout 1800s;
+        
+        # 增加缓冲区大小以支持大文件上传
+        proxy_buffer_size 16k;
+        proxy_buffers 32 16k;
+        proxy_busy_buffers_size 32k;
     }
     
     location /socket.io/ {
@@ -153,7 +176,10 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
 
-        # 超时和缓冲区已通过全局配置继承
+        # 修复 iframe 中 cookie 无法使用的问题
+        # 设置 cookie 的 SameSite=None 和 Secure 属性，允许跨站（iframe）使用
+        proxy_cookie_flags ~ samesite=None secure;
+        proxy_cookie_path / "/; SameSite=None; Secure";
     }
 
     location /redis_insight/ {
