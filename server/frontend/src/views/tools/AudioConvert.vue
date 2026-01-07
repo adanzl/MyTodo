@@ -73,11 +73,11 @@
       </div>
     </div>
 
-    <!-- 右侧：任务详情 -->
-    <div class="flex-1 border rounded p-3 flex flex-col max-w-2xl" v-if="convertCurrentTask">
+    <!-- 中间：文件列表 -->
+    <div class="flex-1 border rounded p-3 flex flex-col" v-if="convertCurrentTask">
       <div class="flex items-center justify-between mb-3 flex-shrink-0">
         <div class="flex items-center gap-2 flex-1">
-          <h3 class="text-base font-semibold">任务详情: {{ convertCurrentTask.name }}</h3>
+          <h3 class="text-base font-semibold">文件列表: {{ convertCurrentTask.name }}</h3>
           <el-button
             type="default"
             size="small"
@@ -94,44 +94,41 @@
 
       <div class="flex-1 overflow-auto flex flex-col gap-3">
         <!-- 任务信息 -->
-        <div class="flex items-center justify-between gap-4 flex-shrink-0">
-          <div class="flex items-center gap-4">
-            <el-tag
-              :type="getConvertStatusTagType(convertCurrentTask.status)"
-              size="small"
-              class="w-16 text-center"
-            >
-              {{ getConvertStatusText(convertCurrentTask.status) }}
-            </el-tag>
-            <span v-if="convertCurrentTask.error_message" class="text-red-500 text-xs">
+        <div class="flex items-center gap-4 flex-shrink-0">
+          <el-tag
+            :type="getConvertStatusTagType(convertCurrentTask.status)"
+            size="small"
+            class="w-16 text-center flex-shrink-0"
+          >
+            {{ getConvertStatusText(convertCurrentTask.status) }}
+          </el-tag>
+          <el-tooltip
+            v-if="convertCurrentTask.error_message"
+            :content="`错误: ${convertCurrentTask.error_message}`"
+            placement="top"
+            class="flex-1 min-w-0 max-w-md"
+          >
+            <span class="text-red-500 text-xs truncate block max-w-md cursor-help">
               错误: {{ convertCurrentTask.error_message }}
             </span>
-          </div>
-          <div class="flex items-center gap-3">
-            <div class="flex items-center gap-2">
-              <span class="text-sm text-gray-600">覆盖同名文件</span>
-              <el-switch
-                v-model="convertOverwrite"
-                :disabled="isDirectoryOperationDisabled"
-                @change="handleConvertOverwriteChange"
-              />
-            </div>
-            <el-button
-              type="success"
-              v-bind="mediumTextButtonProps"
-              @click="handleConvertStart"
-              :disabled="isStartConvertDisabled"
-              :loading="isTaskProcessing"
-            >
-              开始转码
-            </el-button>
-          </div>
+          </el-tooltip>
         </div>
 
         <!-- 目录选择 -->
         <div class="border rounded p-3 flex flex-col gap-2">
           <div class="flex items-center justify-between">
-            <h4 class="text-sm font-semibold">转码目录</h4>
+            <div class="flex items-center gap-2">
+              <h4 class="text-sm font-semibold">转码目录</h4>
+              <span
+                v-if="
+                  convertCurrentTask.total_files !== null &&
+                  convertCurrentTask.total_files !== undefined
+                "
+                class="text-xs text-gray-500"
+              >
+                可处理文件数: {{ convertCurrentTask.total_files }}
+              </span>
+            </div>
             <el-button
               type="primary"
               v-bind="smallTextButtonProps"
@@ -143,24 +140,103 @@
           </div>
           <div
             v-if="convertCurrentTask.directory"
-            class="text-sm text-gray-600 flex flex-col gap-1"
+            class="text-sm text-gray-600"
           >
             <div class="truncate" :title="convertCurrentTask.directory">
               {{ convertCurrentTask.directory }}
-            </div>
-            <div
-              v-if="
-                convertCurrentTask.total_files !== null &&
-                convertCurrentTask.total_files !== undefined
-              "
-              class="text-xs text-gray-500"
-            >
-              可处理文件数: {{ convertCurrentTask.total_files }}
             </div>
           </div>
           <div v-else class="text-sm text-gray-400">
             请选择一个目录，该目录下的所有媒体文件将被转换为 MP3 格式
           </div>
+        </div>
+
+        <!-- 文件列表 -->
+        <div class="border rounded p-3 flex flex-col gap-2 flex-1 min-h-0">
+          <h4 class="text-sm font-semibold">文件列表</h4>
+          <div
+            v-if="convertFileList && convertFileList.length > 0"
+            class="flex-1 overflow-y-auto space-y-1"
+          >
+            <div
+              v-for="(file, index) in convertFileList"
+              :key="index"
+              class="flex items-center gap-2 p-2 rounded hover:bg-gray-50"
+            >
+              <el-icon
+                :class="{
+                  'text-green-500': getFileStatus(file) === 'success',
+                  'text-red-500': getFileStatus(file) === 'failed',
+                  'text-yellow-500': getFileStatus(file) === 'processing',
+                  'text-gray-400': getFileStatus(file) === 'pending',
+                }"
+              >
+                <Check v-if="getFileStatus(file) === 'success'" />
+                <Close v-else-if="getFileStatus(file) === 'failed'" />
+                <Loading v-else-if="getFileStatus(file) === 'processing'" />
+                <Clock v-else />
+              </el-icon>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm truncate" :title="getFileName(file)">
+                  {{ getFileName(file) }}
+                </div>
+                <div class="flex items-center gap-2 text-xs text-gray-500">
+                  <span v-if="file.size">{{ formatFileSize(file.size) }}</span>
+                  <span v-if="file.duration">{{ formatDuration(file.duration) }}</span>
+                </div>
+                <div
+                  v-if="getFileError(file)"
+                  class="text-xs text-red-500 truncate"
+                  :title="getFileError(file)"
+                >
+                  {{ getFileError(file) }}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="flex-1 flex items-center justify-center text-sm text-gray-400">
+            暂无文件，请先选择转码目录
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 中间：空状态 -->
+    <div class="flex-1 border rounded p-3 flex flex-col" v-else>
+      <div class="flex items-center justify-between mb-3 flex-shrink-0">
+        <h3 class="text-base font-semibold">文件列表</h3>
+      </div>
+      <div class="flex-1 flex items-center justify-center text-sm text-gray-400">
+        请从左侧选择一个任务查看文件列表
+      </div>
+    </div>
+
+    <!-- 右侧：输出目录和转码进度 -->
+    <div class="w-80 border rounded p-3 flex flex-col" v-if="convertCurrentTask">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-base font-semibold">输出信息</h3>
+      </div>
+      <div class="flex-1 overflow-auto flex flex-col gap-3">
+        <!-- 操作按钮 -->
+        <div class="border rounded p-3 flex flex-col gap-2">
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-gray-600">覆盖同名文件</span>
+            <el-switch
+              v-model="convertOverwrite"
+              :disabled="isDirectoryOperationDisabled"
+              @change="handleConvertOverwriteChange"
+            />
+          </div>
+          <el-button
+            type="success"
+            v-bind="mediumTextButtonProps"
+            @click="handleConvertStart"
+            :disabled="isStartConvertDisabled"
+            :loading="isTaskProcessing"
+            class="w-full"
+          >
+            开始转码
+          </el-button>
         </div>
 
         <!-- 输出目录名称 -->
@@ -185,8 +261,17 @@
               保存
             </el-button>
           </div>
-          <div class="text-xs text-gray-400">
-            转码后的文件将保存在转码目录下的此文件夹中，默认为 "mp3"
+          <div class="text-xs text-gray-400 flex items-center gap-1">
+            <span>文件将保存在转码目录下的此文件夹中</span>
+            <el-tooltip
+              v-if="convertCurrentTask?.directory && convertCurrentTask?.output_dir"
+              :content="`${convertCurrentTask.directory}/${convertCurrentTask.output_dir}`"
+              placement="top"
+            >
+              <el-icon class="cursor-help text-gray-400 hover:text-gray-600">
+                <InfoFilled />
+              </el-icon>
+            </el-tooltip>
           </div>
         </div>
 
@@ -231,7 +316,7 @@
         >
           <h4 class="text-sm font-semibold">转码结果</h4>
           <div class="text-sm text-gray-600">
-            <div>转码完成！所有文件已保存到目录下的 mp3 文件夹中</div>
+            <div>转码完成！所有文件已保存到输出目录</div>
             <div v-if="convertCurrentTask.progress" class="mt-2">
               共转换 {{ convertCurrentTask.progress.total || 0 }} 个文件
             </div>
@@ -241,12 +326,10 @@
     </div>
 
     <!-- 右侧：空状态 -->
-    <div class="flex-1 border rounded p-3 flex flex-col max-w-2xl" v-else>
-      <div class="flex items-center justify-between mb-3 flex-shrink-0">
-        <h3 class="text-base font-semibold">任务详情</h3>
-      </div>
+    <div class="w-80 border rounded p-3 flex flex-col" v-else>
+      <h3 class="text-base font-semibold mb-3">输出信息</h3>
       <div class="flex-1 flex items-center justify-center text-sm text-gray-400">
-        请从左侧选择一个任务查看详情
+        请从左侧选择一个任务查看输出信息
       </div>
     </div>
 
@@ -317,7 +400,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { Refresh, Plus, Delete, Edit } from "@element-plus/icons-vue";
+import { Refresh, Plus, Delete, Edit, Check, Close, Loading, Clock, InfoFilled } from "@element-plus/icons-vue";
 import FileDialog from "@/views/dialogs/FileDialog.vue";
 import { logAndNoticeError } from "@/utils/error";
 import { useControllableInterval } from "@/composables/useInterval";
@@ -639,7 +722,7 @@ const handleConvertStart = async () => {
   }
 
   const confirmed = await ElMessageBox.confirm(
-    `确定要开始转码吗？将转换目录 "${convertCurrentTask.value.directory}" 下的所有音频文件为 MP3 格式。`,
+    `确定要开始转码吗？将转换目录 "${convertCurrentTask.value.name}" 下的所有音频文件为 MP3 格式。`,
     "确认转码",
     {
       confirmButtonText: "确定",
@@ -710,6 +793,63 @@ const isStartConvertDisabled = computed(
   () => !convertCurrentTask.value?.directory || isTaskProcessing.value
 );
 const isDirectoryOperationDisabled = computed(() => isTaskProcessing.value);
+
+// 文件列表
+const convertFileList = computed(() => {
+  if (!convertCurrentTask.value?.file_status) {
+    return [];
+  }
+  return Object.keys(convertCurrentTask.value.file_status).map((filePath) => {
+    const fileStatus = convertCurrentTask.value!.file_status![filePath];
+    return {
+      path: filePath,
+      status: fileStatus.status || 'pending',
+      error: fileStatus.error,
+      size: fileStatus.size,
+      duration: fileStatus.duration,
+    };
+  });
+});
+
+// 获取文件名
+const getFileName = (file: { path: string }) => {
+  return file.path.split("/").pop() || file.path;
+};
+
+// 获取文件状态
+const getFileStatus = (file: { status: string }): "success" | "failed" | "processing" | "pending" => {
+  return file.status as "success" | "failed" | "processing" | "pending";
+};
+
+// 获取文件错误信息
+const getFileError = (file: { error?: string }): string | undefined => {
+  return file.error;
+};
+
+// 格式化文件大小
+const formatFileSize = (bytes?: number): string => {
+  if (!bytes) return '';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let size = bytes;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex++;
+  }
+  return `${size.toFixed(1)} ${units[unitIndex]}`;
+};
+
+// 格式化时长
+const formatDuration = (seconds?: number): string => {
+  if (!seconds) return '';
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+  return `${minutes}:${secs.toString().padStart(2, '0')}`;
+};
 
 onMounted(() => {
   loadConvertTaskList();

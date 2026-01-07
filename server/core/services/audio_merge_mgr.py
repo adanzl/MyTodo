@@ -426,7 +426,7 @@ class AudioMergeMgr:
         :return: 时长（秒），失败返回 None
         """
         try:
-            cmds = [FFMPEG_PATH, '-i', file_path, '-f', 'null', '-']
+            cmds = [FFMPEG_PATH, '-loglevel', 'error', '-i', file_path, '-f', 'null', '-']
             # 使用公共方法安全地运行 subprocess，避免 gevent 与 asyncio 冲突
             try:
                 returncode, stdout, stderr = run_subprocess_safe(cmds, timeout=self.FFMPEG_DURATION_TIMEOUT)
@@ -479,7 +479,7 @@ class AudioMergeMgr:
                     f.write(f"file '{file_path}'\n")
 
             # 使用 ffmpeg 合并
-            cmds = [FFMPEG_PATH, '-f', 'concat', '-safe', '0', '-i', file_list_path, '-c', 'copy', '-y', result_file]
+            cmds = [FFMPEG_PATH, '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', file_list_path, '-c', 'copy', '-y', result_file]
 
             log.info(f"[AudioMerge] 执行 ffmpeg 命令: {' '.join(cmds)}")
             # 使用公共方法安全地运行 subprocess，避免 gevent 与 asyncio 冲突

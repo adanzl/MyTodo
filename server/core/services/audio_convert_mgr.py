@@ -6,16 +6,15 @@ import json
 import os
 import random
 import string
-import subprocess
 import threading
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 
 from core.log_config import app_logger
 from core.models.const import (MEDIA_BASE_DIR, FFMPEG_PATH, FFMPEG_TIMEOUT, TASK_STATUS_PENDING, TASK_STATUS_PROCESSING,
                                TASK_STATUS_SUCCESS, TASK_STATUS_FAILED)
-from core.utils import ensure_directory, run_subprocess_safe
+from core.utils import ensure_directory, run_subprocess_safe, get_media_duration
 
 log = app_logger
 
@@ -32,6 +31,7 @@ class AudioConvertTask:
     total_files: Optional[int] = None  # 可处理的文件总数
     error_message: Optional[str] = None  # 错误信息
     progress: Optional[Dict] = None  # 转码进度 {total: int, processed: int, current_file: str}
+    file_status: Optional[Dict[str, Any]] = None  # 文件状态 {file_path: {'status': 'success'|'failed'|'pending'|'processing', 'error': str?, 'size': int?, 'duration': int?}}
     create_time: float = 0  # 创建时间戳
     update_time: float = 0  # 更新时间戳
 
@@ -163,17 +163,21 @@ class AudioConvertMgr:
                 if not os.path.isdir(directory):
                     return -1, "路径不是目录"
                 task.directory = directory
-                # 更新目录后，重新计算文件数量
+                # 更新目录后，重新扫描文件并初始化文件状态
                 if task.directory:
-                    task.total_files = len(self._scan_media_files(task.directory, task.output_dir))
+                    media_files = self._scan_media_files(task.directory, task.output_dir)
+                    task.total_files = len(media_files)
+                    self._initialize_file_status(task, media_files)
                 updated = True
             if output_dir is not None:
                 if not output_dir.strip():
                     return -1, "输出目录名称不能为空"
                 task.output_dir = output_dir.strip()
-                # 更新输出目录后，重新计算文件数量
+                # 更新输出目录后，重新扫描文件并初始化文件状态
                 if task.directory:
-                    task.total_files = len(self._scan_media_files(task.directory, task.output_dir))
+                    media_files = self._scan_media_files(task.directory, task.output_dir)
+                    task.total_files = len(media_files)
+                    self._initialize_file_status(task, media_files)
                 updated = True
             if overwrite is not None:
                 task.overwrite = bool(overwrite)
@@ -188,6 +192,102 @@ class AudioConvertMgr:
         except Exception as e:
             log.error(f"[AudioConvert] 更新任务失败: {e}")
             return -1, f"更新任务失败: {str(e)}"
+
+    def _get_file_info(self, file_path: str) -> Dict:
+        """获取文件信息（大小），时长异步获取"""
+        file_info = {}
+        try:
+            # 获取文件大小（同步，快速）
+            if os.path.exists(file_path):
+                file_info['size'] = os.path.getsize(file_path)
+        except Exception as e:
+            log.warning(f"[AudioConvert] 获取文件大小失败 {file_path}: {e}")
+        return file_info
+    
+    def _initialize_file_status(self, task: AudioConvertTask, media_files: List[str]):
+        """初始化文件状态，保留已有文件信息"""
+        if task.file_status is None:
+            task.file_status = {}
+        
+        new_file_status = {}
+        for media_file in media_files:
+            if media_file in task.file_status:
+                # 保留已有状态（如果任务已完成或失败，保持状态）
+                old_status = task.file_status[media_file]
+                if task.status in (TASK_STATUS_SUCCESS, TASK_STATUS_FAILED):
+                    new_file_status[media_file] = old_status
+                else:
+                    # 重置状态但保留文件信息（大小、时长）
+                    file_info = {'size': old_status.get('size'), 'duration': old_status.get('duration')}
+                    new_file_status[media_file] = {'status': 'pending', **file_info}
+            else:
+                # 新文件，获取文件信息（大小），时长异步获取
+                file_info = self._get_file_info(media_file)
+                new_file_status[media_file] = {'status': 'pending', **file_info}
+        
+        task.file_status = new_file_status
+        # 异步获取所有文件的时长
+        self._start_async_duration_update(task.task_id, list(new_file_status.keys()))
+    
+    def _ensure_output_directory(self, output_dir_path: str) -> Tuple[bool, Optional[str]]:
+        """确保输出目录存在且有写权限"""
+        try:
+            if os.path.exists(output_dir_path):
+                # 目录已存在，检查写权限
+                if not os.access(output_dir_path, os.W_OK):
+                    error_msg = f"输出目录无写权限: {output_dir_path}"
+                    log.error(f"[AudioConvert] {error_msg}")
+                    return False, error_msg
+            else:
+                # 目录不存在，尝试创建
+                os.makedirs(output_dir_path, exist_ok=True)
+            return True, None
+        except PermissionError as e:
+            error_msg = f"无法创建输出目录，权限不足: {output_dir_path}"
+            log.error(f"[AudioConvert] {error_msg}: {e}")
+            return False, error_msg
+        except OSError as e:
+            error_msg = f"无法创建输出目录: {output_dir_path}"
+            log.error(f"[AudioConvert] {error_msg}: {e}")
+            return False, error_msg
+    
+    def _update_file_status(self, task: AudioConvertTask, file_path: str, status: str, error: Optional[str] = None):
+        """更新文件状态，保留已有文件信息"""
+        old_status = task.file_status.get(file_path, {})
+        new_status = {**old_status, 'status': status}
+        if error is not None:
+            new_status['error'] = error
+        task.file_status[file_path] = new_status
+    
+    def _update_file_duration_async(self, task_id: str, file_path: str):
+        """异步获取文件时长并更新任务"""
+        try:
+            duration = get_media_duration(file_path)
+            if duration is not None:
+                task = self._get_task(task_id)
+                if task and task.file_status and file_path in task.file_status:
+                    # 更新文件状态中的时长
+                    file_status = task.file_status[file_path]
+                    file_status['duration'] = duration
+                    self._save_task(task)
+                    log.debug(f"[AudioConvert] 异步更新文件时长: {file_path}, {duration}秒")
+        except Exception as e:
+            log.warning(f"[AudioConvert] 异步获取文件时长失败 {file_path}: {e}")
+    
+    def _start_async_duration_update(self, task_id: str, file_paths: List[str]):
+        """启动异步获取文件时长的任务"""
+        from gevent import spawn
+        
+        def update_durations():
+            """在 gevent 协程中异步更新所有文件的时长"""
+            for file_path in file_paths:
+                try:
+                    self._update_file_duration_async(task_id, file_path)
+                except Exception as e:
+                    log.warning(f"[AudioConvert] 异步更新文件时长异常 {file_path}: {e}")
+        
+        # 使用 gevent.spawn 异步执行，不阻塞主流程
+        spawn(update_durations)
 
     def _scan_media_files(self, directory: str, output_dir: str) -> List[str]:
         """扫描目录下的所有媒体文件（音频和视频）"""
@@ -214,83 +314,55 @@ class AudioConvertMgr:
         :param output_file: 输出文件路径
         :return: (是否成功, 错误消息)
         """
-        try:
-            # 确保输出目录存在
-            output_dir = os.path.dirname(output_file)
-            try:
-                if os.path.exists(output_dir):
-                    # 目录已存在，检查写权限
-                    if not os.access(output_dir, os.W_OK):
-                        error_msg = f"输出目录无写权限: {output_dir}"
-                        log.error(f"[AudioConvert] {error_msg}")
-                        return False, error_msg
-                else:
-                    # 目录不存在，尝试创建
-                    os.makedirs(output_dir, exist_ok=True)
-            except PermissionError as e:
-                error_msg = f"无法创建输出目录，权限不足: {output_dir}"
-                log.error(f"[AudioConvert] {error_msg}: {e}")
-                return False, error_msg
-            except OSError as e:
-                error_msg = f"无法创建输出目录: {output_dir}"
-                log.error(f"[AudioConvert] {error_msg}: {e}")
-                return False, error_msg
-
-            # 使用 ffmpeg 转换（支持音频和视频文件）
-            cmds = [
-                FFMPEG_PATH,
-                '-i',
-                input_file,
-                '-vn',  # 不处理视频流，只处理音频
-                '-codec:a',
-                'libmp3lame',
-                '-q:a',
-                '2',  # 高质量
-                '-y',  # 覆盖已存在的文件
-                output_file
-            ]
-
-            log.info(f"[AudioConvert] 执行 ffmpeg 命令: {' '.join(cmds)}")
-            # 使用公共方法安全地运行 subprocess，避免 gevent 与 asyncio 冲突
-            try:
-                returncode, stdout, stderr = run_subprocess_safe(cmds, timeout=FFMPEG_TIMEOUT)
-            except TimeoutError as e:
-                error_msg = "转换超时"
-                log.error(f"[AudioConvert] {error_msg}: {e}")
-                return False, error_msg
-            except FileNotFoundError as e:
-                error_msg = "ffmpeg 未找到，请确保已安装 ffmpeg"
-                log.error(f"[AudioConvert] {error_msg}: {e}")
-                return False, error_msg
-            except Exception as e:
-                error_msg = f"转换失败: {str(e)}"
-                log.error(f"[AudioConvert] {error_msg}")
-                return False, error_msg
-            
-            if returncode == 0:
-                if os.path.exists(output_file):
-                    log.info(f"[AudioConvert] 转换成功: {input_file} -> {output_file}")
-                    return True, None
-                else:
-                    error_msg = f"输出文件不存在: {output_file}"
-                    log.error(f"[AudioConvert] {error_msg}")
-                    return False, error_msg
-            else:
-                error_msg = stderr or stdout or '未知错误'
-                log.error(f"[AudioConvert] ffmpeg 执行失败 (返回码: {returncode}): {error_msg}")
-                return False, error_msg
-
-        except subprocess.TimeoutExpired:
-            error_msg = "转换超时"
-            log.error(f"[AudioConvert] {error_msg}")
+        # 确保输出目录存在
+        output_dir = os.path.dirname(output_file)
+        success, error_msg = self._ensure_output_directory(output_dir)
+        if not success:
             return False, error_msg
-        except FileNotFoundError:
+
+        # 使用 ffmpeg 转换（支持音频和视频文件）
+        cmds = [
+            FFMPEG_PATH,
+            '-loglevel', 'error',  # 只输出错误信息，不输出中间信息
+            '-i',
+            input_file,
+            '-vn',  # 不处理视频流，只处理音频
+            '-codec:a',
+            'libmp3lame',
+            '-q:a',
+            '2',  # 高质量
+            '-y',  # 覆盖已存在的文件
+            output_file
+        ]
+
+        log.info(f"[AudioConvert] 执行 ffmpeg 命令: {' '.join(cmds)}")
+        # 使用公共方法安全地运行 subprocess，避免 gevent 与 asyncio 冲突
+        try:
+            returncode, stdout, stderr = run_subprocess_safe(cmds, timeout=FFMPEG_TIMEOUT)
+        except TimeoutError as e:
+            error_msg = "转换超时"
+            log.error(f"[AudioConvert] {error_msg}: {e}")
+            return False, error_msg
+        except FileNotFoundError as e:
             error_msg = "ffmpeg 未找到，请确保已安装 ffmpeg"
-            log.error(f"[AudioConvert] {error_msg}")
+            log.error(f"[AudioConvert] {error_msg}: {e}")
             return False, error_msg
         except Exception as e:
             error_msg = f"转换失败: {str(e)}"
             log.error(f"[AudioConvert] {error_msg}")
+            return False, error_msg
+        
+        if returncode == 0:
+            if os.path.exists(output_file):
+                log.info(f"[AudioConvert] 转换成功: {input_file} -> {output_file}")
+                return True, None
+            else:
+                error_msg = f"输出文件不存在: {output_file}"
+                log.error(f"[AudioConvert] {error_msg}")
+                return False, error_msg
+        else:
+            error_msg = stderr or stdout or '未知错误'
+            log.error(f"[AudioConvert] ffmpeg 执行失败 (返回码: {returncode}): {error_msg}")
             return False, error_msg
 
     def _convert_directory(self, task: AudioConvertTask):
@@ -310,7 +382,23 @@ class AudioConvertMgr:
             media_files = self._scan_media_files(task.directory, task.output_dir)
             total = len(media_files)
             task.progress['total'] = total
+            task.progress['processed'] = 0  # 重置已处理数量
+            # 初始化所有文件状态为 pending
+            if task.file_status is None:
+                task.file_status = {}
+            for media_file in media_files:
+                if media_file not in task.file_status:
+                    # 获取文件信息（大小），时长异步获取
+                    file_info = self._get_file_info(media_file)
+                    task.file_status[media_file] = {'status': 'pending', **file_info}
+                else:
+                    # 确保有 status 字段
+                    old_status = task.file_status[media_file]
+                    if 'status' not in old_status:
+                        old_status['status'] = 'pending'
             self._save_task(task)
+            # 异步获取所有文件的时长
+            self._start_async_duration_update(task.task_id, media_files)
 
             if total == 0:
                 self._update_task_status(task, TASK_STATUS_SUCCESS, None, {'processed': 0})
@@ -319,36 +407,17 @@ class AudioConvertMgr:
 
             output_dir_path = os.path.join(task.directory, task.output_dir)
             # 检查并创建输出目录
-            try:
-                if os.path.exists(output_dir_path):
-                    # 目录已存在，检查写权限
-                    if not os.access(output_dir_path, os.W_OK):
-                        error_msg = f"输出目录无写权限: {output_dir_path}"
-                        log.error(f"[AudioConvert] {error_msg}")
-                        self._update_task_status(task, TASK_STATUS_FAILED, error_msg)
-                        return
-                else:
-                    # 目录不存在，尝试创建
-                    try:
-                        os.makedirs(output_dir_path, exist_ok=True)
-                    except PermissionError as e:
-                        error_msg = f"无法创建输出目录，权限不足: {output_dir_path}"
-                        log.error(f"[AudioConvert] {error_msg}: {e}")
-                        self._update_task_status(task, TASK_STATUS_FAILED, error_msg)
-                        return
-                    except OSError as e:
-                        error_msg = f"无法创建输出目录: {output_dir_path}"
-                        log.error(f"[AudioConvert] {error_msg}: {e}")
-                        self._update_task_status(task, TASK_STATUS_FAILED, error_msg)
-                        return
-            except Exception as e:
-                error_msg = f"检查输出目录时出错: {output_dir_path}"
-                log.error(f"[AudioConvert] {error_msg}: {e}")
+            success, error_msg = self._ensure_output_directory(output_dir_path)
+            if not success:
                 self._update_task_status(task, TASK_STATUS_FAILED, error_msg)
                 return
 
             processed = 0
             failed_files = []
+            # 初始化文件状态字典
+            if task.file_status is None:
+                task.file_status = {}
+            
             for media_file in media_files:
                 if self._stop_flags.get(task.task_id, False):
                     self._update_task_status(task, TASK_STATUS_FAILED, "任务已被停止", {'current_file': ''})
@@ -356,6 +425,8 @@ class AudioConvertMgr:
                     return
 
                 task.progress['current_file'] = os.path.basename(media_file)
+                # 标记为处理中，保留文件信息
+                self._update_file_status(task, media_file, 'processing')
                 self._save_task(task)
 
                 base_name = os.path.splitext(os.path.basename(media_file))[0]
@@ -364,16 +435,20 @@ class AudioConvertMgr:
                 if os.path.exists(output_file) and not task.overwrite:
                     processed += 1
                     task.progress['processed'] = processed
+                    self._update_file_status(task, media_file, 'success')
                     self._save_task(task)
                     continue
 
                 success, error = self._convert_file_to_mp3(media_file, output_file)
+                processed += 1
+                task.progress['processed'] = processed
+                
                 if success:
-                    processed += 1
-                    task.progress['processed'] = processed
-                    self._save_task(task)
+                    self._update_file_status(task, media_file, 'success')
                 else:
+                    self._update_file_status(task, media_file, 'failed', error)
                     failed_files.append(f"{os.path.basename(media_file)}: {error}")
+                self._save_task(task)
 
             if self._stop_flags.get(task.task_id, False):
                 self._update_task_status(task, TASK_STATUS_FAILED, "任务已被停止", {'current_file': ''})

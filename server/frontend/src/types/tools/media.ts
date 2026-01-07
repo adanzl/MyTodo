@@ -155,4 +155,13 @@ export interface ConvertTask {
    * 转码进度
    */
   progress?: ConvertTaskProgress;
+  /**
+   * 文件状态字典 {file_path: {status: 'success'|'failed'|'pending'|'processing', error?: string, size?: number, duration?: number}}
+   */
+  file_status?: Record<string, {
+    status: string;
+    error?: string;
+    size?: number;
+    duration?: number;
+  }>;
 }

@@ -126,9 +126,15 @@
             >
               转存
             </el-button>
-            <span v-if="audioMergeCurrentTask.error_message" class="text-red-500 text-xs">
-              错误: {{ audioMergeCurrentTask.error_message }}
-            </span>
+            <el-tooltip
+              v-if="audioMergeCurrentTask.error_message"
+              :content="`错误: ${audioMergeCurrentTask.error_message}`"
+              placement="top"
+            >
+              <span class="text-red-500 text-xs truncate max-w-xs inline-block cursor-help">
+                错误: {{ audioMergeCurrentTask.error_message }}
+              </span>
+            </el-tooltip>
           </div>
           <div class="flex items-center gap-2">
             <el-button
