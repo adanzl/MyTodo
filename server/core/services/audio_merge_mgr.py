@@ -15,16 +15,12 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 from core.log_config import app_logger
-from core.models.const import (ALLOWED_AUDIO_EXTENSIONS, MEDIA_BASE_DIR, FFMPEG_PATH, get_media_task_dir, get_media_task_result_dir)
+from core.models.const import (ALLOWED_AUDIO_EXTENSIONS, MEDIA_BASE_DIR, FFMPEG_PATH, FFMPEG_TIMEOUT,
+                               get_media_task_dir, get_media_task_result_dir, TASK_STATUS_PENDING,
+                               TASK_STATUS_PROCESSING, TASK_STATUS_SUCCESS, TASK_STATUS_FAILED)
 from core.utils import get_media_duration, ensure_directory
 
 log = app_logger
-
-# 任务状态
-TASK_STATUS_PENDING = 'pending'  # 等待中
-TASK_STATUS_PROCESSING = 'processing'  # 处理中
-TASK_STATUS_SUCCESS = 'success'  # 成功
-TASK_STATUS_FAILED = 'failed'  # 失败
 
 
 @dataclass
@@ -46,7 +42,6 @@ class AudioMergeMgr:
 
     TASK_META_FILE = 'task.json'  # 任务元数据文件名
     MERGED_FILENAME = 'merged.mp3'  # 合并后的文件名
-    FFMPEG_TIMEOUT = 300  # ffmpeg 超时时间（秒）
     FFMPEG_DURATION_TIMEOUT = 10  # 获取文件时长的超时时间（秒）
 
     # 编译正则表达式以提高性能
@@ -480,12 +475,10 @@ class AudioMergeMgr:
                     f.write(f"file '{file_path}'\n")
 
             # 使用 ffmpeg 合并
-            cmds = [
-                FFMPEG_PATH, '-f', 'concat', '-safe', '0', '-i', file_list_path, '-c', 'copy', '-y', result_file
-            ]
+            cmds = [FFMPEG_PATH, '-f', 'concat', '-safe', '0', '-i', file_list_path, '-c', 'copy', '-y', result_file]
 
             log.info(f"[AudioMerge] 执行 ffmpeg 命令: {' '.join(cmds)}")
-            result = subprocess.run(cmds, capture_output=True, text=True, timeout=self.FFMPEG_TIMEOUT)
+            result = subprocess.run(cmds, capture_output=True, text=True, timeout=FFMPEG_TIMEOUT)
 
             if result.returncode == 0 and os.path.exists(result_file):
                 # 从 ffmpeg 输出中解析时长，如果失败则使用 ffmpeg 快速获取

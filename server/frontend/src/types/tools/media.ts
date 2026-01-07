@@ -140,6 +140,10 @@ export interface ConvertTask {
    */
   output_dir?: string;
   /**
+   * 是否覆盖同名文件，默认为 true
+   */
+  overwrite?: boolean;
+  /**
    * 错误消息
    */
   error_message?: string;

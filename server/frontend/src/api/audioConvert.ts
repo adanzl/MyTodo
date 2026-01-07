@@ -61,6 +61,7 @@ export async function updateConvertTask(
     name?: string;
     directory?: string;
     output_dir?: string;
+    overwrite?: boolean;
   }
 ): Promise<ApiResponse<ConvertTask>> {
   const response = await api.post<ApiResponse<ConvertTask>>("/media/convert/update", {

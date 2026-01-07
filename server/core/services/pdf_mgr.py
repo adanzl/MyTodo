@@ -14,17 +14,12 @@ from werkzeug.utils import secure_filename
 import pikepdf
 
 from core.log_config import app_logger
-from core.models.const import PDF_BASE_DIR, PDF_UPLOAD_DIR, PDF_UNLOCK_DIR, ALLOWED_PDF_EXTENSIONS
+from core.models.const import (PDF_BASE_DIR, PDF_UPLOAD_DIR, PDF_UNLOCK_DIR, ALLOWED_PDF_EXTENSIONS,
+                               TASK_STATUS_PENDING, TASK_STATUS_PROCESSING, TASK_STATUS_SUCCESS, TASK_STATUS_FAILED,
+                               TASK_STATUS_UPLOADED)
 from core.utils import ensure_directory, get_file_info, is_allowed_pdf_file
 
 log = app_logger
-
-# 任务状态
-TASK_STATUS_PENDING = 'pending'  # 等待中
-TASK_STATUS_PROCESSING = 'processing'  # 处理中
-TASK_STATUS_SUCCESS = 'success'  # 成功（已解密）
-TASK_STATUS_FAILED = 'failed'  # 失败
-TASK_STATUS_UPLOADED = 'uploaded'  # 已上传（未解密）
 
 
 @dataclass

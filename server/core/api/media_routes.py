@@ -498,14 +498,16 @@ def create_convert_task():
     参数：
     - name: 任务名称（可选）
     - output_dir: 输出目录名称（可选，默认为 'mp3'）
+    - overwrite: 是否覆盖同名文件（可选，默认为 True）
     """
     try:
         data = read_json_from_request()
         # 如果没有提供名称，使用当前日期时间作为默认名称
         name = data.get('name', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         output_dir = data.get('output_dir')
+        overwrite = data.get('overwrite')
 
-        code, msg, task_id = audio_convert_mgr.create_task(name, output_dir=output_dir)
+        code, msg, task_id = audio_convert_mgr.create_task(name, output_dir=output_dir, overwrite=overwrite)
 
         if code != 0:
             return _err(msg)
@@ -588,8 +590,9 @@ def update_convert_task():
 
         # 至少需要提供一个要更新的字段
         output_dir = data.get('output_dir')
-        if name is None and directory is None and output_dir is None:
-            return _err("至少需要提供一个要更新的字段（name、directory 或 output_dir）")
+        overwrite = data.get('overwrite')
+        if name is None and directory is None and output_dir is None and overwrite is None:
+            return _err("至少需要提供一个要更新的字段（name、directory、output_dir 或 overwrite）")
 
         # 验证目录路径（如果提供了）
         if directory is not None:
@@ -598,7 +601,11 @@ def update_convert_task():
                 return _err(error_msg or "目录路径无效")
             directory = normalized_path
 
-        code, msg = audio_convert_mgr.update_task(task_id, name=name, directory=directory, output_dir=output_dir)
+        code, msg = audio_convert_mgr.update_task(task_id,
+                                                  name=name,
+                                                  directory=directory,
+                                                  output_dir=output_dir,
+                                                  overwrite=overwrite)
         if code != 0:
             return _err(msg)
 

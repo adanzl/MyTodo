@@ -156,6 +156,21 @@
           </div>
         </div>
 
+        <!-- 覆盖选项 -->
+        <div class="border rounded p-3 flex flex-col gap-2">
+          <div class="flex items-center justify-between">
+            <h4 class="text-sm font-semibold">覆盖选项</h4>
+            <el-switch
+              v-model="convertOverwrite"
+              :disabled="isDirectoryOperationDisabled"
+              @change="handleConvertOverwriteChange"
+            />
+          </div>
+          <div class="text-xs text-gray-400">
+            {{ convertOverwrite ? "已启用：转码时会覆盖同名文件" : "已禁用：转码时会跳过同名文件" }}
+          </div>
+        </div>
+
         <!-- 转码进度 -->
         <div
           v-if="convertCurrentTask.status === 'processing' || convertCurrentTask.progress"
@@ -256,6 +271,8 @@ const convertCurrentTask = ref<ConvertTask | null>(null);
 const convertDirectoryDialogVisible = ref(false);
 const convertOutputDir = ref("mp3");
 const convertOutputDirChanged = ref(false);
+const convertOverwrite = ref(true);
+const convertOverwriteChanged = ref(false);
 
 // 按钮公共属性
 const smallIconButtonProps = { size: "small" as const, plain: true, class: "!w-8 !h-6 !p-0" };
@@ -312,6 +329,9 @@ const handleConvertViewTask = async (taskId: string) => {
       // 初始化输出目录名称
       convertOutputDir.value = response.data.output_dir || "mp3";
       convertOutputDirChanged.value = false;
+      // 初始化覆盖选项
+      convertOverwrite.value = response.data.overwrite !== false; // 默认为 true
+      convertOverwriteChanged.value = false;
     } else {
       ElMessage.error(response.msg || "获取任务信息失败");
     }
@@ -435,6 +455,45 @@ const handleConvertSaveOutputDir = async () => {
     }
   } catch (error) {
     logAndNoticeError(error as Error, "保存输出目录名称失败");
+  } finally {
+    convertLoading.value = false;
+  }
+};
+
+// 覆盖选项变化处理
+const handleConvertOverwriteChange = () => {
+  if (!convertCurrentTask.value) {
+    return;
+  }
+  const currentValue = convertCurrentTask.value.overwrite !== false; // 默认为 true
+  convertOverwriteChanged.value = convertOverwrite.value !== currentValue;
+
+  // 如果改变了，自动保存
+  if (convertOverwriteChanged.value) {
+    handleConvertSaveOverwrite();
+  }
+};
+
+// 保存覆盖选项
+const handleConvertSaveOverwrite = async () => {
+  if (!convertCurrentTask.value) {
+    return;
+  }
+
+  try {
+    convertLoading.value = true;
+    const response = await updateConvertTask(convertCurrentTask.value.task_id, {
+      overwrite: convertOverwrite.value,
+    });
+
+    if (response.code === 0) {
+      ElMessage.success("覆盖选项保存成功");
+      await handleConvertViewTask(convertCurrentTask.value.task_id);
+    } else {
+      ElMessage.error(response.msg || "保存覆盖选项失败");
+    }
+  } catch (error) {
+    logAndNoticeError(error as Error, "保存覆盖选项失败");
   } finally {
     convertLoading.value = false;
   }
