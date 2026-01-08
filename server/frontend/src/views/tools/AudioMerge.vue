@@ -1,5 +1,5 @@
 <template>
-  <div class="flex gap-4 h-[calc(100vh-250px)]">
+  <div class="flex gap-4 h-[calc(100vh-220px)]">
     <!-- 左侧：任务列表 -->
     <div class="w-64 border rounded p-3 flex flex-col">
       <div class="flex items-center justify-between mb-3">
