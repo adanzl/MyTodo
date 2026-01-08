@@ -4,37 +4,62 @@
 
     <!-- 上传区域 -->
     <div class="mb-4 flex-shrink-0 border rounded p-3 bg-gray-50">
-      <div class="flex items-center gap-3">
-        <div>
-          <el-button type="success" size="small" @click="handlePdfUpload" :loading="pdfLoading"
-            :disabled="!pdfUploadFile">
-            上传
-          </el-button>
-        </div>
-        <el-upload :auto-upload="false" :on-change="handlePdfFileChange" :show-file-list="false" accept=".pdf">
-          <template #trigger>
-            <el-button type="primary" size="small" class="!m-0">选择文件</el-button>
-          </template>
-        </el-upload>
-        <div v-if="pdfUploadFile" class="flex-1 min-w-0">
-          <div class="flex items-center gap-2">
-            <div class="text-sm text-gray-600 truncate flex-1 min-w-0" :title="pdfUploadFilePath || pdfUploadFile.name">
-              {{ pdfUploadFilePath || pdfUploadFile.name }}
-            </div>
-            <div v-if="pdfUploadElapsedTime" class="text-xs text-gray-500 flex-shrink-0">
-              已用时间: {{ pdfUploadElapsedTime }}
-            </div>
+      <div class="flex flex-col gap-3">
+        <!-- 按钮和文件信息行 -->
+        <div class="flex items-center gap-3">
+          <div>
+            <el-button
+              type="success"
+              size="small"
+              @click="handlePdfUpload"
+              :loading="pdfLoading"
+              :disabled="!pdfUploadFile"
+            >
+              上传
+            </el-button>
           </div>
-          <div v-if="pdfUploadProgress > 0" class="mt-2">
+          <el-upload
+            :auto-upload="false"
+            :on-change="handlePdfFileChange"
+            :show-file-list="false"
+            accept=".pdf"
+          >
+            <template #trigger>
+              <el-button type="primary" size="small" class="!m-0">选择文件</el-button>
+            </template>
+          </el-upload>
+          <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2">
-              <el-progress :percentage="pdfUploadProgress" :status="pdfUploadProgress === 100 ? 'success' : undefined"
-                class="flex-1" />
-              <el-button v-if="pdfUploadProgress > 0 && pdfUploadProgress < 100" type="danger" size="small" plain
-                @click="handleCancelUpload">
-                取消
-              </el-button>
+              <div
+                class="text-sm truncate flex-1 min-w-0"
+                :class="pdfUploadFile ? 'text-gray-600' : 'text-gray-400'"
+                :title="pdfUploadFilePath || pdfUploadFile?.name"
+              >
+                {{ pdfUploadFilePath || pdfUploadFile?.name || "未选择文件" }}
+              </div>
+              <div v-if="pdfUploadElapsedTime" class="text-xs text-gray-500 flex-shrink-0">
+                已用时间: {{ pdfUploadElapsedTime }}
+              </div>
             </div>
           </div>
+        </div>
+
+        <!-- 进度条和取消按钮行 -->
+        <div class="flex items-center gap-2">
+          <el-progress
+            :percentage="pdfUploadProgress"
+            :status="pdfUploadProgress === 100 ? 'success' : undefined"
+            class="flex-1"
+          />
+          <el-button
+            type="danger"
+            size="small"
+            plain
+            @click="handleCancelUpload"
+            :disabled="!pdfUploadFile"
+          >
+            取消
+          </el-button>
         </div>
       </div>
     </div>
@@ -57,8 +82,11 @@
         <el-table :data="pdfFileList" v-loading="pdfLoading" stripe class="w-full">
           <el-table-column prop="filename" label="文件名" min-width="200">
             <template #default="{ row }">
-              <span v-if="row.uploaded_info" class="text-blue-600 cursor-pointer hover:underline"
-                @click="handlePdfDownload(row, 'uploaded')">
+              <span
+                v-if="row.uploaded_info"
+                class="text-blue-600 cursor-pointer hover:underline"
+                @click="handlePdfDownload(row, 'uploaded')"
+              >
                 {{ row.filename }}
               </span>
               <span v-else class="text-gray-400">-</span>
@@ -93,15 +121,26 @@
             <template #default="{ row }">
               <div class="flex flex-col gap-1 items-center">
                 <el-tag v-if="row.status === 'success'" type="success" size="small">已解密</el-tag>
-                <el-tag v-else-if="row.status === 'processing'" type="warning" size="small">处理中</el-tag>
-                <el-tag v-else-if="row.status === 'pending'" type="info" size="small">等待中</el-tag>
+                <el-tag v-else-if="row.status === 'processing'" type="warning" size="small"
+                  >处理中</el-tag
+                >
+                <el-tag v-else-if="row.status === 'pending'" type="info" size="small"
+                  >等待中</el-tag
+                >
                 <el-tag v-else-if="row.status === 'failed'" type="danger" size="small">失败</el-tag>
                 <el-tag v-else type="info" size="small">已上传</el-tag>
-                <span v-if="row.unlocked_info" class="text-xs text-blue-600 cursor-pointer hover:underline"
-                  @click="handlePdfDownload(row, 'unlocked')">
+                <span
+                  v-if="row.unlocked_info"
+                  class="text-xs text-blue-600 cursor-pointer hover:underline"
+                  @click="handlePdfDownload(row, 'unlocked')"
+                >
                   下载
                 </span>
-                <span v-if="row.error_message" class="text-xs text-red-500" :title="row.error_message">
+                <span
+                  v-if="row.error_message"
+                  class="text-xs text-red-500"
+                  :title="row.error_message"
+                >
                   错误
                 </span>
               </div>
@@ -112,21 +151,41 @@
             <template #default="{ row }">
               <div class="flex items-center gap-2">
                 <!-- 密码输入框 -->
-                <el-input v-if="row.uploaded_info" v-model="row._password" type="password" size="small"
-                  placeholder="密码（可选）" show-password clearable class="w-30"
-                  :disabled="row._decrypting || row.status === 'processing'" @keyup.enter="handlePdfDecrypt(row)">
+                <el-input
+                  v-if="row.uploaded_info"
+                  v-model="row._password"
+                  type="password"
+                  size="small"
+                  placeholder="密码（可选）"
+                  show-password
+                  clearable
+                  class="w-30"
+                  :disabled="row._decrypting || row.status === 'processing'"
+                  @keyup.enter="handlePdfDecrypt(row)"
+                >
                 </el-input>
 
                 <!-- 解密 -->
-                <el-button v-if="row.uploaded_info && row.status !== 'processing'" type="primary" size="small"
-                  @click="handlePdfDecrypt(row)" :loading="row._decrypting"
-                  :disabled="row._decrypting || row.status === 'processing'">
+                <el-button
+                  v-if="row.uploaded_info && row.status !== 'processing'"
+                  type="primary"
+                  size="small"
+                  @click="handlePdfDecrypt(row)"
+                  :loading="row._decrypting"
+                  :disabled="row._decrypting || row.status === 'processing'"
+                >
                   {{ row.status === "success" ? "重新解密" : "解密" }}
                 </el-button>
 
                 <!-- 删除 -->
-                <el-button v-if="row.uploaded_info" type="danger" size="small" plain @click="handlePdfDelete(row)"
-                  :disabled="row.status === 'processing'">
+                <el-button
+                  v-if="row.uploaded_info"
+                  type="danger"
+                  size="small"
+                  plain
+                  @click="handlePdfDelete(row)"
+                  :disabled="row.status === 'processing'"
+                >
                   删除
                 </el-button>
               </div>
@@ -230,7 +289,11 @@ const formatElapsedTime = (seconds: number): string => {
 
 // 更新已用时间显示
 const updateElapsedTime = () => {
-  if (uploadStartTime.value !== null && pdfUploadProgress.value > 0 && pdfUploadProgress.value < 100) {
+  if (
+    uploadStartTime.value !== null &&
+    pdfUploadProgress.value > 0 &&
+    pdfUploadProgress.value < 100
+  ) {
     const elapsed = Math.floor((Date.now() - uploadStartTime.value) / 1000);
     pdfUploadElapsedTime.value = formatElapsedTime(elapsed);
   }
@@ -238,19 +301,28 @@ const updateElapsedTime = () => {
 
 // 取消上传
 const handleCancelUpload = () => {
-  if (uploadAbortController.value) {
+  // 如果正在上传，取消上传
+  if (uploadAbortController.value && pdfLoading.value) {
     uploadAbortController.value.abort();
     uploadAbortController.value = null;
+    if (uploadTimer) {
+      clearInterval(uploadTimer);
+      uploadTimer = null;
+    }
+    pdfUploadProgress.value = 0;
+    pdfUploadElapsedTime.value = "";
+    uploadStartTime.value = null;
+    pdfLoading.value = false;
+    ElMessage.info("上传已取消");
+  } else {
+    // 如果未在上传，删除当前选中的文件
+    pdfUploadFile.value = null;
+    pdfUploadFilePath.value = "";
+    pdfUploadProgress.value = 0;
+    pdfUploadElapsedTime.value = "";
+    uploadStartTime.value = null;
+    ElMessage.info("已清除选中文件");
   }
-  if (uploadTimer) {
-    clearInterval(uploadTimer);
-    uploadTimer = null;
-  }
-  pdfUploadProgress.value = 0;
-  pdfUploadElapsedTime.value = "";
-  uploadStartTime.value = null;
-  pdfLoading.value = false;
-  ElMessage.info("上传已取消");
 };
 
 // 上传 PDF 文件
@@ -288,7 +360,7 @@ const handlePdfUpload = async () => {
 
     const response = await uploadPdf(
       file,
-      (progress) => {
+      progress => {
         pdfUploadProgress.value = progress;
         updateElapsedTime();
       },
@@ -324,10 +396,12 @@ const handlePdfUpload = async () => {
     }
   } catch (error: any) {
     // 如果是取消操作，不显示错误
-    if (error.name === 'CanceledError' ||
-      error.code === 'ECONNABORTED' ||
-      error.message?.includes('canceled') ||
-      error.message?.includes('aborted')) {
+    if (
+      error.name === "CanceledError" ||
+      error.code === "ECONNABORTED" ||
+      error.message?.includes("canceled") ||
+      error.message?.includes("aborted")
+    ) {
       // 取消操作已在 handleCancelUpload 中处理，但需要确保清理状态
       if (uploadTimer) {
         clearInterval(uploadTimer);
@@ -345,7 +419,7 @@ const handlePdfUpload = async () => {
     const errorMessage = error.message || "文件上传失败";
     const currentProgress = pdfUploadProgress.value; // 保存当前进度
 
-    if (error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
+    if (error.code === "ERR_NETWORK" || error.message?.includes("Network Error")) {
       ElMessage.error(`网络错误：上传中断。当前进度：${currentProgress}%`);
     } else if (error.response?.status === 413) {
       ElMessage.error("文件太大，超过服务器限制（最大 1000MB）");

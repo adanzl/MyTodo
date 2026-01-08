@@ -18,7 +18,8 @@ const LOCAL_BASE_URL = `http://${LOCAL_IP}:${LOCAL_PORT}`;
 
 // 全局变量：保存 IP 可用性检测结果
 let localIpAvailable: boolean | null = null; // null 表示未检测，true/false 表示检测结果
-let isCheckingIp = false; // 是否正在检测中，避免并发检测
+let checkPromise: Promise<boolean> | null = null; // 保存检测的Promise，避免重复检测
+let initializationComplete = false; // 初始化是否完成
 
 // 检测本地 IP 是否可用（只检测一次）
 async function checkLocalIpAvailable(): Promise<boolean> {
@@ -27,66 +28,100 @@ async function checkLocalIpAvailable(): Promise<boolean> {
     return localIpAvailable;
   }
 
-  // 如果正在检测中，等待检测完成
-  if (isCheckingIp) {
-    // 等待检测完成（最多等待 3 秒）
-    const maxWait = 3000;
-    const startTime = Date.now();
-    while (localIpAvailable === null && Date.now() - startTime < maxWait) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-    return localIpAvailable === true;
+  // 如果正在检测中，返回同一个 Promise
+  if (checkPromise) {
+    return checkPromise;
   }
 
   // 开始检测
-  isCheckingIp = true;
-  try {
-    const url = `http://${LOCAL_IP}:${LOCAL_PORT}/api/health`;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000); // 2秒超时
-
+  checkPromise = (async () => {
     try {
-      await fetch(url, {
-        method: 'GET',
-        signal: controller.signal,
-        mode: 'no-cors', // 避免 CORS 问题
-      });
-      clearTimeout(timeoutId);
-      localIpAvailable = true;
-      logger.info(`Local IP ${LOCAL_IP}:${LOCAL_PORT} is available`);
-      return true;
+      // 检测根路径，任何响应（包括404、500等）都说明服务器在运行
+      const url = `http://${LOCAL_IP}:${LOCAL_PORT}/`;
+      const controller = new AbortController();
+      const TIMEOUT = 200;
+      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT); // 500ms超时
+
+      try {
+        await fetch(url, {
+          method: "HEAD", // 使用HEAD方法更轻量
+          signal: controller.signal,
+          mode: "no-cors", // 避免CORS问题
+        });
+        clearTimeout(timeoutId);
+        // 只要能收到响应就说明服务器可用（no-cors模式下response.ok可能为false）
+        localIpAvailable = true;
+        logger.info(`[API Config] Local IP ${LOCAL_IP}:${LOCAL_PORT} is available`);
+        return true;
+      } catch (error: any) {
+        clearTimeout(timeoutId);
+        // 如果是abort错误说明超时，其他错误说明连接失败
+        localIpAvailable = false;
+        if (error.name === "AbortError") {
+          logger.info(`[API Config] Local IP ${LOCAL_IP}:${LOCAL_PORT} timeout: ${TIMEOUT}ms`);
+        } else {
+          logger.info(
+            `[API Config] Local IP ${LOCAL_IP}:${LOCAL_PORT} is not available:`,
+            error.message
+          );
+        }
+        return false;
+      }
     } catch (error) {
-      clearTimeout(timeoutId);
       localIpAvailable = false;
-      logger.info(`Local IP ${LOCAL_IP}:${LOCAL_PORT} is not available`);
+      logger.warn(`[API Config] Failed to check local IP availability:`, error);
       return false;
     }
-  } catch (error) {
-    localIpAvailable = false;
-    logger.warn(`Failed to check local IP availability:`, error);
-    return false;
-  } finally {
-    isCheckingIp = false;
-  }
+  })();
+
+  return checkPromise;
 }
 
-// 初始化 BASE_URL：优先使用本地 IP，如果不可用再回退到远程 URL
-let BASE_URL = import.meta.env.VITE_API_BASE_URL || LOCAL_BASE_URL;
+// 初始化 BASE_URL：优先使用环境变量，否则先尝试本地IP
+let BASE_URL: string;
 
-// 异步检测本地 IP 是否可用（首次检测）
-checkLocalIpAvailable().then(available => {
-  if (!available && BASE_URL === LOCAL_BASE_URL && !import.meta.env.VITE_API_BASE_URL) {
-    // IP 不可用，切换到远程 URL
-    BASE_URL = REMOTE.url || "http://localhost:8000";
-    const newApiBaseUrl = BASE_URL.endsWith("/api")
-      ? BASE_URL
-      : BASE_URL.endsWith("/")
-        ? `${BASE_URL}api`
-        : `${BASE_URL}/api`;
-    api.defaults.baseURL = newApiBaseUrl;
-    logger.info(`Local IP unavailable, switched to remote URL: ${newApiBaseUrl}`);
-  }
-});
+if (import.meta.env.VITE_API_BASE_URL) {
+  // 如果有环境变量配置，优先使用环境变量
+  BASE_URL = import.meta.env.VITE_API_BASE_URL;
+  logger.info(`[API Config] Using base URL from environment: ${BASE_URL}`);
+  initializationComplete = true;
+} else {
+  // 默认先尝试使用本地IP
+  BASE_URL = LOCAL_BASE_URL;
+  logger.info(`[API Config] Initial base URL (local IP): ${BASE_URL}`);
+
+  // 异步检测本地 IP 是否可用
+  checkLocalIpAvailable()
+    .then(available => {
+      if (!available) {
+        // IP 不可用，切换到远程 URL
+        BASE_URL = REMOTE.url || "http://localhost:8000";
+        const newApiBaseUrl = BASE_URL.endsWith("/api")
+          ? BASE_URL
+          : BASE_URL.endsWith("/")
+            ? `${BASE_URL}api`
+            : `${BASE_URL}/api`;
+        api.defaults.baseURL = newApiBaseUrl;
+        logger.info(`[API Config] Local IP not available, switched to remote: ${newApiBaseUrl}`);
+      } else {
+        logger.info(`[API Config] Local IP available, using: ${LOCAL_BASE_URL}`);
+      }
+      initializationComplete = true;
+    })
+    .catch(error => {
+      // 检测失败，切换到远程 URL
+      logger.error(`[API Config] Error checking local IP:`, error);
+      BASE_URL = REMOTE.url || "http://localhost:8000";
+      const newApiBaseUrl = BASE_URL.endsWith("/api")
+        ? BASE_URL
+        : BASE_URL.endsWith("/")
+          ? `${BASE_URL}api`
+          : `${BASE_URL}/api`;
+      api.defaults.baseURL = newApiBaseUrl;
+      logger.info(`[API Config] Fallback to remote: ${newApiBaseUrl}`);
+      initializationComplete = true;
+    });
+}
 
 // 确保 baseURL 以 /api 结尾
 const API_BASE_URL = BASE_URL.endsWith("/api")
@@ -96,7 +131,9 @@ const API_BASE_URL = BASE_URL.endsWith("/api")
     : `${BASE_URL}/api`;
 
 export function getApiUrl(): string {
-  return BASE_URL;
+  // 从 axios 实例获取最新的 baseURL，去掉 /api 后缀
+  const currentBaseUrl = api.defaults.baseURL || BASE_URL;
+  return currentBaseUrl.replace(/\/api$/, "");
 }
 
 export { API_BASE_URL, BASE_URL as REMOTE_BASE_URL, REMOTE };
@@ -109,11 +146,28 @@ export const api = axios.create({
 
 // 请求拦截器
 api.interceptors.request.use(
-  config => {
+  async config => {
+    // 如果初始化未完成，等待初始化完成
+    if (!initializationComplete) {
+      logger.debug("[API Config] Waiting for initialization to complete...");
+      if (!import.meta.env.VITE_API_BASE_URL) {
+        await checkLocalIpAvailable();
+      }
+      // 等待一小会确保baseURL已更新
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+
+    // 确保使用最新的 baseURL（如果已经被更新）
+    if (api.defaults.baseURL && config.baseURL !== api.defaults.baseURL) {
+      config.baseURL = api.defaults.baseURL;
+      logger.debug(`[API Config] Updated request baseURL to: ${config.baseURL}`);
+    }
+
     // 可以在这里添加请求头、token 等
     logger.debug(
-      "API Request:",
+      "[API Request]",
       config.method?.toUpperCase(),
+      config.baseURL,
       config.url,
       config.params || config.data
     );
@@ -141,36 +195,50 @@ api.interceptors.response.use(
   },
   (error: AxiosError) => {
     // 检查是否是取消的请求，如果是则不处理
-    if (error.code === 'ECONNABORTED' ||
-      error.message?.includes('canceled') ||
-      error.message?.includes('aborted')) {
+    if (
+      error.code === "ECONNABORTED" ||
+      error.message?.includes("canceled") ||
+      error.message?.includes("aborted")
+    ) {
       // 请求已被取消，直接返回，不进行任何重试
       return Promise.reject(error);
     }
 
     // 检查是否是文件上传请求 - 必须在最前面检查，避免任何重试逻辑
-    const isFileUpload = (error.config as any)?._isFileUpload === true ||
+    const isFileUpload =
+      (error.config as any)?._isFileUpload === true ||
       error.config?.data instanceof FormData ||
-      (typeof error.config?.headers?.['Content-Type'] === 'string' &&
-        error.config.headers['Content-Type'].includes('multipart/form-data')) ||
-      error.config?.url?.includes('/pdf/upload') ||
-      error.config?.url?.includes('/upload');
+      (typeof error.config?.headers?.["Content-Type"] === "string" &&
+        error.config.headers["Content-Type"].includes("multipart/form-data")) ||
+      error.config?.url?.includes("/pdf/upload") ||
+      error.config?.url?.includes("/upload");
 
     // 如果是文件上传请求，无论什么错误都不重试，直接拒绝
     if (isFileUpload) {
       logger.warn(`File upload failed, not retrying to avoid re-upload: ${error.config?.url}`, {
         code: error.code,
         message: error.message,
-        status: error.response?.status
+        status: error.response?.status,
       });
       // 直接拒绝，不进行任何后续处理
       return Promise.reject(error);
     }
 
     // 如果使用本地 IP 且请求失败，标记为不可用并切换到远程 URL
-    if (localIpAvailable !== false && BASE_URL === LOCAL_BASE_URL && !import.meta.env.VITE_API_BASE_URL) {
-      if (error.request && !error.response) {
+    if (!import.meta.env.VITE_API_BASE_URL) {
+      // 检查当前是否使用本地IP（通过 baseURL 判断）
+      const currentBaseUrl = api.defaults.baseURL || "";
+      const isUsingLocalIp = currentBaseUrl.includes(LOCAL_IP);
+
+      logger.debug(
+        `[API Error] localIpAvailable: ${localIpAvailable}, isUsingLocalIp: ${isUsingLocalIp}, currentBaseUrl: ${currentBaseUrl}`
+      );
+
+      if (isUsingLocalIp && error.request && !error.response) {
         // 网络错误，标记本地 IP 为不可用
+        logger.warn(
+          `[API Config] Network error with local IP, switching to remote URL. Error: ${error.message}`
+        );
         localIpAvailable = false;
         BASE_URL = REMOTE.url || "http://localhost:8000";
         const newApiBaseUrl = BASE_URL.endsWith("/api")
@@ -179,10 +247,15 @@ api.interceptors.response.use(
             ? `${BASE_URL}api`
             : `${BASE_URL}/api`;
         api.defaults.baseURL = newApiBaseUrl;
-        logger.info(`Local IP unavailable, switched to remote URL: ${newApiBaseUrl}`);
+        logger.info(`[API Config] Switched to remote URL: ${newApiBaseUrl}`);
 
         // 重试当前请求（非文件上传请求）
         if (error.config) {
+          // 确保使用新的 baseURL
+          error.config.baseURL = newApiBaseUrl;
+          logger.info(
+            `[API Config] Retrying request with new baseURL: ${error.config.method?.toUpperCase()} ${newApiBaseUrl}${error.config.url}`
+          );
           return api.request(error.config);
         }
       }
