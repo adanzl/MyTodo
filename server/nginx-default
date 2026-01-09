@@ -1,6 +1,50 @@
+# 更新配置 使用 sudo cp /mnt/data/project/MyTodo/server/nginx-default /etc/nginx/sites-available/default 
+# 重启 nginx: sudo nginx -s reload 
+# Dify 专用服务器配置 - leo-dify.tbit.top
+server {
+    listen 8848;
+    listen 8843 ssl;
+    listen [::]:8848;
+
+    server_name leo-dify.tbit.top;
+
+    # Let's Encrypt SSL 证书配置
+    ssl_certificate /etc/letsencrypt/live/leo-dify.tbit.top/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/leo-dify.tbit.top/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384;
+
+    client_max_body_size 2000m;
+
+    # 所有请求转发到 Dify 服务（9098端口）
+    location / {
+        proxy_pass http://127.0.0.1:9098;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        
+        # 超时设置
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        
+        # CORS 配置
+        add_header 'Access-Control-Allow-Origin' '*' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
+        add_header 'Access-Control-Allow-Headers' 'DNT,X-Mx-ReqToken,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization' always;
+        add_header 'Access-Control-Allow-Credentials' 'true' always;
+    }
+}
+
+# 默认服务器配置 - 其他所有域名
 server {
     listen 8848 default_server;
-    listen 443 ssl;
+    listen 8843 ssl;
     listen [::]:8848 default_server;
 
     root /mnt/data/project/MyTodo/dist;
@@ -202,17 +246,6 @@ server {
         # 超时和缓冲区已通过全局配置继承（proxy_read_timeout 已单独设置）
     }
 
-    location /dify/ {
-        proxy_pass          http://127.0.0.1:9098/;
-        proxy_set_header    Host $host;
-        proxy_set_header    X-Real-IP $remote_addr;
-        proxy_set_header    X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header    X-Forwarded-Proto $scheme;
-        proxy_set_header    X-Forwarded-Prefix /dify;
-        rewrite ^/dify/(.*)$ /$1 break;
-        
-        # 超时和缓冲区已通过全局配置继承
-    }
 
     location /dbgate/ {
         proxy_pass          http://127.0.0.1:8003/;

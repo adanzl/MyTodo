@@ -34,6 +34,10 @@
 
 `sudo nginx -s reload`
 
+> 配置证书
+
+`sudo certbot certonly --nginx --preferred-challenges tls-alpn-01 -d leo-dify.tbit.top -m adanzl@163.com --agree-tos --no-eff-email`
+
 ## 重启 code-server
 
 `sudo systemctl restart code-server@leo`
