@@ -10,7 +10,7 @@
 
 > `sudo systemctl restart my-todo`
 
-> 本地调试 运行main.py
+> 本地调试 运行 main.py
 
 ## 配置 natapp
 
@@ -196,4 +196,4 @@ https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-fro
 | redis         | 6379     | geWechat       |  9101 |
 | cockpit       | 9090     | geWechat       |  9102 |
 | portainer     | 9000     | chrome         |  9103 |
-| redis_insight | 9001     |                |       |
+| redis_insight | 9001     | siyuan_note    |  9104 |

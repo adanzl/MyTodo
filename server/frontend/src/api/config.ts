@@ -39,7 +39,7 @@ async function checkLocalIpAvailable(): Promise<boolean> {
       // 检测根路径，任何响应（包括404、500等）都说明服务器在运行
       const url = `http://${LOCAL_IP}:${LOCAL_PORT}/`;
       const controller = new AbortController();
-      const TIMEOUT = 200;
+      const TIMEOUT = 500;
       const timeoutId = setTimeout(() => controller.abort(), TIMEOUT); // 500ms超时
 
       try {
