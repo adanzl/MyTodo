@@ -13,8 +13,15 @@ const REMOTE = {
 
 // 本地 IP 地址
 const LOCAL_IP = "192.168.50.171";
-const LOCAL_PORT = 8848;
-const LOCAL_BASE_URL = `http://${LOCAL_IP}:${LOCAL_PORT}`;
+const LOCAL_HTTP_PORT = 8848; // HTTP 端口
+const LOCAL_HTTPS_PORT = 8843; // HTTPS 端口
+
+// 本地服务器 URL 配置
+// ✅ 已配置 HTTPS，使用 8843 端口
+const LOCAL_BASE_URL = `https://${LOCAL_IP}:${LOCAL_HTTPS_PORT}`;
+
+// 如果需要切换回 HTTP，使用下面这行
+// const LOCAL_BASE_URL = `http://${LOCAL_IP}:${LOCAL_HTTP_PORT}`;
 
 // 全局变量：保存 IP 可用性检测结果
 let localIpAvailable: boolean | null = null; // null 表示未检测，true/false 表示检测结果
@@ -22,7 +29,8 @@ let localIpAvailable: boolean | null = null; // null 表示未检测，true/fals
 // 检测本地 IP 是否可用
 export async function checkLocalIpAvailable(): Promise<boolean> {
   try {
-    const url = `http://${LOCAL_IP}:${LOCAL_PORT}/`;
+    // 使用 LOCAL_BASE_URL，这样会自动使用正确的协议（http 或 https）
+    const url = `${LOCAL_BASE_URL}/`;
     const controller = new AbortController();
     const TIMEOUT = 500;
     const timeoutId = setTimeout(() => controller.abort(), TIMEOUT); // 500ms超时
@@ -47,6 +55,26 @@ export async function checkLocalIpAvailable(): Promise<boolean> {
 // 切换到本地服务器
 export function switchToLocal(): void {
   if (localIpAvailable === true) return; // 已经是本地了
+
+  // 检测协议兼容性：如果页面是 HTTPS，本地服务器必须也是 HTTPS
+  const isPageHttps = typeof window !== "undefined" && window.location.protocol === "https:";
+  const isLocalHttps = LOCAL_BASE_URL.startsWith("https://");
+
+  if (isPageHttps && !isLocalHttps) {
+    logger.warn(
+      `[API Config] ⚠️ Cannot switch to HTTP local server from HTTPS page. ` +
+        `Mixed Content blocked. Please configure HTTPS for local server or use HTTP to access the page.`
+    );
+    console.warn(
+      `🚫 无法切换到本地服务器！\n` +
+        `原因：当前页面使用 HTTPS，但本地服务器是 HTTP\n` +
+        `解决方案：\n` +
+        `1. 为本地服务器配置 HTTPS (推荐)\n` +
+        `2. 或通过 HTTP 访问前端页面\n` +
+        `详见：/server/setup-local-https.md`
+    );
+    return; // 阻止切换
+  }
 
   localIpAvailable = true;
   const newApiBaseUrl = `${LOCAL_BASE_URL}/api`;
@@ -121,7 +149,19 @@ export function isLocalIpAvailable(): boolean | null {
   return localIpAvailable;
 }
 
-export { API_BASE_URL, BASE_URL as REMOTE_BASE_URL, REMOTE, LOCAL_IP, LOCAL_PORT, LOCAL_BASE_URL };
+// 导出当前使用的端口（用于显示）
+const LOCAL_PORT = LOCAL_BASE_URL.startsWith("https://") ? LOCAL_HTTPS_PORT : LOCAL_HTTP_PORT;
+
+export {
+  API_BASE_URL,
+  BASE_URL as REMOTE_BASE_URL,
+  REMOTE,
+  LOCAL_IP,
+  LOCAL_PORT,
+  LOCAL_HTTP_PORT,
+  LOCAL_HTTPS_PORT,
+  LOCAL_BASE_URL,
+};
 
 // 创建 axios 实例，baseURL 已包含 /api 前缀
 export const api = axios.create({

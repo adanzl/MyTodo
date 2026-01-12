@@ -56,15 +56,23 @@ const checkAndSwitchServer = async () => {
   const currentStatus = isLocalIpAvailable();
 
   if (isAvailable && currentStatus !== true) {
-    // 本地可用且当前不是本地，切换到本地
+    // 本地可用且当前不是本地，尝试切换到本地
     switchToLocal();
-    localIpStatus.value = true;
-    console.log(`[Server Switch] 切换到本地服务器: ${LOCAL_IP}:${LOCAL_PORT}`);
+    // 重新获取状态（switchToLocal 可能因为协议问题没有切换）
+    const newStatus = isLocalIpAvailable();
+    localIpStatus.value = newStatus;
+
+    if (newStatus === true) {
+      console.log(`[Server Switch] ✅ 切换到本地服务器: ${LOCAL_IP}:${LOCAL_PORT}`);
+    } else {
+      // 未能切换（可能是协议不匹配）
+      console.log(`[Server Switch] ⚠️ 检测到本地服务器可用，但因协议不匹配无法切换`);
+    }
   } else if (!isAvailable && currentStatus !== false) {
     // 本地不可用且当前不是远程，切换到远程
     switchToRemote();
     localIpStatus.value = false;
-    console.log("[Server Switch] 切换到远程服务器");
+    console.log("[Server Switch] 🔄 切换到远程服务器");
   } else {
     // 状态未变化，只更新显示
     localIpStatus.value = currentStatus;
