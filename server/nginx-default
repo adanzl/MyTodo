@@ -1,37 +1,6 @@
 # 更新配置 使用 sudo cp /mnt/data/project/MyTodo/server/nginx-default /etc/nginx/sites-available/default 
 # 重启 nginx: sudo nginx -s reload 
 
-# 定义局域网 IP 段（用于自动重定向）
-geo $is_local_network {
-    default 0;
-    192.168.0.0/16 1;      # 局域网 C 类地址
-    10.0.0.0/8 1;          # 局域网 A 类地址
-    172.16.0.0/12 1;       # 局域网 B 类地址
-}
-
-# MyTodo 主域名配置 - leo-zhao.natapp4.cc（内网自动重定向）
-server {
-    listen 8848;
-    listen [::]:8848;
-
-    server_name leo-zhao.natapp4.cc;
-
-    # 内网自动重定向逻辑
-    if ($is_local_network = 1) {
-        set $redirect_port ":8848";
-        return 302 $scheme://192.168.50.171$redirect_port$request_uri;
-    }
-
-    # 外网访问：转发到默认服务器处理（继承所有配置）
-    location / {
-        proxy_pass http://127.0.0.1:8848;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-
 # Dify 专用服务器配置 - leo-dify.tbit.top
 server {
     listen 8848;
