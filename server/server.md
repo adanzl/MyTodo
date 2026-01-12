@@ -184,6 +184,12 @@ https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-fro
         -e VNC_RESOLUTION=1600x900 \
         -d vital987/chrome-novnc:latest
 
+## 自签证书
+
+    sudo mkcert -cert-file /etc/ssl/self-signed/selfsigned.crt \
+             -key-file /etc/ssl/self-signed/selfsigned.key \
+             192.168.50.171 192.168.50.172 localhost 127.0.0.1
+
 ## 服务器端口
 
 | Server        | Port     | Server         |  Port |
