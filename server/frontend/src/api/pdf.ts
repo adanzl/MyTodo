@@ -1,7 +1,7 @@
 /**
  * PDF 相关 API
  */
-import { api } from "./config";
+import { api, getBaseUrl } from "./config";
 import type { ApiResponse } from "@/types/api";
 import type { PdfTask } from "@/types/tools";
 
@@ -44,7 +44,11 @@ export async function uploadPdf(
     },
   };
 
-  const response = await api.post<ApiResponse<{ filename: string }>>("/pdf/upload", formData, config);
+  const response = await api.post<ApiResponse<{ filename: string }>>(
+    "/pdf/upload",
+    formData,
+    config
+  );
   return response.data;
 }
 
@@ -73,11 +77,19 @@ export async function getTaskStatus(task_id: string): Promise<ApiResponse<PdfTas
 
 /**
  * 下载 PDF 文件
+ * 如果本地 IP 可用，会自动使用本地地址，提高下载速度
  */
 export function getPdfDownloadUrl(filename: string, type: "uploaded" | "unlocked"): string {
-  // 使用 api 实例的 baseURL，然后拼接路径
-  const baseURL = api.defaults.baseURL || "";
-  return `${baseURL}/pdf/download/${encodeURIComponent(filename)}?type=${type}`;
+  // 使用 getBaseUrl 获取正确的基础 URL（会根据本地 IP 可用性智能选择）
+  const baseURL = getBaseUrl();
+  const downloadUrl = `${baseURL}/api/pdf/download/${encodeURIComponent(filename)}?type=${type}`;
+
+  // 在开发环境下输出日志，方便调试
+  if (import.meta.env.DEV) {
+    console.log(`[PDF Download] Using baseURL: ${baseURL}, file: ${filename}, type: ${type}`);
+  }
+
+  return downloadUrl;
 }
 
 /**

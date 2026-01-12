@@ -1,7 +1,7 @@
 /**
  * 音频合成相关 API
  */
-import { api } from "./config";
+import { api, getBaseUrl } from "./config";
 import type { ApiResponse } from "@/types/api";
 import type { MediaTask, MediaTaskDetail, MediaTaskFile } from "@/types/tools";
 
@@ -125,11 +125,19 @@ export async function reorderAudioMergeTaskFiles(
 
 /**
  * 获取音频合成任务下载 URL
+ * 如果本地 IP 可用，会自动使用本地地址，提高下载速度
  */
 export function getAudioMergeTaskDownloadUrl(taskId: string): string {
-  // 使用 api 实例的 baseURL，然后拼接路径
-  const baseURL = api.defaults.baseURL || "";
-  return `${baseURL}/media/merge/download?task_id=${taskId}`;
+  // 使用 getBaseUrl 获取正确的基础 URL（会根据本地 IP 可用性智能选择）
+  const baseURL = getBaseUrl();
+  const downloadUrl = `${baseURL}/api/media/merge/download?task_id=${taskId}`;
+
+  // 在开发环境下输出日志，方便调试
+  if (import.meta.env.DEV) {
+    console.log(`[Audio Download] Using baseURL: ${baseURL}, task_id: ${taskId}`);
+  }
+
+  return downloadUrl;
 }
 
 /**
