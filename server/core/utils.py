@@ -123,7 +123,7 @@ def get_media_duration(file_path):
     import shlex
 
     # 使用共享变量存储结果
-    result_container = {'duration': None, 'error': None}
+    result_container = {'duration': None, 'error': None, 'command': None}
 
     def _run_ffprobe_in_thread():
         """在独立线程中运行 ffprobe"""
@@ -133,8 +133,10 @@ def get_media_duration(file_path):
                 tmp_path = tmp_file.name
 
             try:
-                # 构建命令，将输出重定向到临时文件
-                cmd_str = f"/usr/bin/ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 {shlex.quote(file_path)} > {shlex.quote(tmp_path)} 2>&1"
+                # 构建命令，将 stdout 重定向到临时文件，stderr 重定向到 /dev/null 以过滤警告信息
+                # 使用 -v quiet 进一步减少输出，只保留我们需要的时长信息
+                cmd_str = f"/usr/bin/ffprobe -v quiet -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 {shlex.quote(file_path)} > {shlex.quote(tmp_path)} 2>/dev/null"
+                result_container['command'] = cmd_str
 
                 # 使用 os.system 执行命令（返回退出码）
                 returncode = os.system(cmd_str)
@@ -150,19 +152,35 @@ def get_media_duration(file_path):
 
                 # 读取输出（即使返回码非0也尝试读取，因为某些情况下命令可能成功但返回非0）
                 try:
-                    with open(tmp_path, 'r') as f:
+                    with open(tmp_path, 'r', encoding='utf-8', errors='ignore') as f:
                         stdout = f.read().strip()
                 except Exception:
                     stdout = ""
 
                 # 如果输出有效，尝试解析时长（即使返回码非0）
+                # 由于 stderr 已重定向到 /dev/null，输出应该只包含时长值
                 if stdout:
                     try:
+                        # 尝试解析整个输出（通常是单行浮点数）
                         duration = float(stdout)
                         result_container['duration'] = int(duration) if duration else None
                         # 如果成功解析，即使返回码非0也认为成功
                         return
                     except (ValueError, TypeError):
+                        # 如果解析失败，尝试从多行输出中提取（容错处理）
+                        lines = stdout.split('\n')
+                        for line in reversed(lines):  # 从最后一行开始尝试
+                            line = line.strip()
+                            if not line:
+                                continue
+                            try:
+                                duration = float(line)
+                                result_container['duration'] = int(duration) if duration else None
+                                return
+                            except (ValueError, TypeError):
+                                continue
+
+                        # 所有解析方法都失败
                         result_container['error'] = f"Invalid duration value: {stdout}"
                 else:
                     # 没有输出且返回码非0，认为失败
@@ -191,7 +209,8 @@ def get_media_duration(file_path):
 
     # 检查结果
     if result_container['error']:
-        log.warning(f"[Utils] Error getting media duration for {file_path}: {result_container['error']}")
+        cmd_info = f", command: {result_container['command']}" if result_container.get('command') else ""
+        log.warning(f"[Utils] Error getting media duration for {file_path}: {result_container['error']}{cmd_info}")
         return None
 
     return result_container['duration']
@@ -478,12 +497,10 @@ def get_unique_filepath(directory: str, base_name: str, extension: str) -> str:
     return file_path
 
 
-def run_subprocess_safe(
-    cmd: List[str],
-    timeout: float = 30.0,
-    env: Optional[Dict[str, str]] = None,
-    cwd: Optional[str] = None
-) -> Tuple[int, str, str]:
+def run_subprocess_safe(cmd: List[str],
+                        timeout: float = 30.0,
+                        env: Optional[Dict[str, str]] = None,
+                        cwd: Optional[str] = None) -> Tuple[int, str, str]:
     """
     在线程中安全地运行 subprocess，避免 gevent 与 asyncio 冲突
     
@@ -502,49 +519,43 @@ def run_subprocess_safe(
     """
     result_queue = queue.Queue()
     error_queue = queue.Queue()
-    
+
     def _run():
         """在线程中使用 os.system + 临时文件运行命令，完全避免 gevent 的 subprocess patch"""
         try:
             _run_with_os_system(cmd, timeout, env, cwd, result_queue, error_queue)
         except Exception as e:
             error_queue.put(e)
-    
+
     # 在独立线程中运行
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()
     thread.join(timeout=timeout + 5)  # 给一些额外时间
-    
+
     # 检查线程是否还在运行（超时）
     if thread.is_alive():
         error_queue.put(TimeoutError(f"命令执行超时: {' '.join(cmd)}"))
-    
+
     # 检查是否有错误
     if not error_queue.empty():
         error = error_queue.get()
         raise error
-    
+
     # 检查是否有结果
     if result_queue.empty():
         raise TimeoutError(f"命令执行超时或进程异常退出: {' '.join(cmd)}")
-    
+
     return result_queue.get()
 
 
-def _run_with_os_system(
-    cmd_list: List[str],
-    timeout_val: float,
-    env_dict: Optional[Dict[str, str]],
-    cwd_path: Optional[str],
-    result_q: queue.Queue,
-    error_q: queue.Queue
-) -> None:
+def _run_with_os_system(cmd_list: List[str], timeout_val: float, env_dict: Optional[Dict[str, str]],
+                        cwd_path: Optional[str], result_q: queue.Queue, error_q: queue.Queue) -> None:
     """使用 os.system + 临时文件的降级方案"""
     # 创建临时文件用于捕获输出
     stdout_path = None
     stderr_path = None
     returncode_path = None
-    
+
     try:
         # 创建临时文件
         with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.stdout') as tmp_stdout:
@@ -553,21 +564,21 @@ def _run_with_os_system(
             stderr_path = tmp_stderr.name
         with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.returncode') as tmp_rc:
             returncode_path = tmp_rc.name
-        
+
         # 构建并执行命令
         shell_cmd = _build_shell_command(cmd_list, env_dict, cwd_path, stdout_path, stderr_path, returncode_path)
         returncode = _execute_with_timeout(shell_cmd, timeout_val, cmd_list, error_q)
-        
+
         if returncode is None:  # 超时或出错
             return
-        
+
         # 读取返回码和输出
         final_returncode = _read_returncode(returncode_path, returncode)
         stdout = _read_file_safe(stdout_path)
         stderr = _read_file_safe(stderr_path)
-        
+
         result_q.put((final_returncode, stdout, stderr))
-        
+
     except Exception as e:
         error_q.put(e)
     finally:
@@ -575,93 +586,66 @@ def _run_with_os_system(
         _cleanup_temp_files([stdout_path, stderr_path, returncode_path])
 
 
-def _build_shell_command(
-    cmd_list: List[str],
-    env_dict: Optional[Dict[str, str]],
-    cwd_path: Optional[str],
-    stdout_path: str,
-    stderr_path: str,
-    returncode_path: str
-) -> str:
+def _build_shell_command(cmd_list: List[str], env_dict: Optional[Dict[str, str]], cwd_path: Optional[str],
+                         stdout_path: str, stderr_path: str, returncode_path: str) -> str:
     """构建 shell 命令字符串"""
     quoted_cmd = ' '.join(shlex.quote(arg) for arg in cmd_list)
-    
+
     if sys.platform == 'win32':
         return _build_windows_command(quoted_cmd, env_dict, cwd_path, stdout_path, stderr_path, returncode_path)
     else:
         return _build_unix_command(quoted_cmd, env_dict, cwd_path, stdout_path, stderr_path, returncode_path)
 
 
-def _build_windows_command(
-    quoted_cmd: str,
-    env_dict: Optional[Dict[str, str]],
-    cwd_path: Optional[str],
-    stdout_path: str,
-    stderr_path: str,
-    returncode_path: str
-) -> str:
+def _build_windows_command(quoted_cmd: str, env_dict: Optional[Dict[str, str]], cwd_path: Optional[str],
+                           stdout_path: str, stderr_path: str, returncode_path: str) -> str:
     """构建 Windows 命令"""
     full_cmd_parts = []
-    
+
     if cwd_path:
         full_cmd_parts.append(f'cd /d {shlex.quote(cwd_path)}')
-    
+
     # 设置环境变量（Windows）
     if env_dict:
         for k, v in env_dict.items():
             # 使用引号包裹值，防止特殊字符问题
             full_cmd_parts.append(f'set {k}={shlex.quote(v)}')
-    
+
     # 执行命令并重定向输出
-    full_cmd_parts.append(
-        f'{quoted_cmd} > {shlex.quote(stdout_path)} 2> {shlex.quote(stderr_path)}'
-    )
-    
+    full_cmd_parts.append(f'{quoted_cmd} > {shlex.quote(stdout_path)} 2> {shlex.quote(stderr_path)}')
+
     # 捕获返回码
     full_cmd_parts.append(
-        f'&& echo 0 > {shlex.quote(returncode_path)} || echo %ERRORLEVEL% > {shlex.quote(returncode_path)}'
-    )
-    
+        f'&& echo 0 > {shlex.quote(returncode_path)} || echo %ERRORLEVEL% > {shlex.quote(returncode_path)}')
+
     full_cmd = ' && '.join(full_cmd_parts)
     return f'cmd /c "{full_cmd}"'
 
 
-def _build_unix_command(
-    quoted_cmd: str,
-    env_dict: Optional[Dict[str, str]],
-    cwd_path: Optional[str],
-    stdout_path: str,
-    stderr_path: str,
-    returncode_path: str
-) -> str:
+def _build_unix_command(quoted_cmd: str, env_dict: Optional[Dict[str, str]], cwd_path: Optional[str], stdout_path: str,
+                        stderr_path: str, returncode_path: str) -> str:
     """构建 Unix 命令"""
     # 构建环境变量部分
     env_cmd = ''
     if env_dict:
         env_parts = [f'{k}={shlex.quote(v)}' for k, v in env_dict.items()]
         env_cmd = 'env ' + ' '.join(env_parts) + ' '
-    
+
     # 构建工作目录部分
     cd_cmd = f'cd {shlex.quote(cwd_path)} && ' if cwd_path else ''
-    
+
     # 使用子shell确保返回码正确
-    full_cmd = (
-        f'{cd_cmd}({env_cmd}{quoted_cmd} > {shlex.quote(stdout_path)} '
-        f'2> {shlex.quote(stderr_path)}); echo $? > {shlex.quote(returncode_path)}'
-    )
-    
+    full_cmd = (f'{cd_cmd}({env_cmd}{quoted_cmd} > {shlex.quote(stdout_path)} '
+                f'2> {shlex.quote(stderr_path)}); echo $? > {shlex.quote(returncode_path)}')
+
     return f'sh -c {shlex.quote(full_cmd)}'
 
 
-def _execute_with_timeout(
-    shell_cmd: str,
-    timeout_val: float,
-    cmd_list: List[str],
-    error_q: queue.Queue
-) -> Optional[int]:
+def _execute_with_timeout(shell_cmd: str, timeout_val: float, cmd_list: List[str],
+                          error_q: queue.Queue) -> Optional[int]:
     """使用线程执行命令并实现超时控制"""
     system_result = {'returncode': None, 'done': False, 'exception': None}
-    
+
     def run_cmd():
         try:
             system_result['returncode'] = os.system(shell_cmd)
@@ -669,19 +653,19 @@ def _execute_with_timeout(
         except Exception as e:
             system_result['exception'] = e
             system_result['done'] = True
-    
+
     cmd_thread = threading.Thread(target=run_cmd, daemon=True)
     cmd_thread.start()
     cmd_thread.join(timeout=timeout_val)
-    
+
     if system_result['exception']:
         error_q.put(system_result['exception'])
         return None
-    
+
     if not system_result['done']:
         error_q.put(TimeoutError(f"命令执行超时: {' '.join(cmd_list)}"))
         return None
-    
+
     return system_result['returncode']
 
 
@@ -695,14 +679,14 @@ def _read_returncode(returncode_path: Optional[str], system_returncode: Optional
                     return int(returncode_str)
         except Exception:
             pass
-    
+
     # 降级：使用 os.system 的返回值
     if system_returncode is not None:
         if sys.platform == 'win32':
             return system_returncode
         else:
             return system_returncode >> 8 if system_returncode else 0
-    
+
     return 0
 
 
@@ -710,7 +694,7 @@ def _read_file_safe(file_path: Optional[str]) -> str:
     """安全地读取文件内容"""
     if not file_path:
         return ''
-    
+
     try:
         with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
             return f.read()
