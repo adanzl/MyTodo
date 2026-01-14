@@ -85,11 +85,13 @@ class AILocal:
     def get_chat_messages(conversation_id, limit, user, first_id=None):
         try:
             payload = {
-                "first_id": first_id,
                 "conversation_id": conversation_id,
                 "user": user,
                 "limit": limit,
             }
+            # 只有当 first_id 不为 None 且不为空字符串时才添加到参数中
+            if first_id:
+                payload["first_id"] = first_id
             with requests.get(
                     f"{API_URL}/messages",
                     headers=HEADERS,
