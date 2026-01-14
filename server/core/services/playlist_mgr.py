@@ -821,19 +821,29 @@ class PlaylistMgr:
 
     def stop(self, id: str) -> tuple[int, str]:
         """停止播放"""
+        p_name = self._playlist_raw.get(id, {}).get("name", "未知播放列表")
+        log.info(f"[PlaylistMgr] 停止播放: {id} - {p_name}")
+
         playlist_data, code, msg = self._validate_playlist(id)
         if code != 0:
+            log.warning(f"[PlaylistMgr] 停止播放失败 - 验证失败: {id} - {p_name}, {msg}")
             return code, msg
 
         device_obj = self._device_map.get(id)
         if device_obj is None:
+            log.warning(f"[PlaylistMgr] 停止播放失败 - 设备不存在: {id} - {p_name}")
             return -1, "设备不存在或未初始化"
 
         # 清理所有播放状态
         self._cleanup_play_state(id)
 
         # 停止播放
-        return device_obj["obj"].stop()
+        code, msg = device_obj["obj"].stop()
+        if code == 0:
+            log.info(f"[PlaylistMgr] 停止播放成功: {id} - {p_name}")
+        else:
+            log.error(f"[PlaylistMgr] 停止播放失败 - 设备停止失败: {id} - {p_name}, {msg}")
+        return code, msg
 
     def trigger_button(self, button: str, action: str) -> tuple[int, str]:
         """
@@ -999,15 +1009,43 @@ class PlaylistMgr:
         job_id = f"playlist_duration_timer_{id}"
         p_name = self._playlist_raw.get(id, {}).get("name", "未知播放列表")
 
-        if scheduler.get_job(job_id):
+        # 检查并清理已存在的定时器（包括过期的定时器）
+        existing_job = scheduler.get_job(job_id)
+        if existing_job:
+            # 检查定时器是否已过期（执行时间已过去）
+            if hasattr(existing_job, 'next_run_time') and existing_job.next_run_time:
+                from datetime import datetime
+                if existing_job.next_run_time < datetime.now():
+                    log.warning(f"[PlaylistMgr] 发现过期的播放列表时长定时器，清理: {id} - {p_name}, 过期时间: {existing_job.next_run_time}")
+                else:
+                    log.info(f"[PlaylistMgr] 移除已存在的播放列表时长定时器: {id} - {p_name}, 原执行时间: {existing_job.next_run_time}")
             scheduler.remove_job(job_id)
 
         def stop_playlist_task(pid=id):
             p_name = self._playlist_raw.get(pid, {}).get("name", "未知播放列表")
             log.info(f"[PlaylistMgr] 播放列表时长定时器触发: {pid} - {p_name}")
-            self._clear_timer(pid, self._playlist_duration_timers, "playlist_duration_timer_")
-            self._scheduled_play_start_times.pop(pid, None)
-            self.stop(pid)
+            try:
+                # 检查播放列表是否还在播放中，如果不在播放中，说明已经被手动停止或已经停止，直接清理定时器即可
+                if pid not in self._playing_playlists:
+                    log.info(f"[PlaylistMgr] 播放列表时长定时器触发时播放列表已不在播放中，仅清理定时器: {pid} - {p_name}")
+                    self._clear_timer(pid, self._playlist_duration_timers, "playlist_duration_timer_")
+                    self._clear_timer(pid, self._file_timers, "playlist_file_timer_")
+                    self._scheduled_play_start_times.pop(pid, None)
+                    return
+
+                # 先清理定时器
+                self._clear_timer(pid, self._playlist_duration_timers, "playlist_duration_timer_")
+                self._clear_timer(pid, self._file_timers, "playlist_file_timer_")
+                self._scheduled_play_start_times.pop(pid, None)
+
+                # 停止播放
+                code, msg = self.stop(pid)
+                if code == 0:
+                    log.info(f"[PlaylistMgr] 播放列表时长定时器停止播放成功: {pid} - {p_name}")
+                else:
+                    log.error(f"[PlaylistMgr] 播放列表时长定时器停止播放失败: {pid} - {p_name}, {msg}")
+            except Exception as e:
+                log.error(f"[PlaylistMgr] 播放列表时长定时器执行异常: {pid} - {p_name}, {e}", exc_info=True)
 
         # 使用 DateTrigger 在指定时间后执行
         run_date = datetime.datetime.now() + timedelta(minutes=duration_minutes)
