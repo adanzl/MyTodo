@@ -4,7 +4,11 @@
  */
 import { type Ref } from "vue";
 import { ElMessage } from "element-plus";
-import { bluetoothAction } from "@/api/bluetooth";
+import {
+  bluetoothAction,
+  scanMiDevices as apiScanMiDevices,
+  scanDlnaDevices as apiScanDlnaDevices,
+} from "@/api/devices";
 import { api } from "@/api/config";
 import { logAndNoticeError } from "@/utils/error";
 import type { BluetoothDevice, DlnaDevice, MiDevice, AgentDevice } from "@/types/device";
@@ -90,14 +94,12 @@ export function useDeviceManagement(
   const scanDlnaDevices = async () => {
     try {
       dlnaScanning.value = true;
-      const response = await api.get("/dlna/scan", {
-        params: { timeout: 5 },
-      });
-      if (response.data.code === 0) {
-        dlnaDeviceList.value = response.data.data || [];
+      const result = await apiScanDlnaDevices(5);
+      if (result.code === 0) {
+        dlnaDeviceList.value = (result.data || []) as DlnaDevice[];
         ElMessage.success(`扫描到 ${dlnaDeviceList.value.length} 个 DLNA 设备`);
       } else {
-        ElMessage.error(response.data.msg || "扫描 DLNA 设备失败");
+        ElMessage.error(result.msg || "扫描 DLNA 设备失败");
       }
     } catch (error) {
       logAndNoticeError(error as Error, "扫描 DLNA 设备失败");
@@ -139,12 +141,13 @@ export function useDeviceManagement(
   const scanMiDevices = async () => {
     try {
       miScanning.value = true;
-      const response = await api.get("/mi/scan", {
-        params: { timeout: 5 },
-      });
+      const result = await apiScanMiDevices(5);
 
-      if (response.data.code === 0) {
-        const devices = (response.data.data || []).map((device: Partial<MiDevice>) => ({
+      if (result.code === 0) {
+        const dataArray = (result.data || []) as Partial<MiDevice>[];
+        const devices: MiDevice[] = dataArray.map((device: Partial<MiDevice>) => ({
+          name: device.name || "",
+          address: device.address || "",
           ...device,
           volume: undefined,
           _volumeChanging: false,
@@ -158,7 +161,7 @@ export function useDeviceManagement(
 
         ElMessage.success(`扫描到 ${devices.length} 个小米设备`);
       } else {
-        ElMessage.error(response.data.msg || "扫描小米设备失败");
+        ElMessage.error(result.msg || "扫描小米设备失败");
       }
     } catch (error) {
       logAndNoticeError(error as Error, "扫描小米设备失败");

@@ -92,6 +92,12 @@ server/
 │   ├── log_config.py       # 日志配置
 │   └── utils.py            # 工具函数
 ├── frontend/               # 前端项目（Vue + Vite）
+│   └── src/
+│       ├── api/           # API 接口
+│       │   ├── devices.ts # 设备相关 API（蓝牙、小米、DLNA）
+│       │   ├── config.ts  # API 配置
+│       │   └── ...        # 其他 API 模块
+│       └── ...
 ├── static/                 # 静态文件目录
 ├── templates/             # HTML 模板
 ├── logs/                  # 日志目录
@@ -171,6 +177,7 @@ server/
 #### 小米设备
 
 - 扫描小米设备
+- 获取设备状态（包含音量和播放状态）
 - 控制小米设备音量
 - 停止小米设备播放
 
@@ -228,12 +235,13 @@ server/
 
 - **目录浏览**: 支持目录浏览和文件列表
 - **文件信息**: 支持获取文件详细信息
-- **媒体时长**: 支持获取媒体文件时长
+- **媒体时长**: 支持获取媒体文件时长（使用 ffprobe，支持处理警告信息）
 - **路径安全**: 支持路径安全检查和限制
 
 **相关文件**:
 
 - `core/api/routes.py` - 文件相关路由
+- `core/utils.py` - 工具函数（包含 `get_media_duration`）
 
 ### 10. 用户积分系统
 
@@ -305,7 +313,9 @@ server/
 #### 小米设备
 
 - `GET /api/mi/scan` - 扫描小米设备
-- `GET /api/mi/volume` - 获取/设置小米设备音量
+- `GET /api/mi/status` - 获取小米设备状态（包含音量和播放状态）
+- `GET /api/mi/volume` - 获取小米设备音量
+- `POST /api/mi/volume` - 设置小米设备音量
 - `POST /api/mi/stop` - 停止小米设备播放
 
 ### PDF 接口
@@ -479,6 +489,34 @@ sudo systemctl enable my-todo
 - 使用 Python 类型提示
 - 统一的错误处理和日志记录
 - RESTful API 设计
+
+## 📦 前端 API 结构
+
+### 设备 API 统一管理
+
+所有设备相关的 API 已统一整合到 `frontend/src/api/devices.ts`：
+
+- **蓝牙设备**: `bluetoothAction()` - 蓝牙操作接口
+- **小米设备**:
+  - `scanMiDevices()` - 扫描设备
+  - `getMiDeviceStatus()` - 获取设备状态（包含音量和播放状态）
+  - `setMiDeviceVolume()` - 设置音量
+  - `stopMiDevice()` - 停止播放
+- **DLNA 设备**:
+  - `scanDlnaDevices()` - 扫描设备
+  - `getDlnaDeviceVolume()` - 获取音量
+  - `setDlnaDeviceVolume()` - 设置音量
+  - `stopDlnaDevice()` - 停止播放
+
+### 其他 API 模块
+
+- `api/config.ts` - API 配置和基础请求封装
+- `api/common.ts` - 通用 API
+- `api/user.ts` - 用户相关 API
+- `api/playlist.ts` - 播放列表 API
+- `api/audioMerge.ts` - 音频合成 API
+- `api/pdf.ts` - PDF 处理 API
+- `api/cron.ts` - 定时任务 API
 
 ---
 

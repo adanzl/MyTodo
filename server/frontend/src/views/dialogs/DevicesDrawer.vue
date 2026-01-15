@@ -314,26 +314,31 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="功能" min-width="200">
+            <el-table-column label="功能" min-width="250">
               <template #default="{ row }">
                 <div class="flex flex-col gap-2">
                   <div class="flex items-center gap-2">
-                    <span class="text-gray-600 inline-block w-11 flex-shrink-0">音量：</span>
-                    <span class="text-gray-800 w-5">
-                      {{ row.volume !== undefined ? row.volume : "-" }}
-                    </span>
+                    <span class="text-gray-600 inline-block w-11 flex-shrink-0">状态：</span>
+                    <el-tag
+                      v-if="row.status?.state"
+                      :type="row.status.state === 'PLAYING' ? 'success' : 'info'"
+                      size="small"
+                    >
+                      {{ row.status.state === "PLAYING" ? "播放中" : "已停止" }}
+                    </el-tag>
+                    <span v-else class="text-gray-400">-</span>
                     <el-button
                       size="small"
                       type="info"
                       plain
                       circle
-                      @click="getMiDeviceVolume(row)"
-                      :loading="row._volumeRefreshing"
-                      :disabled="row._volumeRefreshing || row._volumeChanging"
-                      title="刷新音量"
+                      @click="getMiDeviceStatus(row)"
+                      :loading="row._statusRefreshing"
+                      :disabled="row._statusRefreshing || row._volumeChanging"
+                      title="刷新状态"
                       class="p-0.5 !w-[17px] !h-[17px]"
                     >
-                      <el-icon v-if="!row._volumeRefreshing"><Refresh /></el-icon>
+                      <el-icon v-if="!row._statusRefreshing"><Refresh /></el-icon>
                     </el-button>
                     <el-button
                       size="small"
@@ -349,6 +354,10 @@
                     </el-button>
                   </div>
                   <div class="flex items-center gap-2">
+                    <span class="text-gray-600 inline-block w-11 flex-shrink-0">音量：</span>
+                    <span class="text-gray-800 w-5">
+                      {{ row.volume !== undefined ? row.volume : "-" }}
+                    </span>
                     <el-slider
                       :model-value="row.volume ?? 0"
                       @input="(val: number) => (row.volume = val)"
@@ -357,7 +366,7 @@
                       :max="100"
                       :step="1"
                       :disabled="
-                        row._volumeChanging || row._volumeRefreshing || row.volume === undefined
+                        row._volumeChanging || row._statusRefreshing || row.volume === undefined
                       "
                       size="small"
                       class="flex-1 max-w-[200px]"
@@ -384,7 +393,17 @@ import { Refresh, Cpu, Loading } from "@element-plus/icons-vue";
 import { api } from "@/api/config";
 import { logAndNoticeError } from "@/utils";
 import { DEVICE_SCAN_TIMEOUT, AGENT_LIST_REFRESH_INTERVAL } from "@/constants/device";
-import { bluetoothAction } from "@/api/bluetooth";
+import {
+  bluetoothAction,
+  scanMiDevices as apiScanMiDevices,
+  getMiDeviceStatus as apiGetMiDeviceStatus,
+  setMiDeviceVolume as apiSetMiDeviceVolume,
+  stopMiDevice as apiStopMiDevice,
+  scanDlnaDevices as apiScanDlnaDevices,
+  getDlnaDeviceVolume as apiGetDlnaDeviceVolume,
+  setDlnaDeviceVolume as apiSetDlnaDeviceVolume,
+  stopDlnaDevice as apiStopDlnaDevice,
+} from "@/api/devices";
 import type { MiDevice, AgentDevice, DlnaDevice, BluetoothDevice } from "@/types/device/device";
 
 interface Props {
@@ -682,8 +701,9 @@ const initMiDeviceState = (device: Partial<MiDevice>): MiDevice => {
   return {
     ...device,
     volume: undefined,
+    status: undefined,
     _volumeChanging: false,
-    _volumeRefreshing: false,
+    _statusRefreshing: false,
   } as MiDevice;
 };
 
@@ -691,19 +711,16 @@ const initMiDeviceState = (device: Partial<MiDevice>): MiDevice => {
 const scanMiDevices = async () => {
   try {
     miScanning.value = true;
-    const response = await api.get("/mi/scan", {
-      params: { timeout: DEVICE_SCAN_TIMEOUT },
-    });
-    const result = response.data;
+    const result = await apiScanMiDevices(DEVICE_SCAN_TIMEOUT);
 
     if (result?.code === 0) {
-      const devices = (result.data || []).map((device: Partial<MiDevice>) =>
-        initMiDeviceState(device)
+      const devices = ((result.data || []) as Partial<MiDevice>[]).map(
+        (device: Partial<MiDevice>) => initMiDeviceState(device)
       );
       miDeviceList.value = devices;
 
-      // 并行获取所有设备的音量
-      await Promise.allSettled(devices.map((device: MiDevice) => getMiDeviceVolume(device)));
+      // 并行获取所有设备的状态（包含音量和播放状态）
+      await Promise.allSettled(devices.map((device: MiDevice) => getMiDeviceStatus(device)));
 
       ElMessage.success(`扫描到 ${devices.length} 个小米设备`);
     } else {
@@ -716,33 +733,38 @@ const scanMiDevices = async () => {
   }
 };
 
-// 获取小米设备音量
-const getMiDeviceVolume = async (device: MiDevice) => {
+// 获取小米设备状态（包含音量和播放状态）
+const getMiDeviceStatus = async (device: MiDevice) => {
   const deviceId = getMiDeviceId(device);
   if (!deviceId) return;
 
   const targetDevice = miDeviceList.value.find(d => getMiDeviceId(d) === deviceId);
   if (!targetDevice) return;
 
-  targetDevice._volumeRefreshing = true;
+  targetDevice._statusRefreshing = true;
 
   try {
-    const response = await api.get("/mi/volume", {
-      params: { device_id: deviceId },
-    });
-    const result = response.data;
+    const result = await apiGetMiDeviceStatus(deviceId);
 
     if (result?.code === 0) {
-      targetDevice.volume = result.data?.volume ?? result.data ?? undefined;
+      // 更新状态信息
+      targetDevice.status = result.data;
+      // 从状态中提取音量
+      if (result.data?.volume !== undefined) {
+        targetDevice.volume = result.data.volume;
+      }
     } else {
       const deviceName = targetDevice.name || deviceId;
-      ElMessage.error(result?.msg || `获取设备 ${deviceName} 音量失败`);
+      logAndNoticeError(
+        new Error(result?.msg || `获取设备 ${deviceName} 状态失败`),
+        `获取设备 ${deviceName} 状态失败`
+      );
     }
   } catch (error) {
     const deviceName = targetDevice.name || deviceId;
-    logAndNoticeError(error as Error, `获取设备 ${deviceName} 音量失败`);
+    logAndNoticeError(error as Error, `获取设备 ${deviceName} 状态失败`);
   } finally {
-    targetDevice._volumeRefreshing = false;
+    targetDevice._statusRefreshing = false;
   }
 };
 
@@ -758,11 +780,7 @@ const setMiDeviceVolume = async (device: MiDevice, volume: number) => {
   device._volumeChanging = true;
 
   try {
-    const response = await api.post("/mi/volume", {
-      device_id: deviceId,
-      volume: clampedVolume,
-    });
-    const result = response.data;
+    const result = await apiSetMiDeviceVolume(deviceId, clampedVolume);
 
     if (result?.code === 0) {
       device.volume = clampedVolume;
@@ -787,10 +805,7 @@ const handleStopMiDevice = async (device: MiDevice) => {
 
   try {
     device._stopping = true;
-    const response = await api.post("/mi/stop", {
-      device_id: deviceId,
-    });
-    const result = response.data;
+    const result = await apiStopMiDevice(deviceId);
 
     if (result?.code === 0) {
       ElMessage.success("停止播放成功");
@@ -824,15 +839,11 @@ const initDlnaDeviceState = (device: Partial<DlnaDevice>): DlnaDevice => {
 const scanDlnaDevices = async () => {
   try {
     dlnaScanning.value = true;
-    const response = await api.get("/dlna/scan", {
-      params: { timeout: DEVICE_SCAN_TIMEOUT },
-    });
-    const result = response.data;
+    const result = await apiScanDlnaDevices(DEVICE_SCAN_TIMEOUT);
 
     if (result?.code === 0) {
-      const devices = (result.data || []).map((device: Partial<DlnaDevice>) =>
-        initDlnaDeviceState(device)
-      );
+      const dataArray = (result.data || []) as Partial<DlnaDevice>[];
+      const devices = dataArray.map((device: Partial<DlnaDevice>) => initDlnaDeviceState(device));
       dlnaDeviceList.value = devices;
 
       // 并行获取所有设备的音量
@@ -860,10 +871,7 @@ const getDlnaDeviceVolume = async (device: DlnaDevice) => {
   targetDevice._volumeRefreshing = true;
 
   try {
-    const response = await api.get("/dlna/volume", {
-      params: { location: location },
-    });
-    const result = response.data;
+    const result = await apiGetDlnaDeviceVolume(location);
 
     if (result?.code === 0) {
       targetDevice.volume = result.data?.volume ?? result.data ?? undefined;
@@ -891,11 +899,7 @@ const setDlnaDeviceVolume = async (device: DlnaDevice, volume: number) => {
   device._volumeChanging = true;
 
   try {
-    const response = await api.post("/dlna/volume", {
-      location: location,
-      volume: clampedVolume,
-    });
-    const result = response.data;
+    const result = await apiSetDlnaDeviceVolume(location, clampedVolume);
 
     if (result?.code === 0) {
       device.volume = clampedVolume;
@@ -920,10 +924,7 @@ const handleStopDlnaDevice = async (device: DlnaDevice) => {
 
   try {
     device._stopping = true;
-    const response = await api.post("/dlna/stop", {
-      location: location,
-    });
-    const result = response.data;
+    const result = await apiStopDlnaDevice(location);
 
     if (result?.code === 0) {
       ElMessage.success("停止播放成功");

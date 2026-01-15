@@ -5,7 +5,7 @@ export * from "./config";
 export * from "./common";
 export * from "./user";
 export * from "./rds";
-export * from "./bluetooth";
+export * from "./devices";
 export * from "./audioMerge";
 export * from "./playlist";
 export * from "./cron";

@@ -82,6 +82,40 @@ export interface DlnaDevice extends BaseDevice {
 }
 
 /**
+ * 小米设备播放状态
+ */
+export interface MiDeviceStatus {
+  /**
+   * 播放状态：PLAYING（播放中）、STOPPED（已停止）
+   */
+  state?: "PLAYING" | "STOPPED";
+  /**
+   * 状态码：OK、ERROR
+   */
+  status?: "OK" | "ERROR";
+  /**
+   * 当前曲目索引（从1开始）
+   */
+  track?: number;
+  /**
+   * 总时长，格式如 "00:03:45"
+   */
+  duration?: string;
+  /**
+   * 已播放时长，格式如 "00:01:30"
+   */
+  position?: string;
+  /**
+   * 音量（0-100）
+   */
+  volume?: number;
+  /**
+   * 错误信息
+   */
+  error?: string;
+}
+
+/**
  * 小米设备
  */
 export interface MiDevice extends BaseDevice {
@@ -102,13 +136,17 @@ export interface MiDevice extends BaseDevice {
    */
   volume?: number;
   /**
+   * 播放状态
+   */
+  status?: MiDeviceStatus;
+  /**
    * 是否正在改变音量（内部状态）
    */
   _volumeChanging?: boolean;
   /**
-   * 是否正在刷新音量（内部状态）
+   * 是否正在刷新状态（内部状态）
    */
-  _volumeRefreshing?: boolean;
+  _statusRefreshing?: boolean;
   /**
    * 是否正在停止（内部状态）
    */

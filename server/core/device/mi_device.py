@@ -91,9 +91,15 @@ class MiDevice:
         username = username or DEFAULT_MI_USERNAME
         password = password or DEFAULT_MI_PASSWORD
 
+        # 验证账号密码是否设置
+        if not username or not password:
+            error_msg = "小米账号或密码未设置，请设置环境变量 MI_USER 和 MI_PASS"
+            log.error(f"[MiDevice] {error_msg}")
+            return []
+
         try:
             MiDevice.scanning = True
-            log.info(f"[MiDevice] Starting scan")
+            log.info(f"[MiDevice] Starting scan with username: {username[:3]}***")
             async with ClientSession() as session:
                 account = MiAccount(
                     session,
@@ -114,7 +120,13 @@ class MiDevice:
             if isinstance(e, gevent.exceptions.LoopExit):
                 log.warning(f"[MiDevice] Scan: gevent LoopExit (可忽略)")
                 return []
-            log.error(f"[MiDevice] Scan error: {e}")
+
+            # 检查是否是登录失败
+            error_str = str(e)
+            if "Login failed" in error_str or "登录验证失败" in error_str or "70016" in error_str:
+                log.error(f"[MiDevice] 登录验证失败，请检查账号密码是否正确。错误: {e}")
+            else:
+                log.error(f"[MiDevice] Scan error: {e}")
             return []
         finally:
             MiDevice.scanning = False
@@ -152,6 +164,12 @@ class MiDevice:
                     except Exception as e2:
                         log.error(f"[MiDevice] Play retry error: {e2}")
                         return -1, f"播放失败: {str(e2)}"
+
+                error_str = str(e)
+                if "Login failed" in error_str or "登录验证失败" in error_str or "70016" in error_str:
+                    log.error(f"[MiDevice] 登录验证失败，请检查账号密码是否正确: {e}")
+                    return -1, "登录验证失败，请检查账号密码是否正确"
+
                 log.error(f"[MiDevice] Play error: {e}")
                 return -1, f"播放失败: {str(e)}"
             finally:
@@ -186,6 +204,10 @@ class MiDevice:
                 await mina_service.player_stop(self.device_id)
                 return 0, "ok"
             except Exception as e:
+                error_str = str(e)
+                if "Login failed" in error_str or "登录验证失败" in error_str or "70016" in error_str:
+                    log.error(f"[MiDevice] 登录验证失败，请检查账号密码是否正确: {e}")
+                    return -1, "登录验证失败，请检查账号密码是否正确"
                 log.error(f"[MiDevice] Stop error: {e}")
                 return -1, f"停止失败: {str(e)}"
             finally:
@@ -215,7 +237,8 @@ class MiDevice:
                 if ret['code'] != 0:
                     return -1, {"error": ret['message']}
                 info = json.loads(ret['data']['info'])
-                state = 'STOPPED' if info.get('status') == 1 else 'PLAYING'
+                state = 'STOPPED' if info.get('status') == 2 else 'PLAYING'
+                state_code = info.get('status')
                 volume = info.get('volume', 0)  # 获取音量，确保始终有音量值
 
                 # 安全访问 play_song_detail，如果不存在或为空则返回基本状态（包含音量）
@@ -224,6 +247,7 @@ class MiDevice:
                     # 如果没有播放详情，返回基本状态（确保包含音量）
                     return 0, {
                         "state": state,
+                        "state_code": state_code,
                         "status": 'OK',
                         "track": 0,
                         "duration": "00:00:00",
@@ -246,6 +270,7 @@ class MiDevice:
 
                 return 0, {
                     "state": state,  # PLAYING, STOPPED
+                    "state_code": state_code,
                     "status": 'OK',  # OK, ERROR
                     "track": track,  # 当前曲目索引（从1开始）
                     "duration": duration,  # 总时长，格式如 "00:03:45"
@@ -253,6 +278,10 @@ class MiDevice:
                     "volume": volume  # 音量
                 }
             except Exception as e:
+                error_str = str(e)
+                if "Login failed" in error_str or "登录验证失败" in error_str or "70016" in error_str:
+                    log.error(f"[MiDevice] 登录验证失败，请检查账号密码是否正确: {e}")
+                    return -1, {"error": "登录验证失败，请检查账号密码是否正确"}
                 log.error(f"[MiDevice] Get status error: {e}")
                 return -1, {"error": f"获取播放状态信息失败: {str(e)}"}
             finally:
@@ -297,6 +326,10 @@ class MiDevice:
                 await mina_service.player_set_volume(self.device_id, volume)
                 return 0, "ok"
             except Exception as e:
+                error_str = str(e)
+                if "Login failed" in error_str or "登录验证失败" in error_str or "70016" in error_str:
+                    log.error(f"[MiDevice] 登录验证失败，请检查账号密码是否正确: {e}")
+                    return -1, "登录验证失败，请检查账号密码是否正确"
                 log.error(f"[MiDevice] Set volume error: {e}")
                 return -1, f"设置音量失败: {str(e)}"
             finally:
