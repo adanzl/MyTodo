@@ -5,10 +5,11 @@ import sys
 import time
 import threading
 from datetime import timedelta
-from queue import Queue
+from queue import Queue, Empty
 from typing import Any, Counter, Dict, List, Optional
 
-from gevent import spawn
+import gevent
+from gevent import spawn, sleep
 from core.utils import get_media_duration, check_cron_will_trigger_today
 from core.db import rds_mgr
 from core.device import create_device
@@ -116,8 +117,6 @@ class PlaylistMgr:
 
         def _rds_save_worker():
             """在 gevent 环境中处理 Redis 保存操作"""
-            from gevent import sleep
-            from queue import Empty
             while True:
                 try:
                     # 检查队列中是否有保存操作
@@ -347,7 +346,6 @@ class PlaylistMgr:
                         log.error(f"[PlaylistMgr] 定时任务播放失败: {pid} - {p_name}, {msg}")
                 except Exception as e:
                     # 捕获 gevent 相关的异常，避免影响线程池 worker
-                    import gevent
                     if isinstance(e, gevent.exceptions.LoopExit):
                         log.warning(f"[PlaylistMgr] 定时任务执行后发生 gevent LoopExit (可忽略): {pid} - {p_name}")
                     else:
@@ -406,9 +404,8 @@ class PlaylistMgr:
         file_duration_seconds = int(duration)
         # 更新时长（file_item 是列表中的引用，直接修改即可）
         file_item["duration"] = file_duration_seconds
-        # RDS 保存改为异步，避免阻塞
-        from gevent import spawn
 
+        # RDS 保存改为异步，避免阻塞
         def save_async():
             try:
                 self._save_playlist_to_rds()
@@ -719,9 +716,8 @@ class PlaylistMgr:
             if not play_state["in_pre_files"] and files:
                 playlist_data["current_index"] = play_state["file_index"]
                 playlist_data["updated_time"] = _TS()
-                # RDS 保存改为异步，避免阻塞播放操作
-                from gevent import spawn
 
+                # RDS 保存改为异步，避免阻塞播放操作
                 def save_async():
                     try:
                         self._save_playlist_to_rds()

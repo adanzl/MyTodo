@@ -201,7 +201,7 @@ class MiDevice:
     def get_status(self) -> tuple[int, dict]:
         """
         获取播放状态信息
-        :return: (错误码, 状态字典) 格式: {'state', 'status', 'track', 'duration', 'position'}
+        :return: (错误码, 状态字典) 格式: {'state', 'status', 'track', 'duration', 'position', 'volume'}
         """
 
         async def _get_status_async():
@@ -216,17 +216,19 @@ class MiDevice:
                     return -1, {"error": ret['message']}
                 info = json.loads(ret['data']['info'])
                 state = 'STOPPED' if info.get('status') == 1 else 'PLAYING'
+                volume = info.get('volume', 0)  # 获取音量，确保始终有音量值
 
-                # 安全访问 play_song_detail，如果不存在则返回默认值
-                play_song_detail = info.get('play_song_detail', {})
-                if not play_song_detail:
-                    # 如果没有播放详情，返回基本状态
+                # 安全访问 play_song_detail，如果不存在或为空则返回基本状态（包含音量）
+                play_song_detail = info.get('play_song_detail')
+                if not play_song_detail or not isinstance(play_song_detail, dict) or len(play_song_detail) == 0:
+                    # 如果没有播放详情，返回基本状态（确保包含音量）
                     return 0, {
                         "state": state,
                         "status": 'OK',
                         "track": 0,
                         "duration": "00:00:00",
-                        "position": "00:00:00"
+                        "position": "00:00:00",
+                        "volume": volume  # 确保音量始终返回
                     }
 
                 duration = format_time_str(play_song_detail['duration'] /
@@ -248,6 +250,7 @@ class MiDevice:
                     "track": track,  # 当前曲目索引（从1开始）
                     "duration": duration,  # 总时长，格式如 "00:03:45"
                     "position": format_time_str(position / 1000),  # 已播放时长，格式如 "00:01:30"
+                    "volume": volume  # 音量
                 }
             except Exception as e:
                 log.error(f"[MiDevice] Get status error: {e}")
@@ -268,35 +271,14 @@ class MiDevice:
         获取设备音量
         :return: (错误码, 音量)
         """
+        # 复用 get_status 方法，避免重复代码
+        code, status = self.get_status()
+        if code != 0:
+            return code, 0
 
-        async def _get_status_async():
-            session = None
-            try:
-                # 获取 MiNAService 对象
-                # 使用普通的 ClientSession，与其他方法保持一致
-                session = ClientSession()
-                account = self._create_account(session)
-                mina_service = MiNAService(account)
-                ret = await mina_service.player_get_status(self.device_id)
-                if ret['code'] != 0:
-                    return -1, {"error": ret['message']}
-                info = json.loads(ret['data']['info'])
-                volume = info.get('volume', 0)
-
-                return 0, volume
-
-            except Exception as e:
-                log.error(f"[MiDevice] Get volume traceback: {traceback.format_exc()}")
-                return -1, -1
-            finally:
-                if session:
-                    await session.close()
-
-        try:
-            return run_async(_get_status_async(), timeout=5.0)
-        except Exception as e:
-            log.error(f"[MiDevice] Get volume traceback: {traceback.format_exc()}")
-            return -1, -1
+        # 从状态字典中提取音量，如果不存在则返回 0
+        volume = status.get('volume', 0)
+        return 0, volume
 
     def set_volume(self, volume: int) -> tuple[int, str]:
         """
