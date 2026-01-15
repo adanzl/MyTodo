@@ -60,6 +60,25 @@ def mi_volume():
         return _err(f'error: {str(e)}')
 
 
+@mi_bp.route("/mi/status", methods=['GET'])
+def mi_status():
+    """获取小米设备播放状态"""
+    try:
+        device_id = request.args.get('device_id')
+        if not device_id:
+            return _err('device_id is required')
+
+        device = MiDevice(device_id)
+        code, status = device.get_status()
+        if code == 0:
+            return _ok(status)
+        else:
+            return _err(status.get('error', '获取状态失败') if isinstance(status, dict) else '获取状态失败')
+    except Exception as e:
+        log.error(f"[MI] Status error: {e}")
+        return _err(f'error: {str(e)}')
+
+
 @mi_bp.route("/mi/stop", methods=['POST'])
 def mi_stop():
     """停止小米设备播放"""
