@@ -1014,8 +1014,7 @@ class PlaylistMgr:
         if existing_job:
             # 检查定时器是否已过期（执行时间已过去）
             if hasattr(existing_job, 'next_run_time') and existing_job.next_run_time:
-                from datetime import datetime
-                if existing_job.next_run_time < datetime.now():
+                if existing_job.next_run_time < datetime.datetime.now():
                     log.warning(f"[PlaylistMgr] 发现过期的播放列表时长定时器，清理: {id} - {p_name}, 过期时间: {existing_job.next_run_time}")
                 else:
                     log.info(f"[PlaylistMgr] 移除已存在的播放列表时长定时器: {id} - {p_name}, 原执行时间: {existing_job.next_run_time}")

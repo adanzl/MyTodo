@@ -153,6 +153,8 @@ import { setSave } from "@/utils/NetUtil";
 import { IonCheckbox, IonicSlides, IonReorder, IonReorderGroup } from "@ionic/vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import dayjs from "dayjs";
+import isToday from "dayjs/plugin/isToday";
+dayjs.extend(isToday);
 import { add, swapVertical } from "ionicons/icons";
 import _ from "lodash";
 import "swiper/css";
