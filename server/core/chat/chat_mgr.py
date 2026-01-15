@@ -150,7 +150,7 @@ class ChatMgr:
             ctx.autoTTS = data.get('ttsAuto', False)
             ctx.tts.vol = data.get('ttsVol', 50)
             ctx.tts.speed = data.get('ttsSpeed', 1.0)
-            log.info(f'[CHAT] Client {request.sid} connected. Total clients: {len(self.clients)}, {json.dumps(data)}')
+            log.info(f'[CHAT] Client {request.sid} connected. Total clients: {len(self.clients)}, {json.dumps(data, ensure_ascii=False)}')
 
             self.socketio.emit('handshakeResponse', {'message': 'Handshake successful'}, room=request.sid)
             return {'message': 'Handshake successful', 'status': 'ok'}
