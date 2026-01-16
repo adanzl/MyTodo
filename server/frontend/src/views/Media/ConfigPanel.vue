@@ -94,20 +94,34 @@
         <h4 class="text-sm font-semibold mb-2">设备配置</h4>
 
         <div class="space-y-2">
-          <div>
-            <div class="text-xs text-gray-600 mb-1">设备类型</div>
+          <div class="flex items-center gap-2">
+            <div class="text-xs text-gray-600 whitespace-nowrap">设备类型</div>
             <el-select
               :model-value="deviceType"
               @change="onUpdateDeviceType"
               placeholder="选择设备类型"
               size="small"
-              class="w-full"
+              class="flex-1"
             >
               <el-option label="蓝牙" value="bluetooth" />
               <el-option label="DLNA" value="dlna" />
               <el-option label="设备代理" value="agent" />
               <el-option label="小米设备" value="mi" />
             </el-select>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <div class="text-xs text-gray-600 whitespace-nowrap">设备音量</div>
+            <el-slider
+              :model-value="localVolume"
+              @input="(val: number) => (localVolume = val)"
+              @change="(val: number) => handleVolumeChange(val)"
+              :min="5"
+              :max="100"
+              :step="1"
+              size="small"
+              class="flex-1"
+            />
           </div>
 
           <div>
@@ -279,7 +293,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { Monitor, Refresh } from "@element-plus/icons-vue";
 import { MAX_PLAYLIST_DURATION, TRIGGER_BUTTONS } from "@/constants/playlist";
 import type { PlaylistStatus } from "@/types/playlist";
@@ -301,6 +315,7 @@ interface Props {
   onOpenCronBuilder: () => void;
   onPreviewCron: () => void;
   onUpdateDeviceType: (deviceType: string) => void;
+  onUpdateDeviceVolume: (volume: number) => void;
   onUpdateDeviceAddress: (address: string, name?: string | null) => void;
   onSelectBluetoothDevice: (address: string) => void;
   onSelectAgentDevice: (device: AgentDevice | string) => void;
@@ -322,6 +337,35 @@ const deviceType = computed<DeviceType | null>(() => {
 const deviceAddress = computed(() => {
   return props.playlistStatus?.device?.address || props.playlistStatus?.device_address || "";
 });
+
+// 获取设备音量（播放列表属性）
+const deviceVolume = computed(() => {
+  const volume = props.playlistStatus?.device_volume;
+  return volume !== undefined && volume !== null ? volume : 20;
+});
+
+// 本地音量状态（用于实时更新 UI）
+const localVolume = ref(deviceVolume.value);
+
+// 限制音量范围
+const clampVolume = (volume: number): number => {
+  return Math.max(5, Math.min(100, volume));
+};
+
+// 处理音量变化
+const handleVolumeChange = (volume: number) => {
+  const clampedVolume = clampVolume(volume);
+  props.onUpdateDeviceVolume(clampedVolume);
+};
+
+// 监听设备音量变化，同步到本地状态
+watch(
+  deviceVolume,
+  newVolume => {
+    localVolume.value = newVolume;
+  },
+  { immediate: true }
+);
 
 // 判断是否为指定设备类型
 const isDeviceType = (type: DeviceType) => computed(() => deviceType.value === type);

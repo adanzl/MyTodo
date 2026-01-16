@@ -164,16 +164,6 @@ https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-fro
 
     cd fastapi && python3 client.py --port 50000 --mode <sft|zero_shot|cross_lingual|instruct>
 
-## gewechat
-
-    docker run -itd -v /mnt/data/gewechat:/root/temp -p 9101:2531 -p 9102:2532 --restart=always --name=geWechat gewe
-
-## dify-on-wechat
-
-    cd /mnt/data/dify-on-wechat
-    conda activate py3_11
-    nohup python3 -u app.py >app.log 2>&1 &
-
 ## docker-chrome
 
     docker run \
@@ -199,7 +189,7 @@ https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-fro
 | mysql         | 8002     | ollama         |  9097 |
 | DBGate        | 8003     | dify           |  9098 |
 | nginx         | 8848/443 | cosy-voice     | x9099 |
-| redis         | 6379     | geWechat       |  9101 |
-| cockpit       | 9090     | geWechat       |  9102 |
+| redis         | 6379     |                |       |
+| cockpit       | 9090     |                |       |
 | portainer     | 9000     | chrome         |  9103 |
 | redis_insight | 9001     | siyuan_note    |  9104 |

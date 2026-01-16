@@ -98,6 +98,7 @@
         :on-open-cron-builder="handleOpenCronBuilder"
         :on-preview-cron="handlePreviewPlaylistCron"
         :on-update-device-type="handleUpdatePlaylistDeviceType"
+        :on-update-device-volume="handleUpdatePlaylistDeviceVolume"
         :on-update-device-address="handleUpdatePlaylistDeviceAddress"
         :on-select-bluetooth-device="handleSelectBluetoothDevice"
         :on-select-agent-device="handleSelectAgentDevice"
@@ -441,6 +442,7 @@ const {
   handleCloseScanDialog,
   handleUpdatePlaylistDeviceType,
   handleUpdatePlaylistDeviceAddress,
+  handleUpdatePlaylistDeviceVolume,
   handleSelectBluetoothDevice,
   handleSelectAgentDevice,
   handleSelectMiDevice,

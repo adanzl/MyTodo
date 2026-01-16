@@ -659,6 +659,20 @@ class PlaylistMgr:
 
         # 播放文件
         device = self._device_map[id]["obj"]
+
+        # 检查并设置设备音量（如果播放列表中有音量配置）
+        device_volume = playlist_data.get("device_volume")
+        if device_volume is not None and hasattr(device, "set_volume"):
+            try:
+                volume_code, volume_msg = device.set_volume(device_volume)
+                if volume_code == 0:
+                    log.info(f"[PlaylistMgr] Set device volume to {device_volume} for playlist {id}")
+                else:
+                    log.warning(
+                        f"[PlaylistMgr] Set device volume failed: id={id}, code={volume_code}, msg={volume_msg}")
+            except Exception as e:
+                log.warning(f"[PlaylistMgr] Set device volume error: id={id}, {e}")
+
         code, msg = device.play(file_path)
 
         if code != 0:

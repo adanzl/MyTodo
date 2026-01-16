@@ -224,11 +224,19 @@ export function useDeviceManagement(
     const typedDeviceType = deviceType as DeviceType;
     pendingDeviceType.value = typedDeviceType;
     const status = playlistStatus.value;
+
+    // 保留现有的音量值（播放列表属性）
+    const existingVolume = status.device_volume;
+
     status.device_type = typedDeviceType;
     if (!status.device) {
       status.device = { type: typedDeviceType, address: "", name: null };
     } else {
       status.device.type = typedDeviceType;
+    }
+    // 保留音量属性（播放列表级别）
+    if (existingVolume !== undefined) {
+      status.device_volume = existingVolume;
     }
 
     await refreshConnectedList();
@@ -244,6 +252,9 @@ export function useDeviceManagement(
         playlistInfo.device_type ||
         "dlna";
 
+      // 保留现有的音量值（播放列表属性）
+      const existingVolume = playlistInfo.device_volume;
+
       if (!playlistInfo.device) {
         playlistInfo.device = { address: "", type: finalType, name: null };
       }
@@ -254,9 +265,28 @@ export function useDeviceManagement(
       }
       playlistInfo.device_address = address;
       playlistInfo.device_type = finalType;
+      // 保留音量属性（播放列表级别）
+      if (existingVolume !== undefined) {
+        playlistInfo.device_volume = existingVolume;
+      }
       return playlistInfo;
     });
     pendingDeviceType.value = null;
+  };
+
+  // 限制音量范围
+  const clampVolume = (volume: number): number => {
+    return Math.max(5, Math.min(100, volume));
+  };
+
+  // 更新播放列表设备音量（播放列表属性，不随设备改变）
+  const handleUpdatePlaylistDeviceVolume = async (volume: number) => {
+    if (!playlistStatus.value) return;
+    const clampedVolume = clampVolume(volume);
+    await updateActivePlaylistData(playlistInfo => {
+      playlistInfo.device_volume = clampedVolume;
+      return playlistInfo;
+    });
   };
 
   // 选择蓝牙设备
@@ -300,6 +330,7 @@ export function useDeviceManagement(
     handleCloseScanDialog,
     handleUpdatePlaylistDeviceType,
     handleUpdatePlaylistDeviceAddress,
+    handleUpdatePlaylistDeviceVolume,
     handleSelectBluetoothDevice,
     handleSelectAgentDevice,
     handleSelectMiDevice,

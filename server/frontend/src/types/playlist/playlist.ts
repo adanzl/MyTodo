@@ -121,6 +121,10 @@ export interface Playlist {
    */
   device_type: DeviceType;
   /**
+   * 设备音量（兼容字段，0-100）
+   */
+  device_volume?: number;
+  /**
    * 设备信息
    */
   device: PlaylistDevice;
@@ -229,6 +233,10 @@ export interface PlaylistApiData {
    * 设备类型（兼容字段）
    */
   device_type?: DeviceType;
+  /**
+   * 设备音量（兼容字段，0-100）
+   */
+  device_volume?: number;
   /**
    * 定时任务配置
    */

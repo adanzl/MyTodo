@@ -177,6 +177,7 @@ export function usePlaylistData(
       pre_index: parseIndex(item?.pre_index, -1),
       device_address: deviceAddress,
       device_type: deviceType,
+      device_volume: item?.device_volume,
       device: item?.device || {
         type: deviceType,
         address: deviceAddress,
@@ -319,6 +320,7 @@ export function usePlaylistData(
           type: deviceType,
           name: item.device?.name || null,
         },
+        device_volume: item.device_volume,
         schedule: item.schedule || { enabled: 0, cron: "", duration: 0 },
         trigger_button: item.trigger_button || "",
         create_time: item.create_time || formatDateTime(),
