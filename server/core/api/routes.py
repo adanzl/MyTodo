@@ -112,9 +112,9 @@ def get_data():
 @api_bp.route("/setData", methods=['POST'])
 def set_data():
     args = read_json_from_request()
-    log.info("===== [Set Data] " + len(args))
     table = args.get('table')
     data = args.get('data')
+    log.info(f"===== [Set Data] {table}: {len(data)}")
     return db_mgr.set_data(table, data)
 
 
@@ -200,9 +200,9 @@ def get_rds_list():
 def set_rds_data():
     try:
         args = read_json_from_request()
-        log.info("===== [Set rds Data] " + json.dumps(args))
         table = args.get('table')
         data = args.get('data')
+        log.info(f"===== [Set rds Data] {table}: {len(data)}")
         id = data.get('id')
         value = data.get('value')
         rds_mgr.set(f"{table}:{id}", value)
@@ -234,7 +234,7 @@ def route_index():
 @api_bp.route("/addScore", methods=['POST'])
 def add_score():
     args = read_json_from_request()
-    log.info("===== [Add Score] " + json.dumps(args))
+    log.info("===== [Add Score] " + json.dumps(args, ensure_ascii=False))
     user = args.get('user')
     value = args.get('value')
     action = args.get('action')

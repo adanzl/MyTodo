@@ -32,7 +32,7 @@ class AILocal:
             "response_mode": "streaming",  # 启用流式模式
             "user": self.user,
         }
-        log.info(f">>[AI] Query: {query}")
+        log.info(f"==== [AI] Query: {self.user} - {query}")
 
         try:
             with requests.post(

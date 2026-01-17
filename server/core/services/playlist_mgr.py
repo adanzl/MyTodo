@@ -998,7 +998,8 @@ class PlaylistMgr:
         run_date = datetime.datetime.now() + timedelta(seconds=duration_seconds)
         scheduler.add_date_job(func=__play_next_task, job_id=job_id, run_date=run_date)
         self._file_timers[id] = job_id
-        log.info(f"[PlaylistMgr] 启动文件定时器: {id}, 将在 {duration_seconds} 秒后播放下一首")
+        p_name = self._playlist_raw.get(id, {}).get("name", "未知播放列表")
+        log.info(f"[PlaylistMgr] 启动文件定时器: {id} - {p_name}, 将在 {duration_seconds} 秒后播放下一首")
 
     def _clear_timer(self, id: str, timer_dict: Dict[str, str], job_prefix: str):
         """清除定时器"""

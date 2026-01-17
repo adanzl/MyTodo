@@ -104,7 +104,7 @@
                   </div>
                 </ion-item>
                 <div
-                  class="pl-[45px] flex items-center text-gray-400"
+                  class="pl-11 flex items-center text-gray-400"
                   v-for="(sub, idx) in schedule.subtasks"
                   :key="idx"
                   @click="btnScheduleClk($event, schedule, day)">
