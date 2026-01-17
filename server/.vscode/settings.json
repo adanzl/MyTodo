@@ -28,7 +28,6 @@
         "upnpclient",
         "zhaozhao"
     ],
-    "basedpyright.disableLanguageServices": true,
     "python-envs.defaultEnvManager": "ms-python.python:conda",
     "[html]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode"
@@ -52,5 +51,10 @@
     "terminal.integrated.defaultProfile.osx": "zsh",
     "terminal.integrated.shellArgs.osx": [
         "-l"
-    ]
+    ],
+    "python.testing.pytestArgs": [
+        "."
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
 }

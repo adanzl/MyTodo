@@ -5,7 +5,7 @@ Agent 管理器
 import time
 from typing import Dict
 from core.device.agent import DeviceAgent
-from core.log_config import app_logger
+from core.config import app_logger
 from core.services.playlist_mgr import playlist_mgr
 
 log = app_logger

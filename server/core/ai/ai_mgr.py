@@ -1,11 +1,12 @@
 import json
+import os
 
 import requests
-from core.log_config import app_logger
+from core.config import app_logger
 
 log = app_logger
-API_URL = "https://ark.cn-beijing.volces.com"
-DOU_BAO_AK = '91cd8756-4fd8-4235-a2bd-777949576205'
+API_URL = os.getenv("DOUBAO_API_URL", "https://ark.cn-beijing.volces.com")
+DOU_BAO_AK = os.getenv("DOUBAO_AK", "")
 # 这里需要根据实际的 API 路径进行修改
 ENDPOINT = "/api/v3/chat/completions"
 DOUBAO_MODEL = "ep-20250205111100-zhcpq"  # cSpell:disable-line

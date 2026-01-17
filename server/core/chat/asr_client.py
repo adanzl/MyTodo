@@ -3,7 +3,7 @@ import threading
 import time
 
 import websocket
-from core.log_config import app_logger
+from core.config import app_logger
 
 log = app_logger
 

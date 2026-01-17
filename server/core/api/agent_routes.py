@@ -1,12 +1,14 @@
-'''
-Agent 设备管理路由
-通过调用 device_agent 服务接口实现
-'''
+"""
+Agent 设备管理路由。
+通过调用 device_agent 服务接口实现。
+"""
 import time
+from typing import Dict, Any
 
 from flask import Blueprint, request
+from flask.typing import ResponseReturnValue
 
-from core.log_config import app_logger
+from core.config import app_logger
 from core.services.agent_mgr import agent_mgr
 from core.utils import _err, _ok, read_json_from_request
 
@@ -14,7 +16,7 @@ log = app_logger
 agent_bp = Blueprint('agent', __name__)
 
 
-def _get_client_ip():
+def _get_client_ip() -> str:
     """获取客户端 IP 地址"""
     # 优先检查代理头
     if request.headers.get('X-Forwarded-For'):
@@ -24,20 +26,19 @@ def _get_client_ip():
         ip = request.headers.get('X-Real-IP')
     else:
         ip = request.remote_addr
-    return ip
+    return ip or ''
 
 
 @agent_bp.route("/agent/heartbeat", methods=['POST'])
-def agent_heartbeat():
+def agent_heartbeat() -> ResponseReturnValue:
     """
-    心跳接口（用于设备注册和心跳更新）
+    心跳接口，用于设备注册和状态更新。
     """
     try:
-        args = read_json_from_request()
+        args: Dict[str, Any] = read_json_from_request()
         address = args.get('address')
         client_ip = _get_client_ip()
 
-        # 如果没有提供 address，使用客户端 IP + 默认端口
         if not address:
             return _err("address is required")
 
@@ -53,12 +54,12 @@ def agent_heartbeat():
 
 
 @agent_bp.route("/agent/event", methods=['POST'])
-def agent_event():
+def agent_event() -> ResponseReturnValue:
     """
-    触发事件接口
+    Agent 事件触发接口。
     """
     try:
-        args = read_json_from_request()
+        args: Dict[str, Any] = read_json_from_request()
         client_ip = _get_client_ip()
         log.info(f"===== [Agent Event] client_ip={client_ip}, {args}")
 
@@ -80,37 +81,26 @@ def agent_event():
 
 
 @agent_bp.route("/agent/list", methods=['GET'])
-def agent_list():
+def agent_list() -> ResponseReturnValue:
     """
-    获取所有agent设备列表
-    返回所有已注册设备的详细信息
+    获取所有 Agent 设备列表。
+    返回所有已注册设备的详细信息，包括在线状态和心跳时间。
     """
     try:
         devices = agent_mgr.get_all_agents()
-        # 将字典转换为列表，包含详细信息
-
         current_time = time.time()
         device_list = []
         for address, device_info in devices.items():
+            heartbeat_time = device_info.get('heartbeat_time', 0)
             device_data = {
-                'address':
-                device_info.get('address', address),
-                'name':
-                device_info.get('name', address),
-                'agent_id':
-                device_info.get('agent_id', ''),
-                'actions':
-                device_info.get('actions', []),
-                'register_time':
-                device_info.get('register_time', 0),
-                'heartbeat_time':
-                device_info.get('heartbeat_time', 0),
-                'last_heartbeat_ago':
-                int(current_time -
-                    device_info.get('heartbeat_time', 0)) if device_info.get('heartbeat_time', 0) > 0 else 0,
-                'is_online':
-                (current_time -
-                 device_info.get('heartbeat_time', 0)) < 30 if device_info.get('heartbeat_time', 0) > 0 else False
+                'address': device_info.get('address', address),
+                'name': device_info.get('name', address),
+                'agent_id': device_info.get('agent_id', ''),
+                'actions': device_info.get('actions', []),
+                'register_time': device_info.get('register_time', 0),
+                'heartbeat_time': heartbeat_time,
+                'last_heartbeat_ago': int(current_time - heartbeat_time) if heartbeat_time > 0 else -1,
+                'is_online': (current_time - heartbeat_time) < 30 if heartbeat_time > 0 else False
             }
             device_list.append(device_data)
         return _ok(device_list)
@@ -120,13 +110,18 @@ def agent_list():
 
 
 @agent_bp.route("/agent/mock", methods=['POST'])
-def agent_mock():
+def agent_mock() -> ResponseReturnValue:
     """
-    Mock接口，用于模拟设备操作
-    参数: agent_id, action, key, value
+    模拟 Agent 设备操作接口，用于测试或调试。
+
+    Body:
+        agent_id (str): 目标 Agent 的唯一 ID。
+        action (str): 要执行的动作名称。
+        key (str, optional): 动作的 key 参数。
+        value (Any, optional): 动作的 value 参数。
     """
     try:
-        args = read_json_from_request()
+        args: Dict[str, Any] = read_json_from_request()
         log.info(f"===== [Agent Mock] {args}")
         agent_id = args.get('agent_id')
         action = args.get('action')

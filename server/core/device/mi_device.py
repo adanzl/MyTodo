@@ -16,7 +16,7 @@ from typing import Dict, List
 from aiohttp import ClientSession
 from miservice import MiAccount, MiNAService
 
-from core.log_config import app_logger
+from core.config import app_logger
 from core.tools.async_util import run_async
 from core.utils import convert_to_http_url, format_time_str
 

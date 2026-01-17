@@ -5,7 +5,7 @@ Device Agent HTTP 客户端
 import os
 import requests
 from typing import Optional, Dict, Any
-from core.log_config import app_logger
+from core.config import app_logger
 
 log = app_logger
 

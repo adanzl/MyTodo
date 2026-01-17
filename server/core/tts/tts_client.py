@@ -6,7 +6,7 @@ import os
 load_dotenv()
 
 try:
-    from core.log_config import app_logger
+    from core.config import app_logger
 
     log = app_logger
     import core.db.rds_mgr as rds_mgr

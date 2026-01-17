@@ -21,6 +21,7 @@ from core.api.pdf_routes import pdf_bp
 from core.chat.chat_mgr import chat_mgr
 from core.db.db_mgr import db_mgr
 from core.services.scheduler_mgr import scheduler_mgr
+from core.config import config
 import os
 
 
@@ -28,8 +29,8 @@ def create_app():
     instance_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     app = Flask(__name__, instance_path=instance_path, instance_relative_config=True)
 
-    # 配置允许上传大文件（最大 1000MB = 2000 * 1024 * 1024 字节）
-    app.config['MAX_CONTENT_LENGTH'] = 2000 * 1024 * 1024  
+    # 配置允许上传大文件
+    app.config['MAX_CONTENT_LENGTH'] = config.MAX_CONTENT_LENGTH
 
     CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})
     # 创建 SocketIO 实例并与 Flask 应用关联

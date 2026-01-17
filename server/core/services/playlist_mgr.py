@@ -13,7 +13,7 @@ from gevent import spawn, sleep
 from core.utils import get_media_duration, check_cron_will_trigger_today
 from core.db import rds_mgr
 from core.device import create_device
-from core.log_config import app_logger
+from core.config import app_logger
 from core.services.scheduler_mgr import scheduler_mgr
 from core.utils import time_to_seconds
 
@@ -26,16 +26,16 @@ DEVICE_TYPES = {"device_agent", "bluetooth", "dlna", "mi"}
 _TS = lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-def _get_weekday_index():
+def _get_weekday_index() -> int:
     """
     获取当前星期对应的索引
-    返回: 0=周一, 1=周二, 2=周三, 3=周四, 4=周五, 5=周六, 6=周日
+    :return: 0=周一, 1=周二, 2=周三, 3=周四, 4=周五, 5=周六, 6=周日
     """
     weekday = datetime.datetime.now().weekday()  # 0=周一, 6=周日
     return weekday
 
 
-def _get_pre_list_for_today(pre_lists):
+def _get_pre_list_for_today(pre_lists: List[List]) -> List:
     """
     获取今天对应的前置文件列表
     :param pre_lists: pre_lists 数组，固定7个元素，分别代表周一到周日
@@ -173,14 +173,10 @@ class PlaylistMgr:
             if playlist_id not in self._playlist_raw:
                 log.info(f"[PlaylistMgr] 创建新播放列表: {playlist_id}")
 
-            # 更新播放列表数据（合并现有数据）
+            # 更新播放列表数据（合并现有数据，保留原有字段）
             if playlist_id in self._playlist_raw:
-                # 合并更新，保留原有字段
-                existing_playlist = self._playlist_raw[playlist_id]
-                existing_playlist.update(playlist_data)
-                self._playlist_raw[playlist_id] = existing_playlist
+                self._playlist_raw[playlist_id].update(playlist_data)
             else:
-                # 新播放列表
                 self._playlist_raw[playlist_id] = playlist_data
 
             # 保存到 RDS 和更新设备映射
@@ -194,24 +190,18 @@ class PlaylistMgr:
             return -1
 
     def reload(self) -> int:
-        if sys.platform != "linux":
-            log.warning(f"[PlaylistMgr] Reload not supported on non-linux platforms : {sys.platform}")
-            # 确保 playlist_raw 和 device_map 已初始化
-            if not hasattr(self, 'playlist_raw'):
-                self._playlist_raw = {}
-            if not hasattr(self, 'device_map'):
-                self._device_map = {}
-            self._needs_reload = False
-            return 0
         """
         重新从 RDS 中加载 playlist 数据
+        :return: 0 表示成功，-1 表示失败
         """
+        if sys.platform != "linux":
+            log.warning(f"[PlaylistMgr] Reload not supported on non-linux platforms : {sys.platform}")
+            self._needs_reload = False
+            return 0
         try:
             raw = rds_mgr.get(PLAYLIST_RDS_FULL_KEY)
             if raw:
                 self._playlist_raw = json.loads(raw.decode("utf-8"))
-            else:
-                self._playlist_raw = {}
 
             # 清除所有播放列表的 isPlaying 状态（程序重启后，播放状态不应该保留）
             for playlist_id, playlist_data in self._playlist_raw.items():
@@ -219,20 +209,14 @@ class PlaylistMgr:
                     del playlist_data['isPlaying']
 
                 # 迁移 pre_files 到 pre_lists（如果还没有 pre_lists）
-                if "pre_lists" not in playlist_data:
+                pre_lists = playlist_data.get("pre_lists", [])
+                if not isinstance(pre_lists, list) or len(pre_lists) != 7:
+                    # 如果 pre_lists 不存在或格式不正确，重新初始化
                     pre_files = playlist_data.get("pre_files", [])
-                    # 创建 pre_lists，固定7个元素，分别代表周一到周日
-                    # 将 pre_files 复制到这7个列表中
                     pre_lists = [list(pre_files) for _ in range(7)]  # 深拷贝到7个列表
                     playlist_data["pre_lists"] = pre_lists
-                    log.info(f"[PlaylistMgr] 迁移 pre_files 到 pre_lists: {playlist_id}, 共 {len(pre_files)} 个文件")
-                elif not isinstance(playlist_data.get("pre_lists"), list) or len(playlist_data.get("pre_lists",
-                                                                                                   [])) != 7:
-                    # 如果 pre_lists 存在但格式不正确，重新初始化
-                    pre_files = playlist_data.get("pre_files", [])
-                    pre_lists = [list(pre_files) for _ in range(7)]
-                    playlist_data["pre_lists"] = pre_lists
-                    log.info(f"[PlaylistMgr] 修复 pre_lists 格式: {playlist_id}")
+                    action = "迁移" if "pre_lists" not in playlist_data else "修复"
+                    log.info(f"[PlaylistMgr] {action} pre_files 到 pre_lists: {playlist_id}, 共 {len(pre_files)} 个文件")
 
             # 从 _playlist_raw 恢复游标状态到 _play_state，保留游标以便从上次位置继续
             # 只恢复那些在 _play_state 中不存在的播放列表（程序启动时的情况）
@@ -261,7 +245,7 @@ class PlaylistMgr:
             # 清除那些已不在 _playlist_raw 中的播放列表的状态
             playlist_ids_to_remove = [pid for pid in self._play_state.keys() if pid not in self._playlist_raw]
             for pid in playlist_ids_to_remove:
-                del self._play_state[pid]
+                self._play_state.pop(pid, None)
 
             # 清除运行时状态（这些状态不应该在重启后保留）
             self._playing_playlists.clear()
@@ -489,12 +473,6 @@ class PlaylistMgr:
         汇总所有没有 duration 的文件，启动单例线程批量获取时长
         :param playlists: 播放列表字典
         """
-        # 检查是否有正在运行的线程
-        with self._duration_fetch_lock:
-            if self._duration_fetch_thread is not None and self._duration_fetch_thread.is_alive():
-                log.debug("[PlaylistMgr] 批量获取时长的线程正在运行，跳过本次启动")
-                return
-
         # 收集所有没有 duration 的文件 URI（去重），排除黑名单中失败超过3次的文件
         files_to_fetch = set()  # {file_uri, ...}
         for playlist_data in playlists.values():
@@ -503,7 +481,13 @@ class PlaylistMgr:
         if not files_to_fetch:
             return
 
-        log.info(f"[PlaylistMgr] 发现 {len(files_to_fetch)} 个文件需要获取时长，启动批量获取线程")
+        # 检查是否有正在运行的线程
+        with self._duration_fetch_lock:
+            if self._duration_fetch_thread is not None and self._duration_fetch_thread.is_alive():
+                log.debug("[PlaylistMgr] 批量获取时长的线程正在运行，跳过本次启动")
+                return
+
+            log.info(f"[PlaylistMgr] 发现 {len(files_to_fetch)} 个文件需要获取时长，启动批量获取线程")
 
         def _batch_fetch_durations():
             """批量获取文件时长的线程函数"""
@@ -576,13 +560,15 @@ class PlaylistMgr:
             return None, -1, "设备不存在或未初始化"
         return playlist_data, 0, None
 
-    def _init_play_state(self, id: str, playlist_data: Dict[str, Any], pre_files: List):
-        """初始化播放状态"""
+    def _init_play_state(self, id: str, playlist_data: Dict[str, Any], pre_files: List) -> None:
+        """
+        初始化播放状态
+        :param id: 播放列表ID
+        :param playlist_data: 播放列表数据
+        :param pre_files: 前置文件列表
+        """
         current_index = playlist_data.get("current_index", 0)
-        if pre_files:
-            self._play_state[id] = {"in_pre_files": True, "pre_index": 0, "file_index": current_index}
-        else:
-            self._play_state[id] = {"in_pre_files": False, "pre_index": 0, "file_index": current_index}
+        self._play_state[id] = {"in_pre_files": bool(pre_files), "pre_index": 0, "file_index": current_index}
 
     def _get_pre_files_for_today(self, playlist_data: Dict[str, Any]) -> List:
         """获取今天对应的前置文件列表"""
@@ -631,16 +617,8 @@ class PlaylistMgr:
         pre_files = self._get_pre_files_for_today(playlist_data)  # 获取今天对应的前置文件列表
         files = playlist_data.get("files", [])
 
-        # 如果不是 force 模式，初始化播放状态（从头开始）
-        # 如果是 force 模式，只有在状态不存在时才初始化（避免覆盖已更新的状态）
-        if not force:
-            self._init_play_state(id, playlist_data, pre_files)
-        elif id not in self._play_state:
-            # force 模式且状态不存在时才初始化
-            self._init_play_state(id, playlist_data, pre_files)
-
-        # 确保播放状态存在（防御性编程）
-        if id not in self._play_state:
+        # 初始化播放状态（如果不是 force 模式或状态不存在）
+        if not force or id not in self._play_state:
             self._init_play_state(id, playlist_data, pre_files)
 
         play_state = self._play_state[id]

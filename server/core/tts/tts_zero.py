@@ -16,7 +16,7 @@ w2 = {
     'prefix': 'woman',
 }
 
-dashscope.api_key = "sk-b7b302bad3b3410a9e21ca2294de4a08"
+dashscope.api_key = os.getenv('ALI_KEY', '')
 target_model = "cosyvoice-v1"
 # cSpell: enable
 # 创建语音注册服务实例

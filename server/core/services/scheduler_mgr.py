@@ -11,7 +11,7 @@ from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 from apscheduler.executors.gevent import GeventExecutor
 from datetime import datetime
 from typing import Callable, Optional
-from core.log_config import app_logger
+from core.config import app_logger
 from core.utils import convert_standard_cron_weekday_to_apscheduler
 
 log = app_logger

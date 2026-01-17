@@ -5,36 +5,29 @@
 import os
 import shutil
 from datetime import datetime
+
 from flask import Blueprint, request, send_file, abort
+from flask.typing import ResponseReturnValue
 from werkzeug.utils import secure_filename
 
-from core.log_config import app_logger
+from core.config import app_logger
 from core.services.audio_merge_mgr import audio_merge_mgr
 from core.services.audio_convert_mgr import audio_convert_mgr
-from core.models.const import get_media_task_dir, get_media_task_result_dir, ALLOWED_AUDIO_EXTENSIONS
-from core.utils import get_media_url, get_media_duration, validate_and_normalize_path, _ok, _err, ensure_directory, is_allowed_audio_file, get_file_info, read_json_from_request, get_unique_filepath
+from core.config import get_media_task_dir, ALLOWED_AUDIO_EXTENSIONS, MIMETYPE_MAP
+from core.config import config
+from core.utils import get_media_duration, validate_and_normalize_path, _ok, _err, ensure_directory, is_allowed_audio_file, get_file_info, read_json_from_request, get_unique_filepath
 
 log = app_logger
 media_bp = Blueprint('media', __name__)
 
 # 常量定义
-DEFAULT_BASE_DIR = '/mnt'
-MIMETYPE_MAP = {
-    '.mp3': 'audio/mpeg',
-    '.wav': 'audio/wav',
-    '.aac': 'audio/aac',
-    '.ogg': 'audio/ogg',
-    '.m4a': 'audio/mp4',
-    '.mp4': 'video/mp4',
-    '.avi': 'video/x-msvideo',
-    '.mkv': 'video/x-matroska',
-}
+DEFAULT_BASE_DIR = config.DEFAULT_BASE_DIR
 
 # ========== 媒体文件服务接口（用于 DLNA 播放）==========
 
 
 @media_bp.route("/media/getDuration", methods=['GET'])
-def get_duration():
+def get_duration() -> ResponseReturnValue:
     """
     获取媒体文件的时长
     :return: 时长（秒）
@@ -64,7 +57,7 @@ def get_duration():
 
 
 @media_bp.route("/media/files/<path:filepath>", methods=['GET'])
-def serve_media_file(filepath):
+def serve_media_file(filepath: str) -> ResponseReturnValue:
     """
     提供媒体文件访问服务（用于 DLNA 播放）
     :param filepath: 文件路径
@@ -97,7 +90,7 @@ def serve_media_file(filepath):
 
 
 @media_bp.route("/media/merge/create", methods=['POST'])
-def create_media_task():
+def create_media_task() -> ResponseReturnValue:
     """
     创建音频合成任务
     参数：
@@ -122,7 +115,7 @@ def create_media_task():
 
 
 @media_bp.route("/media/merge/upload", methods=['POST'])
-def upload_file():
+def upload_file() -> ResponseReturnValue:
     """
     上传文件到任务
     参数：
@@ -172,7 +165,7 @@ def upload_file():
 
 
 @media_bp.route("/media/merge/addFileByPath", methods=['POST'])
-def add_file_by_path():
+def add_file_by_path() -> ResponseReturnValue:
     """
     通过文件路径添加文件到任务
     参数：
@@ -220,7 +213,7 @@ def add_file_by_path():
 
 
 @media_bp.route("/media/merge/deleteFile", methods=['POST'])
-def delete_file():
+def delete_file() -> ResponseReturnValue:
     """
     从任务中删除文件
     参数：
@@ -255,7 +248,7 @@ def delete_file():
 
 
 @media_bp.route("/media/merge/reorderFiles", methods=['POST'])
-def reorder_files():
+def reorder_files() -> ResponseReturnValue:
     """
     调整文件顺序
     参数：
@@ -294,7 +287,7 @@ def reorder_files():
 
 
 @media_bp.route("/media/merge/start", methods=['POST'])
-def start_task():
+def start_task() -> ResponseReturnValue:
     """
     开始音频合成任务
     参数：
@@ -320,7 +313,7 @@ def start_task():
 
 
 @media_bp.route("/media/merge/get", methods=['POST'])
-def get_task_info():
+def get_task_info() -> ResponseReturnValue:
     """
     获取任务信息
     参数：
@@ -345,7 +338,7 @@ def get_task_info():
 
 
 @media_bp.route("/media/merge/list", methods=['GET'])
-def list_all_tasks():
+def list_all_tasks() -> ResponseReturnValue:
     """
     列出所有任务
     """
@@ -359,7 +352,7 @@ def list_all_tasks():
 
 
 @media_bp.route("/media/merge/delete", methods=['POST'])
-def delete_task():
+def delete_task() -> ResponseReturnValue:
     """
     删除任务
     参数：
@@ -384,7 +377,7 @@ def delete_task():
 
 
 @media_bp.route("/media/merge/download", methods=['GET'])
-def download_result():
+def download_result() -> ResponseReturnValue:
     """
     下载合成结果文件
     参数：
@@ -415,7 +408,7 @@ def download_result():
 
 
 @media_bp.route("/media/merge/save", methods=['POST'])
-def save_result():
+def save_result() -> ResponseReturnValue:
     """
     转存合成结果文件到指定目录
     参数：
@@ -479,7 +472,7 @@ def save_result():
 
 
 @media_bp.route("/media/convert/list", methods=['GET'])
-def list_convert_tasks():
+def list_convert_tasks() -> ResponseReturnValue:
     """
     获取所有音频转码任务列表
     """
@@ -492,7 +485,7 @@ def list_convert_tasks():
 
 
 @media_bp.route("/media/convert/create", methods=['POST'])
-def create_convert_task():
+def create_convert_task() -> ResponseReturnValue:
     """
     创建音频转码任务
     参数：
@@ -521,7 +514,7 @@ def create_convert_task():
 
 
 @media_bp.route("/media/convert/get", methods=['POST'])
-def get_convert_task_info():
+def get_convert_task_info() -> ResponseReturnValue:
     """
     获取音频转码任务详情
     参数：
@@ -546,7 +539,7 @@ def get_convert_task_info():
 
 
 @media_bp.route("/media/convert/delete", methods=['POST'])
-def delete_convert_task():
+def delete_convert_task() -> ResponseReturnValue:
     """
     删除音频转码任务
     参数：
@@ -571,7 +564,7 @@ def delete_convert_task():
 
 
 @media_bp.route("/media/convert/update", methods=['POST'])
-def update_convert_task():
+def update_convert_task() -> ResponseReturnValue:
     """
     更新音频转码任务信息
     参数：
@@ -618,7 +611,7 @@ def update_convert_task():
 
 
 @media_bp.route("/media/convert/start", methods=['POST'])
-def start_convert_task():
+def start_convert_task() -> ResponseReturnValue:
     """
     开始音频转码任务
     参数：

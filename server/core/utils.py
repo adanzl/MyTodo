@@ -16,7 +16,7 @@ from urllib.parse import quote, unquote
 from flask import request
 from queue import Queue, Empty
 
-from core.log_config import app_logger
+from core.config import app_logger
 
 log = app_logger
 
@@ -42,6 +42,12 @@ def err_response(message: str):
 # 为了保持向后兼容，提供别名
 _ok = ok_response
 _err = err_response
+
+
+def get_json_body() -> Dict[str, Any]:
+    """安全获取 JSON body（无 Content-Type 时返回空 dict，避免触发 415）。"""
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else {}
 
 
 def read_json_from_request():
@@ -433,7 +439,7 @@ def is_allowed_audio_file(filename: str) -> bool:
     :param filename: 文件名
     :return: True 如果文件扩展名在允许列表中，False 否则
     """
-    from core.models.const import ALLOWED_AUDIO_EXTENSIONS
+    from core.config import ALLOWED_AUDIO_EXTENSIONS
     return os.path.splitext(filename)[1].lower() in ALLOWED_AUDIO_EXTENSIONS
 
 
@@ -443,7 +449,7 @@ def is_allowed_pdf_file(filename: str) -> bool:
     :param filename: 文件名
     :return: True 如果文件扩展名在允许列表中，False 否则
     """
-    from core.models.const import ALLOWED_PDF_EXTENSIONS
+    from core.config import ALLOWED_PDF_EXTENSIONS
     return os.path.splitext(filename)[1].lower() in ALLOWED_PDF_EXTENSIONS
 
 
@@ -477,24 +483,26 @@ def get_file_info(file_path: str) -> Optional[dict]:
 
 def get_unique_filepath(directory: str, base_name: str, extension: str) -> str:
     """
-    生成唯一的文件路径，如果文件已存在则添加序号
-    
+    生成唯一的文件路径，如果文件已存在则添加序号。
+
     :param directory: 目标目录
     :param base_name: 基础文件名（不含扩展名）
     :param extension: 文件扩展名（包含点号，如 '.mp3'）
     :return: 唯一的文件路径
     """
-    filename = f"{base_name}{extension}"
-    file_path = os.path.join(directory, filename)
-
-    if os.path.exists(file_path):
-        counter = 1
-        while os.path.exists(file_path):
+    counter = 0
+    while True:
+        if counter == 0:
+            filename = f"{base_name}{extension}"
+        else:
             filename = f"{base_name}_{counter}{extension}"
-            file_path = os.path.join(directory, filename)
-            counter += 1
 
-    return file_path
+        file_path = os.path.join(directory, filename)
+
+        if not os.path.exists(file_path):
+            return file_path
+
+        counter += 1
 
 
 def run_subprocess_safe(cmd: List[str],

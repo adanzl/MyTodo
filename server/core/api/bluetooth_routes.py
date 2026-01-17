@@ -1,21 +1,25 @@
-'''
-蓝牙设备管理路由
-通过调用 device_agent 服务接口实现
-'''
+"""蓝牙设备管理路由。
+通过调用 device_agent 服务接口实现。
+"""
+
+from __future__ import annotations
+
+from typing import Any, Dict
+
 from flask import Blueprint, json, request
-from core.log_config import app_logger
-from core.utils import _ok, _err, read_json_from_request
+from flask.typing import ResponseReturnValue
+
+from core.config import app_logger
 from core.services.bluetooth_mgr import bluetooth_mgr
+from core.utils import _err, _ok, read_json_from_request
 
 log = app_logger
 bluetooth_bp = Blueprint('bluetooth', __name__)
 
 
 @bluetooth_bp.route("/bluetooth/scan", methods=['GET'])
-def bluetooth_scan():
-    """
-    扫描蓝牙设备（通过 device_agent 服务）
-    """
+def bluetooth_scan() -> ResponseReturnValue:
+    """扫描蓝牙设备（通过 device_agent 服务）。"""
     try:
         timeout = request.args.get('timeout', 5.0, type=float)
         log.info(f"===== [Bluetooth Scan] timeout={timeout}")
@@ -27,10 +31,8 @@ def bluetooth_scan():
 
 
 @bluetooth_bp.route("/bluetooth/device", methods=['GET'])
-def bluetooth_get_device():
-    """
-    获取设备信息（通过 device_agent 服务）
-    """
+def bluetooth_get_device() -> ResponseReturnValue:
+    """获取指定蓝牙设备信息（通过 device_agent 服务）。"""
     try:
         address = request.args.get('address')
         log.info(f"===== [Bluetooth Get Device] address={address}")
@@ -46,18 +48,15 @@ def bluetooth_get_device():
 
 
 @bluetooth_bp.route("/bluetooth/connect", methods=['POST'])
-def bluetooth_connect():
-    """
-    连接蓝牙设备（通过 device_agent 服务）
-    """
+def bluetooth_connect() -> ResponseReturnValue:
+    """连接蓝牙设备（通过 device_agent 服务）。"""
     try:
-        args = read_json_from_request()
+        args: Dict[str, Any] = read_json_from_request()
         log.info(f"===== [Bluetooth Connect] {json.dumps(args)}")
         address = args.get('address')
         if not address:
             return _err("address is required")
         result = bluetooth_mgr.connect_device_sync(address)
-        # 如果 result 已经是标准格式，直接返回；否则包装
         if isinstance(result, dict) and 'code' in result:
             return result
         return _ok(result)
@@ -67,18 +66,15 @@ def bluetooth_connect():
 
 
 @bluetooth_bp.route("/bluetooth/disconnect", methods=['POST'])
-def bluetooth_disconnect():
-    """
-    断开蓝牙设备（通过 device_agent 服务）
-    """
+def bluetooth_disconnect() -> ResponseReturnValue:
+    """断开蓝牙设备（通过 device_agent 服务）。"""
     try:
-        args = read_json_from_request()
+        args: Dict[str, Any] = read_json_from_request()
         log.info(f"===== [Bluetooth Disconnect] {json.dumps(args)}")
         address = args.get('address')
         if not address:
             return _err("address is required")
         result = bluetooth_mgr.disconnect_device_sync(address)
-        # 如果 result 已经是标准格式，直接返回；否则包装
         if isinstance(result, dict) and 'code' in result:
             return result
         return _ok(result)
@@ -88,10 +84,8 @@ def bluetooth_disconnect():
 
 
 @bluetooth_bp.route("/bluetooth/paired", methods=['GET'])
-def bluetooth_get_paired():
-    """
-    获取系统已配对的蓝牙设备列表（通过 device_agent 服务）
-    """
+def bluetooth_get_paired() -> ResponseReturnValue:
+    """获取系统已配对的蓝牙设备列表（通过 device_agent 服务）。"""
     try:
         log.info("===== [Bluetooth Get Paired Devices]")
         devices = bluetooth_mgr.get_paired_devices()

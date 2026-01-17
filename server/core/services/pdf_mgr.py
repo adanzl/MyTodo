@@ -13,8 +13,8 @@ from werkzeug.utils import secure_filename
 
 import pikepdf
 
-from core.log_config import app_logger
-from core.models.const import (PDF_BASE_DIR, PDF_UPLOAD_DIR, PDF_UNLOCK_DIR, ALLOWED_PDF_EXTENSIONS,
+from core.config import app_logger
+from core.config import (PDF_BASE_DIR, PDF_UPLOAD_DIR, PDF_UNLOCK_DIR, ALLOWED_PDF_EXTENSIONS,
                                TASK_STATUS_PENDING, TASK_STATUS_PROCESSING, TASK_STATUS_SUCCESS, TASK_STATUS_FAILED,
                                TASK_STATUS_UPLOADED)
 from core.utils import ensure_directory, get_file_info, is_allowed_pdf_file

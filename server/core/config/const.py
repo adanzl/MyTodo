@@ -19,6 +19,18 @@ MEDIA_RESULT_DIR_SUFFIX = 'result'  # 结果目录后缀：{task_dir}/result/
 FFMPEG_PATH = '/usr/bin/ffmpeg'  # ffmpeg 路径
 FFMPEG_TIMEOUT = 300  # ffmpeg 超时时间（秒）
 
+# 媒体文件 MIME 映射
+MIMETYPE_MAP = {
+    '.mp3': 'audio/mpeg',
+    '.wav': 'audio/wav',
+    '.aac': 'audio/aac',
+    '.ogg': 'audio/ogg',
+    '.m4a': 'audio/mp4',
+    '.mp4': 'video/mp4',
+    '.avi': 'video/x-msvideo',
+    '.mkv': 'video/x-matroska',
+}
+
 
 def get_media_task_dir(task_id: str) -> str:
     """获取媒体任务目录"""

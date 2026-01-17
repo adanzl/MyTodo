@@ -3,7 +3,7 @@ import os
 import sys
 from logging.handlers import TimedRotatingFileHandler
 
-LOG_DIR = "logs"
+LOG_DIR = os.environ.get('LOG_DIR', 'logs')
 IS_PRODUCTION = os.environ.get('ENV', 'development').lower() == 'production'
 # 仅在 Linux 平台创建日志文件
 if sys.platform == "linux":

@@ -4,7 +4,7 @@ import time
 from core.ai.ai_local import AILocal
 from core.chat.asr_client import AsrClient
 from core.tts.tts_client import TTSClient
-from core.log_config import app_logger
+from core.config import app_logger
 from flask import json, request
 import core.db.rds_mgr as rds_mgr
 

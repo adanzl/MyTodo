@@ -1,18 +1,23 @@
-'''
-DLNA设备管理路由
-'''
+"""DLNA 设备管理路由。"""
+
+from __future__ import annotations
+
+from typing import Any, Dict
+
 from flask import Blueprint, request
-from core.log_config import app_logger
-from core.device.dlna import scan_devices_sync, DlnaDev
-from core.utils import _ok, _err, read_json_from_request
+from flask.typing import ResponseReturnValue
+
+from core.config import app_logger
+from core.device.dlna import DlnaDev, scan_devices_sync
+from core.utils import _err, _ok, read_json_from_request, get_json_body
 
 log = app_logger
 dlna_bp = Blueprint('dlna', __name__)
 
 
 @dlna_bp.route("/dlna/scan", methods=['GET'])
-def dlna_scan():
-    """扫描DLNA设备"""
+def dlna_scan() -> ResponseReturnValue:
+    """扫描 DLNA 设备。"""
     try:
         timeout = request.args.get('timeout', 5.0, type=float)
         log.info(f"===== [DLNA Scan] timeout={timeout}")
@@ -23,35 +28,38 @@ def dlna_scan():
 
 
 @dlna_bp.route("/dlna/volume", methods=['GET', 'POST'])
-def dlna_volume():
-    """获取或设置DLNA设备音量"""
+def dlna_volume() -> ResponseReturnValue:
+    """获取或设置 DLNA 设备音量。"""
     try:
-        location = request.args.get('location') or (request.json or {}).get('location')
+        body = get_json_body()
+        location = request.args.get('location') or body.get('location')
         if not location:
             return _err('location is required')
 
         device = DlnaDev(location)
 
         if request.method == 'GET':
-            # 获取音量
             code, volume = device.get_volume()
             if code == 0:
                 return _ok({'volume': volume})
             else:
-                return _err(f'获取音量失败')
+                return _err('获取音量失败')
         else:
-            # 设置音量
-            volume = (request.json or {}).get('volume')
+            volume = body.get('volume')
             if volume is None:
                 return _err('volume is required')
 
-            volume = int(volume)
-            if volume < 0 or volume > 100:
+            try:
+                volume_i = int(volume)
+            except (TypeError, ValueError):
+                return _err('volume must be int')
+
+            if volume_i < 0 or volume_i > 100:
                 return _err('volume must be between 0 and 100')
 
-            code, msg = device.set_volume(volume)
+            code, msg = device.set_volume(volume_i)
             if code == 0:
-                return _ok({'volume': volume})
+                return _ok({'volume': volume_i})
             else:
                 return _err(msg or '设置音量失败')
     except Exception as e:
@@ -60,10 +68,10 @@ def dlna_volume():
 
 
 @dlna_bp.route("/dlna/stop", methods=['POST'])
-def dlna_stop():
-    """停止DLNA设备播放"""
+def dlna_stop() -> ResponseReturnValue:
+    """停止 DLNA 设备播放。"""
     try:
-        data = read_json_from_request()
+        data: Dict[str, Any] = read_json_from_request()
         location = data.get('location')
         if not location:
             return _err('location is required')

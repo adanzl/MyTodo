@@ -8,7 +8,6 @@ rds = redis.Redis(
     password=None,  # 如果Redis设置了密码，则在这里填写
     socket_connect_timeout=5,  # 连接超时时间（秒）
     socket_timeout=5,  # 操作超时时间（秒）
-    retry_on_timeout=True,  # 超时后重试
     # decode_responses=True  # 是否将返回的数据自动解码为字符串
 )
 

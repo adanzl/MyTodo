@@ -2,9 +2,11 @@ import json
 import traceback
 import datetime
 from datetime import timezone, timedelta
+from typing import Any, Dict, List, Optional, Union
 
+from flask import Flask
 from core.db import db_obj
-from core.log_config import app_logger
+from core.config import app_logger
 from sqlalchemy import func
 from sqlalchemy import MetaData, Table, select, text
 from core.models.user import User
@@ -17,11 +19,13 @@ TABLE_SAVE = "t_user_save"
 
 
 class DbMgr:
+    """数据库管理类，封装通用 CRUD 操作"""
 
     def __init__(self):
         self._initialized = False
 
-    def init(self, app):
+    def init(self, app: Flask) -> None:
+        """初始化数据库连接"""
         # 防止重复初始化
         if self._initialized:
             return
@@ -32,7 +36,11 @@ class DbMgr:
         self._initialized = True
         log.info("DbMgr init")
 
-    def set_save(self, id, user_name, data) -> dict:
+    def set_save(self, id: Optional[int], user_name: str, data: str) -> Dict[str, Any]:
+        """
+        保存或更新用户数据到 t_user_save 表。
+        如果 id 存在，则更新；否则插入新记录。
+        """
         try:
             metadata = MetaData()
             table_obj = Table(TABLE_SAVE, metadata, autoload_with=db_obj.engine)
@@ -62,7 +70,8 @@ class DbMgr:
             return {"code": -1, "msg": 'error ' + str(e)}
         return {"code": 0, "msg": "ok", "data": id}
 
-    def get_data_idx(self, table, id, idx=1):
+    def get_data_idx(self, table: str, id: int, idx: int = 1) -> Dict[str, Any]:
+        """根据 id 从指定表获取单个字段的数据。"""
         try:
             metadata = MetaData()
             table_obj = Table(table, metadata, autoload_with=db_obj.engine)
@@ -82,7 +91,8 @@ class DbMgr:
             return {"code": -1, "msg": 'error ' + str(e)}
         return {"code": 0, "msg": "ok", "data": data}
 
-    def get_data(self, table, id, fields):
+    def get_data(self, table: str, id: int, fields: Union[str, List[str]]) -> Dict[str, Any]:
+        """根据 id 从指定表获取一个或多个字段的数据。"""
         try:
             metadata = MetaData()
             table_obj = Table(table, metadata, autoload_with=db_obj.engine)
@@ -116,7 +126,11 @@ class DbMgr:
             return {"code": -1, "msg": 'error ' + str(e)}
         return {"code": 0, "msg": "ok", "data": data}
 
-    def set_data(self, table, data):
+    def set_data(self, table: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        向指定表插入或更新数据。
+        如果 data 中包含 id 且存在，则更新；否则插入。
+        """
         try:
             metadata = MetaData()
             table_obj = Table(table, metadata, autoload_with=db_obj.engine)
@@ -156,10 +170,8 @@ class DbMgr:
             return {"code": -1, "msg": 'error ' + str(e)}
         return {"code": 0, "msg": "ok", "data": id}
 
-    def add_score(self, user_id, value, action, msg):
-        '''
-            增加积分
-        '''
+    def add_score(self, user_id: int, value: int, action: str, msg: Optional[str]) -> Dict[str, Any]:
+        """为用户增加或扣除积分，并记录历史。"""
         try:
             # 查找用户
             user = User.query.get(user_id)
@@ -199,7 +211,8 @@ class DbMgr:
             traceback.print_exc()
             return {"code": -1, "msg": f'error: {str(e)}'}
 
-    def del_data(self, table, id: int) -> dict:
+    def del_data(self, table: str, id: int) -> Dict[str, Any]:
+        """从指定表删除一条数据。"""
         try:
             # 动态获取表对象
             metadata = MetaData()
@@ -215,7 +228,8 @@ class DbMgr:
             return {"code": -1, "msg": 'error ' + str(e)}
         return {"code": 0, "msg": "ok", "data": cnt}
 
-    def query(self, sql) -> dict:
+    def query(self, sql: str) -> Dict[str, Any]:
+        """执行原生 SQL 查询。"""
         try:
             result = db_obj.session.execute(text(sql))
             rows = result.fetchall()
@@ -230,7 +244,7 @@ class DbMgr:
             return {"code": -1, "msg": 'error ' + str(e)}
         return {"code": 0, "msg": "ok", "data": data}
 
-    def get_list(self, table, page_num=1, page_size=20, fields: str | list = '*', conditions=None) -> dict:
+    def get_list(self, table: str, page_num: int = 1, page_size: int = 20, fields: Union[str, List[str]] = '*', conditions: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         try:
             # 动态获取表结构
             metadata = MetaData()

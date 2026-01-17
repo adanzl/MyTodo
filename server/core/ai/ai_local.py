@@ -1,12 +1,13 @@
 import json
+import os
 
 import requests
-from core.log_config import app_logger
+from core.config import app_logger
 
 log = app_logger
-API_URL = "http://192.168.50.171:9098/v1"
+API_URL = os.getenv("AI_DIFY_API_URL", "http://192.168.50.171:9098/v1")
 # cSpell: disable-next-line
-API_KEY = "app-dLf0axfqNnVHwWjFqs0EVo8H"
+API_KEY = os.getenv("AI_DIFY_API_KEY", "")
 
 HEADERS = {
     "Content-Type": "application/json",

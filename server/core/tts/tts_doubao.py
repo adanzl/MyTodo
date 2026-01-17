@@ -1,10 +1,11 @@
 import base64
+import os
 import uuid
 import requests
 
-API_URL = 'https://openspeech.bytedance.com/api/v1/tts'
-API_ID = '9815505713'
-API_TOKEN = 'GRoDq8HhDpyGe7NtdC44thL0uuNtTDfZ'
+API_URL = os.getenv("DOUBAO_TTS_API_URL", 'https://openspeech.bytedance.com/api/v1/tts')
+API_ID = os.getenv("DOUBAO_TTS_API_ID", '')
+API_TOKEN = os.getenv("DOUBAO_TTS_API_TOKEN", '')
 
 
 def gen_tts(text: str, voice_id: str):

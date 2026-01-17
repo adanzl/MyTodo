@@ -12,7 +12,7 @@ from bleak.backends.scanner import AdvertisementData
 
 from core.device.bluetooth import BluetoothDev
 from core.tools.async_util import run_async
-from core.log_config import app_logger
+from core.config import app_logger
 
 log = app_logger
 

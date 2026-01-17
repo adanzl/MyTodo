@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 import upnpclient
 from ssdpy import SSDPClient
 
-from core.log_config import app_logger
+from core.config import app_logger
 from core.utils import convert_to_http_url
 
 log = app_logger

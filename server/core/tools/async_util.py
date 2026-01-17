@@ -9,7 +9,7 @@ from queue import Queue, Empty
 
 from gevent import Timeout as GeventTimeout
 from gevent import spawn
-from core.log_config import app_logger
+from core.config import app_logger
 
 log = app_logger
 

@@ -14,8 +14,8 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
-from core.log_config import app_logger
-from core.models.const import (ALLOWED_AUDIO_EXTENSIONS, MEDIA_BASE_DIR, FFMPEG_PATH, FFMPEG_TIMEOUT,
+from core.config import app_logger
+from core.config import (ALLOWED_AUDIO_EXTENSIONS, MEDIA_BASE_DIR, FFMPEG_PATH, FFMPEG_TIMEOUT,
                                get_media_task_dir, get_media_task_result_dir, TASK_STATUS_PENDING,
                                TASK_STATUS_PROCESSING, TASK_STATUS_SUCCESS, TASK_STATUS_FAILED)
 from core.utils import get_media_duration, ensure_directory, run_subprocess_safe

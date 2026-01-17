@@ -11,7 +11,7 @@ from dashscope.audio.tts_v2 import *
 
 
 try:
-    from core.log_config import app_logger
+    from core.config import app_logger
     log = app_logger
 except:
     import logging

@@ -12,10 +12,10 @@ load_dotenv()
 
 from flask import make_response
 from core import create_app
-from core.log_config import app_logger, access_logger
+from core.config import app_logger, access_logger, config
 
 # 生产环境判断
-IS_PRODUCTION = os.environ.get('ENV', 'development').lower() == 'production'
+IS_PRODUCTION = config.IS_PRODUCTION
 
 log = app_logger
 
@@ -45,11 +45,9 @@ def null_application(environ, start_response):
 
 
 if __name__ == '__main__':
-    import os
-
-    # 支持环境变量配置
-    PORT = int(os.environ.get('PORT', 8000))
-    HOST = os.environ.get('HOST', '127.0.0.1')
+    # 支持统一配置
+    PORT = config.PORT
+    HOST = config.HOST
 
     # 只在开发环境禁用浏览器缓存
     if not IS_PRODUCTION:
