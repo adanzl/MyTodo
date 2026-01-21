@@ -3,6 +3,7 @@ import json
 
 import pytest
 from flask import Flask
+from werkzeug.exceptions import RequestEntityTooLarge
 
 import core.api.pdf_routes as pdf_routes
 
@@ -42,6 +43,7 @@ def test_pdf_upload_requires_filename(client):
 
 
 def test_pdf_upload_ok(client, monkeypatch):
+
     def fake_upload_file(file, filename):
         assert filename == "a.pdf"
         return 0, "ok", {"filename": filename}
@@ -56,6 +58,26 @@ def test_pdf_upload_ok(client, monkeypatch):
     assert body["data"]["filename"] == "a.pdf"
 
 
+def test_pdf_upload_handles_request_entity_too_large(client, monkeypatch):
+    monkeypatch.setattr(pdf_routes.pdf_mgr, "upload_file", lambda f, fn: (_ for _ in ()).throw(RequestEntityTooLarge()))
+    data = {"file": (io.BytesIO(b"%PDF-1.4"), "a.pdf")}
+    resp = client.post("/pdf/upload", data=data, content_type="multipart/form-data")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["code"] != 0
+    assert "文件太大" in body["msg"]
+
+
+def test_pdf_upload_handles_generic_exception(client, monkeypatch):
+    monkeypatch.setattr(pdf_routes.pdf_mgr, "upload_file", lambda f, fn: (_ for _ in ()).throw(Exception("boom")))
+    data = {"file": (io.BytesIO(b"%PDF-1.4"), "a.pdf")}
+    resp = client.post("/pdf/upload", data=data, content_type="multipart/form-data")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["code"] != 0
+    assert "boom" in body["msg"]
+
+
 def test_pdf_decrypt_requires_task_id(client):
     resp = client.post("/pdf/decrypt", data=json.dumps({}), content_type="application/json")
     assert resp.status_code == 200
@@ -68,7 +90,10 @@ def test_pdf_decrypt_ok(client, monkeypatch):
 
     resp = client.post(
         "/pdf/decrypt",
-        data=json.dumps({"task_id": "a.pdf", "password": "p"}),
+        data=json.dumps({
+            "task_id": "a.pdf",
+            "password": "p"
+        }),
         content_type="application/json",
     )
     assert resp.status_code == 200
@@ -91,14 +116,49 @@ def test_pdf_decrypt_err_from_mgr(client, monkeypatch):
     assert body["msg"] == "bad"
 
 
+def test_pdf_decrypt_handles_exception(client, monkeypatch):
+    monkeypatch.setattr(pdf_routes.pdf_mgr, "decrypt", lambda task_id, password:
+                        (_ for _ in ()).throw(Exception("boom")))
+    resp = client.post(
+        "/pdf/decrypt",
+        data=json.dumps({"task_id": "a.pdf"}),
+        content_type="application/json",
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["code"] != 0
+    assert "boom" in body["msg"]
+
+
 def test_pdf_task_status_ok(client, monkeypatch):
-    monkeypatch.setattr(pdf_routes.pdf_mgr, "get_task_status", lambda task_id: (0, "ok", {"id": task_id, "status": "done"}))
+    monkeypatch.setattr(pdf_routes.pdf_mgr, "get_task_status", lambda task_id: (0, "ok", {
+        "id": task_id,
+        "status": "done"
+    }))
 
     resp = client.get("/pdf/task/a.pdf")
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["code"] == 0
     assert body["data"]["id"] == "a.pdf"
+
+
+def test_pdf_task_status_err_from_mgr(client, monkeypatch):
+    monkeypatch.setattr(pdf_routes.pdf_mgr, "get_task_status", lambda task_id: (-1, "not found", None))
+    resp = client.get("/pdf/task/a.pdf")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["code"] != 0
+    assert body["msg"] == "not found"
+
+
+def test_pdf_task_status_handles_exception(client, monkeypatch):
+    monkeypatch.setattr(pdf_routes.pdf_mgr, "get_task_status", lambda task_id: (_ for _ in ()).throw(Exception("boom")))
+    resp = client.get("/pdf/task/a.pdf")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["code"] != 0
+    assert "boom" in body["msg"]
 
 
 def test_pdf_list_ok(client, monkeypatch):
@@ -108,6 +168,15 @@ def test_pdf_list_ok(client, monkeypatch):
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["code"] == 0
+
+
+def test_pdf_list_handles_exception(client, monkeypatch):
+    monkeypatch.setattr(pdf_routes.pdf_mgr, "list", lambda: (_ for _ in ()).throw(Exception("boom")))
+    resp = client.get("/pdf/list")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["code"] != 0
+    assert "boom" in body["msg"]
 
 
 def test_pdf_download_invalid_type(client):
@@ -126,6 +195,29 @@ def test_pdf_download_file_not_exists(client, monkeypatch):
     assert body["code"] != 0
 
 
+def test_pdf_download_ok_unlocked(client, monkeypatch):
+    monkeypatch.setattr(pdf_routes.os.path, "exists", lambda p: True)
+    monkeypatch.setattr(pdf_routes, "send_file", lambda *args, **kwargs: "ok")
+    resp = client.get("/pdf/download/a.pdf?type=unlocked")
+    assert resp.status_code == 200
+
+
+def test_pdf_download_ok_uploaded(client, monkeypatch):
+    monkeypatch.setattr(pdf_routes.os.path, "exists", lambda p: True)
+    monkeypatch.setattr(pdf_routes, "send_file", lambda *args, **kwargs: "ok")
+    resp = client.get("/pdf/download/a.pdf?type=uploaded")
+    assert resp.status_code == 200
+
+
+def test_pdf_download_handles_exception(client, monkeypatch):
+    monkeypatch.setattr(pdf_routes.os.path, "exists", lambda p: (_ for _ in ()).throw(Exception("boom")))
+    resp = client.get("/pdf/download/a.pdf?type=unlocked")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["code"] != 0
+    assert "boom" in body["msg"]
+
+
 def test_pdf_delete_requires_task_id(client):
     resp = client.post("/pdf/delete", data=json.dumps({}), content_type="application/json")
     assert resp.status_code == 200
@@ -141,3 +233,21 @@ def test_pdf_delete_ok(client, monkeypatch):
     body = resp.get_json()
     assert body["code"] == 0
     assert body["data"]["message"] == "deleted"
+
+
+def test_pdf_delete_err_from_mgr(client, monkeypatch):
+    monkeypatch.setattr(pdf_routes.pdf_mgr, "delete", lambda task_id: (-1, "bad"))
+    resp = client.post("/pdf/delete", data=json.dumps({"task_id": "a.pdf"}), content_type="application/json")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["code"] != 0
+    assert body["msg"] == "bad"
+
+
+def test_pdf_delete_handles_exception(client, monkeypatch):
+    monkeypatch.setattr(pdf_routes.pdf_mgr, "delete", lambda task_id: (_ for _ in ()).throw(Exception("boom")))
+    resp = client.post("/pdf/delete", data=json.dumps({"task_id": "a.pdf"}), content_type="application/json")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["code"] != 0
+    assert "boom" in body["msg"]

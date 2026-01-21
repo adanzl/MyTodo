@@ -43,6 +43,7 @@ def test_bluetooth_scan_default_timeout(client, monkeypatch):
 
 
 def test_bluetooth_scan_custom_timeout(client, monkeypatch):
+
     def fake_scan_devices_sync(timeout):
         assert timeout == 1.25
         return []
@@ -54,6 +55,69 @@ def test_bluetooth_scan_custom_timeout(client, monkeypatch):
     body = resp.get_json()
     assert body["code"] == 0
     assert body["data"] == []
+
+
+def test_bluetooth_scan_exception_returns_err(client, monkeypatch):
+    monkeypatch.setattr(bluetooth_routes.bluetooth_mgr, "scan_devices_sync", lambda timeout:
+                        (_ for _ in ()).throw(RuntimeError("boom")))
+
+    resp = client.get("/bluetooth/scan")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["code"] != 0
+    assert "boom" in body["msg"]
+
+
+def test_bluetooth_device_exception_returns_err(client, monkeypatch):
+    monkeypatch.setattr(bluetooth_routes.bluetooth_mgr, "get_device", lambda address:
+                        (_ for _ in ()).throw(RuntimeError("boom")))
+
+    resp = client.get("/bluetooth/device?address=AA:BB")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["code"] != 0
+    assert "boom" in body["msg"]
+
+
+def test_bluetooth_connect_exception_returns_err(client, monkeypatch):
+    monkeypatch.setattr(bluetooth_routes.bluetooth_mgr, "connect_device_sync", lambda address:
+                        (_ for _ in ()).throw(RuntimeError("boom")))
+
+    resp = client.post(
+        "/bluetooth/connect",
+        data=json.dumps({"address": "AA:BB"}),
+        content_type="application/json",
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["code"] != 0
+    assert "boom" in body["msg"]
+
+
+def test_bluetooth_disconnect_exception_returns_err(client, monkeypatch):
+    monkeypatch.setattr(bluetooth_routes.bluetooth_mgr, "disconnect_device_sync", lambda address:
+                        (_ for _ in ()).throw(RuntimeError("boom")))
+
+    resp = client.post(
+        "/bluetooth/disconnect",
+        data=json.dumps({"address": "AA:BB"}),
+        content_type="application/json",
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["code"] != 0
+    assert "boom" in body["msg"]
+
+
+def test_bluetooth_paired_exception_returns_err(client, monkeypatch):
+    monkeypatch.setattr(bluetooth_routes.bluetooth_mgr, "get_paired_devices", lambda:
+                        (_ for _ in ()).throw(RuntimeError("boom")))
+
+    resp = client.get("/bluetooth/paired")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["code"] != 0
+    assert "boom" in body["msg"]
 
 
 def test_bluetooth_device_requires_address(client):
@@ -93,7 +157,11 @@ def test_bluetooth_connect_requires_address(client):
 
 
 def test_bluetooth_connect_returns_raw_result_when_standard_format(client, monkeypatch):
-    monkeypatch.setattr(bluetooth_routes.bluetooth_mgr, "connect_device_sync", lambda address: {"code": 0, "msg": "ok", "data": address})
+    monkeypatch.setattr(bluetooth_routes.bluetooth_mgr, "connect_device_sync", lambda address: {
+        "code": 0,
+        "msg": "ok",
+        "data": address
+    })
 
     resp = client.post(
         "/bluetooth/connect",
@@ -128,7 +196,11 @@ def test_bluetooth_disconnect_requires_address(client):
 
 
 def test_bluetooth_disconnect_returns_raw_result_when_standard_format(client, monkeypatch):
-    monkeypatch.setattr(bluetooth_routes.bluetooth_mgr, "disconnect_device_sync", lambda address: {"code": 0, "msg": "ok", "data": address})
+    monkeypatch.setattr(bluetooth_routes.bluetooth_mgr, "disconnect_device_sync", lambda address: {
+        "code": 0,
+        "msg": "ok",
+        "data": address
+    })
 
     resp = client.post(
         "/bluetooth/disconnect",

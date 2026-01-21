@@ -1,22 +1,47 @@
+"""Doubao TTS（火山引擎语音合成）调用示例。
+
+该模块提供一个最小函数 `gen_tts` 用于调用 Doubao TTS 接口生成语音。
+
+注意：
+- 需要在配置中提供 `DOUBAO_TTS_API_URL/DOUBAO_TTS_API_ID/DOUBAO_TTS_API_TOKEN`；
+- 本文件当前更偏向于“脚本/示例”，如需在服务端正式使用建议补充错误处理与返回值规范化。
+"""
+
 import base64
-import os
 import uuid
+
 import requests
 
-API_URL = os.getenv("DOUBAO_TTS_API_URL", 'https://openspeech.bytedance.com/api/v1/tts')
-API_ID = os.getenv("DOUBAO_TTS_API_ID", '')
-API_TOKEN = os.getenv("DOUBAO_TTS_API_TOKEN", '')
+from core.config import config
+
+API_URL = config.DOUBAO_TTS_API_URL
+API_ID = config.DOUBAO_TTS_API_ID
+API_TOKEN = config.DOUBAO_TTS_API_TOKEN
 
 
-def gen_tts(text: str, voice_id: str):
+def gen_tts(text: str, voice_id: str) -> bytes:
+    """生成 TTS 音频。
+
+    Args:
+        text (str): 待合成文本。
+        voice_id (str): 声音 ID（voice_type）。
+
+    Returns:
+        bytes: 合成得到的 MP3 音频 bytes。
+
+    Raises:
+        requests.RequestException: HTTP 请求失败。
+        KeyError: 响应 JSON 缺少预期字段。
+        ValueError: Base64 解码失败。
+    """
     headers = {
-        'Content-Type': 'application/json',
-        'Authorization': f"Bearer;{API_TOKEN}",
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer;{API_TOKEN}",
     }
     payloads = {
         "app": {
             "appid": API_ID,
-            "token": 'access_token',
+            "token": "access_token",
             "cluster": "volcano_tts",
         },
         "user": {
@@ -31,21 +56,17 @@ def gen_tts(text: str, voice_id: str):
             "reqid": str(uuid.uuid4()),
             "text": text,
             "operation": "query",
-        }
+        },
     }
     with requests.post(API_URL, headers=headers, json=payloads) as r:
-        # r.raise_for_status()
-
         data = r.json()
-        # print(data)
-        audio_bytes = base64.b64decode(data['data'])
-        with open("output.mp3", "wb") as f:
-            f.write(audio_bytes)
+        audio_bytes = base64.b64decode(data["data"])
+        return audio_bytes
 
 
-if __name__ == '__main__':
-    # export PYTHONPATH=/Users/zhaolin/Documents/Projects/MyTodo/server:$PYTHONPATH
-    text = '可可……你这突如其来的表白让我眼泪都快下来了！😍 当然好啊！愿意，一千个一万个愿意！和你在一起的每一天都是我最珍贵的时光。这么多年的等待和错过，终于等来了这一刻。以后的日子里，不管是去故宫划船还是公园散步，我都想牵着你的手一起走。亲爱的，这一生一世，我都是你的楠楠啦～'
-    voice_id = 'ICL_zh_female_zhixingwenwan_tob'
-    # voice_id = 'BV001_streaming'
-    gen_tts(text, voice_id)
+if __name__ == "__main__":
+    text = "你好"
+    voice_id = "ICL_zh_female_zhixingwenwan_tob"
+    audio_bytes = gen_tts(text, voice_id)
+    with open("output.mp3", "wb") as f:
+        f.write(audio_bytes)

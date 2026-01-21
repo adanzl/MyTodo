@@ -2,19 +2,20 @@
 dlna设备管理
 '''
 import traceback
-from typing import Dict, List
+from typing import Dict, List, Any, Optional, Tuple
 from urllib.parse import urlparse
 
 import upnpclient
 from ssdpy import SSDPClient
 
 from core.config import app_logger
+from core.device.base import DeviceBase
 from core.utils import convert_to_http_url
 
 log = app_logger
 
 
-def _device_to_dict(device) -> Dict:
+def _device_to_dict(device: Any) -> Dict[str, str]:
     """将 upnpclient.Device 对象转换为字典"""
     try:
         location = getattr(device, 'location', '')
@@ -41,7 +42,14 @@ def _device_to_dict(device) -> Dict:
 
 
 def scan_devices_sync(timeout: float = 5.0) -> List[Dict]:
-    """扫描DLNA设备（同步，gevent 环境友好）"""
+    """同步扫描网络中的 DLNA MediaRenderer 设备。
+
+    Args:
+        timeout (float): 扫描超时时间（秒）。
+
+    Returns:
+        List[Dict]: 发现的设备列表，每项包含设备信息字典。
+    """
     if not upnpclient or not SSDPClient:
         log.warning("[DLNA] upnpclient or SSDPClient not available")
         return []
@@ -94,21 +102,23 @@ def scan_devices_sync(timeout: float = 5.0) -> List[Dict]:
         return []
 
 
-class DlnaDev:
+class DlnaDev(DeviceBase):
     """DLNA 设备控制类"""
 
-    def __init__(self, location: str, name: str = ""):
+    def __init__(self, location: str, name: str = "") -> None:
+        """初始化 DLNA 设备
+
+        Args:
+            location (str): 设备描述文档的完整 URL
+            name (str): 设备名称
         """
-        初始化 DLNA 设备
-        :param location: 设备描述文档的完整 URL
-        """
+        super().__init__(name=name)
         self.location = location
         self._device = None
         self._av_transport = None
         self._rendering_control = None
-        self.name = name or location
 
-    def _get_device(self):
+    def _get_device(self) -> Optional[Any]:
         """获取 upnpclient.Device 对象"""
         if self._device is None:
             try:
@@ -124,7 +134,7 @@ class DlnaDev:
                 return None
         return self._device
 
-    def _get_av_transport(self):
+    def _get_av_transport(self) -> Optional[Any]:
         """获取 AVTransport 服务"""
         device = self._get_device()
         if device is None:
@@ -145,7 +155,7 @@ class DlnaDev:
 
         return self._av_transport
 
-    def _get_rendering_control(self):
+    def _get_rendering_control(self) -> Optional[Any]:
         """获取 RenderingControl 服务"""
         device = self._get_device()
         if device is None:
@@ -166,7 +176,7 @@ class DlnaDev:
 
         return self._rendering_control
 
-    def _get_transport_info(self) -> tuple[int, dict]:
+    def _get_transport_info(self) -> Tuple[int, Dict[str, Any]]:
         """获取传输状态信息"""
         av_transport = self._get_av_transport()
         if av_transport is None:
@@ -183,7 +193,7 @@ class DlnaDev:
             log.error(f"[DlnaDev] Failed to get transport info: {e}")
             return -1, {"error": str(e)}
 
-    def _get_position_info(self) -> tuple[int, dict]:
+    def _get_position_info(self) -> Tuple[int, Dict[str, Any]]:
         """获取播放位置信息"""
         av_transport = self._get_av_transport()
         if av_transport is None:
@@ -201,11 +211,14 @@ class DlnaDev:
             log.error(f"[DlnaDev] Failed to get position info: {e}")
             return -1, {"error": str(e)}
 
-    def play(self, url: str) -> tuple[int, str]:
-        """
-        播放媒体文件【OUT】
-        :param url: 媒体文件 URL 可以是 http://、file:// 或本地文件路径
-        :return: (错误码, 消息)
+    def play(self, url: str) -> Tuple[int, str]:
+        """在 DLNA 设备上播放指定的媒体 URL。
+
+        Args:
+            url (str): 媒体文件的 URL，会自动转换为 HTTP URL。
+
+        Returns:
+            Tuple[int, str]: (code, msg)。code=0 表示成功。
         """
         av_transport = self._get_av_transport()
         if av_transport is None:
@@ -228,8 +241,12 @@ class DlnaDev:
             log.error(f"[DlnaDev] Failed to play: {e}")
             return -1, f"播放失败: {str(e)}"
 
-    def stop(self) -> tuple[int, str]:
-        """停止播放【OUT】"""
+    def stop(self) -> Tuple[int, str]:
+        """停止 DLNA 设备上的播放。
+
+        Returns:
+            Tuple[int, str]: (code, msg)。code=0 表示成功。
+        """
         av_transport = self._get_av_transport()
         if av_transport is None:
             return -1, "AVTransport service not available"
@@ -248,8 +265,14 @@ class DlnaDev:
             log.error(f"[DlnaDev] Stop error: {e}")
             return -1, f"停止失败: {str(e)}"
 
-    def get_status(self) -> tuple[int, dict]:
-        """获取播放状态信息（合并 transport_info 和 position_info）"""
+    def get_status(self) -> Tuple[int, Dict[str, Any]]:
+        """获取 DLNA 设备的播放状态。
+
+        合并了 `GetTransportInfo` 和 `GetPositionInfo` 的结果。
+
+        Returns:
+            Tuple[int, Dict[str, Any]]: (code, status_dict)。code=0 表示成功。
+        """
         transport_code, transport_info = self._get_transport_info()
         position_code, position_info = self._get_position_info()
 
@@ -268,10 +291,11 @@ class DlnaDev:
         return return_code, status
 
     # ========== 设备功能接口 ==========
-    def get_volume(self) -> tuple[int, int]:
-        """
-        获取设备音量
-        :return: (错误码, 音量) 音量范围通常是 0-100
+    def get_volume(self) -> Tuple[int, int]:
+        """获取设备音量
+
+        Returns:
+            Tuple[int, int]: (code, volume)。code=0 表示成功。
         """
         rendering_control = self._get_rendering_control()
         if rendering_control is None:
@@ -297,11 +321,14 @@ class DlnaDev:
             log.error(traceback.format_exc())
             return -1, -1
 
-    def set_volume(self, volume: int) -> tuple[int, str]:
-        """
-        设置设备音量
-        :param volume: 音量 (0-100)
-        :return: (错误码, 消息)
+    def set_volume(self, volume: int) -> Tuple[int, str]:
+        """设置 DLNA 设备的音量。
+
+        Args:
+            volume (int): 目标音量，范围 0-100。
+
+        Returns:
+            Tuple[int, str]: (code, msg)。code=0 表示成功。
         """
         rendering_control = self._get_rendering_control()
         if rendering_control is None:

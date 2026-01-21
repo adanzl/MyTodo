@@ -1,23 +1,27 @@
 '''
 蓝牙设备类
 '''
-from typing import Dict, Optional
+from typing import Dict, Optional, Any, Union
 
 from bleak import BleakClient
 
 
-class BluetoothDev:
+class BluetoothDev(DeviceBase):
     """蓝牙设备类"""
 
-    def __init__(self, address: str, name: str = "", metadata: dict = None):
+    def __init__(self, address: str, name: str = "", metadata: Optional[Dict[str, Any]] = None):
+        super().__init__(name=name)
         self.address = address
-        self.name = name or address
         self.metadata = metadata or {}
         self.connected = False
         self.client: Optional[BleakClient] = None
 
-    def to_dict(self) -> Dict:
-        """转换为字典，确保所有数据都是 JSON 可序列化的"""
+    def to_dict(self) -> Dict[str, Any]:
+        """将设备信息转换为可序列化为 JSON 的字典。
+
+        Returns:
+            Dict[str, Any]: 包含设备地址、名称、连接状态和元数据的字典。
+        """
         return {
             "address": str(self.address),
             "name": str(self.name) if self.name else str(self.address),
@@ -25,7 +29,7 @@ class BluetoothDev:
             "metadata": self._ensure_json_serializable(self.metadata)
         }
 
-    def _ensure_json_serializable(self, obj):
+    def _ensure_json_serializable(self, obj: Any) -> Union[Dict[str, Any], list, str, int, float, bool, None]:
         """递归确保对象是 JSON 可序列化的"""
         if isinstance(obj, bytes):
             return {'hex': obj.hex(), 'length': len(obj)}
@@ -38,8 +42,28 @@ class BluetoothDev:
         else:
             return obj
 
+    def play(self, url: str) -> tuple[int, str]:
+        """播放媒体文件"""
+        return 0, "ok"
+
+    def stop(self) -> tuple[int, str]:
+        """停止播放"""
+        return 0, "ok"
+
+    def get_status(self) -> tuple[int, dict]:
+        """获取设备状态"""
+        return 0, {"status": "ok"}
+
+    def get_volume(self) -> tuple[int, int]:
+        """获取设备音量"""
+        return 0, 100
+
+    def set_volume(self, volume: int) -> tuple[int, str]:
+        """设置设备音量"""
+        return 0, "ok"
 
 # 从 services 导入 BluetoothMgr 和全局实例
+from core.device.base import DeviceBase
 from core.services.bluetooth_mgr import bluetooth_mgr
 
 if __name__ == "__main__":

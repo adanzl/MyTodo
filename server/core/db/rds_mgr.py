@@ -1,3 +1,13 @@
+"""Redis 访问封装（带 gevent 超时保护）。
+
+该模块提供一组轻量函数用于：
+- 获取/设置简单 key-value；
+- 操作列表（lrange/lpush/rpush/llen）；
+并通过 `gevent.Timeout` 为部分操作提供超时保护，避免阻塞主 greenlet。
+
+注意：当前 Redis 连接参数为静态配置（host/port/db），如需环境化可在后续收敛到 `core.config`。
+"""
+
 import redis
 from gevent import Timeout
 
@@ -12,78 +22,71 @@ rds = redis.Redis(
 )
 
 
-def _safe_redis_operation(operation, timeout=3.0):
-    """安全执行 Redis 操作，带超时保护"""
+def _safe_redis_operation(operation, timeout: float = 3.0):
+    """安全执行 Redis 操作，带超时保护。
+
+    Args:
+        operation: 一个无参可调用对象，用于实际执行 Redis 调用。
+        timeout (float): 超时秒数。
+
+    Returns:
+        Any: operation 的返回值。
+
+    Raises:
+        redis.TimeoutError: 当 gevent 超时触发。
+        Exception: 透传 operation 抛出的异常。
+    """
     try:
         with Timeout(timeout):
             return operation()
     except Timeout:
         raise redis.TimeoutError(f"Redis operation timeout after {timeout} seconds")
-    except Exception as e:
-        raise
 
 
-def get_str(key) -> str:
+def get_str(key: str) -> str:
+    """获取字符串值（bytes -> str），不存在时返回空字符串。"""
     v = rds.get(key)
     if v is None:
         return ''
     return v.decode('utf-8')
 
 
-def get(key):
-    """获取 Redis 键值，带超时保护"""
+def get(key: str):
+    """获取 Redis 键值（带超时保护）。"""
     return _safe_redis_operation(lambda: rds.get(key), timeout=3.0)
 
 
-def set(key, value):
-    """设置 Redis 键值，带超时保护"""
+def set(key: str, value) -> bool:
+    """设置 Redis 键值（带超时保护）。"""
     return _safe_redis_operation(lambda: rds.set(key, value), timeout=3.0)
 
 
-def append_value(key, value):
-    rds.append(key, value)
+def append_value(key: str, value) -> int:
+    """向字符串 key 追加内容。"""
+    return rds.append(key, value)
 
 
-def exists(key):
+def exists(key: str) -> int:
+    """判断 key 是否存在。"""
     return rds.exists(key)
 
 
-def llen(key):
-    """
-    获取列表长度
-    :param key: Redis键名
-    :return: 列表长度
-    """
+def llen(key: str) -> int:
+    """获取列表长度。"""
     return rds.llen(key)
 
 
-def lrange(key, start, end):
-    """
-    获取列表指定范围的数据
-    :param key: Redis键名
-    :param start: 起始索引 include
-    :param end: 结束索引 include
-    :return: 列表数据
-    """
+def lrange(key: str, start: int, end: int) -> list[str]:
+    """获取列表指定范围的数据（bytes -> str）。"""
     data = rds.lrange(key, start, end)
     return [item.decode('utf-8') for item in data]
 
 
-def lpush(key, value):
-    """
-    在列表头部插入数据
-    :param key: Redis键名
-    :param value: 要插入的值
-    :return: 插入后列表的长度
-    """
+def lpush(key: str, value) -> int:
+    """在列表头部插入数据。"""
     return rds.lpush(key, value)
 
 
-def rpush(key, value):
-    """
-    在列表尾部插入数据
-    :param key: Redis键名
-    :param value: 要插入的值
-    :return: 插入后列表的长度
-    """
+def rpush(key: str, value) -> int:
+    """在列表尾部插入数据。"""
     return rds.rpush(key, value)

@@ -2,6 +2,7 @@
 小米设备管理
 '''
 # 必须在导入 miservice 之前 patch fake_useragent，避免 ThreadPoolExecutor 导致的 LoopExit
+from core.device.base import DeviceBase
 from core.tools.useragent_fix import patch_fake_useragent
 
 patch_fake_useragent()
@@ -9,28 +10,27 @@ patch_fake_useragent()
 import asyncio
 import json
 import os
-import traceback
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple, Any
 
 from aiohttp import ClientSession
 from miservice import MiAccount, MiNAService
 
-from core.config import app_logger
+from core.config import app_logger, config
 from core.tools.async_util import run_async
 from core.utils import convert_to_http_url, format_time_str
 
 log = app_logger
 
 # 从环境变量读取小米账号信息，如果没有则使用默认值
-DEFAULT_MI_USERNAME = os.getenv("MI_USER", "")
-DEFAULT_MI_PASSWORD = os.getenv("MI_PASS", "")
+DEFAULT_MI_USERNAME = config.MI_USER
+DEFAULT_MI_PASSWORD = config.MI_PASS
 
 # Token 文件路径
 TOKEN_FILE = os.path.join(str(Path.home()), ".mi.token")
 
 
-def _device_to_dict(device) -> Dict:
+def _device_to_dict(device: Dict[str, Any]) -> Dict[str, str]:
     """将 Device 对象转换为字典"""
     try:
         return {
@@ -46,7 +46,7 @@ def _device_to_dict(device) -> Dict:
         return {}
 
 
-async def _get_device_did_async(username: str, password: str, device_id: str) -> tuple[int, str]:
+async def _get_device_did_async(username: str, password: str, device_id: str) -> Tuple[int, str]:
     session = None
     try:
         session = ClientSession()
@@ -64,26 +64,40 @@ async def _get_device_did_async(username: str, password: str, device_id: str) ->
     return -1, "设备未找到"
 
 
-class MiDevice:
+class MiDevice(DeviceBase):
     """小米设备管理"""
     scanning = False
 
-    def __init__(self, address: str, username: str = None, password: str = None, name: str = ""):
+    def __init__(self,
+                 address: str,
+                 username: Optional[str] = None,
+                 password: Optional[str] = None,
+                 name: str = "") -> None:
+        """初始化小米设备。
+
+        Args:
+            address (str): 设备 ID。
+            username (Optional[str]): 小米账号用户名。如果为 None，则从配置中读取。
+            password (Optional[str]): 小米账号密码。如果为 None，则从配置中读取。
+            name (str): 设备名称。
         """
-        初始化小米设备
-        :param address: 设备ID或地址
-        :param username: 小米账号用户名（可选，使用默认值）
-        :param password: 小米账号密码（可选，使用默认值）
-        """
+        super().__init__(name=name)
         self.device_id = address  # 小米设备使用 deviceID 作为地址
         self.username = username or DEFAULT_MI_USERNAME
         self.password = password or DEFAULT_MI_PASSWORD
-        self.name = name or address
         self.device_did = None
 
     @staticmethod
-    async def scan_devices(username: str = None, password: str = None) -> List[Dict]:
-        """扫描小米设备"""
+    async def scan_devices(username: Optional[str] = None, password: Optional[str] = None) -> List[Dict[str, str]]:
+        """扫描小米设备
+
+        Args:
+            username (Optional[str]): 小米账号用户名（可选，使用默认值）
+            password (Optional[str]): 小米账号密码（可选，使用默认值）
+
+        Returns:
+            List[Dict[str, str]]: 设备列表
+        """
         if MiDevice.scanning:
             log.warning("[MiDevice] Already scanning")
             return []
@@ -135,11 +149,14 @@ class MiDevice:
         return MiAccount(session, self.username, self.password, TOKEN_FILE)
 
     # ========== 统一设备接口 ==========
-    def play(self, url: str) -> tuple[int, str]:
-        """
-        播放媒体文件【OUT】
-        :param url: 媒体文件 URL (可以是 http://、file:// 或本地文件路径)
-        :return: (错误码, 消息)
+    def play(self, url: str) -> Tuple[int, str]:
+        """在小米设备上播放指定的媒体 URL。
+
+        Args:
+            url (str): 媒体文件的 URL，会自动转换为 HTTP URL。
+
+        Returns:
+            Tuple[int, str]: (code, msg)。code=0 表示成功。
         """
 
         async def _play_async():
@@ -187,10 +204,11 @@ class MiDevice:
             log.error(f"[MiDevice] Play error: {e}")
             return -1, f"播放失败: {str(e)}"
 
-    def stop(self) -> tuple[int, str]:
-        """
-        停止播放【OUT】
-        :return: (错误码, 消息)
+    def stop(self) -> Tuple[int, str]:
+        """停止小米设备上的播放。
+
+        Returns:
+            Tuple[int, str]: (code, msg)。code=0 表示成功。
         """
 
         async def _stop_async():
@@ -220,10 +238,11 @@ class MiDevice:
             log.error(f"[MiDevice] Stop error: {e}")
             return -1, f"停止失败: {str(e)}"
 
-    def get_status(self) -> tuple[int, dict]:
-        """
-        获取播放状态信息
-        :return: (错误码, 状态字典) 格式: {'state', 'status', 'track', 'duration', 'position', 'volume'}
+    def get_status(self) -> Tuple[int, Dict[str, Any]]:
+        """获取小米设备的播放状态。
+
+        Returns:
+            Tuple[int, Dict[str, Any]]: (code, status_dict)。code=0 表示成功。
         """
 
         async def _get_status_async():
@@ -295,10 +314,11 @@ class MiDevice:
             return -1, {"error": f"获取播放状态信息失败: {str(e)}"}
 
     # ========== 设备功能接口 ==========
-    def get_volume(self) -> tuple[int, int]:
-        """
-        获取设备音量
-        :return: (错误码, 音量)
+    def get_volume(self) -> Tuple[int, int]:
+        """获取小米设备的音量。
+
+        Returns:
+            Tuple[int, int]: (code, volume)。code=0 表示成功。
         """
         # 复用 get_status 方法，避免重复代码
         code, status = self.get_status()
@@ -309,11 +329,14 @@ class MiDevice:
         volume = status.get('volume', 0)
         return 0, volume
 
-    def set_volume(self, volume: int) -> tuple[int, str]:
-        """
-        设置设备音量
-        :param volume: 音量
-        :return: (错误码, 消息)
+    def set_volume(self, volume: int) -> Tuple[int, str]:
+        """设置小米设备的音量。
+
+        Args:
+            volume (int): 目标音量。
+
+        Returns:
+            Tuple[int, str]: (code, msg)。code=0 表示成功。
         """
 
         async def _set_volume_async():
@@ -342,10 +365,11 @@ class MiDevice:
             log.error(f"[MiDevice] Set volume error: {e}")
             return -1, -1
 
-    def get_device_did(self) -> tuple[int, str]:
-        """
-        获取设备did
-        :return: (错误码, did)
+    def get_device_did(self) -> Tuple[int, str]:
+        """获取小米设备的设备ID。
+
+        Returns:
+            Tuple[int, str]: (code, did)。code=0 表示成功。
         """
         try:
             if self.device_did is None:
@@ -362,7 +386,7 @@ class MiDevice:
 # 同步包装函数（用于在Flask路由中使用）
 
 
-def scan_devices_sync(timeout: float = 5.0) -> List[Dict]:
+def scan_devices_sync(timeout: float = 5.0) -> List[Dict[str, str]]:
     """同步扫描设备"""
     try:
         username = os.getenv("MI_USER", DEFAULT_MI_USERNAME)

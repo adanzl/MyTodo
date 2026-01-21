@@ -3,7 +3,7 @@ Agent 管理器
 用于管理多个 DeviceAgent 实例
 """
 import time
-from typing import Dict
+from typing import Dict, Optional, List, Any, Union
 from core.device.agent import DeviceAgent
 from core.config import app_logger
 from core.services.playlist_mgr import playlist_mgr
@@ -26,11 +26,11 @@ BUTTON_MAP = {
 class AgentMgr:
     """Agent 管理器，管理多个 DeviceAgent 实例"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._agents: Dict[str, DeviceAgent] = {}  # {agent_id: DeviceAgent}
-        self._devices: Dict[str, dict] = {}  # {agent_id: {'heartbeat_time': timestamp, 'agent_id': str}}
+        self._devices: Dict[str, Dict[str, Any]] = {}  # {agent_id: {'heartbeat_time': timestamp, 'agent_id': str}}
 
-    def _cleanup_expired_devices(self):
+    def _cleanup_expired_devices(self) -> None:
         """懒清理：清理过期设备"""
         current_time = time.time()
         expired_devices = []
@@ -43,13 +43,24 @@ class AgentMgr:
             self.remove_agent(agent_id)
             log.info(f"[AgentMgr] 移除过期设备: {agent_id}")
 
-    def handle_heartbeat(self, client_ip: str, address: str, name: str = None, actions: list = None) -> dict:
-        """
-        处理设备心跳
-        :param address: 设备地址（IP:PORT 格式）
-        :param name: 设备名称
-        :param actions: 设备支持的操作列表
-        :return: 设备信息字典
+    def handle_heartbeat(self,
+                         client_ip: str,
+                         address: str,
+                         name: Optional[str] = None,
+                         actions: Optional[List[str]] = None) -> Dict[str, Any]:
+        """处理并注册设备的周期性心跳。
+
+        如果设备是首次上报，则为其创建并注册一个新的 Agent 实例；
+        否则，更新其心跳时间及设备信息。
+
+        Args:
+            client_ip (str): 上报心跳的客户端 IP，作为 Agent 的唯一标识。
+            address (str): 设备的访问地址，通常是 IP:PORT 格式。
+            name (Optional[str]): 设备名称。
+            actions (Optional[List[str]]): 设备支持的操作列表。
+
+        Returns:
+            Dict[str, Any]: 更新或创建后的设备信息字典。
         """
         current_time = time.time()
         # 先清理过期设备
@@ -78,40 +89,54 @@ class AgentMgr:
         return self._devices[agent_id]
 
     def get_agent(self, agent_id: str) -> DeviceAgent:
-        """
-        获取或创建 Agent 实例
-        :param agent_id: Agent 标识，如果为 None 则返回默认 agent
-        :return: DeviceAgent 实例
+        """获取指定 ID 的 Agent 实例。
+
+        Args:
+            agent_id (str): Agent 唯一标识。
+
+        Returns:
+            DeviceAgent: 对应的 Agent 实例。
+
+        Raises:
+            KeyError: 当 `agent_id` 未注册时抛出。
         """
         return self._agents[agent_id]
 
-    def remove_agent(self, agent_id: str):
-        """
-        移除 Agent 实例
-        :param agent_id: Agent 标识
+    def remove_agent(self, agent_id: str) -> None:
+        """移除指定 ID 的 Agent 实例及其设备信息。
+
+        Args:
+            agent_id (str): 要移除的 Agent 的唯一标识。
         """
         self._devices.pop(agent_id, None)
         self._agents.pop(agent_id, None)
 
-    def get_all_agents(self, action: str = None) -> Dict[str, dict]:
+    def get_all_agents(self, action: Optional[str] = None) -> Union[Dict[str, Dict[str, Any]], List[Dict[str, Any]]]:
         """
         获取所有已注册的设备列表
-        :return: 设备信息字典
+        :param action: 可选的操作类型，如果提供则只返回支持该操作的设备列表
+        :return: 设备信息字典或设备列表
         """
         # 先清理过期设备
         self._cleanup_expired_devices()
         if not action:
             return self._devices
-        return [device for device in self._devices.values() if action in device['actions']]
+        return [device for device in self._devices.values() if action in device.get('actions', [])]
 
     def handle_event(self, client_ip: str, key: str, value: str, action: str) -> tuple[int, str]:
-        """
-        处理事件
-        :param client_ip: 客户端 IP
-        :param key: 事件键
-        :param value: 事件值
-        :param type: 事件类型
-        :return: 事件处理结果
+        _ = value
+        """处理来自 Agent 的事件上报。
+
+        目前主要用于处理键盘事件，并将特定按键映射为播放控制操作。
+
+        Args:
+            client_ip (str): 客户端 IP（Agent 唯一标识）。
+            key (str): 事件键（例如键盘按键）。
+            value (str): 事件值（预留字段，当前未使用）。
+            action (str): 事件动作类型（例如 "keyboard"）。
+
+        Returns:
+            tuple[int, str]: (code, msg)。code=0 表示成功。
         """
         _device = self._devices.get(client_ip)
         if not _device or action not in _device.get('actions', []):

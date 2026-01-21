@@ -1,7 +1,13 @@
-import os
+"""DashScope Voice Enrollment 快速脚本（Zero-shot prompt）。
+
+用于通过 DashScope `VoiceEnrollmentService.create_voice` 注册/复刻音色并输出 voice_id。
+该文件为实验脚本：直接运行会进行外部网络请求。
+"""
+
 import dashscope
-from dashscope.audio.tts_v2 import VoiceEnrollmentService, SpeechSynthesizer
-# cSpell: disable
+from dashscope.audio.tts_v2 import VoiceEnrollmentService
+
+from core.config import config
 
 # cosyvoice-taiyi-f42ada0a805d4a5cab0272a1d0acc834
 w1 = {
@@ -16,16 +22,11 @@ w2 = {
     'prefix': 'woman',
 }
 
-dashscope.api_key = os.getenv('ALI_KEY', '')
+dashscope.api_key = config.ALI_KEY
 target_model = "cosyvoice-v1"
-# cSpell: enable
-# 创建语音注册服务实例
+
 service = VoiceEnrollmentService()
 
-# 调用create_voice方法复刻声音，并生成voice_id
-# voice_id = service.create_voice(target_model=target_model, prefix=w1['prefix'], url=w1['url'])
-# print("requestId: ", service.get_last_request_id())
-# print(f"your voice id is {voice_id}")
 voice_id = service.create_voice(target_model=target_model, prefix=w2['prefix'], url=w2['url'])
 print("requestId: ", service.get_last_request_id())
 print(f"your voice id is {voice_id}")

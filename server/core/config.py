@@ -23,6 +23,7 @@ class Config:
 
     # ========== Flask 配置 ==========
     MAX_CONTENT_LENGTH: int = int(os.environ.get('MAX_CONTENT_LENGTH', 2000 * 1024 * 1024))  # 默认 2000MB
+    MAX_UPLOAD_FILE_SIZE: int = int(os.environ.get('MAX_UPLOAD_FILE_SIZE_MB', 2048)) * 1024 * 1024  # 默认 2GB
 
     # ========== 数据库配置 ==========
     DB_NAME: str = os.environ.get('DB_NAME', 'data.db')
@@ -78,6 +79,13 @@ class Config:
 
     # ========== CORS 配置 ==========
     CORS_ORIGINS: str = os.environ.get('CORS_ORIGINS', '*')
+
+    # ========== 限流配置 ==========
+    # Flask-Limiter 默认限流规则（可用 "200 per day; 50 per hour" 这种复合写法）
+    RATE_LIMIT_DEFAULT: str = os.environ.get('RATE_LIMIT_DEFAULT', '20000 per day; 5000 per hour')
+    # 限流状态存储：默认使用内存（单进程/单 worker 生效）。生产建议使用 Redis。
+    # 示例：redis://localhost:6379/1
+    RATE_LIMIT_STORAGE_URI: str = os.environ.get('RATE_LIMIT_STORAGE_URI', 'memory://')
 
     @classmethod
     def get_cors_origins(cls) -> list:

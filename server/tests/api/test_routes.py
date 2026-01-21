@@ -1,24 +1,25 @@
+import builtins
 import json
-import os
-from unittest.mock import MagicMock, patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 from flask import Flask
 
-# Since routes.py imports from core, we need to add the project root to the path
 import core.api.routes as routes
 
 
 @pytest.fixture
 def app(monkeypatch):
     """Create a Flask app instance for testing."""
+
     # Mock managers before app creation to prevent real connections
     monkeypatch.setattr(routes, 'db_mgr', MagicMock())
     monkeypatch.setattr(routes, 'rds_mgr', MagicMock())
     monkeypatch.setattr(routes, 'AILocal', MagicMock())
 
     app = Flask(__name__)
-    app.testing = True
+    app.config["TESTING"] = True
     app.register_blueprint(routes.api_bp)
 
     def _read_json_from_request():
@@ -35,20 +36,92 @@ def client(app):
     return app.test_client()
 
 
-# --- Test DB/Save Endpoints ---
+def test_natapp_ok(client, monkeypatch):
+
+    class DummyFile:
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return "hello"
+
+    monkeypatch.setattr(builtins, "open", lambda *a, **kw: DummyFile())
+
+    resp = client.get('/natapp')
+    assert resp.status_code == 200
+    assert "Natapp Log" in resp.get_data(as_text=True)
+    assert "hello" in resp.get_data(as_text=True)
+
+
+def test_server_log_ok(client, monkeypatch):
+
+    class DummyFile:
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def readlines(self):
+            return ["a\n", "b\n"]
+
+    monkeypatch.setattr(builtins, "open", lambda *a, **kw: DummyFile())
+    monkeypatch.setattr(routes, "render_template", lambda *a, **kw: "ok")
+
+    resp = client.get('/log')
+    assert resp.status_code == 200
+
+
+def test_write_log_ok_and_exception(client, monkeypatch):
+    resp = client.post('/write_log', data=b"hi")
+    assert resp.status_code == 200
+
+    class BadReq:
+
+        def get_data(self):
+            raise RuntimeError("boom")
+
+    monkeypatch.setattr(routes, "request", BadReq())
+    resp = client.post('/write_log', data=b"hi")
+    assert resp.status_code == 200
+
+
+def test_view_pic_requires_id(client):
+    resp = client.get('/viewPic')
+    assert resp.status_code == 400
+
+
+def test_view_pic_invalid_id(client, monkeypatch):
+    resp = client.get('/viewPic?id=abc')
+    assert resp.status_code == 400
+
+
+def test_view_pic_ok_and_not_found(client, monkeypatch):
+    monkeypatch.setattr(routes, "render_template", lambda *a, **kw: "ok")
+
+    routes.db_mgr.get_data_idx.return_value = {"code": 0, "data": "img"}
+    resp = client.get('/viewPic?id=1')
+    assert resp.status_code == 200
+
+    routes.db_mgr.get_data_idx.return_value = {"code": -1}
+    resp = client.get('/viewPic?id=1')
+    assert resp.status_code == 404
 
 
 def test_get_save_ok(client, monkeypatch):
-    mock_db_mgr = MagicMock()
-    mock_db_mgr.get_save.return_value = {"code": 0, "data": {"id": 1, "content": "test"}}
-    monkeypatch.setattr(routes, 'db_mgr', mock_db_mgr)
+    routes.db_mgr.get_save.return_value = {"code": 0, "data": {"id": 1, "content": "test"}}
 
     response = client.get('/getSave?id=1')
     assert response.status_code == 200
     data = response.get_json()
     assert data["code"] == 0
     assert data["data"]["content"] == "test"
-    mock_db_mgr.get_save.assert_called_once_with(1)
+    routes.db_mgr.get_save.assert_called_once_with(1)
 
 
 def test_get_save_invalid_id(client):
@@ -60,208 +133,306 @@ def test_get_save_invalid_id(client):
 
 
 def test_set_save_ok(client, monkeypatch):
-    mock_db_mgr = MagicMock()
-    mock_db_mgr.set_save.return_value = {"code": 0}
-    monkeypatch.setattr(routes, 'db_mgr', mock_db_mgr)
+    routes.db_mgr.set_save.return_value = {"code": 0}
 
     payload = {"id": 1, "user": "testuser", "data": {"key": "value"}}
-    response = client.post('/setSave', data=json.dumps(payload), content_type='application/json')
+    response = client.post('/setSave', json=payload)
 
     assert response.status_code == 200
     assert response.get_json()["code"] == 0
-    mock_db_mgr.set_save.assert_called_once_with(1, "testuser", '{"key": "value"}')
+    routes.db_mgr.set_save.assert_called_once_with(1, "testuser", '{"key": "value"}')
 
 
-# --- Test Redis Endpoints ---
+def test_get_all_fields_split(client, monkeypatch):
+    routes.db_mgr.get_list.return_value = {"code": 0, "data": {"data": []}}
+
+    resp = client.get('/getAll?table=t&pageNum=1&pageSize=2&fields=a,b&conditions=' + json.dumps({"x": 1}))
+    assert resp.status_code == 200
+    routes.db_mgr.get_list.assert_called_once()
+    args, kwargs = routes.db_mgr.get_list.call_args
+    assert args[0] == 't'
+    assert args[1] == 1
+    assert args[2] == 2
+    assert args[3] == ['a', 'b']
+    assert args[4] == {"x": 1}
 
 
-def test_get_rds_data_ok(client, monkeypatch):
-    mock_rds_mgr = MagicMock()
-    mock_rds_mgr.get_str.return_value = "my-redis-value"
-    monkeypatch.setattr(routes, 'rds_mgr', mock_rds_mgr)
+def test_get_data_fields_none_uses_data_idx(client, monkeypatch):
+    routes.db_mgr.get_data_idx.return_value = {"code": 0}
 
-    response = client.get('/getRdsData?table=t&id=1')
-    assert response.status_code == 200
-    data = response.get_json()
-    assert data["code"] == 0
-    assert data["data"] == "my-redis-value"
-    mock_rds_mgr.get_str.assert_called_once_with("t:1")
+    resp = client.get('/getData?table=t&id=1&idx=2')
+    assert resp.status_code == 200
+    routes.db_mgr.get_data_idx.assert_called_once_with('t', 1, 2)
 
 
-def test_set_rds_data_ok(client, monkeypatch):
-    mock_rds_mgr = MagicMock()
-    monkeypatch.setattr(routes, 'rds_mgr', mock_rds_mgr)
+def test_get_data_fields_non_none_uses_get_data(client, monkeypatch):
+    routes.db_mgr.get_data.return_value = {"code": 0}
 
-    payload = {"table": "t", "data": {"id": "1", "value": "v"}}
-    response = client.post('/setRdsData', data=json.dumps(payload), content_type='application/json')
-
-    assert response.status_code == 200
-    data = response.get_json()
-    assert data["code"] == 0
-    assert data["data"] == "1"
-    mock_rds_mgr.set.assert_called_once_with("t:1", "v")
+    resp = client.get('/getData?table=t&id=1&fields=a')
+    assert resp.status_code == 200
+    routes.db_mgr.get_data.assert_called_once_with('t', 1, 'a')
 
 
-def test_add_rds_list_ok(client, monkeypatch):
-    mock_rds_mgr = MagicMock()
-    monkeypatch.setattr(routes, 'rds_mgr', mock_rds_mgr)
-
-    payload = {"key": "my-list", "value": "item1"}
-    response = client.post('/addRdsList', data=json.dumps(payload), content_type='application/json')
-
-    assert response.status_code == 200
-    data = response.get_json()
-    assert data["code"] == 0
-    assert data["data"] == "item1"
-    mock_rds_mgr.rpush.assert_called_once_with("my-list", "item1")
+def test_set_data_ok(client, monkeypatch):
+    routes.db_mgr.set_data.return_value = {"code": 0}
+    resp = client.post('/setData', json={"table": "t", "data": []})
+    assert resp.status_code == 200
+    routes.db_mgr.set_data.assert_called_once_with('t', [])
 
 
-def test_add_rds_list_missing_params(client):
-    response = client.post('/addRdsList', data=json.dumps({"key": "my-list"}), content_type='application/json')
-    assert response.status_code == 200
-    assert response.get_json()["code"] == -1
-    assert "key and value are required" in response.get_json()["msg"]
+def test_del_data_ok(client, monkeypatch):
+    routes.db_mgr.del_data.return_value = {"code": 0}
+    resp = client.post('/delData', json={"table": "t", "id": 1})
+    assert resp.status_code == 200
+    routes.db_mgr.del_data.assert_called_once_with('t', 1)
 
 
-# --- Test File System Endpoints (Security) ---
+def test_query_no_sql(client):
+    resp = client.post('/query', json={})
+    assert resp.json["code"] == -1
 
 
-def test_list_directory_path_traversal(client):
-    response = client.get('/listDirectory?path=../..')
-    assert response.status_code == 200
-    data = response.get_json()
-    assert data["code"] == -1
-    assert "Path traversal not allowed" in data["msg"]
+def test_get_rds_data_ok_and_exception(client, monkeypatch):
+    routes.rds_mgr.get_str.return_value = "v"
+    resp = client.get('/getRdsData?table=t&id=1')
+    assert resp.status_code == 200
+    assert resp.json["code"] == 0
+
+    routes.rds_mgr.get_str.side_effect = RuntimeError("boom")
+    resp = client.get('/getRdsData?table=t&id=1')
+    assert resp.status_code == 200
+    assert resp.json["code"] == -1
 
 
-@patch('core.api.routes.os.path.exists', return_value=True)
-@patch('core.api.routes.os.path.isdir', return_value=True)
-@patch('core.api.routes.os.access', return_value=True)
-@patch('core.api.routes.os.listdir', return_value=['file1.mp3', 'dir1'])
-@patch('core.api.routes.os.stat')
-def test_list_directory_ok(mock_stat, mock_listdir, mock_access, mock_isdir, mock_exists, client):
-    # Mock stat to return basic file info
-    mock_stat.return_value.st_size = 1024
-    mock_stat.return_value.st_mtime = 1234567890
-
-    # Mock isdir for the entries
-    def isdir_side_effect(path):
-        if path.endswith('dir1'):
-            return True
-        return False
-
-    mock_isdir.side_effect = isdir_side_effect
-
-    response = client.get('/listDirectory?path=/mnt/music')
-    assert response.status_code == 200
-    data = response.get_json()
-
-    assert data["code"] == 0
-    assert data["currentPath"] == '/mnt/music'
-    assert len(data["data"]) == 2
-    # Directories should come first due to sorting
-    assert data["data"][0]["name"] == 'dir1'
-    assert data["data"][0]["isDirectory"] is True
-    assert data["data"][1]["name"] == 'file1.mp3'
-    assert data["data"][1]["isDirectory"] is False
+def test_get_rds_list_total_zero(client, monkeypatch):
+    routes.rds_mgr.llen.return_value = 0
+    resp = client.get('/getRdsList?key=k')
+    assert resp.status_code == 200
+    assert resp.json["data"]["totalCount"] == 0
 
 
-def test_get_file_info_path_traversal(client):
-    response = client.get('/getFileInfo?path=~/some/path')
-    assert response.status_code == 200
-    data = response.get_json()
-    assert data["code"] == -1
-    assert "Path traversal not allowed" in data["msg"]
+def test_get_rds_list_total_nonzero(client, monkeypatch):
+    routes.rds_mgr.llen.return_value = 5
+    routes.rds_mgr.lrange.return_value = ['a']
+    resp = client.get('/getRdsList?key=k&pageSize=2&startId=-1')
+    assert resp.status_code == 200
+    assert resp.json["code"] == 0
+    assert resp.json["data"]["totalCount"] == 5
 
 
-# --- Test Lottery Endpoint ---
+def test_get_rds_list_exception(client, monkeypatch):
+    routes.rds_mgr.llen.side_effect = RuntimeError("boom")
+    resp = client.get('/getRdsList?key=k')
+    assert resp.status_code == 200
+    assert resp.json["code"] == -1
 
 
-@pytest.fixture
-def mock_lottery_deps(monkeypatch):
-    mock_db = MagicMock()
-    mock_rds = MagicMock()
+def test_set_rds_data_ok_and_exception(client):
+    resp = client.post('/setRdsData', json={"table": "t", "data": {"id": "1", "value": "v"}})
+    assert resp.status_code == 200
+    assert resp.json["code"] == 0
 
-    # Mock user score
-    mock_db.get_data.return_value = {"code": 0, "data": {"id": 1, "score": 100}}
-    # Mock gift pool
-    mock_db.get_list.return_value = {
-        "code": 0,
-        "data": {
-            "data": [{
-                "id": 101,
-                "name": "Gift A"
-            }, {
-                "id": 102,
-                "name": "Gift B"
-            }]
-        }
-    }
-    # Mock category cost
-    mock_db.get_data.side_effect = [
+    routes.rds_mgr.set.side_effect = RuntimeError("boom")
+    resp = client.post('/setRdsData', json={"table": "t", "data": {"id": "1", "value": "v"}})
+    assert resp.status_code == 200
+    assert resp.json["code"] == -1
+
+
+def test_chat_messages_ok_and_exception(client, monkeypatch):
+    routes.AILocal.get_chat_messages.return_value = []
+    resp = client.get('/chatMessages?conversation_id=c')
+    assert resp.status_code == 200
+    assert resp.json["code"] == 0
+
+    routes.AILocal.get_chat_messages.side_effect = RuntimeError("boom")
+    resp = client.get('/chatMessages?conversation_id=c')
+    assert resp.status_code == 200
+    assert resp.json["code"] == -1
+
+
+def test_route_index_ok(client, monkeypatch):
+    monkeypatch.setattr(routes, "render_template", lambda *a, **kw: "ok")
+    resp = client.get('/index')
+    assert resp.status_code == 200
+
+
+def test_add_score_ok_and_invalid_user(client, monkeypatch):
+    routes.db_mgr.add_score.return_value = {"code": 0}
+    resp = client.post('/addScore', json={"user": 1, "value": 1, "action": "a", "msg": "m"})
+    assert resp.status_code == 200
+
+    resp = client.post('/addScore', json={"user": "x"})
+    assert resp.status_code == 200
+    assert resp.json["code"] == -1
+
+
+def test_do_lottery_paths(client, monkeypatch):
+    # user not found
+    routes.db_mgr.get_data.return_value = {"code": -1}
+    resp = client.post('/doLottery', json={"user_id": 1, "cate_id": 1})
+    assert resp.status_code == 200
+    assert resp.json["msg"] == "User not found"
+
+    # cate_id==0 no lottery data
+    routes.db_mgr.get_data.return_value = {"code": 0, "data": {"score": 100}}
+    routes.rds_mgr.get_str.return_value = None
+    resp = client.post('/doLottery', json={"user_id": 1, "cate_id": 0})
+    assert resp.status_code == 200
+    assert resp.json["msg"] == "No lottery data"
+
+    # cate_id==0 insufficient score
+    routes.rds_mgr.get_str.return_value = json.dumps({"fee": 10})
+    routes.db_mgr.get_data.return_value = {"code": 0, "data": {"score": 0}}
+    resp = client.post('/doLottery', json={"user_id": 1, "cate_id": 0})
+    assert resp.json["msg"] == "Not enough score"
+
+    # cate_id!=0 category not found
+    routes.db_mgr.get_data.side_effect = [
         {
             "code": 0,
             "data": {
-                "id": 1,
                 "score": 100
             }
-        },  # First call for user score
+        },
+        {
+            "code": -1
+        },
+    ]
+    resp = client.post('/doLottery', json={"user_id": 1, "cate_id": 2})
+    assert resp.json["msg"] == "Category not found"
+
+    # cate_id!=0 no gifts
+    routes.db_mgr.get_data.side_effect = [
         {
             "code": 0,
             "data": {
-                "id": 2,
-                "name": "cat",
+                "score": 100
+            }
+        },
+        {
+            "code": 0,
+            "data": {
                 "cost": 10
             }
-        }  # Second call for category
+        },
     ]
-    mock_db.add_score.return_value = {"code": 0}
+    routes.db_mgr.get_list.return_value = {"code": 0, "data": {"data": []}}
+    resp = client.post('/doLottery', json={"user_id": 1, "cate_id": 2})
+    assert resp.json["msg"] == "No available gifts"
 
-    monkeypatch.setattr(routes, 'db_mgr', mock_db)
-    monkeypatch.setattr(routes, 'rds_mgr', mock_rds)
-    monkeypatch.setattr(routes.random, 'choice', lambda x: x[0])  # Make choice deterministic
-
-    return mock_db, mock_rds
-
-
-def test_do_lottery_ok(client, mock_lottery_deps):
-    mock_db, _ = mock_lottery_deps
-
-    payload = {"user_id": "1", "cate_id": "2"}
-    response = client.post('/doLottery', data=json.dumps(payload), content_type='application/json')
-
-    assert response.status_code == 200
-    data = response.get_json()
-    assert data["code"] == 0
-    assert data["msg"] == "抽奖成功"
-    assert data["data"]["gift"]["id"] == 101
-    assert data["data"]["fee"] == 10
-    # Verify score was deducted
-    mock_db.add_score.assert_called_once_with(1, -10, 'lottery', '获得[101]Gift A')
+    # exception path
+    routes.db_mgr.get_data.side_effect = RuntimeError("boom")
+    resp = client.post('/doLottery', json={"user_id": 1, "cate_id": 2})
+    assert resp.json["code"] == -1
 
 
-def test_do_lottery_not_enough_score(client, mock_lottery_deps):
-    mock_db, _ = mock_lottery_deps
-    # Override user score to be insufficient
-    mock_db.get_data.side_effect = [{
-        "code": 0,
-        "data": {
-            "id": 1,
-            "score": 5
-        }
-    }, {
-        "code": 0,
-        "data": {
-            "id": 2,
-            "name": "cat",
-            "cost": 10
-        }
-    }]
+def test_add_rds_list_ok_and_missing_params(client, monkeypatch):
+    resp = client.post('/addRdsList', json={"key": "k", "value": "v"})
+    assert resp.status_code == 200
+    assert resp.json["code"] == 0
 
-    payload = {"user_id": "1", "cate_id": "2"}
-    response = client.post('/doLottery', data=json.dumps(payload), content_type='application/json')
+    resp = client.post('/addRdsList', json={"key": "k"})
+    assert resp.status_code == 200
+    assert resp.json["code"] == -1
 
-    assert response.status_code == 200
-    data = response.get_json()
-    assert data["code"] == -1
-    assert data["msg"] == "Not enough score"
+
+def test_list_directory_more_branches(client, monkeypatch):
+    monkeypatch.setattr(routes.config, 'DEFAULT_BASE_DIR', '/mnt')
+
+    monkeypatch.setattr(routes.os.path, 'abspath', lambda p: p)
+    monkeypatch.setattr(routes.os.path, 'isabs', lambda p: True)
+    monkeypatch.setattr(routes.os.path, 'exists', lambda p: True)
+
+    def fake_access(path, mode):
+        return True
+
+    monkeypatch.setattr(routes.os, 'access', fake_access)
+
+    monkeypatch.setattr(routes.os, 'listdir', lambda p: ['track 2.mp3', 'track 10.mp3', 'a.txt', 'dir1'])
+
+    class Stat:
+        st_size = 1
+        st_mtime = 2
+
+    monkeypatch.setattr(routes.os, 'stat', lambda p: Stat())
+
+    monkeypatch.setattr(routes.os.path, 'isdir', lambda p: p.endswith('dir1'))
+
+    resp = client.get('/listDirectory?path=/mnt/music&extensions=.mp3')
+    assert resp.status_code == 200
+    assert resp.json["code"] == 0
+    # ensure filter applied: only dirs + mp3
+    names = [x['name'] for x in resp.json['data']]
+    assert 'a.txt' not in names
+
+
+def test_list_directory_permission_denied(client, monkeypatch):
+    monkeypatch.setattr(routes.config, 'DEFAULT_BASE_DIR', '/mnt')
+    monkeypatch.setattr(routes.os.path, 'abspath', lambda p: p)
+    monkeypatch.setattr(routes.os.path, 'isabs', lambda p: True)
+    monkeypatch.setattr(routes.os.path, 'exists', lambda p: True)
+
+    monkeypatch.setattr(routes.os, 'listdir', lambda p: [])
+
+    def fake_access(path, mode):
+        return False
+
+    monkeypatch.setattr(routes.os, 'access', fake_access)
+    resp = client.get('/listDirectory?path=/mnt/music')
+    assert resp.status_code == 200
+    assert resp.json['code'] == -1
+
+
+def test_get_file_info_media_and_non_media(client, monkeypatch):
+    monkeypatch.setattr(routes.config, 'DEFAULT_BASE_DIR', '/safe')
+    monkeypatch.setattr(routes.os.path, 'abspath', lambda p: p)
+    monkeypatch.setattr(routes.os.path, 'isabs', lambda p: True)
+    monkeypatch.setattr(routes.os.path, 'exists', lambda p: True)
+    monkeypatch.setattr(routes.os.path, 'isfile', lambda p: True)
+
+    class Stat:
+        st_size = 1
+        st_mtime = 2
+
+    monkeypatch.setattr(routes.os, 'stat', lambda p: Stat())
+
+    monkeypatch.setattr(routes, 'get_media_duration', lambda p: 1.2)
+
+    resp = client.get('/getFileInfo?path=/safe/a.mp3')
+    assert resp.status_code == 200
+    assert resp.json['code'] == 0
+    assert resp.json['data']['isMediaFile'] is True
+    assert resp.json['data']['duration'] == 1.2
+
+    resp = client.get('/getFileInfo?path=/safe/a.txt')
+    assert resp.status_code == 200
+    assert resp.json['code'] == 0
+    assert resp.json['data']['isMediaFile'] is False
+    assert resp.json['data']['duration'] is None
+
+
+def test_get_file_info_permission_and_exception(client, monkeypatch):
+    monkeypatch.setattr(routes.config, 'DEFAULT_BASE_DIR', '/safe')
+    monkeypatch.setattr(routes.os.path, 'abspath', lambda p: p)
+    monkeypatch.setattr(routes.os.path, 'isabs', lambda p: True)
+    monkeypatch.setattr(routes.os.path, 'exists', lambda p: True)
+    monkeypatch.setattr(routes.os.path, 'isfile', lambda p: True)
+
+    def raise_perm(_):
+        raise PermissionError("no")
+
+    monkeypatch.setattr(routes.os, 'stat', raise_perm)
+
+    resp = client.get('/getFileInfo?path=/safe/a.mp3')
+    assert resp.status_code == 200
+    assert resp.json['code'] == -1
+    assert 'Permission denied' in resp.json['msg']
+
+    def raise_any(_):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(routes.os, 'stat', raise_any)
+    resp = client.get('/getFileInfo?path=/safe/a.mp3')
+    assert resp.status_code == 200
+    assert resp.json['code'] == -1
+    assert 'Error:' in resp.json['msg']

@@ -4,7 +4,7 @@
 import asyncio
 import os
 import shutil
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple, Mapping
 
 from gevent import spawn, subprocess
 from bleak import BleakClient, BleakScanner
@@ -32,7 +32,7 @@ PRINTABLE_RATIO_THRESHOLD = 0.7  # 可打印字符比例阈值
 class BluetoothMgr:
     """蓝牙设备管理器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         log.info("[BLUETOOTH] BluetoothMgr init")
         self.devices: Dict[str, BluetoothDev] = {}  # address -> BluetoothDev
         self.scanning = False
@@ -133,7 +133,7 @@ class BluetoothMgr:
 
         return metadata
 
-    def _extract_metadata(self, advertisement_data) -> Dict:
+    def _extract_metadata(self, advertisement_data: Any) -> Dict[str, Any]:
         """从广告数据中提取元数据"""
         if not advertisement_data:
             return {}
@@ -179,7 +179,7 @@ class BluetoothMgr:
 
         return metadata
 
-    def _get_friendly_name(self, device, advertisement_data: Optional[AdvertisementData] = None) -> str:
+    def _get_friendly_name(self, device: Any, advertisement_data: Optional[AdvertisementData] = None) -> str:
         """
         获取设备的友好名称
         :param device: BLE 设备对象
@@ -196,8 +196,18 @@ class BluetoothMgr:
                 '-', '')[-6:].upper() if '-' in device.address else device.address[-6:].upper()
             return f"Unknown Device ({addr_short})"
 
-    async def scan_ble_devices(self, timeout: float = 5.0) -> List[Dict]:
-        """扫描 BLE 蓝牙设备（使用 BleakScanner）"""
+    async def scan_ble_devices(self, timeout: float = 5.0) -> List[Dict[str, Any]]:
+        """扫描 BLE 蓝牙设备。
+
+        使用 `BleakScanner` 异步扫描指定时长，并将发现的设备信息更新到
+        内存中的设备列表。
+
+        Args:
+            timeout (float): 扫描超时时间（秒）。
+
+        Returns:
+            List[Dict[str, Any]]: 发现的设备列表，每项包含 address/name/metadata。
+        """
         if self.scanning:
             log.warning("[BLUETOOTH] Already scanning")
             return []
@@ -226,7 +236,7 @@ class BluetoothMgr:
         finally:
             self.scanning = False
 
-    async def scan_devices(self, timeout: float = 5.0) -> List[Dict]:
+    async def scan_devices(self, timeout: float = 5.0) -> List[Dict[str, Any]]:
         """扫描蓝牙设备（兼容性方法，实际调用 scan_ble_devices）"""
         return await self.scan_ble_devices(timeout)
 
@@ -250,8 +260,19 @@ class BluetoothMgr:
             log.debug(f"[BLUETOOTH] Could not read device name from GATT: {e}")
             return None
 
-    async def connect_device(self, address: str, fetch_name: bool = True) -> Dict:
-        """连接蓝牙设备"""
+    async def connect_device(self, address: str, fetch_name: bool = True) -> Dict[str, Any]:
+        """连接指定蓝牙设备。
+
+        连接成功后会更新内存设备对象的连接状态，并在可能的情况下通过 GATT
+        读取设备名称以补全 `BluetoothDev.name`。
+
+        Args:
+            address (str): 蓝牙地址。
+            fetch_name (bool): 是否尝试从 GATT 读取设备名称。
+
+        Returns:
+            Dict[str, Any]: 统一响应字典（code/msg/data）。
+        """
         try:
             address_upper = address.upper()
             if address_upper in self.devices and self.devices[address_upper].connected:
@@ -284,8 +305,15 @@ class BluetoothMgr:
                 self.devices[address.upper()].connected = False
             return {"code": -1, "msg": f"Connection failed: {str(e)}"}
 
-    async def disconnect_device(self, address: str) -> Dict:
-        """断开蓝牙设备"""
+    async def disconnect_device(self, address: str) -> Dict[str, Any]:
+        """断开指定蓝牙设备连接。
+
+        Args:
+            address (str): 蓝牙地址。
+
+        Returns:
+            Dict[str, Any]: 统一响应字典（code/msg/data）。
+        """
         try:
             address_upper = address.upper()
             if address_upper not in self.devices:
@@ -309,11 +337,11 @@ class BluetoothMgr:
                 self.devices[address.upper()].connected = False
             return {"code": -1, "msg": f"Disconnect failed: {str(e)}"}
 
-    def get_device_list(self) -> List[Dict]:
+    def get_device_list(self) -> List[Dict[str, Any]]:
         """获取所有设备列表"""
         return [device.to_dict() for device in self.devices.values()]
 
-    def get_device(self, address: str) -> Optional[Dict]:
+    def get_device(self, address: str) -> Optional[Dict[str, Any]]:
         """获取指定设备"""
         address_upper = address.upper()
         if address_upper in self.devices:
@@ -333,10 +361,13 @@ class BluetoothMgr:
 
         return None
 
-    def _run_subprocess_safe(self, cmd, timeout=10, env=None):
+    def _run_subprocess_safe(self,
+                             cmd: List[str],
+                             timeout: int = 10,
+                             env: Optional[Mapping[str, str]] = None) -> Tuple[int, str, str]:
         """安全地运行子进程"""
 
-        def _run():
+        def _run() -> Tuple[int, str, str]:
             try:
                 # 查找命令完整路径
                 if isinstance(cmd, list) and len(cmd) > 0:
@@ -384,8 +415,16 @@ class BluetoothMgr:
                     devices[address] = name
         return devices
 
-    def get_paired_devices(self, adapter: str = None) -> List[Dict]:
-        """获取系统已配对的蓝牙设备列表"""
+    def get_paired_devices(self, adapter: Optional[str] = None) -> List[Dict[str, Any]]:
+        """获取系统已配对的蓝牙设备列表。
+
+        Args:
+            adapter (Optional[str]): 预留参数（当前未使用）。
+
+        Returns:
+            List[Dict[str, Any]]: 设备列表，每项包含 address/name/connected。
+        """
+        _ = adapter
         try:
             # 获取已配对设备
             result_code, stdout, _ = self._run_subprocess_safe(["bluetoothctl", "devices", "Paired"], timeout=10)
@@ -417,7 +456,7 @@ class BluetoothMgr:
             log.error(f"[BLUETOOTH] Error getting paired devices: {e}")
             return []
 
-    def scan_devices_sync(self, timeout: float = 5.0) -> List[Dict]:
+    def scan_devices_sync(self, timeout: float = 5.0) -> List[Dict[str, Any]]:
         """
         同步扫描传统蓝牙设备（在事件循环中运行）
         :param timeout: 扫描超时时间（秒）
@@ -432,7 +471,7 @@ class BluetoothMgr:
             log.error(f"[BLUETOOTH] Scan error: {e}")
             return []
 
-    def scan_ble_devices_sync(self, timeout: float = 5.0) -> List[Dict]:
+    def scan_ble_devices_sync(self, timeout: float = 5.0) -> List[Dict[str, Any]]:
         """
         同步扫描 BLE 蓝牙设备（在事件循环中运行）
         :param timeout: 扫描超时时间（秒）
@@ -447,7 +486,7 @@ class BluetoothMgr:
             log.error(f"[BLUETOOTH] BLE scan error: {e}")
             return []
 
-    def connect_device_sync(self, address: str, timeout: float = 10.0) -> Dict:
+    def connect_device_sync(self, address: str, timeout: float = 10.0) -> Dict[str, Any]:
         """同步连接设备"""
         try:
             return run_async(self.connect_device(address), timeout=timeout)
@@ -457,7 +496,7 @@ class BluetoothMgr:
             log.error(f"[BLUETOOTH] Connect error: {e}")
             return {"code": -1, "msg": msg}
 
-    def disconnect_device_sync(self, address: str, timeout: float = 5.0) -> Dict:
+    def disconnect_device_sync(self, address: str, timeout: float = 5.0) -> Dict[str, Any]:
         """同步断开设备"""
         try:
             return run_async(self.disconnect_device(address), timeout=timeout)

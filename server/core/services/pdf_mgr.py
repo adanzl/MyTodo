@@ -6,7 +6,7 @@ PDF 管理服务
 import os
 import json
 import threading
-from typing import Optional, Tuple, Dict, List
+from typing import Optional, Tuple, Dict, List, Any, TypedDict, Protocol
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from werkzeug.utils import secure_filename
@@ -14,12 +14,35 @@ from werkzeug.utils import secure_filename
 import pikepdf
 
 from core.config import app_logger
-from core.config import (PDF_BASE_DIR, PDF_UPLOAD_DIR, PDF_UNLOCK_DIR, ALLOWED_PDF_EXTENSIONS,
-                               TASK_STATUS_PENDING, TASK_STATUS_PROCESSING, TASK_STATUS_SUCCESS, TASK_STATUS_FAILED,
-                               TASK_STATUS_UPLOADED)
+from core.config import (PDF_BASE_DIR, PDF_UPLOAD_DIR, PDF_UNLOCK_DIR, TASK_STATUS_PENDING, TASK_STATUS_PROCESSING,
+                         TASK_STATUS_SUCCESS, TASK_STATUS_FAILED, TASK_STATUS_UPLOADED)
 from core.utils import ensure_directory, get_file_info, is_allowed_pdf_file
 
 log = app_logger
+
+
+class FileLike(Protocol):
+
+    def save(self, dst: str) -> Any:
+        ...
+
+
+class PdfFileInfo(TypedDict, total=False):
+    name: str
+    path: str
+    size: int
+    modified: float
+
+
+class PdfTaskInfo(TypedDict, total=False):
+    task_id: str
+    filename: str
+    status: str
+    uploaded_info: PdfFileInfo
+    unlocked_info: Optional[PdfFileInfo]
+    error_message: Optional[str]
+    create_time: float
+    update_time: float
 
 
 @dataclass
@@ -29,9 +52,9 @@ class PdfTask:
     filename: str  # 文件名
     status: str  # 任务状态：uploaded, pending, processing, success, failed
     uploaded_path: str  # 上传文件路径
-    uploaded_info: Dict  # 上传文件信息（name, path, size, modified）
+    uploaded_info: PdfFileInfo  # 上传文件信息（name, path, size, modified）
     unlocked_path: Optional[str] = None  # 已解密文件路径
-    unlocked_info: Optional[Dict] = None  # 已解密文件信息
+    unlocked_info: Optional[PdfFileInfo] = None  # 已解密文件信息
     error_message: Optional[str] = None  # 错误信息
     create_time: float = 0  # 创建时间戳
     update_time: float = 0  # 更新时间戳
@@ -42,7 +65,7 @@ class PdfMgr:
 
     TASK_META_FILE = 'tasks.json'  # 任务元数据文件名
 
-    def __init__(self):
+    def __init__(self) -> None:
         """初始化管理器"""
         self._tasks: Dict[str, PdfTask] = {}  # key: task_id (filename)
         self._task_lock = threading.Lock()  # 任务操作锁
@@ -52,7 +75,7 @@ class PdfMgr:
         """获取任务对象，不存在返回 None"""
         return self._tasks.get(task_id)
 
-    def _task_to_dict(self, task: PdfTask) -> Dict:
+    def _task_to_dict(self, task: PdfTask) -> PdfTaskInfo:
         """将任务对象转换为字典"""
         return {
             "task_id": task.task_id,
@@ -71,7 +94,7 @@ class PdfMgr:
         unlocked_filename = f"{base_name}_unlocked{ext}"
         return os.path.join(PDF_UNLOCK_DIR, unlocked_filename)
 
-    def _update_unlocked_file_info(self, task: PdfTask):
+    def _update_unlocked_file_info(self, task: PdfTask) -> None:
         """更新任务的已解密文件信息"""
         if task.unlocked_path and os.path.exists(task.unlocked_path):
             unlocked_info = get_file_info(task.unlocked_path)
@@ -100,7 +123,7 @@ class PdfMgr:
                 if task.status == TASK_STATUS_SUCCESS:
                     task.status = TASK_STATUS_UPLOADED
 
-    def _load_history_tasks(self):
+    def _load_history_tasks(self) -> None:
         """加载历史任务"""
         try:
             if not os.path.exists(PDF_BASE_DIR):
@@ -173,7 +196,7 @@ class PdfMgr:
         except Exception as e:
             log.error(f"[PDF] 加载历史任务失败: {e}")
 
-    def _save_all_tasks(self):
+    def _save_all_tasks(self) -> None:
         """保存所有任务到统一的 tasks.json 文件"""
         try:
             task_meta_file = os.path.join(PDF_BASE_DIR, self.TASK_META_FILE)
@@ -187,22 +210,24 @@ class PdfMgr:
         except Exception as e:
             log.error(f"[PDF] 保存所有任务失败: {e}")
 
-    def _update_task_time(self, task: PdfTask):
+    def _update_task_time(self, task: PdfTask) -> None:
         """更新任务的更新时间"""
         task.update_time = datetime.now().timestamp()
 
-    def _save_task_and_update_time(self, task: PdfTask):
+    def _save_task_and_update_time(self, task: PdfTask) -> None:
         """更新任务时间并保存"""
         self._update_task_time(task)
         self._save_all_tasks()
 
-    def upload_file(self, file_obj, filename: str) -> Tuple[int, str, Optional[Dict]]:
-        """
-        上传 PDF 文件
-        
-        :param file_obj: 文件对象（werkzeug FileStorage）
-        :param filename: 原始文件名
-        :return: (错误码, 消息, 文件信息)，0 表示成功
+    def upload_file(self, file_obj: FileLike, filename: str) -> Tuple[int, str, Optional[PdfFileInfo]]:
+        """上传 PDF 文件并为其创建任务。
+
+        Args:
+            file_obj (FileLike): 符合 `save` 方法协议的文件对象（如 werkzeug FileStorage）。
+            filename (str): 原始文件名。
+
+        Returns:
+            Tuple[int, str, Optional[PdfFileInfo]]: (code, msg, file_info)。code=0 表示成功。
         """
         try:
             if not is_allowed_pdf_file(filename):
@@ -229,7 +254,7 @@ class PdfMgr:
             # 保存文件
             file_obj.save(file_path)
             log.info(f"[PDF] 文件保存完成: {file_path}")
-            
+
             # 确保文件完全写入磁盘
             try:
                 fd = os.open(file_path, os.O_RDONLY)
@@ -275,12 +300,17 @@ class PdfMgr:
             return -1, f"上传文件失败: {str(e)}", None
 
     def decrypt(self, task_id: str, password: Optional[str] = None) -> Tuple[int, str]:
-        """
-        解密 PDF 文件（异步处理）
-        
-        :param task_id: 任务ID（文件名）
-        :param password: 密码（可选）
-        :return: (错误码, 消息)，0 表示成功（任务已提交）
+        """提交一个 PDF 文件解密任务（异步处理）。
+
+        此方法将任务状态更新为 'pending'，然后启动一个后台线程来执行
+        实际的解密操作。
+
+        Args:
+            task_id (str): 任务 ID（即上传时的文件名）。
+            password (Optional[str]): PDF 文件的解密密码。
+
+        Returns:
+            Tuple[int, str]: (code, msg)。code=0 表示任务已成功提交。
         """
         try:
             with self._task_lock:
@@ -320,7 +350,7 @@ class PdfMgr:
             log.error(f"[PDF] 提交解密任务失败: {e}")
             return -1, f"提交解密任务失败: {str(e)}"
 
-    def _decrypt_file_async(self, task_id: str, input_path: str, output_path: str, password: Optional[str]):
+    def _decrypt_file_async(self, task_id: str, input_path: str, output_path: str, password: Optional[str]) -> None:
         """
         异步解密文件（在后台线程中执行）
         
@@ -408,11 +438,14 @@ class PdfMgr:
             log.error(f"[PDF] pikepdf 解密失败: {e}")
             return -1, f"PDF 解密失败: {str(e)}"
 
-    def list(self) -> List[Dict]:
-        """
-        列出所有 PDF 转换任务详情
-        
-        :return: 任务详情列表
+    def list(self) -> List[PdfTaskInfo]:
+        """列出所有 PDF 任务的详情。
+
+        在返回列表前，会同步检查每个任务关联的文件是否存在，并更新文件信息。
+        如果文件不存在，对应的任务将被清理。
+
+        Returns:
+            List[PdfTaskInfo]: 任务详情列表，按更新时间倒序排列。
         """
         try:
             # 确保目录存在
@@ -456,12 +489,14 @@ class PdfMgr:
             log.error(f"[PDF] 列出任务失败: {e}")
             return []
 
-    def get_task_status(self, task_id: str) -> Tuple[int, str, Optional[Dict]]:
-        """
-        获取任务状态
-        
-        :param task_id: 任务ID（文件名）
-        :return: (错误码, 消息, 任务信息)，0 表示成功
+    def get_task_status(self, task_id: str) -> Tuple[int, str, Optional[PdfTaskInfo]]:
+        """获取单个 PDF 任务的状态与详情。
+
+        Args:
+            task_id (str): 任务 ID（文件名）。
+
+        Returns:
+            Tuple[int, str, Optional[PdfTaskInfo]]: (code, msg, data)。code=0 表示成功。
         """
         try:
             with self._task_lock:

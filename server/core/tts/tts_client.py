@@ -1,22 +1,25 @@
 import traceback
+import os
 
 import dashscope
-from dotenv import load_dotenv
-import os
-load_dotenv()
+from dashscope.audio.tts_v2 import *
 
 try:
-    from core.config import app_logger
+    from core.config import app_logger, config
+    import core.db.rds_mgr as rds_mgr
 
     log = app_logger
-    import core.db.rds_mgr as rds_mgr
-except:
+    ALI_KEY = config.ALI_KEY
+    FASTAPI_URL = config.ZERO_TTS_FASTAPI_URL
+except ImportError:
+    from dotenv import load_dotenv
+    load_dotenv()
     import logging
+
     log = logging.getLogger()
     rds_mgr = None
-
-FASTAPI_URL = "http://192.168.50.171:9099/inference_zero_shot"  # FastAPI 服务器地址
-from dashscope.audio.tts_v2 import *
+    ALI_KEY = os.getenv('ALI_KEY', '')
+    FASTAPI_URL = os.getenv("ZERO_TTS_FASTAPI_URL", "http://192.168.50.171:9099/inference_zero_shot")
 
 ROLE_MAP = {
     # cSpell: disable-next-line
@@ -46,7 +49,7 @@ class TTSClient(ResultCallback):
     def __init__(self, on_msg=None, on_err=None):
         self.on_msg = on_msg or (lambda x, y: None)
         self.on_err = on_err or (lambda x: None)
-        dashscope.api_key = os.getenv('ALI_KEY')
+        dashscope.api_key = ALI_KEY
         self.synthesizer = None
         self.role = DEFAULT_ROLE
         self.speed = 1.0

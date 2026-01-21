@@ -1,8 +1,20 @@
+"""ASR WebSocket 客户端封装。
+
+该模块负责将前端上传的音频（PCM bytes）分片后通过 WebSocket 推送至 ASR 服务端，
+并将识别结果通过回调返回给上层（`core/chat/chat_mgr.py`）。
+
+关注点：
+- 连接生命周期管理（open/close）；
+- 分片发送与缓冲；
+- 将服务端识别结果聚合并回调。
+"""
+
 import json
 import threading
 import time
 
 import websocket
+
 from core.config import app_logger
 
 log = app_logger
@@ -17,8 +29,15 @@ ASR_WAV = "h5"
 
 
 class AsrClient:
+    """ASR WebSocket 客户端。"""
 
     def __init__(self, on_result=None, on_err=None):
+        """创建客户端。
+
+        Args:
+            on_result: 识别结果回调 `on_result(text)`。
+            on_err: 错误回调 `on_err(err)`。
+        """
         self.is_running = False
         self.sample_rate = -1
         self.package_size = -1

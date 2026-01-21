@@ -21,7 +21,7 @@ from core.config import app_logger
 log = app_logger
 
 
-def ok_response(data=None):
+def ok_response(data: Any = None) -> Dict[str, Any]:
     """
     返回成功响应
     :param data: 响应数据，可选
@@ -30,7 +30,7 @@ def ok_response(data=None):
     return {"code": 0, "msg": "ok", "data": data}
 
 
-def err_response(message: str):
+def err_response(message: str) -> Dict[str, Any]:
     """
     返回错误响应
     :param message: 错误消息
@@ -50,7 +50,7 @@ def get_json_body() -> Dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
-def read_json_from_request():
+def read_json_from_request() -> Dict[str, Any]:
     """
     从请求中读取 JSON 数据，使用 stream 方式避免 gevent 环境中的阻塞问题
     :return: 解析后的 JSON 数据（dict），如果失败返回 {}
@@ -118,7 +118,7 @@ def time_to_seconds(time_str: str) -> int:
     return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2]) if len(parts) == 3 else 0
 
 
-def get_media_duration(file_path):
+def get_media_duration(file_path: str) -> Optional[int]:
     """
     使用 ffprobe 获取媒体文件的时长
     在独立线程中使用 os.system 执行命令，避免 gevent 事件循环和 child watchers 问题
@@ -222,7 +222,7 @@ def get_media_duration(file_path):
     return result_container['duration']
 
 
-def _get_media_server_url():
+def _get_media_server_url() -> str:
     """获取媒体文件服务器的完整URL"""
     # 返回固定的服务器地址和端口
     return "http://192.168.50.172:8848"
@@ -453,16 +453,6 @@ def is_allowed_pdf_file(filename: str) -> bool:
     return os.path.splitext(filename)[1].lower() in ALLOWED_PDF_EXTENSIONS
 
 
-def is_allowed_file(filename: str, allowed_extensions: set) -> bool:
-    """
-    检查文件扩展名是否在允许的扩展名集合中
-    :param filename: 文件名
-    :param allowed_extensions: 允许的扩展名集合
-    :return: True 如果文件扩展名在允许列表中，False 否则
-    """
-    return os.path.splitext(filename)[1].lower() in allowed_extensions
-
-
 def get_file_info(file_path: str) -> Optional[dict]:
     """
     获取文件信息
@@ -479,6 +469,42 @@ def get_file_info(file_path: str) -> Optional[dict]:
         "size": stat_info.st_size,
         "modified": stat_info.st_mtime,
     }
+
+
+def get_file_type_by_magic_number(file) -> Optional[str]:
+    """
+    通过文件头部的 "magic number" 来识别文件类型。
+    :param file: 文件对象 (werkzeug.FileStorage)
+    :return: 文件类型字符串 (例如 'mp3', 'flac')，如果无法识别则返回 None
+    """
+    magic_numbers = {
+        b'\xFF\xFB': 'mp3',
+        b'\xFF\xF3': 'mp3',
+        b'\xFF\xF2': 'mp3',
+        b'ID3': 'mp3',
+        b'fLaC': 'flac',
+        b'RIFF': 'wav',  # WAV and AVI
+        b'OggS': 'ogg',
+        b'\x00\x00\x00\x18ftypM4A': 'm4a',
+        b'\x00\x00\x00\x14ftypmp42': 'mp4',
+        b'\x00\x00\x00 ftyp': 'mp4',  # common for mp4 and mov
+        b'\x30\x26\xb2\x75\x8e\x66\xcf\x11': 'wma',  # WMA/WMV
+    }
+
+    try:
+        header = file.read(32)  # 读取文件头部的一些字节
+        file.seek(0)  # 重置文件指针
+
+        for magic, file_type in magic_numbers.items():
+            if header.startswith(magic):
+                # 特殊处理 WAV, 因为 RIFF 也用于 AVI
+                if file_type == 'wav' and header[8:12] != b'WAVE':
+                    continue
+                return file_type
+        return None
+    except Exception as e:
+        log.warning(f"[Utils] 检查 magic number 失败: {e}")
+        return None
 
 
 def get_unique_filepath(directory: str, base_name: str, extension: str) -> str:

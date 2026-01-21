@@ -108,6 +108,20 @@ def test_mi_volume_post_requires_volume(client, monkeypatch):
     assert body["msg"] == "volume is required"
 
 
+def test_mi_volume_post_volume_must_be_int(client, monkeypatch):
+    monkeypatch.setattr(mi_routes, "MiDevice", lambda device_id: object())
+
+    resp = client.post(
+        "/mi/volume",
+        data=json.dumps({"device_id": "d1", "volume": "x"}),
+        content_type="application/json",
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["code"] != 0
+    assert body["msg"] == "volume must be int"
+
+
 def test_mi_volume_post_range_check(client, monkeypatch):
     monkeypatch.setattr(mi_routes, "MiDevice", lambda device_id: object())
 
@@ -186,6 +200,23 @@ def test_mi_status_err_uses_error_field(client, monkeypatch):
     assert body["msg"] == "boom"
 
 
+def test_mi_status_err_non_dict_fallback_msg(client, monkeypatch):
+    class FakeDev:
+        def __init__(self, device_id):
+            pass
+
+        def get_status(self):
+            return -1, "bad"
+
+    monkeypatch.setattr(mi_routes, "MiDevice", FakeDev)
+
+    resp = client.get("/mi/status?device_id=d1")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["code"] != 0
+    assert body["msg"] == "获取状态失败"
+
+
 def test_mi_stop_requires_device_id(client):
     resp = client.post("/mi/stop", data=json.dumps({}), content_type="application/json")
     assert resp.status_code == 200
@@ -209,3 +240,20 @@ def test_mi_stop_ok(client, monkeypatch):
     body = resp.get_json()
     assert body["code"] == 0
     assert body["data"]["message"] == "stopped"
+
+
+def test_mi_stop_exception_returns_err(client, monkeypatch):
+    class FakeDev:
+        def __init__(self, device_id):
+            pass
+
+        def stop(self):
+            raise RuntimeError("boom")
+
+    monkeypatch.setattr(mi_routes, "MiDevice", FakeDev)
+
+    resp = client.post("/mi/stop", data=json.dumps({"device_id": "d1"}), content_type="application/json")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["code"] != 0
+    assert "boom" in body["msg"]

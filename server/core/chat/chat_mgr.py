@@ -1,12 +1,20 @@
+"""Chat 管理器。
+
+该模块负责 WebSocket（Flask-SocketIO）侧的会话管理与事件分发：
+- 为每个 Socket 客户端维护 `ClientContext`（AI/ASR/TTS 管线）；
+- 处理文本与音频消息，转发/聚合结果并推送给前端；
+- chat_room 模式下将消息写入 Redis 列表用于房间广播。
+"""
+
 import base64
 import time
 
+import core.db.rds_mgr as rds_mgr
 from core.ai.ai_local import AILocal
 from core.chat.asr_client import AsrClient
-from core.tts.tts_client import TTSClient
 from core.config import app_logger
+from core.tts.tts_client import TTSClient
 from flask import json, request
-import core.db.rds_mgr as rds_mgr
 
 log = app_logger
 
@@ -16,6 +24,13 @@ EVENT_MESSAGE = "message"
 
 
 class ClientContext:
+    """单个 Socket 客户端上下文。
+
+    包含：
+    - `AILocal`: 对话流式输出
+    - `AsrClient`: 语音识别（音频 -> 文本）
+    - `TTSClient`: 语音合成（文本 -> 音频）
+    """
 
     def __init__(self, sid, socketio):
         self.sid = sid
@@ -150,7 +165,9 @@ class ChatMgr:
             ctx.autoTTS = data.get('ttsAuto', False)
             ctx.tts.vol = data.get('ttsVol', 50)
             ctx.tts.speed = data.get('ttsSpeed', 1.0)
-            log.info(f'[CHAT] Client {request.sid} connected. Total clients: {len(self.clients)}, {json.dumps(data, ensure_ascii=False)}')
+            log.info(
+                f'[CHAT] Client {request.sid} connected. Total clients: {len(self.clients)}, {json.dumps(data, ensure_ascii=False)}'
+            )
 
             self.socketio.emit('handshakeResponse', {'message': 'Handshake successful'}, room=request.sid)
             return {'message': 'Handshake successful', 'status': 'ok'}

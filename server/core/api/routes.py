@@ -147,6 +147,10 @@ def get_data() -> ResponseReturnValue:
         return db_mgr.get_data(table, data_id, fields)
 
 
+from core import limiter
+
+
+@limiter.limit("10 per minute; 50 per hour")
 @api_bp.route("/setData", methods=['POST'])
 def set_data() -> ResponseReturnValue:
     args: Dict[str, Any] = read_json_from_request()

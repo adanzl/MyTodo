@@ -1,35 +1,53 @@
+"""DashScope Voice Enrollment（声音克隆/音色注册）封装。
+
+该模块通过 DashScope 的 `VoiceEnrollmentService` 注册音色，并轮询音色部署状态。
+主要用于 TTS 的自定义 voice_id 准备阶段。
+
+注意：本文件当前更偏向于脚本/实验性质用法，若要用于服务端长期运行建议：
+- 将 `VOICE_PREFIX`、`TARGET_MODEL` 配置化；
+- 增加更明确的异常类型与重试策略；
+- 明确回调 `on_msg/on_err` 的协议。
+"""
+
 import time
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
-
-# coding=utf-8
 
 import dashscope
 from dashscope.audio.tts_v2 import *
 
-
 try:
-    from core.config import app_logger
+    from core.config import app_logger, config
+
     log = app_logger
-except:
+    ALI_KEY = config.ALI_KEY
+except ImportError:
+    from dotenv import load_dotenv
+    import os
+
+    load_dotenv()
     import logging
+
     log = logging.getLogger()
+    ALI_KEY = os.getenv('ALI_KEY', '')
 
 TARGET_MODEL = "cosyvoice-v3-plus"
-# 为音色起一个有意义的前缀
 VOICE_PREFIX = "leo_audio"  # 仅允许数字和小写字母，小于十个字符
 
 service = VoiceEnrollmentService()
 
 
 class VoiceClone:
+    """Voice enrollment 封装。"""
 
     def __init__(self, on_msg=None, on_err=None):
+        """创建 VoiceClone。
+
+        Args:
+            on_msg: 预留回调。
+            on_err: 错误回调。
+        """
         self.on_msg = on_msg or (lambda x, y: None)
         self.on_err = on_err or (lambda x: None)
-        dashscope.api_key = os.getenv('ALI_KEY')
+        dashscope.api_key = ALI_KEY
         self.voice_id = None
 
     def clone_voice(self, audio_url: str):

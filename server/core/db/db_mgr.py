@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from flask import Flask
 from core.db import db_obj
-from core.config import app_logger
+from core.config import app_logger, config
 from sqlalchemy import func
 from sqlalchemy import MetaData, Table, select, text
 from core.models.user import User
@@ -30,11 +30,29 @@ class DbMgr:
         if self._initialized:
             return
 
-        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///./' + DB_NAME  # SQLite 数据库
         app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # 关闭修改跟踪（减少内存消耗）
+
+        db_uri = 'sqlite:///./' + DB_NAME
+        app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
+
+        # 针对 SQLite，SQLAlchemy 默认使用 NullPool，它会忽略 pool_size 等参数。
+        # 为清晰起见，我们只设置必要的参数，并明确告知 gevent/多线程环境需要关闭线程检查。
+        if 'sqlite' in db_uri:
+            app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'connect_args': {'check_same_thread': False}}
+            log.info("DbMgr init with SQLite, using default NullPool and connect_args={'check_same_thread': False}")
+        else:
+            # 为其他数据库（如 PostgreSQL/MySQL）保留连接池配置
+            app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+                'pool_size': config.DB_POOL_SIZE,
+                'max_overflow': config.DB_MAX_OVERFLOW,
+                'pool_recycle': config.DB_POOL_RECYCLE,
+                'pool_pre_ping': config.DB_POOL_PRE_PING,
+            }
+            log.info(f"DbMgr init with pool_size={config.DB_POOL_SIZE}, max_overflow={config.DB_MAX_OVERFLOW}, "
+                     f"pool_recycle={config.DB_POOL_RECYCLE}, pool_pre_ping={config.DB_POOL_PRE_PING}")
+
         db_obj.init_app(app)
         self._initialized = True
-        log.info("DbMgr init")
 
     def set_save(self, id: Optional[int], user_name: str, data: str) -> Dict[str, Any]:
         """
@@ -174,7 +192,7 @@ class DbMgr:
         """为用户增加或扣除积分，并记录历史。"""
         try:
             # 查找用户
-            user = User.query.get(user_id)
+            user = db_obj.session.get(User, user_id)
             if not user:
                 return {"code": -1, "msg": f"用户不存在: {user_id}"}
 
@@ -244,7 +262,12 @@ class DbMgr:
             return {"code": -1, "msg": 'error ' + str(e)}
         return {"code": 0, "msg": "ok", "data": data}
 
-    def get_list(self, table: str, page_num: int = 1, page_size: int = 20, fields: Union[str, List[str]] = '*', conditions: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def get_list(self,
+                 table: str,
+                 page_num: int = 1,
+                 page_size: int = 20,
+                 fields: Union[str, List[str]] = '*',
+                 conditions: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         try:
             # 动态获取表结构
             metadata = MetaData()

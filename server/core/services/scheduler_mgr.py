@@ -10,7 +10,7 @@ from apscheduler.triggers.date import DateTrigger
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 from apscheduler.executors.gevent import GeventExecutor
 from datetime import datetime
-from typing import Callable, Optional
+from typing import Callable, Optional, Any, List
 from core.config import app_logger
 from core.utils import convert_standard_cron_weekday_to_apscheduler
 
@@ -28,14 +28,14 @@ class SchedulerMgr:
 
     _instance = None
 
-    def __new__(cls):
+    def __new__(cls) -> "SchedulerMgr":
         """单例模式"""
         if cls._instance is None:
             cls._instance = super(SchedulerMgr, cls).__new__(cls)
             cls._instance._initialized = False
         return cls._instance
 
-    def __init__(self):
+    def __init__(self) -> None:
         """初始化调度器"""
         if self._initialized:
             return
@@ -58,7 +58,7 @@ class SchedulerMgr:
         self._initialized = True
         log.info("任务调度器初始化成功 (使用 GeventScheduler)")
 
-    def start(self):
+    def start(self) -> None:
         """启动调度器"""
         if not self.scheduler.running:
             self.scheduler.start()
@@ -66,40 +66,35 @@ class SchedulerMgr:
         else:
             log.warning("任务调度器已经在运行中")
 
-    def shutdown(self, wait: bool = True):
-        """
-        关闭调度器
-        :param wait: 是否等待所有任务执行完毕
+    def shutdown(self, wait: bool = True) -> None:
+        """关闭调度器。
+
+        Args:
+            wait (bool): 是否等待所有正在执行的任务完成后再关闭。
         """
         if self.scheduler.running:
             self.scheduler.shutdown(wait=wait)
             log.info("任务调度器已关闭")
 
-    def add_cron_job(self, func: Callable, job_id: str, cron_expression: Optional[str] = None, **cron_kwargs):
-        """
-        添加 cron 定时任务
-        
-        :param func: 要执行的函数
-        :param job_id: 任务唯一标识
-        :param cron_expression: cron 表达式 (如果提供，会覆盖 cron_kwargs)
-        :param cron_kwargs: cron 参数
-            - second: 秒 (0-59)
-            - minute: 分钟 (0-59)
-            - hour: 小时 (0-23)
-            - day: 日 (1-31)
-            - month: 月 (1-12)
-            - day_of_week: 星期几 (0-6 或 mon,tue,wed,thu,fri,sat,sun)
-        
-        示例:
-            # 每天早上 8 点执行
-            scheduler.add_cron_job(my_func, 'daily_task', hour=8, minute=0)
-            
-            # 每周一到周五上午 9 点执行
-            scheduler.add_cron_job(my_func, 'weekday_task', 
-                                   day_of_week='mon-fri', hour=9, minute=0)
-            
-            # 每 5 分钟执行一次
-            scheduler.add_cron_job(my_func, 'interval_task', minute='*/5')
+    def add_cron_job(self,
+                     func: Callable[..., Any],
+                     job_id: str,
+                     cron_expression: Optional[str] = None,
+                     **cron_kwargs: Any) -> bool:
+        """添加 cron 定时任务。
+
+        支持两种方式：
+        1) 传入 `cron_expression`（5 或 6 字段）；
+        2) 传入 APScheduler 的 `CronTrigger` 参数（`cron_kwargs`）。
+
+        Args:
+            func (Callable[..., Any]): 要执行的函数。
+            job_id (str): 任务唯一标识。
+            cron_expression (Optional[str]): cron 表达式（如果提供，会覆盖 `cron_kwargs`）。
+            **cron_kwargs (Any): APScheduler `CronTrigger` 参数，例如 `minute='*/5'`。
+
+        Returns:
+            bool: 是否添加成功。
         """
         try:
             # 如果任务已存在，先移除
@@ -147,30 +142,26 @@ class SchedulerMgr:
             return False
 
     def add_interval_job(self,
-                         func: Callable,
+                         func: Callable[..., Any],
                          job_id: str,
                          seconds: int = 0,
                          minutes: int = 0,
                          hours: int = 0,
                          days: int = 0,
-                         start_date: Optional[datetime] = None):
-        """
-        添加间隔执行任务
-        
-        :param func: 要执行的函数
-        :param job_id: 任务唯一标识
-        :param seconds: 间隔秒数
-        :param minutes: 间隔分钟数
-        :param hours: 间隔小时数
-        :param days: 间隔天数
-        :param start_date: 开始时间
-        
-        示例:
-            # 每 30 秒执行一次
-            scheduler.add_interval_job(my_func, 'interval_30s', seconds=30)
-            
-            # 每 2 小时执行一次
-            scheduler.add_interval_job(my_func, 'interval_2h', hours=2)
+                         start_date: Optional[datetime] = None) -> bool:
+        """添加间隔执行任务。
+
+        Args:
+            func (Callable[..., Any]): 要执行的函数。
+            job_id (str): 任务唯一标识。
+            seconds (int): 间隔秒数。
+            minutes (int): 间隔分钟数。
+            hours (int): 间隔小时数。
+            days (int): 间隔天数。
+            start_date (Optional[datetime]): 开始时间。
+
+        Returns:
+            bool: 是否添加成功。
         """
         try:
             # 如果任务已存在，先移除
@@ -187,19 +178,16 @@ class SchedulerMgr:
             log.error(f"添加间隔任务失败: {job_id}, 错误: {e}")
             return False
 
-    def add_date_job(self, func: Callable, job_id: str, run_date: datetime):
-        """
-        添加定时执行任务（只执行一次）
-        
-        :param func: 要执行的函数
-        :param job_id: 任务唯一标识
-        :param run_date: 执行时间
-        
-        示例:
-            from datetime import datetime, timedelta
-            # 1小时后执行
-            run_time = datetime.now() + timedelta(hours=1)
-            scheduler.add_date_job(my_func, 'once_task', run_time)
+    def add_date_job(self, func: Callable[..., Any], job_id: str, run_date: datetime) -> bool:
+        """添加定时执行任务（只执行一次）。
+
+        Args:
+            func (Callable[..., Any]): 要执行的函数。
+            job_id (str): 任务唯一标识。
+            run_date (datetime): 执行时间。
+
+        Returns:
+            bool: 是否添加成功。
         """
         try:
             # 如果任务已存在，先移除
@@ -216,7 +204,7 @@ class SchedulerMgr:
             log.error(f"添加定时任务失败: {job_id}, 错误: {e}")
             return False
 
-    def remove_job(self, job_id: str):
+    def remove_job(self, job_id: str) -> bool:
         """
         移除任务
         :param job_id: 任务唯一标识
@@ -233,7 +221,7 @@ class SchedulerMgr:
             log.error(f"移除任务失败: {job_id}, 错误: {e}")
             return False
 
-    def pause_job(self, job_id: str):
+    def pause_job(self, job_id: str) -> bool:
         """
         暂停任务
         :param job_id: 任务唯一标识
@@ -250,7 +238,7 @@ class SchedulerMgr:
             log.error(f"暂停任务失败: {job_id}, 错误: {e}")
             return False
 
-    def resume_job(self, job_id: str):
+    def resume_job(self, job_id: str) -> bool:
         """
         恢复任务
         :param job_id: 任务唯一标识
@@ -267,7 +255,7 @@ class SchedulerMgr:
             log.error(f"恢复任务失败: {job_id}, 错误: {e}")
             return False
 
-    def get_job(self, job_id: str):
+    def get_job(self, job_id: str) -> Any:
         """
         获取任务信息
         :param job_id: 任务唯一标识
@@ -275,14 +263,14 @@ class SchedulerMgr:
         """
         return self.scheduler.get_job(job_id)
 
-    def get_all_jobs(self):
+    def get_all_jobs(self) -> List[Any]:
         """
         获取所有任务列表
         :return: Job 对象列表
         """
         return self.scheduler.get_jobs()
 
-    def print_jobs(self):
+    def print_jobs(self) -> None:
         """打印所有任务信息"""
         jobs = self.get_all_jobs()
         if not jobs:
@@ -293,7 +281,7 @@ class SchedulerMgr:
         for job in jobs:
             log.info(f"  - ID: {job.id}, 名称: {job.name}, 下次执行时间: {job.next_run_time}")
 
-    def _job_executed_listener(self, event):
+    def _job_executed_listener(self, event: Any) -> None:
         """
         任务执行监听器
         :param event: 事件对象

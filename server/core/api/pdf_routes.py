@@ -9,17 +9,31 @@ from typing import Any, Dict
 
 from flask import Blueprint, request, send_file
 from flask.typing import ResponseReturnValue
+from pydantic import BaseModel
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 
 from core.config import PDF_UNLOCK_DIR, PDF_UPLOAD_DIR, app_logger
 from core.services.pdf_mgr import pdf_mgr
+from core.tools.validation import parse_with_model
 from core.utils import _err, _ok, read_json_from_request
 
 log = app_logger
 pdf_bp = Blueprint('pdf', __name__)
 
+from core import limiter
 
+
+class _PdfDecryptBody(BaseModel):
+    task_id: str
+    password: str | None = None
+
+
+class _PdfDeleteBody(BaseModel):
+    task_id: str
+
+
+@limiter.limit("10 per minute; 50 per hour")
 @pdf_bp.route("/pdf/upload", methods=['POST'])
 def pdf_upload() -> ResponseReturnValue:
     """上传 PDF 文件。"""
@@ -45,18 +59,17 @@ def pdf_upload() -> ResponseReturnValue:
         return _err(f"上传文件失败: {str(e)}")
 
 
+@limiter.limit("10 per minute; 50 per hour")
 @pdf_bp.route("/pdf/decrypt", methods=['POST'])
 def pdf_decrypt() -> ResponseReturnValue:
     """解密 PDF 文件（异步处理）。"""
     try:
         data: Dict[str, Any] = read_json_from_request()
-        task_id = data.get('task_id')
-        password = data.get('password')
+        body, err = parse_with_model(_PdfDecryptBody, data, err_factory=_err)
+        if err:
+            return err
 
-        if not task_id:
-            return _err("任务ID不能为空")
-
-        code, msg = pdf_mgr.decrypt(task_id, password)
+        code, msg = pdf_mgr.decrypt(body.task_id, body.password)
         if code != 0:
             return _err(msg)
 
@@ -122,12 +135,11 @@ def pdf_delete() -> ResponseReturnValue:
     """删除 PDF 任务。"""
     try:
         data: Dict[str, Any] = read_json_from_request()
-        task_id = data.get('task_id')
+        body, err = parse_with_model(_PdfDeleteBody, data, err_factory=_err)
+        if err:
+            return err
 
-        if not task_id:
-            return _err("任务ID不能为空")
-
-        code, msg = pdf_mgr.delete(task_id)
+        code, msg = pdf_mgr.delete(body.task_id)
         if code != 0:
             return _err(msg)
 
