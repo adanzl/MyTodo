@@ -23,8 +23,10 @@ import core.ai.ai_mgr as ai_mgr
 from core.chat.chat_mgr import chat_mgr
 from core.db.db_mgr import db_mgr
 from core.services.scheduler_mgr import scheduler_mgr
-from core.config import config
+from core.config import config, app_logger
 import os
+
+log = app_logger
 
 
 def create_app():
@@ -53,11 +55,21 @@ def create_app():
 
     # 统一使用配置中的 CORS 来源
     cors_origins = config.get_cors_origins()
-    # Flask-CORS 配置：如果 origins 是 ['*']，需要特殊处理
+    
+    # Flask-CORS 配置
+    # 注意：当使用 supports_credentials=True 时，Access-Control-Allow-Origin 不能是 '*'
+    # 必须使用具体的 origin 列表
     if cors_origins == ['*']:
-        CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})
+        # 如果配置为 '*'，禁用 credentials 支持（因为 '*' 与 credentials 不兼容）
+        log.warning(
+            "[CORS] CORS_ORIGINS 设置为 '*'，但应用需要 credentials 支持（JWT cookies）。"
+            "建议配置具体的 origins（如：CORS_ORIGINS=https://leo-zhao.natapp4.cc,http://localhost:5173）"
+        )
+        CORS(app, supports_credentials=False, resources={r"/*": {"origins": "*"}})
         socketio_cors_origins = "*"
     else:
+        # 使用具体的 origins 列表，支持 credentials
+        log.info(f"[CORS] 配置允许的 origins: {cors_origins}, 启用 credentials 支持")
         CORS(app, supports_credentials=True, resources={r"/*": {"origins": cors_origins}})
         socketio_cors_origins = cors_origins
 
