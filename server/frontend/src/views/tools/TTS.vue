@@ -10,8 +10,8 @@
               <Refresh />
             </el-icon>
           </el-button>
-          <el-button type="success" v-bind="smallIconButtonProps" @click="handleTtsCreateTask" :loading="ttsLoading">
-            <el-icon v-if="!ttsLoading">
+          <el-button type="success" v-bind="smallIconButtonProps" @click="handleTtsCreateTask" >
+            <el-icon>
               <Plus />
             </el-icon>
           </el-button>
@@ -29,6 +29,9 @@
             <div class="text-sm font-medium truncate flex-1 min-w-0" :title="task.name">
               {{ task.name }}
             </div>
+            <span v-if="task.duration" class="text-xs text-gray-500 flex-shrink-0">
+              {{ formatDuration(task.duration) }}
+            </span>
           </div>
           <!-- 第二行：状态、下载按钮、删除按钮 -->
           <div class="flex items-center justify-between gap-2 min-h-[20px]">
@@ -75,9 +78,6 @@
           </el-tag>
           <MediaComponent v-if="resultFileObject" :file="resultFileObject" :player="ttsPlayer"
             :disabled="isTaskProcessing" @play="handleTtsTogglePlayResult" @seek="handleResultFileSeek" />
-          <span v-if="ttsCurrentTask.duration" class="text-xs text-gray-600 flex-shrink-0">
-            {{ formatDuration(ttsCurrentTask.duration) }}
-          </span>
           <el-button type="primary" v-bind="mediumTextButtonProps" @click="handleTtsDownload"
             :disabled="isResultActionDisabled">
             下载
