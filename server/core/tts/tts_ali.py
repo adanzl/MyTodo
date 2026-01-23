@@ -39,16 +39,18 @@ MODEL_MAP = {
 
 class TTSClient:
 
-    def __init__(self, on_msg=None, on_err=None):
+    def __init__(self, on_msg=None, on_err=None, on_progress=None):
         """
         初始化 TTSClient 实例
 
         参数:
             on_msg: 消息回调函数，接收 (data, type) 参数，type=0 表示音频数据，type=1 表示完成消息
             on_err: 错误回调函数，接收错误对象
+            on_progress: 进度回调函数，接收 (generated_chars, total_chars) 参数
         """
         self.on_msg = on_msg or (lambda x, y: None)
         self.on_err = on_err or (lambda x: None)
+        self.on_progress = on_progress or (lambda x, y: None)
         self.api_key = ALI_KEY
         self.uri = SERVER_URI
         self.task_id = str(uuid.uuid4())
@@ -63,6 +65,8 @@ class TTSClient:
         self._ws_thread = None  # WebSocket 运行线程
         self._lock = threading.Lock()  # 用于线程同步
         self._cancelled = False  # 是否已取消
+        self._generated_chars = 0  # 已生成字数统计
+        self._total_chars = 0  # 总字数（从文本计算）
 
     def streaming_cancel(self):
         """取消流式合成"""
@@ -99,6 +103,8 @@ class TTSClient:
             self.task_started = False
             self.task_finished = False
             self._text_queue = []
+            self._generated_chars = 0
+            self._total_chars = len(text)  # 设置总字数
 
             # 启动 WebSocket 连接
             self._start_websocket(role)
@@ -156,6 +162,8 @@ class TTSClient:
                     self.task_started = False
                     self.task_finished = False
                     self._text_queue = []
+                    self._generated_chars = 0
+                    self._total_chars = 0  # 流式模式下总字数未知，会在发送时累计
                     self._start_websocket(role)
 
                     # 等待任务启动
@@ -272,6 +280,8 @@ class TTSClient:
                             log.debug(">>[TTS-ALI] 任务已完成")
                             self.task_finished = True
                             self.on_msg(">>[TTS-ALI] Completed", 1)
+                            # 发送最终进度
+                            self.on_progress(self._generated_chars, self._total_chars)
                             self.close(ws)
 
                         elif event == "task-failed":
@@ -287,6 +297,25 @@ class TTSClient:
                             if not self._cancelled:
                                 self.on_err(Exception(error_msg))
                             self.close(ws)
+
+                        elif event == "result-generated":
+                            # 处理 result-generated 事件，统计已生成字数
+                            # 只有 type 为 "sentence-end" 时才统计字数
+                            payload = msg_json.get("payload", {})
+                            output = payload.get("output", {})
+                            output_type = output.get("type", "")
+                            
+                            # 只有 sentence-end 类型才统计字数
+                            if output_type == "sentence-end":
+                                usage = payload.get("usage", {})
+                                characters = usage.get("characters", 0)
+                                
+                                if characters > 0:
+                                    # 累计已生成字数
+                                    self._generated_chars += characters
+                                    log.debug(f">>[TTS-ALI] 已生成字数: {self._generated_chars} (本次: {characters}, 文本: {output.get('original_text', '')})")
+                                    # 调用进度回调
+                                    self.on_progress(self._generated_chars, self._total_chars)
 
             except json.JSONDecodeError as e:
                 log.error(f">>[TTS-ALI] JSON 解析失败: {e}")

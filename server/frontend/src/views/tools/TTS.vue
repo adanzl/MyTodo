@@ -69,7 +69,7 @@
 
       <div class="flex-1 overflow-auto flex flex-col gap-3">
         <!-- 任务信息 -->
-        <div class="flex items-center gap-4 flex-shrink-0">
+        <div class="flex items-center gap-4 flex-shrink-0 flex-wrap">
           <el-tag :type="getTtsStatusTagType(ttsCurrentTask.status)" size="small" class="w-16 text-center">
             {{ getTtsStatusText(ttsCurrentTask.status) }}
           </el-tag>
@@ -79,8 +79,16 @@
             :disabled="isResultActionDisabled">
             下载
           </el-button>
+          <span v-if="ttsCurrentTask.total_chars !== undefined" class="text-xs text-gray-600 ml-auto">
+            <template v-if="isTaskProcessing && ttsCurrentTask.generated_chars !== undefined">
+              {{ ttsCurrentTask.generated_chars }} / {{ ttsCurrentTask.total_chars }}
+            </template>
+            <template v-else>
+              {{ ttsCurrentTask.total_chars }}
+            </template>
+          </span>
           <el-tooltip v-if="ttsCurrentTask.error_message" :content="`错误: ${ttsCurrentTask.error_message}`"
-            placement="top">
+            placement="top" class="w-full">
             <span class="text-red-500 text-xs truncate max-w-xs inline-block cursor-help">
               错误: {{ ttsCurrentTask.error_message }}
             </span>
@@ -275,8 +283,8 @@ const ttsRenameTaskName = ref("");
 
 // 任务参数
 const ttsText = ref("");
-const ttsRole = ref<string | null>(null); // 使用 null 而不是空字符串，避免 el-select 警告
-const ttsSpeed = ref(1.0);
+const ttsRole = ref<string | null>("cosyvoice-v3-plus-leo-34ba9eaebae44039a4a9426af6389dcd"); // 默认音色：灿灿
+const ttsSpeed = ref(0.8); // 默认语速：0.8
 const ttsVol = ref(50);
 const ttsParamsChanged = ref(false);
 
@@ -391,8 +399,8 @@ const handleTtsViewTask = async (taskId: string) => {
       // 初始化参数
       ttsText.value = response.data.text || "";
       // 将空字符串转换为 null，避免 el-select 的空字符串警告
-      ttsRole.value = response.data.role ? response.data.role : null;
-      ttsSpeed.value = response.data.speed ?? 1.0;
+      ttsRole.value = response.data.role ? response.data.role : "cosyvoice-v3-plus-leo-34ba9eaebae44039a4a9426af6389dcd";
+      ttsSpeed.value = response.data.speed ?? 0.8;
       ttsVol.value = response.data.vol ?? 50;
       ttsParamsChanged.value = false;
     } else {

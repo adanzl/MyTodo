@@ -54,4 +54,12 @@ export interface TTSTask {
    * 更新时间戳
    */
   update_time: number;
+  /**
+   * 已生成字数（实时更新）
+   */
+  generated_chars?: number;
+  /**
+   * 文本总字数（按统计规则计算）
+   */
+  total_chars?: number;
 }

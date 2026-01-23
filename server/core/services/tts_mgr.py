@@ -11,6 +11,7 @@
 import os
 import shutil
 import threading
+import re
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Any, Callable, Dict, Optional, Tuple
@@ -39,6 +40,40 @@ OUTPUT_FILENAME = 'output.mp3'
 TASK_COMPLETION_TIMEOUT = 600
 
 
+def count_text_chars(text: str) -> int:
+    """统计文本字数。
+    
+    统计规则：
+    - 汉字（包括简/繁体汉字、日文汉字和韩文汉字）按2个字符计算
+    - 其他所有字符（如标点符号、字母、数字、日韩文假名/谚文等）均按1个字符计算
+    
+    Args:
+        text: 待统计的文本
+        
+    Returns:
+        统计后的字符数
+    """
+    if not text:
+        return 0
+    
+    count = 0
+    # 汉字Unicode范围：
+    # \u4e00-\u9fff: CJK统一汉字（中文、日文、韩文常用汉字）
+    # \u3400-\u4dbf: CJK扩展A（更多汉字）
+    # \uac00-\ud7a3: 韩文音节（包含韩文汉字）
+    # \uf900-\ufaff: CJK兼容汉字
+    # 使用正则表达式匹配汉字
+    hanzi_pattern = re.compile(r'[\u4e00-\u9fff\u3400-\u4dbf\uac00-\ud7a3\uf900-\ufaff]')
+    
+    for char in text:
+        if hanzi_pattern.match(char):
+            count += 2  # 汉字按2个字符计算
+        else:
+            count += 1  # 其他字符按1个字符计算
+    
+    return count
+
+
 @dataclass
 class TTSTask(TaskBase):
     """TTS 任务数据模型。
@@ -50,6 +85,8 @@ class TTSTask(TaskBase):
         vol: 音量，默认 50
         work_dir: 任务工作目录路径，格式：{BASE_TMP_DIR}/tts/{task_id}
         output_file: 生成的音频文件路径，格式：{work_dir}/output.mp3
+        generated_chars: 已生成字数（实时更新）
+        total_chars: 文本总字数（按统计规则计算）
     """
 
     text: str = ''
@@ -62,6 +99,12 @@ class TTSTask(TaskBase):
 
     # 输出音频文件路径（由任务执行生成）
     output_file: Optional[str] = None
+    
+    # 已生成字数统计（实时更新）
+    generated_chars: int = 0
+    
+    # 文本总字数（按统计规则计算：汉字2个字符，其他1个字符）
+    total_chars: int = 0
 
 
 class TTSMgr(BaseTaskMgr[TTSTask]):
@@ -152,6 +195,9 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             speed=float(speed) if speed is not None else 1.0,
             vol=int(vol) if vol is not None else 50,
         )
+        
+        # 计算文本总字数
+        task.total_chars = count_text_chars(task.text)
 
         # 保存任务并获取 task_id
         code, msg, task_id = self._create_task_and_save(task)
@@ -214,6 +260,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         if text is not None:
             # 允许文本为空，可以在创建后编辑
             task.text = str(text).strip() if text else ''
+            # 更新文本时重新计算总字数
+            task.total_chars = count_text_chars(task.text)
             updated = True
 
         if role is not None:
@@ -267,6 +315,9 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         # 清理旧的客户端引用（如果存在）
         with self._task_lock:
             self._active_clients.pop(task_id, None)
+            # 重置已生成字数统计
+            task.generated_chars = 0
+            self._save_task_and_update_time(task)
 
         # 异步执行任务（在新线程中运行）
         self._run_task_async(task_id, self._run_tts_task)
@@ -357,6 +408,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         task_completed = threading.Event()
         # 错误信息（用于在回调中传递错误）
         error_info = {'error': None}
+        # 已生成字数统计
+        generated_chars = 0
 
         def on_data(data: Any, data_type: int = 0) -> None:
             """TTS 数据回调：接收音频流数据并写入文件。
@@ -398,6 +451,25 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             # 设置任务完成事件，让主线程退出等待
             task_completed.set()
 
+        def on_progress(generated: int, total: int) -> None:
+            """TTS 进度回调：更新已生成字数统计。
+            
+            Args:
+                generated: 已生成字数
+                total: 总字数（可能为0，表示未知）
+            """
+            nonlocal generated_chars
+            generated_chars = generated
+            log.debug(f"[TTSMgr] 任务 {task.task_id} 进度: {generated}/{total if total > 0 else '?'} 字")
+            
+            # 更新任务中的已生成字数
+            with self._task_lock:
+                current_task = self._get_task(task.task_id)
+                if current_task:
+                    current_task.generated_chars = generated
+                    # 只更新时间，不保存到文件（避免频繁IO）
+                    current_task.update_time = datetime.now().timestamp()
+
         # 在执行前检查是否已被停止
         if self._should_stop(task.task_id):
             log.info(f"[TTSMgr] 任务 {task.task_id} 已被停止，跳过执行")
@@ -408,9 +480,13 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         try:
             # 创建 TTS 客户端并设置参数
             # 注意：tts_ali 使用 WebSocket 连接，不依赖 dashscope SDK
-            client = TTSClient(on_msg=on_data, on_err=on_err)
+            client = TTSClient(on_msg=on_data, on_err=on_err, on_progress=on_progress)
             client.speed = task.speed
             client.vol = task.vol
+            
+            # 计算总字数（用于进度显示）
+            total_chars = len(task.text)
+            client._total_chars = total_chars
 
             # 保存客户端引用，以便停止时可以取消
             with self._task_lock:
@@ -461,8 +537,12 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 raise error_info['error']
 
             log.debug(f"[TTSMgr] 任务 {task.task_id} 已完成")
-            # 更新任务状态为成功
-            self._update_task_status(task.task_id, TASK_STATUS_SUCCESS, None)
+            # 更新任务状态为成功，并保存最终字数统计
+            with self._task_lock:
+                final_task = self._get_task(task.task_id)
+                if final_task:
+                    final_task.generated_chars = generated_chars
+                    self._update_task_status(task.task_id, TASK_STATUS_SUCCESS, None)
 
         except Exception as e:
             # 判断是否为停止操作导致的异常
