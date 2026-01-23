@@ -6,7 +6,8 @@ import os
 import shutil
 from typing import Any, Dict, List, Optional, Tuple, Mapping
 
-from gevent import spawn, subprocess
+from gevent import spawn
+import subprocess
 from bleak import BleakClient, BleakScanner
 from bleak.backends.scanner import AdvertisementData
 

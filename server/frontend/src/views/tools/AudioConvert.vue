@@ -12,7 +12,7 @@
           </el-button>
           <el-button type="success" v-bind="smallIconButtonProps" @click="handleConvertCreateTask"
             :loading="convertLoading">
-            <el-icon>
+            <el-icon  v-if="!convertLoading">
               <Plus />
             </el-icon>
           </el-button>
@@ -435,6 +435,11 @@ const handleConvertViewTask = async (taskId: string) => {
     const response = await getConvertTask(taskId);
     if (response.code === 0) {
       convertCurrentTask.value = response.data;
+      // 同步更新任务列表中对应任务的状态
+      const taskIndex = convertTaskList.value.findIndex(t => t.task_id === taskId);
+      if (taskIndex !== -1) {
+        convertTaskList.value[taskIndex] = { ...response.data };
+      }
       // 初始化输出目录名称
       convertOutputDir.value = response.data.output_dir || "mp3";
       convertOutputDirChanged.value = false;
@@ -620,7 +625,7 @@ const handleConvertStart = async () => {
   }
 
   const confirmed = await ElMessageBox.confirm(
-    `确定要开始转码吗？将转换目录 "${convertCurrentTask.value.name}" 下的所有音频文件为 MP3 格式。`,
+    `确定要开始转码吗？将转换 "${convertCurrentTask.value.name}" 。`,
     "确认转码",
     {
       confirmButtonText: "确定",
@@ -652,11 +657,23 @@ const handleConvertStart = async () => {
 // 轮询转码任务状态
 const { start: startConvertPolling, stop: stopConvertPolling } = useControllableInterval(
   async () => {
-    if (!convertCurrentTask.value || convertCurrentTask.value.status !== "processing") {
+    if (!convertCurrentTask.value) {
       stopConvertPolling();
       return;
     }
+    
+    // 先更新任务列表，确保状态同步
     await loadConvertTaskList();
+    
+    // 检查当前任务状态，如果不再是 processing，则停止轮询
+    if (convertCurrentTask.value.status !== "processing") {
+      // 停止轮询前，再次更新任务列表和当前任务，确保状态是最新的
+      await handleConvertViewTask(convertCurrentTask.value.task_id);
+      stopConvertPolling();
+      return;
+    }
+    
+    // 更新当前任务详情
     await handleConvertViewTask(convertCurrentTask.value.task_id);
   },
   CONVERT_TASK_POLLING_INTERVAL,

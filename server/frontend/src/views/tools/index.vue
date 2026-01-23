@@ -6,6 +6,10 @@
       @tab-change="handleTabChange"
       class="flex-1 flex flex-col overflow-hidden h-[calc(100vh-150px)]"
     >
+      <!-- TTS 页签 -->
+      <el-tab-pane label="TTS" name="tts_tool">
+        <TTS />
+      </el-tab-pane>
       <!-- PDF 工具页签 -->
       <el-tab-pane label="PDF 工具" name="pdf_tool">
         <PdfTool />
@@ -29,9 +33,10 @@ import { ref } from "vue";
 import PdfTool from "./PdfTool.vue";
 import AudioMerge from "./AudioMerge.vue";
 import AudioConvert from "./AudioConvert.vue";
+import TTS from "./TTS.vue";
 
 // 主页签控制
-const activeMainTab = ref("pdf_tool");
+const activeMainTab = ref("tts_tool");
 
 // 监听页签切换
 const handleTabChange = (tabName: string) => {

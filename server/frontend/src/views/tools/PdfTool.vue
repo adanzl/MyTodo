@@ -86,8 +86,9 @@
                 v-if="row.uploaded_info"
                 class="text-blue-600 cursor-pointer hover:underline"
                 @click="handlePdfDownload(row, 'uploaded')"
+                :title="row.uploaded_info.name"
               >
-                {{ row.filename }}
+                {{ row.uploaded_info.name || row.name || row.filename || row.task_id }}
               </span>
               <span v-else class="text-gray-400">-</span>
             </template>

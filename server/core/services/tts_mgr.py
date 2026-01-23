@@ -273,7 +273,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             # 清除事件循环引用，确保创建新循环前状态干净
             _clear_event_loop()
             
-            # 为新线程创建事件循环，并附加 child watcher（dashscope SDK 需要）
+            # 为新线程创建 asyncio 事件循环，并附加 child watcher（dashscope SDK 需要）
             loop = None
             try:
                 loop = asyncio.get_event_loop()
@@ -283,14 +283,18 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
             
-            # 显式附加 child watcher 到事件循环（解决 "child watchers are only available on the default loop" 错误）
+            # 显式附加 child watcher 到事件循环（解决 asyncio "child watchers are only available on the default loop" 错误）
             # dashscope SDK 内部可能使用子进程，需要 child watcher 支持
             # Python 3.8+ 使用 ThreadedChildWatcher，需要显式 attach_loop
+            # 注意：get_child_watcher 在 Python 3.12+ 中已弃用，但在 Python 3.14 之前仍可用
             try:
-                child_watcher = asyncio.get_child_watcher()
-                if hasattr(child_watcher, 'attach_loop'):
-                    child_watcher.attach_loop(loop)
-                    log.debug(f"[{self.__class__.__name__}] Child watcher 已附加到事件循环")
+                import warnings
+                with warnings.catch_warnings():
+                    warnings.filterwarnings('ignore', category=DeprecationWarning, message='.*get_child_watcher.*')
+                    child_watcher = asyncio.get_child_watcher()
+                    if hasattr(child_watcher, 'attach_loop'):
+                        child_watcher.attach_loop(loop)
+                        log.debug(f"[{self.__class__.__name__}] Child watcher 已附加到事件循环")
             except (AttributeError, RuntimeError, ValueError) as e:
                 # 某些平台或 Python 版本可能不支持，记录但不中断执行
                 log.warning(f"[{self.__class__.__name__}] 无法附加 child watcher: {e}")
@@ -386,16 +390,20 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
 
         try:
             # 确保事件循环和 child watcher 已正确设置（dashscope SDK 需要）
+            # 注意：get_child_watcher 在 Python 3.12+ 中已弃用，但在 Python 3.14 之前仍可用
             try:
                 loop = asyncio.get_event_loop()
                 if not loop.is_closed():
-                    child_watcher = asyncio.get_child_watcher()
-                    if hasattr(child_watcher, 'attach_loop'):
-                        try:
-                            child_watcher.attach_loop(loop)
-                        except (RuntimeError, ValueError):
-                            # 如果已经附加，忽略错误
-                            pass
+                    import warnings
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings('ignore', category=DeprecationWarning, message='.*get_child_watcher.*')
+                        child_watcher = asyncio.get_child_watcher()
+                        if hasattr(child_watcher, 'attach_loop'):
+                            try:
+                                child_watcher.attach_loop(loop)
+                            except (RuntimeError, ValueError):
+                                # 如果已经附加，忽略错误
+                                pass
             except RuntimeError:
                 pass
             
