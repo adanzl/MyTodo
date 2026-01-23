@@ -132,19 +132,15 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             - msg: 描述信息
             - task_id: 成功时返回任务 ID，失败时为 None
         """
-        # 验证文本内容
-        if text is None or not str(text).strip():
-            return -1, '文本不能为空', None
-
         # 设置默认任务名称
         name = (name or datetime.now().strftime('%Y-%m-%d %H:%M:%S')).strip()
 
-        # 创建任务对象
+        # 创建任务对象（允许空文本，可以在创建后编辑）
         task = TTSTask(
             task_id='',  # 将在 _create_task_and_save 中生成
             name=name,
             status=TASK_STATUS_PENDING,
-            text=str(text),
+            text=str(text) if text is not None else '',
             role=role,
             speed=float(speed) if speed is not None else 1.0,
             vol=int(vol) if vol is not None else 50,
