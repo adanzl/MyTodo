@@ -75,6 +75,9 @@
           </el-tag>
           <MediaComponent v-if="resultFileObject" :file="resultFileObject" :player="ttsPlayer"
             :disabled="isTaskProcessing" @play="handleTtsTogglePlayResult" @seek="handleResultFileSeek" />
+          <span v-if="ttsCurrentTask.duration" class="text-xs text-gray-600 flex-shrink-0">
+            {{ formatDuration(ttsCurrentTask.duration) }}
+          </span>
           <el-button type="primary" v-bind="mediumTextButtonProps" @click="handleTtsDownload"
             :disabled="isResultActionDisabled">
             下载
@@ -254,6 +257,7 @@ import { Refresh, Plus, Delete, Edit, Close, Picture } from "@element-plus/icons
 import MediaComponent from "@/components/MediaComponent.vue";
 import { getMediaFileUrl } from "@/utils/file";
 import { logAndNoticeError } from "@/utils/error";
+import { formatDuration } from "@/utils/format";
 import { useAudioPlayer } from "@/composables/useAudioPlayer";
 import { useControllableInterval } from "@/composables/useInterval";
 import { MEDIA_TASK_POLLING_INTERVAL } from "@/constants/media";
@@ -406,8 +410,10 @@ const handleTtsViewTask = async (taskId: string) => {
       ttsVol.value = response.data.vol ?? 50;
       ttsParamsChanged.value = false;
       
-      // 选中任务后，自动开始定时刷新状态
-      startTtsPollingTaskStatus();
+      // 只有处理中的任务才自动开始定时刷新状态
+      if (response.data.status === "processing") {
+        startTtsPollingTaskStatus();
+      }
     } else {
       ElMessage.error(response.msg || "获取任务信息失败");
     }
@@ -521,7 +527,7 @@ const handleTtsParamsChange = () => {
     return;
   }
   const currentRole = ttsCurrentTask.value.role || null;
-  const currentSpeed = ttsCurrentTask.value.speed ?? 1.0;
+  const currentSpeed = ttsCurrentTask.value.speed ?? 0.8;
   const currentVol = ttsCurrentTask.value.vol ?? 50;
   ttsParamsChanged.value =
     ttsRole.value !== currentRole ||
@@ -561,7 +567,7 @@ const handleTtsSaveParams = async () => {
     }
 
     // 检查语速是否有变化
-    const currentSpeed = ttsCurrentTask.value.speed ?? 1.0;
+    const currentSpeed = ttsCurrentTask.value.speed ?? 0.8;
     if (ttsSpeed.value !== currentSpeed) {
       updateParams.speed = ttsSpeed.value;
     }
@@ -684,6 +690,14 @@ const { start: startTtsPolling, stop: stopTtsPolling } = useControllableInterval
     const taskInList = ttsTaskList.value.find(t => t.task_id === currentTaskId);
     if (!taskInList) {
       // 任务已被删除，停止轮询
+      stopTtsPolling();
+      return;
+    }
+
+    // 检查当前任务状态，如果不再是 processing，则停止轮询
+    if (taskInList.status !== "processing") {
+      // 停止轮询前，再次更新当前任务，确保状态是最新的
+      await handleTtsViewTask(currentTaskId);
       stopTtsPolling();
       return;
     }
@@ -1024,6 +1038,7 @@ const resultFileObject = computed(() => {
   return {
     path: resultFile.value.path,
     name: resultFile.value.name,
+    duration: ttsCurrentTask.value?.duration || null,
   };
 });
 

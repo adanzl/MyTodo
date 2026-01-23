@@ -81,7 +81,7 @@ class TTSTask(TaskBase):
     Attributes:
         text: 待合成的文本内容
         role: 发音人/音色（可选）
-        speed: 语速，默认 1.0
+        speed: 语速，默认 0.8
         vol: 音量，默认 50
         work_dir: 任务工作目录路径，格式：{BASE_TMP_DIR}/tts/{task_id}
         output_file: 生成的音频文件路径，格式：{work_dir}/output.mp3
@@ -92,7 +92,7 @@ class TTSTask(TaskBase):
 
     text: str = ''
     role: Optional[str] = None
-    speed: float = 1.0
+    speed: float = 0.8
     vol: int = 50
 
     # 工作目录：{BASE_TMP_DIR}/tts/{task_id}
@@ -177,7 +177,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             text: 待合成的文本内容（必填）
             name: 任务名称；为空时使用当前时间字符串
             role: 发音人/音色；透传给 TTSClient
-            speed: 语速，默认 1.0；透传给 TTSClient
+            speed: 语速，默认 0.8；透传给 TTSClient
             vol: 音量，默认 50；透传给 TTSClient
 
         Returns:
@@ -196,7 +196,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             status=TASK_STATUS_PENDING,
             text=str(text) if text is not None else '',
             role=role,
-            speed=float(speed) if speed is not None else 1.0,
+            speed=float(speed) if speed is not None else 0.8,
             vol=int(vol) if vol is not None else 50,
         )
         
