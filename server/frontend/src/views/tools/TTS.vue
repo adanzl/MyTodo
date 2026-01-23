@@ -688,17 +688,85 @@ const startTtsPollingTaskStatus = () => {
 };
 
 // 下载 TTS 结果
-const handleTtsDownload = () => {
+const handleTtsDownload = async () => {
   if (!ttsCurrentTask.value?.output_file) return;
-  const url = getTtsTaskDownloadUrl(ttsCurrentTask.value.task_id);
-  window.open(url, "_blank");
+  
+  try {
+    const url = getTtsTaskDownloadUrl(ttsCurrentTask.value.task_id);
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      ElMessage.error("下载失败");
+      return;
+    }
+    
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    
+    // 获取文件扩展名
+    const outputFile = ttsCurrentTask.value.output_file;
+    const fileExtension = outputFile.includes('.') 
+      ? '.' + outputFile.split('.').pop() 
+      : '';
+    
+    // 构建文件名：任务名字 + 原扩展名
+    const taskName = ttsCurrentTask.value.name || 'tts_output';
+    const fileName = `${taskName}${fileExtension}`;
+    
+    // 创建下载链接
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // 清理 blob URL
+    URL.revokeObjectURL(blobUrl);
+  } catch (error) {
+    logAndNoticeError(error as Error, "下载失败");
+  }
 };
 
 // 从任务列表下载 TTS 结果
-const handleTtsDownloadFromList = (task: TTSTask) => {
+const handleTtsDownloadFromList = async (task: TTSTask) => {
   if (!task?.output_file) return;
-  const url = getTtsTaskDownloadUrl(task.task_id);
-  window.open(url, "_blank");
+  
+  try {
+    const url = getTtsTaskDownloadUrl(task.task_id);
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      ElMessage.error("下载失败");
+      return;
+    }
+    
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    
+    // 获取文件扩展名
+    const outputFile = task.output_file;
+    const fileExtension = outputFile.includes('.') 
+      ? '.' + outputFile.split('.').pop() 
+      : '';
+    
+    // 构建文件名：任务名字 + 原扩展名
+    const taskName = task.name || 'tts_output';
+    const fileName = `${taskName}${fileExtension}`;
+    
+    // 创建下载链接
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // 清理 blob URL
+    URL.revokeObjectURL(blobUrl);
+  } catch (error) {
+    logAndNoticeError(error as Error, "下载失败");
+  }
 };
 
 // 清理浏览器音频播放器状态
