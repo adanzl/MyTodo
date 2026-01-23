@@ -36,7 +36,7 @@ TTS_BASE_DIR = os.path.join(BASE_TMP_DIR, 'tts')
 OUTPUT_FILENAME = 'output.mp3'
 
 # WebSocket 任务完成等待超时时间（秒）
-TASK_COMPLETION_TIMEOUT = 60
+TASK_COMPLETION_TIMEOUT = 600
 
 
 @dataclass
@@ -261,6 +261,13 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         if not task.text or not str(task.text).strip():
             return -1, '文本为空'
 
+        # 清除停止标志（如果存在），允许重新开始
+        self._clear_stop_flag(task_id)
+
+        # 清理旧的客户端引用（如果存在）
+        with self._task_lock:
+            self._active_clients.pop(task_id, None)
+
         # 异步执行任务（在新线程中运行）
         self._run_task_async(task_id, self._run_tts_task)
         return 0, 'TTS 任务已启动'
@@ -348,6 +355,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         file_handle = None
         # 任务完成事件（用于等待 WebSocket 任务完成）
         task_completed = threading.Event()
+        # 错误信息（用于在回调中传递错误）
+        error_info = {'error': None}
 
         def on_data(data: Any, data_type: int = 0) -> None:
             """TTS 数据回调：接收音频流数据并写入文件。
@@ -382,8 +391,12 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 task_completed.set()
 
         def on_err(err: Exception) -> None:
-            """TTS 错误回调：抛出异常以终止任务。"""
-            raise err
+            """TTS 错误回调：记录错误并设置完成事件。"""
+            # 记录错误信息
+            error_info['error'] = err
+            log.error(f"[TTSMgr] TTS 客户端错误回调: {err}")
+            # 设置任务完成事件，让主线程退出等待
+            task_completed.set()
 
         # 在执行前检查是否已被停止
         if self._should_stop(task.task_id):
@@ -408,8 +421,26 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 log.info(f"[TTSMgr] 任务 {task.task_id} 已被停止，取消执行")
                 raise RuntimeError('任务已被停止')
 
-            # 执行流式合成
-            client.stream_msg(text=task.text, role=task.role, id=task.task_id)
+            # 执行流式合成：按行分割文本，逐行发送
+            text_lines = task.text.split('\n')
+            # 过滤空行
+            text_lines = [line.strip() for line in text_lines if line.strip()]
+
+            if not text_lines:
+                log.warning(f"[TTSMgr] 任务 {task.task_id} 文本为空，跳过合成")
+                return
+
+            log.debug(f"[TTSMgr] 任务 {task.task_id} 将按 {len(text_lines)} 行进行流式合成")
+
+            # 逐行发送文本
+            for i, line in enumerate(text_lines, 1):
+                # 检查是否被停止
+                if self._should_stop(task.task_id):
+                    log.info(f"[TTSMgr] 任务 {task.task_id} 已被停止，取消完成操作")
+                    raise RuntimeError('任务已被停止')
+
+                log.debug(f"[TTSMgr] 任务 {task.task_id} 发送第 {i}/{len(text_lines)} 行: {line[:30]}...")
+                client.stream_msg(text=line, role=task.role, id=task.task_id)
 
             # 在执行 stream_complete 前再次检查停止标志
             if self._should_stop(task.task_id):
@@ -421,9 +452,15 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             # 等待任务完成（WebSocket 会异步返回 task-finished 事件）
             if not task_completed.wait(timeout=TASK_COMPLETION_TIMEOUT):
                 log.warning(f"[TTSMgr] 任务 {task.task_id} 等待完成超时（{TASK_COMPLETION_TIMEOUT}秒）")
-            else:
-                log.debug(f"[TTSMgr] 任务 {task.task_id} 已完成")
+                # 超时也视为失败
+                raise TimeoutError(f"任务等待完成超时（{TASK_COMPLETION_TIMEOUT}秒）")
 
+            # 检查是否有错误发生
+            if error_info['error'] is not None:
+                # 有错误发生，抛出异常以便外层处理
+                raise error_info['error']
+
+            log.debug(f"[TTSMgr] 任务 {task.task_id} 已完成")
             # 更新任务状态为成功
             self._update_task_status(task.task_id, TASK_STATUS_SUCCESS, None)
 

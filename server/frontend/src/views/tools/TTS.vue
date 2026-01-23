@@ -198,7 +198,9 @@
 
         <!-- 操作按钮 -->
         <div class="border rounded p-3 flex flex-col gap-2 flex-shrink-0">
+          <!-- 开始生成按钮 -->
           <el-tooltip
+            v-if="!isTaskProcessing"
             :content="!ttsText.trim() ? '请先输入文本内容' : ''"
             :disabled="!!ttsText.trim()"
             placement="top"
@@ -208,14 +210,14 @@
               v-bind="mediumTextButtonProps"
               @click="handleTtsStart"
               :disabled="isStartDisabled"
-              :loading="isTaskProcessing"
               class="w-full"
             >
               开始生成
             </el-button>
           </el-tooltip>
+          <!-- 停止生成按钮 -->
           <el-button
-            v-if="isTaskProcessing"
+            v-else
             type="warning"
             v-bind="mediumTextButtonProps"
             @click="handleTtsStop"
@@ -625,7 +627,7 @@ const handleTtsStart = async () => {
   }
 
   const confirmed = await ElMessageBox.confirm(
-    `确定要开始生成语音吗？将转换文本 "${ttsText.value.substring(0, 50)}${ttsText.value.length > 50 ? '...' : ''}"`,
+    `确定要开始生成任务 "${ttsCurrentTask.value.name}" 吗？`,
     "确认生成",
     {
       confirmButtonText: "确定",
@@ -641,7 +643,10 @@ const handleTtsStart = async () => {
     const response = await startTtsTask(ttsCurrentTask.value.task_id);
     if (response.code === 0) {
       ElMessage.success("TTS 任务已启动");
+      // 立即刷新任务状态
+      await handleTtsViewTask(ttsCurrentTask.value.task_id);
       await loadTtsTaskList();
+      // 再次刷新确保状态同步
       await handleTtsViewTask(ttsCurrentTask.value.task_id);
       startTtsPollingTaskStatus();
     } else {

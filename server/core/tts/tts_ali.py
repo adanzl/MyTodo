@@ -23,7 +23,7 @@ except ImportError:
 
 # cSpell: disable
 DEFAULT_ROLE = "longwan_v2"
-DEFAULT_MODEL = "cosyvoice-v1"
+DEFAULT_MODEL = "cosyvoice-v3-plus"
 MODEL_MAP = {
     "longwan_v2": "cosyvoice-v2",
     'longcheng_v2': 'cosyvoice-v2',
@@ -275,10 +275,17 @@ class TTSClient:
                             self.close(ws)
 
                         elif event == "task-failed":
-                            error_msg = msg_json.get("error_message", "未知错误")
-                            log.error(f">>[TTS-ALI] 任务失败: {error_msg}")
+                            # 根据 DashScope API 文档，错误信息在 header.error_message 中
+                            # 格式：{"header": {"error_code": "...", "error_message": "..."}, "payload": {}}
+
+                            error_msg = header.get("error_message", "未知错误")
+                            error_code = header.get("error_code") or None
+
+                            log.error(f">>[TTS-ALI] 任务失败: {error_code} - {error_msg}, 完整消息: {msg_json}")
                             self.task_finished = True
-                            self.on_err(Exception(error_msg))
+                            # 避免重复调用 on_err（如果已经调用过）
+                            if not self._cancelled:
+                                self.on_err(Exception(error_msg))
                             self.close(ws)
 
             except json.JSONDecodeError as e:
@@ -297,12 +304,22 @@ class TTSClient:
             except Exception as e:
                 log.error(f">>[TTS-ALI] on_msg error: {e}")
                 traceback.print_stack()
-                self.on_err(e)
+                # 避免重复调用 on_err（如果已经调用过或已取消）
+                if not self._cancelled and not self.task_finished:
+                    self.on_err(e)
 
     def _on_error(self, ws, error):
         """发生错误时的回调"""
-        log.error(f">>[TTS-ALI] WebSocket 出错: {error}")
-        self.on_err(error)
+        log.error(f">>[TTS-ALI] WebSocket 出错: {error}, 类型: {type(error)}")
+        # 标记任务已完成（失败）
+        self.task_finished = True
+        # 避免重复调用 on_err（如果已经调用过或已取消）
+        if not self._cancelled:
+            # 确保 error 是 Exception 类型
+            if isinstance(error, Exception):
+                self.on_err(error)
+            else:
+                self.on_err(Exception(str(error)))
 
     def _on_close(self, ws, close_status_code, close_msg):
         """连接关闭时的回调"""
