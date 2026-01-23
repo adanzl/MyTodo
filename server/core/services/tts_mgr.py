@@ -26,7 +26,7 @@ from core.config import (
 )
 from core.services.base_task_mgr import BaseTaskMgr, TaskBase
 from core.tts.tts_ali import TTSClient
-from core.utils import ensure_directory
+from core.utils import ensure_directory, get_media_duration
 
 log = app_logger
 
@@ -87,6 +87,7 @@ class TTSTask(TaskBase):
         output_file: 生成的音频文件路径，格式：{work_dir}/output.mp3
         generated_chars: 已生成字数（实时更新）
         total_chars: 文本总字数（按统计规则计算）
+        duration: 音频时长（秒），任务完成后写入
     """
 
     text: str = ''
@@ -105,6 +106,9 @@ class TTSTask(TaskBase):
     
     # 文本总字数（按统计规则计算：汉字2个字符，其他1个字符）
     total_chars: int = 0
+    
+    # 音频时长（秒），任务完成后写入
+    duration: Optional[float] = None
 
 
 class TTSMgr(BaseTaskMgr[TTSTask]):
@@ -296,7 +300,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             - code: 0 表示成功，-1 表示失败
             - msg: 描述信息
         """
-        log.info(f"[TTSMgr] 收到启动任务请求，task_id: {task_id}")
+        # log.info(f"[TTSMgr] 收到启动任务请求，task_id: {task_id}")
         
         # 获取任务
         task, err = self._get_task_or_err(task_id)
@@ -412,8 +416,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         import time
         task_start_time = time.time()
         
-        log.info(f"[TTSMgr] 开始执行 TTS 任务 {task.task_id}, 任务名称: {task.name}")
-        log.info(f"[TTSMgr] 任务参数 - 文本长度: {len(task.text)} 字符, 音色: {task.role or '默认'}, 语速: {task.speed}, 音量: {task.vol}")
+        # log.info(f"[TTSMgr] 开始执行 TTS 任务 {task.task_id}, 任务名称: {task.name}")
+        log.info(f"[TTSMgr] Start {task.name} - 文本长度: {len(task.text)} 字符,  {task.role or '默认'}, 语速: {task.speed}, 音量: {task.vol}")
         
         # 确保工作目录存在
         if not task.work_dir:
@@ -473,7 +477,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 if file_handle is not None:
                     file_handle.close()
                     file_handle = None
-                    log.info(f"[TTSMgr] 任务 {task.task_id} 音频文件写入完成，总大小: {audio_data_size} 字节 ({audio_chunk_count} 个数据块)")
+                    log.info(f"[TTSMgr] 任务 {task.name} 音频文件写入完成，总大小: {audio_data_size} 字节 ({audio_chunk_count} 个数据块)")
                 # 设置任务完成事件（即使没有音频数据也要设置）
                 task_completed.set()
 
@@ -494,7 +498,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             """
             nonlocal generated_chars
             generated_chars = generated
-            log.info(f"[TTSMgr] 任务 {task.task_id} 进度更新: {generated}/{total if total > 0 else '?'} 字")
+            # log.info(f"[TTSMgr] 任务 {task.task_id} 进度更新: {generated}/{total if total > 0 else '?'} 字")
             
             # 更新任务中的已生成字数
             try:
@@ -546,7 +550,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 return
 
             # 逐行发送文本
-            log.info(f"[TTSMgr] 任务 {task.task_id} 开始流式发送文本，共 {len(text_lines)} 行")
+            # log.info(f"[TTSMgr] 任务 {task.task_id} 开始流式发送文本，共 {len(text_lines)} 行")
             for i, line in enumerate(text_lines, 1):
                 # 检查是否被停止
                 if self._should_stop(task.task_id):
@@ -573,7 +577,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 raise
 
             # 等待任务完成（WebSocket 会异步返回 task-finished 事件）
-            log.info(f"[TTSMgr] 任务 {task.task_id} 开始等待 WebSocket 任务完成（超时: {TASK_COMPLETION_TIMEOUT}秒）")
+            log.info(f"[TTSMgr] 任务 {task.name} 开始等待 WebSocket 任务完成（超时: {TASK_COMPLETION_TIMEOUT}秒）")
             wait_start_time = time.time()
             
             # 定期检查状态
@@ -592,7 +596,6 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 task_completed.wait(timeout=1.0)
             
             wait_elapsed = time.time() - wait_start_time
-            log.info(f"[TTSMgr] 任务 {task.task_id} WebSocket 任务完成，等待时间: {wait_elapsed:.2f}秒")
 
             # 检查是否有错误发生
             if error_info['error'] is not None:
@@ -602,7 +605,20 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             task_elapsed = time.time() - task_start_time
             log.info(f"[TTSMgr] 任务 {task.task_id} 执行成功，已生成字数: {generated_chars}/{task.total_chars}, 总耗时: {task_elapsed:.2f}秒")
             
-            # 更新任务状态为成功，并保存最终字数统计
+            # 获取音频文件时长
+            audio_duration = None
+            if output_file and os.path.exists(output_file):
+                try:
+                    duration_seconds = get_media_duration(output_file)
+                    if duration_seconds is not None:
+                        audio_duration = float(duration_seconds)
+                        log.info(f"[TTSMgr] 任务 {task.task_id} 音频时长: {audio_duration:.2f}秒")
+                    else:
+                        log.warning(f"[TTSMgr] 任务 {task.task_id} 无法获取音频时长")
+                except Exception as e:
+                    log.warning(f"[TTSMgr] 任务 {task.task_id} 获取音频时长失败: {e}")
+            
+            # 更新任务状态为成功，并保存最终字数统计和音频时长
             # 注意：不要在锁内调用 _update_task_status，因为它内部已经有锁了
             final_task = None
             try:
@@ -610,13 +626,11 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                     final_task = self._get_task(task.task_id)
                     if final_task:
                         final_task.generated_chars = generated_chars
+                        final_task.duration = audio_duration
                         # 直接更新状态和保存，避免嵌套锁
-                        old_status = final_task.status
                         final_task.status = TASK_STATUS_SUCCESS
                         final_task.error_message = None
                         self._save_task_and_update_time(final_task)
-                        if old_status != TASK_STATUS_SUCCESS:
-                            log.info(f"[TTSMgr] 任务 {task.task_id} 状态更新: {old_status} -> {TASK_STATUS_SUCCESS}")
                     else:
                         log.warning(f"[TTSMgr] 无法找到任务 {task.task_id} 进行最终更新")
             except Exception as e:

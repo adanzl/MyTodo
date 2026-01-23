@@ -284,12 +284,12 @@ class TTSClient:
                         event = header["event"]
 
                         if event == "task-started":
-                            log.info(">>[TTS-ALI] 任务已启动")
+                            # log.info(">>[TTS-ALI] 任务已启动")
                             self.task_started = True
                             self._task_started_event.set()  # 设置事件，通知等待的线程
 
                         elif event == "task-finished":
-                            log.info(">>[TTS-ALI] 任务已完成")
+                            # log.info(">>[TTS-ALI] 任务已完成")
                             self.task_finished = True
                             try:
                                 self.on_msg(">>[TTS-ALI] Completed", 1)

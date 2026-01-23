@@ -62,4 +62,8 @@ export interface TTSTask {
    * 文本总字数（按统计规则计算）
    */
   total_chars?: number;
+  /**
+   * 音频时长（秒），任务完成后写入
+   */
+  duration?: number;
 }
