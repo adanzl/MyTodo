@@ -67,12 +67,14 @@ class TTSClient:
         self._cancelled = False  # 是否已取消
         self._generated_chars = 0  # 已生成字数统计
         self._total_chars = 0  # 总字数（从文本计算）
+        self._task_started_event = threading.Event()  # 任务启动事件，用于非阻塞等待
 
     def streaming_cancel(self):
         """取消流式合成"""
         log.info(">>[TTS-ALI] cancel streaming")
         try:
             self._cancelled = True
+            self._task_started_event.set()  # 设置事件，让等待的线程立即返回
             if self.ws is not None:
                 self.close(self.ws)
                 self.ws = None
@@ -105,18 +107,16 @@ class TTSClient:
             self._text_queue = []
             self._generated_chars = 0
             self._total_chars = len(text)  # 设置总字数
+            self._task_started_event.clear()  # 清除事件标志
 
             # 启动 WebSocket 连接
             self._start_websocket(role)
 
-            # 等待任务启动
-            import time
+            # 等待任务启动（使用 Event 非阻塞等待）
             timeout = 10
-            start_time = time.time()
-            while not self.task_started and not self._cancelled:
-                if time.time() - start_time > timeout:
+            if not self._task_started_event.wait(timeout=timeout):
+                if not self._cancelled:
                     raise TimeoutError("等待任务启动超时")
-                time.sleep(0.1)
 
             if self._cancelled:
                 return
@@ -128,6 +128,8 @@ class TTSClient:
             self._send_finish_task()
 
             # 等待任务完成
+            import time
+            start_time = time.time()
             while not self.task_finished and not self._cancelled:
                 if time.time() - start_time > timeout * 2:
                     break
@@ -164,16 +166,14 @@ class TTSClient:
                     self._text_queue = []
                     self._generated_chars = 0
                     self._total_chars = 0  # 流式模式下总字数未知，会在发送时累计
+                    self._task_started_event.clear()  # 清除事件标志
                     self._start_websocket(role)
 
-                    # 等待任务启动
-                    import time
+                    # 等待任务启动（使用 Event 非阻塞等待）
                     timeout = 10
-                    start_time = time.time()
-                    while not self.task_started and not self._cancelled:
-                        if time.time() - start_time > timeout:
+                    if not self._task_started_event.wait(timeout=timeout):
+                        if not self._cancelled:
                             raise TimeoutError("等待任务启动超时")
-                        time.sleep(0.1)
 
                 if self._cancelled:
                     return
@@ -275,6 +275,7 @@ class TTSClient:
                         if event == "task-started":
                             log.debug(">>[TTS-ALI] 任务已启动")
                             self.task_started = True
+                            self._task_started_event.set()  # 设置事件，通知等待的线程
 
                         elif event == "task-finished":
                             log.debug(">>[TTS-ALI] 任务已完成")
