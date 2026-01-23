@@ -1,17 +1,17 @@
 # 更新配置 使用 sudo cp /mnt/data/project/MyTodo/server/nginx-default /etc/nginx/sites-available/default 
 # 重启 nginx: sudo nginx -s reload 
 
-# Dify 专用服务器配置 - leo-dify.tbit.top
+# Dify 专用服务器配置 - leo-dify.tbit.xin
 server {
     listen 8848;
     listen 8843 ssl;
     listen [::]:8848;
 
-    server_name leo-dify.tbit.top;
+    server_name leo-dify.tbit.xin;
 
     # Let's Encrypt SSL 证书配置
-    ssl_certificate /etc/letsencrypt/live/leo-dify.tbit.top/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/leo-dify.tbit.top/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/leo-dify.tbit.xin/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/leo-dify.tbit.xin/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers on;
     ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384;
@@ -98,11 +98,9 @@ server {
     proxy_buffers 8 4k;
     proxy_busy_buffers_size 8k;
 
-    # 全局 CORS 配置
-    add_header 'Access-Control-Allow-Origin' '*' always;
-    add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
-    add_header 'Access-Control-Allow-Headers' 'DNT,X-Mx-ReqToken,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization' always;
-    add_header 'Access-Control-Allow-Credentials' 'true' always;
+    # CORS 配置已由 Flask 应用处理
+    # 注意：当使用 credentials 时，不能使用 '*'，必须使用具体的 origin
+    # Flask 会根据 CORS_ORIGINS 环境变量动态设置正确的 CORS 头
     
     # 使用 types 指令确保正确的 MIME 类型
     types {
@@ -169,12 +167,8 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         
-        # 隐藏后端返回的 CORS 头部，避免重复（nginx 全局配置已处理 CORS）
-        proxy_hide_header 'Access-Control-Allow-Origin';
-        proxy_hide_header 'Access-Control-Allow-Methods';
-        proxy_hide_header 'Access-Control-Allow-Headers';
-        proxy_hide_header 'Access-Control-Allow-Credentials';
-        proxy_hide_header 'Access-Control-Max-Age';
+        # 让 Flask 应用的 CORS 配置生效（不隐藏后端返回的 CORS 头部）
+        # Flask 会根据 CORS_ORIGINS 环境变量动态设置正确的 CORS 头
         
         # 大文件上传需要更长的超时时间（30分钟）
         proxy_connect_timeout 1800s;

@@ -7,9 +7,7 @@
 ## app 服务
 
 > `sudo vim /etc/systemd/system/my-todo.service`
-
 > `sudo systemctl restart my-todo`
-
 > 本地调试 运行 main.py
 
 ## 配置 natapp
@@ -36,7 +34,18 @@
 
 > 配置证书
 
-`sudo certbot certonly --nginx --preferred-challenges tls-alpn-01 -d leo-dify.tbit.top -m adanzl@163.com --agree-tos --no-eff-email`
+`sudo certbot certonly --nginx --preferred-challenges tls-alpn-01 -d leo-dify.tbit.xin -m adanzl@163.com --agree-tos --no-eff-email`
+
+sudo pip3 install certbot certbot-dns-freedns
+
+sudo certbot certonly \
+  --authenticator dns-freedns \
+  --dns-freedns-credentials=/etc/letsencrypt/.secrets/freedns.ini \
+  --dns-freedns-propagation-seconds=600 \
+  -d leo-dify.tbit.xin \
+  -m <adanzl@163.com> \
+  --agree-tos \
+  --no-eff-email
 
 ## 重启 code-server
 
@@ -79,7 +88,7 @@
 
 ## cloud-beaver
 
-https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-from-docker-image
+<https://github.com/dbeaver/cloudbeaver/wiki/CloudBeaver-Community-deployment-from-docker-image>
 
 ## redis
 
