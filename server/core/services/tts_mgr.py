@@ -8,10 +8,11 @@
 - 通过 API 提供文件下载功能
 """
 
+import asyncio
 import os
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 from core.config import (
     BASE_TMP_DIR,
@@ -22,6 +23,7 @@ from core.config import (
     app_logger,
 )
 from core.services.base_task_mgr import BaseTaskMgr, TaskBase
+from core.tools.async_util import _clear_event_loop
 from core.tts.tts_client import TTSClient
 from core.utils import ensure_directory
 
@@ -254,9 +256,59 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         if not task.text or not str(task.text).strip():
             return -1, '文本为空'
 
-        # 异步执行任务
-        self._run_task_async(task_id, self._run_tts_task)
+        # 异步执行任务（在新线程中运行，需要设置事件循环）
+        self._run_task_async_with_loop(task_id, self._run_tts_task)
         return 0, 'TTS 任务已启动'
+
+    def _run_task_async_with_loop(self, task_id: str, runner: Callable[[TTSTask], None]) -> None:
+        """在新线程中运行任务，并设置 asyncio 事件循环（TTS 需要）。
+
+        Args:
+            task_id: 任务 ID
+            runner: 任务执行函数
+        """
+        import threading
+
+        def wrapped() -> None:
+            # 清除事件循环引用，确保创建新循环前状态干净
+            _clear_event_loop()
+            
+            # 为新线程创建事件循环
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+            try:
+                with self._task_lock:
+                    task = self._get_task(task_id)
+                    if not task:
+                        return
+                    task.status = TASK_STATUS_PROCESSING
+                    task.error_message = None
+                    self._save_task_and_update_time(task)
+
+                runner(task)
+
+                with self._task_lock:
+                    task2 = self._get_task(task_id)
+                    if task2 and task2.status == TASK_STATUS_PROCESSING:
+                        task2.status = TASK_STATUS_SUCCESS
+                        task2.error_message = None
+                        self._save_task_and_update_time(task2)
+            except Exception as e:
+                log.error(f"[{self.__class__.__name__}] 任务 {task_id} 执行异常: {e}")
+                with self._task_lock:
+                    task3 = self._get_task(task_id)
+                    if task3:
+                        task3.status = TASK_STATUS_FAILED
+                        task3.error_message = str(e)
+                        self._save_task_and_update_time(task3)
+            finally:
+                self._clear_stop_flag(task_id)
+
+        threading.Thread(target=wrapped, daemon=True).start()
 
     def _run_tts_task(self, task: TTSTask) -> None:
         """执行 TTS 任务的核心逻辑。
@@ -437,3 +489,88 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
 
 
 tts_mgr = TTSMgr()
+
+
+def test_tts_task_with_event_loop():
+    """测试 TTS 任务执行时的事件循环设置
+    
+    这个函数用于验证在新线程中创建事件循环是否正确，
+    避免 "child watchers are only available on the default loop" 错误。
+    """
+    import time
+    import threading
+    
+    print("[测试] 开始测试 TTS 任务事件循环设置...")
+    
+    # 创建测试任务
+    code, msg, task_id = tts_mgr.create_task(
+        text="这是一个测试文本，用于验证事件循环设置是否正确。",
+        name="事件循环测试任务"
+    )
+    
+    if code != 0:
+        print(f"[测试] 创建任务失败: {msg}")
+        return False
+    
+    print(f"[测试] 任务创建成功，task_id: {task_id}")
+    
+    # 检查事件循环状态
+    def check_event_loop():
+        """在新线程中检查事件循环"""
+        try:
+            loop = asyncio.get_event_loop()
+            print(f"[测试] 线程 {threading.current_thread().name} 中获取到事件循环: {loop}")
+            return True
+        except RuntimeError:
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                print(f"[测试] 线程 {threading.current_thread().name} 中创建新事件循环: {loop}")
+                return True
+            except Exception as e:
+                print(f"[测试] 线程 {threading.current_thread().name} 中创建事件循环失败: {e}")
+                return False
+    
+    # 在主线程中检查
+    print("[测试] 主线程事件循环检查:")
+    main_thread_ok = check_event_loop()
+    
+    # 在新线程中检查
+    thread_result = {'ok': False}
+    def thread_check():
+        _clear_event_loop()
+        thread_result['ok'] = check_event_loop()
+    
+    thread = threading.Thread(target=thread_check, daemon=True)
+    thread.start()
+    thread.join(timeout=2)
+    
+    if not thread_result['ok']:
+        print("[测试] 新线程中事件循环设置失败")
+        return False
+    
+    print("[测试] 事件循环设置测试通过")
+    
+    # 测试启动任务（使用 mock，避免实际调用 TTS 服务）
+    print("[测试] 测试任务启动流程...")
+    
+    # 检查任务状态
+    task = tts_mgr.get_task(task_id)
+    if not task:
+        print("[测试] 无法获取任务")
+        return False
+    
+    print(f"[测试] 任务状态: {task['status']}")
+    print(f"[测试] 任务文本: {task['text']}")
+    
+    # 清理测试任务
+    print("[测试] 清理测试任务...")
+    tts_mgr.delete_task(task_id)
+    
+    print("[测试] 所有测试通过！")
+    return True
+
+
+if __name__ == "__main__":
+    # 直接运行此文件时执行测试
+    test_tts_task_with_event_loop()

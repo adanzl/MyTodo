@@ -29,10 +29,15 @@ def test_create_task_success(tts_mgr: TTSMgr):
     assert task['status'] == TASK_STATUS_PENDING
 
 
-def test_create_task_empty_text_fails(tts_mgr: TTSMgr):
+def test_create_task_empty_text_succeeds(tts_mgr: TTSMgr):
+    """测试创建空文本任务成功（现在允许创建空文本任务，可以在创建后编辑）"""
     code, msg, task_id = tts_mgr.create_task(text="  ")
-    assert code == -1
-    assert "文本不能为空" in msg
+    assert code == 0, f"创建空文本任务应该成功，但返回: {msg}"
+    assert task_id is not None
+    
+    task = tts_mgr.get_task(task_id)
+    assert task is not None
+    assert task['text'] == "  " or task['text'] == ""  # 空文本或空白文本
 
 
 def test_update_task_success(tts_mgr: TTSMgr):
@@ -72,15 +77,15 @@ def test_delete_task_success(tts_mgr: TTSMgr, tmp_path):
     assert not os.path.exists(task_dir)
 
 
-@patch('core.services.tts_mgr.TTSMgr._run_task_async')
-def test_start_task_success(mock_run_async, tts_mgr: TTSMgr):
+@patch('core.services.tts_mgr.TTSMgr._run_task_async_with_loop')
+def test_start_task_success(mock_run_async_with_loop, tts_mgr: TTSMgr):
     _, _, task_id = tts_mgr.create_task(text="Hello")
 
     code, msg = tts_mgr.start_task(task_id)
 
     assert code == 0
     assert msg == "TTS 任务已启动"
-    mock_run_async.assert_called_once()
+    mock_run_async_with_loop.assert_called_once()
 
 
 def test_start_task_task_not_found(tts_mgr: TTSMgr):
