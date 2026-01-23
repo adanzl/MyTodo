@@ -174,23 +174,19 @@ class TTSClient:
 
             # 在锁外启动 WebSocket 和等待事件，避免死锁
             if need_start_websocket:
-                log.info(f">>[TTS-ALI] [DEBUG] 需要启动 WebSocket, role: {role}")
                 self._start_websocket(role)
-                log.info(">>[TTS-ALI] [DEBUG] WebSocket 启动完成，开始等待 task-started 事件")
                 
                 # 等待任务启动（使用 Event 非阻塞等待，在锁外执行）
                 timeout = 10
                 wait_start = time.time()
                 if not self._task_started_event.wait(timeout=timeout):
                     wait_elapsed = time.time() - wait_start
-                    log.error(f">>[TTS-ALI] [DEBUG] 等待 task-started 超时，等待时间: {wait_elapsed:.2f}秒, task_started: {self.task_started}, cancelled: {self._cancelled}")
+                    log.error(f">>[TTS-ALI] 等待 task-started 超时，等待时间: {wait_elapsed:.2f}秒, task_started: {self.task_started}, cancelled: {self._cancelled}")
                     # 检查是否被取消
                     with self._lock:
                         if not self._cancelled:
                             raise TimeoutError("等待任务启动超时")
                         return
-                wait_elapsed = time.time() - wait_start
-                log.info(f">>[TTS-ALI] [DEBUG] task-started 事件已收到，等待时间: {wait_elapsed:.2f}秒")
 
             # 检查是否被取消（在锁内检查）
             with self._lock:
@@ -280,7 +276,6 @@ class TTSClient:
             # 处理 JSON 文本消息
             try:
                 msg_json = json.loads(message)
-                log.info(f">>[TTS-ALI] [DEBUG] 收到 JSON 消息: {msg_json}")
 
                 if "header" in msg_json:
                     header = msg_json["header"]
@@ -289,30 +284,23 @@ class TTSClient:
                         event = header["event"]
 
                         if event == "task-started":
-                            log.info(">>[TTS-ALI] [DEBUG] 收到 task-started 事件")
                             log.info(">>[TTS-ALI] 任务已启动")
                             self.task_started = True
                             self._task_started_event.set()  # 设置事件，通知等待的线程
-                            log.info(">>[TTS-ALI] [DEBUG] task_started_event 已设置")
 
                         elif event == "task-finished":
-                            log.info(">>[TTS-ALI] [DEBUG] 收到 task-finished 事件")
-                            log.info(f">>[TTS-ALI] [DEBUG] 最终已生成字数: {self._generated_chars}/{self._total_chars}")
                             log.info(">>[TTS-ALI] 任务已完成")
                             self.task_finished = True
                             try:
                                 self.on_msg(">>[TTS-ALI] Completed", 1)
-                                log.info(">>[TTS-ALI] [DEBUG] on_msg(Completed) 调用完成")
                             except Exception as e:
-                                log.error(f">>[TTS-ALI] [DEBUG] on_msg(Completed) 调用出错: {e}", exc_info=True)
+                                log.error(f">>[TTS-ALI] on_msg(Completed) 调用出错: {e}", exc_info=True)
                             
                             # 发送最终进度
                             try:
-                                log.info(f">>[TTS-ALI] [DEBUG] 发送最终进度: {self._generated_chars}/{self._total_chars}")
                                 self.on_progress(self._generated_chars, self._total_chars)
-                                log.info(">>[TTS-ALI] [DEBUG] 最终进度回调完成")
                             except Exception as e:
-                                log.error(f">>[TTS-ALI] [DEBUG] 最终进度回调出错: {e}", exc_info=True)
+                                log.error(f">>[TTS-ALI] 最终进度回调出错: {e}", exc_info=True)
                             
                             self.close(ws)
 
@@ -336,8 +324,6 @@ class TTSClient:
                             output = payload.get("output", {})
                             output_type = output.get("type", "")
                             
-                            log.info(f">>[TTS-ALI] [DEBUG] 收到 result-generated 事件, type: {output_type}, payload: {payload}")
-                            
                             # 尝试从多个地方获取字数统计
                             usage = payload.get("usage", {})
                             characters = usage.get("characters", 0)
@@ -357,9 +343,6 @@ class TTSClient:
                                     estimated_chars = sum(2 if '\u4e00' <= c <= '\u9fff' else 1 for c in original_text)
                                     if estimated_chars > 0:
                                         characters = estimated_chars
-                                        log.info(f">>[TTS-ALI] [DEBUG] 使用文本长度估算字数: {characters}")
-                            
-                            log.info(f">>[TTS-ALI] [DEBUG] result-generated 事件处理, type: {output_type}, characters: {characters}, 当前累计: {self._generated_chars}")
                             
                             # 只有 sentence-end 类型才统计字数，但记录所有类型的事件
                             if output_type == "sentence-end":
@@ -369,16 +352,12 @@ class TTSClient:
                                     self._generated_chars += characters
                                     log.info(f">>[TTS-ALI] 已生成字数更新: {old_chars} -> {self._generated_chars} (本次: {characters}, 文本: {output.get('original_text', '')})")
                                     # 调用进度回调
-                                    log.info(f">>[TTS-ALI] [DEBUG] 准备调用进度回调: generated={self._generated_chars}, total={self._total_chars}")
                                     try:
                                         self.on_progress(self._generated_chars, self._total_chars)
-                                        log.info(f">>[TTS-ALI] [DEBUG] 进度回调调用完成")
                                     except Exception as e:
-                                        log.error(f">>[TTS-ALI] [DEBUG] 进度回调调用出错: {e}", exc_info=True)
+                                        log.error(f">>[TTS-ALI] 进度回调调用出错: {e}", exc_info=True)
                                 else:
-                                    log.warning(f">>[TTS-ALI] [DEBUG] sentence-end 事件但 characters 为 0")
-                            else:
-                                log.info(f">>[TTS-ALI] [DEBUG] 非 sentence-end 事件, type: {output_type}, 文本: {output.get('original_text', '')[:50]}")
+                                    log.warning(f">>[TTS-ALI] sentence-end 事件但 characters 为 0")
 
             except json.JSONDecodeError as e:
                 log.error(f">>[TTS-ALI] JSON 解析失败: {e}")

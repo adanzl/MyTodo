@@ -341,24 +341,21 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             status: 新状态
             error_message: 错误消息（可选）
         """
-        log.info(f"[TTSMgr] [DEBUG] _update_task_status 被调用: task_id={task_id}, status={status}, error_message={error_message}")
         with self._task_lock:
             task = self._get_task(task_id)
             if task:
                 old_status = task.status
                 task.status = status
                 task.error_message = error_message
-                log.info(f"[TTSMgr] [DEBUG] 准备保存任务状态: {old_status} -> {status}")
                 try:
                     self._save_task_and_update_time(task)
-                    log.info(f"[TTSMgr] [DEBUG] 任务状态保存完成")
                 except Exception as e:
-                    log.error(f"[TTSMgr] [DEBUG] 保存任务状态时出错: {e}", exc_info=True)
+                    log.error(f"[TTSMgr] 保存任务状态时出错: {e}", exc_info=True)
                     raise
                 if old_status != status:
                     log.info(f"[TTSMgr] 任务 {task_id} 状态更新: {old_status} -> {status}" + (f", 错误: {error_message}" if error_message else ""))
             else:
-                log.warning(f"[TTSMgr] [DEBUG] _update_task_status 无法找到任务: {task_id}")
+                log.warning(f"[TTSMgr] _update_task_status 无法找到任务: {task_id}")
 
     def _run_task_async(self, task_id: str, runner: Callable[[TTSTask], None]) -> None:
         """在新线程中运行任务。
@@ -385,10 +382,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 # 只需要检查状态是否正确
                 with self._task_lock:
                     task = self._get_task(task_id)
-                    if task:
-                        log.info(f"[TTSMgr] [DEBUG] 任务 {task_id} 执行完成，最终状态: {task.status}, 已生成字数: {task.generated_chars}")
-                    else:
-                        log.warning(f"[TTSMgr] [DEBUG] 任务 {task_id} 执行完成但无法找到任务记录")
+                    if not task:
+                        log.warning(f"[TTSMgr] 任务 {task_id} 执行完成但无法找到任务记录")
 
             except Exception as e:
                 log.error(f"[{self.__class__.__name__}] 任务 {task_id} 执行异常: {e}")
@@ -456,11 +451,9 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
 
             # 检查是否被停止（停止是正常操作，静默返回）
             if self._should_stop(task.task_id):
-                log.info(f"[TTSMgr] [DEBUG] 任务 {task.task_id} 已被停止，忽略数据回调")
                 # 如果收到结束标记，设置完成事件以便主线程退出等待
                 if data_type == 1:
                     task_completed.set()
-                    log.info(f"[TTSMgr] [DEBUG] 已设置完成事件（停止）")
                 return
 
             # 处理数据块
@@ -468,36 +461,29 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 if isinstance(data, (bytes, bytearray)):
                     if file_handle is None:
                         file_handle = open(output_file, 'wb')
-                        log.info(f"[TTSMgr] [DEBUG] 任务 {task.task_id} 开始写入音频文件")
                     file_handle.write(data)
                     audio_data_size += len(data)
                     audio_chunk_count += 1
                 else:
-                    log.warning(f"[TTSMgr] [DEBUG] 收到非字节数据: {type(data)}")
+                    log.warning(f"[TTSMgr] 收到非字节数据: {type(data)}")
                 return
 
             # 处理结束标记
             if data_type == 1:
-                log.info(f"[TTSMgr] [DEBUG] 收到结束标记，准备关闭文件和设置完成事件")
                 if file_handle is not None:
                     file_handle.close()
                     file_handle = None
                     log.info(f"[TTSMgr] 任务 {task.task_id} 音频文件写入完成，总大小: {audio_data_size} 字节 ({audio_chunk_count} 个数据块)")
-                else:
-                    log.warning(f"[TTSMgr] [DEBUG] 收到结束标记但文件句柄为 None")
                 # 设置任务完成事件（即使没有音频数据也要设置）
                 task_completed.set()
-                log.info(f"[TTSMgr] [DEBUG] 完成事件已设置（数据回调）")
 
         def on_err(err: Exception) -> None:
             """TTS 错误回调：记录错误并设置完成事件。"""
-            log.error(f"[TTSMgr] [DEBUG] on_err 回调被调用: {err}", exc_info=True)
             # 记录错误信息
             error_info['error'] = err
             log.error(f"[TTSMgr] TTS 客户端错误回调: {err}")
             # 设置任务完成事件，让主线程退出等待
             task_completed.set()
-            log.info(f"[TTSMgr] [DEBUG] 完成事件已设置（错误回调）")
 
         def on_progress(generated: int, total: int) -> None:
             """TTS 进度回调：更新已生成字数统计。
@@ -507,7 +493,6 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 total: 总字数（可能为0，表示未知）
             """
             nonlocal generated_chars
-            log.info(f"[TTSMgr] [DEBUG] 进度回调被调用 - 任务 {task.task_id}, generated: {generated}, total: {total}, 之前的值: {generated_chars}")
             generated_chars = generated
             log.info(f"[TTSMgr] 任务 {task.task_id} 进度更新: {generated}/{total if total > 0 else '?'} 字")
             
@@ -516,15 +501,13 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 with self._task_lock:
                     current_task = self._get_task(task.task_id)
                     if current_task:
-                        old_generated = current_task.generated_chars
                         current_task.generated_chars = generated
                         # 只更新时间，不保存到文件（避免频繁IO）
                         current_task.update_time = datetime.now().timestamp()
-                        log.info(f"[TTSMgr] [DEBUG] 任务 {task.task_id} 字数已更新: {old_generated} -> {generated}")
                     else:
-                        log.warning(f"[TTSMgr] [DEBUG] 进度回调中无法找到任务 {task.task_id}")
+                        log.warning(f"[TTSMgr] 进度回调中无法找到任务 {task.task_id}")
             except Exception as e:
-                log.error(f"[TTSMgr] [DEBUG] 更新任务字数时出错: {e}", exc_info=True)
+                log.error(f"[TTSMgr] 更新任务字数时出错: {e}", exc_info=True)
 
         # 在执行前检查是否已被停止
         if self._should_stop(task.task_id):
@@ -543,7 +526,6 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             # 计算总字数（用于进度显示）
             total_chars = len(task.text)
             client._total_chars = total_chars
-            log.info(f"[TTSMgr] [DEBUG] 设置客户端总字数: {total_chars}, 任务总字数: {task.total_chars}")
 
             # 保存客户端引用，以便停止时可以取消
             with self._task_lock:
@@ -574,7 +556,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 try:
                     client.stream_msg(text=line, role=task.role, id=task.task_id)
                 except Exception as e:
-                    log.error(f"[TTSMgr] [DEBUG] 发送第 {i} 行时出错: {e}", exc_info=True)
+                    log.error(f"[TTSMgr] 发送第 {i} 行时出错: {e}", exc_info=True)
                     raise
             
             log.info(f"[TTSMgr] 任务 {task.task_id} 文本发送完成，共发送 {len(text_lines)} 行")
@@ -584,16 +566,13 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 log.info(f"[TTSMgr] 任务 {task.task_id} 已被停止，取消完成操作")
                 raise RuntimeError('任务已被停止')
 
-            log.info(f"[TTSMgr] [DEBUG] 准备调用 stream_complete，当前已生成字数: {generated_chars}")
             try:
                 client.stream_complete()
-                log.info(f"[TTSMgr] [DEBUG] stream_complete 调用完成")
             except Exception as e:
-                log.error(f"[TTSMgr] [DEBUG] stream_complete 调用出错: {e}", exc_info=True)
+                log.error(f"[TTSMgr] stream_complete 调用出错: {e}", exc_info=True)
                 raise
 
             # 等待任务完成（WebSocket 会异步返回 task-finished 事件）
-            log.info(f"[TTSMgr] [DEBUG] 开始等待任务完成事件，当前已生成字数: {generated_chars}, 错误信息: {error_info['error']}")
             log.info(f"[TTSMgr] 任务 {task.task_id} 开始等待 WebSocket 任务完成（超时: {TASK_COMPLETION_TIMEOUT}秒）")
             wait_start_time = time.time()
             
@@ -606,58 +585,42 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 if elapsed >= TASK_COMPLETION_TIMEOUT:
                     wait_elapsed = time.time() - wait_start_time
                     log.warning(f"[TTSMgr] 任务 {task.task_id} 等待完成超时，等待时间: {wait_elapsed:.2f}秒（超时限制: {TASK_COMPLETION_TIMEOUT}秒）")
-                    log.warning(f"[TTSMgr] [DEBUG] 超时时状态 - 已生成字数: {generated_chars}, 错误: {error_info['error']}")
                     # 超时也视为失败
                     raise TimeoutError(f"任务等待完成超时（{TASK_COMPLETION_TIMEOUT}秒）")
-                
-                # 定期输出调试信息
-                if time.time() - last_check_time >= check_interval:
-                    log.info(f"[TTSMgr] [DEBUG] 等待中... 已等待 {elapsed:.1f}秒, 已生成字数: {generated_chars}, 任务状态: {task.status}")
-                    last_check_time = time.time()
                 
                 # 使用短超时进行轮询，以便定期检查
                 task_completed.wait(timeout=1.0)
             
             wait_elapsed = time.time() - wait_start_time
-            log.info(f"[TTSMgr] [DEBUG] 任务完成事件已触发，等待时间: {wait_elapsed:.2f}秒, 最终已生成字数: {generated_chars}")
             log.info(f"[TTSMgr] 任务 {task.task_id} WebSocket 任务完成，等待时间: {wait_elapsed:.2f}秒")
 
             # 检查是否有错误发生
-            log.info(f"[TTSMgr] [DEBUG] 检查错误信息: {error_info['error']}")
             if error_info['error'] is not None:
-                log.error(f"[TTSMgr] [DEBUG] 检测到错误，准备抛出异常: {error_info['error']}")
                 # 有错误发生，抛出异常以便外层处理
                 raise error_info['error']
 
             task_elapsed = time.time() - task_start_time
-            log.info(f"[TTSMgr] [DEBUG] 任务执行成功，准备更新状态，已生成字数: {generated_chars}/{task.total_chars}")
             log.info(f"[TTSMgr] 任务 {task.task_id} 执行成功，已生成字数: {generated_chars}/{task.total_chars}, 总耗时: {task_elapsed:.2f}秒")
             
             # 更新任务状态为成功，并保存最终字数统计
             # 注意：不要在锁内调用 _update_task_status，因为它内部已经有锁了
-            log.info(f"[TTSMgr] [DEBUG] 准备更新任务状态为成功，task_id: {task.task_id}")
             final_task = None
             try:
                 with self._task_lock:
-                    log.info(f"[TTSMgr] [DEBUG] 已获取任务锁，准备获取任务")
                     final_task = self._get_task(task.task_id)
                     if final_task:
-                        log.info(f"[TTSMgr] [DEBUG] 找到任务，准备更新: generated_chars {final_task.generated_chars} -> {generated_chars}, status: {final_task.status} -> {TASK_STATUS_SUCCESS}")
                         final_task.generated_chars = generated_chars
                         # 直接更新状态和保存，避免嵌套锁
                         old_status = final_task.status
                         final_task.status = TASK_STATUS_SUCCESS
                         final_task.error_message = None
-                        log.info(f"[TTSMgr] [DEBUG] 准备调用 _save_task_and_update_time")
                         self._save_task_and_update_time(final_task)
-                        log.info(f"[TTSMgr] [DEBUG] _save_task_and_update_time 调用完成")
                         if old_status != TASK_STATUS_SUCCESS:
                             log.info(f"[TTSMgr] 任务 {task.task_id} 状态更新: {old_status} -> {TASK_STATUS_SUCCESS}")
-                        log.info(f"[TTSMgr] [DEBUG] 任务状态已更新为成功")
                     else:
-                        log.warning(f"[TTSMgr] [DEBUG] 无法找到任务 {task.task_id} 进行最终更新")
+                        log.warning(f"[TTSMgr] 无法找到任务 {task.task_id} 进行最终更新")
             except Exception as e:
-                log.error(f"[TTSMgr] [DEBUG] 更新任务状态时出错: {e}", exc_info=True)
+                log.error(f"[TTSMgr] 更新任务状态时出错: {e}", exc_info=True)
                 raise
 
         except Exception as e:
