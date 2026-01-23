@@ -205,10 +205,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             updated = True
 
         if text is not None:
-            text = str(text).strip()
-            if not text:
-                return -1, '文本不能为空'
-            task.text = text
+            # 允许文本为空，可以在创建后编辑
+            task.text = str(text).strip() if text else ''
             updated = True
 
         if role is not None:
