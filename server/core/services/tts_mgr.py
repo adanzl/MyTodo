@@ -76,6 +76,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
     def __init__(self) -> None:
         """初始化 TTS 任务管理器。"""
         super().__init__(base_dir=TTS_BASE_DIR)
+        # 保存正在运行的 TTS 客户端引用，用于停止任务时取消操作
+        self._active_clients: Dict[str, TTSClient] = {}
 
     def _task_from_dict(self, task_data: Dict[str, Any]) -> TTSTask:
         """从字典创建 TTSTask 对象。"""
@@ -272,9 +274,9 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         def wrapped() -> None:
             # 清除事件循环引用，确保创建新循环前状态干净
             _clear_event_loop()
-            
-            # 为新线程创建 asyncio 事件循环，并附加 child watcher（dashscope SDK 需要）
-            loop = None
+
+            # 为新线程创建 asyncio 事件循环（dashscope SDK 可能需要）
+            # 注意：由于不 patch subprocess，不再需要处理 gevent subprocess 的 child watcher 问题
             try:
                 loop = asyncio.get_event_loop()
                 if loop.is_closed():
@@ -282,22 +284,6 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             except RuntimeError:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-            
-            # 显式附加 child watcher 到事件循环（解决 asyncio "child watchers are only available on the default loop" 错误）
-            # dashscope SDK 内部可能使用子进程，需要 child watcher 支持
-            # Python 3.8+ 使用 ThreadedChildWatcher，需要显式 attach_loop
-            # 注意：get_child_watcher 在 Python 3.12+ 中已弃用，但在 Python 3.14 之前仍可用
-            try:
-                import warnings
-                with warnings.catch_warnings():
-                    warnings.filterwarnings('ignore', category=DeprecationWarning, message='.*get_child_watcher.*')
-                    child_watcher = asyncio.get_child_watcher()
-                    if hasattr(child_watcher, 'attach_loop'):
-                        child_watcher.attach_loop(loop)
-                        log.debug(f"[{self.__class__.__name__}] Child watcher 已附加到事件循环")
-            except (AttributeError, RuntimeError, ValueError) as e:
-                # 某些平台或 Python 版本可能不支持，记录但不中断执行
-                log.warning(f"[{self.__class__.__name__}] 无法附加 child watcher: {e}")
 
             try:
                 with self._task_lock:
@@ -325,7 +311,10 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                         task3.error_message = str(e)
                         self._save_task_and_update_time(task3)
             finally:
+                # 清理停止标志和客户端引用
                 self._clear_stop_flag(task_id)
+                with self._task_lock:
+                    self._active_clients.pop(task_id, None)
 
         threading.Thread(target=wrapped, daemon=True).start()
 
@@ -388,32 +377,32 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             """TTS 错误回调：抛出异常以终止任务。"""
             raise err
 
+        # 在执行前检查是否已被停止
+        if self._should_stop(task.task_id):
+            raise RuntimeError('任务已被停止')
+
+        client = None
         try:
-            # 确保事件循环和 child watcher 已正确设置（dashscope SDK 需要）
-            # 注意：get_child_watcher 在 Python 3.12+ 中已弃用，但在 Python 3.14 之前仍可用
-            try:
-                loop = asyncio.get_event_loop()
-                if not loop.is_closed():
-                    import warnings
-                    with warnings.catch_warnings():
-                        warnings.filterwarnings('ignore', category=DeprecationWarning, message='.*get_child_watcher.*')
-                        child_watcher = asyncio.get_child_watcher()
-                        if hasattr(child_watcher, 'attach_loop'):
-                            try:
-                                child_watcher.attach_loop(loop)
-                            except (RuntimeError, ValueError):
-                                # 如果已经附加，忽略错误
-                                pass
-            except RuntimeError:
-                pass
-            
             # 创建 TTS 客户端并设置参数
             client = TTSClient(on_msg=on_data, on_err=on_err)
             client.speed = task.speed
             client.vol = task.vol
 
+            # 保存客户端引用，以便停止时可以取消
+            with self._task_lock:
+                self._active_clients[task.task_id] = client
+
+            # 再次检查是否已被停止（在保存引用后）
+            if self._should_stop(task.task_id):
+                raise RuntimeError('任务已被停止')
+
             # 执行流式合成
             client.stream_msg(text=task.text, role=task.role, id=task.task_id)
+            
+            # 在执行 stream_complete 前再次检查停止标志
+            if self._should_stop(task.task_id):
+                raise RuntimeError('任务已被停止')
+            
             client.stream_complete()
 
             # 更新任务状态为成功
@@ -427,22 +416,72 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         except Exception as e:
             log.error(f"[TTSMgr] 任务 {task.task_id} 执行失败: {e}")
 
-            # 更新任务状态为失败
+            # 判断是否为停止操作导致的异常
+            is_stopped = self._should_stop(task.task_id) or '停止' in str(e)
+
+            # 更新任务状态
             with self._task_lock:
                 task = self._get_task(task.task_id)
                 if task:
-                    task.status = TASK_STATUS_FAILED
-                    task.error_message = str(e)
+                    if is_stopped:
+                        # 任务被停止，标记为失败但错误信息明确说明是停止
+                        task.status = TASK_STATUS_FAILED
+                        task.error_message = '任务已被用户停止'
+                    else:
+                        # 其他错误
+                        task.status = TASK_STATUS_FAILED
+                        task.error_message = str(e)
                     self._save_task_and_update_time(task)
             raise
 
         finally:
+            # 清理客户端引用
+            with self._task_lock:
+                self._active_clients.pop(task.task_id, None)
+
             # 确保文件句柄关闭
             if file_handle is not None:
                 try:
                     file_handle.close()
                 except Exception:
                     pass
+
+    def stop_task(self, task_id: str) -> Tuple[int, str]:
+        """停止正在处理的 TTS 任务。
+
+        该方法会：
+        1. 设置停止标志
+        2. 调用 TTS 客户端的 streaming_cancel() 方法实际中断操作
+        3. 更新任务状态
+
+        Args:
+            task_id: 任务 ID
+
+        Returns:
+            (code, msg)
+            - code: 0 表示成功，-1 表示失败
+            - msg: 描述信息
+        """
+        with self._task_lock:
+            task, err = self._get_task_or_err(task_id)
+            if err:
+                return -1, err
+            if task.status != TASK_STATUS_PROCESSING:
+                return -1, '任务未在处理中'
+
+            # 设置停止标志
+            self._stop_flags[task_id] = True
+
+            # 获取并取消正在运行的 TTS 客户端
+            client = self._active_clients.get(task_id)
+            if client:
+                try:
+                    log.info(f"[TTSMgr] 取消任务 {task_id} 的 TTS 流式合成")
+                    client.streaming_cancel()
+                except Exception as e:
+                    log.error(f"[TTSMgr] 取消 TTS 客户端失败 {task_id}: {e}")
+
+            return 0, '已请求停止任务'
 
     def _should_request_stop_before_delete(self, _task: TTSTask) -> bool:
         """删除处理中的任务时，是否先请求停止。
@@ -536,21 +575,18 @@ def test_tts_task_with_event_loop():
     """
     import time
     import threading
-    
+
     print("[测试] 开始测试 TTS 任务事件循环设置...")
-    
+
     # 创建测试任务
-    code, msg, task_id = tts_mgr.create_task(
-        text="这是一个测试文本，用于验证事件循环设置是否正确。",
-        name="事件循环测试任务"
-    )
-    
+    code, msg, task_id = tts_mgr.create_task(text="这是一个测试文本，用于验证事件循环设置是否正确。", name="事件循环测试任务")
+
     if code != 0:
         print(f"[测试] 创建任务失败: {msg}")
         return False
-    
+
     print(f"[测试] 任务创建成功，task_id: {task_id}")
-    
+
     # 检查事件循环状态
     def check_event_loop():
         """在新线程中检查事件循环"""
@@ -567,43 +603,44 @@ def test_tts_task_with_event_loop():
             except Exception as e:
                 print(f"[测试] 线程 {threading.current_thread().name} 中创建事件循环失败: {e}")
                 return False
-    
+
     # 在主线程中检查
     print("[测试] 主线程事件循环检查:")
     main_thread_ok = check_event_loop()
-    
+
     # 在新线程中检查
     thread_result = {'ok': False}
+
     def thread_check():
         _clear_event_loop()
         thread_result['ok'] = check_event_loop()
-    
+
     thread = threading.Thread(target=thread_check, daemon=True)
     thread.start()
     thread.join(timeout=2)
-    
+
     if not thread_result['ok']:
         print("[测试] 新线程中事件循环设置失败")
         return False
-    
+
     print("[测试] 事件循环设置测试通过")
-    
+
     # 测试启动任务（使用 mock，避免实际调用 TTS 服务）
     print("[测试] 测试任务启动流程...")
-    
+
     # 检查任务状态
     task = tts_mgr.get_task(task_id)
     if not task:
         print("[测试] 无法获取任务")
         return False
-    
+
     print(f"[测试] 任务状态: {task['status']}")
     print(f"[测试] 任务文本: {task['text']}")
-    
+
     # 清理测试任务
     print("[测试] 清理测试任务...")
     tts_mgr.delete_task(task_id)
-    
+
     print("[测试] 所有测试通过！")
     return True
 

@@ -9,7 +9,7 @@ import AutoImport from "unplugin-auto-import/vite";
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: "/web/", // 使用 /web/ 作为基础路径，匹配服务器配置
+  base: process.env.NODE_ENV === "production" ? "/web/" : "/", // 生产环境使用 /web/，开发环境使用根路径
   plugins: [
     vue(),
     // 自动导入 Element Plus API（ElMessage, ElNotification 等）
@@ -48,6 +48,9 @@ export default defineConfig({
     exclude: [],
   },
   server: {
+    host: "localhost", // 仅允许本地访问
+    port: 5174, // 指定端口
+    open: true, // 自动打开浏览器
     proxy: {
       "/api": {
         target: "http://localhost:8000",

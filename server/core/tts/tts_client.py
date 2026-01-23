@@ -120,7 +120,9 @@ class TTSClient(ResultCallback):
                     speech_rate=self.speed,
                     callback=self,
                 )
+            log.info(f">>[TTS] 调用 synthesizer.streaming_call，text: {text[:20]}...")
             self.synthesizer.streaming_call(text)
+            log.info(f">>[TTS] synthesizer.streaming_call 返回")
         except Exception as e:
             log.error(f">>[TTS] {e}")
             traceback.print_stack()
@@ -137,25 +139,25 @@ class TTSClient(ResultCallback):
             self.on_err(e)
 
     def on_open(self):
-        # log.info("[TTS] open")
+        log.debug(">>[TTS] on_open 回调")
         ...
 
     def on_complete(self):
-        # log.info(">>[TTS] finished")
+        log.debug(">>[TTS] on_complete 回调")
         self.on_msg(">>[TTS] Completed", 1)
 
     def on_error(self, message: str):
         log.error(f">>[TTS] failed, {message}")
 
     def on_close(self):
-        log.info(f">>[TTS] closed")
+        log.info(f">>[TTS] on_close 回调")
         self.synthesizer = None
 
     def on_event(self, message):
         pass
 
     def on_data(self, data: bytes) -> None:
-        # log.info("[TTS] result length: " + str(len(data)))
+        log.debug(f">>[TTS] on_data 回调，数据长度: {len(data) if isinstance(data, bytes) else 'N/A'}")
         # Redis 缓存写入失败不应影响 TTS 正常输出。
         if rds_mgr is not None:
             try:
