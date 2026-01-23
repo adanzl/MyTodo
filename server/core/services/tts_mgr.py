@@ -296,18 +296,25 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             - code: 0 表示成功，-1 表示失败
             - msg: 描述信息
         """
+        log.info(f"[TTSMgr] 收到启动任务请求，task_id: {task_id}")
+        
         # 获取任务
         task, err = self._get_task_or_err(task_id)
         if err:
+            log.warning(f"[TTSMgr] 启动任务失败，task_id: {task_id}, 错误: {err}")
             return -1, err
 
         # 检查任务状态
         if task.status == TASK_STATUS_PROCESSING:
+            log.warning(f"[TTSMgr] 启动任务失败，task_id: {task_id}, 原因: 任务正在处理中")
             return -1, '任务正在处理中'
 
         # 验证文本内容
         if not task.text or not str(task.text).strip():
+            log.warning(f"[TTSMgr] 启动任务失败，task_id: {task_id}, 原因: 文本为空")
             return -1, '文本为空'
+
+        log.info(f"[TTSMgr] 准备启动任务 {task_id}, 任务名称: {task.name}, 文本长度: {len(task.text)} 字符")
 
         # 清除停止标志（如果存在），允许重新开始
         self._clear_stop_flag(task_id)
@@ -320,6 +327,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             self._save_task_and_update_time(task)
 
         # 异步执行任务（在新线程中运行）
+        log.info(f"[TTSMgr] 任务 {task_id} 已提交到后台线程执行")
         self._run_task_async(task_id, self._run_tts_task)
         return 0, 'TTS 任务已启动'
 
@@ -334,9 +342,12 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         with self._task_lock:
             task = self._get_task(task_id)
             if task:
+                old_status = task.status
                 task.status = status
                 task.error_message = error_message
                 self._save_task_and_update_time(task)
+                if old_status != status:
+                    log.info(f"[TTSMgr] 任务 {task_id} 状态更新: {old_status} -> {status}" + (f", 错误: {error_message}" if error_message else ""))
 
     def _run_task_async(self, task_id: str, runner: Callable[[TTSTask], None]) -> None:
         """在新线程中运行任务。
@@ -389,14 +400,22 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         Args:
             task: TTS 任务对象
         """
+        import time
+        task_start_time = time.time()
+        
+        log.info(f"[TTSMgr] 开始执行 TTS 任务 {task.task_id}, 任务名称: {task.name}")
+        log.info(f"[TTSMgr] 任务参数 - 文本长度: {len(task.text)} 字符, 音色: {task.role or '默认'}, 语速: {task.speed}, 音量: {task.vol}")
+        
         # 确保工作目录存在
         if not task.work_dir:
             task.work_dir = self._get_task_dir(task.task_id)
         ensure_directory(task.work_dir)
+        log.debug(f"[TTSMgr] 任务工作目录: {task.work_dir}")
 
         # 设置输出文件路径
         output_file = self._get_output_file_path(task.task_id)
         task.output_file = output_file
+        log.debug(f"[TTSMgr] 输出文件路径: {output_file}")
 
         # 保存任务信息（包含 output_file 路径）
         with self._task_lock:
@@ -410,6 +429,9 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         error_info = {'error': None}
         # 已生成字数统计
         generated_chars = 0
+        # 音频数据统计
+        audio_data_size = 0
+        audio_chunk_count = 0
 
         def on_data(data: Any, data_type: int = 0) -> None:
             """TTS 数据回调：接收音频流数据并写入文件。
@@ -418,13 +440,17 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 data: 音频数据（bytes）或结束标记
                 data_type: 0=数据块, 1=结束
             """
-            nonlocal file_handle
+            nonlocal file_handle, audio_data_size, audio_chunk_count
+
+            log.debug(f"[TTSMgr] [DEBUG] on_data 回调被调用, data_type: {data_type}, 数据大小: {len(data) if isinstance(data, (bytes, bytearray)) else 'N/A'}")
 
             # 检查是否被停止（停止是正常操作，静默返回）
             if self._should_stop(task.task_id):
+                log.info(f"[TTSMgr] [DEBUG] 任务 {task.task_id} 已被停止，忽略数据回调")
                 # 如果收到结束标记，设置完成事件以便主线程退出等待
                 if data_type == 1:
                     task_completed.set()
+                    log.info(f"[TTSMgr] [DEBUG] 已设置完成事件（停止）")
                 return
 
             # 处理数据块
@@ -432,24 +458,38 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 if isinstance(data, (bytes, bytearray)):
                     if file_handle is None:
                         file_handle = open(output_file, 'wb')
+                        log.info(f"[TTSMgr] [DEBUG] 任务 {task.task_id} 开始写入音频文件")
                     file_handle.write(data)
+                    audio_data_size += len(data)
+                    audio_chunk_count += 1
+                    if audio_chunk_count % 10 == 0:  # 每10个数据块记录一次
+                        log.info(f"[TTSMgr] [DEBUG] 任务 {task.task_id} 已接收音频数据: {audio_data_size} 字节 ({audio_chunk_count} 个数据块)")
+                else:
+                    log.warning(f"[TTSMgr] [DEBUG] 收到非字节数据: {type(data)}")
                 return
 
             # 处理结束标记
             if data_type == 1:
+                log.info(f"[TTSMgr] [DEBUG] 收到结束标记，准备关闭文件和设置完成事件")
                 if file_handle is not None:
                     file_handle.close()
                     file_handle = None
+                    log.info(f"[TTSMgr] 任务 {task.task_id} 音频文件写入完成，总大小: {audio_data_size} 字节 ({audio_chunk_count} 个数据块)")
+                else:
+                    log.warning(f"[TTSMgr] [DEBUG] 收到结束标记但文件句柄为 None")
                 # 设置任务完成事件（即使没有音频数据也要设置）
                 task_completed.set()
+                log.info(f"[TTSMgr] [DEBUG] 完成事件已设置（数据回调）")
 
         def on_err(err: Exception) -> None:
             """TTS 错误回调：记录错误并设置完成事件。"""
+            log.error(f"[TTSMgr] [DEBUG] on_err 回调被调用: {err}", exc_info=True)
             # 记录错误信息
             error_info['error'] = err
             log.error(f"[TTSMgr] TTS 客户端错误回调: {err}")
             # 设置任务完成事件，让主线程退出等待
             task_completed.set()
+            log.info(f"[TTSMgr] [DEBUG] 完成事件已设置（错误回调）")
 
         def on_progress(generated: int, total: int) -> None:
             """TTS 进度回调：更新已生成字数统计。
@@ -459,16 +499,24 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 total: 总字数（可能为0，表示未知）
             """
             nonlocal generated_chars
+            log.info(f"[TTSMgr] [DEBUG] 进度回调被调用 - 任务 {task.task_id}, generated: {generated}, total: {total}, 之前的值: {generated_chars}")
             generated_chars = generated
-            log.debug(f"[TTSMgr] 任务 {task.task_id} 进度: {generated}/{total if total > 0 else '?'} 字")
+            log.info(f"[TTSMgr] 任务 {task.task_id} 进度更新: {generated}/{total if total > 0 else '?'} 字")
             
             # 更新任务中的已生成字数
-            with self._task_lock:
-                current_task = self._get_task(task.task_id)
-                if current_task:
-                    current_task.generated_chars = generated
-                    # 只更新时间，不保存到文件（避免频繁IO）
-                    current_task.update_time = datetime.now().timestamp()
+            try:
+                with self._task_lock:
+                    current_task = self._get_task(task.task_id)
+                    if current_task:
+                        old_generated = current_task.generated_chars
+                        current_task.generated_chars = generated
+                        # 只更新时间，不保存到文件（避免频繁IO）
+                        current_task.update_time = datetime.now().timestamp()
+                        log.info(f"[TTSMgr] [DEBUG] 任务 {task.task_id} 字数已更新: {old_generated} -> {generated}")
+                    else:
+                        log.warning(f"[TTSMgr] [DEBUG] 进度回调中无法找到任务 {task.task_id}")
+            except Exception as e:
+                log.error(f"[TTSMgr] [DEBUG] 更新任务字数时出错: {e}", exc_info=True)
 
         # 在执行前检查是否已被停止
         if self._should_stop(task.task_id):
@@ -487,10 +535,12 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             # 计算总字数（用于进度显示）
             total_chars = len(task.text)
             client._total_chars = total_chars
+            log.info(f"[TTSMgr] [DEBUG] 设置客户端总字数: {total_chars}, 任务总字数: {task.total_chars}")
 
             # 保存客户端引用，以便停止时可以取消
             with self._task_lock:
                 self._active_clients[task.task_id] = client
+                log.debug(f"[TTSMgr] [DEBUG] 客户端引用已保存，task_id: {task.task_id}")
 
             # 再次检查是否已被停止（在保存引用后）
             if self._should_stop(task.task_id):
@@ -509,48 +559,95 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             log.debug(f"[TTSMgr] 任务 {task.task_id} 将按 {len(text_lines)} 行进行流式合成")
 
             # 逐行发送文本
+            log.info(f"[TTSMgr] 任务 {task.task_id} 开始流式发送文本，共 {len(text_lines)} 行")
             for i, line in enumerate(text_lines, 1):
                 # 检查是否被停止
                 if self._should_stop(task.task_id):
-                    log.info(f"[TTSMgr] 任务 {task.task_id} 已被停止，取消完成操作")
+                    log.info(f"[TTSMgr] 任务 {task.task_id} 已被停止，已发送 {i-1}/{len(text_lines)} 行")
                     raise RuntimeError('任务已被停止')
 
-                log.debug(f"[TTSMgr] 任务 {task.task_id} 发送第 {i}/{len(text_lines)} 行: {line[:30]}...")
-                client.stream_msg(text=line, role=task.role, id=task.task_id)
+                log.info(f"[TTSMgr] [DEBUG] 准备发送第 {i}/{len(text_lines)} 行（长度: {len(line)} 字符）: {line[:30]}...")
+                try:
+                    client.stream_msg(text=line, role=task.role, id=task.task_id)
+                    log.info(f"[TTSMgr] [DEBUG] 第 {i}/{len(text_lines)} 行发送完成")
+                except Exception as e:
+                    log.error(f"[TTSMgr] [DEBUG] 发送第 {i} 行时出错: {e}", exc_info=True)
+                    raise
+            
+            log.info(f"[TTSMgr] 任务 {task.task_id} 文本发送完成，共发送 {len(text_lines)} 行")
 
             # 在执行 stream_complete 前再次检查停止标志
             if self._should_stop(task.task_id):
                 log.info(f"[TTSMgr] 任务 {task.task_id} 已被停止，取消完成操作")
                 raise RuntimeError('任务已被停止')
 
-            client.stream_complete()
+            log.info(f"[TTSMgr] [DEBUG] 准备调用 stream_complete，当前已生成字数: {generated_chars}")
+            try:
+                client.stream_complete()
+                log.info(f"[TTSMgr] [DEBUG] stream_complete 调用完成")
+            except Exception as e:
+                log.error(f"[TTSMgr] [DEBUG] stream_complete 调用出错: {e}", exc_info=True)
+                raise
 
             # 等待任务完成（WebSocket 会异步返回 task-finished 事件）
-            if not task_completed.wait(timeout=TASK_COMPLETION_TIMEOUT):
-                log.warning(f"[TTSMgr] 任务 {task.task_id} 等待完成超时（{TASK_COMPLETION_TIMEOUT}秒）")
-                # 超时也视为失败
-                raise TimeoutError(f"任务等待完成超时（{TASK_COMPLETION_TIMEOUT}秒）")
+            log.info(f"[TTSMgr] [DEBUG] 开始等待任务完成事件，当前已生成字数: {generated_chars}, 错误信息: {error_info['error']}")
+            log.info(f"[TTSMgr] 任务 {task.task_id} 开始等待 WebSocket 任务完成（超时: {TASK_COMPLETION_TIMEOUT}秒）")
+            wait_start_time = time.time()
+            
+            # 定期检查状态
+            check_interval = 5.0  # 每5秒检查一次状态
+            last_check_time = wait_start_time
+            
+            while not task_completed.is_set():
+                elapsed = time.time() - wait_start_time
+                if elapsed >= TASK_COMPLETION_TIMEOUT:
+                    wait_elapsed = time.time() - wait_start_time
+                    log.warning(f"[TTSMgr] 任务 {task.task_id} 等待完成超时，等待时间: {wait_elapsed:.2f}秒（超时限制: {TASK_COMPLETION_TIMEOUT}秒）")
+                    log.warning(f"[TTSMgr] [DEBUG] 超时时状态 - 已生成字数: {generated_chars}, 错误: {error_info['error']}")
+                    # 超时也视为失败
+                    raise TimeoutError(f"任务等待完成超时（{TASK_COMPLETION_TIMEOUT}秒）")
+                
+                # 定期输出调试信息
+                if time.time() - last_check_time >= check_interval:
+                    log.info(f"[TTSMgr] [DEBUG] 等待中... 已等待 {elapsed:.1f}秒, 已生成字数: {generated_chars}, 任务状态: {task.status}")
+                    last_check_time = time.time()
+                
+                # 使用短超时进行轮询，以便定期检查
+                task_completed.wait(timeout=1.0)
+            
+            wait_elapsed = time.time() - wait_start_time
+            log.info(f"[TTSMgr] [DEBUG] 任务完成事件已触发，等待时间: {wait_elapsed:.2f}秒, 最终已生成字数: {generated_chars}")
+            log.info(f"[TTSMgr] 任务 {task.task_id} WebSocket 任务完成，等待时间: {wait_elapsed:.2f}秒")
 
             # 检查是否有错误发生
+            log.info(f"[TTSMgr] [DEBUG] 检查错误信息: {error_info['error']}")
             if error_info['error'] is not None:
+                log.error(f"[TTSMgr] [DEBUG] 检测到错误，准备抛出异常: {error_info['error']}")
                 # 有错误发生，抛出异常以便外层处理
                 raise error_info['error']
 
-            log.debug(f"[TTSMgr] 任务 {task.task_id} 已完成")
+            task_elapsed = time.time() - task_start_time
+            log.info(f"[TTSMgr] [DEBUG] 任务执行成功，准备更新状态，已生成字数: {generated_chars}/{task.total_chars}")
+            log.info(f"[TTSMgr] 任务 {task.task_id} 执行成功，已生成字数: {generated_chars}/{task.total_chars}, 总耗时: {task_elapsed:.2f}秒")
             # 更新任务状态为成功，并保存最终字数统计
             with self._task_lock:
                 final_task = self._get_task(task.task_id)
                 if final_task:
+                    log.info(f"[TTSMgr] [DEBUG] 更新最终字数: {final_task.generated_chars} -> {generated_chars}")
                     final_task.generated_chars = generated_chars
                     self._update_task_status(task.task_id, TASK_STATUS_SUCCESS, None)
+                    log.info(f"[TTSMgr] [DEBUG] 任务状态已更新为成功")
+                else:
+                    log.warning(f"[TTSMgr] [DEBUG] 无法找到任务 {task.task_id} 进行最终更新")
 
         except Exception as e:
+            task_elapsed = time.time() - task_start_time
             # 判断是否为停止操作导致的异常
             is_stopped = self._should_stop(task.task_id) or '停止' in str(e)
 
             if is_stopped:
                 # 停止是正常操作，记录为信息而不是错误
-                log.info(f"[TTSMgr] 任务 {task.task_id} 已被停止")
+                log.info(f"[TTSMgr] 任务 {task.task_id} 已被停止，耗时: {task_elapsed:.2f}秒")
                 # 更新任务状态为停止
                 with self._task_lock:
                     task = self._get_task(task.task_id)
@@ -565,7 +662,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 return
             else:
                 # 其他错误才记录为错误并重新抛出
-                log.error(f"[TTSMgr] 任务 {task.task_id} 执行失败: {e}")
+                log.error(f"[TTSMgr] 任务 {task.task_id} 执行失败，耗时: {task_elapsed:.2f}秒，错误: {e}", exc_info=True)
                 # 更新任务状态
                 self._update_task_status(task.task_id, TASK_STATUS_FAILED, str(e))
                 raise
@@ -598,12 +695,18 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             - code: 0 表示成功，-1 表示失败
             - msg: 描述信息
         """
+        log.info(f"[TTSMgr] 收到停止任务请求，task_id: {task_id}")
+        
         with self._task_lock:
             task, err = self._get_task_or_err(task_id)
             if err:
+                log.warning(f"[TTSMgr] 停止任务失败，task_id: {task_id}, 错误: {err}")
                 return -1, err
             if task.status != TASK_STATUS_PROCESSING:
+                log.warning(f"[TTSMgr] 停止任务失败，task_id: {task_id}, 原因: 任务未在处理中（当前状态: {task.status}）")
                 return -1, '任务未在处理中'
+
+            log.info(f"[TTSMgr] 开始停止任务 {task_id}, 任务名称: {task.name}, 已生成字数: {task.generated_chars}/{task.total_chars}")
 
             # 设置停止标志
             self._stop_flags[task_id] = True
@@ -615,13 +718,16 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                     log.info(f"[TTSMgr] 取消任务 {task_id} 的 TTS 流式合成")
                     client.streaming_cancel()
                 except Exception as e:
-                    log.error(f"[TTSMgr] 取消 TTS 客户端失败 {task_id}: {e}")
+                    log.error(f"[TTSMgr] 取消 TTS 客户端失败 {task_id}: {e}", exc_info=True)
+            else:
+                log.warning(f"[TTSMgr] 任务 {task_id} 没有活动的 TTS 客户端")
 
             # 立即更新任务状态为失败（已停止）
             task.status = TASK_STATUS_FAILED
             task.error_message = '任务已被用户停止'
             self._save_task_and_update_time(task)
 
+            log.info(f"[TTSMgr] 任务 {task_id} 已成功停止")
             return 0, '任务已停止'
 
     def _should_request_stop_before_delete(self, _task: TTSTask) -> bool:

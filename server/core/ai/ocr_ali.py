@@ -82,14 +82,19 @@ class OCRAli:
                 - 状态: "ok" 表示成功, "error" 表示失败
                 - 内容: 成功时返回提取的文本，失败时返回 None
         """
+        import time
+        start_time = time.time()
+        
         try:
             # 统一转换为列表处理
             if isinstance(image_paths, str):
                 image_paths = [image_paths]
 
             if not image_paths:
-                log.error("OCR Ali API error: 图片路径列表为空")
+                log.error("[OCR] 图片路径列表为空")
                 return "error", "图片路径列表为空"
+
+            log.info(f"[OCR] 开始处理 OCR 请求，图片数量: {len(image_paths)}, 图片路径: {image_paths}")
 
             # 构建消息内容：先添加所有图片，最后添加文本提示
             content = []
@@ -109,35 +114,39 @@ class OCRAli:
                 "content": content,
             }]
 
+            log.debug(f"[OCR] 调用 DashScope API，模型: qwen-vl-ocr-latest")
+            api_start_time = time.time()
             response = MultiModalConversation.call(
                 api_key=ALI_KEY,
                 model="qwen-vl-ocr-latest",
                 messages=messages,
             )
+            api_elapsed = time.time() - api_start_time
+            log.info(f"[OCR] API 调用完成，耗时: {api_elapsed:.2f}秒")
 
             # 检查响应是否有效
             if not response:
-                log.error("OCR Ali API error: 响应为空")
+                log.error("[OCR] API 响应为空")
                 return "error", "API 响应为空"
 
             if "output" not in response or not response["output"]:
-                log.error(f"OCR Ali API error: 响应中缺少 output 字段，响应: {response}")
+                log.error(f"[OCR] API 响应中缺少 output 字段，响应: {response}")
                 return "error", "API 响应格式错误：缺少 output 字段"
 
             if "choices" not in response[
                     "output"] or not response["output"]["choices"]:
                 log.error(
-                    f"OCR Ali API error: 响应中缺少 choices 字段，响应: {response}")
+                    f"[OCR] API 响应中缺少 choices 字段，响应: {response}")
                 return "error", "API 响应格式错误：缺少 choices 字段"
 
             if len(response["output"]["choices"]) == 0:
-                log.error("OCR Ali API error: choices 列表为空")
+                log.error("[OCR] API 响应中 choices 列表为空")
                 return "error", "API 响应格式错误：choices 列表为空"
 
             choice = response["output"]["choices"][0]
             if "message" not in choice or not choice["message"]:
                 log.error(
-                    f"OCR Ali API error: 响应中缺少 message 字段，choice: {choice}")
+                    f"[OCR] API 响应中缺少 message 字段，choice: {choice}")
                 return "error", "API 响应格式错误：缺少 message 字段"
 
             message = choice["message"]
@@ -150,17 +159,17 @@ class OCRAli:
                 content = message["content"]
             else:
                 log.error(
-                    f"OCR Ali API error: 响应中缺少 content 字段，message: {message}")
+                    f"[OCR] API 响应中缺少 content 字段，message: {message}")
                 return "error", "API 响应格式错误：缺少 content 字段"
 
             if not content:
-                log.error("OCR Ali API error: content 为空")
+                log.error("[OCR] API 响应中 content 为空")
                 return "error", "API 响应格式错误：content 为空"
 
             # content 可能是列表
             if isinstance(content, list):
                 if len(content) == 0:
-                    log.error("OCR Ali API error: content 列表为空")
+                    log.error("[OCR] API 响应中 content 列表为空")
                     return "error", "API 响应格式错误：content 列表为空"
                 content_item = content[0]
             else:
@@ -175,17 +184,24 @@ class OCRAli:
                 txt = content_item
             else:
                 log.error(
-                    f"OCR Ali API error: 无法提取 text 字段，content_item: {content_item}"
+                    f"[OCR] 无法提取 text 字段，content_item 类型: {type(content_item)}"
                 )
                 return "error", "API 响应格式错误：无法提取 text 字段"
 
             if not txt:
-                log.error("OCR Ali API error: 提取的文本为空")
+                log.warning("[OCR] 提取的文本为空")
                 return "error", "API 响应格式错误：提取的文本为空"
 
+            # 记录成功信息
+            text_length = len(txt)
+            total_elapsed = time.time() - start_time
+            log.info(f"[OCR] OCR 处理成功，提取文本长度: {text_length} 字符，总耗时: {total_elapsed:.2f}秒")
+            log.debug(f"[OCR] 提取的文本预览（前100字符）: {txt[:100]}...")
+            
             return "ok", txt
         except Exception as e:
-            log.error(f"OCR Ali API error: {e}")
+            elapsed = time.time() - start_time if 'start_time' in locals() else 0
+            log.error(f"[OCR] OCR 处理失败，耗时: {elapsed:.2f}秒，错误: {e}", exc_info=True)
             return "error", None
 
 
