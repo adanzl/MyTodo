@@ -8,8 +8,9 @@
 - 通过 API 提供文件下载功能
 """
 
-import asyncio
 import os
+import shutil
+import threading
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Any, Callable, Dict, Optional, Tuple
@@ -23,8 +24,7 @@ from core.config import (
     app_logger,
 )
 from core.services.base_task_mgr import BaseTaskMgr, TaskBase
-from core.tools.async_util import _clear_event_loop
-from core.tts.tts_client import TTSClient
+from core.tts.tts_ali import TTSClient
 from core.utils import ensure_directory
 
 log = app_logger
@@ -34,6 +34,9 @@ TTS_BASE_DIR = os.path.join(BASE_TMP_DIR, 'tts')
 
 # 输出音频文件名
 OUTPUT_FILENAME = 'output.mp3'
+
+# WebSocket 任务完成等待超时时间（秒）
+TASK_COMPLETION_TIMEOUT = 60
 
 
 @dataclass
@@ -258,58 +261,55 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         if not task.text or not str(task.text).strip():
             return -1, '文本为空'
 
-        # 异步执行任务（在新线程中运行，需要设置事件循环）
-        self._run_task_async_with_loop(task_id, self._run_tts_task)
+        # 异步执行任务（在新线程中运行）
+        self._run_task_async(task_id, self._run_tts_task)
         return 0, 'TTS 任务已启动'
 
-    def _run_task_async_with_loop(self, task_id: str, runner: Callable[[TTSTask], None]) -> None:
-        """在新线程中运行任务，并设置 asyncio 事件循环（TTS 需要）。
+    def _update_task_status(self, task_id: str, status: str, error_message: Optional[str] = None) -> None:
+        """更新任务状态。
+        
+        Args:
+            task_id: 任务 ID
+            status: 新状态
+            error_message: 错误消息（可选）
+        """
+        with self._task_lock:
+            task = self._get_task(task_id)
+            if task:
+                task.status = status
+                task.error_message = error_message
+                self._save_task_and_update_time(task)
+
+    def _run_task_async(self, task_id: str, runner: Callable[[TTSTask], None]) -> None:
+        """在新线程中运行任务。
 
         Args:
             task_id: 任务 ID
             runner: 任务执行函数
         """
-        import threading
 
         def wrapped() -> None:
-            # 清除事件循环引用，确保创建新循环前状态干净
-            _clear_event_loop()
-
-            # 为新线程创建 asyncio 事件循环（dashscope SDK 可能需要）
-            # 注意：由于不 patch subprocess，不再需要处理 gevent subprocess 的 child watcher 问题
             try:
-                loop = asyncio.get_event_loop()
-                if loop.is_closed():
-                    raise RuntimeError("Event loop is closed")
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
+                # 更新任务状态为处理中
+                self._update_task_status(task_id, TASK_STATUS_PROCESSING, None)
 
-            try:
+                # 获取任务并执行
                 with self._task_lock:
                     task = self._get_task(task_id)
                     if not task:
                         return
-                    task.status = TASK_STATUS_PROCESSING
-                    task.error_message = None
-                    self._save_task_and_update_time(task)
 
                 runner(task)
 
+                # 任务成功完成（如果状态仍为 processing，则更新为 success）
                 with self._task_lock:
-                    task2 = self._get_task(task_id)
-                    if task2 and task2.status == TASK_STATUS_PROCESSING:
-                        task2.status = TASK_STATUS_SUCCESS
-                        task2.error_message = None
-                        self._save_task_and_update_time(task2)
+                    task = self._get_task(task_id)
+                    if task and task.status == TASK_STATUS_PROCESSING:
+                        self._update_task_status(task_id, TASK_STATUS_SUCCESS, None)
+
             except Exception as e:
                 log.error(f"[{self.__class__.__name__}] 任务 {task_id} 执行异常: {e}")
-                with self._task_lock:
-                    task3 = self._get_task(task_id)
-                    if task3:
-                        task3.status = TASK_STATUS_FAILED
-                        task3.error_message = str(e)
-                        self._save_task_and_update_time(task3)
+                self._update_task_status(task_id, TASK_STATUS_FAILED, str(e))
             finally:
                 # 清理停止标志和客户端引用
                 self._clear_stop_flag(task_id)
@@ -346,6 +346,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
 
         # 文件句柄（在回调中打开和关闭）
         file_handle = None
+        # 任务完成事件（用于等待 WebSocket 任务完成）
+        task_completed = threading.Event()
 
         def on_data(data: Any, data_type: int = 0) -> None:
             """TTS 数据回调：接收音频流数据并写入文件。
@@ -369,9 +371,12 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 return
 
             # 处理结束标记
-            if data_type == 1 and file_handle is not None:
-                file_handle.close()
-                file_handle = None
+            if data_type == 1:
+                if file_handle is not None:
+                    file_handle.close()
+                    file_handle = None
+                # 设置任务完成事件（即使没有音频数据也要设置）
+                task_completed.set()
 
         def on_err(err: Exception) -> None:
             """TTS 错误回调：抛出异常以终止任务。"""
@@ -384,6 +389,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         client = None
         try:
             # 创建 TTS 客户端并设置参数
+            # 注意：tts_ali 使用 WebSocket 连接，不依赖 dashscope SDK
             client = TTSClient(on_msg=on_data, on_err=on_err)
             client.speed = task.speed
             client.vol = task.vol
@@ -398,20 +404,21 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
 
             # 执行流式合成
             client.stream_msg(text=task.text, role=task.role, id=task.task_id)
-            
+
             # 在执行 stream_complete 前再次检查停止标志
             if self._should_stop(task.task_id):
                 raise RuntimeError('任务已被停止')
-            
+
             client.stream_complete()
 
+            # 等待任务完成（WebSocket 会异步返回 task-finished 事件）
+            if not task_completed.wait(timeout=TASK_COMPLETION_TIMEOUT):
+                log.warning(f"[TTSMgr] 任务 {task.task_id} 等待完成超时（{TASK_COMPLETION_TIMEOUT}秒）")
+            else:
+                log.debug(f"[TTSMgr] 任务 {task.task_id} 已完成")
+
             # 更新任务状态为成功
-            with self._task_lock:
-                task = self._get_task(task.task_id)
-                if task:
-                    task.status = TASK_STATUS_SUCCESS
-                    task.error_message = None
-                    self._save_task_and_update_time(task)
+            self._update_task_status(task.task_id, TASK_STATUS_SUCCESS, None)
 
         except Exception as e:
             log.error(f"[TTSMgr] 任务 {task.task_id} 执行失败: {e}")
@@ -428,14 +435,10 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                         log.info(f"[TTSMgr] 任务 {task.task_id} 状态已由 stop_task 更新，跳过重复更新")
                     elif is_stopped:
                         # 任务被停止，标记为失败但错误信息明确说明是停止
-                        task.status = TASK_STATUS_FAILED
-                        task.error_message = '任务已被用户停止'
-                        self._save_task_and_update_time(task)
+                        self._update_task_status(task.task_id, TASK_STATUS_FAILED, '任务已被用户停止')
                     else:
                         # 其他错误
-                        task.status = TASK_STATUS_FAILED
-                        task.error_message = str(e)
-                        self._save_task_and_update_time(task)
+                        self._update_task_status(task.task_id, TASK_STATUS_FAILED, str(e))
             raise
 
         finally:
@@ -511,28 +514,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             return
 
         try:
-            # 递归删除目录中的所有文件和子目录
-            for root, dirs, files in os.walk(task_dir, topdown=False):
-                # 删除文件
-                for name in files:
-                    try:
-                        os.remove(os.path.join(root, name))
-                    except Exception:
-                        pass
-
-                # 删除子目录
-                for name in dirs:
-                    try:
-                        os.rmdir(os.path.join(root, name))
-                    except Exception:
-                        pass
-
-            # 删除任务目录本身
-            try:
-                os.rmdir(task_dir)
-            except Exception:
-                pass
-
+            shutil.rmtree(task_dir)
+            log.debug(f"[TTSMgr] 已删除任务目录: {task_dir}")
         except Exception as e:
             log.warning(f"[TTSMgr] 删除任务目录失败 {task_id}: {e}")
 
@@ -574,86 +557,3 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
 
 
 tts_mgr = TTSMgr()
-
-
-def test_tts_task_with_event_loop():
-    """测试 TTS 任务执行时的事件循环设置
-    
-    这个函数用于验证在新线程中创建事件循环是否正确，
-    避免 "child watchers are only available on the default loop" 错误。
-    """
-    import time
-    import threading
-
-    print("[测试] 开始测试 TTS 任务事件循环设置...")
-
-    # 创建测试任务
-    code, msg, task_id = tts_mgr.create_task(text="这是一个测试文本，用于验证事件循环设置是否正确。", name="事件循环测试任务")
-
-    if code != 0:
-        print(f"[测试] 创建任务失败: {msg}")
-        return False
-
-    print(f"[测试] 任务创建成功，task_id: {task_id}")
-
-    # 检查事件循环状态
-    def check_event_loop():
-        """在新线程中检查事件循环"""
-        try:
-            loop = asyncio.get_event_loop()
-            print(f"[测试] 线程 {threading.current_thread().name} 中获取到事件循环: {loop}")
-            return True
-        except RuntimeError:
-            try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                print(f"[测试] 线程 {threading.current_thread().name} 中创建新事件循环: {loop}")
-                return True
-            except Exception as e:
-                print(f"[测试] 线程 {threading.current_thread().name} 中创建事件循环失败: {e}")
-                return False
-
-    # 在主线程中检查
-    print("[测试] 主线程事件循环检查:")
-    main_thread_ok = check_event_loop()
-
-    # 在新线程中检查
-    thread_result = {'ok': False}
-
-    def thread_check():
-        _clear_event_loop()
-        thread_result['ok'] = check_event_loop()
-
-    thread = threading.Thread(target=thread_check, daemon=True)
-    thread.start()
-    thread.join(timeout=2)
-
-    if not thread_result['ok']:
-        print("[测试] 新线程中事件循环设置失败")
-        return False
-
-    print("[测试] 事件循环设置测试通过")
-
-    # 测试启动任务（使用 mock，避免实际调用 TTS 服务）
-    print("[测试] 测试任务启动流程...")
-
-    # 检查任务状态
-    task = tts_mgr.get_task(task_id)
-    if not task:
-        print("[测试] 无法获取任务")
-        return False
-
-    print(f"[测试] 任务状态: {task['status']}")
-    print(f"[测试] 任务文本: {task['text']}")
-
-    # 清理测试任务
-    print("[测试] 清理测试任务...")
-    tts_mgr.delete_task(task_id)
-
-    print("[测试] 所有测试通过！")
-    return True
-
-
-if __name__ == "__main__":
-    # 直接运行此文件时执行测试
-    test_tts_task_with_event_loop()

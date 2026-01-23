@@ -148,7 +148,7 @@
         <!-- 参数设置 -->
         <div class="border rounded p-3 flex flex-col gap-2">
           <h4 class="text-sm font-semibold">参数设置</h4>
-          <div class="grid grid-cols-2 gap-3">
+          <div class="grid grid-cols-3 gap-3">
             <div class="flex flex-col gap-1">
               <label class="text-xs text-gray-600">发音人/音色</label>
               <el-select

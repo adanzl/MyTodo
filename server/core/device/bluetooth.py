@@ -65,12 +65,12 @@ class BluetoothDev(DeviceBase):
         return 0, "ok"
 
 
-# 从 services 导入 BluetoothMgr 和全局实例
-from core.device.base import DeviceBase
-from core.services.bluetooth_mgr import bluetooth_mgr
+# 注意：不要在模块级别导入 bluetooth_mgr，避免循环导入
+# bluetooth_mgr 在需要时通过延迟导入获取
 
 if __name__ == "__main__":
-    # 测试代码
+    # 测试代码（延迟导入避免循环导入）
+    from core.services.bluetooth_mgr import bluetooth_mgr
     print("Bluetooth Manager Test")
     devices = bluetooth_mgr.scan_devices_sync(timeout=3.0)
     print(f"Found {len(devices)} devices")

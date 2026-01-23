@@ -1,0 +1,397 @@
+import traceback
+import websocket
+import json
+import uuid
+import os
+import threading
+
+try:
+    from core.config import app_logger, config
+
+    log = app_logger
+    ALI_KEY = config.ALI_KEY
+    SERVER_URI = getattr(config, 'DASHSCOPE_WS_URI', None) or os.getenv(
+        "DASHSCOPE_WS_URI", "wss://dashscope.aliyuncs.com/api-ws/v1/inference/")
+except ImportError:
+    from dotenv import load_dotenv
+    load_dotenv()
+    import logging
+
+    log = logging.getLogger()
+    ALI_KEY = os.getenv('ALI_KEY', '')
+    SERVER_URI = os.getenv("DASHSCOPE_WS_URI", "wss://dashscope.aliyuncs.com/api-ws/v1/inference/")
+
+# cSpell: disable
+DEFAULT_ROLE = "longwan_v2"
+DEFAULT_MODEL = "cosyvoice-v1"
+MODEL_MAP = {
+    "longwan_v2": "cosyvoice-v2",
+    'longcheng_v2': 'cosyvoice-v2',
+    'longhua_v2': 'cosyvoice-v2',
+    'longshu_v2': 'cosyvoice-v2',
+    'loongbella_v2': 'cosyvoice-v2',
+    'longxiaochun_v2': 'cosyvoice-v2',
+    'longxiaoxia_v2': 'cosyvoice-v2',
+    'longwan_v3': 'cosyvoice-v3-flash',
+}
+# cSpell: enable
+
+
+class TTSClient:
+
+    def __init__(self, on_msg=None, on_err=None):
+        """
+        初始化 TTSClient 实例
+
+        参数:
+            on_msg: 消息回调函数，接收 (data, type) 参数，type=0 表示音频数据，type=1 表示完成消息
+            on_err: 错误回调函数，接收错误对象
+        """
+        self.on_msg = on_msg or (lambda x, y: None)
+        self.on_err = on_err or (lambda x: None)
+        self.api_key = ALI_KEY
+        self.uri = SERVER_URI
+        self.task_id = str(uuid.uuid4())
+        self.ws = None
+        self.task_started = False
+        self.task_finished = False
+        self.role = DEFAULT_ROLE
+        self.speed = 1.0
+        self.vol = 50
+        self.id = ''
+        self._text_queue = []  # 用于存储待发送的文本
+        self._ws_thread = None  # WebSocket 运行线程
+        self._lock = threading.Lock()  # 用于线程同步
+        self._cancelled = False  # 是否已取消
+
+    def streaming_cancel(self):
+        """取消流式合成"""
+        log.info(">>[TTS-ALI] cancel streaming")
+        try:
+            self._cancelled = True
+            if self.ws is not None:
+                self.close(self.ws)
+                self.ws = None
+        except Exception as e:
+            log.error(f">>[TTS-ALI] cancel error: {e}")
+            traceback.print_stack()
+            self.on_err(e)
+
+    def process_msg(self, text: str, role: str = None, id=None):
+        """一次性合成音频，文本需要一次性传入
+
+        Args:
+            text: 待合成的文本内容。
+            role: 发音人/音色。
+            id: 任务 ID。
+
+        Returns:
+            None
+        """
+        try:
+            if role is None:
+                role = self.role
+            if id:
+                self.id = id
+
+            # 重置状态
+            self._cancelled = False
+            self.task_started = False
+            self.task_finished = False
+            self._text_queue = []
+
+            # 启动 WebSocket 连接
+            self._start_websocket(role)
+
+            # 等待任务启动
+            import time
+            timeout = 10
+            start_time = time.time()
+            while not self.task_started and not self._cancelled:
+                if time.time() - start_time > timeout:
+                    raise TimeoutError("等待任务启动超时")
+                time.sleep(0.1)
+
+            if self._cancelled:
+                return
+
+            # 发送文本
+            self._send_continue_task(text)
+
+            # 发送完成指令
+            self._send_finish_task()
+
+            # 等待任务完成
+            while not self.task_finished and not self._cancelled:
+                if time.time() - start_time > timeout * 2:
+                    break
+                time.sleep(0.1)
+
+        except Exception as e:
+            log.error(f">>[TTS-ALI] {e}")
+            traceback.print_stack()
+            self.on_err(e)
+
+    def stream_msg(self, text: str, role: str = None, id=None):
+        """流式合成音频，文本需要流式传入
+
+        Args:
+            text: 待合成的文本内容。
+            role: 发音人/音色。
+            id: 任务 ID。
+
+        Returns:
+            None
+        """
+        try:
+            if role is None:
+                role = self.role
+            if id:
+                self.id = id
+
+            with self._lock:
+                if not self.task_started:
+                    # 首次调用，启动 WebSocket 连接
+                    self._cancelled = False
+                    self.task_started = False
+                    self.task_finished = False
+                    self._text_queue = []
+                    self._start_websocket(role)
+
+                    # 等待任务启动
+                    import time
+                    timeout = 10
+                    start_time = time.time()
+                    while not self.task_started and not self._cancelled:
+                        if time.time() - start_time > timeout:
+                            raise TimeoutError("等待任务启动超时")
+                        time.sleep(0.1)
+
+                if self._cancelled:
+                    return
+
+                # 发送文本
+                self._send_continue_task(text)
+
+        except Exception as e:
+            log.error(f">>[TTS-ALI] {e}")
+            traceback.print_stack()
+            self.on_err(e)
+
+    def stream_complete(self):
+        """完成流式合成"""
+        try:
+            if self._cancelled:
+                return
+            self._send_finish_task()
+        except Exception as e:
+            log.error(f">>[TTS-ALI] {e}")
+            traceback.print_stack()
+            self.on_err(e)
+
+    def _start_websocket(self, role: str):
+        """启动 WebSocket 连接"""
+        if self.ws is not None:
+            return
+
+        # 设置请求头部（鉴权）
+        header = {"Authorization": f"bearer {self.api_key}", "X-DashScope-DataInspection": "enable"}
+
+        # 创建 WebSocketApp 实例
+        self.ws = websocket.WebSocketApp(self.uri,
+                                         header=header,
+                                         on_open=lambda ws: self._on_open(ws, role),
+                                         on_message=self._on_message,
+                                         on_error=self._on_error,
+                                         on_close=self._on_close)
+
+        # 在新线程中运行 WebSocket
+        self._ws_thread = threading.Thread(target=self.ws.run_forever, daemon=True)
+        self._ws_thread.start()
+        log.debug(">>[TTS-ALI] WebSocket 线程已启动")
+
+    def _on_open(self, ws, role: str):
+        """WebSocket 连接建立时回调函数"""
+        log.debug(">>[TTS-ALI] WebSocket 已连接")
+
+        # 获取模型
+        model = MODEL_MAP.get(role, DEFAULT_MODEL)
+
+        # 构造 run-task 指令
+        run_task_cmd = {
+            "header": {
+                "action": "run-task",
+                "task_id": self.task_id,
+                "streaming": "duplex"
+            },
+            "payload": {
+                "task_group": "audio",
+                "task": "tts",
+                "function": "SpeechSynthesizer",
+                "model": model,
+                "parameters": {
+                    "text_type": "PlainText",
+                    "voice": role,
+                    "format": "mp3",
+                    "sample_rate": 22050,
+                    "volume": self.vol,
+                    "rate": self.speed,
+                    "pitch": 1,
+                    "enable_ssml": False
+                },
+                "input": {}
+            }
+        }
+
+        # 发送 run-task 指令
+        ws.send(json.dumps(run_task_cmd))
+        log.debug(">>[TTS-ALI] 已发送 run-task 指令")
+
+    def _on_message(self, ws, message):
+        """接收到消息时的回调函数"""
+        if self._cancelled:
+            return
+
+        if isinstance(message, str):
+            # 处理 JSON 文本消息
+            try:
+                msg_json = json.loads(message)
+                log.debug(f">>[TTS-ALI] 收到 JSON 消息: {msg_json}")
+
+                if "header" in msg_json:
+                    header = msg_json["header"]
+
+                    if "event" in header:
+                        event = header["event"]
+
+                        if event == "task-started":
+                            log.debug(">>[TTS-ALI] 任务已启动")
+                            self.task_started = True
+
+                        elif event == "task-finished":
+                            log.debug(">>[TTS-ALI] 任务已完成")
+                            self.task_finished = True
+                            self.on_msg(">>[TTS-ALI] Completed", 1)
+                            self.close(ws)
+
+                        elif event == "task-failed":
+                            error_msg = msg_json.get("error_message", "未知错误")
+                            log.error(f">>[TTS-ALI] 任务失败: {error_msg}")
+                            self.task_finished = True
+                            self.on_err(Exception(error_msg))
+                            self.close(ws)
+
+            except json.JSONDecodeError as e:
+                log.error(f">>[TTS-ALI] JSON 解析失败: {e}")
+        else:
+            # 处理二进制消息（音频数据）
+            log.debug(f">>[TTS-ALI] 收到二进制消息，大小: {len(message)} 字节")
+
+            # 注意：WebSocket 回调在独立线程中执行，而 Redis 操作需要在 gevent greenlet 中执行
+            # 由于跨线程/gevent 的复杂性，这里暂时跳过 Redis 缓存写入
+            # Redis 缓存写入失败不应影响 TTS 正常输出
+            # 如果需要 Redis 缓存，可以考虑使用队列机制将操作传递到 gevent 环境
+
+            try:
+                self.on_msg(message, 0)
+            except Exception as e:
+                log.error(f">>[TTS-ALI] on_msg error: {e}")
+                traceback.print_stack()
+                self.on_err(e)
+
+    def _on_error(self, ws, error):
+        """发生错误时的回调"""
+        log.error(f">>[TTS-ALI] WebSocket 出错: {error}")
+        self.on_err(error)
+
+    def _on_close(self, ws, close_status_code, close_msg):
+        """连接关闭时的回调"""
+        log.info(f">>[TTS-ALI] WebSocket 已关闭: {close_msg} ({close_status_code})")
+        self.ws = None
+
+    def _send_continue_task(self, text: str):
+        """发送 continue-task 指令，附带要合成的文本内容"""
+        if self.ws is None or self._cancelled:
+            return
+
+        cmd = {
+            "header": {
+                "action": "continue-task",
+                "task_id": self.task_id,
+                "streaming": "duplex"
+            },
+            "payload": {
+                "input": {
+                    "text": text
+                }
+            }
+        }
+
+        self.ws.send(json.dumps(cmd))
+        log.debug(f">>[TTS-ALI] 已发送 continue-task 指令，文本内容: {text[:20]}...")
+
+    def _send_finish_task(self):
+        """发送 finish-task 指令，结束语音合成任务"""
+        if self.ws is None or self._cancelled:
+            return
+
+        cmd = {
+            "header": {
+                "action": "finish-task",
+                "task_id": self.task_id,
+                "streaming": "duplex"
+            },
+            "payload": {
+                "input": {}
+            }
+        }
+
+        self.ws.send(json.dumps(cmd))
+        log.debug(">>[TTS-ALI] 已发送 finish-task 指令")
+
+    def close(self, ws):
+        """主动关闭连接"""
+        try:
+            if ws and hasattr(ws, 'sock') and ws.sock and hasattr(ws.sock, 'connected') and ws.sock.connected:
+                ws.close()
+                log.debug(">>[TTS-ALI] 已主动关闭连接")
+        except Exception as e:
+            log.warning(f">>[TTS-ALI] 关闭连接时出错: {e}")
+
+
+def test_tts():
+    """测试函数"""
+    f = None
+
+    def on_data(data, type=0):
+        nonlocal f
+        if type == 0:
+            # type=0 表示音频数据
+            if isinstance(data, bytes):
+                log.info(f">>[TTS-ALI] Data: {len(data)} bytes")
+                if f is None:
+                    f = open("output_ali.mp3", "wb")
+                f.write(data)
+            else:
+                log.info(f">>[TTS-ALI] Data: {data}")
+        else:
+            # type=1 表示完成消息
+            log.info(f">>[TTS-ALI] Message END: {data}")
+            if f is not None:
+                f.close()
+                f = None
+
+    def on_err(err):
+        log.error(f">>[TTS-ALI] Error: {err}")
+
+    tts = TTSClient(on_msg=on_data, on_err=on_err)
+    text = '可可……你这突如其来的表白让我眼泪都快下来了！😍 当然好啊！愿意，一千个一万个愿意！和你在一起的每一天都是我最珍贵的时光。'
+    tts.process_msg(text, 'longwan_v3')
+
+    # 等待完成
+    import time
+    time.sleep(5)
+
+
+if __name__ == "__main__":
+    test_tts()
