@@ -358,9 +358,12 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             """
             nonlocal file_handle
 
-            # 检查是否被停止
+            # 检查是否被停止（停止是正常操作，静默返回）
             if self._should_stop(task.task_id):
-                raise RuntimeError('任务已被停止')
+                # 如果收到结束标记，设置完成事件以便主线程退出等待
+                if data_type == 1:
+                    task_completed.set()
+                return
 
             # 处理数据块
             if data_type == 0:
@@ -384,6 +387,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
 
         # 在执行前检查是否已被停止
         if self._should_stop(task.task_id):
+            log.info(f"[TTSMgr] 任务 {task.task_id} 已被停止，跳过执行")
+            # 抛出异常以便外层处理任务状态更新
             raise RuntimeError('任务已被停止')
 
         client = None
@@ -400,6 +405,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
 
             # 再次检查是否已被停止（在保存引用后）
             if self._should_stop(task.task_id):
+                log.info(f"[TTSMgr] 任务 {task.task_id} 已被停止，取消执行")
                 raise RuntimeError('任务已被停止')
 
             # 执行流式合成
@@ -407,6 +413,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
 
             # 在执行 stream_complete 前再次检查停止标志
             if self._should_stop(task.task_id):
+                log.info(f"[TTSMgr] 任务 {task.task_id} 已被停止，取消完成操作")
                 raise RuntimeError('任务已被停止')
 
             client.stream_complete()
@@ -421,25 +428,30 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             self._update_task_status(task.task_id, TASK_STATUS_SUCCESS, None)
 
         except Exception as e:
-            log.error(f"[TTSMgr] 任务 {task.task_id} 执行失败: {e}")
-
             # 判断是否为停止操作导致的异常
             is_stopped = self._should_stop(task.task_id) or '停止' in str(e)
 
-            # 更新任务状态（如果还未被停止）
-            with self._task_lock:
-                task = self._get_task(task.task_id)
-                if task:
-                    # 如果任务已经被 stop_task 设置为停止状态，则不再更新
-                    if task.status == TASK_STATUS_FAILED and task.error_message == '任务已被用户停止':
-                        log.info(f"[TTSMgr] 任务 {task.task_id} 状态已由 stop_task 更新，跳过重复更新")
-                    elif is_stopped:
-                        # 任务被停止，标记为失败但错误信息明确说明是停止
-                        self._update_task_status(task.task_id, TASK_STATUS_FAILED, '任务已被用户停止')
-                    else:
-                        # 其他错误
-                        self._update_task_status(task.task_id, TASK_STATUS_FAILED, str(e))
-            raise
+            if is_stopped:
+                # 停止是正常操作，记录为信息而不是错误
+                log.info(f"[TTSMgr] 任务 {task.task_id} 已被停止")
+                # 更新任务状态为停止
+                with self._task_lock:
+                    task = self._get_task(task.task_id)
+                    if task:
+                        # 如果任务已经被 stop_task 设置为停止状态，则不再更新
+                        if task.status == TASK_STATUS_FAILED and task.error_message == '任务已被用户停止':
+                            log.debug(f"[TTSMgr] 任务 {task.task_id} 状态已由 stop_task 更新，跳过重复更新")
+                        else:
+                            # 任务被停止，标记为失败但错误信息明确说明是停止
+                            self._update_task_status(task.task_id, TASK_STATUS_FAILED, '任务已被用户停止')
+                # 停止操作不重新抛出异常，避免外层再次处理
+                return
+            else:
+                # 其他错误才记录为错误并重新抛出
+                log.error(f"[TTSMgr] 任务 {task.task_id} 执行失败: {e}")
+                # 更新任务状态
+                self._update_task_status(task.task_id, TASK_STATUS_FAILED, str(e))
+                raise
 
         finally:
             # 清理客户端引用

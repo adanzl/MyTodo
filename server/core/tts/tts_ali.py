@@ -306,7 +306,7 @@ class TTSClient:
 
     def _on_close(self, ws, close_status_code, close_msg):
         """连接关闭时的回调"""
-        log.info(f">>[TTS-ALI] WebSocket 已关闭: {close_msg} ({close_status_code})")
+        log.debug(f">>[TTS-ALI] WebSocket 已关闭: {close_msg} ({close_status_code})")
         self.ws = None
 
     def _send_continue_task(self, text: str):
