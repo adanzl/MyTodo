@@ -19,7 +19,7 @@
             @click="handleTtsCreateTask"
             :loading="ttsLoading"
           >
-            <el-icon><Plus /></el-icon>
+            <el-icon v-if="!ttsLoading"><Plus /></el-icon>
           </el-button>
         </div>
       </div>

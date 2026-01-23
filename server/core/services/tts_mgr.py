@@ -419,19 +419,23 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             # 判断是否为停止操作导致的异常
             is_stopped = self._should_stop(task.task_id) or '停止' in str(e)
 
-            # 更新任务状态
+            # 更新任务状态（如果还未被停止）
             with self._task_lock:
                 task = self._get_task(task.task_id)
                 if task:
-                    if is_stopped:
+                    # 如果任务已经被 stop_task 设置为停止状态，则不再更新
+                    if task.status == TASK_STATUS_FAILED and task.error_message == '任务已被用户停止':
+                        log.info(f"[TTSMgr] 任务 {task.task_id} 状态已由 stop_task 更新，跳过重复更新")
+                    elif is_stopped:
                         # 任务被停止，标记为失败但错误信息明确说明是停止
                         task.status = TASK_STATUS_FAILED
                         task.error_message = '任务已被用户停止'
+                        self._save_task_and_update_time(task)
                     else:
                         # 其他错误
                         task.status = TASK_STATUS_FAILED
                         task.error_message = str(e)
-                    self._save_task_and_update_time(task)
+                        self._save_task_and_update_time(task)
             raise
 
         finally:
@@ -481,7 +485,12 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 except Exception as e:
                     log.error(f"[TTSMgr] 取消 TTS 客户端失败 {task_id}: {e}")
 
-            return 0, '已请求停止任务'
+            # 立即更新任务状态为失败（已停止）
+            task.status = TASK_STATUS_FAILED
+            task.error_message = '任务已被用户停止'
+            self._save_task_and_update_time(task)
+
+            return 0, '任务已停止'
 
     def _should_request_stop_before_delete(self, _task: TTSTask) -> bool:
         """删除处理中的任务时，是否先请求停止。
