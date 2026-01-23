@@ -92,6 +92,7 @@ def create_app():
     from core.api.pdf_routes import pdf_bp
     from core.api.auth_routes import auth_bp
     from core.api.tts_routes import tts_bp
+    from core.api.ai_routes import ai_bp
 
     app.register_blueprint(api_bp, url_prefix='/')
     app.register_blueprint(agent_bp, url_prefix='/')
@@ -103,6 +104,7 @@ def create_app():
     app.register_blueprint(pdf_bp, url_prefix='/')
     app.register_blueprint(auth_bp, url_prefix='/')
     app.register_blueprint(tts_bp, url_prefix='/')
+    app.register_blueprint(ai_bp, url_prefix='/')
 
     # ========== JWT Auth ==========
     app.config['JWT_SECRET_KEY'] = config.JWT_SECRET_KEY

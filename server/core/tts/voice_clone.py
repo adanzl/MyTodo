@@ -27,7 +27,8 @@ except ImportError:
     load_dotenv()
     import logging
 
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.basicConfig(level=logging.INFO,
+                        format='%(asctime)s - %(levelname)s - %(message)s')
     log = logging.getLogger()
     ALI_KEY = os.getenv('ALI_KEY', '')
     print("use default log")
@@ -55,8 +56,12 @@ class VoiceClone(ResultCallback):
 
     def clone_voice(self, audio_url: str):
         try:
-            self.voice_id = service.create_voice(target_model=TARGET_MODEL, prefix=VOICE_PREFIX, url=audio_url)
-            log.info(f"Voice enrollment submitted successfully. Request ID: {service.get_last_request_id()}")
+            self.voice_id = service.create_voice(target_model=TARGET_MODEL,
+                                                 prefix=VOICE_PREFIX,
+                                                 url=audio_url)
+            log.info(
+                f"Voice enrollment submitted successfully. Request ID: {service.get_last_request_id()}"
+            )
             log.info(f"Generated Voice ID: {self.voice_id}")
         except Exception as e:
             log.error(f"Error during voice creation: {e}")
@@ -71,7 +76,8 @@ class VoiceClone(ResultCallback):
                 if status == "OK":
                     return True
                 elif status == "UNDEPLOYED":
-                    raise RuntimeError(f"Voice processing failed with status: {status}")
+                    raise RuntimeError(
+                        f"Voice processing failed with status: {status}")
                 # 对于 "DEPLOYING" 等中间状态，继续等待
                 time.sleep(poll_interval)
             except Exception as e:
@@ -126,7 +132,9 @@ if __name__ == "__main__":
                 # log.info(f">>[VOICE_CLONE] Data: {len(data)} bytes")
                 if f is None:
                     f = open("output.mp3", "wb")
-                    log.info(f">>[VOICE_CLONE] Start File: {os.path.abspath(f.name)}")
+                    log.info(
+                        f">>[VOICE_CLONE] Start File: {os.path.abspath(f.name)}"
+                    )
                 f.write(data)
             else:
                 log.info(f">>[VOICE_CLONE] Data: {data}")
@@ -134,7 +142,8 @@ if __name__ == "__main__":
             # type=1 表示完成消息
             log.info(f">>[VOICE_CLONE] Message END: {data}")
             if f is not None:
-                log.info(f">>[VOICE_CLONE] End File: {os.path.abspath(f.name)}")
+                log.info(
+                    f">>[VOICE_CLONE] End File: {os.path.abspath(f.name)}")
                 f.close()
                 f = None
 
