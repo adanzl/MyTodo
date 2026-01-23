@@ -34,18 +34,43 @@
 
 > 配置证书
 
-`sudo certbot certonly --nginx --preferred-challenges tls-alpn-01 -d leo-dify.tbit.xin -m adanzl@163.com --agree-tos --no-eff-email`
+### Standalone 模式（适用于 HTTP 端口无法对外访问的情况）
 
-sudo pip3 install certbot certbot-dns-freedns
+由于服务器只有 HTTPS 端口对外，HTTP-01 验证需要在申请/续期时临时停止 nginx，让 certbot 监听端口 80：
 
-sudo certbot certonly \
-  --authenticator dns-freedns \
-  --dns-freedns-credentials=/etc/letsencrypt/.secrets/freedns.ini \
-  --dns-freedns-propagation-seconds=600 \
+```bash
+sudo pip3 install certbot
+
+# 申请证书（需要临时停止 nginx）
+sudo systemctl stop nginx
+sudo certbot certonly --standalone \
   -d leo-dify.tbit.xin \
-  -m <adanzl@163.com> \
+  -m adanzl@163.com \
   --agree-tos \
   --no-eff-email
+sudo systemctl start nginx
+
+# 续期时也需要临时停止 nginx
+# 可以配置 pre-hook 和 post-hook 自动处理
+```
+
+### 配置自动续期（Standalone 模式）
+
+编辑续期配置文件 `/etc/letsencrypt/renewal/leo-dify.tbit.xin.conf`，在 `[renewalparams]` 部分添加：
+
+```ini
+pre_hook = systemctl stop nginx
+post_hook = systemctl start nginx
+deploy_hook = nginx -t && nginx -s reload
+```
+
+或者使用命令行更新：
+
+```bash
+sudo certbot renew --pre-hook "systemctl stop nginx" --post-hook "systemctl start nginx" --deploy-hook "nginx -t && nginx -s reload"
+```
+
+> 注意：Standalone 模式在续期时会短暂停止 nginx（通常几秒钟），请确保可以接受短暂的服务中断。
 
 ## 重启 code-server
 
