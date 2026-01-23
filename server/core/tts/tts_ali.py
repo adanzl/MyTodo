@@ -209,9 +209,7 @@ class TTSClient:
         """完成流式合成"""
         try:
             if self._cancelled:
-                log.debug(">>[TTS-ALI] 任务已取消，跳过 stream_complete")
                 return
-            log.debug(">>[TTS-ALI] 发送 finish-task 指令，完成流式合成")
             self._send_finish_task()
         except Exception as e:
             log.error(f">>[TTS-ALI] stream_complete 错误: {e}")
@@ -237,11 +235,9 @@ class TTSClient:
         # 在新线程中运行 WebSocket
         self._ws_thread = threading.Thread(target=self.ws.run_forever, daemon=True)
         self._ws_thread.start()
-        log.debug(">>[TTS-ALI] WebSocket 线程已启动")
 
     def _on_open(self, ws, role: str):
         """WebSocket 连接建立时回调函数"""
-        log.debug(">>[TTS-ALI] WebSocket 已连接")
 
         # 获取模型
         model = MODEL_MAP.get(role, DEFAULT_MODEL)
@@ -274,7 +270,6 @@ class TTSClient:
 
         # 发送 run-task 指令
         ws.send(json.dumps(run_task_cmd))
-        log.debug(">>[TTS-ALI] 已发送 run-task 指令")
 
     def _on_message(self, ws, message):
         """接收到消息时的回调函数"""
@@ -285,7 +280,7 @@ class TTSClient:
             # 处理 JSON 文本消息
             try:
                 msg_json = json.loads(message)
-                log.debug(f">>[TTS-ALI] 收到 JSON 消息: {msg_json}")
+                log.info(f">>[TTS-ALI] [DEBUG] 收到 JSON 消息: {msg_json}")
 
                 if "header" in msg_json:
                     header = msg_json["header"]
@@ -337,20 +332,37 @@ class TTSClient:
 
                         elif event == "result-generated":
                             # 处理 result-generated 事件，统计已生成字数
-                            # 只有 type 为 "sentence-end" 时才统计字数
                             payload = msg_json.get("payload", {})
                             output = payload.get("output", {})
                             output_type = output.get("type", "")
                             
-                            log.debug(f">>[TTS-ALI] [DEBUG] 收到 result-generated 事件, type: {output_type}")
+                            log.info(f">>[TTS-ALI] [DEBUG] 收到 result-generated 事件, type: {output_type}, payload: {payload}")
                             
-                            # 只有 sentence-end 类型才统计字数
+                            # 尝试从多个地方获取字数统计
+                            usage = payload.get("usage", {})
+                            characters = usage.get("characters", 0)
+                            
+                            # 如果没有从 usage 中获取到，尝试从其他地方获取
+                            if characters == 0:
+                                # 尝试从 output 中获取
+                                output_chars = output.get("characters", 0)
+                                if output_chars > 0:
+                                    characters = output_chars
+                            
+                            # 如果还是没有，尝试根据文本长度估算（作为备选方案）
+                            if characters == 0:
+                                original_text = output.get("original_text", "")
+                                if original_text:
+                                    # 简单估算：中文字符按2计算，其他按1计算
+                                    estimated_chars = sum(2 if '\u4e00' <= c <= '\u9fff' else 1 for c in original_text)
+                                    if estimated_chars > 0:
+                                        characters = estimated_chars
+                                        log.info(f">>[TTS-ALI] [DEBUG] 使用文本长度估算字数: {characters}")
+                            
+                            log.info(f">>[TTS-ALI] [DEBUG] result-generated 事件处理, type: {output_type}, characters: {characters}, 当前累计: {self._generated_chars}")
+                            
+                            # 只有 sentence-end 类型才统计字数，但记录所有类型的事件
                             if output_type == "sentence-end":
-                                usage = payload.get("usage", {})
-                                characters = usage.get("characters", 0)
-                                
-                                log.info(f">>[TTS-ALI] [DEBUG] sentence-end 事件, characters: {characters}, 当前累计: {self._generated_chars}")
-                                
                                 if characters > 0:
                                     # 累计已生成字数
                                     old_chars = self._generated_chars
@@ -363,14 +375,15 @@ class TTSClient:
                                         log.info(f">>[TTS-ALI] [DEBUG] 进度回调调用完成")
                                     except Exception as e:
                                         log.error(f">>[TTS-ALI] [DEBUG] 进度回调调用出错: {e}", exc_info=True)
+                                else:
+                                    log.warning(f">>[TTS-ALI] [DEBUG] sentence-end 事件但 characters 为 0")
                             else:
-                                log.debug(f">>[TTS-ALI] [DEBUG] 忽略非 sentence-end 事件, type: {output_type}")
+                                log.info(f">>[TTS-ALI] [DEBUG] 非 sentence-end 事件, type: {output_type}, 文本: {output.get('original_text', '')[:50]}")
 
             except json.JSONDecodeError as e:
                 log.error(f">>[TTS-ALI] JSON 解析失败: {e}")
         else:
             # 处理二进制消息（音频数据）
-            log.debug(f">>[TTS-ALI] 收到二进制消息，大小: {len(message)} 字节")
 
             # 注意：WebSocket 回调在独立线程中执行，而 Redis 操作需要在 gevent greenlet 中执行
             # 由于跨线程/gevent 的复杂性，这里暂时跳过 Redis 缓存写入
@@ -401,7 +414,6 @@ class TTSClient:
 
     def _on_close(self, ws, close_status_code, close_msg):
         """连接关闭时的回调"""
-        log.debug(f">>[TTS-ALI] WebSocket 已关闭: {close_msg} ({close_status_code})")
         self.ws = None
 
     def _send_continue_task(self, text: str):
@@ -423,7 +435,6 @@ class TTSClient:
         }
 
         self.ws.send(json.dumps(cmd))
-        log.debug(f">>[TTS-ALI] 已发送 continue-task 指令，文本内容: {text[:20]}...")
 
     def _send_finish_task(self):
         """发送 finish-task 指令，结束语音合成任务"""
@@ -442,14 +453,12 @@ class TTSClient:
         }
 
         self.ws.send(json.dumps(cmd))
-        log.debug(">>[TTS-ALI] 已发送 finish-task 指令")
 
     def close(self, ws):
         """主动关闭连接"""
         try:
             if ws and hasattr(ws, 'sock') and ws.sock and hasattr(ws.sock, 'connected') and ws.sock.connected:
                 ws.close()
-                log.debug(">>[TTS-ALI] 已主动关闭连接")
         except Exception as e:
             log.warning(f">>[TTS-ALI] 关闭连接时出错: {e}")
 

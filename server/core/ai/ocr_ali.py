@@ -114,7 +114,6 @@ class OCRAli:
                 "content": content,
             }]
 
-            log.debug(f"[OCR] 调用 DashScope API，模型: qwen-vl-ocr-latest")
             api_start_time = time.time()
             response = MultiModalConversation.call(
                 api_key=ALI_KEY,
@@ -196,7 +195,6 @@ class OCRAli:
             text_length = len(txt)
             total_elapsed = time.time() - start_time
             log.info(f"[OCR] OCR 处理成功，提取文本长度: {text_length} 字符，总耗时: {total_elapsed:.2f}秒")
-            log.debug(f"[OCR] 提取的文本预览（前100字符）: {txt[:100]}...")
             
             return "ok", txt
         except Exception as e:

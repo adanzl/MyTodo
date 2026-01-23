@@ -106,10 +106,11 @@ class BaseTaskMgr(ABC, Generic[TTask]):
         try:
             ensure_directory(self._base_dir)
             all_tasks_data = {task_id: self._task_to_dict(task) for task_id, task in self._tasks.items()}
-            with open(self._get_task_meta_file(), 'w', encoding='utf-8') as f:
+            meta_file = self._get_task_meta_file()
+            with open(meta_file, 'w', encoding='utf-8') as f:
                 json.dump(all_tasks_data, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            log.error(f"[BaseTaskMgr] 保存所有任务失败: {e}")
+            log.error(f"[BaseTaskMgr] 保存所有任务失败: {e}", exc_info=True)
 
     def _update_task_time(self, task: TTask) -> None:
         task.update_time = self._now_ts()
