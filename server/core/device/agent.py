@@ -195,6 +195,72 @@ class DeviceAgent(DeviceBase):
         # 如果接口不存在，返回未知状态
         return (-1, {"error": "设备不支持获取传输状态"})
 
+    def get_volume(self) -> int | None:
+        """获取设备音量。
+
+        尝试从 Agent 的状态接口获取音量信息，如果不支持则返回 None。
+
+        Returns:
+            int | None: 音量值（0-100），如果不支持则返回 None
+        """
+        try:
+            # 尝试从状态接口获取音量
+            code, status = self.get_status()
+            if code == 0 and isinstance(status, dict):
+                volume = status.get("volume")
+                if volume is not None:
+                    try:
+                        volume_int = int(volume)
+                        # 确保音量在有效范围内
+                        if 0 <= volume_int <= 100:
+                            return volume_int
+                    except (TypeError, ValueError):
+                        pass
+
+            # 尝试直接调用音量接口（如果 Agent 支持）
+            result = self._request("GET", "/media/volume")
+            if result.get("code") == 0:
+                data = result.get("data", {})
+                volume = data.get("volume")
+                if volume is not None:
+                    try:
+                        volume_int = int(volume)
+                        if 0 <= volume_int <= 100:
+                            return volume_int
+                    except (TypeError, ValueError):
+                        pass
+        except Exception as e:
+            log.debug(f"[DeviceAgent] Get volume error: {e}")
+
+        # 设备不支持音量控制
+        return None
+
+    def set_volume(self, volume: int) -> bool:
+        """设置设备音量。
+
+        Args:
+            volume (int): 目标音量值（0-100）
+
+        Returns:
+            bool: 成功返回 True，失败返回 False
+        """
+        # 验证音量范围
+        if not isinstance(volume, int) or volume < 0 or volume > 100:
+            log.warning(f"[DeviceAgent] Invalid volume value: {volume}")
+            return False
+
+        try:
+            # 尝试调用音量设置接口
+            result = self._request("POST", "/media/volume", json_data={"volume": volume})
+            if result.get("code") == 0:
+                return True
+            else:
+                log.debug(f"[DeviceAgent] Set volume failed: {result.get('msg', '未知错误')}")
+                return False
+        except Exception as e:
+            log.debug(f"[DeviceAgent] Set volume error: {e}")
+            return False
+
     # ========== Agent 接口 ==========
 
     def mock(self, action: str, key: Optional[str] = None, value: Optional[str] = None) -> Dict[str, Any]:
