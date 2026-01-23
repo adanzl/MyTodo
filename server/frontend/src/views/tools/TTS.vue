@@ -123,7 +123,7 @@
               <el-button type="default" size="small" @click="handleSelectImages" :disabled="isTaskProcessing"
                 class="!p-0">
                 <el-icon class="!w-7 !h-6">
-                  <Picture class="!w-5 !h-5"/>
+                  <Picture class="!w-5 !h-5" />
                 </el-icon>
               </el-button>
               <el-button type="primary" size="small" @click="handleOcrRecognize"
@@ -132,7 +132,7 @@
               </el-button>
             </div>
           </div>
-          <el-input v-model="ttsText" type="textarea" :rows="6" placeholder="请输入要转换为语音的文本" :disabled="isTaskProcessing"
+          <el-input v-model="ttsText" type="textarea" :rows="16" placeholder="请输入要转换为语音的文本" :disabled="isTaskProcessing"
             @blur="handleTtsTextChange" />
         </div>
 
@@ -409,7 +409,7 @@ const handleTtsViewTask = async (taskId: string) => {
       ttsSpeed.value = response.data.speed ?? 0.8;
       ttsVol.value = response.data.vol ?? 50;
       ttsParamsChanged.value = false;
-      
+
       // 只有处理中的任务才自动开始定时刷新状态
       if (response.data.status === "processing") {
         startTtsPollingTaskStatus();
@@ -430,7 +430,7 @@ const handleTtsDeleteTask = async (taskId: string) => {
   if (ttsCurrentTask.value && ttsCurrentTask.value.task_id === taskId) {
     stopTtsPolling();
   }
-  
+
   const confirmed = await ElMessageBox.confirm("确定要删除该任务吗？", "提示", {
     confirmButtonText: "确定",
     cancelButtonText: "取消",
@@ -694,15 +694,13 @@ const { start: startTtsPolling, stop: stopTtsPolling } = useControllableInterval
       return;
     }
 
-    // 检查当前任务状态，如果不再是 processing，则停止轮询
+    // 检查当前任务状态，如果不再是 processing，则停止轮询（不刷新详情）
     if (taskInList.status !== "processing") {
-      // 停止轮询前，再次更新当前任务，确保状态是最新的
-      await handleTtsViewTask(currentTaskId);
       stopTtsPolling();
       return;
     }
 
-    // 更新当前任务详情
+    // 只有任务状态为 processing 时，才刷新当前任务详情
     await handleTtsViewTask(currentTaskId);
   },
   MEDIA_TASK_POLLING_INTERVAL,
@@ -716,29 +714,29 @@ const startTtsPollingTaskStatus = () => {
 // 下载 TTS 结果
 const handleTtsDownload = async () => {
   if (!ttsCurrentTask.value?.output_file) return;
-  
+
   try {
     const url = getTtsTaskDownloadUrl(ttsCurrentTask.value.task_id);
     const response = await fetch(url);
-    
+
     if (!response.ok) {
       ElMessage.error("下载失败");
       return;
     }
-    
+
     const blob = await response.blob();
     const blobUrl = URL.createObjectURL(blob);
-    
+
     // 获取文件扩展名
     const outputFile = ttsCurrentTask.value.output_file;
-    const fileExtension = outputFile.includes('.') 
-      ? '.' + outputFile.split('.').pop() 
+    const fileExtension = outputFile.includes('.')
+      ? '.' + outputFile.split('.').pop()
       : '';
-    
+
     // 构建文件名：任务名字 + 原扩展名
     const taskName = ttsCurrentTask.value.name || 'tts_output';
     const fileName = `${taskName}${fileExtension}`;
-    
+
     // 创建下载链接
     const link = document.createElement('a');
     link.href = blobUrl;
@@ -746,7 +744,7 @@ const handleTtsDownload = async () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
+
     // 清理 blob URL
     URL.revokeObjectURL(blobUrl);
   } catch (error) {
@@ -757,29 +755,29 @@ const handleTtsDownload = async () => {
 // 从任务列表下载 TTS 结果
 const handleTtsDownloadFromList = async (task: TTSTask) => {
   if (!task?.output_file) return;
-  
+
   try {
     const url = getTtsTaskDownloadUrl(task.task_id);
     const response = await fetch(url);
-    
+
     if (!response.ok) {
       ElMessage.error("下载失败");
       return;
     }
-    
+
     const blob = await response.blob();
     const blobUrl = URL.createObjectURL(blob);
-    
+
     // 获取文件扩展名
     const outputFile = task.output_file;
-    const fileExtension = outputFile.includes('.') 
-      ? '.' + outputFile.split('.').pop() 
+    const fileExtension = outputFile.includes('.')
+      ? '.' + outputFile.split('.').pop()
       : '';
-    
+
     // 构建文件名：任务名字 + 原扩展名
     const taskName = task.name || 'tts_output';
     const fileName = `${taskName}${fileExtension}`;
-    
+
     // 创建下载链接
     const link = document.createElement('a');
     link.href = blobUrl;
@@ -787,7 +785,7 @@ const handleTtsDownloadFromList = async (task: TTSTask) => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
+
     // 清理 blob URL
     URL.revokeObjectURL(blobUrl);
   } catch (error) {
