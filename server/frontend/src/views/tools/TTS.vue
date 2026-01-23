@@ -383,8 +383,10 @@ const handleTtsCreateTaskConfirm = async () => {
 
 // 查看 TTS 任务
 const handleTtsViewTask = async (taskId: string) => {
+  // 如果切换任务，停止之前的轮询
   if (ttsCurrentTask.value && ttsCurrentTask.value.task_id !== taskId) {
     handleTtsStopPlay();
+    stopTtsPolling();
   }
   try {
     ttsLoading.value = true;
@@ -403,6 +405,9 @@ const handleTtsViewTask = async (taskId: string) => {
       ttsSpeed.value = response.data.speed ?? 0.8;
       ttsVol.value = response.data.vol ?? 50;
       ttsParamsChanged.value = false;
+      
+      // 选中任务后，自动开始定时刷新状态
+      startTtsPollingTaskStatus();
     } else {
       ElMessage.error(response.msg || "获取任务信息失败");
     }
@@ -415,6 +420,11 @@ const handleTtsViewTask = async (taskId: string) => {
 
 // 删除 TTS 任务
 const handleTtsDeleteTask = async (taskId: string) => {
+  // 如果删除的是当前选中的任务，停止轮询
+  if (ttsCurrentTask.value && ttsCurrentTask.value.task_id === taskId) {
+    stopTtsPolling();
+  }
+  
   const confirmed = await ElMessageBox.confirm("确定要删除该任务吗？", "提示", {
     confirmButtonText: "确定",
     cancelButtonText: "取消",
@@ -615,7 +625,7 @@ const handleTtsStart = async () => {
       await loadTtsTaskList();
       // 再次刷新确保状态同步
       await handleTtsViewTask(ttsCurrentTask.value.task_id);
-      startTtsPollingTaskStatus();
+      // handleTtsViewTask 中已经会自动开始轮询，这里不需要再次调用
     } else {
       ElMessage.error(response.msg || "启动任务失败");
     }
@@ -665,19 +675,21 @@ const { start: startTtsPolling, stop: stopTtsPolling } = useControllableInterval
       return;
     }
 
+    const currentTaskId = ttsCurrentTask.value.task_id;
+
     // 先更新任务列表，确保状态同步
     await loadTtsTaskList();
 
-    // 检查当前任务状态，如果不再是 processing，则停止轮询
-    if (ttsCurrentTask.value.status !== "processing") {
-      // 停止轮询前，再次更新任务列表和当前任务，确保状态是最新的
-      await handleTtsViewTask(ttsCurrentTask.value.task_id);
+    // 检查任务是否还存在（可能被删除）
+    const taskInList = ttsTaskList.value.find(t => t.task_id === currentTaskId);
+    if (!taskInList) {
+      // 任务已被删除，停止轮询
       stopTtsPolling();
       return;
     }
 
     // 更新当前任务详情
-    await handleTtsViewTask(ttsCurrentTask.value.task_id);
+    await handleTtsViewTask(currentTaskId);
   },
   MEDIA_TASK_POLLING_INTERVAL,
   { immediate: false }

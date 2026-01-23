@@ -157,9 +157,12 @@ class TTSClient:
             if id:
                 self.id = id
 
+            # 检查是否需要启动 WebSocket（在锁外检查，避免死锁）
+            need_start_websocket = False
             with self._lock:
                 if not self.task_started:
-                    # 首次调用，启动 WebSocket 连接
+                    # 首次调用，需要启动 WebSocket 连接
+                    need_start_websocket = True
                     self._cancelled = False
                     self.task_started = False
                     self.task_finished = False
@@ -167,18 +170,26 @@ class TTSClient:
                     self._generated_chars = 0
                     self._total_chars = 0  # 流式模式下总字数未知，会在发送时累计
                     self._task_started_event.clear()  # 清除事件标志
-                    self._start_websocket(role)
 
-                    # 等待任务启动（使用 Event 非阻塞等待）
-                    timeout = 10
-                    if not self._task_started_event.wait(timeout=timeout):
+            # 在锁外启动 WebSocket 和等待事件，避免死锁
+            if need_start_websocket:
+                self._start_websocket(role)
+                
+                # 等待任务启动（使用 Event 非阻塞等待，在锁外执行）
+                timeout = 10
+                if not self._task_started_event.wait(timeout=timeout):
+                    # 检查是否被取消
+                    with self._lock:
                         if not self._cancelled:
                             raise TimeoutError("等待任务启动超时")
+                        return
 
+            # 检查是否被取消（在锁内检查）
+            with self._lock:
                 if self._cancelled:
                     return
-
-                # 发送文本
+                
+                # 发送文本（在锁内发送，确保线程安全）
                 self._send_continue_task(text)
 
         except Exception as e:
