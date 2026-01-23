@@ -217,7 +217,7 @@ import {
   deletePdf,
 } from "@/api/pdf";
 
-import type { PdfTask } from "@/types/tools";
+import type { PdfTask } from "@/types/tools/pdf";
 
 interface PdfTaskWithUI extends PdfTask {
   _decrypting?: boolean;

@@ -1,9 +1,10 @@
 /**
  * API 配置
  */
-import axios, { type AxiosError, type AxiosResponse } from "axios";
+import axios, { type AxiosError, type AxiosRequestConfig, type AxiosResponse } from "axios";
 import { logAndNoticeError } from "@/utils/error";
 import { logger } from "@/utils/logger";
+import { getAccessToken, refreshToken, setAccessToken } from "./auth";
 
 // 与原版保持一致：支持远程和本地配置
 const REMOTE = {
@@ -167,20 +168,58 @@ export {
 export const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
+  withCredentials: true, // IMPORTANT: cross-origin refresh cookie
 });
+
+// Ensure we only run one refresh flow at a time
+let isRefreshing = false;
+let refreshWaiters: Array<(token: string | null) => void> = [];
+
+function notifyRefreshWaiters(token: string | null) {
+  refreshWaiters.forEach(cb => cb(token));
+  refreshWaiters = [];
+}
+
+async function ensureRefreshed(): Promise<string | null> {
+  if (isRefreshing) {
+    return new Promise(resolve => {
+      refreshWaiters.push(resolve);
+    });
+  }
+
+  isRefreshing = true;
+  try {
+    const data = await refreshToken();
+    const token = data?.access_token || getAccessToken();
+    notifyRefreshWaiters(token);
+    return token;
+  } catch (e) {
+    setAccessToken(null);
+    notifyRefreshWaiters(null);
+    throw e;
+  } finally {
+    isRefreshing = false;
+  }
+}
 
 // 请求拦截器
 api.interceptors.request.use(
-  config => {
-    // 可以在这里添加请求头、token 等
+  cfg => {
+    // attach access token
+    const token = getAccessToken();
+    if (token) {
+      cfg.headers = cfg.headers || {};
+      (cfg.headers as any)["Authorization"] = `Bearer ${token}`;
+    }
+
     logger.debug(
       "[API Request]",
-      config.method?.toUpperCase(),
-      config.baseURL,
-      config.url,
-      config.params || config.data
+      cfg.method?.toUpperCase(),
+      cfg.baseURL,
+      cfg.url,
+      cfg.params || cfg.data
     );
-    return config;
+    return cfg;
   },
   error => {
     logger.error("API Request Error:", error);
@@ -188,13 +227,11 @@ api.interceptors.request.use(
   }
 );
 
-// 响应拦截器 - 统一处理错误
+// 响应拦截器 - 统一处理错误 + 401 自动 refresh 重试
 api.interceptors.response.use(
   (response: AxiosResponse) => {
-    // 检查业务错误码
     if (response.data && typeof response.data === "object" && "code" in response.data) {
       if (response.data.code !== 0) {
-        // 业务错误，抛出错误让调用方处理
         const error = new Error(response.data.msg || "请求失败") as AxiosError;
         error.response = response;
         return Promise.reject(error);
@@ -202,45 +239,57 @@ api.interceptors.response.use(
     }
     return response;
   },
-  (error: AxiosError) => {
-    // 检查是否是取消的请求，如果是则不处理
+  async (error: AxiosError) => {
+    const cfg = error.config as (AxiosRequestConfig & { _retry?: boolean; _isFileUpload?: boolean }) | undefined;
+
+    // Ignore cancels
     if (
       error.code === "ECONNABORTED" ||
       error.message?.includes("canceled") ||
       error.message?.includes("aborted")
     ) {
-      // 请求已被取消，直接返回，不进行任何重试
       return Promise.reject(error);
     }
 
-    // 检查是否是文件上传请求 - 必须在最前面检查，避免任何重试逻辑
+    // Do not retry uploads
     const isFileUpload =
-      (error.config as any)?._isFileUpload === true ||
-      error.config?.data instanceof FormData ||
-      (typeof error.config?.headers?.["Content-Type"] === "string" &&
-        error.config.headers["Content-Type"].includes("multipart/form-data")) ||
-      error.config?.url?.includes("/pdf/upload") ||
-      error.config?.url?.includes("/upload");
+      (cfg as any)?._isFileUpload === true ||
+      cfg?.data instanceof FormData ||
+      (typeof (cfg?.headers as any)?.["Content-Type"] === "string" &&
+        String((cfg?.headers as any)?.["Content-Type"]).includes("multipart/form-data")) ||
+      String(cfg?.url || "").includes("/pdf/upload") ||
+      String(cfg?.url || "").includes("/upload");
 
-    // 如果是文件上传请求，无论什么错误都不重试，直接拒绝
     if (isFileUpload) {
-      logger.warn(`File upload failed, not retrying to avoid re-upload: ${error.config?.url}`, {
+      logger.warn(`File upload failed, not retrying to avoid re-upload: ${cfg?.url}`, {
         code: error.code,
         message: error.message,
         status: error.response?.status,
       });
-      // 直接拒绝，不进行任何后续处理
       return Promise.reject(error);
     }
 
-    // 网络错误、超时等
+    // 401 -> refresh -> retry once
+    if (error.response?.status === 401 && cfg && !cfg._retry) {
+      cfg._retry = true;
+      try {
+        const newToken = await ensureRefreshed();
+        if (newToken) {
+          cfg.headers = cfg.headers || {};
+          (cfg.headers as any)["Authorization"] = `Bearer ${newToken}`;
+        }
+        return api.request(cfg);
+      } catch (e) {
+        // fallthrough to normal error handling
+      }
+    }
+
+    // Existing error handling
     if (error.response) {
-      // 服务器返回了错误状态码
       const status = error.response.status;
       const data = error.response.data as { msg?: string } | undefined;
       const errorMessage = data?.msg || `请求失败 (${status})`;
 
-      // 根据状态码处理不同的错误
       if (status >= 500) {
         logAndNoticeError(error, "服务器错误", { context: "API" });
       } else if (status === 404) {
@@ -253,10 +302,8 @@ api.interceptors.response.use(
         logAndNoticeError(error, errorMessage, { context: "API" });
       }
     } else if (error.request) {
-      // 请求已发出但没有收到响应
       logAndNoticeError(error, "网络错误，请检查网络连接", { context: "API" });
     } else {
-      // 请求配置错误
       logAndNoticeError(error, "请求配置错误", { context: "API" });
     }
 

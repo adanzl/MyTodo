@@ -104,7 +104,10 @@ def test_agent_event_error_code_propagates(client, monkeypatch):
 
     resp = client.post(
         "/agent/event",
-        data=json.dumps({"key": "k"}),
+        data=json.dumps({
+            "key": "k",
+            "action": "any"
+        }),
         content_type="application/json",
     )
 

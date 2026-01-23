@@ -2,14 +2,35 @@ import pytest
 import time
 from unittest.mock import patch, MagicMock
 
+from core.device.agent import DeviceAgent
 from core.services.agent_mgr import AgentMgr, HEARTBEAT_TIMEOUT
+
+
+class MockDeviceAgent(DeviceAgent):
+    """A concrete implementation of DeviceAgent for testing purposes."""
+
+    def play(self, source: str, **kwargs):
+        return {"code": 0, "msg": "played"}
+
+    def stop(self):
+        return {"code": 0, "msg": "stopped"}
+
+    def get_status(self):
+        return {"state": "stopped"}
+
+    def get_volume(self) -> int | None:
+        return 50
+
+    def set_volume(self, volume: int) -> bool:
+        return True
 
 
 @pytest.fixture
 def agent_mgr():
     """Provides a clean AgentMgr instance for each test."""
-    mgr = AgentMgr()
-    return mgr
+    with patch('core.services.agent_mgr.DeviceAgent', new=MockDeviceAgent):
+        mgr = AgentMgr()
+        yield mgr
 
 
 def test_handle_heartbeat_new_device(agent_mgr):

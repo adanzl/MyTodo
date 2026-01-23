@@ -3,7 +3,7 @@
  */
 import { api, getBaseUrl } from "./config";
 import type { ApiResponse } from "@/types/api";
-import type { PdfTask } from "@/types/tools";
+import type { PdfTask } from "@/types/tools/pdf";
 
 /**
  * 获取 PDF 任务列表
@@ -23,7 +23,7 @@ export async function uploadPdf(
   file: File,
   onProgress?: (progress: number) => void,
   signal?: AbortSignal
-): Promise<ApiResponse<{ filename: string }>> {
+): Promise<ApiResponse<PdfTask>> {
   const formData = new FormData();
   formData.append("file", file);
 
@@ -44,11 +44,7 @@ export async function uploadPdf(
     },
   };
 
-  const response = await api.post<ApiResponse<{ filename: string }>>(
-    "/pdf/upload",
-    formData,
-    config
-  );
+  const response = await api.post<ApiResponse<PdfTask>>("/pdf/upload", formData, config);
   return response.data;
 }
 

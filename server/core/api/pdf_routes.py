@@ -45,11 +45,15 @@ def pdf_upload() -> ResponseReturnValue:
         if file.filename == '':
             return _err("文件名不能为空")
 
-        code, msg, file_info = pdf_mgr.upload_file(file, file.filename)
-        if code != 0:
+        code, msg, task_id = pdf_mgr.create_task(file, file.filename)
+        if code != 0 or not task_id:
             return _err(msg)
 
-        return _ok(file_info)
+        task_info = pdf_mgr.get_task(task_id)
+        if not task_info:
+            return _err('任务创建成功但无法读取任务信息')
+
+        return _ok(task_info)
 
     except RequestEntityTooLarge:
         log.error("[PDF] 上传文件失败: 文件太大，超过服务器限制（最大 2000MB）")
@@ -69,7 +73,7 @@ def pdf_decrypt() -> ResponseReturnValue:
         if err:
             return err
 
-        code, msg = pdf_mgr.decrypt(body.task_id, body.password)
+        code, msg = pdf_mgr.start_task(body.task_id, body.password)
         if code != 0:
             return _err(msg)
 
@@ -84,9 +88,9 @@ def pdf_decrypt() -> ResponseReturnValue:
 def pdf_task_status(task_id: str) -> ResponseReturnValue:
     """获取 PDF 任务状态。"""
     try:
-        code, msg, task_info = pdf_mgr.get_task_status(task_id)
-        if code != 0:
-            return _err(msg)
+        task_info = pdf_mgr.get_task(task_id)
+        if not task_info:
+            return _err('任务不存在')
 
         return _ok(task_info)
 
@@ -99,7 +103,7 @@ def pdf_task_status(task_id: str) -> ResponseReturnValue:
 def pdf_list() -> ResponseReturnValue:
     """列出 PDF 文件（上传/解密），并建立对应关系。"""
     try:
-        result = pdf_mgr.list()
+        result = pdf_mgr.list_tasks()
         return _ok(result)
 
     except Exception as e:
@@ -139,7 +143,7 @@ def pdf_delete() -> ResponseReturnValue:
         if err:
             return err
 
-        code, msg = pdf_mgr.delete(body.task_id)
+        code, msg = pdf_mgr.delete_task(body.task_id)
         if code != 0:
             return _err(msg)
 

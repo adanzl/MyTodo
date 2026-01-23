@@ -85,6 +85,24 @@ class Config:
     # ========== CORS 配置 ==========
     CORS_ORIGINS: str = os.environ.get('CORS_ORIGINS', '*')
 
+    # ========== JWT / Auth 配置 ==========
+    # IMPORTANT: set a strong secret in environment for production.
+    JWT_SECRET_KEY: str = os.environ.get('JWT_SECRET_KEY', 'change-me-in-prod')
+    JWT_ACCESS_DAYS: int = int(os.environ.get('JWT_ACCESS_DAYS', 1))
+    JWT_REFRESH_DAYS: int = int(os.environ.get('JWT_REFRESH_DAYS', 30))
+
+    # Whitelist behavior: start with all /api allowed, then turn off and tighten.
+    AUTH_WHITELIST_ALL_API: bool = os.environ.get('AUTH_WHITELIST_ALL_API', '1') == '1'
+    AUTH_API_WHITELIST: str = os.environ.get('AUTH_API_WHITELIST', '')
+    AUTH_API_WHITELIST_PREFIX: str = os.environ.get('AUTH_API_WHITELIST_PREFIX', '')
+
+    # ========== 限流配置 ==========
+    # Flask-Limiter 默认限流规则（可用 "200 per day; 50 per hour" 这种复合写法）
+    RATE_LIMIT_DEFAULT: str = os.environ.get('RATE_LIMIT_DEFAULT', '20000 per day; 5000 per hour')
+    # 限流状态存储：默认使用内存（单进程/单 worker 生效）。生产建议使用 Redis。
+    # 示例：redis://localhost:6379/1
+    RATE_LIMIT_STORAGE_URI: str = os.environ.get('RATE_LIMIT_STORAGE_URI', 'memory://')
+
     @classmethod
     def get_cors_origins(cls) -> list:
         """获取 CORS 允许的来源列表"""

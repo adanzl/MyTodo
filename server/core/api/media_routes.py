@@ -249,12 +249,12 @@ def upload_file() -> ResponseReturnValue:
         return _err(f"上传文件失败: {str(e)}")
 
 
-@media_bp.route("/media/merge/addFileByPath", methods=['POST'])
 class _AddFileByPathBody(BaseModel):
     task_id: str
     file_path: str
 
 
+@media_bp.route("/media/merge/addFileByPath", methods=['POST'])
 def add_file_by_path() -> ResponseReturnValue:
     """通过文件路径添加文件到音频合成任务。
 

@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_socketio import SocketIO
 from flask_limiter import Limiter
@@ -8,6 +8,10 @@ from flask_limiter.util import get_remote_address
 limiter = Limiter(key_func=get_remote_address)
 from flask_sqlalchemy import SQLAlchemy
 from flask_smorest import Api
+from datetime import timedelta
+
+from flask_jwt_extended import (JWTManager, create_access_token, create_refresh_token, set_refresh_cookies,
+                                unset_jwt_cookies, verify_jwt_in_request)
 
 # 必须在导入任何使用 miservice 的模块之前 patch fake_useragent
 # 避免 fake_useragent 的 ThreadPoolExecutor 在 gevent 环境中导致 LoopExit
@@ -37,12 +41,12 @@ def create_app():
     Api(app)
 
     # 配置限流（全局默认）
-    limiter = Limiter(key_func=get_remote_address)
-    limiter.init_app(
-        app,
+    limiter = Limiter(
+        key_func=get_remote_address,
         default_limits=[config.RATE_LIMIT_DEFAULT],
         storage_uri=config.RATE_LIMIT_STORAGE_URI,
     )
+    limiter.init_app(app)
 
     # 配置允许上传大文件
     app.config['MAX_CONTENT_LENGTH'] = config.MAX_CONTENT_LENGTH
@@ -74,6 +78,8 @@ def create_app():
     from core.api.playlist_routes import playlist_bp
     from core.api.mi_routes import mi_bp
     from core.api.pdf_routes import pdf_bp
+    from core.api.auth_routes import auth_bp
+    from core.api.tts_routes import tts_bp
 
     app.register_blueprint(api_bp, url_prefix='/')
     app.register_blueprint(agent_bp, url_prefix='/')
@@ -83,6 +89,53 @@ def create_app():
     app.register_blueprint(dlna_bp, url_prefix='/')
     app.register_blueprint(mi_bp, url_prefix='/')
     app.register_blueprint(pdf_bp, url_prefix='/')
+    app.register_blueprint(auth_bp, url_prefix='/')
+    app.register_blueprint(tts_bp, url_prefix='/')
+
+    # ========== JWT Auth ==========
+    app.config['JWT_SECRET_KEY'] = config.JWT_SECRET_KEY
+    app.config['JWT_TOKEN_LOCATION'] = ['headers', 'cookies']
+    app.config['JWT_HEADER_NAME'] = 'Authorization'
+    app.config['JWT_HEADER_TYPE'] = 'Bearer'
+    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=int(config.JWT_ACCESS_DAYS))
+    app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=int(config.JWT_REFRESH_DAYS))
+
+    # refresh token via HttpOnly cookie
+    app.config['JWT_COOKIE_SECURE'] = bool(config.IS_PRODUCTION)
+    app.config['JWT_COOKIE_SAMESITE'] = 'None'
+    app.config['JWT_COOKIE_CSRF_PROTECT'] = False
+    app.config['JWT_REFRESH_COOKIE_PATH'] = '/api/auth/refresh'
+
+    JWTManager(app)
+
+    def _parse_csv(raw: str) -> list[str]:
+        return [x.strip() for x in (raw or '').split(',') if x.strip()]
+
+    def _is_whitelisted(path: str) -> bool:
+        if not path.startswith('/api'):
+            return True
+        if config.AUTH_WHITELIST_ALL_API:
+            return True
+        if path.startswith('/api/auth/'):
+            return True
+        exact = set(_parse_csv(config.AUTH_API_WHITELIST))
+        if path in exact:
+            return True
+        for p in _parse_csv(config.AUTH_API_WHITELIST_PREFIX):
+            if path.startswith(p):
+                return True
+        return False
+
+    @app.before_request
+    def _auth_guard():
+        path = request.path or ''
+        if _is_whitelisted(path):
+            return None
+        try:
+            verify_jwt_in_request()
+            return None
+        except Exception:
+            return jsonify({'code': -1, 'msg': 'unauthorized'}), 401
 
     chat_mgr.init(socketio)
     db_mgr.init(app)

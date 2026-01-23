@@ -12,6 +12,7 @@ import core.api.media_routes as media_routes
 @pytest.fixture
 def app(monkeypatch):
     app = Flask(__name__)
+    app.config.from_object('core.config.Config')
     app.config["TESTING"] = True
     app.register_blueprint(media_routes.media_bp)
 
@@ -170,6 +171,10 @@ def test_media_merge_upload_rejects_extension(client, monkeypatch):
 
 
 def test_media_merge_upload_ok(client, monkeypatch, tmp_path):
+    # The config object is imported when media_routes is loaded.
+    # We need to patch it directly on the module object.
+    monkeypatch.setattr(media_routes.config, "MAX_UPLOAD_FILE_SIZE", 10 * 1024 * 1024, raising=False)
+    monkeypatch.setattr(media_routes.config, "MAX_UPLOAD_FILE_SIZE", 10 * 1024 * 1024)
     monkeypatch.setattr(media_routes, "is_allowed_audio_file", lambda n: True)
     monkeypatch.setattr(media_routes, "ensure_directory", lambda p: os.makedirs(p, exist_ok=True))
     monkeypatch.setattr(media_routes, "get_media_task_dir", lambda tid: str(tmp_path / tid))

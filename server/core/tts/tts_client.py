@@ -67,10 +67,21 @@ class TTSClient(ResultCallback):
             traceback.print_stack()
             self.on_err(e)
 
-    def process_msg(self, text: str, role: str = None):
+    def process_msg(self, text: str, role: str = None, id=None):
+        """ 一次性合成音频，文本需要一次性传入
+
+        Args:
+            text: 待合成的文本内容。
+            role: 发音人/音色。
+
+        Returns:
+            None
+        """
         try:
             if role is None:
                 role = self.role
+            if id:
+                self.id = id
             synthesizer = SpeechSynthesizer(
                 model=MODEL_MAP.get(role, DEFAULT_MODEL),
                 voice=role,
@@ -86,6 +97,16 @@ class TTSClient(ResultCallback):
             self.on_err(e)
 
     def stream_msg(self, text: str, role: str = None, id=None):
+        """ 流式合成音频，文本需要流式传入
+
+        Args:
+            text: 待合成的文本内容。
+            role: 发音人/音色。
+            id: 任务 ID。
+
+        Returns:
+            None
+        """
         try:
             if role is None:
                 role = self.role
@@ -135,10 +156,15 @@ class TTSClient(ResultCallback):
 
     def on_data(self, data: bytes) -> None:
         # log.info("[TTS] result length: " + str(len(data)))
-        try:
-            if rds_mgr is not None:
+        # Redis 缓存写入失败不应影响 TTS 正常输出。
+        if rds_mgr is not None:
+            try:
                 key = f"audio:{self.id}:{self.role}"
                 rds_mgr.append_value(key, data)
+            except Exception as e:
+                log.warning(f">>[TTS] Redis append failed, ignore: {e}")
+
+        try:
             self.on_msg(data, 0)
         except Exception as e:
             log.error(f">>[TTS]{e}")

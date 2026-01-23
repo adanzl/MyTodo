@@ -2,53 +2,43 @@
 音频合成管理服务
 提供音频文件合并等功能
 """
-import json
 import os
-import random
 import re
 import shutil
-import string
 import subprocess
-import threading
 from dataclasses import asdict, dataclass
+
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple, Any, TypedDict
+from typing import Dict, List, Optional, Tuple, Any
+
+from core.services.base_task_mgr import BaseTaskMgr, FileInfo, TaskBase
 
 from core.config import app_logger
 from core.config import (ALLOWED_AUDIO_EXTENSIONS, MEDIA_BASE_DIR, FFMPEG_PATH, FFMPEG_TIMEOUT, get_media_task_dir,
                          get_media_task_result_dir, TASK_STATUS_PENDING, TASK_STATUS_PROCESSING, TASK_STATUS_SUCCESS,
                          TASK_STATUS_FAILED)
-from core.utils import get_media_duration, ensure_directory, run_subprocess_safe
+
+from core.utils import ensure_directory as ensure_directory, get_media_duration, run_subprocess_safe
+
+AUDIO_MERGE_BASE_DIR = os.path.join(MEDIA_BASE_DIR, 'merge')
 
 log = app_logger
 
-
-class AudioFileItem(TypedDict, total=False):
-    name: str
-    path: str
-    size: int
-    duration: float
-    index: int
+AudioFileItem = FileInfo
 
 
 @dataclass
-class AudioMergeTask:
+class AudioMergeTask(TaskBase):
     """音频合成任务"""
-    task_id: str
-    name: str
-    status: str  # pending, processing, success, failed
-    files: List[AudioFileItem]  # 文件列表，每个文件包含 name, path, size 等信息
+    files: List[AudioFileItem]
     result_file: Optional[str] = None  # 结果文件路径
     result_duration: Optional[float] = None  # 结果文件时长（秒）
-    error_message: Optional[str] = None  # 错误信息
-    create_time: float = 0  # 创建时间戳
-    update_time: float = 0  # 更新时间戳
 
 
-class AudioMergeMgr:
+class AudioMergeMgr(BaseTaskMgr[AudioMergeTask]):
     """音频合成管理器"""
 
-    TASK_META_FILE = 'task.json'  # 任务元数据文件名
+    TASK_META_FILE = 'tasks.json'  # 任务元数据文件名
     MERGED_FILENAME = 'merged.mp3'  # 合并后的文件名
     FFMPEG_DURATION_TIMEOUT = 10  # 获取文件时长的超时时间（秒）
 
@@ -57,43 +47,28 @@ class AudioMergeMgr:
 
     def __init__(self) -> None:
         """初始化管理器"""
-        # 确保媒体任务目录存在
-        ensure_directory(MEDIA_BASE_DIR)
-        self._tasks: Dict[str, AudioMergeTask] = {}
-        self._load_history_tasks()
+        super().__init__(base_dir=AUDIO_MERGE_BASE_DIR)
 
-    def _get_task(self, task_id: str) -> Optional[AudioMergeTask]:
-        """获取任务对象，不存在返回 None"""
-        return self._tasks.get(task_id)
+    def _task_from_dict(self, data: dict) -> AudioMergeTask:
+        return AudioMergeTask(**data)
 
     def _validate_task_exists(self, task_id: str) -> Tuple[Optional[AudioMergeTask], Optional[str]]:
-        """验证任务是否存在。
-
-        Args:
-            task_id (str): 任务 ID.
-
-        Returns:
-            Tuple[Optional[AudioMergeTask], Optional[str]]: 如果任务存在，返回 (任务对象, None)。
-                如果不存在，返回 (None, 错误消息)。
-        """
-        task = self._get_task(task_id)
-        if not task:
-            return None, "任务不存在"
-        return task, None
+        return self._get_task_or_err(task_id)
 
     def _validate_task_not_processing(self, task: AudioMergeTask, operation: str) -> Optional[str]:
-        """验证任务是否不在处理中。
-
-        Args:
-            task (AudioMergeTask): 任务对象。
-            operation (str): 正在尝试的操作名称，用于错误消息。
-
-        Returns:
-            Optional[str]: 如果任务正在处理中，返回错误消息，否则返回 None。
-        """
         if task.status == TASK_STATUS_PROCESSING:
             return f"任务正在处理中，无法{operation}"
         return None
+
+    def _read_tasks_from_file(self, file_path: str) -> Optional[Dict[str, Any]]:
+        if not os.path.exists(file_path):
+            return None
+        try:
+            import json
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            return None
 
     def _validate_file(self, file_path: str, filename: str) -> Optional[str]:
         """验证文件是否存在且类型受支持。
@@ -119,143 +94,60 @@ class AudioMergeMgr:
         for i, file_info in enumerate(files):
             file_info['index'] = i
 
-    def _update_task_time(self, task: AudioMergeTask) -> None:
-        """更新任务的更新时间"""
-        task.update_time = datetime.now().timestamp()
-
-    def _save_task_and_update_time(self, task: AudioMergeTask) -> None:
-        """更新任务时间并保存"""
-        self._update_task_time(task)
-        self._save_all_tasks()
-
-    def _read_tasks_from_file(self, file_path: str) -> Optional[Dict[str, Any]]:
-        """从文件读取并解析任务数据"""
-        if not os.path.exists(file_path):
-            return None
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, OSError) as e:
-            log.error(f"[AudioMerge] 解析 {file_path} 失败: {e}")
-            return None
-
     def _load_history_tasks(self) -> None:
         """加载历史任务"""
-        try:
-            task_meta_file = os.path.join(MEDIA_BASE_DIR, self.TASK_META_FILE)
-            all_tasks_data = self._read_tasks_from_file(task_meta_file)
+        super()._load_history_tasks()
 
-            if not all_tasks_data:
-                return
-
-            if not isinstance(all_tasks_data, dict):
-                log.warning("[AudioMerge] task.json 格式错误，应为字典格式")
-                return
-
-            loaded_count = 0
-            for task_id, task_data in all_tasks_data.items():
+        with self._task_lock:
+            tasks_to_remove = []
+            for task_id, task in self._tasks.items():
                 try:
                     task_dir = get_media_task_dir(task_id)
                     if not os.path.exists(task_dir):
                         log.warning(f"[AudioMerge] 任务目录不存在: {task_id}")
+                        tasks_to_remove.append(task_id)
                         continue
 
                     # 重建文件列表（检查文件是否存在）
-                    files = [
-                        file_info for file_info in task_data.get('files', [])
-                        if file_info.get('path') and os.path.exists(file_info.get('path'))
-                    ]
+                    valid_files = []
+                    for file_info in task.files:
+                        if not file_info.get('path') or not os.path.exists(file_info['path']):
+                            continue
+                        valid_files.append(file_info)
+
+                    # 更新文件索引
+                    for i, file_info in enumerate(valid_files):
+                        file_info['index'] = i
+
+                    task.files = valid_files
 
                     # 检查结果文件是否存在
-                    result_file = task_data.get('result_file')
-                    if result_file and not os.path.exists(result_file):
-                        result_file = None
-
-                    # 创建任务对象
-                    task = AudioMergeTask(task_id=task_id,
-                                          name=task_data.get('name', '未命名任务'),
-                                          status=task_data.get('status', TASK_STATUS_PENDING),
-                                          files=files,
-                                          result_file=result_file,
-                                          result_duration=task_data.get('result_duration'),
-                                          error_message=task_data.get('error_message'),
-                                          create_time=task_data.get('create_time', 0),
-                                          update_time=task_data.get('update_time', 0))
-
-                    self._tasks[task_id] = task
-                    loaded_count += 1
+                    if task.result_file and not os.path.exists(task.result_file):
+                        task.result_file = None
+                        task.result_duration = None
 
                 except Exception as e:
-                    log.error(f"[AudioMerge] 加载任务失败 {task_id}: {e}")
-                    continue
+                    log.error(f"[AudioMerge] 校验任务 {task_id} 文件失败: {e}")
+                    tasks_to_remove.append(task_id)
 
-            log.info(f"[AudioMerge] 共加载 {loaded_count} 个历史任务")
+            # 移除无效任务
+            for task_id in tasks_to_remove:
+                self._tasks.pop(task_id, None)
 
-        except Exception as e:
-            log.error(f"[AudioMerge] 加载历史任务失败: {e}")
+            if tasks_to_remove:
+                self._save_all_tasks()
+                log.info(f"[AudioMerge] 清理了 {len(tasks_to_remove)} 个无效任务")
 
-    def _save_all_tasks(self) -> None:
-        """保存所有任务到统一的 task.json 文件"""
-        try:
-            task_meta_file = os.path.join(MEDIA_BASE_DIR, self.TASK_META_FILE)
-            os.makedirs(MEDIA_BASE_DIR, exist_ok=True)
-
-            all_tasks_data = {task_id: asdict(task) for task_id, task in self._tasks.items()}
-
-            with open(task_meta_file, 'w', encoding='utf-8') as f:
-                json.dump(all_tasks_data, f, ensure_ascii=False, indent=2)
-
-        except Exception as e:
-            log.error(f"[AudioMerge] 保存所有任务失败: {e}")
-
-    def _generate_task_id(self) -> str:
-        """生成短任务ID"""
-        timestamp = int(datetime.now().timestamp())
-        random_str = ''.join(random.choices(string.ascii_lowercase + string.digits, k=4))
-        return f"{timestamp}{random_str}"
+    def _before_create_task(self, task: AudioMergeTask) -> None:
+        task_dir = get_media_task_dir(task.task_id)
+        result_dir = get_media_task_result_dir(task.task_id)
+        os.makedirs(task_dir, exist_ok=True)
+        os.makedirs(result_dir, exist_ok=True)
 
     def create_task(self, name: Optional[str] = None) -> Tuple[int, str, Optional[str]]:
-        """创建一个新的音频合并任务。
-
-        Args:
-            name (Optional[str]): 任务名称。如果为 None，则使用当前日期时间。
-
-        Returns:
-            Tuple[int, str, Optional[str]]: (code, msg, task_id)。code=0 表示成功。
-        """
-        try:
-            # 如果没有提供名称，使用当前日期时间作为默认名称
-            if not name:
-                name = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            # 生成唯一任务ID
-            task_id = self._generate_task_id()
-            while task_id in self._tasks:
-                task_id = self._generate_task_id()
-
-            # 创建任务目录
-            task_dir = get_media_task_dir(task_id)
-            result_dir = get_media_task_result_dir(task_id)
-            os.makedirs(task_dir, exist_ok=True)
-            os.makedirs(result_dir, exist_ok=True)
-
-            # 创建任务对象
-            task = AudioMergeTask(task_id=task_id,
-                                  name=name,
-                                  status=TASK_STATUS_PENDING,
-                                  files=[],
-                                  create_time=datetime.now().timestamp(),
-                                  update_time=datetime.now().timestamp())
-
-            self._tasks[task_id] = task
-            self._save_all_tasks()
-
-            log.info(f"[AudioMerge] 创建音频合成任务: {task_id}, 名称: {name}")
-            return 0, "任务创建成功", task_id
-
-        except Exception as e:
-            error_msg = f"创建任务失败: {str(e)}"
-            log.error(f"[AudioMerge] {error_msg}")
-            return -1, error_msg, None
+        name = name or datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        task = AudioMergeTask(task_id='', name=name, files=[])
+        return self._create_task_and_save(task)
 
     def add_file(self, task_id: str, file_path: str, filename: str) -> Tuple[int, str]:
         """向指定任务添加一个音频文件。
@@ -269,11 +161,11 @@ class AudioMergeMgr:
             Tuple[int, str]: (code, msg)。code=0 表示成功。
         """
         try:
-            task, error_msg = self._validate_task_exists(task_id)
+            task, error_msg = self._get_task_or_err(task_id)
             if error_msg:
                 return -1, error_msg
 
-            error_msg = self._validate_task_not_processing(task, "添加文件")
+            error_msg = self._ensure_not_processing(task, "添加文件")
             if error_msg:
                 return -1, error_msg
 
@@ -314,11 +206,11 @@ class AudioMergeMgr:
             Tuple[int, str]: (code, msg)。code=0 表示成功。
         """
         try:
-            task, error_msg = self._validate_task_exists(task_id)
+            task, error_msg = self._get_task_or_err(task_id)
             if error_msg:
                 return -1, error_msg
 
-            error_msg = self._validate_task_not_processing(task, "删除文件")
+            error_msg = self._ensure_not_processing(task, "删除文件")
             if error_msg:
                 return -1, error_msg
 
@@ -348,11 +240,11 @@ class AudioMergeMgr:
             Tuple[int, str]: (code, msg)。code=0 表示成功。
         """
         try:
-            task, error_msg = self._validate_task_exists(task_id)
+            task, error_msg = self._get_task_or_err(task_id)
             if error_msg:
                 return -1, error_msg
 
-            error_msg = self._validate_task_not_processing(task, "调整文件顺序")
+            error_msg = self._ensure_not_processing(task, "调整文件顺序")
             if error_msg:
                 return -1, error_msg
 
@@ -387,7 +279,7 @@ class AudioMergeMgr:
             Tuple[int, str]: (code, msg)。code=0 表示成功。
         """
         try:
-            task, error_msg = self._validate_task_exists(task_id)
+            task, error_msg = self._get_task_or_err(task_id)
             if error_msg:
                 return -1, error_msg
 
@@ -397,40 +289,24 @@ class AudioMergeMgr:
             if len(task.files) == 0:
                 return -1, "任务中没有文件"
 
-            # 更新状态为处理中
-            task.status = TASK_STATUS_PROCESSING
-            self._save_task_and_update_time(task)
+            def runner(t: AudioMergeTask) -> None:
+                result_file, result_duration = self._merge_audio_files(task_id, t.files)
+                if result_file:
+                    t.result_file = result_file
+                    if result_duration is None:
+                        try:
+                            result_duration = get_media_duration(result_file)
+                        except Exception as e:
+                            log.warning(f"[AudioMerge] 任务 {task_id} 获取结果文件时长失败: {e}")
+                    t.result_duration = result_duration
+                    log.info(f"[AudioMerge] 任务 {task_id} 合成成功: {result_file}, 时长: {t.result_duration}秒")
+                else:
+                    t.status = TASK_STATUS_FAILED
+                    t.error_message = "合成失败"
+                    t.result_duration = None
+                    log.error(f"[AudioMerge] 任务 {task_id} 合成失败")
 
-            # 在后台线程中执行合成
-            def merge_thread() -> None:
-                try:
-                    result_file, result_duration = self._merge_audio_files(task_id, task.files)
-                    if result_file:
-                        task.status = TASK_STATUS_SUCCESS
-                        task.result_file = result_file
-                        # 如果 ffmpeg 无法解析时长，使用 get_media_duration 作为后备
-                        if result_duration is None:
-                            try:
-                                result_duration = get_media_duration(result_file)
-                            except Exception as e:
-                                log.warning(f"[AudioMerge] 任务 {task_id} 获取结果文件时长失败: {e}")
-                        task.result_duration = result_duration
-                        log.info(f"[AudioMerge] 任务 {task_id} 合成成功: {result_file}, 时长: {task.result_duration}秒")
-                    else:
-                        task.status = TASK_STATUS_FAILED
-                        task.error_message = "合成失败"
-                        task.result_duration = None
-                        log.error(f"[AudioMerge] 任务 {task_id} 合成失败")
-                except Exception as e:
-                    task.status = TASK_STATUS_FAILED
-                    task.error_message = str(e)
-                    task.result_duration = None
-                    log.error(f"[AudioMerge] 任务 {task_id} 合成异常: {e}")
-                finally:
-                    self._save_task_and_update_time(task)
-
-            threading.Thread(target=merge_thread, daemon=True).start()
-
+            self._run_task_async(task_id, runner)
             return 0, "任务已开始处理"
 
         except Exception as e:
@@ -585,39 +461,10 @@ class AudioMergeMgr:
         tasks.sort(key=lambda x: x.get('create_time', 0), reverse=True)
         return tasks
 
-    def delete_task(self, task_id: str) -> Tuple[int, str]:
-        """删除指定任务及其关联的文件目录。
-
-        Args:
-            task_id (str): 任务 ID。
-
-        Returns:
-            Tuple[int, str]: (code, msg)。code=0 表示成功。
-        """
-        try:
-            task, error_msg = self._validate_task_exists(task_id)
-            if error_msg:
-                return -1, error_msg
-
-            if task.status == TASK_STATUS_PROCESSING:
-                return -1, "任务正在处理中，无法删除"
-
-            # 删除任务目录
-            task_dir = get_media_task_dir(task_id)
-            if os.path.exists(task_dir):
-                shutil.rmtree(task_dir)
-
-            # 从内存中删除
-            del self._tasks[task_id]
-            self._save_all_tasks()  # 更新 task.json
-
-            log.info(f"[AudioMerge] 删除任务: {task_id}")
-            return 0, "任务删除成功"
-
-        except Exception as e:
-            error_msg = f"删除任务失败: {str(e)}"
-            log.error(f"[AudioMerge] {error_msg}")
-            return -1, error_msg
+    def _before_delete_task(self, task: AudioMergeTask) -> None:
+        task_dir = get_media_task_dir(task.task_id)
+        if os.path.exists(task_dir):
+            shutil.rmtree(task_dir)
 
 
 # 创建全局实例

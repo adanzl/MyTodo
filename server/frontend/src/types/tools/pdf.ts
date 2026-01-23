@@ -33,17 +33,29 @@ export interface PdfTask {
    */
   task_id: string;
   /**
-   * 文件名
+   * 任务名称（后端 TaskBase.name）
    */
-  filename: string;
+  name?: string;
+  /**
+   * 文件名（兼容历史字段；当前后端等同于 task_id）
+   */
+  filename?: string;
   /**
    * 任务状态：uploaded, pending, processing, success, failed
    */
   status: string;
   /**
+   * 上传文件路径
+   */
+  uploaded_path?: string;
+  /**
    * 上传文件信息
    */
   uploaded_info: PdfFileInfo;
+  /**
+   * 已解密文件路径
+   */
+  unlocked_path?: string | null;
   /**
    * 已解密文件信息（如果存在）
    */

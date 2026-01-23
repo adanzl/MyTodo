@@ -46,9 +46,8 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { ElMessage } from "element-plus";
-import CryptoJS from "crypto-js";
-import * as _ from "lodash-es";
 import { useUserStore } from "@/stores/user";
+import { login as apiLogin } from "@/api/auth";
 
 const emit = defineEmits<{
   "login-success": [userInfo: { id: number; name: string; icon: string }];
@@ -79,17 +78,28 @@ const refreshUserList = async () => {
 const handleLogin = async () => {
   if (!user.value.id) return;
 
-  const uu = _.find(userList.value, { id: user.value.id });
-  if (uu && (uu.pwd === null || uu.pwd === CryptoJS.MD5(user.value.password).toString())) {
-    // 使用 Pinia store 设置当前用户
-    userStore.setCurUser(uu);
-    emit("login-success", {
-      id: uu.id,
-      name: uu.name,
-      icon: uu.icon,
+  const uu = userList.value.find(u => u.id === user.value.id);
+  if (!uu) return;
+
+  try {
+    const resp = await apiLogin(uu.name, user.value.password);
+    if (resp.code !== 0) {
+      ElMessage.error(resp.msg || "用户名或密码错误");
+      return;
+    }
+
+    userStore.setCurUser({
+      ...uu,
+      icon: resp.user.icon || uu.icon,
     });
-  } else {
-    ElMessage.error("用户名或密码错误");
+
+    emit("login-success", {
+      id: resp.user.id,
+      name: resp.user.name,
+      icon: resp.user.icon || uu.icon,
+    });
+  } catch (e: any) {
+    ElMessage.error(e?.message || "登录失败");
   }
 };
 

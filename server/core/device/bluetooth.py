@@ -5,6 +5,8 @@ from typing import Dict, Optional, Any, Union
 
 from bleak import BleakClient
 
+from core.device.base import DeviceBase
+
 
 class BluetoothDev(DeviceBase):
     """蓝牙设备类"""
@@ -61,6 +63,7 @@ class BluetoothDev(DeviceBase):
     def set_volume(self, volume: int) -> tuple[int, str]:
         """设置设备音量"""
         return 0, "ok"
+
 
 # 从 services 导入 BluetoothMgr 和全局实例
 from core.device.base import DeviceBase
