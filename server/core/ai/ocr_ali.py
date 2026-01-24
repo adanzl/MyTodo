@@ -117,7 +117,7 @@ class OCRAli:
             api_start_time = time.time()
             response = MultiModalConversation.call(
                 api_key=ALI_KEY,
-                model="qwen-vl-ocr-latest",
+                model="qwen-vl-plus",
                 messages=messages,
             )
             api_elapsed = time.time() - api_start_time
@@ -208,7 +208,7 @@ if __name__ == "__main__":
     # 测试单张图片
     print("多张图片测试:")
     local_file = [
-        r"C:\Users\adanz\Downloads\1.jpg", r"C:\Users\adanz\Downloads\2.jpg"
+        r"C:\Users\adanz\Downloads\pic\1.jpg", r"C:\Users\adanz\Downloads\pic\2.jpg"
     ]
     print(ocr_ali.query(image_paths=local_file))
     # 测试多张图片
