@@ -119,7 +119,7 @@ class OCRAli:
                 messages=messages,
             )
             api_elapsed = time.time() - api_start_time
-            log.info(f"[OCR] API 调用完成，耗时: {api_elapsed:.2f}秒")
+            # log.info(f"[OCR] API 调用完成，耗时: {api_elapsed:.2f}秒")
 
             # 检查响应是否有效
             if not response:

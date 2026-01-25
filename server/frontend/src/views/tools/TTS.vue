@@ -10,7 +10,7 @@
               <Refresh />
             </el-icon>
           </el-button>
-          <el-button type="success" v-bind="smallIconButtonProps" @click="handleTtsCreateTask" >
+          <el-button type="success" v-bind="smallIconButtonProps" @click="handleTtsCreateTask">
             <el-icon>
               <Plus />
             </el-icon>
@@ -198,7 +198,7 @@
       </el-form>
       <template #footer>
         <el-button @click="ttsCreateTaskDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleTtsCreateTaskConfirm" :loading="ttsLoading">
+        <el-button type="primary" @click="handleTtsCreateTaskConfirm">
           确定
         </el-button>
       </template>
@@ -213,7 +213,7 @@
       </el-form>
       <template #footer>
         <el-button @click="ttsRenameTaskDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleTtsRenameTaskConfirm" :loading="ttsLoading">
+        <el-button type="primary" @click="handleTtsRenameTaskConfirm">
           确定
         </el-button>
       </template>

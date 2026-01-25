@@ -336,7 +336,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             self._save_task_and_update_time(task)
 
         # 异步执行任务（在新线程中运行）
-        log.info(f"[TTSMgr] 任务 {task_id} 已提交到后台线程执行")
+        # log.info(f"[TTSMgr] 任务 {task_id} 已提交到后台线程执行")
         self._run_task_async(task_id, self._run_tts_task)
         return 0, 'TTS 任务已启动'
 
@@ -457,6 +457,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         # 音频数据统计
         audio_data_size = 0
         audio_chunk_count = 0
+        # 最后一次接收到数据的时间（用于超时检测）
+        last_data_time = [time.time()]  # 使用列表以便在回调中修改
 
         def on_data(data: Any, data_type: int = 0) -> None:
             """TTS 数据回调：接收音频流数据并写入文件。
@@ -466,6 +468,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 data_type: 0=数据块, 1=结束
             """
             nonlocal file_handle, audio_data_size, audio_chunk_count
+            # 更新最后一次接收到数据的时间
+            last_data_time[0] = time.time()
 
             # 检查是否被停止（停止是正常操作，静默返回）
             if self._should_stop(task.task_id):
@@ -513,6 +517,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 total: 总字数（可能为0，表示未知）
             """
             nonlocal generated_chars
+            # 更新最后一次接收到数据的时间
+            last_data_time[0] = time.time()
             generated_chars = generated
             # log.info(f"[TTSMgr] 任务 {task.task_id} 进度更新: {generated}/{total if total > 0 else '?'} 字")
 
@@ -601,28 +607,24 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
 
             # 等待任务完成（WebSocket 会异步返回 task-finished 事件）
             log.info(
-                f"[TTSMgr] 任务 {task.name} 开始等待 WebSocket 任务完成（超时: {TASK_COMPLETION_TIMEOUT}秒）"
+                f"[TTSMgr] 任务 {task.name} 开始等待 WebSocket 任务完成（数据接收超时: 10秒）"
             )
-            wait_start_time = time.time()
-
-            # 定期检查状态
-            check_interval = 5.0  # 每5秒检查一次状态
-            last_check_time = wait_start_time
+            # 初始化最后一次接收到数据的时间（从发送完成时开始计时）
+            last_data_time[0] = time.time()
+            DATA_TIMEOUT = 10.0  # 10秒没有收到数据则视为超时
 
             while not task_completed.is_set():
-                elapsed = time.time() - wait_start_time
-                if elapsed >= TASK_COMPLETION_TIMEOUT:
-                    wait_elapsed = time.time() - wait_start_time
+                # 检查是否10秒没有收到数据
+                time_since_last_data = time.time() - last_data_time[0]
+                if time_since_last_data >= DATA_TIMEOUT:
                     log.warning(
-                        f"[TTSMgr] 任务 {task.task_id} 等待完成超时，等待时间: {wait_elapsed:.2f}秒（超时限制: {TASK_COMPLETION_TIMEOUT}秒）"
+                        f"[TTSMgr] 任务 {task.task_id} 数据接收超时，距离最后一次接收数据已过去: {time_since_last_data:.2f}秒（超时限制: {DATA_TIMEOUT}秒）"
                     )
                     # 超时也视为失败
-                    raise TimeoutError(f"任务等待完成超时（{TASK_COMPLETION_TIMEOUT}秒）")
+                    raise TimeoutError(f"任务数据接收超时（{DATA_TIMEOUT}秒未收到数据）")
 
                 # 使用短超时进行轮询，以便定期检查
                 task_completed.wait(timeout=1.0)
-
-            wait_elapsed = time.time() - wait_start_time
 
             # 检查是否有错误发生
             if error_info['error'] is not None:
