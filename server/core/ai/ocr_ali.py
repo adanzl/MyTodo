@@ -27,12 +27,16 @@ PROMPT = """请从图片中提取文章内容，要求如下：
 1. **内容提取**：准确识别并提取图片中的所有文字内容
 2. **标题保留**：**必须完整保留文章的标题**，标题通常位于文章开头，字体较大或加粗，是文章的重要组成部分
 3. **多图处理**：如果有多张图片，请按照图片内容的逻辑顺序（从左到右、从上到下）进行排列和合并
-4. **内容过滤**：过滤掉以下非文章故事内容：
-   - **批注、注释、标记**（必须完全排除，这是最重要的要求）：
-     * 文章旁边或周围的批注文字
-     * 字体明显小于正文的文字
-     * 颜色不是黑色（如灰色、浅色等）的文字
-     * 任何视觉上明显区别于正文的注释性文字
+4. **必须保留的内容**：
+   - **文章标题**：必须完整保留
+   - **寓意点拨**：必须完整保留，这是文章的重要组成部分，即使字体较小或颜色较浅也要保留
+   - **正文内容**：完整提取所有正文故事内容
+5. **内容过滤**：过滤掉以下非文章故事内容：
+   - **批注、注释、标记**（必须完全排除，但"寓意点拨"除外）：
+     * 文章旁边或周围的批注文字（不包括"寓意点拨"）
+     * 字体明显小于正文的文字（但"寓意点拨"必须保留）
+     * 颜色不是黑色（如灰色、浅色等）的文字（但"寓意点拨"即使颜色较浅也必须保留）
+     * 任何视觉上明显区别于正文的注释性文字（但"寓意点拨"必须保留）
    - 页码、页眉、页脚
    - 水印、印章
    - 图片说明、图注
@@ -40,16 +44,17 @@ PROMPT = """请从图片中提取文章内容，要求如下：
 ## 准确性要求
 - 必须准确无误地提取文字，不得遗漏关键信息
 - **必须完整保留文章标题**：标题是文章的重要组成部分，应完整提取并保留在输出内容的最前面
+- **必须完整保留"寓意点拨"**：无论字体大小、颜色深浅，只要图片中有"寓意点拨"相关内容，都必须完整提取并保留
 - 严禁编造或添加图片中不存在的文字
 - 对于因模糊、强光遮挡等原因无法识别的单个字符，使用英文问号"?"代替
 - 保持原文的段落结构和换行，包括标题与正文之间的段落分隔
-- **严格过滤批注**：通过字体大小、颜色等视觉特征识别并完全排除所有批注、注释、旁注内容，只提取正文故事内容（但必须保留文章标题）
+- **严格过滤批注**：通过字体大小、颜色等视觉特征识别并完全排除所有批注、注释、旁注内容，但**必须保留"寓意点拨"**，只提取正文故事内容（但必须保留文章标题和"寓意点拨"）
 
 ## 输出格式
 - 返回纯文本格式
 - 不要包含任何格式标记（如 Markdown、HTML 等）
 - **首先输出文章标题**，然后空一行，再输出正文内容
-- 保持原文的自然段落分隔
+- 如果图片中有"寓意点拨"相关内容，必须在正文后保留，保持原文的自然段落分隔
 - 故事正文结束后立即停止，不返回任何后续的总结性、解释性文字"""
 
 
@@ -74,7 +79,7 @@ class OCRAli:
         """
         import time
         start_time = time.time()
-        
+
         try:
             # 统一转换为列表处理
             if isinstance(image_paths, str):
@@ -84,7 +89,9 @@ class OCRAli:
                 log.error("[OCR] 图片路径列表为空")
                 return "error", "图片路径列表为空"
 
-            log.info(f"[OCR] 开始处理 OCR 请求，图片数量: {len(image_paths)}, 图片路径: {image_paths}")
+            log.info(
+                f"[OCR] 开始处理 OCR 请求，图片数量: {len(image_paths)}, 图片路径: {image_paths}"
+            )
 
             # 构建消息内容：先添加所有图片，最后添加文本提示
             content = []
@@ -124,8 +131,7 @@ class OCRAli:
 
             if "choices" not in response[
                     "output"] or not response["output"]["choices"]:
-                log.error(
-                    f"[OCR] API 响应中缺少 choices 字段，响应: {response}")
+                log.error(f"[OCR] API 响应中缺少 choices 字段，响应: {response}")
                 return "error", "API 响应格式错误：缺少 choices 字段"
 
             if len(response["output"]["choices"]) == 0:
@@ -134,8 +140,7 @@ class OCRAli:
 
             choice = response["output"]["choices"][0]
             if "message" not in choice or not choice["message"]:
-                log.error(
-                    f"[OCR] API 响应中缺少 message 字段，choice: {choice}")
+                log.error(f"[OCR] API 响应中缺少 message 字段，choice: {choice}")
                 return "error", "API 响应格式错误：缺少 message 字段"
 
             message = choice["message"]
@@ -147,8 +152,7 @@ class OCRAli:
             elif isinstance(message, dict) and "content" in message:
                 content = message["content"]
             else:
-                log.error(
-                    f"[OCR] API 响应中缺少 content 字段，message: {message}")
+                log.error(f"[OCR] API 响应中缺少 content 字段，message: {message}")
                 return "error", "API 响应格式错误：缺少 content 字段"
 
             if not content:
@@ -184,12 +188,16 @@ class OCRAli:
             # 记录成功信息
             text_length = len(txt)
             total_elapsed = time.time() - start_time
-            log.info(f"[OCR] OCR 处理成功，提取文本长度: {text_length} 字符，总耗时: {total_elapsed:.2f}秒")
-            
+            log.info(
+                f"[OCR] OCR 处理成功，提取文本长度: {text_length} 字符，总耗时: {total_elapsed:.2f}秒"
+            )
+
             return "ok", txt
         except Exception as e:
-            elapsed = time.time() - start_time if 'start_time' in locals() else 0
-            log.error(f"[OCR] OCR 处理失败，耗时: {elapsed:.2f}秒，错误: {e}", exc_info=True)
+            elapsed = time.time() - start_time if 'start_time' in locals(
+            ) else 0
+            log.error(f"[OCR] OCR 处理失败，耗时: {elapsed:.2f}秒，错误: {e}",
+                      exc_info=True)
             return "error", None
 
 
@@ -198,9 +206,8 @@ if __name__ == "__main__":
     # 测试单张图片
     print("多张图片测试:")
     local_file = [
-        r"C:\Users\adanz\Downloads\pic\1.jpg", r"C:\Users\adanz\Downloads\pic\2.jpg"
+        r"C:\Users\adanz\Downloads\pic\45-1.jpg",
+        r"C:\Users\adanz\Downloads\pic\45-2.jpg",
+        r"C:\Users\adanz\Downloads\pic\45-3.jpg",
     ]
     print(ocr_ali.query(image_paths=local_file))
-    # 测试多张图片
-    # print("多张图片测试:")
-    # print(ocr_ali.query(image_paths=[local_file, "path/to/another/image.jpg"]))
