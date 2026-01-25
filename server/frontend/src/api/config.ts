@@ -30,8 +30,12 @@ let localIpAvailable: boolean | null = null; // null 表示未检测，true/fals
 // 检测本地 IP 是否可用
 export async function checkLocalIpAvailable(): Promise<boolean> {
   try {
-    // 使用 LOCAL_BASE_URL，这样会自动使用正确的协议（http 或 https）
-    const url = `${LOCAL_BASE_URL}/`;
+    // 根据当前页面的协议动态选择本地服务器的协议
+    const isPageHttps = typeof window !== "undefined" && window.location.protocol === "https:";
+    const protocol = isPageHttps ? "https" : "http";
+    const port = isPageHttps ? LOCAL_HTTPS_PORT : LOCAL_HTTP_PORT;
+    const url = `${protocol}://${LOCAL_IP}:${port}/`;
+    
     const controller = new AbortController();
     const TIMEOUT = 500;
     const timeoutId = setTimeout(() => controller.abort(), TIMEOUT); // 500ms超时
@@ -57,28 +61,14 @@ export async function checkLocalIpAvailable(): Promise<boolean> {
 export function switchToLocal(): void {
   if (localIpAvailable === true) return; // 已经是本地了
 
-  // 检测协议兼容性：如果页面是 HTTPS，本地服务器必须也是 HTTPS
+  // 根据当前页面的协议动态选择本地服务器的协议
   const isPageHttps = typeof window !== "undefined" && window.location.protocol === "https:";
-  const isLocalHttps = LOCAL_BASE_URL.startsWith("https://");
-
-  if (isPageHttps && !isLocalHttps) {
-    logger.warn(
-      `[API Config] ⚠️ Cannot switch to HTTP local server from HTTPS page. ` +
-        `Mixed Content blocked. Please configure HTTPS for local server or use HTTP to access the page.`
-    );
-    console.warn(
-      `🚫 无法切换到本地服务器！\n` +
-        `原因：当前页面使用 HTTPS，但本地服务器是 HTTP\n` +
-        `解决方案：\n` +
-        `1. 为本地服务器配置 HTTPS (推荐)\n` +
-        `2. 或通过 HTTP 访问前端页面\n` +
-        `详见：/server/setup-local-https.md`
-    );
-    return; // 阻止切换
-  }
+  const protocol = isPageHttps ? "https" : "http";
+  const port = isPageHttps ? LOCAL_HTTPS_PORT : LOCAL_HTTP_PORT;
+  const localBaseUrl = `${protocol}://${LOCAL_IP}:${port}`;
 
   localIpAvailable = true;
-  const newApiBaseUrl = `${LOCAL_BASE_URL}/api`;
+  const newApiBaseUrl = `${localBaseUrl}/api`;
   api.defaults.baseURL = newApiBaseUrl;
   logger.info(`[API Config] Switched to local server: ${newApiBaseUrl}`);
 }
@@ -134,7 +124,11 @@ export function getApiUrl(): string {
  */
 export function getBaseUrl(): string {
   if (localIpAvailable === true) {
-    return LOCAL_BASE_URL;
+    // 根据当前页面的协议动态选择本地服务器的协议
+    const isPageHttps = typeof window !== "undefined" && window.location.protocol === "https:";
+    const protocol = isPageHttps ? "https" : "http";
+    const port = isPageHttps ? LOCAL_HTTPS_PORT : LOCAL_HTTP_PORT;
+    return `${protocol}://${LOCAL_IP}:${port}`;
   } else if (localIpAvailable === false) {
     return REMOTE.url || "http://localhost:8000";
   } else {

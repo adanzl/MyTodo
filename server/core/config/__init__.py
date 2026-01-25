@@ -6,6 +6,7 @@ from .config import Config, config
 from .log_config import app_logger, access_logger
 from .const import (
     BASE_TMP_DIR,
+    DEFAULT_BASE_DIR,
     PDF_BASE_DIR,
     PDF_UPLOAD_DIR,
     PDF_UNLOCK_DIR,
@@ -34,6 +35,7 @@ __all__ = [
     'access_logger',
     # Constants
     'BASE_TMP_DIR',
+    'DEFAULT_BASE_DIR',
     'PDF_BASE_DIR',
     'PDF_UPLOAD_DIR',
     'PDF_UNLOCK_DIR',

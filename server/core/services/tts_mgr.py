@@ -4,7 +4,7 @@
 - 创建 TTS 任务（文本 -> 语音）
 - 启动任务异步生成音频文件
 - 任务查询、更新、删除
-- 生成的音频文件保存在临时目录：{BASE_TMP_DIR}/tts/{task_id}/output.mp3
+- 生成的音频文件保存在：{DEFAULT_BASE_DIR}/tasks/tts/{task_id}/output.mp3
 - 通过 API 提供文件下载功能
 """
 
@@ -17,7 +17,7 @@ from datetime import datetime
 from typing import Any, Callable, Dict, Optional, Tuple
 
 from core.config import (
-    BASE_TMP_DIR,
+    DEFAULT_BASE_DIR,
     TASK_STATUS_FAILED,
     TASK_STATUS_PENDING,
     TASK_STATUS_PROCESSING,
@@ -30,8 +30,8 @@ from core.utils import ensure_directory, get_media_duration
 
 log = app_logger
 
-# TTS 任务文件存储基础目录
-TTS_BASE_DIR = os.path.join(BASE_TMP_DIR, 'tts')
+# TTS 任务文件存储基础目录（任务存档和最终文件保存在 base 目录）
+TTS_BASE_DIR = os.path.join(DEFAULT_BASE_DIR, 'tasks', 'tts')
 
 # 输出音频文件名
 OUTPUT_FILENAME = 'output.mp3'
@@ -118,7 +118,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
     负责文本转语音（TTS）任务的完整生命周期管理：
     1. 创建任务：接收文本和参数，创建任务记录
     2. 执行任务：异步调用 TTS 服务生成音频文件
-    3. 文件存储：音频文件保存在临时目录 {BASE_TMP_DIR}/tts/{task_id}/output.mp3
+    3. 文件存储：音频文件保存在 {DEFAULT_BASE_DIR}/tasks/tts/{task_id}/output.mp3
     4. 任务管理：提供查询、更新、删除等功能
     """
 
@@ -141,7 +141,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             task_id: 任务 ID
 
         Returns:
-            任务目录路径：{BASE_TMP_DIR}/tts/{task_id}
+            任务目录路径：{DEFAULT_BASE_DIR}/tasks/tts/{task_id}
         """
         return os.path.join(TTS_BASE_DIR, task_id)
 
@@ -152,7 +152,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             task_id: 任务 ID
 
         Returns:
-            音频文件路径：{BASE_TMP_DIR}/tts/{task_id}/output.mp3
+            音频文件路径：{DEFAULT_BASE_DIR}/tasks/tts/{task_id}/output.mp3
         """
         return os.path.join(self._get_task_dir(task_id), OUTPUT_FILENAME)
 

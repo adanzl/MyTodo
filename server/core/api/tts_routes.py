@@ -155,7 +155,7 @@ def download_tts_file() -> ResponseReturnValue:
 
     Notes:
         - 只有任务状态为 success 且文件存在时才能下载
-        - 文件保存在临时目录：{BASE_TMP_DIR}/tts/{task_id}/output.mp3
+        - 文件保存在：{DEFAULT_BASE_DIR}/tasks/tts/{task_id}/output.mp3
     """
     try:
         task_id = (request.args.get('task_id') or '').strip()

@@ -74,9 +74,11 @@ class Config:
     DEVICE_AGENT_TIMEOUT: int = int(os.environ.get('DEVICE_AGENT_TIMEOUT', 30))
 
     # ========== 文件路径配置 ==========
-    BASE_TMP_DIR: str = os.environ.get('BASE_TMP_DIR', '/tmp/my_todo')
+    # BASE_TMP_DIR: 临时文件目录，用于保存 TTS、PDF、媒体处理等任务产生的临时文件
+    BASE_TMP_DIR: str = os.environ.get('BASE_TMP_DIR', '/opt/my_todo/data')
+    # DEFAULT_BASE_DIR: 项目文件目录，用于保存用户访问的项目文件
+    DEFAULT_BASE_DIR: str = os.environ.get('DEFAULT_BASE_DIR', '/opt/my_todo/data')
     LOG_DIR: str = os.environ.get('LOG_DIR', 'logs')
-    DEFAULT_BASE_DIR: str = os.environ.get('DEFAULT_BASE_DIR', '/mnt')
 
     # ========== 工具配置 ==========
     FFMPEG_PATH: str = os.environ.get('FFMPEG_PATH', '/usr/bin/ffmpeg')

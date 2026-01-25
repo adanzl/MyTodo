@@ -32,6 +32,7 @@ class AudioConvertTask(TaskBase):
     file_status: Optional[Dict[str, FileStatus]] = None  # 文件状态 {file_path: {...}}
 
 
+# 音频转码任务目录（任务存档和最终文件保存在 base 目录）
 AUDIO_CONVERT_BASE_DIR = os.path.join(MEDIA_BASE_DIR, 'convert')
 
 

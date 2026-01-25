@@ -76,7 +76,7 @@ def read_json_from_request() -> Dict[str, Any]:
 def convert_to_http_url(url: str) -> str:
     """
     将本地文件路径转换为 HTTP URL
-    :param url: 本地文件路径（如 /mnt/ext_base/audio/xxx.mp3）或已经是 HTTP URL
+    :param url: 本地文件路径（如 /opt/my_todo/data/ext_base/audio/xxx.mp3）或已经是 HTTP URL
     :return: HTTP URL
     """
     # 如果已经是 HTTP/HTTPS URL，直接返回
@@ -246,12 +246,12 @@ def decode_url_path(path: str) -> str:
 
 
 def validate_and_normalize_path(file_path: str,
-                                base_dir: str = '/mnt',
+                                base_dir: str = '/opt/my_todo/data',
                                 must_be_file: bool = True) -> Tuple[Optional[str], Optional[str]]:
     """
     验证和规范化文件路径
     :param file_path: 文件路径
-    :param base_dir: 基础目录，默认为 /mnt
+    :param base_dir: 基础目录，默认为 /opt/my_todo/data
     :param must_be_file: 是否必须是文件（True）或可以是目录（False）
     :return: (规范化后的路径, 错误消息)，如果成功则错误消息为 None
     """
@@ -290,8 +290,8 @@ def validate_and_normalize_path(file_path: str,
 def get_media_url(local_path: str) -> str:
     """
     将本地文件路径转换为可通过 HTTP 访问的 URL
-    :param local_path: 本地文件路径，如 /mnt/ext_base/audio/xxx.mp3
-    :return: HTTP URL，如 http://192.168.1.100:8000/api/media/files/mnt/ext_base/audio/xxx.mp3
+    :param local_path: 本地文件路径，如 /opt/my_todo/data/ext_base/audio/xxx.mp3
+    :return: HTTP URL，如 http://192.168.1.100:8000/api/media/files/opt/my_todo/data/ext_base/audio/xxx.mp3
     """
     try:
         # 移除路径开头的 /

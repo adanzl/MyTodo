@@ -20,6 +20,7 @@ from core.config import (ALLOWED_AUDIO_EXTENSIONS, MEDIA_BASE_DIR, FFMPEG_PATH, 
 
 from core.utils import ensure_directory as ensure_directory, get_media_duration, run_subprocess_safe
 
+# 音频合并任务目录（任务存档和最终文件保存在 base 目录）
 AUDIO_MERGE_BASE_DIR = os.path.join(MEDIA_BASE_DIR, 'merge')
 
 log = app_logger

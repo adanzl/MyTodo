@@ -1,23 +1,34 @@
 """
 目录常量管理
 统一管理所有功能的目录路径
+
+注意：BASE_TMP_DIR 用于保存真正的临时文件（处理过程中的中间文件）
+      DEFAULT_BASE_DIR 用于保存项目文件、任务存档和生成的最终文件
 """
 import os
+from dotenv import load_dotenv
 
-# 基础目录
-BASE_TMP_DIR = '/tmp/my_todo'
+# 加载 .env 文件（如果存在）
+load_dotenv()
 
-# PDF 工具相关目录
-PDF_BASE_DIR = os.path.join(BASE_TMP_DIR, 'pdf')
+# 临时文件基础目录（用于真正的临时文件，处理过程中的中间文件）
+BASE_TMP_DIR = os.environ.get('BASE_TMP_DIR', '/tmp/my_todo')
+
+# 项目文件基础目录（用于保存任务存档和生成的最终文件）
+DEFAULT_BASE_DIR = os.environ.get('DEFAULT_BASE_DIR', '/opt/my_todo/data')
+
+# PDF 工具相关目录（任务存档和最终文件保存在 base 目录）
+PDF_BASE_DIR = os.path.join(DEFAULT_BASE_DIR, 'tasks', 'pdf')
 PDF_UPLOAD_DIR = os.path.join(PDF_BASE_DIR, 'upload')
 PDF_UNLOCK_DIR = os.path.join(PDF_BASE_DIR, 'unlock')
 
-# 媒体工具相关目录
-MEDIA_BASE_DIR = os.path.join(BASE_TMP_DIR, 'media')
-# 任务目录：/tmp/my_todo/media/{task_id}/
+# 媒体工具相关目录（任务存档和最终文件保存在 base 目录）
+MEDIA_BASE_DIR = os.path.join(DEFAULT_BASE_DIR, 'tasks', 'media')
+# 任务目录：{DEFAULT_BASE_DIR}/tasks/media/{task_id}/
 MEDIA_RESULT_DIR_SUFFIX = 'result'  # 结果目录后缀：{task_dir}/result/
-FFMPEG_PATH = '/usr/bin/ffmpeg'  # ffmpeg 路径
-FFMPEG_TIMEOUT = 300  # ffmpeg 超时时间（秒）
+# FFMPEG 工具配置（从环境变量读取，支持配置）
+FFMPEG_PATH = os.environ.get('FFMPEG_PATH', '/usr/bin/ffmpeg')  # ffmpeg 路径
+FFMPEG_TIMEOUT = int(os.environ.get('FFMPEG_TIMEOUT', '300'))  # ffmpeg 超时时间（秒）
 
 # 媒体文件 MIME 映射
 MIMETYPE_MAP = {
