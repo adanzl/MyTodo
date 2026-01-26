@@ -1,3 +1,7 @@
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from gevent import monkey
 # 不 patch thread，使用真正的操作系统线程，避免与 asyncio 事件循环冲突
 # thread=False 表示不 patch threading 模块，这样 ThreadPoolExecutor 会使用真正的线程
@@ -5,12 +9,7 @@ from gevent import monkey
 # 当 subprocess=False 时，标准库的 subprocess 在 gevent 环境中可能无法正常工作（因为 gevent 已 patch 了 socket、select 等）
 monkey.patch_all(subprocess=True, thread=False, queue=False)
 
-# 在导入其他模块之前加载环境变量
-from dotenv import load_dotenv
 import os
-
-# 加载 .env 文件
-load_dotenv()
 
 from aliyun.opentelemetry.instrumentation.auto_instrumentation import sitecustomize
 
