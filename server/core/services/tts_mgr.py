@@ -849,34 +849,44 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
 
         # 优先使用任务中保存的路径
         if task.output_file:
-            # 如果是相对路径，拼接为绝对路径（使用 DEFAULT_BASE_DIR，不包含 core/）
+            absolute_path = None
+            # 如果是相对路径，拼接为绝对路径（使用 DEFAULT_BASE_DIR）
             if not os.path.isabs(task.output_file):
                 # 相对路径，需要处理不同的格式
                 relative_path = task.output_file
                 # 如果路径以 data/ 开头，去掉 data/ 前缀（因为 DEFAULT_BASE_DIR 已经包含 data）
                 if relative_path.startswith('data/'):
                     relative_path = relative_path[5:]  # 去掉 'data/' 前缀
-                # 如果路径以 tasks/tts/ 开头，直接使用
-                # 否则，拼接到 DEFAULT_BASE_DIR
+                # 拼接到 DEFAULT_BASE_DIR
                 absolute_path = os.path.join(DEFAULT_BASE_DIR, relative_path)
                 # 规范化路径（处理 .. 和 . 等）
                 absolute_path = os.path.normpath(absolute_path)
-            
-            if os.path.exists(absolute_path):
-                # 如果路径被修正，更新任务存档
+            else:
+                # 绝对路径，直接使用（规范化处理）
+                absolute_path = os.path.normpath(task.output_file)
+
+            # 确保返回的是绝对路径，并且文件存在
+            if absolute_path and os.path.exists(absolute_path):
+                # 如果路径被修正（相对路径转绝对路径），更新任务存档
                 if absolute_path != task.output_file:
-                    log.info(f"[TTSMgr] 修正任务 {task_id} 的输出文件路径: {task.output_file} -> {absolute_path}")
+                    log.info(
+                        f"[TTSMgr] 修正任务 {task_id} 的输出文件路径: {task.output_file} -> {absolute_path}"
+                    )
                     with self._task_lock:
                         task.output_file = absolute_path
                         self._save_task_and_update_time(task)
-                return absolute_path
+                # 确保返回绝对路径
+                return os.path.abspath(absolute_path)
 
         # 否则尝试默认路径
         default_path = self._get_output_file_path(task_id)
-        if os.path.exists(default_path):
+        if default_path and os.path.exists(default_path):
+            # 确保返回绝对路径
+            default_path = os.path.abspath(default_path)
             # 如果默认路径存在，更新任务中的路径
             if not task.output_file or task.output_file != default_path:
-                log.info(f"[TTSMgr] 更新任务 {task_id} 的输出文件路径为默认路径: {default_path}")
+                log.info(
+                    f"[TTSMgr] 更新任务 {task_id} 的输出文件路径为默认路径: {default_path}")
                 with self._task_lock:
                     task.output_file = default_path
                     self._save_task_and_update_time(task)
