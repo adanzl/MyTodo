@@ -127,7 +127,7 @@
                 </el-icon>
               </el-button>
               <el-button type="primary" size="small" @click="handleOcrRecognize"
-                :disabled="isTaskProcessing || selectedImages.length === 0" :loading="ocrLoading">
+                :disabled="isTaskProcessing || selectedImages.length === 0 || !ttsCurrentTask" :loading="ocrLoading">
                 识别
               </el-button>
             </div>
@@ -272,8 +272,8 @@ import {
   startTtsTask,
   stopTtsTask,
   getTtsTaskDownloadUrl,
+  ocrTtsTask,
 } from "@/api/tts";
-import { ocrImages } from "@/api/ai";
 
 // TTS 相关状态
 const ttsLoading = ref(false);
@@ -694,8 +694,10 @@ const { start: startTtsPolling, stop: stopTtsPolling } = useControllableInterval
       return;
     }
 
-    // 检查当前任务状态，如果不再是 processing，则停止轮询（不刷新详情）
+    // 检查当前任务状态，如果不再是 processing，则停止轮询
     if (taskInList.status !== "processing") {
+      // 停止轮询前刷新一次任务详情（OCR 完成后状态会从 processing 变为 pending，需要刷新以获取更新后的文本）
+      await handleTtsViewTask(currentTaskId);
       stopTtsPolling();
       return;
     }
@@ -981,30 +983,39 @@ const handleOcrRecognize = async () => {
     return;
   }
 
+  // 检查是否有当前任务
+  if (!ttsCurrentTask.value) {
+    ElMessage.warning("请先创建或选择一个 TTS 任务");
+    return;
+  }
+
+  // 检查任务状态，如果正在处理中，不允许 OCR
+  if (ttsCurrentTask.value.status === "processing") {
+    ElMessage.warning("任务正在处理中，无法执行 OCR");
+    return;
+  }
+
   try {
     ocrLoading.value = true;
-    const response = await ocrImages(selectedImages.value);
+    const response = await ocrTtsTask(ttsCurrentTask.value.task_id, selectedImages.value);
 
-    if (response.code === 0 && response.data?.text) {
-      const ocrText = response.data.text.trim();
-      if (ocrText) {
-        // 追加到文本框最后
-        if (ttsText.value) {
-          ttsText.value += "\n\n" + ocrText;
-        } else {
-          ttsText.value = ocrText;
-        }
-        // 触发文本变化，自动保存
-        handleTtsTextChange();
-        ElMessage.success("OCR 识别成功，文本已追加");
-        // 清空选择的图片
-        selectedImages.value = [];
-        if (imageInputRef.value) {
-          imageInputRef.value.value = "";
-        }
-      } else {
-        ElMessage.warning("识别结果为空");
+    if (response.code === 0) {
+      ElMessage.success("OCR 任务已启动，正在后台处理");
+      // 清空选择的图片
+      selectedImages.value = [];
+      if (imageInputRef.value) {
+        imageInputRef.value.value = "";
       }
+      // 清空预览 URL
+      imagePreviewUrls.value.forEach((url) => {
+        URL.revokeObjectURL(url);
+      });
+      imagePreviewUrls.value.clear();
+      
+      // 刷新任务信息以获取更新后的文本（OCR 完成后会自动追加）
+      await handleTtsViewTask(ttsCurrentTask.value.task_id);
+      // 开始轮询任务状态，等待 OCR 完成
+      startTtsPolling();
     } else {
       ElMessage.error(response.msg || "OCR 识别失败");
     }

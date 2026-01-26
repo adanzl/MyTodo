@@ -91,6 +91,38 @@ export async function stopTtsTask(taskId: string): Promise<ApiResponse<null>> {
 }
 
 /**
+ * TTS 任务 OCR 图片文字识别
+ * 将 OCR 识别结果自动追加到指定 TTS 任务的文本末尾
+ * @param taskId 任务 ID
+ * @param files 图片文件数组
+ */
+export async function ocrTtsTask(
+  taskId: string,
+  files: File[]
+): Promise<ApiResponse<null>> {
+  const formData = new FormData();
+  
+  // 添加 task_id
+  formData.append("task_id", taskId);
+  
+  // 添加所有图片文件
+  files.forEach((file) => {
+    formData.append("file", file);
+  });
+
+  const config = {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+    timeout: 60000, // 60秒超时
+    _isFileUpload: true,
+  };
+
+  const response = await api.post<ApiResponse<null>>("/tts/ocr", formData, config);
+  return response.data;
+}
+
+/**
  * 获取 TTS 任务下载 URL
  * 如果本地 IP 可用，会自动使用本地地址，提高下载速度
  */
