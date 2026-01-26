@@ -3,7 +3,7 @@
 统一管理配置、日志和常量
 """
 from .config import Config, config
-from .log_config import app_logger, access_logger
+from .log_config import app_logger, access_logger, gevent_access_logger
 from .const import (
     BASE_TMP_DIR,
     DEFAULT_BASE_DIR,
@@ -33,6 +33,7 @@ __all__ = [
     # Loggers
     'app_logger',
     'access_logger',
+    'gevent_access_logger',
     # Constants
     'BASE_TMP_DIR',
     'DEFAULT_BASE_DIR',

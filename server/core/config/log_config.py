@@ -64,42 +64,56 @@ def _create_app_logger() -> logging.Logger:
 app_logger = _create_app_logger()
 
 
-def _create_access_logger() -> logging.Logger:
-    """
-    配置访问日志记录器
+def _create_access_logger() -> tuple[logging.Logger, logging.Logger]:
+    """配置访问日志记录器
     
-    :return: 配置好的访问日志记录器
+    同时配置 'gevent.access' 和 'app.access' 两个记录器，使用相同的处理器
+    这样 gevent WSGIServer 和 Flask 中间件都能记录到同一个日志文件
+    
+    仅在生产环境创建访问日志文件，开发环境不记录访问日志
+    
+    :return: (app_access_logger, gevent_access_logger) 配置好的访问日志记录器
     """
-    access_logger = logging.getLogger('gevent.access')
-    access_logger.setLevel(logging.INFO)
-    access_logger.propagate = False  # 不传播到根日志记录器
+    # 配置 gevent.access 记录器（供 gevent WSGIServer 使用）
+    gevent_access_logger = logging.getLogger('gevent.access')
+    gevent_access_logger.setLevel(logging.INFO)
+    gevent_access_logger.propagate = False
+
+    # 配置 app.access 记录器（供 Flask 中间件使用）
+    app_access_logger = logging.getLogger('app.access')
+    app_access_logger.setLevel(logging.INFO)
+    app_access_logger.propagate = False
 
     # 仅在生产环境创建访问日志文件，保留3天
     if IS_PRODUCTION:
-        # 确保 logs 目录存在
         log_file = f"{LOG_DIR}/access.log"
 
         # 创建访问日志文件处理器（按天轮转，保留3天）
         access_handler = TimedRotatingFileHandler(log_file, when="midnight", backupCount=3, encoding="utf-8")
 
         # 配置访问日志格式：时间 方法 路径 状态码 响应时间 客户端IP User-Agent
-        # gevent会自动添加请求信息到message中
         access_formatter = logging.Formatter('%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
         access_handler.setFormatter(access_formatter)
-        access_logger.addHandler(access_handler)
-        # 确保日志级别正确
-        access_logger.setLevel(logging.INFO)
-        # 添加调试信息，确认 access_logger 已正确配置
+
+        # 为两个记录器添加处理器
+        gevent_access_logger.addHandler(access_handler)
+        app_access_logger.addHandler(access_handler)
+
+        # 添加调试信息
         app_logger.info(
-            f'Access logger configured: {access_logger.name}, handlers: {len(access_logger.handlers)}, propagate: {access_logger.propagate}, level: {access_logger.level}'
+            f'Access logger configured: gevent.access and app.access, handlers: {len(app_access_logger.handlers)}, '
+            f'propagate: {app_access_logger.propagate}, level: {app_access_logger.level}, log_file: {log_file}'
         )
-        # 测试 access_logger 是否能正常写入
-        access_logger.info('Access logger test message - if you see this, the logger is working')
+        # 测试访问日志记录器是否能正常写入
+        gevent_access_logger.info('Gevent access logger test - if you see this, gevent logger is working')
+        app_access_logger.info('App access logger test - if you see this, app logger is working')
     else:
-        # 开发环境：创建一个空的日志记录器，不输出任何日志
-        access_logger.setLevel(logging.CRITICAL)  # 设置为 CRITICAL 级别，几乎不记录任何日志
+        # 开发环境：设置为 CRITICAL 级别，不记录任何日志
+        gevent_access_logger.setLevel(logging.CRITICAL)
+        app_access_logger.setLevel(logging.CRITICAL)
+        app_logger.info('Access logger disabled (non-production environment)')
 
-    return access_logger
+    return app_access_logger, gevent_access_logger
 
 
-access_logger = _create_access_logger()
+access_logger, gevent_access_logger = _create_access_logger()

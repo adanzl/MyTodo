@@ -12,9 +12,11 @@ import os
 # 加载 .env 文件
 load_dotenv()
 
+from aliyun.opentelemetry.instrumentation.auto_instrumentation import sitecustomize
+
 from flask import make_response
 from core import create_app
-from core.config import app_logger, access_logger, config
+from core.config import app_logger, config, gevent_access_logger
 
 # 生产环境判断
 IS_PRODUCTION = config.IS_PRODUCTION
@@ -76,7 +78,7 @@ if __name__ == '__main__':
         http_server = WSGIServer(
             (HOST, PORT),
             application,
-            log=access_logger,  # 使用访问日志记录器
+            log=gevent_access_logger,  # 使用 gevent.access 记录器
             error_log=log,  # 错误日志使用应用日志
             handler_class=WebSocketHandler,
         )

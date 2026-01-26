@@ -23,8 +23,9 @@ import core.ai.ai_mgr as ai_mgr
 from core.chat.chat_mgr import chat_mgr
 from core.db.db_mgr import db_mgr
 from core.services.scheduler_mgr import scheduler_mgr
-from core.config import config, app_logger
+from core.config import config, app_logger, access_logger
 import os
+import time
 
 log = app_logger
 
@@ -55,16 +56,14 @@ def create_app():
 
     # 统一使用配置中的 CORS 来源
     cors_origins = config.get_cors_origins()
-    
+
     # Flask-CORS 配置
     # 注意：当使用 supports_credentials=True 时，Access-Control-Allow-Origin 不能是 '*'
     # 必须使用具体的 origin 列表
     if cors_origins == ['*']:
         # 如果配置为 '*'，禁用 credentials 支持（因为 '*' 与 credentials 不兼容）
-        log.warning(
-            "[CORS] CORS_ORIGINS 设置为 '*'，但应用需要 credentials 支持（JWT cookies）。"
-            "建议配置具体的 origins（如：CORS_ORIGINS=https://leo-zhao.natapp4.cc,http://localhost:5173）"
-        )
+        log.warning("[CORS] CORS_ORIGINS 设置为 '*'，但应用需要 credentials 支持（JWT cookies）。"
+                    "建议配置具体的 origins（如：CORS_ORIGINS=https://leo-zhao.natapp4.cc,http://localhost:5173）")
         CORS(app, supports_credentials=False, resources={r"/*": {"origins": "*"}})
         socketio_cors_origins = "*"
     else:
@@ -150,6 +149,35 @@ def create_app():
             return None
         except Exception:
             return jsonify({'code': -1, 'msg': 'unauthorized'}), 401
+
+    @app.before_request
+    def _record_start_time():
+        """记录请求开始时间，用于计算响应时间"""
+        request._start_time = time.time()
+
+    @app.after_request
+    def _log_access(response):
+        """记录访问日志（仅在生产环境）"""
+        if config.IS_PRODUCTION:
+            # 获取请求信息
+            method = request.method
+            path = request.path
+            status_code = response.status_code
+            client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', 'unknown'))
+            user_agent = request.headers.get('User-Agent', '-')
+            
+            # 计算响应时间
+            if hasattr(request, '_start_time'):
+                response_time = (time.time() - request._start_time) * 1000  # 转换为毫秒
+            else:
+                response_time = 0
+            
+            # 记录访问日志（格式：方法 路径 状态码 响应时间(ms) 客户端IP User-Agent）
+            access_logger.info(
+                f'{method} {path} {status_code} {response_time:.2f}ms {client_ip} {user_agent}'
+            )
+        
+        return response
 
     chat_mgr.init(socketio)
     db_mgr.init(app)
