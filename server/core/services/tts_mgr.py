@@ -43,6 +43,7 @@ def _get_ocr_client():
         _ocr_client = OCRAli()
     return _ocr_client
 
+
 log = app_logger
 
 # TTS 任务文件存储基础目录（任务存档和最终文件保存在 base 目录）
@@ -625,8 +626,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
 
             # 等待任务完成（WebSocket 会异步返回 task-finished 事件）
             log.info(
-                f"[TTSMgr] 任务 {task.name} 开始等待 WebSocket 任务完成（数据接收超时: 10秒）"
-            )
+                f"[TTSMgr] 任务 {task.name} 开始等待 WebSocket 任务完成（数据接收超时: 10秒）")
             # 初始化最后一次接收到数据的时间（从发送完成时开始计时）
             last_data_time[0] = time.time()
             DATA_TIMEOUT = 10.0  # 10秒没有收到数据则视为超时
@@ -824,14 +824,14 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         task = self._get_task(task_id)
         if not task:
             return None
-        
+
         # 如果任务状态为成功但没有duration，异步获取并更新
         if task.status == TASK_STATUS_SUCCESS and task.duration is None:
             output_file = self.get_output_file_path(task_id)
             if output_file and os.path.exists(output_file):
                 # 异步获取duration并更新存档
                 self._update_duration_async(task_id, output_file)
-        
+
         return asdict(task)
 
     def get_output_file_path(self, task_id: str) -> Optional[str]:
@@ -848,12 +848,38 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             return None
 
         # 优先使用任务中保存的路径
-        if task.output_file and os.path.exists(task.output_file):
-            return task.output_file
+        if task.output_file:
+            # 如果是相对路径，拼接为绝对路径（使用 DEFAULT_BASE_DIR，不包含 core/）
+            if not os.path.isabs(task.output_file):
+                # 相对路径，需要处理不同的格式
+                relative_path = task.output_file
+                # 如果路径以 data/ 开头，去掉 data/ 前缀（因为 DEFAULT_BASE_DIR 已经包含 data）
+                if relative_path.startswith('data/'):
+                    relative_path = relative_path[5:]  # 去掉 'data/' 前缀
+                # 如果路径以 tasks/tts/ 开头，直接使用
+                # 否则，拼接到 DEFAULT_BASE_DIR
+                absolute_path = os.path.join(DEFAULT_BASE_DIR, relative_path)
+                # 规范化路径（处理 .. 和 . 等）
+                absolute_path = os.path.normpath(absolute_path)
+            
+            if os.path.exists(absolute_path):
+                # 如果路径被修正，更新任务存档
+                if absolute_path != task.output_file:
+                    log.info(f"[TTSMgr] 修正任务 {task_id} 的输出文件路径: {task.output_file} -> {absolute_path}")
+                    with self._task_lock:
+                        task.output_file = absolute_path
+                        self._save_task_and_update_time(task)
+                return absolute_path
 
         # 否则尝试默认路径
         default_path = self._get_output_file_path(task_id)
         if os.path.exists(default_path):
+            # 如果默认路径存在，更新任务中的路径
+            if not task.output_file or task.output_file != default_path:
+                log.info(f"[TTSMgr] 更新任务 {task_id} 的输出文件路径为默认路径: {default_path}")
+                with self._task_lock:
+                    task.output_file = default_path
+                    self._save_task_and_update_time(task)
             return default_path
 
         return None
@@ -865,6 +891,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             task_id: 任务 ID
             output_file: 音频文件路径
         """
+
         def update_duration() -> None:
             try:
                 duration_seconds = get_media_duration(output_file)
@@ -876,7 +903,9 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                             # 只有在任务仍然是成功状态时才更新
                             task.duration = audio_duration
                             self._save_task_and_update_time(task)
-                            log.info(f"[TTSMgr] 异步更新任务 {task_id} 音频时长: {audio_duration:.2f}秒")
+                            log.info(
+                                f"[TTSMgr] 异步更新任务 {task_id} 音频时长: {audio_duration:.2f}秒"
+                            )
                 else:
                     log.warning(f"[TTSMgr] 异步获取任务 {task_id} 音频时长失败：无法获取时长")
             except Exception as e:
@@ -907,33 +936,33 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         if err:
             log.warning(f"[TTSMgr] 启动 OCR 任务失败，task_id: {task_id}, 错误: {err}")
             return -1, err
-        
+
         # 检查任务状态，如果正在处理中，不允许OCR
         if task.status == TASK_STATUS_PROCESSING:
             log.warning(
-                f"[TTSMgr] 启动 OCR 任务失败，task_id: {task_id}, 原因: 任务正在处理中"
-            )
+                f"[TTSMgr] 启动 OCR 任务失败，task_id: {task_id}, 原因: 任务正在处理中")
             return -1, '任务正在处理中，无法执行 OCR'
-        
+
         if not image_paths:
             return -1, '图片路径列表为空'
-        
+
         log.info(
             f"[TTSMgr] 准备启动 OCR 任务 {task_id}, 任务名称: {task.name}, 图片数量: {len(image_paths)}"
         )
-        
+
         # 创建 OCR 任务执行函数（包装器，符合 _run_task_async 的签名）
         def ocr_runner(task: TTSTask) -> None:
             """OCR 任务执行函数（包装器）。"""
             # 使用传入的 task.task_id 而不是闭包中的 task_id，确保使用正确的任务ID
             self._run_ocr_task_logic(task.task_id, image_paths, temp_dir)
-        
+
         # 使用统一的异步任务执行方法
         self._run_task_async(task_id, ocr_runner)
-        
+
         return 0, 'OCR 任务已启动'
 
-    def _append_text_to_task(self, task_id: str, new_text: str) -> Tuple[int, str]:
+    def _append_text_to_task(self, task_id: str,
+                             new_text: str) -> Tuple[int, str]:
         """将文本追加到任务的现有文本末尾。
         
         Args:
@@ -947,18 +976,20 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             task = self._get_task(task_id)
             if not task:
                 return -1, 'TTS 任务不存在'
-            
+
             # 将结果追加到现有文本末尾
             current_text = task.text or ''
             combined_text = f"{current_text}\n\n{new_text}" if current_text else new_text
-        
+
         # 先将状态设置为pending，以便可以更新文本（update_task不允许processing状态下更新）
         self._update_task_status(task_id, TASK_STATUS_PENDING, None)
-        
+
         # 更新任务文本
         return self.update_task(task_id=task_id, text=combined_text)
-    
-    def _restore_task_to_pending(self, task_id: str, error_msg: str = None) -> None:
+
+    def _restore_task_to_pending(self,
+                                 task_id: str,
+                                 error_msg: str = None) -> None:
         """恢复任务状态为待处理（用于错误恢复）。
         
         Args:
@@ -968,7 +999,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         self._update_task_status(task_id, TASK_STATUS_PENDING, None)
         if error_msg:
             log.error(f"[TTSMgr] OCR 任务 {task_id} 失败: {error_msg}")
-    
+
     def _run_ocr_task_logic(self, task_id: str, image_paths: list[str],
                             temp_dir: str) -> None:
         """执行 OCR 任务的核心逻辑。
@@ -982,35 +1013,31 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             temp_dir: 临时文件目录路径
         """
         try:
-            log.info(
-                f"[TTSMgr] 开始 OCR 任务 {task_id}，图片数量: {len(image_paths)}")
-            
+            log.info(f"[TTSMgr] 开始 OCR 任务 {task_id}，图片数量: {len(image_paths)}")
+
             # 调用 OCR 服务
             ocr_client = _get_ocr_client()
             status, result = ocr_client.query(image_paths)
-            
+
             if status == "error":
                 # OCR 失败，恢复任务状态为待处理（不抛出异常，避免 _run_task_async 设置为失败）
                 self._restore_task_to_pending(task_id, result or 'OCR 识别失败')
                 return
-            
+
             # OCR 成功，追加文本到任务
             code, msg = self._append_text_to_task(task_id, result)
             if code != 0:
                 # 更新失败，恢复任务状态为待处理
                 self._restore_task_to_pending(task_id, f"更新文本失败: {msg}")
                 return
-            
-            log.info(
-                f"[TTSMgr] OCR 任务 {task_id} 完成，追加文本长度: {len(result)} 字符"
-            )
+
+            log.info(f"[TTSMgr] OCR 任务 {task_id} 完成，追加文本长度: {len(result)} 字符")
             # 注意：状态已经在 _append_text_to_task 中设置为 pending，不需要再次设置
-            
+
         except Exception as e:
             # 发生异常，恢复任务状态为待处理（不重新抛出，避免 _run_task_async 设置为失败）
             self._restore_task_to_pending(task_id, f"处理异常: {e}")
-            log.error(
-                f"[TTSMgr] OCR 任务 {task_id} 处理异常: {e}", exc_info=True)
+            log.error(f"[TTSMgr] OCR 任务 {task_id} 处理异常: {e}", exc_info=True)
         finally:
             # 清理临时文件
             cleanup_temp_files(temp_dir, image_paths)
