@@ -964,7 +964,14 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         def ocr_runner(task: TTSTask) -> None:
             """OCR 任务执行函数（包装器）。"""
             # 使用传入的 task.task_id 而不是闭包中的 task_id，确保使用正确的任务ID
-            self._run_ocr_task_logic(task.task_id, image_paths, temp_dir)
+            actual_task_id = task.task_id
+            # 验证 task_id 是否匹配（防止并发问题）
+            if actual_task_id != task_id:
+                log.warning(
+                    f"[TTSMgr] OCR 任务 task_id 不匹配: 期望 {task_id}, 实际 {actual_task_id}, 使用实际 task_id"
+                )
+            log.info(f"[TTSMgr] OCR 任务执行，使用 task_id: {actual_task_id} (原始请求: {task_id})")
+            self._run_ocr_task_logic(actual_task_id, image_paths, temp_dir)
 
         # 使用统一的异步任务执行方法
         self._run_task_async(task_id, ocr_runner)
@@ -982,20 +989,37 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         Returns:
             (code, msg) 更新结果
         """
+        log.info(f"[TTSMgr] 追加文本到任务 {task_id}，文本长度: {len(new_text)} 字符")
         with self._task_lock:
             task = self._get_task(task_id)
             if not task:
+                log.error(f"[TTSMgr] 追加文本失败：任务 {task_id} 不存在")
                 return -1, 'TTS 任务不存在'
+
+            # 验证 task_id 是否匹配
+            if task.task_id != task_id:
+                log.error(
+                    f"[TTSMgr] 追加文本失败：任务 ID 不匹配，期望 {task_id}, 实际 {task.task_id}"
+                )
+                return -1, f'任务 ID 不匹配: 期望 {task_id}, 实际 {task.task_id}'
 
             # 将结果追加到现有文本末尾
             current_text = task.text or ''
             combined_text = f"{current_text}\n\n{new_text}" if current_text else new_text
+            log.info(
+                f"[TTSMgr] 任务 {task_id} 文本追加：原长度 {len(current_text)}, 新长度 {len(combined_text)}"
+            )
 
         # 先将状态设置为pending，以便可以更新文本（update_task不允许processing状态下更新）
         self._update_task_status(task_id, TASK_STATUS_PENDING, None)
 
         # 更新任务文本
-        return self.update_task(task_id=task_id, text=combined_text)
+        code, msg = self.update_task(task_id=task_id, text=combined_text)
+        if code == 0:
+            log.info(f"[TTSMgr] 任务 {task_id} 文本追加成功")
+        else:
+            log.error(f"[TTSMgr] 任务 {task_id} 文本追加失败: {msg}")
+        return code, msg
 
     def _restore_task_to_pending(self,
                                  task_id: str,
