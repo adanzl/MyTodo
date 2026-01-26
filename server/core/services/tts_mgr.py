@@ -925,7 +925,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         # 创建 OCR 任务执行函数（包装器，符合 _run_task_async 的签名）
         def ocr_runner(task: TTSTask) -> None:
             """OCR 任务执行函数（包装器）。"""
-            self._run_ocr_task_logic(task_id, image_paths, temp_dir)
+            # 使用传入的 task.task_id 而不是闭包中的 task_id，确保使用正确的任务ID
+            self._run_ocr_task_logic(task.task_id, image_paths, temp_dir)
         
         # 使用统一的异步任务执行方法
         self._run_task_async(task_id, ocr_runner)
