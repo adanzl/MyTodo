@@ -9,12 +9,13 @@ from datetime import datetime
 from flask import Flask, request
 from unittest.mock import patch, MagicMock
 
-from core.utils import (_build_shell_command, _cleanup_temp_files, _read_file_safe, _read_returncode, ok_response,
+from core.utils import (_build_shell_command, _read_file_safe, _read_returncode, ok_response,
                         err_response, get_json_body, read_json_from_request, format_time_str, time_to_seconds,
                         decode_url_path, is_allowed_audio_file, is_allowed_pdf_file, get_unique_filepath,
                         convert_standard_cron_weekday_to_apscheduler, validate_and_normalize_path, get_media_url,
                         ensure_directory, get_file_info, convert_to_http_url, run_subprocess_safe,
-                        check_cron_will_trigger_today, get_media_duration)
+                        check_cron_will_trigger_today, get_media_duration, save_uploaded_files, cleanup_temp_files,
+                        _cleanup_temp_files)
 
 # --- Test Response Helpers ---
 
@@ -169,7 +170,8 @@ def test_validate_and_normalize_path_ok(mock_abspath, mock_isabs, mock_isfile, m
 
 @patch('core.utils.os.path.exists', return_value=False)
 def test_validate_and_normalize_path_not_exists(mock_exists):
-    path, err = validate_and_normalize_path('/mnt/nonexistent.txt')
+    # 使用允许目录内的路径进行测试
+    path, err = validate_and_normalize_path('/opt/my_todo/data/nonexistent.txt')
     assert err == "文件不存在"
     assert path is None
 
@@ -177,7 +179,8 @@ def test_validate_and_normalize_path_not_exists(mock_exists):
 @patch('core.utils.os.path.exists', return_value=True)
 @patch('core.utils.os.path.isfile', return_value=False)
 def test_validate_and_normalize_path_not_a_file(mock_isfile, mock_exists):
-    path, err = validate_and_normalize_path('/mnt/a_directory', must_be_file=True)
+    # 使用允许目录内的路径进行测试
+    path, err = validate_and_normalize_path('/opt/my_todo/data/a_directory', must_be_file=True)
     assert err == "路径不是文件"
     assert path is None
 
@@ -360,7 +363,8 @@ def test_read_returncode_falls_back_to_system_rc(tmp_path):
 
 
 @patch('core.utils.os.unlink')
-def test_cleanup_temp_files(mock_unlink):
+def test_cleanup_temp_files_old(mock_unlink):
+    """测试旧的 _cleanup_temp_files 函数（向后兼容）"""
     _cleanup_temp_files(["/tmp/a", "/tmp/b", None])
     assert mock_unlink.call_count == 2
     mock_unlink.assert_any_call("/tmp/a")
@@ -368,8 +372,136 @@ def test_cleanup_temp_files(mock_unlink):
 
 
 @patch('core.utils.os.unlink', side_effect=OSError("Permission denied"))
-def test_cleanup_temp_files_ignores_errors(mock_unlink):
+def test_cleanup_temp_files_old_ignores_errors(mock_unlink):
+    """测试旧的 _cleanup_temp_files 函数忽略错误（向后兼容）"""
     _cleanup_temp_files(["/tmp/a"])
+
+
+def test_save_uploaded_files_to_temp_dir(tmp_path):
+    """测试保存上传文件到临时目录"""
+    from werkzeug.datastructures import FileStorage
+    from io import BytesIO
+    
+    # 创建模拟文件对象
+    file1 = FileStorage(stream=BytesIO(b'file1 content'), filename='test1.jpg')
+    file2 = FileStorage(stream=BytesIO(b'file2 content'), filename='test2.jpg')
+    files = [file1, file2]
+    
+    file_paths, temp_dir = save_uploaded_files(files, temp_prefix='test_')
+    
+    assert file_paths is not None
+    assert temp_dir is not None
+    assert len(file_paths) == 2
+    assert all(os.path.exists(path) for path in file_paths)
+    assert os.path.exists(temp_dir)
+    
+    # 验证文件内容
+    with open(file_paths[0], 'rb') as f:
+        assert f.read() == b'file1 content'
+    with open(file_paths[1], 'rb') as f:
+        assert f.read() == b'file2 content'
+    
+    # 清理
+    cleanup_temp_files(temp_dir, file_paths)
+
+
+def test_save_uploaded_files_to_target_dir(tmp_path):
+    """测试保存上传文件到指定目录"""
+    from werkzeug.datastructures import FileStorage
+    from io import BytesIO
+    
+    target_dir = str(tmp_path / "upload")
+    file1 = FileStorage(stream=BytesIO(b'content'), filename='test.jpg')
+    
+    file_paths, directory = save_uploaded_files([file1], target_dir=target_dir)
+    
+    assert file_paths is not None
+    assert directory == target_dir
+    assert len(file_paths) == 1
+    assert os.path.exists(file_paths[0])
+    assert os.path.exists(target_dir)
+
+
+def test_save_uploaded_files_empty_files(tmp_path):
+    """测试保存空文件列表"""
+    file_paths, temp_dir = save_uploaded_files([], temp_prefix='test_')
+    
+    assert file_paths is None
+    assert temp_dir is None
+
+
+def test_save_uploaded_files_no_valid_files(tmp_path):
+    """测试保存没有有效文件名的文件"""
+    from werkzeug.datastructures import FileStorage
+    from io import BytesIO
+    
+    # 创建没有文件名的文件对象
+    file1 = FileStorage(stream=BytesIO(b'content'), filename='')
+    files = [file1]
+    
+    file_paths, temp_dir = save_uploaded_files(files, temp_prefix='test_')
+    
+    assert file_paths is None
+    assert temp_dir is None
+
+
+def test_save_uploaded_files_exception(tmp_path, monkeypatch):
+    """测试保存文件时发生异常"""
+    from werkzeug.datastructures import FileStorage
+    from io import BytesIO
+    
+    file1 = FileStorage(stream=BytesIO(b'content'), filename='test.jpg')
+    
+    # Mock os.makedirs 抛出异常
+    def mock_makedirs(*args, **kwargs):
+        raise OSError("Permission denied")
+    
+    monkeypatch.setattr('core.utils.os.makedirs', mock_makedirs)
+    
+    file_paths, temp_dir = save_uploaded_files([file1], target_dir=str(tmp_path / "upload"))
+    
+    assert file_paths is None
+    assert temp_dir is None
+
+
+def test_cleanup_temp_files(tmp_path):
+    """测试清理临时文件"""
+    import tempfile
+    
+    # 创建临时目录和文件
+    temp_dir = tempfile.mkdtemp(prefix='test_cleanup_')
+    file1 = os.path.join(temp_dir, 'file1.txt')
+    file2 = os.path.join(temp_dir, 'file2.txt')
+    
+    with open(file1, 'w') as f:
+        f.write('content1')
+    with open(file2, 'w') as f:
+        f.write('content2')
+    
+    # 清理文件
+    cleanup_temp_files(temp_dir, [file1, file2])
+    
+    # 验证文件已删除
+    assert not os.path.exists(file1)
+    assert not os.path.exists(file2)
+    assert not os.path.exists(temp_dir)
+
+
+def test_cleanup_temp_files_nonexistent(tmp_path):
+    """测试清理不存在的临时文件（应该不抛出异常）"""
+    cleanup_temp_files("/nonexistent/dir", ["/nonexistent/file.txt"])
+
+
+def test_cleanup_temp_files_no_file_paths(tmp_path):
+    """测试清理临时目录（不指定文件路径）"""
+    import tempfile
+    
+    temp_dir = tempfile.mkdtemp(prefix='test_cleanup_')
+    
+    cleanup_temp_files(temp_dir)
+    
+    # 验证目录已删除
+    assert not os.path.exists(temp_dir)
 
 
 @patch('core.utils.sys.platform', 'linux')
@@ -425,3 +557,133 @@ def test_get_media_duration_failure(mock_open, mock_system, mock_tempfile, mock_
                                          is_alive=lambda: False)
 
     assert get_media_duration('fake.mp3') is None
+
+
+# --- Test save_uploaded_files and cleanup_temp_files ---
+
+
+def test_save_uploaded_files_to_temp_dir(tmp_path):
+    """测试保存上传文件到临时目录"""
+    from werkzeug.datastructures import FileStorage
+    from io import BytesIO
+    
+    # 创建模拟文件对象
+    file1 = FileStorage(stream=BytesIO(b'file1 content'), filename='test1.jpg')
+    file2 = FileStorage(stream=BytesIO(b'file2 content'), filename='test2.jpg')
+    files = [file1, file2]
+    
+    file_paths, temp_dir = save_uploaded_files(files, temp_prefix='test_')
+    
+    assert file_paths is not None
+    assert temp_dir is not None
+    assert len(file_paths) == 2
+    assert all(os.path.exists(path) for path in file_paths)
+    assert os.path.exists(temp_dir)
+    
+    # 验证文件内容
+    with open(file_paths[0], 'rb') as f:
+        assert f.read() == b'file1 content'
+    with open(file_paths[1], 'rb') as f:
+        assert f.read() == b'file2 content'
+    
+    # 清理
+    cleanup_temp_files(temp_dir, file_paths)
+
+
+def test_save_uploaded_files_to_target_dir(tmp_path):
+    """测试保存上传文件到指定目录"""
+    from werkzeug.datastructures import FileStorage
+    from io import BytesIO
+    
+    target_dir = str(tmp_path / "upload")
+    file1 = FileStorage(stream=BytesIO(b'content'), filename='test.jpg')
+    
+    file_paths, directory = save_uploaded_files([file1], target_dir=target_dir)
+    
+    assert file_paths is not None
+    assert directory == target_dir
+    assert len(file_paths) == 1
+    assert os.path.exists(file_paths[0])
+    assert os.path.exists(target_dir)
+
+
+def test_save_uploaded_files_empty_files(tmp_path):
+    """测试保存空文件列表"""
+    file_paths, temp_dir = save_uploaded_files([], temp_prefix='test_')
+    
+    assert file_paths is None
+    assert temp_dir is None
+
+
+def test_save_uploaded_files_no_valid_files(tmp_path):
+    """测试保存没有有效文件名的文件"""
+    from werkzeug.datastructures import FileStorage
+    from io import BytesIO
+    
+    # 创建没有文件名的文件对象
+    file1 = FileStorage(stream=BytesIO(b'content'), filename='')
+    files = [file1]
+    
+    file_paths, temp_dir = save_uploaded_files(files, temp_prefix='test_')
+    
+    assert file_paths is None
+    assert temp_dir is None
+
+
+def test_save_uploaded_files_exception(tmp_path, monkeypatch):
+    """测试保存文件时发生异常"""
+    from werkzeug.datastructures import FileStorage
+    from io import BytesIO
+    
+    file1 = FileStorage(stream=BytesIO(b'content'), filename='test.jpg')
+    
+    # Mock os.makedirs 抛出异常
+    def mock_makedirs(*args, **kwargs):
+        raise OSError("Permission denied")
+    
+    monkeypatch.setattr('core.utils.os.makedirs', mock_makedirs)
+    
+    file_paths, temp_dir = save_uploaded_files([file1], target_dir=str(tmp_path / "upload"))
+    
+    assert file_paths is None
+    assert temp_dir is None
+
+
+def test_cleanup_temp_files(tmp_path):
+    """测试清理临时文件"""
+    import tempfile
+    
+    # 创建临时目录和文件
+    temp_dir = tempfile.mkdtemp(prefix='test_cleanup_')
+    file1 = os.path.join(temp_dir, 'file1.txt')
+    file2 = os.path.join(temp_dir, 'file2.txt')
+    
+    with open(file1, 'w') as f:
+        f.write('content1')
+    with open(file2, 'w') as f:
+        f.write('content2')
+    
+    # 清理文件
+    cleanup_temp_files(temp_dir, [file1, file2])
+    
+    # 验证文件已删除
+    assert not os.path.exists(file1)
+    assert not os.path.exists(file2)
+    assert not os.path.exists(temp_dir)
+
+
+def test_cleanup_temp_files_nonexistent(tmp_path):
+    """测试清理不存在的临时文件（应该不抛出异常）"""
+    cleanup_temp_files("/nonexistent/dir", ["/nonexistent/file.txt"])
+
+
+def test_cleanup_temp_files_no_file_paths(tmp_path):
+    """测试清理临时目录（不指定文件路径）"""
+    import tempfile
+    
+    temp_dir = tempfile.mkdtemp(prefix='test_cleanup_')
+    
+    cleanup_temp_files(temp_dir)
+    
+    # 验证目录已删除
+    assert not os.path.exists(temp_dir)

@@ -9,17 +9,15 @@
 from __future__ import annotations
 
 import os
-import tempfile
 
 from flask import Blueprint, request
 from flask.typing import ResponseReturnValue
 from pydantic import BaseModel
-from werkzeug.utils import secure_filename
 
 from core.ai.ocr_ali import OCRAli
 from core.config import app_logger
 from core.tools.validation import parse_with_model
-from core.utils import _err, _ok, read_json_from_request
+from core.utils import _err, _ok, read_json_from_request, save_uploaded_files, cleanup_temp_files
 
 log = app_logger
 
@@ -71,46 +69,11 @@ def ocr() -> ResponseReturnValue:
                 return _err("未找到上传的图片文件")
             
             # 保存上传的文件到临时目录
-            temp_dir = tempfile.mkdtemp(prefix='ocr_')
-            temp_paths = []
-            is_uploaded = True
+            image_paths, temp_dir = save_uploaded_files(files, temp_prefix='ocr_')
+            if image_paths is None:
+                return _err("保存上传文件失败或没有有效的图片文件")
             
-            try:
-                for file in files:
-                    if file.filename == '':
-                        continue
-                    
-                    # 使用安全文件名
-                    safe_filename = secure_filename(file.filename)
-                    temp_path = os.path.join(temp_dir, safe_filename)
-                    file.save(temp_path)
-                    temp_paths.append(temp_path)
-                
-                if not temp_paths:
-                    # 清理临时目录
-                    try:
-                        os.rmdir(temp_dir)
-                    except Exception:
-                        pass
-                    return _err("没有有效的图片文件")
-                
-                image_paths = temp_paths
-                
-            except Exception as e:
-                # 清理临时文件
-                for path in temp_paths:
-                    try:
-                        if os.path.exists(path):
-                            os.remove(path)
-                    except Exception:
-                        pass
-                try:
-                    if temp_dir and os.path.exists(temp_dir):
-                        os.rmdir(temp_dir)
-                except Exception:
-                    pass
-                log.error(f"[OCR] 保存上传文件失败: {e}")
-                return _err(f"保存上传文件失败: {str(e)}")
+            is_uploaded = True
         
         # 方式2: JSON 请求（使用本地路径）
         else:
@@ -138,17 +101,7 @@ def ocr() -> ResponseReturnValue:
         
         # 清理临时文件（如果是上传的文件）
         if is_uploaded and temp_dir:
-            try:
-                for path in temp_paths:
-                    try:
-                        if os.path.exists(path):
-                            os.remove(path)
-                    except Exception:
-                        pass
-                if os.path.exists(temp_dir):
-                    os.rmdir(temp_dir)
-            except Exception as e:
-                log.warning(f"[OCR] 清理临时文件失败: {e}")
+            cleanup_temp_files(temp_dir, image_paths)
         
         if status == "error":
             return _err(result or "OCR 识别失败")

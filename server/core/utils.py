@@ -11,10 +11,11 @@ import queue
 import tempfile
 import shlex
 from datetime import datetime, timedelta
-from typing import Optional, Tuple, List, Dict, Any
+from typing import Optional, Tuple, List, Dict, Any, Union
 from urllib.parse import quote, unquote
 from flask import request
 from queue import Queue, Empty
+from werkzeug.utils import secure_filename
 
 from core.config import app_logger
 
@@ -529,6 +530,110 @@ def get_unique_filepath(directory: str, base_name: str, extension: str) -> str:
             return file_path
 
         counter += 1
+
+
+def _cleanup_directory(directory: str, file_paths: Optional[List[str]] = None, is_temp: bool = False) -> None:
+    """内部辅助函数：清理目录和文件。
+    
+    Args:
+        directory: 目录路径
+        file_paths: 文件路径列表（可选）
+        is_temp: 是否为临时目录（临时目录会尝试删除空目录）
+    """
+    try:
+        # 删除指定文件
+        if file_paths:
+            for path in file_paths:
+                try:
+                    if os.path.exists(path):
+                        os.remove(path)
+                except Exception:
+                    pass
+        
+        # 如果是临时目录，尝试删除空目录
+        if is_temp and directory and os.path.exists(directory):
+            try:
+                os.rmdir(directory)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
+def save_uploaded_files(
+    files: List[Any],
+    target_dir: Optional[str] = None,
+    temp_prefix: str = 'upload_'
+) -> Tuple[Optional[List[str]], Optional[str]]:
+    """保存上传的文件到指定目录或临时目录。
+    
+    通用文件上传保存函数，支持两种模式：
+    1. 保存到临时目录：target_dir=None，自动创建临时目录
+    2. 保存到指定目录：target_dir 指定目标目录路径
+    
+    Args:
+        files: Flask 文件对象列表（从 request.files.getlist() 获取）
+        target_dir: 目标目录路径，None 表示使用临时目录
+        temp_prefix: 临时目录前缀（仅在 target_dir=None 时使用）
+    
+    Returns:
+        (file_paths, directory) 成功时返回文件路径列表和目录路径
+        (None, None) 失败时返回 None
+    
+    Examples:
+        # 保存到临时目录
+        paths, temp_dir = save_uploaded_files(files, temp_prefix='ocr_')
+        
+        # 保存到指定目录
+        paths, _ = save_uploaded_files(files, target_dir='/path/to/dir')
+    """
+    directory = None
+    file_paths = []
+    is_temp = target_dir is None
+    
+    try:
+        # 确定目标目录
+        if is_temp:
+            directory = tempfile.mkdtemp(prefix=temp_prefix)
+        else:
+            directory = target_dir
+            if not os.path.exists(directory):
+                os.makedirs(directory, exist_ok=True)
+        
+        # 保存文件
+        for file in files:
+            if not file.filename:
+                continue
+            
+            safe_filename = secure_filename(file.filename)
+            file_path = os.path.join(directory, safe_filename)
+            file.save(file_path)
+            file_paths.append(file_path)
+        
+        # 检查是否有有效文件
+        if not file_paths:
+            _cleanup_directory(directory, is_temp=is_temp)
+            return None, None
+        
+        return file_paths, directory
+        
+    except Exception as e:
+        log.error(f"[Utils] 保存上传文件失败: {e}")
+        _cleanup_directory(directory, file_paths, is_temp=is_temp)
+        return None, None
+
+
+def cleanup_temp_files(temp_dir: str, file_paths: Optional[List[str]] = None) -> None:
+    """清理临时文件和目录。
+    
+    Args:
+        temp_dir: 临时目录路径
+        file_paths: 文件路径列表（可选，如果提供则只删除这些文件）
+    """
+    try:
+        _cleanup_directory(temp_dir, file_paths, is_temp=True)
+    except Exception as e:
+        log.warning(f"[Utils] 清理临时文件失败: {e}")
 
 
 def run_subprocess_safe(cmd: List[str],

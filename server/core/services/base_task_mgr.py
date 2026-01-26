@@ -10,6 +10,7 @@ from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, TypeVar,
 
 from core.config import (TASK_STATUS_FAILED, TASK_STATUS_PENDING, TASK_STATUS_PROCESSING, TASK_STATUS_SUCCESS,
                          app_logger)
+from core.tools.async_util import run_in_background
 from core.utils import ensure_directory
 
 log = app_logger
@@ -179,7 +180,7 @@ class BaseTaskMgr(ABC, Generic[TTask]):
             finally:
                 self._clear_stop_flag(task_id)
 
-        threading.Thread(target=wrapped, daemon=True).start()
+        run_in_background(wrapped)
 
     def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
         with self._task_lock:

@@ -4,6 +4,7 @@
 - 创建 TTS 任务（文本 -> 语音）
 - 启动任务异步生成音频文件
 - 任务查询、更新、删除
+- OCR 图片文字识别（将结果追加到任务文本末尾）
 - 生成的音频文件保存在：{DEFAULT_BASE_DIR}/tasks/tts/{task_id}/output.mp3
 - 通过 API 提供文件下载功能
 """
@@ -11,6 +12,7 @@
 import os
 import shutil
 import threading
+import time
 import re
 from dataclasses import asdict, dataclass
 from datetime import datetime
@@ -25,8 +27,21 @@ from core.config import (
     app_logger,
 )
 from core.services.base_task_mgr import BaseTaskMgr, TaskBase
+from core.tools.async_util import run_in_background
 from core.tts.tts_ali import TTSClient
-from core.utils import ensure_directory, get_media_duration
+from core.utils import cleanup_temp_files, ensure_directory, get_media_duration
+
+# 延迟导入 OCR 客户端，避免循环依赖
+_ocr_client = None
+
+
+def _get_ocr_client():
+    """获取 OCR 客户端实例（延迟导入）。"""
+    global _ocr_client
+    if _ocr_client is None:
+        from core.ai.ocr_ali import OCRAli
+        _ocr_client = OCRAli()
+    return _ocr_client
 
 log = app_logger
 
@@ -410,7 +425,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 with self._task_lock:
                     self._active_clients.pop(task_id, None)
 
-        threading.Thread(target=wrapped, daemon=True).start()
+        run_in_background(wrapped)
 
     def _run_tts_task(self, task: TTSTask) -> None:
         """执行 TTS 任务的核心逻辑。
@@ -425,7 +440,6 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         Args:
             task: TTS 任务对象
         """
-        import time
         task_start_time = time.time()
 
         # log.info(f"[TTSMgr] 开始执行 TTS 任务 {task.task_id}, 任务名称: {task.name}")
@@ -482,6 +496,10 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             if data_type == 0:
                 if isinstance(data, (bytes, bytearray)):
                     if file_handle is None:
+                        # 确保输出文件目录存在
+                        output_dir = os.path.dirname(output_file)
+                        if output_dir:
+                            ensure_directory(output_dir)
                         file_handle = open(output_file, 'wb')
                     file_handle.write(data)
                     audio_data_size += len(data)
@@ -865,7 +883,136 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 log.warning(f"[TTSMgr] 异步获取任务 {task_id} 音频时长失败: {e}")
 
         # 在后台线程中执行
-        threading.Thread(target=update_duration, daemon=True).start()
+        run_in_background(update_duration)
+
+    def start_ocr_task(self, task_id: str, image_paths: list[str],
+                       temp_dir: str) -> Tuple[int, str]:
+        """启动 OCR 任务（异步执行）。
+        
+        将 OCR 识别结果自动追加到指定 TTS 任务的文本末尾。
+        开始 OCR 后，TTS 任务进入处理中状态；OCR 完成后，结果追加到文本末尾，任务状态恢复为待处理。
+        
+        Args:
+            task_id: 任务 ID
+            image_paths: 图片路径列表
+            temp_dir: 临时文件目录路径（用于清理）
+        
+        Returns:
+            (code, msg)
+            - code: 0 表示成功，-1 表示失败
+            - msg: 描述信息
+        """
+        # 验证任务存在
+        task, err = self._get_task_or_err(task_id)
+        if err:
+            log.warning(f"[TTSMgr] 启动 OCR 任务失败，task_id: {task_id}, 错误: {err}")
+            return -1, err
+        
+        # 检查任务状态，如果正在处理中，不允许OCR
+        if task.status == TASK_STATUS_PROCESSING:
+            log.warning(
+                f"[TTSMgr] 启动 OCR 任务失败，task_id: {task_id}, 原因: 任务正在处理中"
+            )
+            return -1, '任务正在处理中，无法执行 OCR'
+        
+        if not image_paths:
+            return -1, '图片路径列表为空'
+        
+        log.info(
+            f"[TTSMgr] 准备启动 OCR 任务 {task_id}, 任务名称: {task.name}, 图片数量: {len(image_paths)}"
+        )
+        
+        # 创建 OCR 任务执行函数（包装器，符合 _run_task_async 的签名）
+        def ocr_runner(task: TTSTask) -> None:
+            """OCR 任务执行函数（包装器）。"""
+            self._run_ocr_task_logic(task_id, image_paths, temp_dir)
+        
+        # 使用统一的异步任务执行方法
+        self._run_task_async(task_id, ocr_runner)
+        
+        return 0, 'OCR 任务已启动'
+
+    def _append_text_to_task(self, task_id: str, new_text: str) -> Tuple[int, str]:
+        """将文本追加到任务的现有文本末尾。
+        
+        Args:
+            task_id: 任务 ID
+            new_text: 要追加的新文本
+        
+        Returns:
+            (code, msg) 更新结果
+        """
+        with self._task_lock:
+            task = self._get_task(task_id)
+            if not task:
+                return -1, 'TTS 任务不存在'
+            
+            # 将结果追加到现有文本末尾
+            current_text = task.text or ''
+            combined_text = f"{current_text}\n\n{new_text}" if current_text else new_text
+        
+        # 先将状态设置为pending，以便可以更新文本（update_task不允许processing状态下更新）
+        self._update_task_status(task_id, TASK_STATUS_PENDING, None)
+        
+        # 更新任务文本
+        return self.update_task(task_id=task_id, text=combined_text)
+    
+    def _restore_task_to_pending(self, task_id: str, error_msg: str = None) -> None:
+        """恢复任务状态为待处理（用于错误恢复）。
+        
+        Args:
+            task_id: 任务 ID
+            error_msg: 错误消息（可选，用于日志记录）
+        """
+        self._update_task_status(task_id, TASK_STATUS_PENDING, None)
+        if error_msg:
+            log.error(f"[TTSMgr] OCR 任务 {task_id} 失败: {error_msg}")
+    
+    def _run_ocr_task_logic(self, task_id: str, image_paths: list[str],
+                            temp_dir: str) -> None:
+        """执行 OCR 任务的核心逻辑。
+        
+        注意：此方法由 _run_task_async 调用，状态管理由 _run_task_async 处理。
+        此方法只负责 OCR 业务逻辑，不负责状态更新（除了将状态恢复为 pending）。
+        
+        Args:
+            task_id: 任务 ID
+            image_paths: 图片路径列表
+            temp_dir: 临时文件目录路径
+        """
+        try:
+            log.info(
+                f"[TTSMgr] 开始 OCR 任务 {task_id}，图片数量: {len(image_paths)}")
+            
+            # 调用 OCR 服务
+            ocr_client = _get_ocr_client()
+            status, result = ocr_client.query(image_paths)
+            
+            if status == "error":
+                # OCR 失败，恢复任务状态为待处理（不抛出异常，避免 _run_task_async 设置为失败）
+                self._restore_task_to_pending(task_id, result or 'OCR 识别失败')
+                return
+            
+            # OCR 成功，追加文本到任务
+            code, msg = self._append_text_to_task(task_id, result)
+            if code != 0:
+                # 更新失败，恢复任务状态为待处理
+                self._restore_task_to_pending(task_id, f"更新文本失败: {msg}")
+                return
+            
+            log.info(
+                f"[TTSMgr] OCR 任务 {task_id} 完成，追加文本长度: {len(result)} 字符"
+            )
+            # 注意：状态已经在 _append_text_to_task 中设置为 pending，不需要再次设置
+            
+        except Exception as e:
+            # 发生异常，恢复任务状态为待处理（不重新抛出，避免 _run_task_async 设置为失败）
+            self._restore_task_to_pending(task_id, f"处理异常: {e}")
+            log.error(
+                f"[TTSMgr] OCR 任务 {task_id} 处理异常: {e}", exc_info=True)
+        finally:
+            # 清理临时文件
+            cleanup_temp_files(temp_dir, image_paths)
 
 
 tts_mgr = TTSMgr()

@@ -236,22 +236,29 @@ def test_ocr_file_save_error(client, monkeypatch):
     mock_ocr = MagicMock()
     monkeypatch.setattr(ar, "ocr_client", mock_ocr)
     
-    # Mock tempfile.mkdtemp 抛出异常
-    with patch('core.api.ai_routes.tempfile.mkdtemp', side_effect=Exception("创建临时目录失败")):
-        with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp_file:
-            tmp_file.write(b'fake image data')
-            tmp_path = tmp_file.name
+    # Mock save_uploaded_files 返回 None（保存失败）
+    from core.utils import save_uploaded_files
+    original_save = save_uploaded_files
+    def mock_save_uploaded_files(*args, **kwargs):
+        return None, None
+    
+    monkeypatch.setattr('core.api.ai_routes.save_uploaded_files', mock_save_uploaded_files)
+    
+    with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp_file:
+        tmp_file.write(b'fake image data')
+        tmp_path = tmp_file.name
+    
+    try:
+        with open(tmp_path, 'rb') as f:
+            resp = client.post('/ai/ocr', data={'file': (f, 'test.jpg')}, content_type='multipart/form-data')
         
-        try:
-            with open(tmp_path, 'rb') as f:
-                resp = client.post('/ai/ocr', data={'file': (f, 'test.jpg')}, content_type='multipart/form-data')
-            
-            assert resp.status_code == 200
-            data = resp.get_json()
-            assert data["code"] == -1
-        finally:
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["code"] == -1
+        assert "保存上传文件失败" in data["msg"]
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
 
 
 def test_ocr_file_save_io_error(client, monkeypatch, tmp_path):

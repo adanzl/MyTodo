@@ -1,10 +1,10 @@
 """
 异步工具函数
-用于在同步代码中调用异步函数
+用于在同步代码中调用异步函数，以及统一管理同步函数的异步执行
 """
 import asyncio
 import threading
-from typing import Optional, Any, Coroutine
+from typing import Optional, Any, Coroutine, Callable
 from queue import Queue, Empty
 
 from gevent import Timeout as GeventTimeout
@@ -15,6 +15,25 @@ log = app_logger
 
 # 使用 threading.Thread 而不是 ThreadPoolExecutor，避免与 gevent 的队列冲突
 # 因为 main.py 中设置了 thread=False，threading 模块不会被 gevent patch
+
+
+def run_in_background(func: Callable[[], None], daemon: bool = True) -> None:
+    """在后台线程中运行同步函数（不等待结果）。
+    
+    通用的后台任务执行函数，统一管理所有需要异步执行的同步函数。
+    
+    Args:
+        func: 要执行的同步函数（无参数，无返回值）
+        daemon: 是否为守护线程，默认为 True
+    
+    Examples:
+        # 执行后台任务
+        run_in_background(lambda: do_something())
+        
+        # 带参数的函数
+        run_in_background(lambda: process_data(data))
+    """
+    threading.Thread(target=func, daemon=daemon).start()
 
 
 def _clear_event_loop() -> None:

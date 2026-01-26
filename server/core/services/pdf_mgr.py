@@ -16,7 +16,7 @@ import pikepdf
 from core.config import app_logger
 from core.config import (PDF_BASE_DIR, PDF_UPLOAD_DIR, PDF_UNLOCK_DIR, TASK_STATUS_PROCESSING, TASK_STATUS_SUCCESS,
                          TASK_STATUS_UPLOADED)
-from core.utils import ensure_directory, get_file_info, is_allowed_pdf_file
+from core.utils import ensure_directory, get_file_info, get_unique_filepath, is_allowed_pdf_file
 
 log = app_logger
 
@@ -113,16 +113,11 @@ class PdfMgr(BaseTaskMgr[PdfTask]):
             ensure_directory(PDF_UNLOCK_DIR)
 
             safe_filename = secure_filename(filename)
-            file_path = os.path.join(PDF_UPLOAD_DIR, safe_filename)
-
-            if os.path.exists(file_path):
-                base_name, ext = os.path.splitext(safe_filename)
-                counter = 1
-                while os.path.exists(file_path):
-                    new_filename = f"{base_name}_{counter}{ext}"
-                    file_path = os.path.join(PDF_UPLOAD_DIR, new_filename)
-                    counter += 1
-                safe_filename = os.path.basename(file_path)
+            base_name, ext = os.path.splitext(safe_filename)
+            
+            # 使用统一的函数生成唯一文件路径
+            file_path = get_unique_filepath(PDF_UPLOAD_DIR, base_name, ext)
+            safe_filename = os.path.basename(file_path)
 
             file_obj.save(file_path)
             log.info(f"[PDF] 文件保存完成: {file_path}")

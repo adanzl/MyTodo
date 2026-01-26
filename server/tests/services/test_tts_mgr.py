@@ -462,3 +462,110 @@ def test_count_text_chars_numbers(tts_mgr: TTSMgr):
     from core.services.tts_mgr import count_text_chars
     assert count_text_chars("123456") == 6
     assert count_text_chars("你好123") == 7  # 2个汉字*2 + 3个数字 = 4 + 3 = 7
+
+
+def test_start_ocr_task_success(tts_mgr: TTSMgr, tmp_path):
+    """测试启动 OCR 任务成功"""
+    import tempfile
+    _, _, task_id = tts_mgr.create_task(text="初始文本")
+    
+    # 创建临时图片文件
+    temp_dir = tempfile.mkdtemp(prefix='test_ocr_')
+    image_path = os.path.join(temp_dir, 'test.jpg')
+    with open(image_path, 'wb') as f:
+        f.write(b'fake image data')
+    
+    # Mock OCR 客户端
+    with patch('core.services.tts_mgr._get_ocr_client') as mock_get_client:
+        mock_ocr = MagicMock()
+        mock_ocr.query.return_value = ("ok", "OCR识别结果")
+        mock_get_client.return_value = mock_ocr
+        
+        code, msg = tts_mgr.start_ocr_task(task_id, [image_path], temp_dir)
+        assert code == 0
+        assert msg == "OCR 任务已启动"
+        
+        # 等待任务执行完成
+        import time
+        deadline = 3.0
+        start = time.time()
+        while time.time() - start < deadline:
+            task = tts_mgr.get_task(task_id)
+            if task and task['status'] != TASK_STATUS_PROCESSING:
+                break
+            time.sleep(0.1)
+        
+        # 验证文本已追加
+        task = tts_mgr.get_task(task_id)
+        assert task is not None
+        assert "OCR识别结果" in task['text']
+        assert task['status'] == TASK_STATUS_PENDING
+
+
+def test_start_ocr_task_task_not_found(tts_mgr: TTSMgr):
+    """测试启动 OCR 任务时任务不存在"""
+    code, msg = tts_mgr.start_ocr_task("nonexistent", ["/path/to/image.jpg"], "/tmp")
+    assert code == -1
+    assert "任务不存在" in msg
+
+
+def test_start_ocr_task_processing_fails(tts_mgr: TTSMgr):
+    """测试启动 OCR 任务时任务正在处理中"""
+    _, _, task_id = tts_mgr.create_task(text="test")
+    task = tts_mgr._get_task(task_id)
+    task.status = TASK_STATUS_PROCESSING
+    
+    code, msg = tts_mgr.start_ocr_task(task_id, ["/path/to/image.jpg"], "/tmp")
+    assert code == -1
+    assert "任务正在处理中" in msg
+
+
+def test_start_ocr_task_empty_image_paths(tts_mgr: TTSMgr):
+    """测试启动 OCR 任务时图片路径列表为空"""
+    _, _, task_id = tts_mgr.create_task(text="test")
+    code, msg = tts_mgr.start_ocr_task(task_id, [], "/tmp")
+    assert code == -1
+    assert "图片路径列表为空" in msg
+
+
+def test_append_text_to_task(tts_mgr: TTSMgr):
+    """测试追加文本到任务"""
+    _, _, task_id = tts_mgr.create_task(text="初始文本")
+    
+    code, msg = tts_mgr._append_text_to_task(task_id, "追加的文本")
+    assert code == 0
+    
+    task = tts_mgr.get_task(task_id)
+    assert "初始文本" in task['text']
+    assert "追加的文本" in task['text']
+    assert task['status'] == TASK_STATUS_PENDING
+
+
+def test_append_text_to_task_empty_current_text(tts_mgr: TTSMgr):
+    """测试追加文本到空文本任务"""
+    _, _, task_id = tts_mgr.create_task(text="")
+    
+    code, msg = tts_mgr._append_text_to_task(task_id, "新文本")
+    assert code == 0
+    
+    task = tts_mgr.get_task(task_id)
+    assert task['text'] == "新文本"
+
+
+def test_append_text_to_task_not_found(tts_mgr: TTSMgr):
+    """测试追加文本到不存在的任务"""
+    code, msg = tts_mgr._append_text_to_task("nonexistent", "文本")
+    assert code == -1
+    assert "TTS 任务不存在" in msg
+
+
+def test_restore_task_to_pending(tts_mgr: TTSMgr):
+    """测试恢复任务状态为待处理"""
+    _, _, task_id = tts_mgr.create_task(text="test")
+    task = tts_mgr._get_task(task_id)
+    task.status = TASK_STATUS_PROCESSING
+    
+    tts_mgr._restore_task_to_pending(task_id, "测试错误")
+    
+    task = tts_mgr.get_task(task_id)
+    assert task['status'] == TASK_STATUS_PENDING
