@@ -59,6 +59,7 @@ class TTSClient:
         self.task_started = False
         self.task_finished = False
         self.role = DEFAULT_ROLE
+        self.model = None  # 模型选择：cosyvoice-v3-flash 或 cosyvoice-v3-plus，None时使用DEFAULT_MODEL
         self.speed = 1.0
         self.vol = 50
         self.id = ''
@@ -235,8 +236,11 @@ class TTSClient:
     def _on_open(self, ws, role: str):
         """WebSocket 连接建立时回调函数"""
 
-        # 获取模型
-        model = MODEL_MAP.get(role, DEFAULT_MODEL)
+        # 获取模型：优先使用self.model，如果没有则使用MODEL_MAP映射或DEFAULT_MODEL
+        if self.model:
+            model = self.model
+        else:
+            model = MODEL_MAP.get(role, DEFAULT_MODEL)
 
         # 构造 run-task 指令
         run_task_cmd = {

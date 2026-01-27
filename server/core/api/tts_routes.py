@@ -37,6 +37,7 @@ class _CreateTTSTaskBody(BaseModel):
     text: str
     name: str | None = None
     role: str | None = None
+    model: str | None = None  # 模型选择：cosyvoice-v3-flash 或 cosyvoice-v3-plus
     speed: float | None = None
     vol: int | None = None
 
@@ -46,6 +47,7 @@ class _UpdateTTSTaskBody(BaseModel):
     name: str | None = None
     text: str | None = None
     role: str | None = None
+    model: str | None = None  # 模型选择：cosyvoice-v3-flash 或 cosyvoice-v3-plus
     speed: float | None = None
     vol: int | None = None
 
@@ -69,6 +71,7 @@ def create_tts_task() -> ResponseReturnValue:
         text=body.text,
         name=body.name,
         role=body.role,
+        model=body.model,
         speed=body.speed,
         vol=body.vol,
     )
@@ -88,6 +91,7 @@ def update_tts_task() -> ResponseReturnValue:
         name=body.name,
         text=body.text,
         role=body.role,
+        model=body.model,
         speed=body.speed,
         vol=body.vol,
     )

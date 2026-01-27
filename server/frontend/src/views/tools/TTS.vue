@@ -99,7 +99,7 @@
         </div>
 
         <!-- 文本输入 -->
-        <div class="border rounded p-3 flex flex-col gap-2">
+        <div class="border rounded p-3 flex flex-col gap-2 flex-1">
           <div class="flex items-center justify-between">
             <h4 class="h-8 text-sm font-semibold">文本内容</h4>
             <div class="flex items-center gap-2">
@@ -132,14 +132,23 @@
               </el-button>
             </div>
           </div>
-          <el-input v-model="ttsText" type="textarea" :rows="16" placeholder="请输入要转换为语音的文本" :disabled="isTaskProcessing"
-            @blur="handleTtsTextChange" />
+          <el-input v-model="ttsText" type="textarea" :autosize="{ minRows: 6, maxRows: 20 }" 
+            placeholder="请输入要转换为语音的文本" :disabled="isTaskProcessing"
+            @blur="handleTtsTextChange" class="flex-1" />
         </div>
 
         <!-- 参数设置 -->
         <div class="border rounded p-3 flex flex-col gap-2">
           <h4 class="text-sm font-semibold">参数设置</h4>
-          <div class="grid grid-cols-3 gap-3">
+          <div class="grid grid-cols-4 gap-3">
+            <div class="flex flex-col gap-1">
+              <label class="text-xs text-gray-600">模型</label>
+              <el-select v-model="ttsModel" size="small" placeholder="默认模型" clearable :disabled="isTaskProcessing"
+                @change="handleTtsParamsChange" class="w-full">
+                <el-option label="cosyvoice-v3-flash" value="cosyvoice-v3-flash" />
+                <el-option label="cosyvoice-v3-plus" value="cosyvoice-v3-plus" />
+              </el-select>
+            </div>
             <div class="flex flex-col gap-1">
               <label class="text-xs text-gray-600">发音人/音色</label>
               <el-select v-model="ttsRole" size="small" placeholder="请选择音色（可选）" clearable :disabled="isTaskProcessing"
@@ -275,10 +284,16 @@ import {
   ocrTtsTask,
 } from "@/api/tts";
 
+// TTS 常量配置
+const DEFAULT_ROLE = "cosyvoice-v3-plus-leo-34ba9eaebae44039a4a9426af6389dcd"; // 默认音色：灿灿
+const DEFAULT_SPEED = 0.8; // 默认语速
+const DEFAULT_VOL = 50; // 默认音量
+
 // TTS 相关状态
 const ttsLoading = ref(false);
 const ttsTaskList = ref<TTSTask[]>([]);
 const ttsCurrentTask = ref<TTSTask | null>(null);
+const currentFetchingTaskId = ref<string | null>(null); // 当前正在获取的任务ID
 const ttsCreateTaskDialogVisible = ref(false);
 const ttsNewTaskName = ref("");
 const ttsNewTaskText = ref("");
@@ -287,9 +302,10 @@ const ttsRenameTaskName = ref("");
 
 // 任务参数
 const ttsText = ref("");
-const ttsRole = ref<string | null>("cosyvoice-v3-plus-leo-34ba9eaebae44039a4a9426af6389dcd"); // 默认音色：灿灿
-const ttsSpeed = ref(0.8); // 默认语速：0.8
-const ttsVol = ref(50);
+const ttsRole = ref<string | null>(DEFAULT_ROLE);
+const ttsModel = ref<string | null>(null); // 模型选择：cosyvoice-v3-flash 或 cosyvoice-v3-plus
+const ttsSpeed = ref(DEFAULT_SPEED);
+const ttsVol = ref(DEFAULT_VOL);
 const ttsParamsChanged = ref(false);
 
 // OCR 相关状态
@@ -385,50 +401,101 @@ const handleTtsCreateTaskConfirm = async () => {
   }
 };
 
+// 更新任务参数到UI（从任务数据）
+const updateTaskParamsFromData = (task: TTSTask) => {
+  ttsText.value = task.text || "";
+  ttsRole.value = task.role || DEFAULT_ROLE;
+  ttsModel.value = task.model || null;
+  ttsSpeed.value = task.speed ?? DEFAULT_SPEED;
+  ttsVol.value = task.vol ?? DEFAULT_VOL;
+  ttsParamsChanged.value = false;
+};
+
+// 检查是否应该处理请求结果（防止快速切换时的数据覆盖）
+const shouldProcessRequest = (taskId: string): boolean => {
+  return currentFetchingTaskId.value === taskId;
+};
+
+// 更新任务列表中的任务状态
+const updateTaskInList = (task: TTSTask) => {
+  const taskIndex = ttsTaskList.value.findIndex(t => t.task_id === task.task_id);
+  if (taskIndex !== -1) {
+    ttsTaskList.value[taskIndex] = { ...task };
+  }
+};
+
 // 查看 TTS 任务
 const handleTtsViewTask = async (taskId: string) => {
-  // 如果切换任务，停止之前的轮询
-  if (ttsCurrentTask.value && ttsCurrentTask.value.task_id !== taskId) {
+  const isTaskSwitching = ttsCurrentTask.value && ttsCurrentTask.value.task_id !== taskId;
+  
+  // 如果切换任务，执行清理操作
+  if (isTaskSwitching && ttsCurrentTask.value) {
     handleTtsStopPlay();
-    stopTtsPolling();
+    clearSelectedImages();
+    // 如果当前任务不是processing状态，停止轮询
+    if (ttsCurrentTask.value.status !== "processing") {
+      stopTtsPolling();
+    }
   }
+
+  // 优化：先从任务列表中查找任务数据，立即更新UI，提升响应速度
+  const taskInList = ttsTaskList.value.find(t => t.task_id === taskId);
+  if (taskInList) {
+    ttsCurrentTask.value = { ...taskInList };
+    updateTaskParamsFromData(taskInList);
+    
+    // 如果任务正在处理中，启动轮询
+    if (taskInList.status === "processing") {
+      startTtsPollingTaskStatus();
+    }
+  }
+
+  // 然后在后台异步获取最新的任务详情（静默更新，不显示loading）
+  currentFetchingTaskId.value = taskId;
   try {
-    ttsLoading.value = true;
     const response = await getTtsTask(taskId);
+    
+    // 检查是否仍然是当前要获取的任务（用户可能已经切换了）
+    if (!shouldProcessRequest(taskId)) {
+      return;
+    }
+    
     if (response.code === 0) {
-      ttsCurrentTask.value = response.data;
-      // 同步更新任务列表中的任务状态
-      const taskIndex = ttsTaskList.value.findIndex(t => t.task_id === taskId);
-      if (taskIndex !== -1) {
-        ttsTaskList.value[taskIndex] = { ...response.data };
+      // 双重检查，确保数据一致性
+      if (!shouldProcessRequest(taskId)) {
+        return;
       }
-      // 初始化参数
-      ttsText.value = response.data.text || "";
-      // 将空字符串转换为 null，避免 el-select 的空字符串警告
-      ttsRole.value = response.data.role ? response.data.role : "cosyvoice-v3-plus-leo-34ba9eaebae44039a4a9426af6389dcd";
-      ttsSpeed.value = response.data.speed ?? 0.8;
-      ttsVol.value = response.data.vol ?? 50;
-      ttsParamsChanged.value = false;
+      
+      const taskData = response.data;
+      ttsCurrentTask.value = taskData;
+      updateTaskInList(taskData);
+      updateTaskParamsFromData(taskData);
 
       // 只有处理中的任务才自动开始定时刷新状态
-      if (response.data.status === "processing") {
+      if (taskData.status === "processing") {
         startTtsPollingTaskStatus();
       }
-    } else {
-      ElMessage.error(response.msg || "获取任务信息失败");
     }
   } catch (error) {
-    logAndNoticeError(error as Error, "获取任务信息失败");
+    // 静默失败，不影响UI显示（因为已经使用了列表中的数据）
+    if (shouldProcessRequest(taskId)) {
+      console.error(`[TTS] 获取任务详情失败: ${taskId}`, error);
+    }
   } finally {
-    ttsLoading.value = false;
+    // 清理标记
+    if (shouldProcessRequest(taskId)) {
+      currentFetchingTaskId.value = null;
+    }
   }
 };
 
 // 删除 TTS 任务
 const handleTtsDeleteTask = async (taskId: string) => {
-  // 如果删除的是当前选中的任务，停止轮询
+  // 如果删除的是当前选中的任务，停止轮询（如果任务不是processing状态）
   if (ttsCurrentTask.value && ttsCurrentTask.value.task_id === taskId) {
-    stopTtsPolling();
+    if (ttsCurrentTask.value.status !== "processing") {
+      stopTtsPolling();
+    }
   }
 
   const confirmed = await ElMessageBox.confirm("确定要删除该任务吗？", "提示", {
@@ -527,10 +594,12 @@ const handleTtsParamsChange = () => {
     return;
   }
   const currentRole = ttsCurrentTask.value.role || null;
-  const currentSpeed = ttsCurrentTask.value.speed ?? 0.8;
-  const currentVol = ttsCurrentTask.value.vol ?? 50;
+  const currentModel = ttsCurrentTask.value.model || null;
+  const currentSpeed = ttsCurrentTask.value.speed ?? DEFAULT_SPEED;
+  const currentVol = ttsCurrentTask.value.vol ?? DEFAULT_VOL;
   ttsParamsChanged.value =
     ttsRole.value !== currentRole ||
+    ttsModel.value !== currentModel ||
     ttsSpeed.value !== currentSpeed ||
     ttsVol.value !== currentVol;
   if (ttsParamsChanged.value) {
@@ -550,6 +619,7 @@ const handleTtsSaveParams = async () => {
     const updateParams: {
       text?: string;
       role?: string;
+      model?: string;
       speed?: number;
       vol?: number;
     } = {};
@@ -566,14 +636,20 @@ const handleTtsSaveParams = async () => {
       updateParams.role = ttsRole.value || undefined;
     }
 
+    // 检查模型是否有变化
+    const currentModel = ttsCurrentTask.value.model || null;
+    if (ttsModel.value !== currentModel) {
+      updateParams.model = ttsModel.value || undefined;
+    }
+
     // 检查语速是否有变化
-    const currentSpeed = ttsCurrentTask.value.speed ?? 0.8;
+    const currentSpeed = ttsCurrentTask.value.speed ?? DEFAULT_SPEED;
     if (ttsSpeed.value !== currentSpeed) {
       updateParams.speed = ttsSpeed.value;
     }
 
     // 检查音量是否有变化
-    const currentVol = ttsCurrentTask.value.vol ?? 50;
+    const currentVol = ttsCurrentTask.value.vol ?? DEFAULT_VOL;
     if (ttsVol.value !== currentVol) {
       updateParams.vol = ttsVol.value;
     }
@@ -626,10 +702,8 @@ const handleTtsStart = async () => {
     const response = await startTtsTask(ttsCurrentTask.value.task_id);
     if (response.code === 0) {
       ElMessage.success("TTS 任务已启动");
-      // 立即刷新任务状态
-      await handleTtsViewTask(ttsCurrentTask.value.task_id);
+      // 刷新任务列表和当前任务状态
       await loadTtsTaskList();
-      // 再次刷新确保状态同步
       await handleTtsViewTask(ttsCurrentTask.value.task_id);
       // handleTtsViewTask 中已经会自动开始轮询，这里不需要再次调用
     } else {
@@ -673,43 +747,74 @@ const handleTtsStop = async () => {
   }
 };
 
+// 更新任务详情（不改变当前选中的任务）
+const updateTaskDetail = async (taskId: string) => {
+  try {
+    const response = await getTtsTask(taskId);
+    if (response.code === 0) {
+      const taskData = response.data;
+      updateTaskInList(taskData);
+      
+      // 如果这是当前选中的任务，也更新当前任务详情
+      if (ttsCurrentTask.value && ttsCurrentTask.value.task_id === taskId) {
+        ttsCurrentTask.value = taskData;
+        updateTaskParamsFromData(taskData);
+      }
+    }
+  } catch (error) {
+    // 静默失败，不影响轮询
+    console.error(`[TTS] 更新任务详情失败: ${taskId}`, error);
+  }
+};
+
+// 记录上一次轮询时的processing任务ID集合
+const previousProcessingTaskIds = ref<Set<string>>(new Set());
+
 // 轮询 TTS 任务状态
 const { start: startTtsPolling, stop: stopTtsPolling } = useControllableInterval(
   async () => {
-    if (!ttsCurrentTask.value) {
-      stopTtsPolling();
-      return;
-    }
-
-    const currentTaskId = ttsCurrentTask.value.task_id;
-
     // 先更新任务列表，确保状态同步
     await loadTtsTaskList();
 
-    // 检查任务是否还存在（可能被删除）
-    const taskInList = ttsTaskList.value.find(t => t.task_id === currentTaskId);
-    if (!taskInList) {
-      // 任务已被删除，停止轮询
+    // 找出所有 processing 状态的任务
+    const processingTasks = ttsTaskList.value.filter(t => t.status === "processing");
+    const currentProcessingTaskIds = new Set(processingTasks.map(t => t.task_id));
+    
+    // 找出刚刚完成的任务（上一次是processing，现在不是processing）
+    const completedTaskIds = Array.from(previousProcessingTaskIds.value).filter(
+      taskId => !currentProcessingTaskIds.has(taskId)
+    );
+    
+    // 刷新刚刚完成的任务详情（确保OCR结果被正确更新）
+    for (const taskId of completedTaskIds) {
+      await updateTaskDetail(taskId);
+    }
+    
+    // 更新上一次的processing任务ID集合
+    previousProcessingTaskIds.value = currentProcessingTaskIds;
+    
+    if (processingTasks.length === 0) {
+      // 没有 processing 状态的任务，停止轮询
       stopTtsPolling();
+      previousProcessingTaskIds.value.clear();
       return;
     }
 
-    // 检查当前任务状态，如果不再是 processing，则停止轮询
-    if (taskInList.status !== "processing") {
-      // 停止轮询前刷新一次任务详情（OCR 完成后状态会从 processing 变为 pending，需要刷新以获取更新后的文本）
-      await handleTtsViewTask(currentTaskId);
-      stopTtsPolling();
-      return;
+    // 刷新所有 processing 状态的任务详情
+    // 这样可以确保OCR完成后，任务详情会被正确更新（即使当前选中的是其他任务）
+    // 使用 updateTaskDetail 而不是 handleTtsViewTask，避免改变当前选中的任务
+    for (const task of processingTasks) {
+      await updateTaskDetail(task.task_id);
     }
-
-    // 只有任务状态为 processing 时，才刷新当前任务详情
-    await handleTtsViewTask(currentTaskId);
   },
   MEDIA_TASK_POLLING_INTERVAL,
   { immediate: false }
 );
 
 const startTtsPollingTaskStatus = () => {
+  // 初始化上一次的processing任务ID集合
+  const currentProcessingTasks = ttsTaskList.value.filter(t => t.status === "processing");
+  previousProcessingTaskIds.value = new Set(currentProcessingTasks.map(t => t.task_id));
   startTtsPolling();
 };
 
@@ -874,6 +979,26 @@ const getTtsStatusText = (status: string): string => {
 };
 
 // OCR 相关方法
+// 清空选择的图片
+const clearSelectedImages = () => {
+  // 释放所有预览 URL，避免内存泄漏
+  imagePreviewUrls.value.forEach((url) => {
+    URL.revokeObjectURL(url);
+  });
+  imagePreviewUrls.value.clear();
+  // 清空选择的图片
+  selectedImages.value = [];
+  // 清空 input 的值，以便可以重新选择相同的文件
+  if (imageInputRef.value) {
+    imageInputRef.value.value = "";
+  }
+  // 关闭预览对话框
+  if (imagePreviewVisible.value) {
+    imagePreviewVisible.value = false;
+    previewImageIndex.value = -1;
+  }
+};
+
 // 选择图片
 const handleSelectImages = () => {
   imageInputRef.value?.click();
@@ -1002,19 +1127,11 @@ const handleOcrRecognize = async () => {
     if (response.code === 0) {
       ElMessage.success("OCR 任务已启动，正在后台处理");
       // 清空选择的图片
-      selectedImages.value = [];
-      if (imageInputRef.value) {
-        imageInputRef.value.value = "";
-      }
-      // 清空预览 URL
-      imagePreviewUrls.value.forEach((url) => {
-        URL.revokeObjectURL(url);
-      });
-      imagePreviewUrls.value.clear();
+      clearSelectedImages();
       
       // 刷新任务信息以获取更新后的文本（OCR 完成后会自动追加）
       await handleTtsViewTask(ttsCurrentTask.value.task_id);
-      // 开始轮询任务状态，等待 OCR 完成
+      // 开始轮询任务状态，等待 OCR 完成（轮询会检查所有processing状态的任务）
       startTtsPolling();
     } else {
       ElMessage.error(response.msg || "OCR 识别失败");

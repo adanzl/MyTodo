@@ -109,6 +109,7 @@ class TTSTask(TaskBase):
 
     text: str = ''
     role: Optional[str] = None
+    model: Optional[str] = None  # 模型选择：cosyvoice-v3-flash 或 cosyvoice-v3-plus
     speed: float = 0.8
     vol: int = 50
 
@@ -184,6 +185,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             text: str,
             name: Optional[str] = None,
             role: Optional[str] = None,
+            model: Optional[str] = None,
             speed: Optional[float] = None,
             vol: Optional[int] = None) -> Tuple[int, str, Optional[str]]:
         """创建 TTS 任务。
@@ -195,6 +197,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             text: 待合成的文本内容（必填）
             name: 任务名称；为空时使用当前时间字符串
             role: 发音人/音色；透传给 TTSClient
+            model: 模型选择（可选）：cosyvoice-v3-flash 或 cosyvoice-v3-plus；不传则使用 DEFAULT_MODEL
             speed: 语速，默认 0.8；透传给 TTSClient
             vol: 音量，默认 50；透传给 TTSClient
 
@@ -214,6 +217,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             status=TASK_STATUS_PENDING,
             text=str(text) if text is not None else '',
             role=role,
+            model=model,
             speed=float(speed) if speed is not None else 0.8,
             vol=int(vol) if vol is not None else 50,
         )
@@ -241,6 +245,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                     name: Optional[str] = None,
                     text: Optional[str] = None,
                     role: Optional[str] = None,
+                    model: Optional[str] = None,
                     speed: Optional[float] = None,
                     vol: Optional[int] = None) -> Tuple[int, str]:
         """更新 TTS 任务配置。
@@ -252,6 +257,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             name: 新任务名称
             text: 新文本内容
             role: 新音色
+            model: 新模型选择（可选）：cosyvoice-v3-flash 或 cosyvoice-v3-plus
             speed: 新语速
             vol: 新音量
 
@@ -288,6 +294,10 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
 
         if role is not None:
             task.role = role
+            updated = True
+
+        if model is not None:
+            task.model = model
             updated = True
 
         if speed is not None:
@@ -569,6 +579,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                                on_progress=on_progress)
             client.speed = task.speed
             client.vol = task.vol
+            client.model = task.model  # 设置模型选择
 
             # 计算总字数（用于进度显示）
             total_chars = len(task.text)
@@ -960,6 +971,10 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             f"[TTSMgr] 准备启动 OCR 任务 {task_id}, 任务名称: {task.name}, 图片数量: {len(image_paths)}"
         )
 
+        # 立即将任务状态设置为 processing，防止重复OCR
+        # 注意：需要在调用 _run_task_async 之前设置，确保状态立即更新
+        self._update_task_status(task_id, TASK_STATUS_PROCESSING, None)
+
         # 创建 OCR 任务执行函数（包装器，符合 _run_task_async 的签名）
         def ocr_runner(task: TTSTask) -> None:
             """OCR 任务执行函数（包装器）。"""
@@ -974,6 +989,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             self._run_ocr_task_logic(actual_task_id, image_paths, temp_dir)
 
         # 使用统一的异步任务执行方法
+        # 注意：_run_task_async 内部也会设置状态为 processing，但由于我们已经提前设置了，
+        # 这样可以确保在返回之前状态已经是 processing，防止重复OCR
         self._run_task_async(task_id, ocr_runner)
 
         return 0, 'OCR 任务已启动'

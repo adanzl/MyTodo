@@ -120,9 +120,7 @@ class TTSClient(ResultCallback):
                     speech_rate=self.speed,
                     callback=self,
                 )
-            log.info(f">>[TTS] 调用 synthesizer.streaming_call，text: {text[:20]}...")
             self.synthesizer.streaming_call(text)
-            log.info(f">>[TTS] synthesizer.streaming_call 返回")
         except Exception as e:
             log.error(f">>[TTS] {e}")
             traceback.print_stack()
@@ -150,7 +148,7 @@ class TTSClient(ResultCallback):
         log.error(f">>[TTS] failed, {message}")
 
     def on_close(self):
-        log.info(f">>[TTS] on_close 回调")
+        log.debug(f">>[TTS] on_close 回调")
         self.synthesizer = None
 
     def on_event(self, message):

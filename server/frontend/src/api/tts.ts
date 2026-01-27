@@ -23,6 +23,7 @@ export async function createTtsTask(params: {
   text: string;
   name?: string;
   role?: string;
+  model?: string;
   speed?: number;
   vol?: number;
 }): Promise<ApiResponse<{ task_id: string }>> {
@@ -49,6 +50,7 @@ export async function updateTtsTask(
     name?: string;
     text?: string;
     role?: string;
+    model?: string;
     speed?: number;
     vol?: number;
   }

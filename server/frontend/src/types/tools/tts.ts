@@ -27,6 +27,10 @@ export interface TTSTask {
    */
   role?: string;
   /**
+   * 模型选择（可选）：cosyvoice-v3-flash 或 cosyvoice-v3-plus
+   */
+  model?: string;
+  /**
    * 语速，默认 1.0
    */
   speed?: number;
