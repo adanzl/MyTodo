@@ -3,6 +3,19 @@
  */
 
 /**
+ * 文本分析结果结构（对应 txt_ali 返回的 JSON）
+ */
+export interface TTSAnalysis {
+  title?: string;
+  words?: string[];
+  sentence?: string[];
+  abstract?: string;
+  doodle?: string;
+  // 预留扩展字段
+  [key: string]: unknown;
+}
+
+/**
  * TTS 任务接口
  */
 export interface TTSTask {
@@ -70,4 +83,9 @@ export interface TTSTask {
    * 音频时长（秒），任务完成后写入
    */
   duration?: number;
+
+  /**
+   * 文本分析结果（调用 /tts/analysis 后写入）
+   */
+  analysis?: TTSAnalysis | null;
 }

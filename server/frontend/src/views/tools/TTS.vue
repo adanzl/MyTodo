@@ -55,7 +55,7 @@
             </el-tag>
             <div class="flex items-center gap-1 flex-shrink-0">
               <el-button
-                v-if="task.status === 'success' && task.output_file"
+                v-if="task.output_file"
                 type="primary"
                 v-bind="smallTextButtonProps"
                 @click.stop="handleTtsDownloadFromList(task)"
@@ -211,7 +211,7 @@
           <el-input
             v-model="ttsText"
             type="textarea"
-            :autosize="{ minRows: 6, maxRows: 20 }"
+            :autosize="{ minRows: 6, maxRows: 17 }"
             placeholder="请输入要转换为语音的文本"
             :disabled="isTaskProcessing"
             @blur="handleTtsTextChange"
@@ -233,7 +233,102 @@
               分析
             </el-button>
           </div>
-          <div class="text-xs text-gray-400">后续可在此展示更详细的分析结果。</div>
+
+          <!-- 未选择任务 / 无文本提示 -->
+          <div v-if="!ttsCurrentTask" class="text-xs text-gray-400">
+            请先在左侧创建或选择一个 TTS 任务。
+          </div>
+          <div v-else-if="!ttsText.trim()" class="text-xs text-gray-400">
+            当前任务还没有可分析的文本，请先在上方输入内容。
+          </div>
+          <div v-else-if="!ttsCurrentTask.analysis" class="text-xs text-gray-400">
+            暂无分析结果，请点击右上角「分析」按钮，稍等几秒后刷新任务即可查看。
+          </div>
+
+          <!-- 有分析结果时展示结构化内容 -->
+          <div v-else class="text-xs space-y-3 max-h-45 overflow-auto pr-1">
+            <!-- 优美词汇 -->
+            <div v-if="ttsCurrentTask.analysis.words?.length" class="flex gap-3">
+              <!-- 左侧大方块标题（两行文字） -->
+              <div
+                class="w-10 h-6 rounded-md bg-blue-50 border border-blue-300 flex items-center justify-center flex-shrink-0"
+              >
+                <span class="text-[11px] leading-tight text-blue-700 text-center">
+                  美词
+                </span>
+              </div>
+              <!-- 右侧正文 -->
+              <div class="flex-1 flex flex-wrap gap-1 items-start">
+                <el-tag
+                  v-for="(w, idx) in ttsCurrentTask.analysis.words"
+                  :key="idx"
+                  size="small"
+                  effect="light"
+                  class="!text-xs"
+                >
+                  {{ w }}
+                </el-tag>
+              </div>
+            </div>
+
+            <!-- 精彩句段 -->
+            <div v-if="ttsCurrentTask.analysis.sentence?.length" class="flex gap-3">
+              <!-- 左侧大方块标题 -->
+              <div
+                class="w-10 h-10 rounded-md bg-emerald-50 border border-emerald-300 flex items-center justify-center flex-shrink-0"
+              >
+                <span class="text-[11px] leading-tight text-emerald-700 text-center">
+                  精彩<br />句段
+                </span>
+              </div>
+              <!-- 右侧正文 -->
+              <div class="flex-1 space-y-1">
+                <p
+                  v-for="(s, idx) in ttsCurrentTask.analysis.sentence"
+                  :key="idx"
+                  class="leading-snug text-gray-700"
+                >
+                  {{ s }}
+                </p>
+              </div>
+            </div>
+
+            <!-- 好句花园（摘要） -->
+            <div v-if="ttsCurrentTask.analysis.abstract" class="flex gap-3">
+              <!-- 左侧大方块标题 -->
+              <div
+                class="w-10 h-10 rounded-md bg-amber-50 border border-amber-300 flex items-center justify-center flex-shrink-0"
+              >
+                <span class="text-[11px] leading-tight text-amber-700 text-center">
+                  好句<br />花园
+                </span>
+              </div>
+              <!-- 右侧正文 -->
+              <div class="flex-1">
+                <p class="leading-snug text-gray-700">
+                  {{ ttsCurrentTask.analysis.abstract }}
+                </p>
+              </div>
+            </div>
+
+            <!-- 涂鸦 -->
+            <div v-if="ttsCurrentTask.analysis.doodle" class="flex gap-3">
+              <!-- 左侧大方块标题 -->
+              <div
+                class="w-10 h-6 rounded-md bg-pink-50 border border-pink-300 flex items-center justify-center flex-shrink-0"
+              >
+                <span class="text-[11px] leading-tight text-pink-700 text-center">
+                  涂鸦
+                </span>
+              </div>
+              <!-- 右侧正文 -->
+              <div class="flex-1">
+                <p class="leading-snug text-gray-700">
+                  {{ ttsCurrentTask.analysis.doodle }}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1382,9 +1477,7 @@ const handleTtsAnalysis = async () => {
 // 计算属性
 const isTaskProcessing = computed(() => ttsCurrentTask.value?.status === "processing");
 const isStartDisabled = computed(() => !ttsText.value.trim() || isTaskProcessing.value);
-const isResultActionDisabled = computed(
-  () => !ttsCurrentTask.value?.output_file || ttsCurrentTask.value.status !== "success"
-);
+const isResultActionDisabled = computed(() => !ttsCurrentTask.value?.output_file);
 
 // 结果文件对象
 const resultFile = computed(() => {
