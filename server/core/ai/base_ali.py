@@ -3,9 +3,29 @@
 供独立运行脚本或测试时使用。
 """
 import dashscope
+import platform
 
 # 统一设置 dashscope 的基础 URL
 dashscope.base_http_api_url = "https://dashscope.aliyuncs.com/api/v1"
+
+# Python 3.13 在 Linux 下的 platform.platform() 会通过 subprocess 调 uname，
+# 在 gevent patch subprocess=True 时，可能触发 child watcher 错误。
+# 这里用一个简单实现覆盖掉默认的 platform.platform，避免 dashscope 等库
+# 间接触发该问题，同时尽量不改变其他行为。
+_original_platform_platform = platform.platform
+
+
+def _safe_platform(*_args, **_kwargs) -> str:
+    try:
+        system = platform.system()
+        release = platform.release()
+        machine = platform.machine()
+        return f"{system}-{release}-{machine}"
+    except Exception:
+        return "unknown"
+
+
+platform.platform = _safe_platform  # type: ignore[assignment]
 
 
 class BaseAli:
