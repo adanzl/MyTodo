@@ -5,6 +5,7 @@
 - 查询任务信息和列表
 - 下载生成的音频文件
 - OCR 图片文字识别（将结果追加到任务文本末尾）
+- 分析文章（调用 txt_ali 大模型分析文字，将结果追加到任务文本末尾）
 
 所有路由挂载在 `/api` 下（由 create_app 设置 url_prefix='/'）。
 """
@@ -58,6 +59,11 @@ class _TaskIdBody(BaseModel):
 
 class _TTSOCRBody(BaseModel):
     """TTS OCR 请求体"""
+    task_id: str
+
+
+class _TTSAnalyzeBody(BaseModel):
+    """TTS 分析文章请求体"""
     task_id: str
 
 
@@ -193,12 +199,7 @@ def download_tts_file() -> ResponseReturnValue:
             return _err('音频文件不存在')
 
         # 返回文件下载
-        return send_file(
-            output_file,
-            as_attachment=True,
-            download_name=f"tts_{task_id}.mp3",
-            mimetype='audio/mpeg'
-        )
+        return send_file(output_file, as_attachment=True, download_name=f"tts_{task_id}.mp3", mimetype='audio/mpeg')
 
     except Exception as e:
         log.error(f"[TTS] 下载文件失败: {e}")
@@ -229,30 +230,65 @@ def tts_ocr() -> ResponseReturnValue:
         if err:
             return err
         task_id = body.task_id
-        
+
         # 检查是否有上传的文件
         if not request.files:
             return _err("请上传图片文件")
-        
+
         files = request.files.getlist('file') or request.files.getlist('files[]')
         if not files or all(not f.filename for f in files):
             return _err("未找到上传的图片文件")
-        
+
         # 保存上传的文件到临时目录
         image_paths, temp_dir = save_uploaded_files(files, temp_prefix='tts_ocr_')
         if image_paths is None:
             return _err("保存上传文件失败或没有有效的图片文件")
-        
+
         # 启动 OCR 任务（异步执行）
         code, msg = tts_mgr.start_ocr_task(task_id, image_paths, temp_dir)
         if code != 0:
             # 启动失败，清理临时文件
             cleanup_temp_files(temp_dir, image_paths)
             return _err(msg)
-        
+
         log.info(f"[TTS OCR] OCR 任务 {task_id} 已启动，图片数量: {len(image_paths)}")
         return _ok(None)
-        
+
     except Exception as e:
         log.error(f"[TTS OCR] OCR 接口错误: {e}", exc_info=True)
         return _err(f"OCR 识别失败: {str(e)}")
+
+
+@tts_bp.route('/tts/analysis', methods=['POST'])
+def tts_analyze() -> ResponseReturnValue:
+    """TTS 任务分析文章接口。
+
+    调用 txt_ali 大模型对指定 TTS 任务当前文本进行分析，
+    将结构化分析结果仅保存到任务的 `analysis` 字段，不修改原始文本内容。
+    开始分析后，TTS 任务进入处理中状态；分析完成后，任务状态恢复为待处理。
+    该接口采用异步执行方式，立即返回成功响应，分析在后台线程中执行。
+
+    Request (application/json):
+        - task_id: 任务 ID（必填）
+
+    Returns:
+        ResponseReturnValue:
+            - 成功: {"code": 0, "msg": "ok"} - 分析文章任务已启动，正在后台处理
+            - 失败: {"code": -1, "msg": "错误信息"}
+    """
+    try:
+        json_data = read_json_from_request()
+        body, err = parse_with_model(_TTSAnalyzeBody, json_data, err_factory=_err)
+        if err:
+            return err
+
+        code, msg = tts_mgr.start_analyze_article_task(body.task_id)
+        if code != 0:
+            return _err(msg)
+
+        log.info(f"[TTS 分析文章] 分析文章任务 {body.task_id} 已启动")
+        return _ok(None)
+
+    except Exception as e:
+        log.error(f"[TTS 分析文章] 接口错误: {e}", exc_info=True)
+        return _err(f"分析文章失败: {str(e)}")

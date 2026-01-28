@@ -50,7 +50,6 @@ export default defineConfig({
   server: {
     host: "localhost", // 仅允许本地访问
     port: 5174, // 指定端口
-    open: true, // 自动打开浏览器
     proxy: {
       "/api": {
         target: "http://localhost:8000",

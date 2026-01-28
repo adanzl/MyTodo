@@ -7,7 +7,7 @@ set -e  # 遇到错误立即退出
 echo "🚀 开始部署前端项目..."
 
 # 进入前端目录
-cd "$(dirname "$0")/frontend"
+cd "$(dirname "$0")/../frontend"
 
 # 构建前端项目
 echo "📦 正在构建前端项目..."
@@ -55,5 +55,4 @@ if [ -f "frontend/dist/favicon.ico" ]; then
 fi
 
 echo "🎉 部署完成！"
-echo "📝 访问地址: http://localhost:8000/web/index.html"
 
