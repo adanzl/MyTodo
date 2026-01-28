@@ -1,7 +1,7 @@
 from dashscope import MultiModalConversation
 
 import time
-from base_ali import BaseAli, log, ALI_KEY
+from core.ai.base_ali import BaseAli, log, ALI_KEY
 
 PROMPT = """请从图片中提取文章内容，要求如下：
 

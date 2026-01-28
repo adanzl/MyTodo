@@ -105,8 +105,8 @@ def _create_access_logger() -> tuple[logging.Logger, logging.Logger]:
             f'propagate: {app_access_logger.propagate}, level: {app_access_logger.level}, log_file: {log_file}'
         )
         # 测试访问日志记录器是否能正常写入
-        gevent_access_logger.info('Gevent access logger test - if you see this, gevent logger is working')
-        app_access_logger.info('App access logger test - if you see this, app logger is working')
+        # gevent_access_logger.info('Gevent access logger test - if you see this, gevent logger is working')
+        # app_access_logger.info('App access logger test - if you see this, app logger is working')
     else:
         # 开发环境：设置为 CRITICAL 级别，不记录任何日志
         gevent_access_logger.setLevel(logging.CRITICAL)

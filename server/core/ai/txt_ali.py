@@ -1,7 +1,7 @@
 from dashscope import Generation
 import time
 
-from base_ali import BaseAli, log, ALI_KEY
+from core.ai.base_ali import BaseAli, log, ALI_KEY
 
 MODEL = "qwen-plus"
 
