@@ -8,14 +8,17 @@ import platform
 # 统一设置 dashscope 的基础 URL
 dashscope.base_http_api_url = "https://dashscope.aliyuncs.com/api/v1"
 
-# Python 3.13 在 Linux 下的 platform.platform() 会通过 subprocess 调 uname，
-# 在 gevent patch subprocess=True 时，可能触发 child watcher 错误。
-# 这里用一个简单实现覆盖掉默认的 platform.platform，避免 dashscope 等库
-# 间接触发该问题，同时尽量不改变其他行为。
+# Python 3.13 在某些环境下，platform.platform()/platform.processor()
+# 内部会通过 subprocess 调用 uname，配合 gevent 的 subprocess patch
+# 会触发 child watcher 错误。
+# 这里提供简单、安全的实现，避免走到 subprocess，同时不依赖递归。
+
 _original_platform_platform = platform.platform
+_original_platform_processor = platform.processor
 
 
 def _safe_platform(*_args, **_kwargs) -> str:
+    """简化版 platform.platform，不再通过子进程获取信息。"""
     try:
         system = platform.system()
         release = platform.release()
@@ -25,7 +28,17 @@ def _safe_platform(*_args, **_kwargs) -> str:
         return "unknown"
 
 
+def _safe_processor(*_args, **_kwargs) -> str:
+    """简化版 processor，避免内部触发 uname 子进程。"""
+    try:
+        # 大多数情况下 machine 已经足够描述 CPU 架构
+        return platform.machine() or ""
+    except Exception:
+        return ""
+
+
 platform.platform = _safe_platform  # type: ignore[assignment]
+platform.processor = _safe_processor  # type: ignore[assignment]
 
 
 class BaseAli:
