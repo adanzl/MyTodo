@@ -8,10 +8,19 @@ import platform
 # 统一设置 dashscope 的基础 URL
 dashscope.base_http_api_url = "https://dashscope.aliyuncs.com/api/v1"
 
-# Python 3.13 在某些环境下，platform.platform()/platform.processor()
-# 内部会通过 subprocess 调用 uname，配合 gevent 的 subprocess patch
-# 会触发 child watcher 错误。
-# 这里提供简单、安全的实现，避免走到 subprocess，同时不依赖递归。
+# Python 3.13 + gevent + dashscope 组合说明（非常重要）：
+# - dashscope 在构造默认 UA 时会调用 platform.platform() / platform.processor()
+# - Python 3.13 的这两个函数在 Linux 下内部会通过 subprocess.check_output(['uname', '-p'])
+# - 在 main.py 中我们使用 monkey.patch_all(subprocess=True, thread=False, queue=False)
+#   -> subprocess 实际由 gevent 接管，内部依赖 child watcher
+#   -> 最终在非默认 loop 下触发 “child watchers are only available on the default loop” 错误
+#
+# 为了避免 dashscope 间接踩到这个坑，这里统一用一个“不会起子进程”的安全实现
+# 覆盖 platform.platform / platform.processor：
+# - 只使用 platform.system()/release()/machine() 这些不会再调用子进程的字段
+# - 行为上对 UA 影响极小（只是少了 processor 细节），但可以彻底规避 child watcher 报错
+# - 这是针对当前运行环境的兼容性补丁，如果以后去掉 subprocess=True 或升级 gevent/dashscope，
+#   可以视情况移除这段代码。
 
 _original_platform_platform = platform.platform
 _original_platform_processor = platform.processor

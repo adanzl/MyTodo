@@ -1170,6 +1170,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 return
 
             log.info(f"[TTSMgr] 分析文章任务 {task_id} 完成，分析结果长度: {len(result)} 字符")
+            # 分析成功后，将任务状态恢复为待处理，便于后续继续执行 TTS
+            self._restore_task_to_pending(task_id, task_type="analysis")
 
         except Exception as e:
             self._restore_task_to_pending(task_id, f"处理异常: {e}", task_type="分析文章")
