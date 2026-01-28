@@ -1,6 +1,8 @@
 from dashscope import MultiModalConversation
+from dashscope.common import utils as dashscope_utils
 
 import time
+import platform
 from core.ai.base_ali import BaseAli, log, ALI_KEY
 
 PROMPT = """请从图片中提取文章内容，要求如下：
@@ -92,11 +94,40 @@ class OCRAli(BaseAli):
                 "content": content,
             }]
 
-            response = MultiModalConversation.call(
-                api_key=ALI_KEY,
-                model="qwen-vl-plus",
-                messages=messages,
-            )
+            # 在调用 dashscope 之前，对其 default_headers 做一次局部安全补丁，
+            # 防止内部使用 platform.platform()/processor 触发 gevent child watcher 错误。
+            original_default_headers = dashscope_utils.default_headers
+
+            def _safe_default_headers(api_key: str | None = None):
+                try:
+                    safe_platform = f"{platform.system()}-{platform.release()}-{platform.machine()}"
+                except Exception:
+                    safe_platform = "unknown"
+
+                ua = "dashscope/%s; python/%s; platform/%s" % (
+                    getattr(dashscope_utils, "__version__", "unknown"),
+                    platform.python_version(),
+                    safe_platform,
+                )
+
+                headers = {"user-agent": ua}
+                if api_key is None:
+                    api_key = dashscope_utils.get_default_api_key()
+                headers["Authorization"] = "Bearer %s" % api_key
+                headers["Accept"] = "application/json"
+                return headers
+
+            dashscope_utils.default_headers = _safe_default_headers  # type: ignore[assignment]
+
+            try:
+                response = MultiModalConversation.call(
+                    api_key=ALI_KEY,
+                    model="qwen-vl-plus",
+                    messages=messages,
+                )
+            finally:
+                # 恢复原始实现，避免影响其他地方的行为
+                dashscope_utils.default_headers = original_default_headers  # type: ignore[assignment]
 
             # 检查响应是否有效
             ret, content = self.validate_response(response)
