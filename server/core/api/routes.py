@@ -123,7 +123,7 @@ def get_all() -> ResponseReturnValue:
     conditions_str = request.args.get('conditions')
     conditions = json.loads(conditions_str) if conditions_str else None
     table = request.args.get('table')
-    log.info("===== [Get All Data] " + json.dumps(request.args))
+    # log.info("===== [Get All Data] " + json.dumps(request.args))
     if fields != '*':
         fields = fields.split(',')
     return db_mgr.get_list(table, page_num, page_size, fields, conditions)

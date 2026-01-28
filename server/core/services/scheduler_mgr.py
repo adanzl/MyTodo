@@ -135,7 +135,7 @@ class SchedulerMgr:
                 trigger = CronTrigger(**cron_kwargs)
 
             self.scheduler.add_job(func, trigger=trigger, id=job_id, name=job_id, replace_existing=True)
-            log.info(f"添加 cron 任务成功: {job_id}")
+            # log.info(f"添加 cron 任务成功: {job_id}")
             return True
         except Exception as e:
             log.error(f"添加 cron 任务失败: {job_id}, 错误: {e}")

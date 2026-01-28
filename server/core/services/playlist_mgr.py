@@ -368,8 +368,11 @@ class PlaylistMgr:
 
             success = scheduler.add_cron_job(func=cron_play_task, job_id=job_id, cron_expression=cron_expression)
             playlist_name = playlist_data.get("name", "未知播放列表")
-            if not success:
+            if success:
+                log.info(f"[PlaylistMgr] 创建定时任务成功: {playlist_id}, {playlist_name}, cron: {cron_expression}")
+            else:
                 log.error(f"[PlaylistMgr] 创建定时任务失败: {playlist_id}, {playlist_name}, cron: {cron_expression}")
+                
         except Exception as e:
             log.error(f"[PlaylistMgr] _refresh_cron_job error: id={playlist_id}, {e}", exc_info=True)
             raise

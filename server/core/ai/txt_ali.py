@@ -1,10 +1,10 @@
 from dashscope import Generation
 import time
+import platform
 
 from core.ai.base_ali import BaseAli, log, ALI_KEY
 
 MODEL = "qwen-plus"
-
 
 
 class TxtAli(BaseAli):
@@ -37,20 +37,47 @@ class TxtAli(BaseAli):
             # 构建消息内容：提示 + 待分析的文章
             content = [{"text": f"{prompt}\n\n---文章内容---\n{txt}"}]
 
-            messages = [{
-                "role": "system",
-                "content": "你是一名文字处理助手，请根据用户提供的文章，生成一篇和指定参考格式完全一致的文本分析结构化文档",
-            }, {
-                "role": "user",
-                "content": content,
-            }]
+            messages = [
+                {
+                    "role": "system",
+                    "content": "你是一名文字处理助手，请根据用户提供的文章，生成一篇和指定参考格式完全一致的文本分析结构化文档",
+                },
+                {
+                    "role": "user",
+                    "content": content,
+                },
+            ]
 
-            response = Generation.call(
-                api_key=ALI_KEY,
-                model=MODEL,
-                messages=messages,
-                result_format="message",
-            )
+            # dashscope 在内部会调用 platform.platform()，在 gevent 环境下可能触发
+            # “child watchers are only available on the default loop”的错误。
+            # 这里对 platform.platform 做一次临时的安全封装，避免其走到内部的
+            # subprocess.check_output(['uname', '-p']) 分支。
+            original_platform_func = getattr(platform, "platform", None)
+
+            def _safe_platform(*_args, **_kwargs) -> str:
+                try:
+                    system = platform.system()
+                    release = platform.release()
+                    machine = platform.machine()
+                    return f"{system}-{release}-{machine}"
+                except Exception:
+                    # 出现异常时返回一个固定字符串，避免再次触发错误
+                    return "unknown"
+
+            if original_platform_func is not None:
+                platform.platform = _safe_platform  # type: ignore[assignment]
+
+            try:
+                response = Generation.call(
+                    api_key=ALI_KEY,
+                    model=MODEL,
+                    messages=messages,
+                    result_format="message",
+                )
+            finally:
+                # 恢复原来的 platform.platform，避免影响其他代码
+                if original_platform_func is not None:
+                    platform.platform = original_platform_func  # type: ignore[assignment]
             # 检查响应是否有效
             ret, content = self.validate_response(response)
             if ret != "ok":

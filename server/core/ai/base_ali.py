@@ -3,7 +3,51 @@
 供独立运行脚本或测试时使用。
 """
 import dashscope
+import platform
+from typing import Dict
+
+from dashscope.common import utils as dashscope_utils
+
+# 统一设置 dashscope 的基础 URL
 dashscope.base_http_api_url = "https://dashscope.aliyuncs.com/api/v1"
+
+# ---- 全局补丁：修复 gevent 环境下 platform 平台信息导致的 child watcher 报错 ----
+_original_default_headers = dashscope_utils.default_headers
+
+
+def _safe_default_headers(api_key: str | None = None) -> Dict[str, str]:
+    """
+  替换 dashscope 默认的 default_headers，避免在 gevent 环境下调用
+  platform.platform() / platform.processor() 触发 child watchers 错误。
+  """
+    try:
+        safe_platform = f"{platform.system()}-{platform.release()}-{platform.machine()}"
+    except Exception:
+        safe_platform = "unknown"
+
+    try:
+        safe_processor = platform.processor() or ""
+    except Exception:
+        safe_processor = ""
+
+    ua = "dashscope/%s; python/%s; platform/%s; processor/%s" % (
+        dashscope_utils.__version__,
+        platform.python_version(),
+        safe_platform,
+        safe_processor,
+    )
+
+    headers: Dict[str, str] = {"user-agent": ua}
+    if api_key is None:
+        api_key = dashscope_utils.get_default_api_key()
+    headers["Authorization"] = "Bearer %s" % api_key
+    headers["Accept"] = "application/json"
+    return headers
+
+
+# 覆盖 dashscope 内部使用的 default_headers，避免其内部直接调用 platform.platform()
+dashscope_utils.default_headers = _safe_default_headers  # type: ignore[assignment]
+
 
 class BaseAli:
     """

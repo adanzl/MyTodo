@@ -5,7 +5,12 @@
       <div class="flex items-center justify-between mb-3">
         <h3 class="text-base font-semibold">任务列表</h3>
         <div class="flex items-center gap-1">
-          <el-button type="info" v-bind="smallIconButtonProps" @click="loadTtsTaskList" :loading="ttsLoading">
+          <el-button
+            type="info"
+            v-bind="smallIconButtonProps"
+            @click="loadTtsTaskList"
+            :loading="ttsLoading"
+          >
             <el-icon v-if="!ttsLoading">
               <Refresh />
             </el-icon>
@@ -17,13 +22,19 @@
           </el-button>
         </div>
       </div>
-      <div v-if="ttsTaskList && ttsTaskList.length > 0" class="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[400px]">
-        <div v-for="task in ttsTaskList" :key="task.task_id"
+      <div
+        v-if="ttsTaskList && ttsTaskList.length > 0"
+        class="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[400px]"
+      >
+        <div
+          v-for="task in ttsTaskList"
+          :key="task.task_id"
           class="border rounded px-3 py-2 cursor-pointer hover:bg-gray-50 group min-h-[60px] flex flex-col justify-between"
           :class="{
-            'border-blue-500 bg-blue-50':
-              ttsCurrentTask && task.task_id === ttsCurrentTask.task_id,
-          }" @click="handleTtsViewTask(task.task_id)">
+            'border-blue-500 bg-blue-50': ttsCurrentTask && task.task_id === ttsCurrentTask.task_id,
+          }"
+          @click="handleTtsViewTask(task.task_id)"
+        >
           <!-- 第一行：名称 -->
           <div class="flex items-center justify-between gap-2">
             <div class="text-sm font-medium truncate flex-1 min-w-0" :title="task.name">
@@ -35,16 +46,28 @@
           </div>
           <!-- 第二行：状态、下载按钮、删除按钮 -->
           <div class="flex items-center justify-between gap-2 min-h-[20px]">
-            <el-tag :type="getTtsStatusTagType(task.status)" size="small" class="!h-5 !text-xs w-16 text-center">
+            <el-tag
+              :type="getTtsStatusTagType(task.status)"
+              size="small"
+              class="!h-5 !text-xs w-16 text-center"
+            >
               {{ getTtsStatusText(task.status) }}
             </el-tag>
             <div class="flex items-center gap-1 flex-shrink-0">
-              <el-button v-if="task.status === 'success' && task.output_file" type="primary"
-                v-bind="smallTextButtonProps" @click.stop="handleTtsDownloadFromList(task)">
+              <el-button
+                v-if="task.status === 'success' && task.output_file"
+                type="primary"
+                v-bind="smallTextButtonProps"
+                @click.stop="handleTtsDownloadFromList(task)"
+              >
                 下载
               </el-button>
-              <el-button type="danger" v-bind="smallTextButtonProps" @click.stop="handleTtsDeleteTask(task.task_id)"
-                :disabled="task.status === 'processing'">
+              <el-button
+                type="danger"
+                v-bind="smallTextButtonProps"
+                @click.stop="handleTtsDeleteTask(task.task_id)"
+                :disabled="task.status === 'processing'"
+              >
                 <el-icon>
                   <Delete />
                 </el-icon>
@@ -58,31 +81,57 @@
       </div>
     </div>
 
-    <!-- 右侧：任务详情 -->
-    <div class="flex-1 border rounded p-3 flex flex-col max-w-2xl" v-if="ttsCurrentTask">
-      <div class="flex items-cente mb-3 flex-shrink-0">
-        <h3 class="text-base font-semibold mr-2">任务详情: {{ ttsCurrentTask.name }}</h3>
-        <el-button type="default" size="small" plain circle :disabled="isTaskProcessing" @click="handleTtsRenameTask"
-          title="编辑名称">
-          <el-icon>
-            <Edit />
-          </el-icon>
-        </el-button>
+    <!-- 中间：任务详情 -->
+    <div class="flex-1 border rounded p-3 flex flex-col min-h-0" v-if="ttsCurrentTask">
+      <div class="flex items-center mb-3 flex-shrink-0">
+        <div class="flex items-center gap-2 flex-1">
+          <h3 class="text-base font-semibold">任务详情: {{ ttsCurrentTask.name }}</h3>
+          <el-button
+            type="default"
+            size="small"
+            plain
+            circle
+            :disabled="isTaskProcessing"
+            @click="handleTtsRenameTask"
+            title="编辑名称"
+          >
+            <el-icon>
+              <Edit />
+            </el-icon>
+          </el-button>
+        </div>
       </div>
 
-      <div class="flex-1 overflow-auto flex flex-col gap-3">
-        <!-- 任务信息 -->
+      <div class="flex-1 flex flex-col gap-3 min-h-0">
+        <!-- 任务信息（恢复原位置） -->
         <div class="flex items-center gap-4 flex-shrink-0 flex-wrap">
-          <el-tag :type="getTtsStatusTagType(ttsCurrentTask.status)" size="small" class="w-16 text-center">
+          <el-tag
+            :type="getTtsStatusTagType(ttsCurrentTask.status)"
+            size="small"
+            class="w-16 text-center"
+          >
             {{ getTtsStatusText(ttsCurrentTask.status) }}
           </el-tag>
-          <MediaComponent v-if="resultFileObject" :file="resultFileObject" :player="ttsPlayer"
-            :disabled="isTaskProcessing" @play="handleTtsTogglePlayResult" @seek="handleResultFileSeek" />
-          <el-button type="primary" v-bind="mediumTextButtonProps" @click="handleTtsDownload"
-            :disabled="isResultActionDisabled">
+          <MediaComponent
+            v-if="resultFileObject"
+            :file="resultFileObject"
+            :player="ttsPlayer"
+            :disabled="isTaskProcessing"
+            @play="handleTtsTogglePlayResult"
+            @seek="handleResultFileSeek"
+          />
+          <el-button
+            type="primary"
+            v-bind="mediumTextButtonProps"
+            @click="handleTtsDownload"
+            :disabled="isResultActionDisabled"
+          >
             下载
           </el-button>
-          <span v-if="ttsCurrentTask.total_chars !== undefined" class="text-xs text-gray-600 ml-auto">
+          <span
+            v-if="ttsCurrentTask.total_chars !== undefined"
+            class="text-xs text-gray-600 ml-auto"
+          >
             <template v-if="isTaskProcessing && ttsCurrentTask.generated_chars !== undefined">
               {{ ttsCurrentTask.generated_chars }} / {{ ttsCurrentTask.total_chars }}
             </template>
@@ -90,105 +139,107 @@
               {{ ttsCurrentTask.total_chars }}
             </template>
           </span>
-          <el-tooltip v-if="ttsCurrentTask.error_message" :content="`错误: ${ttsCurrentTask.error_message}`"
-            placement="top" class="w-full">
+          <el-tooltip
+            v-if="ttsCurrentTask.error_message"
+            :content="`错误: ${ttsCurrentTask.error_message}`"
+            placement="top"
+            class="w-full"
+          >
             <span class="text-red-500 text-xs truncate max-w-xs inline-block cursor-help">
               错误: {{ ttsCurrentTask.error_message }}
             </span>
           </el-tooltip>
         </div>
-
         <!-- 文本输入 -->
-        <div class="border rounded p-3 flex flex-col gap-2 flex-1">
+        <div class="border rounded p-3 flex flex-col gap-2 flex-1 min-h-0">
           <div class="flex items-center justify-between">
             <h4 class="h-8 text-sm font-semibold">文本内容</h4>
             <div class="flex items-center gap-2">
               <!-- 图片缩略图 -->
               <div v-if="selectedImages.length > 0" class="flex items-center gap-2 mr-2">
-                <div v-for="(image, index) in selectedImages" :key="index" class="relative group cursor-pointer"
-                  @click="handleImagePreview(index)">
-                  <img :src="getImagePreviewUrl(index)" :alt="image.name"
-                    class="w-8 h-8 object-cover rounded border border-gray-300 hover:border-blue-500 transition-colors" />
+                <div
+                  v-for="(image, index) in selectedImages"
+                  :key="index"
+                  class="relative group cursor-pointer"
+                  @click="handleImagePreview(index)"
+                >
+                  <img
+                    :src="getImagePreviewUrl(index)"
+                    :alt="image.name"
+                    class="w-8 h-8 object-cover rounded border border-gray-300 hover:border-blue-500 transition-colors"
+                  />
                   <div
                     class="absolute -right-1 -top-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    @click.stop="removeImage(index)">
+                    @click.stop="removeImage(index)"
+                  >
                     <el-icon class="text-white text-xs">
                       <Close />
                     </el-icon>
                   </div>
                 </div>
               </div>
-              <input ref="imageInputRef" type="file" accept="image/*" multiple @change="handleImageSelect"
-                class="hidden" />
-              <el-button type="default" size="small" @click="handleSelectImages" :disabled="isTaskProcessing"
-                class="!p-0">
+              <input
+                ref="imageInputRef"
+                type="file"
+                accept="image/*"
+                multiple
+                @change="handleImageSelect"
+                class="hidden"
+              />
+              <el-button
+                type="default"
+                size="small"
+                @click="handleSelectImages"
+                :disabled="isTaskProcessing"
+                class="!p-0"
+              >
                 <el-icon class="!w-7 !h-6">
                   <Picture class="!w-5 !h-5" />
                 </el-icon>
               </el-button>
-              <el-button type="primary" size="small" @click="handleOcrRecognize"
-                :disabled="isTaskProcessing || selectedImages.length === 0 || !ttsCurrentTask" :loading="ocrLoading">
+              <el-button
+                type="primary"
+                size="small"
+                @click="handleOcrRecognize"
+                :disabled="isTaskProcessing || selectedImages.length === 0 || !ttsCurrentTask"
+                :loading="ocrLoading"
+              >
                 识别
               </el-button>
             </div>
           </div>
-          <el-input v-model="ttsText" type="textarea" :autosize="{ minRows: 6, maxRows: 20 }" 
-            placeholder="请输入要转换为语音的文本" :disabled="isTaskProcessing"
-            @blur="handleTtsTextChange" class="flex-1" />
+          <el-input
+            v-model="ttsText"
+            type="textarea"
+            :autosize="{ minRows: 6, maxRows: 20 }"
+            placeholder="请输入要转换为语音的文本"
+            :disabled="isTaskProcessing"
+            @blur="handleTtsTextChange"
+            class="flex-1"
+          />
         </div>
 
-        <!-- 参数设置 -->
-        <div class="border rounded p-3 flex flex-col gap-2">
-          <h4 class="text-sm font-semibold">参数设置</h4>
-          <div class="grid grid-cols-4 gap-3">
-            <div class="flex flex-col gap-1">
-              <label class="text-xs text-gray-600">模型</label>
-              <el-select v-model="ttsModel" size="small" placeholder="默认模型" clearable :disabled="isTaskProcessing"
-                @change="handleTtsParamsChange" class="w-full">
-                <el-option label="cosyvoice-v3-flash" value="cosyvoice-v3-flash" />
-                <el-option label="cosyvoice-v3-plus" value="cosyvoice-v3-plus" />
-              </el-select>
-            </div>
-            <div class="flex flex-col gap-1">
-              <label class="text-xs text-gray-600">发音人/音色</label>
-              <el-select v-model="ttsRole" size="small" placeholder="请选择音色（可选）" clearable :disabled="isTaskProcessing"
-                @change="handleTtsRoleChange" class="w-full">
-                <el-option label="灿灿" value="cosyvoice-v3-plus-leo-34ba9eaebae44039a4a9426af6389dcd" />
-              </el-select>
-            </div>
-            <div class="flex flex-col gap-1">
-              <label class="text-xs text-gray-600">语速</label>
-              <el-input-number v-model="ttsSpeed" size="small" :min="0.5" :max="2.0" :step="0.1" :precision="1"
-                :disabled="isTaskProcessing" @change="handleTtsParamsChange" class="w-full" />
-            </div>
-            <div class="flex flex-col gap-1">
-              <label class="text-xs text-gray-600">音量</label>
-              <el-input-number v-model="ttsVol" size="small" :min="0" :max="100" :step="1" :disabled="isTaskProcessing"
-                @change="handleTtsParamsChange" class="w-full" />
-            </div>
-          </div>
-        </div>
-
-        <!-- 操作按钮 -->
+        <!-- 分析数据（中间列底部） -->
         <div class="border rounded p-3 flex flex-col gap-2 flex-shrink-0">
-          <!-- 开始生成按钮 -->
-          <el-tooltip v-if="!isTaskProcessing" :content="!ttsText.trim() ? '请先输入文本内容' : ''" :disabled="!!ttsText.trim()"
-            placement="top">
-            <el-button type="success" v-bind="mediumTextButtonProps" @click="handleTtsStart" :disabled="isStartDisabled"
-              class="w-full">
-              开始生成
+          <div class="flex items-center justify-between">
+            <h4 class="text-sm font-semibold">分析数据</h4>
+            <el-button
+              type="primary"
+              size="small"
+              :loading="analysisLoading"
+              :disabled="isTaskProcessing || !ttsText.trim()"
+              @click="handleTtsAnalysis"
+            >
+              分析
             </el-button>
-          </el-tooltip>
-          <!-- 停止生成按钮 -->
-          <el-button v-else type="warning" v-bind="mediumTextButtonProps" @click="handleTtsStop" class="w-full">
-            停止生成
-          </el-button>
+          </div>
+          <div class="text-xs text-gray-400">后续可在此展示更详细的分析结果。</div>
         </div>
       </div>
     </div>
 
-    <!-- 右侧：空状态 -->
-    <div class="flex-1 border rounded p-3 flex flex-col max-w-2xl" v-else>
+    <!-- 中间：空状态 -->
+    <div class="flex-1 border rounded p-3 flex flex-col" v-else>
       <div class="flex items-center justify-between mb-3 flex-shrink-0">
         <h3 class="text-base font-semibold">任务详情</h3>
       </div>
@@ -197,56 +248,195 @@
       </div>
     </div>
 
+    <!-- 右侧：参数和操作 -->
+    <div class="w-80 border rounded p-3 flex flex-col" v-if="ttsCurrentTask">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-base font-semibold">参数与生成</h3>
+      </div>
+      <div class="flex-1 overflow-auto flex flex-col gap-3">
+        <!-- 参数设置 -->
+        <div class="border rounded p-3 flex flex-col gap-2">
+          <h4 class="text-sm font-semibold">参数设置</h4>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="flex flex-col gap-1">
+              <label class="text-xs text-gray-600">模型</label>
+              <el-select
+                v-model="ttsModel"
+                size="small"
+                placeholder="默认模型"
+                clearable
+                :disabled="isTaskProcessing"
+                @change="handleTtsParamsChange"
+                class="w-full"
+              >
+                <el-option label="cosyvoice-v3-flash" value="cosyvoice-v3-flash" />
+                <el-option label="cosyvoice-v3-plus" value="cosyvoice-v3-plus" />
+              </el-select>
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-xs text-gray-600">发音人/音色</label>
+              <el-select
+                v-model="ttsRole"
+                size="small"
+                placeholder="请选择音色（可选）"
+                clearable
+                :disabled="isTaskProcessing"
+                @change="handleTtsRoleChange"
+                class="w-full"
+              >
+                <el-option
+                  label="灿灿"
+                  value="cosyvoice-v3-plus-leo-34ba9eaebae44039a4a9426af6389dcd"
+                />
+              </el-select>
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-xs text-gray-600">语速</label>
+              <el-input-number
+                v-model="ttsSpeed"
+                size="small"
+                :min="0.5"
+                :max="2.0"
+                :step="0.1"
+                :precision="1"
+                :disabled="isTaskProcessing"
+                @change="handleTtsParamsChange"
+                class="w-full"
+              />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-xs text-gray-600">音量</label>
+              <el-input-number
+                v-model="ttsVol"
+                size="small"
+                :min="0"
+                :max="100"
+                :step="1"
+                :disabled="isTaskProcessing"
+                @change="handleTtsParamsChange"
+                class="w-full"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="border rounded p-3 flex flex-col gap-2 flex-shrink-0">
+          <el-tooltip
+            v-if="!isTaskProcessing"
+            :content="!ttsText.trim() ? '请先输入文本内容' : ''"
+            :disabled="!!ttsText.trim()"
+            placement="top"
+          >
+            <el-button
+              type="success"
+              v-bind="mediumTextButtonProps"
+              @click="handleTtsStart"
+              :disabled="isStartDisabled"
+              class="w-full"
+            >
+              开始生成
+            </el-button>
+          </el-tooltip>
+          <el-button
+            v-else
+            type="warning"
+            v-bind="mediumTextButtonProps"
+            @click="handleTtsStop"
+            class="w-full"
+          >
+            停止生成
+          </el-button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右侧：空状态 -->
+    <div class="w-80 border rounded p-3 flex flex-col" v-else>
+      <h3 class="text-base font-semibold mb-3">参数与生成</h3>
+      <div class="flex-1 flex items-center justify-center text-sm text-gray-400">
+        请从左侧选择一个任务查看参数
+      </div>
+    </div>
+
     <!-- 创建任务对话框 -->
-    <el-dialog v-model="ttsCreateTaskDialogVisible" title="创建 TTS 任务" width="500px"
-      @close="handleTtsCreateTaskDialogClose">
+    <el-dialog
+      v-model="ttsCreateTaskDialogVisible"
+      title="创建 TTS 任务"
+      width="500px"
+      @close="handleTtsCreateTaskDialogClose"
+    >
       <el-form>
         <el-form-item label="任务名称">
-          <el-input v-model="ttsNewTaskName" placeholder="请输入任务名称" @keyup.enter="handleTtsCreateTaskConfirm" />
+          <el-input
+            v-model="ttsNewTaskName"
+            placeholder="请输入任务名称"
+            @keyup.enter="handleTtsCreateTaskConfirm"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="ttsCreateTaskDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleTtsCreateTaskConfirm">
-          确定
-        </el-button>
+        <el-button type="primary" @click="handleTtsCreateTaskConfirm"> 确定 </el-button>
       </template>
     </el-dialog>
 
     <!-- 改名对话框 -->
-    <el-dialog v-model="ttsRenameTaskDialogVisible" title="重命名任务" width="400px" @close="ttsRenameTaskName = ''">
+    <el-dialog
+      v-model="ttsRenameTaskDialogVisible"
+      title="重命名任务"
+      width="400px"
+      @close="ttsRenameTaskName = ''"
+    >
       <el-form>
         <el-form-item label="任务名称">
-          <el-input v-model="ttsRenameTaskName" placeholder="请输入任务名称" @keyup.enter="handleTtsRenameTaskConfirm" />
+          <el-input
+            v-model="ttsRenameTaskName"
+            placeholder="请输入任务名称"
+            @keyup.enter="handleTtsRenameTaskConfirm"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="ttsRenameTaskDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleTtsRenameTaskConfirm">
-          确定
-        </el-button>
+        <el-button type="primary" @click="handleTtsRenameTaskConfirm"> 确定 </el-button>
       </template>
     </el-dialog>
 
     <!-- 图片全屏预览对话框 -->
-    <el-dialog v-model="imagePreviewVisible" :title="previewImageName" width="90%" align-center
-      @close="previewImageIndex = -1">
+    <el-dialog
+      v-model="imagePreviewVisible"
+      :title="previewImageName"
+      width="90%"
+      align-center
+      @close="previewImageIndex = -1"
+    >
       <div class="flex items-center justify-center min-h-[400px]">
-        <img v-if="previewImageIndex >= 0 && selectedImages[previewImageIndex]"
-          :src="getImagePreviewUrl(previewImageIndex)" :alt="selectedImages[previewImageIndex].name"
-          class="max-w-full max-h-[70vh] object-contain" />
+        <img
+          v-if="previewImageIndex >= 0 && selectedImages[previewImageIndex]"
+          :src="getImagePreviewUrl(previewImageIndex)"
+          :alt="selectedImages[previewImageIndex].name"
+          class="max-w-full max-h-[70vh] object-contain"
+        />
       </div>
       <template #footer>
         <div class="flex items-center justify-between w-full">
           <div class="flex items-center gap-2">
-            <el-button @click="previewPreviousImage" :disabled="previewImageIndex <= 0" size="small">
+            <el-button
+              @click="previewPreviousImage"
+              :disabled="previewImageIndex <= 0"
+              size="small"
+            >
               上一张
             </el-button>
             <span class="text-sm text-gray-600">
               {{ previewImageIndex + 1 }} / {{ selectedImages.length }}
             </span>
-            <el-button @click="previewNextImage" :disabled="previewImageIndex >= selectedImages.length - 1"
-              size="small">
+            <el-button
+              @click="previewNextImage"
+              :disabled="previewImageIndex >= selectedImages.length - 1"
+              size="small"
+            >
               下一张
             </el-button>
           </div>
@@ -282,6 +472,7 @@ import {
   stopTtsTask,
   getTtsTaskDownloadUrl,
   ocrTtsTask,
+  analyzeTtsTask,
 } from "@/api/tts";
 
 // TTS 常量配置
@@ -313,6 +504,7 @@ const imageInputRef = ref<HTMLInputElement | null>(null);
 const selectedImages = ref<File[]>([]);
 const imagePreviewUrls = ref<Map<number, string>>(new Map()); // 存储图片预览 URL
 const ocrLoading = ref(false);
+const analysisLoading = ref(false);
 const imagePreviewVisible = ref(false);
 const previewImageIndex = ref(-1);
 
@@ -427,7 +619,7 @@ const updateTaskInList = (task: TTSTask) => {
 // 查看 TTS 任务
 const handleTtsViewTask = async (taskId: string) => {
   const isTaskSwitching = ttsCurrentTask.value && ttsCurrentTask.value.task_id !== taskId;
-  
+
   // 如果切换任务，执行清理操作
   if (isTaskSwitching && ttsCurrentTask.value) {
     handleTtsStopPlay();
@@ -443,7 +635,7 @@ const handleTtsViewTask = async (taskId: string) => {
   if (taskInList) {
     ttsCurrentTask.value = { ...taskInList };
     updateTaskParamsFromData(taskInList);
-    
+
     // 如果任务正在处理中，启动轮询
     if (taskInList.status === "processing") {
       startTtsPollingTaskStatus();
@@ -454,18 +646,18 @@ const handleTtsViewTask = async (taskId: string) => {
   currentFetchingTaskId.value = taskId;
   try {
     const response = await getTtsTask(taskId);
-    
+
     // 检查是否仍然是当前要获取的任务（用户可能已经切换了）
     if (!shouldProcessRequest(taskId)) {
       return;
     }
-    
+
     if (response.code === 0) {
       // 双重检查，确保数据一致性
       if (!shouldProcessRequest(taskId)) {
         return;
       }
-      
+
       const taskData = response.data;
       ttsCurrentTask.value = taskData;
       updateTaskInList(taskData);
@@ -754,7 +946,7 @@ const updateTaskDetail = async (taskId: string) => {
     if (response.code === 0) {
       const taskData = response.data;
       updateTaskInList(taskData);
-      
+
       // 如果这是当前选中的任务，也更新当前任务详情
       if (ttsCurrentTask.value && ttsCurrentTask.value.task_id === taskId) {
         ttsCurrentTask.value = taskData;
@@ -779,20 +971,20 @@ const { start: startTtsPolling, stop: stopTtsPolling } = useControllableInterval
     // 找出所有 processing 状态的任务
     const processingTasks = ttsTaskList.value.filter(t => t.status === "processing");
     const currentProcessingTaskIds = new Set(processingTasks.map(t => t.task_id));
-    
+
     // 找出刚刚完成的任务（上一次是processing，现在不是processing）
     const completedTaskIds = Array.from(previousProcessingTaskIds.value).filter(
       taskId => !currentProcessingTaskIds.has(taskId)
     );
-    
+
     // 刷新刚刚完成的任务详情（确保OCR结果被正确更新）
     for (const taskId of completedTaskIds) {
       await updateTaskDetail(taskId);
     }
-    
+
     // 更新上一次的processing任务ID集合
     previousProcessingTaskIds.value = currentProcessingTaskIds;
-    
+
     if (processingTasks.length === 0) {
       // 没有 processing 状态的任务，停止轮询
       stopTtsPolling();
@@ -836,16 +1028,14 @@ const handleTtsDownload = async () => {
 
     // 获取文件扩展名
     const outputFile = ttsCurrentTask.value.output_file;
-    const fileExtension = outputFile.includes('.')
-      ? '.' + outputFile.split('.').pop()
-      : '';
+    const fileExtension = outputFile.includes(".") ? "." + outputFile.split(".").pop() : "";
 
     // 构建文件名：任务名字 + 原扩展名
-    const taskName = ttsCurrentTask.value.name || 'tts_output';
+    const taskName = ttsCurrentTask.value.name || "tts_output";
     const fileName = `${taskName}${fileExtension}`;
 
     // 创建下载链接
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = blobUrl;
     link.download = fileName;
     document.body.appendChild(link);
@@ -877,16 +1067,14 @@ const handleTtsDownloadFromList = async (task: TTSTask) => {
 
     // 获取文件扩展名
     const outputFile = task.output_file;
-    const fileExtension = outputFile.includes('.')
-      ? '.' + outputFile.split('.').pop()
-      : '';
+    const fileExtension = outputFile.includes(".") ? "." + outputFile.split(".").pop() : "";
 
     // 构建文件名：任务名字 + 原扩展名
-    const taskName = task.name || 'tts_output';
+    const taskName = task.name || "tts_output";
     const fileName = `${taskName}${fileExtension}`;
 
     // 创建下载链接
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = blobUrl;
     link.download = fileName;
     document.body.appendChild(link);
@@ -982,7 +1170,7 @@ const getTtsStatusText = (status: string): string => {
 // 清空选择的图片
 const clearSelectedImages = () => {
   // 释放所有预览 URL，避免内存泄漏
-  imagePreviewUrls.value.forEach((url) => {
+  imagePreviewUrls.value.forEach(url => {
     URL.revokeObjectURL(url);
   });
   imagePreviewUrls.value.clear();
@@ -1128,7 +1316,7 @@ const handleOcrRecognize = async () => {
       ElMessage.success("OCR 任务已启动，正在后台处理");
       // 清空选择的图片
       clearSelectedImages();
-      
+
       // 刷新任务信息以获取更新后的文本（OCR 完成后会自动追加）
       await handleTtsViewTask(ttsCurrentTask.value.task_id);
       // 开始轮询任务状态，等待 OCR 完成（轮询会检查所有processing状态的任务）
@@ -1140,6 +1328,54 @@ const handleOcrRecognize = async () => {
     logAndNoticeError(error as Error, "OCR 识别失败");
   } finally {
     ocrLoading.value = false;
+  }
+};
+
+// 文本分析（调用 tts/analysis）
+const handleTtsAnalysis = async () => {
+  if (!ttsCurrentTask.value) {
+    ElMessage.warning("请先创建或选择一个 TTS 任务");
+    return;
+  }
+
+  if (!ttsText.value.trim()) {
+    ElMessage.warning("请输入要分析的文本内容");
+    return;
+  }
+
+  if (isTaskProcessing.value) {
+    ElMessage.warning("当前任务正在处理中，请稍后再试");
+    return;
+  }
+
+  const confirmed = await ElMessageBox.confirm(
+    `确定要分析当前任务 "${ttsCurrentTask.value.name}" 的文本吗？`,
+    "确认分析",
+    {
+      confirmButtonText: "确定",
+      cancelButtonText: "取消",
+      type: "warning",
+    }
+  ).catch(() => false);
+
+  if (!confirmed) return;
+
+  try {
+    analysisLoading.value = true;
+    const response = await analyzeTtsTask(ttsCurrentTask.value.task_id);
+
+    if (response.code === 0) {
+      ElMessage.success("分析任务已启动，正在后台处理");
+      // 刷新当前任务信息，并启动轮询，等待分析完成
+      await handleTtsViewTask(ttsCurrentTask.value.task_id);
+      startTtsPollingTaskStatus();
+    } else {
+      ElMessage.error(response.msg || "分析任务启动失败");
+    }
+  } catch (error) {
+    logAndNoticeError(error as Error, "分析任务启动失败");
+  } finally {
+    analysisLoading.value = false;
   }
 };
 
@@ -1176,7 +1412,7 @@ onUnmounted(() => {
   stopTtsPolling();
   clearBrowserAudioPlayer();
   // 清理所有图片预览 URL，避免内存泄漏
-  imagePreviewUrls.value.forEach((url) => {
+  imagePreviewUrls.value.forEach(url => {
     URL.revokeObjectURL(url);
   });
   imagePreviewUrls.value.clear();

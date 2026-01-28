@@ -98,17 +98,14 @@ export async function stopTtsTask(taskId: string): Promise<ApiResponse<null>> {
  * @param taskId 任务 ID
  * @param files 图片文件数组
  */
-export async function ocrTtsTask(
-  taskId: string,
-  files: File[]
-): Promise<ApiResponse<null>> {
+export async function ocrTtsTask(taskId: string, files: File[]): Promise<ApiResponse<null>> {
   const formData = new FormData();
-  
+
   // 添加 task_id
   formData.append("task_id", taskId);
-  
+
   // 添加所有图片文件
-  files.forEach((file) => {
+  files.forEach(file => {
     formData.append("file", file);
   });
 
@@ -121,6 +118,17 @@ export async function ocrTtsTask(
   };
 
   const response = await api.post<ApiResponse<null>>("/tts/ocr", formData, config);
+  return response.data;
+}
+
+/**
+ * 启动 TTS 任务文本分析
+ * 仅分析当前任务文本，将结构化结果保存到任务的 analysis 字段
+ */
+export async function analyzeTtsTask(taskId: string): Promise<ApiResponse<null>> {
+  const response = await api.post<ApiResponse<null>>("/tts/analysis", {
+    task_id: taskId,
+  });
   return response.data;
 }
 
