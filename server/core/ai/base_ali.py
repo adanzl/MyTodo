@@ -11,35 +11,36 @@ from dashscope.common import utils as dashscope_utils
 # 统一设置 dashscope 的基础 URL
 dashscope.base_http_api_url = "https://dashscope.aliyuncs.com/api/v1"
 
-# ---- 全局补丁：修复 gevent 环境下 platform 平台信息导致的 child watcher 报错 ----
-# 有些调用链会直接使用 platform.platform() / platform.processor()，例如
-# dashscope.common.utils.default_headers 以及 Python 标准库中的平台探测。
-# 在 gevent 下这些调用可能通过 subprocess 触发 child watcher 错误。
-
-_original_platform_platform = platform.platform
-_original_platform_processor = platform.processor
+# 只精确替换 dashscope 的 default_headers，避免其内部调用 platform.platform()
+_original_default_headers = dashscope_utils.default_headers
 
 
-def _safe_platform(*_args, **_kwargs) -> str:
-    """全局替换 platform.platform，避免其内部再去启动子进程。"""
+def _safe_default_headers(api_key: str | None = None) -> Dict[str, str]:
+    """
+    替换 dashscope 默认的 default_headers，避免在 gevent 环境下调用
+    platform.platform() / platform.processor() 触发 child watchers 错误。
+    这里只使用不会触发子进程的简单平台信息。
+    """
     try:
-        return f"{platform.system()}-{platform.release()}-{platform.machine()}"
+        safe_platform = f"{platform.system()}-{platform.release()}-{platform.machine()}"
     except Exception:
-        return "unknown"
+        safe_platform = "unknown"
+
+    ua = "dashscope/%s; python/%s; platform/%s" % (
+        dashscope_utils.__version__,
+        platform.python_version(),
+        safe_platform,
+    )
+
+    headers: Dict[str, str] = {"user-agent": ua}
+    if api_key is None:
+        api_key = dashscope_utils.get_default_api_key()
+    headers["Authorization"] = "Bearer %s" % api_key
+    headers["Accept"] = "application/json"
+    return headers
 
 
-def _safe_processor(*_args, **_kwargs) -> str:
-    """全局替换 platform.processor，避免其内部再去启动子进程。"""
-    try:
-        value = _original_platform_processor()
-        return value or ""
-    except Exception:
-        return ""
-
-
-# 全局覆盖，确保所有第三方库（包括 dashscope）调用到的是安全版本
-platform.platform = _safe_platform  # type: ignore[assignment]
-platform.processor = _safe_processor  # type: ignore[assignment]
+dashscope_utils.default_headers = _safe_default_headers  # type: ignore[assignment]
 
 
 class BaseAli:
