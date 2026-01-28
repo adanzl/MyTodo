@@ -7,12 +7,14 @@ import platform
 from typing import Dict
 
 from dashscope.common import utils as dashscope_utils
+from dashscope.client import base_api as dashscope_base_api
 
 # 统一设置 dashscope 的基础 URL
 dashscope.base_http_api_url = "https://dashscope.aliyuncs.com/api/v1"
 
 # 只精确替换 dashscope 的 default_headers，避免其内部调用 platform.platform()
-_original_default_headers = dashscope_utils.default_headers
+_original_utils_default_headers = dashscope_utils.default_headers
+_original_baseapi_default_headers = dashscope_base_api.default_headers
 
 
 def _safe_default_headers(api_key: str | None = None) -> Dict[str, str]:
@@ -27,7 +29,7 @@ def _safe_default_headers(api_key: str | None = None) -> Dict[str, str]:
         safe_platform = "unknown"
 
     ua = "dashscope/%s; python/%s; platform/%s" % (
-        dashscope_utils.__version__,
+        getattr(dashscope_utils, "__version__", "unknown"),
         platform.python_version(),
         safe_platform,
     )
@@ -40,7 +42,9 @@ def _safe_default_headers(api_key: str | None = None) -> Dict[str, str]:
     return headers
 
 
+# 覆盖两个入口：utils.default_headers 和 base_api.default_headers
 dashscope_utils.default_headers = _safe_default_headers  # type: ignore[assignment]
+dashscope_base_api.default_headers = _safe_default_headers  # type: ignore[assignment]
 
 
 class BaseAli:
