@@ -2,10 +2,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# ARMS 探针必须在 gevent monkey patch 之前导入
-# 这样才能正确监控 gevent 环境
-from aliyun.opentelemetry.instrumentation.auto_instrumentation import sitecustomize
-
 from gevent import monkey
 # 不 patch thread，使用真正的操作系统线程，避免与 asyncio 事件循环冲突
 # thread=False 表示不 patch threading 模块，这样 ThreadPoolExecutor 会使用真正的线程
