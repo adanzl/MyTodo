@@ -61,7 +61,9 @@ def test_dlna_volume_requires_location(client):
 
 
 def test_dlna_volume_get_ok(client, monkeypatch):
+
     class FakeDev:
+
         def __init__(self, location):
             assert location == "loc"
 
@@ -78,7 +80,9 @@ def test_dlna_volume_get_ok(client, monkeypatch):
 
 
 def test_dlna_volume_get_err(client, monkeypatch):
+
     class FakeDev:
+
         def __init__(self, location):
             pass
 
@@ -108,7 +112,10 @@ def test_dlna_volume_post_volume_must_be_int(client, monkeypatch):
 
     resp = client.post(
         "/dlna/volume",
-        data=json.dumps({"location": "loc", "volume": "x"}),
+        data=json.dumps({
+            "location": "loc",
+            "volume": "x"
+        }),
         content_type="application/json",
     )
     assert resp.status_code == 200
@@ -122,7 +129,10 @@ def test_dlna_volume_post_range_check(client, monkeypatch):
 
     resp = client.post(
         "/dlna/volume",
-        data=json.dumps({"location": "loc", "volume": 101}),
+        data=json.dumps({
+            "location": "loc",
+            "volume": 101
+        }),
         content_type="application/json",
     )
     assert resp.status_code == 200
@@ -132,7 +142,9 @@ def test_dlna_volume_post_range_check(client, monkeypatch):
 
 
 def test_dlna_volume_post_ok(client, monkeypatch):
+
     class FakeDev:
+
         def __init__(self, location):
             assert location == "loc"
 
@@ -144,7 +156,10 @@ def test_dlna_volume_post_ok(client, monkeypatch):
 
     resp = client.post(
         "/dlna/volume",
-        data=json.dumps({"location": "loc", "volume": 50}),
+        data=json.dumps({
+            "location": "loc",
+            "volume": 50
+        }),
         content_type="application/json",
     )
 
@@ -163,7 +178,9 @@ def test_dlna_stop_requires_location(client):
 
 
 def test_dlna_stop_ok(client, monkeypatch):
+
     class FakeDev:
+
         def __init__(self, location):
             assert location == "loc"
 
@@ -177,3 +194,50 @@ def test_dlna_stop_ok(client, monkeypatch):
     body = resp.get_json()
     assert body["code"] == 0
     assert body["data"]["message"] == "stopped"
+
+
+def test_dlna_scan_exception(client, monkeypatch):
+    monkeypatch.setattr(dlna_routes, "scan_devices_sync", lambda t: (_ for _ in ()).throw(RuntimeError("scan err")))
+    resp = client.get("/dlna/scan")
+    assert resp.status_code == 200
+    assert resp.get_json()["code"] != 0
+
+
+def test_dlna_volume_get_failure(client, monkeypatch):
+
+    class FakeDev:
+
+        def __init__(self, location):
+            pass
+
+        def get_volume(self):
+            return -1, None
+
+    monkeypatch.setattr(dlna_routes, "DlnaDev", FakeDev)
+    resp = client.get("/dlna/volume?location=loc")
+    assert resp.status_code == 200
+    assert resp.get_json()["code"] != 0
+    assert "音量" in resp.get_json().get("msg", "")
+
+
+def test_dlna_stop_failure(client, monkeypatch):
+
+    class FakeDev:
+
+        def __init__(self, location):
+            pass
+
+        def stop(self):
+            return -1, "device busy"
+
+    monkeypatch.setattr(dlna_routes, "DlnaDev", FakeDev)
+    resp = client.post("/dlna/stop", data=json.dumps({"location": "loc"}), content_type="application/json")
+    assert resp.status_code == 200
+    assert resp.get_json()["code"] != 0
+
+
+def test_dlna_stop_exception(client, monkeypatch):
+    monkeypatch.setattr(dlna_routes, "DlnaDev", lambda location: (_ for _ in ()).throw(ConnectionError("dlna err")))
+    resp = client.post("/dlna/stop", data=json.dumps({"location": "loc"}), content_type="application/json")
+    assert resp.status_code == 200
+    assert resp.get_json()["code"] != 0

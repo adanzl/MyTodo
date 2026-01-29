@@ -143,6 +143,13 @@ def test_set_save_ok(client, monkeypatch):
     routes.db_mgr.set_save.assert_called_once_with(1, "testuser", '{"key": "value"}')
 
 
+def test_set_save_missing_id(client):
+    response = client.post('/setSave', json={"user": "u", "data": {}})
+    assert response.status_code == 200
+    assert response.get_json()["code"] == -1
+    assert "required" in response.get_json().get("msg", "").lower()
+
+
 def test_get_all_fields_split(client, monkeypatch):
     routes.db_mgr.get_list.return_value = {"code": 0, "data": {"data": []}}
 
@@ -201,6 +208,14 @@ def test_del_data_invalid_id(client):
     assert resp.status_code == 200
     assert resp.json["code"] == -1
     assert "must be int" in resp.json["msg"]
+
+
+def test_del_data_missing_id(client):
+    """delData 缺少 id 时返回错误"""
+    resp = client.post('/delData', json={"table": "t"})
+    assert resp.status_code == 200
+    assert resp.json["code"] == -1
+    assert "required" in resp.json.get("msg", "").lower()
 
 
 def test_query_no_sql(client):
@@ -452,3 +467,156 @@ def test_get_file_info_permission_and_exception(client, monkeypatch):
     assert resp.status_code == 200
     assert resp.json['code'] == -1
     assert 'Error:' in resp.json['msg']
+
+
+def test_parse_int_none_or_empty_returns_error(client):
+    """_parse_int 在 value 为 None 或空串时返回错误"""
+    resp = client.get('/getData?table=t_user')
+    assert resp.status_code == 200
+    assert resp.json.get('code') == -1
+    assert 'required' in resp.json.get('msg', '').lower() or 'id' in resp.json.get('msg', '')
+    resp = client.get('/getData?table=t_user&id=')
+    assert resp.status_code == 200
+    assert resp.json.get('code') == -1
+
+
+def test_parse_int_invalid_type_returns_error(client):
+    """_parse_int 在 value 非数字时返回错误"""
+    resp = client.get('/getData?table=t_user&id=abc&fields=id')
+    assert resp.status_code == 200
+    assert resp.json.get('code') == -1
+    assert 'int' in resp.json.get('msg', '').lower()
+
+
+def test_list_directory_invalid_path_traversal(client, monkeypatch):
+    """listDirectory path 含 .. 或以 ~ 开头时返回 Invalid path"""
+    monkeypatch.setattr(routes.config, 'DEFAULT_BASE_DIR', '/mnt')
+    monkeypatch.setattr(routes.os.path, 'isabs', lambda p: True)
+    monkeypatch.setattr(routes.os.path, 'exists', lambda p: True)
+    resp = client.get('/listDirectory?path=/mnt/foo/../etc')
+    assert resp.status_code == 200
+    assert resp.json.get('code') == -1
+    assert 'Invalid path' in resp.json.get('msg', '')
+    resp = client.get('/listDirectory?path=~/music')
+    assert resp.status_code == 200
+    assert resp.json.get('code') == -1
+    assert 'Invalid path' in resp.json.get('msg', '')
+
+
+def test_get_file_info_path_outside_base(client, monkeypatch):
+    """getFileInfo path 不在 DEFAULT_BASE_DIR 内时返回错误"""
+    monkeypatch.setattr(routes.config, 'DEFAULT_BASE_DIR', '/safe')
+    monkeypatch.setattr(routes.os.path, 'abspath', lambda p: p)
+    monkeypatch.setattr(routes.os.path, 'isabs', lambda p: True)
+    monkeypatch.setattr(routes.os.path, 'exists', lambda p: True)
+    resp = client.get('/getFileInfo?path=/outside/foo.mp3')
+    assert resp.status_code == 200
+    assert resp.json.get('code') == -1
+    assert '允许的目录' in resp.json.get('msg', '') or 'path' in resp.json.get('msg', '').lower()
+
+
+def test_get_file_info_not_exists(client, monkeypatch):
+    """getFileInfo 文件不存在时返回错误"""
+    monkeypatch.setattr(routes.config, 'DEFAULT_BASE_DIR', '/safe')
+    monkeypatch.setattr(routes.os.path, 'abspath', lambda p: p)
+    monkeypatch.setattr(routes.os.path, 'isabs', lambda p: True)
+    monkeypatch.setattr(routes.os.path, 'exists', lambda p: False)
+    resp = client.get('/getFileInfo?path=/safe/nonexistent.mp3')
+    assert resp.status_code == 200
+    assert resp.json.get('code') == -1
+    assert '不存在' in resp.json.get('msg', '')
+
+
+def test_get_file_info_not_file(client, monkeypatch):
+    """getFileInfo path 为目录时返回错误"""
+    monkeypatch.setattr(routes.config, 'DEFAULT_BASE_DIR', '/safe')
+    monkeypatch.setattr(routes.os.path, 'abspath', lambda p: p)
+    monkeypatch.setattr(routes.os.path, 'isabs', lambda p: True)
+    monkeypatch.setattr(routes.os.path, 'exists', lambda p: True)
+    monkeypatch.setattr(routes.os.path, 'isfile', lambda p: False)
+    resp = client.get('/getFileInfo?path=/safe/dir')
+    assert resp.status_code == 200
+    assert resp.json.get('code') == -1
+    assert '不是文件' in resp.json.get('msg', '')
+
+
+def test_list_directory_path_not_exists(client, monkeypatch):
+    """listDirectory path 不存在时回退到默认目录"""
+    monkeypatch.setattr(routes.config, 'DEFAULT_BASE_DIR', '/mnt')
+    monkeypatch.setattr(routes.os.path, 'abspath', lambda p: p)
+    monkeypatch.setattr(routes.os.path, 'isabs', lambda p: True)
+    monkeypatch.setattr(routes.os.path, 'exists', lambda p: p == '/mnt')
+    monkeypatch.setattr(routes.os, 'listdir', lambda p: ['a.mp3'])
+    monkeypatch.setattr(routes.os, 'access', lambda p, m: True)
+    monkeypatch.setattr(routes.os, 'stat', lambda p: type('S', (), {'st_size': 0, 'st_mtime': 0})())
+    monkeypatch.setattr(routes.os.path, 'isdir', lambda p: False)
+    resp = client.get('/listDirectory?path=/mnt/nonexistent')
+    assert resp.status_code == 200
+    assert resp.json.get('code') == 0
+
+
+def test_list_directory_listdir_exception(client, monkeypatch):
+    """listDirectory 首次 listdir 异常时回退默认目录"""
+    monkeypatch.setattr(routes.config, 'DEFAULT_BASE_DIR', '/mnt')
+    monkeypatch.setattr(routes.os.path, 'abspath', lambda p: p)
+    monkeypatch.setattr(routes.os.path, 'isabs', lambda p: True)
+    monkeypatch.setattr(routes.os.path, 'exists', lambda p: True)
+    call_count = [0]
+
+    def listdir(p):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            raise OSError("perm")
+        return ['a.mp3']
+
+    monkeypatch.setattr(routes.os, 'listdir', listdir)
+    monkeypatch.setattr(routes.os, 'access', lambda p, m: True)
+    monkeypatch.setattr(routes.os, 'stat', lambda p: type('S', (), {'st_size': 0, 'st_mtime': 0})())
+    monkeypatch.setattr(routes.os.path, 'isdir', lambda p: False)
+    monkeypatch.setattr(routes.os.path, 'exists', lambda p: True)
+    resp = client.get('/listDirectory?path=/mnt/music')
+    assert resp.status_code == 200
+    assert resp.json.get('code') == 0
+
+
+def test_list_directory_entry_oserror(client, monkeypatch):
+    """listDirectory 某 entry stat 失败时标记 accessible=False"""
+    monkeypatch.setattr(routes.config, 'DEFAULT_BASE_DIR', '/mnt')
+    monkeypatch.setattr(routes.os.path, 'abspath', lambda p: p)
+    monkeypatch.setattr(routes.os.path, 'isabs', lambda p: True)
+    monkeypatch.setattr(routes.os.path, 'exists', lambda p: True)
+    monkeypatch.setattr(routes.os, 'listdir', lambda p: ['ok.mp3', 'bad'])
+    St = type('Stat', (), {'st_size': 1, 'st_mtime': 0})
+
+    def stat_fake(p, *args, **kwargs):
+        if 'bad' in str(p):
+            raise PermissionError("denied")
+        return St()
+
+    monkeypatch.setattr(routes.os, 'stat', stat_fake)
+    monkeypatch.setattr(routes.os.path, 'isdir', lambda p: False)
+    monkeypatch.setattr(routes.os, 'access', lambda p, m: True)
+    resp = client.get('/listDirectory?path=/mnt/music&extensions=all')
+    assert resp.status_code == 200
+    assert resp.json.get('code') == 0
+    names = [x['name'] for x in resp.json['data']]
+    assert 'ok.mp3' in names and 'bad' in names
+    bad_item = next(x for x in resp.json['data'] if x['name'] == 'bad')
+    assert bad_item.get('accessible') is False
+
+
+def test_list_directory_extensions_video(client, monkeypatch):
+    """listDirectory extensions=video 时过滤视频扩展名"""
+    monkeypatch.setattr(routes.config, 'DEFAULT_BASE_DIR', '/mnt')
+    monkeypatch.setattr(routes.os.path, 'abspath', lambda p: p)
+    monkeypatch.setattr(routes.os.path, 'isabs', lambda p: True)
+    monkeypatch.setattr(routes.os.path, 'exists', lambda p: True)
+    monkeypatch.setattr(routes.os, 'listdir', lambda p: ['a.mp4', 'b.txt', 'c.mkv'])
+    monkeypatch.setattr(routes.os, 'stat', lambda p: type('S', (), {'st_size': 0, 'st_mtime': 0})())
+    monkeypatch.setattr(routes.os.path, 'isdir', lambda p: False)
+    monkeypatch.setattr(routes.os, 'access', lambda p, m: True)
+    resp = client.get('/listDirectory?path=/mnt&extensions=video')
+    assert resp.status_code == 200
+    names = [x['name'] for x in resp.json['data']]
+    assert 'a.mp4' in names and 'c.mkv' in names
+    assert 'b.txt' not in names

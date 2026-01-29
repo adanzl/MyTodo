@@ -23,6 +23,7 @@ class Config:
 
     # ========== Flask 配置 ==========
     MAX_CONTENT_LENGTH: int = int(os.environ.get('MAX_CONTENT_LENGTH', 2000 * 1024 * 1024))  # 默认 2000MB
+    MAX_UPLOAD_FILE_SIZE: int = int(os.environ.get('MAX_UPLOAD_FILE_SIZE', 500 * 1024 * 1024))  # 单文件上传限制，默认 500MB
 
     # ========== 数据库配置 ==========
     DB_NAME: str = os.environ.get('DB_NAME', 'data.db')

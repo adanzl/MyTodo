@@ -54,6 +54,49 @@ def test_create_task_with_defaults(convert_mgr: AudioConvertMgr, monkeypatch):
     assert task['status'] == TASK_STATUS_PENDING
 
 
+def test_create_task_empty_output_dir_fails(convert_mgr: AudioConvertMgr):
+    """output_dir 为纯空格时返回 -1（空串会被 or 'mp3' 变成 'mp3'）"""
+    code, msg, task_id = convert_mgr.create_task(output_dir="   ")
+    assert code == -1
+    assert "输出目录" in msg
+    assert task_id is None
+
+
+def test_update_task_empty_output_dir_fails(convert_mgr: AudioConvertMgr, monkeypatch):
+    monkeypatch.setattr('core.services.audio_convert_mgr._spawn', lambda fn: None)
+    _, _, task_id = convert_mgr.create_task()
+    code, msg = convert_mgr.update_task(task_id, output_dir="   ")
+    assert code == -1
+    assert "输出目录" in msg
+
+
+def test_update_task_no_fields_fails(convert_mgr: AudioConvertMgr):
+    _, _, task_id = convert_mgr.create_task()
+    code, msg = convert_mgr.update_task(task_id)
+    assert code == -1
+    assert "没有提供" in msg
+
+
+def test_ensure_output_directory_no_write_permission(convert_mgr: AudioConvertMgr, tmp_path, monkeypatch):
+    """_ensure_output_directory 当目录存在但无写权限时返回 False"""
+    read_only = tmp_path / "readonly"
+    read_only.mkdir()
+    monkeypatch.setattr(convert_mgr, "_spawn", lambda fn: None)
+    monkeypatch.setattr("os.access", lambda p, m: False if "readonly" in str(p) else True)
+    ok, err = convert_mgr._ensure_output_directory(str(read_only))
+    assert ok is False
+    assert err is not None
+    assert "写权限" in err or "权限" in err
+
+
+def test_get_file_info_exception(convert_mgr: AudioConvertMgr, monkeypatch):
+    """_get_file_info 当 getsize 异常时返回空 dict 并记录日志"""
+    monkeypatch.setattr("os.path.exists", lambda p: True)
+    monkeypatch.setattr("os.path.getsize", lambda p: (_ for _ in ()).throw(OSError("perm")))
+    info = convert_mgr._get_file_info("/some/file.mp3")
+    assert "size" not in info or info.get("size") is None
+
+
 def test_update_task_success(convert_mgr: AudioConvertMgr, tmp_path, monkeypatch):
     monkeypatch.setattr('core.services.audio_convert_mgr._spawn', lambda fn: None)
     """Test successful update of a task's properties."""

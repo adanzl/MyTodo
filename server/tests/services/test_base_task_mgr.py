@@ -101,3 +101,62 @@ def test_run_task_async_failure(task_mgr: SimpleTaskMgr):
     task = task_mgr.get_task(task_id)
     assert task['status'] == TASK_STATUS_FAILED
     assert "Something went wrong" in task['error_message']
+
+
+def test_stop_task_not_processing(task_mgr: SimpleTaskMgr):
+    """stop_task 在任务未处于 processing 时返回 -1"""
+    _, _, task_id = task_mgr.create_task(some_data="ok")
+    code, msg = task_mgr.stop_task(task_id)
+    assert code == -1
+    assert "未在处理中" in msg
+
+
+def test_ensure_not_processing(task_mgr: SimpleTaskMgr):
+    """_ensure_not_processing 在 status 为 PROCESSING 时返回错误信息"""
+    _, _, task_id = task_mgr.create_task(some_data="x")
+    task = task_mgr._get_task(task_id)
+    task.status = TASK_STATUS_PROCESSING
+    err = task_mgr._ensure_not_processing(task, "更新任务")
+    assert err is not None
+    assert "任务正在处理中" in err
+    assert "更新任务" in err
+
+
+def test_load_tasks_invalid_json_not_dict(task_mgr: SimpleTaskMgr):
+    """加载 meta 文件内容非 dict 时静默跳过（不抛错）"""
+    meta_file = task_mgr._get_task_meta_file()
+    os.makedirs(os.path.dirname(meta_file), exist_ok=True)
+    with open(meta_file, 'w', encoding='utf-8') as f:
+        f.write('[]')
+    task_mgr._load_history_tasks()
+    assert len(task_mgr._tasks) == 0
+
+
+def test_save_all_tasks_exception(task_mgr: SimpleTaskMgr, monkeypatch):
+    """_save_all_tasks 在写文件异常时记录日志不抛错"""
+    _, _, task_id = task_mgr.create_task(some_data="x")
+
+    def broken_dump(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(json, "dump", broken_dump)
+    task_mgr._save_all_tasks()
+    # 不应抛错；任务仍在内存
+    assert task_mgr.get_task(task_id) is not None
+
+
+def test_run_task_async_task_gone_after_runner(task_mgr: SimpleTaskMgr):
+    """runner 执行完后任务已被删除时，不更新状态（命中 task2 为 None 分支）"""
+    _, _, task_id = task_mgr.create_task(some_data="gone")
+
+    def runner_that_clears_status_and_deletes(task):
+        # 先改为 PENDING 才能通过 delete_task 的状态检查，再删除；使 wrapped 内 task2=None
+        task.status = TASK_STATUS_PENDING
+        task_mgr.delete_task(task.task_id)
+
+    task_mgr.start_task(task_id, runner=runner_that_clears_status_and_deletes)
+    for _ in range(50):
+        if task_mgr.get_task(task_id) is None:
+            break
+        time.sleep(0.1)
+    assert task_mgr.get_task(task_id) is None

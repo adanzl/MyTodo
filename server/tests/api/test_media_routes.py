@@ -75,6 +75,16 @@ def test_media_get_duration_permission_error(client, monkeypatch):
     assert resp.get_json()["code"] != 0
 
 
+def test_media_get_duration_generic_exception(client, monkeypatch):
+    monkeypatch.setattr(media_routes, "validate_and_normalize_path", lambda *args, **kwargs: ("/_/a.mp3", None))
+    monkeypatch.setattr(media_routes, "get_media_duration", lambda path:
+                        (_ for _ in ()).throw(RuntimeError("probe err")))
+    resp = client.get("/media/getDuration?path=/_/a.mp3")
+    assert resp.status_code == 200
+    assert resp.get_json()["code"] != 0
+    assert "Error" in resp.get_json().get("msg", "")
+
+
 # endregion
 
 # region /media/files/<path:filepath>
@@ -106,6 +116,25 @@ def test_serve_media_file_server_error(client, monkeypatch):
 
     resp = client.get("/media/files/tmp.mp3")
     assert resp.status_code == 500
+
+
+def test_serve_media_file_strips_traversal_and_adds_slash(client, monkeypatch):
+    """serve_media_file 会替换 ../ 并给无前导 / 的路径加 /"""
+    seen_path = []
+
+    def fake_send_file(path, *a, **kw):
+        seen_path.append(path)
+        return "ok"
+
+    monkeypatch.setattr(media_routes.os.path, "exists", lambda p: True)
+    monkeypatch.setattr(media_routes.os.path, "isfile", lambda p: True)
+    monkeypatch.setattr(media_routes, "send_file", fake_send_file)
+
+    resp = client.get("/media/files/foo/../bar.mp3")
+    assert resp.status_code == 200
+    assert len(seen_path) == 1
+    assert "../" not in seen_path[0]
+    assert "foo/bar.mp3" in seen_path[0] or "bar.mp3" in seen_path[0]
 
 
 # endregion
@@ -168,6 +197,38 @@ def test_media_merge_upload_rejects_extension(client, monkeypatch):
     resp = client.post("/media/merge/upload", data=data, content_type="multipart/form-data")
     assert resp.status_code == 200
     assert resp.get_json()["code"] != 0
+
+
+def test_media_merge_upload_empty_filename(client, monkeypatch):
+    monkeypatch.setattr(media_routes.audio_merge_mgr, "get_task", lambda tid: {"id": tid, "files": []})
+    data = {"task_id": "t", "file": (io.BytesIO(b"x"), "")}
+    resp = client.post("/media/merge/upload", data=data, content_type="multipart/form-data")
+    assert resp.status_code == 200
+    assert resp.get_json()["code"] != 0
+    assert "文件名" in resp.get_json().get("msg", "")
+
+
+def test_media_merge_upload_file_type_rejected(client, monkeypatch):
+    """上传文件类型校验：magic number 与扩展名均不通过时返回错误"""
+    monkeypatch.setattr(media_routes.audio_merge_mgr, "get_task", lambda tid: {"id": tid, "files": []})
+    monkeypatch.setattr(media_routes, "get_file_type_by_magic_number", lambda f: None)
+    monkeypatch.setattr(media_routes, "is_allowed_audio_file", lambda n: False)
+    data = {"task_id": "t", "file": (io.BytesIO(b"x"), "a.txt")}
+    resp = client.post("/media/merge/upload", data=data, content_type="multipart/form-data")
+    assert resp.status_code == 200
+    assert resp.get_json()["code"] != 0
+    assert "不支持" in resp.get_json().get("msg", "")
+
+
+def test_media_merge_upload_file_too_large(client, monkeypatch):
+    """上传文件超过大小限制时返回错误"""
+    monkeypatch.setattr(media_routes.audio_merge_mgr, "get_task", lambda tid: {"id": tid, "files": []})
+    monkeypatch.setattr(media_routes.config, "MAX_UPLOAD_FILE_SIZE", 0)
+    data = {"task_id": "t", "file": (io.BytesIO(b"x"), "a.mp3")}
+    resp = client.post("/media/merge/upload", data=data, content_type="multipart/form-data")
+    assert resp.status_code == 200
+    assert resp.get_json()["code"] != 0
+    assert "大小" in resp.get_json().get("msg", "") or "限制" in resp.get_json().get("msg", "")
 
 
 def test_media_merge_upload_ok(client, monkeypatch, tmp_path):
@@ -284,6 +345,53 @@ def test_media_merge_reorder_files_mgr_err(client, monkeypatch):
     monkeypatch.setattr(media_routes.audio_merge_mgr, "reorder_files", lambda task_id, file_indices: (-1, "bad"))
     resp = client.post("/media/merge/reorderFiles", json={"task_id": "tid", "file_indices": [1]})
     assert resp.get_json()["code"] != 0
+
+
+def test_media_merge_reorder_files_missing_task_id(client):
+    resp = client.post("/media/merge/reorderFiles", json={"file_indices": [0]})
+    assert resp.get_json()["code"] != 0
+    assert "task_id" in resp.get_json().get("msg", "")
+
+
+def test_media_merge_reorder_files_missing_file_indices(client):
+    resp = client.post("/media/merge/reorderFiles", json={"task_id": "tid"})
+    assert resp.get_json()["code"] != 0
+    assert "file_indices" in resp.get_json().get("msg", "")
+
+
+def test_media_merge_add_file_by_path_not_exists(client, monkeypatch):
+    monkeypatch.setattr(media_routes, "validate_and_normalize_path", lambda p: ("/abs/path.mp3", None))
+    monkeypatch.setattr(media_routes.os.path, "exists", lambda p: False)
+    resp = client.post("/media/merge/addFileByPath", json={"task_id": "t", "file_path": "/x.mp3"})
+    assert resp.get_json()["code"] != 0
+    assert "不存在" in resp.get_json().get("msg", "")
+
+
+def test_media_merge_add_file_by_path_not_file(client, monkeypatch):
+    monkeypatch.setattr(media_routes, "validate_and_normalize_path", lambda p: ("/abs/dir", None))
+    monkeypatch.setattr(media_routes.os.path, "exists", lambda p: True)
+    monkeypatch.setattr(media_routes.os.path, "isfile", lambda p: False)
+    resp = client.post("/media/merge/addFileByPath", json={"task_id": "t", "file_path": "/dir"})
+    assert resp.get_json()["code"] != 0
+    assert "不是文件" in resp.get_json().get("msg", "")
+
+
+def test_media_merge_add_file_by_path_add_fails(client, monkeypatch):
+    monkeypatch.setattr(media_routes, "validate_and_normalize_path", lambda p: ("/abs/a.mp3", None))
+    monkeypatch.setattr(media_routes.os.path, "exists", lambda p: True)
+    monkeypatch.setattr(media_routes.os.path, "isfile", lambda p: True)
+    monkeypatch.setattr(media_routes, "is_allowed_audio_file", lambda n: True)
+    monkeypatch.setattr(media_routes.audio_merge_mgr, "add_file", lambda tid, path, name: (-1, "add failed"))
+    resp = client.post("/media/merge/addFileByPath", json={"task_id": "t", "file_path": "/abs/a.mp3"})
+    assert resp.get_json()["code"] != 0
+    assert "add failed" in resp.get_json().get("msg", "")
+
+
+def test_media_merge_delete_file_exception(client, monkeypatch):
+    monkeypatch.setattr(media_routes.audio_merge_mgr, "remove_file", lambda tid, idx: (_ for _ in ()).throw(ValueError("mgr err")))
+    resp = client.post("/media/merge/deleteFile", json={"task_id": "t", "file_index": 0})
+    assert resp.get_json()["code"] != 0
+    assert "删除" in resp.get_json().get("msg", "")
 
 
 def test_media_merge_start_requires_task_id(client):

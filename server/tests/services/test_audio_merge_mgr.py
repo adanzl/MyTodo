@@ -81,6 +81,34 @@ def test_add_file_failures(merge_mgr: AudioMergeMgr, tmp_path):
     assert "不支持的文件类型" in msg
 
 
+def test_read_tasks_from_file_not_exists(merge_mgr: AudioMergeMgr):
+    """_read_tasks_from_file 当文件不存在时返回 None"""
+    assert merge_mgr._read_tasks_from_file("/nonexistent/path/tasks.json") is None
+
+
+def test_read_tasks_from_file_invalid_json(merge_mgr: AudioMergeMgr, tmp_path):
+    """_read_tasks_from_file 当文件内容非合法 JSON 时返回 None"""
+    bad_file = tmp_path / "bad.json"
+    bad_file.write_text("not valid json {", encoding="utf-8")
+    assert merge_mgr._read_tasks_from_file(str(bad_file)) is None
+
+
+def test_validate_file_not_exists(merge_mgr: AudioMergeMgr):
+    """_validate_file 当文件不存在时返回错误信息"""
+    err = merge_mgr._validate_file("/nonexistent.mp3", "a.mp3")
+    assert err is not None
+    assert "文件不存在" in err
+
+
+def test_validate_file_unsupported_extension(merge_mgr: AudioMergeMgr, tmp_path):
+    """_validate_file 当扩展名不支持时返回错误信息"""
+    f = tmp_path / "a.txt"
+    f.write_text("x", encoding="utf-8")
+    err = merge_mgr._validate_file(str(f), "a.txt")
+    assert err is not None
+    assert "不支持" in err
+
+
 @patch('os.path.exists', return_value=True)
 @patch('os.path.getsize', return_value=1024)
 @patch('core.services.audio_merge_mgr.get_media_duration', return_value=10.0)

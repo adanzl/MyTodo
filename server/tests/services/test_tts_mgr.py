@@ -747,3 +747,92 @@ def test_get_output_file_path_no_output_file(tts_mgr: TTSMgr):
     result = tts_mgr.get_output_file_path(task_id)
     # tmp_path 下目录存在但 output.mp3 不存在，应返回 None
     assert result is None or (result and "output.mp3" in result)
+
+
+def test_update_task_empty_name_fails(tts_mgr: TTSMgr):
+    """测试 update_task 传入空名称时返回 -1"""
+    _, _, task_id = tts_mgr.create_task(text="test")
+    code, msg = tts_mgr.update_task(task_id, name="")
+    assert code == -1
+    assert "任务名称不能为空" in msg
+    code, msg = tts_mgr.update_task(task_id, name="   ")
+    assert code == -1
+    assert "任务名称不能为空" in msg
+
+
+def test_create_task_returns_failure_when_save_fails(tts_mgr: TTSMgr, monkeypatch):
+    """测试 create_task 在 _create_task_and_save 返回失败时原样返回"""
+
+    def fake_create_and_save(_task):
+        return -1, "保存失败", None
+
+    monkeypatch.setattr(tts_mgr, "_create_task_and_save", fake_create_and_save)
+    code, msg, task_id = tts_mgr.create_task(text="hello")
+    assert code == -1
+    assert msg == "保存失败"
+    assert task_id is None
+
+
+def test_update_task_status_task_not_found(tts_mgr: TTSMgr):
+    """测试 _update_task_status 在任务不存在时只打日志不抛错"""
+    tts_mgr._update_task_status("nonexistent_id", TASK_STATUS_FAILED, "test error")
+    # 不应抛错，仅内部 log.warning
+
+
+def test_tts_run_fails_when_client_calls_on_err(tts_mgr: TTSMgr, tmp_path):
+    """测试 TTS 任务在客户端 on_err 回调时标记为失败"""
+    import time
+    _, _, task_id = tts_mgr.create_task(text="fail me")
+
+    class FakeTTSClientErr:
+
+        def __init__(self, on_msg=None, on_err=None, on_progress=None):
+            self.on_msg = on_msg
+            self.on_err = on_err
+            self.on_progress = on_progress
+            self.speed = 1.0
+            self.vol = 50
+            self._total_chars = 1
+
+        def stream_msg(self, text, role=None, id=None):
+            if self.on_err:
+                self.on_err(ValueError("client error"))
+            if self.on_msg:
+                self.on_msg("done", 1)
+
+        def stream_complete(self):
+            pass
+
+    with patch('core.services.tts_mgr.TTSClient', FakeTTSClientErr):
+        tts_mgr.start_task(task_id)
+        deadline = 5.0
+        start = time.time()
+        while time.time() - start < deadline:
+            task = tts_mgr.get_task(task_id)
+            if task and task['status'] in (TASK_STATUS_SUCCESS, TASK_STATUS_FAILED):
+                break
+            time.sleep(0.1)
+        assert task is not None
+        assert task['status'] == TASK_STATUS_FAILED
+        assert "client error" in (task.get("error_message") or "")
+
+
+def test_save_analysis_to_task_non_dict_parsed(tts_mgr: TTSMgr):
+    """_save_analysis_to_task 当 JSON 解析结果为非 dict 时包装为 {"data": parsed}"""
+    _, _, task_id = tts_mgr.create_task(text="test")
+    code, msg = tts_mgr._save_analysis_to_task(task_id, "[1,2,3]")
+    assert code == 0
+    task = tts_mgr.get_task(task_id)
+    assert task.get("analysis") == {"data": [1, 2, 3]}
+
+
+def test_append_text_to_task_task_id_mismatch(tts_mgr: TTSMgr):
+    """_append_text_to_task 当 task_id 与任务不匹配时返回错误（内部校验）"""
+    _, _, task_id = tts_mgr.create_task(text="x")
+    task = tts_mgr._get_task(task_id)
+    # 人为改 task_id 制造不匹配（仅测试分支）
+    original_id = task.task_id
+    task.task_id = "other_id"
+    code, msg = tts_mgr._append_text_to_task(original_id, "y", keep_status=True)
+    assert code == -1
+    task.task_id = original_id

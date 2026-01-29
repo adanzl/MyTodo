@@ -26,7 +26,8 @@ def client(app):
 
 
 def test_playlist_get_all_when_id_missing(client, monkeypatch):
-    monkeypatch.setattr(playlist_routes.playlist_mgr, "get_playlist", lambda pid: {"all": True} if pid is None else None)
+    monkeypatch.setattr(playlist_routes.playlist_mgr, "get_playlist", lambda pid: {"all": True}
+                        if pid is None else None)
 
     resp = client.get("/playlist/get")
     assert resp.status_code == 200
@@ -194,3 +195,33 @@ def test_playlist_reload_err(client, monkeypatch):
     body = resp.get_json()
     assert body["code"] != 0
     assert "重新加载" in body["msg"]
+
+
+def test_playlist_update_exception(client, monkeypatch):
+    monkeypatch.setattr(playlist_routes.playlist_mgr, "update_single_playlist", lambda data:
+                        (_ for _ in ()).throw(ValueError("mgr err")))
+    resp = client.post("/playlist/update", data=json.dumps({"id": "p1"}), content_type="application/json")
+    assert resp.status_code == 200
+    assert resp.get_json()["code"] != 0
+
+
+def test_playlist_update_all_exception(client, monkeypatch):
+    monkeypatch.setattr(playlist_routes.playlist_mgr, "save_playlist", lambda data:
+                        (_ for _ in ()).throw(RuntimeError("save err")))
+    resp = client.post("/playlist/updateAll", data=json.dumps({"p1": {}}), content_type="application/json")
+    assert resp.status_code == 200
+    assert resp.get_json()["code"] != 0
+
+
+def test_playlist_play_exception(client, monkeypatch):
+    monkeypatch.setattr(playlist_routes.playlist_mgr, "play", lambda pid: (_ for _ in ()).throw(OSError("play err")))
+    resp = client.post("/playlist/play", data=json.dumps({"id": "p1"}), content_type="application/json")
+    assert resp.status_code == 200
+    assert resp.get_json()["code"] != 0
+
+
+def test_playlist_reload_exception(client, monkeypatch):
+    monkeypatch.setattr(playlist_routes.playlist_mgr, "reload", lambda: (_ for _ in ()).throw(ValueError("reload err")))
+    resp = client.post("/playlist/reload", data=json.dumps({}), content_type="application/json")
+    assert resp.status_code == 200
+    assert resp.get_json()["code"] != 0

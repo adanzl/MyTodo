@@ -52,6 +52,14 @@ def test_mi_scan_custom_timeout(client, monkeypatch):
     assert body["data"] == []
 
 
+def test_mi_scan_exception(client, monkeypatch):
+    monkeypatch.setattr(mi_routes, "scan_devices_sync", lambda t: (_ for _ in ()).throw(RuntimeError("scan err")))
+    resp = client.get("/mi/scan")
+    assert resp.status_code == 200
+    assert resp.get_json()["code"] != 0
+    assert "error" in resp.get_json().get("msg", "").lower()
+
+
 def test_mi_volume_requires_device_id(client):
     resp = client.get("/mi/volume")
     assert resp.status_code == 200
@@ -61,7 +69,9 @@ def test_mi_volume_requires_device_id(client):
 
 
 def test_mi_volume_get_ok(client, monkeypatch):
+
     class FakeDev:
+
         def __init__(self, device_id):
             assert device_id == "d1"
 
@@ -78,7 +88,9 @@ def test_mi_volume_get_ok(client, monkeypatch):
 
 
 def test_mi_volume_get_err(client, monkeypatch):
+
     class FakeDev:
+
         def __init__(self, device_id):
             pass
 
@@ -113,7 +125,10 @@ def test_mi_volume_post_volume_must_be_int(client, monkeypatch):
 
     resp = client.post(
         "/mi/volume",
-        data=json.dumps({"device_id": "d1", "volume": "x"}),
+        data=json.dumps({
+            "device_id": "d1",
+            "volume": "x"
+        }),
         content_type="application/json",
     )
     assert resp.status_code == 200
@@ -127,7 +142,10 @@ def test_mi_volume_post_range_check(client, monkeypatch):
 
     resp = client.post(
         "/mi/volume",
-        data=json.dumps({"device_id": "d1", "volume": 101}),
+        data=json.dumps({
+            "device_id": "d1",
+            "volume": 101
+        }),
         content_type="application/json",
     )
     assert resp.status_code == 200
@@ -137,7 +155,9 @@ def test_mi_volume_post_range_check(client, monkeypatch):
 
 
 def test_mi_volume_post_ok(client, monkeypatch):
+
     class FakeDev:
+
         def __init__(self, device_id):
             assert device_id == "d1"
 
@@ -149,7 +169,10 @@ def test_mi_volume_post_ok(client, monkeypatch):
 
     resp = client.post(
         "/mi/volume",
-        data=json.dumps({"device_id": "d1", "volume": 50}),
+        data=json.dumps({
+            "device_id": "d1",
+            "volume": 50
+        }),
         content_type="application/json",
     )
     assert resp.status_code == 200
@@ -167,7 +190,9 @@ def test_mi_status_requires_device_id(client):
 
 
 def test_mi_status_ok(client, monkeypatch):
+
     class FakeDev:
+
         def __init__(self, device_id):
             assert device_id == "d1"
 
@@ -184,7 +209,9 @@ def test_mi_status_ok(client, monkeypatch):
 
 
 def test_mi_status_err_uses_error_field(client, monkeypatch):
+
     class FakeDev:
+
         def __init__(self, device_id):
             pass
 
@@ -201,7 +228,9 @@ def test_mi_status_err_uses_error_field(client, monkeypatch):
 
 
 def test_mi_status_err_non_dict_fallback_msg(client, monkeypatch):
+
     class FakeDev:
+
         def __init__(self, device_id):
             pass
 
@@ -226,7 +255,9 @@ def test_mi_stop_requires_device_id(client):
 
 
 def test_mi_stop_ok(client, monkeypatch):
+
     class FakeDev:
+
         def __init__(self, device_id):
             assert device_id == "d1"
 
@@ -243,7 +274,9 @@ def test_mi_stop_ok(client, monkeypatch):
 
 
 def test_mi_stop_exception_returns_err(client, monkeypatch):
+
     class FakeDev:
+
         def __init__(self, device_id):
             pass
 

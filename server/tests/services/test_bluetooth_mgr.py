@@ -113,6 +113,58 @@ def test_build_ble_metadata_no_adv_returns_empty():
     assert mgr._build_ble_metadata(None) == {}
 
 
+def test_build_ble_metadata_manufacturer_data_not_bytes():
+    """manufacturer_data 值为非 bytes 时走 else 分支"""
+    from core.services.bluetooth_mgr import BluetoothMgr
+
+    mgr = BluetoothMgr()
+    adv = types.SimpleNamespace(
+        manufacturer_data={1: "not-bytes"},
+        service_data={},
+        service_uuids=[],
+    )
+    meta = mgr._build_ble_metadata(adv)
+    assert meta["manufacturer_data"][1] == "not-bytes"
+
+
+def test_build_ble_metadata_service_data_empty():
+    """service_data 为空时 metadata['service_data'] 为 {}"""
+    from core.services.bluetooth_mgr import BluetoothMgr
+
+    mgr = BluetoothMgr()
+    adv = types.SimpleNamespace(manufacturer_data={}, service_data={}, service_uuids=[])
+    meta = mgr._build_ble_metadata(adv)
+    assert meta.get("service_data") == {}
+
+
+def test_extract_metadata_empty_returns_empty():
+    from core.services.bluetooth_mgr import BluetoothMgr
+
+    mgr = BluetoothMgr()
+    assert mgr._extract_metadata(None) == {}
+    assert mgr._extract_metadata(False) == {}
+
+
+def test_extract_metadata_with_bytes_and_uuids():
+    """_extract_metadata 含 manufacturer_data bytes、service_data、service_uuids"""
+    from core.services.bluetooth_mgr import BluetoothMgr
+
+    mgr = BluetoothMgr()
+    adv = types.SimpleNamespace(
+        manufacturer_data={0x1234: b"\x01\x02"},
+        service_data={"uuid1": b"ab"},
+        service_uuids=["u1", "u2"],
+        local_name="Test",
+        tx_power=4,
+    )
+    meta = mgr._extract_metadata(adv)
+    assert meta["manufacturer_data"]["4660"]["hex"] == "0102"
+    assert meta["service_data"]["uuid1"]["hex"] == "6162"
+    assert meta["service_uuids"] == ["u1", "u2"]
+    assert meta["local_name"] == "Test"
+    assert meta["tx_power"] == 4
+
+
 def test_scan_ble_devices_updates_cache_and_returns_list(monkeypatch, mock_bluetooth_dev):
     import core.services.bluetooth_mgr as bm
     from core.services.bluetooth_mgr import BluetoothMgr

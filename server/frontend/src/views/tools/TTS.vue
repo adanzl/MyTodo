@@ -49,22 +49,34 @@
             <el-tag
               :type="getTtsStatusTagType(task.status)"
               size="small"
-              class="!h-5 !text-xs w-16 text-center"
+              class="!h-5 !text-xs w-14 text-center"
             >
               {{ getTtsStatusText(task.status) }}
             </el-tag>
-            <div class="flex items-center gap-1 flex-shrink-0">
+            <el-tag
+              v-if="task.analysis"
+              type="primary"
+              size="small"
+              effect="dark"
+              round
+              class="!h-4 !w-4 !text-[10px] mr-1"
+            >
+              析
+            </el-tag>
+            <div class="flex items-center justify-end gap-0 flex-shrink-0 w-23">
               <el-button
                 v-if="task.output_file"
                 type="primary"
+                class="!w-6"
                 v-bind="smallTextButtonProps"
                 @click.stop="handleTtsDownloadFromList(task)"
               >
-                下载
+                <el-icon><Download /></el-icon>
               </el-button>
               <el-button
                 type="danger"
                 v-bind="smallTextButtonProps"
+                class="!w-6"
                 @click.stop="handleTtsDeleteTask(task.task_id)"
                 :disabled="isTaskBusyForTask(task)"
               >
@@ -220,7 +232,7 @@
         </div>
 
         <!-- 分析数据（中间列底部） -->
-        <div class="border rounded p-3 flex flex-col gap-2 flex-shrink-10 h-[230px]">
+        <div class="border rounded p-3 flex flex-col gap-2 flex-shrink-10 h-[240px]">
           <div class="flex items-center justify-between">
             <h4 class="text-sm font-semibold">分析数据</h4>
             <el-button
@@ -543,7 +555,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { Refresh, Plus, Delete, Edit, Close, Picture } from "@element-plus/icons-vue";
+import { Refresh, Plus, Delete, Edit, Close, Picture, Download } from "@element-plus/icons-vue";
 import MediaComponent from "@/components/MediaComponent.vue";
 import { getMediaFileUrl } from "@/utils/file";
 import { logAndNoticeError } from "@/utils/error";

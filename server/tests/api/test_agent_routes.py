@@ -239,3 +239,63 @@ def test_agent_mock_returns_err_when_agent_returns_nonzero(client, monkeypatch):
     body = resp.get_json()
     assert body["code"] != 0
     assert body["msg"] == "nope"
+
+
+def test_agent_heartbeat_exception(client, monkeypatch):
+    monkeypatch.setattr(agent_routes.agent_mgr, "handle_heartbeat", lambda **kw:
+                        (_ for _ in ()).throw(RuntimeError("boom")))
+    resp = client.post(
+        "/agent/heartbeat",
+        data=json.dumps({
+            "address": "http://x",
+            "name": "n",
+            "actions": []
+        }),
+        content_type="application/json",
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["code"] != 0
+    assert "error" in resp.get_json().get("msg", "").lower() or "boom" in resp.get_json().get("msg", "")
+
+
+def test_agent_event_exception(client, monkeypatch):
+    monkeypatch.setattr(agent_routes.agent_mgr, "handle_event", lambda **kw:
+                        (_ for _ in ()).throw(ValueError("event err")))
+    resp = client.post(
+        "/agent/event",
+        data=json.dumps({
+            "key": "k",
+            "value": "v",
+            "action": "a"
+        }),
+        content_type="application/json",
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["code"] != 0
+
+
+def test_agent_list_exception(client, monkeypatch):
+    monkeypatch.setattr(agent_routes.agent_mgr, "get_all_agents", lambda: (_ for _ in ()).throw(OSError("list err")))
+    resp = client.get("/agent/list")
+    assert resp.status_code == 200
+    assert resp.get_json()["code"] != 0
+
+
+def test_agent_mock_exception(client, monkeypatch):
+
+    class FakeAgent:
+
+        def mock(self, *, action, key, value):
+            raise RuntimeError("mock err")
+
+    monkeypatch.setattr(agent_routes.agent_mgr, "get_agent", lambda agent_id: FakeAgent())
+    resp = client.post(
+        "/agent/mock",
+        data=json.dumps({
+            "agent_id": "id1",
+            "action": "a"
+        }),
+        content_type="application/json",
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["code"] != 0
