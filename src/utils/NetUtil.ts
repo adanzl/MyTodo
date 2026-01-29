@@ -1,7 +1,7 @@
 import { LoadColorData } from "@/modal/ColorType.ts";
 import EventBus, { C_EVENT } from "@/modal/EventBus.ts";
 import { UData, UserData } from "@/modal/UserData.ts";
-import { getAccessToken, refreshToken, setAccessToken } from "@/utils/auth";
+import { getAccessToken, refreshToken, setAccessToken } from "@/utils/Auth";
 import axios, { type AxiosRequestConfig, type InternalAxiosRequestConfig } from "axios";
 import _ from "lodash";
 
