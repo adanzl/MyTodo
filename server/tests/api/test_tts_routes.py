@@ -39,13 +39,14 @@ def test_create_tts_task_ok(client):
 
 def test_create_tts_task_with_all_params(client):
     """测试创建任务时传递所有参数"""
-    resp = client.post('/tts/create', json={
-        "text": "hello",
-        "name": "test task",
-        "role": "test_role",
-        "speed": 1.5,
-        "vol": 75
-    })
+    resp = client.post('/tts/create',
+                       json={
+                           "text": "hello",
+                           "name": "test task",
+                           "role": "test_role",
+                           "speed": 1.5,
+                           "vol": 75
+                       })
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["code"] == 0
@@ -77,14 +78,15 @@ def test_update_tts_task_ok(client):
 
 def test_update_tts_task_with_all_params(client):
     """测试更新任务时传递所有参数"""
-    resp = client.post('/tts/update', json={
-        "task_id": "t1",
-        "name": "new name",
-        "text": "new text",
-        "role": "new_role",
-        "speed": 1.2,
-        "vol": 80
-    })
+    resp = client.post('/tts/update',
+                       json={
+                           "task_id": "t1",
+                           "name": "new name",
+                           "text": "new text",
+                           "role": "new_role",
+                           "speed": 1.2,
+                           "vol": 80
+                       })
     assert resp.status_code == 200
     assert resp.get_json()["code"] == 0
 
@@ -214,10 +216,10 @@ def test_download_tts_file_success(client, monkeypatch, tmp_path):
     import os
     test_file = tmp_path / "output.mp3"
     test_file.write_bytes(b"fake audio data")
-    
+
     monkeypatch.setattr(tr.tts_mgr, "get_task", lambda task_id: {"task_id": task_id, "status": "success"})
     monkeypatch.setattr(tr.tts_mgr, "get_output_file_path", lambda task_id: str(test_file))
-    
+
     resp = client.get('/tts/download?task_id=t1')
     assert resp.status_code == 200
     assert resp.data == b"fake audio data"
@@ -289,24 +291,25 @@ def test_tts_ocr_success(client, monkeypatch, tmp_path):
     """测试 TTS OCR 成功"""
     import tempfile
     import os
-    
+
     # Mock tts_mgr 方法
     monkeypatch.setattr(tr.tts_mgr, "get_task", lambda task_id: {"task_id": task_id, "status": "pending"})
     monkeypatch.setattr(tr.tts_mgr, "start_ocr_task", lambda task_id, image_paths, temp_dir: (0, "OCR 任务已启动"))
-    
+
     # 创建临时图片文件
     with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp_file:
         tmp_file.write(b'fake image data')
         tmp_path_file = tmp_file.name
-    
+
     try:
         with open(tmp_path_file, 'rb') as f:
-            resp = client.post(
-                '/tts/ocr',
-                data={'task_id': 't1', 'file': (f, 'test.jpg')},
-                content_type='multipart/form-data'
-            )
-        
+            resp = client.post('/tts/ocr',
+                               data={
+                                   'task_id': 't1',
+                                   'file': (f, 'test.jpg')
+                               },
+                               content_type='multipart/form-data')
+
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["code"] == 0
@@ -328,16 +331,17 @@ def test_tts_ocr_empty_filenames(client, monkeypatch):
     """测试 TTS OCR 上传的文件名为空"""
     from core.config import TASK_STATUS_PENDING
     from core.services.tts_mgr import TTSTask
-    
+
     def mock_get_task_or_err(task_id):
         task = TTSTask(task_id=task_id, name="test", status=TASK_STATUS_PENDING, text="test")
         return task, None
+
     monkeypatch.setattr(tr.tts_mgr, "_get_task_or_err", mock_get_task_or_err)
-    
+
     # 创建一个空文件名的文件对象
     from werkzeug.datastructures import FileStorage
     empty_file = FileStorage(filename='', stream=None)
-    
+
     resp = client.post('/tts/ocr', data={'task_id': 't1', 'file': empty_file}, content_type='multipart/form-data')
     assert resp.status_code == 200
     data = resp.get_json()
@@ -349,28 +353,30 @@ def test_tts_ocr_save_files_failure(client, monkeypatch):
     """测试 TTS OCR 保存文件失败"""
     from core.config import TASK_STATUS_PENDING
     from core.services.tts_mgr import TTSTask
-    
+
     def mock_get_task_or_err(task_id):
         task = TTSTask(task_id=task_id, name="test", status=TASK_STATUS_PENDING, text="test")
         return task, None
+
     monkeypatch.setattr(tr.tts_mgr, "_get_task_or_err", mock_get_task_or_err)
-    
+
     # Mock save_uploaded_files 返回 None（保存失败）
     monkeypatch.setattr('core.api.tts_routes.save_uploaded_files', lambda *args, **kwargs: (None, None))
-    
+
     import tempfile
     with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp_file:
         tmp_file.write(b'fake image data')
         tmp_path_file = tmp_file.name
-    
+
     try:
         with open(tmp_path_file, 'rb') as f:
-            resp = client.post(
-                '/tts/ocr',
-                data={'task_id': 't1', 'file': (f, 'test.jpg')},
-                content_type='multipart/form-data'
-            )
-        
+            resp = client.post('/tts/ocr',
+                               data={
+                                   'task_id': 't1',
+                                   'file': (f, 'test.jpg')
+                               },
+                               content_type='multipart/form-data')
+
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["code"] == -1
@@ -382,25 +388,27 @@ def test_tts_ocr_save_files_failure(client, monkeypatch):
 
 def test_tts_ocr_exception(client, monkeypatch):
     """测试 TTS OCR 发生异常"""
+
     # Mock parse_with_model 抛出异常
     def mock_parse_with_model(*args, **kwargs):
         raise Exception("测试异常")
-    
+
     monkeypatch.setattr('core.api.tts_routes.parse_with_model', mock_parse_with_model)
-    
+
     import tempfile
     with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp_file:
         tmp_file.write(b'fake image data')
         tmp_path_file = tmp_file.name
-    
+
     try:
         with open(tmp_path_file, 'rb') as f:
-            resp = client.post(
-                '/tts/ocr',
-                data={'task_id': 't1', 'file': (f, 'test.jpg')},
-                content_type='multipart/form-data'
-            )
-        
+            resp = client.post('/tts/ocr',
+                               data={
+                                   'task_id': 't1',
+                                   'file': (f, 'test.jpg')
+                               },
+                               content_type='multipart/form-data')
+
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["code"] == -1
@@ -420,24 +428,27 @@ def test_tts_ocr_no_task_id(client):
 
 def test_tts_ocr_task_not_found(client, monkeypatch):
     """测试 TTS OCR 任务不存在"""
+
     # Mock _get_task_or_err 返回错误（start_ocr_task 内部使用这个方法）
     def mock_get_task_or_err(task_id):
         return None, "任务不存在"
+
     monkeypatch.setattr(tr.tts_mgr, "_get_task_or_err", mock_get_task_or_err)
-    
+
     import tempfile
     with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp_file:
         tmp_file.write(b'fake image data')
         tmp_path_file = tmp_file.name
-    
+
     try:
         with open(tmp_path_file, 'rb') as f:
-            resp = client.post(
-                '/tts/ocr',
-                data={'task_id': 'nonexistent', 'file': (f, 'test.jpg')},
-                content_type='multipart/form-data'
-            )
-        
+            resp = client.post('/tts/ocr',
+                               data={
+                                   'task_id': 'nonexistent',
+                                   'file': (f, 'test.jpg')
+                               },
+                               content_type='multipart/form-data')
+
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["code"] == -1
@@ -451,26 +462,28 @@ def test_tts_ocr_task_processing(client, monkeypatch):
     """测试 TTS OCR 任务正在处理中"""
     from core.config import TASK_STATUS_PROCESSING
     from core.services.tts_mgr import TTSTask
-    
+
     # Mock _get_task_or_err 返回一个 processing 状态的任务
     def mock_get_task_or_err(task_id):
         task = TTSTask(task_id=task_id, name="test", status=TASK_STATUS_PROCESSING, text="test")
         return task, None
+
     monkeypatch.setattr(tr.tts_mgr, "_get_task_or_err", mock_get_task_or_err)
-    
+
     import tempfile
     with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp_file:
         tmp_file.write(b'fake image data')
         tmp_path_file = tmp_file.name
-    
+
     try:
         with open(tmp_path_file, 'rb') as f:
-            resp = client.post(
-                '/tts/ocr',
-                data={'task_id': 't1', 'file': (f, 'test.jpg')},
-                content_type='multipart/form-data'
-            )
-        
+            resp = client.post('/tts/ocr',
+                               data={
+                                   'task_id': 't1',
+                                   'file': (f, 'test.jpg')
+                               },
+                               content_type='multipart/form-data')
+
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["code"] == -1
@@ -483,22 +496,23 @@ def test_tts_ocr_task_processing(client, monkeypatch):
 def test_tts_ocr_start_failure(client, monkeypatch, tmp_path):
     """测试 TTS OCR 启动失败"""
     import tempfile
-    
+
     monkeypatch.setattr(tr.tts_mgr, "get_task", lambda task_id: {"task_id": task_id, "status": "pending"})
     monkeypatch.setattr(tr.tts_mgr, "start_ocr_task", lambda task_id, image_paths, temp_dir: (-1, "启动失败"))
-    
+
     with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp_file:
         tmp_file.write(b'fake image data')
         tmp_path_file = tmp_file.name
-    
+
     try:
         with open(tmp_path_file, 'rb') as f:
-            resp = client.post(
-                '/tts/ocr',
-                data={'task_id': 't1', 'file': (f, 'test.jpg')},
-                content_type='multipart/form-data'
-            )
-        
+            resp = client.post('/tts/ocr',
+                               data={
+                                   'task_id': 't1',
+                                   'file': (f, 'test.jpg')
+                               },
+                               content_type='multipart/form-data')
+
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["code"] == -1
@@ -506,3 +520,43 @@ def test_tts_ocr_start_failure(client, monkeypatch, tmp_path):
     finally:
         if os.path.exists(tmp_path_file):
             os.remove(tmp_path_file)
+
+
+# ---------- TTS 分析文章 /tts/analysis ----------
+
+
+def test_tts_analysis_success(client, monkeypatch):
+    """测试 POST /tts/analysis 成功"""
+    monkeypatch.setattr(tr.tts_mgr, "start_analyze_article_task", lambda task_id: (0, "分析文章任务已启动"))
+    resp = client.post("/tts/analysis", json={"task_id": "t1"})
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["code"] == 0
+
+
+def test_tts_analysis_failure(client, monkeypatch):
+    """测试 POST /tts/analysis 启动失败"""
+    monkeypatch.setattr(tr.tts_mgr, "start_analyze_article_task", lambda task_id: (-1, "待分析的文章内容为空"))
+    resp = client.post("/tts/analysis", json={"task_id": "t1"})
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["code"] == -1
+    assert "待分析的文章内容为空" in data["msg"]
+
+
+def test_tts_analysis_invalid_json(client):
+    """测试 POST /tts/analysis 无效 JSON"""
+    resp = client.post("/tts/analysis", data="not json", content_type="application/json")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["code"] == -1
+
+
+def test_tts_analysis_exception(client, monkeypatch):
+    """测试 POST /tts/analysis 接口异常"""
+    monkeypatch.setattr(tr.tts_mgr, "start_analyze_article_task", MagicMock(side_effect=Exception("服务异常")))
+    resp = client.post("/tts/analysis", json={"task_id": "t1"})
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["code"] == -1
+    assert "分析文章失败" in data["msg"]

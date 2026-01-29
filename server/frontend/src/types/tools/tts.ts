@@ -88,4 +88,14 @@ export interface TTSTask {
    * 文本分析结果（调用 /tts/analysis 后写入）
    */
   analysis?: TTSAnalysis | null;
+
+  /**
+   * 是否正在执行 OCR 子任务（不改变主状态，但锁定更新/启动/删除）
+   */
+  ocr_running?: boolean;
+
+  /**
+   * 是否正在执行分析子任务（不改变主状态，但锁定更新/启动/删除）
+   */
+  analysis_running?: boolean;
 }

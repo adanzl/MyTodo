@@ -66,7 +66,7 @@
                 type="danger"
                 v-bind="smallTextButtonProps"
                 @click.stop="handleTtsDeleteTask(task.task_id)"
-                :disabled="task.status === 'processing'"
+                :disabled="isTaskBusyForTask(task)"
               >
                 <el-icon>
                   <Delete />
@@ -91,7 +91,7 @@
             size="small"
             plain
             circle
-            :disabled="isTaskProcessing"
+            :disabled="isTaskBusy"
             @click="handleTtsRenameTask"
             title="编辑名称"
           >
@@ -116,7 +116,7 @@
             v-if="resultFileObject"
             :file="resultFileObject"
             :player="ttsPlayer"
-            :disabled="isTaskProcessing"
+            :disabled="isTaskBusy"
             @play="handleTtsTogglePlayResult"
             @seek="handleResultFileSeek"
           />
@@ -190,7 +190,7 @@
                 type="default"
                 size="small"
                 @click="handleSelectImages"
-                :disabled="isTaskProcessing"
+                :disabled="isTaskBusy"
                 class="!p-0"
               >
                 <el-icon class="!w-7 !h-6">
@@ -201,7 +201,7 @@
                 type="primary"
                 size="small"
                 @click="handleOcrRecognize"
-                :disabled="isTaskProcessing || selectedImages.length === 0 || !ttsCurrentTask"
+                :disabled="isTaskBusy || selectedImages.length === 0 || !ttsCurrentTask"
                 :loading="ocrLoading"
               >
                 识别
@@ -213,21 +213,21 @@
             type="textarea"
             :autosize="{ minRows: 6, maxRows: 17 }"
             placeholder="请输入要转换为语音的文本"
-            :disabled="isTaskProcessing"
+            :disabled="isTaskBusy"
             @blur="handleTtsTextChange"
             class="flex-1"
           />
         </div>
 
         <!-- 分析数据（中间列底部） -->
-        <div class="border rounded p-3 flex flex-col gap-2 flex-shrink-0">
+        <div class="border rounded p-3 flex flex-col gap-2 flex-shrink-10 h-[230px]">
           <div class="flex items-center justify-between">
             <h4 class="text-sm font-semibold">分析数据</h4>
             <el-button
               type="primary"
               size="small"
               :loading="analysisLoading"
-              :disabled="isTaskProcessing || !ttsText.trim()"
+              :disabled="isTaskBusy || !ttsText.trim()"
               @click="handleTtsAnalysis"
             >
               分析
@@ -253,9 +253,7 @@
               <div
                 class="w-10 h-6 rounded-md bg-blue-50 border border-blue-300 flex items-center justify-center flex-shrink-0"
               >
-                <span class="text-[11px] leading-tight text-blue-700 text-center">
-                  美词
-                </span>
+                <span class="text-[11px] leading-tight text-blue-700 text-center"> 美词 </span>
               </div>
               <!-- 右侧正文 -->
               <div class="flex-1 flex flex-wrap gap-1 items-start">
@@ -317,9 +315,7 @@
               <div
                 class="w-10 h-6 rounded-md bg-pink-50 border border-pink-300 flex items-center justify-center flex-shrink-0"
               >
-                <span class="text-[11px] leading-tight text-pink-700 text-center">
-                  涂鸦
-                </span>
+                <span class="text-[11px] leading-tight text-pink-700 text-center"> 涂鸦 </span>
               </div>
               <!-- 右侧正文 -->
               <div class="flex-1">
@@ -360,7 +356,7 @@
                 size="small"
                 placeholder="默认模型"
                 clearable
-                :disabled="isTaskProcessing"
+                :disabled="isTaskBusy"
                 @change="handleTtsParamsChange"
                 class="w-full"
               >
@@ -375,7 +371,7 @@
                 size="small"
                 placeholder="请选择音色（可选）"
                 clearable
-                :disabled="isTaskProcessing"
+                :disabled="isTaskBusy"
                 @change="handleTtsRoleChange"
                 class="w-full"
               >
@@ -394,7 +390,7 @@
                 :max="2.0"
                 :step="0.1"
                 :precision="1"
-                :disabled="isTaskProcessing"
+                :disabled="isTaskBusy"
                 @change="handleTtsParamsChange"
                 class="w-full"
               />
@@ -407,7 +403,7 @@
                 :min="0"
                 :max="100"
                 :step="1"
-                :disabled="isTaskProcessing"
+                :disabled="isTaskBusy"
                 @change="handleTtsParamsChange"
                 class="w-full"
               />
@@ -719,8 +715,8 @@ const handleTtsViewTask = async (taskId: string) => {
   if (isTaskSwitching && ttsCurrentTask.value) {
     handleTtsStopPlay();
     clearSelectedImages();
-    // 如果当前任务不是processing状态，停止轮询
-    if (ttsCurrentTask.value.status !== "processing") {
+    // 如果当前任务不再“忙”（非 TTS 生成中且非 OCR/分析子任务中），停止轮询
+    if (!isTaskBusyInList(ttsCurrentTask.value)) {
       stopTtsPolling();
     }
   }
@@ -731,8 +727,8 @@ const handleTtsViewTask = async (taskId: string) => {
     ttsCurrentTask.value = { ...taskInList };
     updateTaskParamsFromData(taskInList);
 
-    // 如果任务正在处理中，启动轮询
-    if (taskInList.status === "processing") {
+    // 若任务正在 TTS 生成或 OCR/分析子任务中，启动轮询
+    if (isTaskBusyInList(taskInList)) {
       startTtsPollingTaskStatus();
     }
   }
@@ -758,8 +754,8 @@ const handleTtsViewTask = async (taskId: string) => {
       updateTaskInList(taskData);
       updateTaskParamsFromData(taskData);
 
-      // 只有处理中的任务才自动开始定时刷新状态
-      if (taskData.status === "processing") {
+      // 若任务正在 TTS 生成或 OCR/分析子任务中，自动开始定时刷新状态
+      if (taskData.status === "processing" || taskData.ocr_running || taskData.analysis_running) {
         startTtsPollingTaskStatus();
       }
     }
@@ -778,9 +774,9 @@ const handleTtsViewTask = async (taskId: string) => {
 
 // 删除 TTS 任务
 const handleTtsDeleteTask = async (taskId: string) => {
-  // 如果删除的是当前选中的任务，停止轮询（如果任务不是processing状态）
+  // 如果删除的是当前选中的任务，且该任务不再“忙”，停止轮询
   if (ttsCurrentTask.value && ttsCurrentTask.value.task_id === taskId) {
-    if (ttsCurrentTask.value.status !== "processing") {
+    if (!isTaskBusyInList(ttsCurrentTask.value)) {
       stopTtsPolling();
     }
   }
@@ -1054,43 +1050,39 @@ const updateTaskDetail = async (taskId: string) => {
   }
 };
 
-// 记录上一次轮询时的processing任务ID集合
-const previousProcessingTaskIds = ref<Set<string>>(new Set());
+// 任务是否“忙”（TTS 生成中或 OCR/分析子任务运行中）
+function isTaskBusyInList(t: TTSTask): boolean {
+  return t.status === "processing" || !!t.ocr_running || !!t.analysis_running;
+}
 
-// 轮询 TTS 任务状态
+// 记录上一次轮询时的“忙”任务 ID 集合
+const previousBusyTaskIds = ref<Set<string>>(new Set());
+
+// 轮询 TTS 任务状态（含 OCR/分析子任务：子任务不再改主状态，通过 ocr_running/analysis_running 判断）
 const { start: startTtsPolling, stop: stopTtsPolling } = useControllableInterval(
   async () => {
-    // 先更新任务列表，确保状态同步
     await loadTtsTaskList();
 
-    // 找出所有 processing 状态的任务
-    const processingTasks = ttsTaskList.value.filter(t => t.status === "processing");
-    const currentProcessingTaskIds = new Set(processingTasks.map(t => t.task_id));
+    const busyTasks = ttsTaskList.value.filter(isTaskBusyInList);
+    const currentBusyTaskIds = new Set(busyTasks.map(t => t.task_id));
 
-    // 找出刚刚完成的任务（上一次是processing，现在不是processing）
-    const completedTaskIds = Array.from(previousProcessingTaskIds.value).filter(
-      taskId => !currentProcessingTaskIds.has(taskId)
+    // 刚结束“忙”的任务：刷新详情（如 OCR/分析完成后更新文本或 analysis）
+    const completedTaskIds = Array.from(previousBusyTaskIds.value).filter(
+      taskId => !currentBusyTaskIds.has(taskId)
     );
-
-    // 刷新刚刚完成的任务详情（确保OCR结果被正确更新）
     for (const taskId of completedTaskIds) {
       await updateTaskDetail(taskId);
     }
 
-    // 更新上一次的processing任务ID集合
-    previousProcessingTaskIds.value = currentProcessingTaskIds;
+    previousBusyTaskIds.value = currentBusyTaskIds;
 
-    if (processingTasks.length === 0) {
-      // 没有 processing 状态的任务，停止轮询
+    if (busyTasks.length === 0) {
       stopTtsPolling();
-      previousProcessingTaskIds.value.clear();
+      previousBusyTaskIds.value.clear();
       return;
     }
 
-    // 刷新所有 processing 状态的任务详情
-    // 这样可以确保OCR完成后，任务详情会被正确更新（即使当前选中的是其他任务）
-    // 使用 updateTaskDetail 而不是 handleTtsViewTask，避免改变当前选中的任务
-    for (const task of processingTasks) {
+    for (const task of busyTasks) {
       await updateTaskDetail(task.task_id);
     }
   },
@@ -1099,9 +1091,8 @@ const { start: startTtsPolling, stop: stopTtsPolling } = useControllableInterval
 );
 
 const startTtsPollingTaskStatus = () => {
-  // 初始化上一次的processing任务ID集合
-  const currentProcessingTasks = ttsTaskList.value.filter(t => t.status === "processing");
-  previousProcessingTaskIds.value = new Set(currentProcessingTasks.map(t => t.task_id));
+  const busyTasks = ttsTaskList.value.filter(isTaskBusyInList);
+  previousBusyTaskIds.value = new Set(busyTasks.map(t => t.task_id));
   startTtsPolling();
 };
 
@@ -1397,9 +1388,8 @@ const handleOcrRecognize = async () => {
     return;
   }
 
-  // 检查任务状态，如果正在处理中，不允许 OCR
-  if (ttsCurrentTask.value.status === "processing") {
-    ElMessage.warning("任务正在处理中，无法执行 OCR");
+  if (isTaskBusy.value) {
+    ElMessage.warning("任务正在处理中或正在执行分析，无法执行 OCR");
     return;
   }
 
@@ -1438,8 +1428,8 @@ const handleTtsAnalysis = async () => {
     return;
   }
 
-  if (isTaskProcessing.value) {
-    ElMessage.warning("当前任务正在处理中，请稍后再试");
+  if (isTaskBusy.value) {
+    ElMessage.warning("当前任务正在处理中或正在执行 OCR，请稍后再试");
     return;
   }
 
@@ -1476,7 +1466,19 @@ const handleTtsAnalysis = async () => {
 
 // 计算属性
 const isTaskProcessing = computed(() => ttsCurrentTask.value?.status === "processing");
-const isStartDisabled = computed(() => !ttsText.value.trim() || isTaskProcessing.value);
+/** 当前任务是否正在执行 OCR 或分析子任务（不改变主状态，但锁定更新/启动/删除） */
+const isSubtaskRunning = computed(
+  () => !!(ttsCurrentTask.value?.ocr_running || ttsCurrentTask.value?.analysis_running)
+);
+/** 当前任务是否“忙”：TTS 生成中或 OCR/分析子任务运行中，此时禁止更新、启动、删除等 */
+const isTaskBusy = computed(() => isTaskProcessing.value || isSubtaskRunning.value);
+/** 列表项任务是否忙（用于禁用删除等） */
+function isTaskBusyForTask(task: TTSTask): boolean {
+  return task.status === "processing" || !!task.ocr_running || !!task.analysis_running;
+}
+const isStartDisabled = computed(
+  () => !ttsText.value.trim() || isTaskProcessing.value || isSubtaskRunning.value
+);
 const isResultActionDisabled = computed(() => !ttsCurrentTask.value?.output_file);
 
 // 结果文件对象

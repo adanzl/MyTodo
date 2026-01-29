@@ -157,6 +157,14 @@ def test_get_all_fields_split(client, monkeypatch):
     assert args[4] == {"x": 1}
 
 
+def test_get_data_invalid_id(client):
+    """getData 的 id 非数字时返回错误"""
+    resp = client.get('/getData?table=t&id=abc&idx=0')
+    assert resp.status_code == 200
+    assert resp.json["code"] == -1
+    assert "must be int" in resp.json["msg"]
+
+
 def test_get_data_fields_none_uses_data_idx(client, monkeypatch):
     routes.db_mgr.get_data_idx.return_value = {"code": 0}
 
@@ -185,6 +193,14 @@ def test_del_data_ok(client, monkeypatch):
     resp = client.post('/delData', json={"table": "t", "id": 1})
     assert resp.status_code == 200
     routes.db_mgr.del_data.assert_called_once_with('t', 1)
+
+
+def test_del_data_invalid_id(client):
+    """delData 的 id 非数字时返回错误"""
+    resp = client.post('/delData', json={"table": "t", "id": "abc"})
+    assert resp.status_code == 200
+    assert resp.json["code"] == -1
+    assert "must be int" in resp.json["msg"]
 
 
 def test_query_no_sql(client):

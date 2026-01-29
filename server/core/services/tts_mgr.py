@@ -18,7 +18,7 @@ import time
 import re
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from core.config import (
     DEFAULT_BASE_DIR,
@@ -143,6 +143,9 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         super().__init__(base_dir=TTS_BASE_DIR)
         # 保存正在运行的 TTS 客户端引用，用于停止任务时取消操作
         self._active_clients: Dict[str, TTSClient] = {}
+        # OCR/分析子任务运行中时锁定任务（不改变主状态，但禁止更新、启动 TTS、重复触发子任务）
+        self._ocr_running_tasks: set[str] = set()
+        self._analysis_running_tasks: set[str] = set()
 
     def _task_from_dict(self, task_data: Dict[str, Any]) -> TTSTask:
         """从字典创建 TTSTask 对象。"""
@@ -267,8 +270,13 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         if err:
             return -1, err
 
-        # 检查任务状态
+        # 检查任务状态（TTS 处理中不允许更新）
         err = self._ensure_not_processing(task, '更新任务')
+        if err:
+            return -1, err
+
+        # 检查是否被 OCR/分析子任务锁定
+        err = self._ensure_no_subtask_running(task_id, '更新任务')
         if err:
             return -1, err
 
@@ -332,10 +340,15 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             log.warning(f"[TTSMgr] 启动任务失败，task_id: {task_id}, 错误: {err}")
             return -1, err
 
-        # 检查任务状态
+        # 检查任务状态（TTS 处理中不允许再次启动）
         if task.status == TASK_STATUS_PROCESSING:
             log.warning(f"[TTSMgr] 启动任务失败，task_id: {task_id}, 原因: 任务正在处理中")
             return -1, '任务正在处理中'
+
+        # 检查是否被 OCR/分析子任务锁定
+        err = self._ensure_no_subtask_running(task_id, '启动 TTS')
+        if err:
+            return -1, err
 
         # 验证文本内容
         if not task.text or not str(task.text).strip():
@@ -385,6 +398,15 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                              (f", 错误: {error_message}" if error_message else ""))
             else:
                 log.warning(f"[TTSMgr] _update_task_status 无法找到任务: {task_id}")
+
+    def _ensure_no_subtask_running(self, task_id: str, operation: str) -> Optional[str]:
+        """检查任务是否被 OCR/分析子任务锁定；若锁定则返回错误信息。"""
+        with self._task_lock:
+            if task_id in self._ocr_running_tasks:
+                return f"任务正在执行 OCR，无法{operation}"
+            if task_id in self._analysis_running_tasks:
+                return f"任务正在执行分析，无法{operation}"
+        return None
 
     def _run_task_async(self, task_id: str, runner: Callable[[TTSTask], None]) -> None:
         """在新线程中运行任务。
@@ -764,6 +786,13 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             log.info(f"[TTSMgr] 任务 {task_id} 已成功停止")
             return 0, '任务已停止'
 
+    def delete_task(self, task_id: str) -> Tuple[int, str]:
+        """删除任务。若任务正在执行 OCR/分析子任务，则不允许删除。"""
+        err = self._ensure_no_subtask_running(task_id, '删除')
+        if err:
+            return -1, err
+        return super().delete_task(task_id)
+
     def _should_request_stop_before_delete(self, _task: TTSTask) -> bool:
         """删除处理中的任务时，是否先请求停止。
 
@@ -794,20 +823,33 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             task_id: 任务 ID
 
         Returns:
-            任务字典（包含所有任务字段）；任务不存在时返回 None
+            任务字典（包含所有任务字段及 ocr_running、analysis_running）；任务不存在时返回 None
         """
-        task = self._get_task(task_id)
-        if not task:
-            return None
+        with self._task_lock:
+            task = self._get_task(task_id)
+            if not task:
+                return None
 
-        # 如果任务状态为成功但没有duration，异步获取并更新
-        if task.status == TASK_STATUS_SUCCESS and task.duration is None:
-            output_file = self.get_output_file_path(task_id)
-            if output_file and os.path.exists(output_file):
-                # 异步获取duration并更新存档
-                self._update_duration_async(task_id, output_file)
+            # 如果任务状态为成功但没有duration，异步获取并更新
+            if task.status == TASK_STATUS_SUCCESS and task.duration is None:
+                output_file = self.get_output_file_path(task_id)
+                if output_file and os.path.exists(output_file):
+                    self._update_duration_async(task_id, output_file)
 
-        return asdict(task)
+            d = asdict(task)
+            d['ocr_running'] = task_id in self._ocr_running_tasks
+            d['analysis_running'] = task_id in self._analysis_running_tasks
+            return d
+
+    def list_tasks(self) -> List[Dict[str, Any]]:
+        """获取任务列表。每个任务字典包含 ocr_running、analysis_running。"""
+        tasks = super().list_tasks()
+        with self._task_lock:
+            for t in tasks:
+                tid = t.get('task_id', '')
+                t['ocr_running'] = tid in self._ocr_running_tasks
+                t['analysis_running'] = tid in self._analysis_running_tasks
+        return tasks
 
     def get_output_file_path(self, task_id: str) -> Optional[str]:
         """获取任务的输出音频文件路径。
@@ -895,287 +937,143 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         run_in_background(update_duration)
 
     def start_ocr_task(self, task_id: str, image_paths: list[str], temp_dir: str) -> Tuple[int, str]:
-        """启动 OCR 任务（异步执行）。
-        
-        将 OCR 识别结果自动追加到指定 TTS 任务的文本末尾。
-        开始 OCR 后，TTS 任务进入处理中状态；OCR 完成后，结果追加到文本末尾，任务状态恢复为待处理。
-        
-        Args:
-            task_id: 任务 ID
-            image_paths: 图片路径列表
-            temp_dir: 临时文件目录路径（用于清理）
-        
-        Returns:
-            (code, msg)
-            - code: 0 表示成功，-1 表示失败
-            - msg: 描述信息
-        """
-        # 验证任务存在
+        """启动 OCR 任务（后台执行，不改变任务主状态）。"""
         task, err = self._get_task_or_err(task_id)
         if err:
-            log.warning(f"[TTSMgr] 启动 OCR 任务失败，task_id: {task_id}, 错误: {err}")
             return -1, err
-
-        # 检查任务状态，如果正在处理中，不允许OCR
         if task.status == TASK_STATUS_PROCESSING:
-            log.warning(f"[TTSMgr] 启动 OCR 任务失败，task_id: {task_id}, 原因: 任务正在处理中")
             return -1, '任务正在处理中，无法执行 OCR'
-
+        err = self._ensure_no_subtask_running(task_id, '执行 OCR')
+        if err:
+            return -1, err
         if not image_paths:
             return -1, '图片路径列表为空'
 
-        log.info(f"[TTSMgr] 准备启动 OCR 任务 {task_id}, 任务名称: {task.name}, 图片数量: {len(image_paths)}")
-
-        # 立即将任务状态设置为 processing，防止重复OCR
-        # 注意：需要在调用 _run_task_async 之前设置，确保状态立即更新
-        self._update_task_status(task_id, TASK_STATUS_PROCESSING, None)
-
-        # 创建 OCR 任务执行函数（包装器，符合 _run_task_async 的签名）
-        def ocr_runner(task: TTSTask) -> None:
-            """OCR 任务执行函数（包装器）。"""
-            # 使用传入的 task.task_id 而不是闭包中的 task_id，确保使用正确的任务ID
-            actual_task_id = task.task_id
-            # 验证 task_id 是否匹配（防止并发问题）
-            if actual_task_id != task_id:
-                log.warning(f"[TTSMgr] OCR 任务 task_id 不匹配: 期望 {task_id}, 实际 {actual_task_id}, 使用实际 task_id")
-            log.info(f"[TTSMgr] OCR 任务执行，使用 task_id: {actual_task_id} (原始请求: {task_id})")
-            self._run_ocr_task_logic(actual_task_id, image_paths, temp_dir)
-
-        # 使用统一的异步任务执行方法
-        # 注意：_run_task_async 内部也会设置状态为 processing，但由于我们已经提前设置了，
-        # 这样可以确保在返回之前状态已经是 processing，防止重复OCR
-        self._run_task_async(task_id, ocr_runner)
-
+        log.info(f"[TTSMgr] 准备启动 OCR 任务 {task_id}, 图片数: {len(image_paths)}")
+        self._run_subtask_with_lock(
+            task_id,
+            self._ocr_running_tasks,
+            lambda: self._run_ocr_task_logic(task_id, image_paths, temp_dir),
+        )
         return 0, 'OCR 任务已启动'
 
-    def _append_text_to_task(self, task_id: str, new_text: str) -> Tuple[int, str]:
-        """将文本追加到任务的现有文本末尾。
-        
-        Args:
-            task_id: 任务 ID
-            new_text: 要追加的新文本
-        
-        Returns:
-            (code, msg) 更新结果
-        """
-        log.info(f"[TTSMgr] 追加文本到任务 {task_id}，文本长度: {len(new_text)} 字符")
+    def _run_subtask_with_lock(self, task_id: str, running_set: set[str], runner: Callable[[], None]) -> None:
+        """在后台运行子任务并加锁：执行前加入 running_set，执行毕（含异常）从 running_set 移除。"""
+        with self._task_lock:
+            running_set.add(task_id)
+
+        def wrapped() -> None:
+            try:
+                runner()
+            finally:
+                with self._task_lock:
+                    running_set.discard(task_id)
+
+        run_in_background(wrapped)
+
+    def _append_text_to_task(self, task_id: str, new_text: str, keep_status: bool = False) -> Tuple[int, str]:
+        """将文本追加到任务末尾。keep_status=True 时不改任务状态且不经过 update_task（子任务用，避免被自己的锁拦住）。"""
         with self._task_lock:
             task = self._get_task(task_id)
-            if not task:
-                log.error(f"[TTSMgr] 追加文本失败：任务 {task_id} 不存在")
-                return -1, 'TTS 任务不存在'
-
-            # 验证 task_id 是否匹配
-            if task.task_id != task_id:
-                log.error(f"[TTSMgr] 追加文本失败：任务 ID 不匹配，期望 {task_id}, 实际 {task.task_id}")
-                return -1, f'任务 ID 不匹配: 期望 {task_id}, 实际 {task.task_id}'
-
-            # 将结果追加到现有文本末尾
+            if not task or task.task_id != task_id:
+                return -1, 'TTS 任务不存在' if not task else '任务 ID 不匹配'
             current_text = task.text or ''
             combined_text = f"{current_text}\n\n{new_text}" if current_text else new_text
-            log.info(f"[TTSMgr] 任务 {task_id} 文本追加：原长度 {len(current_text)}, 新长度 {len(combined_text)}")
-
-        # 先将状态设置为pending，以便可以更新文本（update_task不允许processing状态下更新）
+            task.text = combined_text
+            task.total_chars = count_text_chars(combined_text)
+            if keep_status:
+                self._save_task_and_update_time(task)
+                log.info(f"[TTSMgr] 任务 {task_id} 文本追加，新长度: {len(combined_text)}")
+                return 0, "ok"
+        log.info(f"[TTSMgr] 任务 {task_id} 文本追加，新长度: {len(combined_text)}")
         self._update_task_status(task_id, TASK_STATUS_PENDING, None)
-
-        # 更新任务文本
         code, msg = self.update_task(task_id=task_id, text=combined_text)
-        if code == 0:
-            log.info(f"[TTSMgr] 任务 {task_id} 文本追加成功")
-        else:
+        if code != 0:
             log.error(f"[TTSMgr] 任务 {task_id} 文本追加失败: {msg}")
         return code, msg
 
-    def _restore_task_to_pending(self, task_id: str, error_msg: str = None, task_type: str = "OCR") -> None:
-        """恢复任务状态为待处理（用于错误恢复）。
-        
-        Args:
-            task_id: 任务 ID
-            error_msg: 错误消息（可选，用于日志记录）
-            task_type: 任务类型（用于日志，如 "OCR"、"分析文章"）
-        """
-        self._update_task_status(task_id, TASK_STATUS_PENDING, None)
-        if error_msg:
-            log.error(f"[TTSMgr] {task_type} 任务 {task_id} 失败: {error_msg}")
-
     def _save_analysis_to_task(self, task_id: str, analysis_raw: str) -> Tuple[int, str]:
-        """保存分析结果到任务的 analysis 字段。
-        
-        Args:
-            task_id: 任务 ID
-            analysis_raw: 大模型返回的原始分析结果（期望为 JSON 字符串）
-        
-        Returns:
-            (code, msg) 更新结果
-        """
-        log.info(f"[TTSMgr] 保存分析结果到任务 {task_id}，原始长度: {len(analysis_raw)} 字符")
-
+        """保存分析结果到任务的 analysis 字段（期望 analysis_raw 为 JSON 字符串）。"""
         try:
-            # 尝试解析为 JSON，对错误进行兜底
-            try:
-                parsed = json.loads(analysis_raw)
-                # 确保最终存的是 dict，便于前端直接使用
-                if not isinstance(parsed, dict):
-                    parsed = {"data": parsed}
-            except Exception as e:
-                log.warning(
-                    f"[TTSMgr] 解析分析结果 JSON 失败，按原始字符串保存，task_id: {task_id}, 错误: {e}",
-                    exc_info=True,
-                )
-                parsed = {"raw": analysis_raw}
-
-            with self._task_lock:
-                task = self._get_task(task_id)
-                if not task:
-                    log.error(f"[TTSMgr] 保存分析结果失败：任务 {task_id} 不存在")
-                    return -1, "TTS 任务不存在"
-
-                if task.task_id != task_id:
-                    log.error(f"[TTSMgr] 保存分析结果失败：任务 ID 不匹配，期望 {task_id}, 实际 {task.task_id}")
-                    return -1, f"任务 ID 不匹配: 期望 {task_id}, 实际 {task.task_id}"
-
-                task.analysis = parsed
-                self._save_task_and_update_time(task)
-
-            log.info(f"[TTSMgr] 任务 {task_id} 分析结果保存成功，keys: {list(parsed.keys())}")
-            return 0, "分析结果已保存"
+            parsed = json.loads(analysis_raw)
+            if not isinstance(parsed, dict):
+                parsed = {"data": parsed}
         except Exception as e:
-            log.error(
-                f"[TTSMgr] 保存分析结果到任务 {task_id} 失败: {e}",
-                exc_info=True,
-            )
-            return -1, f"保存分析结果失败: {e}"
+            log.warning(f"[TTSMgr] 解析分析结果 JSON 失败，按 raw 保存，task_id={task_id}, err={e}")
+            parsed = {"raw": analysis_raw}
+
+        with self._task_lock:
+            task = self._get_task(task_id)
+            if not task or task.task_id != task_id:
+                return -1, "TTS 任务不存在" if not task else "任务 ID 不匹配"
+            task.analysis = parsed
+            self._save_task_and_update_time(task)
+        log.info(f"[TTSMgr] 任务 {task_id} 分析结果已保存，keys: {list(parsed.keys())}")
+        return 0, "分析结果已保存"
 
     def _run_ocr_task_logic(self, task_id: str, image_paths: list[str], temp_dir: str) -> None:
-        """执行 OCR 任务的核心逻辑。
-        
-        注意：此方法由 _run_task_async 调用，状态管理由 _run_task_async 处理。
-        此方法只负责 OCR 业务逻辑，不负责状态更新（除了将状态恢复为 pending）。
-        
-        Args:
-            task_id: 任务 ID
-            image_paths: 图片路径列表
-            temp_dir: 临时文件目录路径
-        """
+        """OCR 核心逻辑：调用服务、追加文本，不改变任务主状态。"""
         try:
-            log.info(f"[TTSMgr] 开始 OCR 任务 {task_id}，图片数量: {len(image_paths)}")
-
-            # 调用 OCR 服务
+            log.info(f"[TTSMgr] OCR 任务 {task_id} 开始，图片数: {len(image_paths)}")
             status, result = _ocr_client.query(image_paths)
-
             if status == "error":
-                # OCR 失败，恢复任务状态为待处理（不抛出异常，避免 _run_task_async 设置为失败）
-                self._restore_task_to_pending(task_id, result or 'OCR 识别失败', task_type="OCR")
+                log.error(f"[TTSMgr] OCR 任务 {task_id} 失败: {result or 'OCR 识别失败'}")
                 return
-
-            # OCR 成功，追加文本到任务
-            code, msg = self._append_text_to_task(task_id, result)
+            code, msg = self._append_text_to_task(task_id, result, keep_status=True)
             if code != 0:
-                # 更新失败，恢复任务状态为待处理
-                self._restore_task_to_pending(task_id, f"更新文本失败: {msg}", task_type="OCR")
+                log.error(f"[TTSMgr] OCR 任务 {task_id} 更新文本失败: {msg}")
                 return
-
-            log.info(f"[TTSMgr] OCR 任务 {task_id} 完成，追加文本长度: {len(result)} 字符")
-            # 注意：状态已经在 _append_text_to_task 中设置为 pending，不需要再次设置
-
+            log.info(f"[TTSMgr] OCR 任务 {task_id} 完成，追加 {len(result)} 字符")
         except Exception as e:
-            # 发生异常，恢复任务状态为待处理（不重新抛出，避免 _run_task_async 设置为失败）
-            self._restore_task_to_pending(task_id, f"处理异常: {e}", task_type="OCR")
-            log.error(f"[TTSMgr] OCR 任务 {task_id} 处理异常: {e}", exc_info=True)
+            log.error(f"[TTSMgr] OCR 任务 {task_id} 异常: {e}", exc_info=True)
         finally:
-            # 清理临时文件
             cleanup_temp_files(temp_dir, image_paths)
 
     def start_analyze_article_task(self, task_id: str) -> Tuple[int, str]:
-        """启动分析文章任务（异步执行）。
-
-        调用 txt_ali 大模型对传入文字进行分析，将分析结果自动追加到指定 TTS 任务的文本末尾。
-        开始分析后，TTS 任务进入处理中状态；分析完成后，结果追加到文本末尾，任务状态恢复为待处理。
-
-        Args:
-            task_id: 任务 ID
-
-        Returns:
-            (code, msg)
-            - code: 0 表示成功，-1 表示失败
-            - msg: 描述信息
-        """
-        # 验证任务存在
+        """启动分析文章任务（后台执行，不改变任务主状态）。"""
         task, err = self._get_task_or_err(task_id)
         if err:
-            log.warning(f"[TTSMgr] 启动分析文章任务失败，task_id: {task_id}, 错误: {err}")
             return -1, err
-
-        # 检查任务状态，如果正在处理中，不允许分析文章
         if task.status == TASK_STATUS_PROCESSING:
-            log.warning(f"[TTSMgr] 启动分析文章任务失败，task_id: {task_id}, 原因: 任务正在处理中")
             return -1, "任务正在处理中，无法执行分析文章"
-
-        # 使用任务当前文本作为分析内容
+        err = self._ensure_no_subtask_running(task_id, '执行分析')
+        if err:
+            return -1, err
         text = (task.text or "").strip()
         if not text:
             return -1, "待分析的文章内容为空"
 
-        log.info(f"[TTSMgr] 准备启动分析文章任务 {task_id}, 任务名称: {task.name}, 文本长度: {len(text)}")
-
-        # 立即将任务状态设置为 processing，防止重复执行
-        self._update_task_status(task_id, TASK_STATUS_PROCESSING, None)
-
-        # 创建分析文章任务执行函数（包装器，符合 _run_task_async 的签名）
-        def analyze_runner(t: TTSTask) -> None:
-            """分析文章任务执行函数（包装器）。"""
-            actual_task_id = t.task_id
-            if actual_task_id != task_id:
-                log.warning(f"[TTSMgr] 分析文章任务 task_id 不匹配: 期望 {task_id}, 实际 {actual_task_id}, 使用实际 task_id")
-            log.info(f"[TTSMgr] 分析文章任务执行，使用 task_id: {actual_task_id} (原始请求: {task_id})")
-            self._run_analyze_article_task_logic(actual_task_id, text)
-
-        self._run_task_async(task_id, analyze_runner)
-
+        log.info(f"[TTSMgr] 准备启动分析文章任务 {task_id}, 文本长度: {len(text)}")
+        self._run_subtask_with_lock(
+            task_id,
+            self._analysis_running_tasks,
+            lambda: self._run_analyze_article_task_logic(task_id, text),
+        )
         return 0, '分析文章任务已启动'
 
     def _run_analyze_article_task_logic(self, task_id: str, text: str) -> None:
-        """执行分析文章任务的核心逻辑。
-
-        注意：此方法由 _run_task_async 调用，状态管理由 _run_task_async 处理。
-        此方法只负责分析文章业务逻辑，不负责状态更新（除了将状态恢复为 pending）。
-
-        Args:
-            task_id: 任务 ID
-            text: 待分析的文章内容
-        """
+        """分析文章核心逻辑：调用 txt_ali、保存 analysis，不改变任务主状态。"""
+        PROMPT = """请基于提供的文章，生成一篇和指定参考格式完全一致的文本分析结构化文档
+*具体格式与要求严格遵循以下规范*：
+    - 文档标题为文章的完整名称，标题下方依次分几个核心模块，模块标题分别为：优美词汇、精彩句段、好句花园、涂鸦；
+    - 优美词汇(words)：从文章中选取 8到10 个贴合文意、有积累价值的词语；
+    - 精彩句段(sentence)：从文章中选取 2 个有画面感/表现力/核心情节的完整句子/段落，每段内容单独成段，保留原文语句完整性；
+    - 好句花园(abstract)：结合文章主旨撰写一段通顺连贯的分析内容，无需分段，字数适中，精准提炼文章的道理/启示/寓意，语言简洁易懂；
+    - 涂鸦(doodle)：结合文章主题，写几个字的简单趣味的文字，中文（5字以内）+对应的英文，内容简洁活泼，只写一句，贴合文章核心元素
+*返回格式*：标准 json 格式，key 为英文"""
         try:
-            log.info(f"[TTSMgr] 开始分析文章任务 {task_id}，文本长度: {len(text)}")
-            PROMPT = """请基于提供的文章，生成一篇和指定参考格式完全一致的文本分析结构化文档
-                        *具体格式与要求严格遵循以下规范*：
-                            - 文档标题为文章的完整名称，标题下方依次分几个核心模块，模块标题分别为：优美词汇、精彩句段、好句花园、涂鸦；
-                            - 优美词汇(words)：从文章中选取 8到10 个贴合文意、有积累价值的词语；
-                            - 精彩句段(sentence)：从文章中选取 2 个有画面感 / 表现力 / 核心情节的完整句子 / 段落，每段内容单独成段，保留原文语句完整性；
-                            - 好句花园(abstract)：结合文章主旨撰写一段通顺连贯的分析内容，无需分段，字数适中，精准提炼文章的道理 / 启示 / 寓意，语言简洁易懂；
-                            - 涂鸦(doodle)：结合文章主题，写 几个字的 简单趣味的文字，中文（5字以内）+对应的英文（贴合小学生手写涂鸦的轻松风格），内容简洁活泼，只写一句，贴合文章核心元素
-                        *返回格式*
-                            - 标准json格式的文本
-                            - key 为英文"""
-            # 调用 Txt 服务（txt_ali 大模型分析）
+            log.info(f"[TTSMgr] 分析文章任务 {task_id} 开始，文本长度: {len(text)}")
             status, result = _txt_client.query(txt=text, prompt=PROMPT)
-
             if status == "error":
-                self._restore_task_to_pending(task_id, result or "分析文章失败", task_type="analysis")
+                log.error(f"[TTSMgr] 分析文章任务 {task_id} 失败: {result or '分析文章失败'}")
                 return
-
-            # 保存结构化分析结果到任务 analysis 字段
             code, msg = self._save_analysis_to_task(task_id, result)
             if code != 0:
-                self._restore_task_to_pending(task_id, f"保存分析结果失败: {msg}", task_type="analysis")
+                log.error(f"[TTSMgr] 分析文章任务 {task_id} 保存失败: {msg}")
                 return
-
-            log.info(f"[TTSMgr] 分析文章任务 {task_id} 完成，分析结果长度: {len(result)} 字符")
-            # 分析成功后，将任务状态恢复为待处理，便于后续继续执行 TTS
-            self._restore_task_to_pending(task_id, task_type="analysis")
-
+            log.info(f"[TTSMgr] 分析文章任务 {task_id} 完成，结果 {len(result)} 字符")
         except Exception as e:
-            self._restore_task_to_pending(task_id, f"处理异常: {e}", task_type="分析文章")
-            log.error(f"[TTSMgr] 分析文章任务 {task_id} 处理异常: {e}", exc_info=True)
+            log.error(f"[TTSMgr] 分析文章任务 {task_id} 异常: {e}", exc_info=True)
 
 
 tts_mgr = TTSMgr()
