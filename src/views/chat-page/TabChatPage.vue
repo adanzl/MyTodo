@@ -17,7 +17,7 @@
         content-id="chat"
         layout="icon-start"
         class="text-blue-500">
-        <ion-icon :icon="heartOutline"></ion-icon>
+        <ion-icon :icon="heartOutline" class="h-4 w-4 mr-1"></ion-icon>
         <ion-label>聊天室</ion-label>
       </ion-segment-button>
       <ion-segment-button
@@ -25,92 +25,34 @@
         content-id="aiChat"
         layout="icon-start"
         class="text-blue-500">
-        <ion-icon :icon="heartOutline"></ion-icon>
+        <ion-icon :icon="heartOutline" class="h-4 w-4 mr-1"></ion-icon>
         <ion-label>AI</ion-label>
+      </ion-segment-button>
+      <ion-segment-button
+        :value="CHAT_TTS_TASKS"
+        content-id="ttsTasks"
+        layout="icon-start"
+        class="text-blue-500">
+        <ion-icon :icon="megaphoneOutline" class="h-4 w-4 mr-1"></ion-icon>
+        <ion-label>TTS</ion-label>
       </ion-segment-button>
     </ion-segment>
     <ion-segment-view :style="{ height: `calc(100% - ${tabsHeight}px)` }">
-      <!-- 聊天室 -->
-      <ion-segment-content id="chat">
-        <ion-content class="" ref="chatContent">
-          <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
-            <ion-refresher-content></ion-refresher-content>
-          </ion-refresher>
-          <div class="flex flex-col h-full p-2 border-t-1 border-gray-200">
-            <div v-for="(msg, idx) in chatMessages" :key="idx" class="p-1.5 w-full">
-              <!-- 自己 -->
-              <div v-if="msg.role === globalVar.user.id" class="flex">
-                <div
-                  class="max-w-[70%] min-w-[40px] bg-green-500 text-white p-2 ml-auto rounded-lg shadow-md relative">
-                  {{ msg.content }}
-                </div>
-                <ion-avatar slot="start" class="w-12 h-12 ml-1">
-                  <ion-img :src="getUserInfo(msg.role).icon" />
-                </ion-avatar>
-                <div
-                  v-if="!msg.audioSrc"
-                  class="absolute -right-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center text-black"
-                  @click="btnAudioClk(msg)">
-                  <Icon icon="mdi:stop-circle-outline" class="w-6 h-6" v-if="msg.playing" />
-                  <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
-                </div>
-              </div>
-              <!-- 他人 -->
-              <div v-else class="flex">
-                <ion-avatar slot="start" class="w-12 h-12 mr-1">
-                  <ion-img :src="getUserInfo(msg.role).icon" />
-                </ion-avatar>
-                <div
-                  class="max-w-[70%] min-w-[40px] bg-pink-200 p-2 mr-auto rounded-lg shadow-md relative">
-                  {{ msg.content }}
-                </div>
-                <div
-                  class="absolute -left-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center"
-                  @click="btnAudioClk(msg)">
-                  <Icon icon="mdi:stop-circle-outline" class="w-6 h-6" v-if="msg.playing" />
-                  <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
-                </div>
-              </div>
-            </div>
-          </div>
-        </ion-content>
-      </ion-segment-content>
-      <!-- AI -->
-      <ion-segment-content id="aiChat">
-        <ion-content class="" ref="aiChatContent">
-          <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
-            <ion-refresher-content></ion-refresher-content>
-          </ion-refresher>
-          <div class="flex flex-col h-full p-2 border-t-1 border-gray-200">
-            <div v-for="(msg, idx) in aiChatMessages" :key="idx" class="p-1.5 w-full">
-              <div
-                v-if="msg.role == 'server'"
-                class="w-[80%] bg-pink-200 rounded-lg p-2 shadow-md ml-auto relative">
-                {{ msg.content ?? "..." }}
-                <div
-                  class="absolute -left-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center"
-                  @click="btnAudioClk(msg)">
-                  <Icon icon="mdi:stop-circle-outline" class="w-6 h-6" v-if="msg.playing" />
-                  <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
-                </div>
-              </div>
-              <div v-else class="w-[80%] bg-green-500 text-white p-2 rounded-lg shadow-md relative">
-                {{ msg.content }}
-                <div
-                  v-if="msg.audioSrc"
-                  class="absolute -right-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center text-black"
-                  @click="btnAudioClk(msg)">
-                  <Icon icon="mdi:stop-circle-outline" class="w-6 h-6" v-if="msg.playing" />
-                  <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
-                </div>
-              </div>
-            </div>
-          </div>
-        </ion-content>
-      </ion-segment-content>
+      <ChatRoomTab
+        ref="chatRoomTabRef"
+        :chat-room-id="chatSetting.chatRoomId"
+        :user-id="String(globalVar.user?.id ?? '')"
+        :get-user-info="getUserInfo"
+        @audio-click="btnAudioClk" />
+      <AiChatTab
+        ref="aiChatTabRef"
+        :ai-conversation-id="chatSetting.aiConversationId"
+        :user-name="globalVar.user.name"
+        @audio-click="btnAudioClk" />
+      <TtsTasksTab />
     </ion-segment-view>
     <audio ref="audioRef" style="width: auto" class="m-2"></audio>
-    <ion-item>
+    <ion-item v-if="chatType !== CHAT_TTS_TASKS">
       <div class="flex py-2 w-full h-[72px]" v-if="INPUT_TYPE == 'text'">
         <div class="w-12 h-auto flex items-center" @click="btnChangeMode">
           <Icon icon="weui:voice-outlined" class="h-10 w-10" />
@@ -161,32 +103,29 @@
 </template>
 
 <script setup lang="ts">
+import ChatRoomTab from "./ChatRoomTab.vue";
+import AiChatTab from "./AiChatTab.vue";
+import TtsTasksTab from "./TtsTasksTab.vue";
+import type { ChatMsg as AiChatMsg } from "./AiChatTab.vue";
 import ChatSetting from "@/components/ChatSetting.vue";
+import { Icon } from "@iconify/vue";
 import EventBus, { C_EVENT } from "@/modal/EventBus";
 import {
-  getAiChatMessages,
   getApiUrl,
-  getChatMessages,
   getChatSetting,
   getUserList,
   setChatSetting,
 } from "@/utils/NetUtil";
 import {
   createGesture,
-  IonAvatar,
   IonCheckbox,
-  IonImg,
-  IonRefresher,
-  IonRefresherContent,
   IonSegment,
   IonSegmentButton,
-  IonSegmentContent,
   IonSegmentView,
   IonToolbar,
   onIonViewDidEnter,
-  RefresherCustomEvent,
 } from "@ionic/vue";
-import { heartOutline, volumeMediumOutline } from "ionicons/icons";
+import { heartOutline, megaphoneOutline } from "ionicons/icons";
 import Recorder from "recorder-core/recorder.wav.min";
 import io, { Socket } from "socket.io-client";
 import { inject, onBeforeUnmount, onMounted, ref } from "vue";
@@ -200,10 +139,10 @@ const MSG_TYPE_TRANSLATION = "translation";
 const TTS_AUTO = false;
 // cSpell: disable-next-line
 const TTS_ROLE = "longwan_v2";
-// const TTS_SPEED = 1.1;
 
 const CHAT_ROOM = "chat_room";
 const CHAT_AI = "chat_ai";
+const CHAT_TTS_TASKS = "tts_tasks";
 const chatSetting = ref({
   open: false,
   ttsSpeed: 1.1,
@@ -213,28 +152,15 @@ const chatSetting = ref({
 });
 const INPUT_TYPE = ref("text");
 const AUDIO_TYPE = ref("hold");
-// 存储识别结果的变量
 const inputText = ref("");
 const globalVar: any = inject("globalVar");
 const inputRef = ref<HTMLElement | null>(null);
 const userList = ref<any>([]);
-class MSG {
-  id?: string | number;
-  content: string = "";
-  role: string = "";
-  audioSrc?: string = "";
-  playing? = false;
-  ts?: string;
-  type?: string = "text";
-}
-const aiChatMessages = ref<MSG[]>([]);
-const aiChatContent = ref<any>(null);
-const chatMessages = ref<MSG[]>([]);
-const chatContent = ref<any>(null);
+
+const chatRoomTabRef = ref<InstanceType<typeof ChatRoomTab> | null>(null);
+const aiChatTabRef = ref<InstanceType<typeof AiChatTab> | null>(null);
 
 const wsUrl = getApiUrl().replace("api", "");
-// const wsUrl = "localhost:8000"; // 使用 /api 前缀
-// console.log(getApiUrl());
 const recBtn = ref<any>();
 const socketRef = ref<Socket>();
 
@@ -242,7 +168,7 @@ const isWaitingServer = ref(false);
 const isRecording = ref(false);
 const SAMPLE_RATE = 16000;
 const audioRef = ref<HTMLAudioElement | null>(null);
-const audioPlayMsg = ref<MSG | null>(null);
+const audioPlayMsg = ref<AiChatMsg | null>(null);
 const lstAudioSrc = ref<string>("");
 const chatType = ref(CHAT_AI);
 const ttsData = ref<any>({ audioBuffer: null, msg: null, audioEnd: false, mediaSource: null });
@@ -252,16 +178,15 @@ const rec = Recorder({
   sampleRate: 16000,
   onProcess: recProcess,
   audioTrackSet: {
-    echoCancellation: true, //回声消除（AEC）开关，不设置时由浏览器控制（一般为默认自动打开），设为true明确打开，设为false明确关闭
-    noiseSuppression: true, //降噪（ANS）开关，取值和回声消除开关一样
-    autoGainControl: true, //自动增益（AGC）开关，取值和回声消除开关一样
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true,
   },
 });
 let recSampleBuf = new Int16Array();
 let playAudioData: ArrayBuffer[] = [];
 
 onMounted(async () => {
-  // messages.value.push({ id: "", content: "你好，我是楠楠，和我聊点什么吧", role: "server" });
   audioRef.value!.addEventListener("ended", () => {
     console.log("==> event audio ended");
     audioPlayMsg.value!.playing = false;
@@ -287,22 +212,22 @@ onMounted(async () => {
       ttsData.value.mediaSource.endOfStream();
     }
   }, 2000);
-  // 创建 MutationObserver 监听 tabs 元素
   observer = new MutationObserver(() => {
     updateTabsHeight();
   });
-  // 开始监听 body 的变化，因为 tabs 可能还没有渲染
   observer.observe(document.body, {
     childList: true,
     subtree: true,
   });
 });
+
 const updateTabsHeight = () => {
   const tabs = document.querySelector("ion-tab-bar");
   if (tabs) {
     tabsHeight.value = tabs.clientHeight;
   }
 };
+
 const updateChatSetting = async () => {
   await getChatSetting(globalVar.user.id).then((setting) => {
     if (setting) {
@@ -311,6 +236,7 @@ const updateChatSetting = async () => {
     }
   });
 };
+
 async function refreshUserList() {
   await getUserList()
     .then((uList) => {
@@ -322,51 +248,35 @@ async function refreshUserList() {
 }
 
 function getUserInfo(userId: string) {
-  // console.log("==> getUserInfo", userId);
   if (userId === "me") {
     return globalVar.user;
   }
   return userList.value.find((u: any) => u.id === userId);
 }
+
 onBeforeUnmount(() => {
-  // 移除事件监听
   window.removeEventListener("resize", updateTabsHeight);
-  // 断开 observer
   if (observer) {
     observer.disconnect();
     observer = null;
   }
 });
+
 onIonViewDidEnter(async () => {
   await updateChatSetting();
   await refreshUserList();
-  getChatMessages(chatSetting.value.chatRoomId, -1, 3).then((data: any) => {
-    // console.log("==> handleRefresh", data);
-    chatMessages.value = [];
-    data.data.reverse().forEach((item: any) => {
-      const d = JSON.parse(item);
-      // console.log("==> getChatMessages", d);
-      chatMessages.value.unshift({
-        id: d.id,
-        content: d.content,
-        role: d.user_id,
-        ts: d.ts,
-        type: d.type,
-      });
-    });
-  });
+  chatRoomTabRef.value?.loadInitial();
 });
+
 function initSocketIO() {
   socketRef.value = io(wsUrl, {
-    transports: ["websocket"], // 强制使用 WebSocket 传输
-    // path: "/api/socket.io/",
+    transports: ["websocket"],
     reconnection: true,
-    reconnectionAttempts: 5, // 最大重连次数
-    reconnectionDelay: 1000, // 重连延迟时间
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
     secure: true,
     rejectUnauthorized: false,
   });
-  // 发送握手请求
   socketRef.value.on("connect", () => {
     const chatConfig = {
       key: "123456",
@@ -378,45 +288,41 @@ function initSocketIO() {
       chatRoomId: chatSetting.value.chatRoomId,
       user: globalVar.user.name,
     };
-
-    // console.log("Connected to the server. Sending handshake...", chatConfig);
     socketRef.value!.emit("handshake", chatConfig);
   });
   socketRef.value.on("message", (data) => {
     console.log("==> message", data);
     if (data.type === MSG_TYPE_TRANSLATION) {
-      aiChatMessages.value.push({
+      aiChatTabRef.value?.addMessage({
         id: "",
         content: `Translation: ${data.content}`,
         role: "server",
       });
       isWaitingServer.value = false;
     } else {
-      aiChatMessages.value.push({
+      aiChatTabRef.value?.addMessage({
         id: "",
         content: `Unknown: ${JSON.stringify(data)}`,
         role: "server",
       });
     }
-    aiChatContent.value.$el.scrollToBottom(200);
+    aiChatTabRef.value?.scrollToBottom(200);
   });
-  // 处理asr结果
   socketRef.value.on("msgAsr", (data) => {
     if (data.content) {
-      aiChatMessages.value.push({
+      aiChatTabRef.value?.addMessage({
         id: "",
         content: data.content,
         role: "me",
         audioSrc: lstAudioSrc.value,
       });
     }
-    aiChatContent.value.$el.scrollToBottom(200);
+    aiChatTabRef.value?.scrollToBottom(200);
   });
-  // 处理ai chat结果
   socketRef.value.on("msgChat", async (data) => {
     console.log("==> msgChat", data);
     if (data.chat_type === CHAT_ROOM) {
-      chatMessages.value.push({
+      chatRoomTabRef.value?.addMessage({
         id: data.id,
         content: data.content,
         role: data.user_id,
@@ -424,51 +330,51 @@ function initSocketIO() {
         type: data.type,
       });
     } else {
+      const aiTab = aiChatTabRef.value;
+      const last = aiTab?.getLastMessage?.();
       if (
-        aiChatMessages.value.length === 0 ||
-        aiChatMessages.value[aiChatMessages.value.length - 1].role === "me"
+        !last ||
+        last.role === "me"
       ) {
-        const msg = { id: data.id, content: data.content, role: "server", playing: TTS_AUTO };
-        aiChatMessages.value.push(msg);
+        const msg: AiChatMsg = {
+          id: data.id,
+          content: data.content,
+          role: "server",
+          playing: TTS_AUTO,
+        };
+        aiChatTabRef.value?.addMessage(msg);
         if (TTS_AUTO) {
           audioPlayMsg.value = msg;
         }
       } else {
-        aiChatMessages.value[aiChatMessages.value.length - 1].content += data.content;
+        aiChatTabRef.value?.appendLastMessageContent(data.content);
       }
       if (data.aiConversationId != chatSetting.value.aiConversationId) {
         chatSetting.value.aiConversationId = data.aiConversationId;
         setChatSetting(globalVar.user.id, JSON.stringify(chatSetting.value));
       }
-      aiChatContent.value.$el.scrollToBottom(200);
+      aiChatTabRef.value?.scrollToBottom(200);
     }
   });
   socketRef.value.on("endChat", (data: any) => {
     console.log("==> MSG_TYPE_CHAT_END", data.content);
     isWaitingServer.value = false;
-    // playAudio(messages.value[messages.value.length - 1]);
   });
-  // 处理tts结果
   socketRef.value.on("dataAudio", (data: any) => {
     if (data.type === "tts") {
-      const chunk = data.data; // 接收的是二进制数据
-      // console.log(chunk.length, data.data);
+      const chunk = data.data;
       if (chunk instanceof ArrayBuffer) {
         playAudioData.push(chunk);
-        // 如果数据是 ArrayBuffer
         if (ttsData.value.audioBuffer && !ttsData.value.audioBuffer.updating) {
-          // ttsAudioBuffer.value!.appendBuffer(chunk);
           const combinedBuffer = new Uint8Array(
             playAudioData.reduce((acc, curr) => acc + curr.byteLength, 0)
           );
           let offset = 0;
-          // 将所有数据块合并为一个 Uint8Array
           playAudioData.forEach((chunk) => {
             combinedBuffer.set(new Uint8Array(chunk), offset);
             offset += chunk.byteLength;
           });
-          ttsData.value.audioBuffer.appendBuffer(combinedBuffer); // 直接添加 ArrayBuffer 数据
-          // 清空已处理的数据
+          ttsData.value.audioBuffer.appendBuffer(combinedBuffer);
           playAudioData = [];
         }
       } else {
@@ -482,28 +388,32 @@ function initSocketIO() {
     ttsData.value.audioEnd = true;
     console.log("==> end_audio", data.content);
   });
-  socketRef.value.on("handshakeResponse", () => {
-    // console.log("handshake:", data)
-  });
+  socketRef.value.on("handshakeResponse", () => {});
   socketRef.value.on("disconnect", () => console.log("Disconnected from the server."));
   socketRef.value.on("error", (error) => console.error("msg error:", error));
   socketRef.value.on("close", () => console.log("WebSocket connection closed."));
 }
 
 async function handleSegmentChange(event: any) {
-  // console.log("segment change", event);
   chatType.value = event.detail.value;
 }
 
-// 模拟发送消息
 const sendTextMessage = () => {
   if (inputText.value && !isWaitingServer.value) {
     if (chatType.value === CHAT_AI) {
-      aiChatMessages.value.push({ id: "", content: inputText.value, role: "me" });
-      aiChatContent.value.$el.scrollToBottom(200);
+      aiChatTabRef.value?.addMessage({
+        id: "",
+        content: inputText.value,
+        role: "me",
+      });
+      aiChatTabRef.value?.scrollToBottom(200);
     } else if (chatType.value === CHAT_ROOM) {
-      chatMessages.value.push({ id: "", content: inputText.value, role: globalVar.user.id });
-      chatContent.value.$el.scrollToBottom(200);
+      chatRoomTabRef.value?.addMessage({
+        id: "",
+        content: inputText.value,
+        role: globalVar.user.id,
+      });
+      chatRoomTabRef.value?.scrollToBottom(200);
     }
 
     const message = JSON.stringify({
@@ -513,18 +423,12 @@ const sendTextMessage = () => {
       roomId: chatSetting.value.chatRoomId,
       userId: globalVar.user.id,
     });
-    // EventBus.$emit(C_EVENT.TOAST, inputText.value);
     inputText.value = "";
     isWaitingServer.value = true;
-    // if (TTS_AUTO) {
-    //   streamAudio(() => {
-    //     socketRef.value!.emit("message", message);
-    //   });
-    // } else {
     socketRef.value!.emit("message", message);
-    // }
   }
 };
+
 function sendAudioData(data: string, finish: boolean = false, cancel = false) {
   if (!socketRef.value!.connected) {
     console.warn("WebSocket未连接，稍后重试");
@@ -537,9 +441,9 @@ function sendAudioData(data: string, finish: boolean = false, cancel = false) {
     finish: finish,
     cancel: cancel,
   });
-  // console.log("==> sendData audio ", data.length, finish);
   socketRef.value!.emit("message", message);
 }
+
 async function startRecording() {
   if (!isWaitingServer.value) {
     console.log("==> startRecording");
@@ -548,14 +452,12 @@ async function startRecording() {
         () => {
           console.info("Recording started");
           rec.start();
-          // 创建手势
           const gesture = createGesture({
-            el: recBtn.value.$el, // 目标元素
-            gestureName: "longPress", // 手势名称
-            threshold: 0, // 触发距离阈值
+            el: recBtn.value.$el,
+            gestureName: "longPress",
+            threshold: 0,
             onStart: () => {},
             onMove: (ev) => {
-              // 检查是否移动出按钮范围
               const rect = recBtn.value.$el.getBoundingClientRect();
               const isOutside =
                 ev.currentX < rect.left ||
@@ -564,17 +466,15 @@ async function startRecording() {
                 ev.currentY > rect.bottom;
 
               if (isOutside) {
-                stopRecording(true); // 移动出按钮范围时取消录制
+                stopRecording(true);
                 gesture.destroy();
               }
             },
             onEnd: () => {
-              stopRecording(false); // 长按结束时触发
+              stopRecording(false);
               gesture.destroy();
             },
           });
-
-          // 启用手势
           gesture.enable();
           isRecording.value = true;
         },
@@ -588,29 +488,24 @@ async function startRecording() {
     }
   }
 }
+
 function recProcess(
-  buffer: any, // 缓冲的PCM数据块(16位小端LE)，为从开始录音到现在的所有pcm片段，每次回调可能增加0-n个不定量的pcm片段。
-  powerLevel: any, // 当前缓冲的音量级别0-100。
-  bufferDuration: any, // 已缓冲时长
+  buffer: any,
+  powerLevel: any,
+  bufferDuration: any,
   bufferSampleRate: any
-  // _newBufferIdx: any,
-  // _asyncEnd: any
 ) {
   const data_48k = buffer[buffer.length - 1];
-
   const array_48k = new Array(data_48k);
   const data_16k = Recorder.SampleData(array_48k, bufferSampleRate, SAMPLE_RATE).data;
 
   recSampleBuf = Int16Array.from([...recSampleBuf, ...data_16k]);
-  const chunk_size = 960; // for asr chunk_size [5, 10, 5]
-  // info_div.innerHTML = "" + bufferDuration / 1000 + "s";
+  const chunk_size = 960;
   while (recSampleBuf.length >= chunk_size) {
     const sendBuf = recSampleBuf.slice(0, chunk_size);
     recSampleBuf = recSampleBuf.slice(chunk_size, recSampleBuf.length);
     const uint8 = new Uint8Array(sendBuf.buffer);
     const base64Data = btoa(String.fromCharCode(...uint8));
-    // console.log("==> recProcess ", base64Data);
-    // 通过 WebSocket 发送 Base64 编码的音频数据
     sendAudioData(base64Data);
   }
 }
@@ -639,7 +534,7 @@ function stopRecording(cancel = false) {
   isRecording.value = false;
 }
 
-async function btnAudioClk(msg: MSG) {
+async function btnAudioClk(msg: AiChatMsg) {
   if (isWaitingServer.value) return;
   console.log("==> playAudio", msg);
   if (msg.playing) {
@@ -665,13 +560,13 @@ async function btnAudioClk(msg: MSG) {
     }
   }
 }
+
 async function stopAndClearAudio() {
   if (audioRef.value) {
     audioRef.value.pause();
     audioRef.value!.src = "";
   }
   if (ttsData.value.audioBuffer) {
-    // ttsData.value.audioBuffer.abort();
     ttsData.value.audioBuffer = null;
     console.log("==> ttsCancel");
     socketRef.value!.emit("ttsCancel", {});
@@ -696,27 +591,22 @@ function streamAudio(f = () => {}) {
   ttsData.value.audioEnd = false;
   ttsData.value.mediaSource = mediaSource;
 
-  // 等待 MediaSource 打开
   mediaSource.addEventListener("sourceopen", () => {
     ttsData.value.audioBuffer = mediaSource.addSourceBuffer("audio/mpeg");
-    // 错误处理
     ttsData.value.audioBuffer.addEventListener("error", (e: any) => {
       console.error("SourceBuffer 错误:", e);
     });
     ttsData.value.audioBuffer.addEventListener("updateend", () => {
-      // 如果还有数据未处理，可以继续添加
       if (playAudioData.length > 0 && !ttsData.value.audioBuffer.updating) {
         const combinedBuffer = new Uint8Array(
           playAudioData.reduce((acc, curr) => acc + curr.byteLength, 0)
         );
         let offset = 0;
-        // 将所有数据块合并为一个 Uint8Array
         playAudioData.forEach((chunk) => {
           combinedBuffer.set(new Uint8Array(chunk), offset);
           offset += chunk.byteLength;
         });
-        ttsData.value.audioBuffer.appendBuffer(combinedBuffer); // 直接添加 ArrayBuffer 数据
-        // 清空已处理的数据
+        ttsData.value.audioBuffer.appendBuffer(combinedBuffer);
         playAudioData = [];
       } else if (ttsData.value.audioEnd) {
         if (ttsData.value.mediaSource) {
@@ -736,6 +626,7 @@ function streamAudio(f = () => {}) {
     f();
   });
 }
+
 function btnChangeMode() {
   if (INPUT_TYPE.value == "text") {
     INPUT_TYPE.value = "voice";
@@ -743,6 +634,7 @@ function btnChangeMode() {
     INPUT_TYPE.value = "text";
   }
 }
+
 function onAudioTypeChange() {
   if (AUDIO_TYPE.value == "hold") {
     AUDIO_TYPE.value = "stream";
@@ -750,11 +642,12 @@ function onAudioTypeChange() {
     AUDIO_TYPE.value = "hold";
   }
 }
+
 function btnChatSettingClk() {
   chatSetting.value.open = true;
 }
+
 function onChatSettingDismiss(e: any) {
-  // console.log("onChatSettingDismiss", e);
   if (e.detail.rol === "confirm") {
     updateChatSetting();
     socketRef.value!.emit("config", {
@@ -765,60 +658,5 @@ function onChatSettingDismiss(e: any) {
     });
   }
   chatSetting.value.open = false;
-}
-function handleRefresh(e: RefresherCustomEvent) {
-  if (chatType.value === CHAT_ROOM) {
-    const firstId = chatMessages.value.length + 1;
-    // console.log("==> handleRefresh", chatSetting.value);
-    getChatMessages(chatSetting.value.chatRoomId, -firstId, 3)
-      .then((data: any) => {
-        // console.log("==> handleRefresh", data);
-        data.data.reverse().forEach((item: any) => {
-          const d = JSON.parse(item);
-          console.log(d);
-          chatMessages.value.unshift({
-            id: d.id,
-            content: d.content,
-            role: d.user_id,
-            ts: d.ts,
-            type: d.type,
-          });
-        });
-      })
-      .finally(() => {
-        e.target.complete();
-      });
-  } else if (chatType.value === CHAT_AI) {
-    let firstId = undefined;
-    if (aiChatMessages.value.length > 0) {
-      firstId = aiChatMessages.value[0].id;
-    }
-    getAiChatMessages(chatSetting.value.aiConversationId, 3, globalVar.user.name, firstId).then(
-      (data: any) => {
-        // messages;
-        try {
-          data.data.reverse().forEach((item: any) => {
-            // console.log(item);
-            if (item.answer === "") {
-              return;
-            }
-            aiChatMessages.value.unshift({
-              id: item.id,
-              content: item.answer,
-              role: "server",
-            });
-            aiChatMessages.value.unshift({
-              id: item.id,
-              content: item.query,
-              role: "me",
-            });
-          });
-          // chatContent.value.$el.scrollToBottom(200);
-        } finally {
-          e.target.complete();
-        }
-      }
-    );
-  }
 }
 </script>

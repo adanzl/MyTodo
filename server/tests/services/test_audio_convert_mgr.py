@@ -97,6 +97,38 @@ def test_get_file_info_exception(convert_mgr: AudioConvertMgr, monkeypatch):
     assert "size" not in info or info.get("size") is None
 
 
+def test_convert_file_to_mp3_generic_exception(convert_mgr: AudioConvertMgr, tmp_path):
+    """_convert_file_to_mp3 当 run_subprocess_safe 抛非 Timeout/FileNotFound 异常时返回 False"""
+    in_f = tmp_path / "a.wav"
+    in_f.write_bytes(b"x")
+    out_f = tmp_path / "out" / "a.mp3"
+    with patch.object(convert_mgr, "_ensure_output_directory", return_value=(True, None)):
+        with patch("core.services.audio_convert_mgr.run_subprocess_safe", side_effect=RuntimeError("boom")):
+            ok, err = convert_mgr._convert_file_to_mp3(str(in_f), str(out_f))
+    assert ok is False
+    assert err is not None
+    assert "boom" in err or "失败" in err
+
+
+def test_update_file_duration_async_duration_none(convert_mgr: AudioConvertMgr, monkeypatch):
+    """_update_file_duration_async 当 get_media_duration 返回 None 时不更新"""
+    monkeypatch.setattr("core.services.audio_convert_mgr.get_media_duration", lambda p: None)
+    _, _, task_id = convert_mgr.create_task()
+    task = convert_mgr._get_task(task_id)
+    task.file_status = {"/f.mp3": {"status": "pending"}}
+    convert_mgr._update_file_duration_async(task_id, "/f.mp3")
+    assert task.file_status["/f.mp3"].get("duration") is None
+
+
+def test_ensure_output_directory_os_error(convert_mgr: AudioConvertMgr, tmp_path, monkeypatch):
+    """_ensure_output_directory 当 makedirs 抛 OSError 时返回 False"""
+    monkeypatch.setattr("os.path.exists", lambda p: False)
+    monkeypatch.setattr("os.makedirs", lambda p, **kw: (_ for _ in ()).throw(OSError("disk full")))
+    ok, err = convert_mgr._ensure_output_directory(str(tmp_path / "newdir"))
+    assert ok is False
+    assert err is not None
+
+
 def test_update_task_success(convert_mgr: AudioConvertMgr, tmp_path, monkeypatch):
     monkeypatch.setattr('core.services.audio_convert_mgr._spawn', lambda fn: None)
     """Test successful update of a task's properties."""

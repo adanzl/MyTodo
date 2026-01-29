@@ -224,6 +224,7 @@ def test_download_tts_file_success(client, monkeypatch, tmp_path):
     assert resp.status_code == 200
     assert resp.data == b"fake audio data"
     assert 'attachment' in resp.headers.get('Content-Disposition', '')
+    resp.close()  # 关闭响应以释放 send_file 打开的文件句柄，消除 ResourceWarning
 
 
 def test_download_tts_file_no_task_id(client):

@@ -400,6 +400,72 @@ def test_scan_devices_sync_timeout(monkeypatch):
     assert mgr.scan_devices_sync(timeout=0.01) == []
 
 
+def test_scan_devices_sync_generic_exception(monkeypatch):
+    import core.services.bluetooth_mgr as bm
+    from core.services.bluetooth_mgr import BluetoothMgr
+
+    mgr = BluetoothMgr()
+
+    def run_async_raise(coro, timeout=None):
+        coro.close()  # 避免 "coroutine was never awaited" 警告
+        raise RuntimeError("scan err")
+
+    monkeypatch.setattr(bm, "run_async", run_async_raise)
+    assert mgr.scan_devices_sync(timeout=0.01) == []
+
+
+def test_scan_ble_devices_sync_exception(monkeypatch):
+    import core.services.bluetooth_mgr as bm
+    from core.services.bluetooth_mgr import BluetoothMgr
+
+    mgr = BluetoothMgr()
+
+    def run_async_raise(coro, timeout=None):
+        coro.close()  # 避免 "coroutine was never awaited" 警告
+        raise ValueError("ble err")
+
+    monkeypatch.setattr(bm, "run_async", run_async_raise)
+    assert mgr.scan_ble_devices_sync(timeout=0.01) == []
+
+
+def test_connect_device_exception_clears_connected(monkeypatch, mock_bluetooth_dev):
+    """connect_device 异常且设备已在 devices 时设置 connected=False"""
+    import core.services.bluetooth_mgr as bm
+    from core.services.bluetooth_mgr import BluetoothMgr
+
+    mgr = BluetoothMgr()
+    mgr._update_or_create_device("AA:BB", "n1", {})
+
+    class FakeClient:
+
+        async def connect(self):
+            raise ConnectionError("fail")
+
+    monkeypatch.setattr(bm.BleakClient, "__new__", lambda cls, addr: FakeClient())
+    result = asyncio.run(mgr.connect_device("aa:bb"))
+    assert result.get("code") == -1
+    assert mgr.devices["AA:BB"].connected is False
+
+
+def test_disconnect_device_exception_clears_connected(mock_bluetooth_dev):
+    """disconnect_device 异常时设置 connected=False"""
+    from core.services.bluetooth_mgr import BluetoothMgr
+
+    mgr = BluetoothMgr()
+    dev = mgr._update_or_create_device("AA:BB", "n1", {})
+    dev.connected = True
+
+    class BadClient:
+
+        async def disconnect(self):
+            raise RuntimeError("disconnect err")
+
+    dev.client = BadClient()
+    result = asyncio.run(mgr.disconnect_device("aa:bb"))
+    assert result.get("code") == -1
+    assert mgr.devices["AA:BB"].connected is False
+
+
 def test_connect_device_sync_exception(monkeypatch):
     import core.services.bluetooth_mgr as bm
     from core.services.bluetooth_mgr import BluetoothMgr

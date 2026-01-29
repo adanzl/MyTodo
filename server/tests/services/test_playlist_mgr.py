@@ -209,6 +209,35 @@ def test_play_rejects_when_already_playing_unless_force(mock_get_duration, playl
     assert code == 0
 
 
+def test_get_playlist_nonexistent_id_returns_empty(playlist_mgr):
+    """get_playlist 当 id 不存在时返回空 dict"""
+    playlist_mgr._playlist_raw = {"p1": {"id": "p1", "name": "n", "files": []}}
+    result = playlist_mgr.get_playlist("nonexistent")
+    assert result == {}
+
+
+def test_get_playlist_with_play_state_in_pre_files(playlist_mgr):
+    """get_playlist 当列表在播放且 in_pre_files 为 True 时包含 pre_index"""
+    playlist_id = "p1"
+    playlist_mgr._playlist_raw = {playlist_id: {"id": playlist_id, "name": "n", "files": []}}
+    playlist_mgr._play_state[playlist_id] = {"in_pre_files": True, "pre_index": 2}
+    result = playlist_mgr.get_playlist(playlist_id)
+    pl = result[playlist_id]
+    assert pl.get("in_pre_files") is True
+    assert pl.get("pre_index") == 2
+
+
+def test_get_playlist_with_play_state_not_in_pre_files(playlist_mgr):
+    """get_playlist 当列表在播放但 in_pre_files 为 False 时 pre_index 为 -1"""
+    playlist_id = "p1"
+    playlist_mgr._playlist_raw = {playlist_id: {"id": playlist_id, "name": "n", "files": []}}
+    playlist_mgr._play_state[playlist_id] = {"in_pre_files": False}
+    result = playlist_mgr.get_playlist(playlist_id)
+    pl = result[playlist_id]
+    assert pl.get("in_pre_files") is False
+    assert pl.get("pre_index") == -1
+
+
 def test_play_invalid_id(playlist_mgr):
     code, msg = playlist_mgr.play("nope")
     assert code != 0
@@ -581,3 +610,142 @@ def test_start_batch_duration_fetch_updates_and_blacklists(playlist_mgr, monkeyp
     assert playlist_mgr._duration_blacklist["none.mp3"] >= 1
     assert playlist_mgr._duration_blacklist["boom.mp3"] >= 1
     q.put.assert_any_call(('save_playlist', None))
+
+
+def test_get_pre_list_for_today_edge_cases():
+    """_get_pre_list_for_today: pre_lists 非7元素或当天元素非 list 时返回 []"""
+    assert pm._get_pre_list_for_today([]) == []
+    assert pm._get_pre_list_for_today([[]] * 3) == []
+    # 7 个元素但当天索引处不是 list（由 weekday 决定，用 patch 固定）
+    with patch.object(pm, '_get_weekday_index', return_value=0):
+        assert pm._get_pre_list_for_today([1, [], [], [], [], [], []]) == []
+        assert pm._get_pre_list_for_today([[{"uri": "a.mp3"}], [], [], [], [], [], []]) == [{"uri": "a.mp3"}]
+
+
+def test_save_playlist_to_rds_exception(playlist_mgr, monkeypatch):
+    """_save_playlist_to_rds 异常时向上抛出"""
+    playlist_mgr._playlist_raw = {"p1": {}}
+    monkeypatch.setattr(rds_mgr, 'set', MagicMock(side_effect=RuntimeError("redis error")))
+    with pytest.raises(RuntimeError, match="redis error"):
+        playlist_mgr._save_playlist_to_rds()
+
+
+def test_update_single_playlist_exception(playlist_mgr, monkeypatch):
+    """update_single_playlist 内部异常时返回 -1"""
+    playlist_mgr._playlist_raw = {}
+    monkeypatch.setattr(playlist_mgr, '_save_playlist_to_rds', MagicMock(side_effect=Exception("save fail")))
+    ret = playlist_mgr.update_single_playlist({"id": "p1", "name": "P1", "files": []})
+    assert ret == -1
+
+
+def test_refresh_cron_job_add_cron_fails(playlist_mgr, monkeypatch):
+    """_refresh_cron_job 当 add_cron_job 返回 False 时记录错误"""
+    mock_scheduler_mgr.get_job.return_value = None
+    mock_scheduler_mgr.add_cron_job.return_value = False
+    p1 = create_playlist_data("p1", "P1", [{"uri": "f1.mp3"}], schedule={"enabled": 1, "cron": "0 8 * * *"})
+    playlist_mgr._playlist_raw = {"p1": p1}
+    playlist_mgr._refresh_device_map()
+    mock_scheduler_mgr.add_cron_job.assert_called()
+    # 仅验证调用过且返回 False 时不会抛错
+    playlist_mgr._refresh_cron_job("p1", p1)
+
+
+def test_refresh_cron_job_play_task_skip_when_playing(playlist_mgr):
+    """定时任务触发时若列表正在播放则跳过"""
+    p1 = create_playlist_data("p1", "P1", [{"uri": "f1.mp3"}], schedule={"enabled": 1, "cron": "0 8 * * *"})
+    playlist_mgr._playlist_raw = {"p1": p1}
+    playlist_mgr._device_map["p1"] = {"obj": mock_device}
+    playlist_mgr._playing_playlists.add("p1")
+    mock_scheduler_mgr.get_job.return_value = None
+    captured_func = []
+
+    def capture_and_return_true(func, job_id, cron_expression):
+        captured_func.append(func)
+        return True
+
+    mock_scheduler_mgr.add_cron_job.side_effect = capture_and_return_true
+    playlist_mgr._refresh_cron_job("p1", p1)
+    assert len(captured_func) == 1
+    captured_func[0]()  # 执行定时任务回调，内部应因 p1 在 _playing_playlists 而跳过 play
+    assert "p1" in playlist_mgr._playing_playlists
+
+
+def test_cleanup_play_state_without_is_playing(playlist_mgr):
+    """_cleanup_play_state 当 playlist_data 无 isPlaying 时不 del"""
+    p1 = create_playlist_data("p1", "P1", [{"uri": "f1.mp3"}])
+    playlist_mgr._playlist_raw["p1"] = p1
+    playlist_mgr._play_state["p1"] = {"in_pre_files": False, "pre_index": 0, "file_index": 0}
+    assert "isPlaying" not in p1
+    playlist_mgr._cleanup_play_state("p1")
+    assert "p1" not in playlist_mgr._play_state
+
+
+def test_update_file_duration_empty_path(playlist_mgr):
+    """_update_file_duration 空路径返回 None"""
+    assert playlist_mgr._update_file_duration("", {"uri": ""}) is None
+
+
+def test_update_file_duration_already_has_duration(playlist_mgr, monkeypatch):
+    """_update_file_duration 已有 duration 时直接返回不调用 get_media_duration"""
+    get_duration = MagicMock()
+    monkeypatch.setattr(pm, "get_media_duration", get_duration)
+    file_item = {"uri": "f.mp3", "duration": 10}
+    ret = playlist_mgr._update_file_duration("f.mp3", file_item)
+    assert ret == 10
+    get_duration.assert_not_called()
+
+
+def test_update_file_duration_get_returns_none(playlist_mgr, monkeypatch):
+    """_update_file_duration get_media_duration 返回 None 时返回 None"""
+    monkeypatch.setattr(pm, "get_media_duration", lambda _: None)
+    file_item = {"uri": "f.mp3"}
+    ret = playlist_mgr._update_file_duration("f.mp3", file_item)
+    assert ret is None
+    assert "duration" not in file_item or file_item.get("duration") is None
+
+
+def test_collect_files_without_duration_no_blacklist(playlist_mgr):
+    """_collect_files_without_duration check_blacklist=False 时不过滤黑名单"""
+    p1 = create_playlist_data("p1", "P1", [{"uri": "bad.mp3"}])
+    playlist_mgr._duration_blacklist["bad.mp3"] = 5
+    uris = playlist_mgr._collect_files_without_duration(p1, check_blacklist=False)
+    assert "bad.mp3" in uris
+
+
+def test_reload_fix_pre_lists_format(playlist_mgr):
+    """reload 时 pre_lists 存在但格式错误（非 list 或长度非 7）会修复"""
+    raw = {
+        "p1": {
+            "id": "p1",
+            "name": "P1",
+            "files": [{
+                "uri": "f1.mp3"
+            }],
+            "pre_lists": "invalid",
+            "device": {
+                "type": "dlna",
+                "address": "http://p1.local"
+            },
+            "schedule": {
+                "enabled": 0,
+                "cron": ""
+            },
+        }
+    }
+    rds_mgr.set("schedule_play:playlist_collection", json.dumps(raw))
+    playlist_mgr.reload()
+    assert "p1" in playlist_mgr._playlist_raw
+    pre_lists = playlist_mgr._playlist_raw["p1"].get("pre_lists")
+    assert isinstance(pre_lists, list) and len(pre_lists) == 7
+
+
+def test_trigger_button_stop_some_fail(playlist_mgr, mock_device):
+    """trigger_button stop 时部分列表停止失败返回错误信息"""
+    p1 = create_playlist_data("p1", "P1", [{"uri": "f1.mp3"}], trigger_button="B1")
+    playlist_mgr._playlist_raw = {"p1": p1}
+    playlist_mgr._device_map["p1"] = {"obj": mock_device}
+    playlist_mgr._playing_playlists.add("p1")
+    mock_device.stop.return_value = (-1, "device error")
+    code, msg = playlist_mgr.trigger_button("B1", "stop")
+    assert code == -1
+    assert "p1" in msg or "device error" in msg

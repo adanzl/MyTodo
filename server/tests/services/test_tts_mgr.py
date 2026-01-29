@@ -1,8 +1,10 @@
 import os
+import threading
+import time
 import pytest
 from unittest.mock import patch, MagicMock
 
-from core.services.tts_mgr import TTSMgr
+from core.services.tts_mgr import TTSMgr, count_text_chars
 from core.config import TASK_STATUS_PENDING, TASK_STATUS_PROCESSING, TASK_STATUS_SUCCESS, TASK_STATUS_FAILED
 
 
@@ -836,3 +838,188 @@ def test_append_text_to_task_task_id_mismatch(tts_mgr: TTSMgr):
     code, msg = tts_mgr._append_text_to_task(original_id, "y", keep_status=True)
     assert code == -1
     task.task_id = original_id
+
+
+def test_start_analyze_article_task_no_text(tts_mgr: TTSMgr):
+    """start_analyze_article_task 当任务文本为空时返回 -1"""
+    _, _, task_id = tts_mgr.create_task(text="")
+    code, msg = tts_mgr.start_analyze_article_task(task_id)
+    assert code == -1
+    assert "内容为空" in msg or "空" in msg
+
+
+def test_run_ocr_task_logic_error_status(tts_mgr: TTSMgr, tmp_path):
+    """_run_ocr_task_logic 当 OCR 返回 error 时只记录日志不抛错"""
+    import tempfile
+    _, _, task_id = tts_mgr.create_task(text="x")
+    temp_dir = tempfile.mkdtemp()
+    image_path = os.path.join(temp_dir, "a.jpg")
+    with open(image_path, "wb") as f:
+        f.write(b"fake")
+    with patch('core.services.tts_mgr._ocr_client') as mock_ocr:
+        mock_ocr.query.return_value = ("error", "OCR failed")
+        tts_mgr._run_ocr_task_logic(task_id, [image_path], temp_dir)
+    task = tts_mgr.get_task(task_id)
+    assert "OCR failed" not in (task.get("text") or "")
+
+
+def test_run_analyze_article_task_logic_error_status(tts_mgr: TTSMgr):
+    """_run_analyze_article_task_logic 当 txt_ali 返回 error 时只记录日志不抛错"""
+    _, _, task_id = tts_mgr.create_task(text="some text")
+    with patch('core.services.tts_mgr._txt_client') as mock_txt:
+        mock_txt.query.return_value = ("error", "分析失败")
+        tts_mgr._run_analyze_article_task_logic(task_id, "some text")
+    task = tts_mgr.get_task(task_id)
+    assert task.get("analysis") is None
+
+
+def test_run_analyze_article_task_logic_save_fails(tts_mgr: TTSMgr):
+    """_run_analyze_article_task_logic 当 _save_analysis_to_task 返回非 0 时只记录日志"""
+    _, _, task_id = tts_mgr.create_task(text="some text")
+    with patch('core.services.tts_mgr._txt_client') as mock_txt:
+        mock_txt.query.return_value = ("ok", '{"title":"x"}')
+        with patch.object(tts_mgr, '_save_analysis_to_task', return_value=(-1, "save failed")):
+            tts_mgr._run_analyze_article_task_logic(task_id, "some text")
+    task = tts_mgr.get_task(task_id)
+    assert task.get("analysis") is None or task.get("analysis") != {"title": "x"}
+
+
+def test_run_ocr_task_logic_append_fails(tts_mgr: TTSMgr, tmp_path):
+    """_run_ocr_task_logic 当 _append_text_to_task 返回非 0 时只记录日志"""
+    import tempfile
+    _, _, task_id = tts_mgr.create_task(text="x")
+    temp_dir = tempfile.mkdtemp()
+    image_path = os.path.join(temp_dir, "a.jpg")
+    with open(image_path, "wb") as f:
+        f.write(b"fake")
+    with patch('core.services.tts_mgr._ocr_client') as mock_ocr:
+        mock_ocr.query.return_value = ("ok", "OCR结果")
+        with patch.object(tts_mgr, '_append_text_to_task', return_value=(-1, "append failed")):
+            tts_mgr._run_ocr_task_logic(task_id, [image_path], temp_dir)
+    task = tts_mgr.get_task(task_id)
+    assert "OCR结果" not in (task.get("text") or "")
+
+
+def test_count_text_chars_none():
+    """count_text_chars(None) 返回 0"""
+    assert count_text_chars(None) == 0
+
+
+def test_update_task_status_task_not_found(tts_mgr: TTSMgr):
+    """_update_task_status 任务不存在时只记录 warning 不抛错"""
+    tts_mgr._update_task_status("nonexistent_id", TASK_STATUS_FAILED, "test")
+    # 不抛错即通过
+    assert tts_mgr.get_task("nonexistent_id") is None
+
+
+def test_update_task_status_save_raises(tts_mgr: TTSMgr):
+    """_update_task_status 内 _save_task_and_update_time 抛错时向外抛出"""
+    _, _, task_id = tts_mgr.create_task(text="x")
+    with patch.object(tts_mgr, '_save_task_and_update_time', side_effect=RuntimeError("save error")):
+        with pytest.raises(RuntimeError, match="save error"):
+            tts_mgr._update_task_status(task_id, TASK_STATUS_FAILED, "err")
+
+
+def test_run_tts_task_on_data_non_bytes_logs(tts_mgr: TTSMgr, tmp_path):
+    """_run_tts_task on_data 收到非 bytes 时记录 warning 不崩溃"""
+
+    class FakeTTSClientNonBytes:
+
+        def __init__(self, on_msg=None, on_err=None, on_progress=None):
+            self.on_msg = on_msg
+            self.on_err = on_err
+            self.on_progress = on_progress
+            self.speed = 1.0
+            self.vol = 50
+            self._total_chars = 10
+
+        def stream_msg(self, text, role=None, id=None):
+            if self.on_msg:
+                self.on_msg("not-bytes", 0)  # 非 bytes
+                self.on_msg("done", 1)
+
+        def stream_complete(self):
+            pass
+
+    with patch('core.services.tts_mgr.TTSClient', FakeTTSClientNonBytes):
+        _, _, task_id = tts_mgr.create_task(text="ab")
+        tts_mgr._run_tts_task(tts_mgr._get_task(task_id))
+    task = tts_mgr.get_task(task_id)
+    assert task is not None
+    assert task.get("status") in (TASK_STATUS_SUCCESS, TASK_STATUS_FAILED)
+
+
+def test_run_tts_task_duration_none(tts_mgr: TTSMgr, tmp_path):
+    """_run_tts_task 完成后 get_media_duration 返回 None 时只记录 warning"""
+
+    class FakeTTSClientQuick:
+
+        def __init__(self, on_msg=None, on_err=None, on_progress=None):
+            self.on_msg = on_msg
+            self.on_err = on_err
+            self.on_progress = on_progress
+            self.speed = 1.0
+            self.vol = 50
+            self._total_chars = 10
+
+        def stream_msg(self, text, role=None, id=None):
+            if self.on_msg and id:
+                out = os.path.join(str(tmp_path), id, 'output.mp3')
+                os.makedirs(os.path.dirname(out), exist_ok=True)
+                with open(out, 'wb') as f:
+                    f.write(b'x')
+                self.on_msg(b"x", 0)
+                self.on_msg("done", 1)
+
+        def stream_complete(self):
+            pass
+
+    with patch('core.services.tts_mgr.TTSClient', FakeTTSClientQuick):
+        with patch('core.services.tts_mgr.get_media_duration', return_value=None):
+            _, _, task_id = tts_mgr.create_task(text="ab")
+            tts_mgr._run_tts_task(tts_mgr._get_task(task_id))
+    task = tts_mgr.get_task(task_id)
+    assert task.get("status") == TASK_STATUS_SUCCESS
+    assert task.get("duration") is None
+
+
+def test_get_task_success_without_duration_triggers_update(tts_mgr: TTSMgr, tmp_path):
+    """get_task 当任务成功且 duration 为 None 且文件存在时触发 _update_duration_async"""
+    _, _, task_id = tts_mgr.create_task(text="x")
+    task = tts_mgr._get_task(task_id)
+    task.status = TASK_STATUS_SUCCESS
+    task.duration = None
+    task.output_file = os.path.join(str(tmp_path), task_id, 'output.mp3')
+    os.makedirs(os.path.dirname(task.output_file), exist_ok=True)
+    with open(task.output_file, 'wb') as f:
+        f.write(b'fake')
+    tts_mgr._save_task_and_update_time(task)
+    # 整段测试内 patch get_media_duration，确保后台线程执行时仍返回 2.5（避免与 fixture 的 1.0 冲突）
+    with patch('core.services.tts_mgr.get_media_duration', return_value=2.5):
+        with patch('core.services.tts_mgr.run_in_background', lambda fn: threading.Thread(target=fn, daemon=True).start()):
+            d = tts_mgr.get_task(task_id)
+        assert d is not None
+        assert d.get("duration") is None  # 首次调用时异步尚未完成
+        # 等待后台线程完成时长更新
+        d2 = None
+        for _ in range(50):
+            d2 = tts_mgr.get_task(task_id)
+            if d2 and d2.get("duration") is not None:
+                assert d2.get("duration") == 2.5
+                return
+            time.sleep(0.05)
+        assert d2 is not None and d2.get("duration") == 2.5, "异步更新应在 2.5 秒内完成"
+
+
+def test_get_output_file_path_absolute_exists(tts_mgr: TTSMgr, tmp_path):
+    """get_output_file_path 当 output_file 为绝对路径且文件存在时返回该路径"""
+    _, _, task_id = tts_mgr.create_task(text="x")
+    task = tts_mgr._get_task(task_id)
+    abs_path = os.path.abspath(os.path.join(str(tmp_path), task_id, 'output.mp3'))
+    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+    with open(abs_path, 'wb') as f:
+        f.write(b'x')
+    task.output_file = abs_path
+    tts_mgr._save_task_and_update_time(task)
+    res = tts_mgr.get_output_file_path(task_id)
+    assert res == os.path.abspath(abs_path)

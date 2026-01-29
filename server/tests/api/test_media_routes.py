@@ -388,7 +388,8 @@ def test_media_merge_add_file_by_path_add_fails(client, monkeypatch):
 
 
 def test_media_merge_delete_file_exception(client, monkeypatch):
-    monkeypatch.setattr(media_routes.audio_merge_mgr, "remove_file", lambda tid, idx: (_ for _ in ()).throw(ValueError("mgr err")))
+    monkeypatch.setattr(media_routes.audio_merge_mgr, "remove_file", lambda tid, idx:
+                        (_ for _ in ()).throw(ValueError("mgr err")))
     resp = client.post("/media/merge/deleteFile", json={"task_id": "t", "file_index": 0})
     assert resp.get_json()["code"] != 0
     assert "删除" in resp.get_json().get("msg", "")

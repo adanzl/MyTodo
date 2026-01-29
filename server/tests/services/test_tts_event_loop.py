@@ -168,6 +168,11 @@ def test_run_task_async_with_loop_creates_event_loop(tts_mgr: TTSMgr):
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
         event_loop_created['created'] = True
+        try:
+            if loop is not None and not loop.is_closed():
+                loop.close()
+        except Exception:
+            pass
 
     thread = threading.Thread(target=test_wrapped, daemon=True)
     thread.start()
@@ -181,6 +186,7 @@ def test_clear_event_loop_in_thread():
     clear_result = {'ok': False}
 
     def thread_test():
+        loop = None
         try:
             _clear_event_loop()
             # 尝试创建新的事件循环
@@ -189,6 +195,9 @@ def test_clear_event_loop_in_thread():
             clear_result['ok'] = True
         except Exception as e:
             clear_result['error'] = str(e)
+        finally:
+            if loop is not None and not loop.is_closed():
+                loop.close()
 
     thread = threading.Thread(target=thread_test, daemon=True)
     thread.start()
