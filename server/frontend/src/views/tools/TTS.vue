@@ -220,15 +220,17 @@
               </el-button>
             </div>
           </div>
-          <el-input
-            v-model="ttsText"
-            type="textarea"
-            :autosize="{ minRows: 6, maxRows: 17 }"
-            placeholder="请输入要转换为语音的文本"
-            :disabled="isTaskBusy"
-            @blur="handleTtsTextChange"
-            class="flex-1"
-          />
+          <div class="tts-textarea-wrapper flex-1 min-h-0 flex flex-col overflow-hidden">
+            <el-input
+              v-model="ttsText"
+              type="textarea"
+              :autosize="{ minRows: 6, maxRows: 17 }"
+              placeholder="请输入要转换为语音的文本"
+              :disabled="isTaskBusy"
+              @blur="handleTtsTextChange"
+              class="flex-1 min-h-0 h-full !block"
+            />
+          </div>
         </div>
 
         <!-- 分析数据（中间列底部） -->
@@ -1525,3 +1527,19 @@ onUnmounted(() => {
   imagePreviewUrls.value.clear();
 });
 </script>
+
+<style scoped>
+/* 父容器变小时，textarea 受约束并正确显示滚动条 */
+.tts-textarea-wrapper :deep(.el-input),
+.tts-textarea-wrapper :deep(.el-textarea) {
+  height: 100%;
+  min-height: 0;
+}
+.tts-textarea-wrapper :deep(.el-textarea__inner) {
+  height: 100% !important;
+  max-height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+</style>

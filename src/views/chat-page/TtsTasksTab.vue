@@ -62,9 +62,6 @@
           </ion-buttons>
           <ion-title>{{ selectedTask?.name || selectedTask?.task_id || "任务详情" }}</ion-title>
           <ion-buttons slot="end" class="mr-2">
-            <ion-button color="danger" @click="confirmDelete">
-              <ion-icon :icon="trashOutline" />
-            </ion-button>
             <ion-button @click="scrollToAnalysis" color="primary" class="!mr-3">分析</ion-button>
             <ion-button :disabled="!canGoPrev" @click="goPrev">
               <ion-icon :icon="arrowUpOutline" />
@@ -89,42 +86,100 @@
             </div>
 
             <!-- 识别（仿 server/frontend TTS.vue：选择图片后 OCR 结果追加到任务文本） -->
-            <div class="rounded-lg border border-gray-200 px-3 py-2">
-              <div class="flex items-center justify-between flex-wrap gap-2">
-                <h4 class="text-sm font-semibold text-gray-700">识别</h4>
-                <div class="flex items-center gap-2">
-                  <input
-                    ref="imageInputRef"
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    class="hidden"
-                    @change="onImageFileChange" />
-                  <ion-button size="small" fill="outline" @click="pickImages">
-                    <ion-icon :icon="imageOutline" class="mr-1" />
-                    选择图片
-                  </ion-button>
-                  <ion-button
-                    size="small"
-                    color="primary"
-                    :disabled="isTaskBusy || selectedImages.length === 0 || ocrLoading"
-                    @click="runOcr">
-                    {{ ocrLoading ? "识别中…" : "识别" }}
-                  </ion-button>
-                </div>
-              </div>
-              <div v-if="selectedImages.length > 0" class="flex flex-wrap gap-2 mt-2">
+            <div class="rounded-lg border border-gray-200 px-3 py-2 flex items-center gap-3">
+              <!-- 已选图片与添加按钮同一行，点击图片可预览 -->
+              <div class="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+                <button
+                  type="button"
+                  size="small"
+                  class="flex items-center justify-center w-10 h-14 rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-primary hover:text-primary"
+                  @click="pickImages">
+                  <ion-icon :icon="imageOutline" class="text-2xl" />
+                </button>
+                <input
+                  ref="imageInputRef"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  class="hidden"
+                  @change="onImageFileChange" />
                 <div
                   v-for="(file, idx) in selectedImages"
                   :key="idx"
-                  class="relative flex items-center gap-1 rounded bg-gray-100 px-2 py-1 text-xs">
-                  <span class="max-w-[120px] truncate">{{ file.name }}</span>
-                  <ion-button size="small" fill="clear" class="min-w-6 h-6 p-0" @click="removeOcrImage(idx)">
-                    <ion-icon :icon="closeCircleOutline" />
+                  class="relative w-14 h-14 flex-shrink-0 cursor-pointer active:opacity-80"
+                  @click="openOcrPreview(idx)">
+                  <div class="absolute inset-0 rounded-lg overflow-hidden border border-gray-200">
+                    <img
+                      :src="getOcrImageUrl(idx)"
+                      :alt="file.name"
+                      class="w-full h-full object-cover" />
+                  </div>
+                  <ion-button
+                    size="small"
+                    fill="solid"
+                    color="dark"
+                    class="absolute -top-1 -right-1 !min-w-0 !min-h-0 !w-6 !h-6 !max-w-6 !max-h-6 !p-0 !aspect-square !rounded-full !overflow-hidden !flex !items-center !justify-center shadow [--color:white] [--border-radius:50%]"
+                    style="border-radius: 50%;"
+                    @click.stop="removeOcrImage(idx)">
+                    <ion-icon :icon="closeCircleOutline" class="!w-5 !h-5 block shrink-0" />
                   </ion-button>
                 </div>
               </div>
+              <div class="flex items-center flex-shrink-0">
+                <ion-button
+                  size="small"
+                  color="primary"
+                  :disabled="isTaskBusy || selectedImages.length === 0 || ocrLoading"
+                  class="!w-8 !h-12 !p-0"
+                  @click="runOcr">
+                  {{ ocrLoading ? "识别中…" : "识别" }}
+                </ion-button>
+              </div>
             </div>
+
+            <!-- 图片预览弹窗 -->
+            <ion-modal
+              :is-open="previewOcrIndex >= 0"
+              class="ion-modal-fullscreen"
+              :initial-breakpoint="1"
+              :breakpoints="[0, 1]"
+              @didDismiss="previewOcrIndex = -1">
+              <ion-header>
+                <ion-toolbar>
+                  <ion-buttons slot="start">
+                    <ion-button @click="previewOcrIndex = -1">
+                      <ion-icon :icon="closeOutline" />
+                    </ion-button>
+                  </ion-buttons>
+                  <ion-title>{{ selectedImages[previewOcrIndex]?.name || "图片预览" }}</ion-title>
+                  <ion-buttons slot="end" class="mr-2">
+                    <ion-button color="danger" fill="clear" @click="removeOcrImageInPreview">
+                      移除
+                    </ion-button>
+                    <ion-button :disabled="previewOcrIndex <= 0" @click="previewOcrPrev">
+                      <ion-icon :icon="arrowUpOutline" />
+                    </ion-button>
+                    <ion-button
+                      :disabled="
+                        previewOcrIndex < 0 || previewOcrIndex >= selectedImages.length - 1
+                      "
+                      @click="previewOcrNext">
+                      <ion-icon :icon="arrowDownOutline" />
+                    </ion-button>
+                  </ion-buttons>
+                </ion-toolbar>
+              </ion-header>
+              <ion-content class="ion-padding">
+                <div
+                  v-if="previewOcrIndex >= 0 && selectedImages[previewOcrIndex]"
+                  class="flex items-center justify-center min-h-full">
+                  <img
+                    :src="getOcrImageUrl(previewOcrIndex)"
+                    :alt="selectedImages[previewOcrIndex].name"
+                    class="max-w-full max-h-[85vh] object-contain" />
+                </div>
+              </ion-content>
+            </ion-modal>
 
             <!-- 音频预览（仿 server/frontend MediaComponent） -->
             <AudioPreview
@@ -133,10 +188,15 @@
               :duration-seconds="selectedTask.duration ?? undefined"
               class="w-full" />
 
-            <div v-if="selectedTask.text" class="rounded-lg bg-gray-100 p-3">
-              <div class="text-gray-800 whitespace-pre-wrap break-words">
-                {{ selectedTask.text }}
-              </div>
+            <div class="rounded-lg bg-gray-100 p-3">
+              <ion-textarea
+                v-model="editText"
+                placeholder="请输入要转换为语音的文本"
+                :disabled="isTaskBusy"
+                class="text-gray-800 rounded-lg min-h-[100px] [--padding-start:8px] [--padding-end:8px] [--padding-top:8px] [--padding-bottom:8px]"
+                :auto-grow="true"
+                :rows="4"
+              />
             </div>
 
             <!-- 分析内容（参考 server/frontend TTS.vue） -->
@@ -270,8 +330,11 @@
               <span v-if="selectedTask.analysis_running">解析进行中</span>
             </div>
 
-            <div class="ion-padding-top ion-padding-bottom">
-              <ion-button expand="block" @click="saveAndClose">确定</ion-button>
+            <div class="ion-padding-top ion-padding-bottom flex items-center gap-2">
+              <ion-button expand="block" @click="saveAndClose" class="flex-1">确定</ion-button>
+              <ion-button color="danger" @click="confirmDelete">
+                <ion-icon :icon="trashOutline" />
+              </ion-button>
             </div>
           </div>
         </template>
@@ -292,6 +355,7 @@ import {
   IonRefresher,
   IonRefresherContent,
   IonSegmentContent,
+  IonTextarea,
   IonTitle,
   IonToolbar,
   alertController,
@@ -302,8 +366,8 @@ import {
   closeOutline,
   add,
   trashOutline,
-  imageOutline,
   closeCircleOutline,
+  imageOutline,
 } from "ionicons/icons";
 import { computed, ref, watch } from "vue";
 import AudioPreview from "@/components/AudioPreview.vue";
@@ -333,13 +397,17 @@ const loading = ref(false);
 const error = ref("");
 const selectedTask = ref<TtsTaskItem | null>(null);
 const analysisSectionRef = ref<HTMLElement | null>(null);
-/** 弹窗内可编辑的语速、音量（确定时提交） */
+/** 弹窗内可编辑的语速、音量、文本（确定时提交） */
 const editSpeed = ref<number>(1);
 const editVol = ref<number>(50);
-/** 识别：已选图片、隐藏 input、加载态 */
+const editText = ref<string>("");
+/** 识别：已选图片、预览 URL 缓存、隐藏 input、加载态 */
 const selectedImages = ref<File[]>([]);
+const ocrImageUrls = ref<string[]>([]);
 const imageInputRef = ref<HTMLInputElement | null>(null);
 const ocrLoading = ref(false);
+/** 当前预览的图片下标，-1 表示未打开 */
+const previewOcrIndex = ref(-1);
 
 /** 任务是否忙（TTS 生成中或 OCR/分析子任务中），仿 frontend TTS.vue */
 const isTaskBusy = computed(
@@ -355,10 +423,32 @@ watch(selectedTask, (t) => {
   if (t) {
     editSpeed.value = t.speed ?? 1;
     editVol.value = t.vol ?? 50;
+    editText.value = t.text ?? "";
   } else {
-    selectedImages.value = [];
+    clearSelectedImages();
   }
 });
+
+function getOcrImageUrl(index: number): string {
+  return ocrImageUrls.value[index] ?? "";
+}
+
+function openOcrPreview(index: number) {
+  previewOcrIndex.value = index;
+}
+
+function removeOcrImageInPreview() {
+  if (previewOcrIndex.value < 0) return;
+  removeOcrImage(previewOcrIndex.value);
+}
+
+function previewOcrPrev() {
+  if (previewOcrIndex.value > 0) previewOcrIndex.value--;
+}
+
+function previewOcrNext() {
+  if (previewOcrIndex.value < selectedImages.value.length - 1) previewOcrIndex.value++;
+}
 
 const currentIndex = computed(() => {
   if (!selectedTask.value || tasks.value.length === 0) return -1;
@@ -435,17 +525,33 @@ function onImageFileChange(e: Event) {
   const input = e.target as HTMLInputElement;
   const files = input.files;
   if (files?.length) {
-    selectedImages.value.push(...Array.from(files));
+    const list = Array.from(files);
+    list.forEach((f) => {
+      selectedImages.value.push(f);
+      ocrImageUrls.value.push(URL.createObjectURL(f));
+    });
   }
   input.value = "";
 }
 
 function removeOcrImage(index: number) {
+  if (ocrImageUrls.value[index]) {
+    URL.revokeObjectURL(ocrImageUrls.value[index]);
+  }
+  ocrImageUrls.value.splice(index, 1);
   selectedImages.value.splice(index, 1);
+  if (previewOcrIndex.value === index) {
+    previewOcrIndex.value = -1;
+  } else if (previewOcrIndex.value > index) {
+    previewOcrIndex.value--;
+  }
 }
 
 function clearSelectedImages() {
+  ocrImageUrls.value.forEach((url) => URL.revokeObjectURL(url));
+  ocrImageUrls.value = [];
   selectedImages.value = [];
+  previewOcrIndex.value = -1;
   if (imageInputRef.value) imageInputRef.value.value = "";
 }
 
@@ -480,17 +586,20 @@ async function saveAndClose() {
   if (!task) return;
   try {
     await updateTtsTask(task.task_id, {
+      text: editText.value,
       speed: Number(editSpeed.value),
       vol: Number(editVol.value),
     });
     const t = tasks.value.find((x) => x.task_id === task.task_id);
     if (t) {
+      t.text = editText.value;
       t.speed = Number(editSpeed.value);
       t.vol = Number(editVol.value);
     }
     if (selectedTask.value?.task_id === task.task_id) {
       selectedTask.value = {
         ...selectedTask.value,
+        text: editText.value,
         speed: t?.speed ?? editSpeed.value,
         vol: t?.vol ?? editVol.value,
       };
