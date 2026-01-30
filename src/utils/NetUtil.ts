@@ -374,6 +374,33 @@ export function getTtsDownloadUrl(taskId: string): string {
   return `${base}${sep}tts/download?task_id=${encodeURIComponent(taskId)}`;
 }
 
+/** TTS 任务更新，参考 server/core/api/tts_routes.py POST /tts/update */
+export async function updateTtsTask(
+  taskId: string,
+  opts: { name?: string; text?: string; role?: string; model?: string; speed?: number; vol?: number }
+): Promise<void> {
+  const rsp: any = await apiClient.post("/tts/update", { task_id: taskId, ...opts });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg || "更新任务失败");
+  }
+}
+
+/** TTS 任务删除，参考 server/core/api/tts_routes.py POST /tts/delete */
+export async function deleteTtsTask(taskId: string): Promise<void> {
+  const rsp: any = await apiClient.post("/tts/delete", { task_id: taskId });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg || "删除任务失败");
+  }
+}
+
+/** TTS 任务发起分析，参考 server/core/api/tts_routes.py POST /tts/analysis */
+export async function startTtsAnalysis(taskId: string): Promise<void> {
+  const rsp: any = await apiClient.post("/tts/analysis", { task_id: taskId });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg || "发起分析失败");
+  }
+}
+
 export async function getChatMem(id: number) {
   const rsp: any = await apiClient.get("/getRdsData", {
     params: { table: "mem", id: id },

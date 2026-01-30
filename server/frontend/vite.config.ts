@@ -9,7 +9,8 @@ import AutoImport from "unplugin-auto-import/vite";
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: process.env.NODE_ENV === "production" ? "/web/" : "/", // 生产环境使用 /web/，开发环境使用根路径
+  // 生产构建用 "/"，由 deploy.js 将 /assets/ 替换为 /web/assets/，避免 base 拼接出 /webassets/
+  base: "/",
   plugins: [
     vue(),
     // 自动导入 Element Plus API（ElMessage, ElNotification 等）

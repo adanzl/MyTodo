@@ -62,9 +62,10 @@ if (!existsSync(indexPath)) {
 
 let indexHtml = readFileSync(indexPath, "utf-8");
 
-// 由于 vite.config.ts 中设置了 base: "/web/"，资源路径应该是 /web/assets/...
-// 确保路径正确（不需要修改，因为 base: "/web/" 已经处理了）
-// 但如果构建后的 HTML 中有错误的路径，这里可以修复
+// 构建使用 base: "/"，输出为 /assets/...；此处统一改为 /web/assets/...
+// 同时修复错误拼接产生的 /webassets/（应为 /web/assets/）
+indexHtml = indexHtml.replace(/src="\/webassets\//g, 'src="/web/assets/');
+indexHtml = indexHtml.replace(/href="\/webassets\//g, 'href="/web/assets/');
 indexHtml = indexHtml.replace(/src="\/assets\//g, 'src="/web/assets/');
 indexHtml = indexHtml.replace(/href="\/assets\//g, 'href="/web/assets/');
 indexHtml = indexHtml.replace(/href="\/favicon\.ico"/g, 'href="/web/favicon.ico"');

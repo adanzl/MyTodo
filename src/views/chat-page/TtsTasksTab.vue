@@ -62,6 +62,9 @@
           </ion-buttons>
           <ion-title>{{ selectedTask?.name || selectedTask?.task_id || "任务详情" }}</ion-title>
           <ion-buttons slot="end" class="mr-2">
+            <ion-button color="danger" @click="confirmDelete">
+              <ion-icon :icon="trashOutline" />
+            </ion-button>
             <ion-button @click="scrollToAnalysis" color="primary" class="!mr-3">分析</ion-button>
             <ion-button :disabled="!canGoPrev" @click="goPrev">
               <ion-icon :icon="arrowUpOutline" />
@@ -102,7 +105,10 @@
             <div
               ref="analysisSectionRef"
               class="rounded-lg border border-gray-200 px-3 flex flex-col gap-1 min-h-[120px]">
-              <h4 class="text-sm font-semibold text-gray-700">分析内容</h4>
+              <div class="flex items-center justify-between">
+                <h4 class="text-sm font-semibold text-gray-700">分析内容</h4>
+                <ion-button size="small" color="primary" @click="runAnalysis">分析</ion-button>
+              </div>
               <template v-if="!selectedTask.analysis">
                 <div class="text-xs text-gray-400">
                   暂无分析结果，可在服务端对该任务执行「分析」后刷新查看。
@@ -184,13 +190,29 @@
                 <span class="text-gray-500">时长</span>
                 <div>{{ formatDuration(selectedTask.duration) }}</div>
               </div>
-              <div v-if="selectedTask.speed != null" class="rounded bg-gray-50 p-2">
+              <div class="rounded bg-gray-50 p-2">
                 <span class="text-gray-500">语速</span>
-                <div>{{ selectedTask.speed }}</div>
+                <ion-input
+                  v-model.number="editSpeed"
+                  type="number"
+                  min="0.5"
+                  max="2"
+                  step="0.1"
+                  class="ion-no-padding mt-1"
+                  placeholder="1"
+                />
               </div>
-              <div v-if="selectedTask.vol != null" class="rounded bg-gray-50 p-2">
+              <div class="rounded bg-gray-50 p-2">
                 <span class="text-gray-500">音量</span>
-                <div>{{ selectedTask.vol }}</div>
+                <ion-input
+                  v-model.number="editVol"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  class="ion-no-padding mt-1"
+                  placeholder="50"
+                />
               </div>
             </div>
 
@@ -199,6 +221,10 @@
               class="flex gap-2 text-sm text-amber-600">
               <span v-if="selectedTask.ocr_running">OCR 进行中</span>
               <span v-if="selectedTask.analysis_running">解析进行中</span>
+            </div>
+
+            <div class="ion-padding-top ion-padding-bottom">
+              <ion-button expand="block" @click="saveAndClose">确定</ion-button>
             </div>
           </div>
         </template>
@@ -215,18 +241,28 @@ import {
   IonContent,
   IonHeader,
   IonIcon,
+  IonInput,
   IonModal,
   IonRefresher,
   IonRefresherContent,
   IonSegmentContent,
   IonTitle,
   IonToolbar,
+  alertController,
 } from "@ionic/vue";
-import { arrowDownOutline, arrowUpOutline, closeOutline, add } from "ionicons/icons";
-import { computed, ref } from "vue";
+import { arrowDownOutline, arrowUpOutline, closeOutline, add, trashOutline } from "ionicons/icons";
+import { computed, ref, watch } from "vue";
 import AudioPreview from "@/components/AudioPreview.vue";
 import FabButton from "@/components/FabButton.vue";
-import { getTtsDownloadUrl, getTtsTaskList, type TtsTaskItem } from "@/utils/NetUtil";
+import EventBus, { C_EVENT } from "@/modal/EventBus";
+import {
+  deleteTtsTask,
+  getTtsDownloadUrl,
+  getTtsTaskList,
+  startTtsAnalysis,
+  updateTtsTask,
+  type TtsTaskItem,
+} from "@/utils/NetUtil";
 import type { RefresherCustomEvent } from "@ionic/vue";
 
 withDefaults(
@@ -242,6 +278,16 @@ const loading = ref(false);
 const error = ref("");
 const selectedTask = ref<TtsTaskItem | null>(null);
 const analysisSectionRef = ref<HTMLElement | null>(null);
+/** 弹窗内可编辑的语速、音量（确定时提交） */
+const editSpeed = ref<number>(1);
+const editVol = ref<number>(50);
+
+watch(selectedTask, (t) => {
+  if (t) {
+    editSpeed.value = t.speed ?? 1;
+    editVol.value = t.vol ?? 50;
+  }
+});
 
 const currentIndex = computed(() => {
   if (!selectedTask.value || tasks.value.length === 0) return -1;
@@ -269,6 +315,67 @@ function goNext() {
 
 function scrollToAnalysis() {
   analysisSectionRef.value?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function confirmDelete() {
+  const task = selectedTask.value;
+  if (!task) return;
+  const alert = await alertController.create({
+    header: "删除任务",
+    message: `确定删除任务「${task.name || task.task_id}」吗？此操作不可恢复。`,
+    buttons: [
+      { text: "取消", role: "cancel" },
+      {
+        text: "删除",
+        role: "destructive",
+        handler: async () => {
+          try {
+            await deleteTtsTask(task.task_id);
+            const idx = tasks.value.findIndex((t) => t.task_id === task.task_id);
+            if (idx >= 0) tasks.value.splice(idx, 1);
+            selectedTask.value = null;
+            EventBus.$emit(C_EVENT.TOAST, "已删除");
+          } catch (e: any) {
+            EventBus.$emit(C_EVENT.TOAST, e?.message ?? "删除失败");
+          }
+        },
+      },
+    ],
+  });
+  await alert.present();
+}
+
+async function runAnalysis() {
+  const task = selectedTask.value;
+  if (!task) return;
+  try {
+    await startTtsAnalysis(task.task_id);
+    EventBus.$emit(C_EVENT.TOAST, "分析已启动，请稍后刷新查看结果");
+  } catch (e: any) {
+    EventBus.$emit(C_EVENT.TOAST, e?.message ?? "发起分析失败");
+  }
+}
+
+async function saveAndClose() {
+  const task = selectedTask.value;
+  if (!task) return;
+  try {
+    await updateTtsTask(task.task_id, {
+      speed: Number(editSpeed.value),
+      vol: Number(editVol.value),
+    });
+    const t = tasks.value.find((x) => x.task_id === task.task_id);
+    if (t) {
+      t.speed = Number(editSpeed.value);
+      t.vol = Number(editVol.value);
+    }
+    if (selectedTask.value?.task_id === task.task_id) {
+      selectedTask.value = { ...selectedTask.value, speed: t?.speed ?? editSpeed.value, vol: t?.vol ?? editVol.value };
+    }
+    EventBus.$emit(C_EVENT.TOAST, "已保存");
+  } catch (e: any) {
+    EventBus.$emit(C_EVENT.TOAST, e?.message ?? "保存失败");
+  }
 }
 
 const STATUS_LABELS: Record<string, string> = {
