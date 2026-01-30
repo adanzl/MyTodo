@@ -360,6 +360,14 @@ export async function getTtsTaskList(): Promise<TtsTaskItem[]> {
   return rsp.data.data ?? [];
 }
 
+/** TTS 任务音频下载 URL，参考 server/core/api/tts_routes.py GET /tts/download */
+export function getTtsDownloadUrl(taskId: string): string {
+  const base = getApiUrl();
+  if (!base) return "";
+  const sep = base.endsWith("/") ? "" : "/";
+  return `${base}${sep}tts/download?task_id=${encodeURIComponent(taskId)}`;
+}
+
 export async function getChatMem(id: number) {
   const rsp: any = await apiClient.get("/getRdsData", {
     params: { table: "mem", id: id },

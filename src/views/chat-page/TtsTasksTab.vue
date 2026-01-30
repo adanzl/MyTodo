@@ -22,7 +22,9 @@
             @click="openDetail(task)">
             <div class="flex items-center justify-between">
               <span class="font-medium text-gray-800">{{ task.name || task.task_id }}</span>
-              <ion-badge :color="statusColor(task.status)" class="p-1">{{ statusLabel(task.status) }}</ion-badge>
+              <ion-badge :color="statusColor(task.status)" class="p-1">{{
+                statusLabel(task.status)
+              }}</ion-badge>
             </div>
             <div v-if="task.text" class="mt-1 line-clamp-2 text-sm text-gray-600">
               {{ task.text.slice(0, 80) }}{{ task.text.length > 80 ? "…" : "" }}
@@ -30,9 +32,6 @@
             <div class="mt-2 flex items-center gap-3 text-xs text-gray-400">
               <span v-if="task.total_chars != null">字数 {{ task.total_chars }}</span>
               <span>{{ formatTime(task.update_time) }}</span>
-            </div>
-            <div v-if="task.error_message" class="mt-1 text-xs text-red-500">
-              {{ task.error_message }}
             </div>
           </div>
         </div>
@@ -67,19 +66,35 @@
       </ion-header>
       <ion-content class="ion-padding">
         <template v-if="selectedTask">
-          <div class="space-y-4">
-            <div class="flex items-center justify-between flex-wrap gap-2">
-              <ion-badge :color="statusColor(selectedTask.status)" class="p-1">{{ statusLabel(selectedTask.status) }}</ion-badge>
-              <div>{{ formatDuration(selectedTask.duration) }}</div>
-              <span class="text-sm text-gray-500">{{ selectedTask.error_message }}</span>
+          <div class="space-y-3">
+            <div class="flex items-center justify-between flex-wrap gap-3">
+              <ion-badge :color="statusColor(selectedTask.status)" class="p-1">{{
+                statusLabel(selectedTask.status)
+              }}</ion-badge>
+              <span class="text-sm text-gray-500 flex-1 truncate">
+                {{ (selectedTask.error_message || "").slice(0, 80) }}
+                {{ (selectedTask.error_message || "").length > 80 ? "…" : "" }}
+              </span>
             </div>
 
+            <!-- 音频预览（仿 server/frontend MediaComponent） -->
+            <AudioPreview
+              v-if="selectedTask.status === 'success'"
+              :src="getTtsDownloadUrl(selectedTask.task_id)"
+              :duration-seconds="selectedTask.duration ?? undefined"
+              class="w-full"
+            />
+
             <div v-if="selectedTask.text" class="rounded-lg bg-gray-100 p-3">
-              <div class="text-gray-800 whitespace-pre-wrap break-words">{{ selectedTask.text }}</div>
+              <div class="text-gray-800 whitespace-pre-wrap break-words">
+                {{ selectedTask.text }}
+              </div>
             </div>
 
             <!-- 分析内容（参考 server/frontend TTS.vue） -->
-            <div ref="analysisSectionRef" class="rounded-lg border border-gray-200 p-3 flex flex-col gap-3 min-h-[120px]">
+            <div
+              ref="analysisSectionRef"
+              class="rounded-lg border border-gray-200 px-3 flex flex-col gap-1 min-h-[120px]">
               <h4 class="text-sm font-semibold text-gray-700">分析内容</h4>
               <template v-if="!selectedTask.analysis">
                 <div class="text-xs text-gray-400">
@@ -87,11 +102,9 @@
                 </div>
               </template>
               <template v-else>
-                <div class="space-y-3 text-xs max-h-[280px] overflow-auto pr-1">
+                <div class="space-y-3 text-xs pr-1">
                   <!-- 美词 -->
-                  <div
-                    v-if="selectedTask.analysis.words?.length"
-                    class="flex gap-3">
+                  <div v-if="selectedTask.analysis.words?.length" class="flex gap-3">
                     <div
                       class="w-10 h-6 rounded-md bg-blue-50 border border-blue-300 flex items-center justify-center flex-shrink-0">
                       <span class="text-[11px] leading-tight text-blue-700 text-center">美词</span>
@@ -106,9 +119,7 @@
                     </div>
                   </div>
                   <!-- 精彩句段 -->
-                  <div
-                    v-if="selectedTask.analysis.sentence?.length"
-                    class="flex gap-3">
+                  <div v-if="selectedTask.analysis.sentence?.length" class="flex gap-3">
                     <div
                       class="w-10 h-10 rounded-md bg-emerald-50 border border-emerald-300 flex items-center justify-center flex-shrink-0">
                       <span class="text-[11px] leading-tight text-emerald-700 text-center">
@@ -153,27 +164,18 @@
                 </div>
               </template>
             </div>
-
+            <div v-if="selectedTask.role" class="rounded bg-gray-50 p-2 text-[12px]">
+              <span class="text-gray-500">角色</span>
+              <div>{{ selectedTask.role }}</div>
+            </div>
             <div class="grid grid-cols-2 gap-3 text-sm">
               <div v-if="selectedTask.total_chars != null" class="rounded bg-gray-50 p-2">
                 <span class="text-gray-500">字数</span>
                 <div>{{ selectedTask.total_chars }}</div>
               </div>
-              <div v-if="selectedTask.generated_chars != null" class="rounded bg-gray-50 p-2">
-                <span class="text-gray-500">已生成字数</span>
-                <div>{{ selectedTask.generated_chars }}</div>
-              </div>
               <div v-if="selectedTask.duration != null" class="rounded bg-gray-50 p-2">
                 <span class="text-gray-500">时长</span>
                 <div>{{ formatDuration(selectedTask.duration) }}</div>
-              </div>
-              <div v-if="selectedTask.role" class="rounded bg-gray-50 p-2">
-                <span class="text-gray-500">角色</span>
-                <div>{{ selectedTask.role }}</div>
-              </div>
-              <div v-if="selectedTask.model" class="rounded bg-gray-50 p-2">
-                <span class="text-gray-500">模型</span>
-                <div>{{ selectedTask.model }}</div>
               </div>
               <div v-if="selectedTask.speed != null" class="rounded bg-gray-50 p-2">
                 <span class="text-gray-500">语速</span>
@@ -185,7 +187,9 @@
               </div>
             </div>
 
-            <div v-if="selectedTask.ocr_running || selectedTask.analysis_running" class="flex gap-2 text-sm text-amber-600">
+            <div
+              v-if="selectedTask.ocr_running || selectedTask.analysis_running"
+              class="flex gap-2 text-sm text-amber-600">
               <span v-if="selectedTask.ocr_running">OCR 进行中</span>
               <span v-if="selectedTask.analysis_running">解析进行中</span>
             </div>
@@ -213,7 +217,8 @@ import {
 } from "@ionic/vue";
 import { arrowDownOutline, arrowUpOutline, closeOutline } from "ionicons/icons";
 import { computed, ref } from "vue";
-import { getTtsTaskList, type TtsTaskItem } from "@/utils/NetUtil";
+import AudioPreview from "@/components/AudioPreview.vue";
+import { getTtsDownloadUrl, getTtsTaskList, type TtsTaskItem } from "@/utils/NetUtil";
 import type { RefresherCustomEvent } from "@ionic/vue";
 
 const tasks = ref<TtsTaskItem[]>([]);
@@ -228,7 +233,9 @@ const currentIndex = computed(() => {
   return idx;
 });
 const canGoPrev = computed(() => currentIndex.value > 0);
-const canGoNext = computed(() => currentIndex.value >= 0 && currentIndex.value < tasks.value.length - 1);
+const canGoNext = computed(
+  () => currentIndex.value >= 0 && currentIndex.value < tasks.value.length - 1
+);
 
 function openDetail(task: TtsTaskItem) {
   selectedTask.value = task;
@@ -281,9 +288,13 @@ function formatTime(ts: number): string {
   if (sameDay) {
     return d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
   }
-  return d.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
-
 
 function formatDuration(seconds: number | null | undefined): string {
   if (seconds == null || seconds < 0) return "—";

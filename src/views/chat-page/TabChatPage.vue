@@ -65,7 +65,6 @@
           fill="solid"
           style="--color: #000"
           @keyup.enter="sendTextMessage"
-          autofocus="true"
           mode="md" />
         <ion-button @click="sendTextMessage">发送</ion-button>
       </div>

@@ -7,6 +7,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AudioPreview: typeof import('./src/components/AudioPreview.vue')['default']
     CalendarCover: typeof import('./src/components/CalendarCover.vue')['default']
     CalendarTab: typeof import('./src/components/CalendarTab.vue')['default']
     ChatSetting: typeof import('./src/components/ChatSetting.vue')['default']
