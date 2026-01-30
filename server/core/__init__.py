@@ -125,6 +125,9 @@ def create_app():
         return [x.strip() for x in (raw or '').split(',') if x.strip()]
 
     def _is_whitelisted(path: str) -> bool:
+        # getAll 接口移出白名单，必须走 JWT 验证
+        if path == '/getAll' or path.rstrip('/') == '/getAll':
+            return False
         if not path.startswith('/api'):
             return True
         if config.AUTH_WHITELIST_ALL_API:

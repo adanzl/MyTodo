@@ -15,7 +15,7 @@
     "axios": "^1.13.2",
     "crypto-js": "^4.2.0",
     "dayjs": "^1.11.19",
-    "element-plus": "^2.13.0",
+    "element-plus": "2.13.1",
     "lodash-es": "^4.17.22",
     "pinia": "^3.0.4",
     "socket.io-client": "^4.8.3",
@@ -39,9 +39,9 @@
     "sass-embedded": "^1.97.1",
     "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3",
-    "unplugin-auto-import": "^20.3.0",
-    "unplugin-icons": "^22.5.0",
-    "unplugin-vue-components": "^30.0.0",
+    "unplugin-auto-import": "21.0.0",
+    "unplugin-icons": "23.0.1",
+    "unplugin-vue-components": "31.0.0",
     "vite": "^7.2.4",
     "vue-tsc": "^3.2.1"
   }
