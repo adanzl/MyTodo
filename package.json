@@ -44,7 +44,7 @@
   },
   "devDependencies": {
     "@capacitor/cli": "6.2.0",
-    "@capawesome/cli": "3.11.0",
+    "@capawesome/cli": "4.0.1",
     "@iconify/json": "2.2.428",
     "@iconify/utils": "2.3.0",
     "@iconify/vue": "^4.2.0",
@@ -55,6 +55,7 @@
     "@vue/eslint-config-typescript": "^12.0.0",
     "@vue/test-utils": "^2.3.0",
     "autoprefixer": "10.4.21",
+    "caniuse-lite": "^1.0.30001766",
     "cypress": "14.2.1",
     "eslint": "^8.35.0",
     "eslint-plugin-vue": "^9.9.0",
