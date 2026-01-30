@@ -62,8 +62,7 @@ if (!existsSync(indexPath)) {
 
 let indexHtml = readFileSync(indexPath, "utf-8");
 
-// 构建使用 base: "/"，输出为 /assets/...；此处统一改为 /web/assets/...
-// 同时修复错误拼接产生的 /webassets/（应为 /web/assets/）
+// 生产环境 base 为 /web/，资源已是 /web/assets/...；仅兜底替换（若构建出 /assets/ 或 /webassets/）
 indexHtml = indexHtml.replace(/src="\/webassets\//g, 'src="/web/assets/');
 indexHtml = indexHtml.replace(/href="\/webassets\//g, 'href="/web/assets/');
 indexHtml = indexHtml.replace(/src="\/assets\//g, 'src="/web/assets/');

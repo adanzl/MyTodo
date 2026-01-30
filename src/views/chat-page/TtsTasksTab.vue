@@ -88,6 +88,44 @@
               </span>
             </div>
 
+            <!-- 识别（仿 server/frontend TTS.vue：选择图片后 OCR 结果追加到任务文本） -->
+            <div class="rounded-lg border border-gray-200 px-3 py-2">
+              <div class="flex items-center justify-between flex-wrap gap-2">
+                <h4 class="text-sm font-semibold text-gray-700">识别</h4>
+                <div class="flex items-center gap-2">
+                  <input
+                    ref="imageInputRef"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    class="hidden"
+                    @change="onImageFileChange" />
+                  <ion-button size="small" fill="outline" @click="pickImages">
+                    <ion-icon :icon="imageOutline" class="mr-1" />
+                    选择图片
+                  </ion-button>
+                  <ion-button
+                    size="small"
+                    color="primary"
+                    :disabled="isTaskBusy || selectedImages.length === 0 || ocrLoading"
+                    @click="runOcr">
+                    {{ ocrLoading ? "识别中…" : "识别" }}
+                  </ion-button>
+                </div>
+              </div>
+              <div v-if="selectedImages.length > 0" class="flex flex-wrap gap-2 mt-2">
+                <div
+                  v-for="(file, idx) in selectedImages"
+                  :key="idx"
+                  class="relative flex items-center gap-1 rounded bg-gray-100 px-2 py-1 text-xs">
+                  <span class="max-w-[120px] truncate">{{ file.name }}</span>
+                  <ion-button size="small" fill="clear" class="min-w-6 h-6 p-0" @click="removeOcrImage(idx)">
+                    <ion-icon :icon="closeCircleOutline" />
+                  </ion-button>
+                </div>
+              </div>
+            </div>
+
             <!-- 音频预览（仿 server/frontend MediaComponent） -->
             <AudioPreview
               v-if="selectedTask.status === 'success'"
@@ -192,27 +230,36 @@
               </div>
               <div class="rounded bg-gray-50 p-2">
                 <span class="text-gray-500">语速</span>
-                <ion-input
-                  v-model.number="editSpeed"
-                  type="number"
-                  min="0.5"
-                  max="2"
-                  step="0.1"
-                  class="ion-no-padding mt-1"
-                  placeholder="1"
-                />
+                <div class="flex items-center gap-2 mt-1">
+                  <ion-button
+                    size="small"
+                    fill="clear"
+                    @click="editSpeed = Math.max(0.5, Math.round((editSpeed - 0.1) * 10) / 10)"
+                    >−</ion-button
+                  >
+                  <span class="min-w-[2.5rem] text-center">{{ editSpeed }}</span>
+                  <ion-button
+                    size="small"
+                    fill="clear"
+                    @click="editSpeed = Math.min(2, Math.round((editSpeed + 0.1) * 10) / 10)"
+                    >+</ion-button
+                  >
+                </div>
               </div>
               <div class="rounded bg-gray-50 p-2">
                 <span class="text-gray-500">音量</span>
-                <ion-input
-                  v-model.number="editVol"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="1"
-                  class="ion-no-padding mt-1"
-                  placeholder="50"
-                />
+                <div class="flex items-center gap-2 mt-1">
+                  <ion-button size="small" fill="clear" @click="editVol = Math.max(0, editVol - 10)"
+                    >−</ion-button
+                  >
+                  <span class="min-w-[2.5rem] text-center">{{ editVol }}</span>
+                  <ion-button
+                    size="small"
+                    fill="clear"
+                    @click="editVol = Math.min(100, editVol + 10)"
+                    >+</ion-button
+                  >
+                </div>
               </div>
             </div>
 
@@ -241,7 +288,6 @@ import {
   IonContent,
   IonHeader,
   IonIcon,
-  IonInput,
   IonModal,
   IonRefresher,
   IonRefresherContent,
@@ -250,7 +296,15 @@ import {
   IonToolbar,
   alertController,
 } from "@ionic/vue";
-import { arrowDownOutline, arrowUpOutline, closeOutline, add, trashOutline } from "ionicons/icons";
+import {
+  arrowDownOutline,
+  arrowUpOutline,
+  closeOutline,
+  add,
+  trashOutline,
+  imageOutline,
+  closeCircleOutline,
+} from "ionicons/icons";
 import { computed, ref, watch } from "vue";
 import AudioPreview from "@/components/AudioPreview.vue";
 import FabButton from "@/components/FabButton.vue";
@@ -259,6 +313,7 @@ import {
   deleteTtsTask,
   getTtsDownloadUrl,
   getTtsTaskList,
+  ocrTtsTask,
   startTtsAnalysis,
   updateTtsTask,
   type TtsTaskItem,
@@ -281,11 +336,27 @@ const analysisSectionRef = ref<HTMLElement | null>(null);
 /** 弹窗内可编辑的语速、音量（确定时提交） */
 const editSpeed = ref<number>(1);
 const editVol = ref<number>(50);
+/** 识别：已选图片、隐藏 input、加载态 */
+const selectedImages = ref<File[]>([]);
+const imageInputRef = ref<HTMLInputElement | null>(null);
+const ocrLoading = ref(false);
+
+/** 任务是否忙（TTS 生成中或 OCR/分析子任务中），仿 frontend TTS.vue */
+const isTaskBusy = computed(
+  () =>
+    !!(
+      selectedTask.value?.status === "processing" ||
+      selectedTask.value?.ocr_running ||
+      selectedTask.value?.analysis_running
+    )
+);
 
 watch(selectedTask, (t) => {
   if (t) {
     editSpeed.value = t.speed ?? 1;
     editVol.value = t.vol ?? 50;
+  } else {
+    selectedImages.value = [];
   }
 });
 
@@ -356,6 +427,54 @@ async function runAnalysis() {
   }
 }
 
+function pickImages() {
+  imageInputRef.value?.click();
+}
+
+function onImageFileChange(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const files = input.files;
+  if (files?.length) {
+    selectedImages.value.push(...Array.from(files));
+  }
+  input.value = "";
+}
+
+function removeOcrImage(index: number) {
+  selectedImages.value.splice(index, 1);
+}
+
+function clearSelectedImages() {
+  selectedImages.value = [];
+  if (imageInputRef.value) imageInputRef.value.value = "";
+}
+
+async function runOcr() {
+  const task = selectedTask.value;
+  if (!task) return;
+  if (selectedImages.value.length === 0) {
+    EventBus.$emit(C_EVENT.TOAST, "请先选择图片");
+    return;
+  }
+  if (isTaskBusy.value) {
+    EventBus.$emit(C_EVENT.TOAST, "任务正在处理中或正在执行分析，无法执行识别");
+    return;
+  }
+  try {
+    ocrLoading.value = true;
+    await ocrTtsTask(task.task_id, selectedImages.value);
+    clearSelectedImages();
+    EventBus.$emit(C_EVENT.TOAST, "识别已启动，结果将追加到任务文本，请稍后刷新");
+    await loadTasks();
+    const updated = tasks.value.find((t) => t.task_id === task.task_id);
+    if (updated) selectedTask.value = updated;
+  } catch (e: any) {
+    EventBus.$emit(C_EVENT.TOAST, e?.message ?? "识别失败");
+  } finally {
+    ocrLoading.value = false;
+  }
+}
+
 async function saveAndClose() {
   const task = selectedTask.value;
   if (!task) return;
@@ -370,7 +489,11 @@ async function saveAndClose() {
       t.vol = Number(editVol.value);
     }
     if (selectedTask.value?.task_id === task.task_id) {
-      selectedTask.value = { ...selectedTask.value, speed: t?.speed ?? editSpeed.value, vol: t?.vol ?? editVol.value };
+      selectedTask.value = {
+        ...selectedTask.value,
+        speed: t?.speed ?? editSpeed.value,
+        vol: t?.vol ?? editVol.value,
+      };
     }
     EventBus.$emit(C_EVENT.TOAST, "已保存");
   } catch (e: any) {

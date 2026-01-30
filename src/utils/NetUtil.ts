@@ -401,6 +401,17 @@ export async function startTtsAnalysis(taskId: string): Promise<void> {
   }
 }
 
+/** TTS 任务 OCR 图片识别，参考 server/core/api/tts_routes.py POST /tts/ocr，结果追加到任务文本末尾 */
+export async function ocrTtsTask(taskId: string, files: File[]): Promise<void> {
+  const formData = new FormData();
+  formData.append("task_id", taskId);
+  files.forEach((f) => formData.append("file", f));
+  const rsp: any = await apiClient.post("/tts/ocr", formData, { timeout: 60000 });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg || "OCR 识别失败");
+  }
+}
+
 export async function getChatMem(id: number) {
   const rsp: any = await apiClient.get("/getRdsData", {
     params: { table: "mem", id: id },

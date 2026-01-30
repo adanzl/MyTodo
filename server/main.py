@@ -65,27 +65,12 @@ if __name__ == '__main__':
         from geventwebsocket.handler import WebSocketHandler
 
         base_dir = os.path.dirname(os.path.abspath(__file__))
-        static_dir = os.path.join(base_dir, "static")
-        index_path = os.path.join(static_dir, "index.html")
         static_app = SharedDataMiddleware(null_application, {'/': 'static'})
-
-        def web_spa_app(environ, start_response):
-            # SharedDataMiddleware 对目录请求不会返回 index.html，导致直接打开 /web 或 /web/#/xxx 时 404
-            # 对 /web、/web/ 直接返回 index.html，让 SPA 与 hash 路由能正常加载
-            path_info = environ.get("PATH_INFO") or ""
-            if path_info in ("", "/"):
-                if os.path.isfile(index_path):
-                    with open(index_path, "rb") as f:
-                        body = f.read()
-                    start_response("200 OK", [("Content-Type", "text/html; charset=utf-8")])
-                    return [body]
-            return static_app(environ, start_response)
-
         application = DispatcherMiddleware(
             null_application,  # 主应用（此处为空）
             {
                 '/api': app,
-                '/web': web_spa_app,  # 先走 SPA 回退，再走静态文件
+                '/web': static_app,  # 静态文件挂载到 /web
             })
         http_server = WSGIServer(
             (HOST, PORT),
