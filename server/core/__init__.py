@@ -24,6 +24,7 @@ from core.chat.chat_mgr import chat_mgr
 from core.db.db_mgr import db_mgr
 from core.services.scheduler_mgr import scheduler_mgr
 from core.config import config, app_logger, access_logger
+import json
 import os
 import time
 
@@ -119,7 +120,14 @@ def create_app():
     app.config['JWT_COOKIE_CSRF_PROTECT'] = False
     app.config['JWT_REFRESH_COOKIE_PATH'] = '/api/auth/refresh'
 
-    JWTManager(app)
+    jwt = JWTManager(app)
+
+    # flask-jwt-extended 4.x 要求 JWT 的 sub 为字符串，auth_routes 中 identity 为 dict，需序列化
+    @jwt.user_identity_loader
+    def _user_identity_loader(identity):
+        if isinstance(identity, dict):
+            return json.dumps(identity, sort_keys=True)
+        return str(identity) if identity is not None else None
 
     def _parse_csv(raw: str) -> list[str]:
         return [x.strip() for x in (raw or '').split(',') if x.strip()]
