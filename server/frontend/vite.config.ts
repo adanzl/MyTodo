@@ -8,8 +8,9 @@ import { ElementPlusResolver } from "unplugin-vue-components/resolvers";
 import AutoImport from "unplugin-auto-import/vite";
 
 // https://vite.dev/config/
+// 生产用 base: "/"，构建输出 /assets/...，由 deploy.js 统一改为 /web/assets/（Vite 用 /web/ 或 /web 都会拼成 /webassets/）
 export default defineConfig({
-  base: process.env.NODE_ENV === "production" ? "/web/" : "/",
+  base: "/web/",
   plugins: [
     vue(),
     // 自动导入 Element Plus API（ElMessage, ElNotification 等）

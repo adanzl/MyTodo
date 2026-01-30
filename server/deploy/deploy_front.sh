@@ -26,18 +26,6 @@ cd ..
 echo "📝 复制 index.html..."
 cp -f frontend/dist/index.html static/index.html
 
-# 修复 index.html 中的资源路径（将 /assets/ 改为 assets/）
-# 修复 favicon 路径（将 /favicon.ico 改为 favicon.ico）
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS
-    sed -i '' 's|/assets/|assets/|g' static/index.html
-    sed -i '' 's|href="/favicon\.ico"|href="favicon.ico"|g' static/index.html
-else
-    # Linux
-    sed -i 's|/assets/|assets/|g' static/index.html
-    sed -i 's|href="/favicon\.ico"|href="favicon.ico"|g' static/index.html
-fi
-
 # 复制 assets 目录
 if [ -d "frontend/dist/assets" ]; then
     echo "📁 复制 assets 目录..."

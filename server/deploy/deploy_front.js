@@ -6,21 +6,32 @@
 import { readFileSync, writeFileSync, copyFileSync, existsSync, cpSync, rmSync, readdirSync, statSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { spawnSync } from "child_process";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const projectRoot = join(__dirname, "..");
-const staticDir = join(projectRoot, "static");
-const distDir = join(__dirname, "dist");
+const projectRoot = join(__dirname, "../frontend");
+const staticDir = join(projectRoot, "../static");
+const distDir = join(projectRoot, "dist");
 
 console.log("🚀 开始部署...");
 console.log(`📦 构建目录: ${distDir}`);
 console.log(`📁 目标目录: ${staticDir}`);
 
-// 检查构建目录是否存在
+// 在前端目录执行 npm run build
+console.log("📦 正在构建前端项目...");
+const buildResult = spawnSync("npm", ["run", "build"], {
+    cwd: projectRoot,
+    stdio: "inherit",
+    shell: true,
+});
+if (buildResult.status !== 0) {
+    console.error("❌ 错误: 构建失败");
+    process.exit(1);
+}
 if (!existsSync(distDir)) {
-    console.error("❌ 错误: 构建目录不存在，请先运行 npm run build");
+    console.error("❌ 错误: 构建失败，dist 目录不存在");
     process.exit(1);
 }
 
@@ -62,11 +73,11 @@ if (!existsSync(indexPath)) {
 
 let indexHtml = readFileSync(indexPath, "utf-8");
 
-// 生产环境 base 为 /web/，资源已是 /web/assets/...；仅兜底替换（若构建出 /assets/ 或 /webassets/）
-indexHtml = indexHtml.replace(/src="\/webassets\//g, 'src="/web/assets/');
-indexHtml = indexHtml.replace(/href="\/webassets\//g, 'href="/web/assets/');
-indexHtml = indexHtml.replace(/src="\/assets\//g, 'src="/web/assets/');
-indexHtml = indexHtml.replace(/href="\/assets\//g, 'href="/web/assets/');
+// 由于 vite.config.ts 中设置了 base: "/web/"，资源路径应该是 /web/assets/...
+// 确保路径正确（不需要修改，因为 base: "/web/" 已经处理了）
+// 但如果构建后的 HTML 中有错误的路径，这里可以修复
+// indexHtml = indexHtml.replace(/src="\/assets\//g, 'src="/web/assets/');
+// indexHtml = indexHtml.replace(/href="\/assets\//g, 'href="/web/assets/');
 indexHtml = indexHtml.replace(/href="\/favicon\.ico"/g, 'href="/web/favicon.ico"');
 
 // 保存修复后的 index.html 到 static 目录
