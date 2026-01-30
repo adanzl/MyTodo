@@ -1,6 +1,6 @@
 import EventBus, { C_EVENT } from "@/modal/EventBus.ts";
 import { UData, UserData } from "@/modal/UserData.ts";
-import { getAccessToken, refreshToken, setAccessToken } from "@/utils/Auth";
+import { clearLoginCache, getAccessToken, refreshToken } from "@/utils/Auth";
 import axios, { type AxiosRequestConfig, type InternalAxiosRequestConfig } from "axios";
 import _ from "lodash";
 
@@ -78,9 +78,9 @@ async function ensureRefreshed(): Promise<string | null> {
     refreshWaiters = [];
     return token;
   } catch (e: any) {
-    // 仅 refresh 返回 401 时清除 token；422 等（如刚登录 cookie 未就绪）保留当前 token
+    // 仅 refresh 返回 401 时清空本地登录缓存；422 等（如刚登录 cookie 未就绪）保留
     if (e?.response?.status === 401) {
-      setAccessToken(null);
+      clearLoginCache();
     }
     refreshWaiters.forEach((cb) => cb(null));
     refreshWaiters = [];
@@ -107,7 +107,7 @@ apiClient.interceptors.response.use(
         // refresh 返回 401 才视为登录过期并跳转登录页；422 等（如刚登录时 refresh 未就绪）不踢出
         const status = refreshErr?.response?.status;
         if (status === 401) {
-          setAccessToken(null);
+          clearLoginCache();
           EventBus.$emit(C_EVENT.AUTH_EXPIRED);
         }
       }

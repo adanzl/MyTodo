@@ -6,6 +6,8 @@
  */
 
 const KEY_ACCESS_TOKEN = "access_token";
+/** 与登录相关的 localStorage 键，清空缓存时一并移除 */
+const LOGIN_CACHE_KEYS = [KEY_ACCESS_TOKEN, "saveUser", "bAuth"] as const;
 
 export interface LoginResponse {
   code: number;
@@ -25,6 +27,16 @@ export function setAccessToken(token: string | null): void {
     return;
   }
   localStorage.setItem(KEY_ACCESS_TOKEN, token);
+}
+
+/**
+ * 清空本地登录相关缓存（access_token、saveUser、bAuth 等），
+ * 在 401/登录过期或登出时调用，避免旧缓存导致反复报错。
+ */
+export function clearLoginCache(): void {
+  for (const key of LOGIN_CACHE_KEYS) {
+    localStorage.removeItem(key);
+  }
 }
 
 /**
@@ -86,6 +98,6 @@ export async function logout(baseUrl: string): Promise<void> {
   try {
     await axios.post(url, {}, { withCredentials: true, timeout: 5000 });
   } finally {
-    setAccessToken(null);
+    clearLoginCache();
   }
 }

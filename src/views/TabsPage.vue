@@ -251,7 +251,7 @@ import { ColorOptions, LoadColorData } from "@/modal/ColorType";
 import { C_EVENT } from "@/modal/EventBus";
 import { GroupOptions, PriorityOptions } from "@/modal/ScheduleType";
 import { User, UserData } from "@/modal/UserData";
-import { login } from "@/utils/Auth";
+import { clearLoginCache, login } from "@/utils/Auth";
 import { getApiUrl, getScheduleList, getUserList } from "@/utils/NetUtil";
 import avatar from "@/assets/images/avatar.svg";
 import {
@@ -427,13 +427,13 @@ async function btnLoginClick() {
 }
 function btnLogoff() {
   bLogin.value = false;
-  localStorage.removeItem("saveUser");
+  clearLoginCache();
 }
 
-/** 401 或 token 失效时：显示登录页并可选提示 */
+/** 401 或 token 失效时：清空登录缓存并显示登录页 */
 function goToLoginPage(toastMsg?: string) {
   bLogin.value = false;
-  localStorage.removeItem("saveUser");
+  clearLoginCache();
   if (globalVar.user) {
     globalVar.user = undefined as any;
   }
