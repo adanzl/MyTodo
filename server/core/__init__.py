@@ -147,10 +147,17 @@ def create_app():
         path = request.path or ''
         if _is_whitelisted(path):
             return None
+        has_auth_header = bool(request.headers.get('Authorization'))
         try:
             verify_jwt_in_request()
             return None
-        except Exception:
+        except Exception as e:
+            log.warning(
+                "[Auth] 401 path=%s has_Authorization=%s err=%s",
+                path,
+                has_auth_header,
+                type(e).__name__,
+            )
             return jsonify({'code': -1, 'msg': 'unauthorized'}), 401
 
     @app.before_request
