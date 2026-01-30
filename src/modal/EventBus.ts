@@ -35,6 +35,8 @@ export const C_EVENT = {
   UPDATE_USER_INFO: "updateUserInfo",
   REWARD: "reward",
   TOAST: "toast",
+  /** 未登录或 token 失效，应显示登录页 */
+  AUTH_EXPIRED: "authExpired",
 };
 
 export default EventBus;

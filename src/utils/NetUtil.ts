@@ -1,4 +1,3 @@
-import { LoadColorData } from "@/modal/ColorType.ts";
 import EventBus, { C_EVENT } from "@/modal/EventBus.ts";
 import { UData, UserData } from "@/modal/UserData.ts";
 import { getAccessToken, refreshToken, setAccessToken } from "@/utils/Auth";
@@ -78,8 +77,11 @@ async function ensureRefreshed(): Promise<string | null> {
     refreshWaiters.forEach((cb) => cb(token));
     refreshWaiters = [];
     return token;
-  } catch (e) {
-    setAccessToken(null);
+  } catch (e: any) {
+    // 仅 refresh 返回 401 时清除 token；422 等（如刚登录 cookie 未就绪）保留当前 token
+    if (e?.response?.status === 401) {
+      setAccessToken(null);
+    }
     refreshWaiters.forEach((cb) => cb(null));
     refreshWaiters = [];
     throw e;
@@ -101,8 +103,13 @@ apiClient.interceptors.response.use(
           (cfg.headers as Record<string, string>)["Authorization"] = `Bearer ${newToken}`;
         }
         return apiClient.request(cfg);
-      } catch {
-        // fallthrough
+      } catch (refreshErr: any) {
+        // refresh 返回 401 才视为登录过期并跳转登录页；422 等（如刚登录时 refresh 未就绪）不踢出
+        const status = refreshErr?.response?.status;
+        if (status === 401) {
+          setAccessToken(null);
+          EventBus.$emit(C_EVENT.AUTH_EXPIRED);
+        }
       }
     }
     return Promise.reject(error);
@@ -148,7 +155,6 @@ export async function initNet(): Promise<void> {
   }
   apiClient.defaults.baseURL = API_URL;
   console.log("init net ");
-  LoadColorData();
 }
 export async function getSave(id: number) {
   if (id === undefined) {
@@ -441,9 +447,7 @@ export async function getScheduleList() {
 }
 
 export async function getUserList() {
-  const rsp: any = await apiClient.get("/getAll", {
-    params: { table: "t_user" },
-  });
+  const rsp: any = await apiClient.get("/getAllUser");
   // console.log(rsp.data.data);
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);

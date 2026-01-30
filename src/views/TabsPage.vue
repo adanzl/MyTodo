@@ -247,11 +247,12 @@
 
 <script setup lang="ts">
 import RewardSet from "@/components/RewardSet.vue";
-import { ColorOptions } from "@/modal/ColorType";
+import { ColorOptions, LoadColorData } from "@/modal/ColorType";
 import { C_EVENT } from "@/modal/EventBus";
 import { GroupOptions, PriorityOptions } from "@/modal/ScheduleType";
 import { User, UserData } from "@/modal/UserData";
-import { getScheduleList, getUserList } from "@/utils/NetUtil";
+import { login } from "@/utils/Auth";
+import { getApiUrl, getScheduleList, getUserList } from "@/utils/NetUtil";
 import avatar from "@/assets/images/avatar.svg";
 import {
   IonAccordion,
@@ -323,18 +324,28 @@ onMounted(async () => {
     message: "Loading...",
   });
   loading.present();
-  const userListData = await getUserList();
-  userList.value = userListData.data;
-  const sUserId = localStorage.getItem("saveUser");
-  const sUser = _.find(userListData.data, (u) => u.id.toString() === sUserId);
-  globalVar.scheduleListId = 1;
-  if (sUser) {
-    bLogin.value = true;
-    curUser.value = sUser;
-    globalVar.user = sUser;
-    updateScheduleGroup(sUser.id);
+  try {
+    const userListData = await getUserList();
+    userList.value = userListData.data;
+    const sUserId = localStorage.getItem("saveUser");
+    const sUser = _.find(userListData.data, (u) => u.id.toString() === sUserId);
+    globalVar.scheduleListId = 1;
+    if (sUser) {
+      bLogin.value = true;
+      curUser.value = sUser;
+      globalVar.user = sUser;
+      await updateScheduleGroup(sUser.id);
+      LoadColorData();
+    }
+  } catch (e: any) {
+    // 401 未登录或 token 失效：显示登录页并提示
+    userList.value = [];
+    if (e?.response?.status === 401) {
+      goToLoginPage("未登录或登录已过期，请重新登录");
+    }
+  } finally {
+    loading.dismiss();
   }
-  loading.dismiss();
 });
 
 async function updateScheduleGroup(userId: number) {
@@ -391,21 +402,50 @@ function onPwdChange(event: any) {
   textPwd.value = event.detail.value;
   errMsg.value = "";
 }
-function btnLoginClick() {
-  if (curUser.value.pwd === null || curUser.value.pwd === CryptoJS.MD5(textPwd.value).toString()) {
-    errMsg.value = "";
+async function btnLoginClick() {
+  const pwdOk =
+    curUser.value.pwd === null || curUser.value.pwd === CryptoJS.MD5(textPwd.value).toString();
+  if (!pwdOk) {
+    errMsg.value = "密码错误";
+    return;
+  }
+  errMsg.value = "";
+  try {
+    await login(getApiUrl(), curUser.value.name, textPwd.value);
     bLogin.value = true;
     globalVar.user = curUser.value;
     localStorage.setItem("saveUser", curUser.value.id.toString());
-    updateScheduleGroup(curUser.value.id);
-  } else {
-    errMsg.value = "密码错误";
+    try {
+      await updateScheduleGroup(curUser.value.id);
+      LoadColorData();
+    } catch (e) {
+      console.warn("加载日程/颜色失败", e);
+    }
+  } catch (e: any) {
+    errMsg.value = e?.response?.data?.msg || e?.message || "登录失败，请重试";
   }
 }
 function btnLogoff() {
   bLogin.value = false;
   localStorage.removeItem("saveUser");
 }
+
+/** 401 或 token 失效时：显示登录页并可选提示 */
+function goToLoginPage(toastMsg?: string) {
+  bLogin.value = false;
+  localStorage.removeItem("saveUser");
+  if (globalVar.user) {
+    globalVar.user = undefined as any;
+  }
+  if (toastMsg) {
+    eventBus.$emit(C_EVENT.TOAST, toastMsg);
+  }
+}
+
+eventBus.$on(C_EVENT.AUTH_EXPIRED, () => {
+  goToLoginPage("未登录或登录已过期，请重新登录");
+});
+
 eventBus.$on(C_EVENT.UPDATE_SAVE, (params: any) => {
   userData.value = params;
 });

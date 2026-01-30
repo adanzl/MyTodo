@@ -17,19 +17,23 @@ export const ColorOptions: ColorType[] = [
 
 export async function LoadColorData() {
   return new Promise((resolve) => {
-    getColorList(1, 30).then((res) => {
-      // console.log("LoadColorData", res);
-      ColorOptions.splice(0, ColorOptions.length);
-      res.data.forEach((e: any) => {
-        ColorOptions.push({
-          id: e.id,
-          label: e.name,
-          tag: e.color,
+    getColorList(1, 30)
+      .then((res) => {
+        ColorOptions.splice(0, ColorOptions.length);
+        res.data.forEach((e: any) => {
+          ColorOptions.push({
+            id: e.id,
+            label: e.name,
+            tag: e.color,
+          });
         });
+        EventBus.$emit(C_EVENT.UPDATE_COLOR, ColorOptions);
+        resolve(ColorOptions);
+      })
+      .catch(() => {
+        // 401 等错误时保留默认颜色，不阻塞应用
+        resolve(ColorOptions);
       });
-      EventBus.$emit(C_EVENT.UPDATE_COLOR, ColorOptions);
-      resolve(ColorOptions);
-    });
   });
 }
 
