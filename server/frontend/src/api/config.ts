@@ -196,15 +196,16 @@ async function ensureRefreshed(): Promise<string | null> {
   }
 }
 
-// 请求拦截器
+// 请求拦截器：每次请求都从 localStorage 读取 token 并写入 headers，兼容网站端
 api.interceptors.request.use(
   cfg => {
-    // attach access token
     const token = getAccessToken();
-    if (token) {
-      cfg.headers = cfg.headers || {};
-      (cfg.headers as any)["Authorization"] = `Bearer ${token}`;
-    }
+    const value = token ? `Bearer ${token}` : "";
+    // 同步到 axios 默认头，确保网站端请求也能带上（部分环境 per-request 合并异常）
+    (api.defaults.headers.common as Record<string, string>)["Authorization"] = value;
+    // 合并到当前请求 headers，不覆盖已有项
+    const prev = (cfg.headers || {}) as Record<string, unknown>;
+    cfg.headers = { ...prev, Authorization: value } as typeof cfg.headers;
 
     logger.debug(
       "[API Request]",

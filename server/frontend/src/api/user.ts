@@ -4,6 +4,17 @@
 import { api } from "./config";
 import { UData, type UserData } from "@/types";
 import type { ApiResponse } from "@/types/api";
+import type { PaginatedResponse } from "@/types/api";
+
+/**
+ * 获取用户列表（与 getAll 传 table=t_user 时返回格式一致）
+ */
+export async function getAllUser<T = unknown>(
+  params?: { pageNum?: number; pageSize?: number; fields?: string; conditions?: string }
+): Promise<PaginatedResponse<T>> {
+  const response = await api.get("/getAllUser", { params: params || {} });
+  return response.data;
+}
 
 /**
  * 获取用户数据（日程）

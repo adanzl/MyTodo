@@ -183,18 +183,16 @@ def create_app():
             status_code = response.status_code
             client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', 'unknown'))
             user_agent = request.headers.get('User-Agent', '-')
-            
+
             # 计算响应时间
             if hasattr(request, '_start_time'):
                 response_time = (time.time() - request._start_time) * 1000  # 转换为毫秒
             else:
                 response_time = 0
-            
+
             # 记录访问日志（格式：方法 路径 状态码 响应时间(ms) 客户端IP User-Agent）
-            access_logger.info(
-                f'{method} {path} {status_code} {response_time:.2f}ms {client_ip} {user_agent}'
-            )
-        
+            access_logger.info(f'{method} {path} {status_code} {response_time:.2f}ms {client_ip} {user_agent}')
+
         return response
 
     chat_mgr.init(socketio)

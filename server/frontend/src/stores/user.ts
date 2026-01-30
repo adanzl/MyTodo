@@ -4,7 +4,7 @@
  */
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import { getList } from "@/api/common";
+import { getAllUser } from "@/api/user";
 import { ElMessage } from "element-plus";
 import type { User } from "@/types/user";
 
@@ -59,7 +59,7 @@ export const useUserStore = defineStore("user", () => {
 
     loading.value = true;
     try {
-      const response = await getList<UserWithExtras>("t_user");
+      const response = await getAllUser<UserWithExtras>();
       if (response && response.data) {
         userList.value = response.data.data || [];
         lastFetchTime.value = Date.now();

@@ -49,7 +49,7 @@
         :ai-conversation-id="chatSetting.aiConversationId"
         :user-name="globalVar.user.name"
         @audio-click="btnAudioClk" />
-      <TtsTasksTab />
+      <TtsTasksTab :active="chatType === CHAT_TTS_TASKS" />
     </ion-segment-view>
     <audio ref="audioRef" style="width: auto" class="m-2"></audio>
     <ion-item v-if="chatType !== CHAT_TTS_TASKS">

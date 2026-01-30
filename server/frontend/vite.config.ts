@@ -129,25 +129,13 @@ export default defineConfig({
             return "vendor";
           }
 
-          // 将共享的业务模块单独分割，避免修改一个文件影响其他 chunk
-          // API 层：所有 /api/ 下的共享模块
-          if (id.includes("/api/") && !id.includes("/views/")) {
-            return "api-shared";
-          }
-
-          // 工具层：所有 /utils/ 下的工具函数
-          if (id.includes("/utils/") && !id.includes("node_modules")) {
-            return "utils-shared";
-          }
-
-          // 类型层：所有 /types/ 下的类型定义
-          if (id.includes("/types/") && !id.includes("node_modules")) {
-            return "types-shared";
-          }
-
-          // 常量层：所有 /constants/ 下的常量定义
-          if (id.includes("/constants/") && !id.includes("node_modules")) {
-            return "constants-shared";
+          // 将 API + types + utils 打成一个 shared 包，避免 api-shared <-> types-shared <-> utils-shared 循环依赖
+          if (
+            (id.includes("/api/") || id.includes("/types/") || id.includes("/utils/") || id.includes("/constants/")) &&
+            !id.includes("/views/") &&
+            !id.includes("node_modules")
+          ) {
+            return "shared";
           }
 
           // 业务代码让 Vite 自动处理（按路由分割）

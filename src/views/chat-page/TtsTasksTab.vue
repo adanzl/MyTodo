@@ -37,7 +37,15 @@
         </div>
       </div>
     </ion-content>
-
+    <FabButton
+      v-if="active"
+      @click="() => {}"
+      class="right-[5%] bottom-[1%]"
+      bottom="1%"
+      right="5%"
+      :hasBar="true">
+      <ion-icon :icon="add" size="large"></ion-icon>
+    </FabButton>
     <!-- 全屏详情弹窗 -->
     <ion-modal
       :is-open="!!selectedTask"
@@ -82,8 +90,7 @@
               v-if="selectedTask.status === 'success'"
               :src="getTtsDownloadUrl(selectedTask.task_id)"
               :duration-seconds="selectedTask.duration ?? undefined"
-              class="w-full"
-            />
+              class="w-full" />
 
             <div v-if="selectedTask.text" class="rounded-lg bg-gray-100 p-3">
               <div class="text-gray-800 whitespace-pre-wrap break-words">
@@ -215,11 +222,20 @@ import {
   IonTitle,
   IonToolbar,
 } from "@ionic/vue";
-import { arrowDownOutline, arrowUpOutline, closeOutline } from "ionicons/icons";
+import { arrowDownOutline, arrowUpOutline, closeOutline, add } from "ionicons/icons";
 import { computed, ref } from "vue";
 import AudioPreview from "@/components/AudioPreview.vue";
+import FabButton from "@/components/FabButton.vue";
 import { getTtsDownloadUrl, getTtsTaskList, type TtsTaskItem } from "@/utils/NetUtil";
 import type { RefresherCustomEvent } from "@ionic/vue";
+
+withDefaults(
+  defineProps<{
+    /** 仅在此页签激活时显示 FabButton */
+    active?: boolean;
+  }>(),
+  { active: false }
+);
 
 const tasks = ref<TtsTaskItem[]>([]);
 const loading = ref(false);
