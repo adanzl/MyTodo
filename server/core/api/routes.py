@@ -12,7 +12,9 @@ import core.db.rds_mgr as rds_mgr
 from core.ai.ai_local import AILocal
 from core.config import app_logger
 from core.config import config
+from core.db import db_obj
 from core.db.db_mgr import db_mgr
+from core.models.user import User
 from core.utils import get_media_duration, read_json_from_request
 from flask import Blueprint, json, jsonify, render_template, request
 from flask.typing import ResponseReturnValue
@@ -115,6 +117,18 @@ def set_save() -> ResponseReturnValue:
 
 
 # =========== Common ==========
+@api_bp.route("/getAllUser", methods=['GET'])
+def get_all_user() -> ResponseReturnValue:
+    """返回所有用户列表（不含密码）。"""
+    try:
+        users = db_obj.session.query(User).all()
+        data = [u.to_dict() for u in users]
+        return jsonify({"code": 0, "msg": "ok", "data": data})
+    except Exception as e:
+        log.error(f"[getAllUser] error: {e}")
+        return jsonify({"code": -1, "msg": str(e)}), 500
+
+
 @api_bp.route("/getAll", methods=['GET'])
 def get_all() -> ResponseReturnValue:
     page_size = request.args.get('pageSize', 20, type=int)
