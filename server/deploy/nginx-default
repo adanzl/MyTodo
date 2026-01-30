@@ -110,12 +110,18 @@ server {
     }
     default_type application/octet-stream;
 
-    location /web {
-        alias /mnt/data/project/MyTodo/server/static;
+    # 精确匹配 /web（无尾部斜杠），重定向到 /web/ 以便 SPA 与 hash 路由正常加载
+    location = /web {
+        return 302 /web/$is_args$args;
+    }
+
+    # 前端 SPA：/web/ 与 /web/assets/ 等由 static 目录提供，找不到则回退到 index.html
+    location /web/ {
+        alias /mnt/data/project/MyTodo/server/static/;
         index index.html;
         try_files $uri $uri/ /web/index.html;
-        autoindex on;
-        
+        autoindex off;
+
         # 缓存静态资源
         expires 7d;
         add_header Cache-Control "public, immutable";
