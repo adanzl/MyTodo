@@ -7,9 +7,14 @@
     "dev": "vite",
     "build": "vue-tsc && vite build && npx capawesome apps:liveupdates:generatemanifest --path dist",
     "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit",
     "test:e2e": "cypress run",
     "test:unit": "vitest",
-    "lint": "eslint ."
+    "test:unit:coverage": "vitest run --coverage",
+    "lint": "eslint .",
+    "ci": "npm run typecheck && npm run lint",
+    "deps:check": "npm outdated",
+    "deps:check:ncu": "npx npm-check-updates"
   },
   "dependencies": {
     "@capacitor/app": "6.0.2",
@@ -52,6 +57,7 @@
     "@types/lodash": "4.17.23",
     "@vitejs/plugin-legacy": "^6.0.0",
     "@vitejs/plugin-vue": "^6.0.3",
+    "@vitest/coverage-v8": "^2.1.9",
     "@vue/eslint-config-typescript": "^12.0.0",
     "@vue/test-utils": "^2.3.0",
     "autoprefixer": "10.4.21",

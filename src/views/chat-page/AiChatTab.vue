@@ -4,6 +4,12 @@
       <ion-refresher slot="fixed" @ionRefresh="onRefresh">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
+      <div
+        v-if="networkError"
+        class="mx-2 mt-2 p-2 rounded-lg bg-amber-100 text-amber-800 text-sm flex items-center justify-between">
+        <span>加载失败，请检查网络后下拉刷新</span>
+        <ion-button size="small" fill="clear" @click="retryRefresh">重试</ion-button>
+      </div>
       <div class="flex flex-col h-full p-2 border-t-1 border-gray-200">
         <div v-for="(msg, idx) in messages" :key="idx" class="p-1.5 w-full">
           <div
@@ -34,11 +40,18 @@
 </template>
 
 <script setup lang="ts">
-import { IonContent, IonRefresher, IonRefresherContent, IonSegmentContent } from "@ionic/vue";
+import {
+  IonButton,
+  IonContent,
+  IonRefresher,
+  IonRefresherContent,
+  IonSegmentContent,
+} from "@ionic/vue";
 import { Icon } from "@iconify/vue";
 import { volumeMediumOutline } from "ionicons/icons";
 import { ref } from "vue";
-import { getAiChatMessages } from "@/utils/NetUtil";
+import EventBus, { C_EVENT } from "@/types/EventBus";
+import { getAiChatMessages, getNetworkErrorMessage } from "@/utils/NetUtil";
 import type { RefresherCustomEvent } from "@ionic/vue";
 
 export interface ChatMsg {
@@ -62,6 +75,7 @@ defineEmits<{
 
 const contentRef = ref<InstanceType<typeof IonContent> | null>(null);
 const messages = ref<ChatMsg[]>([]);
+const networkError = ref(false);
 
 function scrollToBottom(duration = 200) {
   contentRef.value?.$el?.scrollToBottom?.(duration);
@@ -83,11 +97,12 @@ function getLastMessage(): ChatMsg | undefined {
   return messages.value[messages.value.length - 1];
 }
 
-async function onRefresh(e: RefresherCustomEvent) {
+async function doRefresh(e: RefresherCustomEvent) {
   if (!props.aiConversationId) {
     e.target.complete();
     return;
   }
+  networkError.value = false;
   const firstId = messages.value.length > 0 ? messages.value[0].id : undefined;
   try {
     const data: any = await getAiChatMessages(
@@ -96,8 +111,9 @@ async function onRefresh(e: RefresherCustomEvent) {
       props.userName,
       firstId
     );
-    data.data.reverse().forEach((item: any) => {
-      if (item.answer === "") return;
+    const list = data?.data ?? [];
+    list.reverse().forEach((item: any) => {
+      if (item?.answer === "") return;
       messages.value.unshift({
         id: item.id,
         content: item.answer,
@@ -109,9 +125,21 @@ async function onRefresh(e: RefresherCustomEvent) {
         role: "me",
       });
     });
+  } catch (err) {
+    networkError.value = true;
+    EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
   } finally {
     e.target.complete();
   }
+}
+
+function onRefresh(e: RefresherCustomEvent) {
+  doRefresh(e);
+}
+
+function retryRefresh() {
+  networkError.value = false;
+  doRefresh({ target: { complete: () => {} } } as RefresherCustomEvent);
 }
 
 defineExpose({

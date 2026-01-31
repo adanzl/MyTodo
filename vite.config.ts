@@ -1,5 +1,3 @@
-/// <reference types="vitest" />
-
 import tailwindcss from "@tailwindcss/vite";
 import legacy from "@vitejs/plugin-legacy";
 import Vue from "@vitejs/plugin-vue";
@@ -7,7 +5,7 @@ import path from "path";
 import IconsResolver from "unplugin-icons/resolver";
 import Icons from "unplugin-icons/vite";
 import Components from "unplugin-vue-components/vite";
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
@@ -41,11 +39,22 @@ export default defineConfig({
     }),
     legacy(),
     tailwindcss(),
-  ],
+  ] as any,
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
       "~icons": "virtual:icons",
+    },
+  },
+  test: {
+    environment: "jsdom",
+    globals: true,
+    include: ["tests/unit/**/*.spec.ts", "src/**/*.spec.ts"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json-summary", "html"],
+      include: ["src/utils/Auth.ts", "src/utils/LocalCache.ts", "src/api/user.ts", "src/api/chat.ts", "src/api/schedule.ts"],
+      exclude: ["src/**/*.spec.ts", "src/**/*.d.ts", "node_modules"],
     },
   },
 });

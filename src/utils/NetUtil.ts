@@ -1,731 +1,80 @@
-import EventBus, { C_EVENT } from "@/modal/EventBus.ts";
-import { UData, UserData } from "@/modal/UserData.ts";
-import { clearLoginCache, getAccessToken, refreshToken } from "@/utils/Auth";
-import axios, { type AxiosRequestConfig, type InternalAxiosRequestConfig } from "axios";
-import _ from "lodash";
-
-/** TTS 任务分析结果，与 server/frontend TTS.vue 展示一致 */
-export interface TtsTaskAnalysis {
-  words?: string[];
-  sentence?: string[];
-  abstract?: string;
-  doodle?: string;
-  [key: string]: unknown;
-}
-
-/** TTS 任务项，与 server/core/services/tts_mgr TTSTask 及 list_tasks 返回字段一致 */
-export interface TtsTaskItem {
-  task_id: string;
-  name: string;
-  status: string;
-  error_message?: string | null;
-  create_time: number;
-  update_time: number;
-  text?: string;
-  role?: string | null;
-  model?: string | null;
-  speed?: number;
-  vol?: number;
-  generated_chars?: number;
-  total_chars?: number;
-  duration?: number | null;
-  ocr_running?: boolean;
-  analysis_running?: boolean;
-  analysis?: TtsTaskAnalysis | null;
-}
-// const URL = "https://3ft23fh89533.vicp.fun/api";
-// natapp.cn
-// 最新域名： cat /usr/env/natapp/log/natapp.log
-const REMOTE = { url: "https://leo-zhao.natapp4.cc/api", available: false };
-const LOCAL = { url: "http://192.168.50.171:8848/api", available: false };
-// const LOCAL = { url: "http://localhost:8888", available: false };
-let API_URL = "";
-
-/** 本地地址是否可用：null=未检测，true=使用本地，false=使用远程 */
-let localIpAvailable: boolean | null = null;
-// const URL = "http://192.168.50.184:9527/api";
-
-/** 带认证的 API 客户端：自动带 Authorization、withCredentials，401 时尝试 refresh 后重试一次 */
-const apiClient = axios.create({
-  timeout: 30000,
-  withCredentials: true,
-});
-
-// 请求拦截器：附加 access_token
-apiClient.interceptors.request.use(
-  (cfg: InternalAxiosRequestConfig) => {
-    const token = getAccessToken();
-    if (token) {
-      if (!cfg.headers) cfg.headers = {} as InternalAxiosRequestConfig["headers"];
-      (cfg.headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
-    }
-    return cfg;
-  },
-  (err) => Promise.reject(err)
-);
-
-// 401 时 refresh 后重试一次
-let isRefreshing = false;
-let refreshWaiters: Array<(token: string | null) => void> = [];
-async function ensureRefreshed(): Promise<string | null> {
-  if (isRefreshing) {
-    return new Promise((resolve) => {
-      refreshWaiters.push(resolve);
-    });
-  }
-  isRefreshing = true;
-  try {
-    const data = await refreshToken(API_URL);
-    const token = data?.access_token || getAccessToken();
-    refreshWaiters.forEach((cb) => cb(token));
-    refreshWaiters = [];
-    return token;
-  } catch (e: any) {
-    // 仅 refresh 返回 401 时清空本地登录缓存；422 等（如刚登录 cookie 未就绪）保留
-    if (e?.response?.status === 401) {
-      clearLoginCache();
-    }
-    refreshWaiters.forEach((cb) => cb(null));
-    refreshWaiters = [];
-    throw e;
-  } finally {
-    isRefreshing = false;
-  }
-}
-
-apiClient.interceptors.response.use(
-  (res) => res,
-  async (error) => {
-    const cfg = error.config as (AxiosRequestConfig & { _retry?: boolean }) | undefined;
-    if (error.response?.status === 401 && cfg && !cfg._retry) {
-      cfg._retry = true;
-      try {
-        const newToken = await ensureRefreshed();
-        if (newToken) {
-          if (!cfg.headers) cfg.headers = {} as AxiosRequestConfig["headers"];
-          (cfg.headers as Record<string, string>)["Authorization"] = `Bearer ${newToken}`;
-        }
-        return apiClient.request(cfg);
-      } catch (refreshErr: any) {
-        // refresh 返回 401 才视为登录过期并跳转登录页；422 等（如刚登录时 refresh 未就绪）不踢出
-        const status = refreshErr?.response?.status;
-        if (status === 401) {
-          clearLoginCache();
-          EventBus.$emit(C_EVENT.AUTH_EXPIRED);
-        }
-      }
-    }
-    return Promise.reject(error);
-  }
-);
-
-export function getApiUrl() {
-  return API_URL;
-}
-
-/** 检测地址是否可达，失败时静默返回 false。使用 fetch+AbortController 在超时前主动中止，减少浏览器对 ERR_CONNECTION_TIMED_OUT 的 console 输出 */
-async function checkAddress(url: string, timeout: number = 10000): Promise<boolean> {
-  const target = url.replace(/\/$/, "") + "/";
-
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
-    const res = await fetch(target, {
-      method: "HEAD",
-      signal: controller.signal,
-      cache: "no-store",
-    });
-    clearTimeout(timeoutId);
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-/** 检测本地地址是否可用（短超时，供后台自动切换使用） */
-export async function checkLocalAddressAvailable(): Promise<boolean> {
-  const protocol = typeof window !== "undefined" ? window.location.protocol : "https:";
-  if (protocol === "https:") return false;
-  return checkAddress(LOCAL.url, 500);
-}
-
-/** 切换到本地地址 */
-export function switchToLocal(): void {
-  if (localIpAvailable === true) return;
-  localIpAvailable = true;
-  REMOTE.available = false;
-  LOCAL.available = true;
-  API_URL = LOCAL.url;
-  apiClient.defaults.baseURL = API_URL;
-  EventBus.$emit(C_EVENT.SERVER_SWITCH, false);
-}
-
-/** 切换到远程地址 */
-export function switchToRemote(): void {
-  if (localIpAvailable === false) return;
-  localIpAvailable = false;
-  REMOTE.available = true;
-  LOCAL.available = false;
-  API_URL = REMOTE.url;
-  apiClient.defaults.baseURL = API_URL;
-  EventBus.$emit(C_EVENT.SERVER_SWITCH, true);
-}
-
-/** 后台检测并自动选择本地/远程地址（可配合 setInterval 定时调用） */
-export async function checkAndSwitchServer(): Promise<void> {
-  const available = await checkLocalAddressAvailable();
-  if (available && localIpAvailable !== true) {
-    switchToLocal();
-  } else if (!available && localIpAvailable !== false) {
-    switchToRemote();
-  }
-}
-
-/** 是否正在使用本地地址（null 表示尚未检测完成） */
-export function isLocalIpAvailable(): boolean | null {
-  return localIpAvailable;
-}
-
 /**
- * 初始化网络：立即使用远程地址，后台线程自动检测本地地址并在可用时切换（效仿 server/frontend api/config.ts）
+ * 网络与 API 工具：统一从 @/api 再导出，保持对 @/utils/NetUtil 的兼容。
+ * 新代码建议直接从 @/api 或 @/api/schedule、@/api/chat 等按模块引用。
  */
-export function initNet(): void {
-  // 默认使用远程，保证首屏请求不阻塞；localIpAvailable 保持 null 表示检测中
-  API_URL = REMOTE.url;
-  REMOTE.available = true;
-  LOCAL.available = false;
-  localIpAvailable = null;
-  apiClient.defaults.baseURL = API_URL;
-  EventBus.$emit(C_EVENT.SERVER_SWITCH, true);
 
-  // 后台异步检测本地地址，可用则自动切换
-  checkAndSwitchServer();
-}
-export async function getSave(id: number) {
-  if (id === undefined) {
-    throw new Error("id is undefined");
-  }
-  const rsp: any = await apiClient.get("/getData", {
-    params: { id: id, table: "t_schedule", fields: "data,user_id" },
-  });
-  // console.log(rsp.data.data);
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  const ret: UserData = UData.parseUserData(rsp.data.data.data);
-  ret.userId = rsp.data.data.user_id;
-  EventBus.$emit(C_EVENT.UPDATE_SAVE, ret);
-  return ret;
-}
+const AXIOS_ERR_NETWORK = "ERR_NETWORK";
+const AXIOS_ERR_TIMEOUT = "ECONNABORTED";
 
-export function setSave(id: number | undefined, data: any) {
-  // console.log(data);
-  return new Promise((resolve, reject) => {
-    if (id === undefined) {
-      reject(new Error("id is undefined"));
-      return;
-    }
-    apiClient
-      .post("/setData", {
-        table: "t_schedule",
-        data: {
-          id: id,
-          data: JSON.stringify(data),
-        },
-      })
-      .then((res: any) => {
-        if (res.data.code === 0) {
-          resolve(res);
-          EventBus.$emit(C_EVENT.UPDATE_SAVE, data);
-        } else {
-          reject(new Error(res.data.msg));
-        }
-      })
-      .catch((err: any) => {
-        reject(err);
-      });
-  });
+/** 将接口/网络错误转为用户可读的提示文案，用于聊天、抽奖等强依赖后端的场景。 */
+export function getNetworkErrorMessage(err: unknown): string {
+  if (err == null) return "请求失败，请稍后重试";
+
+  const ax = err as {
+    code?: string;
+    response?: { status?: number; data?: { msg?: string } };
+    message?: string;
+  };
+  if (ax.code === AXIOS_ERR_NETWORK || ax.response?.status === 0) {
+    return "网络异常，请检查网络后重试";
+  }
+  if (ax.code === AXIOS_ERR_TIMEOUT) {
+    return "请求超时，请稍后重试";
+  }
+  if (ax.response?.status != null && ax.response.status >= 500) {
+    return "服务暂时不可用，请稍后重试";
+  }
+  const msg = ax.response?.data?.msg;
+  if (typeof msg === "string" && msg.trim()) return msg;
+
+  if (err instanceof Error && err.message) return err.message;
+  if (typeof (err as { message?: string }).message === "string") {
+    return (err as { message: string }).message;
+  }
+  return "请求失败，请稍后重试";
 }
 
-export async function getGiftData(id: number) {
-  if (id === undefined) {
-    throw new Error("id is undefined");
-  }
-  const rsp: any = await apiClient.get("/getData", {
-    params: { id: id, table: "t_gift", fields: "*" },
-  });
-  // console.log(rsp.data.data);
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  return rsp.data.data;
-}
+export {
+  getApiUrl,
+  initNet,
+  checkLocalAddressAvailable,
+  checkAndSwitchServer,
+  switchToLocal,
+  switchToRemote,
+  isLocalIpAvailable,
+} from "@/api/api-client";
 
-// export async function setUserInfo(id: number | undefined, score: number) {
-//   const rsp: any = await apiClient.post("/setData", {
-//     table: "t_user",
-//     data: {
-//       id: id,
-//       score: score,
-//     },
-//   });
-//   console.log("setUserInfo", rsp.data);
-//   if (rsp.data.code !== 0) {
-//     throw new Error(rsp.data.msg);
-//   }
-//   return rsp.data.data;
-// }
-/**
- * 变更积分
- * @param {*} user id
- * @param {*} action 行为
- * @param {*} value 分值
- * @param {*} msg 备注
- * @returns
- */
-export async function addScore(user: number, action: string, value: number, msg: string) {
-  const rsp = await apiClient.post("/addScore", {
-    user,
-    action,
-    value,
-    msg,
-  });
-
-  console.log("addScore", rsp.data);
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-
-  return rsp.data.data;
-}
-
-export async function getConversationId(id: number) {
-  const rsp: any = await apiClient.get("/getRdsData", {
-    params: { table: "conversation:id", id: id },
-  });
-  // console.log("getPic", rsp.data);
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  return rsp.data.data;
-}
-
-export async function setConversationId(id: number, cId: string) {
-  const rsp: any = await apiClient.post("/setRdsData", {
-    table: "conversation:id",
-    data: {
-      id: id,
-      value: cId,
-    },
-  });
-  console.log("setConversationId", rsp.data);
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  return rsp.data.data;
-}
-export async function getChatSetting(id: number) {
-  const rsp: any = await apiClient.get("/getRdsData", {
-    params: { table: "chatSetting", id: id },
-  });
-  // console.log("getPic", rsp.data);
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  return rsp.data.data;
-}
-
-export async function setChatSetting(id: number, cId: string) {
-  const rsp: any = await apiClient.post("/setRdsData", {
-    table: "chatSetting",
-    data: {
-      id: id,
-      value: cId,
-    },
-  });
-  console.log("setChatSetting", rsp.data);
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  return rsp.data.data;
-}
-export async function getLotteryData() {
-  const rsp: any = await apiClient.get("/getRdsData", {
-    params: { table: "lottery", id: 2 },
-  });
-  // console.log("getPic", rsp.data);
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  return rsp.data.data;
-}
-
-export async function setLotteryData(value: string) {
-  const rsp: any = await apiClient.post("/setRdsData", {
-    table: "lottery",
-    data: {
-      id: 2,
-      value: value,
-    },
-  });
-  // console.log("setChatSetting", rsp.data);
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  return rsp.data.data;
-}
-export async function getAiChatMessages(
-  conversation_id: string,
-  limit: number,
-  user: string,
-  first_id?: string | number
-) {
-  const rsp: any = await apiClient.get("/chatMessages", {
-    params: { conversation_id: conversation_id, limit: limit, user: user, first_id: first_id },
-  });
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  return rsp.data.data;
-}
-export async function getChatMessages(
-  key: string,
-  startId: number | string | undefined,
-  pageSize: number
-) {
-  const rsp: any = await apiClient.get("/getRdsList", {
-    params: { key: "chat:" + key, pageSize: pageSize, startId: startId },
-  });
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  return rsp.data.data;
-}
-
-/** TTS 任务创建，参考 server/core/api/tts_routes.py POST /tts/create，返回 task_id */
-export async function createTtsTask(opts: {
-  text: string;
-  name?: string;
-  role?: string;
-  model?: string;
-  speed?: number;
-  vol?: number;
-}): Promise<{ task_id: string }> {
-  const rsp: any = await apiClient.post("/tts/create", opts);
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg || "创建任务失败");
-  }
-  return { task_id: rsp.data.data?.task_id ?? "" };
-}
-
-/** TTS 任务列表，参考 server/core/api/tts_routes.py GET /tts/list */
-export async function getTtsTaskList(): Promise<TtsTaskItem[]> {
-  const rsp: any = await apiClient.get("/tts/list");
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg || "获取 TTS 任务列表失败");
-  }
-  return rsp.data.data ?? [];
-}
-
-/** TTS 任务音频下载 URL，参考 server/core/api/tts_routes.py GET /tts/download */
-export function getTtsDownloadUrl(taskId: string): string {
-  const base = getApiUrl();
-  if (!base) return "";
-  const sep = base.endsWith("/") ? "" : "/";
-  return `${base}${sep}tts/download?task_id=${encodeURIComponent(taskId)}`;
-}
-
-/** 下载 TTS 任务音频到本地：请求 blob 后触发浏览器下载 */
-export async function downloadTtsAudio(taskId: string, fileName?: string): Promise<void> {
-  const rsp = await apiClient.get("/tts/download", {
-    params: { task_id: taskId },
-    responseType: "blob",
-  });
-  const blob = rsp.data as Blob;
-  if (blob.type === "application/json" || blob.size < 200) {
-    const text = await blob.text();
-    try {
-      const json = JSON.parse(text) as { code?: number; msg?: string };
-      if (json?.code !== 0) throw new Error(json?.msg || "下载失败");
-    } catch (e) {
-      if (e instanceof Error && e.message !== "下载失败") throw e;
-      throw new Error((e as Error)?.message ?? text ?? "下载失败");
-    }
-  }
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = fileName ?? `tts_${taskId}.mp3`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-/** TTS 任务更新，参考 server/core/api/tts_routes.py POST /tts/update */
-export async function updateTtsTask(
-  taskId: string,
-  opts: {
-    name?: string;
-    text?: string;
-    role?: string;
-    model?: string;
-    speed?: number;
-    vol?: number;
-  }
-): Promise<void> {
-  const rsp: any = await apiClient.post("/tts/update", { task_id: taskId, ...opts });
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg || "更新任务失败");
-  }
-}
-
-/** TTS 任务删除，参考 server/core/api/tts_routes.py POST /tts/delete */
-export async function deleteTtsTask(taskId: string): Promise<void> {
-  const rsp: any = await apiClient.post("/tts/delete", { task_id: taskId });
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg || "删除任务失败");
-  }
-}
-
-/** TTS 任务发起分析，参考 server/core/api/tts_routes.py POST /tts/analysis */
-export async function startTtsAnalysis(taskId: string): Promise<void> {
-  const rsp: any = await apiClient.post("/tts/analysis", { task_id: taskId });
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg || "发起分析失败");
-  }
-}
-
-/** TTS 任务 OCR 图片识别，参考 server/core/api/tts_routes.py POST /tts/ocr，结果追加到任务文本末尾 */
-export async function ocrTtsTask(taskId: string, files: File[]): Promise<void> {
-  const formData = new FormData();
-  formData.append("task_id", taskId);
-  files.forEach((f) => formData.append("file", f));
-  const rsp: any = await apiClient.post("/tts/ocr", formData, { timeout: 60000 });
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg || "OCR 识别失败");
-  }
-}
-
-export async function getChatMem(id: number) {
-  const rsp: any = await apiClient.get("/getRdsData", {
-    params: { table: "mem", id: id },
-  });
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  return rsp.data.data;
-}
-
-export async function setChatMem(id: number, cId: string) {
-  const rsp: any = await apiClient.post("/setRdsData", {
-    table: "mem",
-    data: {
-      id: id,
-      value: cId,
-    },
-  });
-  console.log("setChatMem", rsp.data);
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  return rsp.data.data;
-}
-
-export async function getUserInfo(id: number) {
-  const rsp: any = await apiClient.get("/getData", {
-    params: { table: "t_user", id: id, fields: "id,score" },
-  });
-  // console.log("getPic", rsp.data);
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  return rsp.data.data;
-}
-
-export async function setPic(id: number | undefined, data: string): Promise<string> {
-  const rsp: any = await apiClient.post("/setData", {
-    table: "t_user_pic",
-    data: {
-      id: id,
-      data: data,
-    },
-  });
-  console.log("setPic", rsp.data);
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  return rsp.data.data;
-}
-export async function delPic(id: number) {
-  const rsp: any = await apiClient.post("/delData", {
-    id: id,
-    table: "t_user_pic",
-  });
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  return rsp.data.data;
-}
-
-export async function getScheduleList() {
-  const rsp: any = await apiClient.get("/getAll", {
-    params: { table: "t_schedule", fields: "id,name,user_id" },
-  });
-  // console.log(rsp.data.data);
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  return rsp.data.data;
-}
-
-export async function getUserList() {
-  const rsp: any = await apiClient.get("/getAllUser");
-  // console.log(rsp.data.data);
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  _.forEach(rsp.data.data.data, (item: any) => {
-    if (item.wish_list) {
-      item.wish_list = JSON.parse(item.wish_list);
-    }
-  });
-  return rsp.data.data;
-}
-
-export async function setUserData(data: any) {
-  const rsp: any = await apiClient.post("/setData", {
-    table: "t_user",
-    data: data,
-  });
-  console.log("setUser", rsp.data);
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  return rsp.data.data;
-}
-
-export async function getPicList(pageNum?: number, pageSize?: number) {
-  const rsp: any = await apiClient.get("/getAll", {
-    params: { table: "t_user_pic", pageNum: pageNum, pageSize: pageSize },
-  });
-  // console.log(rsp.data.data);
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  return rsp.data.data;
-}
-export async function getPic(id: number): Promise<string> {
-  const rsp: any = await apiClient.get("/getData", {
-    params: { table: "t_user_pic", id: id, idx: 1 },
-  });
-  // console.log("getPic", rsp.data);
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  return rsp.data.data;
-}
-
-export async function getColorList(pageNum?: number, pageSize?: number) {
-  const rsp: any = await apiClient.get("/getAll", {
-    params: { table: "t_colors", pageNum: pageNum, pageSize: pageSize },
-  });
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  return rsp.data.data;
-}
-
-export async function setColor(
-  id: number | undefined,
-  name: string,
-  color: string
-): Promise<string> {
-  const rsp: any = await apiClient.post("/setData", {
-    table: "t_colors",
-    data: { id: id, name: name, color: color },
-  });
-  // console.log("getPic", rsp.data);
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  return rsp.data.data;
-}
-
-export async function delColor(id: number) {
-  const rsp: any = await apiClient.post("/delData", {
-    id: id,
-    table: "t_colors",
-  });
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  return rsp.data.data;
-}
-
-/**
- * 获取数据列表
- */
-export async function getList(
-  table: string,
-  conditions: any = undefined,
-  pageNum: number = 1,
-  pageSize: number = 10
-) {
-  const rsp = await apiClient.get("/getAll", {
-    params: {
-      table: table,
-      conditions: conditions ? JSON.stringify(conditions) : undefined,
-      pageNum,
-      pageSize,
-    },
-  });
-
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-
-  return rsp.data.data;
-}
-
-/**
- * 获取rds数据
- */
-export async function getRdsData(table: string, id: number) {
-  const rsp = await apiClient.get("/getRdsData", {
-    params: { table: table, id: id },
-  });
-  // console.log("getRdsData", rsp.data);
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  return rsp.data.data;
-}
-/**
- * 设置rds数据
- */
-export async function setRdsData(table: string, id: number, value: any) {
-  const rsp = await apiClient.post("/setRdsData", {
-    table: table,
-    data: {
-      id: id,
-      value: value,
-    },
-  });
-  // console.log("setRdsData", rsp.data);
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  return rsp.data.data;
-}
-
-export async function doLottery(userId: number, cateId: number) {
-  const rsp = await apiClient.post("/doLottery", {
-    user_id: userId,
-    cate_id: cateId,
-  });
-  if (rsp.data.code !== 0) {
-    throw new Error(rsp.data.msg);
-  }
-  return rsp.data.data;
-}
+export { getSave, setSave, getScheduleList } from "@/api/schedule";
+export { getUserInfo, setUserData, getUserList, addScore } from "@/api/user";
+export {
+  getConversationId,
+  setConversationId,
+  getChatSetting,
+  setChatSetting,
+  getChatMessages,
+  getAiChatMessages,
+  getChatMem,
+  setChatMem,
+} from "@/api/chat";
+export {
+  getLotteryData,
+  setLotteryData,
+  getGiftData,
+  doLottery,
+} from "@/api/lottery";
+export {
+  createTtsTask,
+  getTtsTaskList,
+  getTtsDownloadUrl,
+  downloadTtsAudio,
+  updateTtsTask,
+  deleteTtsTask,
+  startTtsAnalysis,
+  ocrTtsTask,
+} from "@/api/tts";
+export type { TtsTaskItem, TtsTaskAnalysis } from "@/api/tts";
+export { getPic, getPicList, setPic, delPic } from "@/api/pic";
+export { getColorList, setColor, delColor } from "@/api/color";
+export { getList, getRdsData, setRdsData } from "@/api/data";
 
 export default {};

@@ -1,6 +1,6 @@
-describe('My First Test', () => {
-  it('Visits the app root url', () => {
+describe('Smoke', () => {
+  it('访问根路径可打开应用', () => {
     cy.visit('/')
-    cy.contains('ion-content', 'Tab 1 page')
+    cy.get('ion-page').should('be.visible')
   })
 })

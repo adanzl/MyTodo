@@ -87,13 +87,14 @@
 
 <script lang="ts" setup>
 import avatar from "@/assets/images/avatar.svg";
-import { getLotteryData, setLotteryData } from "@/utils/NetUtil";
+import EventBus, { C_EVENT } from "@/types/EventBus";
+import { getLotteryData, getNetworkErrorMessage, setLotteryData } from "@/utils/NetUtil";
 import { removeCircleOutline, saveOutline } from "ionicons/icons";
 import { onMounted, ref } from "vue";
 import { alertController, loadingController, IonGrid, IonCol, IonRow } from "@ionic/vue";
 import { calcImgPos } from "@/utils/Math";
 import { getImage, loadAndSetImage } from "@/utils/ImgMgr";
-import { LotteryData } from "@/modal/UserData";
+import { LotteryData } from "@/types/UserData";
 
 const modal = ref();
 const canvasWidth = ref(400); // 设置canvas的宽度
@@ -128,8 +129,13 @@ const cancel = async () => {
   }
 };
 const confirm = async () => {
-  setLotteryData(JSON.stringify(lotteryData.value));
-  modal.value.$el!.dismiss(lotteryData.value, "confirm");
+  setLotteryData(JSON.stringify(lotteryData.value))
+    .then(() => {
+      modal.value.$el!.dismiss(lotteryData.value, "confirm");
+    })
+    .catch((err) => {
+      EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+    });
 };
 
 onMounted(async () => {});
@@ -149,6 +155,9 @@ async function onModalPresent() {
           item.img = await getImage(item.imgId);
         });
       }
+    })
+    .catch((err) => {
+      EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
     })
     .finally(() => {
       loading.dismiss();
@@ -172,9 +181,10 @@ async function btnModifyClk() {
   }
 }
 
-async function btnRemoveClk(_event: any, item: any, idx: number) {
+async function btnRemoveClk(_event: any, item: any, idx: number | string) {
   bModify.value = true;
-  lotteryData.value.splice(idx, 1);
+  const index = typeof idx === "number" ? idx : parseInt(String(idx), 10);
+  lotteryData.value.splice(index, 1);
   if (curItem.value === item) {
     curItem.value = null;
   }

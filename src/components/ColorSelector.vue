@@ -70,7 +70,7 @@ ion-radio.ios::part(container) {
 </style>
 
 <script lang="ts" setup>
-import { ColorOptions } from "@/modal/ColorType";
+import { ColorOptions } from "@/types/ColorType";
 import { createTriggerController } from "@/utils/Overlay";
 import { IonRadio, IonRadioGroup } from "@ionic/vue";
 import { onMounted, ref, watch } from "vue";

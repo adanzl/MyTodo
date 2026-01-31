@@ -1,0 +1,11 @@
+{
+  "code": 0,
+  "msg": "ok",
+  "access_token": "e2e-fake-token",
+  "expires_in": 3600,
+  "user": {
+    "id": 1,
+    "name": "E2E测试用户",
+    "admin": 1
+  }
+}

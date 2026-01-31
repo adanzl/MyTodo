@@ -31,7 +31,7 @@
 </template>
 
 <script lang="ts" setup>
-import { User } from "@/modal/UserData";
+import { User } from "@/types/UserData";
 import { getUserList, addScore } from "@/utils/NetUtil";
 import { IonAvatar, IonImg } from "@ionic/vue";
 import { inject, onMounted, ref } from "vue";

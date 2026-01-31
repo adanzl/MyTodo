@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">MyTodo</string>
-    <string name="title_activity_main">MyTodo</string>
-    <string name="package_name">leo.todo</string>
-    <string name="custom_url_scheme">leo.todo</string>
-</resources>

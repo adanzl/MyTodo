@@ -254,7 +254,7 @@
 <script setup lang="ts">
 import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import { getRdsData, setRdsData } from "@/utils/NetUtil";
-import EventBus, { C_EVENT } from "@/modal/EventBus";
+import EventBus, { C_EVENT } from "@/types/EventBus";
 import {
   IonButton,
   IonContent,
@@ -623,8 +623,10 @@ const deleteCourse = async () => {
             // 保存到RDS
             try {
               await setRdsData("t_timetable", 0, JSON.stringify(timetableData.value));
+              EventBus.$emit(C_EVENT.TOAST, "已删除课程");
             } catch (error) {
               console.error("删除课程失败:", error);
+              EventBus.$emit(C_EVENT.TOAST, "删除课程失败");
             }
           }
 
@@ -696,7 +698,7 @@ const loadTimetableData = async () => {
   try {
     const data = await getRdsData("t_timetable", 0);
     if (data) {
-      timetableData.value = JSON.parse(data);
+      timetableData.value = JSON.parse(data as string);
     } else {
       // 如果没有数据，初始化为空对象
       timetableData.value = {};

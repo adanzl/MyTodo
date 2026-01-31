@@ -52,7 +52,14 @@
 </template>
 
 <script lang="ts" setup>
-import { setChatSetting, getChatSetting, getChatMem, getConversationId } from "@/utils/NetUtil";
+import EventBus, { C_EVENT } from "@/types/EventBus";
+import {
+  getChatMem,
+  getChatSetting,
+  getConversationId,
+  getNetworkErrorMessage,
+  setChatSetting,
+} from "@/utils/NetUtil";
 import { inject, onMounted, ref } from "vue";
 import { IonTextarea, loadingController } from "@ionic/vue";
 
@@ -68,8 +75,13 @@ const cancel = () => {
   modal.value.$el!.dismiss({}, "cancel");
 };
 const confirm = () => {
-  setChatSetting(globalVar.user.id, JSON.stringify(chatSetting.value));
-  modal.value.$el!.dismiss(chatSetting.value, "confirm");
+  setChatSetting(globalVar.user.id, JSON.stringify(chatSetting.value))
+    .then(() => {
+      modal.value.$el!.dismiss(chatSetting.value, "confirm");
+    })
+    .catch((err) => {
+      EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+    });
 };
 
 onMounted(async () => {});
@@ -78,24 +90,22 @@ async function onModalPresent() {
     message: "Loading...",
   });
   loading.present();
-  getChatSetting(globalVar.user.id).then((setting) => {
+  try {
+    const setting = await getChatSetting(globalVar.user.id);
     if (setting) {
       const v = JSON.parse(setting);
       chatSetting.value.ttsSpeed = v.ttsSpeed;
       chatSetting.value.ttsRole = v.ttsRole;
     }
-  }).finally(() => {
+    const aiConversationId = (await getConversationId(globalVar.user.id)) || "";
+    if (aiConversationId) {
+      const mem = await getChatMem(aiConversationId);
+      textareaMem.value = mem ?? "";
+    }
+  } catch (err) {
+    EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+  } finally {
     loading.dismiss();
-  });
-  const aiConversationId = (await getConversationId(globalVar.user.id)) || "";
-  if (aiConversationId) {
-    getChatMem(aiConversationId)
-      .then((mem) => {
-        textareaMem.value = mem;
-      })
-      .finally(() => {
-        loading.dismiss();
-      });
   }
 }
 const onModalDismiss = () => {};

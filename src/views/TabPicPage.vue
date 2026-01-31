@@ -106,7 +106,7 @@ const btnRemoveClk = async (_event: any, item: any) => {
           delImage(item.id).then((res) => {
             console.log("delPic", res);
             getPicList().then((res) => {
-              picList.value = res;
+              picList.value = res.data;
             });
           });
         },

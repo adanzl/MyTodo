@@ -59,7 +59,7 @@
 </template>
 
 <script lang="ts" setup>
-import { Subtask } from "@/modal/UserData";
+import { Subtask } from "@/types/UserData";
 import { cameraAndSetImage, getImage, loadAndSetImage } from "@/utils/ImgMgr";
 import { createTriggerController } from "@/utils/Overlay";
 import { alertController, IonActionSheet, IonInput, IonToolbar } from "@ionic/vue";

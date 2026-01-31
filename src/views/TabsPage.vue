@@ -247,10 +247,10 @@
 
 <script setup lang="ts">
 import RewardSet from "@/components/RewardSet.vue";
-import { ColorOptions, LoadColorData } from "@/modal/ColorType";
-import { C_EVENT } from "@/modal/EventBus";
-import { GroupOptions, PriorityOptions } from "@/modal/ScheduleType";
-import { User, UserData } from "@/modal/UserData";
+import { ColorOptions, LoadColorData } from "@/types/ColorType";
+import { C_EVENT } from "@/types/EventBus";
+import { GroupOptions, PriorityOptions } from "@/types/ScheduleType";
+import { User, UserData } from "@/types/UserData";
 import { clearLoginCache, login } from "@/utils/Auth";
 import { getApiUrl, getScheduleList, getUserList } from "@/utils/NetUtil";
 import avatar from "@/assets/images/avatar.svg";
@@ -332,8 +332,8 @@ onMounted(async () => {
     globalVar.scheduleListId = 1;
     if (sUser) {
       bLogin.value = true;
-      curUser.value = sUser;
-      globalVar.user = sUser;
+      curUser.value = sUser as typeof curUser.value;
+      globalVar.user = sUser as typeof globalVar.user;
       await updateScheduleGroup(sUser.id);
       LoadColorData();
     }

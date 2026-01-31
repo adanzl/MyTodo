@@ -88,8 +88,8 @@
 </style>
 <script lang="ts" setup>
 import ColorPicker from "@/components/ColorPicker.vue";
-import { ColorOptions, LoadColorData } from "@/modal/ColorType";
-import { C_EVENT } from "@/modal/EventBus";
+import { ColorOptions, LoadColorData } from "@/types/ColorType";
+import { C_EVENT } from "@/types/EventBus";
 import { delColor, setColor } from "@/utils/NetUtil";
 import { createTriggerController } from "@/utils/Overlay";
 import { alertController } from "@ionic/vue";

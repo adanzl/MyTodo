@@ -69,12 +69,14 @@
 <script setup lang="ts">
 import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import { Icon } from "@iconify/vue";
-import EventBus, { C_EVENT } from "@/modal/EventBus";
+import EventBus, { C_EVENT } from "@/types/EventBus";
+import type { GiftCategoryItem, GiftListItem } from "@/api";
 import {
   doLottery,
   getGiftData,
   getList,
   getLotteryData,
+  getNetworkErrorMessage,
   getUserList,
   setUserData,
 } from "@/utils/NetUtil";
@@ -171,7 +173,7 @@ function handleRefresh(event: any) {
       }
     })
     .catch((err) => {
-      EventBus.$emit(C_EVENT.TOAST, JSON.stringify(err));
+      EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
     })
     .finally(() => event.target.complete());
 }
@@ -202,11 +204,11 @@ function refreshScoreHistoryList(userId: number | undefined, pageNum: number) {
       scoreHistoryList.value = data;
     })
     .catch((err) => {
-      EventBus.$emit(C_EVENT.TOAST, JSON.stringify(err));
+      EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
     });
 }
 function refreshCateList() {
-  getList("t_gift_category")
+  getList<GiftCategoryItem>("t_gift_category")
     .then((data) => {
       const d = data.data;
       lotteryCatList.value = [...d];
@@ -216,7 +218,7 @@ function refreshCateList() {
       }
     })
     .catch((err) => {
-      EventBus.$emit(C_EVENT.TOAST, JSON.stringify(err));
+      EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
     });
 }
 async function refreshUserList() {
@@ -246,7 +248,7 @@ async function refreshUserList() {
       }
     })
     .catch((err) => {
-      EventBus.$emit(C_EVENT.TOAST, JSON.stringify(err));
+      EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
     });
 }
 
@@ -255,7 +257,7 @@ function refreshGiftList(cateId?: number | undefined, pageNum?: number) {
   if (cateId) {
     filter["cate_id"] = cateId;
   }
-  getList("t_gift", filter, pageNum, PAGE_SIZE)
+  getList<GiftListItem>("t_gift", filter, pageNum, PAGE_SIZE)
     .then((data) => {
       const d = data.data;
       giftList.value.data = [];
@@ -276,7 +278,7 @@ function refreshGiftList(cateId?: number | undefined, pageNum?: number) {
       });
     })
     .catch((err) => {
-      EventBus.$emit(C_EVENT.TOAST, JSON.stringify(err));
+      EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
     });
 }
 
@@ -289,19 +291,35 @@ function handleUserChange(value: any) {
   refreshScoreHistoryList(value?.id, 1);
 }
 
-function btnLotteryClk() {
-  doLottery(globalVar.user.id, selectedCate.value.id)
-    .then((data) => {
-      console.log("lottery data", data);
-      EventBus.$emit(C_EVENT.REWARD, {
-        value: data.gift.name,
-        img: data.gift.image,
-        rewardType: "gift",
-      });
-    })
-    .catch((err) => {
-      EventBus.$emit(C_EVENT.TOAST, JSON.stringify(err));
-    });
+async function btnLotteryClk() {
+  const { alertController } = await import("@ionic/vue");
+  const cateName = selectedCate.value?.name ?? "当前分类";
+  const alert = await alertController.create({
+    header: "确认抽奖",
+    message: `确定使用积分进行抽奖吗？\n（${cateName}）`,
+    buttons: [
+      { text: "取消", role: "cancel" },
+      {
+        text: "确定",
+        role: "confirm",
+        handler: () => {
+          doLottery(globalVar.user.id, selectedCate.value.id)
+            .then((data) => {
+              EventBus.$emit(C_EVENT.REWARD, {
+                value: data.gift.name,
+                img: data.gift.image,
+                rewardType: "gift",
+              });
+              EventBus.$emit(C_EVENT.TOAST, "抽奖成功");
+            })
+            .catch((err) => {
+              EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+            });
+        },
+      },
+    ],
+  });
+  await alert.present();
 }
 
 async function btnRemoveWishClk(item: any) {
@@ -322,7 +340,7 @@ async function btnRemoveWishClk(item: any) {
               _.remove(wishList.value.data, (i: any) => i.id === item.id);
             })
             .catch((err) => {
-              EventBus.$emit(C_EVENT.TOAST, JSON.stringify(err));
+              EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
             });
         },
       },
@@ -348,7 +366,7 @@ async function btnAddWishClk(item: any) {
       });
     })
     .catch((err) => {
-      EventBus.$emit(C_EVENT.TOAST, JSON.stringify(err));
+      EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
     });
 }
 

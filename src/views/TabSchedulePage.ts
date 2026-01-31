@@ -2,10 +2,10 @@ import CalenderTab from "@/components/CalendarTab.vue";
 import FabButton from "@/components/FabButton.vue";
 import SchedulePop from "@/components/SchedulePopModal.vue";
 import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
-import { getColorOptions } from "@/modal/ColorType";
-import { C_EVENT } from "@/modal/EventBus";
-import IonIcons from "@/modal/IonIcons";
-import { getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
+import { getColorOptions } from "@/types/ColorType";
+import EventBus, { C_EVENT } from "@/types/EventBus";
+import IonIcons from "@/types/IonIcons";
+import { getGroupOptions, getPriorityOptions } from "@/types/ScheduleType";
 import {
   DayData,
   MonthData,
@@ -15,8 +15,9 @@ import {
   UData,
   User,
   UserData,
-} from "@/modal/UserData";
-import { getSave, getUserInfo, setSave } from "@/utils/NetUtil";
+} from "@/types/UserData";
+import { getSave, setSave } from "@/api/schedule";
+import { getUserInfo } from "@/api/user";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import {
   IonAccordion,
@@ -461,10 +462,10 @@ export default defineComponent({
       btnScheduleRemoveClk: (_event: any, schedule: ScheduleData) => {
         refData.scheduleDelConfirm.value.isOpen = true;
         refData.scheduleDelConfirm.value.data = schedule;
-        refData.scheduleDelConfirm.value.text = "del " + schedule.title + "?";
+        refData.scheduleDelConfirm.value.text =
+          "确定要删除日程「" + (schedule.title || "未命名") + "」吗？删除后不可恢复。";
       },
       onDelSchedulerConfirm: (event: any) => {
-        // 处理数据
         refData.scheduleDelConfirm.value.isOpen = false;
         if (event.detail.role === "confirm") {
           const idx = refData.userData.value.schedules.findIndex(
@@ -475,6 +476,7 @@ export default defineComponent({
           }
           updateScheduleData();
           doSaveUserData();
+          EventBus.$emit(C_EVENT.TOAST, "已删除日程");
         }
       },
       onReorder: (event: any) => {

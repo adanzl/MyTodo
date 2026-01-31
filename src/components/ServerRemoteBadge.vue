@@ -4,7 +4,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from "vue";
-import EventBus, { C_EVENT } from "@/modal/EventBus";
+import EventBus, { C_EVENT } from "@/types/EventBus";
 import { isLocalIpAvailable } from "@/utils/NetUtil";
 
 const isRemote = ref(isLocalIpAvailable() === false);

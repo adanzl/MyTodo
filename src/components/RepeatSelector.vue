@@ -62,7 +62,7 @@ import {
   RepeatData,
   CUSTOM_REPEAT_ID,
   RepeatType,
-} from "@/modal/ScheduleType";
+} from "@/types/ScheduleType";
 import { createTriggerController } from "@/utils/Overlay";
 import { IonRadio, IonRadioGroup } from "@ionic/vue";
 import { onMounted, ref, watch } from "vue";

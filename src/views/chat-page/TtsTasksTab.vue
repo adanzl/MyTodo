@@ -410,7 +410,7 @@ import {
 import { computed, ref, watch } from "vue";
 import AudioPreview from "@/components/AudioPreview.vue";
 import FabButton from "@/components/FabButton.vue";
-import EventBus, { C_EVENT } from "@/modal/EventBus";
+import EventBus, { C_EVENT } from "@/types/EventBus";
 import { resizeImageToFile } from "@/utils/ImgMgr";
 import {
   createTtsTask,

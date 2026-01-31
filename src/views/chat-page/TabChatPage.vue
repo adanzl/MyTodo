@@ -110,10 +110,11 @@ import type { ChatMsg as AiChatMsg } from "./AiChatTab.vue";
 import ChatSetting from "@/components/ChatSetting.vue";
 import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import { Icon } from "@iconify/vue";
-import EventBus, { C_EVENT } from "@/modal/EventBus";
+import EventBus, { C_EVENT } from "@/types/EventBus";
 import {
   getApiUrl,
   getChatSetting,
+  getNetworkErrorMessage,
   getUserList,
   setChatSetting,
 } from "@/utils/NetUtil";
@@ -135,11 +136,14 @@ Recorder.CLog = function () {}; // 屏蔽Recorder的日志输出
 
 const tabsHeight = ref(0);
 let observer: MutationObserver | null = null;
+let mediaSourceCheckTimer: ReturnType<typeof setInterval> | null = null;
 
 const MSG_TYPE_TRANSLATION = "translation";
 const TTS_AUTO = false;
 // cSpell: disable-next-line
 const TTS_ROLE = "longwan_v2";
+const MEDIA_SOURCE_CHECK_MS = 2000;
+const SCROLL_TO_BOTTOM_DELAY = 200;
 
 const CHAT_ROOM = "chat_room";
 const CHAT_AI = "chat_ai";
@@ -187,14 +191,37 @@ const rec = Recorder({
 let recSampleBuf = new Int16Array();
 let playAudioData: ArrayBuffer[] = [];
 
-onMounted(async () => {
-  audioRef.value!.addEventListener("ended", () => {
-    console.log("==> event audio ended");
-    audioPlayMsg.value!.playing = false;
-    ttsData.value.audioEnd = true;
-    ttsData.value.audioBuffer = null;
+const onAudioEnded = () => {
+  if (audioPlayMsg.value) audioPlayMsg.value.playing = false;
+  ttsData.value.audioEnd = true;
+  ttsData.value.audioBuffer = null;
+};
+
+function appendPlayAudioToBuffer() {
+  if (
+    !ttsData.value.audioBuffer ||
+    ttsData.value.audioBuffer.updating ||
+    playAudioData.length === 0
+  )
+    return;
+  const combinedBuffer = new Uint8Array(
+    playAudioData.reduce((acc, curr) => acc + curr.byteLength, 0)
+  );
+  let offset = 0;
+  playAudioData.forEach((chunk) => {
+    combinedBuffer.set(new Uint8Array(chunk), offset);
+    offset += chunk.byteLength;
   });
-  await getChatSetting(globalVar.user.id).then((setting) => {
+  ttsData.value.audioBuffer.appendBuffer(combinedBuffer);
+  playAudioData = [];
+}
+
+onMounted(async () => {
+  const audioEl = audioRef.value;
+  if (audioEl) audioEl.addEventListener("ended", onAudioEnded);
+
+  try {
+    const setting = await getChatSetting(globalVar.user.id);
     if (setting) {
       const v = JSON.parse(setting);
       chatSetting.value.ttsSpeed = v.ttsSpeed;
@@ -202,24 +229,20 @@ onMounted(async () => {
       chatSetting.value.aiConversationId = v.aiConversationId;
       chatSetting.value.chatRoomId = v.chatRoomId;
     }
-  });
-  initSocketIO();
-  setInterval(() => {
-    if (
-      ttsData.value.audioEnd &&
-      ttsData.value.mediaSource &&
-      ttsData.value.mediaSource.readyState === "open"
-    ) {
+  } catch (err) {
+    EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+  } finally {
+    initSocketIO();
+  }
+
+  mediaSourceCheckTimer = setInterval(() => {
+    if (ttsData.value.audioEnd && ttsData.value.mediaSource?.readyState === "open") {
       ttsData.value.mediaSource.endOfStream();
     }
-  }, 2000);
-  observer = new MutationObserver(() => {
-    updateTabsHeight();
-  });
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true,
-  });
+  }, MEDIA_SOURCE_CHECK_MS);
+
+  observer = new MutationObserver(updateTabsHeight);
+  observer.observe(document.body, { childList: true, subtree: true });
 });
 
 const updateTabsHeight = () => {
@@ -229,23 +252,25 @@ const updateTabsHeight = () => {
   }
 };
 
-const updateChatSetting = async () => {
-  await getChatSetting(globalVar.user.id).then((setting) => {
+async function updateChatSetting() {
+  try {
+    const setting = await getChatSetting(globalVar.user.id);
     if (setting) {
       const v = JSON.parse(setting);
       chatSetting.value = Object.assign({}, chatSetting.value, v);
     }
-  });
-};
+  } catch (err) {
+    EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+  }
+}
 
 async function refreshUserList() {
-  await getUserList()
-    .then((uList) => {
-      userList.value = [...uList.data];
-    })
-    .catch((err) => {
-      EventBus.$emit(C_EVENT.TOAST, JSON.stringify(err));
-    });
+  try {
+    const uList = await getUserList();
+    userList.value = [...uList.data];
+  } catch (err) {
+    EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+  }
 }
 
 function getUserInfo(userId: string) {
@@ -260,6 +285,16 @@ onBeforeUnmount(() => {
   if (observer) {
     observer.disconnect();
     observer = null;
+  }
+  if (mediaSourceCheckTimer != null) {
+    clearInterval(mediaSourceCheckTimer);
+    mediaSourceCheckTimer = null;
+  }
+  const audioEl = audioRef.value;
+  if (audioEl) audioEl.removeEventListener("ended", onAudioEnded);
+  if (socketRef.value) {
+    socketRef.value.removeAllListeners();
+    socketRef.value.disconnect();
   }
 });
 
@@ -307,7 +342,7 @@ function initSocketIO() {
         role: "server",
       });
     }
-    aiChatTabRef.value?.scrollToBottom(200);
+    aiChatTabRef.value?.scrollToBottom(SCROLL_TO_BOTTOM_DELAY);
   });
   socketRef.value.on("msgAsr", (data) => {
     if (data.content) {
@@ -318,7 +353,7 @@ function initSocketIO() {
         audioSrc: lstAudioSrc.value,
       });
     }
-    aiChatTabRef.value?.scrollToBottom(200);
+    aiChatTabRef.value?.scrollToBottom(SCROLL_TO_BOTTOM_DELAY);
   });
   socketRef.value.on("msgChat", async (data) => {
     console.log("==> msgChat", data);
@@ -333,10 +368,7 @@ function initSocketIO() {
     } else {
       const aiTab = aiChatTabRef.value;
       const last = aiTab?.getLastMessage?.();
-      if (
-        !last ||
-        last.role === "me"
-      ) {
+      if (!last || last.role === "me") {
         const msg: AiChatMsg = {
           id: data.id,
           content: data.content,
@@ -354,7 +386,7 @@ function initSocketIO() {
         chatSetting.value.aiConversationId = data.aiConversationId;
         setChatSetting(globalVar.user.id, JSON.stringify(chatSetting.value));
       }
-      aiChatTabRef.value?.scrollToBottom(200);
+      aiChatTabRef.value?.scrollToBottom(SCROLL_TO_BOTTOM_DELAY);
     }
   });
   socketRef.value.on("endChat", (data: any) => {
@@ -366,18 +398,7 @@ function initSocketIO() {
       const chunk = data.data;
       if (chunk instanceof ArrayBuffer) {
         playAudioData.push(chunk);
-        if (ttsData.value.audioBuffer && !ttsData.value.audioBuffer.updating) {
-          const combinedBuffer = new Uint8Array(
-            playAudioData.reduce((acc, curr) => acc + curr.byteLength, 0)
-          );
-          let offset = 0;
-          playAudioData.forEach((chunk) => {
-            combinedBuffer.set(new Uint8Array(chunk), offset);
-            offset += chunk.byteLength;
-          });
-          ttsData.value.audioBuffer.appendBuffer(combinedBuffer);
-          playAudioData = [];
-        }
+        appendPlayAudioToBuffer();
       } else {
         console.warn("未知的数据类型");
       }
@@ -407,14 +428,14 @@ const sendTextMessage = () => {
         content: inputText.value,
         role: "me",
       });
-      aiChatTabRef.value?.scrollToBottom(200);
+      aiChatTabRef.value?.scrollToBottom(SCROLL_TO_BOTTOM_DELAY);
     } else if (chatType.value === CHAT_ROOM) {
       chatRoomTabRef.value?.addMessage({
         id: "",
         content: inputText.value,
         role: globalVar.user.id,
       });
-      chatRoomTabRef.value?.scrollToBottom(200);
+      chatRoomTabRef.value?.scrollToBottom(SCROLL_TO_BOTTOM_DELAY);
     }
 
     const message = JSON.stringify({
@@ -490,12 +511,7 @@ async function startRecording() {
   }
 }
 
-function recProcess(
-  buffer: any,
-  powerLevel: any,
-  bufferDuration: any,
-  bufferSampleRate: any
-) {
+function recProcess(buffer: any, powerLevel: any, bufferDuration: any, bufferSampleRate: any) {
   const data_48k = buffer[buffer.length - 1];
   const array_48k = new Array(data_48k);
   const data_16k = Recorder.SampleData(array_48k, bufferSampleRate, SAMPLE_RATE).data;
@@ -598,24 +614,12 @@ function streamAudio(f = () => {}) {
       console.error("SourceBuffer 错误:", e);
     });
     ttsData.value.audioBuffer.addEventListener("updateend", () => {
-      if (playAudioData.length > 0 && !ttsData.value.audioBuffer.updating) {
-        const combinedBuffer = new Uint8Array(
-          playAudioData.reduce((acc, curr) => acc + curr.byteLength, 0)
-        );
-        let offset = 0;
-        playAudioData.forEach((chunk) => {
-          combinedBuffer.set(new Uint8Array(chunk), offset);
-          offset += chunk.byteLength;
-        });
-        ttsData.value.audioBuffer.appendBuffer(combinedBuffer);
-        playAudioData = [];
-      } else if (ttsData.value.audioEnd) {
-        if (ttsData.value.mediaSource) {
-          try {
-            ttsData.value.mediaSource.endOfStream();
-          } catch (ignore) {
-            /* empty */
-          }
+      appendPlayAudioToBuffer();
+      if (ttsData.value.audioEnd && ttsData.value.mediaSource) {
+        try {
+          ttsData.value.mediaSource.endOfStream();
+        } catch {
+          /* empty */
         }
       }
     });
@@ -649,7 +653,7 @@ function btnChatSettingClk() {
 }
 
 function onChatSettingDismiss(e: any) {
-  if (e.detail.rol === "confirm") {
+  if (e.detail.role === "confirm") {
     updateChatSetting();
     socketRef.value!.emit("config", {
       ttsSpeed: chatSetting.value.ttsSpeed,

@@ -35,7 +35,7 @@
 </template>
 
 <script lang="ts" setup>
-import { GroupOptions } from "@/modal/ScheduleType";
+import { GroupOptions } from "@/types/ScheduleType";
 import { createTriggerController } from "@/utils/Overlay";
 import { IonRadio, IonRadioGroup } from "@ionic/vue";
 import { onMounted, ref, watch } from "vue";

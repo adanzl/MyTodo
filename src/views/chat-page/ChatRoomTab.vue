@@ -4,6 +4,12 @@
       <ion-refresher slot="fixed" @ionRefresh="onRefresh">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
+      <div
+        v-if="networkError"
+        class="mx-2 mt-2 p-2 rounded-lg bg-amber-100 text-amber-800 text-sm flex items-center justify-between">
+        <span>加载失败，请检查网络后下拉刷新</span>
+        <ion-button size="small" fill="clear" @click="retryLoad">重试</ion-button>
+      </div>
       <div class="flex flex-col h-full p-2 border-t-1 border-gray-200">
         <div v-for="(msg, idx) in messages" :key="idx" class="p-1.5 w-full">
           <!-- 自己 -->
@@ -46,11 +52,20 @@
 </template>
 
 <script setup lang="ts">
-import { IonAvatar, IonContent, IonImg, IonRefresher, IonRefresherContent, IonSegmentContent } from "@ionic/vue";
+import {
+  IonAvatar,
+  IonButton,
+  IonContent,
+  IonImg,
+  IonRefresher,
+  IonRefresherContent,
+  IonSegmentContent,
+} from "@ionic/vue";
 import { Icon } from "@iconify/vue";
 import { volumeMediumOutline } from "ionicons/icons";
 import { computed, ref, watch } from "vue";
-import { getChatMessages } from "@/utils/NetUtil";
+import EventBus, { C_EVENT } from "@/types/EventBus";
+import { getChatMessages, getNetworkErrorMessage } from "@/utils/NetUtil";
 import type { RefresherCustomEvent } from "@ionic/vue";
 
 export interface ChatMsg {
@@ -80,6 +95,7 @@ defineEmits<{
 
 const contentRef = ref<InstanceType<typeof IonContent> | null>(null);
 const messages = ref<ChatMsg[]>([]);
+const networkError = ref(false);
 
 function scrollToBottom(duration = 200) {
   contentRef.value?.$el?.scrollToBottom?.(duration);
@@ -91,30 +107,13 @@ function addMessage(msg: ChatMsg) {
 
 async function loadInitial() {
   if (!props.chatRoomId) return;
-  const data: any = await getChatMessages(props.chatRoomId, -1, 3);
-  messages.value = [];
-  data.data.reverse().forEach((item: any) => {
-    const d = JSON.parse(item);
-    messages.value.unshift({
-      id: d.id,
-      content: d.content,
-      role: d.user_id,
-      ts: d.ts,
-      type: d.type,
-    });
-  });
-}
-
-async function onRefresh(e: RefresherCustomEvent) {
-  if (!props.chatRoomId) {
-    e.target.complete();
-    return;
-  }
-  const firstId = messages.value.length + 1;
+  networkError.value = false;
   try {
-    const data: any = await getChatMessages(props.chatRoomId, -firstId, 3);
-    data.data.reverse().forEach((item: any) => {
-      const d = JSON.parse(item);
+    const data: any = await getChatMessages(props.chatRoomId, -1, 3);
+    messages.value = [];
+    const list = data?.data ?? [];
+    list.reverse().forEach((item: any) => {
+      const d = typeof item === "string" ? JSON.parse(item) : item;
       messages.value.unshift({
         id: d.id,
         content: d.content,
@@ -123,6 +122,40 @@ async function onRefresh(e: RefresherCustomEvent) {
         type: d.type,
       });
     });
+  } catch (err) {
+    networkError.value = true;
+    EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+  }
+}
+
+function retryLoad() {
+  networkError.value = false;
+  loadInitial();
+}
+
+async function onRefresh(e: RefresherCustomEvent) {
+  if (!props.chatRoomId) {
+    e.target.complete();
+    return;
+  }
+  networkError.value = false;
+  const firstId = messages.value.length + 1;
+  try {
+    const data: any = await getChatMessages(props.chatRoomId, -firstId, 3);
+    const list = data?.data ?? [];
+    list.reverse().forEach((item: any) => {
+      const d = typeof item === "string" ? JSON.parse(item) : item;
+      messages.value.unshift({
+        id: d.id,
+        content: d.content,
+        role: d.user_id,
+        ts: d.ts,
+        type: d.type,
+      });
+    });
+  } catch (err) {
+    networkError.value = true;
+    EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
   } finally {
     e.target.complete();
   }

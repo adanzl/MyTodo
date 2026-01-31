@@ -146,10 +146,10 @@
 <script setup lang="ts">
 import FabButton from "@/components/FabButton.vue";
 import SchedulePop from "@/components/SchedulePopModal.vue";
-import { getColorOptions } from "@/modal/ColorType";
-import { getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
-import { DayData, S_TS, ScheduleData, ScheduleSave, UData, UserData } from "@/modal/UserData";
-import { setSave } from "@/utils/NetUtil";
+import { getColorOptions } from "@/types/ColorType";
+import { getGroupOptions, getPriorityOptions } from "@/types/ScheduleType";
+import { DayData, S_TS, ScheduleData, ScheduleSave, UData, UserData } from "@/types/UserData";
+import { setSave } from "@/api/schedule";
 import { IonCheckbox, IonicSlides, IonReorder, IonReorderGroup } from "@ionic/vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import dayjs from "dayjs";

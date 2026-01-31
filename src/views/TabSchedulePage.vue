@@ -176,12 +176,12 @@
       </SchedulePop>
       <ion-alert
         :is-open="scheduleDelConfirm.isOpen"
-        header="Confirm!"
+        header="确认删除"
+        :message="scheduleDelConfirm.text"
         :buttons="[
-          { text: 'Cancel', role: 'cancel' },
-          { text: 'OK', role: 'confirm' },
+          { text: '取消', role: 'cancel' },
+          { text: '删除', role: 'confirm' },
         ]"
-        :sub-header="scheduleDelConfirm.text"
         @didDismiss="onDelSchedulerConfirm($event)">
       </ion-alert>
       <ion-toast

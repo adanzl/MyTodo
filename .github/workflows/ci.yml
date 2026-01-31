@@ -1,0 +1,30 @@
+# CI：类型检查 + 规范门禁（vue-tsc --noEmit + eslint）
+# 保证类型与规范不退化
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  typecheck-and-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check (vue-tsc --noEmit)
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint

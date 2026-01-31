@@ -1,0 +1,15 @@
+{
+  "code": 0,
+  "data": {
+    "data": [
+      {
+        "id": 1,
+        "name": "E2E测试用户",
+        "score": 0,
+        "admin": 1,
+        "pwd": null,
+        "icon": "/assets/images/avatar.svg"
+      }
+    ]
+  }
+}
