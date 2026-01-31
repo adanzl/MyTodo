@@ -20,7 +20,7 @@
             @click="openDetail(task)">
             <div class="flex items-center justify-between gap-2">
               <span class="font-medium text-gray-800 flex-1 truncate">{{ task.name || task.task_id }}</span>
-              <ion-icon v-if="task.analysis"  :icon="checkmarkCircleOutline" class="w-4 h-4"></ion-icon>
+              <ion-icon v-if="task.analysis" :icon="checkmarkCircleOutline" class="w-4 h-4"></ion-icon>
               <ion-badge :color="statusColor(task.status)" class="p-1 w-14">{{
                 statusLabel(task.status)
               }}</ion-badge>
@@ -44,11 +44,11 @@
     </FabButton>
     <!-- 全屏详情弹窗 -->
     <ion-modal :is-open="!!selectedTask" class="ion-modal-fullscreen" :initial-breakpoint="1" :breakpoints="[0, 1]"
-      @didDismiss="selectedTask = null">
+      @didDismiss="closeDetailModal">
       <ion-header>
         <ion-toolbar>
           <ion-buttons slot="start">
-            <ion-button @click="selectedTask = null">
+            <ion-button @click="closeDetailModal">
               <ion-icon :icon="closeOutline" />
             </ion-button>
           </ion-buttons>
@@ -159,7 +159,11 @@
                 </div>
               </ion-content>
             </ion-modal>
-
+            <div v-if="selectedTask.ocr_running || selectedTask.analysis_running"
+              class="flex gap-2 text-sm text-amber-600">
+              <span v-if="selectedTask.ocr_running">OCR 进行中</span>
+              <span v-if="selectedTask.analysis_running">解析进行中</span>
+            </div>
             <!-- 音频 -->
             <div v-if="selectedTask.status === 'success'" class="flex gap-2">
               <AudioPreview :src="getTtsDownloadUrl(selectedTask.task_id)"
@@ -289,11 +293,7 @@
               </div>
             </div>
 
-            <div v-if="selectedTask.ocr_running || selectedTask.analysis_running"
-              class="flex gap-2 text-sm text-amber-600">
-              <span v-if="selectedTask.ocr_running">OCR 进行中</span>
-              <span v-if="selectedTask.analysis_running">解析进行中</span>
-            </div>
+
 
             <div class="ion-padding-top ion-padding-bottom flex items-center gap-2">
               <ion-button expand="block" @click="saveAndClose" class="flex-1">确定</ion-button>
@@ -316,6 +316,7 @@
           <ion-input v-model="renameInputValue" placeholder="任务名称"
             class="mb-3 rounded-lg border border-gray-300 text-base !px-2" :clear-input="true" :clear-on-edit="false" />
           <div class="flex justify-end gap-1 border-t border-gray-200 pt-2">
+            <ion-button fill="clear" class="min-h-[44px] font-semibold" @click="appendFirstLineToRename">填入</ion-button>
             <ion-button fill="clear" class="min-h-[44px] font-semibold" @click="renameModalOpen = false">取消</ion-button>
             <ion-button fill="clear" color="primary" class="min-h-[44px] font-semibold"
               @click="confirmRename">确定</ion-button>
@@ -506,6 +507,15 @@ function openDetail(task: TtsTaskItem) {
   selectedTask.value = task;
 }
 
+/** 关闭详情弹窗并停止刷新当前任务的定时器 */
+function closeDetailModal() {
+  if (processingPollTimer) {
+    clearInterval(processingPollTimer);
+    processingPollTimer = null;
+  }
+  selectedTask.value = null;
+}
+
 function goPrev() {
   if (!canGoPrev.value) return;
   selectedTask.value = tasks.value[currentIndex.value - 1];
@@ -553,6 +563,13 @@ function openRenameDialog() {
   if (!task) return;
   renameInputValue.value = task.name || task.task_id || "";
   renameModalOpen.value = true;
+}
+
+/** 把任务正文的第一行文字追加到改名输入框末尾 */
+function appendFirstLineToRename() {
+  const text = selectedTask.value?.text ?? "";
+  const firstLine = text.split(/\r?\n/)[0]?.trim() ?? "";
+  renameInputValue.value = (renameInputValue.value ?? "") + firstLine;
 }
 
 async function confirmRename() {

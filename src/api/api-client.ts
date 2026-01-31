@@ -102,6 +102,7 @@ function getLocalApiUrl(): string {
 }
 
 export async function checkLocalAddressAvailable(): Promise<boolean> {
+  if(window.location.protocol === "https:") return false;
   return checkAddress(getLocalApiUrl());
 }
 
