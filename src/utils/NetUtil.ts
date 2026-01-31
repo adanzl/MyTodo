@@ -64,6 +64,7 @@ export {
 } from "@/api/lottery";
 export {
   createTtsTask,
+  getTtsTask,
   getTtsTaskList,
   getTtsDownloadUrl,
   downloadTtsAudio,

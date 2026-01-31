@@ -18,9 +18,10 @@
           <div v-for="task in tasks" :key="task.task_id"
             class="rounded-lg border border-gray-300 bg-white p-3 shadow-sm cursor-pointer active:opacity-80"
             @click="openDetail(task)">
-            <div class="flex items-center justify-between">
-              <span class="font-medium text-gray-800">{{ task.name || task.task_id }}</span>
-              <ion-badge :color="statusColor(task.status)" class="p-1">{{
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-medium text-gray-800 flex-1 truncate">{{ task.name || task.task_id }}</span>
+              <ion-icon v-if="task.analysis"  :icon="checkmarkCircleOutline" class="w-4 h-4"></ion-icon>
+              <ion-badge :color="statusColor(task.status)" class="p-1 w-14">{{
                 statusLabel(task.status)
               }}</ion-badge>
             </div>
@@ -29,7 +30,8 @@
             </div>
             <div class="mt-2 flex items-center gap-3 text-xs text-gray-400">
               <span v-if="task.total_chars != null">字数 {{ task.total_chars }}</span>
-              <span>{{ formatTime(task.update_time) }}</span>
+              <span v-if="task.duration != null">时长 {{ formatDuration(task.duration) }}</span>
+              <span class="flex-1 text-right">{{ formatTime(task.update_time) }}</span>
             </div>
           </div>
         </div>
@@ -73,7 +75,8 @@
                 <ion-badge :color="statusColor(selectedTask.status)" class="p-2 text-[10px]">
                   {{ statusLabel(selectedTask.status) }}
                 </ion-badge>
-                <ion-button size="small" color="primary" :disabled="isTaskBusy || selectedTask.status === 'processing' || generateVoiceLock"
+                <ion-button size="small" color="primary"
+                  :disabled="isTaskBusy || selectedTask.status === 'processing' || generateVoiceLock"
                   @click.stop="handleStartTask">
                   生成语音
                 </ion-button>
@@ -303,22 +306,19 @@
       </ion-content>
     </ion-modal>
     <!-- 改名弹窗（样式类似 alert，Tailwind 实现） -->
-    <ion-modal
-      :is-open="renameModalOpen"
+    <ion-modal :is-open="renameModalOpen"
       class="[--width:100%] [--height:100%] [--border-radius:0] [--box-shadow:none] [--backdrop-opacity:0] [--background:transparent]"
       @didDismiss="renameModalOpen = false">
-      <div class="fixed inset-0 z-[1] flex items-center justify-center bg-black/50 p-5" @click.self="renameModalOpen = false">
+      <div class="fixed inset-0 z-[1] flex items-center justify-center bg-black/50 p-5"
+        @click.self="renameModalOpen = false">
         <div class="w-full max-w-[400px] min-w-[260px] rounded-2xl bg-white p-4 shadow-xl">
           <h2 class="mb-3 text-center text-lg font-semibold text-gray-900">任务改名</h2>
-          <ion-input
-            v-model="renameInputValue"
-            placeholder="任务名称"
-            class="mb-3 rounded-lg border border-gray-300 text-base !px-2"
-            :clear-input="true"
-            :clear-on-edit="false" />
+          <ion-input v-model="renameInputValue" placeholder="任务名称"
+            class="mb-3 rounded-lg border border-gray-300 text-base !px-2" :clear-input="true" :clear-on-edit="false" />
           <div class="flex justify-end gap-1 border-t border-gray-200 pt-2">
             <ion-button fill="clear" class="min-h-[44px] font-semibold" @click="renameModalOpen = false">取消</ion-button>
-            <ion-button fill="clear" color="primary" class="min-h-[44px] font-semibold" @click="confirmRename">确定</ion-button>
+            <ion-button fill="clear" color="primary" class="min-h-[44px] font-semibold"
+              @click="confirmRename">确定</ion-button>
           </div>
         </div>
       </div>
@@ -355,6 +355,7 @@ import {
   closeCircleOutline,
   imageOutline,
   createOutline,
+  checkmarkCircleOutline,
 } from "ionicons/icons";
 import { computed, onUnmounted, ref, watch } from "vue";
 import AudioPreview from "@/components/AudioPreview.vue";
@@ -365,6 +366,7 @@ import {
   createTtsTask,
   deleteTtsTask,
   downloadTtsAudio,
+  getTtsTask,
   getTtsDownloadUrl,
   getTtsTaskList,
   ocrTtsTask,
@@ -448,9 +450,15 @@ watch(
     if (task && status === "processing") {
       const poll = async () => {
         if (!selectedTask.value || selectedTask.value.status !== "processing") return;
-        await loadTasks();
-        const updated = tasks.value.find((t) => t.task_id === selectedTask.value!.task_id);
-        if (updated) selectedTask.value = updated;
+        const taskId = selectedTask.value.task_id;
+        try {
+          const updated = await getTtsTask(taskId);
+          selectedTask.value = updated;
+          const idx = tasks.value.findIndex((t) => t.task_id === taskId);
+          if (idx >= 0) tasks.value[idx] = updated;
+        } catch {
+          // 忽略单次刷新失败，下次轮询再试
+        }
       };
       poll();
       processingPollTimer = setInterval(poll, PROCESSING_POLL_MS);
@@ -751,10 +759,6 @@ function formatTime(ts: number): string {
   if (!ts) return "";
   const d = new Date(ts * 1000);
   const now = new Date();
-  const sameDay = d.toDateString() === now.toDateString();
-  if (sameDay) {
-    return d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
-  }
   return d.toLocaleDateString("zh-CN", {
     month: "2-digit",
     day: "2-digit",
@@ -822,6 +826,7 @@ loadTasks();
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
+
 .ocr-image-list::-webkit-scrollbar {
   display: none;
 }

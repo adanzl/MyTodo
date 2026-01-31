@@ -32,6 +32,19 @@ export async function getTtsTaskList(): Promise<TtsTaskItem[]> {
   return rsp.data.data ?? [];
 }
 
+/** 获取单个 TTS 任务详情 */
+export async function getTtsTask(taskId: string): Promise<TtsTaskItem> {
+  const rsp = await apiClient.get<ApiResponse<TtsTaskItem>>("/tts/get", {
+    params: { task_id: taskId },
+  });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg || "获取任务失败");
+  }
+  const data = rsp.data.data;
+  if (!data) throw new Error("任务不存在");
+  return data;
+}
+
 export function getTtsDownloadUrl(taskId: string): string {
   const base = getApiUrl();
   if (!base) return "";
