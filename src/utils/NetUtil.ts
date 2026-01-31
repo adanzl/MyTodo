@@ -357,6 +357,22 @@ export async function getChatMessages(
   return rsp.data.data;
 }
 
+/** TTS 任务创建，参考 server/core/api/tts_routes.py POST /tts/create，返回 task_id */
+export async function createTtsTask(opts: {
+  text: string;
+  name?: string;
+  role?: string;
+  model?: string;
+  speed?: number;
+  vol?: number;
+}): Promise<{ task_id: string }> {
+  const rsp: any = await apiClient.post("/tts/create", opts);
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg || "创建任务失败");
+  }
+  return { task_id: rsp.data.data?.task_id ?? "" };
+}
+
 /** TTS 任务列表，参考 server/core/api/tts_routes.py GET /tts/list */
 export async function getTtsTaskList(): Promise<TtsTaskItem[]> {
   const rsp: any = await apiClient.get("/tts/list");

@@ -29,7 +29,7 @@ const routes: Array<RouteRecordRaw> = [
       },
       {
         path: 'tab4',
-        component: () => import('@/views/TabLotteryPage.vue')
+        component: () => import('@/views/lottery-page/TabLotteryPage.vue')
       },
       {
         path: 'tab0',

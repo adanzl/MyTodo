@@ -1,6 +1,7 @@
 <template>
   <ion-button
     class="absolute rounded-full ion-no-padding"
+    :disabled="disabled"
     @touchmove="onTouchMove"
     :style="{ right: posR + ' !important', bottom: posB + ' !important' }">
     <slot></slot>
@@ -18,6 +19,10 @@ const props = defineProps({
   bottom: String,
   right: String,
   hasBar: {
+    type: Boolean,
+    default: false,
+  },
+  disabled: {
     type: Boolean,
     default: false,
   },

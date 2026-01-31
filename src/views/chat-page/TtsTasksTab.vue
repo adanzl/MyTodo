@@ -37,9 +37,11 @@
         </div>
       </div>
     </ion-content>
+    <!-- 添加按钮 -->
     <FabButton
       v-if="active"
-      @click="() => {}"
+      :disabled="addButtonCooling"
+      @click="createAndOpenTask"
       class="right-[5%] bottom-[1%]"
       bottom="1%"
       right="5%"
@@ -205,7 +207,13 @@
               class="rounded-lg border border-gray-200 px-3 flex flex-col gap-1 min-h-[120px]">
               <div class="flex items-center justify-between">
                 <h4 class="text-sm font-semibold text-gray-700">分析内容</h4>
-                <ion-button size="small" color="primary" @click="runAnalysis">分析</ion-button>
+                <ion-button
+                  size="small"
+                  color="primary"
+                  :disabled="!editText.trim() || isTaskBusy"
+                  @click="runAnalysis">
+                  分析
+                </ion-button>
               </div>
               <template v-if="!selectedTask.analysis">
                 <div class="text-xs text-gray-400">
@@ -275,16 +283,26 @@
                 </div>
               </template>
             </div>
-            <div v-if="selectedTask.role" class="rounded bg-gray-50 p-2 text-[12px]">
-              <span class="text-gray-500">角色</span>
-              <div>{{ selectedTask.role }}</div>
+            <div class="rounded bg-gray-50 p-2 text-[12px] flex items-center gap-2">
+              <span class="text-gray-500 shrink-0 w-10">音色</span>
+              <ion-select
+                v-model="editRole"
+                placeholder="请选择音色（可选）"
+                :disabled="isTaskBusy"
+                interface="popover"
+                class="min-h-8 flex-1 min-w-0">
+                <ion-select-option value="">无</ion-select-option>
+                <ion-select-option value="cosyvoice-v3-plus-leo-34ba9eaebae44039a4a9426af6389dcd">
+                  灿灿
+                </ion-select-option>
+              </ion-select>
             </div>
             <div class="grid grid-cols-2 gap-3 text-sm">
               <div v-if="selectedTask.total_chars != null" class="rounded bg-gray-50 p-2">
                 <span class="text-gray-500">字数</span>
                 <div>{{ selectedTask.total_chars }}</div>
               </div>
-              <div v-if="selectedTask.duration != null" class="rounded bg-gray-50 p-2">
+              <div class="rounded bg-gray-50 p-2">
                 <span class="text-gray-500">时长</span>
                 <div>{{ formatDuration(selectedTask.duration) }}</div>
               </div>
@@ -355,6 +373,8 @@ import {
   IonRefresher,
   IonRefresherContent,
   IonSegmentContent,
+  IonSelect,
+  IonSelectOption,
   IonTextarea,
   IonTitle,
   IonToolbar,
@@ -374,6 +394,7 @@ import AudioPreview from "@/components/AudioPreview.vue";
 import FabButton from "@/components/FabButton.vue";
 import EventBus, { C_EVENT } from "@/modal/EventBus";
 import {
+  createTtsTask,
   deleteTtsTask,
   getTtsDownloadUrl,
   getTtsTaskList,
@@ -397,10 +418,11 @@ const loading = ref(false);
 const error = ref("");
 const selectedTask = ref<TtsTaskItem | null>(null);
 const analysisSectionRef = ref<HTMLElement | null>(null);
-/** 弹窗内可编辑的语速、音量、文本（确定时提交） */
+/** 弹窗内可编辑的语速、音量、文本、角色（确定时提交），仿 server/frontend TTS.vue */
 const editSpeed = ref<number>(1);
 const editVol = ref<number>(50);
 const editText = ref<string>("");
+const editRole = ref<string>("");
 /** 识别：已选图片、预览 URL 缓存、隐藏 input、加载态 */
 const selectedImages = ref<File[]>([]);
 const ocrImageUrls = ref<string[]>([]);
@@ -408,6 +430,9 @@ const imageInputRef = ref<HTMLInputElement | null>(null);
 const ocrLoading = ref(false);
 /** 当前预览的图片下标，-1 表示未打开 */
 const previewOcrIndex = ref(-1);
+/** 添加按钮防短时间多点：创建中或冷却期内为 true */
+const addButtonCooling = ref(false);
+const ADD_COOLDOWN_MS = 1500;
 
 /** 任务是否忙（TTS 生成中或 OCR/分析子任务中），仿 frontend TTS.vue */
 const isTaskBusy = computed(
@@ -424,6 +449,7 @@ watch(selectedTask, (t) => {
     editSpeed.value = t.speed ?? 1;
     editVol.value = t.vol ?? 50;
     editText.value = t.text ?? "";
+    editRole.value = t.role ?? "";
   } else {
     clearSelectedImages();
   }
@@ -587,12 +613,14 @@ async function saveAndClose() {
   try {
     await updateTtsTask(task.task_id, {
       text: editText.value,
+      role: editRole.value || undefined,
       speed: Number(editSpeed.value),
       vol: Number(editVol.value),
     });
     const t = tasks.value.find((x) => x.task_id === task.task_id);
     if (t) {
       t.text = editText.value;
+      t.role = editRole.value || undefined;
       t.speed = Number(editSpeed.value);
       t.vol = Number(editVol.value);
     }
@@ -600,6 +628,7 @@ async function saveAndClose() {
       selectedTask.value = {
         ...selectedTask.value,
         text: editText.value,
+        role: editRole.value || undefined,
         speed: t?.speed ?? editSpeed.value,
         vol: t?.vol ?? editVol.value,
       };
@@ -674,6 +703,25 @@ async function loadTasks() {
 async function onRefresh(e: RefresherCustomEvent) {
   await loadTasks();
   e.target.complete();
+}
+
+/** 点击添加按钮：创建新 TTS 任务并打开其详情弹窗（防短时间多点） */
+async function createAndOpenTask() {
+  if (addButtonCooling.value) return;
+  addButtonCooling.value = true;
+  try {
+    const { task_id } = await createTtsTask({ text: "" });
+    await loadTasks();
+    const task = tasks.value.find((t) => t.task_id === task_id);
+    if (task) selectedTask.value = task;
+    else EventBus.$emit(C_EVENT.TOAST, "已创建，请从列表打开");
+  } catch (e: any) {
+    EventBus.$emit(C_EVENT.TOAST, e?.message ?? "创建失败");
+  } finally {
+    setTimeout(() => {
+      addButtonCooling.value = false;
+    }, ADD_COOLDOWN_MS);
+  }
 }
 
 loadTasks();

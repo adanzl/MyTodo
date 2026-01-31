@@ -169,7 +169,7 @@ const SAMPLE_RATE = 16000;
 const audioRef = ref<HTMLAudioElement | null>(null);
 const audioPlayMsg = ref<AiChatMsg | null>(null);
 const lstAudioSrc = ref<string>("");
-const chatType = ref(CHAT_AI);
+const chatType = ref(CHAT_TTS_TASKS);
 const ttsData = ref<any>({ audioBuffer: null, msg: null, audioEnd: false, mediaSource: null });
 const rec = Recorder({
   type: "wav",
