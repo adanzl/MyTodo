@@ -76,7 +76,7 @@
                   {{ statusLabel(selectedTask.status) }}
                 </ion-badge>
                 <ion-button size="small" color="primary"
-                  :disabled="isTaskBusy || selectedTask.status === 'processing' || generateVoiceLock"
+                  :disabled="isTaskBusy || selectedTask.status === 'processing' || generateVoiceLock || !(selectedTask.text || '').trim()"
                   @click.stop="handleStartTask">
                   生成语音
                 </ion-button>
