@@ -1,0 +1,27 @@
+# 存放位置 /etc/systemd/system/
+# 开启 systemctl start natapp
+# 关闭 systemctl stop natapp
+# 开机启动 systemctl enable natapp
+# 取消开机启动 system disable natapp
+
+[Unit]
+Description=NatApp Web Service
+After=network.target
+
+[Service]
+User=leo
+Group=leo
+Type=simple
+ExecStart=/opt/natapp/natapp -config=/opt/natapp/config_web.ini
+# Suppress stderr to eliminate duplicated messages in syslog. NM calls openlog()
+# with LOG_PERROR when run in foreground. But systemd redirects stderr to
+# syslog by default, which results in logging each message twice.
+StandardError=null
+Restart=on-failure
+# 重启间隔时间（避免频繁重启，单位：秒）
+RestartSec=3
+# 进程最大文件打开数（解决高并发下文件句柄不足）
+LimitNOFILE=6553
+
+[Install]
+WantedBy=multi-user.target

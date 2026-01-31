@@ -63,7 +63,7 @@ import {
   IonToolbar,
 } from "@ionic/vue";
 
-import { initNet, checkAndSwitchServer } from "@/utils/NetUtil";
+import { initNet, checkAndSwitchServer, isLocalIpAvailable } from "@/utils/NetUtil";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
 import isToday from "dayjs/plugin/isToday";
@@ -112,11 +112,19 @@ console.log(`当前 Vue 版本是：${app.version}`);
 
 router.isReady().then(async () => {
   initNet();
-  // 定时检测本地/远程地址，每 5 秒自动切换（效仿 server/frontend App.vue）
-  const SERVER_CHECK_INTERVAL_MS = 5000;
-  setInterval(() => {
-    checkAndSwitchServer();
-  }, SERVER_CHECK_INTERVAL_MS);
+  // 定时检测本地/远程地址：本地可用时每 5 秒检查，本地不可用时每 60 秒检查（减少 console 的 ERR_CONNECTION_TIMED_OUT 输出）
+  const CHECK_WHEN_LOCAL_MS = 5000;
+  const CHECK_WHEN_REMOTE_MS = 60000;
+
+  function scheduleNextCheck() {
+    const interval =
+      isLocalIpAvailable() === false ? CHECK_WHEN_REMOTE_MS : CHECK_WHEN_LOCAL_MS;
+    setTimeout(() => {
+      checkAndSwitchServer();
+      scheduleNextCheck();
+    }, interval);
+  }
+  scheduleNextCheck();
   app.mount("#app");
 });
 // ignore

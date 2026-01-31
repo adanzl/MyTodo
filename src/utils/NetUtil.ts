@@ -123,37 +123,23 @@ export function getApiUrl() {
   return API_URL;
 }
 
-/** 检测地址是否可达，失败时静默返回 false，不向控制台输出错误 */
+/** 检测地址是否可达，失败时静默返回 false。使用 fetch+AbortController 在超时前主动中止，减少浏览器对 ERR_CONNECTION_TIMED_OUT 的 console 输出 */
 async function checkAddress(url: string, timeout: number = 10000): Promise<boolean> {
   const target = url.replace(/\/$/, "") + "/";
 
-  return new Promise((resolve) => {
-    // 创建XHR对象，替代fetch
-    const xhr = new XMLHttpRequest();
-    // 配置HEAD请求和目标地址
-    xhr.open("HEAD", target, true);
-    // 设置请求超时时间（无需额外setTimeout）
-    xhr.timeout = timeout;
-
-    // 成功回调：判断状态码是否在200-299区间
-    xhr.onload = function () {
-      resolve(xhr.status >= 200 && xhr.status < 300);
-    };
-
-    // 错误/超时/中止回调：统一返回false，无控制台报错
-    xhr.onerror = function () {
-      resolve(false);
-    }; // 网络错误
-    xhr.ontimeout = function () {
-      resolve(false);
-    }; // 超时
-    xhr.onabort = function () {
-      resolve(false);
-    }; // 手动中止
-
-    // 发送请求
-    xhr.send();
-  });
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    const res = await fetch(target, {
+      method: "HEAD",
+      signal: controller.signal,
+      cache: "no-store",
+    });
+    clearTimeout(timeoutId);
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 /** 检测本地地址是否可用（短超时，供后台自动切换使用） */
