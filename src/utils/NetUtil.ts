@@ -69,6 +69,7 @@ export {
   downloadTtsAudio,
   updateTtsTask,
   deleteTtsTask,
+  startTtsTask,
   startTtsAnalysis,
   ocrTtsTask,
 } from "@/api/tts";

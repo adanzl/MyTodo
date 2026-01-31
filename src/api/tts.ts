@@ -85,6 +85,15 @@ export async function deleteTtsTask(taskId: string): Promise<void> {
   }
 }
 
+/** 开始处理 TTS 任务（合成语音） */
+export async function startTtsTask(taskId: string): Promise<void> {
+  const body: TtsTaskIdBody = { task_id: taskId };
+  const rsp = await apiClient.post<ApiResponse<unknown>>("/tts/start", body);
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg || "启动任务失败");
+  }
+}
+
 export async function startTtsAnalysis(taskId: string): Promise<void> {
   const body: TtsTaskIdBody = { task_id: taskId };
   const rsp = await apiClient.post<ApiResponse<unknown>>("/tts/analysis", body);
