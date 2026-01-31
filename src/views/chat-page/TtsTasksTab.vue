@@ -90,41 +90,50 @@
             <!-- 识别（仿 server/frontend TTS.vue：选择图片后 OCR 结果追加到任务文本） -->
             <div class="rounded-lg border border-gray-200 px-3 py-2 flex items-center gap-3">
               <!-- 已选图片与添加按钮同一行，点击图片可预览 -->
-              <div class="flex flex-wrap items-center gap-2 flex-1 min-w-0">
-                <button
-                  type="button"
+              <div class="flex items-center gap-2 flex-1 min-w-0">
+                <ion-button
                   size="small"
+                  fill="clear"
                   class="flex items-center justify-center w-10 h-14 rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-primary hover:text-primary"
                   @click="pickImages">
-                  <ion-icon :icon="imageOutline" class="text-2xl" />
-                </button>
-                <input
-                  ref="imageInputRef"
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  class="hidden"
-                  @change="onImageFileChange" />
-                <div
-                  v-for="(file, idx) in selectedImages"
-                  :key="idx"
-                  class="relative w-14 h-14 flex-shrink-0 cursor-pointer active:opacity-80"
-                  @click="openOcrPreview(idx)">
-                  <div class="absolute inset-0 rounded-lg overflow-hidden border border-gray-200">
-                    <img
-                      :src="getOcrImageUrl(idx)"
-                      :alt="file.name"
-                      class="w-full h-full object-cover" />
+                  <ion-icon :icon="imageOutline" slot="icon-only" class="text-2xl" />
+                  <div class="absolute top-0.5 !p-0 !overflow-hidden items-center justify-center">
+                    <span class="text-xs">{{ selectedImages.length }}</span>
                   </div>
-                  <ion-button
-                    size="small"
-                    fill="solid"
-                    color="dark"
-                    class="absolute -top-1 -right-1 !min-w-0 !min-h-0 !w-6 !h-6 !max-w-6 !max-h-6 !p-0 !aspect-square !rounded-full !overflow-hidden !flex !items-center !justify-center shadow [--color:white] [--border-radius:50%]"
-                    style="border-radius: 50%;"
-                    @click.stop="removeOcrImage(idx)">
-                    <ion-icon :icon="closeCircleOutline" class="!w-5 !h-5 block shrink-0" />
-                  </ion-button>
+                </ion-button>
+                <!-- ocr 图片列表 -->
+                <div class="ocr-image-list flex flex-1 items-center gap-2 mr-2 overflow-x-auto">
+                  <input
+                    ref="imageInputRef"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    class="hidden"
+                    @change="onImageFileChange" />
+                  <div
+                    v-for="(file, idx) in selectedImages"
+                    :key="idx"
+                    class="relative w-14 h-14 flex-shrink-0 cursor-pointer active:opacity-80"
+                    @click="openOcrPreview(idx)">
+                    <div class="absolute inset-0 rounded-lg overflow-hidden border border-gray-200">
+                      <img
+                        :src="getOcrImageUrl(idx)"
+                        :alt="file.name"
+                        class="w-full h-full object-cover" />
+                    </div>
+                    <ion-button
+                      size="small"
+                      fill="solid"
+                      color="dark"
+                      class="absolute -top-0 -right-0 !min-w-0 !min-h-0 !w-6 !h-6 !max-w-6 !max-h-6 !p-0 !aspect-square !rounded-full !overflow-hidden !flex !items-center !justify-center shadow [--color:white] [--border-radius:50%]"
+                      sharp="round"
+                      @click.stop="removeOcrImage(idx)">
+                      <ion-icon
+                        :icon="closeCircleOutline"
+                        slot="icon-only"
+                        class="!w-5 !h-5 block shrink-0" />
+                    </ion-button>
+                  </div>
                 </div>
               </div>
               <div class="flex items-center flex-shrink-0">
@@ -132,7 +141,8 @@
                   size="small"
                   color="primary"
                   :disabled="isTaskBusy || selectedImages.length === 0 || ocrLoading"
-                  class="!w-8 !h-12 !p-0"
+                  class="!w-10 !h-12 !p-0"
+                  style="--padding-start: 0; --padding-end: 0"
                   @click="runOcr">
                   {{ ocrLoading ? "识别中…" : "识别" }}
                 </ion-button>
@@ -183,22 +193,30 @@
               </ion-content>
             </ion-modal>
 
-            <!-- 音频预览（仿 server/frontend MediaComponent） -->
-            <AudioPreview
-              v-if="selectedTask.status === 'success'"
-              :src="getTtsDownloadUrl(selectedTask.task_id)"
-              :duration-seconds="selectedTask.duration ?? undefined"
-              class="w-full" />
+            <!-- 音频 -->
+            <div v-if="selectedTask.status === 'success'" class="flex gap-2">
+              <AudioPreview
+                :src="getTtsDownloadUrl(selectedTask.task_id)"
+                :duration-seconds="selectedTask.duration ?? undefined"
+                class="flex-1" />
+              <ion-button
+                size="small"
+                color="primary"
+                fill="clear"
+                :disabled="downloadButtonLock"
+                @click="handleDownloadTtsAudio">
+                下载
+              </ion-button>
+            </div>
 
-            <div class="rounded-lg bg-gray-100 p-3">
+            <div class="rounded-lg bg-gray-100 p-2">
               <ion-textarea
                 v-model="editText"
                 placeholder="请输入要转换为语音的文本"
                 :disabled="isTaskBusy"
-                class="text-gray-800 rounded-lg min-h-[100px] [--padding-start:8px] [--padding-end:8px] [--padding-top:8px] [--padding-bottom:8px]"
+                class="text-gray-800 rounded-lg min-h-[100px] [--padding-start:8px] [--padding-end:8px] [--padding-top:1px] [--padding-bottom:8px]"
                 :auto-grow="true"
-                :rows="4"
-              />
+                :rows="4" />
             </div>
 
             <!-- 分析内容（参考 server/frontend TTS.vue） -->
@@ -221,7 +239,7 @@
                 </div>
               </template>
               <template v-else>
-                <div class="space-y-3 text-xs pr-1">
+                <div class="space-y-3 text-xs pr-1 py-1">
                   <!-- 美词 -->
                   <div v-if="selectedTask.analysis.words?.length" class="flex gap-3">
                     <div
@@ -396,6 +414,7 @@ import EventBus, { C_EVENT } from "@/modal/EventBus";
 import {
   createTtsTask,
   deleteTtsTask,
+  downloadTtsAudio,
   getTtsDownloadUrl,
   getTtsTaskList,
   ocrTtsTask,
@@ -433,6 +452,9 @@ const previewOcrIndex = ref(-1);
 /** 添加按钮防短时间多点：创建中或冷却期内为 true */
 const addButtonCooling = ref(false);
 const ADD_COOLDOWN_MS = 1500;
+/** 下载按钮点击后锁住 1s */
+const downloadButtonLock = ref(false);
+const DOWNLOAD_LOCK_MS = 1000;
 
 /** 任务是否忙（TTS 生成中或 OCR/分析子任务中），仿 frontend TTS.vue */
 const isTaskBusy = computed(
@@ -540,6 +562,24 @@ async function runAnalysis() {
     EventBus.$emit(C_EVENT.TOAST, "分析已启动，请稍后刷新查看结果");
   } catch (e: any) {
     EventBus.$emit(C_EVENT.TOAST, e?.message ?? "发起分析失败");
+  }
+}
+
+async function handleDownloadTtsAudio() {
+  if (downloadButtonLock.value) return;
+  const task = selectedTask.value;
+  if (!task) return;
+  downloadButtonLock.value = true;
+  try {
+    const name = (task.name || task.task_id).replace(/[/\\?%*:|"<>]/g, "_");
+    await downloadTtsAudio(task.task_id, `tts_${name}.mp3`);
+    EventBus.$emit(C_EVENT.TOAST, "已开始下载");
+  } catch (e: any) {
+    EventBus.$emit(C_EVENT.TOAST, e?.message ?? "下载失败");
+  } finally {
+    setTimeout(() => {
+      downloadButtonLock.value = false;
+    }, DOWNLOAD_LOCK_MS);
   }
 }
 
@@ -733,5 +773,14 @@ loadTasks();
   --height: 100%;
   --border-radius: 0;
   --box-shadow: none;
+}
+
+/* ocr 图片列表：隐藏滚动条，仍可横向滑动 */
+.ocr-image-list {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.ocr-image-list::-webkit-scrollbar {
+  display: none;
 }
 </style>

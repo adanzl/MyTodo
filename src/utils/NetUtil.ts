@@ -390,6 +390,31 @@ export function getTtsDownloadUrl(taskId: string): string {
   return `${base}${sep}tts/download?task_id=${encodeURIComponent(taskId)}`;
 }
 
+/** 下载 TTS 任务音频到本地：请求 blob 后触发浏览器下载 */
+export async function downloadTtsAudio(taskId: string, fileName?: string): Promise<void> {
+  const rsp = await apiClient.get("/tts/download", {
+    params: { task_id: taskId },
+    responseType: "blob",
+  });
+  const blob = rsp.data as Blob;
+  if (blob.type === "application/json" || blob.size < 200) {
+    const text = await blob.text();
+    try {
+      const json = JSON.parse(text) as { code?: number; msg?: string };
+      if (json?.code !== 0) throw new Error(json?.msg || "下载失败");
+    } catch (e) {
+      if (e instanceof Error && e.message !== "下载失败") throw e;
+      throw new Error((e as Error)?.message ?? text ?? "下载失败");
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName ?? `tts_${taskId}.mp3`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 /** TTS 任务更新，参考 server/core/api/tts_routes.py POST /tts/update */
 export async function updateTtsTask(
   taskId: string,
