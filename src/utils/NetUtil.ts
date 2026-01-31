@@ -40,6 +40,9 @@ const REMOTE = { url: "https://leo-zhao.natapp4.cc/api", available: false };
 const LOCAL = { url: "http://192.168.50.171:8848/api", available: false };
 // const LOCAL = { url: "http://localhost:8888", available: false };
 let API_URL = "";
+
+/** 本地地址是否可用：null=未检测，true=使用本地，false=使用远程 */
+let localIpAvailable: boolean | null = null;
 // const URL = "http://192.168.50.184:9527/api";
 
 /** 带认证的 API 客户端：自动带 Authorization、withCredentials，401 时尝试 refresh 后重试一次 */
@@ -120,41 +123,79 @@ export function getApiUrl() {
   return API_URL;
 }
 
-async function checkAddress(url: string, timeout: number = 10000) {
+/** 检测地址是否可达，失败时静默返回 false，不向控制台输出错误 */
+async function checkAddress(url: string, timeout: number = 10000): Promise<boolean> {
+  const target = url.replace(/\/$/, "") + "/";
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
   try {
-    const response = await axios
-      .create({
-        timeout: timeout,
-      })
-      .head(url + "/");
-    return response.status >= 200 && response.status < 300;
+    const res = await fetch(target, { method: "HEAD", signal: controller.signal });
+    clearTimeout(timeoutId);
+    return res.status >= 200 && res.status < 300;
   } catch {
+    clearTimeout(timeoutId);
     return false;
   }
 }
 
-export async function initNet(): Promise<void> {
-  await checkAddress(REMOTE.url).then((ret) => {
-    if (ret && !LOCAL.available) {
-      REMOTE.available = true;
-      console.log("use url:", REMOTE.url);
-      API_URL = REMOTE.url;
-    }
-    return ret;
-  });
-  const protocol = window.location.protocol;
-  if (protocol !== "https:") {
-    await checkAddress(LOCAL.url, 100).then((ret) => {
-      if (ret) {
-        LOCAL.available = true;
-        console.log("use url:", LOCAL.url, ret);
-        API_URL = LOCAL.url;
-      }
-      return ret;
-    });
-  }
+/** 检测本地地址是否可用（短超时，供后台自动切换使用） */
+export async function checkLocalAddressAvailable(): Promise<boolean> {
+  const protocol = typeof window !== "undefined" ? window.location.protocol : "https:";
+  if (protocol === "https:") return false;
+  return checkAddress(LOCAL.url, 500);
+}
+
+/** 切换到本地地址 */
+export function switchToLocal(): void {
+  if (localIpAvailable === true) return;
+  localIpAvailable = true;
+  REMOTE.available = false;
+  LOCAL.available = true;
+  API_URL = LOCAL.url;
   apiClient.defaults.baseURL = API_URL;
-  console.log("init net ");
+  EventBus.$emit(C_EVENT.SERVER_SWITCH, false);
+}
+
+/** 切换到远程地址 */
+export function switchToRemote(): void {
+  if (localIpAvailable === false) return;
+  localIpAvailable = false;
+  REMOTE.available = true;
+  LOCAL.available = false;
+  API_URL = REMOTE.url;
+  apiClient.defaults.baseURL = API_URL;
+  EventBus.$emit(C_EVENT.SERVER_SWITCH, true);
+}
+
+/** 后台检测并自动选择本地/远程地址（可配合 setInterval 定时调用） */
+export async function checkAndSwitchServer(): Promise<void> {
+  const available = await checkLocalAddressAvailable();
+  if (available && localIpAvailable !== true) {
+    switchToLocal();
+  } else if (!available && localIpAvailable !== false) {
+    switchToRemote();
+  }
+}
+
+/** 是否正在使用本地地址（null 表示尚未检测完成） */
+export function isLocalIpAvailable(): boolean | null {
+  return localIpAvailable;
+}
+
+/**
+ * 初始化网络：立即使用远程地址，后台线程自动检测本地地址并在可用时切换（效仿 server/frontend api/config.ts）
+ */
+export function initNet(): void {
+  // 默认使用远程，保证首屏请求不阻塞；localIpAvailable 保持 null 表示检测中
+  API_URL = REMOTE.url;
+  REMOTE.available = true;
+  LOCAL.available = false;
+  localIpAvailable = null;
+  apiClient.defaults.baseURL = API_URL;
+  EventBus.$emit(C_EVENT.SERVER_SWITCH, true);
+
+  // 后台异步检测本地地址，可用则自动切换
+  checkAndSwitchServer();
 }
 export async function getSave(id: number) {
   if (id === undefined) {

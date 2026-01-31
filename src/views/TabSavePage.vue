@@ -3,6 +3,9 @@
     <ion-header>
       <ion-toolbar>
         <ion-title>Tab Save</ion-title>
+        <ion-buttons slot="end">
+          <ServerRemoteBadge />
+        </ion-buttons>
       </ion-toolbar>
     </ion-header>
     <ion-content>
@@ -76,6 +79,7 @@
 </template>
 
 <script setup lang="ts">
+import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import { getSave } from "@/utils/NetUtil";
 import { getGroupOptions, getPriorityOptions } from "@/modal/ScheduleType";
 import { getColorOptions } from "@/modal/ColorType";

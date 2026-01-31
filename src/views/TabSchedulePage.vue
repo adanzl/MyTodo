@@ -10,10 +10,11 @@
           <div v-else>日历</div>
         </ion-title>
         <ion-buttons slot="end">
+          <ServerRemoteBadge />
           <ion-button
-            style="position: absolute; right: 50px"
+            class="!mr-1"
             @click="btnTodayClk"
-            v-if="!selectedDate?.dt.isToday()">
+            :disabled="selectedDate?.dt.isToday()">
             今
           </ion-button>
           <ion-button id="btnSort" @click="btnSortClk">

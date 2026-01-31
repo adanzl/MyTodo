@@ -4,6 +4,9 @@
     <ion-header>
       <ion-toolbar>
         <ion-title>Tab Pic</ion-title>
+        <ion-buttons slot="end">
+          <ServerRemoteBadge />
+        </ion-buttons>
       </ion-toolbar>
     </ion-header>
     <ion-item collapse="condense">
@@ -37,6 +40,7 @@
 </template>
 
 <script setup lang="ts">
+import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import { getPicList } from "@/utils/NetUtil";
 import {
   IonItemSliding,

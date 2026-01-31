@@ -63,7 +63,7 @@ import {
   IonToolbar,
 } from "@ionic/vue";
 
-import { initNet } from "@/utils/NetUtil";
+import { initNet, checkAndSwitchServer } from "@/utils/NetUtil";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
 import isToday from "dayjs/plugin/isToday";
@@ -111,7 +111,12 @@ console.log(`当前 Vue 版本是：${app.version}`);
 // npm cache verify
 
 router.isReady().then(async () => {
-  await initNet();
+  initNet();
+  // 定时检测本地/远程地址，每 5 秒自动切换（效仿 server/frontend App.vue）
+  const SERVER_CHECK_INTERVAL_MS = 5000;
+  setInterval(() => {
+    checkAndSwitchServer();
+  }, SERVER_CHECK_INTERVAL_MS);
   app.mount("#app");
 });
 // ignore

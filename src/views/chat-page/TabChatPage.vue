@@ -4,6 +4,7 @@
       <ion-toolbar>
         <ion-title class="px-2">Tab Chat</ion-title>
         <ion-buttons slot="end">
+          <ServerRemoteBadge />
           <ion-button @click="btnChatSettingClk">
             <Icon icon="weui:setting-outlined" class="h-7 w-7" />
           </ion-button>
@@ -107,6 +108,7 @@ import AiChatTab from "./AiChatTab.vue";
 import TtsTasksTab from "./TtsTasksTab.vue";
 import type { ChatMsg as AiChatMsg } from "./AiChatTab.vue";
 import ChatSetting from "@/components/ChatSetting.vue";
+import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import { Icon } from "@iconify/vue";
 import EventBus, { C_EVENT } from "@/modal/EventBus";
 import {

@@ -10,10 +10,11 @@
           <div v-else>日历</div>
         </ion-title>
         <ion-buttons slot="end">
+          <ServerRemoteBadge />
           <ion-button
-            style="position: absolute; right: 50px"
+            class="!mr-5"
             @click="btnTodayClk"
-            v-if="!isThisMonth()">
+            :disabled="isThisMonth()">
             今
           </ion-button>
         </ion-buttons>
@@ -92,6 +93,7 @@
 </template>
 <script setup lang="ts">
 import CalendarCover from "@/components/CalendarCover.vue";
+import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import { getColorOptions } from "@/modal/ColorType";
 import { C_EVENT } from "@/modal/EventBus";
 import { DayData, MonthData, ScheduleData, UData, UserData } from "@/modal/UserData";

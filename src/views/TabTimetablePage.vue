@@ -6,6 +6,7 @@
           <div class="px-2">课程表</div>
         </ion-title>
         <ion-buttons slot="end">
+          <ServerRemoteBadge />
           <ion-button @click="refreshData" fill="clear" class="text-gray-400 pr-2">
             <ion-icon :icon="refreshOutline"></ion-icon>
           </ion-button>
@@ -251,6 +252,7 @@
 </template>
 
 <script setup lang="ts">
+import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import { getRdsData, setRdsData } from "@/utils/NetUtil";
 import EventBus, { C_EVENT } from "@/modal/EventBus";
 import {

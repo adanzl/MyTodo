@@ -1,6 +1,7 @@
 import CalenderTab from "@/components/CalendarTab.vue";
 import FabButton from "@/components/FabButton.vue";
 import SchedulePop from "@/components/SchedulePopModal.vue";
+import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import { getColorOptions } from "@/modal/ColorType";
 import { C_EVENT } from "@/modal/EventBus";
 import IonIcons from "@/modal/IonIcons";
@@ -47,6 +48,7 @@ import { defineComponent, inject, nextTick, onMounted, ref } from "vue";
 export default defineComponent({
   components: {
     FabButton,
+    ServerRemoteBadge,
     IonAccordion,
     IonAccordionGroup,
     IonCheckbox,

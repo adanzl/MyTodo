@@ -4,6 +4,7 @@
       <ion-toolbar>
         <ion-title class="px-2">Secret Room</ion-title>
         <ion-buttons slot="end">
+          <ServerRemoteBadge />
           <ion-button @click="btnSettingClk">
             <Icon icon="weui:setting-outlined" class="w-7 h-7" />
           </ion-button>
@@ -66,6 +67,7 @@
 </template>
 
 <script setup lang="ts">
+import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import { Icon } from "@iconify/vue";
 import EventBus, { C_EVENT } from "@/modal/EventBus";
 import {
