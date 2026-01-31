@@ -126,16 +126,34 @@ export function getApiUrl() {
 /** 检测地址是否可达，失败时静默返回 false，不向控制台输出错误 */
 async function checkAddress(url: string, timeout: number = 10000): Promise<boolean> {
   const target = url.replace(/\/$/, "") + "/";
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-  try {
-    const res = await fetch(target, { method: "HEAD", signal: controller.signal });
-    clearTimeout(timeoutId);
-    return res.status >= 200 && res.status < 300;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    return false;
-  }
+
+  return new Promise((resolve) => {
+    // 创建XHR对象，替代fetch
+    const xhr = new XMLHttpRequest();
+    // 配置HEAD请求和目标地址
+    xhr.open("HEAD", target, true);
+    // 设置请求超时时间（无需额外setTimeout）
+    xhr.timeout = timeout;
+
+    // 成功回调：判断状态码是否在200-299区间
+    xhr.onload = function () {
+      resolve(xhr.status >= 200 && xhr.status < 300);
+    };
+
+    // 错误/超时/中止回调：统一返回false，无控制台报错
+    xhr.onerror = function () {
+      resolve(false);
+    }; // 网络错误
+    xhr.ontimeout = function () {
+      resolve(false);
+    }; // 超时
+    xhr.onabort = function () {
+      resolve(false);
+    }; // 手动中止
+
+    // 发送请求
+    xhr.send();
+  });
 }
 
 /** 检测本地地址是否可用（短超时，供后台自动切换使用） */
@@ -459,7 +477,14 @@ export async function downloadTtsAudio(taskId: string, fileName?: string): Promi
 /** TTS 任务更新，参考 server/core/api/tts_routes.py POST /tts/update */
 export async function updateTtsTask(
   taskId: string,
-  opts: { name?: string; text?: string; role?: string; model?: string; speed?: number; vol?: number }
+  opts: {
+    name?: string;
+    text?: string;
+    role?: string;
+    model?: string;
+    speed?: number;
+    vol?: number;
+  }
 ): Promise<void> {
   const rsp: any = await apiClient.post("/tts/update", { task_id: taskId, ...opts });
   if (rsp.data.code !== 0) {
