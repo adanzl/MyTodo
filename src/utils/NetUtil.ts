@@ -132,7 +132,7 @@ async function checkAddress(url: string, timeout: number = 10000): Promise<boole
     const res = await fetch(target, { method: "HEAD", signal: controller.signal });
     clearTimeout(timeoutId);
     return res.status >= 200 && res.status < 300;
-  } catch {
+  } catch (error) {
     clearTimeout(timeoutId);
     return false;
   }

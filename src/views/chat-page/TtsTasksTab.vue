@@ -411,6 +411,7 @@ import { computed, ref, watch } from "vue";
 import AudioPreview from "@/components/AudioPreview.vue";
 import FabButton from "@/components/FabButton.vue";
 import EventBus, { C_EVENT } from "@/modal/EventBus";
+import { resizeImageToFile } from "@/utils/ImgMgr";
 import {
   createTtsTask,
   deleteTtsTask,
@@ -587,17 +588,25 @@ function pickImages() {
   imageInputRef.value?.click();
 }
 
-function onImageFileChange(e: Event) {
+async function onImageFileChange(e: Event) {
   const input = e.target as HTMLInputElement;
   const files = input.files;
-  if (files?.length) {
+  if (!files?.length) {
+    input.value = "";
+    return;
+  }
+  try {
     const list = Array.from(files);
-    list.forEach((f) => {
+    const resized = await Promise.all(list.map((f) => resizeImageToFile(f)));
+    resized.forEach((f) => {
       selectedImages.value.push(f);
       ocrImageUrls.value.push(URL.createObjectURL(f));
     });
+  } catch (err: any) {
+    EventBus.$emit(C_EVENT.TOAST, err?.message ?? "图片处理失败");
+  } finally {
+    input.value = "";
   }
-  input.value = "";
 }
 
 function removeOcrImage(index: number) {

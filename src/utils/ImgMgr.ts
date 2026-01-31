@@ -148,4 +148,68 @@ export async function cameraAndSetImage(
     fileInput.click();
   });
 }
+
+const MAX_WIDTH = 1920;
+const MAX_HEIGHT = 1080;
+
+/**
+ * 将图片等比缩放到最大 1920x1080（按宽高最小的比缩放），返回新的 File
+ * @param file 原始图片文件
+ * @returns 缩放后的 File，若无需缩放则返回原文件
+ */
+export async function resizeImageToFile(file: File): Promise<File> {
+  if (file.type === "image/svg+xml") {
+    return file;
+  }
+
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    img.onload = () => {
+      let { width, height } = { width: img.width, height: img.height };
+
+      if (width <= MAX_WIDTH && height <= MAX_HEIGHT) {
+        URL.revokeObjectURL(img.src);
+        resolve(file);
+        return;
+      }
+
+      const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
+      width = Math.floor(width * ratio);
+      height = Math.floor(height * ratio);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        URL.revokeObjectURL(img.src);
+        reject(new Error("无法获取 canvas 上下文"));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(img.src);
+
+      const outputFormat = file.type === "image/png" ? "image/png" : "image/jpeg";
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error("压缩失败"));
+            return;
+          }
+          const ext = file.name.split(".").pop() || "jpg";
+          const baseName = file.name.replace(/\.[^.]+$/, "");
+          resolve(new File([blob], `${baseName}.${ext}`, { type: blob.type }));
+        },
+        outputFormat,
+        0.85
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(img.src);
+      reject(new Error("图片加载失败"));
+    };
+  });
+}
+
 export default {};
