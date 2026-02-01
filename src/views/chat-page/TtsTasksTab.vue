@@ -378,7 +378,7 @@ import {
 } from "@/utils/NetUtil";
 import type { RefresherCustomEvent } from "@ionic/vue";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     /** 仅在此页签激活时显示 FabButton */
     active?: boolean;
@@ -635,7 +635,7 @@ async function handleDownloadTtsAudio() {
   downloadButtonLock.value = true;
   try {
     const name = (task.name || task.task_id).replace(/[/\\?%*:|"<>]/g, "_");
-    await downloadTtsAudio(task.task_id, `tts_${name}.mp3`);
+    await downloadTtsAudio(task.task_id, `${name}.mp3`);
     EventBus.$emit(C_EVENT.TOAST, "已开始下载");
   } catch (e: any) {
     EventBus.$emit(C_EVENT.TOAST, e?.message ?? "下载失败");
@@ -832,6 +832,14 @@ async function createAndOpenTask() {
 }
 
 loadTasks();
+
+/** TTS 页签激活时自动刷新列表 */
+watch(
+  () => props.active,
+  (isActive) => {
+    if (isActive) loadTasks();
+  }
+);
 </script>
 
 <style scoped>

@@ -52,31 +52,17 @@ export function getTtsDownloadUrl(taskId: string): string {
   return `${base}${sep}tts/download?task_id=${encodeURIComponent(taskId)}`;
 }
 
-export async function downloadTtsAudio(
-  taskId: string,
-  fileName?: string
-): Promise<void> {
-  const rsp = await apiClient.get("/tts/download", {
-    params: { task_id: taskId },
-    responseType: "blob",
-  });
-  const blob = rsp.data as Blob;
-  if (blob.type === "application/json" || blob.size < 200) {
-    const text = await blob.text();
-    try {
-      const json = JSON.parse(text) as { code?: number; msg?: string };
-      if (json?.code !== 0) throw new Error(json?.msg || "下载失败");
-    } catch (e) {
-      if (e instanceof Error && e.message !== "下载失败") throw e;
-      throw new Error((e as Error)?.message ?? text ?? "下载失败");
-    }
-  }
-  const url = URL.createObjectURL(blob);
+/** 直接链接下载：不经过 blob，兼容各类浏览器（依赖同源或 Cookie 鉴权） */
+export function downloadTtsAudio(taskId: string, fileName?: string): void {
+  const name = fileName ?? `tts_${taskId}.mp3`;
+  const url = getTtsDownloadUrl(taskId);
+  if (!url) throw new Error("无法生成下载地址");
   const a = document.createElement("a");
   a.href = url;
-  a.download = fileName ?? `tts_${taskId}.mp3`;
+  a.download = name;
+  a.rel = "noopener";
+  a.target = "_blank";
   a.click();
-  URL.revokeObjectURL(url);
 }
 
 export async function updateTtsTask(

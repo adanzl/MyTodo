@@ -95,15 +95,21 @@ async function checkAddress(url: string, timeout = 500): Promise<boolean> {
   }
 }
 
-function getLocalApiUrl(): string {
+/** 本地服务器根 URL（与 server/frontend 一致，用于可用性检测） */
+function getLocalRootUrl(): string {
   const https = typeof window !== "undefined" && window.location.protocol === "https:";
   const port = LOCAL_PORTS[https ? "https" : "http"];
-  return `http${https ? "s" : ""}://${LOCAL_IP}:${port}/api`;
+  return `http${https ? "s" : ""}://${LOCAL_IP}:${port}/`;
 }
 
+function getLocalApiUrl(): string {
+  return getLocalRootUrl().replace(/\/$/, "") + "/api";
+}
+
+/** 本地可用性检测：HEAD 请求根路径。Ionic/Capacitor 下 origin 为 capacitor://localhost 或 ionic://localhost，服务端 CORS_ORIGINS 需包含二者 */
 export async function checkLocalAddressAvailable(): Promise<boolean> {
-  if(window.location.protocol === "https:") return false;
-  return checkAddress(getLocalApiUrl());
+  if (window.location.protocol === "https:") return false;
+  return checkAddress(getLocalRootUrl());
 }
 
 function setBaseUrl(url: string): void {
