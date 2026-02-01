@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import os
+from urllib.parse import quote
 
 from flask import Blueprint, request, send_file
 from flask.typing import ResponseReturnValue
@@ -203,12 +204,18 @@ def download_tts_file() -> ResponseReturnValue:
         safe_name = ''.join(c if c.isalnum() or c in ' _-' else '_' for c in raw_name).strip() or f"tts_{task_id}"
         download_name = f"{safe_name}.mp3"
 
-        # 返回文件下载，增加移动端/UC 浏览器兼容的响应头
+        # 返回文件下载。UC 等浏览器对 HTML 中 a.download 的中文支持差，依赖服务端 Content-Disposition
+        # 使用 RFC 5987 filename*=UTF-8'' 保证中文文件名正确保存
         resp = send_file(
             output_file,
             as_attachment=True,
             download_name=download_name,
             mimetype='audio/mpeg',
+        )
+        ascii_fallback = ''.join(c if ord(c) < 128 else '_' for c in download_name).strip() or 'audio.mp3'
+        encoded_filename = quote(download_name, safe='')
+        resp.headers['Content-Disposition'] = (
+            f"attachment; filename=\"{ascii_fallback}\"; filename*=UTF-8''{encoded_filename}"
         )
         resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         resp.headers['X-Content-Type-Options'] = 'nosniff'
