@@ -198,8 +198,21 @@ def download_tts_file() -> ResponseReturnValue:
         if not output_file or not os.path.exists(output_file):
             return _err('音频文件不存在')
 
-        # 返回文件下载
-        return send_file(output_file, as_attachment=True, download_name=f"tts_{task_id}.mp3", mimetype='audio/mpeg')
+        # 使用任务名称作为下载文件名，非法字符替换为下划线，无名称时用 task_id
+        raw_name = (task_info.get('name') or '').strip()
+        safe_name = ''.join(c if c.isalnum() or c in ' _-' else '_' for c in raw_name).strip() or f"tts_{task_id}"
+        download_name = f"{safe_name}.mp3"
+
+        # 返回文件下载，增加移动端/UC 浏览器兼容的响应头
+        resp = send_file(
+            output_file,
+            as_attachment=True,
+            download_name=download_name,
+            mimetype='audio/mpeg',
+        )
+        resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        resp.headers['X-Content-Type-Options'] = 'nosniff'
+        return resp
 
     except Exception as e:
         log.error(f"[TTS] 下载文件失败: {e}")
