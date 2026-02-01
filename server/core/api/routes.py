@@ -21,7 +21,9 @@ log = app_logger
 api_bp = Blueprint('api', __name__)
 
 
-def _parse_int(value: Any, name: str) -> tuple[Optional[int], Optional[ResponseReturnValue]]:
+def _parse_int(
+        value: Any,
+        name: str) -> tuple[Optional[int], Optional[ResponseReturnValue]]:
     """把输入解析为 int。失败时返回错误响应。"""
     if value is None or value == "":
         return None, {"code": -1, "msg": f"{name} is required"}
@@ -169,7 +171,9 @@ def set_data() -> ResponseReturnValue:
     args: Dict[str, Any] = read_json_from_request()
     table = args.get('table')
     data = args.get('data')
-    log.info(f"===== [Set Data] {table}: {len(data) if hasattr(data, '__len__') else 0}")
+    log.info(
+        f"===== [Set Data] {table}: {len(data) if hasattr(data, '__len__') else 0}"
+    )
     return db_mgr.set_data(table, data)
 
 
@@ -217,7 +221,9 @@ def get_rds_list() -> ResponseReturnValue:
         key = request.args.get('key')
         page_size = request.args.get('pageSize', 10, type=int)
         start_id = request.args.get('startId', -1, type=int)
-        log.info(f"===== [Get Rds List] {key}, pageSize={page_size}, startId={start_id}")
+        log.info(
+            f"===== [Get Rds List] {key}, pageSize={page_size}, startId={start_id}"
+        )
 
         total = rds_mgr.llen(key)
         if total == 0:
@@ -259,7 +265,9 @@ def set_rds_data() -> ResponseReturnValue:
         args: Dict[str, Any] = read_json_from_request()
         table = args.get('table')
         data = args.get('data')
-        log.info(f"===== [Set rds Data] {table}: {len(data) if hasattr(data, '__len__') else 0}")
+        log.info(
+            f"===== [Set rds Data] {table}: {len(data) if hasattr(data, '__len__') else 0}"
+        )
         rid = data.get('id') if isinstance(data, dict) else None
         value = data.get('value') if isinstance(data, dict) else None
         rds_mgr.set(f"{table}:{rid}", value)
@@ -277,7 +285,11 @@ def chat_messages() -> ResponseReturnValue:
         limit = request.args.get('limit')
         first_id = request.args.get('first_id')
         user = request.args.get('user')
-        return {"code": 0, "msg": "ok", "data": AILocal.get_chat_messages(c_id, limit, user, first_id)}
+        return {
+            "code": 0,
+            "msg": "ok",
+            "data": AILocal.get_chat_messages(c_id, limit, user, first_id)
+        }
     except Exception as e:
         log.error(e)
         return {"code": -1, "msg": 'error' + str(e)}
@@ -333,29 +345,46 @@ def do_lottery() -> ResponseReturnValue:
                 return {"code": -1, "msg": "No lottery data"}
             cate_cost = json.loads(cate_data)['fee']
         else:
-            cate_data = db_mgr.get_data('t_gift_category', cate_id, "id,name,cost")
+            cate_data = db_mgr.get_data('t_gift_category', cate_id,
+                                        "id,name,cost")
             if cate_data['code'] != 0:
                 return {"code": -1, "msg": "Category not found"}
             cate_cost = cate_data['data']['cost']
         if user_score < cate_cost:
             return {"code": -1, "msg": "Not enough score"}
         if cate_id == 0:
-            lottery_poll = db_mgr.get_list('t_gift', 1, 200, '*', {'enable': 1})
+            lottery_poll = db_mgr.get_list('t_gift', 1, 200, '*',
+                                           {'enable': 1})
         else:
-            lottery_poll = db_mgr.get_list('t_gift', 1, 200, '*', {'enable': 1, 'cate_id': cate_id})
+            lottery_poll = db_mgr.get_list('t_gift', 1, 200, '*', {
+                'enable': 1,
+                'cate_id': cate_id
+            })
 
-        if lottery_poll['code'] != 0 or not lottery_poll['data']['data'] or len(lottery_poll['data']['data']) == 0:
+        if lottery_poll['code'] != 0 or not lottery_poll['data']['data'] or len(
+                lottery_poll['data']['data']) == 0:
             return {"code": -1, "msg": "No available gifts"}
 
         gifts = lottery_poll['data']['data']
         selected_gift = random.choice(gifts)
-        log.info(f"Selected Gift: [{selected_gift['id']}] {selected_gift.get('name', '')}")
+        log.info(
+            f"Selected Gift: [{selected_gift['id']}] {selected_gift.get('name', '')}"
+        )
         if not selected_gift:
             return {"code": -1, "msg": "Lottery failed"}
 
-        db_mgr.add_score(user_id, -cate_cost, 'lottery', f"获得[{selected_gift['id']}]{selected_gift.get('name', '')}")
+        db_mgr.add_score(
+            user_id, -cate_cost, 'lottery',
+            f"获得[{selected_gift['id']}]{selected_gift.get('name', '')}")
 
-        return {"code": 0, "msg": "抽奖成功", "data": {"gift": selected_gift, "fee": cate_cost}}
+        return {
+            "code": 0,
+            "msg": "抽奖成功",
+            "data": {
+                "gift": selected_gift,
+                "fee": cate_cost
+            }
+        }
     except Exception as e:
         log.error(e)
         return {"code": -1, "msg": 'error: ' + str(e)}
@@ -398,7 +427,9 @@ def list_directory() -> ResponseReturnValue:
                 except Exception:
                     break
 
-        log.info(f"===== [List Directory] path={path}, extensions={extensions_filter}")
+        log.info(
+            f"===== [List Directory] path={path}, extensions={extensions_filter}"
+        )
 
         default_base_dir = config.DEFAULT_BASE_DIR
 
@@ -407,7 +438,10 @@ def list_directory() -> ResponseReturnValue:
         else:
             path_parts = path.split('/')
             if '..' in path_parts or path.startswith('~'):
-                return {"code": -1, "msg": "Invalid path: Path traversal not allowed"}
+                return {
+                    "code": -1,
+                    "msg": "Invalid path: Path traversal not allowed"
+                }
 
             if not os.path.isabs(path):
                 path = os.path.join(default_base_dir, path.lstrip('/'))
@@ -415,12 +449,10 @@ def list_directory() -> ResponseReturnValue:
             else:
                 path = os.path.abspath(path)
 
-            if not path.startswith(default_base_dir):
-                log.warning(f"Path {path} is outside allowed directory {default_base_dir}, using default directory")
-                path = default_base_dir
-
         if not os.path.exists(path):
-            log.warning(f"Path does not exist: {path}, using default directory: {default_base_dir}")
+            log.warning(
+                f"Path does not exist: {path}, using default directory: {default_base_dir}"
+            )
             path = default_base_dir
 
         # 优先尝试读取用户传入的目录；失败再回退到默认目录
@@ -431,11 +463,17 @@ def list_directory() -> ResponseReturnValue:
             entries = os.listdir(path)
 
         if not os.access(path, os.R_OK):
-            if path != default_base_dir and os.access(default_base_dir, os.R_OK):
-                log.warning(f"No read permission for {path}, using default directory: {default_base_dir}")
+            if path != default_base_dir and os.access(default_base_dir,
+                                                      os.R_OK):
+                log.warning(
+                    f"No read permission for {path}, using default directory: {default_base_dir}"
+                )
                 path = default_base_dir
             else:
-                return {"code": -1, "msg": f"Permission denied: No read permission for {path}"}
+                return {
+                    "code": -1,
+                    "msg": f"Permission denied: No read permission for {path}"
+                }
 
         items: list[Dict[str, Any]] = []
         try:
@@ -444,11 +482,13 @@ def list_directory() -> ResponseReturnValue:
                 try:
                     # 不调用 os.path.isfile（测试中未 mock，且在 mock 环境里可能触发底层类型错误）
                     stat_info = os.stat(entry_path)
-                    is_dir = os.path.isdir(entry_path) if os.path.exists(entry_path) else False
+                    is_dir = os.path.isdir(entry_path) if os.path.exists(
+                        entry_path) else False
                     item = {
                         "name": entry,
                         "isDirectory": is_dir,
-                        "size": 0 if is_dir else getattr(stat_info, 'st_size', 0),
+                        "size":
+                        0 if is_dir else getattr(stat_info, 'st_size', 0),
                         "modified": getattr(stat_info, 'st_mtime', 0),
                         "accessible": True,
                     }
@@ -505,18 +545,27 @@ def list_directory() -> ResponseReturnValue:
 
             if extensions_filter and extensions_filter != "all":
                 if extensions_filter == "audio":
-                    allowed_exts = {'.mp3', '.wav', '.aac', '.ogg', '.m4a', '.flac', '.wma', '.mp4'}
+                    allowed_exts = {
+                        '.mp3', '.wav', '.aac', '.ogg', '.m4a', '.flac',
+                        '.wma', '.mp4'
+                    }
                 elif extensions_filter == "video":
-                    allowed_exts = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'}
+                    allowed_exts = {
+                        '.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'
+                    }
                 elif extensions_filter.startswith("."):
-                    allowed_exts = {ext.strip().lower() for ext in extensions_filter.split(",")}
+                    allowed_exts = {
+                        ext.strip().lower()
+                        for ext in extensions_filter.split(",")
+                    }
                 else:
                     allowed_exts = None
 
                 if allowed_exts:
                     items = [
                         item for item in items
-                        if item["isDirectory"] or os.path.splitext(item["name"])[1].lower() in allowed_exts
+                        if item["isDirectory"] or os.path.splitext(
+                            item["name"])[1].lower() in allowed_exts
                     ]
 
             return {"code": 0, "msg": "ok", "data": items, "currentPath": path}
@@ -550,7 +599,10 @@ def get_file_info() -> ResponseReturnValue:
                 break
 
         if '..' in file_path.split('/') or file_path.startswith('~'):
-            return {"code": -1, "msg": "Invalid path: Path traversal not allowed"}
+            return {
+                "code": -1,
+                "msg": "Invalid path: Path traversal not allowed"
+            }
 
         default_base_dir = config.DEFAULT_BASE_DIR
         if not os.path.isabs(file_path):
@@ -560,7 +612,9 @@ def get_file_info() -> ResponseReturnValue:
             file_path = os.path.abspath(file_path)
 
         if not file_path.startswith(default_base_dir):
-            log.warning(f"Path {file_path} is outside allowed directory {default_base_dir}")
+            log.warning(
+                f"Path {file_path} is outside allowed directory {default_base_dir}"
+            )
             return {"code": -1, "msg": "文件路径不在允许的目录内"}
 
         if not os.path.exists(file_path):
@@ -579,8 +633,8 @@ def get_file_info() -> ResponseReturnValue:
         }
 
         media_extensions = {
-            '.mp3', '.wav', '.aac', '.ogg', '.m4a', '.flac', '.wma', '.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv',
-            '.webm'
+            '.mp3', '.wav', '.aac', '.ogg', '.m4a', '.flac', '.wma', '.mp4',
+            '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'
         }
         file_ext = os.path.splitext(file_path)[1].lower()
         is_media_file = file_ext in media_extensions

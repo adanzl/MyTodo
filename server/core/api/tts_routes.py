@@ -204,8 +204,8 @@ def download_tts_file() -> ResponseReturnValue:
         safe_name = ''.join(c if c.isalnum() or c in ' _-' else '_' for c in raw_name).strip() or f"tts_{task_id}"
         download_name = f"{safe_name}.mp3"
 
-        # 返回文件下载。UC 等浏览器对 HTML 中 a.download 的中文支持差，依赖服务端 Content-Disposition
-        # 使用 RFC 5987 filename*=UTF-8'' 保证中文文件名正确保存
+        # 返回文件下载。UC 等对 HTML a.download 的中文支持差，依赖服务端 Content-Disposition。
+        # filename= 为 ASCII 回退（旧浏览器）；支持 RFC 5987 的用 filename* 取中文名。
         resp = send_file(
             output_file,
             as_attachment=True,
