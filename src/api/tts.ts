@@ -52,8 +52,8 @@ export function getTtsDownloadUrl(taskId: string): string {
   return `${base}${sep}tts/download?task_id=${encodeURIComponent(taskId)}`;
 }
 
-/** 直接链接下载：不经过 blob，兼容各类浏览器（依赖同源或 Cookie 鉴权） */
-export function downloadTtsAudio(taskId: string, fileName?: string): void {
+/** 直接链接下载：不经过 blob，兼容各类浏览器（依赖同源或 Cookie 鉴权）。返回实际使用的下载文件名。 */
+export function downloadTtsAudio(taskId: string, fileName?: string): string {
   const name = fileName ?? `tts_${taskId}.mp3`;
   const url = getTtsDownloadUrl(taskId);
   if (!url) throw new Error("无法生成下载地址");
@@ -63,6 +63,7 @@ export function downloadTtsAudio(taskId: string, fileName?: string): void {
   a.rel = "noopener";
   a.target = "_blank";
   a.click();
+  return name;
 }
 
 export async function updateTtsTask(

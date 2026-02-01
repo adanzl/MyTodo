@@ -635,8 +635,8 @@ async function handleDownloadTtsAudio() {
   downloadButtonLock.value = true;
   try {
     const name = (task.name || task.task_id).replace(/[/\\?%*:|"<>]/g, "_");
-    await downloadTtsAudio(task.task_id, `${name}.mp3`);
-    EventBus.$emit(C_EVENT.TOAST, "已开始下载");
+    const fileName = await downloadTtsAudio(task.task_id, `${name}.mp3`);
+    EventBus.$emit(C_EVENT.TOAST, `已开始下载：${fileName}`);
   } catch (e: any) {
     EventBus.$emit(C_EVENT.TOAST, e?.message ?? "下载失败");
   } finally {
