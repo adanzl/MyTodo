@@ -454,7 +454,10 @@ watch(
         const taskId = selectedTask.value.task_id;
         try {
           const updated = await getTtsTask(taskId);
-          selectedTask.value = updated;
+          // 仅当详情弹窗仍在该任务时更新 selectedTask，避免关闭弹窗后被轮询结果重新打开
+          if (selectedTask.value?.task_id === taskId) {
+            selectedTask.value = updated;
+          }
           const idx = tasks.value.findIndex((t) => t.task_id === taskId);
           if (idx >= 0) tasks.value[idx] = updated;
         } catch {
