@@ -343,6 +343,7 @@ import {
   IonTitle,
   IonToolbar,
   alertController,
+  loadingController,
 } from "@ionic/vue";
 import {
   arrowDownOutline,
@@ -504,12 +505,18 @@ const canGoNext = computed(
 );
 
 async function openDetail(task: TtsTaskItem) {
+  const loading = await loadingController.create({
+    message: "Loading...",
+  });
+  loading.present();
   try {
     const full = await getTtsTask(task.task_id);
     selectedTask.value = full;
   } catch (e: any) {
     EventBus.$emit(C_EVENT.TOAST, e?.message ?? "加载任务详情失败");
     selectedTask.value = task;
+  } finally {
+    loading.dismiss();
   }
 }
 
@@ -525,20 +532,28 @@ function closeDetailModal() {
 async function goPrev() {
   if (!canGoPrev.value) return;
   const prev = tasks.value[currentIndex.value - 1];
+  const loading = await loadingController.create({ message: "Loading..." });
+  loading.present();
   try {
     selectedTask.value = await getTtsTask(prev.task_id);
   } catch {
     selectedTask.value = prev;
+  } finally {
+    loading.dismiss();
   }
 }
 
 async function goNext() {
   if (!canGoNext.value) return;
   const next = tasks.value[currentIndex.value + 1];
+  const loading = await loadingController.create({ message: "Loading..." });
+  loading.present();
   try {
     selectedTask.value = await getTtsTask(next.task_id);
   } catch {
     selectedTask.value = next;
+  } finally {
+    loading.dismiss();
   }
 }
 

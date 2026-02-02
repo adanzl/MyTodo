@@ -44,6 +44,13 @@ def create_app():
     app.config.setdefault("OPENAPI_SWAGGER_UI_URL", "https://cdn.jsdelivr.net/npm/swagger-ui-dist/")
     Api(app)
 
+    # OPTIONS 预检短路：必须在 limiter 之前注册，避免 OPTIONS 走限流等逻辑导致延迟
+    @app.before_request
+    def _short_circuit_options():
+        if request.method == 'OPTIONS':
+            request._start_time = time.time()
+            return '', 200
+
     # 配置限流（全局默认）
     limiter = Limiter(
         key_func=get_remote_address,
