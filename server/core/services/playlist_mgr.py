@@ -75,6 +75,7 @@ class PlaylistMgr:
         self._needs_reload = False  # 标记是否需要重新从 RDS 加载
         self._rds_save_queue = Queue()  # Redis 保存操作队列（用于从线程传递到 gevent 环境）
         self._rds_save_greenlet = None  # Redis 保存操作的 greenlet
+        self._last_play_sent_at = {}  # 向设备发送 play 的时间 {playlist_id: datetime}，用于停止时判断是否需延迟再发 stop
         self.reload()
         self._start_rds_save_worker()  # 启动 Redis 保存操作的 worker
 
@@ -372,7 +373,7 @@ class PlaylistMgr:
                 log.info(f"[PlaylistMgr] 创建定时任务成功: {playlist_id}, {playlist_name}, cron: {cron_expression}")
             else:
                 log.error(f"[PlaylistMgr] 创建定时任务失败: {playlist_id}, {playlist_name}, cron: {cron_expression}")
-                
+
         except Exception as e:
             log.error(f"[PlaylistMgr] _refresh_cron_job error: id={playlist_id}, {e}", exc_info=True)
             raise
@@ -384,7 +385,7 @@ class PlaylistMgr:
 
         # 清理孤立的定时任务
         job_prefixes = [("playlist_cron_", "定时任务"), ("playlist_file_timer_", "文件定时器"),
-                        ("playlist_duration_timer_", "播放列表时长定时器")]
+                        ("playlist_duration_timer_", "播放列表时长定时器"), ("playlist_stop_verify_", "停止验证任务")]
         for job in scheduler.get_all_jobs():
             for prefix, name in job_prefixes:
                 if job.id.startswith(prefix):
@@ -396,7 +397,8 @@ class PlaylistMgr:
 
         # 清理孤立的状态记录
         state_dicts = [(self._scheduled_play_start_times, "定时任务播放开始时间"), (self._file_timers, "文件定时器"),
-                       (self._playlist_duration_timers, "播放列表时长定时器"), (self._play_state, "播放状态跟踪")]
+                       (self._playlist_duration_timers, "播放列表时长定时器"), (self._play_state, "播放状态跟踪"),
+                       (self._last_play_sent_at, "最近发 play 时间")]
         for state_dict, name in state_dicts:
             for playlist_id in list(state_dict.keys()):
                 if playlist_id not in playlist_ids:
@@ -709,6 +711,9 @@ class PlaylistMgr:
             log.warning(f"[PlaylistMgr] play failed: id={id}, code={code}, msg={msg}")
             return code, msg
 
+        # 记录向设备发送 play 的时间，供停止时判断是否需延迟再发 stop（设备加载中可能忽略第一次 stop）
+        self._last_play_sent_at[id] = datetime.datetime.now()
+
         # 标记为正在播放
         self._playing_playlists.add(id)
         playlist_data['isPlaying'] = True
@@ -930,6 +935,31 @@ class PlaylistMgr:
             log.info(f"[PlaylistMgr] 停止播放成功: {id} - {p_name}")
         else:
             log.error(f"[PlaylistMgr] 停止播放失败 - 设备停止失败: {id} - {p_name}, {msg}")
+
+        # 若 3s 内向设备发过 play（如刚切歌），设备可能在加载中忽略了 stop，3s 后若列表仍为停止状态则再发一次 stop
+        last_play_sent = self._last_play_sent_at.get(id)
+        if last_play_sent and (datetime.datetime.now() - last_play_sent).total_seconds() < 3:
+            verify_job_id = f"playlist_stop_verify_{id}"
+            if scheduler_mgr.get_job(verify_job_id):
+                scheduler_mgr.remove_job(verify_job_id)
+
+            def _stop_verify_task(pid=id) -> None:
+                try:
+                    if pid not in self._playing_playlists:
+                        dev = self._device_map.get(pid)
+                        if dev:
+                            c, m = dev["obj"].stop()
+                            p_name_verify = self._playlist_raw.get(pid, {}).get("name", "未知播放列表")
+                            log.info(
+                                f"[PlaylistMgr] 停止验证: 列表已停止且 3s 内曾发过 play，再次向设备发 stop: {pid} - {p_name_verify}, code={c}, msg={m}"
+                            )
+                except Exception as e:
+                    log.error(f"[PlaylistMgr] 停止验证任务异常: {pid}, {e}", exc_info=True)
+
+            run_date = datetime.datetime.now() + timedelta(seconds=3)
+            scheduler_mgr.add_date_job(func=_stop_verify_task, job_id=verify_job_id, run_date=run_date)
+            log.info(f"[PlaylistMgr] 3s 内曾向设备发过 play，已安排 3s 后验证并必要时再发 stop: {id} - {p_name}")
+
         return code, msg
 
     def trigger_button(self, button: str, action: str) -> tuple[int, str]:
