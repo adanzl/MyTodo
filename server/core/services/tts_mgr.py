@@ -842,10 +842,13 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             return d
 
     def list_tasks(self) -> List[Dict[str, Any]]:
-        """获取任务列表。每个任务字典包含 ocr_running、analysis_running。"""
+        """获取任务列表。不返回 text、analysis 以减小响应体积；包含 has_analysis、ocr_running、analysis_running。"""
         tasks = super().list_tasks()
         with self._task_lock:
             for t in tasks:
+                t['has_analysis'] = bool(t.get('analysis'))
+                t.pop('text', None)
+                t.pop('analysis', None)
                 tid = t.get('task_id', '')
                 t['ocr_running'] = tid in self._ocr_running_tasks
                 t['analysis_running'] = tid in self._analysis_running_tasks
