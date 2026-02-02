@@ -19,6 +19,18 @@ console.log("🚀 开始部署...");
 console.log(`📦 构建目录: ${distDir}`);
 console.log(`📁 目标目录: ${staticDir}`);
 
+// 在前端目录执行 npm install 确保依赖已安装
+console.log("📦 安装前端依赖...");
+const installResult = spawnSync("npm", ["install"], {
+    cwd: projectRoot,
+    stdio: "inherit",
+    shell: true,
+});
+if (installResult.status !== 0) {
+    console.error("❌ 错误: 依赖安装失败");
+    process.exit(1);
+}
+
 // 在前端目录执行 npm run build
 console.log("📦 正在构建前端项目...");
 const buildResult = spawnSync("npm", ["run", "build"], {
