@@ -230,7 +230,7 @@
             <el-icon><Refresh /></el-icon>
           </el-button>
           <el-button
-            v-show="!preFilesBatchDeleteMode && !preFilesDragMode"
+            v-show="showMoreActions && !preFilesBatchDeleteMode && !preFilesDragMode"
             type="info"
             size="small"
             plain
@@ -240,6 +240,18 @@
             title="应用到列表"
           >
             <el-icon><DocumentCopy /></el-icon>
+          </el-button>
+          <el-button
+            v-show="!preFilesBatchDeleteMode && !preFilesDragMode"
+            type="info"
+            size="small"
+            plain
+            circle
+            @click.stop="$emit('play-on-device', file)"
+            :disabled="playlistLoading"
+            title="在设备上播放"
+          >
+            <span>▶</span>
           </el-button>
           <el-button
             v-show="!preFilesBatchDeleteMode"
@@ -327,6 +339,7 @@ defineEmits<{
   "move-down": [index: number];
   replace: [index: number];
   "open-playlist-selector": [file: MediaFile];
+  "play-on-device": [file: MediaFile];
   delete: [index: number];
 }>();
 

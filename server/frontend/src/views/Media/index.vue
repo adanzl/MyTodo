@@ -1,9 +1,9 @@
 <template>
   <div class="p-1">
     <!-- 3列布局：播放列表 | 文件列表 | 配置详情 -->
-    <div class="flex gap-4 h-[calc(100vh-150px)]">
+    <div class="flex gap-4 h-[calc(100vh-150px)] w-full min-w-0 overflow-hidden">
       <!-- 第一列：播放列表列表 -->
-      <PlaylistList
+      <PanelPlaylistList
         :playlist-collection="playlistCollection"
         :active-playlist-id="activePlaylistId"
         :refreshing="playlistRefreshing"
@@ -14,10 +14,10 @@
         @toggle-auto-refresh="handleToggleAutoRefresh"
         @menu-command="handlePlaylistMenuCommand"
       >
-      </PlaylistList>
+      </PanelPlaylistList>
 
       <!-- 第二列：文件列表 -->
-      <FileListPanel
+      <PanelFileList
         :playlist-status="playlistStatus"
         :active-playlist-id="activePlaylistId"
         :editing-playlist-id="editingPlaylistId"
@@ -73,17 +73,19 @@
         @move-pre-file-down="handleMovePreFileDown"
         @replace-pre-file="handleReplacePreFile"
         @open-playlist-selector-for-pre-file="handleOpenPlaylistSelectorForPreFile"
+        @play-on-device-for-pre-file="handlePlayOnDeviceForPreFile"
         @delete-pre-file="handleDeletePreFile"
         @move-file-up="handleMovePlaylistItemUp"
         @move-file-down="handleMovePlaylistItemDown"
         @replace-file="handleReplacePlaylistItem"
         @open-playlist-selector-for-file="handleOpenPlaylistSelectorForFile"
+        @play-on-device-for-file="handlePlayOnDeviceForFile"
         @delete-file="handleDeletePlaylistItem"
       >
-      </FileListPanel>
+      </PanelFileList>
 
       <!-- 第三列：配置详情（Cron + 设备） -->
-      <ConfigPanel
+      <PanelConfig
         :playlist-status="playlistStatus"
         :connected-device-list="connectedDeviceList"
         :dlna-device-list="dlnaDeviceList"
@@ -107,7 +109,7 @@
         :on-scan-mi-devices="scanMiDevices"
         :on-open-scan-dialog="handleOpenScanDialog"
         :on-open-device-list="handleOpenAgentListDialog"
-      ></ConfigPanel>
+      ></PanelConfig>
     </div>
 
     <!-- 文件浏览对话框 -->
@@ -218,9 +220,9 @@ import { logAndNoticeError } from "@/utils/error";
 import FileDialog from "@/views/dialogs/FileDialog.vue";
 import CronDialog from "@/views/dialogs/CronDialog.vue";
 import CronPreviewDialog from "@/views/dialogs/CronPreviewDialog.vue";
-import PlaylistList from "./PlaylistList.vue";
-import FileListPanel from "./FileListPanel.vue";
-import ConfigPanel from "./ConfigPanel.vue";
+import PanelPlaylistList from "./PanelPlaylistList.vue";
+import PanelFileList from "./PanelFileList.vue";
+import PanelConfig from "./PanelConfig.vue";
 import ScanDeviceDialog from "@/views/dialogs/ScanDeviceDialog.vue";
 import DevicesDrawer from "@/views/dialogs/DevicesDrawer.vue";
 import PlaylistSelectDialog from "@/views/dialogs/PlaylistSelectDialog.vue";
@@ -236,6 +238,9 @@ import { useAudioPlayback } from "./composables/useAudioPlayback";
 import { useFileOperations } from "./composables/useFileOperations";
 import { useDragAndDrop } from "./composables/useDragAndDrop";
 import { usePlaylistNameEdit } from "./composables/usePlaylistNameEdit";
+import { ElMessage } from "element-plus";
+import { playFileOnDevice } from "@/api/playlist";
+import type { MediaFile } from "@/types/tools";
 
 // 状态管理 - 使用 composable
 const {
@@ -511,6 +516,33 @@ const handlePlaylistMenuCommand = async (command: string, playlistId: string) =>
     await handleCopyPlaylist(playlistId);
   }
 };
+
+// 在设备上播放（单次推播，使用当前播放列表绑定的设备）
+const playOnDevice = async (file: MediaFile) => {
+  const uri = file?.uri || file?.path || "";
+  if (!uri) {
+    ElMessage.warning("文件地址无效");
+    return;
+  }
+  const pid = activePlaylistId.value;
+  if (!pid) {
+    ElMessage.warning("请先选择播放列表");
+    return;
+  }
+  try {
+    const res = await playFileOnDevice(pid, uri);
+    if (res?.code === 0) {
+      ElMessage.success(res?.msg ?? "已在设备上开始播放");
+    } else {
+      ElMessage.error(res?.msg ?? "在设备上播放失败");
+    }
+  } catch (e) {
+    ElMessage.error("在设备上播放失败");
+    console.error(e);
+  }
+};
+const handlePlayOnDeviceForPreFile = (file: MediaFile) => playOnDevice(file);
+const handlePlayOnDeviceForFile = (file: MediaFile) => playOnDevice(file);
 
 // 批量添加文件到播放列表
 const handleBatchAddFiles = async (data: {

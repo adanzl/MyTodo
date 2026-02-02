@@ -136,6 +136,28 @@ def playlist_play_pre() -> ResponseReturnValue:
         return _err(f'error: {str(e)}')
 
 
+@playlist_bp.route("/playlist/playFile", methods=['POST'])
+def playlist_play_file() -> ResponseReturnValue:
+    """在指定播放列表绑定的设备上播放指定文件（单次推播）。"""
+    try:
+        args: Dict[str, Any] = read_json_from_request()
+        if not args:
+            return _err("请求数据不能为空")
+        pid = args.get("id")
+        uri = args.get("uri")
+        if not pid:
+            return _err("播放列表 id 不能为空")
+        if not uri or not str(uri).strip():
+            return _err("文件 uri 不能为空")
+        ret, msg = playlist_mgr.play_file_on_device(pid, str(uri).strip())
+        if ret != 0:
+            return _err(msg)
+        return _ok(msg)
+    except Exception as e:
+        log.error(f"[PLAYLIST] PlayFile error: {e}")
+        return _err(f'error: {str(e)}')
+
+
 @playlist_bp.route("/playlist/stop", methods=['POST'])
 def playlist_stop() -> ResponseReturnValue:
     """停止播放。"""

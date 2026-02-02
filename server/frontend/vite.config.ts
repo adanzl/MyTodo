@@ -50,7 +50,7 @@ export default defineConfig({
   },
   server: {
     host: "localhost", // 仅允许本地访问
-    port: 5174, // 指定端口
+    port: 5174, // 指定端口；也可用 npm run dev -- --port 端口号 临时覆盖
     proxy: {
       "/api": {
         target: "http://localhost:8000",
@@ -132,7 +132,10 @@ export default defineConfig({
 
           // 将 API + types + utils 打成一个 shared 包，避免 api-shared <-> types-shared <-> utils-shared 循环依赖
           if (
-            (id.includes("/api/") || id.includes("/types/") || id.includes("/utils/") || id.includes("/constants/")) &&
+            (id.includes("/api/") ||
+              id.includes("/types/") ||
+              id.includes("/utils/") ||
+              id.includes("/constants/")) &&
             !id.includes("/views/") &&
             !id.includes("node_modules")
           ) {

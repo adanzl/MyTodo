@@ -128,7 +128,7 @@
             <el-icon><Refresh /></el-icon>
           </el-button>
           <el-button
-            v-show="showPlaylistSelectorButton"
+            v-show="showMoreButtons"
             type="info"
             size="small"
             plain
@@ -138,6 +138,19 @@
             title="应用到列表"
           >
             <el-icon><DocumentCopy /></el-icon>
+          </el-button>
+          <el-button
+            v-show="showPlaylistSelectorButton"
+            type="info"
+            size="small"
+            plain
+            circle
+            @click.stop="emit('play-on-device', file)"
+            :disabled="playlistLoading"
+            title="在设备上播放"
+          >
+            <el-icon v-if="false" size="12" class="animate-spin"><Loading /></el-icon>
+            <span v-else>▶</span>
           </el-button>
           <el-button
             v-show="!filesBatchDeleteMode"
@@ -193,6 +206,7 @@ const emit = defineEmits<{
   "move-down": [index: number];
   replace: [index: number];
   "open-playlist-selector": [file: MediaFile];
+  "play-on-device": [file: MediaFile];
   delete: [index: number];
 }>();
 

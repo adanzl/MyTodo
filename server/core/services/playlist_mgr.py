@@ -733,6 +733,39 @@ class PlaylistMgr:
 
         return 0, "播放成功"
 
+    def play_file_on_device(self, playlist_id: str, file_uri: str) -> tuple[int, str]:
+        """在指定播放列表绑定的设备上播放指定文件（单次推播，不改变列表播放状态）。
+
+        Args:
+            playlist_id (str): 播放列表 ID。
+            file_uri (str): 文件路径或 URI。
+
+        Returns:
+            tuple[int, str]: (code, msg)。code=0 表示成功。
+        """
+        if not file_uri or not str(file_uri).strip():
+            return -1, "文件地址无效"
+        if not self._playlist_raw or playlist_id not in self._playlist_raw:
+            return -1, "播放列表不存在"
+        device_obj = self._device_map.get(playlist_id)
+        if device_obj is None:
+            return -1, "该播放列表未绑定设备，请先在配置中设置设备"
+        device = device_obj["obj"]
+        playlist_data = self._playlist_raw[playlist_id]
+        device_volume = playlist_data.get("device_volume")
+        if device_volume is not None and hasattr(device, "set_volume"):
+            try:
+                device.set_volume(device_volume)
+            except Exception as e:
+                log.warning(f"[PlaylistMgr] play_file_on_device set_volume: {e}")
+        code, msg = device.play(file_uri.strip())
+        if code != 0:
+            log.warning(f"[PlaylistMgr] play_file_on_device failed: id={playlist_id}, code={code}, msg={msg}")
+            return code, msg
+        self._last_play_sent_at[playlist_id] = datetime.datetime.now()
+        log.info(f"[PlaylistMgr] play_file_on_device ok: id={playlist_id}, uri={file_uri[:80]}")
+        return 0, "已在设备上开始播放"
+
     def _update_index_and_play(self,
                                id: str,
                                in_pre_files: bool = None,
@@ -905,7 +938,8 @@ class PlaylistMgr:
         """停止指定播放列表的播放。
 
         该方法会清理与该播放列表相关的运行时状态（播放状态、定时器等），并调用
-        设备层的 `stop()` 停止实际播放。
+        设备层的 `stop()` 停止实际播放。不要求播放列表非空，以便在仅做过「在设备上播放」
+        单次推播时也能停止设备。
 
         Args:
             id (str): 播放列表 ID。
@@ -916,11 +950,8 @@ class PlaylistMgr:
         p_name = self._playlist_raw.get(id, {}).get("name", "未知播放列表")
         log.info(f"[PlaylistMgr] 停止播放: {id} - {p_name}")
 
-        _, code, msg = self._validate_playlist(id)
-        if code != 0:
-            log.warning(f"[PlaylistMgr] 停止播放失败 - 验证失败: {id} - {p_name}, {msg}")
-            return code, msg
-
+        if not self._playlist_raw or id not in self._playlist_raw:
+            return -1, "播放列表不存在"
         device_obj = self._device_map.get(id)
         if device_obj is None:
             log.warning(f"[PlaylistMgr] 停止播放失败 - 设备不存在: {id} - {p_name}")

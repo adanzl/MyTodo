@@ -1,5 +1,5 @@
 <template>
-  <div class="w-64 border rounded p-3 flex flex-col">
+  <div class="w-64 min-w-62 border rounded p-3 flex flex-col">
     <div class="flex items-center justify-between mb-3">
       <h3 class="text-base font-semibold">播放列表</h3>
       <div class="flex items-center gap-1">
