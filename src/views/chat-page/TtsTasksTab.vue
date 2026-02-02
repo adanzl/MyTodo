@@ -20,13 +20,10 @@
             @click="openDetail(task)">
             <div class="flex items-center justify-between gap-2">
               <span class="font-medium text-gray-800 flex-1 truncate">{{ task.name || task.task_id }}</span>
-              <ion-icon v-if="task.analysis" :icon="checkmarkCircleOutline" class="w-4 h-4"></ion-icon>
+              <ion-icon v-if="task.has_analysis" :icon="checkmarkCircleOutline" class="w-4 h-4"></ion-icon>
               <ion-badge :color="statusColor(task.status)" class="p-1 w-14">{{
                 statusLabel(task.status)
               }}</ion-badge>
-            </div>
-            <div v-if="task.text" class="mt-1 line-clamp-2 text-sm text-gray-600">
-              {{ task.text.slice(0, 80) }}{{ task.text.length > 80 ? "…" : "" }}
             </div>
             <div class="mt-2 flex items-center gap-3 text-xs text-gray-400">
               <span v-if="task.total_chars != null">字数 {{ task.total_chars }}</span>
@@ -506,8 +503,14 @@ const canGoNext = computed(
   () => currentIndex.value >= 0 && currentIndex.value < tasks.value.length - 1
 );
 
-function openDetail(task: TtsTaskItem) {
-  selectedTask.value = task;
+async function openDetail(task: TtsTaskItem) {
+  try {
+    const full = await getTtsTask(task.task_id);
+    selectedTask.value = full;
+  } catch (e: any) {
+    EventBus.$emit(C_EVENT.TOAST, e?.message ?? "加载任务详情失败");
+    selectedTask.value = task;
+  }
 }
 
 /** 关闭详情弹窗并停止刷新当前任务的定时器 */
@@ -519,14 +522,24 @@ function closeDetailModal() {
   selectedTask.value = null;
 }
 
-function goPrev() {
+async function goPrev() {
   if (!canGoPrev.value) return;
-  selectedTask.value = tasks.value[currentIndex.value - 1];
+  const prev = tasks.value[currentIndex.value - 1];
+  try {
+    selectedTask.value = await getTtsTask(prev.task_id);
+  } catch {
+    selectedTask.value = prev;
+  }
 }
 
-function goNext() {
+async function goNext() {
   if (!canGoNext.value) return;
-  selectedTask.value = tasks.value[currentIndex.value + 1];
+  const next = tasks.value[currentIndex.value + 1];
+  try {
+    selectedTask.value = await getTtsTask(next.task_id);
+  } catch {
+    selectedTask.value = next;
+  }
 }
 
 function scrollToAnalysis() {
@@ -607,7 +620,13 @@ async function handleStartTask() {
     EventBus.$emit(C_EVENT.TOAST, "任务已开始处理");
     await loadTasks();
     const updated = tasks.value.find((t) => t.task_id === task.task_id);
-    if (updated) selectedTask.value = updated;
+    if (updated) {
+      try {
+        selectedTask.value = await getTtsTask(updated.task_id);
+      } catch {
+        selectedTask.value = updated;
+      }
+    }
   } catch (e: any) {
     EventBus.$emit(C_EVENT.TOAST, e?.message ?? "启动任务失败");
   } finally {
@@ -710,7 +729,13 @@ async function runOcr() {
     EventBus.$emit(C_EVENT.TOAST, "识别已启动，结果将追加到任务文本，请稍后刷新");
     await loadTasks();
     const updated = tasks.value.find((t) => t.task_id === task.task_id);
-    if (updated) selectedTask.value = updated;
+    if (updated) {
+      try {
+        selectedTask.value = await getTtsTask(updated.task_id);
+      } catch {
+        selectedTask.value = updated;
+      }
+    }
   } catch (e: any) {
     EventBus.$emit(C_EVENT.TOAST, e?.message ?? "识别失败");
   } finally {
@@ -778,7 +803,6 @@ function statusColor(status: string): string {
 function formatTime(ts: number): string {
   if (!ts) return "";
   const d = new Date(ts * 1000);
-  const now = new Date();
   return d.toLocaleDateString("zh-CN", {
     month: "2-digit",
     day: "2-digit",
@@ -820,8 +844,13 @@ async function createAndOpenTask() {
     const { task_id } = await createTtsTask({ text: "" });
     await loadTasks();
     const task = tasks.value.find((t) => t.task_id === task_id);
-    if (task) selectedTask.value = task;
-    else EventBus.$emit(C_EVENT.TOAST, "已创建，请从列表打开");
+    if (task) {
+      try {
+        selectedTask.value = await getTtsTask(task_id);
+      } catch {
+        selectedTask.value = task;
+      }
+    } else EventBus.$emit(C_EVENT.TOAST, "已创建，请从列表打开");
   } catch (e: any) {
     EventBus.$emit(C_EVENT.TOAST, e?.message ?? "创建失败");
   } finally {

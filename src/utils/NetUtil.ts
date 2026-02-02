@@ -45,7 +45,13 @@ export {
 } from "@/api/api-client";
 
 export { getSave, setSave, getScheduleList } from "@/api/schedule";
-export { getUserInfo, setUserData, getUserList, addScore } from "@/api/user";
+export {
+  getUserInfo,
+  setUserData,
+  getUserList,
+  addScore,
+  clearUserListCache,
+} from "@/api/user";
 export {
   getConversationId,
   setConversationId,

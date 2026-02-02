@@ -236,7 +236,8 @@ export interface TtsTaskAnalysis {
   [key: string]: unknown;
 }
 
-/** TTS 任务项，与 server/core/services/tts_mgr TTSTask 及 GET /tts/list 返回一致 */
+/** TTS 任务项，与 server/core/services/tts_mgr TTSTask 及 GET /tts/list 返回一致。
+ * 注意：list 接口不返回 text、analysis，仅返回 has_analysis；详情需通过 get 接口获取。 */
 export interface TtsTaskItem {
   task_id: string;
   name: string;
@@ -244,6 +245,7 @@ export interface TtsTaskItem {
   error_message?: string | null;
   create_time: number;
   update_time: number;
+  /** list 接口不返回，需通过 get 获取 */
   text?: string;
   role?: string | null;
   model?: string | null;
@@ -254,7 +256,10 @@ export interface TtsTaskItem {
   duration?: number | null;
   ocr_running?: boolean;
   analysis_running?: boolean;
+  /** list 接口不返回，需通过 get 获取 */
   analysis?: TtsTaskAnalysis | null;
+  /** 是否有分析结果（仅 list 接口返回，用于列表展示角标） */
+  has_analysis?: boolean;
 }
 
 /** POST /tts/create 请求体 */

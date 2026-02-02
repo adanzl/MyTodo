@@ -3,11 +3,20 @@
     <h3 class="text-lg font-semibold mb-3">配置详情</h3>
 
     <!-- 功能按钮区域 -->
-    <div v-if="playlistStatus" class="mb-3 flex items-center gap-2 flex-wrap">
-      <el-button type="default" @click="onOpenDeviceList" title="打开设备列表">
-        <el-icon><Monitor /></el-icon>
-        <span class="ml-1">设备列表</span>
-      </el-button>
+    <div v-if="playlistStatus" class="mb-3 flex flex-col gap-2">
+      <!-- 任务id -->
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-gray-500">任务 ID</span>
+        <span class="text-xs font-mono text-gray-700 truncate" :title="playlistStatus.id">{{
+          playlistStatus.id
+        }}</span>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <el-button type="default" @click="onOpenDeviceList" title="打开设备列表">
+          <el-icon><Monitor /></el-icon>
+          <span class="ml-1">设备列表</span>
+        </el-button>
+      </div>
     </div>
 
     <div v-if="playlistStatus" class="flex-1 overflow-y-auto space-y-4">

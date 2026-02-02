@@ -54,7 +54,7 @@
               {{ getTtsStatusText(task.status) }}
             </el-tag>
             <el-tag
-              v-if="task.analysis"
+              v-if="task.has_analysis"
               type="primary"
               size="small"
               effect="dark"
@@ -362,6 +362,12 @@
         <!-- 参数设置 -->
         <div class="border rounded p-3 flex flex-col gap-2">
           <h4 class="text-sm font-semibold">参数设置</h4>
+          <div class="flex gap-1">
+            <label class="text-xs text-gray-600">任务 ID: </label>
+            <span class="text-xs text-gray-600">
+              {{ ttsCurrentTask.task_id }}
+            </span>
+          </div>
           <div class="grid grid-cols-2 gap-3">
             <div class="flex flex-col gap-1">
               <label class="text-xs text-gray-600">模型</label>

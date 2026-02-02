@@ -10,7 +10,13 @@ export {
 } from "./api-client";
 
 export { getSave, setSave, getScheduleList } from "./schedule";
-export { getUserInfo, setUserData, getUserList, addScore } from "./user";
+export {
+  getUserInfo,
+  setUserData,
+  getUserList,
+  addScore,
+  clearUserListCache,
+} from "./user";
 export {
   getConversationId,
   setConversationId,

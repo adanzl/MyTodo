@@ -85,9 +85,14 @@ export interface TTSTask {
   duration?: number;
 
   /**
-   * 文本分析结果（调用 /tts/analysis 后写入）
+   * 文本分析结果（调用 /tts/analysis 后写入）。list 接口不返回，需通过 get 获取。
    */
   analysis?: TTSAnalysis | null;
+
+  /**
+   * 是否有分析结果（仅 list 接口返回，用于列表展示角标）
+   */
+  has_analysis?: boolean;
 
   /**
    * 是否正在执行 OCR 子任务（不改变主状态，但锁定更新/启动/删除）

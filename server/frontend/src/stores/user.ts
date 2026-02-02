@@ -30,6 +30,9 @@ export const useUserStore = defineStore("user", () => {
   // 缓存时间（毫秒），5分钟内不重复请求
   const CACHE_DURATION = 5 * 60 * 1000;
 
+  // 合并并发请求：同一时刻只发起一次 getAllUser
+  let pendingRequest: Promise<void> | null = null;
+
   // localStorage key
   const KEY_USER_ID = "user_id";
 
@@ -57,22 +60,33 @@ export const useUserStore = defineStore("user", () => {
       return;
     }
 
-    loading.value = true;
-    try {
-      const response = await getAllUser<UserWithExtras>();
-      if (response && response.data) {
-        userList.value = response.data.data || [];
-        lastFetchTime.value = Date.now();
-      } else {
-        userList.value = [];
-      }
-    } catch (error) {
-      console.error("获取用户列表失败:", error);
-      ElMessage.error("获取用户列表失败");
-      userList.value = [];
-    } finally {
-      loading.value = false;
+    // 合并并发调用：已有请求在飞则复用
+    if (pendingRequest) {
+      return pendingRequest;
     }
+
+    const doFetch = async () => {
+      loading.value = true;
+      try {
+        const response = await getAllUser<UserWithExtras>();
+        if (response && response.data) {
+          userList.value = response.data.data || [];
+          lastFetchTime.value = Date.now();
+        } else {
+          userList.value = [];
+        }
+      } catch (error) {
+        console.error("获取用户列表失败:", error);
+        ElMessage.error("获取用户列表失败");
+        userList.value = [];
+      } finally {
+        loading.value = false;
+        pendingRequest = null;
+      }
+    };
+
+    pendingRequest = doFetch();
+    return pendingRequest;
   };
 
   /**

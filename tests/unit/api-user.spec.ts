@@ -3,6 +3,7 @@
  */
 import {
   addScore,
+  clearUserListCache,
   getUserInfo,
   getUserList,
   setUserData,
@@ -20,6 +21,10 @@ vi.mock("@/api/api-client", () => ({
 }));
 
 describe("api/user", () => {
+  beforeEach(() => {
+    clearUserListCache();
+  });
+
   describe("getUserInfo", () => {
     it("code===0 时返回 data", async () => {
       mockGet.mockResolvedValueOnce({
@@ -70,6 +75,34 @@ describe("api/user", () => {
         data: { code: 500, msg: "服务异常" },
       });
       await expect(getUserList()).rejects.toThrow("服务异常");
+    });
+
+    it("5 分钟内复用缓存，不重复请求", async () => {
+      mockGet.mockReset();
+      mockGet.mockResolvedValue({
+        data: {
+          code: 0,
+          data: { data: [{ id: 1, name: "a" }] },
+        },
+      });
+      const r1 = await getUserList();
+      const r2 = await getUserList();
+      expect(r1.data).toHaveLength(1);
+      expect(r2.data).toHaveLength(1);
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+
+    it("force=true 时忽略缓存重新请求", async () => {
+      mockGet.mockReset();
+      mockGet.mockResolvedValue({
+        data: {
+          code: 0,
+          data: { data: [{ id: 1, name: "a" }] },
+        },
+      });
+      await getUserList();
+      await getUserList(true);
+      expect(mockGet).toHaveBeenCalledTimes(2);
     });
   });
 
