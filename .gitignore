@@ -35,6 +35,8 @@ npm-debug.log*
 /plugins
 /www
 /server/__pycache__
+/server/static/*
+!/server/static/README.md
 /dist
 android/.idea/
 **/__pycache__

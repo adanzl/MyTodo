@@ -47,7 +47,7 @@ python main.py
 
 ## 📁 项目结构
 
-```
+```txt
 server/
 ├── core/                    # 核心模块
 │   ├── __init__.py         # Flask 应用工厂
@@ -297,20 +297,20 @@ server/
 
 ### 设备接口
 
-#### 蓝牙
+#### 蓝牙接口
 
 - `GET /api/bluetooth/scan` - 扫描蓝牙设备
 - `GET /api/bluetooth/device` - 获取蓝牙设备信息
 - `POST /api/bluetooth/connect` - 连接蓝牙设备
 - `POST /api/bluetooth/disconnect` - 断开蓝牙设备
 
-#### DLNA
+#### DLNA接口
 
 - `GET /api/dlna/scan` - 扫描 DLNA 设备
 - `GET /api/dlna/volume` - 获取/设置 DLNA 音量
 - `POST /api/dlna/stop` - 停止 DLNA 播放
 
-#### 小米设备
+#### 小米接口
 
 - `GET /api/mi/scan` - 扫描小米设备
 - `GET /api/mi/status` - 获取小米设备状态（包含音量和播放状态）
@@ -478,7 +478,7 @@ sudo systemctl enable my-todo
 
 项目在 `main.py` 开头进行了 gevent monkey patching，但设置了 `thread=False` 和 `queue=False`，以避免与 asyncio 事件循环冲突。
 
-### 异步处理
+### 异步处理说明
 
 - 使用 Gevent 进行异步 I/O 处理
 - WebSocket 使用 gevent 模式

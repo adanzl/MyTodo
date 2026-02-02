@@ -1,76 +1,44 @@
-#!/usr/bin/env sh
+#!/bin/sh
+# Certbot manual-auth-hook for FreeDNS Fun
+# sudo cp /mnt/data/project/MyTodo/server/deploy/freednsfun-auth.sh /etc/letsencrypt/freednsfun-auth.sh
+# 用于 DNS-01 验证时自动添加 TXT 记录
+# sudo certbot renew --dry-run --run-deploy-hooks -v
 
-# FreeDNS Fun DNS API Plugin
-# URL: https://freedns.fun/
-#
-# This plugin is used for automatically adding and removing TXT records for DNS-01 challenge
-# using FreeDNS Fun's API.
-#
-# Instructions:
-# 1. Set the environment variables FREEDNS_User and FREEDNS_Token with your FreeDNS Fun credentials.
-# 2. Use the --dns dns_freednsfun parameter with acme.sh to issue a certificate.
-#
-# Example:
-# export FREEDNS_User="your_username"
-# export FREEDNS_Token="your_token"
-# ./acme.sh --issue --dns dns_freednsfun -d yourdomain.com -d *.yourdomain.com
+set -e
 
-# API endpoint for FreeDNS Fun
-FREEDNSFUN_API="https://freedns.fun/zone/ssl"
+DOMAIN=$CERTBOT_DOMAIN
+TOKEN=$CERTBOT_VALIDATION
+RECORDID=1406
 
-# Initialize the plugin
-dns_freednsfun_init() {
-  _info "Initializing FreeDNS Fun DNS plugin"
-  # Check if required environment variables are set
-  if [ -z "${FREEDNSFUN_KEY}" ] || [ -z "${FREEDNSFUN_TOKEN}" ]; then
-    _err "Error: FREEDNS_User and FREEDNS_Token environment variables must be set."
-    return 1
-  fi
-  return 0
-}
+# 从环境变量或配置文件读取凭证
+# 优先使用环境变量，如果没有则尝试读取配置文件
+if [ -z "$FREEDNSFUN_KEY" ] || [ -z "$FREEDNSFUN_TOKEN" ]; then
+    if [ -f /etc/letsencrypt/.secrets/freednsfun.ini ]; then
+        . /etc/letsencrypt/.secrets/freednsfun.ini
+    else
+        echo "Error: FREEDNSFUN_KEY and FREEDNSFUN_TOKEN must be set or configured in /etc/letsencrypt/.secrets/freednsfun.ini"
+        exit 1
+    fi
+fi
 
-# Add a TXT record for the specified domain and subdomain
-dns_freednsfun_add() {
-  _info "Adding TXT record for domain: $1"
-  _debug "value: $1"
- # _debug "TXT value: $3"
+# 构造记录名：_acme-challenge.{domain}
+RECORD_NAME="_acme-challenge"
 
-  # Extract the main domain and construct the full subdomain
- # main_domain=$(echo "$1" | awk -F '.' '{print $(NF-1)"."$NF}')
-  
-  # Construct the API request URL
-  request_url="${FREEDNSFUN_API}/addrecord?records=$1&value=$2&key=${FREEDNSFUN_KEY}&token=${FREEDNSFUN_TOKEN}"
- _info "请求地址:$request_url"
-  # Send the GET request to add the TXT record
-  response=$(curl -s -X GET "$request_url")
-  _info "curl:$request"
-   #response="success"
- # 检查响应是否为 "success"
-  if [ "$response" = "success" ]; then
-    _debug "TXT 记录添加成功。"
-    return 0
-  else
-    _err "添加 TXT 记录失败。"
-    return 1
-  fi
-}
+# API endpoint
+API_URL="https://freedns.fun/webapi/ddns"
 
-# Remove the TXT record for the specified domain and subdomain
-dns_freednsfun_rm() {
-  _info "Removing TXT record for domain: $1"
-  # Construct the API request URL
-  request_url="${FREEDNSFUN_API}/delrecord?records=$1&key=${FREEDNSFUN_KEY}&token=${FREEDNSFUN_TOKEN}"
+# 发送请求添加 TXT 记录
+REQUEST_URL="${API_URL}?recordid=${RECORDID}&value=${TOKEN}&keyid=${FREEDNSFUN_KEY}&token=${FREEDNSFUN_TOKEN}"
 
-  # Send the GET request to remove the TXT record
-  response=$(curl -s -X GET "$request_url")
-  #response="success"
-  # Check if the request was successful
-  # 检查响应是否为 "success"
-  if [ "$response" = "success" ]; then
-    _debug "TXT 记录删除成功。"
-    return 0
-  else
-    _err "删除 TXT 记录失败。"
-    return 1
-  fi
-}
+echo "Updating TXT record: ${RECORDID} = ${TOKEN}"
+RESPONSE=$(curl -s -X GET "$REQUEST_URL")
+
+if [ "$RESPONSE" = "success" ]; then
+    echo "TXT record added successfully"
+    # 等待 DNS 传播（FreeDNS Fun 可能需要一些时间）
+    sleep 60
+    exit 0
+else
+    echo "Failed to add TXT record. Response: $RESPONSE"
+    exit 1
+fi

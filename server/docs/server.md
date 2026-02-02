@@ -1,5 +1,17 @@
 # 服务器
 
+## 命令别名
+
+vim ~/.bashrc
+添加
+alias cd_todo='cd /mnt/data/project/MyTodo'
+alias tail_todo='cd /mnt/data/project/MyTodo && tail -f server/logs/app.log'
+alias npx_build='cd /mnt/data/project/MyTodo && git pull && npx npm run build && npx cap copy'
+alias up_todo='cd /mnt/data/project/MyTodo && git pull && sudo systemctl restart my-todo && tail -f server/logs/app.log'
+alias up_front='cd /mnt/data/project/MyTodo/server && git pull && node deploy/deploy_front.js'
+生效
+source ~/.bashrc
+
 ## app 依赖
 
 > pip3 install -r requirements.txt
