@@ -1,5 +1,4 @@
 import os
-import json
 import pytest
 from unittest.mock import patch, MagicMock
 from core.services.audio_convert_mgr import AudioConvertMgr, AudioConvertTask
@@ -354,65 +353,6 @@ def test_convert_directory_stopped(convert_mgr: AudioConvertMgr, tmp_path, monke
 
     assert task.status == TASK_STATUS_FAILED
     assert "任务已被停止" in task.error_message
-
-
-def test_migrate_legacy_tasks_if_needed_migrates(monkeypatch, tmp_path):
-    monkeypatch.setattr('core.services.audio_convert_mgr.AUDIO_CONVERT_BASE_DIR', str(tmp_path))
-
-    # make tasks.json appear "empty" (< 2 bytes)
-    (tmp_path / 'tasks.json').write_text('', encoding='utf-8')
-
-    legacy = {
-        'task_id': '',
-        'name': 'legacy',
-        'status': TASK_STATUS_PENDING,
-        'directory': None,
-        'output_dir': 'mp3',
-        'overwrite': True,
-        'total_files': None,
-        'progress': None,
-        'file_status': None,
-        'error_message': None,
-        'create_time': 1,
-        'update_time': 1,
-    }
-    (tmp_path / 'abc.json').write_text(json.dumps(legacy, ensure_ascii=False), encoding='utf-8')
-
-    monkeypatch.setattr('core.services.audio_convert_mgr._spawn', lambda fn: None)
-    mgr = AudioConvertMgr()
-
-    task = mgr.get_task('abc')
-    assert task is not None
-    assert task['name'] == 'legacy'
-
-
-def test_migrate_legacy_tasks_if_needed_skips_when_has_new_meta(monkeypatch, tmp_path):
-    monkeypatch.setattr('core.services.audio_convert_mgr.AUDIO_CONVERT_BASE_DIR', str(tmp_path))
-
-    # tasks.json size > 2, should skip migration
-    (tmp_path / 'tasks.json').write_text('{}\n', encoding='utf-8')
-
-    legacy = {
-        'task_id': '',
-        'name': 'legacy',
-        'status': TASK_STATUS_PENDING,
-        'directory': None,
-        'output_dir': 'mp3',
-        'overwrite': True,
-        'total_files': None,
-        'progress': None,
-        'file_status': None,
-        'error_message': None,
-        'create_time': 1,
-        'update_time': 1,
-    }
-    (tmp_path / 'abc.json').write_text(json.dumps(legacy, ensure_ascii=False), encoding='utf-8')
-
-    monkeypatch.setattr('core.services.audio_convert_mgr._spawn', lambda fn: None)
-    mgr = AudioConvertMgr()
-
-    task = mgr.get_task('abc')
-    assert task is None
 
 
 def test_ensure_output_directory_no_write_permission(convert_mgr: AudioConvertMgr, tmp_path):

@@ -2,8 +2,8 @@ import json
 import os
 import random
 import string
-import threading
 from abc import ABC, abstractmethod
+from readerwriterlock import rwlock
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, TypeVar, TypedDict
@@ -52,7 +52,7 @@ class BaseTaskMgr(ABC, Generic[TTask]):
 
     def __init__(self, base_dir: str) -> None:
         self._tasks: Dict[str, TTask] = {}
-        self._task_lock = threading.Lock()
+        self._task_lock = rwlock.RWLockFair()
         self._stop_flags: Dict[str, bool] = {}
         self._base_dir = base_dir
         ensure_directory(self._base_dir)
@@ -126,7 +126,7 @@ class BaseTaskMgr(ABC, Generic[TTask]):
         return None
 
     def stop_task(self, task_id: str) -> Tuple[int, str]:
-        with self._task_lock:
+        with self._task_lock.gen_wlock():
             task, err = self._get_task_or_err(task_id)
             if err:
                 return -1, err
@@ -153,7 +153,7 @@ class BaseTaskMgr(ABC, Generic[TTask]):
 
         def wrapped() -> None:
             try:
-                with self._task_lock:
+                with self._task_lock.gen_wlock():
                     task = self._get_task(task_id)
                     if not task:
                         return
@@ -163,7 +163,7 @@ class BaseTaskMgr(ABC, Generic[TTask]):
 
                 runner(task)
 
-                with self._task_lock:
+                with self._task_lock.gen_wlock():
                     task2 = self._get_task(task_id)
                     if task2 and task2.status == TASK_STATUS_PROCESSING:
                         task2.status = TASK_STATUS_SUCCESS
@@ -171,7 +171,7 @@ class BaseTaskMgr(ABC, Generic[TTask]):
                         self._save_task_and_update_time(task2)
             except Exception as e:
                 log.error(f"[{self.__class__.__name__}] 任务 {task_id} 执行异常: {e}")
-                with self._task_lock:
+                with self._task_lock.gen_wlock():
                     task3 = self._get_task(task_id)
                     if task3:
                         task3.status = TASK_STATUS_FAILED
@@ -183,12 +183,12 @@ class BaseTaskMgr(ABC, Generic[TTask]):
         run_in_background(wrapped)
 
     def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
-        with self._task_lock:
+        with self._task_lock.gen_rlock():
             task = self._get_task(task_id)
             return self._task_to_dict(task) if task else None
 
     def list_tasks(self) -> List[Dict[str, Any]]:
-        with self._task_lock:
+        with self._task_lock.gen_rlock():
             tasks = [self._task_to_dict(t) for t in self._tasks.values()]
         tasks.sort(key=lambda x: x.get('create_time', 0), reverse=True)
         return tasks
@@ -206,7 +206,7 @@ class BaseTaskMgr(ABC, Generic[TTask]):
         return False
 
     def delete_task(self, task_id: str) -> Tuple[int, str]:
-        with self._task_lock:
+        with self._task_lock.gen_wlock():
             task, err = self._get_task_or_err(task_id)
             if err:
                 return -1, err
@@ -238,7 +238,7 @@ class BaseTaskMgr(ABC, Generic[TTask]):
         pass
 
     def _create_task_and_save(self, task: TTask, task_id: Optional[str] = None) -> Tuple[int, str, Optional[str]]:
-        with self._task_lock:
+        with self._task_lock.gen_wlock():
             tid = task_id or task.task_id or self._generate_task_id()
             while tid in self._tasks:
                 tid = self._generate_task_id()

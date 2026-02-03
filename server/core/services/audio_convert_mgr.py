@@ -2,7 +2,6 @@
 音频转码管理服务
 提供音频文件转码为 MP3 格式的功能
 """
-import json
 import os
 from dataclasses import asdict, dataclass
 from datetime import datetime
@@ -56,58 +55,6 @@ class AudioConvertMgr(BaseTaskMgr[AudioConvertTask]):
     def _load_history_tasks(self) -> None:
         """加载历史任务"""
         super()._load_history_tasks()
-        self._migrate_legacy_tasks_if_needed()
-
-    def _migrate_legacy_tasks_if_needed(self) -> None:
-        """兼容迁移：旧 convert/<task_id>.json -> convert/tasks.json。
-
-        迁移策略：当 tasks.json 为空/不存在时，尝试读取同目录下的 <task_id>.json。
-        不删除旧文件。
-        """
-        meta_file = self._get_task_meta_file()
-        has_new_meta = os.path.exists(meta_file) and os.path.getsize(meta_file) > 2
-
-        if has_new_meta:
-            return
-
-        try:
-            if not os.path.exists(AUDIO_CONVERT_BASE_DIR):
-                return
-
-            legacy_files = []
-            for filename in os.listdir(AUDIO_CONVERT_BASE_DIR):
-                if not filename.endswith('.json'):
-                    continue
-                if filename == self.TASK_META_FILE:
-                    continue
-                legacy_files.append(os.path.join(AUDIO_CONVERT_BASE_DIR, filename))
-
-            if not legacy_files:
-                return
-
-            migrated = 0
-            with self._task_lock:
-                for fp in legacy_files:
-                    try:
-                        with open(fp, 'r', encoding='utf-8') as f:
-                            data = json.load(f)
-                        task = AudioConvertTask(**data)
-                        if not getattr(task, 'task_id', None):
-                            # 从文件名推断 task_id
-                            task.task_id = os.path.splitext(os.path.basename(fp))[0]
-                        self._tasks[task.task_id] = task
-                        migrated += 1
-                    except Exception as e:
-                        log.error(f"[AudioConvert] 迁移旧任务文件失败 {fp}: {e}")
-
-                if migrated > 0:
-                    self._save_all_tasks()
-
-            if migrated > 0:
-                log.info(f"[AudioConvert] 已迁移 {migrated} 个旧任务到 tasks.json")
-
-        except Exception as e:
-            log.error(f"[AudioConvert] 迁移旧任务异常: {e}")
 
     def _update_task_status(self,
                             task: AudioConvertTask,

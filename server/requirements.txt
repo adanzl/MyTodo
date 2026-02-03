@@ -23,6 +23,7 @@ nest_asyncio>=1.5.6
 pikepdf>=8.0.0
 lxml>=5.0.0
 dbus-python>=1.2.18; platform_system == "Linux"
+readerwriterlock>=1.0.9
 pytest==8.3.4
 pytest-cov
 fakeredis

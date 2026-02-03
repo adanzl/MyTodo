@@ -99,7 +99,7 @@ class AudioMergeMgr(BaseTaskMgr[AudioMergeTask]):
         """加载历史任务"""
         super()._load_history_tasks()
 
-        with self._task_lock:
+        with self._task_lock.gen_wlock():
             tasks_to_remove = []
             for task_id, task in self._tasks.items():
                 try:

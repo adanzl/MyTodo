@@ -81,7 +81,7 @@ class PdfMgr(BaseTaskMgr[PdfTask]):
     def _load_history_tasks(self) -> None:
         super()._load_history_tasks()
 
-        with self._task_lock:
+        with self._task_lock.gen_wlock():
             tasks_to_remove = []
             for task_id, task in self._tasks.items():
                 if not task.uploaded_path or not os.path.exists(task.uploaded_path):
@@ -114,7 +114,7 @@ class PdfMgr(BaseTaskMgr[PdfTask]):
 
             safe_filename = secure_filename(filename)
             base_name, ext = os.path.splitext(safe_filename)
-            
+
             # 使用统一的函数生成唯一文件路径
             file_path = get_unique_filepath(PDF_UPLOAD_DIR, base_name, ext)
             safe_filename = os.path.basename(file_path)

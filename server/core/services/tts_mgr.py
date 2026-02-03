@@ -230,7 +230,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             return code, msg, task_id
 
         # 创建任务工作目录并更新 work_dir
-        with self._task_lock:
+        with self._task_lock.gen_wlock():
             task = self._get_task(task_id)
             if task:
                 task.work_dir = self._get_task_dir(task_id)
@@ -361,7 +361,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         self._clear_stop_flag(task_id)
 
         # 清理旧的客户端引用（如果存在）
-        with self._task_lock:
+        with self._task_lock.gen_wlock():
             self._active_clients.pop(task_id, None)
             # 重置已生成字数统计
             task.generated_chars = 0
@@ -382,7 +382,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             status: 新状态
             error_message: 错误消息（可选）
         """
-        with self._task_lock:
+        with self._task_lock.gen_wlock():
             task = self._get_task(task_id)
             if task:
                 old_status = task.status
@@ -401,7 +401,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
 
     def _ensure_no_subtask_running(self, task_id: str, operation: str) -> Optional[str]:
         """检查任务是否被 OCR/分析子任务锁定；若锁定则返回错误信息。"""
-        with self._task_lock:
+        with self._task_lock.gen_rlock():
             if task_id in self._ocr_running_tasks:
                 return f"任务正在执行 OCR，无法{operation}"
             if task_id in self._analysis_running_tasks:
@@ -422,7 +422,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 self._update_task_status(task_id, TASK_STATUS_PROCESSING, None)
 
                 # 获取任务并执行
-                with self._task_lock:
+                with self._task_lock.gen_rlock():
                     task = self._get_task(task_id)
                     if not task:
                         return
@@ -431,7 +431,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
 
                 # 注意：runner 内部已经更新了状态，这里不需要再次更新
                 # 只需要检查状态是否正确
-                with self._task_lock:
+                with self._task_lock.gen_rlock():
                     task = self._get_task(task_id)
                     if not task:
                         log.warning(f"[TTSMgr] 任务 {task_id} 执行完成但无法找到任务记录")
@@ -442,7 +442,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             finally:
                 # 清理停止标志和客户端引用
                 self._clear_stop_flag(task_id)
-                with self._task_lock:
+                with self._task_lock.gen_wlock():
                     self._active_clients.pop(task_id, None)
 
         run_in_background(wrapped)
@@ -477,7 +477,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         task.output_file = output_file
 
         # 保存任务信息（包含 output_file 路径）
-        with self._task_lock:
+        with self._task_lock.gen_wlock():
             self._save_task_and_update_time(task)
 
         # 文件句柄（在回调中打开和关闭）
@@ -560,7 +560,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
 
             # 更新任务中的已生成字数
             try:
-                with self._task_lock:
+                with self._task_lock.gen_wlock():
                     current_task = self._get_task(task.task_id)
                     if current_task:
                         current_task.generated_chars = generated
@@ -591,7 +591,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             client._total_chars = total_chars
 
             # 保存客户端引用，以便停止时可以取消
-            with self._task_lock:
+            with self._task_lock.gen_wlock():
                 self._active_clients[task.task_id] = client
 
             # 再次检查是否已被停止（在保存引用后）
@@ -681,7 +681,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             # 注意：不要在锁内调用 _update_task_status，因为它内部已经有锁了
             final_task = None
             try:
-                with self._task_lock:
+                with self._task_lock.gen_wlock():
                     final_task = self._get_task(task.task_id)
                     if final_task:
                         final_task.generated_chars = generated_chars
@@ -705,7 +705,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 # 停止是正常操作，记录为信息而不是错误
                 log.info(f"[TTSMgr] 任务 {task.task_id} 已被停止，耗时: {task_elapsed:.2f}秒")
                 # 更新任务状态为停止
-                with self._task_lock:
+                with self._task_lock.gen_wlock():
                     task = self._get_task(task.task_id)
                     if task:
                         # 如果任务已经被 stop_task 设置为停止状态，则不再更新
@@ -725,7 +725,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
 
         finally:
             # 清理客户端引用
-            with self._task_lock:
+            with self._task_lock.gen_wlock():
                 self._active_clients.pop(task.task_id, None)
 
             # 确保文件句柄关闭
@@ -753,7 +753,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         """
         log.info(f"[TTSMgr] 收到停止任务请求，task_id: {task_id}")
 
-        with self._task_lock:
+        with self._task_lock.gen_wlock():
             task, err = self._get_task_or_err(task_id)
             if err:
                 log.warning(f"[TTSMgr] 停止任务失败，task_id: {task_id}, 错误: {err}")
@@ -825,7 +825,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         Returns:
             任务字典（包含所有任务字段及 ocr_running、analysis_running）；任务不存在时返回 None
         """
-        with self._task_lock:
+        with self._task_lock.gen_wlock():
             task = self._get_task(task_id)
             if not task:
                 return None
@@ -844,7 +844,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
     def list_tasks(self) -> List[Dict[str, Any]]:
         """获取任务列表。不返回 text、analysis 以减小响应体积；包含 has_analysis、ocr_running、analysis_running。"""
         tasks = super().list_tasks()
-        with self._task_lock:
+        with self._task_lock.gen_rlock():
             for t in tasks:
                 t['has_analysis'] = bool(t.get('analysis'))
                 t.pop('text', None)
@@ -890,7 +890,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 # 如果路径被修正（相对路径转绝对路径），更新任务存档
                 if absolute_path != task.output_file:
                     log.info(f"[TTSMgr] 修正任务 {task_id} 的输出文件路径: {task.output_file} -> {absolute_path}")
-                    with self._task_lock:
+                    with self._task_lock.gen_wlock():
                         task.output_file = absolute_path
                         self._save_task_and_update_time(task)
                 # 确保返回绝对路径
@@ -904,7 +904,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             # 如果默认路径存在，更新任务中的路径
             if not task.output_file or task.output_file != default_path:
                 log.info(f"[TTSMgr] 更新任务 {task_id} 的输出文件路径为默认路径: {default_path}")
-                with self._task_lock:
+                with self._task_lock.gen_wlock():
                     task.output_file = default_path
                     self._save_task_and_update_time(task)
             return default_path
@@ -924,7 +924,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 duration_seconds = get_media_duration(output_file)
                 if duration_seconds is not None:
                     audio_duration = float(duration_seconds)
-                    with self._task_lock:
+                    with self._task_lock.gen_wlock():
                         task = self._get_task(task_id)
                         if task and task.status == TASK_STATUS_SUCCESS:
                             # 只有在任务仍然是成功状态时才更新
@@ -962,21 +962,21 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
 
     def _run_subtask_with_lock(self, task_id: str, running_set: set[str], runner: Callable[[], None]) -> None:
         """在后台运行子任务并加锁：执行前加入 running_set，执行毕（含异常）从 running_set 移除。"""
-        with self._task_lock:
+        with self._task_lock.gen_wlock():
             running_set.add(task_id)
 
         def wrapped() -> None:
             try:
                 runner()
             finally:
-                with self._task_lock:
+                with self._task_lock.gen_wlock():
                     running_set.discard(task_id)
 
         run_in_background(wrapped)
 
     def _append_text_to_task(self, task_id: str, new_text: str, keep_status: bool = False) -> Tuple[int, str]:
         """将文本追加到任务末尾。keep_status=True 时不改任务状态且不经过 update_task（子任务用，避免被自己的锁拦住）。"""
-        with self._task_lock:
+        with self._task_lock.gen_wlock():
             task = self._get_task(task_id)
             if not task or task.task_id != task_id:
                 return -1, 'TTS 任务不存在' if not task else '任务 ID 不匹配'
@@ -1005,7 +1005,7 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             log.warning(f"[TTSMgr] 解析分析结果 JSON 失败，按 raw 保存，task_id={task_id}, err={e}")
             parsed = {"raw": analysis_raw}
 
-        with self._task_lock:
+        with self._task_lock.gen_wlock():
             task = self._get_task(task_id)
             if not task or task.task_id != task_id:
                 return -1, "TTS 任务不存在" if not task else "任务 ID 不匹配"
