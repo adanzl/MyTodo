@@ -298,8 +298,13 @@ onBeforeUnmount(() => {
   }
 });
 
+const hasChatTabEnteredBefore = ref(false);
 onIonViewDidEnter(async () => {
-  await updateChatSetting();
+  if (hasChatTabEnteredBefore.value) {
+    await updateChatSetting();
+  } else {
+    hasChatTabEnteredBefore.value = true;
+  }
   await refreshUserList();
   chatRoomTabRef.value?.loadInitial();
 });
