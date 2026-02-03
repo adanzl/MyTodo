@@ -183,8 +183,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
     def create_task(self,
                     text: str,
                     name: Optional[str] = None,
-                    role: Optional[str] = None,
-                    model: Optional[str] = None,
+                    role: Optional[str] = 'cosyvoice-v3-plus-leo-34ba9eaebae44039a4a9426af6389dcd',
+                    model: Optional[str] = 'cosyvoice-v3-flash',
                     speed: Optional[float] = None,
                     vol: Optional[int] = None) -> Tuple[int, str, Optional[str]]:
         """创建 TTS 任务。
