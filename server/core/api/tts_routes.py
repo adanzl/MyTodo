@@ -74,14 +74,17 @@ def create_tts_task() -> ResponseReturnValue:
     body, err = parse_with_model(_CreateTTSTaskBody, json_data, err_factory=_err)
     if err:
         return err
-    code, msg, task_id = tts_mgr.create_task(
-        text=body.text,
-        name=body.name,
-        role=body.role,
-        model=body.model,
-        speed=body.speed,
-        vol=body.vol,
-    )
+    create_kwargs = {
+        'text': body.text,
+        'name': body.name,
+        'speed': body.speed,
+        'vol': body.vol,
+    }
+    if body.role is not None:
+        create_kwargs['role'] = body.role
+    if body.model is not None:
+        create_kwargs['model'] = body.model
+    code, msg, task_id = tts_mgr.create_task(**create_kwargs)
     if code != 0:
         return _err(msg)
     return _ok({'task_id': task_id})
