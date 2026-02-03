@@ -49,7 +49,8 @@ class SchedulerMgr:
             executors={'default': executor},
             job_defaults={
                 'coalesce': True,  # 合并错过的任务
-                'max_instances': 1  # 每个任务同时只允许一个实例
+                'max_instances': 1,  # 每个任务同时只允许一个实例
+                'misfire_grace_time': 300,  # 允许任务错过执行时间后 5 分钟内仍可执行（避免因文件定时器等阻塞导致时长定时器被丢弃）
             })
 
         # 添加任务执行监听器
