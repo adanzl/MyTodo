@@ -196,7 +196,7 @@
     </FabButton>
   </ion-page>
 </template>
-<script lang="ts" src="@/views/TabSchedulePage.ts"></script>
+<script lang="ts" src="@/views/PageSchedule.ts"></script>
 <style lang="css" scoped>
 .schedule-group-item::part(native) {
   height: 35px !important;

@@ -17,23 +17,23 @@ const routes: Array<RouteRecordRaw> = [
       },
       {
         path: 'tab1',
-        component: () => import('@/views/TabSchedulePage.vue')
+        component: () => import('@/views/PageSchedule.vue')
       },
       {
         path: 'tab2',
-        component: () => import('@/views/TabCalendarPage.vue')
+        component: () => import('@/views/PageCalendar.vue')
       },
       {
         path: 'tab3',
-        component: () => import('@/views/chat-page/TabChatPage.vue')
+        component: () => import('@/views/chat-page/PageChat.vue')
       },
       {
         path: 'tab4',
-        component: () => import('@/views/lottery-page/TabLotteryPage.vue')
+        component: () => import('@/views/lottery-page/PageLottery.vue')
       },
       {
         path: 'tab0',
-        component: () => import('@/views/TabTimetablePage.vue')
+        component: () => import('@/views/PageTimetable.vue')
       }
     ]
   }

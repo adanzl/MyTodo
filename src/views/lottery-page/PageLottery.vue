@@ -87,9 +87,9 @@ import {
 import { giftOutline, heartOutline } from "ionicons/icons";
 import _ from "lodash";
 import { inject, onBeforeUnmount, onMounted, ref } from "vue";
-import LotteryTab from "./LotteryTab.vue";
-import ShopTab from "./ShopTab.vue";
-import HistoryTab from "./HistoryTab.vue";
+import LotteryTab from "./TabLottery.vue";
+import ShopTab from "./TabShop.vue";
+import HistoryTab from "./TabHistory.vue";
 
 const PAGE_SIZE = 20;
 const lotterySetting = ref({ open: false });

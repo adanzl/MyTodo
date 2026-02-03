@@ -103,10 +103,10 @@
 </template>
 
 <script setup lang="ts">
-import ChatRoomTab from "./ChatRoomTab.vue";
-import AiChatTab from "./AiChatTab.vue";
-import TtsTasksTab from "./TtsTasksTab.vue";
-import type { ChatMsg as AiChatMsg } from "./AiChatTab.vue";
+import ChatRoomTab from "./TabChatRoom.vue";
+import AiChatTab from "./TabAiChat.vue";
+import TtsTasksTab from "./TabTtsTasks.vue";
+import type { ChatMsg as AiChatMsg } from "./TabAiChat.vue";
 import ChatSetting from "@/components/ChatSetting.vue";
 import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import { Icon } from "@iconify/vue";

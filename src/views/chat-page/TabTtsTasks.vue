@@ -15,18 +15,28 @@
           暂无 TTS 任务
         </div>
         <div v-else class="space-y-2">
-          <div v-for="task in tasks" :key="task.task_id"
+          <div
+            v-for="task in tasks"
+            :key="task.task_id"
             class="rounded-lg border border-gray-300 bg-white p-3 shadow-sm cursor-pointer active:opacity-80"
             @click="openDetail(task)">
             <div class="flex items-center justify-between gap-2">
-              <span class="font-medium text-gray-800 flex-1 truncate">{{ task.name || task.task_id }}</span>
-              <ion-icon v-if="task.has_analysis" :icon="checkmarkCircleOutline" class="w-4 h-4"></ion-icon>
+              <span class="font-medium text-gray-800 flex-1 truncate">{{
+                task.name || task.task_id
+              }}</span>
+              <ion-icon
+                v-if="task.has_analysis"
+                :icon="checkmarkCircleOutline"
+                class="w-4 h-4"></ion-icon>
               <ion-badge :color="statusColor(task.status)" class="p-1 w-10 text-[10px]">{{
                 statusLabel(task.status)
               }}</ion-badge>
             </div>
             <div class="mt-2 flex items-center gap-3 text-xs text-gray-400">
-              <div v-if="task.total_chars != null" class="flex gap-1">字数 <div class="!w-7 text-right">{{ task.total_chars }}</div></div>
+              <div v-if="task.total_chars != null" class="flex gap-1">
+                字数
+                <div class="!w-7 text-right">{{ task.total_chars }}</div>
+              </div>
               <span v-if="task.duration != null">时长 {{ formatDuration(task.duration) }}</span>
               <span class="flex-1 text-right">{{ formatTime(task.update_time) }}</span>
             </div>
@@ -35,12 +45,22 @@
       </div>
     </ion-content>
     <!-- 添加按钮 -->
-    <FabButton v-if="active" :disabled="addButtonCooling" @click="createAndOpenTask" class="right-[5%] bottom-[1%]"
-      bottom="1%" right="5%" :hasBar="true">
+    <FabButton
+      v-if="active"
+      :disabled="addButtonCooling"
+      @click="createAndOpenTask"
+      class="right-[5%] bottom-[1%]"
+      bottom="1%"
+      right="5%"
+      :hasBar="true">
       <ion-icon :icon="add" size="large"></ion-icon>
     </FabButton>
     <!-- 全屏详情弹窗 -->
-    <ion-modal :is-open="!!selectedTask" class="ion-modal-fullscreen" :initial-breakpoint="1" :breakpoints="[0, 1]"
+    <ion-modal
+      :is-open="!!selectedTask"
+      class="[--width:100%] [--height:100%] [--border-radius:0] [--box-shadow:none]"
+      :initial-breakpoint="1"
+      :breakpoints="[0, 1]"
       @didDismiss="closeDetailModal">
       <ion-header>
         <ion-toolbar>
@@ -66,14 +86,28 @@
           <div class="space-y-3">
             <div class="flex items-center justify-between flex-wrap gap-3">
               <div class="flex items-center gap-2 flex-shrink-0">
-                <ion-button size="small" fill="outline" class="[--border-width:1px]" @click.stop="openRenameDialog" shape="round">
+                <ion-button
+                  size="small"
+                  fill="outline"
+                  class="[--border-width:1px]"
+                  @click.stop="openRenameDialog"
+                  shape="round">
                   <ion-icon :icon="createOutline" slot="icon-only" />
                 </ion-button>
-                <ion-badge :color="statusColor(selectedTask.status)" class="p-1.5 -text-[10px] h-7 flex items-center">
+                <ion-badge
+                  :color="statusColor(selectedTask.status)"
+                  class="p-1.5 -text-[10px] h-7 flex items-center">
                   {{ statusLabel(selectedTask.status) }}
                 </ion-badge>
-                <ion-button size="small" color="primary"
-                  :disabled="isTaskBusy || selectedTask.status === 'processing' || generateVoiceLock || !(selectedTask.text || '').trim()"
+                <ion-button
+                  size="small"
+                  color="primary"
+                  :disabled="
+                    isTaskBusy ||
+                    selectedTask.status === 'processing' ||
+                    generateVoiceLock ||
+                    !(selectedTask.text || '').trim()
+                  "
                   @click.stop="handleStartTask">
                   生成语音
                 </ion-button>
@@ -88,7 +122,9 @@
             <div class="rounded-lg border border-gray-300 px-3 py-2 flex items-center gap-3">
               <!-- 已选图片与添加按钮同一行，点击图片可预览 -->
               <div class="flex items-center gap-2 flex-1 min-w-0">
-                <ion-button size="small" fill="clear"
+                <ion-button
+                  size="small"
+                  fill="clear"
                   class="flex items-center justify-center w-10 h-14 rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-primary hover:text-primary"
                   @click="pickImages">
                   <ion-icon :icon="imageOutline" slot="icon-only" class="text-2xl" />
@@ -98,34 +134,59 @@
                 </ion-button>
                 <!-- ocr 图片列表 -->
                 <div class="ocr-image-list flex flex-1 items-center gap-2 mr-2 overflow-x-auto">
-                  <input ref="imageInputRef" type="file" accept="image/*" multiple class="hidden"
+                  <input
+                    ref="imageInputRef"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    class="hidden"
                     @change="onImageFileChange" />
-                  <div v-for="(file, idx) in selectedImages" :key="idx"
+                  <div
+                    v-for="(file, idx) in selectedImages"
+                    :key="idx"
                     class="relative w-14 h-14 flex-shrink-0 cursor-pointer active:opacity-80"
                     @click="openOcrPreview(idx)">
                     <div class="absolute inset-0 rounded-lg overflow-hidden border border-gray-200">
-                      <img :src="getOcrImageUrl(idx)" :alt="file.name" class="w-full h-full object-cover" />
+                      <img
+                        :src="getOcrImageUrl(idx)"
+                        :alt="file.name"
+                        class="w-full h-full object-cover" />
                     </div>
-                    <ion-button size="small" fill="solid" color="dark"
+                    <ion-button
+                      size="small"
+                      fill="solid"
+                      color="dark"
                       class="absolute -top-0 -right-0 !min-w-0 !min-h-0 !w-6 !h-6 !max-w-6 !max-h-6 !p-0 !aspect-square !rounded-full !overflow-hidden !flex !items-center !justify-center shadow [--color:white] [--border-radius:50%]"
-                      sharp="round" @click.stop="removeOcrImage(idx)">
-                      <ion-icon :icon="closeCircleOutline" slot="icon-only" class="!w-5 !h-5 block shrink-0" />
+                      sharp="round"
+                      @click.stop="removeOcrImage(idx)">
+                      <ion-icon
+                        :icon="closeCircleOutline"
+                        slot="icon-only"
+                        class="!w-5 !h-5 block shrink-0" />
                     </ion-button>
                   </div>
                 </div>
               </div>
               <div class="flex items-center flex-shrink-0">
-                <ion-button size="small" color="primary"
-                  :disabled="isTaskBusy || selectedImages.length === 0 || ocrLoading" class="!w-10 !h-12 !p-0"
-                  style="--padding-start: 0; --padding-end: 0" @click="runOcr">
+                <ion-button
+                  size="small"
+                  color="primary"
+                  :disabled="isTaskBusy || selectedImages.length === 0 || ocrLoading"
+                  class="!w-10 !h-12 !p-0"
+                  style="--padding-start: 0; --padding-end: 0"
+                  @click="runOcr">
                   {{ ocrLoading ? "识别中…" : "识别" }}
                 </ion-button>
               </div>
             </div>
 
             <!-- 图片预览弹窗 -->
-            <ion-modal :is-open="previewOcrIndex >= 0" class="ion-modal-fullscreen" :initial-breakpoint="1"
-              :breakpoints="[0, 1]" @didDismiss="previewOcrIndex = -1">
+            <ion-modal
+              :is-open="previewOcrIndex >= 0"
+              class="[--width:100%] [--height:100%] [--border-radius:0] [--box-shadow:none]"
+              :initial-breakpoint="1"
+              :breakpoints="[0, 1]"
+              @didDismiss="previewOcrIndex = -1">
               <ion-header>
                 <ion-toolbar>
                   <ion-buttons slot="start">
@@ -141,48 +202,69 @@
                     <ion-button :disabled="previewOcrIndex <= 0" @click="previewOcrPrev">
                       <ion-icon :icon="arrowUpOutline" />
                     </ion-button>
-                    <ion-button :disabled="previewOcrIndex < 0 || previewOcrIndex >= selectedImages.length - 1
-                      " @click="previewOcrNext">
+                    <ion-button
+                      :disabled="
+                        previewOcrIndex < 0 || previewOcrIndex >= selectedImages.length - 1
+                      "
+                      @click="previewOcrNext">
                       <ion-icon :icon="arrowDownOutline" />
                     </ion-button>
                   </ion-buttons>
                 </ion-toolbar>
               </ion-header>
               <ion-content class="ion-padding">
-                <div v-if="previewOcrIndex >= 0 && selectedImages[previewOcrIndex]"
+                <div
+                  v-if="previewOcrIndex >= 0 && selectedImages[previewOcrIndex]"
                   class="flex items-center justify-center min-h-full">
-                  <img :src="getOcrImageUrl(previewOcrIndex)" :alt="selectedImages[previewOcrIndex].name"
+                  <img
+                    :src="getOcrImageUrl(previewOcrIndex)"
+                    :alt="selectedImages[previewOcrIndex].name"
                     class="max-w-full max-h-[85vh] object-contain" />
                 </div>
               </ion-content>
             </ion-modal>
-            <div v-if="selectedTask.ocr_running || selectedTask.analysis_running"
+            <div
+              v-if="selectedTask.ocr_running || selectedTask.analysis_running"
               class="flex gap-2 text-sm text-amber-600">
               <span v-if="selectedTask.ocr_running">OCR 进行中</span>
               <span v-if="selectedTask.analysis_running">解析进行中</span>
             </div>
             <!-- 音频 -->
             <div v-if="selectedTask.status === 'success'" class="flex gap-2">
-              <AudioPreview :src="getTtsDownloadUrl(selectedTask.task_id)"
-                :duration-seconds="selectedTask.duration ?? undefined" class="flex-1" />
-              <ion-button size="small" color="primary" fill="clear" :disabled="downloadButtonLock"
+              <AudioPreview
+                :src="getTtsDownloadUrl(selectedTask.task_id)"
+                :duration-seconds="selectedTask.duration ?? undefined"
+                class="flex-1" />
+              <ion-button
+                size="small"
+                color="primary"
+                fill="clear"
+                :disabled="downloadButtonLock"
                 @click="handleDownloadTtsAudio">
                 下载
               </ion-button>
             </div>
 
             <div class="rounded-lg bg-gray-100 p-2">
-              <ion-textarea v-model="editText" placeholder="请输入要转换为语音的文本" :disabled="isTaskBusy"
+              <ion-textarea
+                v-model="editText"
+                placeholder="请输入要转换为语音的文本"
+                :disabled="isTaskBusy"
                 class="text-gray-800 rounded-lg min-h-[100px] [--padding-start:8px] [--padding-end:8px] [--padding-top:1px] [--padding-bottom:8px]"
-                :auto-grow="true" :rows="4" />
+                :auto-grow="true"
+                :rows="4" />
             </div>
 
             <!-- 分析内容（参考 server/frontend TTS.vue） -->
-            <div ref="analysisSectionRef"
+            <div
+              ref="analysisSectionRef"
               class="rounded-lg border border-gray-300 px-3 flex flex-col gap-1 min-h-[120px]">
               <div class="flex items-center justify-between">
                 <h4 class="text-sm font-semibold text-gray-700">分析内容</h4>
-                <ion-button size="small" color="primary" :disabled="!editText.trim() || isTaskBusy"
+                <ion-button
+                  size="small"
+                  color="primary"
+                  :disabled="!editText.trim() || isTaskBusy"
                   @click="runAnalysis">
                   分析
                 </ion-button>
@@ -201,7 +283,9 @@
                       <span class="text-[11px] leading-tight text-blue-700 text-center">美词</span>
                     </div>
                     <div class="flex-1 flex flex-wrap gap-1 items-start">
-                      <span v-for="(w, idx) in selectedTask.analysis.words" :key="idx"
+                      <span
+                        v-for="(w, idx) in selectedTask.analysis.words"
+                        :key="idx"
                         class="inline-block px-2 py-0.5 rounded bg-blue-100 text-blue-800">
                         {{ w }}
                       </span>
@@ -216,7 +300,9 @@
                       </span>
                     </div>
                     <div class="flex-1 space-y-1">
-                      <p v-for="(s, idx) in selectedTask.analysis.sentence" :key="idx"
+                      <p
+                        v-for="(s, idx) in selectedTask.analysis.sentence"
+                        :key="idx"
                         class="leading-snug text-gray-700">
                         {{ s }}
                       </p>
@@ -254,16 +340,26 @@
             <div class="grid grid-cols-2 gap-3 text-sm">
               <div class="rounded bg-gray-50 p-2">
                 <span class="text-gray-500">模型</span>
-                <ion-select v-model="editModel" placeholder="默认" :disabled="isTaskBusy" interface="popover"
+                <ion-select
+                  v-model="editModel"
+                  placeholder="默认"
+                  :disabled="isTaskBusy"
+                  interface="popover"
                   class="min-h-8 block w-full mt-1">
                   <ion-select-option value="">默认</ion-select-option>
-                  <ion-select-option value="cosyvoice-v3-flash">cosyvoice-v3-flash</ion-select-option>
+                  <ion-select-option value="cosyvoice-v3-flash"
+                    >cosyvoice-v3-flash</ion-select-option
+                  >
                   <ion-select-option value="cosyvoice-v3-plus">cosyvoice-v3-plus</ion-select-option>
                 </ion-select>
               </div>
               <div class="rounded bg-gray-50 p-2">
                 <span class="text-gray-500">音色</span>
-                <ion-select v-model="editRole" placeholder="无" :disabled="isTaskBusy" interface="popover"
+                <ion-select
+                  v-model="editRole"
+                  placeholder="无"
+                  :disabled="isTaskBusy"
+                  interface="popover"
                   class="min-h-8 block w-full mt-1">
                   <ion-select-option value="">无</ion-select-option>
                   <ion-select-option value="cosyvoice-v3-plus-leo-34ba9eaebae44039a4a9426af6389dcd">
@@ -282,24 +378,37 @@
               <div class="rounded bg-gray-50 p-2">
                 <span class="text-gray-500">语速</span>
                 <div class="flex items-center gap-2 mt-1">
-                  <ion-button size="small" fill="clear"
-                    @click="editSpeed = Math.max(0.5, Math.round((editSpeed - 0.1) * 10) / 10)">−</ion-button>
+                  <ion-button
+                    size="small"
+                    fill="clear"
+                    @click="editSpeed = Math.max(0.5, Math.round((editSpeed - 0.1) * 10) / 10)"
+                    >−</ion-button
+                  >
                   <span class="min-w-[2.5rem] text-center">{{ editSpeed }}</span>
-                  <ion-button size="small" fill="clear"
-                    @click="editSpeed = Math.min(2, Math.round((editSpeed + 0.1) * 10) / 10)">+</ion-button>
+                  <ion-button
+                    size="small"
+                    fill="clear"
+                    @click="editSpeed = Math.min(2, Math.round((editSpeed + 0.1) * 10) / 10)"
+                    >+</ion-button
+                  >
                 </div>
               </div>
               <div class="rounded bg-gray-50 p-2">
                 <span class="text-gray-500">音量</span>
                 <div class="flex items-center gap-2 mt-1">
-                  <ion-button size="small" fill="clear" @click="editVol = Math.max(0, editVol - 10)">−</ion-button>
+                  <ion-button size="small" fill="clear" @click="editVol = Math.max(0, editVol - 10)"
+                    >−</ion-button
+                  >
                   <span class="min-w-[2.5rem] text-center">{{ editVol }}</span>
-                  <ion-button size="small" fill="clear" @click="editVol = Math.min(100, editVol + 10)">+</ion-button>
+                  <ion-button
+                    size="small"
+                    fill="clear"
+                    @click="editVol = Math.min(100, editVol + 10)"
+                    >+</ion-button
+                  >
                 </div>
               </div>
             </div>
-
-
 
             <div class="ion-padding-top ion-padding-bottom flex items-center gap-2">
               <ion-button expand="block" @click="saveAndClose" class="flex-1">确定</ion-button>
@@ -312,20 +421,41 @@
       </ion-content>
     </ion-modal>
     <!-- 改名弹窗（样式类似 alert，Tailwind 实现） -->
-    <ion-modal :is-open="renameModalOpen"
+    <ion-modal
+      :is-open="renameModalOpen"
       class="[--width:100%] [--height:100%] [--border-radius:0] [--box-shadow:none] [--backdrop-opacity:0] [--background:transparent]"
       @didDismiss="renameModalOpen = false">
-      <div class="fixed inset-0 z-[1] flex items-center justify-center bg-black/50 p-5"
+      <div
+        class="fixed inset-0 z-[1] flex items-center justify-center bg-black/50 p-5"
         @click.self="renameModalOpen = false">
         <div class="w-full max-w-[400px] min-w-[260px] rounded-2xl bg-white p-4 shadow-xl">
           <h2 class="mb-3 text-center text-lg font-semibold text-gray-900">任务改名</h2>
-          <ion-input v-model="renameInputValue" placeholder="任务名称"
-            class="mb-3 rounded-lg border border-gray-300 text-base !px-2" :clear-input="true" :clear-on-edit="false" />
+          <ion-input
+            v-model="renameInputValue"
+            placeholder="任务名称"
+            class="mb-3 rounded-lg border border-gray-300 text-base !px-2"
+            :clear-input="true"
+            :clear-on-edit="false" />
           <div class="flex justify-end gap-1 border-t border-gray-200 pt-2">
-            <ion-button fill="clear" class="min-h-[44px] font-semibold" @click="appendFirstLineToRename">填入</ion-button>
-            <ion-button fill="clear" class="min-h-[44px] font-semibold" @click="renameModalOpen = false">取消</ion-button>
-            <ion-button fill="clear" color="primary" class="min-h-[44px] font-semibold"
-              @click="confirmRename">确定</ion-button>
+            <ion-button
+              fill="clear"
+              class="min-h-[44px] font-semibold"
+              @click="appendFirstLineToRename"
+              >填入</ion-button
+            >
+            <ion-button
+              fill="clear"
+              class="min-h-[44px] font-semibold"
+              @click="renameModalOpen = false"
+              >取消</ion-button
+            >
+            <ion-button
+              fill="clear"
+              color="primary"
+              class="min-h-[44px] font-semibold"
+              @click="confirmRename"
+              >确定</ion-button
+            >
           </div>
         </div>
       </div>
@@ -336,21 +466,12 @@
 <script setup lang="ts">
 import {
   IonBadge,
-  IonButton,
-  IonButtons,
-  IonContent,
-  IonHeader,
-  IonIcon,
-  IonInput,
-  IonModal,
   IonRefresher,
   IonRefresherContent,
   IonSegmentContent,
   IonSelect,
   IonSelectOption,
   IonTextarea,
-  IonTitle,
-  IonToolbar,
   alertController,
   loadingController,
 } from "@ionic/vue";
@@ -426,6 +547,9 @@ const renameInputValue = ref("");
 /** 详情页「处理中」时定时刷新当前任务的定时器 */
 let processingPollTimer: ReturnType<typeof setInterval> | null = null;
 const PROCESSING_POLL_MS = 3000;
+/** 页签激活时每 5s 刷新列表的定时器 */
+let listRefreshTimer: ReturnType<typeof setInterval> | null = null;
+const LIST_REFRESH_MS = 5000;
 
 /** 任务是否忙（TTS 生成中或 OCR/分析子任务中），仿 frontend TTS.vue */
 const isTaskBusy = computed(
@@ -482,6 +606,7 @@ watch(
 
 onUnmounted(() => {
   if (processingPollTimer) clearInterval(processingPollTimer);
+  if (listRefreshTimer) clearInterval(listRefreshTimer);
 });
 
 function getOcrImageUrl(index: number): string {
@@ -911,23 +1036,23 @@ async function createAndOpenTask() {
 
 loadTasks();
 
-/** TTS 页签激活时自动刷新列表 */
+/** TTS 页签激活时自动刷新列表，并定时刷新 */
 watch(
   () => props.active,
   (isActive) => {
-    if (isActive) loadTasks();
+    if (listRefreshTimer) {
+      clearInterval(listRefreshTimer);
+      listRefreshTimer = null;
+    }
+    if (isActive) {
+      loadTasks();
+      listRefreshTimer = setInterval(loadTasks, LIST_REFRESH_MS);
+    }
   }
 );
 </script>
 
 <style scoped>
-.ion-modal-fullscreen {
-  --width: 100%;
-  --height: 100%;
-  --border-radius: 0;
-  --box-shadow: none;
-}
-
 .ocr-image-list {
   scrollbar-width: none;
   -ms-overflow-style: none;
