@@ -74,7 +74,8 @@ def count_text_chars(text: str) -> int:
     # \uac00-\ud7a3: 韩文音节（包含韩文汉字）
     # \uf900-\ufaff: CJK兼容汉字
     # 使用正则表达式匹配汉字
-    hanzi_pattern = re.compile(r'[\u4e00-\u9fff\u3400-\u4dbf\uac00-\ud7a3\uf900-\ufaff]')
+    hanzi_pattern = re.compile(
+        r'[\u4e00-\u9fff\u3400-\u4dbf\uac00-\ud7a3\uf900-\ufaff]')
 
     for char in text:
         if hanzi_pattern.match(char):
@@ -180,13 +181,15 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         """
         pass
 
-    def create_task(self,
-                    text: str,
-                    name: Optional[str] = None,
-                    role: Optional[str] = 'cosyvoice-v3-plus-leo-34ba9eaebae44039a4a9426af6389dcd',
-                    model: Optional[str] = 'cosyvoice-v3-flash',
-                    speed: Optional[float] = None,
-                    vol: Optional[int] = None) -> Tuple[int, str, Optional[str]]:
+    def create_task(
+            self,
+            text: str,
+            name: Optional[str] = None,
+            role: Optional[
+                str] = 'cosyvoice-v3-plus-leo-34ba9eaebae44039a4a9426af6389dcd',
+            model: Optional[str] = 'cosyvoice-v3-plus',
+            speed: Optional[float] = None,
+            vol: Optional[int] = None) -> Tuple[int, str, Optional[str]]:
         """创建 TTS 任务。
 
         创建任务记录并初始化工作目录，不会立即开始生成音频。
@@ -319,7 +322,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         self._save_task_and_update_time(task)
         return 0, '任务更新成功'
 
-    def start_task(self, task_id: str, *args: Any, **kwargs: Any) -> Tuple[int, str]:
+    def start_task(self, task_id: str, *args: Any,
+                   **kwargs: Any) -> Tuple[int, str]:
         """启动 TTS 任务（异步执行）。
 
         在后台线程中调用 TTS 服务生成音频文件，保存到任务目录下的 output.mp3。
@@ -355,7 +359,9 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             log.warning(f"[TTSMgr] 启动任务失败，task_id: {task_id}, 原因: 文本为空")
             return -1, '文本为空'
 
-        log.info(f"[TTSMgr] 准备启动任务 {task_id}, 任务名称: {task.name}, 文本长度: {len(task.text)} 字符")
+        log.info(
+            f"[TTSMgr] 准备启动任务 {task_id}, 任务名称: {task.name}, 文本长度: {len(task.text)} 字符"
+        )
 
         # 清除停止标志（如果存在），允许重新开始
         self._clear_stop_flag(task_id)
@@ -372,7 +378,10 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         self._run_task_async(task_id, self._run_tts_task)
         return 0, 'TTS 任务已启动'
 
-    def _update_task_status(self, task_id: str, status: str, error_message: Optional[str] = None) -> None:
+    def _update_task_status(self,
+                            task_id: str,
+                            status: str,
+                            error_message: Optional[str] = None) -> None:
         """更新任务状态。
         
         注意：此方法内部会获取锁，调用者不应在持有锁的情况下调用此方法。
@@ -394,12 +403,14 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                     log.error(f"[TTSMgr] 保存任务状态时出错: {e}", exc_info=True)
                     raise
                 if old_status != status:
-                    log.info(f"[TTSMgr] 任务 {task_id} 状态更新: {old_status} -> {status}" +
-                             (f", 错误: {error_message}" if error_message else ""))
+                    log.info(
+                        f"[TTSMgr] 任务 {task_id} 状态更新: {old_status} -> {status}"
+                        + (f", 错误: {error_message}" if error_message else ""))
             else:
                 log.warning(f"[TTSMgr] _update_task_status 无法找到任务: {task_id}")
 
-    def _ensure_no_subtask_running(self, task_id: str, operation: str) -> Optional[str]:
+    def _ensure_no_subtask_running(self, task_id: str,
+                                   operation: str) -> Optional[str]:
         """检查任务是否被 OCR/分析子任务锁定；若锁定则返回错误信息。"""
         with self._task_lock.gen_rlock():
             if task_id in self._ocr_running_tasks:
@@ -408,7 +419,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 return f"任务正在执行分析，无法{operation}"
         return None
 
-    def _run_task_async(self, task_id: str, runner: Callable[[TTSTask], None]) -> None:
+    def _run_task_async(self, task_id: str, runner: Callable[[TTSTask],
+                                                             None]) -> None:
         """在新线程中运行任务。
 
         Args:
@@ -437,7 +449,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                         log.warning(f"[TTSMgr] 任务 {task_id} 执行完成但无法找到任务记录")
 
             except Exception as e:
-                log.error(f"[{self.__class__.__name__}] 任务 {task_id} 执行异常: {e}")
+                log.error(
+                    f"[{self.__class__.__name__}] 任务 {task_id} 执行异常: {e}")
                 self._update_task_status(task_id, TASK_STATUS_FAILED, str(e))
             finally:
                 # 清理停止标志和客户端引用
@@ -533,7 +546,9 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 if file_handle is not None:
                     file_handle.close()
                     file_handle = None
-                    log.info(f"[TTSMgr] 任务 {task.name} 音频文件写入完成，总大小: {audio_data_size} 字节 ({audio_chunk_count} 个数据块)")
+                    log.info(
+                        f"[TTSMgr] 任务 {task.name} 音频文件写入完成，总大小: {audio_data_size} 字节 ({audio_chunk_count} 个数据块)"
+                    )
                 # 设置任务完成事件（即使没有音频数据也要设置）
                 task_completed.set()
 
@@ -581,7 +596,9 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         try:
             # 创建 TTS 客户端并设置参数
             # 注意：tts_ali 使用 WebSocket 连接，不依赖 dashscope SDK
-            client = TTSClient(on_msg=on_data, on_err=on_err, on_progress=on_progress)
+            client = TTSClient(on_msg=on_data,
+                               on_err=on_err,
+                               on_progress=on_progress)
             client.speed = task.speed
             client.vol = task.vol
             client.model = task.model  # 设置模型选择
@@ -613,16 +630,21 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             for i, line in enumerate(text_lines, 1):
                 # 检查是否被停止
                 if self._should_stop(task.task_id):
-                    log.info(f"[TTSMgr] 任务 {task.task_id} 已被停止，已发送 {i-1}/{len(text_lines)} 行")
+                    log.info(
+                        f"[TTSMgr] 任务 {task.task_id} 已被停止，已发送 {i-1}/{len(text_lines)} 行"
+                    )
                     raise RuntimeError('任务已被停止')
 
                 try:
-                    client.stream_msg(text=line, role=task.role, id=task.task_id)
+                    client.stream_msg(text=line,
+                                      role=task.role,
+                                      id=task.task_id)
                 except Exception as e:
                     log.error(f"[TTSMgr] 发送第 {i} 行时出错: {e}", exc_info=True)
                     raise
 
-            log.info(f"[TTSMgr] 任务 {task.task_id} 文本发送完成，共发送 {len(text_lines)} 行")
+            log.info(
+                f"[TTSMgr] 任务 {task.task_id} 文本发送完成，共发送 {len(text_lines)} 行")
 
             # 在执行 stream_complete 前再次检查停止标志
             if self._should_stop(task.task_id):
@@ -636,7 +658,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 raise
 
             # 等待任务完成（WebSocket 会异步返回 task-finished 事件）
-            log.info(f"[TTSMgr] 任务 {task.name} 开始等待 WebSocket 任务完成（数据接收超时: 10秒）")
+            log.info(
+                f"[TTSMgr] 任务 {task.name} 开始等待 WebSocket 任务完成（数据接收超时: 10秒）")
             # 初始化最后一次接收到数据的时间（从发送完成时开始计时）
             last_data_time[0] = time.time()
             DATA_TIMEOUT = 10.0  # 10秒没有收到数据则视为超时
@@ -671,7 +694,9 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                     duration_seconds = get_media_duration(output_file)
                     if duration_seconds is not None:
                         audio_duration = float(duration_seconds)
-                        log.info(f"[TTSMgr] 任务 {task.task_id} 音频时长: {audio_duration:.2f}秒")
+                        log.info(
+                            f"[TTSMgr] 任务 {task.task_id} 音频时长: {audio_duration:.2f}秒"
+                        )
                     else:
                         log.warning(f"[TTSMgr] 任务 {task.task_id} 无法获取音频时长")
                 except Exception as e:
@@ -703,7 +728,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
 
             if is_stopped:
                 # 停止是正常操作，记录为信息而不是错误
-                log.info(f"[TTSMgr] 任务 {task.task_id} 已被停止，耗时: {task_elapsed:.2f}秒")
+                log.info(
+                    f"[TTSMgr] 任务 {task.task_id} 已被停止，耗时: {task_elapsed:.2f}秒")
                 # 更新任务状态为停止
                 with self._task_lock.gen_wlock():
                     task = self._get_task(task.task_id)
@@ -713,14 +739,19 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                             pass  # 状态已更新，跳过
                         else:
                             # 任务被停止，标记为失败但错误信息明确说明是停止
-                            self._update_task_status(task.task_id, TASK_STATUS_FAILED, '任务已被用户停止')
+                            self._update_task_status(task.task_id,
+                                                     TASK_STATUS_FAILED,
+                                                     '任务已被用户停止')
                 # 停止操作不重新抛出异常，避免外层再次处理
                 return
             else:
                 # 其他错误才记录为错误并重新抛出
-                log.error(f"[TTSMgr] 任务 {task.task_id} 执行失败，耗时: {task_elapsed:.2f}秒，错误: {e}", exc_info=True)
+                log.error(
+                    f"[TTSMgr] 任务 {task.task_id} 执行失败，耗时: {task_elapsed:.2f}秒，错误: {e}",
+                    exc_info=True)
                 # 更新任务状态
-                self._update_task_status(task.task_id, TASK_STATUS_FAILED, str(e))
+                self._update_task_status(task.task_id, TASK_STATUS_FAILED,
+                                         str(e))
                 raise
 
         finally:
@@ -759,10 +790,14 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 log.warning(f"[TTSMgr] 停止任务失败，task_id: {task_id}, 错误: {err}")
                 return -1, err
             if task.status != TASK_STATUS_PROCESSING:
-                log.warning(f"[TTSMgr] 停止任务失败，task_id: {task_id}, 原因: 任务未在处理中（当前状态: {task.status}）")
+                log.warning(
+                    f"[TTSMgr] 停止任务失败，task_id: {task_id}, 原因: 任务未在处理中（当前状态: {task.status}）"
+                )
                 return -1, '任务未在处理中'
 
-            log.info(f"[TTSMgr] 开始停止任务 {task_id}, 任务名称: {task.name}, 已生成字数: {task.generated_chars}/{task.total_chars}")
+            log.info(
+                f"[TTSMgr] 开始停止任务 {task_id}, 任务名称: {task.name}, 已生成字数: {task.generated_chars}/{task.total_chars}"
+            )
 
             # 设置停止标志
             self._stop_flags[task_id] = True
@@ -774,7 +809,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                     log.info(f"[TTSMgr] 取消任务 {task_id} 的 TTS 流式合成")
                     client.streaming_cancel()
                 except Exception as e:
-                    log.error(f"[TTSMgr] 取消 TTS 客户端失败 {task_id}: {e}", exc_info=True)
+                    log.error(f"[TTSMgr] 取消 TTS 客户端失败 {task_id}: {e}",
+                              exc_info=True)
             else:
                 log.warning(f"[TTSMgr] 任务 {task_id} 没有活动的 TTS 客户端")
 
@@ -833,13 +869,15 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             # 如果任务状态为成功但没有duration，异步获取并更新（用默认路径，避免持锁做 I/O）
             output_file_for_duration = None
             if task.status == TASK_STATUS_SUCCESS and task.duration is None:
-                output_file_for_duration = task.output_file or self._get_output_file_path(task_id)
+                output_file_for_duration = task.output_file or self._get_output_file_path(
+                    task_id)
 
             d = asdict(task)
             d['ocr_running'] = task_id in self._ocr_running_tasks
             d['analysis_running'] = task_id in self._analysis_running_tasks
 
-        if output_file_for_duration and os.path.exists(output_file_for_duration):
+        if output_file_for_duration and os.path.exists(
+                output_file_for_duration):
             self._update_duration_async(task_id, output_file_for_duration)
 
         return d
@@ -892,7 +930,9 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             if absolute_path and os.path.exists(absolute_path):
                 # 如果路径被修正（相对路径转绝对路径），更新任务存档
                 if absolute_path != task.output_file:
-                    log.info(f"[TTSMgr] 修正任务 {task_id} 的输出文件路径: {task.output_file} -> {absolute_path}")
+                    log.info(
+                        f"[TTSMgr] 修正任务 {task_id} 的输出文件路径: {task.output_file} -> {absolute_path}"
+                    )
                     with self._task_lock.gen_wlock():
                         task.output_file = absolute_path
                         self._save_task_and_update_time(task)
@@ -906,7 +946,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             default_path = os.path.abspath(default_path)
             # 如果默认路径存在，更新任务中的路径
             if not task.output_file or task.output_file != default_path:
-                log.info(f"[TTSMgr] 更新任务 {task_id} 的输出文件路径为默认路径: {default_path}")
+                log.info(
+                    f"[TTSMgr] 更新任务 {task_id} 的输出文件路径为默认路径: {default_path}")
                 with self._task_lock.gen_wlock():
                     task.output_file = default_path
                     self._save_task_and_update_time(task)
@@ -933,7 +974,9 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                             # 只有在任务仍然是成功状态时才更新
                             task.duration = audio_duration
                             self._save_task_and_update_time(task)
-                            log.info(f"[TTSMgr] 异步更新任务 {task_id} 音频时长: {audio_duration:.2f}秒")
+                            log.info(
+                                f"[TTSMgr] 异步更新任务 {task_id} 音频时长: {audio_duration:.2f}秒"
+                            )
                 else:
                     log.warning(f"[TTSMgr] 异步获取任务 {task_id} 音频时长失败：无法获取时长")
             except Exception as e:
@@ -942,7 +985,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         # 在后台线程中执行
         run_in_background(update_duration)
 
-    def start_ocr_task(self, task_id: str, image_paths: list[str], temp_dir: str) -> Tuple[int, str]:
+    def start_ocr_task(self, task_id: str, image_paths: list[str],
+                       temp_dir: str) -> Tuple[int, str]:
         """启动 OCR 任务（后台执行，不改变任务主状态）。"""
         task, err = self._get_task_or_err(task_id)
         if err:
@@ -963,7 +1007,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         )
         return 0, 'OCR 任务已启动'
 
-    def _run_subtask_with_lock(self, task_id: str, running_set: set[str], runner: Callable[[], None]) -> None:
+    def _run_subtask_with_lock(self, task_id: str, running_set: set[str],
+                               runner: Callable[[], None]) -> None:
         """在后台运行子任务并加锁：执行前加入 running_set，执行毕（含异常）从 running_set 移除。"""
         with self._task_lock.gen_wlock():
             running_set.add(task_id)
@@ -977,7 +1022,10 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
 
         run_in_background(wrapped)
 
-    def _append_text_to_task(self, task_id: str, new_text: str, keep_status: bool = False) -> Tuple[int, str]:
+    def _append_text_to_task(self,
+                             task_id: str,
+                             new_text: str,
+                             keep_status: bool = False) -> Tuple[int, str]:
         """将文本追加到任务末尾。keep_status=True 时不改任务状态且不经过 update_task（子任务用，避免被自己的锁拦住）。"""
         with self._task_lock.gen_wlock():
             task = self._get_task(task_id)
@@ -989,7 +1037,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             task.total_chars = count_text_chars(combined_text)
             if keep_status:
                 self._save_task_and_update_time(task)
-                log.info(f"[TTSMgr] 任务 {task_id} 文本追加，新长度: {len(combined_text)}")
+                log.info(
+                    f"[TTSMgr] 任务 {task_id} 文本追加，新长度: {len(combined_text)}")
                 return 0, "ok"
         log.info(f"[TTSMgr] 任务 {task_id} 文本追加，新长度: {len(combined_text)}")
         self._update_task_status(task_id, TASK_STATUS_PENDING, None)
@@ -998,14 +1047,16 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             log.error(f"[TTSMgr] 任务 {task_id} 文本追加失败: {msg}")
         return code, msg
 
-    def _save_analysis_to_task(self, task_id: str, analysis_raw: str) -> Tuple[int, str]:
+    def _save_analysis_to_task(self, task_id: str,
+                               analysis_raw: str) -> Tuple[int, str]:
         """保存分析结果到任务的 analysis 字段（期望 analysis_raw 为 JSON 字符串）。"""
         try:
             parsed = json.loads(analysis_raw)
             if not isinstance(parsed, dict):
                 parsed = {"data": parsed}
         except Exception as e:
-            log.warning(f"[TTSMgr] 解析分析结果 JSON 失败，按 raw 保存，task_id={task_id}, err={e}")
+            log.warning(
+                f"[TTSMgr] 解析分析结果 JSON 失败，按 raw 保存，task_id={task_id}, err={e}")
             parsed = {"raw": analysis_raw}
 
         with self._task_lock.gen_wlock():
@@ -1017,15 +1068,19 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         log.info(f"[TTSMgr] 任务 {task_id} 分析结果已保存，keys: {list(parsed.keys())}")
         return 0, "分析结果已保存"
 
-    def _run_ocr_task_logic(self, task_id: str, image_paths: list[str], temp_dir: str) -> None:
+    def _run_ocr_task_logic(self, task_id: str, image_paths: list[str],
+                            temp_dir: str) -> None:
         """OCR 核心逻辑：调用服务、追加文本，不改变任务主状态。"""
         try:
             log.info(f"[TTSMgr] OCR 任务 {task_id} 开始，图片数: {len(image_paths)}")
             status, result = _ocr_client.query(image_paths)
             if status == "error":
-                log.error(f"[TTSMgr] OCR 任务 {task_id} 失败: {result or 'OCR 识别失败'}")
+                log.error(
+                    f"[TTSMgr] OCR 任务 {task_id} 失败: {result or 'OCR 识别失败'}")
                 return
-            code, msg = self._append_text_to_task(task_id, result, keep_status=True)
+            code, msg = self._append_text_to_task(task_id,
+                                                  result,
+                                                  keep_status=True)
             if code != 0:
                 log.error(f"[TTSMgr] OCR 任务 {task_id} 更新文本失败: {msg}")
                 return
@@ -1071,7 +1126,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             log.info(f"[TTSMgr] 分析文章任务 {task_id} 开始，文本长度: {len(text)}")
             status, result = _txt_client.query(txt=text, prompt=PROMPT)
             if status == "error":
-                log.error(f"[TTSMgr] 分析文章任务 {task_id} 失败: {result or '分析文章失败'}")
+                log.error(
+                    f"[TTSMgr] 分析文章任务 {task_id} 失败: {result or '分析文章失败'}")
                 return
             code, msg = self._save_analysis_to_task(task_id, result)
             if code != 0:
