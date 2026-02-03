@@ -2,6 +2,7 @@ export {
   apiClient,
   getApiUrl,
   initNet,
+  scheduleProactiveRefresh,
   checkLocalAddressAvailable,
   checkAndSwitchServer,
   switchToLocal,

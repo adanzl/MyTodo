@@ -37,6 +37,8 @@ export const C_EVENT = {
   TOAST: "toast",
   /** 未登录或 token 失效，应显示登录页 */
   AUTH_EXPIRED: "authExpired",
+  /** 登录缓存已清除（登出/401 等），用于取消 proactive refresh 定时器 */
+  LOGIN_CACHE_CLEARED: "loginCacheCleared",
   /** 本地/远程地址切换（payload: boolean，true=使用远程） */
   SERVER_SWITCH: "serverSwitch",
 };

@@ -1,4 +1,4 @@
-import { getColorList } from "@/utils/NetUtil.ts";
+import { getColorList } from "@/api/color";
 import EventBus, { C_EVENT } from "@/types/EventBus";
 
 export interface ColorType {

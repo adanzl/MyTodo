@@ -4,7 +4,7 @@
  */
 import avatar from "@/assets/images/avatar.svg";
 import { CUSTOM_REPEAT_ID, RepeatData } from "@/types/ScheduleType";
-import { getUserInfo, addScore } from "@/utils/NetUtil.ts";
+import { addScore, getUserInfo } from "@/api/user";
 import dayjs from "dayjs";
 import _ from "lodash";
 import EventBus, { C_EVENT } from "@/types/EventBus";

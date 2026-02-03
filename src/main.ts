@@ -63,7 +63,7 @@ import {
   IonToolbar,
 } from "@ionic/vue";
 
-import { initNet, checkAndSwitchServer, isLocalIpAvailable } from "@/utils/NetUtil";
+import { checkAndSwitchServer, initNet, isLocalIpAvailable } from "@/api/api-client";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
 import isToday from "dayjs/plugin/isToday";

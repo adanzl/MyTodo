@@ -251,8 +251,10 @@ import { ColorOptions, LoadColorData } from "@/types/ColorType";
 import { C_EVENT } from "@/types/EventBus";
 import { GroupOptions, PriorityOptions } from "@/types/ScheduleType";
 import { User, UserData } from "@/types/UserData";
+import { getApiUrl, scheduleProactiveRefresh } from "@/api/api-client";
+import { getScheduleList } from "@/api/schedule";
+import { getUserList } from "@/api/user";
 import { clearLoginCache, login } from "@/utils/Auth";
-import { getApiUrl, getScheduleList, getUserList } from "@/utils/NetUtil";
 import avatar from "@/assets/images/avatar.svg";
 import {
   IonAccordion,
@@ -411,9 +413,10 @@ async function btnLoginClick() {
   }
   errMsg.value = "";
   try {
-    await login(getApiUrl(), curUser.value.name, textPwd.value);
+    const res = await login(getApiUrl(), curUser.value.name, textPwd.value);
     bLogin.value = true;
     globalVar.user = curUser.value;
+    if (res?.expires_in) scheduleProactiveRefresh(res.expires_in);
     localStorage.setItem("saveUser", curUser.value.id.toString());
     try {
       await updateScheduleGroup(curUser.value.id);

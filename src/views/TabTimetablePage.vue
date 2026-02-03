@@ -253,7 +253,7 @@
 
 <script setup lang="ts">
 import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
-import { getRdsData, setRdsData } from "@/utils/NetUtil";
+import { getRdsData, setRdsData } from "@/api/data";
 import EventBus, { C_EVENT } from "@/types/EventBus";
 import {
   IonButton,

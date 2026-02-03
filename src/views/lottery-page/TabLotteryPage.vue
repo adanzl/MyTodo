@@ -71,15 +71,10 @@ import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import { Icon } from "@iconify/vue";
 import EventBus, { C_EVENT } from "@/types/EventBus";
 import type { GiftCategoryItem, GiftListItem } from "@/api";
-import {
-  doLottery,
-  getGiftData,
-  getList,
-  getLotteryData,
-  getNetworkErrorMessage,
-  getUserList,
-  setUserData,
-} from "@/utils/NetUtil";
+import { getList } from "@/api/data";
+import { doLottery, getGiftData, getLotteryData } from "@/api/lottery";
+import { getUserList, setUserData } from "@/api/user";
+import { getNetworkErrorMessage } from "@/utils/NetUtil";
 import {
   IonButton,
   IonHeader,

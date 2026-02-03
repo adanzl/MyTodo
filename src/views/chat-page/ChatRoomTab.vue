@@ -65,7 +65,8 @@ import { Icon } from "@iconify/vue";
 import { volumeMediumOutline } from "ionicons/icons";
 import { computed, ref, watch } from "vue";
 import EventBus, { C_EVENT } from "@/types/EventBus";
-import { getChatMessages, getNetworkErrorMessage } from "@/utils/NetUtil";
+import { getChatMessages } from "@/api/chat";
+import { getNetworkErrorMessage } from "@/utils/NetUtil";
 import type { RefresherCustomEvent } from "@ionic/vue";
 
 export interface ChatMsg {

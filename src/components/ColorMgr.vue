@@ -90,7 +90,7 @@
 import ColorPicker from "@/components/ColorPicker.vue";
 import { ColorOptions, LoadColorData } from "@/types/ColorType";
 import { C_EVENT } from "@/types/EventBus";
-import { delColor, setColor } from "@/utils/NetUtil";
+import { delColor, setColor } from "@/api/color";
 import { createTriggerController } from "@/utils/Overlay";
 import { alertController } from "@ionic/vue";
 import { colorPaletteOutline, removeCircleOutline, saveOutline } from "ionicons/icons";

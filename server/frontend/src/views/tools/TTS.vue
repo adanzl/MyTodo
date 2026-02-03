@@ -1260,8 +1260,8 @@ const handleSeekFile = (fileItem: MediaFile, percentage: number) => {
 
 // TTS 状态映射
 const TTS_STATUS_MAP: Record<string, { tag: string; text: string }> = {
-  pending: { tag: "info", text: "等待中" },
-  processing: { tag: "warning", text: "处理中" },
+  pending: { tag: "info", text: "等待" },
+  processing: { tag: "warning", text: "处理" },
   success: { tag: "success", text: "成功" },
   failed: { tag: "danger", text: "失败" },
 };

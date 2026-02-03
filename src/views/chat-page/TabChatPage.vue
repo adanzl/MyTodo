@@ -111,13 +111,10 @@ import ChatSetting from "@/components/ChatSetting.vue";
 import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import { Icon } from "@iconify/vue";
 import EventBus, { C_EVENT } from "@/types/EventBus";
-import {
-  getApiUrl,
-  getChatSetting,
-  getNetworkErrorMessage,
-  getUserList,
-  setChatSetting,
-} from "@/utils/NetUtil";
+import { getApiUrl } from "@/api/api-client";
+import { getChatSetting, setChatSetting } from "@/api/chat";
+import { getUserList } from "@/api/user";
+import { getNetworkErrorMessage } from "@/utils/NetUtil";
 import {
   createGesture,
   IonCheckbox,

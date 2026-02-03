@@ -21,7 +21,7 @@
             <div class="flex items-center justify-between gap-2">
               <span class="font-medium text-gray-800 flex-1 truncate">{{ task.name || task.task_id }}</span>
               <ion-icon v-if="task.has_analysis" :icon="checkmarkCircleOutline" class="w-4 h-4"></ion-icon>
-              <ion-badge :color="statusColor(task.status)" class="p-1 w-14">{{
+              <ion-badge :color="statusColor(task.status)" class="p-1 w-10 text-[10px]">{{
                 statusLabel(task.status)
               }}</ion-badge>
             </div>
@@ -69,7 +69,7 @@
                 <ion-button size="small" fill="outline" class="" @click.stop="openRenameDialog" shape="round">
                   <ion-icon :icon="createOutline" slot="icon-only" />
                 </ion-button>
-                <ion-badge :color="statusColor(selectedTask.status)" class="p-2 text-[10px]">
+                <ion-badge :color="statusColor(selectedTask.status)" class="p-2 text-[10px] h-7">
                   {{ statusLabel(selectedTask.status) }}
                 </ion-badge>
                 <ion-button size="small" color="primary"
@@ -382,7 +382,7 @@ import {
   startTtsTask,
   updateTtsTask,
   type TtsTaskItem,
-} from "@/utils/NetUtil";
+} from "@/api/tts";
 import type { RefresherCustomEvent } from "@ionic/vue";
 
 const props = withDefaults(
@@ -762,6 +762,8 @@ async function runOcr() {
     EventBus.$emit(C_EVENT.TOAST, "任务正在处理中或正在执行分析，无法执行识别");
     return;
   }
+  const loading = await loadingController.create({ message: "Loading…" });
+  loading.present();
   try {
     ocrLoading.value = true;
     await ocrTtsTask(task.task_id, selectedImages.value);
@@ -779,6 +781,7 @@ async function runOcr() {
   } catch (e: any) {
     EventBus.$emit(C_EVENT.TOAST, e?.message ?? "识别失败");
   } finally {
+    loading.dismiss();
     ocrLoading.value = false;
   }
 }
@@ -819,8 +822,8 @@ async function saveAndClose() {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  pending: "等待中",
-  processing: "处理中",
+  pending: "等待",
+  processing: "处理",
   success: "成功",
   failed: "失败",
   uploaded: "已上传",

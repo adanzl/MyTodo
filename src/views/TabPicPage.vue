@@ -41,7 +41,7 @@
 
 <script setup lang="ts">
 import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
-import { getPicList } from "@/utils/NetUtil";
+import { getPicList } from "@/api/pic";
 import {
   IonItemSliding,
   IonPage,

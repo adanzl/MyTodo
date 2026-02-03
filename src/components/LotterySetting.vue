@@ -88,7 +88,8 @@
 <script lang="ts" setup>
 import avatar from "@/assets/images/avatar.svg";
 import EventBus, { C_EVENT } from "@/types/EventBus";
-import { getLotteryData, getNetworkErrorMessage, setLotteryData } from "@/utils/NetUtil";
+import { getLotteryData, setLotteryData } from "@/api/lottery";
+import { getNetworkErrorMessage } from "@/utils/NetUtil";
 import { removeCircleOutline, saveOutline } from "ionicons/icons";
 import { onMounted, ref } from "vue";
 import { alertController, loadingController, IonGrid, IonCol, IonRow } from "@ionic/vue";

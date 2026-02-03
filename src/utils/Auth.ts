@@ -4,6 +4,7 @@
  * - POST /api/auth/refresh：用 Cookie 中的 refresh_token 换取新 access_token
  * - POST /api/auth/logout：登出并清除服务端 Cookie
  */
+import EventBus, { C_EVENT } from "@/types/EventBus";
 
 const KEY_ACCESS_TOKEN = "access_token";
 /** 与登录相关的 localStorage 键，清空缓存时一并移除 */
@@ -37,6 +38,7 @@ export function clearLoginCache(): void {
   for (const key of LOGIN_CACHE_KEYS) {
     localStorage.removeItem(key);
   }
+  EventBus.$emit(C_EVENT.LOGIN_CACHE_CLEARED);
 }
 
 /**

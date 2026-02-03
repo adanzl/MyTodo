@@ -26,6 +26,42 @@ apiClient.interceptors.request.use(
 
 let isRefreshing = false;
 let refreshWaiters: Array<(token: string | null) => void> = [];
+let proactiveRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** 提前刷新缓冲时间（秒），在 token 过期前多久触发 proactive refresh */
+const REFRESH_BUFFER_SEC = 300;
+
+function clearProactiveRefreshTimer(): void {
+  if (proactiveRefreshTimer != null) {
+    clearTimeout(proactiveRefreshTimer);
+    proactiveRefreshTimer = null;
+  }
+}
+
+/**
+ * 根据 expires_in 安排 proactive refresh，在 token 过期前刷新。
+ * 刷新时机：取「80% 过期时间」与「过期前 5 分钟」中较早者。
+ */
+export function scheduleProactiveRefresh(expiresInSeconds: number): void {
+  clearProactiveRefreshTimer();
+  if (expiresInSeconds <= 0) return;
+  const delayMs =
+    Math.min(expiresInSeconds * 0.8, Math.max(0, expiresInSeconds - REFRESH_BUFFER_SEC)) * 1000;
+  proactiveRefreshTimer = setTimeout(async () => {
+    proactiveRefreshTimer = null;
+    try {
+      const data = await refreshToken(API_URL);
+      if (data?.access_token) {
+        scheduleProactiveRefresh(data.expires_in);
+      }
+    } catch {
+      // 静默失败，下次请求 401 时会走 ensureRefreshed
+    }
+  }, delayMs);
+}
+
+EventBus.$on(C_EVENT.LOGIN_CACHE_CLEARED, clearProactiveRefreshTimer);
+
 async function ensureRefreshed(): Promise<string | null> {
   if (isRefreshing) {
     return new Promise((resolve) => {
@@ -38,8 +74,10 @@ async function ensureRefreshed(): Promise<string | null> {
     const token = data?.access_token || getAccessToken();
     refreshWaiters.forEach((cb) => cb(token));
     refreshWaiters = [];
+    if (data?.expires_in) scheduleProactiveRefresh(data.expires_in);
     return token;
   } catch (e: any) {
+    clearProactiveRefreshTimer();
     if (e?.response?.status === 401) {
       clearLoginCache();
     }
