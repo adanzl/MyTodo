@@ -825,21 +825,24 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
         Returns:
             任务字典（包含所有任务字段及 ocr_running、analysis_running）；任务不存在时返回 None
         """
-        with self._task_lock.gen_wlock():
+        with self._task_lock.gen_rlock():
             task = self._get_task(task_id)
             if not task:
                 return None
 
-            # 如果任务状态为成功但没有duration，异步获取并更新
+            # 如果任务状态为成功但没有duration，异步获取并更新（用默认路径，避免持锁做 I/O）
+            output_file_for_duration = None
             if task.status == TASK_STATUS_SUCCESS and task.duration is None:
-                output_file = self.get_output_file_path(task_id)
-                if output_file and os.path.exists(output_file):
-                    self._update_duration_async(task_id, output_file)
+                output_file_for_duration = task.output_file or self._get_output_file_path(task_id)
 
             d = asdict(task)
             d['ocr_running'] = task_id in self._ocr_running_tasks
             d['analysis_running'] = task_id in self._analysis_running_tasks
-            return d
+
+        if output_file_for_duration and os.path.exists(output_file_for_duration):
+            self._update_duration_async(task_id, output_file_for_duration)
+
+        return d
 
     def list_tasks(self) -> List[Dict[str, Any]]:
         """获取任务列表。不返回 text、analysis 以减小响应体积；包含 has_analysis、ocr_running、analysis_running。"""
