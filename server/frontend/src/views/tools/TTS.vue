@@ -220,7 +220,11 @@
               </el-button>
             </div>
           </div>
-          <div class="tts-textarea-wrapper flex-1 min-h-0 flex flex-col overflow-hidden">
+          <div
+            class="tts-textarea-wrapper flex-1 min-h-0 flex flex-col overflow-hidden relative"
+            v-loading="isTextContentLoading"
+            element-loading-text="加载文本中..."
+          >
             <el-input
               v-model="ttsText"
               type="textarea"
@@ -1485,6 +1489,13 @@ const handleTtsAnalysis = async () => {
 };
 
 // 计算属性
+/** 文本内容区域是否正在加载（获取任务详情中，含 text 字段） */
+const isTextContentLoading = computed(
+  () =>
+    !!currentFetchingTaskId.value &&
+    !!ttsCurrentTask.value &&
+    currentFetchingTaskId.value === ttsCurrentTask.value.task_id
+);
 const isTaskProcessing = computed(() => ttsCurrentTask.value?.status === "processing");
 /** 当前任务是否正在执行 OCR 或分析子任务（不改变主状态，但锁定更新/启动/删除） */
 const isSubtaskRunning = computed(

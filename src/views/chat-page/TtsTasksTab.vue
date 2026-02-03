@@ -26,7 +26,7 @@
               }}</ion-badge>
             </div>
             <div class="mt-2 flex items-center gap-3 text-xs text-gray-400">
-              <span v-if="task.total_chars != null">字数 {{ task.total_chars }}</span>
+              <div v-if="task.total_chars != null" class="flex gap-1">字数 <div class="!w-7 text-right">{{ task.total_chars }}</div></div>
               <span v-if="task.duration != null">时长 {{ formatDuration(task.duration) }}</span>
               <span class="flex-1 text-right">{{ formatTime(task.update_time) }}</span>
             </div>
@@ -251,17 +251,26 @@
                 </div>
               </template>
             </div>
-            <div class="rounded bg-gray-50 p-2 text-[12px] flex items-center gap-2">
-              <span class="text-gray-500 shrink-0 w-10">音色</span>
-              <ion-select v-model="editRole" placeholder="请选择音色（可选）" :disabled="isTaskBusy" interface="popover"
-                class="min-h-8 flex-1 min-w-0">
-                <ion-select-option value="">无</ion-select-option>
-                <ion-select-option value="cosyvoice-v3-plus-leo-34ba9eaebae44039a4a9426af6389dcd">
-                  灿灿
-                </ion-select-option>
-              </ion-select>
-            </div>
             <div class="grid grid-cols-2 gap-3 text-sm">
+              <div class="rounded bg-gray-50 p-2">
+                <span class="text-gray-500">模型</span>
+                <ion-select v-model="editModel" placeholder="默认" :disabled="isTaskBusy" interface="popover"
+                  class="min-h-8 block w-full mt-1">
+                  <ion-select-option value="">默认</ion-select-option>
+                  <ion-select-option value="cosyvoice-v3-flash">cosyvoice-v3-flash</ion-select-option>
+                  <ion-select-option value="cosyvoice-v3-plus">cosyvoice-v3-plus</ion-select-option>
+                </ion-select>
+              </div>
+              <div class="rounded bg-gray-50 p-2">
+                <span class="text-gray-500">音色</span>
+                <ion-select v-model="editRole" placeholder="无" :disabled="isTaskBusy" interface="popover"
+                  class="min-h-8 block w-full mt-1">
+                  <ion-select-option value="">无</ion-select-option>
+                  <ion-select-option value="cosyvoice-v3-plus-leo-34ba9eaebae44039a4a9426af6389dcd">
+                    灿灿
+                  </ion-select-option>
+                </ion-select>
+              </div>
               <div v-if="selectedTask.total_chars != null" class="rounded bg-gray-50 p-2">
                 <span class="text-gray-500">字数</span>
                 <div>{{ selectedTask.total_chars }}</div>
@@ -394,6 +403,7 @@ const editSpeed = ref<number>(1);
 const editVol = ref<number>(50);
 const editText = ref<string>("");
 const editRole = ref<string>("");
+const editModel = ref<string>("");
 /** 识别：已选图片、预览 URL 缓存、隐藏 input、加载态 */
 const selectedImages = ref<File[]>([]);
 const ocrImageUrls = ref<string[]>([]);
@@ -433,6 +443,7 @@ watch(selectedTask, (t) => {
     editVol.value = t.vol ?? 50;
     editText.value = t.text ?? "";
     editRole.value = t.role ?? "";
+    editModel.value = t.model ?? "";
   } else {
     clearSelectedImages();
   }
@@ -629,26 +640,40 @@ async function handleStartTask() {
   const task = selectedTask.value;
   if (!task) return;
   if (isTaskBusy.value || task.status === "processing" || generateVoiceLock.value) return;
-  generateVoiceLock.value = true;
-  try {
-    await startTtsTask(task.task_id);
-    EventBus.$emit(C_EVENT.TOAST, "任务已开始处理");
-    await loadTasks();
-    const updated = tasks.value.find((t) => t.task_id === task.task_id);
-    if (updated) {
-      try {
-        selectedTask.value = await getTtsTask(updated.task_id);
-      } catch {
-        selectedTask.value = updated;
-      }
-    }
-  } catch (e: any) {
-    EventBus.$emit(C_EVENT.TOAST, e?.message ?? "启动任务失败");
-  } finally {
-    setTimeout(() => {
-      generateVoiceLock.value = false;
-    }, GENERATE_VOICE_LOCK_MS);
-  }
+  const alert = await alertController.create({
+    header: "确认生成",
+    message: `确定要开始生成任务「${task.name || task.task_id}」的语音吗？`,
+    buttons: [
+      { text: "取消", role: "cancel" },
+      {
+        text: "确定",
+        role: "confirm",
+        handler: async () => {
+          generateVoiceLock.value = true;
+          try {
+            await startTtsTask(task.task_id);
+            EventBus.$emit(C_EVENT.TOAST, "任务已开始处理");
+            await loadTasks();
+            const updated = tasks.value.find((t) => t.task_id === task.task_id);
+            if (updated) {
+              try {
+                selectedTask.value = await getTtsTask(updated.task_id);
+              } catch {
+                selectedTask.value = updated;
+              }
+            }
+          } catch (e: any) {
+            EventBus.$emit(C_EVENT.TOAST, e?.message ?? "启动任务失败");
+          } finally {
+            setTimeout(() => {
+              generateVoiceLock.value = false;
+            }, GENERATE_VOICE_LOCK_MS);
+          }
+        },
+      },
+    ],
+  });
+  await alert.present();
 }
 
 async function runAnalysis() {
@@ -765,6 +790,7 @@ async function saveAndClose() {
     await updateTtsTask(task.task_id, {
       text: editText.value,
       role: editRole.value || undefined,
+      model: editModel.value || undefined,
       speed: Number(editSpeed.value),
       vol: Number(editVol.value),
     });
@@ -772,6 +798,7 @@ async function saveAndClose() {
     if (t) {
       t.text = editText.value;
       t.role = editRole.value || undefined;
+      t.model = editModel.value || undefined;
       t.speed = Number(editSpeed.value);
       t.vol = Number(editVol.value);
     }
@@ -780,6 +807,7 @@ async function saveAndClose() {
         ...selectedTask.value,
         text: editText.value,
         role: editRole.value || undefined,
+        model: editModel.value || undefined,
         speed: t?.speed ?? editSpeed.value,
         vol: t?.vol ?? editVol.value,
       };
@@ -855,6 +883,8 @@ async function onRefresh(e: RefresherCustomEvent) {
 async function createAndOpenTask() {
   if (addButtonCooling.value) return;
   addButtonCooling.value = true;
+  const loading = await loadingController.create({ message: "Loading..." });
+  loading.present();
   try {
     const { task_id } = await createTtsTask({ text: "" });
     await loadTasks();
@@ -869,6 +899,7 @@ async function createAndOpenTask() {
   } catch (e: any) {
     EventBus.$emit(C_EVENT.TOAST, e?.message ?? "创建失败");
   } finally {
+    loading.dismiss();
     setTimeout(() => {
       addButtonCooling.value = false;
     }, ADD_COOLDOWN_MS);
