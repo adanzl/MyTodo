@@ -66,10 +66,10 @@
           <div class="space-y-3">
             <div class="flex items-center justify-between flex-wrap gap-3">
               <div class="flex items-center gap-2 flex-shrink-0">
-                <ion-button size="small" fill="outline" class="" @click.stop="openRenameDialog" shape="round">
+                <ion-button size="small" fill="outline" class="[--border-width:1px]" @click.stop="openRenameDialog" shape="round">
                   <ion-icon :icon="createOutline" slot="icon-only" />
                 </ion-button>
-                <ion-badge :color="statusColor(selectedTask.status)" class="p-2 text-[10px] h-7">
+                <ion-badge :color="statusColor(selectedTask.status)" class="p-1.5 -text-[10px] h-7 flex items-center">
                   {{ statusLabel(selectedTask.status) }}
                 </ion-badge>
                 <ion-button size="small" color="primary"
@@ -838,11 +838,11 @@ function statusColor(status: string): string {
     case "success":
       return "success";
     case "processing":
-      return "primary";
+      return "warning";
     case "failed":
       return "danger";
     default:
-      return "medium";
+      return "light";
   }
 }
 
