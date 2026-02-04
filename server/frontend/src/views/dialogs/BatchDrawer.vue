@@ -7,7 +7,11 @@
     header-class="h-12 !mb-1"
     :before-close="handleClose"
   >
-    <div class="flex gap-4 h-full">
+    <div
+      v-loading.fullscreen.lock="loading"
+      element-loading-text="加载中..."
+      class="flex gap-4 h-full"
+    >
       <!-- 第一列：Batch List -->
       <div class="w-64 border rounded p-3 flex flex-col">
         <div class="flex items-center justify-between mb-3">
@@ -268,7 +272,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Plus, Delete, Edit, Check, Minus } from "@element-plus/icons-vue";
 import { getRdsData, setRdsData } from "@/api/rds";
@@ -852,7 +856,5 @@ watch(internalVisible, newVal => {
   }
 });
 
-onMounted(() => {
-  loadBatchList();
-});
+// 不再在 onMounted 中加载：抽屉默认关闭，由 watch(visible) 在打开时加载，避免重复请求
 </script>
