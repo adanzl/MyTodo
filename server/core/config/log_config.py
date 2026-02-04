@@ -30,11 +30,10 @@ handler_filter = HandlerFilter()
 
 
 def _create_app_logger() -> logging.Logger:
-    """
-    配置根日志记录器
-    
-    :param IS_PRODUCTION: 是否为生产环境
-    :return: 配置好的根日志记录器
+    """配置根日志记录器。
+
+    Returns:
+        配置好的根日志记录器。
     """
     log_file = f"{LOG_DIR}/app.log"
     # cSpell: disable-next-line
@@ -65,14 +64,14 @@ app_logger = _create_app_logger()
 
 
 def _create_access_logger() -> tuple[logging.Logger, logging.Logger]:
-    """配置访问日志记录器
-    
-    同时配置 'gevent.access' 和 'app.access' 两个记录器，使用相同的处理器
-    这样 gevent WSGIServer 和 Flask 中间件都能记录到同一个日志文件
-    
-    仅在生产环境创建访问日志文件，开发环境不记录访问日志
-    
-    :return: (app_access_logger, gevent_access_logger) 配置好的访问日志记录器
+    """配置访问日志记录器。
+
+    同时配置 'gevent.access' 和 'app.access' 两个记录器，使用相同的处理器，
+    这样 gevent WSGIServer 和 Flask 中间件都能记录到同一个日志文件。
+    仅在生产环境创建访问日志文件，开发环境不记录访问日志。
+
+    Returns:
+        (app_access_logger, gevent_access_logger) 配置好的访问日志记录器。
     """
     # 配置 gevent.access 记录器（供 gevent WSGIServer 使用）
     gevent_access_logger = logging.getLogger('gevent.access')

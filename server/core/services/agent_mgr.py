@@ -112,10 +112,13 @@ class AgentMgr:
         self._agents.pop(agent_id, None)
 
     def get_all_agents(self, action: Optional[str] = None) -> Union[Dict[str, Dict[str, Any]], List[Dict[str, Any]]]:
-        """
-        获取所有已注册的设备列表
-        :param action: 可选的操作类型，如果提供则只返回支持该操作的设备列表
-        :return: 设备信息字典或设备列表
+        """获取所有已注册的设备列表。
+
+        Args:
+            action: 可选的操作类型，如果提供则只返回支持该操作的设备列表。
+
+        Returns:
+            设备信息字典或设备列表。
         """
         # 先清理过期设备
         self._cleanup_expired_devices()

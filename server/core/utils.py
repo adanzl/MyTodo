@@ -23,19 +23,25 @@ log = app_logger
 
 
 def ok_response(data: Any = None) -> Dict[str, Any]:
-    """
-    返回成功响应
-    :param data: 响应数据，可选
-    :return: 成功响应字典
+    """返回成功响应。
+
+    Args:
+        data: 响应数据，可选。
+
+    Returns:
+        成功响应字典。
     """
     return {"code": 0, "msg": "ok", "data": data}
 
 
 def err_response(message: str) -> Dict[str, Any]:
-    """
-    返回错误响应
-    :param message: 错误消息
-    :return: 错误响应字典
+    """返回错误响应。
+
+    Args:
+        message: 错误消息。
+
+    Returns:
+        错误响应字典。
     """
     return {"code": -1, "msg": message}
 
@@ -52,9 +58,10 @@ def get_json_body() -> Dict[str, Any]:
 
 
 def read_json_from_request() -> Dict[str, Any]:
-    """
-    从请求中读取 JSON 数据，使用 stream 方式避免 gevent 环境中的阻塞问题
-    :return: 解析后的 JSON 数据（dict），如果失败返回 {}
+    """从请求中读取 JSON 数据，使用 stream 方式避免 gevent 环境中的阻塞问题。
+
+    Returns:
+        解析后的 JSON 数据（dict），如果失败返回 {}。
     """
     try:
         content_length = request.content_length or 0
@@ -75,10 +82,13 @@ def read_json_from_request() -> Dict[str, Any]:
 
 
 def convert_to_http_url(url: str) -> str:
-    """
-    将本地文件路径转换为 HTTP URL
-    :param url: 本地文件路径（如 /opt/my_todo/data/ext_base/audio/xxx.mp3）或已经是 HTTP URL
-    :return: HTTP URL
+    """将本地文件路径转换为 HTTP URL。
+
+    Args:
+        url: 本地文件路径（如 /opt/my_todo/data/ext_base/audio/xxx.mp3）或已经是 HTTP URL。
+
+    Returns:
+        HTTP URL。
     """
     # 如果已经是 HTTP/HTTPS URL，直接返回
     if url.startswith('http://') or url.startswith('https://'):
@@ -96,11 +106,23 @@ def convert_to_http_url(url: str) -> str:
     return url
 
 
-def format_time_str(seconds: float) -> str:
+def get_weekday_index() -> int:
+    """获取当前星期对应的索引。
+
+    Returns:
+        int: 0=周一, 1=周二, 2=周三, 3=周四, 4=周五, 5=周六, 6=周日。
     """
-    将秒数格式化为 "HH:MM:SS" 格式
-    :param seconds: 秒数（可以是整数或浮点数）
-    :return: "HH:MM:SS" 格式的时间字符串
+    return datetime.now().weekday()
+
+
+def format_time_str(seconds: float) -> str:
+    """将秒数格式化为 "HH:MM:SS" 格式。
+
+    Args:
+        seconds: 秒数（可以是整数或浮点数）。
+
+    Returns:
+        "HH:MM:SS" 格式的时间字符串。
     """
     seconds = int(seconds)
     hours = seconds // 3600
@@ -110,21 +132,28 @@ def format_time_str(seconds: float) -> str:
 
 
 def time_to_seconds(time_str: str) -> int:
-    """
-    将 "HH:MM:SS" 格式的时间字符串转换为秒数
-    :param time_str: "HH:MM:SS" 格式的时间字符串
-    :return: 秒数
+    """将 "HH:MM:SS" 格式的时间字符串转换为秒数。
+
+    Args:
+        time_str: "HH:MM:SS" 格式的时间字符串。
+
+    Returns:
+        秒数。
     """
     parts = time_str.split(':')
     return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2]) if len(parts) == 3 else 0
 
 
 def get_media_duration(file_path: str) -> Optional[int]:
-    """
-    使用 ffprobe 获取媒体文件的时长
-    在独立线程中使用 os.system 执行命令，避免 gevent 事件循环和 child watchers 问题
-    :param file_path: 文件路径
-    :return: 时长（秒），如果失败返回 None
+    """使用 ffprobe 获取媒体文件的时长。
+
+    在独立线程中使用 os.system 执行命令，避免 gevent 事件循环和 child watchers 问题。
+
+    Args:
+        file_path: 文件路径。
+
+    Returns:
+        时长（秒），如果失败返回 None。
     """
     import tempfile
     import shlex
@@ -224,16 +253,19 @@ def get_media_duration(file_path: str) -> Optional[int]:
 
 
 def _get_media_server_url() -> str:
-    """获取媒体文件服务器的完整URL"""
+    """获取媒体文件服务器的完整 URL。"""
     # 返回固定的服务器地址和端口
     return "http://192.168.50.172:8848"
 
 
 def decode_url_path(path: str) -> str:
-    """
-    解码 URL 编码的路径
-    :param path: URL 编码的路径
-    :return: 解码后的路径
+    """解码 URL 编码的路径。
+
+    Args:
+        path: URL 编码的路径。
+
+    Returns:
+        解码后的路径。
     """
     while '%' in path:
         try:
@@ -249,12 +281,15 @@ def decode_url_path(path: str) -> str:
 def validate_and_normalize_path(file_path: str,
                                 base_dir: str = '/opt/my_todo/data',
                                 must_be_file: bool = True) -> Tuple[Optional[str], Optional[str]]:
-    """
-    验证和规范化文件路径
-    :param file_path: 文件路径
-    :param base_dir: 基础目录，默认为 /opt/my_todo/data
-    :param must_be_file: 是否必须是文件（True）或可以是目录（False）
-    :return: (规范化后的路径, 错误消息)，如果成功则错误消息为 None
+    """验证和规范化文件路径。
+
+    Args:
+        file_path: 文件路径。
+        base_dir: 基础目录，默认为 /opt/my_todo/data。
+        must_be_file: 是否必须是文件（True）或可以是目录（False）。
+
+    Returns:
+        (规范化后的路径, 错误消息)，如果成功则错误消息为 None。
     """
     if not file_path:
         return None, "文件路径不能为空"
@@ -289,10 +324,13 @@ def validate_and_normalize_path(file_path: str,
 
 
 def get_media_url(local_path: str) -> str:
-    """
-    将本地文件路径转换为可通过 HTTP 访问的 URL
-    :param local_path: 本地文件路径，如 /opt/my_todo/data/ext_base/audio/xxx.mp3
-    :return: HTTP URL，如 http://192.168.1.100:8000/api/media/files/opt/my_todo/data/ext_base/audio/xxx.mp3
+    """将本地文件路径转换为可通过 HTTP 访问的 URL。
+
+    Args:
+        local_path: 本地文件路径，如 /opt/my_todo/data/ext_base/audio/xxx.mp3。
+
+    Returns:
+        HTTP URL，如 http://192.168.1.100:8000/api/media/files/opt/my_todo/data/ext_base/audio/xxx.mp3。
     """
     try:
         # 移除路径开头的 /
@@ -318,16 +356,17 @@ def get_media_url(local_path: str) -> str:
 
 
 def convert_standard_cron_weekday_to_apscheduler(day_of_week: str) -> str:
-    """
-    将标准 cron 的周几映射转换为 APScheduler 的周几映射
-    
+    """将标准 cron 的周几映射转换为 APScheduler 的周几映射。
+
     标准 cron: 0=周日, 1=周一, 2=周二, 3=周三, 4=周四, 5=周五, 6=周六
     APScheduler: 0=周一, 1=周二, 2=周三, 3=周四, 4=周五, 5=周六, 6=周日
-    
     转换公式: (标准cron + 6) % 7
-    
-    :param day_of_week: 标准 cron 的周几字段（可能是 *、数字、范围、列表等）
-    :return: 转换后的 APScheduler 周几字段
+
+    Args:
+        day_of_week: 标准 cron 的周几字段（可能是 *、数字、范围、列表等）。
+
+    Returns:
+        转换后的 APScheduler 周几字段。
     """
     if day_of_week == '*':
         return '*'
@@ -371,10 +410,13 @@ def convert_standard_cron_weekday_to_apscheduler(day_of_week: str) -> str:
 
 
 def check_cron_will_trigger_today(cron_expression: str) -> bool:
-    """
-    检查 cron 表达式是否会在今天触发
-    :param cron_expression: cron 表达式
-    :return: True 如果今天会触发，False 否则
+    """检查 cron 表达式是否会在今天触发。
+
+    Args:
+        cron_expression: cron 表达式。
+
+    Returns:
+        True 如果今天会触发，False 否则。
     """
     if not cron_expression or not cron_expression.strip():
         return False
@@ -423,9 +465,10 @@ def check_cron_will_trigger_today(cron_expression: str) -> bool:
 
 
 def ensure_directory(directory_path: str) -> None:
-    """
-    确保目录存在，如果不存在则创建
-    :param directory_path: 目录路径
+    """确保目录存在，如果不存在则创建。
+
+    Args:
+        directory_path: 目录路径。
     """
     try:
         os.makedirs(directory_path, exist_ok=True)
@@ -435,30 +478,39 @@ def ensure_directory(directory_path: str) -> None:
 
 
 def is_allowed_audio_file(filename: str) -> bool:
-    """
-    检查音频文件扩展名是否允许
-    :param filename: 文件名
-    :return: True 如果文件扩展名在允许列表中，False 否则
+    """检查音频文件扩展名是否允许。
+
+    Args:
+        filename: 文件名。
+
+    Returns:
+        True 如果文件扩展名在允许列表中，False 否则。
     """
     from core.config import ALLOWED_AUDIO_EXTENSIONS
     return os.path.splitext(filename)[1].lower() in ALLOWED_AUDIO_EXTENSIONS
 
 
 def is_allowed_pdf_file(filename: str) -> bool:
-    """
-    检查 PDF 文件扩展名是否允许
-    :param filename: 文件名
-    :return: True 如果文件扩展名在允许列表中，False 否则
+    """检查 PDF 文件扩展名是否允许。
+
+    Args:
+        filename: 文件名。
+
+    Returns:
+        True 如果文件扩展名在允许列表中，False 否则。
     """
     from core.config import ALLOWED_PDF_EXTENSIONS
     return os.path.splitext(filename)[1].lower() in ALLOWED_PDF_EXTENSIONS
 
 
 def get_file_info(file_path: str) -> Optional[dict]:
-    """
-    获取文件信息
-    :param file_path: 文件路径
-    :return: 包含文件信息的字典，如果文件不存在则返回 None
+    """获取文件信息。
+
+    Args:
+        file_path: 文件路径。
+
+    Returns:
+        包含文件信息的字典，如果文件不存在则返回 None。
     """
     if not os.path.exists(file_path):
         return None
@@ -473,10 +525,13 @@ def get_file_info(file_path: str) -> Optional[dict]:
 
 
 def get_file_type_by_magic_number(file) -> Optional[str]:
-    """
-    通过文件头部的 "magic number" 来识别文件类型。
-    :param file: 文件对象 (werkzeug.FileStorage)
-    :return: 文件类型字符串 (例如 'mp3', 'flac')，如果无法识别则返回 None
+    """通过文件头部的 magic number 来识别文件类型。
+
+    Args:
+        file: 文件对象 (werkzeug.FileStorage)。
+
+    Returns:
+        文件类型字符串（例如 'mp3', 'flac'），如果无法识别则返回 None。
     """
     magic_numbers = {
         b'\xFF\xFB': 'mp3',
@@ -509,13 +564,15 @@ def get_file_type_by_magic_number(file) -> Optional[str]:
 
 
 def get_unique_filepath(directory: str, base_name: str, extension: str) -> str:
-    """
-    生成唯一的文件路径，如果文件已存在则添加序号。
+    """生成唯一的文件路径，如果文件已存在则添加序号。
 
-    :param directory: 目标目录
-    :param base_name: 基础文件名（不含扩展名）
-    :param extension: 文件扩展名（包含点号，如 '.mp3'）
-    :return: 唯一的文件路径
+    Args:
+        directory: 目标目录。
+        base_name: 基础文件名（不含扩展名）。
+        extension: 文件扩展名（包含点号，如 '.mp3'）。
+
+    Returns:
+        唯一的文件路径。
     """
     counter = 0
     while True:
@@ -640,21 +697,25 @@ def run_subprocess_safe(cmd: List[str],
                         timeout: float = 30.0,
                         env: Optional[Dict[str, str]] = None,
                         cwd: Optional[str] = None) -> Tuple[int, str, str]:
-    """
-    在线程中安全地运行 subprocess，避免 gevent 与 asyncio 冲突
-    
+    """在线程中安全地运行 subprocess，避免 gevent 与 asyncio 冲突。
+
     由于 gevent.monkey.patch_all(subprocess=True) 会 patch subprocess 模块，
     可能导致 "child watchers are only available on the default loop" 错误。
     直接使用 os.system + 临时文件的方案，完全避免 gevent 的 subprocess patch。
-    
-    :param cmd: 要执行的命令列表
-    :param timeout: 超时时间（秒），默认 30 秒
-    :param env: 环境变量字典，可选
-    :param cwd: 工作目录，可选
-    :return: (returncode, stdout, stderr) 元组
-    :raises TimeoutError: 如果命令执行超时
-    :raises FileNotFoundError: 如果命令未找到
-    :raises Exception: 其他执行错误
+
+    Args:
+        cmd: 要执行的命令列表。
+        timeout: 超时时间（秒），默认 30 秒。
+        env: 环境变量字典，可选。
+        cwd: 工作目录，可选。
+
+    Returns:
+        (returncode, stdout, stderr) 元组。
+
+    Raises:
+        TimeoutError: 如果命令执行超时。
+        FileNotFoundError: 如果命令未找到。
+        Exception: 其他执行错误。
     """
     result_queue = queue.Queue()
     error_queue = queue.Queue()

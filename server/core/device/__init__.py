@@ -9,11 +9,13 @@ from core.device.mi_device import MiDevice
 
 
 def create_device(node):
-    """
-    根据节点信息创建设备对象
-    
-    :param node: 设备节点信息，包含 type, address, name 等字段
-    :return: 包含 node 和 obj 的字典，obj 为设备对象实例
+    """根据节点信息创建设备对象。
+
+    Args:
+        node: 设备节点信息，包含 type, address, name 等字段。
+
+    Returns:
+        包含 node 和 obj 的字典，obj 为设备对象实例。
     """
     ret = {"node": node, "obj": None}
     if node["type"] == "agent":

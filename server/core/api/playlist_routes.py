@@ -75,7 +75,15 @@ def playlist_update_all() -> ResponseReturnValue:
 
 
 def _require_playlist_id(args: Dict[str, Any]) -> tuple[Optional[Any], Optional[ResponseReturnValue]]:
-    """从请求体中提取播放列表 id。"""
+    """从请求体中提取播放列表 id。
+
+    Args:
+        args: 请求体字典。
+
+    Returns:
+        (playlist_id, error_response)。若成功则 error_response 为 None；
+        若失败则 playlist_id 为 None 且 error_response 为错误响应。
+    """
     pid = args.get("id")
     if pid is None:
         return None, _err("id is required")

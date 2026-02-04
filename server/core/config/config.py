@@ -115,9 +115,10 @@ class Config:
 
     @classmethod
     def validate(cls) -> tuple[bool, Optional[str]]:
-        """
-        验证必需的配置项
-        :return: (是否有效, 错误消息)
+        """验证必需的配置项。
+
+        Returns:
+            (是否有效, 错误消息)。
         """
         errors = []
 

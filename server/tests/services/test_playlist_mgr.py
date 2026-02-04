@@ -617,7 +617,7 @@ def test_get_pre_list_for_today_edge_cases():
     assert pm._get_pre_list_for_today([]) == []
     assert pm._get_pre_list_for_today([[]] * 3) == []
     # 7 个元素但当天索引处不是 list（由 weekday 决定，用 patch 固定）
-    with patch.object(pm, '_get_weekday_index', return_value=0):
+    with patch.object(pm, 'get_weekday_index', return_value=0):
         assert pm._get_pre_list_for_today([1, [], [], [], [], [], []]) == []
         assert pm._get_pre_list_for_today([[{"uri": "a.mp3"}], [], [], [], [], [], []]) == [{"uri": "a.mp3"}]
 

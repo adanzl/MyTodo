@@ -40,12 +40,15 @@ class BluetoothMgr:
         self._scan_task = None
 
     def _update_or_create_device(self, address: str, name: str, metadata: Dict[str, Any]) -> BluetoothDev:
-        """
-        更新或创建设备对象
-        :param address: 设备地址
-        :param name: 设备名称
-        :param metadata: 设备元数据
-        :return: BluetoothDev 对象
+        """更新或创建设备对象。
+
+        Args:
+            address: 设备地址。
+            name: 设备名称。
+            metadata: 设备元数据。
+
+        Returns:
+            BluetoothDev 对象。
         """
         address_upper = address.upper()
         if address_upper not in self.devices:
@@ -57,10 +60,13 @@ class BluetoothMgr:
         return self.devices[address_upper]
 
     def _build_ble_metadata(self, advertisement_data: Optional[AdvertisementData]) -> Dict[str, Any]:
-        """
-        从 BLE 广告数据构建 metadata
-        :param advertisement_data: BLE 广告数据
-        :return: metadata 字典
+        """从 BLE 广告数据构建 metadata。
+
+        Args:
+            advertisement_data: BLE 广告数据。
+
+        Returns:
+            metadata 字典。
         """
         metadata = {}
         if not advertisement_data:
@@ -181,11 +187,14 @@ class BluetoothMgr:
         return metadata
 
     def _get_friendly_name(self, device: Any, advertisement_data: Optional[AdvertisementData] = None) -> str:
-        """
-        获取设备的友好名称
-        :param device: BLE 设备对象
-        :param advertisement_data: 广告数据
-        :return: 友好名称
+        """获取设备的友好名称。
+
+        Args:
+            device: BLE 设备对象。
+            advertisement_data: 广告数据。
+
+        Returns:
+            友好名称。
         """
         if advertisement_data and hasattr(advertisement_data, 'local_name') and advertisement_data.local_name:
             return advertisement_data.local_name
@@ -458,10 +467,13 @@ class BluetoothMgr:
             return []
 
     def scan_devices_sync(self, timeout: float = 5.0) -> List[Dict[str, Any]]:
-        """
-        同步扫描传统蓝牙设备（在事件循环中运行）
-        :param timeout: 扫描超时时间（秒）
-        :return: 设备列表
+        """同步扫描传统蓝牙设备（在事件循环中运行）。
+
+        Args:
+            timeout: 扫描超时时间（秒）。
+
+        Returns:
+            设备列表。
         """
         try:
             return run_async(self.scan_devices(timeout), timeout=timeout + 2.0)
@@ -473,10 +485,13 @@ class BluetoothMgr:
             return []
 
     def scan_ble_devices_sync(self, timeout: float = 5.0) -> List[Dict[str, Any]]:
-        """
-        同步扫描 BLE 蓝牙设备（在事件循环中运行）
-        :param timeout: 扫描超时时间（秒）
-        :return: 设备列表
+        """同步扫描 BLE 蓝牙设备（在事件循环中运行）。
+
+        Args:
+            timeout: 扫描超时时间（秒）。
+
+        Returns:
+            设备列表。
         """
         try:
             return run_async(self.scan_ble_devices(timeout), timeout=timeout + 2.0)

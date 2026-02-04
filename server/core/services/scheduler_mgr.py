@@ -206,9 +206,10 @@ class SchedulerMgr:
             return False
 
     def remove_job(self, job_id: str) -> bool:
-        """
-        移除任务
-        :param job_id: 任务唯一标识
+        """移除任务。
+
+        Args:
+            job_id: 任务唯一标识。
         """
         try:
             if self.scheduler.get_job(job_id):
@@ -223,9 +224,10 @@ class SchedulerMgr:
             return False
 
     def pause_job(self, job_id: str) -> bool:
-        """
-        暂停任务
-        :param job_id: 任务唯一标识
+        """暂停任务。
+
+        Args:
+            job_id: 任务唯一标识。
         """
         try:
             if self.scheduler.get_job(job_id):
@@ -240,9 +242,10 @@ class SchedulerMgr:
             return False
 
     def resume_job(self, job_id: str) -> bool:
-        """
-        恢复任务
-        :param job_id: 任务唯一标识
+        """恢复任务。
+
+        Args:
+            job_id: 任务唯一标识。
         """
         try:
             if self.scheduler.get_job(job_id):
@@ -257,17 +260,21 @@ class SchedulerMgr:
             return False
 
     def get_job(self, job_id: str) -> Any:
-        """
-        获取任务信息
-        :param job_id: 任务唯一标识
-        :return: Job 对象或 None
+        """获取任务信息。
+
+        Args:
+            job_id: 任务唯一标识。
+
+        Returns:
+            Job 对象或 None。
         """
         return self.scheduler.get_job(job_id)
 
     def get_all_jobs(self) -> List[Any]:
-        """
-        获取所有任务列表
-        :return: Job 对象列表
+        """获取所有任务列表。
+
+        Returns:
+            Job 对象列表。
         """
         return self.scheduler.get_jobs()
 
@@ -283,9 +290,10 @@ class SchedulerMgr:
             log.info(f"  - ID: {job.id}, 名称: {job.name}, 下次执行时间: {job.next_run_time}")
 
     def _job_executed_listener(self, event: Any) -> None:
-        """
-        任务执行监听器
-        :param event: 事件对象
+        """任务执行监听器。
+
+        Args:
+            event: 事件对象。
         """
         if event.exception:
             # 捕获 gevent 相关的异常，避免影响线程池 worker

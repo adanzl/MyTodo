@@ -316,11 +316,13 @@ class AudioMergeMgr(BaseTaskMgr[AudioMergeTask]):
             return -1, error_msg
 
     def _parse_duration_from_ffmpeg_output(self, output: str) -> Optional[float]:
-        """
-        从 ffmpeg 输出中解析时长
-        
-        :param output: ffmpeg 的输出文本
-        :return: 时长（秒），解析失败返回 None
+        """从 ffmpeg 输出中解析时长。
+
+        Args:
+            output: ffmpeg 的输出文本。
+
+        Returns:
+            时长（秒），解析失败返回 None。
         """
         match = self._DURATION_PATTERN.search(output)
         if match:
@@ -329,11 +331,13 @@ class AudioMergeMgr(BaseTaskMgr[AudioMergeTask]):
         return None
 
     def _get_file_duration_with_ffmpeg(self, file_path: str) -> Optional[float]:
-        """
-        使用 ffmpeg 快速获取文件时长
-        
-        :param file_path: 文件路径
-        :return: 时长（秒），失败返回 None
+        """使用 ffmpeg 快速获取文件时长。
+
+        Args:
+            file_path: 文件路径。
+
+        Returns:
+            时长（秒），失败返回 None。
         """
         try:
             cmds = [FFMPEG_PATH, '-loglevel', 'error', '-i', file_path, '-f', 'null', '-']
@@ -349,12 +353,14 @@ class AudioMergeMgr(BaseTaskMgr[AudioMergeTask]):
             return None
 
     def _get_result_duration(self, result_file: str, fallback_duration: Optional[float] = None) -> Optional[float]:
-        """
-        获取结果文件时长，优先使用后备时长，否则使用 ffmpeg 获取
-        
-        :param result_file: 结果文件路径
-        :param fallback_duration: 后备时长（如果提供则直接返回）
-        :return: 时长（秒），失败返回 None
+        """获取结果文件时长，优先使用后备时长，否则使用 ffmpeg 获取。
+
+        Args:
+            result_file: 结果文件路径。
+            fallback_duration: 后备时长（如果提供则直接返回）。
+
+        Returns:
+            时长（秒），失败返回 None。
         """
         if fallback_duration is not None:
             return fallback_duration
@@ -366,8 +372,8 @@ class AudioMergeMgr(BaseTaskMgr[AudioMergeTask]):
         如果只有一个文件，则直接复制。否则，使用 ffmpeg 的 concat demuxer 合并。
 
         Args:
-            task_id (str): 任务 ID。
-            files (List[AudioFileItem]): 待合并的文件列表。
+            task_id: 任务 ID。
+            files: 待合并的文件列表。
 
         Returns:
             Tuple[Optional[str], Optional[float]]: (结果文件路径, 时长秒)，失败则返回 (None, None)。

@@ -85,17 +85,21 @@ def _run_in_thread(coroutine: Coroutine,
 
 
 def run_async(coroutine: Coroutine, timeout: Optional[float] = None) -> Any:
-    """
-    在新的事件循环中运行协程
-    用于在同步代码中调用异步函数
-    
-    使用 threading.Thread 在线程中运行，避免与 gevent 的队列冲突
-    使用 gevent.spawn 等待线程完成，避免阻塞其他 gevent 协程
-    
-    :param coroutine: 协程对象
-    :param timeout: 超时时间（秒），可选
-    :return: 协程的返回值
-    :raises asyncio.TimeoutError: 如果操作超时
+    """在新的事件循环中运行协程。
+
+    用于在同步代码中调用异步函数。使用 threading.Thread 在线程中运行，
+    避免与 gevent 的队列冲突；使用 gevent.spawn 等待线程完成，
+    避免阻塞其他 gevent 协程。
+
+    Args:
+        coroutine: 协程对象。
+        timeout: 超时时间（秒），可选。
+
+    Returns:
+        协程的返回值。
+
+    Raises:
+        asyncio.TimeoutError: 如果操作超时。
     """
     if timeout is None:
         timeout = 10.0  # 默认超时时间，避免无限等待
