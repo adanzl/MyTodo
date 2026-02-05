@@ -30,12 +30,7 @@
             "internalConsoleOptions": "neverOpen",
             "skipFiles": [
                 "<node_internals>/**"
-            ],
-            "serverReadyAction": {
-                "pattern": "Local:\\s+(https?://[^\\s]+)",
-                "uriFormat": "%s",
-                "action": "openExternally"
-            }
+            ]
         }
     ],
     "compounds": [

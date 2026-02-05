@@ -14,6 +14,7 @@ source ~/.bashrc
 
 ## app 依赖
 
+> conda activate flask_env
 > pip3 install -r requirements.txt
 
 ## app 服务
@@ -38,7 +39,37 @@ source ~/.bashrc
 
 `sudo nginx -s reload`
 
-> 配置证书
+## 配置证书
+
+### 安装
+
+sudo apt install -y python3-certbot-nginx
+
+### 查看证书状态
+
+`sudo certbot certificates`
+
+### 手动续期
+
+``` text
+测试续期 `sudo certbot certonly --dry-run \
+  --preferred-challenges dns-01 \
+  --manual \
+  -d leo-dify.tbit.xin`
+实际续期 `sudo certbot certonly \
+  --preferred-challenges dns-01 \
+  --manual \
+  -d leo-dify.tbit.xin`
+
+添加对应 TXT 记录 主机记录：_acme-challenge.leo-dify，记录值：终端输出的字符串
+验证 dig TXT _acme-challenge.leo-dify.tbit.xin +short
+回车
+续期后重启 Web 服务
+```
+
+### 配置目录
+
+ls /etc/letsencrypt/renewal/
 
 ### Standalone 模式（适用于 HTTP 端口无法对外访问的情况）
 
