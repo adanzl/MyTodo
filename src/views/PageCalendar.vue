@@ -12,7 +12,7 @@
         <ion-buttons slot="end">
           <ServerRemoteBadge />
           <ion-button
-            class="!mr-5"
+            class="mr-5!"
             @click="btnTodayClk"
             :disabled="isThisMonth()">
             今
@@ -41,7 +41,7 @@
           <ion-grid class="w-full">
             <ion-row v-for="week in month.weekArr" :key="week" class="flex-nowrap">
               <ion-col
-                class="p-[1px] min-h-32 border-[0.5px] border-gray-300 border-solid w-[14.28%] h-auto"
+                class="p-px min-h-32 border-[0.5px] border-gray-300 border-solid w-[14.28%] h-auto"
                 @click="onDaySelected(month, day)"
                 v-for="day in week"
                 :key="day">
@@ -52,7 +52,7 @@
                       today: day.dt.unix() === dayjs().startOf('day').unix(),
                       gray: day.dt.month() !== month.month,
                     }"
-                    class="py-[1px] px-1 min-h-0">
+                    class="py-px px-1 min-h-0">
                     {{ day.dt.date() }}
                   </ion-chip>
                 </span>
@@ -62,7 +62,7 @@
                   :class="{
                     'line-through': day.save && day.save[event.id]?.state === 1,
                   }"
-                  class="text-left truncate mt-[1px] rounded-xs py-[1px] px-1"
+                  class="text-left truncate mt-px rounded-xs py-px px-1"
                   :style="{
                     'background-color': getColorOptions(event.color).tag,
                     'font-size': 'clamp(9px, 2.7vw, 16px)',

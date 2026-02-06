@@ -10,12 +10,12 @@
         <span>加载失败，请检查网络后下拉刷新</span>
         <ion-button size="small" fill="clear" @click="retryLoad">重试</ion-button>
       </div>
-      <div class="flex flex-col h-full p-2 border-t-1 border-gray-200">
+      <div class="flex flex-col h-full p-2 border-t border-gray-200">
         <div v-for="(msg, idx) in messages" :key="idx" class="p-1.5 w-full">
           <!-- 自己 -->
           <div v-if="String(msg.role) === userIdStr" class="flex">
             <div
-              class="max-w-[70%] min-w-[40px] bg-green-500 text-white p-2 ml-auto rounded-lg shadow-md relative">
+              class="max-w-[70%] min-w-10 bg-green-500 text-white p-2 ml-auto rounded-lg shadow-md relative">
               {{ msg.content }}
             </div>
             <ion-avatar slot="start" class="w-12 h-12 ml-1">
@@ -35,7 +35,7 @@
               <ion-img :src="(getUserInfo(msg.role)?.icon) ?? DEFAULT_AVATAR" />
             </ion-avatar>
             <div
-              class="max-w-[70%] min-w-[40px] bg-pink-200 p-2 mr-auto rounded-lg shadow-md relative">
+              class="max-w-[70%] min-w-10 bg-pink-200 p-2 mr-auto rounded-lg shadow-md relative">
               {{ msg.content }}
             </div>
             <div

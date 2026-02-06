@@ -54,7 +54,7 @@
     </ion-segment-view>
     <audio ref="audioRef" style="width: auto" class="m-2"></audio>
     <ion-item v-if="chatType !== CHAT_TTS_TASKS">
-      <div class="flex py-2 w-full h-[72px]" v-if="INPUT_TYPE == 'text'">
+      <div class="flex py-2 w-full h-18" v-if="INPUT_TYPE == 'text'">
         <div class="w-12 h-auto flex items-center" @click="btnChangeMode">
           <Icon icon="weui:voice-outlined" class="h-10 w-10" />
         </div>
@@ -69,7 +69,7 @@
           mode="md" />
         <ion-button @click="sendTextMessage">发送</ion-button>
       </div>
-      <div class="flex py-2 w-full h-[72px]" v-else>
+      <div class="flex py-2 w-full h-18" v-else>
         <div class="w-12 h-auto flex items-center" @click="btnChangeMode">
           <Icon icon="weui:keyboard-outlined" class="h-10 w-10" />
         </div>

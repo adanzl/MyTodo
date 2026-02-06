@@ -239,7 +239,7 @@
           </div>
         </ion-item>
       </ion-content>
-      <ion-footer class="!flex">
+      <ion-footer class="flex!">
         <ion-button class="flex-1 text-gray-400" fill="clear" @click="closeEditModal">
           取消
         </ion-button>

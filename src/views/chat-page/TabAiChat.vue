@@ -10,7 +10,7 @@
         <span>加载失败，请检查网络后下拉刷新</span>
         <ion-button size="small" fill="clear" @click="retryRefresh">重试</ion-button>
       </div>
-      <div class="flex flex-col h-full p-2 border-t-1 border-gray-200">
+      <div class="flex flex-col h-full p-2 border-t border-gray-200">
         <div v-for="(msg, idx) in messages" :key="idx" class="p-1.5 w-full">
           <div
             v-if="msg.role == 'server'"

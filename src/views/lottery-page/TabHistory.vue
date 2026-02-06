@@ -29,11 +29,11 @@
               <ion-icon
                 :icon="item.value >= 0 ? caretUpOutline : caretDownOutline"
                 :class="item.value >= 0 ? 'text-green-500' : 'text-red-500'"
-                class="w-[20px] h-[20px]"></ion-icon>
+                class="w-5 h-5"></ion-icon>
               {{ item.value }}
             </div>
             <div class="ml-2 flex items-center text-sm">
-              <ion-icon class="mr-1 h-[18px] w-[18px]" :icon="timeOutline"></ion-icon>
+              <ion-icon class="mr-1 h-4.5 w-4.5" :icon="timeOutline"></ion-icon>
               {{ formatDate(item.dt) }}
             </div>
           </div>

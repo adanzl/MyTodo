@@ -59,7 +59,7 @@
           :resistanceRatio="0.5"
           :momentum-ratio="0.5"
           @swiper="setSwiperInstance">
-          <swiper-slide v-for="item in wishList.data" :key="item.id" class="!w-auto px-2">
+          <swiper-slide v-for="item in wishList.data" :key="item.id" class="w-auto! px-2">
             <div class="w-24 h-24 relative">
               <img :src="item.img" class="w-full h-full object-cover rounded-lg" />
               <div

@@ -4,7 +4,7 @@
       <ion-refresher slot="fixed" @ionRefresh="onRefresh">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
-      <div class="flex flex-col h-full p-2 border-t-1 border-gray-300">
+      <div class="flex flex-col h-full p-2 border-t border-gray-300">
         <div v-if="loading && tasks.length === 0" class="p-4 text-center text-gray-500">
           加载中…
         </div>
@@ -35,7 +35,7 @@
             <div class="mt-2 flex items-center gap-3 text-xs text-gray-400">
               <div v-if="task.total_chars != null" class="flex gap-1">
                 字数
-                <div class="!w-7 text-right">{{ task.total_chars }}</div>
+                <div class="w-7! text-right">{{ task.total_chars }}</div>
               </div>
               <span v-if="task.duration != null">时长 {{ formatDuration(task.duration) }}</span>
               <span class="flex-1 text-right">{{ formatTime(task.update_time) }}</span>
@@ -71,7 +71,7 @@
           </ion-buttons>
           <ion-title>{{ selectedTask?.name || selectedTask?.task_id || "任务详情" }}</ion-title>
           <ion-buttons slot="end" class="mr-2">
-            <ion-button @click="scrollToAnalysis" color="primary" class="!mr-3">分析</ion-button>
+            <ion-button @click="scrollToAnalysis" color="primary" class="mr-3!">分析</ion-button>
             <ion-button :disabled="!canGoPrev" @click="goPrev">
               <ion-icon :icon="arrowUpOutline" />
             </ion-button>
@@ -85,7 +85,7 @@
         <template v-if="selectedTask">
           <div class="space-y-3">
             <div class="flex items-center justify-between flex-wrap gap-3">
-              <div class="flex items-center gap-2 flex-shrink-0">
+              <div class="flex items-center gap-2 shrink-0">
                 <ion-button
                   size="small"
                   fill="outline"
@@ -128,7 +128,7 @@
                   class="flex items-center justify-center w-10 h-14 rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-primary hover:text-primary"
                   @click="pickImages">
                   <ion-icon :icon="imageOutline" slot="icon-only" class="text-2xl" />
-                  <div class="absolute top-0.5 !p-0 !overflow-hidden items-center justify-center">
+                  <div class="absolute top-0.5 p-0! overflow-hidden! items-center justify-center">
                     <span class="text-xs">{{ selectedImages.length }}</span>
                   </div>
                 </ion-button>
@@ -144,7 +144,7 @@
                   <div
                     v-for="(file, idx) in selectedImages"
                     :key="idx"
-                    class="relative w-14 h-14 flex-shrink-0 cursor-pointer active:opacity-80"
+                    class="relative w-14 h-14 shrink-0 cursor-pointer active:opacity-80"
                     @click="openOcrPreview(idx)">
                     <div class="absolute inset-0 rounded-lg overflow-hidden border border-gray-200">
                       <img
@@ -156,23 +156,23 @@
                       size="small"
                       fill="solid"
                       color="dark"
-                      class="absolute -top-0 -right-0 !min-w-0 !min-h-0 !w-6 !h-6 !max-w-6 !max-h-6 !p-0 !aspect-square !rounded-full !overflow-hidden !flex !items-center !justify-center shadow [--color:white] [--border-radius:50%]"
+                      class="absolute top-0 right-0 min-w-0! min-h-0! w-6! h-6! max-w-6! max-h-6! p-0! aspect-square! rounded-full! overflow-hidden! flex! items-center! justify-center! shadow [--color:white] [--border-radius:50%]"
                       sharp="round"
                       @click.stop="removeOcrImage(idx)">
                       <ion-icon
                         :icon="closeCircleOutline"
                         slot="icon-only"
-                        class="!w-5 !h-5 block shrink-0" />
+                        class="w-5! h-5! block shrink-0" />
                     </ion-button>
                   </div>
                 </div>
               </div>
-              <div class="flex items-center flex-shrink-0">
+              <div class="flex items-center shrink-0">
                 <ion-button
                   size="small"
                   color="primary"
                   :disabled="isTaskBusy || selectedImages.length === 0 || ocrLoading"
-                  class="!w-10 !h-12 !p-0"
+                  class="w-10! h-12! p-0!"
                   style="--padding-start: 0; --padding-end: 0"
                   @click="runOcr">
                   {{ ocrLoading ? "识别中…" : "识别" }}
@@ -250,7 +250,7 @@
                 v-model="editText"
                 placeholder="请输入要转换为语音的文本"
                 :disabled="isTaskBusy"
-                class="text-gray-800 rounded-lg min-h-[100px] [--padding-start:8px] [--padding-end:8px] [--padding-top:1px] [--padding-bottom:8px]"
+                class="text-gray-800 rounded-lg min-h-25 [--padding-start:8px] [--padding-end:8px] [--padding-top:1px] [--padding-bottom:8px]"
                 :auto-grow="true"
                 :rows="4" />
             </div>
@@ -258,7 +258,7 @@
             <!-- 分析内容（参考 server/frontend TTS.vue） -->
             <div
               ref="analysisSectionRef"
-              class="rounded-lg border border-gray-300 px-3 flex flex-col gap-1 min-h-[120px]">
+              class="rounded-lg border border-gray-300 px-3 flex flex-col gap-1 min-h-30">
               <div class="flex items-center justify-between">
                 <h4 class="text-sm font-semibold text-gray-700">分析内容</h4>
                 <ion-button
@@ -279,7 +279,7 @@
                   <!-- 美词 -->
                   <div v-if="selectedTask.analysis.words?.length" class="flex gap-3">
                     <div
-                      class="w-10 h-6 rounded-md bg-blue-50 border border-blue-300 flex items-center justify-center flex-shrink-0">
+                      class="w-10 h-6 rounded-md bg-blue-50 border border-blue-300 flex items-center justify-center shrink-0">
                       <span class="text-[11px] leading-tight text-blue-700 text-center">美词</span>
                     </div>
                     <div class="flex-1 flex flex-wrap gap-1 items-start">
@@ -294,7 +294,7 @@
                   <!-- 精彩句段 -->
                   <div v-if="selectedTask.analysis.sentence?.length" class="flex gap-3">
                     <div
-                      class="w-10 h-10 rounded-md bg-emerald-50 border border-emerald-300 flex items-center justify-center flex-shrink-0">
+                      class="w-10 h-10 rounded-md bg-emerald-50 border border-emerald-300 flex items-center justify-center shrink-0">
                       <span class="text-[11px] leading-tight text-emerald-700 text-center">
                         精彩<br />句段
                       </span>
@@ -311,7 +311,7 @@
                   <!-- 好句花园（摘要） -->
                   <div v-if="selectedTask.analysis.abstract" class="flex gap-3">
                     <div
-                      class="w-10 h-10 rounded-md bg-amber-50 border border-amber-300 flex items-center justify-center flex-shrink-0">
+                      class="w-10 h-10 rounded-md bg-amber-50 border border-amber-300 flex items-center justify-center shrink-0">
                       <span class="text-[11px] leading-tight text-amber-700 text-center">
                         好句<br />花园
                       </span>
@@ -325,7 +325,7 @@
                   <!-- 涂鸦 -->
                   <div v-if="selectedTask.analysis.doodle" class="flex gap-3">
                     <div
-                      class="w-10 h-6 rounded-md bg-pink-50 border border-pink-300 flex items-center justify-center flex-shrink-0">
+                      class="w-10 h-6 rounded-md bg-pink-50 border border-pink-300 flex items-center justify-center shrink-0">
                       <span class="text-[11px] leading-tight text-pink-700 text-center">涂鸦</span>
                     </div>
                     <div class="flex-1">
@@ -384,7 +384,7 @@
                     @click="editSpeed = Math.max(0.5, Math.round((editSpeed - 0.1) * 10) / 10)"
                     >−</ion-button
                   >
-                  <span class="min-w-[2.5rem] text-center">{{ editSpeed }}</span>
+                  <span class="min-w-10 text-center">{{ editSpeed }}</span>
                   <ion-button
                     size="small"
                     fill="clear"
@@ -399,7 +399,7 @@
                   <ion-button size="small" fill="clear" @click="editVol = Math.max(0, editVol - 10)"
                     >−</ion-button
                   >
-                  <span class="min-w-[2.5rem] text-center">{{ editVol }}</span>
+                  <span class="min-w-10 text-center">{{ editVol }}</span>
                   <ion-button
                     size="small"
                     fill="clear"
@@ -426,33 +426,33 @@
       class="[--width:100%] [--height:100%] [--border-radius:0] [--box-shadow:none] [--backdrop-opacity:0] [--background:transparent]"
       @didDismiss="renameModalOpen = false">
       <div
-        class="fixed inset-0 z-[1] flex items-center justify-center bg-black/50 p-5"
+        class="fixed inset-0 z-1 flex items-center justify-center bg-black/50 p-5"
         @click.self="renameModalOpen = false">
-        <div class="w-full max-w-[400px] min-w-[260px] rounded-2xl bg-white p-4 shadow-xl">
+        <div class="w-full max-w-100 min-w-65 rounded-2xl bg-white p-4 shadow-xl">
           <h2 class="mb-3 text-center text-lg font-semibold text-gray-900">任务改名</h2>
           <ion-input
             v-model="renameInputValue"
             placeholder="任务名称"
-            class="mb-3 rounded-lg border border-gray-300 text-base !px-2"
+            class="mb-3 rounded-lg border border-gray-300 text-base px-2!"
             :clear-input="true"
             :clear-on-edit="false" />
           <div class="flex justify-end gap-1 border-t border-gray-200 pt-2">
             <ion-button
               fill="clear"
-              class="min-h-[44px] font-semibold"
+              class="min-h-11 font-semibold"
               @click="appendFirstLineToRename"
               >填入</ion-button
             >
             <ion-button
               fill="clear"
-              class="min-h-[44px] font-semibold"
+              class="min-h-11 font-semibold"
               @click="renameModalOpen = false"
               >取消</ion-button
             >
             <ion-button
               fill="clear"
               color="primary"
-              class="min-h-[44px] font-semibold"
+              class="min-h-11 font-semibold"
               @click="confirmRename"
               >确定</ion-button
             >
@@ -534,7 +534,7 @@ const ocrLoading = ref(false);
 const previewOcrIndex = ref(-1);
 /** 添加按钮防短时间多点：创建中或冷却期内为 true */
 const addButtonCooling = ref(false);
-const ADD_COOLDOWN_MS = 1500;
+const ADD_COOL_DOWN_MS = 1500;
 /** 下载按钮点击后锁住 1s */
 const downloadButtonLock = ref(false);
 const DOWNLOAD_LOCK_MS = 1000;
@@ -1030,7 +1030,7 @@ async function createAndOpenTask() {
     loading.dismiss();
     setTimeout(() => {
       addButtonCooling.value = false;
-    }, ADD_COOLDOWN_MS);
+    }, ADD_COOL_DOWN_MS);
   }
 }
 

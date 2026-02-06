@@ -12,7 +12,7 @@
         <ion-buttons slot="end">
           <ServerRemoteBadge />
           <ion-button
-            class="!mr-1"
+            class="mr-1!"
             @click="btnTodayClk"
             :disabled="selectedDate?.dt.isToday()">
             今
@@ -135,7 +135,7 @@
                     <ion-reorder slot="end"></ion-reorder>
                   </ion-item>
                   <div
-                    class="pl-[60px] flex items-center text-gray-400"
+                    class="pl-15 flex items-center text-gray-400"
                     v-for="(sub, idx) in schedule.subtasks"
                     :key="idx"
                     @click="btnScheduleClk($event, schedule)">
