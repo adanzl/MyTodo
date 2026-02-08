@@ -257,7 +257,7 @@
 
           <!-- 小米设备类型：显示小米设备 -->
           <div v-else-if="isMi">
-            <div class="space-y-2 max-h-[200px] overflow-y-auto" v-loading="miScanning">
+            <div class="space-y-2 max-h-[300px] overflow-y-auto" v-loading="miScanning">
               <div
                 v-for="device in miDeviceList"
                 :key="device.deviceID || device.address"
