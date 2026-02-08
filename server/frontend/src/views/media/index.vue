@@ -531,7 +531,23 @@ const handleCreatePlaylist = async () => {
 // 播放列表菜单命令
 const handlePlaylistMenuCommand = async (command: string, playlistId: string) => {
   if (command === "delete") {
-    await handleDeletePlaylistGroup(playlistId);
+    const confirmed = await handleDeletePlaylistGroup(playlistId);
+    if (!confirmed) return;
+    try {
+      const remaining = playlistCollection.value.filter(p => p.id !== playlistId);
+      playlistCollection.value = remaining;
+      // 若删除的是当前选中的列表，则切换到第一个
+      if (activePlaylistId.value === playlistId) {
+        const newActiveId = remaining[0]?.id ?? "";
+        activePlaylistId.value = newActiveId;
+        localStorage.setItem(STORAGE_KEY_ACTIVE_PLAYLIST_ID, newActiveId);
+      }
+      syncActivePlaylist(playlistCollection.value);
+      await savePlaylist(playlistCollection.value);
+      ElMessage.success("播放列表已删除");
+    } catch (error) {
+      logAndNoticeError(error as Error, "删除播放列表失败");
+    }
   } else if (command === "copy") {
     const result = await handleCopyPlaylist(playlistId);
     if (!result) return;

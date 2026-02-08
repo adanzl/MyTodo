@@ -4,7 +4,7 @@
 import axios, { type AxiosError, type AxiosRequestConfig, type AxiosResponse } from "axios";
 import { logAndNoticeError } from "@/utils/error";
 import { logger } from "@/utils/logger";
-import { getAccessToken, refreshToken, setAccessToken } from "./auth";
+import { getAccessToken, getTokenExpiresAt, refreshToken, setAccessToken } from "./auth";
 
 // 与原版保持一致：支持远程和本地配置
 const REMOTE = {
@@ -196,11 +196,40 @@ async function ensureRefreshed(): Promise<string | null> {
   }
 }
 
+// token 即将过期时提前续期的缓冲时间（秒），1 小时
+const TOKEN_REFRESH_BUFFER_SEC = 3600;
+
 // 请求拦截器：每次请求都从 localStorage 读取 token 并写入 headers，兼容网站端
+// 若 token 即将过期则主动续期，实现“有请求就自动续期”
 api.interceptors.request.use(
-  cfg => {
+  async cfg => {
+    // 跳过 auth 相关接口，避免循环
+    const url = String(cfg.url || "");
+    if (url.includes("/auth/login") || url.includes("/auth/refresh")) {
+      const token = getAccessToken();
+      const value = token ? `Bearer ${token}` : "";
+      (api.defaults.headers.common as Record<string, string>)["Authorization"] = value;
+      cfg.headers = { ...(cfg.headers || {}), Authorization: value } as typeof cfg.headers;
+      return cfg;
+    }
+
     const token = getAccessToken();
-    const value = token ? `Bearer ${token}` : "";
+    const expiresAt = getTokenExpiresAt();
+    const now = Date.now();
+    const needRefresh =
+      token &&
+      expiresAt &&
+      expiresAt - now < TOKEN_REFRESH_BUFFER_SEC * 1000;
+    if (needRefresh) {
+      try {
+        await ensureRefreshed();
+      } catch {
+        // 续期失败，继续使用当前 token，401 时由响应拦截器处理
+      }
+    }
+
+    const finalToken = getAccessToken();
+    const value = finalToken ? `Bearer ${finalToken}` : "";
     // 同步到 axios 默认头，确保网站端请求也能带上（部分环境 per-request 合并异常）
     (api.defaults.headers.common as Record<string, string>)["Authorization"] = value;
     // 合并到当前请求 headers，不覆盖已有项
