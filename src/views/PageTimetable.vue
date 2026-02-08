@@ -727,7 +727,7 @@ const refreshData = async () => {
 };
 
 // 定时器引用
-let timeUpdateInterval: number | null = null;
+let timeUpdateInterval: ReturnType<typeof setInterval> | null = null;
 
 // 更新时间
 const updateCurrentTime = () => {
