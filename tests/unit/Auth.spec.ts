@@ -4,10 +4,12 @@
 import {
   clearLoginCache,
   getAccessToken,
+  getTokenExpiresAt,
   login,
   logout,
   refreshToken,
   setAccessToken,
+  setTokenWithExpiry,
 } from "@/utils/Auth";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -26,30 +28,44 @@ describe("Auth", () => {
     localStorage.clear();
   });
 
-  describe("getAccessToken / setAccessToken", () => {
+  describe("getAccessToken / setAccessToken / getTokenExpiresAt / setTokenWithExpiry", () => {
     it("getAccessToken 无 token 时返回 null", () => {
       expect(getAccessToken()).toBeNull();
     });
 
-    it("setAccessToken(null) 移除 token", () => {
+    it("setAccessToken(null) 移除 token 及过期时间", () => {
       localStorage.setItem("access_token", "old");
+      localStorage.setItem("access_token_expires_at", "123");
       setAccessToken(null);
       expect(localStorage.getItem("access_token")).toBeNull();
+      expect(localStorage.getItem("access_token_expires_at")).toBeNull();
     });
 
     it("setAccessToken(token) 写入 token，getAccessToken 可读回", () => {
       setAccessToken("abc123");
       expect(getAccessToken()).toBe("abc123");
     });
+
+    it("setTokenWithExpiry 写入 token 及过期时间，getTokenExpiresAt 可读回", () => {
+      const now = Date.now();
+      setTokenWithExpiry("xyz", 3600);
+      expect(getAccessToken()).toBe("xyz");
+      const expiresAt = getTokenExpiresAt();
+      expect(expiresAt).not.toBeNull();
+      expect(expiresAt! - now).toBeGreaterThanOrEqual(3599000);
+      expect(expiresAt! - now).toBeLessThanOrEqual(3601000);
+    });
   });
 
   describe("clearLoginCache", () => {
-    it("移除 access_token、saveUser、bAuth", () => {
+    it("移除 access_token、access_token_expires_at、saveUser、bAuth", () => {
       localStorage.setItem("access_token", "x");
+      localStorage.setItem("access_token_expires_at", "123");
       localStorage.setItem("saveUser", "1");
       localStorage.setItem("bAuth", "1");
       clearLoginCache();
       expect(localStorage.getItem("access_token")).toBeNull();
+      expect(localStorage.getItem("access_token_expires_at")).toBeNull();
       expect(localStorage.getItem("saveUser")).toBeNull();
       expect(localStorage.getItem("bAuth")).toBeNull();
     });

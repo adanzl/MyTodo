@@ -1,5 +1,5 @@
 import EventBus, { C_EVENT } from "@/types/EventBus";
-import { clearLoginCache, getAccessToken, refreshToken } from "@/utils/Auth";
+import { clearLoginCache, getAccessToken, getTokenExpiresAt, refreshToken } from "@/utils/Auth";
 import axios, { type AxiosRequestConfig, type InternalAxiosRequestConfig } from "axios";
 
 const REMOTE_URL = "https://leo-zhao.natapp4.cc/api";
@@ -13,11 +13,41 @@ export const apiClient = axios.create({
   withCredentials: true,
 });
 
+// token 即将过期时提前续期的缓冲时间（秒），1 小时
+const TOKEN_REFRESH_BUFFER_SEC = 3600;
+
+// 请求拦截器：每次请求都从 localStorage 读取 token 并写入 headers
+// 若 token 即将过期则主动续期，实现「有请求就自动续期」
 apiClient.interceptors.request.use(
-  (cfg: InternalAxiosRequestConfig) => {
+  async (cfg: InternalAxiosRequestConfig) => {
+    // 跳过 auth 相关接口，避免循环
+    const url = String(cfg.url || "");
+    if (url.includes("/auth/login") || url.includes("/auth/refresh")) {
+      const token = getAccessToken();
+      if (token) {
+        (cfg.headers = cfg.headers ?? ({} as typeof cfg.headers))["Authorization"] = `Bearer ${token}`;
+      }
+      return cfg;
+    }
+
     const token = getAccessToken();
-    if (token) {
-      (cfg.headers = cfg.headers ?? ({} as typeof cfg.headers))["Authorization"] = `Bearer ${token}`;
+    const expiresAt = getTokenExpiresAt();
+    const now = Date.now();
+    const needRefresh =
+      token &&
+      expiresAt &&
+      expiresAt - now < TOKEN_REFRESH_BUFFER_SEC * 1000;
+    if (needRefresh) {
+      try {
+        await ensureRefreshed();
+      } catch {
+        // 续期失败，继续使用当前 token，401 时由响应拦截器处理
+      }
+    }
+
+    const finalToken = getAccessToken();
+    if (finalToken) {
+      (cfg.headers = cfg.headers ?? ({} as typeof cfg.headers))["Authorization"] = `Bearer ${finalToken}`;
     }
     return cfg;
   },
