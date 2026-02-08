@@ -241,6 +241,7 @@ import { usePlaylistNameEdit } from "./composables/usePlaylistNameEdit";
 import { ElMessage } from "element-plus";
 import { playFileOnDevice } from "@/api/playlist";
 import type { MediaFile } from "@/types/tools";
+import { STORAGE_KEY_ACTIVE_PLAYLIST_ID } from "@/constants/playlist";
 
 // 状态管理 - 使用 composable
 const {
@@ -311,6 +312,7 @@ const {
   updateActivePlaylistData,
   loadPlaylist,
   refreshPlaylistStatus,
+  createNewPlaylist,
 } = usePlaylistData(
   playlistCollection,
   activePlaylistId,
@@ -470,7 +472,7 @@ const {
 // 播放列表操作 - 使用 composable
 const {
   handleSelectPlaylist: handleSelectPlaylistBase,
-  handleCreatePlaylist,
+  handleCreatePlaylist: handleCreatePlaylistPrompt,
   handleCopyPlaylist,
   handleDeletePlaylistGroup,
   handlePlayPlaylist,
@@ -506,6 +508,23 @@ const handleSelectPlaylist = async (playlistId: string) => {
   selectedPreFileIndices.value = [];
   selectedFileIndices.value = [];
   await refreshConnectedList();
+};
+
+// 新建播放列表（弹窗获取名称后创建并保存）
+const handleCreatePlaylist = async () => {
+  const result = await handleCreatePlaylistPrompt();
+  if (!result) return;
+  try {
+    const newPlaylist = createNewPlaylist(result.name);
+    playlistCollection.value = [...playlistCollection.value, newPlaylist];
+    activePlaylistId.value = newPlaylist.id;
+    localStorage.setItem(STORAGE_KEY_ACTIVE_PLAYLIST_ID, newPlaylist.id);
+    syncActivePlaylist(playlistCollection.value);
+    await savePlaylist(playlistCollection.value);
+    ElMessage.success("播放列表已创建");
+  } catch (error) {
+    logAndNoticeError(error as Error, "创建播放列表失败");
+  }
 };
 
 // 播放列表菜单命令

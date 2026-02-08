@@ -141,6 +141,13 @@ export function usePlaylistData(
   };
 
   /**
+   * 创建新的空播放列表
+   */
+  const createNewPlaylist = (name: string): Playlist => {
+    return normalizePlaylistItem({ name: (name || DEFAULT_PLAYLIST_NAME).trim() });
+  };
+
+  /**
    * 检查 pre_lists 是否有效
    */
   const isValidPreLists = (preLists: unknown): preLists is PlaylistItem[][] => {
@@ -595,6 +602,7 @@ export function usePlaylistData(
   return {
     normalizePlaylistItem,
     normalizePlaylistCollection,
+    createNewPlaylist,
     transformApiDataToPlaylistFormat,
     transformPlaylistToApiFormat,
     savePlaylist,
