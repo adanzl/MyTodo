@@ -761,44 +761,47 @@ async function confirmRename() {
   }
 }
 
+async function doStartTask(task: TtsTaskItem) {
+  generateVoiceLock.value = true;
+  try {
+    await startTtsTask(task.task_id);
+    EventBus.$emit(C_EVENT.TOAST, "任务已开始处理");
+    await loadTasks();
+    const updated = tasks.value.find((t) => t.task_id === task.task_id);
+    if (updated) {
+      try {
+        selectedTask.value = await getTtsTask(updated.task_id);
+      } catch {
+        selectedTask.value = updated;
+      }
+    }
+  } catch (e: any) {
+    EventBus.$emit(C_EVENT.TOAST, e?.message ?? "启动任务失败");
+  } finally {
+    setTimeout(() => {
+      generateVoiceLock.value = false;
+    }, GENERATE_VOICE_LOCK_MS);
+  }
+}
+
 async function handleStartTask() {
   const task = selectedTask.value;
   if (!task) return;
   if (isTaskBusy.value || task.status === "processing" || generateVoiceLock.value) return;
-  const alert = await alertController.create({
-    header: "确认生成",
-    message: `确定要开始生成任务「${task.name || task.task_id}」的语音吗？`,
-    buttons: [
-      { text: "取消", role: "cancel" },
-      {
-        text: "确定",
-        role: "confirm",
-        handler: async () => {
-          generateVoiceLock.value = true;
-          try {
-            await startTtsTask(task.task_id);
-            EventBus.$emit(C_EVENT.TOAST, "任务已开始处理");
-            await loadTasks();
-            const updated = tasks.value.find((t) => t.task_id === task.task_id);
-            if (updated) {
-              try {
-                selectedTask.value = await getTtsTask(updated.task_id);
-              } catch {
-                selectedTask.value = updated;
-              }
-            }
-          } catch (e: any) {
-            EventBus.$emit(C_EVENT.TOAST, e?.message ?? "启动任务失败");
-          } finally {
-            setTimeout(() => {
-              generateVoiceLock.value = false;
-            }, GENERATE_VOICE_LOCK_MS);
-          }
-        },
-      },
-    ],
-  });
-  await alert.present();
+  const hasVoiceData = task.status === "success";
+  if (hasVoiceData) {
+    const alert = await alertController.create({
+      header: "确认生成",
+      message: `该任务已有语音数据，重新生成将覆盖。确定要开始吗？`,
+      buttons: [
+        { text: "取消", role: "cancel" },
+        { text: "确定", role: "confirm", handler: () => doStartTask(task) },
+      ],
+    });
+    await alert.present();
+  } else {
+    await doStartTask(task);
+  }
 }
 
 async function runAnalysis() {

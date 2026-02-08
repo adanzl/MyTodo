@@ -313,6 +313,7 @@ const {
   loadPlaylist,
   refreshPlaylistStatus,
   createNewPlaylist,
+  createCopyPlaylist,
 } = usePlaylistData(
   playlistCollection,
   activePlaylistId,
@@ -532,7 +533,19 @@ const handlePlaylistMenuCommand = async (command: string, playlistId: string) =>
   if (command === "delete") {
     await handleDeletePlaylistGroup(playlistId);
   } else if (command === "copy") {
-    await handleCopyPlaylist(playlistId);
+    const result = await handleCopyPlaylist(playlistId);
+    if (!result) return;
+    try {
+      const newPlaylist = createCopyPlaylist(result.sourcePlaylist, result.name);
+      playlistCollection.value = [...playlistCollection.value, newPlaylist];
+      activePlaylistId.value = newPlaylist.id;
+      localStorage.setItem(STORAGE_KEY_ACTIVE_PLAYLIST_ID, newPlaylist.id);
+      syncActivePlaylist(playlistCollection.value);
+      await savePlaylist(playlistCollection.value);
+      ElMessage.success("播放列表已复制");
+    } catch (error) {
+      logAndNoticeError(error as Error, "复制播放列表失败");
+    }
   }
 };
 

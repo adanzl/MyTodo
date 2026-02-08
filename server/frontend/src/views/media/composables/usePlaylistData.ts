@@ -148,6 +148,17 @@ export function usePlaylistData(
   };
 
   /**
+   * 从源播放列表创建副本（新 id、新名称，保留内容与配置）
+   */
+  const createCopyPlaylist = (source: Playlist, name: string): Playlist => {
+    const { id: _id, ...rest } = source;
+    return normalizePlaylistItem(
+      { ...rest, name: (name || `${source.name}_副本`).trim() },
+      source.name
+    );
+  };
+
+  /**
    * 检查 pre_lists 是否有效
    */
   const isValidPreLists = (preLists: unknown): preLists is PlaylistItem[][] => {
@@ -603,6 +614,7 @@ export function usePlaylistData(
     normalizePlaylistItem,
     normalizePlaylistCollection,
     createNewPlaylist,
+    createCopyPlaylist,
     transformApiDataToPlaylistFormat,
     transformPlaylistToApiFormat,
     savePlaylist,
