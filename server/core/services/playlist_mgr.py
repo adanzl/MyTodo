@@ -1143,11 +1143,13 @@ class PlaylistMgr:
             # 播放下一首
             try:
                 result = self.play_next(pid)
-                # 如果播放失败，记录错误但不抛出异常（避免影响定时器）
+                # 如果播放失败，清理播放状态，避免任务一直显示“播放中”但实际已停止
                 if result[0] != 0:
                     log.warning(f"[PlaylistMgr] 定时器触发播放下一首失败: {pid}, {result[1]}")
+                    self._cleanup_play_state(pid)
             except Exception as e:
                 log.error(f"[PlaylistMgr] 定时器触发播放下一首异常: {pid}, {e}", exc_info=True)
+                self._cleanup_play_state(pid)
 
         # 使用 DateTrigger 在指定时间后执行
         run_date = datetime.datetime.now() + timedelta(seconds=duration_seconds)
