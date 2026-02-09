@@ -163,6 +163,9 @@ def create_app():
             return True
         if path.startswith('/api/auth/'):
             return True
+        # pic 图片查看接口白名单（img 标签无法携带 JWT）
+        if path.startswith('/api/pic/') or path.startswith('/pic/'):
+            return True
         exact = set(_parse_csv(config.AUTH_API_WHITELIST))
         if path in exact:
             return True
