@@ -250,7 +250,10 @@ async function refreshUserList() {
 }
 
 function refreshGiftList(cateId?: number | undefined, pageNum?: number) {
-  const filter = { enable: 1 };
+  const filter: Record<string, number> = {};
+  if (globalVar.user?.admin !== 1) {
+    filter.enable = 1;
+  }
   if (cateId) {
     filter["cate_id"] = cateId;
   }
@@ -270,6 +273,7 @@ function refreshGiftList(cateId?: number | undefined, pageNum?: number) {
           img: item.image,
           cate_id: item.cate_id,
           cost: item.cost,
+          enable: item.enable,
           edited: false,
         });
       });

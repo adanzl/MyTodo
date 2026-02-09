@@ -16,7 +16,12 @@
       <ion-refresher slot="fixed" @ionRefresh="onRefresh">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
-      <ion-item v-for="item in giftList.data" :key="item.id" button @click="openGiftDetail(item)">
+      <ion-item
+        v-for="item in giftList.data"
+        :key="item.id"
+        :class="{ '[&::part(native)]:bg-gray-300': !item.enable }"
+        button
+        @click="openGiftDetail(item)">
         <ion-thumbnail slot="start">
           <img :src="getGiftImgUrl(item)" alt="" />
         </ion-thumbnail>
@@ -65,11 +70,21 @@
         </ion-toolbar>
       </ion-header>
       <ion-content>
-        <div class="p-4 space-y-4">
+        <div class="p-4 space-y-2">
           <ion-item lines="full">
             <ion-label position="stacked">名称</ion-label>
-            <ion-input :model-value="newGift.name" placeholder="请输入奖品名称"
-              @ionInput="newGift.name = $event.detail.value" :readonly="!!editingGift && !isAdmin" />
+            <div class="flex items-center gap-2 w-full">
+              <ion-input :model-value="newGift.name" placeholder="请输入奖品名称"
+                @ionInput="newGift.name = $event.detail.value" :readonly="!!editingGift && !isAdmin" class="flex-1 min-w-0" />
+              <div class="origin-left shrink-0">
+                <ion-checkbox
+                  :checked="!!newGift.enable"
+                  @ionChange="newGift.enable = $event.detail.checked ? 1 : 0"
+                  :disabled="!!editingGift && !isAdmin">
+                  启用
+                </ion-checkbox>
+              </div>
+            </div>
           </ion-item>
           <div class="flex gap-2 w-full">
             <ion-item lines="full" class="flex-1">
@@ -165,6 +180,7 @@
 <script setup lang="ts">
 import {
   IonButtons,
+  IonCheckbox,
   IonHeader,
   IonInput,
   IonList,
@@ -212,10 +228,11 @@ const isAdmin = computed(() => globalVar?.user?.admin === 1);
 
 const isGiftModalOpen = ref(false);
 const editingGift = ref<any>(null);
-const newGift = ref<{ name: string; cost: number; cate_id?: number; image?: string }>({
+const newGift = ref<{ name: string; cost: number; cate_id?: number; image?: string; enable?: number }>({
   name: "",
   cost: 0,
   image: "",
+  enable: 1,
 });
 const newGiftPreview = ref<string>("");
 const newGiftFile = ref<File | null>(null);
@@ -275,6 +292,7 @@ function openNewGift() {
     cate_id:
       props.selectedCate && props.selectedCate.id !== 0 ? props.selectedCate.id : undefined,
     image: "",
+    enable: 1,
   };
   isGiftModalOpen.value = true;
   newGiftPreview.value = "";
@@ -287,6 +305,7 @@ function openGiftDetail(item: any) {
     cost: item.cost ?? 0,
     cate_id: item.cate_id,
     image: item.img ?? item.image ?? "",
+    enable: item.enable ?? 1,
   };
   newGiftPreview.value = newGift.value.image
     ? getPicDisplayUrl(newGift.value.image)
@@ -328,7 +347,7 @@ async function saveGift() {
         newGift.value.cate_id ??
         (props.selectedCate && props.selectedCate.id !== 0 ? props.selectedCate.id : undefined),
       cost: Number(newGift.value.cost) || 0,
-      enable: 1,
+      enable: newGift.value.enable ?? 1,
       image: imageName,
     });
     EventBus.$emit(C_EVENT.TOAST, isUpdate ? "更新成功" : "添加奖品成功");
