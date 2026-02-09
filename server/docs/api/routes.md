@@ -22,16 +22,7 @@
 - **请求体**：任意文本（非 JSON）
 - **返回**：`{}`
 
-## 图片展示
-
-### GET `/api/viewPic`
-
-- **Query**
-  - `id`：string，必填
-- **行为**
-  - `db_mgr.get_data_idx(db_mgr.TABLE_PIC, id)`
-  - 成功：渲染 `image.html`
-  - 失败：`404` + `{"error":"Image not found"}`
+> 图片展示接口已迁移至 `core/api/pic_routes.py`（路径 `/pic/viewPic`），参见 [pic_routes.md](./pic_routes.md)。应用挂载在 `/api` 下时，完整路径为 `/api/pic/...`。
 
 ## Save 存储
 

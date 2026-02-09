@@ -503,6 +503,19 @@ def is_allowed_pdf_file(filename: str) -> bool:
     return os.path.splitext(filename)[1].lower() in ALLOWED_PDF_EXTENSIONS
 
 
+def is_allowed_image_file(filename: str) -> bool:
+    """检查图片文件扩展名是否允许。
+
+    Args:
+        filename: 文件名。
+
+    Returns:
+        True 如果文件扩展名在允许列表中，False 否则。
+    """
+    from core.config import ALLOWED_IMAGE_EXTENSIONS
+    return os.path.splitext(filename)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
+
+
 def get_file_info(file_path: str) -> Optional[dict]:
     """获取文件信息。
 

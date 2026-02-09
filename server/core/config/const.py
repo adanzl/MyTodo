@@ -15,7 +15,7 @@ load_dotenv()
 BASE_TMP_DIR = os.environ.get('BASE_TMP_DIR', '/tmp/my_todo')
 
 # 项目文件基础目录（用于保存任务存档和生成的最终文件）
-DEFAULT_BASE_DIR = os.environ.get('DEFAULT_BASE_DIR', '/opt/my_todo/data')
+DEFAULT_BASE_DIR = os.environ.get('DEFAULT_BASE_DIR', 'data')
 
 # PDF 工具相关目录（任务存档和最终文件保存在 base 目录）
 PDF_BASE_DIR = os.path.join(DEFAULT_BASE_DIR, 'tasks', 'pdf')
@@ -58,6 +58,11 @@ ALLOWED_AUDIO_EXTENSIONS = {'.mp3', '.wav', '.flac', '.aac', '.m4a', '.ogg', '.w
 
 # 允许的 PDF 文件扩展名
 ALLOWED_PDF_EXTENSIONS = {'.pdf'}
+
+# 图片存储目录（DEFAULT_BASE_DIR 的 pic 子目录）
+PIC_BASE_DIR = os.path.join(DEFAULT_BASE_DIR, 'pic')
+# 允许的图片文件扩展名
+ALLOWED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
 
 # 任务状态常量（公共）
 TASK_STATUS_PENDING = 'pending'  # 等待中

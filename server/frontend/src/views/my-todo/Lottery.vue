@@ -44,8 +44,8 @@
                   <div class="relative z-50 w-full h-full">
                     <el-image
                       class="w-24 cursor-pointer !z-[99]"
-                      :src="row.img"
-                      :preview-src-list="[row.img]"
+                      :src="getPicDisplayUrl(row.img)"
+                      :preview-src-list="[getPicDisplayUrl(row.img)]"
                       :preview-teleported="true"
                       fit="contain"
                     />
@@ -68,8 +68,8 @@
               <div class="relative w-24">
                 <el-image
                   class="w-24 cursor-pointer !z-[9999]"
-                  :src="row.img"
-                  :preview-src-list="[row.img]"
+                  :src="getPicDisplayUrl(row.img)"
+                  :preview-src-list="[getPicDisplayUrl(row.img)]"
                   :preview-teleported="true"
                   fit="contain"
                 />
@@ -247,7 +247,7 @@ import type { UploadFile } from "element-plus";
 import { Edit, Plus } from "@element-plus/icons-vue";
 import { getList, getData, setData, delData } from "@/api/common";
 import { getRdsData, setRdsData } from "@/api/rds";
-import { compressImageToBase64 } from "@/utils/image";
+import { uploadPic, getPicDisplayUrl } from "@/api/pic";
 import * as _ from "lodash-es";
 
 interface Gift {
@@ -453,12 +453,15 @@ const handleGiftSave = async (item: Gift) => {
 const handleImageChange = async (file: UploadFile, row: Gift) => {
   if (file && file.raw) {
     try {
-      const base64 = await compressImageToBase64(file.raw, { quality: 0.5 });
-      console.log("压缩后的base64", base64.length);
-      row.img = base64;
+      const resp = await uploadPic(file.raw);
+      if (resp.code === 0 && resp.data?.filename) {
+        row.img = resp.data.filename;
+      } else {
+        ElMessage.error(resp.msg || "图片上传失败");
+      }
     } catch (error) {
-      console.error("图片压缩失败:", error);
-      ElMessage.error("图片压缩失败");
+      console.error("图片上传失败:", error);
+      ElMessage.error("图片上传失败");
     }
   }
 };

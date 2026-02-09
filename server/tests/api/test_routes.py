@@ -91,28 +91,6 @@ def test_write_log_ok_and_exception(client, monkeypatch):
     assert resp.status_code == 200
 
 
-def test_view_pic_requires_id(client):
-    resp = client.get('/viewPic')
-    assert resp.status_code == 400
-
-
-def test_view_pic_invalid_id(client, monkeypatch):
-    resp = client.get('/viewPic?id=abc')
-    assert resp.status_code == 400
-
-
-def test_view_pic_ok_and_not_found(client, monkeypatch):
-    monkeypatch.setattr(routes, "render_template", lambda *a, **kw: "ok")
-
-    routes.db_mgr.get_data_idx.return_value = {"code": 0, "data": "img"}
-    resp = client.get('/viewPic?id=1')
-    assert resp.status_code == 200
-
-    routes.db_mgr.get_data_idx.return_value = {"code": -1}
-    resp = client.get('/viewPic?id=1')
-    assert resp.status_code == 404
-
-
 def test_get_save_ok(client, monkeypatch):
     routes.db_mgr.get_save.return_value = {"code": 0, "data": {"id": 1, "content": "test"}}
 

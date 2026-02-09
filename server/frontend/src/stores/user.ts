@@ -5,6 +5,7 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { getAllUser } from "@/api/user";
+import { getAccessToken } from "@/api/auth";
 import { ElMessage } from "element-plus";
 import type { User } from "@/types/user";
 
@@ -119,18 +120,18 @@ export const useUserStore = defineStore("user", () => {
 
   /**
    * 从 localStorage 恢复当前用户
+   * 若 token 不存在则不清恢复，避免「已登录」但请求 401 的状态
    */
   const restoreCurUser = async () => {
     const uId = localStorage.getItem(KEY_USER_ID);
-    if (uId) {
-      // 确保用户列表已加载
-      if (userList.value.length === 0) {
-        await refreshUserList();
-      }
-      const u = getUserById(uId);
-      if (u) {
-        setCurUser(u);
-      }
+    if (!uId || !getAccessToken()) return;
+    // 确保用户列表已加载
+    if (userList.value.length === 0) {
+      await refreshUserList();
+    }
+    const u = getUserById(uId);
+    if (u) {
+      setCurUser(u);
     }
   };
 

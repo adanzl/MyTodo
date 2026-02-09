@@ -19,11 +19,11 @@
         layout="icon-start"
         class="text-blue-500">
         <ion-icon :icon="heartOutline" class="w-4 h-4"></ion-icon>
-        <ion-label class="ml-1">抽取奖励</ion-label>
+        <ion-label class="ml-1">抽奖</ion-label>
       </ion-segment-button>
       <ion-segment-button value="shop" content-id="shop" layout="icon-start" class="text-blue-500">
         <ion-icon :icon="giftOutline" class="w-4 h-4"></ion-icon>
-        <ion-label class="ml-1">积分兑换</ion-label>
+        <ion-label class="ml-1">奖品</ion-label>
       </ion-segment-button>
       <ion-segment-button
         value="history"

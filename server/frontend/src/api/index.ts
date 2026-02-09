@@ -3,6 +3,7 @@
  */
 export * from "./config";
 export * from "./common";
+export * from "./pic";
 export * from "./user";
 export * from "./rds";
 export * from "./devices";

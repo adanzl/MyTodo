@@ -22,8 +22,9 @@ patch_fake_useragent()
 import core.ai.ai_mgr as ai_mgr
 from core.chat.chat_mgr import chat_mgr
 from core.db.db_mgr import db_mgr
+from core.utils import ensure_directory
 from core.services.scheduler_mgr import scheduler_mgr
-from core.config import config, app_logger, access_logger
+from core.config import config, app_logger, access_logger, PIC_BASE_DIR
 import json
 import os
 import time
@@ -94,6 +95,7 @@ def create_app():
     from core.api.bluetooth_routes import bluetooth_bp
     from core.api.dlna_routes import dlna_bp
     from core.api.media_routes import media_bp
+    from core.api.pic_routes import pic_bp
     from core.api.playlist_routes import playlist_bp
     from core.api.mi_routes import mi_bp
     from core.api.pdf_routes import pdf_bp
@@ -102,6 +104,7 @@ def create_app():
     from core.api.ai_routes import ai_bp
 
     app.register_blueprint(api_bp, url_prefix='/')
+    app.register_blueprint(pic_bp, url_prefix='/pic')
     app.register_blueprint(agent_bp, url_prefix='/')
     app.register_blueprint(bluetooth_bp, url_prefix='/')
     app.register_blueprint(media_bp, url_prefix='/')
@@ -217,6 +220,9 @@ def create_app():
     chat_mgr.init(socketio)
     db_mgr.init(app)
     ai_mgr.init()
+
+    # 初始化 pic 存储目录
+    ensure_directory(PIC_BASE_DIR)
 
     # 初始化定时任务调度器
     scheduler_mgr.start()

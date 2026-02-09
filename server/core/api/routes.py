@@ -68,26 +68,6 @@ def write_log() -> ResponseReturnValue:
     return {}
 
 
-# =========== PIC ==========
-@api_bp.route("/viewPic", methods=['GET'])
-def view_pic() -> ResponseReturnValue:
-    raw_id = request.args.get('id')
-    if raw_id is None:
-        return jsonify({'error': 'id is required'}), 400
-
-    log.info("===== [View Pic] " + raw_id)
-
-    pic_id, err = _parse_int(raw_id, 'id')
-    if err:
-        return jsonify({'error': err.get('msg', 'invalid id')}), 400
-
-    p_data = db_mgr.get_data_idx(db_mgr.TABLE_PIC, pic_id)
-    if p_data['code'] == 0:
-        return render_template('image.html', image_data=p_data['data'])
-    else:
-        return jsonify({'error': 'Image not found'}), 404
-
-
 # =========== SAVE ==========
 @api_bp.route("/getSave", methods=['GET'])
 def get_save() -> ResponseReturnValue:
