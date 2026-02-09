@@ -224,11 +224,12 @@ api.interceptors.request.use(
       try {
         await ensureRefreshed();
       } catch {
-        // 续期失败，继续使用当前 token，401 时由响应拦截器处理
+        // 续期失败时 ensureRefreshed 会清空 token，需保留原 token 继续请求，401 时由响应拦截器处理
       }
     }
 
-    const finalToken = getAccessToken();
+    // 优先用最新 token，续期失败时 ensureRefreshed 会清空，此时用续期前的 token 兜底
+    const finalToken = getAccessToken() || token;
     const value = finalToken ? `Bearer ${finalToken}` : "";
     // 同步到 axios 默认头，确保网站端请求也能带上（部分环境 per-request 合并异常）
     (api.defaults.headers.common as Record<string, string>)["Authorization"] = value;
@@ -293,9 +294,16 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // 401 -> refresh -> retry once
-    if (error.response?.status === 401 && cfg && !cfg._retry) {
+    // 401 或 422（token 签名验证失败）-> 清除旧 token、尝试 refresh、重试一次
+    const isTokenError =
+      error.response?.status === 401 ||
+      (error.response?.status === 422 &&
+        /signature|token|invalid/i.test(
+          String((error.response?.data as { msg?: string })?.msg || error.message || "")
+        ));
+    if (isTokenError && cfg && !cfg._retry) {
       cfg._retry = true;
+      setAccessToken(null); // 清除可能无效的 token
       try {
         const newToken = await ensureRefreshed();
         if (newToken) {
@@ -320,8 +328,8 @@ api.interceptors.response.use(
         logAndNoticeError(error, "资源未找到", { context: "API" });
       } else if (status === 403) {
         logAndNoticeError(error, "无权限访问", { context: "API" });
-      } else if (status === 401) {
-        logAndNoticeError(error, "未授权，请重新登录", { context: "API" });
+      } else if (status === 401 || (status === 422 && /signature|token|invalid/i.test(errorMessage))) {
+        logAndNoticeError(error, "token无效，请重新登录", { context: "API" });
       } else {
         logAndNoticeError(error, errorMessage, { context: "API" });
       }

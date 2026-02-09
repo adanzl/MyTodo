@@ -170,7 +170,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { Check, Delete, Menu, Refresh, DocumentCopy, Minus } from "@element-plus/icons-vue";
+import { Check, Delete, Loading, Menu, Refresh, DocumentCopy, Minus } from "@element-plus/icons-vue";
 import { formatDuration } from "@/utils/format";
 import { calculateFilesTotalDuration } from "@/utils/file";
 import type { MediaFile } from "@/types/tools";

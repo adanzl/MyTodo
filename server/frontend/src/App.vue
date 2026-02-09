@@ -4,9 +4,13 @@
     <el-container v-if="userStore.curUser.bLogin">
       <el-header class="flex justify-between items-center bg-blue-50 px-6">
         <div class="flex items-center gap-2">
-          <el-icon><StarFilled /></el-icon>
+          <el-icon>
+            <StarFilled />
+          </el-icon>
           哈哈哈
-          <el-icon><StarFilled /></el-icon>
+          <el-icon>
+            <StarFilled />
+          </el-icon>
         </div>
         <div class="flex items-center gap-2 text-sm">
           <span class="text-gray-500">服务器:</span>

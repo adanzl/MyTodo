@@ -129,6 +129,18 @@ def create_app():
 
     jwt = JWTManager(app)
 
+    # token 无效（签名验证失败等）时返回 401，便于前端统一处理
+    @jwt.invalid_token_loader
+    def _invalid_token_callback(error_string: str):
+        log.warning("[Auth] invalid token: %s", error_string)
+        return jsonify({'code': -1, 'msg': 'token无效，请重新登录'}), 401
+
+    # token 过期时返回 401
+    @jwt.expired_token_loader
+    def _expired_token_callback(jwt_header, jwt_payload):
+        log.warning("[Auth] expired token")
+        return jsonify({'code': -1, 'msg': 'token已过期，请重新登录'}), 401
+
     # flask-jwt-extended 4.x 要求 JWT 的 sub 为字符串，auth_routes 中 identity 为 dict，需序列化
     @jwt.user_identity_loader
     def _user_identity_loader(identity):
