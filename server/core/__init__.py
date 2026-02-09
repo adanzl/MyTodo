@@ -22,9 +22,8 @@ patch_fake_useragent()
 import core.ai.ai_mgr as ai_mgr
 from core.chat.chat_mgr import chat_mgr
 from core.db.db_mgr import db_mgr
-from core.utils import ensure_directory
 from core.services.scheduler_mgr import scheduler_mgr
-from core.config import config, app_logger, access_logger, PIC_BASE_DIR
+from core.config import config, app_logger, access_logger
 import json
 import os
 import time
@@ -220,9 +219,6 @@ def create_app():
     chat_mgr.init(socketio)
     db_mgr.init(app)
     ai_mgr.init()
-
-    # 初始化 pic 存储目录
-    ensure_directory(PIC_BASE_DIR)
 
     # 初始化定时任务调度器
     scheduler_mgr.start()
