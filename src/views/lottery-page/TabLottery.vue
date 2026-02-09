@@ -25,12 +25,12 @@
         <ion-button
           @click="$emit('lottery')"
           size="default"
-          :disabled="userScore < selectedCate.cost">
+          :disabled="userScore < lotteryCost">
           <div class="w-20 h-20 flex flex-col items-center justify-center">
             <span>立即抽奖</span>
             <div class="flex items-center justify-center mt-2">
               <Icon icon="mdi:star" class="text-red-500 w-5 h-5" />
-              {{ selectedCate.cost }}
+              {{ lotteryCost }}
             </div>
           </div>
         </ion-button>
@@ -61,7 +61,7 @@
           @swiper="setSwiperInstance">
           <swiper-slide v-for="item in wishList.data" :key="item.id" class="w-auto! px-2">
             <div class="w-24 h-24 relative">
-              <img :src="item.img" class="w-full h-full object-cover rounded-lg" />
+              <img :src="getWishImgUrl(item)" class="w-full h-full object-cover rounded-lg" />
               <div
                 class="absolute top-0 right-0 bg-amber-300 w-6 h-6 flex items-center justify-center"
                 @click="$emit('remove-wish', item)">
@@ -101,15 +101,33 @@ import "swiper/css";
 import "swiper/css/free-mode";
 import { FreeMode } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
-import { ref } from "vue";
+import { computed, ref } from "vue";
+import { getPicDisplayUrl } from "@/api/pic";
+import { PicDisplaySize } from "@/utils/ImgMgr";
 
-defineProps<{
+/** 心愿单兼容 img/image 字段，转为可展示的图片 URL */
+function getWishImgUrl(item: { img?: string; image?: string }) {
+  const raw = item.img ?? item.image;
+  if (!raw)
+    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Crect fill='%23e5e7eb' width='96' height='96'/%3E%3C/svg%3E";
+  return getPicDisplayUrl(raw, PicDisplaySize.LIST, PicDisplaySize.LIST);
+}
+
+const props = defineProps<{
   lotteryCatList: any[];
   selectedCate: any;
   wishList: { progress: number; ids: number[]; data: any[] };
   lotteryData: any;
   userScore: number;
 }>();
+
+/** 未选择类别(id===0)时使用 RDS 的 fee，否则使用所选类别的 cost */
+const lotteryCost = computed(() => {
+  if (props.selectedCate?.id === 0) {
+    return props.lotteryData?.fee ?? 10;
+  }
+  return props.selectedCate?.cost ?? 10;
+});
 
 const emit = defineEmits<{
   (e: "cate-change", value: any): void;

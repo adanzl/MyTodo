@@ -2,6 +2,20 @@ import LocalCache from "./LocalCache.ts";
 import { calcImgPos } from "./Math.ts";
 import { delPic, getPic, setPic } from "@/api/pic";
 
+/** 图片展示尺寸 */
+export const PicDisplaySize = {
+  /** 列表缩略图 */
+  LIST: 96,
+  /** 详情/弹窗展示 */
+  ITEM: 160,
+} as const;
+
+/** 上传图片尺寸限制（与 TTS 任务拍照一致） */
+export const PicUploadLimit = {
+  MAX_WIDTH: 1920,
+  MAX_HEIGHT: 1080,
+} as const;
+
 export async function getImage(id?: number) {
   if(id === undefined){
     return '';
@@ -149,11 +163,8 @@ export async function cameraAndSetImage(
   });
 }
 
-const MAX_WIDTH = 1920;
-const MAX_HEIGHT = 1080;
-
 /**
- * 将图片等比缩放到最大 1920x1080（按宽高最小的比缩放），返回新的 File
+ * 将图片等比缩放到最大限制尺寸（与 TTS 拍照、礼品上传一致），返回新的 File
  * @param file 原始图片文件
  * @returns 缩放后的 File，若无需缩放则返回原文件
  */
@@ -168,13 +179,13 @@ export async function resizeImageToFile(file: File): Promise<File> {
     img.onload = () => {
       let { width, height } = { width: img.width, height: img.height };
 
-      if (width <= MAX_WIDTH && height <= MAX_HEIGHT) {
+      if (width <= PicUploadLimit.MAX_WIDTH && height <= PicUploadLimit.MAX_HEIGHT) {
         URL.revokeObjectURL(img.src);
         resolve(file);
         return;
       }
 
-      const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
+      const ratio = Math.min(PicUploadLimit.MAX_WIDTH / width, PicUploadLimit.MAX_HEIGHT / height);
       width = Math.floor(width * ratio);
       height = Math.floor(height * ratio);
 

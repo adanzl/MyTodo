@@ -53,7 +53,8 @@
         @refresh="onRefresh"
         @cate-change="handleShopCateChange"
         @exchange="btnExchangeClk"
-        @add-wish="btnAddWishClk" />
+        @add-wish="btnAddWishClk"
+        @delete="btnDeleteGiftClk" />
       <HistoryTab
         :user-list="userList"
         :selected-user="selectedUser"
@@ -71,7 +72,7 @@ import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import { Icon } from "@iconify/vue";
 import EventBus, { C_EVENT } from "@/types/EventBus";
 import type { GiftCategoryItem, GiftListItem } from "@/api";
-import { getList } from "@/api/data";
+import { getList, delData } from "@/api/data";
 import { doLottery, getGiftData, getLotteryData } from "@/api/lottery";
 import { getUserList, setUserData } from "@/api/user";
 import { getNetworkErrorMessage } from "@/utils/NetUtil";
@@ -90,6 +91,7 @@ import { inject, onBeforeUnmount, onMounted, ref } from "vue";
 import LotteryTab from "./TabLottery.vue";
 import TabPrize from "./TabPrize.vue";
 import HistoryTab from "./TabHistory.vue";
+import LotterySetting from "./dialogs/LotterySetting.vue";
 
 const PAGE_SIZE = 20;
 const lotterySetting = ref({ open: false });
@@ -287,7 +289,7 @@ function handleUserChange(value: any) {
 }
 
 async function btnLotteryClk() {
-  const { alertController } = await import("@ionic/vue");
+  const { alertController, loadingController } = await import("@ionic/vue");
   const cateName = selectedCate.value?.name ?? "当前分类";
   const alert = await alertController.create({
     header: "确认抽奖",
@@ -297,19 +299,22 @@ async function btnLotteryClk() {
       {
         text: "确定",
         role: "confirm",
-        handler: () => {
-          doLottery(globalVar.user.id, selectedCate.value.id)
-            .then((data) => {
-              EventBus.$emit(C_EVENT.REWARD, {
-                value: data.gift.name,
-                img: data.gift.image,
-                rewardType: "gift",
-              });
-              EventBus.$emit(C_EVENT.TOAST, "抽奖成功");
-            })
-            .catch((err) => {
-              EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+        handler: async () => {
+          const loading = await loadingController.create({ message: "抽奖中..." });
+          await loading.present();
+          try {
+            const data = await doLottery(globalVar.user.id, selectedCate.value.id);
+            EventBus.$emit(C_EVENT.REWARD, {
+              value: data.gift.name,
+              img: data.gift.image,
+              rewardType: "gift",
             });
+            EventBus.$emit(C_EVENT.TOAST, "抽奖成功");
+          } catch (err) {
+            EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+          } finally {
+            await loading.dismiss();
+          }
         },
       },
     ],
@@ -379,6 +384,31 @@ async function btnExchangeClk(item: any) {
         },
       },
       "Cancel",
+    ],
+  });
+  await alert.present();
+}
+
+async function btnDeleteGiftClk(item: any) {
+  const { alertController } = await import("@ionic/vue");
+  const alert = await alertController.create({
+    header: "确认删除",
+    message: `确定删除奖品「${item.name}」吗？`,
+    buttons: [
+      { text: "取消", role: "cancel" },
+      {
+        text: "确定",
+        role: "confirm",
+        handler: async () => {
+          try {
+            await delData("t_gift", item.id);
+            EventBus.$emit(C_EVENT.TOAST, "删除成功");
+            refreshGiftList(selectedCate.value?.id, 1);
+          } catch (err) {
+            EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+          }
+        },
+      },
     ],
   });
   await alert.present();

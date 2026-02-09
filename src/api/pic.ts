@@ -73,7 +73,12 @@ export async function uploadPic(file: File): Promise<PicUploadResult> {
   return rsp.data.data!;
 }
 
-/** 将文件名或 base64 转成可展示的图片 URL */
+/**
+ * 将文件名或 base64 转成可展示的图片 URL
+ * @param img 图片数据（文件名或 base64）
+ * @param w 可选，目标宽度，建议用 PicDisplaySize.LIST(96) 或 PicDisplaySize.ITEM(160)
+ * @param h 可选，目标高度，不传则使用原图
+ */
 export function getPicDisplayUrl(img: string, w?: number, h?: number): string {
   if (!img) return "";
   if (img.startsWith("data:")) return img;
