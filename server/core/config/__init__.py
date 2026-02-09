@@ -5,6 +5,7 @@
 from .config import Config, config
 from .log_config import app_logger, access_logger, gevent_access_logger
 from .const import (
+    _SERVER_ROOT,
     BASE_TMP_DIR,
     DEFAULT_BASE_DIR,
     PDF_BASE_DIR,
@@ -37,6 +38,7 @@ __all__ = [
     'access_logger',
     'gevent_access_logger',
     # Constants
+    '_SERVER_ROOT',
     'BASE_TMP_DIR',
     'DEFAULT_BASE_DIR',
     'PDF_BASE_DIR',

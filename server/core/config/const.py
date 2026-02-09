@@ -11,6 +11,9 @@ from dotenv import load_dotenv
 # 加载 .env 文件（如果存在）
 load_dotenv()
 
+# 服务根目录（main.py 所在目录，用于解析相对路径）
+_SERVER_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 # 临时文件基础目录（用于真正的临时文件，处理过程中的中间文件）
 BASE_TMP_DIR = os.environ.get('BASE_TMP_DIR', '/tmp/my_todo')
 

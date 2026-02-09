@@ -1,12 +1,13 @@
 import os
 
-# 规范运行目录：统一切换到 server 根目录，使相对路径（如 DEFAULT_BASE_DIR=data）解析一致
-_SERVER_ROOT = os.path.dirname(os.path.abspath(__file__))
-os.chdir(_SERVER_ROOT)
-
 from dotenv import load_dotenv
 
 load_dotenv()
+
+from core.config import _SERVER_ROOT
+
+# 规范运行目录：统一切换到 server 根目录，使相对路径（如 DEFAULT_BASE_DIR=data）解析一致
+os.chdir(_SERVER_ROOT)
 
 from gevent import monkey
 # 不 patch thread，使用真正的操作系统线程，避免与 asyncio 事件循环冲突

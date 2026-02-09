@@ -12,7 +12,7 @@ from typing import List, Optional, Tuple
 
 from werkzeug.utils import secure_filename
 
-from core.config import PIC_BASE_DIR, app_logger
+from core.config import PIC_BASE_DIR, _SERVER_ROOT, app_logger
 from core.utils import ensure_directory, get_unique_filepath, is_allowed_image_file
 
 log = app_logger
@@ -25,7 +25,8 @@ class PicMgr:
     """图片管理器。"""
 
     def __init__(self, base_dir: str | None = None) -> None:
-        self._base_dir = base_dir or PIC_BASE_DIR
+        raw = base_dir or PIC_BASE_DIR
+        self._base_dir = raw if os.path.isabs(raw) else os.path.normpath(os.path.join(_SERVER_ROOT, raw))
         ensure_directory(self._base_dir)
 
     def _get_cache_filename(self, base_name: str, w: int, h: int) -> str:
