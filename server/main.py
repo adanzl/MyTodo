@@ -1,3 +1,9 @@
+import os
+
+# 规范运行目录：统一切换到 server 根目录，使相对路径（如 DEFAULT_BASE_DIR=data）解析一致
+_SERVER_ROOT = os.path.dirname(os.path.abspath(__file__))
+os.chdir(_SERVER_ROOT)
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -8,8 +14,6 @@ from gevent import monkey
 # subprocess=False 表示不 patch subprocess 模块，避免 gevent subprocess 在新线程中的 "child watchers are only available on the default loop" 错误
 # 当 subprocess=False 时，标准库的 subprocess 在 gevent 环境中可能无法正常工作（因为 gevent 已 patch 了 socket、select 等）
 monkey.patch_all(subprocess=True, thread=False, queue=False)
-
-import os
 
 from flask import make_response
 from core import create_app
