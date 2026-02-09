@@ -1,5 +1,5 @@
 <template>
-  <ion-segment-content id="lotterySpecial">
+  <ion-segment-content id="tabLottery">
     <ion-content>
       <ion-item>
         <div class="flex items-center justify-center">

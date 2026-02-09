@@ -68,4 +68,4 @@ export type {
 } from "./types";
 export { getPic, getPicList, setPic, delPic } from "./pic";
 export { getColorList, setColor, delColor } from "./color";
-export { getList, getRdsData, setRdsData } from "./data";
+export { getList, getRdsData, setRdsData, setData, delData } from "./data";

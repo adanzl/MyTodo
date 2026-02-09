@@ -111,18 +111,25 @@ class PicMgr:
         from PIL import Image
 
         with Image.open(orig_path) as img:
-            if img.mode in ('RGBA', 'LA', 'P'):
+            # 统一转为 RGBA，兼容 CMYK、P 等模式
+            if img.mode in ('RGBA', 'LA'):
                 img = img.convert('RGBA')
+            elif img.mode == 'P':
+                img = img.convert('RGBA')
+            elif img.mode in ('CMYK', 'YCbCr', 'I', 'F'):
+                img = img.convert('RGB').convert('RGBA')
             else:
                 img = img.convert('RGBA')
 
             orig_w, orig_h = img.size
+            if orig_w <= 0 or orig_h <= 0:
+                raise ValueError("Invalid image dimensions")
             if orig_w <= w and orig_h <= h:
                 out_w, out_h = orig_w, orig_h
             else:
                 ratio = min(w / orig_w, h / orig_h)
-                out_w = int(orig_w * ratio)
-                out_h = int(orig_h * ratio)
+                out_w = max(1, int(orig_w * ratio))
+                out_h = max(1, int(orig_h * ratio))
 
             resized = img.resize((out_w, out_h), Image.Resampling.LANCZOS)
             ensure_directory(os.path.dirname(cache_path))
@@ -153,7 +160,11 @@ class PicMgr:
         if os.path.isfile(cache_path):
             return cache_path, 'image/png'
 
-        self._resize_and_cache(abs_path, w, h, cache_path)
+        try:
+            self._resize_and_cache(abs_path, w, h, cache_path)
+        except Exception as e:
+            log.warning(f"[Pic] 缩放缓存失败，返回原图: {e}")
+            return abs_path, None
         return cache_path, 'image/png'
 
 

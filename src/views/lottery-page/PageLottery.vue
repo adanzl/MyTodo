@@ -12,22 +12,22 @@
       </ion-toolbar>
     </ion-header>
 
-    <ion-segment value="lotterySpecial" @ionChange="handleSegmentChange">
+    <ion-segment value="shop" @ionChange="handleSegmentChange">
       <ion-segment-button
         value="lotterySpecial"
-        content-id="lotterySpecial"
+        content-id="tabLottery"
         layout="icon-start"
         class="text-blue-500">
         <ion-icon :icon="heartOutline" class="w-4 h-4"></ion-icon>
         <ion-label class="ml-1">抽奖</ion-label>
       </ion-segment-button>
-      <ion-segment-button value="shop" content-id="shop" layout="icon-start" class="text-blue-500">
+      <ion-segment-button value="shop" content-id="tabPrize" layout="icon-start" class="text-blue-500">
         <ion-icon :icon="giftOutline" class="w-4 h-4"></ion-icon>
         <ion-label class="ml-1">奖品</ion-label>
       </ion-segment-button>
       <ion-segment-button
         value="history"
-        content-id="history"
+        content-id="tabHistory"
         layout="icon-start"
         class="text-blue-500">
         <Icon icon="material-symbols:history" class="w-4 h-4" />
@@ -44,7 +44,7 @@
         @cate-change="handleShopCateChange"
         @lottery="btnLotteryClk"
         @remove-wish="btnRemoveWishClk" />
-      <ShopTab
+      <TabPrize
         :lottery-cat-list="lotteryCatList"
         :selected-cate="selectedCate"
         :gift-list="giftList"
@@ -88,7 +88,7 @@ import { giftOutline, heartOutline } from "ionicons/icons";
 import _ from "lodash";
 import { inject, onBeforeUnmount, onMounted, ref } from "vue";
 import LotteryTab from "./TabLottery.vue";
-import ShopTab from "./TabShop.vue";
+import TabPrize from "./TabPrize.vue";
 import HistoryTab from "./TabHistory.vue";
 
 const PAGE_SIZE = 20;

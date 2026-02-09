@@ -1,5 +1,5 @@
 <template>
-  <ion-segment-content id="history">
+  <ion-segment-content id="tabHistory">
     <ion-item>
       <ion-select
         label="用户"

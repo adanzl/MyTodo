@@ -45,3 +45,33 @@ export async function setRdsData(
   }
   return rsp.data.data;
 }
+
+/** 设置单条数据（新增或更新） */
+export async function setData<T = unknown>(
+  table: string,
+  data: Record<string, unknown>
+): Promise<T> {
+  const payload = { ...data };
+  if (payload.id === -1) {
+    delete payload.id;
+  }
+  const rsp = await apiClient.post<ApiResponse<T>>("/setData", {
+    table,
+    data: payload,
+  });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data!;
+}
+
+/** 删除单条数据 */
+export async function delData(table: string, id: number | string): Promise<void> {
+  const rsp = await apiClient.post<ApiResponse<unknown>>("/delData", {
+    table,
+    id,
+  });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+}
