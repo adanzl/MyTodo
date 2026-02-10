@@ -3,7 +3,6 @@
     ref="modal"
     aria-hidden="false"
     id="main"
-    mode="ios"
     :is-open="isOpen"
     @didPresent="onModalPresent"
     @willDismiss="onModalWillDismiss">
