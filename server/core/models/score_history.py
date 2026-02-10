@@ -1,3 +1,5 @@
+from typing import Optional
+
 from core.db import db_obj
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -12,6 +14,8 @@ class ScoreHistory(db_obj.Model):
     current: Mapped[int] = mapped_column(default=0, nullable=False)
     msg: Mapped[str] = mapped_column(default='', nullable=True)
     dt: Mapped[str] = mapped_column(default='', nullable=False)
+    # 关联外部对象（如抽奖礼物 id 等），可为空
+    out_key: Mapped[Optional[int]] = mapped_column(nullable=True)
 
     def to_dict(self):
         return {
@@ -22,5 +26,7 @@ class ScoreHistory(db_obj.Model):
             "pre_value": self.pre_value,
             "current": self.current,
             "msg": self.msg,
-            "dt": self.dt
+            "dt": self.dt,
+            "out_key": self.out_key,
         }
+        

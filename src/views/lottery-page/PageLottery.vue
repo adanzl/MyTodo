@@ -23,7 +23,7 @@
       </ion-segment-button>
       <ion-segment-button value="shop" content-id="tabPrize" layout="icon-start" class="text-blue-500">
         <ion-icon :icon="giftOutline" class="w-4 h-4"></ion-icon>
-        <ion-label class="ml-1">奖品</ion-label>
+        <ion-label class="ml-1">商店</ion-label>
       </ion-segment-button>
       <ion-segment-button
         value="history"
@@ -274,6 +274,8 @@ function refreshGiftList(cateId?: number | undefined, pageNum?: number) {
           cate_id: item.cate_id,
           cost: item.cost,
           enable: item.enable,
+          exchange: item.exchange,
+          stock: item.stock,
           edited: false,
         });
       });

@@ -354,8 +354,12 @@ def do_lottery() -> ResponseReturnValue:
             return {"code": -1, "msg": "Lottery failed"}
 
         db_mgr.add_score(
-            user_id, -cate_cost, 'lottery',
-            f"获得[{selected_gift['id']}]{selected_gift.get('name', '')}")
+            user_id,
+            -cate_cost,
+            'lottery',
+            f"获得[{selected_gift['id']}]{selected_gift.get('name', '')}",
+            out_key=selected_gift['id'],
+        )
 
         return {
             "code": 0,

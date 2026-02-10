@@ -39,13 +39,16 @@
           </div>
         </div>
         <div class="flex gap-2" @click.stop>
-        <ion-button class="w-14 h-10" @click="$emit('exchange', item)" :disabled="userScore < item.cost">
-          兑
-        </ion-button>
-        <ion-button class="w-14 h-10" color="warning" @click="$emit('add-wish', item)"
-          :disabled="wishList.ids.includes(item.id)">
-          愿
-        </ion-button>
+          <ion-button
+            class="w-14 h-10"
+            @click="$emit('exchange', item)"
+            :disabled="userScore < item.cost || !item.exchange || item.stock <= 0">
+            兑
+          </ion-button>
+          <ion-button class="w-14 h-10" color="warning" @click="$emit('add-wish', item)"
+            :disabled="wishList.ids.includes(item.id)">
+            愿
+          </ion-button>
         </div>
       </ion-item>
     </ion-content>
@@ -65,7 +68,7 @@
             </ion-button>
           </ion-buttons>
           <ion-buttons slot="end" v-if="editingGift && isAdmin">
-            <ion-button color="danger" fill="clear" class="mr-3" @click="onDeleteGiftInModal">删除</ion-button>
+            <ion-button color="danger" fill="clear" class="mr-5" @click="onDeleteGiftInModal">删除</ion-button>
           </ion-buttons>
         </ion-toolbar>
       </ion-header>
@@ -75,11 +78,11 @@
             <ion-label position="stacked">名称</ion-label>
             <div class="flex items-center gap-2 w-full">
               <ion-input :model-value="newGift.name" placeholder="请输入奖品名称"
-                @ionInput="newGift.name = $event.detail.value" :readonly="!!editingGift && !isAdmin" class="flex-1 min-w-0" />
+                @ionInput="newGift.name = $event.detail.value" :readonly="!!editingGift && !isAdmin"
+                :clear-input="true"
+                class="flex-1 min-w-0" />
               <div class="origin-left shrink-0">
-                <ion-checkbox
-                  :checked="!!newGift.enable"
-                  @ionChange="newGift.enable = $event.detail.checked ? 1 : 0"
+                <ion-checkbox :checked="!!newGift.enable" @ionChange="newGift.enable = $event.detail.checked ? 1 : 0"
                   :disabled="!!editingGift && !isAdmin">
                   启用
                 </ion-checkbox>
@@ -89,24 +92,61 @@
           <div class="flex gap-2 w-full">
             <ion-item lines="full" class="flex-1">
               <ion-label position="stacked">类别</ion-label>
-              <ion-select interface="popover" placeholder="选择类别" :model-value="newGift.cate_id"
-                @ionChange="newGift.cate_id = $event.detail.value" :disabled="!!editingGift && !isAdmin">
-                <ion-select-option v-for="cate in lotteryCatList.filter((c: any) => c.id !== 0)" :key="cate.id"
+              <ion-select
+                interface="popover"
+                placeholder="选择类别"
+                :model-value="newGift.cate_id"
+                @ionChange="newGift.cate_id = $event.detail.value"
+                :disabled="!!editingGift && !isAdmin">
+                <ion-select-option
+                  v-for="cate in lotteryCatList.filter((c: any) => c.id !== 0)"
+                  :key="cate.id"
                   :value="cate.id">
                   {{ cate.name }}
                 </ion-select-option>
               </ion-select>
             </ion-item>
-            <ion-item lines="full" class="flex-1">
+            <ion-item lines="full" class="w-18 shrink-0">
               <ion-label position="stacked">积分</ion-label>
-              <ion-input type="number" :model-value="newGift.cost" placeholder="消耗积分"
-                @ionInput="newGift.cost = +$event.detail.value" :readonly="!!editingGift && !isAdmin" />
+              <ion-input
+                type="number"
+                :model-value="newGift.cost"
+                placeholder="消耗积分"
+                @ionInput="newGift.cost = +$event.detail.value"
+                :readonly="!!editingGift && !isAdmin"
+              />
+            </ion-item>
+            <ion-item lines="full" class="w-18 shrink-0">
+              <ion-label position="stacked">库存</ion-label>
+              <ion-input
+                type="number"
+                :model-value="newGift.stock"
+                placeholder="数量"
+                @ionInput="newGift.stock = +$event.detail.value"
+                :readonly="!!editingGift && !isAdmin"
+              />
+            </ion-item>
+            <ion-item lines="full" class="w-18 shrink-0">
+              <ion-label position="stacked">兑换</ion-label>
+              <div class="flex items-center justify-center pt-1">
+                <ion-checkbox
+                  class="scale-75 origin-center"
+                  :checked="!!newGift.exchange"
+                  @ionChange="newGift.exchange = $event.detail.checked ? 1 : 0"
+                  :disabled="!!editingGift && !isAdmin">
+                </ion-checkbox>
+              </div>
             </ion-item>
           </div>
           <ion-item lines="full">
             <ion-label position="stacked">图片</ion-label>
-            <input type="file" accept="image/*" @change="onNewGiftImageChange" class="mt-1"
-              v-if="!editingGift || isAdmin" />
+            <input
+              type="file"
+              accept="image/*"
+              @change="onNewGiftImageChange"
+              class="mt-1"
+              v-if="!editingGift || isAdmin"
+            />
           </ion-item>
           <div v-if="newGiftPreview" class="mt-2 flex justify-center">
             <img :src="newGiftPreview" class="w-full h-full object-cover rounded" />
@@ -228,11 +268,21 @@ const isAdmin = computed(() => globalVar?.user?.admin === 1);
 
 const isGiftModalOpen = ref(false);
 const editingGift = ref<any>(null);
-const newGift = ref<{ name: string; cost: number; cate_id?: number; image?: string; enable?: number }>({
+const newGift = ref<{
+  name: string;
+  cost: number;
+  cate_id?: number;
+  image?: string;
+  enable?: number;
+  exchange?: number;
+  stock?: number;
+}>({
   name: "",
   cost: 0,
   image: "",
   enable: 1,
+  exchange: 1,
+  stock: 0,
 });
 const newGiftPreview = ref<string>("");
 const newGiftFile = ref<File | null>(null);
@@ -286,13 +336,16 @@ async function saveCate(cate: any, _idx: number) {
 
 function openNewGift() {
   editingGift.value = null;
+  const rand = Math.floor(10000 + Math.random() * 90000); // 5 位随机数
   newGift.value = {
-    name: "",
+    name: `gift_${rand}`,
     cost: 0,
     cate_id:
       props.selectedCate && props.selectedCate.id !== 0 ? props.selectedCate.id : undefined,
     image: "",
     enable: 1,
+    exchange: 1,
+    stock: 0,
   };
   isGiftModalOpen.value = true;
   newGiftPreview.value = "";
@@ -306,6 +359,8 @@ function openGiftDetail(item: any) {
     cate_id: item.cate_id,
     image: item.img ?? item.image ?? "",
     enable: item.enable ?? 1,
+    exchange: item.exchange ?? 1,
+    stock: item.stock ?? 0,
   };
   newGiftPreview.value = newGift.value.image
     ? getPicDisplayUrl(newGift.value.image)
@@ -348,6 +403,8 @@ async function saveGift() {
         (props.selectedCate && props.selectedCate.id !== 0 ? props.selectedCate.id : undefined),
       cost: Number(newGift.value.cost) || 0,
       enable: newGift.value.enable ?? 1,
+      exchange: newGift.value.exchange ?? 1,
+      stock: Number(newGift.value.stock) || 0,
       image: imageName,
     });
     EventBus.$emit(C_EVENT.TOAST, isUpdate ? "更新成功" : "添加奖品成功");
