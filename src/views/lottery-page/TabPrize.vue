@@ -41,12 +41,12 @@
         </div>
         <div class="flex gap-2" @click.stop>
           <ion-button
-            class="w-14 h-10"
+            class="w-10 h-10"
             @click="$emit('exchange', item)"
             :disabled="userScore < item.cost || !item.exchange || item.stock <= 0">
             兑
           </ion-button>
-          <ion-button class="w-14 h-10" color="warning" @click="$emit('add-wish', item)"
+          <ion-button class="w-10 h-10" color="warning" @click="$emit('add-wish', item)"
             :disabled="wishList.ids.includes(item.id)">
             愿
           </ion-button>
