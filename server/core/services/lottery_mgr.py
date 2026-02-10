@@ -76,6 +76,19 @@ class LotteryMgr:
         if not selected_gift:
             return {"code": -1, "msg": "Lottery failed"}
 
+        # 中奖后扣减库存（stock）
+        gift_id = selected_gift.get('id')
+        stock = selected_gift.get('stock')
+        if gift_id is not None and isinstance(stock, (int, float)):
+            new_stock = int(stock) - 1
+            if new_stock < 0:
+                new_stock = 0
+            # 只更新 id 与 stock 字段，其它字段保持不变
+            self._db.set_data('t_gift', {
+                'id': gift_id,
+                'stock': new_stock,
+            })
+
         # 扣除积分并记录积分变更历史
         self._db.add_score(
             user_id,
