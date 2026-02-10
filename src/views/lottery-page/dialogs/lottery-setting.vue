@@ -1,0 +1,441 @@
+<template>
+  <ion-modal
+    ref="modal"
+    aria-hidden="false"
+    id="main"
+    mode="ios"
+    :is-open="isOpen"
+    @didPresent="onModalPresent"
+    @willDismiss="onModalWillDismiss">
+    <ion-header>
+      <ion-toolbar>
+        <ion-buttons slot="start">
+          <ion-button fill="clear" @click="cancel()"> <ion-icon :icon="closeOutline" /></ion-button>
+        </ion-buttons>
+        <ion-title>Lottery Setting</ion-title>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content class="ion-padding">
+      <ion-item lines="none">
+        <div class="w-60 ml-0">普通抽奖费用</div>
+        <ion-input
+          type="number"
+          :value="lotteryData.fee"
+          fill="outline"
+          mode="ios"
+          @ionChange="onFeeChange" />
+        <ion-button slot="end" size="small" color="primary" @click="updateFee">
+          更新
+        </ion-button>
+      </ion-item>
+
+      <!-- 当前类别礼物列表（点击类别后显示） -->
+      <template v-if="selectedCateForGifts">
+        <div class="flex items-center gap-2 mt-4 mb-2">
+          <ion-button fill="clear" size="small" @click="backToCategoryList">
+            <ion-icon :icon="chevronBackOutline" />
+          </ion-button>
+          <ion-label class="font-bold">{{ selectedCateForGifts.name }} — 奖品列表</ion-label>
+        </div>
+        <ion-list v-if="categoryGiftList.length > 0">
+          <ion-item
+            v-for="item in categoryGiftList"
+            :key="item.id"
+            :class="{ '[&::part(native)]:bg-gray-300': !item.enable }"
+            button
+            lines="full"
+            @click="openGiftEdit(item)">
+            <div slot="start" class="w-14 h-14 mr-2">
+              <img :src="getGiftImgUrl(item)" alt="" class="w-14 h-14 object-cover rounded" />
+            </div>
+            <ion-label>
+              <h2>[{{ item.id }}] {{ item.name }}</h2>
+              <p>
+                <Icon icon="mdi:star" class="text-red-500 w-4 h-4 inline" />
+                {{ item.cost }} 积分 · 库存 {{ item.stock ?? 0 }}
+              </p>
+            </ion-label>
+          </ion-item>
+        </ion-list>
+        <ion-item v-else>
+          <ion-label class="text-gray-500">该类别下暂无奖品</ion-label>
+        </ion-item>
+      </template>
+
+      <!-- 类别列表：点击后在设置页显示该类别下的礼物 -->
+      <template v-else>
+        <ion-list class="mt-4">
+          <ion-item lines="full">
+            <ion-label class="font-bold">奖品类别</ion-label>
+            <ion-button
+              slot="end"
+              size="small"
+              fill="outline"
+              @click.stop="addCate">
+              添加类别
+            </ion-button>
+          </ion-item>
+          <ion-item
+            v-for="cate in lotteryCatList"
+            :key="cate.id"
+            button
+            detail
+            class="py-2"
+            @click="onCateClick(cate)">
+            <ion-label>
+              <h2>{{ cate.name }}</h2>
+              <p v-if="cate.cost != null">消耗积分: {{ cate.cost }} </p>
+            </ion-label>
+            <div slot="end" class="flex gap-1" @click.stop>
+              <ion-button size="small" fill="outline" @click="editCate(cate)">编辑</ion-button>
+              <ion-button size="small" fill="outline" color="danger" @click="deleteCate(cate)">删除</ion-button>
+            </div>
+          </ion-item>
+          <ion-item v-if="lotteryCatList.length === 0">
+            <ion-label class="text-gray-500">暂无类别，请先在商店页中添加</ion-label>
+          </ion-item>
+        </ion-list>
+      </template>
+    </ion-content>
+
+    <DialogGift
+      :is-open="isGiftDialogOpen"
+      :editing-gift="editingGift"
+      :lottery-cat-list="lotteryCatList"
+      :selected-cate="selectedCateForGifts"
+      :is-admin="isAdmin"
+      @close="closeGiftDialog"
+      @delete="onGiftDelete"
+      @saved="onGiftSaved" />
+  </ion-modal>
+</template>
+
+<script lang="ts" setup>
+import EventBus, { C_EVENT } from "@/types/EventBus";
+import { getLotteryData, setLotteryData } from "@/api/lottery";
+import { getPicDisplayUrl } from "@/api/pic";
+import { getList, setData, delData } from "@/api/data";
+import { getNetworkErrorMessage } from "@/utils/NetUtil";
+import { PicDisplaySize } from "@/utils/ImgMgr";
+import { computed, inject, ref } from "vue";
+import { alertController, loadingController } from "@ionic/vue";
+import { closeOutline, chevronBackOutline } from "ionicons/icons";
+import { Icon } from "@iconify/vue";
+import DialogGift from "./dialog-gift.vue";
+
+const props = defineProps<{
+  isOpen: boolean;
+}>();
+
+const emit = defineEmits<{
+  (e: "willDismiss", event: any): void;
+}>();
+
+const globalVar: any = inject("globalVar");
+const isAdmin = computed(() => globalVar?.user?.admin === 1);
+
+const modal = ref();
+const lotteryData = ref<{ fee: number; giftList: any[] }>({
+  fee: 10,
+  giftList: [],
+});
+const lotteryCatList = ref<any[]>([]);
+const bModify = ref(false);
+/** 当前选中的类别（用于在设置页内显示该类别下的礼物） */
+const selectedCateForGifts = ref<any>(null);
+const categoryGiftList = ref<any[]>([]);
+/** 礼物编辑弹窗 */
+const isGiftDialogOpen = ref(false);
+const editingGift = ref<any>(null);
+
+const cancel = async () => {
+  if (bModify.value) {
+    const alert = await alertController.create({
+      header: "Confirm",
+      message: "确认放弃修改",
+      buttons: [
+        {
+          text: "OK",
+          handler: () => {
+            modal.value.$el!.dismiss({}, "cancel");
+          },
+        },
+        "Cancel",
+      ],
+    });
+    await alert.present();
+  } else {
+    modal.value.$el!.dismiss({}, "cancel");
+  }
+};
+
+async function onModalPresent() {
+  bModify.value = false;
+  selectedCateForGifts.value = null;
+  categoryGiftList.value = [];
+  isGiftDialogOpen.value = false;
+  editingGift.value = null;
+  const loading = await loadingController.create({
+    message: "Loading...",
+  });
+  loading.present();
+  Promise.all([
+    getLotteryData()
+      .then((data: any) => {
+        if (data) {
+          const parsed = JSON.parse(data);
+          lotteryData.value = {
+            fee: parsed.fee ?? 10,
+            giftList: parsed.giftList ?? [],
+          };
+        }
+      })
+      .catch((err) => {
+        EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+      }),
+    getList("t_gift_category")
+      .then((data: any) => {
+        lotteryCatList.value = data?.data ?? [];
+      })
+      .catch((err: any) => {
+        EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+      }),
+  ]).finally(() => {
+    loading.dismiss();
+  });
+}
+
+const onModalWillDismiss = (event: any) => {
+  emit("willDismiss", event);
+};
+
+async function onCateClick(cate: any) {
+  selectedCateForGifts.value = cate;
+  categoryGiftList.value = [];
+  const loading = await loadingController.create({ message: "加载中..." });
+  await loading.present();
+  getList("t_gift", { cate_id: cate.id }, 1, 200)
+    .then((data: any) => {
+      categoryGiftList.value = (data?.data ?? []).map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        img: item.image,
+        image: item.image,
+        cate_id: item.cate_id,
+        cost: item.cost,
+        enable: item.enable,
+        exchange: item.exchange,
+        stock: item.stock,
+      }));
+    })
+    .catch((err: any) => {
+      EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+    })
+    .finally(() => loading.dismiss());
+}
+
+function backToCategoryList() {
+  selectedCateForGifts.value = null;
+  categoryGiftList.value = [];
+}
+
+function openGiftEdit(item: any) {
+  editingGift.value = item;
+  isGiftDialogOpen.value = true;
+}
+
+function closeGiftDialog() {
+  isGiftDialogOpen.value = false;
+  editingGift.value = null;
+}
+
+function onGiftSaved() {
+  closeGiftDialog();
+  if (selectedCateForGifts.value) {
+    getList("t_gift", { cate_id: selectedCateForGifts.value.id }, 1, 200)
+      .then((data: any) => {
+        categoryGiftList.value = (data?.data ?? []).map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          img: item.image,
+          image: item.image,
+          cate_id: item.cate_id,
+          cost: item.cost,
+          enable: item.enable,
+          exchange: item.exchange,
+          stock: item.stock,
+        }));
+      })
+      .catch((err: any) => EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err)));
+  }
+}
+
+async function onGiftDelete(gift: any) {
+  try {
+    await delData("t_gift", gift.id);
+    EventBus.$emit(C_EVENT.TOAST, "删除成功");
+    categoryGiftList.value = categoryGiftList.value.filter((x: any) => x.id !== gift.id);
+    closeGiftDialog();
+  } catch (err: any) {
+    EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+  }
+}
+
+async function addCate() {
+  const alert = await alertController.create({
+    header: "添加类别",
+    inputs: [
+      { name: "name", type: "text", placeholder: "类别名称" },
+      { name: "cost", type: "number", value: "0", placeholder: "消耗积分" },
+    ],
+    buttons: [
+      { text: "取消", role: "cancel" },
+      {
+        text: "确定",
+        role: "confirm",
+        handler: async (data: { name?: string; cost?: string }) => {
+          const name = (data?.name ?? "").trim();
+          if (!name) {
+            EventBus.$emit(C_EVENT.TOAST, "请输入类别名称");
+            return;
+          }
+          try {
+            await setData("t_gift_category", {
+              name,
+              cost: Number(data?.cost) || 0,
+            });
+            EventBus.$emit(C_EVENT.TOAST, "添加成功");
+            getList("t_gift_category")
+              .then((res: any) => {
+                lotteryCatList.value = res?.data ?? [];
+              })
+              .catch((err: any) => {
+                EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+              });
+          } catch (err: any) {
+            EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+          }
+        },
+      },
+    ],
+  });
+  await alert.present();
+}
+
+async function editCate(cate: any) {
+  const alert = await alertController.create({
+    header: "编辑类别",
+    inputs: [
+      {
+        name: "id",
+        type: "text",
+        value: `ID: ${cate.id ?? ""}`,
+        disabled: true,
+      },
+      { name: "name", type: "text", value: cate.name ?? "", placeholder: "类别名称" },
+      { name: "cost", type: "number", value: String(cate.cost ?? 0), placeholder: "消耗积分" },
+    ],
+    buttons: [
+      { text: "取消", role: "cancel" },
+      {
+        text: "确定",
+        role: "confirm",
+        handler: async (data: { name?: string; cost?: string }) => {
+          const name = (data?.name ?? "").trim();
+          if (!name) {
+            EventBus.$emit(C_EVENT.TOAST, "请输入类别名称");
+            return;
+          }
+          try {
+            await setData("t_gift_category", {
+              id: cate.id,
+              name,
+              cost: Number(data?.cost) || 0,
+            });
+            EventBus.$emit(C_EVENT.TOAST, "更新成功");
+            const idx = lotteryCatList.value.findIndex((x: any) => x.id === cate.id);
+            if (idx >= 0) {
+              lotteryCatList.value[idx] = { ...lotteryCatList.value[idx], name, cost: Number(data?.cost) || 0 };
+            }
+            if (selectedCateForGifts.value?.id === cate.id) {
+              selectedCateForGifts.value.name = name;
+              selectedCateForGifts.value.cost = Number(data?.cost) || 0;
+            }
+          } catch (err: any) {
+            EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+          }
+        },
+      },
+    ],
+  });
+  await alert.present();
+}
+
+async function deleteCate(cate: any) {
+  const alert = await alertController.create({
+    header: "确认删除",
+    message: `确定删除类别「${cate.name}」吗？`,
+    buttons: [
+      { text: "取消", role: "cancel" },
+      {
+        text: "确定",
+        role: "confirm",
+        handler: async () => {
+          try {
+            await delData("t_gift_category", cate.id);
+            EventBus.$emit(C_EVENT.TOAST, "删除成功");
+            lotteryCatList.value = lotteryCatList.value.filter((x: any) => x.id !== cate.id);
+            if (selectedCateForGifts.value?.id === cate.id) {
+              selectedCateForGifts.value = null;
+              categoryGiftList.value = [];
+            }
+          } catch (err: any) {
+            EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+          }
+        },
+      },
+    ],
+  });
+  await alert.present();
+}
+
+function getGiftImgUrl(item: { img?: string; image?: string }) {
+  const raw = item.img ?? item.image;
+  if (!raw)
+    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Crect fill='%23e5e7eb' width='96' height='96'/%3E%3C/svg%3E";
+  return getPicDisplayUrl(raw, PicDisplaySize.LIST, PicDisplaySize.LIST);
+}
+
+function onFeeChange(e: any) {
+  lotteryData.value.fee = Number(e.detail.value) || 10;
+  bModify.value = true;
+}
+
+async function updateFee() {
+  const loading = await loadingController.create({
+    message: "Saving...",
+  });
+  await loading.present();
+  setLotteryData(JSON.stringify(lotteryData.value))
+    .then(() => {
+      bModify.value = false;
+      EventBus.$emit(C_EVENT.TOAST, "更新成功");
+    })
+    .catch((err) => {
+      EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+    })
+    .finally(async () => {
+      await loading.dismiss();
+    });
+}
+</script>
+
+<style scoped>
+
+ion-modal#main::part(content) {
+  max-width: 500px;
+}
+ion-modal#main {
+  --height: 100%;
+}
+</style>

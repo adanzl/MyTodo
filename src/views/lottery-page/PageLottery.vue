@@ -5,14 +5,14 @@
         <ion-title class="px-2">Secret Room</ion-title>
         <ion-buttons slot="end">
           <ServerRemoteBadge />
-          <ion-button @click="btnSettingClk">
+          <ion-button @click="btnSettingClk" :disabled="!isAdmin">
             <Icon icon="weui:setting-outlined" class="w-7 h-7" />
           </ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
 
-    <ion-segment value="shop" @ionChange="handleSegmentChange">
+    <ion-segment :value="segmentValue" @ionChange="handleSegmentChange">
       <ion-segment-button
         value="lotterySpecial"
         content-id="tabLottery"
@@ -87,16 +87,18 @@ import {
 } from "@ionic/vue";
 import { giftOutline, heartOutline } from "ionicons/icons";
 import _ from "lodash";
-import { inject, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, inject, onBeforeUnmount, onMounted, ref } from "vue";
 import LotteryTab from "./TabLottery.vue";
 import TabPrize from "./TabPrize.vue";
 import HistoryTab from "./TabHistory.vue";
-import LotterySetting from "./dialogs/LotterySetting.vue";
+import LotterySetting from "./dialogs/lottery-setting.vue";
 
 const PAGE_SIZE = 20;
 const lotterySetting = ref({ open: false });
 const globalVar: any = inject("globalVar");
+const isAdmin = computed(() => globalVar?.user?.admin === 1);
 const lotteryDate = ref<any>({});
+const segmentValue = ref("shop");
 
 const wishList = ref<any>({
   progress: 30.2,
@@ -146,12 +148,29 @@ onMounted(async () => {
   window.addEventListener("resize", updateTabsHeight);
 });
 
+const onNavToCate = (cateId: number) => {
+  const target = lotteryCatList.value.find((c: any) => c.id === cateId);
+  if (target) {
+    selectedCate.value = target;
+  } else {
+    selectedCate.value = {
+      id: cateId,
+      name: "",
+      cost: lotteryDate.value.fee || 10,
+    };
+  }
+  segmentValue.value = "shop";
+  refreshGiftList(selectedCate.value.id);
+};
+
+EventBus.$on(C_EVENT.LOTTERY_NAV_TO_CATE, onNavToCate);
 onBeforeUnmount(() => {
   window.removeEventListener("resize", updateTabsHeight);
   if (observer) {
     observer.disconnect();
     observer = null;
   }
+  EventBus.$off(C_EVENT.LOTTERY_NAV_TO_CATE, onNavToCate);
 });
 
 function onRefresh(event: any) {
@@ -176,7 +195,8 @@ function handleRefresh(event: any) {
 }
 
 function handleSegmentChange(event: any) {
-  if (event.detail.value === "shop") {
+  segmentValue.value = event.detail.value;
+  if (segmentValue.value === "shop") {
     refreshGiftList(selectedCate.value.id);
   }
 }

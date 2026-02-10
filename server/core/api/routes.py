@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import random
 import re
 import urllib.parse
 from typing import Any, Dict, Optional
@@ -13,6 +12,7 @@ from core.ai.ai_local import AILocal
 from core.config import app_logger
 from core.config import config
 from core.db.db_mgr import db_mgr
+from core.services.lottery_mgr import lottery_mgr
 from core.utils import get_media_duration, read_json_from_request
 from flask import Blueprint, json, jsonify, render_template, request
 from flask.typing import ResponseReturnValue
@@ -314,61 +314,8 @@ def do_lottery() -> ResponseReturnValue:
         if err:
             return err
 
-        user_data = db_mgr.get_data('t_user', user_id, "id,score")
-        if user_data['code'] != 0:
-            return {"code": -1, "msg": "User not found"}
-        user_score = user_data['data']['score']
-        if cate_id == 0:
-            key = f"lottery:2"
-            cate_data = rds_mgr.get_str(key)
-            if not cate_data or json.loads(cate_data)['fee'] is None:
-                return {"code": -1, "msg": "No lottery data"}
-            cate_cost = json.loads(cate_data)['fee']
-        else:
-            cate_data = db_mgr.get_data('t_gift_category', cate_id,
-                                        "id,name,cost")
-            if cate_data['code'] != 0:
-                return {"code": -1, "msg": "Category not found"}
-            cate_cost = cate_data['data']['cost']
-        if user_score < cate_cost:
-            return {"code": -1, "msg": "Not enough score"}
-        if cate_id == 0:
-            lottery_poll = db_mgr.get_list('t_gift', 1, 200, '*',
-                                           {'enable': 1})
-        else:
-            lottery_poll = db_mgr.get_list('t_gift', 1, 200, '*', {
-                'enable': 1,
-                'cate_id': cate_id
-            })
-
-        if lottery_poll['code'] != 0 or not lottery_poll['data']['data'] or len(
-                lottery_poll['data']['data']) == 0:
-            return {"code": -1, "msg": "No available gifts"}
-
-        gifts = lottery_poll['data']['data']
-        selected_gift = random.choice(gifts)
-        log.info(
-            f"Selected Gift: [{selected_gift['id']}] {selected_gift.get('name', '')}"
-        )
-        if not selected_gift:
-            return {"code": -1, "msg": "Lottery failed"}
-
-        db_mgr.add_score(
-            user_id,
-            -cate_cost,
-            'lottery',
-            f"获得[{selected_gift['id']}]{selected_gift.get('name', '')}",
-            out_key=selected_gift['id'],
-        )
-
-        return {
-            "code": 0,
-            "msg": "抽奖成功",
-            "data": {
-                "gift": selected_gift,
-                "fee": cate_cost
-            }
-        }
+        # 将具体业务逻辑委托给 LotteryMgr，保持路由层只做参数解析和异常兜底
+        return lottery_mgr.do_lottery(user_id, cate_id)
     except Exception as e:
         log.error(e)
         return {"code": -1, "msg": 'error: ' + str(e)}

@@ -35,6 +35,8 @@ export const C_EVENT = {
   UPDATE_USER_INFO: "updateUserInfo",
   REWARD: "reward",
   TOAST: "toast",
+  /** 抽奖：从设置页跳转到指定奖品类别 */
+  LOTTERY_NAV_TO_CATE: "lotteryNavToCate",
   /** 未登录或 token 失效，应显示登录页 */
   AUTH_EXPIRED: "authExpired",
   /** 登录缓存已清除（登出/401 等），用于取消 proactive refresh 定时器 */

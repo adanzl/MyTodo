@@ -332,13 +332,35 @@ class DbMgr:
                 query = select(*columns)
                 count_query = select(func.count()).select_from(table_obj)
 
-            # 条件过滤
+            # 条件过滤（支持 (op, value) 表示 >, <, >=, <=, !=）
             if conditions and isinstance(conditions, dict):
                 for k, v in conditions.items():
-                    if k in table_obj.columns:
-                        query = query.where(table_obj.columns[k] == v)
-                        count_query = count_query.where(
-                            table_obj.columns[k] == v)
+                    if k not in table_obj.columns:
+                        continue
+                    col = table_obj.columns[k]
+                    if isinstance(v, tuple) and len(v) == 2:
+                        op, val = v
+                        if op == '>':
+                            query = query.where(col > val)
+                            count_query = count_query.where(col > val)
+                        elif op == '<':
+                            query = query.where(col < val)
+                            count_query = count_query.where(col < val)
+                        elif op == '>=':
+                            query = query.where(col >= val)
+                            count_query = count_query.where(col >= val)
+                        elif op == '<=':
+                            query = query.where(col <= val)
+                            count_query = count_query.where(col <= val)
+                        elif op == '!=':
+                            query = query.where(col != val)
+                            count_query = count_query.where(col != val)
+                        else:
+                            query = query.where(col == val)
+                            count_query = count_query.where(col == val)
+                    else:
+                        query = query.where(col == v)
+                        count_query = count_query.where(col == v)
 
             # 获取总数
             total_count = db_obj.session.execute(count_query).scalar()
