@@ -19,7 +19,10 @@
       <ion-refresher slot="fixed" @ionRefresh="onRefresh">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
-      <ion-item v-for="item in scoreHistoryList.data" :key="item.id">
+      <ion-item
+        v-for="item in scoreHistoryList.data"
+        :key="item.id"
+        @click="onLotteryHistoryDetail(item)">
         <ion-avatar slot="start" class="w-12 h-12">
           <img :src="getUserInfo(item.user_id).icon" />
         </ion-avatar>
@@ -48,6 +51,15 @@
             </div>
           </div>
         </div>
+        <div
+          slot="end"
+          class="text-primary text-sm shrink-0 w-3 flex items-center justify-center">
+          <Icon
+            v-if="item.action === 'lottery' && item.out_key"
+            icon="mdi:gift"
+            class="w-full h-5 cursor-pointer" />
+          <span v-else>-</span>
+        </div>
       </ion-item>
     </ion-content>
   </ion-segment-content>
@@ -64,6 +76,7 @@ import {
   IonSegmentContent,
   IonSelect,
   IonSelectOption,
+  loadingController,
 } from "@ionic/vue";
 import { Icon } from "@iconify/vue";
 import {
@@ -73,6 +86,9 @@ import {
   timeOutline,
 } from "ionicons/icons";
 import dayjs from "dayjs";
+import { getGiftData } from "@/api/lottery";
+import { getNetworkErrorMessage } from "@/utils/NetUtil";
+import EventBus, { C_EVENT } from "@/types/EventBus";
 
 const props = defineProps<{
   userList: any[];
@@ -99,5 +115,27 @@ function getUserInfo(userId: number) {
 function formatDate(dateStr: string) {
   if (!dateStr) return dateStr;
   return dayjs(dateStr).format("YYYY-MM-DD HH:mm:ss");
+}
+
+async function onLotteryHistoryDetail(item: any) {
+  if (!(item.action === "lottery" && item.out_key)) {
+    return;
+  }
+
+  const loading = await loadingController.create({ message: "加载中..." });
+  await loading.present();
+
+  try {
+    const gift = await getGiftData(item.out_key);
+    EventBus.$emit(C_EVENT.REWARD, {
+      value: gift.name,
+      img: gift.image,
+      rewardType: "gift",
+    });
+  } catch (err) {
+    EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err as any));
+  } finally {
+    await loading.dismiss();
+  }
 }
 </script>
