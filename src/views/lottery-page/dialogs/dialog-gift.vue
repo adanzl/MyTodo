@@ -167,7 +167,7 @@ const newGift = ref<{
   image: "",
   enable: 1,
   exchange: 1,
-  stock: 0,
+  stock: 1,
 });
 const newGiftPreview = ref<string>("");
 const newGiftFile = ref<File | null>(null);
@@ -201,7 +201,7 @@ watch(
         image: "",
         enable: 1,
         exchange: 1,
-        stock: 0,
+        stock: 1,
       };
       newGiftPreview.value = "";
       newGiftFile.value = null;

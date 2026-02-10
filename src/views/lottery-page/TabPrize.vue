@@ -35,7 +35,8 @@
           <div class="flex items-center">
             <Icon icon="mdi:star" class="text-red-500 w-5 h-5" />
             <div class="text-left pl-1 pt-1 font-bold w-12">{{ item.cost }}</div>
-            <p class="text-sm ml-2 pt-1">{{ getCateName(item.cate_id) }}</p>
+            <p class="text-sm ml-2 pt-1 w-20">{{ getCateName(item.cate_id) }}</p>
+            <p class="text-sm ml-2 pt-1"> {{ item.stock ?? 0 }}</p>
           </div>
         </div>
         <div class="flex gap-2" @click.stop>

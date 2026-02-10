@@ -270,10 +270,10 @@ async function refreshUserList() {
 }
 
 function refreshGiftList(cateId?: number | undefined, pageNum?: number) {
-  const filter: Record<string, number> = {};
-  if (globalVar.user?.admin !== 1) {
-    filter.enable = 1;
-  }
+  const filter: Record<string, number> = {
+    enable: 1,
+    exchange: 1,
+  };
   if (cateId) {
     filter["cate_id"] = cateId;
   }

@@ -16,7 +16,7 @@
       </ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding">
-      <ion-item lines="none">
+      <ion-item lines="none" class="mb-2">
         <div class="w-60 ml-0">普通抽奖费用</div>
         <ion-input
           type="number"
@@ -25,17 +25,25 @@
           mode="ios"
           @ionChange="onFeeChange" />
         <ion-button slot="end" size="small" color="primary" @click="updateFee">
-          更新
+          <span class="text-[12px]">更新</span>
         </ion-button>
       </ion-item>
 
       <!-- 当前类别礼物列表（点击类别后显示） -->
       <template v-if="selectedCateForGifts">
-        <div class="flex items-center gap-2 mt-4 mb-2">
+        <div class="flex items-center gap-2 mt-2 mb-1 h-8 pr-4">
           <ion-button fill="clear" size="small" @click="backToCategoryList">
             <ion-icon :icon="chevronBackOutline" />
           </ion-button>
           <ion-label class="font-bold">{{ selectedCateForGifts.name }} — 奖品列表</ion-label>
+          <ion-button
+            class="ml-auto [--padding-bottom:0px]! [--padding-top:0px]!"
+            size="small"
+            fill="outline"
+            color="primary"
+            @click="openNewGiftFromSetting">
+            <span class="text-[12px]">添加奖品</span>
+          </ion-button>
         </div>
         <ion-list v-if="categoryGiftList.length > 0">
           <ion-item
@@ -51,8 +59,8 @@
             <ion-label>
               <h2>[{{ item.id }}] {{ item.name }}</h2>
               <p>
-                <Icon icon="mdi:star" class="text-red-500 w-4 h-4 inline" />
-                {{ item.cost }} 积分 · 库存 {{ item.stock ?? 0 }}
+                <Icon icon="mdi:star" class="text-red-500 w-4 h-4 inline mb-1" />
+                {{ item.cost }}  · 库存 {{ item.stock ?? 0 }} · 兑换 {{ item.exchange ? "是" : "否" }} · 启用 {{ item.enable ? "是" : "否" }}
               </p>
             </ion-label>
           </ion-item>
@@ -64,17 +72,17 @@
 
       <!-- 类别列表：点击后在设置页显示该类别下的礼物 -->
       <template v-else>
+        <div class="flex items-center gap-2 mb-1 h-8 p-4">
+          <ion-label class="font-bold">奖品类别</ion-label>
+          <ion-button
+            class="ml-auto [--padding-bottom:0px]! [--padding-top:0px]!"
+            size="small"
+            fill="outline"
+            @click.stop="addCate">
+            <span class="text-[12px]">添加类别</span>
+          </ion-button>
+        </div>
         <ion-list class="mt-4">
-          <ion-item lines="full">
-            <ion-label class="font-bold">奖品类别</ion-label>
-            <ion-button
-              slot="end"
-              size="small"
-              fill="outline"
-              @click.stop="addCate">
-              添加类别
-            </ion-button>
-          </ion-item>
           <ion-item
             v-for="cate in lotteryCatList"
             :key="cate.id"
@@ -86,7 +94,11 @@
               <h2>{{ cate.name }}</h2>
               <p v-if="cate.cost != null">消耗积分: {{ cate.cost }} </p>
             </ion-label>
-            <div slot="end" class="flex gap-1" @click.stop>
+            <div
+              v-if="cate.id !== 0"
+              slot="end"
+              class="flex gap-1"
+              @click.stop>
               <ion-button size="small" fill="outline" @click="editCate(cate)">编辑</ion-button>
               <ion-button size="small" fill="outline" color="danger" @click="deleteCate(cate)">删除</ion-button>
             </div>
@@ -201,6 +213,18 @@ async function onModalPresent() {
         EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
       }),
   ]).finally(() => {
+    // 在已有类别基础上插入“全部”选项
+    if (lotteryCatList.value.length > 0) {
+      const others = lotteryCatList.value.filter((c: any) => c.id !== 0);
+      lotteryCatList.value = [
+        {
+          id: 0,
+          name: "全部",
+          cost: lotteryData.value.fee ?? 10,
+        },
+        ...others,
+      ];
+    }
     loading.dismiss();
   });
 }
@@ -214,7 +238,11 @@ async function onCateClick(cate: any) {
   categoryGiftList.value = [];
   const loading = await loadingController.create({ message: "加载中..." });
   await loading.present();
-  getList("t_gift", { cate_id: cate.id }, 1, 200)
+  const filter: Record<string, number> = {};
+  if (cate.id && cate.id !== 0) {
+    filter.cate_id = cate.id;
+  }
+  getList("t_gift", filter, 1, 200)
     .then((data: any) => {
       categoryGiftList.value = (data?.data ?? []).map((item: any) => ({
         id: item.id,
@@ -244,6 +272,12 @@ function openGiftEdit(item: any) {
   isGiftDialogOpen.value = true;
 }
 
+function openNewGiftFromSetting() {
+  // 在当前类别下新增奖品
+  editingGift.value = null;
+  isGiftDialogOpen.value = true;
+}
+
 function closeGiftDialog() {
   isGiftDialogOpen.value = false;
   editingGift.value = null;
@@ -252,7 +286,11 @@ function closeGiftDialog() {
 function onGiftSaved() {
   closeGiftDialog();
   if (selectedCateForGifts.value) {
-    getList("t_gift", { cate_id: selectedCateForGifts.value.id }, 1, 200)
+    const filter: Record<string, number> = {};
+    if (selectedCateForGifts.value.id && selectedCateForGifts.value.id !== 0) {
+      filter.cate_id = selectedCateForGifts.value.id;
+    }
+    getList("t_gift", filter, 1, 200)
       .then((data: any) => {
         categoryGiftList.value = (data?.data ?? []).map((item: any) => ({
           id: item.id,
@@ -307,7 +345,16 @@ async function addCate() {
             EventBus.$emit(C_EVENT.TOAST, "添加成功");
             getList("t_gift_category")
               .then((res: any) => {
-                lotteryCatList.value = res?.data ?? [];
+                const raw = res?.data ?? [];
+                const others = raw.filter((c: any) => c.id !== 0);
+                lotteryCatList.value = [
+                  {
+                    id: 0,
+                    name: "全部",
+                    cost: lotteryData.value.fee ?? 10,
+                  },
+                  ...others,
+                ];
               })
               .catch((err: any) => {
                 EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
