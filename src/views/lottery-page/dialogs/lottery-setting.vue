@@ -15,19 +15,6 @@
       </ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding">
-      <ion-item lines="none" class="mb-2">
-        <div class="w-60 ml-0">普通抽奖费用</div>
-        <ion-input
-          type="number"
-          :value="lotteryData.fee"
-          fill="outline"
-          mode="ios"
-          @ionChange="onFeeChange" />
-        <ion-button slot="end" size="small" color="primary" @click="updateFee">
-          <span class="text-[12px]">更新</span>
-        </ion-button>
-      </ion-item>
-
       <!-- 当前类别礼物列表（点击类别后显示） -->
       <template v-if="selectedCateForGifts">
         <div class="flex items-center gap-2 mt-2 mb-1 h-8 pr-4">
@@ -93,13 +80,16 @@
               <h2>{{ cate.name }}</h2>
               <p v-if="cate.cost != null">消耗积分: {{ cate.cost }} </p>
             </ion-label>
-            <div
-              v-if="cate.id !== 0"
-              slot="end"
-              class="flex gap-1"
-              @click.stop>
+            <div slot="end" class="flex gap-1" @click.stop>
               <ion-button size="small" fill="outline" @click="editCate(cate)">编辑</ion-button>
-              <ion-button size="small" fill="outline" color="danger" @click="deleteCate(cate)">删除</ion-button>
+              <ion-button
+                v-if="cate.id !== 0"
+                size="small"
+                fill="outline"
+                color="danger"
+                @click="deleteCate(cate)">
+                删除
+              </ion-button>
             </div>
           </ion-item>
           <ion-item v-if="lotteryCatList.length === 0">
@@ -369,6 +359,7 @@ async function addCate() {
 }
 
 async function editCate(cate: any) {
+  const costVal = String(cate.cost ?? 0);
   const alert = await alertController.create({
     header: "编辑类别",
     inputs: [
@@ -378,8 +369,14 @@ async function editCate(cate: any) {
         value: `ID: ${cate.id ?? ""}`,
         disabled: true,
       },
-      { name: "name", type: "text", value: cate.name ?? "", placeholder: "类别名称" },
-      { name: "cost", type: "number", value: String(cate.cost ?? 0), placeholder: "消耗积分" },
+      {
+        name: "name",
+        type: "text",
+        value: cate.name ?? "",
+        placeholder: "类别名称",
+        disabled: cate.id === 0,
+      },
+      { name: "cost", type: "number", value: costVal, placeholder: "消耗积分" },
     ],
     buttons: [
       { text: "取消", role: "cancel" },
@@ -387,26 +384,40 @@ async function editCate(cate: any) {
         text: "确定",
         role: "confirm",
         handler: async (data: { name?: string; cost?: string }) => {
-          const name = (data?.name ?? "").trim();
-          if (!name) {
-            EventBus.$emit(C_EVENT.TOAST, "请输入类别名称");
-            return;
-          }
+          const cost = Number(data?.cost) ?? 0;
           try {
-            await setData("t_gift_category", {
-              id: cate.id,
-              name,
-              cost: Number(data?.cost) || 0,
-            });
+            if (cate.id === 0) {
+              await setLotteryData(
+                JSON.stringify({ ...lotteryData.value, fee: cost })
+              );
+              lotteryData.value.fee = cost;
+              const idx = lotteryCatList.value.findIndex((x: any) => x.id === 0);
+              if (idx >= 0) lotteryCatList.value[idx].cost = cost;
+              if (selectedCateForGifts.value?.id === 0) {
+                selectedCateForGifts.value.cost = cost;
+              }
+            } else {
+              const name = (data?.name ?? cate.name ?? "").trim();
+              if (!name) {
+                EventBus.$emit(C_EVENT.TOAST, "请输入类别名称");
+                return;
+              }
+              await setData("t_gift_category", {
+                id: cate.id,
+                name,
+                cost,
+              });
+              const idx = lotteryCatList.value.findIndex((x: any) => x.id === cate.id);
+              if (idx >= 0) {
+                lotteryCatList.value[idx].name = name;
+                lotteryCatList.value[idx].cost = cost;
+              }
+              if (selectedCateForGifts.value?.id === cate.id) {
+                selectedCateForGifts.value.name = name;
+                selectedCateForGifts.value.cost = cost;
+              }
+            }
             EventBus.$emit(C_EVENT.TOAST, "更新成功");
-            const idx = lotteryCatList.value.findIndex((x: any) => x.id === cate.id);
-            if (idx >= 0) {
-              lotteryCatList.value[idx] = { ...lotteryCatList.value[idx], name, cost: Number(data?.cost) || 0 };
-            }
-            if (selectedCateForGifts.value?.id === cate.id) {
-              selectedCateForGifts.value.name = name;
-              selectedCateForGifts.value.cost = Number(data?.cost) || 0;
-            }
           } catch (err: any) {
             EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
           }
@@ -450,29 +461,6 @@ function getGiftImgUrl(item: { img?: string; image?: string }) {
   if (!raw)
     return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Crect fill='%23e5e7eb' width='96' height='96'/%3E%3C/svg%3E";
   return getPicDisplayUrl(raw, PicDisplaySize.LIST, PicDisplaySize.LIST);
-}
-
-function onFeeChange(e: any) {
-  lotteryData.value.fee = Number(e.detail.value) || 10;
-  bModify.value = true;
-}
-
-async function updateFee() {
-  const loading = await loadingController.create({
-    message: "Saving...",
-  });
-  await loading.present();
-  setLotteryData(JSON.stringify(lotteryData.value))
-    .then(() => {
-      bModify.value = false;
-      EventBus.$emit(C_EVENT.TOAST, "更新成功");
-    })
-    .catch((err) => {
-      EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
-    })
-    .finally(async () => {
-      await loading.dismiss();
-    });
 }
 </script>
 

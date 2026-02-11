@@ -97,8 +97,13 @@
               <div class="flex flex-col items-stretch w-full ">
                 <div class="flex items-center gap-2 mb-1">
                   <span class="text-sm text-gray-500 w-12">ID: {{ cate.id ?? -1 }}</span>
-                  <ion-input :model-value="cate.name" @ionInput="cate.name = $event.detail.value" placeholder="类别名称"
-                    class="flex-1 min-w-0 flex-1 " fill="outline" />
+                  <ion-input
+                    :model-value="cate.name"
+                    @ionInput="cate.id !== 0 && (cate.name = $event.detail.value)"
+                    placeholder="类别名称"
+                    :readonly="cate.id === 0"
+                    class="flex-1 min-w-0 flex-1 "
+                    fill="outline" />
                 </div>
                 <div class="flex flex-wrap items-center gap-2 w-full">
                   <span class="text-sm text-gray-500 w-12">积分:</span>
@@ -110,7 +115,11 @@
                       @click="cancelAddCate(idx)">
                       取消
                     </ion-button>
-                    <ion-button v-if="cate.id !== -1 && cate.id != null" size="small" color="danger" fill="outline"
+                    <ion-button
+                      v-if="cate.id !== 0 && cate.id !== -1 && cate.id != null"
+                      size="small"
+                      color="danger"
+                      fill="outline"
                       @click="deleteCate(cate)">
                       删除
                     </ion-button>
@@ -145,6 +154,7 @@ import {
 } from "@ionic/vue";
 import { Icon } from "@iconify/vue";
 import { setData, delData } from "@/api/data";
+import { getLotteryData, setLotteryData } from "@/api/lottery";
 import { getPicDisplayUrl } from "@/api/pic";
 import { PicDisplaySize } from "@/utils/ImgMgr";
 import EventBus, { C_EVENT } from "@/types/EventBus";
@@ -188,8 +198,7 @@ watch(
   () => [isManageOpen.value, props.lotteryCatList],
   () => {
     if (isManageOpen.value) {
-      const list = props.lotteryCatList.filter((c: any) => c.id !== 0);
-      manageCatList.value = list.map((c: any) => ({
+      manageCatList.value = props.lotteryCatList.map((c: any) => ({
         id: c.id,
         name: c.name,
         cost: c.cost ?? 0,
@@ -214,6 +223,18 @@ function cancelAddCate(idx: number) {
   manageCatList.value.splice(idx, 1);
 }
 async function saveCate(cate: any, _idx: number) {
+  if (cate.id === 0) {
+    try {
+      const data = await getLotteryData();
+      const parsed = typeof data === "string" ? JSON.parse(data) : data;
+      await setLotteryData(JSON.stringify({ ...parsed, fee: Number(cate.cost) || 0 }));
+      EventBus.$emit(C_EVENT.TOAST, "更新成功");
+      emit("refresh", { target: { complete: () => {} } });
+    } catch (err) {
+      EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+    }
+    return;
+  }
   if (!cate.name?.trim()) {
     EventBus.$emit(C_EVENT.TOAST, "请输入类别名称");
     return;
@@ -225,7 +246,7 @@ async function saveCate(cate: any, _idx: number) {
       cost: Number(cate.cost) || 0,
     });
     EventBus.$emit(C_EVENT.TOAST, "更新成功");
-    emit("refresh", { target: { complete: () => { } } });
+    emit("refresh", { target: { complete: () => {} } });
   } catch (err) {
     EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
   }
