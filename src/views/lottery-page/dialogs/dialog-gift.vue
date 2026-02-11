@@ -132,7 +132,7 @@ import {
 } from "@ionic/vue";
 import { Icon } from "@iconify/vue";
 import { uploadPic, getPicDisplayUrl } from "@/api/pic";
-import { PicDisplaySize, resizeImageToFile } from "@/utils/ImgMgr";
+import { resizeImageToFile } from "@/utils/ImgMgr";
 import EventBus, { C_EVENT } from "@/types/EventBus";
 import { getNetworkErrorMessage } from "@/utils/NetUtil";
 import { ref, watch } from "vue";
@@ -189,7 +189,7 @@ watch(
         stock: item.stock ?? 0,
       };
       newGiftPreview.value = newGift.value.image
-        ? getPicDisplayUrl(newGift.value.image, PicDisplaySize.LIST, PicDisplaySize.LIST)
+        ? getPicDisplayUrl(newGift.value.image)
         : "";
       newGiftFile.value = null;
     } else {

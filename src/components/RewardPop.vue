@@ -28,7 +28,6 @@ ion-modal {
 <script setup lang="ts">
 import { computed } from "vue";
 import { getPicDisplayUrl } from "@/api/pic";
-import { PicDisplaySize } from "@/utils/ImgMgr";
 
 const props = defineProps({
   value: {
@@ -45,10 +44,10 @@ const props = defineProps({
   },
 });
 
-/** 兼容文件名、base64 等，转为可展示的图片 URL */
+/** 详情用原始图片 */
 const rewardImgUrl = computed(() => {
   const raw = props.img;
   if (!raw) return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Crect fill='%23e5e7eb' width='80' height='80'/%3E%3C/svg%3E";
-  return getPicDisplayUrl(raw, PicDisplaySize.ITEM, PicDisplaySize.ITEM);
+  return getPicDisplayUrl(raw);
 });
 </script>
