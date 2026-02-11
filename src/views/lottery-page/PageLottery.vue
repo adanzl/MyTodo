@@ -50,7 +50,10 @@
         :gift-list="giftList"
         :wish-list="wishList"
         :user-score="globalVar.user.score"
+        :has-more="giftListHasMore"
+        :loading-more="loadingGifts"
         @refresh="onRefresh"
+        @load-more="loadMoreGifts"
         @cate-change="handleShopCateChange"
         @exchange="btnExchangeClk"
         @add-wish="btnAddWishClk"
@@ -112,6 +115,10 @@ const giftList = ref<any>({
   totalCount: 0,
   totalPage: 0,
 });
+const loadingGifts = ref(false);
+const giftListHasMore = computed(
+  () => giftList.value.pageNum < giftList.value.totalPage
+);
 const scoreHistoryList = ref<any>({
   data: [],
   pageNum: 1,
@@ -269,7 +276,11 @@ async function refreshUserList() {
     });
 }
 
-function refreshGiftList(cateId?: number | undefined, pageNum?: number) {
+function refreshGiftList(
+  cateId?: number | undefined,
+  pageNum: number = 1,
+  append: boolean = false
+): Promise<void> {
   const filter: Record<string, number> = {
     enable: 1,
     exchange: 1,
@@ -277,10 +288,15 @@ function refreshGiftList(cateId?: number | undefined, pageNum?: number) {
   if (cateId) {
     filter["cate_id"] = cateId;
   }
-  getList<GiftListItem>("t_gift", filter, pageNum, PAGE_SIZE)
+  if (append) {
+    loadingGifts.value = true;
+  }
+  return getList<GiftListItem>("t_gift", filter, pageNum, PAGE_SIZE)
     .then((data) => {
       const d = data.data;
-      giftList.value.data = [];
+      if (!append) {
+        giftList.value.data = [];
+      }
       giftList.value.pageNum = data.pageNum;
       giftList.value.pageSize = data.pageSize;
       giftList.value.totalCount = data.totalCount;
@@ -302,7 +318,27 @@ function refreshGiftList(cateId?: number | undefined, pageNum?: number) {
     })
     .catch((err) => {
       EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+    })
+    .finally(() => {
+      loadingGifts.value = false;
     });
+}
+
+function loadMoreGifts(event: any) {
+  if (
+    loadingGifts.value ||
+    giftList.value.pageNum >= giftList.value.totalPage
+  ) {
+    event?.target?.complete();
+    return;
+  }
+  refreshGiftList(
+    selectedCate.value?.id === 0 ? undefined : selectedCate.value?.id,
+    giftList.value.pageNum + 1,
+    true
+  ).finally(() => {
+    event?.target?.complete();
+  });
 }
 
 function handleShopCateChange(value: any) {

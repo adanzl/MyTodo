@@ -52,6 +52,13 @@
           </ion-button>
         </div>
       </ion-item>
+      <ion-infinite-scroll
+        :disabled="!hasMore || loadingMore"
+        @ionInfinite="onLoadMore">
+        <ion-infinite-scroll-content
+          loading-spinner="crescent"
+          loading-text="加载更多..." />
+      </ion-infinite-scroll>
     </ion-content>
 
     <FabButton v-if="isAdmin" @click="openNewGift" class="right-[5%] bottom-[1%]" bottom="1%" right="5%" :hasBar="true">
@@ -122,6 +129,8 @@
 import {
   IonButtons,
   IonHeader,
+  IonInfiniteScroll,
+  IonInfiniteScrollContent,
   IonInput,
   IonList,
   IonModal,
@@ -151,10 +160,16 @@ const props = defineProps<{
   giftList: { data: any[] };
   wishList: { ids: number[] };
   userScore: number;
+  hasMore?: boolean;
+  loadingMore?: boolean;
 }>();
+
+const hasMore = computed(() => props.hasMore ?? false);
+const loadingMore = computed(() => props.loadingMore ?? false);
 
 const emit = defineEmits<{
   (e: "refresh", event: any): void;
+  (e: "load-more", event: any): void;
   (e: "cate-change", value: any): void;
   (e: "exchange", item: any): void;
   (e: "add-wish", item: any): void;
@@ -266,6 +281,9 @@ async function deleteCate(cate: any) {
 
 function onRefresh(event: any) {
   emit("refresh", event);
+}
+function onLoadMore(event: any) {
+  emit("load-more", event);
 }
 function onCateChange(event: any) {
   emit("cate-change", event.detail.value);
