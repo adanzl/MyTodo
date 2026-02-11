@@ -79,6 +79,7 @@ import { getList, delData } from "@/api/data";
 import { doLottery, getGiftData, getLotteryData } from "@/api/lottery";
 import { getUserList, setUserData } from "@/api/user";
 import { getNetworkErrorMessage } from "@/utils/NetUtil";
+import { getCachedPicByName, PicDisplaySize } from "@/utils/ImgMgr";
 import {
   IonButton,
   IonHeader,
@@ -303,7 +304,7 @@ function refreshGiftList(
       giftList.value.totalPage = data.totalPage;
 
       _.forEach(d, (item) => {
-        giftList.value.data.push({
+        const row = {
           id: item.id,
           name: item.name,
           img: item.image,
@@ -313,7 +314,17 @@ function refreshGiftList(
           exchange: item.exchange,
           stock: item.stock,
           edited: false,
-        });
+          cachedImgUrl: "" as string,
+        };
+        giftList.value.data.push(row);
+        const name = item.image;
+        if (name) {
+          getCachedPicByName(name, PicDisplaySize.LIST, PicDisplaySize.LIST).then(
+            (url) => {
+              row.cachedImgUrl = url;
+            }
+          );
+        }
       });
     })
     .catch((err) => {

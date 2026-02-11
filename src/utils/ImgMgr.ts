@@ -1,6 +1,6 @@
 import LocalCache from "./LocalCache.ts";
 import { calcImgPos } from "./Math.ts";
-import { delPic, getPic, setPic } from "@/api/pic";
+import { delPic, getPic, setPic, getPicDisplayUrl } from "@/api/pic";
 
 /** 图片展示尺寸 */
 export const PicDisplaySize = {
@@ -28,6 +28,53 @@ export async function getImage(id?: number) {
     }
   }
   return ret;
+}
+
+/**
+ * 根据文件名获取图片的本地缓存（data URL），若本地无缓存则从服务端拉取并写入缓存。
+ * 适用于 `/pic/view?name=xxx&w=..&h=..` 这类按文件名访问的图片。
+ * @param name  图片文件名，如 image_29.jpg
+ * @param w     目标宽度，对应接口的 w 参数
+ * @param h     目标高度，对应接口的 h 参数
+ * @param ttl   缓存时长（秒），默认 1 小时
+ */
+export async function getCachedPicByName(
+  name: string,
+  w?: number,
+  h?: number,
+  ttl: number = 60 * 60
+): Promise<string> {
+  if (!name) return "";
+
+  const key = `pic_file_${name}_${w || 0}_${h || 0}`;
+  const cached = LocalCache.get<string>(key);
+  if (cached) {
+    return cached;
+  }
+
+  const url = getPicDisplayUrl(name, w, h);
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      throw new Error("图片加载失败");
+    }
+    const blob = await resp.blob();
+
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error("图片读取失败"));
+      reader.readAsDataURL(blob);
+    });
+
+    // 写入本地缓存（localStorage），后续直接用 data URL 展示，无需再次走网络
+    LocalCache.set(key, dataUrl, ttl);
+    return dataUrl;
+  } catch (err) {
+    // 失败时退回原始 URL，至少能正常展示
+    console.warn("getCachedPicByName fail:", err);
+    return url;
+  }
 }
 
 export async function setImage(id: number | undefined, data: string) {

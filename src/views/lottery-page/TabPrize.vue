@@ -294,10 +294,16 @@ function getCateName(cateId: number) {
   return cate ? cate.name : "";
 }
 
-/** 兼容 img/image 字段，转为可展示的图片 URL */
-function getGiftImgUrl(item: { img?: string; image?: string }) {
+/** 兼容 img/image 字段，优先使用本地缓存的 data URL，否则返回可展示的图片 URL */
+function getGiftImgUrl(item: {
+  img?: string;
+  image?: string;
+  cachedImgUrl?: string;
+}) {
+  if (item.cachedImgUrl) return item.cachedImgUrl;
   const raw = item.img ?? item.image;
-  if (!raw) return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Crect fill='%23e5e7eb' width='96' height='96'/%3E%3C/svg%3E";
+  if (!raw)
+    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Crect fill='%23e5e7eb' width='96' height='96'/%3E%3C/svg%3E";
   return getPicDisplayUrl(raw, PicDisplaySize.LIST, PicDisplaySize.LIST);
 }
 </script>
