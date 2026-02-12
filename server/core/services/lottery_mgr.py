@@ -112,13 +112,15 @@ class LotteryMgr:
         enable: Optional[int] = None,
         exchange: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """按 enable、exchange 筛选 t_gift，计算 cost 平均值。"""
+        """按 enable、exchange 筛选 t_gift，返回总均值与每个类别(cate_id)的均值。"""
         conditions: Dict[str, Any] = {}
         if enable is not None:
             conditions['enable'] = enable
         if exchange is not None:
             conditions['exchange'] = exchange
-        resp = self._db.get_list('t_gift', 1, 1000, ['cost'], conditions or None)
+        resp = self._db.get_list(
+            't_gift', 1, 1000, ['cost', 'cate_id'], conditions or None
+        )
 
         if resp.get('code') != 0:
             return {"code": -1, "msg": "Failed to query gift list"}
@@ -126,17 +128,47 @@ class LotteryMgr:
         data = resp.get('data') or {}
         gifts = data.get('data') or []
 
-        costs = [
-            g.get('cost') for g in gifts
-            if isinstance(g.get('cost'), (int, float))
-        ]
+        # 有效 cost 列表（总均值用）
+        costs = []
+        # 按 cate_id 分组收集 cost
+        by_cate: Dict[Any, list] = {}
+        for g in gifts:
+            c = g.get('cost')
+            if not isinstance(c, (int, float)):
+                continue
+            cost_val = float(c) if isinstance(c, int) else c
+            costs.append(cost_val)
+            cate_id = g.get('cate_id')
+            if cate_id not in by_cate:
+                by_cate[cate_id] = []
+            by_cate[cate_id].append(cost_val)
 
         if not costs:
             return {"code": -1, "msg": "No matching gifts"}
 
         avg_cost = sum(costs) / len(costs)
+        def _sort_key(item: tuple) -> tuple:
+            cid = item[0]
+            return (cid is None, cid if cid is not None else 0)
 
-        return {"code": 0, "msg": "ok", "data": {"avg_cost": avg_cost}}
+        by_category = [
+            {
+                "cate_id": cate_id,
+                "avg_cost": sum(lst) / len(lst),
+                "count": len(lst),
+            }
+            for cate_id, lst in sorted(by_cate.items(), key=_sort_key)
+        ]
+
+        return {
+            "code": 0,
+            "msg": "ok",
+            "data": {
+                "avg_cost": avg_cost,
+                "total_count": len(costs),
+                "by_category": by_category,
+            },
+        }
 
 
 lottery_mgr = LotteryMgr()
