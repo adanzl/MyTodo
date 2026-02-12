@@ -143,6 +143,22 @@ class LotteryMgr:
                 by_cate[cate_id] = []
             by_cate[cate_id].append(cost_val)
 
+        # 查询类别名称映射（t_gift_category.id -> name）
+        cate_name_map: Dict[Any, str] = {}
+        try:
+            cate_resp = self._db.get_list('t_gift_category', 1, 1000,
+                                          ['id', 'name'], None)
+            if cate_resp.get('code') == 0:
+                cate_data = cate_resp.get('data') or {}
+                cate_list = cate_data.get('data') or []
+                for c_row in cate_list:
+                    cid = c_row.get('id')
+                    if cid is not None:
+                        cate_name_map[cid] = c_row.get('name') or ''
+        except Exception:
+            # 分类名称获取失败时，不影响均值计算，只是不返回名称
+            pass
+
         if not costs:
             return {"code": -1, "msg": "No matching gifts"}
 
@@ -154,6 +170,7 @@ class LotteryMgr:
         by_category = [
             {
                 "cate_id": cate_id,
+                "cate_name": cate_name_map.get(cate_id),
                 "avg_cost": sum(lst) / len(lst),
                 "count": len(lst),
             }
