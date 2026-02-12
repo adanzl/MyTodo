@@ -91,7 +91,7 @@ import {
 } from "@ionic/vue";
 import { giftOutline, heartOutline } from "ionicons/icons";
 import _ from "lodash";
-import { computed, inject, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import LotteryTab from "./TabLottery.vue";
 import TabPrize from "./TabPrize.vue";
 import HistoryTab from "./TabHistory.vue";
@@ -117,9 +117,11 @@ const giftList = ref<any>({
   totalPage: 0,
 });
 const loadingGifts = ref(false);
-const giftListHasMore = computed(
-  () => giftList.value.pageNum < giftList.value.totalPage
-);
+const giftListHasMore = computed(() => {
+  const { pageNum, totalPage, data, totalCount } = giftList.value;
+  if (totalCount > 0 && data.length < totalCount) return true;
+  return pageNum < totalPage;
+});
 const scoreHistoryList = ref<any>({
   data: [],
   pageNum: 1,
@@ -294,14 +296,23 @@ function refreshGiftList(
   }
   return getList<GiftListItem>("t_gift", filter, pageNum, PAGE_SIZE)
     .then((data) => {
-      const d = data.data;
+      const d = data.data ?? [];
       if (!append) {
         giftList.value.data = [];
       }
-      giftList.value.pageNum = data.pageNum;
-      giftList.value.pageSize = data.pageSize;
-      giftList.value.totalCount = data.totalCount;
-      giftList.value.totalPage = data.totalPage;
+      const totalCount = Number(data.totalCount) ?? 0;
+      const pageSizeNum = Number(data.pageSize) || PAGE_SIZE;
+      giftList.value.pageNum = Number(data.pageNum) ?? pageNum;
+      giftList.value.pageSize = pageSizeNum;
+      giftList.value.totalCount = totalCount;
+      // 兜底：接口未返回 totalPage 或为 0 时，用 totalCount 推算，避免翻页一直为 false
+      const rawTotalPage = Number(data.totalPage);
+      giftList.value.totalPage =
+        rawTotalPage > 0
+          ? rawTotalPage
+          : totalCount > 0
+            ? Math.max(1, Math.ceil(totalCount / pageSizeNum))
+            : 0;
 
       _.forEach(d, (item) => {
         const row = {
@@ -336,10 +347,10 @@ function refreshGiftList(
 }
 
 function loadMoreGifts(event: any) {
-  if (
-    loadingGifts.value ||
-    giftList.value.pageNum >= giftList.value.totalPage
-  ) {
+  const { pageNum, totalPage, data, totalCount } = giftList.value;
+  const noMore =
+    totalCount > 0 ? data.length >= totalCount : pageNum >= totalPage;
+  if (loadingGifts.value || noMore) {
     event?.target?.complete();
     return;
   }
@@ -348,7 +359,9 @@ function loadMoreGifts(event: any) {
     giftList.value.pageNum + 1,
     true
   ).finally(() => {
-    event?.target?.complete();
+    nextTick(() => {
+      event?.target?.complete();
+    });
   });
 }
 

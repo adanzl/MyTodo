@@ -55,3 +55,35 @@ export async function doLottery(
   }
   return rsp.data.data!;
 }
+
+/** 礼物成本均值接口返回 */
+export interface GiftAvgCostResult {
+  /** 所有符合条件礼物的总体均值 */
+  avg_cost: number;
+  /** 参与统计的礼物总数量 */
+  total_count: number;
+  /** 按类别统计的均值信息 */
+  by_category: Array<{
+    cate_id: number | null;
+    /** 类别名称（如果存在） */
+    cate_name?: string | null;
+    avg_cost: number;
+    count: number;
+  }>;
+}
+
+export async function getGiftAvgCost(params?: {
+  /** 是否按启用状态筛选（1: 只看启用，0: 只看未启用） */
+  enable?: number;
+  /** 是否按兑换属性筛选（1: 只看可兑换，0: 只看不可兑换） */
+  exchange?: number;
+}): Promise<GiftAvgCostResult> {
+  const rsp = await apiClient.get<ApiResponse<GiftAvgCostResult>>(
+    "/giftAvgCost",
+    { params }
+  );
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg ?? "请求失败");
+  }
+  return rsp.data.data!;
+}

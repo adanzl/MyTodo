@@ -53,7 +53,8 @@
         </div>
       </ion-item>
       <ion-infinite-scroll
-        :disabled="!hasMore || loadingMore"
+        threshold="150px"
+        :disabled="!hasMore"
         @ionInfinite="onLoadMore">
         <ion-infinite-scroll-content
           loading-spinner="crescent"

@@ -12,6 +12,9 @@
           <ion-button fill="clear" @click="cancel()"> <ion-icon :icon="closeOutline" /></ion-button>
         </ion-buttons>
         <ion-title>Lottery Setting</ion-title>
+        <ion-buttons slot="end">
+          <ion-button @click="btnAvgCostClk">均值</ion-button>
+        </ion-buttons>
       </ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding">
@@ -113,7 +116,7 @@
 
 <script lang="ts" setup>
 import EventBus, { C_EVENT } from "@/types/EventBus";
-import { getLotteryData, setLotteryData } from "@/api/lottery";
+import { getLotteryData, setLotteryData, getGiftAvgCost } from "@/api/lottery";
 import { getPicDisplayUrl } from "@/api/pic";
 import { getList, setData, delData } from "@/api/data";
 import { getNetworkErrorMessage } from "@/utils/NetUtil";
@@ -148,6 +151,49 @@ const categoryGiftList = ref<any[]>([]);
 /** 礼物编辑弹窗 */
 const isGiftDialogOpen = ref(false);
 const editingGift = ref<any>(null);
+
+async function btnAvgCostClk() {
+  try {
+    const data = await getGiftAvgCost();
+    const lines = [
+      `平均成本：${Number(data.avg_cost).toFixed(2)}`,
+      `参与统计：${data.total_count} 件`,
+      ...(data.by_category?.length
+        ? [
+            "",
+            "按类别：",
+            ...data.by_category.map((c) => {
+              const rawName = (c.cate_name ?? "").trim() || "未命名";
+              const maxLen = 10;
+              const shortName =
+                rawName.length > maxLen
+                  ? `${rawName.slice(0, maxLen)}…`
+                  : rawName;
+              const label = `[${c.cate_id ?? "无"}] ${shortName}`;
+              return `   ${label}： ${Number(c.avg_cost).toFixed(
+                2
+              )}（${c.count} 件）`;
+            }),
+          ]
+        : []),
+    ];
+    const message = lines.join("\n");
+    const alert = await alertController.create({
+      header: "礼物均值",
+      message,
+      cssClass: "alert-message-preline",
+      buttons: ["确定"],
+    });
+    await alert.present();
+  } catch (err: any) {
+    const alert = await alertController.create({
+      header: "请求失败",
+      message: getNetworkErrorMessage(err),
+      buttons: ["确定"],
+    });
+    await alert.present();
+  }
+}
 
 const cancel = async () => {
   if (bModify.value) {
@@ -471,5 +517,12 @@ ion-modal#main::part(content) {
 }
 ion-modal#main {
   --height: 100%;
+}
+</style>
+
+<style>
+/* 成本均值弹窗：保留换行和空格，便于对齐 */
+.alert-message-preline .alert-message {
+  white-space: pre;
 }
 </style>
