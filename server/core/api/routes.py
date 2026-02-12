@@ -321,6 +321,22 @@ def do_lottery() -> ResponseReturnValue:
         return {"code": -1, "msg": 'error: ' + str(e)}
 
 
+@api_bp.route("/giftAvgCost", methods=['GET'])
+def gift_avg_cost() -> ResponseReturnValue:
+    """按 enable、exchange 筛选礼物并计算平均 cost。Query: enable, exchange（可选，整数）。"""
+    try:
+        raw_enable = request.args.get('enable', 1)
+        raw_exchange = request.args.get('exchange')
+        enable = int(raw_enable) if raw_enable not in (None, '') else None
+        exchange = int(raw_exchange) if raw_exchange not in (None, '') else None
+        return lottery_mgr.get_gift_avg_cost(enable=enable, exchange=exchange)
+    except ValueError:
+        return {"code": -1, "msg": "enable and exchange must be int"}
+    except Exception as e:
+        log.error(e)
+        return {"code": -1, "msg": 'error: ' + str(e)}
+
+
 @api_bp.route("/addRdsList", methods=['POST'])
 def add_rds_list() -> ResponseReturnValue:
     """向Redis列表中插入数据（列表尾部插入）"""

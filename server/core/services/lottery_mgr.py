@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import random
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import core.db.rds_mgr as rds_mgr
 from core.config import app_logger
@@ -20,7 +20,7 @@ class LotteryMgr:
         self._rds = rds_mgr
 
     def do_lottery(self, user_id: int, cate_id: int) -> Dict[str, Any]:
-        """执行一次抽奖，返回与原 /doLottery 接口一致的结构。"""
+        """执行一次抽奖"""
         # 查询用户积分
         user_data = self._db.get_data('t_user', user_id, "id,score")
         if user_data['code'] != 0:
@@ -106,6 +106,37 @@ class LotteryMgr:
                 "fee": cate_cost
             }
         }
+
+    def get_gift_avg_cost(
+        self,
+        enable: Optional[int] = None,
+        exchange: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """按 enable、exchange 筛选 t_gift，计算 cost 平均值。"""
+        conditions: Dict[str, Any] = {}
+        if enable is not None:
+            conditions['enable'] = enable
+        if exchange is not None:
+            conditions['exchange'] = exchange
+        resp = self._db.get_list('t_gift', 1, 1000, ['cost'], conditions or None)
+
+        if resp.get('code') != 0:
+            return {"code": -1, "msg": "Failed to query gift list"}
+
+        data = resp.get('data') or {}
+        gifts = data.get('data') or []
+
+        costs = [
+            g.get('cost') for g in gifts
+            if isinstance(g.get('cost'), (int, float))
+        ]
+
+        if not costs:
+            return {"code": -1, "msg": "No matching gifts"}
+
+        avg_cost = sum(costs) / len(costs)
+
+        return {"code": 0, "msg": "ok", "data": {"avg_cost": avg_cost}}
 
 
 lottery_mgr = LotteryMgr()
