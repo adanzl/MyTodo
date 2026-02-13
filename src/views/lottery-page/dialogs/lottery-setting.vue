@@ -1,10 +1,5 @@
 <template>
-  <ion-modal
-    ref="modal"
-    aria-hidden="false"
-    id="main"
-    :is-open="isOpen"
-    @didPresent="onModalPresent"
+  <ion-modal ref="modal" aria-hidden="false" id="main" :is-open="isOpen" @didPresent="onModalPresent"
     @willDismiss="onModalWillDismiss">
     <ion-header>
       <ion-toolbar>
@@ -20,37 +15,33 @@
     <ion-content class="ion-padding">
       <!-- 当前类别礼物列表（点击类别后显示） -->
       <template v-if="selectedCateForGifts">
-        <div class="flex items-center gap-2 mt-2 mb-1 h-8 pr-4">
+        <div class="flex items-center gap-2 mt-0 mb-1 h-8 pr-4">
           <ion-button fill="clear" size="small" @click="backToCategoryList">
             <ion-icon :icon="chevronBackOutline" />
           </ion-button>
           <ion-label class="font-bold">{{ selectedCateForGifts.name }} — 奖品列表</ion-label>
-          <ion-button
-            class="ml-auto [--padding-bottom:0px]! [--padding-top:0px]!"
-            size="small"
-            fill="outline"
-            color="primary"
-            @click="openNewGiftFromSetting">
+          <ion-button class="ml-auto [--padding-bottom:0px]! [--padding-top:0px]!" size="small" fill="outline"
+            color="primary" @click="openNewGiftFromSetting">
             <span class="text-[12px]">添加奖品</span>
           </ion-button>
         </div>
         <ion-list v-if="categoryGiftList.length > 0">
-          <ion-item
-            v-for="item in categoryGiftList"
-            :key="item.id"
-            :class="{ '[&::part(native)]:bg-gray-300': !item.enable }"
-            button
-            lines="full"
-            @click="openGiftEdit(item)">
+          <ion-item v-for="item in categoryGiftList" :key="item.id"
+            :class="{ '[&::part(native)]:bg-gray-300': !item.enable }" button lines="full" @click="openGiftEdit(item)">
             <div slot="start" class="w-14 h-14 mr-2">
               <img :src="getGiftImgUrl(item)" alt="" class="w-14 h-14 object-cover rounded" />
             </div>
             <ion-label>
               <h2>[{{ item.id }}] {{ item.name }}</h2>
-              <p>
-                <Icon icon="mdi:star" class="text-red-500 w-4 h-4 inline mb-1" />
-                {{ item.cost }}  · 库存 {{ item.stock ?? 0 }} · 兑换 {{ item.exchange ? "是" : "否" }} · 启用 {{ item.enable ? "是" : "否" }}
-              </p>
+              <div class="flex items-center text-[12px] gap-1">
+                <Icon icon="mdi:star" class="text-red-500 w-3.5 h-3.5 inline " />
+                <div class="w-7">{{ item.cost }} </div>
+                <ion-icon :icon="serverOutline" class=""></ion-icon>
+                <div class="w-6">{{ item.stock ?? 0 }} </div>
+                <div class="w-10">愿：{{ item.wish ? "是" : "否" }}</div>
+                <div class="w-10">兑: {{ item.exchange ? "是" : "否" }}</div>
+                <ion-icon :icon="item.enable ? checkmarkCircleOutline : checkmarkCircleOutline" class=""></ion-icon>
+              </div>
             </ion-label>
           </ion-item>
         </ion-list>
@@ -63,34 +54,20 @@
       <template v-else>
         <div class="flex items-center gap-2 mb-1 h-8 p-4">
           <ion-label class="font-bold">奖品类别</ion-label>
-          <ion-button
-            class="ml-auto [--padding-bottom:0px]! [--padding-top:0px]!"
-            size="small"
-            fill="outline"
+          <ion-button class="ml-auto [--padding-bottom:0px]! [--padding-top:0px]!" size="small" fill="outline"
             @click.stop="addCate">
             <span class="text-[12px]">添加类别</span>
           </ion-button>
         </div>
         <ion-list class="mt-4">
-          <ion-item
-            v-for="cate in lotteryCatList"
-            :key="cate.id"
-            button
-            detail
-            class="py-2"
-            @click="onCateClick(cate)">
+          <ion-item v-for="cate in lotteryCatList" :key="cate.id" button detail class="py-2" @click="onCateClick(cate)">
             <ion-label>
               <h2>{{ cate.name }}</h2>
               <p v-if="cate.cost != null">消耗积分: {{ cate.cost }} </p>
             </ion-label>
             <div slot="end" class="flex gap-1" @click.stop>
               <ion-button size="small" fill="outline" @click="editCate(cate)">编辑</ion-button>
-              <ion-button
-                v-if="cate.id !== 0"
-                size="small"
-                fill="outline"
-                color="danger"
-                @click="deleteCate(cate)">
+              <ion-button v-if="cate.id !== 0" size="small" fill="outline" color="danger" @click="deleteCate(cate)">
                 删除
               </ion-button>
             </div>
@@ -102,14 +79,8 @@
       </template>
     </ion-content>
 
-    <DialogGift
-      :is-open="isGiftDialogOpen"
-      :editing-gift="editingGift"
-      :lottery-cat-list="lotteryCatList"
-      :selected-cate="selectedCateForGifts"
-      :is-admin="isAdmin"
-      @close="closeGiftDialog"
-      @delete="onGiftDelete"
+    <DialogGift :is-open="isGiftDialogOpen" :editing-gift="editingGift" :lottery-cat-list="lotteryCatList"
+      :selected-cate="selectedCateForGifts" :is-admin="isAdmin" @close="closeGiftDialog" @delete="onGiftDelete"
       @saved="onGiftSaved" />
   </ion-modal>
 </template>
@@ -123,7 +94,7 @@ import { getNetworkErrorMessage } from "@/utils/NetUtil";
 import { PicDisplaySize } from "@/utils/ImgMgr";
 import { computed, inject, ref } from "vue";
 import { alertController, loadingController } from "@ionic/vue";
-import { closeOutline, chevronBackOutline } from "ionicons/icons";
+import { closeOutline, chevronBackOutline, serverOutline, checkmarkCircleOutline } from "ionicons/icons";
 import { Icon } from "@iconify/vue";
 import DialogGift from "./dialog-gift.vue";
 
@@ -160,21 +131,21 @@ async function btnAvgCostClk() {
       `参与统计：${data.total_count} 件`,
       ...(data.by_category?.length
         ? [
-            "",
-            "按类别：",
-            ...data.by_category.map((c) => {
-              const rawName = (c.cate_name ?? "").trim() || "未命名";
-              const maxLen = 10;
-              const shortName =
-                rawName.length > maxLen
-                  ? `${rawName.slice(0, maxLen)}…`
-                  : rawName;
-              const label = `[${c.cate_id ?? "无"}] ${shortName}`;
-              return `   ${label}： ${Number(c.avg_cost).toFixed(
-                2
-              )}（${c.count} 件）`;
-            }),
-          ]
+          "",
+          "按类别：",
+          ...data.by_category.map((c) => {
+            const rawName = (c.cate_name ?? "").trim() || "未命名";
+            const maxLen = 10;
+            const shortName =
+              rawName.length > maxLen
+                ? `${rawName.slice(0, maxLen)}…`
+                : rawName;
+            const label = `[${c.cate_id ?? "无"}] ${shortName}`;
+            return `   ${label}： ${Number(c.avg_cost).toFixed(
+              2
+            )}（${c.count} 件）`;
+          }),
+        ]
         : []),
     ];
     const message = lines.join("\n");
@@ -511,10 +482,10 @@ function getGiftImgUrl(item: { img?: string; image?: string }) {
 </script>
 
 <style scoped>
-
 ion-modal#main::part(content) {
   max-width: 500px;
 }
+
 ion-modal#main {
   --height: 100%;
 }

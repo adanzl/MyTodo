@@ -130,6 +130,11 @@
           </div>
         </template>
       </el-table-column>
+      <el-table-column label="心愿单" width="80" align="center">
+        <template #default="{ row }">
+          <el-checkbox v-model="row.wish" :true-value="true" :false-value="false" :disabled="!row.edited" />
+        </template>
+      </el-table-column>
       <el-table-column label="Operations">
         <template #default="{ row }">
           <div class="flex flex-col gap-2 [&_.el-button+_.el-button]:!ml-0">
@@ -268,6 +273,7 @@ interface Gift {
   enable: boolean;
   exchange: number;
   stock: number;
+  wish: boolean;
   edited?: boolean;
 }
 
@@ -280,6 +286,7 @@ interface GiftApiData {
   enable: number;
   exchange?: number;
   stock?: number;
+  wish?: number;
 }
 
 interface GiftCategory {
@@ -371,6 +378,7 @@ const refreshGiftList = async (cateId: number, pageNum: number, pageSize: number
           enable: item.enable === 1,
           exchange: item.exchange ?? 0,
           stock: item.stock ?? 0,
+          wish: (item.wish ?? 0) === 1,
           edited: false,
         });
       });
@@ -409,6 +417,7 @@ const onAddGiftClk = () => {
     enable: false,
     exchange: 0,
     stock: 0,
+    wish: false,
     edited: true,
   });
 };
@@ -444,6 +453,7 @@ const handleGiftCancel = async (item: Gift, idx: number) => {
         enable: data.enable === 1,
         exchange: data.exchange ?? 0,
         stock: data.stock ?? 0,
+        wish: (data.wish ?? 0) === 1,
       });
     } catch (error) {
       console.error("获取奖品数据失败:", error);
@@ -462,6 +472,7 @@ const handleGiftSave = async (item: Gift) => {
       cost: item.cost,
       exchange: item.exchange ?? 0,
       stock: item.stock ?? 0,
+      wish: item.wish ? 1 : 0,
     };
     await setData("t_gift", data);
     await refreshGiftList(selectedCate.value.id, giftList.value.pageNum, giftList.value.pageSize);

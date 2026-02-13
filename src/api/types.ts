@@ -142,13 +142,15 @@ export interface GiftCategoryItem {
   [key: string]: unknown;
 }
 
-/** 礼品列表项（getList t_gift） */
+/** 礼品列表项（getList t_gift），wish=1 表示可加入心愿单 */
 export interface GiftListItem {
   id?: number;
   name?: string;
   image?: string;
   cate_id?: number;
   cost?: number;
+  /** 是否可加入心愿单，1=是 0=否 */
+  wish?: number;
   [key: string]: unknown;
 }
 

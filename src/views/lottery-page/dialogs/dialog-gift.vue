@@ -62,6 +62,8 @@
               @ionInput="newGift.cost = +$event.detail.value"
               :readonly="!!editingGift && !isAdmin" />
           </ion-item>
+        </div>
+        <div class="flex gap-2 w-full">
           <ion-item lines="full" class="w-18 shrink-0">
             <ion-label position="stacked">库存</ion-label>
             <ion-input
@@ -78,6 +80,17 @@
                 class="scale-75 origin-center"
                 :checked="!!newGift.exchange"
                 @ionChange="newGift.exchange = $event.detail.checked ? 1 : 0"
+                :disabled="!!editingGift && !isAdmin">
+              </ion-checkbox>
+            </div>
+          </ion-item>
+          <ion-item lines="full" class="w-20 shrink-0">
+            <ion-label position="stacked">心愿单</ion-label>
+            <div class="flex items-center justify-center pt-1">
+              <ion-checkbox
+                class="scale-75 origin-center"
+                :checked="!!newGift.wish"
+                @ionChange="newGift.wish = $event.detail.checked ? 1 : 0"
                 :disabled="!!editingGift && !isAdmin">
               </ion-checkbox>
             </div>
@@ -161,6 +174,7 @@ const newGift = ref<{
   enable?: number;
   exchange?: number;
   stock?: number;
+  wish?: number;
 }>({
   name: "",
   cost: 0,
@@ -168,6 +182,7 @@ const newGift = ref<{
   enable: 1,
   exchange: 1,
   stock: 1,
+  wish: 1,
 });
 const newGiftPreview = ref<string>("");
 const newGiftFile = ref<File | null>(null);
@@ -187,6 +202,7 @@ watch(
         enable: item.enable ?? 1,
         exchange: item.exchange ?? 1,
         stock: item.stock ?? 0,
+        wish: item.wish ?? 1,
       };
       newGiftPreview.value = newGift.value.image
         ? getPicDisplayUrl(newGift.value.image)
@@ -202,6 +218,7 @@ watch(
         enable: 1,
         exchange: 1,
         stock: 1,
+        wish: 1,
       };
       newGiftPreview.value = "";
       newGiftFile.value = null;
@@ -251,6 +268,7 @@ async function saveGift() {
       exchange: newGift.value.exchange ?? 1,
       stock: Number(newGift.value.stock) || 0,
       image: imageName,
+      wish: newGift.value.wish ?? 1,
     });
     EventBus.$emit(C_EVENT.TOAST, isUpdate ? "更新成功" : "添加奖品成功");
     newGiftFile.value = null;

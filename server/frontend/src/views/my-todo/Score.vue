@@ -74,7 +74,7 @@ interface UserWithAll extends User {
   name: string;
 }
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
 
 // 使用 Pinia Store
 const userStore = useUserStore();
