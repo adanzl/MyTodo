@@ -47,7 +47,7 @@
             兑
           </ion-button>
           <ion-button class="w-8 h-10" color="warning" @click="$emit('add-wish', item)"
-            :disabled="wishList.ids.includes(item.id) || item.wish === 0">
+            :disabled="wishList.ids.includes(item.id) || Number(item.wish) === 0">
             愿
           </ion-button>
         </div>

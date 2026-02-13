@@ -188,7 +188,8 @@ function onRefresh(event: any) {
 }
 
 function handleRefresh(event: any) {
-  refreshGiftList(undefined, 1);
+  const cateId = selectedCate.value?.id === 0 ? undefined : selectedCate.value?.id;
+  refreshGiftList(cateId, 1);
   refreshCateList();
   refreshScoreHistoryList(undefined, 1);
   getLotteryData()
@@ -324,6 +325,7 @@ function refreshGiftList(
           enable: item.enable,
           exchange: item.exchange,
           stock: item.stock,
+          wish: item.wish,
           edited: false,
           cachedImgUrl: "" as string,
         };
