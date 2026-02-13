@@ -119,7 +119,7 @@ class LotteryMgr:
         if exchange is not None:
             conditions['exchange'] = exchange
         resp = self._db.get_list(
-            't_gift', 1, 1000, ['cost', 'cate_id'], conditions or None
+            't_gift', 1, 1000, ['cost', 'cate_id', 'stock'], conditions or None
         )
 
         if resp.get('code') != 0:
@@ -128,20 +128,27 @@ class LotteryMgr:
         data = resp.get('data') or {}
         gifts = data.get('data') or []
 
-        # 有效 cost 列表（总均值用）
-        costs = []
-        # 按 cate_id 分组收集 cost
-        by_cate: Dict[Any, list] = {}
+        # 按库存加权：(cost, stock) 列表；总加权和与总库存
+        weighted_sum = 0.0
+        total_stock = 0
+        # 按 cate_id 分组：(cost*stock 累加, stock 累加)
+        by_cate: Dict[Any, tuple] = {}  # cate_id -> (sum_cost_stock, sum_stock)
         for g in gifts:
             c = g.get('cost')
-            if not isinstance(c, (int, float)):
+            s = g.get('stock')
+            if not isinstance(c, (int, float)) or not isinstance(s, (int, float)):
                 continue
             cost_val = float(c) if isinstance(c, int) else c
-            costs.append(cost_val)
+            stock_val = int(s) if isinstance(s, float) else s
+            if stock_val < 0:
+                continue
+            weighted_sum += cost_val * stock_val
+            total_stock += stock_val
             cate_id = g.get('cate_id')
             if cate_id not in by_cate:
-                by_cate[cate_id] = []
-            by_cate[cate_id].append(cost_val)
+                by_cate[cate_id] = (0.0, 0)
+            prev_w, prev_s = by_cate[cate_id]
+            by_cate[cate_id] = (prev_w + cost_val * stock_val, prev_s + stock_val)
 
         # 查询类别名称映射（t_gift_category.id -> name）
         cate_name_map: Dict[Any, str] = {}
@@ -159,30 +166,33 @@ class LotteryMgr:
             # 分类名称获取失败时，不影响均值计算，只是不返回名称
             pass
 
-        if not costs:
-            return {"code": -1, "msg": "No matching gifts"}
+        if total_stock <= 0:
+            return {"code": -1, "msg": "No matching gifts or zero total stock"}
 
-        avg_cost = sum(costs) / len(costs)
+        avg_cost = weighted_sum / total_stock
+
         def _sort_key(item: tuple) -> tuple:
             cid = item[0]
             return (cid is None, cid if cid is not None else 0)
 
-        by_category = [
-            {
+        by_category = []
+        for cate_id, (cate_weighted, cate_stock) in sorted(
+            by_cate.items(), key=_sort_key
+        ):
+            cate_avg = cate_weighted / cate_stock if cate_stock > 0 else 0.0
+            by_category.append({
                 "cate_id": cate_id,
                 "cate_name": cate_name_map.get(cate_id),
-                "avg_cost": sum(lst) / len(lst),
-                "count": len(lst),
-            }
-            for cate_id, lst in sorted(by_cate.items(), key=_sort_key)
-        ]
+                "avg_cost": cate_avg,
+                "count": cate_stock,
+            })
 
         return {
             "code": 0,
             "msg": "ok",
             "data": {
                 "avg_cost": avg_cost,
-                "total_count": len(costs),
+                "total_count": total_stock,
                 "by_category": by_category,
             },
         }
