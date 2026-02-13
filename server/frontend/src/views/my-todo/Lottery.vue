@@ -1,9 +1,16 @@
 <template>
   <div class="">
-    <div class="flex w-[400px] items-center mb-2">
-      <el-text class="w-24">普通抽奖费用</el-text>
-      <el-input v-model="lotterySettingData.fee" class="!w-32 ml-2" type="number" />
-      <el-button type="primary" class="ml-2" @click="handleUpdateFee"> Update </el-button>
+    <div class="flex flex-wrap items-end gap-2 mb-2">
+      <div class="flex items-center">
+        <el-text class="w-24">普通抽奖费用</el-text>
+        <el-input v-model="lotterySettingData.fee" class="!w-32 ml-2" type="number" />
+      </div>
+      <div class="flex items-center">
+        <el-text class="w-28">心愿单阈值</el-text>
+        <el-input v-model.number="lotterySettingData.wish_count_threshold" class="!w-32 ml-2" type="number" placeholder="5" />
+        <el-text class="ml-2 text-gray-500 text-sm">进度达到后下一抽仅从心愿单池抽取并清零</el-text>
+      </div>
+      <el-button type="primary" @click="handleUpdateFee">更新配置</el-button>
     </div>
     <el-divider />
     <div class="flex items-center">
@@ -13,7 +20,9 @@
         </el-radio-button>
       </el-radio-group>
       <el-button type="primary" class="ml-1" @click="modifyCateModel = true">
-        <el-icon><Edit /></el-icon>
+        <el-icon>
+          <Edit />
+        </el-icon>
       </el-button>
       <div class="flex-1 flex items-center justify-end">
         <el-button type="primary" class="" @click="onAddGiftClk">添加奖品</el-button>
@@ -28,36 +37,24 @@
               <!-- 图片 -->
               <div class="flex items-center w-24">
                 <template v-if="!row.img">
-                  <el-upload
-                    class="flex items-center justify-center bg-white w-full h-full"
-                    action="#"
-                    list-type="picture-card"
-                    :limit="1"
-                    :auto-upload="false"
-                    :show-file-list="false"
-                    :on-change="(file: UploadFile) => handleImageChange(file, row)"
-                  >
-                    <el-icon><Plus /></el-icon>
+                  <el-upload class="flex items-center justify-center bg-white w-full h-full" action="#"
+                    list-type="picture-card" :limit="1" :auto-upload="false" :show-file-list="false"
+                    :on-change="(file: UploadFile) => handleImageChange(file, row)">
+                    <el-icon>
+                      <Plus />
+                    </el-icon>
                   </el-upload>
                 </template>
                 <template v-else>
                   <div class="relative z-50 w-full h-full">
-                    <el-image
-                      class="w-24 cursor-pointer !z-[99]"
-                      :src="getPicDisplayUrl(row.img)"
-                      :preview-src-list="[getPicDisplayUrl(row.img)]"
-                      :preview-teleported="true"
-                      fit="contain"
-                    />
-                    <el-upload
-                      class="absolute bottom-0 right-0 !z-[100]"
-                      action="#"
-                      :show-file-list="false"
-                      :auto-upload="false"
-                      :on-change="(file: UploadFile) => handleImageChange(file, row)"
-                    >
+                    <el-image class="w-24 cursor-pointer !z-[99]" :src="getPicDisplayUrl(row.img)"
+                      :preview-src-list="[getPicDisplayUrl(row.img)]" :preview-teleported="true" fit="contain" />
+                    <el-upload class="absolute bottom-0 right-0 !z-[100]" action="#" :show-file-list="false"
+                      :auto-upload="false" :on-change="(file: UploadFile) => handleImageChange(file, row)">
                       <el-button size="small" type="primary" circle>
-                        <el-icon><Edit /></el-icon>
+                        <el-icon>
+                          <Edit />
+                        </el-icon>
                       </el-button>
                     </el-upload>
                   </div>
@@ -66,13 +63,8 @@
             </template>
             <template v-else>
               <div class="relative w-24">
-                <el-image
-                  class="w-24 cursor-pointer !z-[9999]"
-                  :src="getPicDisplayUrl(row.img)"
-                  :preview-src-list="[getPicDisplayUrl(row.img)]"
-                  :preview-teleported="true"
-                  fit="contain"
-                />
+                <el-image class="w-24 cursor-pointer !z-[9999]" :src="getPicDisplayUrl(row.img)"
+                  :preview-src-list="[getPicDisplayUrl(row.img)]" :preview-teleported="true" fit="contain" />
               </div>
             </template>
           </div>
@@ -108,17 +100,8 @@
       <el-table-column label="Category" width="180">
         <template #default="{ row }">
           <div class="flex items-center">
-            <el-select
-              :disabled="!row.edited"
-              v-model="row.cate_id"
-              @change="handleGiftCatChange($event, row)"
-            >
-              <el-option
-                v-for="item in lotteryCatList"
-                :key="item.id"
-                :label="item.name"
-                :value="item.id"
-              />
+            <el-select :disabled="!row.edited" v-model="row.cate_id" @change="handleGiftCatChange($event, row)">
+              <el-option v-for="item in lotteryCatList" :key="item.id" :label="item.name" :value="item.id" />
             </el-select>
           </div>
         </template>
@@ -138,48 +121,26 @@
       <el-table-column label="Operations">
         <template #default="{ row }">
           <div class="flex flex-col gap-2 [&_.el-button+_.el-button]:!ml-0">
-            <el-button
-              v-if="row.id !== -1"
-              class="w-16"
-              size="small"
-              type="danger"
-              @click="handleGiftDel(row)"
-            >
+            <el-button v-if="row.id !== -1" class="w-16" size="small" type="danger" @click="handleGiftDel(row)">
               Delete
             </el-button>
-            <el-button
-              v-if="row.edited"
-              class="w-16"
-              size="small"
-              @click="handleGiftCancel(row, giftList.data.indexOf(row))"
-            >
+            <el-button v-if="row.edited" class="w-16" size="small"
+              @click="handleGiftCancel(row, giftList.data.indexOf(row))">
               Cancel
             </el-button>
             <el-button v-else size="small" class="w-16" @click="handleCateEdit(row)">
               Edit
             </el-button>
-            <el-button
-              v-if="row.edited"
-              class="w-16"
-              size="small"
-              type="primary"
-              @click="handleGiftSave(row)"
-            >
+            <el-button v-if="row.edited" class="w-16" size="small" type="primary" @click="handleGiftSave(row)">
               Save
             </el-button>
           </div>
         </template>
       </el-table-column>
     </el-table>
-    <el-pagination
-      layout="prev, pager, next"
-      :total="giftList.totalCount"
-      :page-size="PAGE_SIZE"
-      :current-page="giftList.pageNum"
-      class="mt-2"
-      background
-      @current-change="(page: number) => handlePageChange(page, PAGE_SIZE)"
-    />
+    <el-pagination layout="prev, pager, next" :total="giftList.totalCount" :page-size="PAGE_SIZE"
+      :current-page="giftList.pageNum" class="mt-2" background
+      @current-change="(page: number) => handlePageChange(page, PAGE_SIZE)" />
   </div>
   <el-dialog v-model="modifyCateModel" title="类别管理" width="800" destroy-on-close>
     <el-table :data="lotteryCatPopList">
@@ -188,11 +149,8 @@
         <template #default="{ row }">
           <div class="flex items-center">
             <template v-if="row.edited">
-              <el-input
-                v-model="row.name"
-                size="small"
-                @blur="handleCateBlur(row, 'name', lotteryCatPopList.indexOf(row))"
-              />
+              <el-input v-model="row.name" size="small"
+                @blur="handleCateBlur(row, 'name', lotteryCatPopList.indexOf(row))" />
             </template>
             <template v-else>
               <span> {{ row.name }} </span>
@@ -204,12 +162,8 @@
         <template #default="{ row }">
           <div class="flex items-center">
             <template v-if="row.edited">
-              <el-input
-                v-model="row.cost"
-                size="small"
-                clearable
-                @blur="handleCateBlur(row, 'cost', lotteryCatPopList.indexOf(row))"
-              />
+              <el-input v-model="row.cost" size="small" clearable
+                @blur="handleCateBlur(row, 'cost', lotteryCatPopList.indexOf(row))" />
             </template>
             <template v-else>
               <span> {{ row.cost }} </span>
@@ -219,33 +173,18 @@
       </el-table-column>
       <el-table-column label="OP">
         <template #default="{ row }">
-          <el-button
-            v-if="row.edited"
-            class="w-16"
-            size="small"
-            type="primary"
-            @click="handleCateSave(row, lotteryCatPopList.indexOf(row))"
-          >
+          <el-button v-if="row.edited" class="w-16" size="small" type="primary"
+            @click="handleCateSave(row, lotteryCatPopList.indexOf(row))">
             Save
           </el-button>
-          <el-button
-            v-if="row.edited"
-            class="w-16"
-            size="small"
-            @click="handleCateCancel(row, lotteryCatPopList.indexOf(row))"
-          >
+          <el-button v-if="row.edited" class="w-16" size="small"
+            @click="handleCateCancel(row, lotteryCatPopList.indexOf(row))">
             Cancel
           </el-button>
           <el-button v-else size="small" class="w-16" @click="handleCateEdit(row)">
             Edit
           </el-button>
-          <el-button
-            v-if="row.id !== -1"
-            class="w-16"
-            size="small"
-            type="danger"
-            @click="handleCateDelete(row)"
-          >
+          <el-button v-if="row.id !== -1" class="w-16" size="small" type="danger" @click="handleCateDelete(row)">
             Delete
           </el-button>
         </template>
@@ -318,7 +257,7 @@ const giftList = ref<{
 });
 const lotteryCatList = ref<GiftCategory[]>([]);
 const loading = ref(false);
-const lotterySettingData = ref({ fee: 10 });
+const lotterySettingData = ref({ fee: 10, wish_count_threshold: 5 });
 const modifyCateModel = ref(false);
 const lotteryCatPopList = ref<GiftCategory[]>([]);
 
@@ -393,10 +332,15 @@ const refreshGiftList = async (cateId: number, pageNum: number, pageSize: number
 
 const handleUpdateFee = async () => {
   try {
-    await setRdsData("lottery", 2, JSON.stringify(lotterySettingData.value));
+    const payload = {
+      fee: lotterySettingData.value.fee,
+      wish_count_threshold: lotterySettingData.value.wish_count_threshold ?? 5,
+    };
+    await setRdsData("lottery", 2, JSON.stringify(payload));
+    ElMessage.success("已更新：普通抽奖费用、心愿单阈值");
   } catch (error) {
-    console.error("更新费用失败:", error);
-    ElMessage.error("更新费用失败");
+    console.error("更新配置失败:", error);
+    ElMessage.error("更新配置失败");
   }
 };
 
@@ -548,7 +492,11 @@ const getLotterySetting = async () => {
   try {
     const data = await getRdsData("lottery", 2);
     if (data) {
-      Object.assign(lotterySettingData.value, JSON.parse(data as string));
+      const parsed = JSON.parse(data as string);
+      lotterySettingData.value = {
+        fee: parsed.fee ?? 10,
+        wish_count_threshold: parsed.wish_count_threshold ?? 5,
+      };
     }
   } catch (error) {
     console.error("获取抽奖设置失败:", error);
