@@ -35,18 +35,18 @@
           <div class="flex items-center">
             <Icon icon="mdi:star" class="text-red-500 w-5 h-5" />
             <div class="text-left pl-1 pt-1 font-bold w-12">{{ item.cost }}</div>
-            <p class="text-sm ml-2 pt-1 w-20">{{ getCateName(item.cate_id) }}</p>
-            <p class="text-sm ml-2 pt-1"> {{ item.stock ?? 0 }}</p>
+            <p class="text-sm ml-1 pt-1 w-18">{{ getCateName(item.cate_id) }}</p>
+            <p class="text-[10px] ml-1 pt-1"> {{ item.stock ?? 0 }}</p>
           </div>
         </div>
         <div class="flex gap-2" @click.stop>
           <ion-button
-            class="w-10 h-10"
+            class="w-8 h-10"
             @click="$emit('exchange', item)"
             :disabled="userScore < item.cost || !item.exchange || item.stock <= 0">
             兑
           </ion-button>
-          <ion-button class="w-10 h-10" color="warning" @click="$emit('add-wish', item)"
+          <ion-button class="w-8 h-10" color="warning" @click="$emit('add-wish', item)"
             :disabled="wishList.ids.includes(item.id)">
             愿
           </ion-button>

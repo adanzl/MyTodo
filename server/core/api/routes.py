@@ -199,7 +199,7 @@ def get_rds_list() -> ResponseReturnValue:
     """获取redis列表的数据，分页"""
     try:
         key = request.args.get('key')
-        page_size = request.args.get('pageSize', 10, type=int)
+        page_size = request.args.get('pageSize', 20, type=int)
         start_id = request.args.get('startId', -1, type=int)
         log.info(
             f"===== [Get Rds List] {key}, pageSize={page_size}, startId={start_id}"

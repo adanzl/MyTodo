@@ -95,7 +95,16 @@
           </div>
         </template>
       </el-table-column>
-
+      <el-table-column label="Exchange" width="100" align="center">
+        <template #default="{ row }">
+          <el-checkbox v-model="row.exchange" :true-value="1" :false-value="0" :disabled="!row.edited" />
+        </template>
+      </el-table-column>
+      <el-table-column label="Stock" width="100" align="center">
+        <template #default="{ row }">
+          <el-input v-model.number="row.stock" size="small" :disabled="!row.edited" type="number" />
+        </template>
+      </el-table-column>
       <el-table-column label="Category" width="180">
         <template #default="{ row }">
           <div class="flex items-center">
@@ -257,6 +266,8 @@ interface Gift {
   cate_id: number;
   cost: number;
   enable: boolean;
+  exchange: number;
+  stock: number;
   edited?: boolean;
 }
 
@@ -267,6 +278,8 @@ interface GiftApiData {
   cate_id: number;
   cost: number;
   enable: number;
+  exchange?: number;
+  stock?: number;
 }
 
 interface GiftCategory {
@@ -292,7 +305,7 @@ const giftList = ref<{
 }>({
   data: [],
   pageNum: 1,
-  pageSize: 10,
+  pageSize: 20,
   totalCount: 0,
   totalPage: 0,
 });
@@ -356,6 +369,8 @@ const refreshGiftList = async (cateId: number, pageNum: number, pageSize: number
           cate_id: item.cate_id,
           cost: item.cost,
           enable: item.enable === 1,
+          exchange: item.exchange ?? 0,
+          stock: item.stock ?? 0,
           edited: false,
         });
       });
@@ -392,6 +407,8 @@ const onAddGiftClk = () => {
     cate_id: selectedCate.value.id,
     cost: 0,
     enable: false,
+    exchange: 0,
+    stock: 0,
     edited: true,
   });
 };
@@ -425,6 +442,8 @@ const handleGiftCancel = async (item: Gift, idx: number) => {
         cate_id: data.cate_id,
         cost: data.cost,
         enable: data.enable === 1,
+        exchange: data.exchange ?? 0,
+        stock: data.stock ?? 0,
       });
     } catch (error) {
       console.error("获取奖品数据失败:", error);
@@ -441,6 +460,8 @@ const handleGiftSave = async (item: Gift) => {
       cate_id: item.cate_id,
       enable: item.enable ? 1 : 0,
       cost: item.cost,
+      exchange: item.exchange ?? 0,
+      stock: item.stock ?? 0,
     };
     await setData("t_gift", data);
     await refreshGiftList(selectedCate.value.id, giftList.value.pageNum, giftList.value.pageSize);
