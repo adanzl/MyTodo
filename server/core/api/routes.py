@@ -128,7 +128,7 @@ def get_all() -> ResponseReturnValue:
 def get_data() -> ResponseReturnValue:
     table = request.args.get('table')
     raw_id = request.args.get('id')
-    idx = request.args.get('idx', type=int)
+    idx = request.args.get('idx', default=1, type=int)
     fields = request.args.get('fields')
     log.info("===== [Get Data] " + json.dumps(request.args))
 

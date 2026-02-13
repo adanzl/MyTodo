@@ -7,7 +7,11 @@
         </el-radio-button>
       </el-radio-group>
     </div>
-    <el-table :data="recordList.data" v-loading="loading" stripe>
+    <el-table
+      :data="recordList.data"
+      v-loading="loading"
+      stripe
+      @row-click="onRowClick">
       <el-table-column label="ID" prop="id" width="60"> </el-table-column>
       <el-table-column label="user" width="60">
         <template #default="{ row }">
@@ -21,7 +25,7 @@
       </el-table-column>
       <el-table-column label="Action" prop="action" width="100"> </el-table-column>
       <el-table-column label="Date" prop="dt" width="180"> </el-table-column>
-      <el-table-column label="Pre" prop="pre_value" width="70"> </el-table-column>
+      <el-table-column label="Pre" prop="pre_value" width="80"> </el-table-column>
       <el-table-column label="Value" width="70">
         <template #default="{ row }">
           <div class="flex items-center gap-1 w-full">
@@ -33,7 +37,32 @@
       </el-table-column>
       <el-table-column label="Current" prop="current" width="80"> </el-table-column>
       <el-table-column label="MSG" prop="msg"> </el-table-column>
+      <el-table-column label="" width="60" align="center" class-name="text-primary">
+        <template #default="{ row }">
+          <el-icon
+            v-if="row.action === 'lottery' && row.out_key"
+            :size="20">
+            <Present />
+          </el-icon>
+          <span v-else>-</span>
+        </template>
+      </el-table-column>
     </el-table>
+    <el-dialog
+      v-model="giftDialogVisible"
+      title="奖品详情"
+      width="320px"
+      align-center
+      @close="giftDialogData = null">
+      <div v-if="giftDialogData" class="flex flex-col items-center gap-3 py-2">
+        <el-image
+          v-if="giftDialogData.image"
+          :src="getPicDisplayUrl(giftDialogData.image)"
+          class="w-32 h-32 object-contain rounded"
+          fit="contain" />
+        <div class="font-medium text-lg">{{ giftDialogData.name || "-" }}</div>
+      </div>
+    </el-dialog>
     <el-pagination
       layout="sizes, prev, pager, next"
       :total="recordList.totalCount"
@@ -50,8 +79,10 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
-import { CaretTop, CaretBottom } from "@element-plus/icons-vue";
-import { getList } from "@/api/common";
+import { CaretTop, CaretBottom, Present } from "@element-plus/icons-vue";
+import { getList, getData } from "@/api/common";
+import { getPicDisplayUrl } from "@/api/pic";
+import { ElMessage } from "element-plus";
 import * as _ from "lodash-es";
 import dayjs from "dayjs";
 import { useUserStore } from "@/stores/user";
@@ -66,6 +97,7 @@ interface ScoreHistory {
   current: number;
   msg: string;
   dt: string;
+  out_key?: string;
   user?: User;
 }
 
@@ -159,6 +191,31 @@ const onUserChange = async () => {
 const handlePageChange = (pageNum: number, pageSize: number) => {
   refreshRecordList(selectedUser.value.id, pageNum, pageSize);
 };
+
+const giftDialogVisible = ref(false);
+const giftDialogData = ref<{ name: string; image: string } | null>(null);
+
+function onRowClick(row: ScoreHistory) {
+  if (row.action === "lottery" && row.out_key) {
+    onGiftClick(row);
+  }
+}
+
+async function onGiftClick(row: ScoreHistory) {
+  if (row.action !== "lottery" || !row.out_key) return;
+  try {
+    const gift = await getData<{ name: string; image: string }>(
+      "t_gift",
+      Number(row.out_key),
+      "name,image"
+    );
+    giftDialogData.value = { name: gift?.name ?? "", image: gift?.image ?? "" };
+    giftDialogVisible.value = true;
+  } catch (err) {
+    console.error("获取奖品详情失败:", err);
+    ElMessage.error("获取奖品详情失败");
+  }
+}
 
 onMounted(async () => {
   await refreshUserList();

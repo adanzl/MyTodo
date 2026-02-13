@@ -29,10 +29,12 @@ export async function getList<T = unknown>(
 export async function getData<T = unknown>(
   table: string,
   id: number | string,
-  fields?: string[]
+  fields?: string | string[]
 ): Promise<T> {
   const params: Record<string, unknown> = { table, id };
-  if (fields) params.fields = fields;
+  if (fields !== undefined && fields !== null) {
+    params.fields = Array.isArray(fields) ? fields.join(",") : fields;
+  }
 
   const response = await api.get("/getData", { params });
   // 错误已在拦截器中处理，这里直接返回数据

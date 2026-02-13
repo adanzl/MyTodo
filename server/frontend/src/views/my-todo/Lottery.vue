@@ -8,7 +8,9 @@
       <div class="flex items-center">
         <el-text class="w-28">心愿单阈值</el-text>
         <el-input v-model.number="lotterySettingData.wish_count_threshold" class="!w-32 ml-2" type="number" placeholder="5" />
-        <el-text class="ml-2 text-gray-500 text-sm">进度达到后下一抽仅从心愿单池抽取并清零</el-text>
+        <el-tooltip content="进度达到后下一抽仅从心愿单池抽取并清零" placement="top">
+          <el-icon class="ml-1 cursor-help text-gray-400 hover:text-gray-600"><InfoFilled /></el-icon>
+        </el-tooltip>
       </div>
       <el-button type="primary" @click="handleUpdateFee">更新配置</el-button>
     </div>
@@ -197,7 +199,7 @@
 import { ref, onMounted, computed } from "vue";
 import { ElMessage } from "element-plus";
 import type { UploadFile } from "element-plus";
-import { Edit, Plus } from "@element-plus/icons-vue";
+import { Edit, Plus, InfoFilled } from "@element-plus/icons-vue";
 import { getList, getData, setData, delData } from "@/api/common";
 import { getRdsData, setRdsData } from "@/api/rds";
 import { uploadPic, getPicDisplayUrl } from "@/api/pic";
