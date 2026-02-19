@@ -96,7 +96,7 @@ import { CaretTop, CaretBottom, Present } from "@element-plus/icons-vue";
 import { getList, getData } from "@/api/common";
 import { getPicDisplayUrl } from "@/api/pic";
 import { undoLottery } from "@/api/user";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import * as _ from "lodash-es";
 import dayjs from "dayjs";
 import { useUserStore } from "@/stores/user";
@@ -239,10 +239,16 @@ async function onGiftClick(row: ScoreHistory) {
 async function onUndo(row: ScoreHistory) {
   if (!isGiftRecord(row)) return;
   try {
+    await ElMessageBox.confirm(
+      "撤销后将删除该条记录、恢复用户积分并补充礼物库存，确定继续？",
+      "确认撤销",
+      { type: "warning" }
+    );
     await undoLottery(row.id);
     ElMessage.success("已撤销：已删除该条记录、恢复积分并补充库存");
     await refreshRecordList(selectedUserId.value, recordList.value.pageNum, recordList.value.pageSize);
   } catch (err: unknown) {
+    if (err === "cancel" || err === "close") return;
     const msg = err instanceof Error ? err.message : "撤销失败";
     ElMessage.error(msg);
   }
