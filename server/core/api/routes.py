@@ -129,7 +129,7 @@ def get_data() -> ResponseReturnValue:
     raw_id = request.args.get('id')
     idx = request.args.get('idx', default=1, type=int)
     fields = request.args.get('fields')
-    log.info("===== [Get Data] " + json.dumps(request.args))
+    # log.info("===== [Get Data] " + json.dumps(request.args))
 
     data_id, err = _parse_int(raw_id, 'id')
     if err:
@@ -185,7 +185,7 @@ def get_rds_data() -> ResponseReturnValue:
     try:
         table = request.args.get('table')
         raw_id = request.args.get('id')
-        log.info(f"===== [Get Rds Data] {table}-{raw_id}")
+        # log.info(f"===== [Get Rds Data] {table}-{raw_id}")
         key = f"{table}:{raw_id}"
         return {"code": 0, "msg": "ok", "data": rds_mgr.get_str(key)}
     except Exception as e:
