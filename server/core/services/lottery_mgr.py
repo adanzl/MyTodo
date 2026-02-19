@@ -219,8 +219,8 @@ class LotteryMgr:
 
     def undo_lottery(self, history_id: int) -> Dict[str, Any]:
         """
-        撤销一次抽奖：删除该条积分历史、将用户积分恢复为抽奖前、对应礼物库存 +1。
-        仅支持 action='lottery' 且 out_key 有值的记录。
+        撤销一次抽奖/兑换：删除该条积分历史、将用户积分恢复为操作前、对应礼物库存 +1。
+        仅支持 action 为 lottery 或 exchange 且 out_key 有值的记录。
         """
         res = self._db.get_data('t_score_history', history_id, '*')
         if res.get('code') != 0:
@@ -228,8 +228,9 @@ class LotteryMgr:
         rec = res.get('data') or {}
         if not rec:
             return {"code": -1, "msg": "历史记录不存在"}
-        if (rec.get('action') or '').strip() != 'lottery':
-            return {"code": -1, "msg": "仅支持撤销抽奖记录"}
+        action = (rec.get('action') or '').strip()
+        if action not in ('lottery', 'exchange'):
+            return {"code": -1, "msg": "仅支持撤销抽奖/兑换记录"}
         out_key = rec.get('out_key')
         if out_key is None:
             return {"code": -1, "msg": "该记录无关联奖品，无法撤销"}
@@ -259,7 +260,7 @@ class LotteryMgr:
         if del_res.get('code') != 0:
             return {"code": -1, "msg": "删除历史记录失败"}
 
-        log.info(f"Undo lottery: history_id={history_id}, user_id={user_id}, gift_id={out_key}")
+        log.info(f"Undo {action}: history_id={history_id}, user_id={user_id}, gift_id={out_key}")
         return {"code": 0, "msg": "撤销成功", "data": {"user_id": user_id, "score": pre_value}}
 
     def get_gift_avg_cost(

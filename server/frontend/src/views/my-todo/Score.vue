@@ -40,7 +40,7 @@
       <el-table-column label="" width="60" align="center" class-name="text-primary">
         <template #default="{ row }">
           <el-icon
-            v-if="row.action === 'lottery' && row.out_key"
+            v-if="isGiftRecord(row)"
             :size="20">
             <Present />
           </el-icon>
@@ -50,7 +50,7 @@
       <el-table-column label="操作" width="80" align="center" fixed="right">
         <template #default="{ row }">
           <el-button
-            v-if="row.action === 'lottery' && row.out_key"
+            v-if="isGiftRecord(row)"
             type="danger"
             link
             size="small"
@@ -209,14 +209,19 @@ const handlePageChange = (pageNum: number, pageSize: number) => {
 const giftDialogVisible = ref(false);
 const giftDialogData = ref<{ name: string; image: string } | null>(null);
 
+/** 抽奖/兑换记录（可查看奖品、可撤销） */
+function isGiftRecord(row: ScoreHistory) {
+  return (row.action === "lottery" || row.action === "exchange") && row.out_key;
+}
+
 function onRowClick(row: ScoreHistory) {
-  if (row.action === "lottery" && row.out_key) {
+  if (isGiftRecord(row)) {
     onGiftClick(row);
   }
 }
 
 async function onGiftClick(row: ScoreHistory) {
-  if (row.action !== "lottery" || !row.out_key) return;
+  if (!isGiftRecord(row)) return;
   try {
     const gift = await getData<{ name: string; image: string }>(
       "t_gift",
@@ -232,7 +237,7 @@ async function onGiftClick(row: ScoreHistory) {
 }
 
 async function onUndo(row: ScoreHistory) {
-  if (row.action !== "lottery" || !row.out_key) return;
+  if (!isGiftRecord(row)) return;
   try {
     await undoLottery(row.id);
     ElMessage.success("已撤销：已删除该条记录、恢复积分并补充库存");
