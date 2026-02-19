@@ -8,6 +8,7 @@ import type {
   GiftItem,
   DoLotteryBody,
   DoLotteryResult,
+  DoExchangeResult,
   LotteryConfig,
 } from "./types";
 
@@ -50,6 +51,21 @@ export async function doLottery(
     "/doLottery",
     body
   );
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data!;
+}
+
+/** 兑换：扣库存、扣积分并记录历史 */
+export async function doExchange(
+  userId: number,
+  giftId: number
+): Promise<DoExchangeResult> {
+  const rsp = await apiClient.post<ApiResponse<DoExchangeResult>>("/exchange", {
+    user_id: userId,
+    gift_id: giftId,
+  });
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
   }

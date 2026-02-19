@@ -33,6 +33,7 @@ export {
   setLotteryData,
   getGiftData,
   doLottery,
+  doExchange,
 } from "./lottery";
 export {
   createTtsTask,

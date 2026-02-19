@@ -90,6 +90,7 @@ def create_app():
     )
 
     from core.api.routes import api_bp
+    from core.api.lottery_routes import lottery_bp
     from core.api.agent_routes import agent_bp
     from core.api.bluetooth_routes import bluetooth_bp
     from core.api.dlna_routes import dlna_bp
@@ -103,6 +104,7 @@ def create_app():
     from core.api.ai_routes import ai_bp
 
     app.register_blueprint(api_bp, url_prefix='/')
+    app.register_blueprint(lottery_bp, url_prefix='/')
     app.register_blueprint(pic_bp, url_prefix='/pic')
     app.register_blueprint(agent_bp, url_prefix='/')
     app.register_blueprint(bluetooth_bp, url_prefix='/')

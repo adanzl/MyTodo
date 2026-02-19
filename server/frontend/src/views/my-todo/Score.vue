@@ -47,6 +47,19 @@
           <span v-else>-</span>
         </template>
       </el-table-column>
+      <el-table-column label="操作" width="80" align="center" fixed="right">
+        <template #default="{ row }">
+          <el-button
+            v-if="row.action === 'lottery' && row.out_key"
+            type="danger"
+            link
+            size="small"
+            @click.stop="onUndo(row)">
+            撤销
+          </el-button>
+          <span v-else>-</span>
+        </template>
+      </el-table-column>
     </el-table>
     <el-dialog
       v-model="giftDialogVisible"
@@ -82,6 +95,7 @@ import { ref, onMounted, computed } from "vue";
 import { CaretTop, CaretBottom, Present } from "@element-plus/icons-vue";
 import { getList, getData } from "@/api/common";
 import { getPicDisplayUrl } from "@/api/pic";
+import { undoLottery } from "@/api/user";
 import { ElMessage } from "element-plus";
 import * as _ from "lodash-es";
 import dayjs from "dayjs";
@@ -214,6 +228,18 @@ async function onGiftClick(row: ScoreHistory) {
   } catch (err) {
     console.error("获取奖品详情失败:", err);
     ElMessage.error("获取奖品详情失败");
+  }
+}
+
+async function onUndo(row: ScoreHistory) {
+  if (row.action !== "lottery" || !row.out_key) return;
+  try {
+    await undoLottery(row.id);
+    ElMessage.success("已撤销：已删除该条记录、恢复积分并补充库存");
+    await refreshRecordList(selectedUserId.value, recordList.value.pageNum, recordList.value.pageSize);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "撤销失败";
+    ElMessage.error(msg);
   }
 }
 

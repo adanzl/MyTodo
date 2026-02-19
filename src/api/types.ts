@@ -134,6 +134,12 @@ export interface DoLotteryResult {
   [key: string]: unknown;
 }
 
+/** 兑换接口返回 */
+export interface DoExchangeResult {
+  gift: { id?: number; name?: string; image?: string; [key: string]: unknown };
+  cost: number;
+}
+
 /** 礼品分类（getList t_gift_category） */
 export interface GiftCategoryItem {
   id?: number;

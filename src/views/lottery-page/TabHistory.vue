@@ -55,7 +55,7 @@
           slot="end"
           class="text-primary text-sm shrink-0 w-3 flex items-center justify-center">
           <Icon
-            v-if="item.action === 'lottery' && item.out_key"
+            v-if="(item.action === 'lottery' || item.action === 'exchange') && item.out_key"
             icon="mdi:gift"
             class="w-full h-5 cursor-pointer" />
           <span v-else>-</span>
@@ -118,7 +118,7 @@ function formatDate(dateStr: string) {
 }
 
 async function onLotteryHistoryDetail(item: any) {
-  if (!(item.action === "lottery" && item.out_key)) {
+  if (!((item.action === "lottery" || item.action === "exchange") && item.out_key)) {
     return;
   }
 

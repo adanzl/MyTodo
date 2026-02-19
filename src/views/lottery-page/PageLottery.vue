@@ -76,8 +76,8 @@ import { Icon } from "@iconify/vue";
 import EventBus, { C_EVENT } from "@/types/EventBus";
 import type { GiftCategoryItem, GiftListItem } from "@/api";
 import { getList, delData } from "@/api/data";
-import { doLottery, getGiftData, getLotteryData } from "@/api/lottery";
-import { getUserList, setUserData } from "@/api/user";
+import { doExchange, doLottery, getGiftData, getLotteryData } from "@/api/lottery";
+import { clearUserListCache, getUserList, setUserData } from "@/api/user";
 import { getNetworkErrorMessage } from "@/utils/NetUtil";
 import { getCachedPicByName, PicDisplaySize } from "@/utils/ImgMgr";
 import {
@@ -260,6 +260,7 @@ async function refreshUserList() {
 
       const sUser = _.find(uList.data, (u) => u.id === globalVar.user.id);
       if (sUser) {
+        globalVar.user.score = sUser.score ?? globalVar.user.score;
         wishList.value.progress = sUser.wish_progress ?? 0;
         if (sUser.wish_list) {
           wishList.value.ids = sUser.wish_list;
@@ -397,6 +398,8 @@ async function btnLotteryClk() {
               rewardType: "gift",
             });
             EventBus.$emit(C_EVENT.TOAST, "抽奖成功");
+            clearUserListCache();
+            await refreshUserList();
           } catch (err) {
             EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
           } finally {
@@ -466,8 +469,21 @@ async function btnExchangeClk(item: any) {
     buttons: [
       {
         text: "OK",
-        handler: () => {
-          console.log("cost");
+        handler: async () => {
+          try {
+            const data = await doExchange(globalVar.user.id, item.id);
+            EventBus.$emit(C_EVENT.REWARD, {
+              value: data.gift.name,
+              img: data.gift.image,
+              rewardType: "gift",
+            });
+            EventBus.$emit(C_EVENT.TOAST, "兑换成功");
+            clearUserListCache();
+            await refreshUserList();
+            refreshGiftList(selectedCate.value?.id, 1);
+          } catch (err) {
+            EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+          }
         },
       },
       "Cancel",

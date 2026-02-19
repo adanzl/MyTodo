@@ -12,7 +12,6 @@ from core.ai.ai_local import AILocal
 from core.config import app_logger
 from core.config import config
 from core.db.db_mgr import db_mgr
-from core.services.lottery_mgr import lottery_mgr
 from core.utils import get_media_duration, read_json_from_request
 from flask import Blueprint, json, jsonify, render_template, request
 from flask.typing import ResponseReturnValue
@@ -294,47 +293,6 @@ def add_score() -> ResponseReturnValue:
     action = args.get('action')
     msg = args.get('msg')
     return db_mgr.add_score(user_id, value, action, msg)
-
-
-@api_bp.route("/doLottery", methods=['POST'])
-def do_lottery() -> ResponseReturnValue:
-    """执行抽奖"""
-    try:
-        args: Dict[str, Any] = read_json_from_request()
-        log.info("===== [Do Lottery] " + json.dumps(args))
-
-        user_id_raw = args.get('user_id')
-        cate_id_raw = args.get('cate_id')
-
-        user_id, err = _parse_int(user_id_raw, 'user_id')
-        if err:
-            return err
-
-        cate_id, err = _parse_int(cate_id_raw, 'cate_id')
-        if err:
-            return err
-
-        # 将具体业务逻辑委托给 LotteryMgr，保持路由层只做参数解析和异常兜底
-        return lottery_mgr.do_lottery(user_id, cate_id)
-    except Exception as e:
-        log.error(e)
-        return {"code": -1, "msg": 'error: ' + str(e)}
-
-
-@api_bp.route("/giftAvgCost", methods=['GET'])
-def gift_avg_cost() -> ResponseReturnValue:
-    """按 enable、exchange 筛选礼物并计算平均 cost。Query: enable, exchange（可选，整数）。"""
-    try:
-        raw_enable = request.args.get('enable', 1)
-        raw_exchange = request.args.get('exchange')
-        enable = int(raw_enable) if raw_enable not in (None, '') else None
-        exchange = int(raw_exchange) if raw_exchange not in (None, '') else None
-        return lottery_mgr.get_gift_avg_cost(enable=enable, exchange=exchange)
-    except ValueError:
-        return {"code": -1, "msg": "enable and exchange must be int"}
-    except Exception as e:
-        log.error(e)
-        return {"code": -1, "msg": 'error: ' + str(e)}
 
 
 @api_bp.route("/addRdsList", methods=['POST'])

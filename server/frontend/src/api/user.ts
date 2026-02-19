@@ -94,3 +94,18 @@ export async function addScore(
 
   return rsp.data.data;
 }
+
+/**
+ * 撤销一次抽奖：删除该条积分历史、恢复用户积分、补充对应礼物库存
+ */
+export async function undoLottery(historyId: number): Promise<{ user_id: number; score: number }> {
+  const rsp = await api.post<ApiResponse<{ user_id: number; score: number }>>("/undoLottery", {
+    history_id: historyId,
+  });
+
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+
+  return rsp.data.data;
+}

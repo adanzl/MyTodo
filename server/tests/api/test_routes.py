@@ -6,7 +6,9 @@ from unittest.mock import MagicMock
 import pytest
 from flask import Flask
 
+import core.api.lottery_routes as lottery_routes
 import core.api.routes as routes
+import core.services.lottery_mgr as lottery_mgr_mod
 
 
 @pytest.fixture
@@ -21,6 +23,7 @@ def app(monkeypatch):
     app = Flask(__name__)
     app.config["TESTING"] = True
     app.register_blueprint(routes.api_bp)
+    app.register_blueprint(lottery_routes.lottery_bp)
 
     def _read_json_from_request():
         return routes.request.get_json(silent=True) or {}
@@ -276,61 +279,50 @@ def test_add_score_ok_and_invalid_user(client, monkeypatch):
 
 
 def test_do_lottery_paths(client, monkeypatch):
+    # lottery_mgr 在 lottery_routes 中，mock 其 _db / _rds
+    mock_db = MagicMock()
+    mock_rds = MagicMock()
+    monkeypatch.setattr(lottery_mgr_mod.lottery_mgr, "_db", mock_db)
+    monkeypatch.setattr(lottery_mgr_mod.lottery_mgr, "_rds", mock_rds)
+
     # user not found
-    routes.db_mgr.get_data.return_value = {"code": -1}
+    mock_db.get_data.return_value = {"code": -1}
     resp = client.post('/doLottery', json={"user_id": 1, "cate_id": 1})
     assert resp.status_code == 200
     assert resp.json["msg"] == "User not found"
 
     # cate_id==0 no lottery data
-    routes.db_mgr.get_data.return_value = {"code": 0, "data": {"score": 100}}
-    routes.rds_mgr.get_str.return_value = None
+    mock_db.get_data.return_value = {"code": 0, "data": {"score": 100}}
+    mock_rds.get_str.return_value = None
     resp = client.post('/doLottery', json={"user_id": 1, "cate_id": 0})
     assert resp.status_code == 200
     assert resp.json["msg"] == "No lottery data"
 
     # cate_id==0 insufficient score
-    routes.rds_mgr.get_str.return_value = json.dumps({"fee": 10})
-    routes.db_mgr.get_data.return_value = {"code": 0, "data": {"score": 0}}
+    mock_rds.get_str.return_value = json.dumps({"fee": 10})
+    mock_db.get_data.return_value = {"code": 0, "data": {"score": 0}}
     resp = client.post('/doLottery', json={"user_id": 1, "cate_id": 0})
     assert resp.json["msg"] == "Not enough score"
 
     # cate_id!=0 category not found
-    routes.db_mgr.get_data.side_effect = [
-        {
-            "code": 0,
-            "data": {
-                "score": 100
-            }
-        },
-        {
-            "code": -1
-        },
+    mock_db.get_data.side_effect = [
+        {"code": 0, "data": {"score": 100}},
+        {"code": -1},
     ]
     resp = client.post('/doLottery', json={"user_id": 1, "cate_id": 2})
     assert resp.json["msg"] == "Category not found"
 
     # cate_id!=0 no gifts
-    routes.db_mgr.get_data.side_effect = [
-        {
-            "code": 0,
-            "data": {
-                "score": 100
-            }
-        },
-        {
-            "code": 0,
-            "data": {
-                "cost": 10
-            }
-        },
+    mock_db.get_data.side_effect = [
+        {"code": 0, "data": {"score": 100}},
+        {"code": 0, "data": {"cost": 10}},
     ]
-    routes.db_mgr.get_list.return_value = {"code": 0, "data": {"data": []}}
+    mock_db.get_list.return_value = {"code": 0, "data": {"data": []}}
     resp = client.post('/doLottery', json={"user_id": 1, "cate_id": 2})
     assert resp.json["msg"] == "No available gifts"
 
     # exception path
-    routes.db_mgr.get_data.side_effect = RuntimeError("boom")
+    mock_db.get_data.side_effect = RuntimeError("boom")
     resp = client.post('/doLottery', json={"user_id": 1, "cate_id": 2})
     assert resp.json["code"] == -1
 
