@@ -1,11 +1,7 @@
 <template>
   <ion-segment-content id="tabHistory">
     <ion-item>
-      <ion-select
-        label="用户"
-        :model-value="selectedUser"
-        @ionChange="onUserChange"
-        justify="start">
+      <ion-select label="用户" :model-value="selectedUser" @ionChange="onUserChange" justify="start">
         <ion-select-option :value="item" v-for="item in userList" :key="item.id">
           {{ item.name }}
         </ion-select-option>
@@ -19,20 +15,15 @@
       <ion-refresher slot="fixed" @ionRefresh="onRefresh">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
-      <ion-item
-        v-for="item in scoreHistoryList.data"
-        :key="item.id"
-        @click="onLotteryHistoryDetail(item)">
+      <ion-item v-for="item in scoreHistoryList.data" :key="item.id" @click="onLotteryHistoryDetail(item)">
         <ion-avatar slot="start" class="w-12 h-12">
           <img :src="getUserInfo(item.user_id).icon" />
         </ion-avatar>
         <div class="flex flex-col w-full">
           <div class="flex">
             <div class="ml-2 flex items-center w-1/4">
-              <ion-icon
-                :icon="item.value >= 0 ? caretUpOutline : caretDownOutline"
-                :class="item.value >= 0 ? 'text-green-500' : 'text-red-500'"
-                class="w-5 h-5"></ion-icon>
+              <ion-icon :icon="item.value >= 0 ? caretUpOutline : caretDownOutline"
+                :class="item.value >= 0 ? 'text-green-500' : 'text-red-500'" class="w-5 h-5"></ion-icon>
               {{ item.value }}
             </div>
             <div class="ml-2 flex items-center text-sm">
@@ -45,18 +36,14 @@
               <Icon icon="mdi:star" class="text-red-500 w-5 h-5" />
               {{ item.current }}
             </div>
-            <div class="ml-2 flex min-w-0 items-center overflow-hidden text-ellipsis whitespace-nowrap">
+            <div class="ml-2 flex flex-1 min-w-0 items-center overflow-hidden text-ellipsis whitespace-nowrap">
               <ion-icon class="mr-1 shrink-0" :icon="chatbubbleEllipsesOutline"></ion-icon>
               <span class="min-w-0 truncate text-[14px]">{{ item.msg }}</span>
             </div>
           </div>
         </div>
-        <div
-          slot="end"
-          class="text-primary text-sm shrink-0 w-3 flex items-center justify-center">
-          <Icon
-            v-if="(item.action === 'lottery' || item.action === 'exchange') && item.out_key"
-            icon="mdi:gift"
+        <div slot="end" class="text-primary text-sm shrink-0 w-3 flex items-center justify-center">
+          <Icon v-if="(item.action === 'lottery' || item.action === 'exchange') && item.out_key" icon="mdi:gift"
             class="w-full h-5 cursor-pointer" />
           <span v-else>-</span>
         </div>
@@ -118,24 +105,25 @@ function formatDate(dateStr: string) {
 }
 
 async function onLotteryHistoryDetail(item: any) {
-  if (!((item.action === "lottery" || item.action === "exchange") && item.out_key)) {
-    return;
-  }
+  if ((item.action === "lottery" || item.action === "exchange") && item.out_key) {
 
-  const loading = await loadingController.create({ message: "加载中..." });
-  await loading.present();
+    const loading = await loadingController.create({ message: "加载中..." });
+    await loading.present();
 
-  try {
-    const gift = await getGiftData(item.out_key);
-    EventBus.$emit(C_EVENT.REWARD, {
-      value: gift.name,
-      img: gift.image,
-      rewardType: "gift",
-    });
-  } catch (err) {
-    EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err as any));
-  } finally {
-    await loading.dismiss();
+    try {
+      const gift = await getGiftData(item.out_key);
+      EventBus.$emit(C_EVENT.REWARD, {
+        value: gift.name,
+        img: gift.image,
+        rewardType: "gift",
+      });
+    } catch (err) {
+      EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err as any));
+    } finally {
+      await loading.dismiss();
+    }
+  } else {
+    EventBus.$emit(C_EVENT.TOAST, item.msg);
   }
 }
 </script>

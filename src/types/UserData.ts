@@ -381,6 +381,7 @@ export class UData {
     // 变更积分 只能给日程的所有者加积分
     if (dScore !== 0) {
       // GlobalVar.user.score += dScore;
+      desc = "[" + dKey + "]" + desc;
       getUserInfo(userData.userId).then((userInfo: any) => {
         userInfo.score += dScore;
         addScore(userData.userId, "schedule", dScore, "任务:" + desc).then(() => {
