@@ -45,9 +45,9 @@
               <Icon icon="mdi:star" class="text-red-500 w-5 h-5" />
               {{ item.current }}
             </div>
-            <div class="ml-2 flex items-center">
-              <ion-icon class="mr-1" :icon="chatbubbleEllipsesOutline"></ion-icon>
-              {{ item.msg }}
+            <div class="ml-2 flex min-w-0 items-center overflow-hidden text-ellipsis whitespace-nowrap">
+              <ion-icon class="mr-1 shrink-0" :icon="chatbubbleEllipsesOutline"></ion-icon>
+              <span class="min-w-0 truncate text-[14px]">{{ item.msg }}</span>
             </div>
           </div>
         </div>

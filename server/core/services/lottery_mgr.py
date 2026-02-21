@@ -66,11 +66,13 @@ class LotteryMgr:
             self._db.set_data('t_user', {'id': user_id, 'wish_progress': 0})
             return self._commit_win(user_id, cate_cost, selected)
 
-        # 4. 正常抽奖：全池抽取，抽中即发奖（无未中奖状态）
+        # 4. 正常抽奖：全池抽取，抽中即发奖（无未中奖状态），并将心愿单进度 +1（不超过阈值）
         gifts = self._get_full_pool(cate_id)
         if not gifts:
             return {"code": -1, "msg": "No available gifts"}
         selected = random.choice(gifts)
+        new_progress = min(int(wish_progress) + 1, wish_threshold)
+        self._db.set_data('t_user', {'id': user_id, 'wish_progress': new_progress})
         return self._commit_win(user_id, cate_cost, selected)
 
     def _get_cost_and_wish_threshold(self, cate_id: int) -> tuple:

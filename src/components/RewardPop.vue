@@ -11,7 +11,7 @@
       </div>
     </div>
     <div class="flex flex-col h-full items-center" v-else>
-      <img :src="rewardImgUrl" class="w-20 h-20 mt-5 object-contain" alt="" />
+      <img :src="rewardImgUrl" class="max-w-[50%] max-h-[50%] mt-5 object-contain" alt="" />
       <div class="font-bold text-[30px] flex mt-4 items-center">
         <div class="">{{ props.value }}</div>
       </div>
@@ -20,14 +20,15 @@
 </template>
 <style lang="css" scoped>
 ion-modal {
-  --height: 30%;
+  --height: 50%;
   --width: 80%;
 }
 </style>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { getPicDisplayUrl } from "@/api/pic";
+import { getCachedPicByName, PicDisplaySize } from "@/utils/ImgMgr";
 
 const props = defineProps({
   value: {
@@ -44,10 +45,36 @@ const props = defineProps({
   },
 });
 
-/** 详情用原始图片 */
+const placeholder =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Crect fill='%23e5e7eb' width='80' height='80'/%3E%3C/svg%3E";
+
+/** 缓存的礼品图 data URL，弹窗内展示用 */
+const cachedImgUrl = ref("");
+
+function loadCachedImg() {
+  const raw = props.img;
+  if (!raw) {
+    cachedImgUrl.value = "";
+    return;
+  }
+  getCachedPicByName(raw, PicDisplaySize.ITEM, PicDisplaySize.ITEM).then(
+    (url) => {
+      cachedImgUrl.value = url || "";
+    }
+  );
+}
+
+watch(
+  () => props.img,
+  () => loadCachedImg(),
+  { immediate: true }
+);
+
+/** 优先使用缓存，无缓存时用接口 URL，无图时用占位 */
 const rewardImgUrl = computed(() => {
   const raw = props.img;
-  if (!raw) return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Crect fill='%23e5e7eb' width='80' height='80'/%3E%3C/svg%3E";
+  if (!raw) return placeholder;
+  if (cachedImgUrl.value) return cachedImgUrl.value;
   return getPicDisplayUrl(raw);
 });
 </script>
