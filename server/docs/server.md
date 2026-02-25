@@ -1,16 +1,19 @@
 # 服务器
 
 ## 命令别名
-
+``` shell
 vim ~/.bashrc
+
 添加
 alias cd_todo='cd /mnt/data/project/MyTodo'
 alias tail_todo='cd /mnt/data/project/MyTodo && tail -f server/logs/app.log'
 alias npx_build='cd /mnt/data/project/MyTodo && git pull && npx npm run build && npx cap copy'
 alias up_todo='cd /mnt/data/project/MyTodo && git pull && sudo systemctl restart my-todo && tail -f server/logs/app.log'
 alias up_front='cd /mnt/data/project/MyTodo/server && git pull && node deploy/deploy_front.js'
+
 生效
 source ~/.bashrc
+```
 
 ## app 依赖
 
@@ -118,6 +121,31 @@ sudo certbot renew --pre-hook "systemctl stop nginx" --post-hook "systemctl star
 ## 打包
 
 `git pull && npx npm run build --  --mode=production && npx capawesome apps:liveupdates:generatemanifest --path dist npx cap copy`
+
+## OpenFrp
+### docker
+``` bash
+# ssh channel
+docker run -d --name frpc_ssh \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    --restart unless-stopped --dns 223.5.5.5 \
+    openfrp/frpc:latest \
+    -u 9266c2d09e67a0b3a243ce228e77146f \
+    -p 1096970 
+
+# web channel
+docker run -d --name frpc_web \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    --restart unless-stopped --dns 223.5.5.5 \
+    openfrp/frpc:latest \
+    -u 9266c2d09e67a0b3a243ce228e77146f \
+    -p 1098893 
+```        
+
+### FreeDns 域名
+域名 leo-dify.mooo.com
+
+https://freedns.afraid.org/subdomain/edit.php?data_id=25288404
 
 ## portainer
 
