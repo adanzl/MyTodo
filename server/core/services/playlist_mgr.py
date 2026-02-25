@@ -73,6 +73,7 @@ class PlaylistMgr:
         self._last_play_sent_at = {}  # 向设备发送 play 的时间 {playlist_id: datetime}，用于停止时判断是否需延迟再发 stop
         self.reload()
         self._start_rds_save_worker()  # 启动 Redis 保存操作的 worker
+        self._ensure_playlist_duration_guard_job()  # 启动播放列表时长守护任务
 
     def get_playlist(self, id: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
         """获取播放列表。
@@ -375,6 +376,62 @@ class PlaylistMgr:
         except Exception as e:
             log.error(f"[PlaylistMgr] _refresh_cron_job error: id={playlist_id}, {e}", exc_info=True)
             raise
+
+    def _ensure_playlist_duration_guard_job(self) -> None:
+        """确保播放列表时长守护任务已启动。
+
+        该守护任务会定期检查所有带有时长限制的播放列表，
+        如果当前时间已经明显超过计划结束时间，但对应的停止逻辑
+        因为某些原因（例如 APScheduler 任务丢失）没有执行，
+        则由守护任务兜底触发一次 stop()，尽量保证「到点必停」。
+        """
+        scheduler = scheduler_mgr
+        job_id = "playlist_duration_guard"
+
+        try:
+            if scheduler.get_job(job_id):
+                return
+
+            def _guard_task() -> None:
+                try:
+                    now = datetime.datetime.now()
+                    # 遍历所有有记录的定时任务播放开始时间
+                    for pid, start_time in list(self._scheduled_play_start_times.items()):
+                        playlist_data = self._playlist_raw.get(pid, {})
+                        schedule = playlist_data.get("schedule", {}) or {}
+                        duration_minutes = schedule.get("duration", 0)
+                        if duration_minutes <= 0:
+                            continue
+
+                        planned_end = start_time + timedelta(minutes=duration_minutes)
+                        # 预留一点缓冲（例如 15 秒），避免因为时间上的微小偏差导致过早停止
+                        grace = datetime.timedelta(seconds=15)
+                        if now >= planned_end + grace:
+                            p_name = playlist_data.get("name", "未知播放列表")
+                            log.warning(
+                                f"[PlaylistMgr] 播放列表时长守护任务检测到超时，尝试强制停止: {pid} - {p_name}, "
+                                f"计划结束时间: {planned_end}, 当前时间: {now}"
+                            )
+                            code, msg = self.stop(pid)
+                            if code == 0:
+                                log.info(
+                                    f"[PlaylistMgr] 播放列表时长守护任务强制停止成功: {pid} - {p_name}"
+                                )
+                            else:
+                                log.error(
+                                    f"[PlaylistMgr] 播放列表时长守护任务强制停止失败: {pid} - {p_name}, {msg}"
+                                )
+                except Exception as e:
+                    log.error(f"[PlaylistMgr] 播放列表时长守护任务执行异常: {e}", exc_info=True)
+
+            # 每 30 秒检查一次播放列表是否超出时长限制
+            added = scheduler.add_interval_job(func=_guard_task, job_id=job_id, seconds=30)
+            if added:
+                log.info("[PlaylistMgr] 启动播放列表时长守护任务成功: 每 30 秒检查一次超时播放列表")
+            else:
+                log.error("[PlaylistMgr] 启动播放列表时长守护任务失败")
+        except Exception as e:
+            log.error(f"[PlaylistMgr] 初始化播放列表时长守护任务异常: {e}", exc_info=True)
 
     def _cleanup_orphaned_cron_jobs(self) -> None:
         """清理孤立的定时任务和状态。"""
