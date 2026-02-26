@@ -83,13 +83,27 @@ sudo pip3 install certbot
 
 # 申请证书（需要临时停止 nginx）
 sudo systemctl stop nginx
-sudo certbot certonly --standalone \
-  -d leo-dify.tbit.xin \
+ # 指定使用 DNS-01 验证
+sudo certbot certonly --manual \
+  --preferred-challenges dns \
+  -d leo-dify.91svip.eu.cc \
   -m adanzl@163.com \
   --agree-tos \
   --no-eff-email
+
 sudo systemctl start nginx
 
+自签名证书
+# 生成自签名证书，有效期365天，指定域名
+openssl req -x509 -newkey rsa:4096 \
+    -keyout /etc/ssl/self-signed/leo-dify.91svip.eu.cc.key \
+    -out /etc/ssl/self-signed/leo-dify.91svip.eu.cc.crt \
+    -days 365 -nodes -subj "/CN=leo-dify.91svip.eu.cc"
+
+ZeroSSL
+https://app.zerossl.com/certificate/install/4c89197ed7b20efbae0ba58ee02ae68b
+EAB KID: jV94BfaI4s-ZpAAkf5PfRw
+EAB HMAC Key: 7Stm-rnNin8zvhh-9gl4oUjDLG5ckB_lRs0wbLUCpNzKcfVhvjvVoxyKlElN38YkvLcQNqMsvguFv2vNcGbrQQ
 # 续期时也需要临时停止 nginx
 # 可以配置 pre-hook 和 post-hook 自动处理
 ```

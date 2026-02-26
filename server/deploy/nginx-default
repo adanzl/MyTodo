@@ -1,23 +1,32 @@
 # 更新配置 使用 sudo cp /mnt/data/project/MyTodo/server/deploy/nginx-default /etc/nginx/sites-available/default 
 # 重启 nginx: sudo nginx -s reload 
 
-# Dify 专用服务器配置 - leo-dify.mooo.com
+# Dify 专用服务器配置 - leo-dify.91svip.eu.cc
 server {
     listen 8848;
     listen 8843 ssl;
     listen [::]:8848;
 
-    server_name leo-dify.mooo.com;
+    server_name leo-dify.91svip.eu.cc;
 
     # Let's Encrypt SSL 证书配置
-    ssl_certificate /etc/letsencrypt/live/leo-dify.mooo.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/leo-dify.mooo.com/privkey.pem;
+    #ssl_certificate /etc/letsencrypt/live/leo-dify.91svip.eu.cc/fullchain.pem;
+    #ssl_certificate_key /etc/letsencrypt/live/leo-dify.91svip.eu.cc/privkey.pem;
+    ssl_certificate /etc/ssl/self-signed/leo-dify.91svip.eu.cc.crt;
+    ssl_certificate_key /etc/ssl/self-signed/leo-dify.91svip.eu.cc.key;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers on;
     ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384;
 
     client_max_body_size 2000m;
 
+    location ^~ /.well-known/pki-validation/ {
+        alias /etc/letsencrypt/live/leo-dify.91svip.eu.cc/;
+        default_type text/plain;
+        expires -1;
+        add_header Cache-Control "no-store";
+        try_files $uri =404;
+    }
     # gzip 压缩配置
     gzip on;
     gzip_vary on;
