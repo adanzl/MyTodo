@@ -516,10 +516,8 @@ def get_file_info() -> ResponseReturnValue:
         else:
             file_path = os.path.abspath(file_path)
 
-        if not file_path.startswith(default_base_dir):
-            log.warning(
-                f"Path {file_path} is outside allowed directory {default_base_dir}"
-            )
+        if not file_path.startswith(config.ALLOWED_DIR):
+            log.warning(f"Path {file_path} is outside allowed directory {config.ALLOWED_DIR}")
             return {"code": -1, "msg": "文件路径不在允许的目录内"}
 
         if not os.path.exists(file_path):

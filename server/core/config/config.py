@@ -79,6 +79,7 @@ class Config:
     BASE_TMP_DIR: str = os.environ.get('BASE_TMP_DIR', '/opt/my_todo/data')
     # DEFAULT_BASE_DIR: 项目文件目录，用于保存用户访问的项目文件
     DEFAULT_BASE_DIR: str = os.environ.get('DEFAULT_BASE_DIR', '/opt/my_todo/data')
+    ALLOWED_DIR: str = os.environ.get('ALLOWED_DIR', '/mnt')
     LOG_DIR: str = os.environ.get('LOG_DIR', 'logs')
 
     # ========== 工具配置 ==========

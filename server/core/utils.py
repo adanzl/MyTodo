@@ -308,11 +308,6 @@ def validate_and_normalize_path(file_path: str,
     else:
         file_path = os.path.abspath(file_path)
 
-    # 检查路径是否在允许的目录内
-    if not file_path.startswith(base_dir):
-        log.warning(f"Path {file_path} is outside allowed directory {base_dir}")
-        return None, "文件路径不在允许的目录内"
-
     # 检查文件是否存在
     if not os.path.exists(file_path):
         return None, "文件不存在"

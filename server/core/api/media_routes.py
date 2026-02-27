@@ -47,6 +47,7 @@ media_bp = Blueprint('media', __name__)
 
 # 常量定义
 DEFAULT_BASE_DIR = config.DEFAULT_BASE_DIR
+ALLOWED_DIR = config.ALLOWED_DIR
 
 # ========== 媒体文件服务接口（用于 DLNA 播放）==========
 

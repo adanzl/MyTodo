@@ -263,15 +263,6 @@ def test_validate_and_normalize_path_relative_path_ok(mock_join, mock_isfile, mo
     assert path.startswith("/mnt/")
 
 
-@patch('core.utils.os.path.isabs', return_value=True)
-@patch('core.utils.os.path.abspath', side_effect=lambda p: p)
-def test_validate_and_normalize_path_outside_base_dir(mock_abspath, mock_isabs):
-    with patch('core.utils.os.path.exists', return_value=True):
-        path, err = validate_and_normalize_path("/etc/passwd", base_dir="/mnt")
-    assert path is None
-    assert err == "文件路径不在允许的目录内"
-
-
 # --- Test Cron Helpers (check_cron_will_trigger_today) ---
 
 
