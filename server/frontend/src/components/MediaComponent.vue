@@ -11,10 +11,10 @@
       @click.stop="handlePlayClick"
       :disabled="isButtonDisabled"
       :loading="isLoading && !isPlaying"
-      class="!w-6 !h-6 !p-0 flex-shrink-0 mr-1"
+      class="w-6! h-6! p-0! shrink-0 mr-1"
     >
       <span v-if="isPlaying">⏹</span>
-      <el-icon v-else-if="!isLoading" class="!w-3 !h-3"><Headset /></el-icon>
+      <el-icon v-else-if="!isLoading" class="w-3! h-3!"><Headset /></el-icon>
     </el-button>
     <el-slider
       :model-value="progress"
@@ -30,7 +30,7 @@
       @click.stop
     >
     </el-slider>
-    <span class="text-xs text-gray-600 flex-shrink-0 min-width-[35px]">
+    <span class="text-xs text-gray-600 shrink-0 width-[35px]">
       {{ formattedDuration }}
     </span>
   </div>

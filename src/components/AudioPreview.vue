@@ -139,7 +139,7 @@ onBeforeUnmount(() => {
     <ion-button
       fill="clear"
       size="small"
-      class="!min-w-9 !w-10 !h-10 !m-0"
+      class="min-w-9! w-10! h-10! m-0!"
       :disabled="!src"
       @click="togglePlay">
       <ion-icon v-if="isPlaying" :icon="stopOutline" />
@@ -155,7 +155,7 @@ onBeforeUnmount(() => {
       @ionInput="onSeek($event)"
       @ionChange="onSeek($event)">
     </ion-range>
-    <span class="text-xs text-gray-600 shrink-0 min-w-[4rem] tabular-nums">
+    <span class="text-xs text-gray-600 shrink-0 min-w-16 tabular-nums">
       {{ formattedCurrent }} / {{ formattedDuration }}
     </span>
   </div>
