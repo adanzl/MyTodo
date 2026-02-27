@@ -10,8 +10,8 @@ server {
     server_name leo-dify.91svip.eu.cc;
 
     # Let's Encrypt SSL 证书配置
-    ssl_certificate /etc/letsencrypt/live/leo-dify.91svip.eu.cc/certificate.crt;
-    ssl_certificate_key /etc/letsencrypt/live/leo-dify.91svip.eu.cc/private.pem;
+    ssl_certificate /etc/letsencrypt/live/leo-dify.91svip.eu.cc/cer/certificate.crt;
+    ssl_certificate_key /etc/letsencrypt/live/leo-dify.91svip.eu.cc/cer/private.pem;
     # ssl_certificate /etc/ssl/self-signed/leo-dify.91svip.eu.cc.crt;
     # ssl_certificate_key /etc/ssl/self-signed/leo-dify.91svip.eu.cc.key;
     ssl_protocols TLSv1.2 TLSv1.3;
