@@ -71,7 +71,7 @@
         <el-image
           v-if="giftDialogData.image"
           :src="getPicDisplayUrl(giftDialogData.image)"
-          class="w-32 h-32 object-contain rounded"
+          class="w-64 h-64 object-contain rounded"
           fit="contain" />
         <div class="font-medium text-lg">{{ giftDialogData.name || "-" }}</div>
       </div>

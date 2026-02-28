@@ -7,7 +7,7 @@
           <el-icon>
             <StarFilled />
           </el-icon>
-          哈哈哈
+          麟曦之家
           <el-icon>
             <StarFilled />
           </el-icon>
@@ -24,7 +24,7 @@
       </el-main>
     </el-container>
     <el-container v-else>
-      <el-main class="bg-blue-100 !flex justify-center items-center">
+      <el-main class="bg-blue-100 flex! justify-center items-center">
         <Login @login-success="handleLoginSuccess" />
       </el-main>
     </el-container>

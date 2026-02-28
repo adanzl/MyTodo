@@ -14,7 +14,13 @@
           <el-progress :text-inside="true" :stroke-width="26" :percentage="row.wish_progress" />
         </template>
       </el-table-column>
-      <el-table-column prop="wish_list" label="WList" width="100" class="items-center text-center">
+      <el-table-column
+        prop="wish_list"
+        label="WList"
+        width="150"
+        class="items-center text-center"
+        show-overflow-tooltip
+      >
       </el-table-column>
       <el-table-column prop="score" label="Score" width="100">
         <template #default="{ row }">
