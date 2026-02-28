@@ -18,7 +18,12 @@ _SERVER_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 BASE_TMP_DIR = os.environ.get('BASE_TMP_DIR', '/tmp/my_todo')
 
 # 项目文件基础目录（用于保存任务存档和生成的最终文件）
-DEFAULT_BASE_DIR = os.environ.get('DEFAULT_BASE_DIR', 'data')
+# 如果是相对路径，则基于_SERVER_ROOT；如果是绝对路径则直接使用
+DEFAULT_BASE_DIR_RAW = os.environ.get('DEFAULT_BASE_DIR', 'data')
+if os.path.isabs(DEFAULT_BASE_DIR_RAW):
+    DEFAULT_BASE_DIR = DEFAULT_BASE_DIR_RAW
+else:
+    DEFAULT_BASE_DIR = os.path.normpath(os.path.join(_SERVER_ROOT, DEFAULT_BASE_DIR_RAW))
 
 # PDF 工具相关目录（任务存档和最终文件保存在 base 目录）
 PDF_BASE_DIR = os.path.join(DEFAULT_BASE_DIR, 'tasks', 'pdf')

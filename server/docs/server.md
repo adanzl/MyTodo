@@ -47,7 +47,9 @@ source ~/.bashrc
 ### 安装
 
 sudo apt install -y python3-certbot-nginx
-
+-- acme.sh 续期（兼容网页申请的证书，更灵活
+curl https://get.acme.sh | sh -s email=adanzl@163.com
+source ~/.bashrc
 ### 查看证书状态
 
 `sudo certbot certificates`
@@ -55,6 +57,9 @@ sudo apt install -y python3-certbot-nginx
 ### 手动续期
 
 ``` text
+
+网页续期 https://app.zerossl.com/certificates
+
 测试续期 `sudo certbot certonly --dry-run \
   --preferred-challenges dns-01 \
   --manual \
@@ -104,8 +109,20 @@ ZeroSSL
 https://app.zerossl.com/certificate/install/4c89197ed7b20efbae0ba58ee02ae68b
 EAB KID: jV94BfaI4s-ZpAAkf5PfRw
 EAB HMAC Key: 7Stm-rnNin8zvhh-9gl4oUjDLG5ckB_lRs0wbLUCpNzKcfVhvjvVoxyKlElN38YkvLcQNqMsvguFv2vNcGbrQQ
+
+sudo certbot renew --dry-run --server https://acme.zerossl.com/v2/DV90 \
+    --eab-kid jV94BfaI4s-ZpAAkf5PfRw \
+    --eab-hmac-key 7Stm-rnNin8zvhh-9gl4oUjDLG5ckB_lRs0wbLUCpNzKcfVhvjvVoxyKlElN38YkvLcQNqMsvguFv2vNcGbrQQ
+
 # 续期时也需要临时停止 nginx
 # 可以配置 pre-hook 和 post-hook 自动处理
+安装证书
+合并证书  cat ca_bundle.crt >> certificate.crt
+配置nginx 
+
+    ssl                  on;
+    ssl_certificate      /etc/ssl/certificate.crt; 
+    ssl_certificate_key  /etc/ssl/private.key;
 ```
 
 ### 配置自动续期（Standalone 模式）
