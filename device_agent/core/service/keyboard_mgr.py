@@ -568,13 +568,9 @@ class KeyboardMgr:
                     log.info(f"[KEYBOARD] 找到支持 F12-F19 的键盘设备: {device.path} ({device.name})")
                     return device.path
 
-            # 如果没找到支持 F12-F19 的设备，使用第一个键盘设备
-            for device in devices:
-                if evdev.ecodes.EV_KEY in device.capabilities():
-                    log.info(f"[KEYBOARD] 使用键盘设备: {device.path} ({device.name})")
-                    return device.path
-
-            log.warning("[KEYBOARD] 未找到可用的键盘设备")
+            # 未找到支持 F12-F19 的键盘设备时，不再退化为“任意 EV_KEY 设备”，
+            # 避免错误地将红外遥控等设备当成键盘，从而导致重连后设备不正确。
+            log.warning("[KEYBOARD] 未找到支持 F12-F19 的键盘设备，等待真实键盘插入")
             return None
         except Exception as e:
             log.warning(f"[KEYBOARD] 查找键盘设备失败: {e}")
