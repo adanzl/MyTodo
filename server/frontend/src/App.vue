@@ -1,5 +1,5 @@
 <template>
-  <el-container :loading="userStore.loading" class="h-screen">
+  <el-container class="h-screen">
     <Sidebar />
     <el-container v-if="userStore.curUser.bLogin">
       <el-header class="flex justify-between items-center bg-blue-50 px-6">
@@ -24,7 +24,11 @@
       </el-main>
     </el-container>
     <el-container v-else>
-      <el-main class="bg-blue-100 flex! justify-center items-center">
+      <el-main
+        class="bg-blue-100 flex! justify-center items-center"
+        v-loading="userStore.loading"
+        element-loading-text="正在加载..."
+      >
         <Login @login-success="handleLoginSuccess" />
       </el-main>
     </el-container>

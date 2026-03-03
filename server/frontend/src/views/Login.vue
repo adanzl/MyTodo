@@ -1,24 +1,24 @@
 <template>
-  <el-card class="w-[480px]" shadow="always">
+  <el-card class="w-120" shadow="always">
     <template #header>用户登录</template>
     <div class="flex flex-col gap-2 items-center">
       <el-select
         v-model="user.id"
         placeholder="请选择用户"
-        class="!w-60"
+        class="w-60!"
         :loading="loading"
         loading-text="加载用户列表中..."
         :disabled="loading"
       >
         <el-option
-          class="!h-13"
+          class="h-13!"
           v-for="item in userList"
           :key="item.id"
           :label="item.name"
           :value="item.id"
         >
-          <div class="flex items-center border-b-1 border-gray-200">
-            <el-avatar class="!h-10 !w-10" :src="item.icon"></el-avatar>
+          <div class="flex items-center border-b border-gray-200">
+            <el-avatar class="h-10! w-10!" :src="item.icon"></el-avatar>
             <div class="pl-4 text-base text-gray-500">{{ item.name }}</div>
           </div>
         </el-option>
