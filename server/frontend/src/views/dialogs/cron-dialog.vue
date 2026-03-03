@@ -15,16 +15,16 @@
             @change="updateCronExpression"
             class="flex items-center"
           >
-            <el-radio label="*" class="!w-[80px]">每秒钟</el-radio>
-            <el-radio label="0" class="!w-[80px]">第0秒</el-radio>
-            <el-radio label="30" class="!w-[80px]">第30秒</el-radio>
-            <el-radio label="custom" class="!w-[80px]">自定义</el-radio>
+            <el-radio label="*" class="w-20!">每秒钟</el-radio>
+            <el-radio label="0" class="w-20!">第0秒</el-radio>
+            <el-radio label="30" class="w-20!">第30秒</el-radio>
+            <el-radio label="custom" class="w-20!">自定义</el-radio>
           </el-radio-group>
           <el-input
             v-model="cronBuilder.secondCustom"
             placeholder="例如: 0,30 或 */10"
             :disabled="cronBuilder.second !== 'custom'"
-            class="!w-[200px]"
+            class="w-50!"
             @input="updateCronExpression"
           >
           </el-input>
@@ -40,16 +40,16 @@
             @change="updateCronExpression"
             class="flex items-center"
           >
-            <el-radio label="*" class="!w-[80px]">每分钟</el-radio>
-            <el-radio label="0" class="!w-[80px]">第0分</el-radio>
-            <el-radio label="30" class="!w-[80px]">第30分</el-radio>
-            <el-radio label="custom" class="!w-[80px]">自定义</el-radio>
+            <el-radio label="*" class="w-20!">每分钟</el-radio>
+            <el-radio label="0" class="w-20!">第0分</el-radio>
+            <el-radio label="30" class="w-20!">第30分</el-radio>
+            <el-radio label="custom" class="w-20!">自定义</el-radio>
           </el-radio-group>
           <el-input
             v-model="cronBuilder.minuteCustom"
             placeholder="例如: 0,30 或 */15"
             :disabled="cronBuilder.minute !== 'custom'"
-            class="!w-[200px]"
+            class="w-50!"
             @input="updateCronExpression"
           >
           </el-input>
@@ -65,16 +65,16 @@
             @change="updateCronExpression"
             class="flex items-center"
           >
-            <el-radio label="*" class="!w-[80px]">每小时</el-radio>
-            <el-radio label="0" class="!w-[80px]">0点</el-radio>
-            <el-radio label="9" class="!w-[80px]">9点</el-radio>
-            <el-radio label="custom" class="!w-[80px]">自定义</el-radio>
+            <el-radio label="*" class="w-20!">每小时</el-radio>
+            <el-radio label="0" class="w-20!">0点</el-radio>
+            <el-radio label="9" class="w-20!">9点</el-radio>
+            <el-radio label="custom" class="w-20!">自定义</el-radio>
           </el-radio-group>
           <el-input
             v-model="cronBuilder.hourCustom"
             placeholder="例如: 9,12,18 或 */2"
             :disabled="cronBuilder.hour !== 'custom'"
-            class="!w-[200px]"
+            class="w-50!"
             @input="updateCronExpression"
           >
           </el-input>
@@ -90,16 +90,16 @@
             @change="updateCronExpression"
             class="flex items-center"
           >
-            <el-radio label="*" class="!w-[80px]">每天</el-radio>
-            <el-radio label="1" class="!w-[80px]">每月1号</el-radio>
-            <el-radio label="15" class="!w-[80px]">每月15号</el-radio>
-            <el-radio label="custom" class="!w-[80px]">自定义</el-radio>
+            <el-radio label="*" class="w-20!">每天</el-radio>
+            <el-radio label="1" class="w-20!">每月1号</el-radio>
+            <el-radio label="15" class="w-20!">每月15号</el-radio>
+            <el-radio label="custom" class="w-20!">自定义</el-radio>
           </el-radio-group>
           <el-input
             v-model="cronBuilder.dayCustom"
             placeholder="例如: 1,15 或 */5"
             :disabled="cronBuilder.day !== 'custom'"
-            class="!w-[200px]"
+            class="w-50!"
             @input="updateCronExpression"
           >
           </el-input>
@@ -115,16 +115,16 @@
             @change="updateCronExpression"
             class="flex items-center"
           >
-            <el-radio label="*" class="!w-[80px]">每月</el-radio>
-            <el-radio label="1" class="!w-[80px]">1月</el-radio>
-            <el-radio label="6" class="!w-[80px]">6月</el-radio>
-            <el-radio label="custom" class="!w-[80px]">自定义</el-radio>
+            <el-radio label="*" class="w-20!">每月</el-radio>
+            <el-radio label="1" class="w-20!">1月</el-radio>
+            <el-radio label="6" class="w-20!">6月</el-radio>
+            <el-radio label="custom" class="w-20!">自定义</el-radio>
           </el-radio-group>
           <el-input
             v-model="cronBuilder.monthCustom"
             placeholder="例如: 1,6,12 或 */3"
             :disabled="cronBuilder.month !== 'custom'"
-            class="!w-[200px]"
+            class="w-50!"
             @input="updateCronExpression"
           >
           </el-input>
@@ -140,16 +140,16 @@
             @change="updateCronExpression"
             class="flex items-center"
           >
-            <el-radio label="*" class="!w-[80px]">每天</el-radio>
-            <el-radio label="1-5" class="!w-[80px]">工作日</el-radio>
-            <el-radio label="0,6" class="!w-[80px]">周末</el-radio>
-            <el-radio label="custom" class="!w-[80px]">自定义</el-radio>
+            <el-radio label="*" class="w-20!">每天</el-radio>
+            <el-radio label="1-5" class="w-20!">工作日</el-radio>
+            <el-radio label="0,6" class="w-20!">周末</el-radio>
+            <el-radio label="custom" class="w-20!">自定义</el-radio>
           </el-radio-group>
           <el-input
             v-model="cronBuilder.weekdayCustom"
             placeholder="例如: 1,3,5 或 1-5"
             :disabled="cronBuilder.weekday !== 'custom'"
-            class="!w-[200px]"
+            class="w-50!"
             @input="updateCronExpression"
           >
           </el-input>

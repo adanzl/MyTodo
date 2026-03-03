@@ -25,12 +25,12 @@
       </div>
       <div
         v-if="audioMergeTaskList && audioMergeTaskList.length > 0"
-        class="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[400px]"
+        class="flex-1 overflow-y-auto space-y-2 pr-1 min-h-100"
       >
         <div
           v-for="task in audioMergeTaskList"
           :key="task.task_id"
-          class="border rounded px-3 py-2 cursor-pointer hover:bg-gray-50 group min-h-[60px] flex flex-col justify-between"
+          class="border rounded px-3 py-2 cursor-pointer hover:bg-gray-50 group min-h-15 flex flex-col justify-between"
           :class="{
             'border-blue-500 bg-blue-50':
               audioMergeCurrentTask && task.task_id === audioMergeCurrentTask.task_id,
@@ -40,25 +40,23 @@
           <!-- 第一行：名称、文件数量 -->
           <div class="flex items-center justify-between gap-2">
             <div class="text-sm font-medium truncate flex-1 min-w-0">{{ task.name }}</div>
-            <span
-              class="text-xs text-gray-500 whitespace-nowrap flex items-center gap-1 flex-shrink-0"
-            >
-              <el-icon><Document class="!w-3 !h-3" /></el-icon>
+            <span class="text-xs text-gray-500 whitespace-nowrap flex items-center gap-1 shrink-0">
+              <el-icon><Document class="w-3! h-3!" /></el-icon>
               <span class="whitespace-nowrap w-5 flex items-center justify-center">{{
                 task.files ? task.files.length : 0
               }}</span>
             </span>
           </div>
           <!-- 第二行：状态、下载按钮、删除按钮 -->
-          <div class="flex items-center justify-between gap-2 min-h-[20px]">
+          <div class="flex items-center justify-between gap-2 min-h-5">
             <el-tag
               :type="getAudioMergeStatusTagType(task.status)"
               size="small"
-              class="!h-5 !text-xs w-16 text-center"
+              class="h-5! text-xs! w-16 text-center"
             >
               {{ getAudioMergeStatusText(task.status) }}
             </el-tag>
-            <div class="flex items-center gap-1 flex-shrink-0">
+            <div class="flex items-center gap-1 shrink-0">
               <el-button
                 v-if="task.status === 'success' && task.result_file"
                 type="primary"
@@ -86,14 +84,14 @@
 
     <!-- 右侧：任务详情 -->
     <div class="flex-1 border rounded p-3 flex flex-col max-w-2xl" v-if="audioMergeCurrentTask">
-      <div class="flex items-center justify-between mb-3 flex-shrink-0">
+      <div class="flex items-center justify-between mb-3 shrink-0">
         <h3 class="text-base font-semibold">任务详情: {{ audioMergeCurrentTask.name }}</h3>
         <span class="text-sm text-gray-500"> 共 {{ filesCount }} 个文件 </span>
       </div>
 
       <div class="flex-1 overflow-auto flex flex-col gap-3">
         <!-- 任务信息 -->
-        <div class="flex items-center justify-between gap-4 flex-shrink-0">
+        <div class="flex items-center justify-between gap-4 shrink-0">
           <div class="flex items-center gap-4">
             <el-tag
               :type="getAudioMergeStatusTagType(audioMergeCurrentTask.status)"
@@ -151,7 +149,7 @@
 
         <!-- 文件列表 -->
         <div class="border rounded p-2 flex-1 flex flex-col overflow-hidden">
-          <div class="flex items-center justify-between mb-2 flex-shrink-0">
+          <div class="flex items-center justify-between mb-2 shrink-0">
             <h4 class="text-sm font-semibold">文件列表</h4>
             <div class="flex items-center gap-1 pr-1">
               <el-button
@@ -172,7 +170,7 @@
                 <el-icon v-if="audioMergeFilesDragMode"><Check /></el-icon>
                 <i-ion-chevron-expand-sharp
                   v-else
-                  class="!w-3.5 !h-3.5"
+                  class="w-3.5! h-3.5!"
                 ></i-ion-chevron-expand-sharp>
               </el-button>
             </div>
@@ -206,7 +204,7 @@
                   {{ formatAudioMergeFileSize(file.size) }}
                 </span>
                 <div v-else class="w-20"></div>
-                <div class="flex items-center gap-1 flex-shrink-0" @mousedown.stop @click.stop>
+                <div class="flex items-center gap-1 shrink-0" @mousedown.stop @click.stop>
                   <MediaComponent
                     :file="file"
                     :player="audioMergePlayer"
@@ -221,7 +219,7 @@
                     circle
                     @click.stop="handleAudioMergeRemoveFile(Number(index))"
                     :disabled="isFileOperationDisabled"
-                    class="!h-6 !text-xs"
+                    class="h-6! text-xs!"
                   >
                     <el-icon><Minus /></el-icon>
                   </el-button>
@@ -236,7 +234,7 @@
 
     <!-- 右侧：空状态 -->
     <div class="flex-1 border rounded p-3 flex flex-col max-w-2xl" v-else>
-      <div class="flex items-center justify-between mb-3 flex-shrink-0">
+      <div class="flex items-center justify-between mb-3 shrink-0">
         <h3 class="text-base font-semibold">任务详情</h3>
       </div>
       <div class="flex-1 flex items-center justify-center text-sm text-gray-400">
@@ -275,13 +273,13 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Refresh, Plus, Document, Delete, Check, Minus } from "@element-plus/icons-vue";
-import FileDialog from "@/views/dialogs/FileDialog.vue";
-import MediaComponent from "@/components/MediaComponent.vue";
+import FileDialog from "@/views/dialogs/file-dialog.vue";
+import MediaComponent from "@/components/media-component.vue";
 import { formatSize } from "@/utils/format";
 import { getMediaFileUrl } from "@/utils/file";
 import { logAndNoticeError } from "@/utils/error";
-import { useAudioPlayer } from "@/composables/useAudioPlayer";
-import { useControllableInterval } from "@/composables/useInterval";
+import { useAudioPlayer } from "@/composables/use-audio-player";
+import { useControllableInterval } from "@/composables/use-interval";
 import { MEDIA_TASK_POLLING_INTERVAL } from "@/constants/media";
 import type { MediaTaskDetail, MediaFile } from "@/types/tools";
 import {
@@ -296,7 +294,7 @@ import {
   getMediaTaskDownloadUrl,
   saveMediaTaskResult,
   type MediaTask,
-} from "@/api/audioMerge";
+} from "@/api/audio-merge";
 
 // 音频合成相关状态
 const audioMergeLoading = ref(false);
@@ -767,12 +765,16 @@ const filesCount = computed(() => (audioMergeCurrentTask.value?.files || []).len
 const resultFile = computed(() => audioMergeCurrentTask.value?.result_file);
 const isResultActionDisabled = computed(
   () =>
-    !resultFile.value || audioMergeCurrentTask.value?.status !== "success" || audioMergeFilesDragMode.value
+    !resultFile.value ||
+    audioMergeCurrentTask.value?.status !== "success" ||
+    audioMergeFilesDragMode.value
 );
 const isStartMergeDisabled = computed(
   () => !hasFiles.value || isTaskProcessing.value || audioMergeFilesDragMode.value
 );
-const isFileOperationDisabled = computed(() => isTaskProcessing.value || audioMergeFilesDragMode.value);
+const isFileOperationDisabled = computed(
+  () => isTaskProcessing.value || audioMergeFilesDragMode.value
+);
 const isDragModeButtonDisabled = computed(
   () => !audioMergeCurrentTask.value || !hasFiles.value || isTaskProcessing.value
 );
@@ -809,7 +811,10 @@ const handleAudioMergeToggleFilesDragMode = async () => {
         try {
           audioMergeLoading.value = true;
           const fileIndices = audioMergeCurrentTask.value.files.map((_, index: number) => index);
-          const response = await reorderMediaTaskFiles(audioMergeCurrentTask.value.task_id, fileIndices);
+          const response = await reorderMediaTaskFiles(
+            audioMergeCurrentTask.value.task_id,
+            fileIndices
+          );
 
           if (response.code === 0) {
             ElMessage.success("排序已保存");
@@ -953,4 +958,3 @@ onUnmounted(() => {
   stopAudioMergePolling();
 });
 </script>
-

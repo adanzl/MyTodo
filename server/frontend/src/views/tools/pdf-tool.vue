@@ -3,7 +3,7 @@
     <h2 class="text-xl font-semibold mb-4">PDF 解密工具</h2>
 
     <!-- 上传区域 -->
-    <div class="mb-4 flex-shrink-0 border rounded p-3 bg-gray-50">
+    <div class="mb-4 shrink-0 border rounded p-3 bg-gray-50">
       <div class="flex flex-col gap-3">
         <!-- 按钮和文件信息行 -->
         <div class="flex items-center gap-3">
@@ -25,7 +25,7 @@
             accept=".pdf"
           >
             <template #trigger>
-              <el-button type="primary" size="small" class="!m-0">选择文件</el-button>
+              <el-button type="primary" size="small" class="m-0!">选择文件</el-button>
             </template>
           </el-upload>
           <div class="flex-1 min-w-0">
@@ -37,7 +37,7 @@
               >
                 {{ pdfUploadFilePath || pdfUploadFile?.name || "未选择文件" }}
               </div>
-              <div v-if="pdfUploadElapsedTime" class="text-xs text-gray-500 flex-shrink-0">
+              <div v-if="pdfUploadElapsedTime" class="text-xs text-gray-500 shrink-0">
                 已用时间: {{ pdfUploadElapsedTime }}
               </div>
             </div>

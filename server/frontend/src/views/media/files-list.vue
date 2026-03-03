@@ -84,7 +84,7 @@
         >
           {{ getFileName(file.uri) }}
         </span>
-        <div class="flex items-center gap-1 flex-shrink-0" @mousedown.stop @click.stop>
+        <div class="flex items-center gap-1 shrink-0" @mousedown.stop @click.stop>
           <MediaComponent
             v-show="!filesBatchDeleteMode"
             :file="file"
@@ -95,7 +95,7 @@
           />
           <el-checkbox
             v-show="filesBatchDeleteMode"
-            class="!h-6"
+            class="h-6!"
             :model-value="isSelected(index)"
             @change="emit('toggle-selection', index)"
             @click.stop
@@ -170,12 +170,20 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { Check, Delete, Loading, Menu, Refresh, DocumentCopy, Minus } from "@element-plus/icons-vue";
+import {
+  Check,
+  Delete,
+  Loading,
+  Menu,
+  Refresh,
+  DocumentCopy,
+  Minus,
+} from "@element-plus/icons-vue";
 import { formatDuration } from "@/utils/format";
 import { calculateFilesTotalDuration } from "@/utils/file";
 import type { MediaFile } from "@/types/tools";
 import type { PlaylistStatus } from "@/types/playlist";
-import MediaComponent from "@/components/MediaComponent.vue";
+import MediaComponent from "@/components/media-component.vue";
 
 interface Props {
   playlistStatus: PlaylistStatus | null;
@@ -184,7 +192,7 @@ interface Props {
   selectedFileIndices: number[];
   playlistLoading: boolean;
   showMoreActions: boolean;
-  audioPlayer: ReturnType<typeof import("@/composables/useAudioPlayer").useAudioPlayer>;
+  audioPlayer: ReturnType<typeof import("@/composables/use-audio-player").useAudioPlayer>;
 }
 
 const props = defineProps<Props>();
@@ -248,10 +256,18 @@ const showPlaylistSelectorButton = computed(
 
 // 按钮禁用状态
 const isAddButtonDisabled = computed(
-  () => !props.playlistStatus || props.filesDragMode || props.filesBatchDeleteMode
+  () =>
+    !props.playlistStatus ||
+    props.filesDragMode ||
+    props.filesBatchDeleteMode ||
+    props.playlistLoading
 );
-const isDragButtonDisabled = computed(() => !hasFiles.value || props.filesBatchDeleteMode);
-const isBatchDeleteButtonDisabled = computed(() => !hasFiles.value || props.filesDragMode);
+const isDragButtonDisabled = computed(
+  () => !hasFiles.value || props.filesBatchDeleteMode || props.playlistLoading
+);
+const isBatchDeleteButtonDisabled = computed(
+  () => !hasFiles.value || props.filesDragMode || props.playlistLoading
+);
 const isBatchDeleteDisabled = computed(
   () => props.playlistLoading || props.selectedFileIndices.length === 0
 );

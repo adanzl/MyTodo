@@ -3,11 +3,11 @@
     <div class="flex flex-wrap items-end gap-2 mb-2">
       <div class="flex items-center">
         <el-text class="w-24">普通抽奖费用</el-text>
-        <el-input v-model="lotterySettingData.fee" class="!w-32 ml-2" type="number" />
+        <el-input v-model="lotterySettingData.fee" class="w-32! ml-2" type="number" />
       </div>
       <div class="flex items-center">
         <el-text class="w-28">心愿单阈值</el-text>
-        <el-input v-model.number="lotterySettingData.wish_count_threshold" class="!w-32 ml-2" type="number" placeholder="5" />
+        <el-input v-model.number="lotterySettingData.wish_count_threshold" class="w-32! ml-2" type="number" placeholder="5" />
         <el-tooltip content="进度达到后下一抽仅从心愿单池抽取并清零" placement="top">
           <el-icon class="ml-1 cursor-help text-gray-400 hover:text-gray-600"><InfoFilled /></el-icon>
         </el-tooltip>
@@ -49,9 +49,9 @@
                 </template>
                 <template v-else>
                   <div class="relative z-50 w-full h-full">
-                    <el-image class="w-24 cursor-pointer !z-[99]" :src="getPicDisplayUrl(row.img)"
+                    <el-image class="w-24 cursor-pointer z-99!" :src="getPicDisplayUrl(row.img)"
                       :preview-src-list="[getPicDisplayUrl(row.img)]" :preview-teleported="true" fit="contain" />
-                    <el-upload class="absolute bottom-0 right-0 !z-[100]" action="#" :show-file-list="false"
+                    <el-upload class="absolute bottom-0 right-0 z-100!" action="#" :show-file-list="false"
                       :auto-upload="false" :on-change="(file: UploadFile) => handleImageChange(file, row)">
                       <el-button size="small" type="primary" circle>
                         <el-icon>
@@ -65,7 +65,7 @@
             </template>
             <template v-else>
               <div class="relative w-24">
-                <el-image class="w-24 cursor-pointer !z-[9999]" :src="getPicDisplayUrl(row.img)"
+                <el-image class="w-24 cursor-pointer z-9999!" :src="getPicDisplayUrl(row.img)"
                   :preview-src-list="[getPicDisplayUrl(row.img)]" :preview-teleported="true" fit="contain" />
               </div>
             </template>
@@ -122,7 +122,7 @@
       </el-table-column>
       <el-table-column label="Operations">
         <template #default="{ row }">
-          <div class="flex flex-col gap-2 [&_.el-button+_.el-button]:!ml-0">
+          <div class="flex flex-col gap-2 [&_.el-button+_.el-button]:ml-0!">
             <el-button v-if="row.id !== -1" class="w-16" size="small" type="danger" @click="handleGiftDel(row)">
               Delete
             </el-button>

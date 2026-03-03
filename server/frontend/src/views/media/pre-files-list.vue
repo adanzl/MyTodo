@@ -1,5 +1,8 @@
 <template>
-  <div class="border rounded p-2 mb-2">
+  <div class="border rounded p-2 mb-2" style="position: relative">
+    <!-- Loading 遮罩 -->
+    <div v-loading="playlistLoading" class="absolute inset-0 z-50">
+    </div>
     <!-- 第一行：标题和星期选择按钮 -->
     <div class="flex items-center justify-between mb-2">
       <div class="text-xs font-semibold text-gray-600 w-39">前置文件（播放时优先播放）</div>
@@ -19,7 +22,7 @@
             plain
             @click="$emit('select-weekday', index)"
             :title="day"
-            class="!w-16 !h-6 !p-0 text-xs"
+            class="w-16! h-6! p-0! text-xs"
           >
             {{ day }}<span class="text-[10px]">[{{ getPreFilesCountForWeekday(index) }}]</span>
           </el-button>
@@ -61,7 +64,9 @@
           size="small"
           plain
           @click="$emit('open-file-browser')"
-          :disabled="!playlistStatus || preFilesDragMode || preFilesBatchDeleteMode"
+          :disabled="
+            !playlistStatus || preFilesDragMode || preFilesBatchDeleteMode || playlistLoading
+          "
         >
           +
         </el-button>
@@ -69,13 +74,14 @@
           :type="preFilesDragMode ? 'success' : 'default'"
           size="small"
           plain
-          class="!w-8 !h-6"
+          class="w-8! h-6!"
           @click="$emit('toggle-drag-mode')"
           :disabled="
             !playlistStatus ||
             !getCurrentPreFiles() ||
             getCurrentPreFiles().length === 0 ||
-            preFilesBatchDeleteMode
+            preFilesBatchDeleteMode ||
+            playlistLoading
           "
           :title="preFilesDragMode ? '点击退出拖拽排序模式' : '点击进入拖拽排序模式'"
         >
@@ -86,13 +92,14 @@
           :type="preFilesBatchDeleteMode ? 'success' : 'default'"
           size="small"
           plain
-          class="!w-8 !h-6"
+          class="w-8! h-6!"
           @click="$emit('toggle-batch-delete-mode')"
           :disabled="
             !playlistStatus ||
             !getCurrentPreFiles() ||
             getCurrentPreFiles().length === 0 ||
-            preFilesDragMode
+            preFilesDragMode ||
+            playlistLoading
           "
           :title="preFilesBatchDeleteMode ? '点击退出批量删除模式' : '点击进入批量删除模式'"
         >
@@ -104,7 +111,7 @@
           type="danger"
           size="small"
           plain
-          class="!w-8 !h-6"
+          class="w-8! h-6!"
           @click="$emit('batch-delete')"
           :disabled="playlistLoading || selectedPreFileIndices.length === 0"
           :title="`删除选中的 ${selectedPreFileIndices.length} 项`"
@@ -115,7 +122,7 @@
           type="default"
           size="small"
           plain
-          class="!w-8 !h-6"
+          class="w-8! h-6!"
           v-show="showMoreActions && !preFilesBatchDeleteMode"
           @click="$emit('clear')"
           :disabled="
@@ -135,7 +142,7 @@
     <div
       v-if="getCurrentPreFiles() && getCurrentPreFiles().length > 0"
       class="overflow-y-scroll scrollbar-overlay"
-      :class="{ 'max-h-[192px]': !preFilesExpanded }"
+      :class="{ 'max-h-48': !preFilesExpanded }"
     >
       <div
         v-for="(file, index) in getCurrentPreFiles()"
@@ -176,7 +183,7 @@
         >
           {{ file.uri ? file.uri.split("/").pop() : "" }}
         </span>
-        <div class="flex items-center gap-1 flex-shrink-0" @mousedown.stop @click.stop>
+        <div class="flex items-center gap-1 shrink-0" @mousedown.stop @click.stop>
           <MediaComponent
             v-show="!preFilesBatchDeleteMode"
             :file="file"
@@ -187,7 +194,7 @@
           />
           <el-checkbox
             v-show="preFilesBatchDeleteMode"
-            class="!h-6"
+            class="h-6!"
             :model-value="selectedPreFileIndices.includes(Number(index))"
             @change="$emit('toggle-selection', Number(index))"
             @click.stop
@@ -276,7 +283,7 @@
         type="default"
         size="small"
         plain
-        class="!w-full !h-4 !p-0 !text-xs"
+        class="w-full! h-4! p-0! text-xs!"
         @click="$emit('toggle-expand')"
         :title="preFilesExpanded ? '折叠' : '展开'"
       >
@@ -304,7 +311,7 @@ import { getWeekdayIndex } from "@/utils/date";
 import { calculateFilesTotalDuration } from "@/utils/file";
 import type { MediaFile } from "@/types/tools";
 import type { PlaylistStatus } from "@/types/playlist";
-import MediaComponent from "@/components/MediaComponent.vue";
+import MediaComponent from "@/components/media-component.vue";
 
 interface Props {
   playlistStatus: PlaylistStatus | null;
@@ -315,7 +322,7 @@ interface Props {
   preFilesExpanded: boolean;
   playlistLoading: boolean;
   showMoreActions: boolean;
-  audioPlayer: ReturnType<typeof import("@/composables/useAudioPlayer").useAudioPlayer>;
+  audioPlayer: ReturnType<typeof import("@/composables/use-audio-player").useAudioPlayer>;
 }
 
 const props = defineProps<Props>();

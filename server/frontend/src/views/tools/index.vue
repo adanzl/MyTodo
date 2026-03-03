@@ -30,10 +30,10 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
-import PdfTool from "./PdfTool.vue";
-import AudioMerge from "./AudioMerge.vue";
-import AudioConvert from "./AudioConvert.vue";
-import TTS from "./TTS.vue";
+import PdfTool from "./pdf-tool.vue";
+import AudioMerge from "./audio-merge.vue";
+import AudioConvert from "./audio-convert.vue";
+import TTS from "./tts.vue";
 
 // 主页签控制
 const activeMainTab = ref("tts_tool");

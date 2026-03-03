@@ -2,8 +2,8 @@
  * 一天的数据模型
  */
 import dayjs, { type Dayjs } from "dayjs";
-import type { ScheduleData } from "./ScheduleData";
-import type { ScheduleSave } from "./ScheduleSave";
+import type { ScheduleData } from "./schedule-data";
+import type { ScheduleSave } from "./schedule-save";
 
 // 一天的数据
 export class DayData {

@@ -7,6 +7,6 @@ export * from "./pic";
 export * from "./user";
 export * from "./rds";
 export * from "./devices";
-export * from "./audioMerge";
+export * from "./audio-merge";
 export * from "./playlist";
 export * from "./cron";

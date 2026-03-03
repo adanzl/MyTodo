@@ -20,7 +20,7 @@
           @click="$emit('refresh')"
           :loading="refreshing"
           title="刷新播放列表"
-          class="!w-8 !h-6 !p-0"
+          class="w-8! h-6! p-0!"
         >
           <el-icon v-if="!refreshing"><Refresh /></el-icon>
         </el-button>
@@ -29,7 +29,7 @@
           size="small"
           @click="$emit('create')"
           title="新建播放列表"
-          class="!w-8 !h-6 !p-0"
+          class="w-8! h-6! p-0!"
         >
           <el-icon><Plus /></el-icon>
         </el-button>
@@ -42,16 +42,16 @@
       <div
         v-for="playlist in playlistCollection"
         :key="playlist.id"
-        class="border rounded px-3 py-2 cursor-pointer hover:bg-gray-50 group min-h-[60px] flex flex-col justify-between"
+        class="border rounded px-3 py-2 cursor-pointer hover:bg-gray-50 group min-h-15 flex flex-col justify-between"
         :class="{ 'border-blue-500 bg-blue-50': playlist.id === activePlaylistId }"
         @click="$emit('select', playlist.id)"
       >
         <!-- 第一行：名称、曲目数量、功能按钮 -->
         <div class="flex items-center justify-between gap-2">
           <div class="text-sm font-medium truncate flex-1 min-w-0">{{ playlist.name }}</div>
-          <div class="flex items-center gap-2 flex-shrink-0">
+          <div class="flex items-center gap-2 shrink-0">
             <span class="text-xs text-gray-500 whitespace-nowrap flex items-center gap-1">
-              <el-icon><Headset class="!w-3 !h-3" /></el-icon>
+              <el-icon><Headset class="w-3! h-3!" /></el-icon>
               <span class="whitespace-nowrap w-5 flex items-center justify-center">
                 {{
                   ((playlist.pre_lists &&
@@ -72,7 +72,7 @@
                   size="small"
                   plain
                   circle
-                  class="!w-5 !h-5 !min-w-5 !p-0 text-xs"
+                  class="w-5! h-5! min-w-5! p-0! text-xs"
                   title="更多"
                 >
                   <span class="text-base leading-none mb-1">»</span>
@@ -92,14 +92,14 @@
           </div>
         </div>
         <!-- 第二行：下次运行时间（始终存在，保持固定高度） -->
-        <div class="text-[10px] text-blue-600 min-h-[14px] flex items-center justify-between">
+        <div class="text-[10px] text-blue-600 min-h-3.5 flex items-center justify-between">
           <span v-if="getPlaylistNextCronTime(playlist)" class="flex items-center gap-1">
-            <el-icon class="!w-3 !h-4"><VideoPlay /></el-icon>
+            <el-icon class="w-3! h-4!"><VideoPlay /></el-icon>
             {{ getPlaylistNextCronTime(playlist) }}
           </span>
           <span v-else class="invisible">占位</span>
           <span v-if="playlist.trigger_button" class="text-gray-500 flex items-center gap-1">
-            <el-icon class="!w-3 !h-4"><Cpu /></el-icon> {{ playlist.trigger_button }}
+            <el-icon class="w-3! h-4!"><Cpu /></el-icon> {{ playlist.trigger_button }}
           </span>
         </div>
       </div>

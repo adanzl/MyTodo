@@ -4,7 +4,7 @@
     title="批量模式"
     :size="1200"
     direction="rtl"
-    header-class="h-12 !mb-1"
+    header-class="h-12 mb-1!"
     :before-close="handleClose"
   >
     <div
@@ -33,7 +33,7 @@
                 {{ batch.files ? batch.files.length : 0 }} 个文件
               </div>
             </div>
-            <div class="flex items-center gap-1 flex-shrink-0">
+            <div class="flex items-center gap-1 shrink-0">
               <el-button
                 type="default"
                 plain
@@ -76,9 +76,9 @@
               type="default"
               size="small"
               @click="handleToggleSelectAll(!isAllFilesSelected)"
-              :class="{ '!text-blue-600': isAllFilesSelected || isIndeterminate }"
+              :class="{ 'text-blue-600!': isAllFilesSelected || isIndeterminate }"
               plain
-              class="!w-20"
+              class="w-20!"
             >
               <el-icon v-if="isAllFilesSelected" class="mr-1"><Check /></el-icon>
               <el-icon v-else-if="isIndeterminate" class="mr-1"><Minus /></el-icon>
@@ -89,7 +89,7 @@
               size="small"
               @click="handleOpenFileBrowser"
               plain
-              class="!w-20"
+              class="w-20!"
             >
               <el-icon><Plus /></el-icon>
             </el-button>
@@ -99,7 +99,7 @@
               @click="handleDeleteSelectedFiles"
               :disabled="selectedFileIndices.length === 0"
               plain
-              class="!w-20"
+              class="w-20!"
             >
               <el-icon><Delete /></el-icon>
               <span v-if="selectedFileIndices.length > 0" class="ml-1 text-xs"
@@ -123,7 +123,7 @@
               <el-checkbox
                 :model-value="selectedFileIndices.includes(index)"
                 @change="handleToggleFileSelection(index)"
-                class="!h-6"
+                class="h-6!"
                 @click.stop
                 size="default"
               >
@@ -277,7 +277,7 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import { Plus, Delete, Edit, Check, Minus } from "@element-plus/icons-vue";
 import { getRdsData, setRdsData } from "@/api/rds";
 import { logAndNoticeError } from "@/utils";
-import FileDialog from "@/views/dialogs/FileDialog.vue";
+import FileDialog from "@/views/dialogs/file-dialog.vue";
 
 import type { PlaylistItem } from "@/types/playlist";
 

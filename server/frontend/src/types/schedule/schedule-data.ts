@@ -2,8 +2,8 @@
  * 日程计划数据模型
  */
 import dayjs, { type Dayjs } from "dayjs";
-import { RepeatData } from "./RepeatData";
-import { Subtask } from "./Subtask";
+import { RepeatData } from "./repeat-data";
+import { Subtask } from "./subtask";
 
 // 日程计划数据
 export class ScheduleData {
@@ -58,4 +58,3 @@ export class ScheduleData {
     return ret;
   }
 }
-

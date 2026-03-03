@@ -1,5 +1,7 @@
 <template>
   <div class="flex-1 min-w-190 border rounded p-3 flex flex-col overflow-hidden">
+    <!-- Loading 遮罩 -->
+    <div v-loading="playlistLoading" class="absolute inset-0 z-50"></div>
     <div class="flex items-center justify-between mb-3">
       <div class="flex-1">
         <div v-if="playlistStatus" class="flex items-center gap-2 mb-1">
@@ -65,6 +67,7 @@
           plain
           circle
           @click="$emit('open-batch-drawer')"
+          :disabled="!playlistStatus || playlistLoading"
           title="批量模式"
         >
           <el-icon><Collection /></el-icon>
@@ -80,7 +83,8 @@
             !playlistStatus ||
             !playlistStatus.playlist ||
             playlistStatus.playlist.length === 0 ||
-            !!playlistStatus.isPlaying
+            !!playlistStatus.isPlaying ||
+            playlistLoading
           "
           title="播放"
         >
@@ -96,7 +100,8 @@
           :disabled="
             !playlistStatus ||
             ((!getCurrentPreFiles() || getCurrentPreFiles().length === 0) &&
-              (!playlistStatus.playlist || playlistStatus.playlist.length === 0))
+              (!playlistStatus.playlist || playlistStatus.playlist.length === 0)) ||
+            playlistLoading
           "
           title="上一首"
         >
@@ -112,14 +117,23 @@
           :disabled="
             !playlistStatus ||
             ((!getCurrentPreFiles() || getCurrentPreFiles().length === 0) &&
-              (!playlistStatus.playlist || playlistStatus.playlist.length === 0))
+              (!playlistStatus.playlist || playlistStatus.playlist.length === 0)) ||
+            playlistLoading
           "
           title="下一首"
         >
           <el-icon v-if="playing" size="12" class="animate-spin"><Loading /></el-icon>
           <span v-else>⏭</span>
         </el-button>
-        <el-button type="default" size="small" plain circle @click="$emit('stop')" title="停止">
+        <el-button
+          type="default"
+          size="small"
+          plain
+          circle
+          @click="$emit('stop')"
+          :disabled="playlistLoading"
+          title="停止"
+        >
           <el-icon v-if="stopping" size="12" class="animate-spin"><Loading /></el-icon>
           <span v-else>⏹</span>
         </el-button>
@@ -239,8 +253,8 @@ import { getWeekdayIndex } from "@/utils/date";
 import { calculateFilesTotalDuration } from "@/utils/file";
 import type { MediaFile } from "@/types/tools";
 import type { PlaylistStatus } from "@/types/playlist";
-import PreFilesList from "./PreFilesList.vue";
-import FilesList from "./FilesList.vue";
+import PreFilesList from "./pre-files-list.vue";
+import FilesList from "./files-list.vue";
 
 interface Props {
   playlistStatus: PlaylistStatus | null;
@@ -259,7 +273,7 @@ interface Props {
   playing: boolean;
   stopping: boolean;
   showMoreActions: boolean;
-  audioPlayer: ReturnType<typeof import("@/composables/useAudioPlayer").useAudioPlayer>;
+  audioPlayer: ReturnType<typeof import("@/composables/use-audio-player").useAudioPlayer>;
 }
 
 const props = defineProps<Props>();

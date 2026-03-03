@@ -123,7 +123,7 @@
       @close="handleCloseFileBrowser"
     >
       <template #footer-prepend>
-        <el-select v-model="fileBrowserTarget" size="small" class="w-[150px]">
+        <el-select v-model="fileBrowserTarget" size="small" class="w-37">
           <el-option label="添加到主列表" value="files"></el-option>
           <el-option label="添加到前置列表" value="pre_files"></el-option>
         </el-select>
@@ -217,27 +217,27 @@
 import { onMounted, onUnmounted, ref } from "vue";
 // ElMessage 已通过自动导入插件自动导入，无需手动导入
 import { logAndNoticeError } from "@/utils/error";
-import FileDialog from "@/views/dialogs/FileDialog.vue";
-import CronDialog from "@/views/dialogs/CronDialog.vue";
-import CronPreviewDialog from "@/views/dialogs/CronPreviewDialog.vue";
-import PanelPlaylistList from "./PanelPlaylistList.vue";
-import PanelFileList from "./PanelFileList.vue";
-import PanelConfig from "./PanelConfig.vue";
-import ScanDeviceDialog from "@/views/dialogs/ScanDeviceDialog.vue";
-import DevicesDrawer from "@/views/dialogs/DevicesDrawer.vue";
-import PlaylistSelectDialog from "@/views/dialogs/PlaylistSelectDialog.vue";
-import BatchDrawer from "@/views/dialogs/BatchDrawer.vue";
+import FileDialog from "@/views/dialogs/file-dialog.vue";
+import CronDialog from "@/views/dialogs/cron-dialog.vue";
+import CronPreviewDialog from "@/views/dialogs/cron-preview-dialog.vue";
+import PanelPlaylistList from "./panel-playlist-list.vue";
+import PanelFileList from "./panel-file-list.vue";
+import PanelConfig from "./panel-config.vue";
+import ScanDeviceDialog from "@/views/dialogs/scan-device-dialog.vue";
+import DevicesDrawer from "@/views/dialogs/devices-drawer.vue";
+import PlaylistSelectDialog from "@/views/dialogs/playlist-select-dialog.vue";
+import BatchDrawer from "@/views/dialogs/batch-drawer.vue";
 import { getWeekdayIndex } from "@/utils/date";
-import { usePlaylistState } from "./composables/usePlaylistState";
-import { usePlaylistData } from "./composables/usePlaylistData";
-import { usePlaylistOperations } from "./composables/usePlaylistOperations";
+import { usePlaylistState } from "./composables/use-playlist-state";
+import { usePlaylistData } from "./composables/use-playlist-data";
+import { usePlaylistOperations } from "./composables/use-playlist-operations";
 import type { PlaylistItem, Playlist } from "@/types/playlist";
-import { useCronManagement } from "./composables/useCronManagement";
-import { useDeviceManagement } from "./composables/useDeviceManagement";
-import { useAudioPlayback } from "./composables/useAudioPlayback";
-import { useFileOperations } from "./composables/useFileOperations";
-import { useDragAndDrop } from "./composables/useDragAndDrop";
-import { usePlaylistNameEdit } from "./composables/usePlaylistNameEdit";
+import { useCronManagement } from "./composables/use-cron-management";
+import { useDeviceManagement } from "./composables/use-device-management";
+import { useAudioPlayback } from "./composables/use-audio-playback";
+import { useFileOperations } from "./composables/use-file-operations";
+import { useDragAndDrop } from "./composables/use-drag-and-drop";
+import { usePlaylistNameEdit } from "./composables/use-playlist-name-edit";
 import { ElMessage } from "element-plus";
 import { playFileOnDevice } from "@/api/playlist";
 import type { MediaFile } from "@/types/tools";
@@ -319,6 +319,7 @@ const {
   activePlaylistId,
   playlistStatus,
   playlistRefreshing,
+  playlistLoading,
   pendingDeviceType,
   preFilesDragMode,
   filesDragMode,
@@ -758,7 +759,7 @@ const handleSelectWeekday = (weekdayIndex: number) => {
 const autoRefreshEnabled = ref(true);
 
 // 定时器 - 每5秒刷新一次当前播放列表状态
-import { useInterval } from "@/composables/useInterval";
+import { useInterval } from "@/composables/use-interval";
 import { PLAYLIST_REFRESH_INTERVAL } from "@/constants/playlist";
 
 const { start: startStatusRefresh, stop: stopStatusRefresh } = useInterval(

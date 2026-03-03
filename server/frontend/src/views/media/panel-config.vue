@@ -185,7 +185,7 @@
 
           <!-- 设备代理类型：显示已配对设备 -->
           <div v-if="isAgentOrBluetooth">
-            <div class="space-y-2 max-h-[200px] overflow-y-auto" v-loading="loading">
+            <div class="space-y-2 max-h-50 overflow-y-auto" v-loading="loading">
               <div
                 v-for="device in connectedDeviceList"
                 :key="device.address"
@@ -195,7 +195,7 @@
                   <div class="text-sm font-medium truncate">{{ device.name }}</div>
                   <div class="text-xs text-gray-500 truncate">{{ device.address }}</div>
                 </div>
-                <div class="flex-shrink-0">
+                <div class="shrink-0">
                   <el-button
                     size="small"
                     type="primary"
@@ -221,7 +221,7 @@
 
           <!-- DLNA 类型：显示 DLNA 设备 -->
           <div v-else-if="isDlna">
-            <div class="space-y-2 max-h-[200px] overflow-y-auto" v-loading="dlnaScanning">
+            <div class="space-y-2 max-h-50 overflow-y-auto" v-loading="dlnaScanning">
               <div
                 v-for="device in dlnaDeviceList"
                 :key="device.location"
@@ -233,7 +233,7 @@
                     {{ device.location }}
                   </div>
                 </div>
-                <div class="flex-shrink-0">
+                <div class="shrink-0">
                   <el-button
                     size="small"
                     type="primary"
@@ -257,7 +257,7 @@
 
           <!-- 小米设备类型：显示小米设备 -->
           <div v-else-if="isMi">
-            <div class="space-y-2 max-h-[300px] overflow-y-auto" v-loading="miScanning">
+            <div class="space-y-2 max-h-75 overflow-y-auto" v-loading="miScanning">
               <div
                 v-for="device in miDeviceList"
                 :key="device.deviceID || device.address"
@@ -272,7 +272,7 @@
                     {{ device.deviceID || device.address }}
                   </div>
                 </div>
-                <div class="flex-shrink-0">
+                <div class="shrink-0">
                   <el-button
                     size="small"
                     type="primary"

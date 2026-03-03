@@ -31,6 +31,7 @@ export function usePlaylistData(
   activePlaylistId: Ref<string>,
   playlistStatus: Ref<PlaylistStatus | null>,
   playlistRefreshing: Ref<boolean>,
+  playlistLoading: Ref<boolean>,
   pendingDeviceType: Ref<string | null>,
   preFilesDragMode: Ref<boolean>,
   filesDragMode: Ref<boolean>,
@@ -499,6 +500,7 @@ export function usePlaylistData(
    * 加载播放列表
    */
   const loadPlaylist = async () => {
+    playlistLoading.value = true;
     try {
       const response = await playlistAction("get", "GET", {});
       if (response.code !== 0) {
@@ -530,6 +532,8 @@ export function usePlaylistData(
       syncActivePlaylist(fallback.playlists);
 
       return fallback;
+    } finally {
+      playlistLoading.value = false;
     }
   };
 

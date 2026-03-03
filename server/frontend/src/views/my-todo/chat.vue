@@ -1,7 +1,7 @@
 <template>
   <div class="max-w-250 h-full bg-blue-100 flex flex-col">
     <h1 class="text-center">Chat length [{{ chatMessages.length }}]</h1>
-    <div class="h-[300px]">
+    <div class="h-75">
       <van-pull-refresh
         v-model="loading"
         @refresh="onRefresh"
@@ -13,7 +13,7 @@
             <!-- 我的消息 -->
             <div v-if="msg.role == currentUserId" class="flex">
               <div
-                class="max-w-[70%] min-w-[40px] bg-green-500 text-white p-2 ml-auto rounded-lg shadow-md relative"
+                class="max-w-[70%] min-w-10 bg-green-500 text-white p-2 ml-auto rounded-lg shadow-md relative"
               >
                 {{ msg.content }}
               </div>
@@ -31,7 +31,7 @@
             <div v-else class="flex">
               <el-avatar :src="getUserInfo(msg.role)?.icon" class="w-12 h-12 ml-1"> </el-avatar>
               <div
-                class="max-w-[70%] min-w-[40px] bg-pink-200 rounded-lg ml-2 p-2 shadow-md mr-auto relative"
+                class="max-w-[70%] min-w-10 bg-pink-200 rounded-lg ml-2 p-2 shadow-md mr-auto relative"
               >
                 {{ msg.content }}
               </div>
@@ -54,7 +54,7 @@
         type="textarea"
         placeholder="Please input"
       ></el-input>
-      <el-button class="!w-16 !h-13 mx-2 mt-2" type="primary" @click="onSendBtnClick">
+      <el-button class="w-16! h-13! mx-2 mt-2" type="primary" @click="onSendBtnClick">
         Send
       </el-button>
     </div>

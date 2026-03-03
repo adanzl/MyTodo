@@ -4,7 +4,7 @@
     title="应用到列表"
     width="900"
     :before-close="handleClose">
-    <div class="flex gap-4 h-[500px]">
+    <div class="flex gap-4 h-125">
       <!-- 左列：播放列表选择 -->
       <div class="w-64 flex flex-col border rounded p-3">
         <div class="text-sm font-semibold mb-2">选择播放列表</div>

@@ -4,7 +4,7 @@
     :size="1200"
     direction="rtl"
     :before-close="handleClose"
-    header-class="h-12 !mb-1"
+    header-class="h-12 mb-1!"
   >
     <template #header>
       <div class="flex items-center gap-3 w-full pr-4">
@@ -58,11 +58,11 @@
               <template #default="{ row }">
                 <div class="flex flex-col gap-1">
                   <div class="text-sm flex items-start">
-                    <span class="text-gray-600 inline-block w-12 flex-shrink-0">地址：</span>
+                    <span class="text-gray-600 inline-block w-12 shrink-0">地址：</span>
                     <span class="text-gray-800">{{ row.address }}</span>
                   </div>
                   <div class="text-sm flex items-start">
-                    <span class="text-gray-600 inline-block w-12 flex-shrink-0">ID：</span>
+                    <span class="text-gray-600 inline-block w-12 shrink-0">ID：</span>
                     <span class="text-gray-800">{{ row.agent_id }}</span>
                   </div>
                 </div>
@@ -102,8 +102,8 @@
                     :key="groupIndex"
                     class="flex gap-1 items-center"
                   >
-                    <el-icon class="!w-4 !h-5"><Cpu /></el-icon>
-                    <span class="text-[12px] mr-1 !w-4">{{ buttonGroup.label }}</span>
+                    <el-icon class="w-4! h-5!"><Cpu /></el-icon>
+                    <span class="text-[12px] mr-1 w-4!">{{ buttonGroup.label }}</span>
                     <el-button
                       v-for="(key, btnIndex) in buttonGroup.keys"
                       :key="btnIndex"
@@ -219,13 +219,13 @@
               <template #default="{ row }">
                 <div class="flex flex-col gap-1">
                   <div class="text-sm flex items-start">
-                    <span class="text-gray-600 inline-block w-12 flex-shrink-0">位置：</span>
+                    <span class="text-gray-600 inline-block w-12 shrink-0">位置：</span>
                     <span class="text-gray-800 flex-1 truncate" :title="row.location">
                       {{ row.location || "-" }}
                     </span>
                   </div>
                   <div v-if="row.manufacturer || row.model_name" class="text-sm flex items-start">
-                    <span class="text-gray-600 inline-block w-12 flex-shrink-0">型号：</span>
+                    <span class="text-gray-600 inline-block w-12 shrink-0">型号：</span>
                     <span class="text-gray-800">
                       {{ row.manufacturer || "" }} {{ row.model_name || "" }}
                     </span>
@@ -237,7 +237,7 @@
               <template #default="{ row }">
                 <div class="flex flex-col gap-2">
                   <div class="flex items-center gap-2">
-                    <span class="text-gray-600 inline-block w-11 flex-shrink-0">音量：</span>
+                    <span class="text-gray-600 inline-block w-11 shrink-0">音量：</span>
                     <span class="text-gray-800 w-5">
                       {{ row.volume !== undefined ? row.volume : "-" }}
                     </span>
@@ -250,13 +250,13 @@
                       :loading="row._volumeRefreshing"
                       :disabled="row._volumeRefreshing || row._volumeChanging"
                       title="刷新音量"
-                      class="p-0.5 !w-[17px] !h-[17px]"
+                      class="p-0.5 w-4! h-4!"
                     >
                       <el-icon v-if="!row._volumeRefreshing"><Refresh /></el-icon>
                     </el-button>
                     <el-button
                       size="small"
-                      class="!w-8 !h-6"
+                      class="w-8! h-6!"
                       type="danger"
                       plain
                       @click="handleStopDlnaDevice(row)"
@@ -279,7 +279,7 @@
                         row._volumeChanging || row._volumeRefreshing || row.volume === undefined
                       "
                       size="small"
-                      class="flex-1 max-w-[200px]"
+                      class="flex-1 max-w-50"
                     >
                     </el-slider>
                   </div>
@@ -302,13 +302,13 @@
               <template #default="{ row }">
                 <div class="flex flex-col gap-1">
                   <div class="text-sm flex items-start">
-                    <span class="text-gray-600 inline-block w-12 flex-shrink-0">ID：</span>
+                    <span class="text-gray-600 inline-block w-12 shrink-0">ID：</span>
                     <span class="text-gray-800">{{ row.deviceID || "-" }}</span>
                   </div>
                   <div class="text-sm flex items-start">
-                    <span class="text-gray-600 inline-block w-12 flex-shrink-0">地址：</span>
+                    <span class="text-gray-600 inline-block w-12 shrink-0">地址：</span>
                     <span class="text-gray-800 w-40">{{ row.mac || "-" }}</span>
-                    <span class="text-gray-600 inline-block w-12 flex-shrink-0">DTD：</span>
+                    <span class="text-gray-600 inline-block w-12 shrink-0">DTD：</span>
                     <span class="text-gray-800 w-40">{{ row.miotDID || "-" }}</span>
                   </div>
                 </div>
@@ -318,7 +318,7 @@
               <template #default="{ row }">
                 <div class="flex flex-col gap-2">
                   <div class="flex items-center gap-2">
-                    <span class="text-gray-600 inline-block w-11 flex-shrink-0">状态：</span>
+                    <span class="text-gray-600 inline-block w-11 shrink-0">状态：</span>
                     <el-tag
                       v-if="row.status?.state"
                       :type="row.status.state === 'PLAYING' ? 'success' : 'info'"
@@ -336,13 +336,13 @@
                       :loading="row._statusRefreshing"
                       :disabled="row._statusRefreshing || row._volumeChanging"
                       title="刷新状态"
-                      class="p-0.5 !w-[17px] !h-[17px]"
+                      class="p-0.5 w-4! h-4!"
                     >
                       <el-icon v-if="!row._statusRefreshing"><Refresh /></el-icon>
                     </el-button>
                     <el-button
                       size="small"
-                      class="!w-8 !h-6"
+                      class="w-8! h-6!"
                       type="danger"
                       plain
                       @click="handleStopMiDevice(row)"
@@ -354,7 +354,7 @@
                     </el-button>
                   </div>
                   <div class="flex items-center gap-2">
-                    <span class="text-gray-600 inline-block w-11 flex-shrink-0">音量：</span>
+                    <span class="text-gray-600 inline-block w-11 shrink-0">音量：</span>
                     <span class="text-gray-800 w-5">
                       {{ row.volume !== undefined ? row.volume : "-" }}
                     </span>
@@ -369,7 +369,7 @@
                         row._volumeChanging || row._statusRefreshing || row.volume === undefined
                       "
                       size="small"
-                      class="flex-1 max-w-[200px]"
+                      class="flex-1 max-w-50"
                     >
                     </el-slider>
                   </div>
