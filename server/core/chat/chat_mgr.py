@@ -115,28 +115,31 @@ class ChatMgr:
             del self.clients[sid]
 
     def handle_text(self, sid, data):
-        chat_type = data.get('chatType', '')
-        content = data.get('content', '')
-        if chat_type == 'chat_room':
-            room_id = data.get('roomId', '')
-            user_id = data.get('userId', '')
-            msg_data = {
-                'user_id': user_id,
-                'content': content,
-                'type': 'text',
-                'ts': time.strftime('%Y-%m-%d %H:%M:%S'),
-                'chat_type': chat_type,
-            }
-            rds_mgr.rpush("chat:" + room_id, json.dumps(msg_data, ensure_ascii=False))
-            for client in self.clients.values():
-                if client.sid != sid:
-                    log.info(f"[CHAT] Emitting [msgChat] to client {client.sid} msg {content}")
-                    self.socketio.emit('msgChat', msg_data, room=client.sid)
-            self.socketio.emit('endChat', {}, room=sid)
+        try:
+            chat_type = data.get('chatType', '')
+            content = data.get('content', '')
+            if chat_type == 'chat_room':
+                room_id = data.get('roomId', '')
+                user_id = data.get('userId', '')
+                msg_data = {
+                    'user_id': user_id,
+                    'content': content,
+                    'type': 'text',
+                    'ts': time.strftime('%Y-%m-%d %H:%M:%S'),
+                    'chat_type': chat_type,
+                }
+                rds_mgr.rpush("chat:" + room_id, json.dumps(msg_data, ensure_ascii=False))
+                for client in self.clients.values():
+                    if client.sid != sid:
+                        log.info(f"[CHAT] Emitting [msgChat] to client {client.sid} msg {content}")
+                        self.socketio.emit('msgChat', msg_data, room=client.sid)
+                self.socketio.emit('endChat', {}, room=sid)
 
-        else:
-            client: ClientContext = self.clients.get(sid)
-            client.ai.stream_msg(content)
+            else:
+                client: ClientContext = self.clients.get(sid)
+                client.ai.stream_msg(content)
+        except e:
+            log.error(f"[CHAT] Error handling text for client {sid}: {e}")
 
     def handle_audio(self, sid, sample_rate, audio_bytes, room_id):
         '''
@@ -193,7 +196,7 @@ class ChatMgr:
                 return
             ctx = self.clients[client_id]
             if data_type == 'text':
-                log.info(f'[CHAT] Received message from {client_id}: {data_type}, {chat_type} {content}')
+                log.info(f'[CHAT] Received {client_id}: [{data_type}-{chat_type}],{room_id}  {content}')
                 self.handle_text(client_id, data)
             elif data_type == 'audio':
                 audio_bytes = base64.b64decode(content)

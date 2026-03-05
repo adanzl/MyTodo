@@ -259,7 +259,7 @@ def set_rds_data() -> ResponseReturnValue:
 @api_bp.route("/chatMessages", methods=['GET'])
 def chat_messages() -> ResponseReturnValue:
     try:
-        log.info("===== [Chat Messages] " + json.dumps(request.args))
+        log.info("===== [Chat Messages] " + json.dumps(request.args, ensure_ascii=False))
         c_id = request.args.get('conversation_id')
         limit = request.args.get('limit')
         first_id = request.args.get('first_id')
