@@ -55,7 +55,10 @@
     <audio ref="audioRef" style="width: auto" class="m-2"></audio>
     <ion-item v-if="chatType !== CHAT_TTS_TASKS">
       <div class="flex py-2 w-full h-18" v-if="INPUT_TYPE == 'text'">
-        <div class="w-12 h-auto flex items-center" @click="btnChangeMode">
+        <div
+          class="w-12 h-auto flex items-center cursor-pointer"
+          :class="chatType === CHAT_ROOM ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''"
+          @click="btnChangeMode">
           <Icon icon="weui:voice-outlined" class="h-10 w-10" />
         </div>
         <ion-input
@@ -67,7 +70,12 @@
           style="--color: #000"
           @keyup.enter="sendTextMessage"
           mode="md" />
-        <ion-button @click="sendTextMessage">发送</ion-button>
+        <ion-button
+          @click="sendTextMessage"
+          :disabled="!inputText || isWaitingServer"
+          :loading="isWaitingServer">
+          发送
+        </ion-button>
       </div>
       <div class="flex py-2 w-full h-18" v-else>
         <div class="w-12 h-auto flex items-center" @click="btnChangeMode">
@@ -224,7 +232,10 @@ onMounted(async () => {
       chatSetting.value.ttsSpeed = v.ttsSpeed;
       chatSetting.value.ttsRole = v.ttsRole;
       chatSetting.value.aiConversationId = v.aiConversationId;
-      chatSetting.value.chatRoomId = v.chatRoomId;
+      chatSetting.value.chatRoomId = v.chatRoomId || "v_chat_room_001";
+    } else {
+      // 如果没有 setting，设置默认值
+      chatSetting.value.chatRoomId = "v_chat_room_001";
     }
   } catch (err) {
     EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
@@ -255,6 +266,9 @@ async function updateChatSetting() {
     if (setting) {
       const v = JSON.parse(setting);
       chatSetting.value = Object.assign({}, chatSetting.value, v);
+    } else {
+      // 如果没有 setting，设置默认值
+      chatSetting.value.chatRoomId = "v_chat_room_001";
     }
   } catch (err) {
     EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
@@ -582,8 +596,12 @@ async function btnAudioClk(msg: AiChatMsg) {
 
 async function stopAndClearAudio() {
   if (audioRef.value) {
-    audioRef.value.pause();
-    audioRef.value!.src = "";
+    try {
+      audioRef.value.pause();
+      audioRef.value!.src = "";
+    } catch (e) {
+      /* empty */
+    }
   }
   if (ttsData.value.audioBuffer) {
     ttsData.value.audioBuffer = null;

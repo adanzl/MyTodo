@@ -10,39 +10,25 @@
         <span>加载失败，请检查网络后下拉刷新</span>
         <ion-button size="small" fill="clear" @click="retryLoad">重试</ion-button>
       </div>
-      <div class="flex flex-col h-full p-2 border-t border-gray-200">
+      <div class="flex flex-col h-full p-2 border-t border-gray-200 gap-2">
         <div v-for="(msg, idx) in messages" :key="idx" class="p-1.5 w-full">
           <!-- 自己 -->
           <div v-if="String(msg.role) === userIdStr" class="flex">
             <div
-              class="max-w-[70%] min-w-10 bg-green-500 text-white p-2 ml-auto rounded-lg shadow-md relative">
+              class="max-w-[70%] bg-green-500 text-white p-2 ml-auto mr-15 rounded-lg shadow-md relative inline-block">
               {{ msg.content }}
-            </div>
-            <ion-avatar slot="start" class="w-12 h-12 ml-1">
-              <ion-img :src="(getUserInfo(msg.role)?.icon) ?? DEFAULT_AVATAR" />
-            </ion-avatar>
-            <div
-              v-if="!msg.audioSrc"
-              class="absolute -right-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center text-black"
-              @click="$emit('audio-click', msg)">
-              <Icon icon="mdi:stop-circle-outline" class="w-6 h-6" v-if="msg.playing" />
-              <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
+              <ion-avatar slot="start" class="w-12 h-12 ml-1 absolute -right-15 -top-1">
+                <ion-img :src="getUserInfo(msg.role)?.icon ?? DEFAULT_AVATAR" />
+              </ion-avatar>
             </div>
           </div>
           <!-- 他人 -->
-          <div v-else class="flex">
-            <ion-avatar slot="start" class="w-12 h-12 mr-1">
-              <ion-img :src="(getUserInfo(msg.role)?.icon) ?? DEFAULT_AVATAR" />
-            </ion-avatar>
-            <div
-              class="max-w-[70%] min-w-10 bg-pink-200 p-2 mr-auto rounded-lg shadow-md relative">
+          <div v-else class="">
+            <div class="max-w-[70%] bg-pink-200 p-2 mr-auto ml-15 rounded-lg shadow-md relative inline-block">
+              <ion-avatar slot="start" class="w-12 h-12 mr-1 absolute -left-15 -top-1">
+                <ion-img :src="getUserInfo(msg.role)?.icon ?? DEFAULT_AVATAR" />
+              </ion-avatar>
               {{ msg.content }}
-            </div>
-            <div
-              class="absolute -left-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center"
-              @click="$emit('audio-click', msg)">
-              <Icon icon="mdi:stop-circle-outline" class="w-6 h-6" v-if="msg.playing" />
-              <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
             </div>
           </div>
         </div>
@@ -61,8 +47,6 @@ import {
   IonRefresherContent,
   IonSegmentContent,
 } from "@ionic/vue";
-import { Icon } from "@iconify/vue";
-import { volumeMediumOutline } from "ionicons/icons";
 import { computed, ref, watch } from "vue";
 import EventBus, { C_EVENT } from "@/types/EventBus";
 import { getChatMessages } from "@/api/chat";
@@ -162,9 +146,13 @@ async function onRefresh(e: RefresherCustomEvent) {
   }
 }
 
-watch(() => props.chatRoomId, (id) => {
-  if (id) loadInitial();
-}, { immediate: true });
+watch(
+  () => props.chatRoomId,
+  (id) => {
+    if (id) loadInitial();
+  },
+  { immediate: true }
+);
 
 defineExpose({ scrollToBottom, addMessage, loadInitial });
 </script>

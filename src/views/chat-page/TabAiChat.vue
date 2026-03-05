@@ -10,24 +10,24 @@
         <span>加载失败，请检查网络后下拉刷新</span>
         <ion-button size="small" fill="clear" @click="retryRefresh">重试</ion-button>
       </div>
-      <div class="flex flex-col h-full p-2 border-t border-gray-200">
-        <div v-for="(msg, idx) in messages" :key="idx" class="p-1.5 w-full">
+      <div class="flex flex-col h-full p-2 border-t border-gray-200 gap-2">
+        <div v-for="(msg, idx) in messages" :key="idx" class="p-1.5 w-full flex">
           <div
             v-if="msg.role == 'server'"
-            class="w-[80%] bg-pink-200 rounded-lg p-2 shadow-md ml-auto relative">
+            class="max-w-[80%] bg-pink-200 rounded-lg p-2 shadow-md relative inline-block">
             {{ msg.content ?? "..." }}
             <div
-              class="absolute -left-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center"
+              class="absolute -right-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center"
               @click="$emit('audio-click', msg)">
               <Icon icon="mdi:stop-circle-outline" class="w-6 h-6" v-if="msg.playing" />
               <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
             </div>
           </div>
-          <div v-else class="w-[80%] bg-green-500 text-white p-2 rounded-lg shadow-md relative">
+          <div v-else class="max-w-[80%] bg-green-500 text-white p-2 rounded-lg shadow-md relative ml-auto inline-block">
             {{ msg.content }}
             <div
               v-if="msg.audioSrc"
-              class="absolute -right-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center text-black"
+              class="absolute -left-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center text-black"
               @click="$emit('audio-click', msg)">
               <Icon icon="mdi:stop-circle-outline" class="w-6 h-6" v-if="msg.playing" />
               <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />

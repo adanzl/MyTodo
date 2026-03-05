@@ -138,7 +138,7 @@ class ChatMgr:
             else:
                 client: ClientContext = self.clients.get(sid)
                 client.ai.stream_msg(content)
-        except e:
+        except Exception as e:
             log.error(f"[CHAT] Error handling text for client {sid}: {e}")
 
     def handle_audio(self, sid, sample_rate, audio_bytes, room_id):
