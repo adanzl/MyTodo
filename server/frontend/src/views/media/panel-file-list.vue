@@ -1,21 +1,15 @@
 <template>
-  <div class="flex-1 min-w-190 border rounded p-3 flex flex-col overflow-hidden">
-    <!-- Loading 遮罩 -->
-    <div v-loading="playlistLoading" class="absolute inset-0 z-50"></div>
+  <div class="flex-1 min-w-190 border rounded p-3 flex flex-col overflow-hidden" v-loading="playlistLoading">
     <div class="flex items-center justify-between mb-3">
       <div class="flex-1">
         <div v-if="playlistStatus" class="flex items-center gap-2 mb-1">
           <div class="flex items-center gap-2 flex-1">
             <h3 class="text-lg font-semibold truncate">{{ playlistStatus.name }}</h3>
-            <el-button
-              type="default"
-              size="small"
-              plain
-              circle
-              @click="$emit('start-edit-name', activePlaylistId)"
-              title="编辑名称"
-            >
-              <el-icon><Edit /></el-icon>
+            <el-button type="default" size="small" plain circle @click="$emit('start-edit-name', activePlaylistId)"
+              title="编辑名称">
+              <el-icon>
+                <Edit />
+              </el-icon>
             </el-button>
           </div>
         </div>
@@ -27,30 +21,24 @@
             总时长：{{ formatDuration(getPlaylistTotalDuration()) }}
           </span>
           <template v-if="playlistStatus">
-            <template
-              v-if="
-                (getCurrentPreFiles()?.length || 0) + (playlistStatus.playlist?.length || 0) > 0
-              "
-            >
+            <template v-if="
+              (getCurrentPreFiles()?.length || 0) + (playlistStatus.playlist?.length || 0) > 0
+            ">
               共
               {{ (getCurrentPreFiles()?.length || 0) + (playlistStatus.playlist?.length || 0) }}
               首， 当前:
-              <template
-                v-if="
-                  playlistStatus.pre_index !== undefined &&
-                  playlistStatus.pre_index !== null &&
-                  playlistStatus.pre_index >= 0
-                "
-              >
+              <template v-if="
+                playlistStatus.pre_index !== undefined &&
+                playlistStatus.pre_index !== null &&
+                playlistStatus.pre_index >= 0
+              ">
                 {{ playlistStatus.pre_index + 1 }}
               </template>
-              <template
-                v-else-if="
-                  playlistStatus.current_index !== undefined &&
-                  playlistStatus.current_index !== null &&
-                  playlistStatus.current_index >= 0
-                "
-              >
+              <template v-else-if="
+                playlistStatus.current_index !== undefined &&
+                playlistStatus.current_index !== null &&
+                playlistStatus.current_index >= 0
+              ">
                 {{ (getCurrentPreFiles()?.length || 0) + playlistStatus.current_index + 1 }}
               </template>
               <template v-else> - </template>
@@ -61,182 +49,109 @@
         </div>
       </div>
       <div class="flex flex-wrap gap-2">
-        <el-button
-          type="default"
-          size="small"
-          plain
-          circle
-          @click="$emit('open-batch-drawer')"
-          :disabled="!playlistStatus || playlistLoading"
-          title="批量模式"
-        >
-          <el-icon><Collection /></el-icon>
+        <el-button type="default" size="small" plain circle @click="$emit('open-batch-drawer')"
+          :disabled="!playlistStatus || playlistLoading" title="批量模式">
+          <el-icon>
+            <Collection />
+          </el-icon>
         </el-button>
-        <el-button
-          type="default"
-          size="small"
-          plain
-          circle
-          @click="$emit('play')"
-          class="items-center justify-center"
-          :disabled="
-            !playlistStatus ||
+        <el-button type="default" size="small" plain circle @click="$emit('play')" class="items-center justify-center"
+          :disabled="!playlistStatus ||
             !playlistStatus.playlist ||
             playlistStatus.playlist.length === 0 ||
             !!playlistStatus.isPlaying ||
             playlistLoading
-          "
-          title="播放"
-        >
-          <el-icon v-if="playing" size="12" class="animate-spin"><Loading /></el-icon>
+            " title="播放">
+          <el-icon v-if="playing" size="12" class="animate-spin">
+            <Loading />
+          </el-icon>
           <span v-else>▶</span>
         </el-button>
-        <el-button
-          type="default"
-          size="small"
-          plain
-          circle
-          @click="$emit('play-pre')"
-          :disabled="
-            !playlistStatus ||
-            ((!getCurrentPreFiles() || getCurrentPreFiles().length === 0) &&
-              (!playlistStatus.playlist || playlistStatus.playlist.length === 0)) ||
-            playlistLoading
-          "
-          title="上一首"
-        >
-          <el-icon v-if="playing" size="12" class="animate-spin"><Loading /></el-icon>
+        <el-button type="default" size="small" plain circle @click="$emit('play-pre')" :disabled="!playlistStatus ||
+          ((!getCurrentPreFiles() || getCurrentPreFiles().length === 0) &&
+            (!playlistStatus.playlist || playlistStatus.playlist.length === 0)) ||
+          playlistLoading
+          " title="上一首">
+          <el-icon v-if="playing" size="12" class="animate-spin">
+            <Loading />
+          </el-icon>
           <span v-else>⏮</span>
         </el-button>
-        <el-button
-          type="default"
-          size="small"
-          plain
-          circle
-          @click="$emit('play-next')"
-          :disabled="
-            !playlistStatus ||
-            ((!getCurrentPreFiles() || getCurrentPreFiles().length === 0) &&
-              (!playlistStatus.playlist || playlistStatus.playlist.length === 0)) ||
-            playlistLoading
-          "
-          title="下一首"
-        >
-          <el-icon v-if="playing" size="12" class="animate-spin"><Loading /></el-icon>
+        <el-button type="default" size="small" plain circle @click="$emit('play-next')" :disabled="!playlistStatus ||
+          ((!getCurrentPreFiles() || getCurrentPreFiles().length === 0) &&
+            (!playlistStatus.playlist || playlistStatus.playlist.length === 0)) ||
+          playlistLoading
+          " title="下一首">
+          <el-icon v-if="playing" size="12" class="animate-spin">
+            <Loading />
+          </el-icon>
           <span v-else>⏭</span>
         </el-button>
-        <el-button
-          type="default"
-          size="small"
-          plain
-          circle
-          @click="$emit('stop')"
-          :disabled="playlistLoading"
-          title="停止"
-        >
-          <el-icon v-if="stopping" size="12" class="animate-spin"><Loading /></el-icon>
+        <el-button type="default" size="small" plain circle @click="$emit('stop')" :disabled="playlistLoading"
+          title="停止">
+          <el-icon v-if="stopping" size="12" class="animate-spin">
+            <Loading />
+          </el-icon>
           <span v-else>⏹</span>
         </el-button>
-        <el-button
-          v-show="showMoreActions"
-          type="default"
-          size="small"
-          plain
-          circle
-          @click="$emit('clear')"
-          :disabled="
-            !playlistStatus ||
-            ((!getCurrentPreFiles() || getCurrentPreFiles().length === 0) &&
-              (!playlistStatus.playlist || playlistStatus.playlist.length === 0)) ||
-            playlistLoading
-          "
-          title="清空列表（包括前置文件和正式文件）"
-        >
-          <el-icon><Delete /></el-icon>
+        <el-button v-show="showMoreActions" type="default" size="small" plain circle @click="$emit('clear')" :disabled="!playlistStatus ||
+          ((!getCurrentPreFiles() || getCurrentPreFiles().length === 0) &&
+            (!playlistStatus.playlist || playlistStatus.playlist.length === 0)) ||
+          playlistLoading
+          " title="清空列表（包括前置文件和正式文件）">
+          <el-icon>
+            <Delete />
+          </el-icon>
         </el-button>
-        <el-button
-          type="default"
-          size="small"
-          plain
-          circle
-          @click="$emit('toggle-more-actions')"
-          title="更多"
-        >
-          <el-icon><Menu /></el-icon>
+        <el-button type="default" size="small" plain circle @click="$emit('toggle-more-actions')" title="更多">
+          <el-icon>
+            <Menu />
+          </el-icon>
         </el-button>
       </div>
     </div>
 
     <div v-if="playlistStatus" class="flex-1 overflow-y-scroll scrollbar-overlay">
-      <PreFilesList
-        :playlist-status="playlistStatus"
-        :selected-weekday-index="selectedWeekdayIndex"
-        :pre-files-drag-mode="preFilesDragMode"
-        :pre-files-batch-delete-mode="preFilesBatchDeleteMode"
-        :selected-pre-file-indices="selectedPreFileIndices"
-        :pre-files-expanded="preFilesExpanded"
-        :playlist-loading="playlistLoading"
-        :show-more-actions="showMoreActions"
-        :audio-player="audioPlayer"
-        @select-weekday="$emit('select-weekday', $event)"
-        @open-file-browser="$emit('open-file-browser-for-pre-files')"
+      <PreFilesList :playlist-status="playlistStatus" :selected-weekday-index="selectedWeekdayIndex"
+        :pre-files-drag-mode="preFilesDragMode" :pre-files-batch-delete-mode="preFilesBatchDeleteMode"
+        :selected-pre-file-indices="selectedPreFileIndices" :pre-files-expanded="preFilesExpanded"
+        :playlist-loading="playlistLoading" :show-more-actions="showMoreActions" :audio-player="audioPlayer"
+        @select-weekday="$emit('select-weekday', $event)" @open-file-browser="$emit('open-file-browser-for-pre-files')"
         @toggle-drag-mode="$emit('toggle-pre-files-drag-mode')"
         @toggle-batch-delete-mode="$emit('toggle-pre-files-batch-delete-mode')"
-        @batch-delete="$emit('batch-delete-pre-files')"
-        @clear="$emit('clear-pre-files')"
-        @toggle-expand="$emit('toggle-pre-files-expand')"
-        @toggle-selection="$emit('toggle-pre-file-selection', $event)"
+        @batch-delete="$emit('batch-delete-pre-files')" @clear="$emit('clear-pre-files')"
+        @toggle-expand="$emit('toggle-pre-files-expand')" @toggle-selection="$emit('toggle-pre-file-selection', $event)"
         @drag-start="(event, index) => $emit('pre-file-drag-start', event, index)"
-        @drag-end="event => $emit('pre-file-drag-end', event)"
-        @drag-over="event => $emit('pre-file-drag-over', event)"
-        @drop="(event, index) => $emit('pre-file-drop', event, index)"
-        @play-file="$emit('play-file', $event)"
+        @drag-end="event => $emit('pre-file-drag-end', event)" @drag-over="event => $emit('pre-file-drag-over', event)"
+        @drop="(event, index) => $emit('pre-file-drop', event, index)" @play-file="$emit('play-file', $event)"
         @seek-file="(file, percentage) => $emit('seek-file', file, percentage)"
-        @move-up="index => $emit('move-pre-file-up', index)"
-        @move-down="index => $emit('move-pre-file-down', index)"
+        @move-up="index => $emit('move-pre-file-up', index)" @move-down="index => $emit('move-pre-file-down', index)"
         @replace="index => $emit('replace-pre-file', index)"
         @open-playlist-selector="file => $emit('open-playlist-selector-for-pre-file', file)"
         @play-on-device="file => $emit('play-on-device-for-pre-file', file)"
-        @delete="index => $emit('delete-pre-file', index)"
-      >
+        @delete="index => $emit('delete-pre-file', index)">
       </PreFilesList>
 
-      <FilesList
-        :playlist-status="playlistStatus"
-        :files-drag-mode="filesDragMode"
-        :files-batch-delete-mode="filesBatchDeleteMode"
-        :selected-file-indices="selectedFileIndices"
-        :playlist-loading="playlistLoading"
-        :show-more-actions="showMoreActions"
-        :audio-player="audioPlayer"
-        @open-file-browser="$emit('open-file-browser')"
-        @toggle-drag-mode="$emit('toggle-files-drag-mode')"
-        @toggle-batch-delete-mode="$emit('toggle-files-batch-delete-mode')"
-        @batch-delete="$emit('batch-delete-files')"
-        @clear="$emit('clear-files')"
-        @toggle-selection="$emit('toggle-file-selection', $event)"
+      <FilesList :playlist-status="playlistStatus" :files-drag-mode="filesDragMode"
+        :files-batch-delete-mode="filesBatchDeleteMode" :selected-file-indices="selectedFileIndices"
+        :playlist-loading="playlistLoading" :show-more-actions="showMoreActions" :audio-player="audioPlayer"
+        @open-file-browser="$emit('open-file-browser')" @toggle-drag-mode="$emit('toggle-files-drag-mode')"
+        @toggle-batch-delete-mode="$emit('toggle-files-batch-delete-mode')" @batch-delete="$emit('batch-delete-files')"
+        @clear="$emit('clear-files')" @toggle-selection="$emit('toggle-file-selection', $event)"
         @drag-start="(event, index) => $emit('file-drag-start', event, index)"
-        @drag-end="event => $emit('file-drag-end', event)"
-        @drag-over="event => $emit('file-drag-over', event)"
-        @drop="(event, index) => $emit('file-drop', event, index)"
-        @play-file="$emit('play-file', $event)"
+        @drag-end="event => $emit('file-drag-end', event)" @drag-over="event => $emit('file-drag-over', event)"
+        @drop="(event, index) => $emit('file-drop', event, index)" @play-file="$emit('play-file', $event)"
         @seek-file="(file, percentage) => $emit('seek-file', file, percentage)"
-        @move-up="index => $emit('move-file-up', index)"
-        @move-down="index => $emit('move-file-down', index)"
+        @move-up="index => $emit('move-file-up', index)" @move-down="index => $emit('move-file-down', index)"
         @replace="index => $emit('replace-file', index)"
         @open-playlist-selector="file => $emit('open-playlist-selector-for-file', file)"
-        @play-on-device="file => $emit('play-on-device-for-file', file)"
-        @delete="index => $emit('delete-file', index)"
-      >
+        @play-on-device="file => $emit('play-on-device-for-file', file)" @delete="index => $emit('delete-file', index)">
       </FilesList>
 
-      <div
-        v-if="
-          (!getCurrentPreFiles() || getCurrentPreFiles().length === 0) &&
-          (!playlistStatus?.playlist || playlistStatus.playlist.length === 0)
-        "
-        class="text-sm text-gray-400 text-center py-8"
-      >
+      <div v-if="
+        (!getCurrentPreFiles() || getCurrentPreFiles().length === 0) &&
+        (!playlistStatus?.playlist || playlistStatus.playlist.length === 0)
+      " class="text-sm text-gray-400 text-center py-8">
         当前播放列表为空，点击"添加文件"开始构建播放列表
       </div>
     </div>
