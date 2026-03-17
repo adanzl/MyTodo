@@ -34,10 +34,11 @@ def mi_volume() -> ResponseReturnValue:
     try:
         body = get_json_body()
         device_id = request.args.get('device_id') or body.get('device_id')
-        if not device_id:
-            return _err('device_id is required')
+        device_did = request.args.get('device_did') or body.get('device_did')
+        if not device_id or not device_did:
+            return _err('device_id or device_did is required')
 
-        device = MiDevice(address=device_id)
+        device = MiDevice(address=device_id, did=device_did)
 
         if request.method == 'GET':
             code, volume = device.get_volume()
@@ -73,10 +74,11 @@ def mi_status() -> ResponseReturnValue:
     """获取小米设备播放状态。"""
     try:
         device_id = request.args.get('device_id')
-        if not device_id:
-            return _err('device_id is required')
+        device_did = request.args.get('device_did') 
+        if not device_id or not device_did:
+            return _err('device_id or device_did is required')
 
-        device = MiDevice(address=device_id)
+        device = MiDevice(address=device_id, did=device_did)
         code, status = device.get_status()
         if code == 0:
             return _ok(status)
