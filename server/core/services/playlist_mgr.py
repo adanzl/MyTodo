@@ -317,6 +317,7 @@ class PlaylistMgr:
                     self._device_map[playlist_id] = create_device({
                         "type": device_type,
                         "address": device.get("address"),
+                        "did": device.get("did"),
                         "name": device.get("name")
                     })
                 else:
