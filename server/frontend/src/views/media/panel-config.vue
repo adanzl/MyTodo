@@ -100,11 +100,11 @@
 
       <!-- 设备配置 -->
       <div class="border rounded p-3">
-        <h4 class="text-sm font-semibold mb-2">设备配置</h4>
+        <h4 class="text-sm font-semibold mb-2 ">设备配置</h4>
 
         <div class="space-y-2">
           <div class="flex items-center gap-2">
-            <div class="text-xs text-gray-600 whitespace-nowrap">设备类型</div>
+            <div class="text-xs text-gray-600 whitespace-nowrap w-12">设备类型</div>
             <el-select
               :model-value="deviceType"
               @change="onUpdateDeviceType"
@@ -120,7 +120,7 @@
           </div>
 
           <div class="flex items-center gap-2">
-            <div class="text-xs text-gray-600 whitespace-nowrap">设备音量</div>
+            <div class="text-xs text-gray-600 whitespace-nowrap w-12">设备音量</div>
             <el-slider
               :model-value="localVolume"
               @input="(val: number) => (localVolume = val)"
@@ -135,9 +135,15 @@
 
           <div>
             <div class="text-xs text-gray-600 mb-1 flex items-center gap-2">
-              <span>设备地址</span>
+              <span class="text-xs text-gray-600 whitespace-nowrap w-12">设备地址</span>
               <span v-if="playlistStatus.device?.name" class="text-xs text-gray-500">
                 {{ playlistStatus.device.name }}
+              </span>
+            </div>
+            <div class="text-xs text-gray-600 mb-1 flex items-center gap-2">
+              <span class="text-xs text-gray-600 whitespace-nowrap w-12">设备DID</span>
+              <span v-if="playlistStatus.device?.did" class="text-xs text-gray-500">
+                {{ playlistStatus.device.did }}
               </span>
             </div>
             <div class="flex items-center gap-2">

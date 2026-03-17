@@ -75,6 +75,10 @@ export interface PlaylistDevice {
    * 设备名称（可选）
    */
   name?: string | null;
+  /**
+   * 设备DID（可选）
+   */
+  did?: string | null;
 }
 
 /**

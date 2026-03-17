@@ -8,6 +8,7 @@ import {
   bluetoothAction,
   scanMiDevices as apiScanMiDevices,
   scanDlnaDevices as apiScanDlnaDevices,
+  getMiDeviceVolume as apiGetMiDeviceVolume,
 } from "@/api/devices";
 import { api } from "@/api/config";
 import { logAndNoticeError } from "@/utils/error";
@@ -111,7 +112,8 @@ export function useDeviceManagement(
   // 获取小米设备音量
   const getMiDeviceVolume = async (device: MiDevice) => {
     const deviceId = getMiDeviceId(device);
-    if (!deviceId) return;
+    const deviceDid = device.miotDID;
+    if (!deviceId || !deviceDid) return;
 
     const deviceList = miDeviceList.value;
     if (!Array.isArray(deviceList)) return;
@@ -121,14 +123,20 @@ export function useDeviceManagement(
     targetDevice._volumeRefreshing = true;
 
     try {
-      const response = await api.get("/mi/volume", {
-        params: { device_id: deviceId },
-      });
+      const response = await apiGetMiDeviceVolume(deviceId, deviceDid);
 
-      if (response.data.code === 0) {
-        targetDevice.volume = response.data.data?.volume ?? response.data.data ?? undefined;
+      if (response.code === 0) {
+        // 处理返回数据可能是 { volume } 对象或直接是数字的情况
+        const volumeData = response.data;
+        if (typeof volumeData === 'number') {
+          targetDevice.volume = volumeData;
+        } else if (volumeData && typeof volumeData === 'object' && 'volume' in volumeData) {
+          targetDevice.volume = volumeData.volume ?? undefined;
+        } else {
+          targetDevice.volume = volumeData as number | undefined;
+        }
       } else {
-        ElMessage.error(response.data.msg || `获取设备 ${targetDevice.name || deviceId} 音量失败`);
+        ElMessage.error(response.msg || `获取设备 ${targetDevice.name || deviceId} 音量失败`);
       }
     } catch (error) {
       logAndNoticeError(error as Error, `获取设备 ${targetDevice.name || deviceId} 音量失败`);
@@ -243,7 +251,11 @@ export function useDeviceManagement(
   };
 
   // 更新播放列表设备地址
-  const handleUpdatePlaylistDeviceAddress = async (address: string, name: string | null = null) => {
+  const handleUpdatePlaylistDeviceAddress = async (
+    address: string,
+    name: string | null = null,
+    did?: string | null
+  ) => {
     if (!playlistStatus.value) return;
     await updateActivePlaylistData(playlistInfo => {
       const finalType: DeviceType =
@@ -262,6 +274,9 @@ export function useDeviceManagement(
       playlistInfo.device.address = address;
       if (name !== null) {
         playlistInfo.device.name = name;
+      }
+      if (did !== undefined) {
+        playlistInfo.device.did = did;
       }
       playlistInfo.device_address = address;
       playlistInfo.device_type = finalType;
@@ -309,7 +324,8 @@ export function useDeviceManagement(
   const handleSelectMiDevice = async (device: MiDevice) => {
     const address = device.deviceID || device.address || "";
     const name = device.name || "";
-    await handleUpdatePlaylistDeviceAddress(address, name);
+    const did = device.miotDID || null;
+    await handleUpdatePlaylistDeviceAddress(address, name, did);
   };
 
   // 打开设备列表对话框

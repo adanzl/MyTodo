@@ -148,15 +148,14 @@
             <el-table-column label="状态" width="100">
               <template #default="{ row }">
                 <el-tag
-                  :type="
-                    row.connecting || row.disconnecting
+                  :type="row.connecting || row.disconnecting
                       ? 'warning'
                       : row.connected
                         ? 'success'
                         : row.rssi !== undefined
                           ? 'info'
                           : 'info'
-                  "
+                    "
                   size="small"
                 >
                   {{
@@ -275,9 +274,8 @@
                       :min="5"
                       :max="100"
                       :step="1"
-                      :disabled="
-                        row._volumeChanging || row._volumeRefreshing || row.volume === undefined
-                      "
+                      :disabled="row._volumeChanging || row._volumeRefreshing || row.volume === undefined
+                        "
                       size="small"
                       class="flex-1 max-w-50"
                     >
@@ -365,9 +363,8 @@
                       :min="5"
                       :max="100"
                       :step="1"
-                      :disabled="
-                        row._volumeChanging || row._statusRefreshing || row.volume === undefined
-                      "
+                      :disabled="row._volumeChanging || row._statusRefreshing || row.volume === undefined
+                        "
                       size="small"
                       class="flex-1 max-w-50"
                     >
@@ -736,7 +733,8 @@ const scanMiDevices = async () => {
 // 获取小米设备状态（包含音量和播放状态）
 const getMiDeviceStatus = async (device: MiDevice) => {
   const deviceId = getMiDeviceId(device);
-  if (!deviceId) return;
+  const deviceDid = device.miotDID;
+  if (!deviceId || !deviceDid) return;
 
   const targetDevice = miDeviceList.value.find(d => getMiDeviceId(d) === deviceId);
   if (!targetDevice) return;
@@ -744,7 +742,7 @@ const getMiDeviceStatus = async (device: MiDevice) => {
   targetDevice._statusRefreshing = true;
 
   try {
-    const result = await apiGetMiDeviceStatus(deviceId);
+    const result = await apiGetMiDeviceStatus(deviceId, deviceDid);
 
     if (result?.code === 0) {
       // 更新状态信息

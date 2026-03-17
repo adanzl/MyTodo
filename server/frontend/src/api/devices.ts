@@ -41,11 +41,30 @@ export async function scanMiDevices(timeout?: number): Promise<ApiResponse<unkno
 }
 
 /**
+ * 获取小米设备音量
+ */
+export async function getMiDeviceVolume(
+  deviceId: string,
+  deviceDid?: string
+): Promise<ApiResponse<{ volume?: number } | number | undefined>> {
+  const response = await api.get("/mi/volume", {
+    params: { device_id: deviceId, device_did: deviceDid },
+  });
+  return response.data;
+}
+
+/**
  * 获取小米设备状态（包含音量和播放状态）
  */
-export async function getMiDeviceStatus(deviceId: string): Promise<ApiResponse<MiDeviceStatus>> {
+export async function getMiDeviceStatus(
+  deviceId: string,
+  deviceDid?: string
+): Promise<ApiResponse<MiDeviceStatus>> {
+  if (deviceDid === undefined) {
+    console.error("deviceDid is undefined");
+  }
   const response = await api.get("/mi/status", {
-    params: { device_id: deviceId },
+    params: { device_id: deviceId, device_did: deviceDid },
   });
   return response.data;
 }

@@ -20,6 +20,10 @@ export interface BaseDevice {
    */
   type?: DeviceType;
   /**
+   * 设备id
+   */
+  miotDID?: string;
+  /**
    * 允许扩展字段
    */
   [key: string]: unknown;
