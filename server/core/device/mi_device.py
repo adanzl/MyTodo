@@ -255,6 +255,7 @@ class MiDevice(DeviceBase):
                 ret = await mina_service.player_get_status(self.device_id)
                 if ret['code'] != 0:
                     return -1, {"error": ret['message']}
+                log.info(f"[MiDevice] Get status: {ret}")
                 info = json.loads(ret['data']['info'])
                 state = 'STOPPED' if info.get('status') == 2 else 'PLAYING'
                 state_code = info.get('status')
