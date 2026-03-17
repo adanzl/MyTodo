@@ -36,14 +36,14 @@ def test_scan_devices():
         return []
 
 
-def test_get_status(device_id: str):
+def test_get_status(device_id: str, did: str):
     """测试获取设备状态"""
     print("\n" + "=" * 50)
     print(f"测试获取设备状态: {device_id}")
     print("=" * 50)
 
     try:
-        device = MiDevice(device_id)
+        device = MiDevice(address=device_id, did=did)
         code, status = device.get_status()
 
         if code == 0:
@@ -60,6 +60,28 @@ def test_get_status(device_id: str):
             print(f"  播放位置: {status.get('position', '未知')}")
         else:
             error_msg = status.get('error', '未知错误') if isinstance(status, dict) else str(status)
+            print(f"获取状态失败: {error_msg}")
+
+    except Exception as e:
+        print(f"测试失败: {e}")
+        import traceback
+        traceback.print_exc()
+
+def test_get_volume(device_id: str, did: str):
+    """测试获取设备音量"""
+    print("\n" + "=" * 50)
+    print(f"测试获取设备音量: {device_id}, {did}")
+    print("=" * 50)
+
+    try:
+        device = MiDevice(address=device_id, did=did)
+        code, data = device.get_volume()
+
+        if code == 0:
+            print("获取音量成功:")
+            print(json.dumps(data, indent=2, ensure_ascii=False))
+        else:
+            error_msg = data.get('error', '未知错误') if isinstance(data, dict) else str(data)
             print(f"获取状态失败: {error_msg}")
 
     except Exception as e:
@@ -87,7 +109,7 @@ def main():
         print()
         return
 
-    print(f"✓ 使用账号: {mi_user[:3]}*** (已隐藏)")
+    print(f"✓ 使用账号: {mi_user}")
 
     # 测试1: 扫描设备
     devices = test_scan_devices()
@@ -99,10 +121,12 @@ def main():
     # 测试2: 获取第一个设备的状态
     first_device = devices[0]
     device_id = first_device.get('deviceID')
+    device_did = first_device.get('miotDID')
 
     if device_id:
         # 测试获取状态（包含音量）
-        test_get_status(device_id)
+        test_get_status(device_id, did = device_did)
+        # test_get_volume(device_id, did = device_did)
 
     else:
         print("\n设备ID无效，无法继续测试")

@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, Tuple, Any
 
 from aiohttp import ClientSession
 from miservice import MiAccount, MiNAService
+from miservice.miiocommand import miio_command, MiIOService
 
 from core.config import app_logger, config
 from core.tools.async_util import run_async
@@ -29,7 +30,7 @@ DEFAULT_MI_PASSWORD = config.MI_PASS
 # Token 文件路径
 TOKEN_FILE = os.path.join(str(Path.home()), ".mi.token")
 
-
+print(f'Token file {TOKEN_FILE}')
 def _device_to_dict(device: Dict[str, Any]) -> Dict[str, str]:
     """将 Device 对象转换为字典"""
     try:
@@ -70,6 +71,7 @@ class MiDevice(DeviceBase):
 
     def __init__(self,
                  address: str,
+                 did: str,
                  username: Optional[str] = None,
                  password: Optional[str] = None,
                  name: str = "") -> None:
@@ -83,9 +85,9 @@ class MiDevice(DeviceBase):
         """
         super().__init__(name=name)
         self.device_id = address  # 小米设备使用 deviceID 作为地址
+        self.device_did = did
         self.username = username or DEFAULT_MI_USERNAME
         self.password = password or DEFAULT_MI_PASSWORD
-        self.device_did = None
 
     @staticmethod
     async def scan_devices(username: Optional[str] = None, password: Optional[str] = None) -> List[Dict[str, str]]:
@@ -251,21 +253,12 @@ class MiDevice(DeviceBase):
                 # 获取 MiNAService 对象
                 session = ClientSession()
                 account = self._create_account(session)
-                mina_service = MiNAService(account)
-                ret = await mina_service.player_get_status(self.device_id)
-                if ret['code'] != 0:
-                    return -1, {"error": ret['message']}
-                log.info(f"[MiDevice] Get status: {ret}")
-                info = json.loads(ret['data']['info'])
-                state = 'STOPPED' if info.get('status') == 2 else 'PLAYING'
-                state_code = info.get('status')
-                volume = info.get('volume', 0)  # 获取音量，确保始终有音量值
-
-                # 安全访问 play_song_detail，如果不存在或为空则返回基本状态（包含音量）
-                play_song_detail = info.get('play_song_detail')
-                if not play_song_detail or not isinstance(play_song_detail, dict) or len(play_song_detail) == 0:
-                    # 如果没有播放详情，返回基本状态（确保包含音量）
-                    return 0, {
+                _service = MiIOService(account)
+                result = await miio_command(_service, self.device_did, '2-1,3-1,3-2')
+                volume = result[0]  # 获取音量，确保始终有音量值
+                state = 'PLAYING' if result[1] == 1 else 'STOPPED'
+                state_code = result[1]
+                return 0, {
                         "state": state,
                         "state_code": state_code,
                         "status": 'OK',
@@ -274,29 +267,56 @@ class MiDevice(DeviceBase):
                         "position": "00:00:00",
                         "volume": volume  # 确保音量始终返回
                     }
+            # try:
+            #     # 获取 MiNAService 对象
+            #     session = ClientSession()
+            #     account = self._create_account(session)
+            #     mina_service = MiNAService(account)
+            #     ret = await mina_service.player_get_status(self.device_id)
+            #     if ret['code'] != 0:
+            #         return -1, {"error": ret['message']}
+            #     log.info(f"[MiDevice] Get status: {ret}")
+            #     info = json.loads(ret['data']['info'])
+            #     state = 'STOPPED' if info.get('status') == 2 else 'PLAYING'
+            #     state_code = info.get('status')
+            #     volume = info.get('volume', 0)  # 获取音量，确保始终有音量值
 
-                duration = format_time_str(play_song_detail['duration'] /
-                                           1000) if play_song_detail.get('duration') else '00:00:00'
-                track_list = info.get('track_list', [])
-                audio_id = play_song_detail.get('audio_id')
-                position = play_song_detail.get('position', 0)  # 播放位置 单位：毫秒
+            #     # 安全访问 play_song_detail，如果不存在或为空则返回基本状态（包含音量）
+            #     play_song_detail = info.get('play_song_detail')
+            #     if not play_song_detail or not isinstance(play_song_detail, dict) or len(play_song_detail) == 0:
+            #         # 如果没有播放详情，返回基本状态（确保包含音量）
+            #         return 0, {
+            #             "state": state,
+            #             "state_code": state_code,
+            #             "status": 'OK',
+            #             "track": 0,
+            #             "duration": "00:00:00",
+            #             "position": "00:00:00",
+            #             "volume": volume  # 确保音量始终返回
+            #         }
 
-                track = 0
-                if audio_id and track_list:
-                    try:
-                        track = track_list.index(audio_id) + 1
-                    except ValueError:
-                        track = 0
+            #     duration = format_time_str(play_song_detail['duration'] /
+            #                                1000) if play_song_detail.get('duration') else '00:00:00'
+            #     track_list = info.get('track_list', [])
+            #     audio_id = play_song_detail.get('audio_id')
+            #     position = play_song_detail.get('position', 0)  # 播放位置 单位：毫秒
 
-                return 0, {
-                    "state": state,  # PLAYING, STOPPED
-                    "state_code": state_code,
-                    "status": 'OK',  # OK, ERROR
-                    "track": track,  # 当前曲目索引（从1开始）
-                    "duration": duration,  # 总时长，格式如 "00:03:45"
-                    "position": format_time_str(position / 1000),  # 已播放时长，格式如 "00:01:30"
-                    "volume": volume  # 音量
-                }
+            #     track = 0
+            #     if audio_id and track_list:
+            #         try:
+            #             track = track_list.index(audio_id) + 1
+            #         except ValueError:
+            #             track = 0
+
+            #     return 0, {
+            #         "state": state,  # PLAYING, STOPPED
+            #         "state_code": state_code,
+            #         "status": 'OK',  # OK, ERROR
+            #         "track": track,  # 当前曲目索引（从1开始）
+            #         "duration": duration,  # 总时长，格式如 "00:03:45"
+            #         "position": format_time_str(position / 1000),  # 已播放时长，格式如 "00:01:30"
+            #         "volume": volume  # 音量
+            #     }
             except Exception as e:
                 error_str = str(e)
                 if "Login failed" in error_str or "登录验证失败" in error_str or "70016" in error_str:
@@ -321,14 +341,32 @@ class MiDevice(DeviceBase):
         Returns:
             Tuple[int, int]: (code, volume)。code=0 表示成功。
         """
-        # 复用 get_status 方法，避免重复代码
-        code, status = self.get_status()
-        if code != 0:
-            return code, 0
 
-        # 从状态字典中提取音量，如果不存在则返回 0
-        volume = status.get('volume', 0)
-        return 0, volume
+        async def _get_volume_async():
+            session = None
+            try:
+                # 获取 MiNAService 对象
+                session = ClientSession()
+                account = self._create_account(session)
+                _service = MiIOService(account)
+                result = await miio_command(_service, self.device_did, '2-1')
+                return 0, result[0]
+            except Exception as e:
+                error_str = str(e)
+                if "Login failed" in error_str or "登录验证失败" in error_str or "70016" in error_str:
+                    log.error(f"[MiDevice] 登录验证失败，请检查账号密码是否正确: {e}")
+                    return -1, {"error": "登录验证失败，请检查账号密码是否正确"}
+                log.error(f"[MiDevice] Get status error: {e}")
+                return -1, {"error": f"获取播放状态信息失败: {str(e)}"}
+            finally:
+                if session:
+                    await session.close()
+
+        try:
+            return run_async(_get_volume_async(), timeout=5.0)
+        except Exception as e:
+            log.error(f"[MiDevice] Get volume error: {e}")
+            return -1, {"error": f"获取音量失败: {str(e)}"}
 
     def set_volume(self, volume: int) -> Tuple[int, str]:
         """设置小米设备的音量。

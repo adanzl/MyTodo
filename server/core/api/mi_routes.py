@@ -37,7 +37,7 @@ def mi_volume() -> ResponseReturnValue:
         if not device_id:
             return _err('device_id is required')
 
-        device = MiDevice(device_id)
+        device = MiDevice(address=device_id)
 
         if request.method == 'GET':
             code, volume = device.get_volume()
@@ -76,7 +76,7 @@ def mi_status() -> ResponseReturnValue:
         if not device_id:
             return _err('device_id is required')
 
-        device = MiDevice(device_id)
+        device = MiDevice(address=device_id)
         code, status = device.get_status()
         if code == 0:
             return _ok(status)
@@ -96,7 +96,7 @@ def mi_stop() -> ResponseReturnValue:
         if not device_id:
             return _err('device_id is required')
 
-        device = MiDevice(device_id)
+        device = MiDevice(address=device_id)
         code, msg = device.stop()
         if code == 0:
             return _ok({'message': msg or '停止成功'})

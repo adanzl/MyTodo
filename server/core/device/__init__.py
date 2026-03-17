@@ -25,5 +25,5 @@ def create_device(node):
     elif node["type"] == "dlna":
         ret["obj"] = DlnaDev(node["address"], name=node.get("name"))
     elif node["type"] == "mi":
-        ret["obj"] = MiDevice(node.get("address", ""), name=node.get("name"))
+        ret["obj"] = MiDevice(address=node.get("address", ""), name=node.get("name"))
     return ret
