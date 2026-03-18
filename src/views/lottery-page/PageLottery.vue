@@ -392,11 +392,24 @@ async function btnLotteryClk() {
           await loading.present();
           try {
             const data = await doLottery(globalVar.user.id, selectedCate.value.id);
-            EventBus.$emit(C_EVENT.REWARD, {
-              value: data.gift.name,
-              img: data.gift.image,
-              rewardType: "gift",
-            });
+            // 优先使用 gifts 数组（支持多个中奖礼物），兼容旧的 gift 字段
+            const wonGifts: any[] = data.gifts || (data.gift ? [data.gift] : []);
+            if (wonGifts.length > 0) {
+              // 构建奖励列表
+              const rewardList = wonGifts.map((gift) => ({
+                value: gift.name || "-",
+                img: gift.image || "",
+                rewardType: "gift" as const,
+              }));
+              // 只有一个元素时使用 REWARD，多个元素时使用 REWARD_LIST
+              if (rewardList.length === 1) {
+                EventBus.$emit(C_EVENT.REWARD, rewardList[0]);
+              } else {
+                EventBus.$emit(C_EVENT.REWARD_LIST, {
+                  rewardList,
+                });
+              }
+            }
             EventBus.$emit(C_EVENT.TOAST, "抽奖成功");
             clearUserListCache();
             await refreshUserList();
@@ -472,10 +485,11 @@ async function btnExchangeClk(item: any) {
         handler: async () => {
           try {
             const data = await doExchange(globalVar.user.id, item.id);
+            // 兑换只返回单个礼物
             EventBus.$emit(C_EVENT.REWARD, {
-              value: data.gift.name,
-              img: data.gift.image,
-              rewardType: "gift",
+              value: data.gift.name || "-",
+              img: data.gift.image || "",
+              rewardType: "gift" as const,
             });
             EventBus.$emit(C_EVENT.TOAST, "兑换成功");
             clearUserListCache();

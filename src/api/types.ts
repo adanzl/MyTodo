@@ -131,6 +131,7 @@ export interface DoLotteryBody {
 /** doLottery 返回：含 gift 信息 */
 export interface DoLotteryResult {
   gift: { name?: string; image?: string; [key: string]: unknown };
+  gifts?: { name?: string; image?: string; [key: string]: unknown }[];
   [key: string]: unknown;
 }
 

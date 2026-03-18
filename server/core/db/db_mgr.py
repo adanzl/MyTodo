@@ -145,7 +145,7 @@ class DbMgr:
             return {"code": DB_CODE_ERROR, "msg": 'error ' + str(e)}
         return {"code": DB_CODE_SUCCESS, "msg": "ok", "data": data}
 
-    def set_data(self, table: str, data: Dict[str, Any], condition: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def set_data(self, table: str, data: Dict[str, Any], conditions: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         向指定表插入或更新数据。
         如果 data 中包含 id 且存在，则更新；否则插入。
@@ -180,8 +180,8 @@ class DbMgr:
                     stmt_upd = table_obj.update().where(table_obj.c.id == id).values(**processed_data)
 
                     # 添加乐观锁条件
-                    if condition and isinstance(condition, dict):
-                        for k, v in condition.items():
+                    if conditions and isinstance(conditions, dict):
+                        for k, v in conditions.items():
                             if k not in table_obj.columns:
                                 continue
                             col = table_obj.columns[k]
