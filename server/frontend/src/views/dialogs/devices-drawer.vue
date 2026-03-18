@@ -769,8 +769,9 @@ const getMiDeviceStatus = async (device: MiDevice) => {
 // 设置小米设备音量
 const setMiDeviceVolume = async (device: MiDevice, volume: number) => {
   const deviceId = getMiDeviceId(device);
-  if (!deviceId) {
-    ElMessage.error("设备ID无效");
+  const deviceDid = device.miotDID;
+  if (!deviceId || !deviceDid) {
+    ElMessage.error("设备ID 或 设备Did 无效");
     return;
   }
 
@@ -778,7 +779,7 @@ const setMiDeviceVolume = async (device: MiDevice, volume: number) => {
   device._volumeChanging = true;
 
   try {
-    const result = await apiSetMiDeviceVolume(deviceId, clampedVolume);
+    const result = await apiSetMiDeviceVolume(deviceId, deviceDid, clampedVolume);
 
     if (result?.code === 0) {
       device.volume = clampedVolume;

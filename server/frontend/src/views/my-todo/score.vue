@@ -64,17 +64,23 @@
     <el-dialog
       v-model="giftDialogVisible"
       title="奖品详情"
-      width="320px"
+      width="800px"
       align-center
-      @close="giftDialogData = null">
-      <div v-if="giftDialogData" class="flex flex-col items-center gap-3 py-2">
-        <el-image
-          v-if="giftDialogData.image"
-          :src="getPicDisplayUrl(giftDialogData.image)"
-          class="w-64 h-64 object-contain rounded"
-          fit="contain" />
-        <div class="font-medium text-lg">{{ giftDialogData.name || "-" }}</div>
+      @close="giftDialogData = []">
+      <div v-if="giftDialogData && giftDialogData.length > 0" class="flex flex-wrap gap-4 py-2 justify-center w-full">
+        <div
+          v-for="(gift, index) in giftDialogData"
+          :key="index"
+          class="flex flex-col items-center gap-2 p-3 border border-gray-200 rounded-lg min-w-50">
+          <el-image
+            v-if="gift.image"
+            :src="getPicDisplayUrl(gift.image)"
+            class="w-48 h-48 object-contain rounded"
+            fit="contain" />
+          <div class="font-medium text-sm text-center">{{ gift.name || "-" }}</div>
+        </div>
       </div>
+      <div v-else class="text-center py-8 text-gray-500">暂无奖品信息</div>
     </el-dialog>
     <el-pagination
       layout="sizes, prev, pager, next"
@@ -93,7 +99,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { CaretTop, CaretBottom, Present } from "@element-plus/icons-vue";
-import { getList, getData } from "@/api/common";
+import { getList } from "@/api/common";
 import { getPicDisplayUrl } from "@/api/pic";
 import { undoLottery } from "@/api/user";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -207,7 +213,7 @@ const handlePageChange = (pageNum: number, pageSize: number) => {
 };
 
 const giftDialogVisible = ref(false);
-const giftDialogData = ref<{ name: string; image: string } | null>(null);
+const giftDialogData = ref<Array<{ name: string; image: string }>>([]);
 
 /** 抽奖/兑换记录（可查看奖品、可撤销） */
 function isGiftRecord(row: ScoreHistory) {
@@ -222,17 +228,25 @@ function onRowClick(row: ScoreHistory) {
 
 async function onGiftClick(row: ScoreHistory) {
   if (!isGiftRecord(row)) return;
+  loading.value = true;
   try {
-    const gift = await getData<{ name: string; image: string }>(
+    // 解析 out_key 为 ID 列表
+    const ids = String(row.out_key).split(',').map(id => Number(id.trim()));
+
+    // 使用 getList 接口获取所有奖品数据
+    const response = await getList<{ name: string; image: string }>(
       "t_gift",
-      Number(row.out_key),
-      "name,image"
+      { id: { in: ids } }
     );
-    giftDialogData.value = { name: gift?.name ?? "", image: gift?.image ?? "" };
+
+    // 转换为数组并赋值
+    giftDialogData.value = response.data.data || [];
     giftDialogVisible.value = true;
   } catch (err) {
     console.error("获取奖品详情失败:", err);
     ElMessage.error("获取奖品详情失败");
+  } finally {
+    loading.value = false;
   }
 }
 

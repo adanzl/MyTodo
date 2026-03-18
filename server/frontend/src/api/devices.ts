@@ -74,10 +74,12 @@ export async function getMiDeviceStatus(
  */
 export async function setMiDeviceVolume(
   deviceId: string,
+  deviceDid: string,
   volume: number
 ): Promise<ApiResponse<{ volume: number }>> {
   const response = await api.post("/mi/volume", {
     device_id: deviceId,
+    device_did: deviceDid,
     volume,
   });
   return response.data;

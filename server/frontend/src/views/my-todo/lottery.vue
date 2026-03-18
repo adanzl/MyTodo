@@ -160,7 +160,7 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column property="cost" label="Cost" width="200">
+      <el-table-column property="cost" label="Cost" width="150">
         <template #default="{ row }">
           <div class="flex items-center">
             <template v-if="row.edited">
@@ -169,6 +169,19 @@
             </template>
             <template v-else>
               <span> {{ row.cost }} </span>
+            </template>
+          </div>
+        </template>
+      </el-table-column>
+      <el-table-column label="中奖数量" width="100">
+        <template #default="{ row }">
+          <div class="flex items-center">
+            <template v-if="row.edited">
+              <el-input v-model="row.count" size="small" clearable
+                @blur="handleCateBlur(row, 'count', lotteryCatPopList.indexOf(row))" />
+            </template>
+            <template v-else>
+              <span> {{ row.count }} </span>
             </template>
           </div>
         </template>
@@ -235,6 +248,7 @@ interface GiftCategory {
   name: string;
   cost?: number;
   edited?: boolean;
+  count?: number;
 }
 
 const PAGE_SIZE = 10;
@@ -281,6 +295,7 @@ const refreshCateList = async () => {
           id: item.id,
           name: item.name,
           cost: item.cost,
+          count: item.count,
           edited: false,
         });
       });
@@ -458,6 +473,7 @@ const handleCateSave = async (item: GiftCategory, _idx: number) => {
       id: item.id,
       name: item.name,
       cost: item.cost,
+      count: item.count,
     };
     await setData("t_gift_category", data);
     await refreshCateList();
