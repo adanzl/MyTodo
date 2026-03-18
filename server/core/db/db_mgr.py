@@ -295,7 +295,7 @@ class DbMgr:
                 query = select(*columns)
                 count_query = select(func.count()).select_from(table_obj)
 
-            # 条件过滤（支持 (op, value) 表示 >, <, >=, <=, !=, in）
+            # 条件过滤（支持 (op, value) 表示 >, <, >=, <=, !=, in；也支持 { in: [...] } 格式）
             if conditions and isinstance(conditions, dict):
                 for k, v in conditions.items():
                     if k not in table_obj.columns:
@@ -324,6 +324,15 @@ class DbMgr:
                         else:
                             query = query.where(col == val)
                             count_query = count_query.where(col == val)
+                    elif isinstance(v, dict):
+                        # 支持 { field: { in: [...] } } 格式
+                        for op, val in v.items():
+                            if op == 'in':
+                                query = query.where(col.in_(val))
+                                count_query = count_query.where(col.in_(val))
+                            else:
+                                query = query.where(col == val)
+                                count_query = count_query.where(col == val)
                     else:
                         query = query.where(col == v)
                         count_query = count_query.where(col == v)
