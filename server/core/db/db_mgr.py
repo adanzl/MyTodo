@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Union
 from flask import Flask
 from core.db import db_obj
 from core.config import app_logger, config
+from core.config.const import DB_CODE_SUCCESS, DB_CODE_ERROR, DB_CODE_ERROR_RUNTIME
 from sqlalchemy import func
 from sqlalchemy import MetaData, Table, select, text, inspect
 from core.models.user import User
@@ -76,7 +77,7 @@ class DbMgr:
                     res = db_obj.session.execute(stmt_ins)
                     id = res.inserted_primary_key[0] if res.inserted_primary_key else id
             else:
-                # 没有id直接插入
+                # 没有 id 直接插入
                 stmt_ins = table_obj.insert().values(user_name=user_name, data=data)
                 res = db_obj.session.execute(stmt_ins)
                 id = res.inserted_primary_key[0] if res.inserted_primary_key else None
@@ -85,8 +86,8 @@ class DbMgr:
             db_obj.session.rollback()
             log.error(e)
             traceback.print_exc()
-            return {"code": -1, "msg": 'error ' + str(e)}
-        return {"code": 0, "msg": "ok", "data": id}
+            return {"code": DB_CODE_ERROR, "msg": 'error ' + str(e)}
+        return {"code": DB_CODE_SUCCESS, "msg": "ok", "data": id}
 
     def get_data_idx(self, table: str, id: int, idx: int = 1) -> Dict[str, Any]:
         """根据 id 从指定表获取单个字段的数据。"""
@@ -106,8 +107,8 @@ class DbMgr:
         except Exception as e:
             log.error(e)
             traceback.print_exc()
-            return {"code": -1, "msg": 'error ' + str(e)}
-        return {"code": 0, "msg": "ok", "data": data}
+            return {"code": DB_CODE_ERROR, "msg": 'error ' + str(e)}
+        return {"code": DB_CODE_SUCCESS, "msg": "ok", "data": data}
 
     def get_data(self, table: str, id: int, fields: Union[str, List[str]]) -> Dict[str, Any]:
         """根据 id 从指定表获取一个或多个字段的数据。"""
@@ -131,7 +132,7 @@ class DbMgr:
                     fields = [f.strip() for f in fields.split(',')]
                 columns = [table_obj.c[f] for f in fields if f in table_obj.c]
                 if not columns:
-                    return {"code": -1, "msg": f"无效的字段: {fields}", "data": None}
+                    return {"code": DB_CODE_ERROR_RUNTIME, "msg": f"无效的字段: {fields}", "data": None}
                 stmt = select(*columns).where(table_obj.c.id == id)
                 result = db_obj.session.execute(stmt).fetchone()
                 if result:
@@ -141,19 +142,27 @@ class DbMgr:
         except Exception as e:
             log.error(e)
             traceback.print_exc()
-            return {"code": -1, "msg": 'error ' + str(e)}
-        return {"code": 0, "msg": "ok", "data": data}
+            return {"code": DB_CODE_ERROR, "msg": 'error ' + str(e)}
+        return {"code": DB_CODE_SUCCESS, "msg": "ok", "data": data}
 
-    def set_data(self, table: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    def set_data(self, table: str, data: Dict[str, Any], condition: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         向指定表插入或更新数据。
         如果 data 中包含 id 且存在，则更新；否则插入。
+            
+        Args:
+            table: 表名
+            data: 要插入或更新的数据字典
+            condition: 可选的更新条件字典，用于实现乐观锁。
+                      例如：{"version": 5} 表示只有当 version 字段等于 5 时才更新
+                           {"version": (">", 3)} 表示只有当 version > 3 时才更新
         """
+        cnt = 0
         try:
             metadata = MetaData()
             table_obj = Table(table, metadata, autoload_with=db_obj.engine)
 
-            # 处理数据，将list类型转换为JSON字符串
+            # 处理数据，将 list 类型转换为 JSON 字符串
             processed_data = {}
             for key, value in data.items():
                 if isinstance(value, list):
@@ -169,24 +178,52 @@ class DbMgr:
                 if result:
                     # 存在则更新
                     stmt_upd = table_obj.update().where(table_obj.c.id == id).values(**processed_data)
-                    db_obj.session.execute(stmt_upd)
+
+                    # 添加乐观锁条件
+                    if condition and isinstance(condition, dict):
+                        for k, v in condition.items():
+                            if k not in table_obj.columns:
+                                continue
+                            col = table_obj.columns[k]
+                            if isinstance(v, tuple) and len(v) == 2:
+                                op, val = v
+                                if op == '>':
+                                    stmt_upd = stmt_upd.where(col > val)
+                                elif op == '<':
+                                    stmt_upd = stmt_upd.where(col < val)
+                                elif op == '>=':
+                                    stmt_upd = stmt_upd.where(col >= val)
+                                elif op == '<=':
+                                    stmt_upd = stmt_upd.where(col <= val)
+                                elif op == '!=':
+                                    stmt_upd = stmt_upd.where(col != val)
+                                elif op == 'in':
+                                    stmt_upd = stmt_upd.where(col.in_(val))
+                                else:
+                                    stmt_upd = stmt_upd.where(col == val)
+                            else:
+                                stmt_upd = stmt_upd.where(col == v)
+
+                    res = db_obj.session.execute(stmt_upd)
                 else:
                     # 不存在则插入
                     stmt_ins = table_obj.insert().values(**processed_data)
                     res = db_obj.session.execute(stmt_ins)
                     id = res.inserted_primary_key[0] if res.inserted_primary_key else id
+
             else:
-                # 没有id直接插入
+                # 没有 id 直接插入
                 stmt_ins = table_obj.insert().values(**processed_data)
                 res = db_obj.session.execute(stmt_ins)
                 id = res.inserted_primary_key[0] if res.inserted_primary_key else None
             db_obj.session.commit()
+            cnt = res.rowcount
         except Exception as e:
             db_obj.session.rollback()
             log.error(e)
             traceback.print_exc()
-            return {"code": -1, "msg": 'error ' + str(e)}
-        return {"code": 0, "msg": "ok", "data": id}
+            return {"code": DB_CODE_ERROR, "msg": 'error ' + str(e), 'cnt': cnt}
+        return {"code": DB_CODE_SUCCESS, "msg": "ok", "data": id, "cnt": cnt}
 
     def add_score(
         self,
@@ -201,7 +238,7 @@ class DbMgr:
             # 查找用户
             user = db_obj.session.get(User, user_id)
             if not user:
-                return {"code": -1, "msg": f"用户不存在: {user_id}"}
+                return {"code": DB_CODE_ERROR_RUNTIME, "msg": f"用户不存在: {user_id}"}
 
             # 计算新的积分
             pre_score = user.score
@@ -232,12 +269,12 @@ class DbMgr:
             db_obj.session.add(score_history)
             db_obj.session.commit()
 
-            return {"code": 0, "msg": "ok", "data": cur_score}
+            return {"code": DB_CODE_SUCCESS, "msg": "ok", "data": cur_score}
         except Exception as e:
             db_obj.session.rollback()
             log.error(e)
             traceback.print_exc()
-            return {"code": -1, "msg": f'error: {str(e)}'}
+            return {"code": DB_CODE_ERROR, "msg": f'error: {str(e)}'}
 
     def del_data(self, table: str, id: int) -> Dict[str, Any]:
         """从指定表删除一条数据。"""
@@ -253,8 +290,8 @@ class DbMgr:
             db_obj.session.rollback()
             log.error(e)
             traceback.print_exc()
-            return {"code": -1, "msg": 'error ' + str(e)}
-        return {"code": 0, "msg": "ok", "data": cnt}
+            return {"code": DB_CODE_ERROR, "msg": 'error ' + str(e)}
+        return {"code": DB_CODE_SUCCESS, "msg": "ok", "data": cnt}
 
     def query(self, sql: str) -> Dict[str, Any]:
         """执行原生 SQL 查询。"""
@@ -269,8 +306,8 @@ class DbMgr:
         except Exception as e:
             log.error(e)
             traceback.print_exc()
-            return {"code": -1, "msg": 'error ' + str(e)}
-        return {"code": 0, "msg": "ok", "data": data}
+            return {"code": DB_CODE_ERROR, "msg": 'error ' + str(e)}
+        return {"code": DB_CODE_SUCCESS, "msg": "ok", "data": data}
 
     def get_list(self,
                  table: str,
@@ -291,7 +328,7 @@ class DbMgr:
                 # 字段筛选
                 columns = [table_obj.columns[f] for f in fields if f in table_obj.columns]
                 if not columns:
-                    return {"code": -1, "msg": f"无效的字段: {fields}", "data": None}
+                    return {"code": DB_CODE_ERROR, "msg": f"无效的字段: {fields}", "data": None}
                 query = select(*columns)
                 count_query = select(func.count()).select_from(table_obj)
 
@@ -361,11 +398,11 @@ class DbMgr:
                 'pageSize': page_size,
                 'totalPage': (total_count + page_size - 1) // page_size,
             }
-            return {"code": 0, "msg": "ok", "data": data}
+            return {"code": DB_CODE_SUCCESS, "msg": "ok", "data": data}
         except Exception as e:
             log.error(e)
             traceback.print_exc()
-            return {"code": -1, "msg": f'error: {str(e)}', "data": None}
+            return {"code": DB_CODE_ERROR, "msg": f'error: {str(e)}', "data": None}
 
 
 db_mgr = DbMgr()

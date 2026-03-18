@@ -78,3 +78,8 @@ TASK_STATUS_PROCESSING = 'processing'  # 处理中
 TASK_STATUS_SUCCESS = 'success'  # 成功
 TASK_STATUS_FAILED = 'failed'  # 失败
 TASK_STATUS_UPLOADED = 'uploaded'  # 已上传（PDF 工具专用）
+
+# API 响应码常量
+DB_CODE_SUCCESS = 0  # 成功
+DB_CODE_ERROR = -1  # 通用错误
+DB_CODE_ERROR_RUNTIME = -2  # 运行时错误
