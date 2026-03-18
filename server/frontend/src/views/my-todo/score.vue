@@ -230,17 +230,27 @@ async function onGiftClick(row: ScoreHistory) {
   if (!isGiftRecord(row)) return;
   loading.value = true;
   try {
-    // 解析 out_key 为 ID 列表
+    // 解析 out_key 为 ID 列表（保留重复项）
     const ids = String(row.out_key).split(',').map(id => Number(id.trim()));
 
-    // 使用 getList 接口获取所有奖品数据
+    // 获取所有唯一的 ID
+    const uniqueIds = [...new Set(ids)];
+
+    // 使用 getList 接口获取所有唯一 ID 的奖品数据
     const response = await getList<{ name: string; image: string }>(
       "t_gift",
-      { id: { in: ids } }
+      { id: { in: uniqueIds } }
     );
 
-    // 转换为数组并赋值
-    giftDialogData.value = response.data.data || [];
+    // 创建 ID 到奖品的映射
+    const giftMap = new Map<number, { name: string; image: string }>();
+    (response.data.data || []).forEach(gift => {
+      // 需要从返回数据中获取 id，或者重新查询
+      giftMap.set((gift as any).id, gift);
+    });
+
+    // 按照原始 IDs 的顺序重组数据（包括重复项）
+    giftDialogData.value = ids.map(id => giftMap.get(id)).filter(Boolean) as Array<{ name: string; image: string }>;
     giftDialogVisible.value = true;
   } catch (err) {
     console.error("获取奖品详情失败:", err);

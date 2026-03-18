@@ -234,7 +234,11 @@
       :value="bOpenRewardPop.value"
       :reward-type="bOpenRewardPop.rewardType"
       :img="bOpenRewardPop.img"
-      @willDismiss="onRewardDismiss" />
+      @willDismiss="bOpenRewardPop.open = false" />
+    <RewardListPop
+      :is-open="bOpenRewardListPop.open"
+      :reward-list="bOpenRewardListPop.rewardList"
+      @willDismiss="bOpenRewardListPop.open = false" />
     <RewardSet :is-open="rewardSet.open" @willDismiss="() => (rewardSet.open = false)" />
     <ion-toast
       :is-open="toastData.isOpen"
@@ -247,6 +251,7 @@
 
 <script setup lang="ts">
 import RewardSet from "@/components/RewardSet.vue";
+import RewardListPop from "@/components/RewardListPop.vue";
 import { ColorOptions, LoadColorData } from "@/types/ColorType";
 import { C_EVENT } from "@/types/EventBus";
 import { GroupOptions, PriorityOptions } from "@/types/ScheduleType";
@@ -303,6 +308,10 @@ const bOpenRewardPop = ref({
   value: "0",
   rewardType: "points",
   img: avatar,
+});
+const bOpenRewardListPop = ref({
+  open: false,
+  rewardList: [] as Array<{ value: string; rewardType: string; img?: string }>,
 });
 const rewardSet = ref({
   open: false,
@@ -458,13 +467,15 @@ eventBus.$on(C_EVENT.REWARD, (params: any) => {
   bOpenRewardPop.value.rewardType = params.rewardType;
   bOpenRewardPop.value.img = params.img;
 });
+eventBus.$on(C_EVENT.REWARD_LIST, (params: any) => {
+  bOpenRewardListPop.value.open = true;
+  bOpenRewardListPop.value.rewardList = params.rewardList || [];
+});
 eventBus.$on(C_EVENT.TOAST, (params: any) => {
   toastData.value.isOpen = true;
   toastData.value.text = params;
 });
-function onRewardDismiss() {
-  bOpenRewardPop.value.open = false;
-}
+
 async function rewardLbClk() {
   if (curUser.value.admin !== 1) return;
   rewardSet.value.open = true;

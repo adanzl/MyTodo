@@ -22,6 +22,7 @@ declare module 'vue' {
     IconMdiListStatus: typeof import('~icons/mdi/list-status')['default']
     PrioritySelector: typeof import('./src/components/PrioritySelector.vue')['default']
     RepeatSelector: typeof import('./src/components/RepeatSelector.vue')['default']
+    RewardListPop: typeof import('./src/components/RewardListPop.vue')['default']
     RewardPop: typeof import('./src/components/RewardPop.vue')['default']
     RewardSet: typeof import('./src/components/RewardSet.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

@@ -34,6 +34,7 @@ export const C_EVENT = {
   UPDATE_SCHEDULE_GROUP: "updateScheduleListId",
   UPDATE_USER_INFO: "updateUserInfo",
   REWARD: "reward",
+  REWARD_LIST: "rewardList",
   TOAST: "toast",
   /** 抽奖：从设置页跳转到指定奖品类别 */
   LOTTERY_NAV_TO_CATE: "lotteryNavToCate",

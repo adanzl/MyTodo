@@ -191,7 +191,7 @@ function handleRefresh(event: any) {
   const cateId = selectedCate.value?.id === 0 ? undefined : selectedCate.value?.id;
   refreshGiftList(cateId, 1);
   refreshCateList();
-  refreshScoreHistoryList(undefined, 1);
+  refreshScoreHistoryList(selectedUser.value?.id, 1);
   getLotteryData()
     .then((data: any) => {
       lotteryDate.value = JSON.parse(data);

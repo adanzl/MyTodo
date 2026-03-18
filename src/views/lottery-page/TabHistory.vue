@@ -73,7 +73,7 @@ import {
   timeOutline,
 } from "ionicons/icons";
 import dayjs from "dayjs";
-import { getGiftData } from "@/api/lottery";
+import { getList } from "@/api/data";
 import { getNetworkErrorMessage } from "@/utils/NetUtil";
 import EventBus, { C_EVENT } from "@/types/EventBus";
 
@@ -106,17 +106,48 @@ function formatDate(dateStr: string) {
 
 async function onLotteryHistoryDetail(item: any) {
   if ((item.action === "lottery" || item.action === "exchange") && item.out_key) {
-
     const loading = await loadingController.create({ message: "加载中..." });
     await loading.present();
 
     try {
-      const gift = await getGiftData(item.out_key);
-      EventBus.$emit(C_EVENT.REWARD, {
-        value: gift.name,
-        img: gift.image,
-        rewardType: "gift",
+      // 解析 out_key 为 ID 列表（保留重复项）
+      const ids = String(item.out_key)
+        .split(",")
+        .map((id: string) => Number(id.trim()));
+
+      // 获取所有唯一的 ID
+      const uniqueIds = [...new Set(ids)];
+
+      // 使用 getList 接口批量获取奖品数据
+      const response = await getList<{ name: string; image: string }>(
+        "t_gift",
+        { id: { in: uniqueIds } }
+      );
+
+      // 创建 ID 到奖品的映射
+      const giftMap = new Map<number, { name: string; image: string }>();
+      (response.data || []).forEach((gift) => {
+        giftMap.set((gift as any).id, gift);
       });
+
+      // 按照原始 IDs 的顺序重组数据（包括重复项）
+      const rewardList = ids
+        .map((id) => giftMap.get(id))
+        .filter(Boolean)
+        .map((gift) => ({
+          value: gift!.name || "-",
+          img: gift!.image || "",
+          rewardType: "gift" as const,
+        }));
+
+      // 只有一个元素时使用 REWARD，多个元素时使用 REWARD_LIST
+      if (rewardList.length === 1) {
+        EventBus.$emit(C_EVENT.REWARD, rewardList[0]);
+      } else {
+        EventBus.$emit(C_EVENT.REWARD_LIST, {
+          rewardList,
+        });
+      }
     } catch (err) {
       EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err as any));
     } finally {
