@@ -38,14 +38,8 @@ class DbMgr:
         # 针对 SQLite，SQLAlchemy 默认使用 NullPool，它会忽略 pool_size 等参数。
         # 为清晰起见，我们只设置必要的参数，并明确告知 gevent/多线程环境需要关闭线程检查。
         if 'sqlite' in db_uri:
-            app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-                'connect_args': {
-                    'check_same_thread': False
-                }
-            }
-            log.info(
-                "DbMgr init with SQLite, using default NullPool and connect_args={'check_same_thread': False}"
-            )
+            app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'connect_args': {'check_same_thread': False}}
+            log.info("DbMgr init with SQLite, using default NullPool and connect_args={'check_same_thread': False}")
         else:
             # 为其他数据库（如 PostgreSQL/MySQL）保留连接池配置
             app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
@@ -54,50 +48,38 @@ class DbMgr:
                 'pool_recycle': config.DB_POOL_RECYCLE,
                 'pool_pre_ping': config.DB_POOL_PRE_PING,
             }
-            log.info(
-                f"DbMgr init with pool_size={config.DB_POOL_SIZE}, max_overflow={config.DB_MAX_OVERFLOW}, "
-                f"pool_recycle={config.DB_POOL_RECYCLE}, pool_pre_ping={config.DB_POOL_PRE_PING}"
-            )
+            log.info(f"DbMgr init with pool_size={config.DB_POOL_SIZE}, max_overflow={config.DB_MAX_OVERFLOW}, "
+                     f"pool_recycle={config.DB_POOL_RECYCLE}, pool_pre_ping={config.DB_POOL_PRE_PING}")
 
         db_obj.init_app(app)
         self._initialized = True
 
-    def set_save(self, id: Optional[int], user_name: str,
-                 data: str) -> Dict[str, Any]:
+    def set_save(self, id: Optional[int], user_name: str, data: str) -> Dict[str, Any]:
         """
         保存或更新用户数据到 t_user_save 表。
         如果 id 存在，则更新；否则插入新记录。
         """
         try:
             metadata = MetaData()
-            table_obj = Table(TABLE_SAVE,
-                              metadata,
-                              autoload_with=db_obj.engine)
+            table_obj = Table(TABLE_SAVE, metadata, autoload_with=db_obj.engine)
             if id:
                 # 查找是否存在
                 stmt_sel = select(table_obj).where(table_obj.c.id == id)
                 result = db_obj.session.execute(stmt_sel).fetchone()
                 if result:
                     # 存在则更新
-                    stmt_upd = table_obj.update().where(
-                        table_obj.c.id == id).values(user_name=user_name,
-                                                     data=data)
+                    stmt_upd = table_obj.update().where(table_obj.c.id == id).values(user_name=user_name, data=data)
                     db_obj.session.execute(stmt_upd)
                 else:
                     # 不存在则插入
-                    stmt_ins = table_obj.insert().values(id=id,
-                                                         user_name=user_name,
-                                                         data=data)
+                    stmt_ins = table_obj.insert().values(id=id, user_name=user_name, data=data)
                     res = db_obj.session.execute(stmt_ins)
-                    id = res.inserted_primary_key[
-                        0] if res.inserted_primary_key else id
+                    id = res.inserted_primary_key[0] if res.inserted_primary_key else id
             else:
                 # 没有id直接插入
-                stmt_ins = table_obj.insert().values(user_name=user_name,
-                                                     data=data)
+                stmt_ins = table_obj.insert().values(user_name=user_name, data=data)
                 res = db_obj.session.execute(stmt_ins)
-                id = res.inserted_primary_key[
-                    0] if res.inserted_primary_key else None
+                id = res.inserted_primary_key[0] if res.inserted_primary_key else None
             db_obj.session.commit()
         except Exception as e:
             db_obj.session.rollback()
@@ -106,10 +88,7 @@ class DbMgr:
             return {"code": -1, "msg": 'error ' + str(e)}
         return {"code": 0, "msg": "ok", "data": id}
 
-    def get_data_idx(self,
-                     table: str,
-                     id: int,
-                     idx: int = 1) -> Dict[str, Any]:
+    def get_data_idx(self, table: str, id: int, idx: int = 1) -> Dict[str, Any]:
         """根据 id 从指定表获取单个字段的数据。"""
         try:
             metadata = MetaData()
@@ -130,8 +109,7 @@ class DbMgr:
             return {"code": -1, "msg": 'error ' + str(e)}
         return {"code": 0, "msg": "ok", "data": data}
 
-    def get_data(self, table: str, id: int,
-                 fields: Union[str, List[str]]) -> Dict[str, Any]:
+    def get_data(self, table: str, id: int, fields: Union[str, List[str]]) -> Dict[str, Any]:
         """根据 id 从指定表获取一个或多个字段的数据。"""
         try:
             metadata = MetaData()
@@ -153,11 +131,7 @@ class DbMgr:
                     fields = [f.strip() for f in fields.split(',')]
                 columns = [table_obj.c[f] for f in fields if f in table_obj.c]
                 if not columns:
-                    return {
-                        "code": -1,
-                        "msg": f"无效的字段: {fields}",
-                        "data": None
-                    }
+                    return {"code": -1, "msg": f"无效的字段: {fields}", "data": None}
                 stmt = select(*columns).where(table_obj.c.id == id)
                 result = db_obj.session.execute(stmt).fetchone()
                 if result:
@@ -194,21 +168,18 @@ class DbMgr:
                 result = db_obj.session.execute(stmt_sel).fetchone()
                 if result:
                     # 存在则更新
-                    stmt_upd = table_obj.update().where(
-                        table_obj.c.id == id).values(**processed_data)
+                    stmt_upd = table_obj.update().where(table_obj.c.id == id).values(**processed_data)
                     db_obj.session.execute(stmt_upd)
                 else:
                     # 不存在则插入
                     stmt_ins = table_obj.insert().values(**processed_data)
                     res = db_obj.session.execute(stmt_ins)
-                    id = res.inserted_primary_key[
-                        0] if res.inserted_primary_key else id
+                    id = res.inserted_primary_key[0] if res.inserted_primary_key else id
             else:
                 # 没有id直接插入
                 stmt_ins = table_obj.insert().values(**processed_data)
                 res = db_obj.session.execute(stmt_ins)
-                id = res.inserted_primary_key[
-                    0] if res.inserted_primary_key else None
+                id = res.inserted_primary_key[0] if res.inserted_primary_key else None
             db_obj.session.commit()
         except Exception as e:
             db_obj.session.rollback()
@@ -301,13 +272,12 @@ class DbMgr:
             return {"code": -1, "msg": 'error ' + str(e)}
         return {"code": 0, "msg": "ok", "data": data}
 
-    def get_list(
-            self,
-            table: str,
-            page_num: int = 1,
-            page_size: int = 20,
-            fields: Union[str, List[str]] = '*',
-            conditions: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def get_list(self,
+                 table: str,
+                 page_num: int = 1,
+                 page_size: int = 20,
+                 fields: Union[str, List[str]] = '*',
+                 conditions: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         try:
             # 动态获取表结构
             metadata = MetaData()
@@ -319,20 +289,13 @@ class DbMgr:
                 count_query = select(func.count()).select_from(table_obj)
             else:
                 # 字段筛选
-                columns = [
-                    table_obj.columns[f] for f in fields
-                    if f in table_obj.columns
-                ]
+                columns = [table_obj.columns[f] for f in fields if f in table_obj.columns]
                 if not columns:
-                    return {
-                        "code": -1,
-                        "msg": f"无效的字段: {fields}",
-                        "data": None
-                    }
+                    return {"code": -1, "msg": f"无效的字段: {fields}", "data": None}
                 query = select(*columns)
                 count_query = select(func.count()).select_from(table_obj)
 
-            # 条件过滤（支持 (op, value) 表示 >, <, >=, <=, !=）
+            # 条件过滤（支持 (op, value) 表示 >, <, >=, <=, !=, in）
             if conditions and isinstance(conditions, dict):
                 for k, v in conditions.items():
                     if k not in table_obj.columns:
@@ -355,6 +318,9 @@ class DbMgr:
                         elif op == '!=':
                             query = query.where(col != val)
                             count_query = count_query.where(col != val)
+                        elif op == 'in':
+                            query = query.where(col.in_(val))
+                            count_query = count_query.where(col.in_(val))
                         else:
                             query = query.where(col == val)
                             count_query = count_query.where(col == val)
@@ -366,8 +332,7 @@ class DbMgr:
             total_count = db_obj.session.execute(count_query).scalar()
 
             # 分页和排序
-            query = query.order_by(text('id DESC')).offset(
-                (page_num - 1) * page_size).limit(page_size)
+            query = query.order_by(text('id DESC')).offset((page_num - 1) * page_size).limit(page_size)
 
             # 执行查询
             result = db_obj.session.execute(query)
