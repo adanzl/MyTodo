@@ -18,14 +18,14 @@ lottery_bp = Blueprint("lottery", __name__)
 def _parse_int(
     value: Any,
     name: str,
-) -> tuple[Optional[int], Optional[ResponseReturnValue]]:
+) -> tuple[int, Optional[ResponseReturnValue]]:
     """把输入解析为 int。失败时返回错误响应。"""
     if value is None or value == "":
-        return None, {"code": -1, "msg": f"{name} is required"}
+        return 0, {"code": -1, "msg": f"{name} is required"}
     try:
         return int(value), None
     except (TypeError, ValueError):
-        return None, {"code": -1, "msg": f"{name} must be int"}
+        return 0, {"code": -1, "msg": f"{name} must be int"}
 
 
 @lottery_bp.route("/doLottery", methods=["POST"])

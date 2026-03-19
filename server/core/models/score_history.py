@@ -15,7 +15,7 @@ class ScoreHistory(db_obj.Model):
     msg: Mapped[str] = mapped_column(default='', nullable=True)
     dt: Mapped[str] = mapped_column(default='', nullable=False)
     # 关联外部对象（如抽奖礼物 id 等），可为空
-    out_key: Mapped[Optional[int]] = mapped_column(nullable=True)
+    out_key: Mapped[Optional[str]] = mapped_column(nullable=True)
 
     def to_dict(self):
         return {

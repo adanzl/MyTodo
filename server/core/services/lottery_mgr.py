@@ -333,7 +333,7 @@ class LotteryMgr:
             -cost,
             'exchange',
             f"兑换[{gift.get('id')}]{gift.get('name', '')}",
-            out_key=gift_id,
+            out_key=str(gift_id),
         )
         if add_ret.get('code') != 0:
             return add_ret

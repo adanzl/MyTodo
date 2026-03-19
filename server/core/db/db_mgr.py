@@ -2,7 +2,7 @@ import json
 import traceback
 import datetime
 from datetime import timezone, timedelta
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, cast
 
 from flask import Flask
 from core.db import db_obj
@@ -10,6 +10,7 @@ from core.config import app_logger, config
 from core.config.const import DB_CODE_SUCCESS, DB_CODE_ERROR, DB_CODE_ERROR_RUNTIME
 from sqlalchemy import func
 from sqlalchemy import MetaData, Table, select, text, inspect
+from sqlalchemy.engine import CursorResult
 from core.models.user import User
 from core.models.score_history import ScoreHistory
 
@@ -75,12 +76,12 @@ class DbMgr:
                     # 不存在则插入
                     stmt_ins = table_obj.insert().values(id=id, user_name=user_name, data=data)
                     res = db_obj.session.execute(stmt_ins)
-                    id = res.inserted_primary_key[0] if res.inserted_primary_key else id
+                    id = res.inserted_primary_key[0] if res.inserted_primary_key else id  # type: ignore[attr-defined]
             else:
                 # 没有 id 直接插入
                 stmt_ins = table_obj.insert().values(user_name=user_name, data=data)
                 res = db_obj.session.execute(stmt_ins)
-                id = res.inserted_primary_key[0] if res.inserted_primary_key else None
+                id = res.inserted_primary_key[0] if res.inserted_primary_key else None  # type: ignore[attr-defined]
             db_obj.session.commit()
         except Exception as e:
             db_obj.session.rollback()
@@ -209,15 +210,15 @@ class DbMgr:
                     # 不存在则插入
                     stmt_ins = table_obj.insert().values(**processed_data)
                     res = db_obj.session.execute(stmt_ins)
-                    id = res.inserted_primary_key[0] if res.inserted_primary_key else id
+                    id = res.inserted_primary_key[0] if res.inserted_primary_key else id  # type: ignore[attr-defined]
 
             else:
                 # 没有 id 直接插入
                 stmt_ins = table_obj.insert().values(**processed_data)
                 res = db_obj.session.execute(stmt_ins)
-                id = res.inserted_primary_key[0] if res.inserted_primary_key else None
+                id = res.inserted_primary_key[0] if res.inserted_primary_key else None  # type: ignore[attr-defined]
             db_obj.session.commit()
-            cnt = res.rowcount
+            cnt = res.rowcount  # type: ignore[attr-defined]
         except Exception as e:
             db_obj.session.rollback()
             log.error(e)
@@ -231,7 +232,7 @@ class DbMgr:
         value: int,
         action: str,
         msg: Optional[str],
-        out_key: Optional[int] = None,
+        out_key: Optional[str] = None,
     ) -> Dict[str, Any]:
         """为用户增加或扣除积分，并记录历史。"""
         try:
@@ -248,19 +249,19 @@ class DbMgr:
             # 手动计算时区偏移，确保正确输出时区信息
             now = datetime.datetime.now()
             offset = now.astimezone().utcoffset()
-            offset_hours = int(offset.total_seconds() / 3600)
+            offset_hours = int(offset.total_seconds() / 3600) if offset else 0
             offset_str = f"{offset_hours:+03d}:00"
 
-            score_history = ScoreHistory(
-                user_id=user_id,
-                value=value,
-                action=action,
-                pre_value=pre_score,
-                current=cur_score,
-                msg=msg,
-                dt=now.strftime(f"%Y-%m-%d %H:%M:%S {offset_str}"),
-                out_key=out_key,
-            )
+            # 使用属性赋值方式创建 ScoreHistory 对象
+            score_history = ScoreHistory()
+            score_history.user_id = user_id
+            score_history.value = value
+            score_history.action = action
+            score_history.pre_value = pre_score
+            score_history.current = cur_score
+            score_history.msg = msg if msg else ''
+            score_history.dt = now.strftime(f"%Y-%m-%d %H:%M:%S {offset_str}")
+            score_history.out_key = out_key
 
             # 更新用户积分
             user.score = cur_score
@@ -285,7 +286,7 @@ class DbMgr:
             stmt = table_obj.delete().where(table_obj.c.id == id)
             result = db_obj.session.execute(stmt)
             db_obj.session.commit()
-            cnt = result.rowcount
+            cnt = result.rowcount  # type: ignore[attr-defined]
         except Exception as e:
             db_obj.session.rollback()
             log.error(e)
@@ -375,7 +376,7 @@ class DbMgr:
                         count_query = count_query.where(col == v)
 
             # 获取总数
-            total_count = db_obj.session.execute(count_query).scalar()
+            total_count = db_obj.session.execute(count_query).scalar() or 0
 
             # 分页和排序
             query = query.order_by(text('id DESC')).offset((page_num - 1) * page_size).limit(page_size)
