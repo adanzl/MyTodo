@@ -44,7 +44,7 @@ export interface UserListItem {
   id: number;
   name?: string;
   score?: number;
-  wish_list?: unknown;
+  wish_list?: number[];
   [key: string]: unknown;
 }
 
@@ -146,6 +146,7 @@ export interface GiftCategoryItem {
   id?: number;
   name?: string;
   cost?: number;
+  count?: number;
   [key: string]: unknown;
 }
 

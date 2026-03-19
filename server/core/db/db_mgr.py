@@ -1,18 +1,16 @@
+import datetime
 import json
 import traceback
-import datetime
-from datetime import timezone, timedelta
 from typing import Any, Dict, List, Optional, Union, cast
 
 from flask import Flask
-from core.db import db_obj
+from sqlalchemy import MetaData, Table, func, inspect, select, text
+
 from core.config import app_logger, config
-from core.config.const import DB_CODE_SUCCESS, DB_CODE_ERROR, DB_CODE_ERROR_RUNTIME
-from sqlalchemy import func
-from sqlalchemy import MetaData, Table, select, text, inspect
-from sqlalchemy.engine import CursorResult
-from core.models.user import User
+from core.config.const import (DB_CODE_ERROR, DB_CODE_ERROR_RUNTIME, DB_CODE_SUCCESS)
+from core.db import db_obj
 from core.models.score_history import ScoreHistory
+from core.models.user import User
 
 log = app_logger
 

@@ -261,30 +261,6 @@ class LotteryMgr:
 
         return False, False
 
-    def _commit_win(self, user_id: int, cate_cost: Any, gift: Dict[str, Any]) -> Dict[str, Any]:
-        """扣库存、扣积分并返回中奖结果。"""
-        gid = gift.get('id')
-        stock = gift.get('stock')
-        if gid is not None and isinstance(stock, (int, float)):
-            self._db.set_data('t_gift', {'id': gid, 'stock': max(0, int(stock) - 1)})
-        self._db.add_score(
-            user_id,
-            -cate_cost,
-            'lottery',
-            f"获得[{gift.get('id')}]{gift.get('name', '')}",
-            out_key=gift.get('id'),
-        )
-        log.info(f"Selected Gift: [{gift.get('id')}] {gift.get('name', '')}")
-        return {
-            "code": 0,
-            "msg": "抽奖成功",
-            "data": {
-                "gift": gift,
-                "fee": cate_cost,
-                "won": True
-            },
-        }
-
     def do_exchange(self, user_id: int, gift_id: int) -> Dict[str, Any]:
         """
         执行兑换：校验礼物可兑换且库存、用户积分足够，扣库存、扣积分并记录历史。
@@ -363,7 +339,7 @@ class LotteryMgr:
         if action not in ('lottery', 'exchange'):
             return {"code": -1, "msg": "仅支持撤销抽奖/兑换记录"}
         out_key = rec.get('out_key')
-        if out_key is None:
+        if out_key is None or (isinstance(out_key, str) and not out_key.strip()):
             return {"code": -1, "msg": "该记录无关联奖品，无法撤销"}
         user_id = rec.get('user_id')
         pre_value = rec.get('pre_value')
