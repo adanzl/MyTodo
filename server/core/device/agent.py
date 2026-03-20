@@ -284,14 +284,19 @@ class DeviceAgent(DeviceBase):
             return self._request("POST", "/keyboard/mock", json_data=json_data)
         else:
             return {"code": -1, "msg": f"不支持的 action: {action}"}
-    
-    def update_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
+
+    def update_config(self, config_type: str, config: Dict[str, Any]) -> Dict[str, Any]:
         """请求 Agent 更新设备配置。
     
         Args:
+            config_type (str): 配置类型，例如 "keyboard"。
             config (Dict[str, Any]): 新的配置字典，可以包含任意键值对。
-    
         Returns:
             Dict[str, Any]: Agent 返回的响应字典。
         """
-        return self._request("POST", "/agent/config", json_data={"config": config})
+        if config_type == "keyboard":
+            url = "/keyboard/config/set"
+            json_data = config
+        else:
+            ret = {"code": -1, "msg": f"不支持的 config_type: {config_type}"}
+        return self._request("POST", url, json_data=json_data)

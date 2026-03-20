@@ -210,7 +210,7 @@ def agent_config_update() -> ResponseReturnValue:
 
         log.info(f"===== [Agent Config Update] agent_id={data.agent_id}, config={data.config}")
 
-        code, msg = agent_mgr.update_agent_config(agent_id=data.agent_id, config=data.config)
+        code, msg = agent_mgr.update_agent_config(data)
         if code == 0:
             return _ok()
         else:

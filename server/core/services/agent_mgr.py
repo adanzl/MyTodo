@@ -4,7 +4,7 @@ Agent 管理器
 """
 import time
 from typing import Dict, Optional, List, Any, Union
-from core.api.types import AgentHeartbeatData
+from core.api.types import AgentConfigBody, AgentHeartbeatData
 from core.device.agent import DeviceAgent
 from core.config import app_logger
 from core.services.playlist_mgr import playlist_mgr
@@ -148,16 +148,19 @@ class AgentMgr:
             playlist_mgr.trigger_button(button, action)
         return 0, "ok"
 
-    def update_agent_config(self, agent_id: str, config: dict[str, Any]) -> tuple[int, str]:
+    def update_agent_config(self, data: AgentConfigBody) -> tuple[int, str]:
         """更新指定 Agent 的配置（通过 HTTP 请求）。
 
         Args:
-            agent_id (str): Agent 唯一标识。
-            config (dict[str, Any]): 新的配置字典。
+            data (AgentConfigBody): 包含 agent_id 和 config 的数据对象。
 
         Returns:
             tuple[int, str]: (code, msg)。code=0 表示成功。
         """
+        # agent_id: str, config: dict[str, Any]
+        agent_id = data.agent_id
+        config = data.config
+        config_type = data.type
         if agent_id not in self._devices:
             return -1, f"device not found: {agent_id}"
 
@@ -168,11 +171,11 @@ class AgentMgr:
 
         # 通过 HTTP 请求向 Agent 发送配置更新
         try:
-            result = agent.update_config(config)
+            result = agent.update_config(config_type, config)
             if result.get("code") == 0:
-                # 更新本地存储的配置
-                self._devices[agent_id]['config'] = config
                 log.info(f"[AgentMgr] 更新设备配置成功：{agent_id}, config={config}")
+                if config_type == "keyboard":
+                    self._devices[agent_id]
                 return 0, "ok"
             else:
                 msg = result.get("msg", "更新配置失败")

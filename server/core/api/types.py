@@ -11,6 +11,7 @@ class AgentHeartbeatData(BaseModel):
 
 class AgentConfigBody(BaseModel):
     agent_id: str  # 设备 ID
+    type: str
     config: dict[str, Any]  # 配置内容
 
 
