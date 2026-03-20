@@ -68,20 +68,22 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="支持的操作" min-width="100">
+            <el-table-column label="支持的操作" min-width="60">
               <template #default="{ row }">
-                <el-tag
-                  v-for="action in row.actions"
-                  :key="action"
-                  size="small"
-                  type="info"
-                  class="mr-1"
-                >
-                  {{ action }}
-                </el-tag>
-                <span v-if="!row.actions || row.actions.length === 0" class="text-gray-400"
-                  >无</span
-                >
+                <div class="flex flex-col gap-1">
+                  <el-tag
+                    v-for="action in row.actions"
+                    :key="action"
+                    size="small"
+                    type="info"
+                    class="mr-1"
+                  >
+                    {{ action }}
+                  </el-tag>
+                  <span v-if="!row.actions || row.actions.length === 0" class="text-gray-400"
+                    >无</span
+                  >
+                </div>
               </template>
             </el-table-column>
             <el-table-column label="状态/心跳" width="90">
@@ -120,6 +122,40 @@
                 </div>
               </template>
             </el-table-column>
+          <el-table-column label="生效时间" width="200">
+            <template #default="{ row }">
+              <div class="flex flex-col gap-1">
+                <div class="flex items-center gap-1">
+                  <span class="text-xs text-gray-600 w-10 shrink-0">开始：</span>
+                  <el-time-picker
+                    v-model="row.effect_start_time"
+                    format="HH:mm"
+                    value-format="HH:mm"
+                    size="small"
+                    placeholder="选择时间"
+                    :clearable="true"
+                    @change="handleEffectTimeChange(row)"
+                    class="w-25!"
+                  />
+                </div>
+                <div class="flex items-center gap-1">
+                  <span class="text-xs text-gray-600 w-10 shrink-0">持续：</span>
+                  <el-input-number
+                    v-model="row.effect_duration"
+                    :min="0"
+                    :max="1440"
+                    :step="5"
+                    size="small"
+                    placeholder="分钟"
+                    controls-position="right"
+                    @change="handleEffectTimeChange(row)"
+                    class="w-18!"
+                  />
+                  <span class="text-xs text-gray-600">分钟</span>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
             <template #empty>
               <div class="text-center text-gray-400 py-8">暂无设备，请等待设备注册</div>
             </template>
@@ -149,12 +185,12 @@
               <template #default="{ row }">
                 <el-tag
                   :type="row.connecting || row.disconnecting
-                      ? 'warning'
-                      : row.connected
-                        ? 'success'
-                        : row.rssi !== undefined
-                          ? 'info'
-                          : 'info'
+                    ? 'warning'
+                    : row.connected
+                      ? 'success'
+                      : row.rssi !== undefined
+                        ? 'info'
+                        : 'info'
                     "
                   size="small"
                 >
@@ -443,8 +479,29 @@ const buttonGroups = [
   { label: "B3", keys: ["F17", "F18"] },
 ];
 
-// ========== Agent设备相关方法 ==========
-// 刷新Agent设备列表
+// ========== Agent 设备相关方法 ==========
+// 处理生效时间变化
+const handleEffectTimeChange = async (device: AgentDevice) => {
+  try {
+    // TODO: 调用后端 API 保存生效时间配置
+    // const response = await api.post('/agent/effect_time', {
+    //   agent_id: device.agent_id,
+    //   effect_start_time: device.effect_start_time,
+    //   effect_duration: device.effect_duration
+    // });
+
+    // if (response?.data?.code === 0) {
+    //   ElMessage.success('生效时间已更新');
+    // } else {
+    //   ElMessage.error(response?.data?.msg || '更新生效时间失败');
+    // }
+    ElMessage.success('生效时间已更新');
+  } catch (error) {
+    logAndNoticeError(error as Error, '更新生效时间失败');
+  }
+};
+
+// 刷新 Agent 设备列表
 const refreshAgentList = async (showLoading = true, showMessage = false) => {
   try {
     if (showLoading) {

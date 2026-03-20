@@ -186,6 +186,14 @@ export interface AgentDevice extends BaseDevice {
    */
   type?: "agent";
   /**
+   * 生效开始时间（格式：HH:mm）
+   */
+  effect_start_time?: string;
+  /**
+   * 生效持续时间（单位：分钟）
+   */
+  effect_duration?: number;
+  /**
    * 测试按钮状态（动态字段）
    * 格式：testing_F{number}
    */
