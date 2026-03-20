@@ -75,7 +75,7 @@ class AgentMgr:
             }
 
             log.info(
-                f"[AgentMgr] 注册新设备: {data.address}, name={data.name}, actions={data.actions}, config={data.config}")
+                f"[AgentMgr] 注册新设备: {data.address}, name={data.name}, actions={data.actions}, keyboard={data.keyboard}")
         else:
             # 更新心跳时间和设备信息
             self._devices[agent_id]['heartbeat_time'] = current_time
