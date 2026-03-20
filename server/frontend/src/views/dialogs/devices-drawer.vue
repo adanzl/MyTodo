@@ -68,7 +68,7 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="支持的操作" min-width="60">
+            <el-table-column label="支持的操作" min-width="80">
               <template #default="{ row }">
                 <div class="flex flex-col gap-1">
                   <el-tag
@@ -128,20 +128,20 @@
                 <div class="flex items-center gap-1">
                   <span class="text-xs text-gray-600 w-10 shrink-0">开始：</span>
                   <el-time-picker
-                    v-model="row.effect_start_time"
+                    v-model="row.keyboard.configs.global.key_valid_time"
                     format="HH:mm"
                     value-format="HH:mm"
                     size="small"
                     placeholder="选择时间"
                     :clearable="true"
                     @change="handleEffectTimeChange(row)"
-                    class="w-25!"
+                    class="w-26!"
                   />
                 </div>
                 <div class="flex items-center gap-1">
                   <span class="text-xs text-gray-600 w-10 shrink-0">持续：</span>
                   <el-input-number
-                    v-model="row.effect_duration"
+                    v-model="row.keyboard.configs.global.key_valid_duration"
                     :min="0"
                     :max="1440"
                     :step="5"
@@ -149,7 +149,7 @@
                     placeholder="分钟"
                     controls-position="right"
                     @change="handleEffectTimeChange(row)"
-                    class="w-18!"
+                    class="w-19!"
                   />
                   <span class="text-xs text-gray-600">分钟</span>
                 </div>
@@ -484,9 +484,13 @@ const buttonGroups = [
 // 处理生效时间变化
 const handleEffectTimeChange = async (device: AgentDevice) => {
   try {
+    // 从 keyboard.configs.global 中读取配置
+    const keyboardGlobalConfig = device.keyboard?.configs?.global || {};
+    console.log('[Agent Config] 当前设备配置:', keyboardGlobalConfig);
+
     const response = await apiSetAgentConfig(device.agent_id, 'keyboard', {
-      effect_start_time: device.effect_start_time,
-      effect_duration: device.effect_duration,
+      key_valid_time: keyboardGlobalConfig.key_valid_time,
+      key_valid_duration: keyboardGlobalConfig.key_valid_duration,
     });
 
     if (response?.code === 0) {
@@ -511,6 +515,7 @@ const refreshAgentList = async (showLoading = true, showMessage = false) => {
 
     if (result?.code === 0) {
       agentList.value = result.data || [];
+      console.log('[Agent List] 获取的设备数据:', result.data);
       if (showMessage) {
         ElMessage.success(`已获取 ${agentList.value.length} 个 Agent 设备`);
       }
@@ -522,7 +527,7 @@ const refreshAgentList = async (showLoading = true, showMessage = false) => {
       agentList.value = [];
     }
   } catch (error) {
-    console.error("获取Agent设备列表失败:", error);
+    console.error("获取 Agent 设备列表失败:", error);
     const shouldShowError = showMessage || showLoading;
     if (shouldShowError) {
       logAndNoticeError(error as Error, "获取设备列表失败");

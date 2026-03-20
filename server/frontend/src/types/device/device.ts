@@ -162,6 +162,55 @@ export interface MiDevice extends BaseDevice {
 }
 
 /**
+ * Agent 设备键盘配置接口
+ */
+export interface AgentDeviceKeyboardConfig {
+  /**
+   * 键有效开始时间（格式：HH:mm）
+   */
+  key_valid_time?: string;
+  /**
+   * 键有效持续时间（单位：分钟）
+   */
+  key_valid_duration?: number;
+  [key: string]: unknown;
+}
+
+/**
+ * Agent 设备键盘信息
+ */
+export interface AgentDeviceKeyboard {
+  /**
+   * 是否支持
+   */
+  supported?: boolean;
+  /**
+   * 是否正在运行
+   */
+  is_running?: boolean;
+  /**
+   * 平台信息
+   */
+  platform?: string;
+  /**
+   * evdev 是否可用
+   */
+  evdev_available?: boolean;
+  /**
+   * pynput 是否可用
+   */
+  pynput_available?: boolean;
+  /**
+   * 已注册的按键处理器列表
+   */
+  handlers?: string[];
+  /**
+   * 键盘配置
+   */
+  configs?: Record<string, AgentDeviceKeyboardConfig & Record<string, unknown>>;
+}
+
+/**
  * Agent 设备
  */
 export interface AgentDevice extends BaseDevice {
@@ -186,13 +235,9 @@ export interface AgentDevice extends BaseDevice {
    */
   type?: "agent";
   /**
-   * 生效开始时间（格式：HH:mm）
+   * 键盘设备信息
    */
-  effect_start_time?: string;
-  /**
-   * 生效持续时间（单位：分钟）
-   */
-  effect_duration?: number;
+  keyboard?: AgentDeviceKeyboard;
   /**
    * 测试按钮状态（动态字段）
    * 格式：testing_F{number}
