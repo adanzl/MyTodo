@@ -26,7 +26,7 @@ class DeviceAgent(DeviceBase):
             address (Optional[str]): Agent 服务地址（IP:PORT 格式），如果为 None 则使用默认配置。
             name (Optional[str]): 设备名称。
         """
-        super().__init__(name=name)
+        super().__init__(name=name or "")
         base_url = address or DEVICE_AGENT_BASE_URL
         # 确保 base_url 有 http:// 前缀
         if base_url and not base_url.startswith(('http://', 'https://')):

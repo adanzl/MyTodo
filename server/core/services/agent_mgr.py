@@ -4,6 +4,7 @@ Agent 管理器
 """
 import time
 from typing import Dict, Optional, List, Any, Union
+from core.api.agent_routes import AgentHeartbeatData
 from core.device.agent import DeviceAgent
 from core.config import app_logger
 from core.services.playlist_mgr import playlist_mgr
@@ -30,6 +31,7 @@ class AgentMgr:
         self._agents: Dict[str, DeviceAgent] = {}  # {agent_id: DeviceAgent}
         self._devices: Dict[str, Dict[str, Any]] = {}  # {agent_id: {'heartbeat_time': timestamp, 'agent_id': str}}
 
+
     def _cleanup_expired_devices(self) -> None:
         """懒清理：清理过期设备"""
         current_time = time.time()
@@ -43,22 +45,15 @@ class AgentMgr:
             self.remove_agent(agent_id)
             log.info(f"[AgentMgr] 移除过期设备: {agent_id}")
 
-    def handle_heartbeat(self,
-                         client_ip: str,
-                         address: str,
-                         name: Optional[str] = None,
-                         actions: Optional[List[str]] = None) -> Dict[str, Any]:
+
+    def handle_heartbeat(self, client_ip: str, data: AgentHeartbeatData):
         """处理并注册设备的周期性心跳。
 
         如果设备是首次上报，则为其创建并注册一个新的 Agent 实例；
         否则，更新其心跳时间及设备信息。
 
         Args:
-            client_ip (str): 上报心跳的客户端 IP，作为 Agent 的唯一标识。
-            address (str): 设备的访问地址，通常是 IP:PORT 格式。
-            name (Optional[str]): 设备名称。
-            actions (Optional[List[str]]): 设备支持的操作列表。
-
+            data (AgentHeartbeatData): 上报数据
         Returns:
             Dict[str, Any]: 更新或创建后的设备信息字典。
         """
@@ -69,23 +64,26 @@ class AgentMgr:
         agent_id = client_ip
         if agent_id not in self._devices:
             # 注册新设备
-            self._agents[agent_id] = DeviceAgent(address=address, name=name)
+            self._agents[agent_id] = DeviceAgent(address=data.address, name=data.name)
             self._devices[agent_id] = {
                 'heartbeat_time': current_time,
                 'agent_id': agent_id,
                 'register_time': current_time,
-                'name': name or client_ip,
-                'address': address,
-                'actions': actions or []
+                'name': data.name or client_ip,
+                'address': data.address,
+                'actions': data.actions or [],
+                'config': data.config or {},
             }
-            log.info(f"[AgentMgr] 注册新设备: {address}, name={name}, actions={actions}")
+
+            log.info(
+                f"[AgentMgr] 注册新设备: {data.address}, name={data.name}, actions={data.actions}, config={data.config}")
         else:
             # 更新心跳时间和设备信息
             self._devices[agent_id]['heartbeat_time'] = current_time
-            self._devices[agent_id]['name'] = name
-            self._devices[agent_id]['actions'] = actions or []
+            self._devices[agent_id]['name'] = data.name
+            self._devices[agent_id]['actions'] = data.actions or []
+            self._devices[agent_id]['config'] = data.config or {}
             log.debug(f"[agent_id] 更新设备心跳: {agent_id}")
-
         return self._devices[agent_id]
 
     def get_agent(self, agent_id: str) -> DeviceAgent:

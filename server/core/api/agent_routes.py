@@ -26,10 +26,11 @@ agent_bp = Blueprint('agent', __name__)
 from core import limiter
 
 
-class _AgentHeartbeatBody(BaseModel):
-    address: str
-    name: str | None = None
-    actions: list[str] | None = None
+class AgentHeartbeatData(BaseModel):
+    address: str # 设备的访问地址，通常是 IP:PORT 格式
+    name: str | None = None # 设备名称
+    actions: list[str] | None = None # 设备支持的操作列表
+    config: dict[str, Any] | None = None # 设备配置
 
 
 class _AgentEventBody(BaseModel):
@@ -81,17 +82,17 @@ def agent_heartbeat() -> ResponseReturnValue:
         ResponseReturnValue: 成功时返回 code=0，失败时返回错误信息。
     """
     try:
-        data: Dict[str, Any] = read_json_from_request()
-        body, err = parse_with_model(_AgentHeartbeatBody, data, err_factory=_err)
-        if err or not body:
+        req: Dict[str, Any] = read_json_from_request()
+        data, err = parse_with_model(AgentHeartbeatData, req, err_factory=_err)
+        if err or not data:
             return _err(f'error: {str(err)}')
 
         client_ip = _get_client_ip()
 
         log.debug(
-            f"===== [Agent Heartbeat] client_ip={client_ip}, address={body.address}, name={body.name}, actions={body.actions}"
+            f"===== [Agent Heartbeat] client_ip={client_ip}, address={data.address}, name={data.name}, actions={data.actions}"
         )
-        agent_mgr.handle_heartbeat(client_ip=client_ip, address=body.address, name=body.name, actions=body.actions)
+        agent_mgr.handle_heartbeat(client_ip=client_ip, data=data)
         return _ok()
     except Exception as e:
         log.error(f"[Agent] Heartbeat error: {e}")
@@ -159,6 +160,7 @@ def agent_list() -> ResponseReturnValue:
                 'agent_id': device_info.get('agent_id', ''),
                 'actions': device_info.get('actions', []),
                 'register_time': device_info.get('register_time', 0),
+                'config': device_info.get('config', {}),
                 'heartbeat_time': heartbeat_time,
                 'last_heartbeat_ago': int(current_time - heartbeat_time) if heartbeat_time > 0 else -1,
                 'is_online': (current_time - heartbeat_time) < 30 if heartbeat_time > 0 else False
