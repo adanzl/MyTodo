@@ -14,28 +14,38 @@ export function useDragAndDrop(
   playlistLoading: Ref<boolean>,
   preFilesDragMode: Ref<boolean>,
   filesDragMode: Ref<boolean>,
+  playlistDragMode: Ref<boolean>,
   preFilesSortOrder: Ref<string | null>,
   filesSortOrder: Ref<string | null>,
   preFilesOriginalOrder: Ref<PlaylistItem[] | null>,
   filesOriginalOrder: Ref<PlaylistItem[] | null>,
+  playlistOriginalOrder: Ref<Playlist[] | null>,
   selectedWeekdayIndex: Ref<number | null>,
   updateActivePlaylistData: (updater: (playlistInfo: Playlist) => Playlist) => Promise<void>,
   syncActivePlaylist: (collection: Playlist[]) => void,
-  getCurrentPreFiles: () => PlaylistItem[]
+  getCurrentPreFiles: () => PlaylistItem[],
+  savePlaylist: () => Promise<void>,
+  onToggleAutoRefresh?: (enabled: boolean) => void
 ) {
   const getSelectedWeekdayIndex = () => {
     return selectedWeekdayIndex.value !== null ? selectedWeekdayIndex.value : getWeekdayIndex();
   };
 
-  // 检查两个数组的顺序是否相同
-  const isOrderChanged = (original: PlaylistItem[], current: PlaylistItem[]) => {
+  // 检查两个数组的顺序是否相同（支持 PlaylistItem[] 和 Playlist[]）
+  const isOrderChanged = <T extends PlaylistItem | Playlist>(original: T[], current: T[]) => {
     if (!original || !current || original.length !== current.length) {
       return true;
     }
     for (let i = 0; i < original.length; i++) {
-      const origUri = original[i]?.uri || original[i];
-      const currUri = current[i]?.uri || current[i];
-      if (origUri !== currUri) {
+      const origId =
+        "id" in original[i]
+          ? (original[i] as Playlist).id
+          : (original[i] as PlaylistItem).uri || original[i];
+      const currId =
+        "id" in current[i]
+          ? (current[i] as Playlist).id
+          : (current[i] as PlaylistItem).uri || current[i];
+      if (origId !== currId) {
         return true;
       }
     }
@@ -125,6 +135,41 @@ export function useDragAndDrop(
       filesSortOrder.value = null;
     }
     filesDragMode.value = !filesDragMode.value;
+  };
+
+  // 切换播放列表拖拽排序模式
+  const handleTogglePlaylistDragMode = async () => {
+    if (playlistDragMode.value) {
+      // 退出拖拽模式时，检查是否有变化
+      const hasChanged = isOrderChanged(
+        playlistOriginalOrder.value || [],
+        playlistCollection.value
+      );
+      if (hasChanged) {
+        try {
+          playlistLoading.value = true;
+          await savePlaylist();
+          ElMessage.success("排序已保存");
+        } catch (error) {
+          logAndNoticeError(error as Error, "保存排序失败");
+        } finally {
+          playlistLoading.value = false;
+        }
+      }
+      // 清除原始顺序
+      playlistOriginalOrder.value = null;
+    } else {
+      // 启用拖拽模式时，保存原始顺序
+      if (playlistCollection.value && playlistCollection.value.length > 0) {
+        playlistOriginalOrder.value = [...playlistCollection.value];
+      }
+    }
+    playlistDragMode.value = !playlistDragMode.value;
+    
+    // 进入拖拽模式时，关闭自动刷新（如果有回调）
+    if (playlistDragMode.value && onToggleAutoRefresh) {
+      onToggleAutoRefresh(false);
+    }
   };
 
   // 处理前置文件拖拽开始
@@ -357,9 +402,88 @@ export function useDragAndDrop(
     syncActivePlaylist(collection);
   };
 
+  // 处理播放列表拖拽开始
+  const handlePlaylistDragStart = (event: DragEvent, playlistId: string) => {
+    if (!playlistDragMode.value) {
+      event.preventDefault();
+      return;
+    }
+    try {
+      event.dataTransfer!.effectAllowed = "move";
+      event.dataTransfer!.setData("text/plain", playlistId);
+    } catch (e) {
+      console.error("拖拽开始失败:", e);
+    }
+  };
+
+  // 处理播放列表拖拽结束
+  const handlePlaylistDragEnd = (event: DragEvent) => {
+    const target = event.currentTarget as HTMLElement;
+    if (target) {
+      target.classList.remove("bg-gray-100", "border-t-2", "border-b-2", "border-blue-500");
+    }
+  };
+
+  // 处理播放列表拖拽悬停
+  const handlePlaylistDragOver = (event: DragEvent) => {
+    if (!playlistDragMode.value) {
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer!.dropEffect = "move";
+    const target = event.currentTarget as HTMLElement;
+    if (target) {
+      const rect = target.getBoundingClientRect();
+      const mouseY = event.clientY;
+      const elementCenterY = rect.top + rect.height / 2;
+
+      target.classList.remove("bg-gray-100", "border-t-2", "border-b-2", "border-blue-500");
+
+      if (mouseY < elementCenterY) {
+        target.classList.add("border-t-2", "border-blue-500");
+      } else {
+        target.classList.add("border-b-2", "border-blue-500");
+      }
+    }
+  };
+
+  // 处理播放列表拖拽放置
+  const handlePlaylistDrop = (event: DragEvent, targetPlaylistId: string) => {
+    if (!playlistDragMode.value) {
+      return;
+    }
+    event.preventDefault();
+    const target = event.currentTarget as HTMLElement;
+    if (target) {
+      target.classList.remove("bg-gray-100", "border-t-2", "border-b-2", "border-blue-500");
+    }
+
+    const sourcePlaylistId = event.dataTransfer!.getData("text/plain");
+
+    if (sourcePlaylistId === targetPlaylistId || !sourcePlaylistId) {
+      return;
+    }
+
+    const collection = playlistCollection.value;
+    const sourceIndex = collection.findIndex(item => item.id === sourcePlaylistId);
+    const targetIndex = collection.findIndex(item => item.id === targetPlaylistId);
+
+    if (sourceIndex < 0 || targetIndex < 0) {
+      return;
+    }
+
+    // 只在内存中更新，不保存到后端（退出拖拽模式时再保存）
+    const list = [...collection];
+    const [removed] = list.splice(sourceIndex, 1);
+    list.splice(targetIndex, 0, removed);
+
+    playlistCollection.value = list;
+  };
+
   return {
     handleTogglePreFilesDragMode,
     handleToggleFilesDragMode,
+    handleTogglePlaylistDragMode,
     handlePreFileDragStart,
     handlePreFileDragEnd,
     handlePreFileDragOver,
@@ -368,5 +492,9 @@ export function useDragAndDrop(
     handleFileDragEnd,
     handleFileDragOver,
     handleFileDrop,
+    handlePlaylistDragStart,
+    handlePlaylistDragEnd,
+    handlePlaylistDragOver,
+    handlePlaylistDrop,
   };
 }

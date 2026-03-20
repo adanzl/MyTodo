@@ -104,9 +104,7 @@
           </el-icon>
         </el-button>
         <el-button type="default" size="small" plain circle @click="$emit('toggle-more-actions')" title="更多">
-          <el-icon>
-            <Menu />
-          </el-icon>
+          <el-icon><Menu /></el-icon>
         </el-button>
       </div>
     </div>

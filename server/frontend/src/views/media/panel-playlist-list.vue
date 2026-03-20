@@ -2,7 +2,7 @@
   <div class="w-64 min-w-62 border rounded p-3 flex flex-col">
     <div class="flex items-center justify-between mb-3">
       <h3 class="text-base font-semibold">播放列表</h3>
-      <div class="flex items-center gap-1">
+      <div class="flex items-center gap-0">
         <el-switch
           :model-value="autoRefreshEnabled"
           @update:model-value="(value: boolean) => $emit('toggle-auto-refresh', value)"
@@ -10,8 +10,9 @@
           inactive-text=""
           active-color="#409eff"
           size="small"
-          title="自动刷新"
-          class="mr-1"
+          class="mr-2"
+          :disabled="dragMode"
+          :title="dragMode ? '排序模式下禁用' : '自动刷新'"
         />
         <el-button
           type="primary"
@@ -19,17 +20,31 @@
           plain
           @click="$emit('refresh')"
           :loading="refreshing"
-          title="刷新播放列表"
-          class="w-8! h-6! p-0!"
+          :disabled="dragMode"
+          :title="dragMode ? '排序模式下禁用' : '刷新播放列表'"
+          class="w-7! h-6! p-0!"
         >
           <el-icon v-if="!refreshing"><Refresh /></el-icon>
+        </el-button>
+        <el-button
+          :type="dragMode ? 'success' : 'default'"
+          size="small"
+          plain
+          @click="$emit('toggle-drag-mode')"
+          :disabled="playlistCollection.length === 0 || refreshing"
+          :title="dragMode ? '点击退出拖拽排序模式' : '点击进入拖拽排序模式'"
+          class="w-7! h-6! p-0!"
+        >
+          <el-icon v-if="dragMode"><Check /></el-icon>
+          <el-icon v-else><Sort /></el-icon>
         </el-button>
         <el-button
           type="success"
           size="small"
           @click="$emit('create')"
-          title="新建播放列表"
-          class="w-8! h-6! p-0!"
+          :disabled="dragMode"
+          :title="dragMode ? '排序模式下禁用' : '新建播放列表'"
+          class="w-7! h-6! p-0!"
         >
           <el-icon><Plus /></el-icon>
         </el-button>
@@ -43,8 +58,18 @@
         v-for="playlist in playlistCollection"
         :key="playlist.id"
         class="border rounded px-3 py-2 cursor-pointer hover:bg-gray-50 group min-h-15 flex flex-col justify-between"
-        :class="{ 'border-blue-500 bg-blue-50': playlist.id === activePlaylistId }"
-        @click="$emit('select', playlist.id)"
+        :class="[
+          { 'border-blue-500 bg-blue-50': playlist.id === activePlaylistId },
+          { 'cursor-move': dragMode },
+          { 'select-none': true },
+        ]"
+        :draggable="dragMode"
+        @click="dragMode ? null : $emit('select', playlist.id)"
+        @dragstart="(e: DragEvent) => $emit('drag-start', e, playlist.id)"
+        @dragend="(e: DragEvent) => $emit('drag-end', e)"
+        @dragover.prevent="(e: DragEvent) => $emit('drag-over', e)"
+        @dragleave="handleDragLeave"
+        @drop.prevent="(e: DragEvent) => $emit('drop', e, playlist.id)"
       >
         <!-- 第一行：名称、曲目数量、功能按钮 -->
         <div class="flex items-center justify-between gap-2">
@@ -111,7 +136,7 @@
 </template>
 
 <script setup lang="ts">
-import { Refresh, Plus, Headset, VideoPlay, Cpu } from "@element-plus/icons-vue";
+import { Refresh, Plus, Headset, VideoPlay, Cpu, Check, Sort } from "@element-plus/icons-vue";
 import { getWeekdayIndex } from "@/utils/date";
 import { calculateNextCronTimes } from "@/utils/cron";
 import { formatDateTimeWithWeekday } from "@/utils/date";
@@ -122,6 +147,7 @@ interface Props {
   activePlaylistId: string;
   refreshing: boolean;
   autoRefreshEnabled: boolean;
+  dragMode: boolean;
 }
 
 defineProps<Props>();
@@ -131,7 +157,12 @@ defineEmits<{
   create: [];
   refresh: [];
   "toggle-auto-refresh": [enabled: boolean];
+  "toggle-drag-mode": [];
   "menu-command": [command: string, playlistId: string];
+  "drag-start": [event: DragEvent, playlistId: string];
+  "drag-end": [event: DragEvent];
+  "drag-over": [event: DragEvent];
+  drop: [event: DragEvent, playlistId: string];
 }>();
 
 const getPlaylistNextCronTime = (playlist: Playlist) => {
@@ -156,6 +187,13 @@ const getPlaylistNextCronTime = (playlist: Playlist) => {
     return null;
   } catch (error) {
     return null;
+  }
+};
+
+const handleDragLeave = (e: DragEvent) => {
+  const target = e.currentTarget as HTMLElement | null;
+  if (target?.classList) {
+    target.classList.remove("bg-gray-100", "border-t-2", "border-b-2", "border-blue-500");
   }
 };
 </script>

@@ -8,11 +8,17 @@
         :active-playlist-id="activePlaylistId"
         :refreshing="playlistRefreshing"
         :auto-refresh-enabled="autoRefreshEnabled"
+        :drag-mode="playlistDragMode"
         @select="handleSelectPlaylist"
         @create="handleCreatePlaylist"
         @refresh="refreshPlaylistStatus"
         @toggle-auto-refresh="handleToggleAutoRefresh"
+        @toggle-drag-mode="handleTogglePlaylistDragMode"
         @menu-command="handlePlaylistMenuCommand"
+        @drag-start="handlePlaylistDragStart"
+        @drag-end="handlePlaylistDragEnd"
+        @drag-over="handlePlaylistDragOver"
+        @drop="handlePlaylistDrop"
       >
       </PanelPlaylistList>
 
@@ -261,6 +267,7 @@ const {
   selectedWeekdayIndex,
   preFilesDragMode,
   filesDragMode,
+  playlistDragMode,
   preFilesBatchDeleteMode,
   filesBatchDeleteMode,
   selectedPreFileIndices,
@@ -287,6 +294,7 @@ const {
   filesSortOrder,
   preFilesOriginalOrder,
   filesOriginalOrder,
+  playlistOriginalOrder,
 } = usePlaylistState();
 
 // 音频播放 - 使用 composable
@@ -376,10 +384,36 @@ const {
   playlistSelectorSelectedFiles
 );
 
+// 自动刷新状态
+const autoRefreshEnabled = ref(true);
+
+// 定时器 - 每 5 秒刷新一次当前播放列表状态
+import { useInterval } from "@/composables/use-interval";
+import { PLAYLIST_REFRESH_INTERVAL } from "@/constants/playlist";
+
+const { start: startStatusRefresh, stop: stopStatusRefresh } = useInterval(
+  async () => {
+    await refreshPlaylistStatus(true, true);
+  },
+  PLAYLIST_REFRESH_INTERVAL,
+  { immediate: false, autoCleanup: true }
+);
+
+// 切换自动刷新
+const handleToggleAutoRefresh = (enabled: boolean) => {
+  autoRefreshEnabled.value = enabled;
+  if (enabled) {
+    startStatusRefresh();
+  } else {
+    stopStatusRefresh();
+  }
+};
+
 // 拖拽操作 - 使用 composable
 const {
   handleTogglePreFilesDragMode,
   handleToggleFilesDragMode,
+  handleTogglePlaylistDragMode,
   handlePreFileDragStart,
   handlePreFileDragEnd,
   handlePreFileDragOver,
@@ -388,20 +422,28 @@ const {
   handleFileDragEnd,
   handleFileDragOver,
   handleFileDrop,
+  handlePlaylistDragStart,
+  handlePlaylistDragEnd,
+  handlePlaylistDragOver,
+  handlePlaylistDrop,
 } = useDragAndDrop(
   playlistCollection,
   playlistStatus,
   playlistLoading,
   preFilesDragMode,
   filesDragMode,
+  playlistDragMode,
   preFilesSortOrder,
   filesSortOrder,
   preFilesOriginalOrder,
   filesOriginalOrder,
+  playlistOriginalOrder,
   selectedWeekdayIndex,
   updateActivePlaylistDataVoid,
   syncActivePlaylist,
-  getCurrentPreFiles
+  getCurrentPreFiles,
+  savePlaylist,
+  handleToggleAutoRefresh
 );
 
 // 播放列表名称编辑 - 使用 composable
@@ -753,31 +795,6 @@ const handleSelectWeekday = (weekdayIndex: number) => {
   selectedWeekdayIndex.value = weekdayIndex;
   // 重新同步当前播放列表状态，以更新显示的 pre_files
   syncActivePlaylist(playlistCollection.value);
-};
-
-// 自动刷新状态
-const autoRefreshEnabled = ref(true);
-
-// 定时器 - 每5秒刷新一次当前播放列表状态
-import { useInterval } from "@/composables/use-interval";
-import { PLAYLIST_REFRESH_INTERVAL } from "@/constants/playlist";
-
-const { start: startStatusRefresh, stop: stopStatusRefresh } = useInterval(
-  async () => {
-    await refreshPlaylistStatus(true, true);
-  },
-  PLAYLIST_REFRESH_INTERVAL,
-  { immediate: false, autoCleanup: true }
-);
-
-// 切换自动刷新
-const handleToggleAutoRefresh = (enabled: boolean) => {
-  autoRefreshEnabled.value = enabled;
-  if (enabled) {
-    startStatusRefresh();
-  } else {
-    stopStatusRefresh();
-  }
 };
 
 // 初始化

@@ -35,6 +35,7 @@ export function usePlaylistState() {
     // 拖拽模式
     preFilesDragMode: ref(false),
     filesDragMode: ref(false),
+    playlistDragMode: ref(false),
 
     // 批量删除模式
     preFilesBatchDeleteMode: ref(false),
@@ -75,6 +76,7 @@ export function usePlaylistState() {
     filesSortOrder: ref<string | null>(null),
     preFilesOriginalOrder: ref<PlaylistItem[] | null>(null),
     filesOriginalOrder: ref<PlaylistItem[] | null>(null),
+    playlistOriginalOrder: ref<Playlist[] | null>(null),
   };
 
   return {

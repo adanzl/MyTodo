@@ -28,7 +28,7 @@
           :title="filesDragMode ? '点击退出拖拽排序模式' : '点击进入拖拽排序模式'"
         >
           <el-icon v-if="filesDragMode"><Check /></el-icon>
-          <el-icon v-else><Menu /></el-icon>
+          <el-icon v-else><Sort /></el-icon>
         </el-button>
         <el-button
           :type="filesBatchDeleteMode ? 'success' : 'default'"
@@ -174,7 +174,7 @@ import {
   Check,
   Delete,
   Loading,
-  Menu,
+  Sort,
   Refresh,
   DocumentCopy,
   Minus,

@@ -207,6 +207,7 @@ export function usePlaylistData(
       updatedAt:
         "updatedAt" in item && typeof item.updatedAt === "number" ? item.updatedAt : Date.now(),
       isPlaying: normalizeIsPlaying(item?.isPlaying),
+      order: item?.order,  // 保留 order 字段
     };
   };
 
@@ -238,7 +239,7 @@ export function usePlaylistData(
       const collection = raw as PlaylistCollection;
       const playlists = normalizePlaylistArray(
         collection.playlists as PlaylistApiData[] | Playlist[]
-      );
+      ).sort((a, b) => (a.order ?? 999999) - (b.order ?? 999999));  // 按 order 字段排序
       const activeId = playlists.some(item => item.id === collection.activePlaylistId)
         ? (collection.activePlaylistId as string | null)
         : playlists[0]?.id || null;
@@ -277,9 +278,9 @@ export function usePlaylistData(
 
     // Record<string, PlaylistApiData> 格式
     if (!Array.isArray(apiData) && Object.keys(apiData).length > 0) {
-      const playlists = Object.values(apiData).map(item =>
-        normalizePlaylistItem(item, item.name || DEFAULT_PLAYLIST_NAME)
-      );
+      const playlists = Object.values(apiData)
+        .map(item => normalizePlaylistItem(item, item.name || DEFAULT_PLAYLIST_NAME))
+        .sort((a, b) => (a.order ?? 999999) - (b.order ?? 999999)); // 按 order 字段排序
       return {
         playlists: playlists as Playlist[],
         activePlaylistId: playlists[0]?.id || null,
@@ -288,9 +289,9 @@ export function usePlaylistData(
 
     // PlaylistApiData[] 格式
     if (Array.isArray(apiData)) {
-      const playlists = apiData.map(item =>
-        normalizePlaylistItem(item, item.name || DEFAULT_PLAYLIST_NAME)
-      );
+      const playlists = apiData
+        .map(item => normalizePlaylistItem(item, item.name || DEFAULT_PLAYLIST_NAME))
+        .sort((a, b) => (a.order ?? 999999) - (b.order ?? 999999)); // 按 order 字段排序
       return {
         playlists: playlists as Playlist[],
         activePlaylistId: playlists[0]?.id || null,
@@ -321,7 +322,7 @@ export function usePlaylistData(
   ): Record<string, PlaylistApiData> => {
     const playlistDict: Record<string, PlaylistApiData> = {};
 
-    collection.forEach(item => {
+    collection.forEach((item, index) => {
       if (!item.id) return;
 
       const deviceType = normalizeDeviceType(item.device?.type || item.device_type);
@@ -344,6 +345,7 @@ export function usePlaylistData(
         trigger_button: item.trigger_button || "",
         create_time: item.create_time || formatDateTime(),
         updated_time: formatDateTime(),
+        order: item.order ?? index, // 保留或设置 order 字段
       } as PlaylistApiData;
     });
 
@@ -355,13 +357,23 @@ export function usePlaylistData(
    */
   const savePlaylist = async (collectionOverride?: Playlist[]) => {
     try {
-      const collection = (collectionOverride || playlistCollection.value || []).map(item => ({
-        ...item,
-        total: Array.isArray(item.playlist) ? item.playlist.length : 0,
-        updatedAt: Date.now(),
-      }));
+      // 直接使用原始数组，保持顺序不变
+      const collection = collectionOverride || playlistCollection.value || [];
 
-      const playlistDict = transformPlaylistToApiFormat(collection);
+      // 构建保持顺序的字典对象
+      const playlistDict: Record<string, any> = {};
+      collection.forEach((item, index) => {
+        if (!item.id) return;
+
+        // 直接传递原始数据，让后端处理
+        playlistDict[item.id] = {
+          ...item,
+          order: index, // 设置顺序值
+          total: Array.isArray(item.playlist) ? item.playlist.length : 0,
+          updated_time: formatDateTime(),
+        };
+      });
+
       const response = await playlistAction("updateAll", "POST", playlistDict);
       if (response.code !== 0) {
         throw new Error(response.msg || "保存播放列表集合失败");

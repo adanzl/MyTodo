@@ -111,20 +111,20 @@ class AgentMgr:
         self._devices.pop(agent_id, None)
         self._agents.pop(agent_id, None)
 
-    def get_all_agents(self, action: Optional[str] = None) -> Union[Dict[str, Dict[str, Any]], List[Dict[str, Any]]]:
+    def get_all_agents(self, action: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
         """获取所有已注册的设备列表。
 
         Args:
-            action: 可选的操作类型，如果提供则只返回支持该操作的设备列表。
+            action: 可选的操作类型，如果提供则只返回支持该操作的设备。
 
         Returns:
-            设备信息字典或设备列表。
+            设备信息字典，key 为 agent_id，value 为设备信息。
         """
         # 先清理过期设备
         self._cleanup_expired_devices()
         if not action:
             return self._devices
-        return [device for device in self._devices.values() if action in device.get('actions', [])]
+        return {agent_id: device for agent_id, device in self._devices.items() if action in device.get('actions', [])}
 
     def handle_event(self, client_ip: str, key: str, value: str, action: str) -> tuple[int, str]:
         _ = value
@@ -148,7 +148,7 @@ class AgentMgr:
         if not _agent:
             return -1, "agent not found"
         if action == "keyboard":
-            button, action = BUTTON_MAP.get(key, (0, ""))
+            button, action = BUTTON_MAP.get(key, ('0', ""))
             playlist_mgr.trigger_button(button, action)
         return 0, "ok"
 

@@ -55,9 +55,10 @@ def _get_client_ip() -> str:
         str: 客户端 IP 地址。
     """
     # 优先检查代理头
-    if request.headers.get('X-Forwarded-For'):
+    x_forwarded_for = request.headers.get('X-Forwarded-For')
+    if x_forwarded_for:
         # X-Forwarded-For 可能包含多个 IP，取第一个
-        ip = request.headers.get('X-Forwarded-For').split(',')[0].strip()
+        ip = x_forwarded_for.split(',')[0].strip()
     elif request.headers.get('X-Real-IP'):
         ip = request.headers.get('X-Real-IP')
     else:
@@ -82,8 +83,8 @@ def agent_heartbeat() -> ResponseReturnValue:
     try:
         data: Dict[str, Any] = read_json_from_request()
         body, err = parse_with_model(_AgentHeartbeatBody, data, err_factory=_err)
-        if err:
-            return err
+        if err or not body:
+            return _err(f'error: {str(err)}')
 
         client_ip = _get_client_ip()
 
@@ -115,8 +116,8 @@ def agent_event() -> ResponseReturnValue:
     try:
         data: Dict[str, Any] = read_json_from_request()
         body, err = parse_with_model(_AgentEventBody, data, err_factory=_err)
-        if err:
-            return err
+        if err or not body:
+            return _err(f'error: {str(err)}')
 
         client_ip = _get_client_ip()
         log.info(f"===== [Agent Event] client_ip={client_ip}, {data}")
@@ -188,8 +189,8 @@ def agent_mock() -> ResponseReturnValue:
     try:
         data: Dict[str, Any] = read_json_from_request()
         body, err = parse_with_model(_AgentMockBody, data, err_factory=_err)
-        if err:
-            return err
+        if err or not body:
+            return _err(f'error: {str(err)}')
 
         log.info(f"===== [Agent Mock] {data}")
 

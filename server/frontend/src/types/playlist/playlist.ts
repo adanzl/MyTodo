@@ -99,7 +99,7 @@ export interface Playlist {
    */
   playlist: PlaylistItem[];
   /**
-   * 前置文件列表（7天，对应一周7天）
+   * 前置文件列表（7 天，对应一周 7 天）
    * 每个元素是一天的前置文件列表
    */
   pre_lists: PlaylistItem[][];
@@ -156,6 +156,10 @@ export interface Playlist {
    * 是否正在播放
    */
   isPlaying: boolean;
+  /**
+   * 排序顺序（用于保持播放列表顺序）
+   */
+  order?: number;
 }
 
 /**
@@ -261,6 +265,10 @@ export interface PlaylistApiData {
    * 是否正在播放
    */
   isPlaying?: boolean | 0 | 1;
+  /**
+   * 排序顺序（用于保持播放列表顺序）
+   */
+  order?: number;
 }
 
 /**
