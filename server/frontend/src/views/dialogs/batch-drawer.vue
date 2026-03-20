@@ -53,7 +53,7 @@
       </div>
 
       <!-- 第二列：文件列表 -->
-      <div class="flex-1 border rounded p-3 flex flex-col">
+      <div class="flex-1 border rounded p-3 flex flex-col max-w-140">
         <div class="mb-3 flex items-center justify-between">
           <div class="flex items-center gap-2">
             <h3 class="text-base font-semibold">
