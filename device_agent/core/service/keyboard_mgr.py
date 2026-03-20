@@ -8,7 +8,24 @@ import platform
 import threading
 import time
 from datetime import datetime, timedelta
-from typing import Dict, Optional, Callable, Tuple, Union
+from typing import Dict, Optional, Callable, Tuple, Union, TypedDict
+
+class GlobalConfig(TypedDict):
+    """全局配置类型"""
+    key_valid_time: str
+    key_valid_duration: str
+
+class KeyConfig(TypedDict, total=False):
+    """按键配置类型"""
+    method: str
+    url: str
+    data: dict
+
+class AllKeyConfigs(TypedDict):
+    """所有按键配置类型"""
+    global_key: GlobalConfig
+    keys: Dict[str, KeyConfig]
+
 
 from core.log_config import root_logger
 from core.config import config_mgr
@@ -390,15 +407,22 @@ class KeyboardMgr:
             log.error(f"[KEYBOARD] 停止服务失败：{e}")
             return False, f"停止失败：{str(e)}"
 
-    def _build_key_config(self, key: str) -> Dict[str, Union[str, dict, None]]:
+    def _build_key_config(self, key: str) -> KeyConfig:
         """
         构建单个按键配置
         :param key: 按键名
         :return: 配置字典
         """
-        return self._get_key_config(key) or {}
+        config = self._get_key_config(key)
+        if config:
+            return KeyConfig(
+                method=config.get("method", DEFAULT_HTTP_METHOD),
+                url=config.get("url", ""),
+                data=config.get("data", {})
+            )
+        return KeyConfig()
 
-    def get_key_config(self, key: Optional[str] = None) -> Dict[str, Union[str, dict, None]]:
+    def get_key_config(self, key: Optional[str] = None) -> Union[KeyConfig, Dict[str, Union[GlobalConfig, Dict[str, KeyConfig]]]]:
         """
         获取按键配置
         :param key: 按键名，如果为 None 则返回所有按键配置（包含 global 节点）
@@ -411,24 +435,21 @@ class KeyboardMgr:
             return self._build_key_config(key)
         else:
             # 返回所有按键配置 + 全局配置
-            result = {}
+            global_config = GlobalConfig(
+                key_valid_time=config_mgr.get("key_valid_time") or "",
+                key_valid_duration=config_mgr.get("key_valid_duration") or ""
+            )
             
-            # 添加全局配置到 global 节点
-            result["global"] = {
-                "key_valid_time": config_mgr.get("key_valid_time", ""),
-                "key_valid_duration": config_mgr.get("key_valid_duration", "")
-            }
-            
-            # 添加所有按键配置
-            configs = {}
+            configs: Dict[str, KeyConfig] = {}
             for k in KEY_NAMES:
                 key_config = self._build_key_config(k)
                 if key_config:
                     configs[k] = key_config
             
-            result["keys"] = configs
-            
-            return result
+            return {
+                "global": global_config,
+                "keys": configs
+            }
 
     def save_key_config(self, key: str, url: str, method: str, data: Optional[dict] = None) -> Tuple[bool, str, dict]:
         """

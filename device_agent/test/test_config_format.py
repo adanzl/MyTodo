@@ -4,11 +4,12 @@
 '''
 from datetime import datetime, timedelta
 import json
+from typing import cast
 
 # 模拟配置管理器
 class MockConfigMgr:
     def __init__(self):
-        self.config = {
+        self.config: dict[str, str] = {
             'key_valid_time': '09:00',
             'key_valid_duration': '480',
             'keyboard.F13.url': 'http://example.com/f13',
@@ -72,7 +73,7 @@ def _get_key_config(key: str):
     if not full_url:
         return None
     
-    result = {
+    result: dict[str, str | dict] = {
         "method": raw_config.get("method", DEFAULT_HTTP_METHOD),
         "url": full_url,
     }
@@ -159,10 +160,10 @@ if __name__ == "__main__":
     
     # 测试 4: 没有按键配置时的结构
     print("\n\n测试 4: 清空配置后的结构")
-    config_mgr.config = {
+    config_mgr.config = cast(dict[str, str], {
         'key_valid_time': '10:00',
         'key_valid_duration': '60'
-    }
+    })
     empty_configs = get_key_config()
     print(f"返回的键：{list(empty_configs.keys())}")
     print(f"数据结构:")
