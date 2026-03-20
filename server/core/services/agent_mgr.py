@@ -82,6 +82,7 @@ class AgentMgr:
             self._devices[agent_id]['name'] = data.name
             self._devices[agent_id]['actions'] = data.actions or []
             self._devices[agent_id]['config'] = data.config or {}
+            self._devices[agent_id]['keyboard'] = data.keyboard or {}
             log.debug(f"[agent_id] 更新设备心跳: {agent_id}")
         return self._devices[agent_id]
 
