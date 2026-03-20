@@ -13,7 +13,6 @@ from typing import Any, Dict
 
 from flask import Blueprint, request
 from flask.typing import ResponseReturnValue
-from pydantic import BaseModel
 
 from core.config import app_logger
 from core.services.agent_mgr import agent_mgr
@@ -24,26 +23,7 @@ log = app_logger
 agent_bp = Blueprint('agent', __name__)
 
 from core import limiter
-
-
-class AgentHeartbeatData(BaseModel):
-    address: str # 设备的访问地址，通常是 IP:PORT 格式
-    name: str | None = None # 设备名称
-    actions: list[str] | None = None # 设备支持的操作列表
-    config: dict[str, Any] | None = None # 设备配置
-
-
-class _AgentEventBody(BaseModel):
-    key: str
-    action: str
-    value: Any | None = None
-
-
-class _AgentMockBody(BaseModel):
-    agent_id: str
-    action: str
-    key: str | None = None
-    value: Any | None = None
+from core.api.types import AgentHeartbeatData, AgentEventBody, AgentMockBody
 
 
 def _get_client_ip() -> str:
@@ -116,7 +96,7 @@ def agent_event() -> ResponseReturnValue:
     """
     try:
         data: Dict[str, Any] = read_json_from_request()
-        body, err = parse_with_model(_AgentEventBody, data, err_factory=_err)
+        body, err = parse_with_model(AgentEventBody, data, err_factory=_err)
         if err or not body:
             return _err(f'error: {str(err)}')
 
@@ -190,7 +170,7 @@ def agent_mock() -> ResponseReturnValue:
     """
     try:
         data: Dict[str, Any] = read_json_from_request()
-        body, err = parse_with_model(_AgentMockBody, data, err_factory=_err)
+        body, err = parse_with_model(AgentMockBody, data, err_factory=_err)
         if err or not body:
             return _err(f'error: {str(err)}')
 
