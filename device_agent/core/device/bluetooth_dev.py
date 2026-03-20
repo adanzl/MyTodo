@@ -8,7 +8,7 @@ from bleak import BleakClient
 class BluetoothDev:
     """蓝牙设备类"""
 
-    def __init__(self, address: str, name: str = "", metadata: dict = None):
+    def __init__(self, address: str, name: str = "", metadata: dict = {}):
         self.address = address
         self.name = name or address
         self.metadata = metadata or {}

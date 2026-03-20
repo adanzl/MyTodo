@@ -7,35 +7,18 @@ import os
 import platform
 import threading
 import time
-import traceback
-from typing import Dict, Optional, Callable, Tuple
+from datetime import datetime, timedelta
+from typing import Dict, Optional, Callable, Tuple, Union
 
 from core.log_config import root_logger
 from core.config import config_mgr
 from core.utils import _send_http_request
+from core.device.keyboard_dev import KeyboardDev, KEY_NAMES
 
 log = root_logger()
 
-# ==================== 库导入 ====================
-PYNPUT_AVAILABLE = False
-keyboard = None
-try:
-    from pynput import keyboard  # pyright: ignore[reportMissingModuleSource]
-    PYNPUT_AVAILABLE = True
-except ImportError:
-    pass
-
-EVDEV_AVAILABLE = False
-evdev = None
-try:
-    import evdev  # pyright: ignore[reportMissingImports]
-    EVDEV_AVAILABLE = True
-except ImportError:
-    pass
-
 # ==================== 常量定义 ====================
-# F12~F19 按键名列表
-KEY_NAMES = [f'F{i}' for i in range(12, 20)]
+# F12~F19 按键名列表（从 keyboard_dev 导入）
 
 # 向后兼容：KEY_CODES 字典（用于 API 验证）
 KEY_CODES = {name: name for name in KEY_NAMES}
@@ -49,61 +32,20 @@ DEFAULT_HTTP_METHOD = "GET"
 # 默认 F12 URL
 DEFAULT_F12_URL = "http://localhost:8000/keyboard/status"
 
-# 线程等待超时时间（秒）
-THREAD_JOIN_TIMEOUT = 2
-
-# pynput 监听循环休眠间隔（秒）
-PYNPUT_SLEEP_INTERVAL = 0.1
-
-# evdev 按键按下事件值
-EVDEV_KEY_PRESS_VALUE = 1
-
-# evdev 设备重连间隔（秒）
-EVDEV_RECONNECT_INTERVAL = 2
-
-# evdev 设备重连最大尝试次数（0 表示无限重试）
-EVDEV_MAX_RECONNECT_ATTEMPTS = 0
-
-# pynput 按键映射（如果可用）
-PYNPUT_KEY_CODES: Dict[str, object] = {}
-PYNPUT_KEY_TO_NAME: Dict[object, str] = {}
-if PYNPUT_AVAILABLE and keyboard:
-    PYNPUT_KEY_CODES = {f'F{i}': getattr(keyboard.Key, f'f{i}', None) for i in range(12, 20)}
-    PYNPUT_KEY_CODES = {k: v for k, v in PYNPUT_KEY_CODES.items() if v is not None}
-    PYNPUT_KEY_TO_NAME = {v: k for k, v in PYNPUT_KEY_CODES.items() if v is not None}
-
-# evdev 按键码映射（Linux 键盘扫描码）
-EVDEV_KEY_CODES: Dict[str, int] = {}
-EVDEV_KEY_TO_NAME: Dict[int, str] = {}
-if EVDEV_AVAILABLE:
-    EVDEV_KEY_CODES = {
-        'F12': evdev.ecodes.KEY_F12,
-        'F13': evdev.ecodes.KEY_F13,
-        'F14': evdev.ecodes.KEY_F14,
-        'F15': evdev.ecodes.KEY_F15,
-        'F16': evdev.ecodes.KEY_F16,
-        'F17': evdev.ecodes.KEY_F17,
-        'F18': evdev.ecodes.KEY_F18,
-        'F19': evdev.ecodes.KEY_F19,
-    }
-    EVDEV_KEY_TO_NAME = {v: k for k, v in EVDEV_KEY_CODES.items()}
-
 
 
 
 class KeyboardMgr:
-    """键盘监听管理器"""
+    """键盘监听管理器 - 负责按键逻辑和业务处理"""
 
     def __init__(self):
         log.info("[KEYBOARD] KeyboardMgr init")
-        self.is_running = False
-        self.listener_thread: Optional[threading.Thread] = None
-        self.listener: Optional[object] = None  # pynput keyboard.Listener 或 evdev InputDevice
         self.handlers: Dict[str, Callable] = {}  # 按键名 -> 处理函数
         self._lock = threading.Lock()
-        self._use_evdev = False  # 是否使用 evdev
-        self._evdev_device_path: Optional[str] = None
         self._base_url_cache: Optional[str] = None  # URL 构建缓存
+        
+        # 初始化硬件设备
+        self._device = KeyboardDev()
 
     def set_handler(self, key: str, handler: Callable):
         """
@@ -112,7 +54,7 @@ class KeyboardMgr:
         :param handler: 处理函数，接收按键名作为参数
         """
         if key not in KEY_NAMES:
-            raise ValueError(f"不支持的按键: {key}，仅支持 F12~F19")
+            raise ValueError(f"不支持的按键：{key}，仅支持 F12~F19")
 
         with self._lock:
             self.handlers[key] = handler
@@ -130,63 +72,12 @@ class KeyboardMgr:
             self.handlers.clear()
             log.info("[KEYBOARD] 清除所有处理函数")
 
-    def _on_key_press_pynput(self, key):
-        """pynput 按键按下事件处理"""
-        if not self.is_running:
-            return False
-
-        # 将按键转换为字符串名称
-        try:
-            if hasattr(key, 'name'):
-                # 特殊按键（如 Key.f12）
-                key_name = key.name
-            elif hasattr(key, 'char') and key.char:
-                # 普通字符按键
-                key_name = key.char
-            else:
-                # 其他情况，尝试转换为字符串
-                key_name = str(key)
-            
-            # 输出日志
-            log.info(f"[KEYBOARD] 按键按下: {key_name}")
-            
-            # 如果是 F12~F19，触发对应的处理函数
-            if key in PYNPUT_KEY_TO_NAME:
-                key_name_mapped = PYNPUT_KEY_TO_NAME[key]
-                self._trigger_handler(key_name_mapped)
-        except Exception as e:
-            log.error(f"[KEYBOARD] 处理按键事件时出错: {e}")
-        
-        return True
-
-    def _on_key_press_evdev(self, key_code: int):
-        """evdev 按键按下事件处理"""
-        if not self.is_running:
-            return
-
-        # 获取按键名称
-        try:
-            if EVDEV_AVAILABLE:
-                # 尝试从 evdev.ecodes.KEY 获取按键名称（反向映射字典）
-                if hasattr(evdev.ecodes, 'KEY') and key_code in evdev.ecodes.KEY:
-                    key_name = evdev.ecodes.KEY[key_code]
-                    # 移除 KEY_ 前缀（如果存在）
-                    if key_name.startswith('KEY_'):
-                        key_name = key_name[4:]
-                else:
-                    key_name = f"UNKNOWN_{key_code}"
-            else:
-                key_name = f"KEY_{key_code}"
-            
-            # 输出日志
-            log.info(f"[KEYBOARD] 按键按下: {key_name} (code: {key_code})")
-            
-            # 如果是 F12~F19，触发对应的处理函数
-            if key_code in EVDEV_KEY_TO_NAME:
-                key_name_mapped = EVDEV_KEY_TO_NAME[key_code]
-                self._trigger_handler(key_name_mapped)
-        except Exception as e:
-            log.error(f"[KEYBOARD] 处理按键事件时出错: {e}")
+    def _on_key_press(self, key_name: str):
+        """
+        统一的按键回调（由 keyboard_dev 调用）
+        :param key_name: 按键名称
+        """
+        self._trigger_handler(key_name)
 
     def _trigger_handler(self, key_name: str):
         """触发按键处理函数"""
@@ -197,239 +88,30 @@ class KeyboardMgr:
             try:
                 handler(key_name)
             except Exception as e:
-                log.error(f"[KEYBOARD] 处理按键 {key_name} 时出错: {e}")
+                log.error(f"[KEYBOARD] 处理按键 {key_name} 时出错：{e}")
         else:
             log.debug(f"[KEYBOARD] 按键 {key_name} 未设置处理函数")
 
-    def _listen_loop_pynput(self):
-        """pynput 监听循环"""
-        try:
-            self.listener = keyboard.Listener(on_press=self._on_key_press_pynput)
-            self.listener.start()
-
-            while self.is_running:
-                time.sleep(PYNPUT_SLEEP_INTERVAL)
-        except Exception as e:
-            log.error(f"[KEYBOARD] pynput 监听循环出错: {e}")
-            log.error(f"[KEYBOARD] Traceback: {traceback.format_exc()}")
-        finally:
-            if self.listener:
-                try:
-                    self.listener.stop()
-                except Exception:
-                    pass
-            self.is_running = False
-            log.info("[KEYBOARD] pynput 监听循环已退出")
-
-    def _listen_loop_evdev(self):
-        """evdev 监听循环（支持设备热插拔）"""
-        reconnect_count = 0
-        permanent_error = False
-        
-        while self.is_running and not permanent_error:
-            device = None
-            try:
-                # 每次循环都重新查找设备（支持热插拔）
-                device_path = self._find_keyboard_device()
-                if not device_path:
-                    if reconnect_count == 0:
-                        log.warning("[KEYBOARD] 未找到键盘设备，等待设备插入...")
-                    reconnect_count += 1
-                    
-                    # 检查是否超过最大重连次数
-                    if EVDEV_MAX_RECONNECT_ATTEMPTS > 0 and reconnect_count > EVDEV_MAX_RECONNECT_ATTEMPTS:
-                        log.error(f"[KEYBOARD] 已达到最大重连次数 ({EVDEV_MAX_RECONNECT_ATTEMPTS})，停止监听")
-                        permanent_error = True
-                        break
-                    
-                    # 等待一段时间后重试
-                    for _ in range(int(EVDEV_RECONNECT_INTERVAL * 10)):
-                        if not self.is_running:
-                            return
-                        time.sleep(0.1)
-                    continue
-
-                # 找到设备，重置重连计数
-                if reconnect_count > 0:
-                    log.info(f"[KEYBOARD] 检测到键盘设备已插入: {device_path}")
-                    reconnect_count = 0
-                    self._evdev_device_path = device_path
-
-                device = evdev.InputDevice(device_path)
-                log.info(f"[KEYBOARD] 开始监听设备: {device.path} ({device.name})")
-
-                # 将设备设置为独占模式（需要权限）
-                try:
-                    device.grab()
-                    log.debug("[KEYBOARD] 设备已独占锁定")
-                except (PermissionError, OSError) as e:
-                    log.warning(f"[KEYBOARD] 无法独占锁定设备（可能需要 root 权限或 input 组）: {e}")
-
-                # 监听事件
-                for event in device.read_loop():
-                    if not self.is_running:
-                        break
-
-                    # 只处理按键按下事件 (value=1 表示按下，0=释放，2=长按)
-                    if event.type == evdev.ecodes.EV_KEY and event.value == EVDEV_KEY_PRESS_VALUE:
-                        self._on_key_press_evdev(event.code)
-
-            except PermissionError:
-                log.error("[KEYBOARD] 权限不足，无法访问键盘设备。请使用 root 运行或添加用户到 input 组: sudo usermod -a -G input $USER")
-                permanent_error = True
-                break
-            except OSError as e:
-                # 设备断开或不可用，尝试重连
-                error_msg = str(e).lower()
-                if any(keyword in error_msg for keyword in ['no such file', 'no such device', 'device disconnected', 'input/output error']):
-                    log.warning(f"[KEYBOARD] 键盘设备已断开: {e}，尝试重新连接...")
-                    reconnect_count += 1
-                    
-                    # 检查是否超过最大重连次数
-                    if EVDEV_MAX_RECONNECT_ATTEMPTS > 0 and reconnect_count > EVDEV_MAX_RECONNECT_ATTEMPTS:
-                        log.error(f"[KEYBOARD] 已达到最大重连次数 ({EVDEV_MAX_RECONNECT_ATTEMPTS})，停止监听")
-                        permanent_error = True
-                        break
-                    
-                    # 清理设备引用
-                    if device:
-                        try:
-                            device.ungrab()
-                        except Exception:
-                            pass
-                    
-                    # 清除设备路径，下次循环会重新查找
-                    self._evdev_device_path = None
-                    
-                    # 等待一段时间后重试
-                    for _ in range(int(EVDEV_RECONNECT_INTERVAL * 10)):
-                        if not self.is_running:
-                            return
-                        time.sleep(0.1)
-                else:
-                    # 其他 OSError，可能是永久性错误
-                    log.error(f"[KEYBOARD] 设备访问错误: {e}")
-                    permanent_error = True
-                    break
-            except Exception as e:
-                log.error(f"[KEYBOARD] evdev 监听循环出错: {e}")
-                log.error(f"[KEYBOARD] Traceback: {traceback.format_exc()}")
-                permanent_error = True
-                break
-            finally:
-                if device:
-                    try:
-                        device.ungrab()
-                    except Exception:
-                        pass
-        
-        self.is_running = False
-        log.info("[KEYBOARD] evdev 监听循环已退出")
-
-    def _try_start_evdev(self) -> bool:
-        """尝试启动 evdev 监听"""
-        if platform.system() != 'Linux' or not EVDEV_AVAILABLE:
-            return False
-
-        if not self._evdev_device_path:
-            self._evdev_device_path = self._find_keyboard_device()
-
-        if self._evdev_device_path:
-            self._listen_loop_evdev()
-            return True
-        else:
-            log.error("[KEYBOARD] 未找到可用的键盘设备")
-            self.is_running = False
-            return False
-
-    def _listen_loop(self):
-        """监听循环（自动选择 pynput 或 evdev）"""
-        # 如果已指定使用 evdev，直接使用
-        if self._use_evdev:
-            if not self._try_start_evdev():
-                log.error("[KEYBOARD] evdev 不可用")
-                self.is_running = False
-            return
-
-        # 尝试使用 pynput
-        if PYNPUT_AVAILABLE:
-            try:
-                self._listen_loop_pynput()
-                return
-            except Exception as e:
-                error_msg = str(e)
-                # 如果是无 DISPLAY 错误，尝试 evdev
-                display_keywords = ['NoDisplay', 'DISPLAY', 'X11']
-                if any(keyword in error_msg for keyword in display_keywords):
-                    log.info("[KEYBOARD] pynput 需要图形界面，切换到 evdev 模式")
-                else:
-                    log.warning(f"[KEYBOARD] pynput 启动失败: {e}，尝试 evdev")
-                self._use_evdev = True
-
-        # 如果 pynput 失败，尝试使用 evdev（仅 Linux）
-        if self._use_evdev:
-            self._try_start_evdev()
-        elif not PYNPUT_AVAILABLE and not EVDEV_AVAILABLE:
-            log.error("[KEYBOARD] 无法启动键盘监听：pynput 和 evdev 都不可用")
-            self.is_running = False
-
     def start(self):
         """启动监听服务"""
-        if self.is_running:
-            log.warning("[KEYBOARD] 监听服务已在运行")
-            return
-
-        # 在 Linux 上，如果没有 DISPLAY，尝试使用 evdev
-        if platform.system() == 'Linux' and not os.environ.get('DISPLAY'):
-            if EVDEV_AVAILABLE:
-                self._use_evdev = True
-                self._evdev_device_path = self._find_keyboard_device()
-                if not self._evdev_device_path:
-                    log.warning("[KEYBOARD] 无桌面环境且未找到键盘设备，键盘监听可能不可用")
-            else:
-                log.warning("[KEYBOARD] 无桌面环境且 evdev 不可用，请安装 python-evdev")
-
-        self.is_running = True
-        self.listener_thread = threading.Thread(target=self._listen_loop, daemon=True)
-        self.listener_thread.start()
-
-        mode = "evdev" if self._use_evdev else "pynput"
-        log.info(f"[KEYBOARD] 键盘监听服务已启动（模式: {mode}）")
+        # 注册统一的按键回调到硬件设备
+        self._device.set_on_press_handler(self._on_key_press)
+        self._device.start()
 
     def stop(self):
         """停止监听服务"""
-        if not self.is_running:
-            return
-
-        self.is_running = False
-
-        # 停止监听器
-        if self.listener:
-            try:
-                if self._use_evdev and hasattr(self.listener, 'ungrab'):
-                    # evdev 设备
-                    self.listener.ungrab()
-                elif not self._use_evdev:
-                    # pynput listener
-                    self.listener.stop()
-            except Exception as e:
-                log.debug(f"[KEYBOARD] 停止监听器时出错（可忽略）: {e}")
-
-        # 等待线程结束
-        if self.listener_thread:
-            self.listener_thread.join(timeout=THREAD_JOIN_TIMEOUT)
-            if self.listener_thread.is_alive():
-                log.warning("[KEYBOARD] 监听线程未在超时时间内结束")
-
-        log.info("[KEYBOARD] 键盘监听服务已停止")
+        self._device.stop()
 
     def get_status(self) -> Dict:
         """获取服务状态"""
+        device_status = self._device.get_status()
         return {
-            "is_running": self.is_running,
+            "is_running": device_status["is_running"],
             "handlers": list(self.handlers.keys()),
-            "platform": platform.system(),
-            "supported": True
+            "platform": device_status["platform"],
+            "supported": True,
+            "pynput_available": device_status["pynput_available"],
+            "evdev_available": device_status["evdev_available"]
         }
 
     # ==================== 工具方法 ====================
@@ -440,7 +122,7 @@ class KeyboardMgr:
     def _get_base_url(self) -> Optional[str]:
         """获取并缓存 center_server_url 的基础 URL"""
         if self._base_url_cache is None:
-            base_url = config_mgr.get('center_server_url', '').strip()
+            base_url = config_mgr.get('center_server_url', '')
             if base_url:
                 # 移除末尾的斜杠
                 self._base_url_cache = base_url.rstrip('/')
@@ -488,10 +170,10 @@ class KeyboardMgr:
         try:
             return json.loads(data_str)
         except json.JSONDecodeError:
-            log.warning(f"[KEYBOARD] 数据格式错误，忽略: {data_str}")
+            log.warning(f"[KEYBOARD] 数据格式错误，忽略：{data_str}")
         return {}
 
-    def _get_key_config_raw(self, key: str) -> Optional[Dict[str, str]]:
+    def _get_key_config_raw(self, key: str) -> Optional[Dict[str, Optional[str]]]:
         """
         获取按键的原始配置（不构建 URL）
         :param key: 按键名
@@ -506,75 +188,106 @@ class KeyboardMgr:
             "method": config_mgr.get(self._get_config_key(key, "method"), DEFAULT_HTTP_METHOD),
             "data": config_mgr.get(self._get_config_key(key, "data"), "")
         }
+    
+    def _is_within_valid_time(self) -> Tuple[bool, str]:
+        """
+        检查当前时间是否在有效时间范围内
+        :return: (is_valid: bool, reason: str)
+        """
+        valid_time_str = config_mgr.get("key_valid_time", "")
+        duration_str = config_mgr.get("key_valid_duration", "")
+        
+        # 如果没有配置有效时间，则认为始终有效
+        if not valid_time_str:
+            return True, "未配置有效时间限制"
+        
+        # 解析开始时间（格式：HH:MM）
+        valid_time_parts = valid_time_str.split(":")
+        if len(valid_time_parts) != 2:
+            log.warning(f"[KEYBOARD] 无效的时间格式：{valid_time_str}，应为 HH:MM")
+            return True, "时间格式错误，跳过检查"
+        
+        try:
+            start_hour = int(valid_time_parts[0])
+            start_minute = int(valid_time_parts[1])
+        except ValueError:
+            log.warning(f"[KEYBOARD] 无效的时间值：{valid_time_str}")
+            return True, "时间值解析失败，跳过检查"
+        
+        if not (0 <= start_hour <= 23 and 0 <= start_minute <= 59):
+            log.warning(f"[KEYBOARD] 无效的时间值：{valid_time_str}")
+            return True, "时间值超出范围，跳过检查"
+        
+        # 解析持续时间（分钟）
+        duration_minutes = 0
+        if duration_str:
+            try:
+                duration_minutes = int(duration_str)
+                if duration_minutes < 0:
+                    log.warning(f"[KEYBOARD] 无效的持续时间：{duration_str}")
+                    duration_minutes = 0
+            except ValueError:
+                log.warning(f"[KEYBOARD] 无效的持续时间格式：{duration_str}")
+                duration_minutes = 0
+        
+        # 获取当前时间
+        now = datetime.now()
+        
+        # 构建开始时间（今天的 HH:MM）
+        start_time = now.replace(hour=start_hour, minute=start_minute, second=0, microsecond=0)
+        
+        # 计算结束时间
+        end_time = start_time + timedelta(minutes=duration_minutes)
+        
+        # 如果持续时间超过 24 小时，认为始终有效
+        if duration_minutes >= 24 * 60:
+            return True, f"持续时间超过 24 小时，始终有效"
+        
+        # 检查是否在时间范围内
+        if start_time <= now <= end_time:
+            return True, f"在有效时间内 ({start_time.strftime('%H:%M')}-{end_time.strftime('%H:%M')})"
+        else:
+            # 计算距离下次有效时间的剩余时间
+            if now < start_time:
+                next_valid = start_time
+            else:
+                # 已经过了今天的有效时间，计算明天的有效时间
+                next_valid = start_time + timedelta(days=1)
+            
+            remaining = (next_valid - now).total_seconds()
+            return False, f"不在有效时间内，下次有效时间：{next_valid.strftime('%Y-%m-%d %H:%M')}（约{int(remaining/60)}分钟后）"
 
     def _get_key_config(self, key: str) -> Optional[Dict]:
         """
         获取按键配置（构建完整 URL）
         :param key: 按键名
-        :return: 配置字典，包含 method, url（完整URL）, data，如果未配置或 URL 构建失败则返回 None
+        :return: 配置字典，包含 method, url（完整 URL）, data，如果未配置或 URL 构建失败则返回 None
         """
         raw_config = self._get_key_config_raw(key)
         if not raw_config:
             return None
-
+    
         # 构建完整 URL
-        full_url = self._build_full_url(raw_config["url"])
+        url_value = raw_config.get("url")
+        if not url_value:
+            return None
+        full_url = self._build_full_url(url_value)
         if not full_url:
             return None
-
+    
         result = {
-            "method": raw_config["method"],
+            "method": raw_config.get("method", DEFAULT_HTTP_METHOD),
             "url": full_url,
         }
-
+    
         # 解析数据
-        data = self._parse_config_data(raw_config["data"])
-        if data:
-            result["data"] = data
-
+        data_value = raw_config.get("data")
+        if data_value:
+            data = self._parse_config_data(data_value)
+            if data:
+                result["data"] = data
+    
         return result
-
-    def _find_keyboard_device(self) -> Optional[str]:
-        """
-        查找可用的键盘设备（Linux evdev）
-        :return: 设备路径，如果未找到则返回 None
-        """
-        if not EVDEV_AVAILABLE:
-            return None
-
-        try:
-            # 查找所有输入设备
-            device_paths = evdev.list_devices()
-            if not device_paths:
-                log.warning("[KEYBOARD] 未找到任何输入设备")
-                return None
-
-            devices = []
-            for path in device_paths:
-                try:
-                    device = evdev.InputDevice(path)
-                    devices.append(device)
-                except (OSError, PermissionError) as e:
-                    log.debug(f"[KEYBOARD] 无法打开设备 {path}: {e}")
-                    continue
-
-            # 优先查找支持 F12-F19 的键盘设备
-            for device in devices:
-                if evdev.ecodes.EV_KEY not in device.capabilities():
-                    continue
-
-                key_codes = device.capabilities().get(evdev.ecodes.EV_KEY, [])
-                if any(code in key_codes for code in EVDEV_KEY_CODES.values()):
-                    log.info(f"[KEYBOARD] 找到支持 F12-F19 的键盘设备: {device.path} ({device.name})")
-                    return device.path
-
-            # 未找到支持 F12-F19 的键盘设备时，不再退化为“任意 EV_KEY 设备”，
-            # 避免错误地将红外遥控等设备当成键盘，从而导致重连后设备不正确。
-            log.warning("[KEYBOARD] 未找到支持 F12-F19 的键盘设备，等待真实键盘插入")
-            return None
-        except Exception as e:
-            log.warning(f"[KEYBOARD] 查找键盘设备失败: {e}")
-            return None
 
     def _create_key_handler(self, key: str) -> Callable:
         """
@@ -583,6 +296,12 @@ class KeyboardMgr:
         :return: 处理函数
         """
         def handler(key_name: str):
+            # 首先检查时间有效性
+            is_valid, reason = self._is_within_valid_time()
+            if not is_valid:
+                log.warning(f"[KEYBOARD] 按键 {key_name} 触发被阻止：{reason}")
+                return
+            
             config = self._get_key_config(key_name)
             if not config:
                 log.warning(f"[KEYBOARD] 按键 {key_name} 未配置或 URL 构建失败，跳过")
@@ -599,20 +318,20 @@ class KeyboardMgr:
             url = config["url"]
             method = config["method"]
             log.info(f"[KEYBOARD] 按键 {key_name} 触发，发送 {method} 请求到 {url}")
-            result = _send_http_request(url, method=method, data=data, headers=None)
+            result = _send_http_request(url, method=method, data=data, headers={})
 
             if not result.get("success"):
-                log.error(f"[KEYBOARD] 按键 {key_name} 请求失败: {result.get('error')}")
+                log.error(f"[KEYBOARD] 按键 {key_name} 请求失败：{result.get('error')}")
 
         return handler
 
     def _setup_default_config(self):
-        """设置F12的默认配置"""
+        """设置 F12 的默认配置"""
         if not config_mgr.get(self._get_config_key("F12", "url")):
             config_mgr.set(self._get_config_key("F12", "url"), DEFAULT_F12_URL)
             config_mgr.set(self._get_config_key("F12", "method"), DEFAULT_HTTP_METHOD)
             config_mgr.save_config()
-            log.info(f"[KEYBOARD] 已设置F12默认配置: {DEFAULT_HTTP_METHOD} {DEFAULT_F12_URL}")
+            log.info(f"[KEYBOARD] 已设置 F12 默认配置：{DEFAULT_HTTP_METHOD} {DEFAULT_F12_URL}")
 
     def get_keyboard_status(self) -> Dict:
         """
@@ -643,7 +362,7 @@ class KeyboardMgr:
         try:
             log.info(f"===== [Start keyboard service] =====")
             # 设置所有已配置按键的处理函数
-            # 设置F12的默认配置（如果未配置）
+            # 设置 F12 的默认配置（如果未配置）
             self._setup_default_config()
 
             for key in KEY_NAMES:
@@ -656,8 +375,8 @@ class KeyboardMgr:
             self.start()
             return True, "键盘监听服务已启动"
         except Exception as e:
-            log.error(f"[KEYBOARD] 启动服务失败: {e}")
-            return False, f"启动失败: {str(e)}"
+            log.error(f"[KEYBOARD] 启动服务失败：{e}")
+            return False, f"启动失败：{str(e)}"
 
     def stop_service(self) -> Tuple[bool, str]:
         """
@@ -668,10 +387,10 @@ class KeyboardMgr:
             self.stop()
             return True, "键盘监听服务已停止"
         except Exception as e:
-            log.error(f"[KEYBOARD] 停止服务失败: {e}")
-            return False, f"停止失败: {str(e)}"
+            log.error(f"[KEYBOARD] 停止服务失败：{e}")
+            return False, f"停止失败：{str(e)}"
 
-    def _build_key_config(self, key: str) -> Dict:
+    def _build_key_config(self, key: str) -> Dict[str, Union[str, dict, None]]:
         """
         构建单个按键配置
         :param key: 按键名
@@ -679,7 +398,7 @@ class KeyboardMgr:
         """
         return self._get_key_config(key) or {}
 
-    def get_key_config(self, key: Optional[str] = None) -> Dict:
+    def get_key_config(self, key: Optional[str] = None) -> Dict[str, Union[str, dict, None]]:
         """
         获取按键配置
         :param key: 按键名，如果为 None 则返回所有按键配置
@@ -699,7 +418,7 @@ class KeyboardMgr:
                     configs[k] = key_config
             return configs
 
-    def save_key_config(self, key: str, url: str, method: str, data: dict = None) -> Tuple[bool, str, dict]:
+    def save_key_config(self, key: str, url: str, method: str, data: Optional[dict] = None) -> Tuple[bool, str, dict]:
         """
         保存按键配置
         :param key: 按键名
@@ -728,7 +447,7 @@ class KeyboardMgr:
                 return False, "保存配置失败", {}
 
             # 如果服务正在运行，更新处理函数
-            if self.is_running:
+            if self._device.is_running:
                 handler = self._create_key_handler(key)
                 self.set_handler(key, handler)
 
@@ -741,8 +460,8 @@ class KeyboardMgr:
                 log.warning(f"[KEYBOARD] 已保存按键 {key} 配置，但 URL 构建失败（请检查 center_server_url 配置）")
                 return True, f"按键 {key} 配置已保存（URL: {url}）", {"method": method, "url": url, "data": data}
         except Exception as e:
-            log.error(f"[KEYBOARD] 配置失败: {e}")
-            return False, f"配置失败: {str(e)}", {}
+            log.error(f"[KEYBOARD] 配置失败：{e}")
+            return False, f"配置失败：{str(e)}", {}
 
     def delete_key_config(self, key: str) -> Tuple[bool, str]:
         """
@@ -760,14 +479,14 @@ class KeyboardMgr:
                 return False, "保存配置失败"
 
             # 如果服务正在运行，移除处理函数
-            if self.is_running:
+            if self._device.is_running:
                 self.remove_handler(key)
 
             log.info(f"[KEYBOARD] 已删除按键 {key} 的配置")
             return True, f"按键 {key} 配置已删除"
         except Exception as e:
-            log.error(f"[KEYBOARD] 删除配置失败: {e}")
-            return False, f"删除失败: {str(e)}"
+            log.error(f"[KEYBOARD] 删除配置失败：{e}")
+            return False, f"删除失败：{str(e)}"
 
     def simulate_key_press(self, key: str) -> Tuple[bool, str, dict]:
         """
@@ -777,9 +496,9 @@ class KeyboardMgr:
         """
         try:
             if key not in KEY_NAMES:
-                return False, f"不支持的按键: {key}，仅支持 {', '.join(KEY_NAMES)}", {}
+                return False, f"不支持的按键：{key}，仅支持 {', '.join(KEY_NAMES)}", {}
 
-            # 检查是否有配置该按键的处理函数
+            # 检查是否有配置该按键处理函数
             with self._lock:
                 handler = self.handlers.get(key)
 
@@ -794,17 +513,17 @@ class KeyboardMgr:
                 self.set_handler(key, handler)
 
             # 模拟按键触发
-            log.info(f"[KEYBOARD] 模拟按键触发: {key}")
+            log.info(f"[KEYBOARD] 模拟按键触发：{key}")
             try:
                 handler(key)
                 return True, f"按键 {key} 模拟触发成功", {}
             except Exception as e:
-                log.error(f"[KEYBOARD] 模拟按键 {key} 触发失败: {e}")
-                return False, f"触发失败: {str(e)}", {}
+                log.error(f"[KEYBOARD] 模拟按键 {key} 触发失败：{e}")
+                return False, f"触发失败：{str(e)}", {}
 
         except Exception as e:
-            log.error(f"[KEYBOARD] 模拟按键失败: {e}")
-            return False, f"模拟失败: {str(e)}", {}
+            log.error(f"[KEYBOARD] 模拟按键失败：{e}")
+            return False, f"模拟失败：{str(e)}", {}
 
 
 

@@ -5,6 +5,7 @@ from functools import wraps
 from typing import Dict, Tuple, Optional, Any, Callable
 from flask import Blueprint, request
 from core.log_config import root_logger
+from core.config import config_mgr
 from core.utils import _ok, _err, _handle_service_result
 from core.service.keyboard_mgr import KEY_CODES, keyboard_mgr
 
@@ -13,7 +14,7 @@ keyboard_bp = Blueprint('keyboard', __name__)
 
 # HTTP 方法白名单
 ALLOWED_METHODS = {'GET', 'POST', 'PUT', 'DELETE'}
-
+GLOBAL_CONFIG_KEY = {'center_server_url', 'key_valid_time', 'key_valid_duration'}
 
 def handle_errors(operation_name: str):
     """
@@ -138,6 +139,16 @@ def keyboard_set_config():
         "data": {"action": "test"}
     }
     
+    设置全局配置:
+    {
+        "key": "global",
+        "data": {
+            "center_server_url": "http://localhost:8000",
+            "key_valid_time": "10:00",  // 时-分
+            "key_valid_duration": 3600  // 分钟
+        }
+    }
+    
     删除配置:
     {
         "key": "F13",
@@ -146,8 +157,33 @@ def keyboard_set_config():
     """
     args = request.get_json() or {}
     key = args.get('key')
+    if not key:
+        return _err(msg="key 参数是必需的")
 
-    # 验证 key 参数
+    # 如果是全局配置
+    if key == 'global':
+        data = args.get('data', {})
+        
+        # 筛选允许的全局配置项
+        updated_configs = {}
+        for config_key in GLOBAL_CONFIG_KEY:
+            if config_key in data:
+                value = data[config_key]
+                # 将值转换为字符串存储
+                config_mgr.set(config_key, str(value) if value is not None else '')
+                updated_configs[config_key] = value
+        
+        # 保存到配置文件
+        if not config_mgr.save_config():
+            return _err(msg="保存全局配置失败")
+        
+        # 清除缓存（如果有的话）
+        keyboard_mgr._clear_base_url_cache()
+        
+        log.info(f"[KEYBOARD] 已更新全局配置：{updated_configs}")
+        return _ok(data=updated_configs, msg=f"全局配置已保存，共更新 {len(updated_configs)} 条配置")
+
+    # 验证 key 参数（F12~F19）
     is_valid, error = _validate_key(key)
     if not is_valid:
         return _err(msg=error)
@@ -183,7 +219,7 @@ def keyboard_mock():
     key = args.get('key')
 
     is_valid, error = _validate_key(key)
-    if not is_valid:
+    if key is None or not is_valid:
         return _err(msg=error)
 
     success, message, result = keyboard_mgr.simulate_key_press(key)
