@@ -401,7 +401,7 @@ class KeyboardMgr:
     def get_key_config(self, key: Optional[str] = None) -> Dict[str, Union[str, dict, None]]:
         """
         获取按键配置
-        :param key: 按键名，如果为 None 则返回所有按键配置
+        :param key: 按键名，如果为 None 则返回所有按键配置（包含 global 节点）
         :return: 配置字典
         """
         if key:
@@ -410,13 +410,25 @@ class KeyboardMgr:
                 return {}
             return self._build_key_config(key)
         else:
-            # 返回所有按键配置
+            # 返回所有按键配置 + 全局配置
+            result = {}
+            
+            # 添加全局配置到 global 节点
+            result["global"] = {
+                "key_valid_time": config_mgr.get("key_valid_time", ""),
+                "key_valid_duration": config_mgr.get("key_valid_duration", "")
+            }
+            
+            # 添加所有按键配置
             configs = {}
             for k in KEY_NAMES:
                 key_config = self._build_key_config(k)
                 if key_config:
                     configs[k] = key_config
-            return configs
+            
+            result["keys"] = configs
+            
+            return result
 
     def save_key_config(self, key: str, url: str, method: str, data: Optional[dict] = None) -> Tuple[bool, str, dict]:
         """
