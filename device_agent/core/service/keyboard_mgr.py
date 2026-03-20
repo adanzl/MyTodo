@@ -10,7 +10,6 @@ import time
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Callable, Tuple, Union, TypedDict
 
-
 from core.log_config import root_logger
 from core.config import config_mgr
 from core.utils import _send_http_request
@@ -32,8 +31,6 @@ DEFAULT_HTTP_METHOD = "GET"
 
 # 默认 F12 URL
 DEFAULT_F12_URL = "http://localhost:8000/keyboard/status"
-
-
 
 
 class KeyboardMgr:
@@ -195,8 +192,8 @@ class KeyboardMgr:
         检查当前时间是否在有效时间范围内
         :return: (is_valid: bool, reason: str)
         """
-        valid_time_str = config_mgr.get("key_valid_time", "")
-        duration_str = config_mgr.get("key_valid_duration", "")
+        valid_time_str = config_mgr.get(self._get_config_key("global", "key_valid_time"), "")
+        duration_str = config_mgr.get(self._get_config_key("global", "key_valid_duration"), "")
 
         # 如果没有配置有效时间，则认为始终有效
         if not valid_time_str:
@@ -296,6 +293,7 @@ class KeyboardMgr:
         :param key: 按键名 (F13~F19)
         :return: 处理函数
         """
+
         def handler(key_name: str):
             # 首先检查时间有效性
             is_valid, reason = self._is_within_valid_time()
@@ -310,11 +308,7 @@ class KeyboardMgr:
 
             # 准备请求数据
             data = config.get("data", {}).copy()
-            data.update({
-                "key": key_name,
-                "value": 1,
-                "action": "keyboard"
-            })
+            data.update({"key": key_name, "value": 1, "action": "keyboard"})
 
             url = config["url"]
             method = config["method"]
@@ -351,7 +345,7 @@ class KeyboardMgr:
                     "url": key_config["url"],
                     "data": key_config.get("data", {})
                 }
-
+        configs['global'] = self.get_keyboard_config()
         status["configs"] = configs
         return status
 
@@ -406,10 +400,10 @@ class KeyboardMgr:
             }
         return {}
 
-    def get_global_config(self) -> Dict:
+    def get_keyboard_config(self) -> Dict:
         return {
-            "key_valid_time": config_mgr.get("key_valid_time") or "",
-            "key_valid_duration": config_mgr.get("key_valid_duration") or ""
+            "key_valid_time": config_mgr.get(self._get_config_key("global", "key_valid_time")) or "",
+            "key_valid_duration": config_mgr.get(self._get_config_key("global", "key_valid_duration")) or ""
         }
 
     def get_key_config(self, key: Optional[str] = None) -> Dict:
@@ -430,8 +424,25 @@ class KeyboardMgr:
                 key_config = self._build_key_config(k)
                 if key_config:
                     configs[k] = key_config
-            configs["global"] = self.get_global_config()
+            configs["global"] = self.get_keyboard_config()
             return configs
+
+    def save_global_config(self, new_config) -> Tuple[bool, str]:
+        """
+        保存keyboard全局配置
+        :param new_config: 配置字典，包含 key_valid_time 和 key_valid_duration
+        :return: (success: bool, message: str)
+        """
+        try:
+            config_mgr.set(self._get_config_key("global", "key_valid_time"), new_config["key_valid_time"])
+            config_mgr.set(self._get_config_key("global", "key_valid_duration"), new_config["key_valid_duration"])
+            if not config_mgr.save_config():
+                return False, "保存配置失败"
+            log.info(f"[KEYBOARD] 已保存全局配置：{new_config}")
+            return True, "全局配置已保存"
+        except Exception as e:
+            log.error(f"[KEYBOARD] 保存全局配置失败：{e}")
+            return False, f"保存失败：{str(e)}"
 
     def save_key_config(self, key: str, url: str, method: str, data: Optional[dict] = None) -> Tuple[bool, str, dict]:
         """
@@ -539,8 +550,6 @@ class KeyboardMgr:
         except Exception as e:
             log.error(f"[KEYBOARD] 模拟按键失败：{e}")
             return False, f"模拟失败：{str(e)}", {}
-
-
 
 
 # ==================== 全局实例 ====================

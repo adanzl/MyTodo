@@ -60,3 +60,6 @@
 # keyboard.F15.method=
 # keyboard.F15.data=
 
+# 键盘的全局配置
+keyboard.global.valid_time=
+keyboard.global.valid_duration=

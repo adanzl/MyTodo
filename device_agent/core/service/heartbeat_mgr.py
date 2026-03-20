@@ -77,7 +77,6 @@ class HeartbeatMgr:
             "name": self._get_name(),
             "actions": ["bluetooth", "keyboard"],
             "keyboard": keyboard_status,
-            "config": keyboard_mgr.get_global_config()
         }
         return status
 

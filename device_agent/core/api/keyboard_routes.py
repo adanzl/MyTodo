@@ -14,7 +14,7 @@ keyboard_bp = Blueprint('keyboard', __name__)
 
 # HTTP 方法白名单
 ALLOWED_METHODS = {'GET', 'POST', 'PUT', 'DELETE'}
-GLOBAL_CONFIG_KEY = {'center_server_url', 'key_valid_time', 'key_valid_duration'}
+GLOBAL_CONFIG_KEY = {'key_valid_time', 'key_valid_duration'}
 
 def handle_errors(operation_name: str):
     """
@@ -143,7 +143,6 @@ def keyboard_set_config():
     {
         "key": "global",
         "data": {
-            "center_server_url": "http://localhost:8000",
             "key_valid_time": "10:00",  // 时-分
             "key_valid_duration": 3600  // 分钟
         }
@@ -163,23 +162,17 @@ def keyboard_set_config():
     # 如果是全局配置
     if key == 'global':
         data = args.get('data', {})
-        
+
         # 筛选允许的全局配置项
         updated_configs = {}
         for config_key in GLOBAL_CONFIG_KEY:
             if config_key in data:
-                value = data[config_key]
-                # 将值转换为字符串存储
-                config_mgr.set(config_key, str(value) if value is not None else '')
-                updated_configs[config_key] = value
-        
-        # 保存到配置文件
-        if not config_mgr.save_config():
-            return _err(msg="保存全局配置失败")
-        
+                updated_configs[config_key] = data[config_key]
+        keyboard_mgr.save_global_config(data)
+
         # 清除缓存（如果有的话）
         keyboard_mgr._clear_base_url_cache()
-        
+
         log.info(f"[KEYBOARD] 已更新全局配置：{updated_configs}")
         return _ok(data=updated_configs, msg=f"全局配置已保存，共更新 {len(updated_configs)} 条配置")
 

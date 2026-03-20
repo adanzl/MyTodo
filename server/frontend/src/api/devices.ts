@@ -88,9 +88,10 @@ export async function setMiDeviceVolume(
 /**
  * 停止小米设备播放
  */
-export async function stopMiDevice(deviceId: string): Promise<ApiResponse<{ message: string }>> {
+export async function stopMiDevice(deviceId: string, deviceDid: string): Promise<ApiResponse<{ message: string }>> {
   const response = await api.post("/mi/stop", {
     device_id: deviceId,
+    device_did: deviceDid,
   });
   return response.data;
 }

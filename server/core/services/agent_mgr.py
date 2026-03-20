@@ -31,7 +31,6 @@ class AgentMgr:
         self._agents: Dict[str, DeviceAgent] = {}  # {agent_id: DeviceAgent}
         self._devices: Dict[str, Dict[str, Any]] = {}  # {agent_id: {'heartbeat_time': timestamp, 'agent_id': str}}
 
-
     def _cleanup_expired_devices(self) -> None:
         """懒清理：清理过期设备"""
         current_time = time.time()
@@ -44,7 +43,6 @@ class AgentMgr:
         for agent_id in expired_devices:
             self.remove_agent(agent_id)
             log.info(f"[AgentMgr] 移除过期设备: {agent_id}")
-
 
     def handle_heartbeat(self, client_ip: str, data: AgentHeartbeatData):
         """处理并注册设备的周期性心跳。
@@ -149,6 +147,40 @@ class AgentMgr:
             button, action = BUTTON_MAP.get(key, ('0', ""))
             playlist_mgr.trigger_button(button, action)
         return 0, "ok"
+
+    def update_agent_config(self, agent_id: str, config: dict[str, Any]) -> tuple[int, str]:
+        """更新指定 Agent 的配置（通过 HTTP 请求）。
+
+        Args:
+            agent_id (str): Agent 唯一标识。
+            config (dict[str, Any]): 新的配置字典。
+
+        Returns:
+            tuple[int, str]: (code, msg)。code=0 表示成功。
+        """
+        if agent_id not in self._devices:
+            return -1, f"device not found: {agent_id}"
+
+        # 获取对应的 Agent 实例
+        agent = self._agents.get(agent_id)
+        if not agent:
+            return -1, f"agent instance not found: {agent_id}"
+
+        # 通过 HTTP 请求向 Agent 发送配置更新
+        try:
+            result = agent.update_config(config)
+            if result.get("code") == 0:
+                # 更新本地存储的配置
+                self._devices[agent_id]['config'] = config
+                log.info(f"[AgentMgr] 更新设备配置成功：{agent_id}, config={config}")
+                return 0, "ok"
+            else:
+                msg = result.get("msg", "更新配置失败")
+                log.error(f"[AgentMgr] 更新设备配置失败：{agent_id}, {msg}")
+                return -1, msg
+        except Exception as e:
+            log.error(f"[AgentMgr] 更新设备配置异常：{agent_id}, error={e}")
+            return -1, f"请求失败：{str(e)}"
 
 
 # 全局实例

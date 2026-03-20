@@ -265,12 +265,12 @@ class DeviceAgent(DeviceBase):
 
     def mock(self, action: str, key: Optional[str] = None, value: Optional[str] = None) -> Dict[str, Any]:
         """请求 Agent 模拟一个设备操作。
-
+    
         Args:
-            action (str): 操作类型 (例如, "keyboard")。
+            action (str): 操作类型 (例如，"keyboard")。
             key (Optional[str]): 操作的键。
             value (Optional[str]): 操作的值。
-
+    
         Returns:
             Dict[str, Any]: Agent 返回的响应字典。
         """
@@ -284,3 +284,14 @@ class DeviceAgent(DeviceBase):
             return self._request("POST", "/keyboard/mock", json_data=json_data)
         else:
             return {"code": -1, "msg": f"不支持的 action: {action}"}
+    
+    def update_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """请求 Agent 更新设备配置。
+    
+        Args:
+            config (Dict[str, Any]): 新的配置字典，可以包含任意键值对。
+    
+        Returns:
+            Dict[str, Any]: Agent 返回的响应字典。
+        """
+        return self._request("POST", "/agent/config", json_data={"config": config})

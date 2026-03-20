@@ -9,6 +9,11 @@ class AgentHeartbeatData(BaseModel):
     config: dict[str, Any] | None = None  # 设备配置
 
 
+class AgentConfigBody(BaseModel):
+    agent_id: str  # 设备 ID
+    config: dict[str, Any]  # 配置内容
+
+
 class AgentEventBody(BaseModel):
     key: str
     action: str

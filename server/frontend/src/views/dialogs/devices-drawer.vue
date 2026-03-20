@@ -854,14 +854,15 @@ const setMiDeviceVolume = async (device: MiDevice, volume: number) => {
 // 停止小米设备播放
 const handleStopMiDevice = async (device: MiDevice) => {
   const deviceId = getMiDeviceId(device);
-  if (!deviceId) {
-    ElMessage.warning("设备ID无效");
+  const deviceDid = device.miotDID;
+  if (!deviceId || !deviceDid) {
+    ElMessage.warning("设备ID 或 设备Did 无效");
     return;
   }
 
   try {
     device._stopping = true;
-    const result = await apiStopMiDevice(deviceId);
+    const result = await apiStopMiDevice(deviceId, deviceDid);
 
     if (result?.code === 0) {
       ElMessage.success("停止播放成功");

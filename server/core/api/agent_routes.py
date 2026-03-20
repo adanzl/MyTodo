@@ -23,7 +23,7 @@ log = app_logger
 agent_bp = Blueprint('agent', __name__)
 
 from core import limiter
-from core.api.types import AgentHeartbeatData, AgentEventBody, AgentMockBody
+from core.api.types import AgentHeartbeatData, AgentEventBody, AgentMockBody, AgentConfigBody
 
 
 def _get_client_ip() -> str:
@@ -95,18 +95,18 @@ def agent_event() -> ResponseReturnValue:
         ResponseReturnValue: 成功时返回 code=0，失败时返回错误信息。
     """
     try:
-        data: Dict[str, Any] = read_json_from_request()
-        body, err = parse_with_model(AgentEventBody, data, err_factory=_err)
-        if err or not body:
+        req: Dict[str, Any] = read_json_from_request()
+        data, err = parse_with_model(AgentEventBody, req, err_factory=_err)
+        if err or not data:
             return _err(f'error: {str(err)}')
 
         client_ip = _get_client_ip()
-        log.info(f"===== [Agent Event] client_ip={client_ip}, {data}")
+        log.info(f"===== [Agent Event] client_ip={client_ip}, {req}")
 
         code, msg = agent_mgr.handle_event(client_ip=client_ip,
-                                           key=body.key,
-                                           value=str(body.value or ''),
-                                           action=body.action)
+                                           key=data.key,
+                                           value=str(data.value or ''),
+                                           action=data.action)
         if code == 0:
             return _ok()
         else:
@@ -169,23 +169,53 @@ def agent_mock() -> ResponseReturnValue:
         KeyError: 当 `agent_id` 未注册时，由 `agent_mgr.get_agent` 抛出。
     """
     try:
-        data: Dict[str, Any] = read_json_from_request()
-        body, err = parse_with_model(AgentMockBody, data, err_factory=_err)
-        if err or not body:
+        req: Dict[str, Any] = read_json_from_request()
+        data, err = parse_with_model(AgentMockBody, req, err_factory=_err)
+        if err or not data:
             return _err(f'error: {str(err)}')
 
-        log.info(f"===== [Agent Mock] {data}")
+        log.info(f"===== [Agent Mock] {req}")
 
-        agent = agent_mgr.get_agent(body.agent_id)
+        agent = agent_mgr.get_agent(data.agent_id)
         if not agent:
-            return _err(f"agent not found: {body.agent_id}")
+            return _err(f"agent not found: {data.agent_id}")
 
-        result = agent.mock(action=body.action, key=body.key, value=body.value)
+        result = agent.mock(action=data.action, key=data.key, value=data.value)
 
         if result.get("code") == 0:
             return _ok(result.get("data"))
         else:
-            return _err(result.get("msg", "mock操作失败"))
+            return _err(result.get("msg", "mock 操作失败"))
     except Exception as e:
         log.error(f"[Agent] Mock error: {e}")
+        return _err(f'error: {str(e)}')
+
+
+@agent_bp.route("/agent/config", methods=['POST'])
+def agent_config_update() -> ResponseReturnValue:
+    """更新指定 Agent 设备的配置。
+
+    JSON Body:
+        agent_id (str): 目标 Agent 的唯一 ID（通常是客户端 IP）。
+        config (dict[str, Any]): 新的配置字典。
+
+    Returns:
+        ResponseReturnValue: 成功时返回 code=0，失败时返回错误信息。
+    """
+    try:
+        req: Dict[str, Any] = read_json_from_request()
+        data, err = parse_with_model(AgentConfigBody, req, err_factory=_err)
+        if err or not data:
+            return _err(f'error: {str(err)}')
+
+        log.info(f"===== [Agent Config Update] agent_id={data.agent_id}, config={data.config}")
+
+        code, msg = agent_mgr.update_agent_config(agent_id=data.agent_id, config=data.config)
+        if code == 0:
+            return _ok()
+        else:
+            log.error(f"[Agent] Update config error: {msg}")
+            return _err(msg)
+    except Exception as e:
+        log.error(f"[Agent] Update config error: {e}")
         return _err(f'error: {str(e)}')

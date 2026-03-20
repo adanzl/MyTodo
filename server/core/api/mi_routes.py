@@ -74,7 +74,7 @@ def mi_status() -> ResponseReturnValue:
     """获取小米设备播放状态。"""
     try:
         device_id = request.args.get('device_id')
-        device_did = request.args.get('device_did') 
+        device_did = request.args.get('device_did')
         if not device_id or not device_did:
             return _err('device_id or device_did is required')
 
@@ -95,10 +95,11 @@ def mi_stop() -> ResponseReturnValue:
     try:
         data: Dict[str, Any] = read_json_from_request()
         device_id = data.get('device_id')
-        if not device_id:
-            return _err('device_id is required')
+        device_did = request.args.get('device_did')
+        if not device_id or not device_did:
+            return _err('device_id or device_did is required')
 
-        device = MiDevice(address=device_id)
+        device = MiDevice(address=device_id, did=device_did)
         code, msg = device.stop()
         if code == 0:
             return _ok({'message': msg or '停止成功'})
