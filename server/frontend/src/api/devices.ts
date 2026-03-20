@@ -1,6 +1,6 @@
 /**
  * 设备相关 API
- * 包含蓝牙、小米设备、DLNA 设备的操作接口
+ * 包含蓝牙、小米设备、DLNA 设备、Agent 设备的操作接口
  */
 import { api } from "./config";
 import type { ApiResponse } from "@/types/api";
@@ -88,7 +88,10 @@ export async function setMiDeviceVolume(
 /**
  * 停止小米设备播放
  */
-export async function stopMiDevice(deviceId: string, deviceDid: string): Promise<ApiResponse<{ message: string }>> {
+export async function stopMiDevice(
+  deviceId: string,
+  deviceDid: string
+): Promise<ApiResponse<{ message: string }>> {
   const response = await api.post("/mi/stop", {
     device_id: deviceId,
     device_did: deviceDid,
@@ -140,6 +143,24 @@ export async function setDlnaDeviceVolume(
 export async function stopDlnaDevice(location: string): Promise<ApiResponse<{ message: string }>> {
   const response = await api.post("/dlna/stop", {
     location,
+  });
+  return response.data;
+}
+
+// ========== Agent 设备 API ==========
+
+/**
+ * 设置 Agent 设备配置
+ */
+export async function setAgentConfig(
+  agentId: string,
+  configType: string,
+  config: Record<string, unknown>
+): Promise<ApiResponse<void>> {
+  const response = await api.post("/agent/config", {
+    agent_id: agentId,
+    type: configType,
+    config,
   });
   return response.data;
 }

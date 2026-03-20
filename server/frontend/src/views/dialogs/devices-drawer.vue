@@ -436,6 +436,7 @@ import {
   getDlnaDeviceVolume as apiGetDlnaDeviceVolume,
   setDlnaDeviceVolume as apiSetDlnaDeviceVolume,
   stopDlnaDevice as apiStopDlnaDevice,
+  setAgentConfig as apiSetAgentConfig,
 } from "@/api/devices";
 import type { MiDevice, AgentDevice, DlnaDevice, BluetoothDevice } from "@/types/device/device";
 
@@ -483,19 +484,16 @@ const buttonGroups = [
 // 处理生效时间变化
 const handleEffectTimeChange = async (device: AgentDevice) => {
   try {
-    // TODO: 调用后端 API 保存生效时间配置
-    // const response = await api.post('/agent/effect_time', {
-    //   agent_id: device.agent_id,
-    //   effect_start_time: device.effect_start_time,
-    //   effect_duration: device.effect_duration
-    // });
+    const response = await apiSetAgentConfig(device.agent_id, 'keyboard', {
+      effect_start_time: device.effect_start_time,
+      effect_duration: device.effect_duration,
+    });
 
-    // if (response?.data?.code === 0) {
-    //   ElMessage.success('生效时间已更新');
-    // } else {
-    //   ElMessage.error(response?.data?.msg || '更新生效时间失败');
-    // }
-    ElMessage.success('生效时间已更新');
+    if (response?.code === 0) {
+      ElMessage.success('生效时间已更新');
+    } else {
+      ElMessage.error(response?.msg || '更新生效时间失败');
+    }
   } catch (error) {
     logAndNoticeError(error as Error, '更新生效时间失败');
   }

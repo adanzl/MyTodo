@@ -7,6 +7,7 @@ class AgentHeartbeatData(BaseModel):
     name: str | None = None  # 设备名称
     actions: list[str] | None = None  # 设备支持的操作列表
     config: dict[str, Any] | None = None  # 设备配置
+    keyboard: dict[str, Any] | None = None  # 设备键盘配置
 
 
 class AgentConfigBody(BaseModel):

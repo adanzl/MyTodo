@@ -71,6 +71,7 @@ class AgentMgr:
                 'address': data.address,
                 'actions': data.actions or [],
                 'config': data.config or {},
+                'keyboard': data.keyboard or {},
             }
 
             log.info(
