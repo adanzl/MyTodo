@@ -30,7 +30,7 @@ class HeartbeatMgr:
     def _get_center_url(self) -> Optional[str]:
         """获取center服务器地址（带缓存）"""
         if self._center_url is None:
-            base_url = config_mgr.get('center_server_url', '').strip()
+            base_url = config_mgr.get('center_server_url', '')
             if base_url:
                 # 拼接固定路径
                 fixed_path = '/api/agent/heartbeat'
@@ -46,13 +46,13 @@ class HeartbeatMgr:
         """获取服务端口（带缓存）"""
         if self._port is None:
             port_str = config_mgr.get('server_port', '8000')
-            self._port = int(port_str)
+            self._port = int(port_str) if port_str else 8000
         return self._port
 
     def _get_name(self) -> str:
         """获取服务名称，如果配置中没有则使用主机名（带缓存）"""
         if self._name is None:
-            self._name = config_mgr.get('agent_name', socket.gethostname()).strip()
+            self._name = config_mgr.get('agent_name', socket.gethostname()) or ''
         return self._name
 
     def _collect_status(self) -> Dict:
@@ -77,6 +77,7 @@ class HeartbeatMgr:
             "name": self._get_name(),
             "actions": ["bluetooth", "keyboard"],
             "keyboard": keyboard_status,
+            "config": keyboard_mgr.get_global_config()
         }
         return status
 

@@ -10,22 +10,6 @@ import time
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Callable, Tuple, Union, TypedDict
 
-class GlobalConfig(TypedDict):
-    """全局配置类型"""
-    key_valid_time: str
-    key_valid_duration: str
-
-class KeyConfig(TypedDict, total=False):
-    """按键配置类型"""
-    method: str
-    url: str
-    data: dict
-
-class AllKeyConfigs(TypedDict):
-    """所有按键配置类型"""
-    global_key: GlobalConfig
-    keys: Dict[str, KeyConfig]
-
 
 from core.log_config import root_logger
 from core.config import config_mgr
@@ -60,7 +44,7 @@ class KeyboardMgr:
         self.handlers: Dict[str, Callable] = {}  # 按键名 -> 处理函数
         self._lock = threading.Lock()
         self._base_url_cache: Optional[str] = None  # URL 构建缓存
-        
+
         # 初始化硬件设备
         self._device = KeyboardDev()
 
@@ -205,7 +189,7 @@ class KeyboardMgr:
             "method": config_mgr.get(self._get_config_key(key, "method"), DEFAULT_HTTP_METHOD),
             "data": config_mgr.get(self._get_config_key(key, "data"), "")
         }
-    
+
     def _is_within_valid_time(self) -> Tuple[bool, str]:
         """
         检查当前时间是否在有效时间范围内
@@ -213,28 +197,28 @@ class KeyboardMgr:
         """
         valid_time_str = config_mgr.get("key_valid_time", "")
         duration_str = config_mgr.get("key_valid_duration", "")
-        
+
         # 如果没有配置有效时间，则认为始终有效
         if not valid_time_str:
             return True, "未配置有效时间限制"
-        
+
         # 解析开始时间（格式：HH:MM）
         valid_time_parts = valid_time_str.split(":")
         if len(valid_time_parts) != 2:
             log.warning(f"[KEYBOARD] 无效的时间格式：{valid_time_str}，应为 HH:MM")
             return True, "时间格式错误，跳过检查"
-        
+
         try:
             start_hour = int(valid_time_parts[0])
             start_minute = int(valid_time_parts[1])
         except ValueError:
             log.warning(f"[KEYBOARD] 无效的时间值：{valid_time_str}")
             return True, "时间值解析失败，跳过检查"
-        
+
         if not (0 <= start_hour <= 23 and 0 <= start_minute <= 59):
             log.warning(f"[KEYBOARD] 无效的时间值：{valid_time_str}")
             return True, "时间值超出范围，跳过检查"
-        
+
         # 解析持续时间（分钟）
         duration_minutes = 0
         if duration_str:
@@ -246,20 +230,20 @@ class KeyboardMgr:
             except ValueError:
                 log.warning(f"[KEYBOARD] 无效的持续时间格式：{duration_str}")
                 duration_minutes = 0
-        
+
         # 获取当前时间
         now = datetime.now()
-        
+
         # 构建开始时间（今天的 HH:MM）
         start_time = now.replace(hour=start_hour, minute=start_minute, second=0, microsecond=0)
-        
+
         # 计算结束时间
         end_time = start_time + timedelta(minutes=duration_minutes)
-        
+
         # 如果持续时间超过 24 小时，认为始终有效
         if duration_minutes >= 24 * 60:
             return True, f"持续时间超过 24 小时，始终有效"
-        
+
         # 检查是否在时间范围内
         if start_time <= now <= end_time:
             return True, f"在有效时间内 ({start_time.strftime('%H:%M')}-{end_time.strftime('%H:%M')})"
@@ -270,7 +254,7 @@ class KeyboardMgr:
             else:
                 # 已经过了今天的有效时间，计算明天的有效时间
                 next_valid = start_time + timedelta(days=1)
-            
+
             remaining = (next_valid - now).total_seconds()
             return False, f"不在有效时间内，下次有效时间：{next_valid.strftime('%Y-%m-%d %H:%M')}（约{int(remaining/60)}分钟后）"
 
@@ -283,7 +267,7 @@ class KeyboardMgr:
         raw_config = self._get_key_config_raw(key)
         if not raw_config:
             return None
-    
+
         # 构建完整 URL
         url_value = raw_config.get("url")
         if not url_value:
@@ -291,19 +275,19 @@ class KeyboardMgr:
         full_url = self._build_full_url(url_value)
         if not full_url:
             return None
-    
+
         result = {
             "method": raw_config.get("method", DEFAULT_HTTP_METHOD),
             "url": full_url,
         }
-    
+
         # 解析数据
         data_value = raw_config.get("data")
         if data_value:
             data = self._parse_config_data(data_value)
             if data:
                 result["data"] = data
-    
+
         return result
 
     def _create_key_handler(self, key: str) -> Callable:
@@ -318,7 +302,7 @@ class KeyboardMgr:
             if not is_valid:
                 log.warning(f"[KEYBOARD] 按键 {key_name} 触发被阻止：{reason}")
                 return
-            
+
             config = self._get_key_config(key_name)
             if not config:
                 log.warning(f"[KEYBOARD] 按键 {key_name} 未配置或 URL 构建失败，跳过")
@@ -407,7 +391,7 @@ class KeyboardMgr:
             log.error(f"[KEYBOARD] 停止服务失败：{e}")
             return False, f"停止失败：{str(e)}"
 
-    def _build_key_config(self, key: str) -> KeyConfig:
+    def _build_key_config(self, key: str) -> Dict:
         """
         构建单个按键配置
         :param key: 按键名
@@ -415,14 +399,20 @@ class KeyboardMgr:
         """
         config = self._get_key_config(key)
         if config:
-            return KeyConfig(
-                method=config.get("method", DEFAULT_HTTP_METHOD),
-                url=config.get("url", ""),
-                data=config.get("data", {})
-            )
-        return KeyConfig()
+            return {
+                "method": config.get("method", DEFAULT_HTTP_METHOD),
+                "url": config.get("url", ""),
+                "data": config.get("data", {})
+            }
+        return {}
 
-    def get_key_config(self, key: Optional[str] = None) -> Union[KeyConfig, Dict[str, Union[GlobalConfig, Dict[str, KeyConfig]]]]:
+    def get_global_config(self) -> Dict:
+        return {
+            "key_valid_time": config_mgr.get("key_valid_time") or "",
+            "key_valid_duration": config_mgr.get("key_valid_duration") or ""
+        }
+
+    def get_key_config(self, key: Optional[str] = None) -> Dict:
         """
         获取按键配置
         :param key: 按键名，如果为 None 则返回所有按键配置（包含 global 节点）
@@ -435,21 +425,13 @@ class KeyboardMgr:
             return self._build_key_config(key)
         else:
             # 返回所有按键配置 + 全局配置
-            global_config = GlobalConfig(
-                key_valid_time=config_mgr.get("key_valid_time") or "",
-                key_valid_duration=config_mgr.get("key_valid_duration") or ""
-            )
-            
-            configs: Dict[str, KeyConfig] = {}
+            configs: Dict[str, Dict[str, str]] = {}
             for k in KEY_NAMES:
                 key_config = self._build_key_config(k)
                 if key_config:
                     configs[k] = key_config
-            
-            return {
-                "global": global_config,
-                "keys": configs
-            }
+            configs["global"] = self.get_global_config()
+            return configs
 
     def save_key_config(self, key: str, url: str, method: str, data: Optional[dict] = None) -> Tuple[bool, str, dict]:
         """
