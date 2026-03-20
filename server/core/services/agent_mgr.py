@@ -4,7 +4,7 @@ Agent 管理器
 """
 import time
 from typing import Dict, Optional, List, Any, Union
-from core.api.agent_routes import AgentHeartbeatData
+from core.api.types import AgentHeartbeatData
 from core.device.agent import DeviceAgent
 from core.config import app_logger
 from core.services.playlist_mgr import playlist_mgr
