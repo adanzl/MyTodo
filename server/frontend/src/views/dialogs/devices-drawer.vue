@@ -486,19 +486,33 @@ const handleEffectTimeChange = async (device: AgentDevice) => {
   try {
     // 从 keyboard.configs.global 中读取配置
     const keyboardGlobalConfig = device.keyboard?.configs?.global || {};
-    console.log('[Agent Config] 当前设备配置:', keyboardGlobalConfig);
 
-    const response = await apiSetAgentConfig(device.agent_id, 'keyboard', {
-      key_valid_time: keyboardGlobalConfig.key_valid_time,
-      key_valid_duration: keyboardGlobalConfig.key_valid_duration,
+    // 构建完整的配置对象，确保包含 global 层级
+    const configPayload = {
+      key: "global",
+      data: {
+        key_valid_time: keyboardGlobalConfig.key_valid_time || null,
+        key_valid_duration: keyboardGlobalConfig.key_valid_duration || 0,
+      }
+    };
+
+    console.log('[Agent Config] 更新配置:', {
+      agent_id: device.agent_id,
+      type: 'keyboard',
+      config: configPayload,
     });
+
+    const response = await apiSetAgentConfig(device.agent_id, 'keyboard', configPayload);
 
     if (response?.code === 0) {
       ElMessage.success('生效时间已更新');
     } else {
-      ElMessage.error(response?.msg || '更新生效时间失败');
+      const errorMsg = response?.msg || '更新生效时间失败';
+      console.error('[Agent Config] 更新失败:', errorMsg);
+      ElMessage.error(errorMsg);
     }
   } catch (error) {
+    console.error('[Agent Config] 更新异常:', error);
     logAndNoticeError(error as Error, '更新生效时间失败');
   }
 };

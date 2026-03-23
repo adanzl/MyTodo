@@ -175,9 +175,10 @@ class AgentMgr:
         try:
             result = agent.update_config(config_type, config)
             if result.get("code") == 0:
-                log.info(f"[AgentMgr] 更新设备配置成功：{agent_id}, config={config}")
+                log.info(f"[AgentMgr] 更新设备配置成功：{agent_id}, config_type={config_type}")
+                # 更新本地缓存的配置信息
                 if config_type == "keyboard":
-                    self._devices[agent_id]
+                    self._devices[agent_id]['keyboard'] = {**self._devices[agent_id].get('keyboard', {}), **config}
                 return 0, "ok"
             else:
                 msg = result.get("msg", "更新配置失败")

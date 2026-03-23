@@ -297,6 +297,7 @@ class DeviceAgent(DeviceBase):
         if config_type == "keyboard":
             url = "/keyboard/config/set"
             json_data = config
+            return self._request("POST", url, json_data=json_data)
         else:
-            ret = {"code": -1, "msg": f"不支持的 config_type: {config_type}"}
-        return self._request("POST", url, json_data=json_data)
+            log.warning(f"[DeviceAgent] 不支持的配置类型：{config_type}")
+            return {"code": -1, "msg": f"不支持的 config_type: {config_type}"}
