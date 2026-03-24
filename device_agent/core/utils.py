@@ -73,7 +73,7 @@ def _handle_service_result(success: bool, message: str, data=None):
     return _err(msg=message)
 
 
-def _send_http_request(url: str, method: str = 'GET', data: dict = None, headers: dict = None):
+def _send_http_request(url: str, method: str = 'GET', data: Optional[dict] = None, headers: Optional[dict] = None):
     """
     发送 HTTP 请求
     :param url: 请求 URL
@@ -84,7 +84,7 @@ def _send_http_request(url: str, method: str = 'GET', data: dict = None, headers
     """
     try:
         method = method.upper()
-        timeout = 5  # 5秒超时
+        timeout = 10  # 10秒超时
         
         # 使用字典映射简化方法调用
         method_map = {
@@ -162,7 +162,7 @@ def find_command(cmd_name: str) -> Optional[str]:
     return None
 
 
-def run_async(coro, timeout: float = None, log_prefix: str = ""):
+def run_async(coro, timeout: Optional[float] = None, log_prefix: str = ""):
     """
     在新的事件循环中运行协程
     :param coro: 协程对象
