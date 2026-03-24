@@ -45,7 +45,7 @@ class PlaylistMgr:
 
     该服务负责：
     - 播放列表数据的 CRUD（通过 RDS 持久化）
-    - 播放状态机与游标（pre_files/pre_lists + files）
+    - 播放状态机与游标（pre_files/pre_lists + playlist）
     - 与设备层交互（play/stop/get_status/set_volume）
     - 定时任务（cron 自动播放、文件结束自动切下一首、播放列表时长限制）
 
@@ -248,13 +248,6 @@ class PlaylistMgr:
                     playlist_data["pre_lists"] = pre_lists
                     action = "迁移" if "pre_lists" not in playlist_data else "修复"
                     log.info(f"[PlaylistMgr] {action} pre_files 到 pre_lists: {playlist_id}, 共 {len(pre_files)} 个文件")
-            
-                # 迁移 playlist 到 files（如果还没有 files）
-                if "files" not in playlist_data:
-                    old_playlist = playlist_data.get("playlist", [])
-                    if old_playlist:
-                        playlist_data["files"] = old_playlist
-                        log.info(f"[PlaylistMgr] 迁移 playlist 到 files: {playlist_id}, 共 {len(old_playlist)} 个文件")
 
             # 从 _playlist_raw 恢复游标状态到 _play_state，保留游标以便从上次位置继续
             # 只恢复那些在 _play_state 中不存在的播放列表（程序启动时的情况）
@@ -273,7 +266,7 @@ class PlaylistMgr:
                             "file_index": current_index
                         }
                     else:
-                        # 如果没有 pre_files，从 files 的 current_index 开始
+                        # 如果没有 pre_files，从 playlist 的 current_index 开始
                         self._play_state[playlist_id] = {
                             "in_pre_files": False,
                             "pre_index": 0,
@@ -528,8 +521,8 @@ class PlaylistMgr:
                                 else:
                                     files_to_fetch.add(file_uri)
 
-        # Check files
-        for file_item in playlist_data.get("files", []):
+        # Check playlist
+        for file_item in playlist_data.get("playlist", []):
             if not file_item.get("duration"):
                 file_uri = file_item.get("uri")
                 if file_uri:
@@ -565,9 +558,9 @@ class PlaylistMgr:
                             file_item["duration"] = file_durations[file_uri]
                             updated_count += 1
 
-        # Update files
-        files = playlist_data.get("files", [])
-        for file_item in files:
+        # Update playlist
+        playlist = playlist_data.get("playlist", [])
+        for file_item in playlist:
             file_uri = file_item.get("uri")
             if file_uri and file_uri in file_durations and not file_item.get("duration"):
                 file_item["duration"] = file_durations[file_uri]
@@ -668,8 +661,8 @@ class PlaylistMgr:
         playlist_data = self._playlist_raw[id]
         pre_lists = playlist_data.get("pre_lists", [])
         pre_files = _get_pre_list_for_today(pre_lists)  # 获取今天对应的前置文件列表
-        files = playlist_data.get("files", [])
-        if not files and not pre_files:
+        playlist = playlist_data.get("playlist", [])
+        if not playlist and not pre_files:
             return {}, -1, "播放列表为空"
         device_obj = self._device_map.get(id)
         if device_obj is None:
@@ -706,7 +699,7 @@ class PlaylistMgr:
         pre_lists = playlist_data.get("pre_lists", [])
         return _get_pre_list_for_today(pre_lists)
 
-    def _get_current_file(self, play_state: Dict[str, Any], pre_files: List, files: List) -> tuple[Any, str]:
+    def _get_current_file(self, play_state: Dict[str, Any], pre_files: List, playlist: List) -> tuple[Any, str]:
         """获取当前要播放的文件。"""
         if play_state["in_pre_files"]:
             pre_index = play_state["pre_index"]
@@ -715,9 +708,9 @@ class PlaylistMgr:
             return pre_files[pre_index], 'SUCCESS'
         else:
             file_index = play_state["file_index"]
-            if file_index < 0 or file_index >= len(files):
-                return None, f"files 索引 {file_index} 超出范围"
-            return files[file_index], 'SUCCESS'
+            if file_index < 0 or file_index >= len(playlist):
+                return None, f"playlist 索引 {file_index} 超出范围"
+            return playlist[file_index], 'SUCCESS'
 
     def _cleanup_play_state(self, id: str) -> None:
         """清理播放状态。"""
@@ -736,7 +729,7 @@ class PlaylistMgr:
 
         播放逻辑：
         1) 先播放当天的 pre_files（来自 pre_lists）；
-        2) 再从 files[current_index] 开始播放。
+        2) 再从 playlist[current_index] 开始播放。
 
         该方法会与设备层交互（set_volume/play），并根据文件时长启动文件定时器；
         若配置了播放列表时长限制，也会启动时长定时器。
@@ -756,14 +749,14 @@ class PlaylistMgr:
             return code, msg
 
         pre_files = self._get_pre_files_for_today(playlist_data)  # 获取今天对应的前置文件列表
-        files = playlist_data.get("files", [])
+        playlist = playlist_data.get("playlist", [])
 
         # 初始化播放状态（如果不是 force 模式或状态不存在）
         if not force or id not in self._play_state:
             self._init_play_state(id, playlist_data, pre_files)
 
         play_state = self._play_state[id]
-        file_item, error_msg = self._get_current_file(play_state, pre_files, files)
+        file_item, error_msg = self._get_current_file(play_state, pre_files, playlist)
         if error_msg:
             return -1, error_msg
 
@@ -870,7 +863,7 @@ class PlaylistMgr:
                 return code, msg
 
             pre_files = self._get_pre_files_for_today(playlist_data)  # 获取今天对应的前置文件列表
-            files = playlist_data.get("files", [])
+            playlist = playlist_data.get("playlist", [])
 
             # 初始化播放状态（如果不存在）
             if id not in self._play_state:
@@ -886,8 +879,8 @@ class PlaylistMgr:
             if file_index is not None:
                 play_state["file_index"] = file_index
 
-            # 更新播放列表的 current_index（只对 files 生效）
-            if not play_state["in_pre_files"] and files:
+            # 更新播放列表的 current_index（只对 playlist 生效）
+            if not play_state["in_pre_files"] and playlist:
                 playlist_data["current_index"] = play_state["file_index"]
                 playlist_data["updated_time"] = _TS()
 
@@ -908,8 +901,8 @@ class PlaylistMgr:
     def play_next(self, id: str) -> tuple[int, str]:
         """播放下一首。
 
-        根据当前播放状态（in_pre_files 或 files），自动递增游标并播放下一个文件。
-        files 列表采用循环播放策略。
+        根据当前播放状态（in_pre_files 或 playlist），自动递增游标并播放下一个文件。
+        playlist 列表采用循环播放策略。
 
         Args:
             id: 播放列表 ID。
@@ -926,7 +919,7 @@ class PlaylistMgr:
                 return code, msg
 
             pre_files = self._get_pre_files_for_today(playlist_data)  # 获取今天对应的前置文件列表
-            files = playlist_data.get("files", [])
+            playlist = playlist_data.get("playlist", [])
 
             # 如果没有播放状态，初始化并从头开始
             if id not in self._play_state:
@@ -947,14 +940,14 @@ class PlaylistMgr:
                                                        in_pre_files=True,
                                                        pre_index=next_pre_index,
                                                        file_index=play_state["file_index"])
-                # pre_files 播放完了，开始播放 files（从保存的 file_index 开始）
-                if files and play_state["file_index"] < len(files):
+                # pre_files 播放完了，开始播放 playlist（从保存的 file_index 开始）
+                if playlist and play_state["file_index"] < len(playlist):
                     return self._update_index_and_play(id, in_pre_files=False, pre_index=0, file_index=play_state["file_index"])
                 return -1, "没有更多文件可播放"
             else:
-                # 播放 files 的下一首（使用取余实现循环）
-                if files:
-                    next_file_index = (play_state["file_index"] + 1) % len(files)
+                # 播放 playlist 的下一首（使用取余实现循环）
+                if playlist:
+                    next_file_index = (play_state["file_index"] + 1) % len(playlist)
                     return self._update_index_and_play(id, in_pre_files=False, pre_index=0, file_index=next_file_index)
                 return -1, "没有更多文件可播放"
         except Exception as e:
@@ -964,8 +957,8 @@ class PlaylistMgr:
     def play_pre(self, id: str) -> tuple[int, str]:
         """播放上一首。
 
-        根据当前播放状态（in_pre_files 或 files），自动递减游标并播放上一个文件。
-        当 files 在开头时，会回退到 pre_files 的最后一项（若存在）。
+        根据当前播放状态（in_pre_files 或 playlist），自动递减游标并播放上一个文件。
+        当 playlist 在开头时，会回退到 pre_files 的最后一项（若存在）。
 
         Args:
             id: 播放列表 ID。
@@ -978,7 +971,7 @@ class PlaylistMgr:
             return code, msg
 
         pre_files = self._get_pre_files_for_today(playlist_data)  # 获取今天对应的前置文件列表
-        files = playlist_data.get("files", [])
+        playlist = playlist_data.get("playlist", [])
 
         # 如果没有播放状态，初始化
         if id not in self._play_state:
@@ -988,7 +981,7 @@ class PlaylistMgr:
                                                    pre_index=len(pre_files) - 1,
                                                    file_index=playlist_data.get("current_index", 0))
             current_index = playlist_data.get("current_index", 0)
-            prev_index = (current_index - 1) % len(files) if files else 0
+            prev_index = (current_index - 1) % len(playlist) if playlist else 0
             return self._update_index_and_play(id, in_pre_files=False, pre_index=0, file_index=prev_index)
 
         play_state = self._play_state[id]
@@ -1003,11 +996,11 @@ class PlaylistMgr:
                                                    file_index=play_state["file_index"])
             return -1, "已经是第一首"
         else:
-            # 播放 files 的上一首
+            # 播放 playlist 的上一首
             prev_file_index = play_state["file_index"] - 1
             if prev_file_index >= 0:
                 return self._update_index_and_play(id, in_pre_files=False, pre_index=0, file_index=prev_file_index)
-            # files 在开头，回到 pre_files 的最后
+            # playlist 在开头，回到 pre_files 的最后
             if pre_files:
                 return self._update_index_and_play(id, in_pre_files=True, pre_index=len(pre_files) - 1, file_index=0)
             return -1, "已经是第一首"

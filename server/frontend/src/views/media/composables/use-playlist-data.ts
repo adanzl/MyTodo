@@ -47,11 +47,11 @@ export function usePlaylistData(
   };
 
   /**
-   * Get files from item (files property only)
+   * Get files from item (playlist property only)
    */
   const getFilesFromItem = (item: Partial<PlaylistApiData> | Partial<Playlist>): PlaylistItem[] => {
     const filesData =
-      ("files" in item && Array.isArray(item.files) && item.files) ||
+      ("playlist" in item && Array.isArray(item.playlist) && item.playlist) ||
       [];
     return toPlaylistItems(normalizeFiles(filesData, true));
   };
@@ -188,7 +188,7 @@ export function usePlaylistData(
     return {
       id: item?.id || createPlaylistId(),
       name,
-      files: playlist,
+      playlist: playlist,
       pre_lists,
       total: playlist.length,
       current_index: currentIndex,
@@ -219,8 +219,8 @@ export function usePlaylistData(
     }
     return list.map((item, index) => {
       // If already Playlist type, return as is
-      if ("files" in item && "total" in item) {
-        return item as Playlist;
+      if ("playlist" in item && "total" in item) {
+        return item as unknown as Playlist;
       }
       // Otherwise treat as PlaylistApiData
       return normalizePlaylistItem(item as PlaylistApiData, item?.name || `播放列表${index + 1}`);
@@ -245,16 +245,16 @@ export function usePlaylistData(
       return { playlists, activePlaylistId: activeId };
     }
 
-    // Type guard: Check if it's a single PlaylistApiData (has files property)
-    if (raw && !Array.isArray(raw) && "files" in raw) {
+    // Type guard: Check if it's a single PlaylistApiData (has playlist property)
+    if (raw && !Array.isArray(raw) && "playlist" in raw) {
       const apiData = raw as PlaylistApiData;
       const playlistData =
-        ("files" in apiData && Array.isArray(apiData.files) && apiData.files) ||
+        ("playlist" in apiData && Array.isArray(apiData.playlist) && apiData.playlist) ||
         [];
       const migrated = normalizePlaylistItem({
         id: apiData.id || (apiData as any).playlist_id,
         name: apiData.name || DEFAULT_PLAYLIST_NAME,
-        files: playlistData,
+        playlist: playlistData,
         current_index: apiData.current_index,
         device_address: apiData.device_address,
       });
@@ -324,13 +324,13 @@ export function usePlaylistData(
       if (!item.id) return;
 
       const deviceType = normalizeDeviceType(item.device?.type || item.device_type);
-      const normalizedFiles = normalizeFiles(item.files || [], true);
+      const normalizedFiles = normalizeFiles(item.playlist || [], true);
       const normalizedPreLists = normalizePreLists(item);
 
       playlistDict[item.id] = {
         id: item.id,
         name: item.name || DEFAULT_PLAYLIST_NAME,
-        files: normalizedFiles,
+        playlist: normalizedFiles,
         pre_lists: normalizedPreLists,
         current_index: item.current_index || 0,
         device: {
@@ -367,7 +367,7 @@ export function usePlaylistData(
         playlistDict[item.id] = {
           ...item,
           order: index, // Set order value
-          total: Array.isArray(item.files) ? item.files.length : 0,
+          total: Array.isArray(item.playlist) ? item.playlist.length : 0,
           updated_time: formatDateTime(),
         };
       });
@@ -425,14 +425,14 @@ export function usePlaylistData(
     const active = list.find(item => item.id === activePlaylistId.value) || list[0];
     activePlaylistId.value = active.id;
 
-    const currentIndex = normalizeCurrentIndex(active.current_index, active.files?.length || 0);
+    const currentIndex = normalizeCurrentIndex(active.current_index, active.playlist?.length || 0);
     const pre_lists = isValidPreLists(active.pre_lists)
       ? active.pre_lists.map(list => [...(list || [])])
       : createEmptyPreLists();
 
     playlistStatus.value = {
       ...active,
-      files: [...(active.files || [])],
+      playlist: [...(active.playlist || [])],
       pre_lists,
       current_index: currentIndex,
       pre_index: parseIndex(active.pre_index, -1),
@@ -444,7 +444,7 @@ export function usePlaylistData(
   const clonePlaylistItem = (item: Playlist): Playlist => {
     return {
       ...item,
-      files: item.files.map(f => ({ ...f })),
+      playlist: item.playlist.map(f => ({ ...f })),
       pre_lists: isValidPreLists(item.pre_lists)
         ? item.pre_lists.map(list => list.map(f => ({ ...f })))
         : createEmptyPreLists(),
@@ -597,7 +597,7 @@ export function usePlaylistData(
           return {
             ...item,
             ...updatedPlaylist,
-            files: updatedPlaylist.files || item.files,
+            playlist: updatedPlaylist.playlist || item.playlist,
             pre_lists: isValidPreLists(updatedPlaylist.pre_lists)
               ? updatedPlaylist.pre_lists.map(list => [...(list || [])])
               : item.pre_lists,

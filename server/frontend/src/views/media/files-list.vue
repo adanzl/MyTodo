@@ -1,5 +1,5 @@
 <template>
-  <div v-if="playlistStatus?.playlist" class="border rounded p-2">
+  <div v-if="playlist" class="border rounded p-2">
     <div class="flex items-center justify-between mb-2 pr-2.5">
       <div class="text-xs font-semibold text-gray-600">
         正式文件（播放时记录进度）
@@ -12,154 +12,91 @@
         <el-tag v-if="isPlaying" type="success" size="small" class="ml-2"> 播放中 </el-tag>
       </div>
       <div class="flex items-center gap-1">
-        <el-button
-          type="primary"
-          v-bind="buttonBaseProps"
-          @click="emit('open-file-browser')"
-          :disabled="isAddButtonDisabled"
-        >
+        <el-button type="primary" v-bind="buttonBaseProps" @click="emit('open-file-browser')"
+          :disabled="isAddButtonDisabled">
           +
         </el-button>
-        <el-button
-          :type="filesDragMode ? 'success' : 'default'"
-          v-bind="buttonBaseProps"
-          @click="emit('toggle-drag-mode')"
-          :disabled="isDragButtonDisabled"
-          :title="filesDragMode ? '点击退出拖拽排序模式' : '点击进入拖拽排序模式'"
-        >
-          <el-icon v-if="filesDragMode"><Check /></el-icon>
-          <el-icon v-else><Sort /></el-icon>
+        <el-button :type="filesDragMode ? 'success' : 'default'" v-bind="buttonBaseProps"
+          @click="emit('toggle-drag-mode')" :disabled="isDragButtonDisabled"
+          :title="filesDragMode ? '点击退出拖拽排序模式' : '点击进入拖拽排序模式'">
+          <el-icon v-if="filesDragMode">
+            <Check />
+          </el-icon>
+          <el-icon v-else>
+            <Sort />
+          </el-icon>
         </el-button>
-        <el-button
-          :type="filesBatchDeleteMode ? 'success' : 'default'"
-          v-bind="buttonBaseProps"
-          @click="emit('toggle-batch-delete-mode')"
-          :disabled="isBatchDeleteButtonDisabled"
-          :title="filesBatchDeleteMode ? '点击退出批量删除模式' : '点击进入批量删除模式'"
-        >
-          <el-icon v-if="filesBatchDeleteMode"><Check /></el-icon>
-          <el-icon v-else><Delete /></el-icon>
+        <el-button :type="filesBatchDeleteMode ? 'success' : 'default'" v-bind="buttonBaseProps"
+          @click="emit('toggle-batch-delete-mode')" :disabled="isBatchDeleteButtonDisabled"
+          :title="filesBatchDeleteMode ? '点击退出批量删除模式' : '点击进入批量删除模式'">
+          <el-icon v-if="filesBatchDeleteMode">
+            <Check />
+          </el-icon>
+          <el-icon v-else>
+            <Delete />
+          </el-icon>
         </el-button>
-        <el-button
-          v-show="filesBatchDeleteMode"
-          type="danger"
-          v-bind="buttonBaseProps"
-          @click="emit('batch-delete')"
-          :disabled="isBatchDeleteDisabled"
-          :title="batchDeleteTitle"
-        >
-          <el-icon><Delete /></el-icon>
+        <el-button v-show="filesBatchDeleteMode" type="danger" v-bind="buttonBaseProps" @click="emit('batch-delete')"
+          :disabled="isBatchDeleteDisabled" :title="batchDeleteTitle">
+          <el-icon>
+            <Delete />
+          </el-icon>
         </el-button>
-        <el-button
-          v-show="showClearButton"
-          type="default"
-          v-bind="buttonBaseProps"
-          @click="emit('clear')"
-          :disabled="isClearButtonDisabled"
-          title="清空正式文件列表"
-        >
-          <el-icon><Delete /></el-icon>
+        <el-button v-show="showClearButton" type="default" v-bind="buttonBaseProps" @click="emit('clear')"
+          :disabled="isClearButtonDisabled" title="清空正式文件列表">
+          <el-icon>
+            <Delete />
+          </el-icon>
         </el-button>
       </div>
     </div>
     <div v-if="hasFiles" class="overflow-y-scroll scrollbar-overlay">
-      <div
-        v-for="(file, index) in playlist"
-        :key="file.uri || index"
-        class="flex items-center gap-2 p-1 hover:bg-gray-100 rounded select-none"
-        :class="getFileItemClass(index)"
-        :draggable="filesDragMode"
-        @click="handleFileItemClick(index)"
-        @dragstart="handleDragStart($event, index)"
-        @dragend="handleDragEnd"
-        @dragover.prevent="handleDragOver"
-        @dragleave="handleDragLeave"
-        @drop.prevent="handleDrop($event, index)"
-      >
+      <div v-for="(file, index) in playlist" :key="file.uri || index"
+        class="flex items-center gap-2 p-1 hover:bg-gray-100 rounded select-none" :class="getFileItemClass(index)"
+        :draggable="filesDragMode" @click="handleFileItemClick(index)" @dragstart="handleDragStart($event, index)"
+        @dragend="handleDragEnd" @dragover.prevent="handleDragOver" @dragleave="handleDragLeave"
+        @drop.prevent="handleDrop($event, index)">
         <span class="text-xs text-gray-500 w-8">{{ index + 1 }}</span>
-        <span
-          class="flex-1 text-sm truncate"
-          :class="{ 'text-blue-600': isCurrent(index) }"
-          :title="file.uri || ''"
-        >
+        <span class="flex-1 text-sm truncate" :class="{ 'text-blue-600': isCurrent(index) }" :title="file.uri || ''">
           {{ getFileName(file.uri) }}
         </span>
         <div class="flex items-center gap-1 shrink-0" @mousedown.stop @click.stop>
-          <MediaComponent
-            v-show="!filesBatchDeleteMode"
-            :file="file"
-            :player="audioPlayer"
-            :disabled="playlistLoading"
-            @play="emit('play-file', file)"
-            @seek="handleSeek"
-          />
-          <el-checkbox
-            v-show="filesBatchDeleteMode"
-            class="h-6!"
-            :model-value="isSelected(index)"
-            @change="emit('toggle-selection', index)"
-            @click.stop
-          />
-          <el-button
-            v-show="showMoreButtons"
-            v-bind="circleButtonProps"
-            @click.stop="emit('move-up', index)"
-            :disabled="index === 0 || playlistLoading"
-            title="上移"
-          >
+          <MediaComponent v-show="!filesBatchDeleteMode" :file="file" :player="audioPlayer" :disabled="playlistLoading"
+            @play="emit('play-file', file)" @seek="handleSeek" />
+          <el-checkbox v-show="filesBatchDeleteMode" class="h-6!" :model-value="isSelected(index)"
+            @change="emit('toggle-selection', index)" @click.stop />
+          <el-button v-show="showMoreButtons" v-bind="circleButtonProps" @click.stop="emit('move-up', index)"
+            :disabled="index === 0 || playlistLoading" title="上移">
             ↑
           </el-button>
-          <el-button
-            v-show="showMoreButtons"
-            v-bind="circleButtonProps"
-            @click.stop="emit('move-down', index)"
-            :disabled="index === playlistLength - 1 || playlistLoading"
-            title="下移"
-          >
+          <el-button v-show="showMoreButtons" v-bind="circleButtonProps" @click.stop="emit('move-down', index)"
+            :disabled="index === playlistLength - 1 || playlistLoading" title="下移">
             ↓
           </el-button>
-          <el-button
-            v-show="showMoreButtons"
-            v-bind="circleButtonProps"
-            @click.stop="emit('replace', index)"
-            :disabled="playlistLoading"
-            title="替换"
-          >
-            <el-icon><Refresh /></el-icon>
+          <el-button v-show="showMoreButtons" v-bind="circleButtonProps" @click.stop="emit('replace', index)"
+            :disabled="playlistLoading" title="替换">
+            <el-icon>
+              <Refresh />
+            </el-icon>
           </el-button>
-          <el-button
-            v-show="showMoreButtons"
-            type="info"
-            size="small"
-            plain
-            circle
-            @click.stop="emit('open-playlist-selector', file)"
-            :disabled="playlistLoading"
-            title="应用到列表"
-          >
-            <el-icon><DocumentCopy /></el-icon>
+          <el-button v-show="showMoreButtons" type="info" size="small" plain circle
+            @click.stop="emit('open-playlist-selector', file)" :disabled="playlistLoading" title="应用到列表">
+            <el-icon>
+              <DocumentCopy />
+            </el-icon>
           </el-button>
-          <el-button
-            v-show="showPlaylistSelectorButton"
-            type="info"
-            size="small"
-            plain
-            circle
-            @click.stop="emit('play-on-device', file)"
-            :disabled="playlistLoading"
-            title="在设备上播放"
-          >
-            <el-icon v-if="false" size="12" class="animate-spin"><Loading /></el-icon>
+          <el-button v-show="showPlaylistSelectorButton" type="info" size="small" plain circle
+            @click.stop="emit('play-on-device', file)" :disabled="playlistLoading" title="在设备上播放">
+            <el-icon v-if="false" size="12" class="animate-spin">
+              <Loading />
+            </el-icon>
             <span v-else>▶</span>
           </el-button>
-          <el-button
-            v-show="!filesBatchDeleteMode"
-            v-bind="circleButtonProps"
-            @click.stop="emit('delete', index)"
-            :disabled="isDeleteButtonDisabled"
-            title="删除"
-          >
-            <el-icon><Minus /></el-icon>
+          <el-button v-show="!filesBatchDeleteMode" v-bind="circleButtonProps" @click.stop="emit('delete', index)"
+            :disabled="isDeleteButtonDisabled" title="删除">
+            <el-icon>
+              <Minus />
+            </el-icon>
           </el-button>
         </div>
       </div>

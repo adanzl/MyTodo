@@ -55,7 +55,7 @@
                   ((playlist.pre_lists &&
                     playlist.pre_lists[getWeekdayIndex()] &&
                     playlist.pre_lists[getWeekdayIndex()].length) ||
-                    0) + ((playlist.files && playlist.files.length) || 0)
+                    0) + ((playlist.playlist && playlist.playlist.length) || 0)
                 }}
               </span>
             </span>

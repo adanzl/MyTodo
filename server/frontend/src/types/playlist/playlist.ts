@@ -97,7 +97,7 @@ export interface Playlist {
   /**
    * Main playlist (file list)
    */
-  files: PlaylistItem[];
+  playlist: PlaylistItem[];
   /**
    * 前置文件列表（7 天，对应一周 7 天）
    * 每个元素是一天的前置文件列表
@@ -198,7 +198,7 @@ export interface PlaylistCollection {
  */
 export interface PlaylistApiData {
   /**
-   * 播放列表ID
+   * 播放列表 ID
    */
   id: string;
   /**
@@ -208,9 +208,9 @@ export interface PlaylistApiData {
   /**
    * 文件列表（API 格式）
    */
-  files: PlaylistItem[];
+  playlist: PlaylistItem[];
   /**
-   * 前置文件列表（API 格式，7天）
+   * 前置文件列表（API 格式，7 天）
    */
   pre_lists?: PlaylistItem[][];
   /**

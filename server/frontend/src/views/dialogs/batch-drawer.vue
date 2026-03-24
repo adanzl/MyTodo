@@ -314,7 +314,7 @@ const isValidPreLists = (playlist: Playlist | null): boolean => {
 };
 
 const isValidFilesList = (playlist: Playlist | null): boolean => {
-  return !!(playlist?.files && Array.isArray(playlist.files));
+  return !!(playlist?.playlist && Array.isArray(playlist.playlist));
 };
 
 const countMatchedFiles = (fileList: PlaylistItem[], uriSet: Set<string>): number => {
@@ -348,7 +348,7 @@ const getPreMatchedFileCount = (weekdayIndex: number): number => {
 const getFilesListCount = (): number => {
   const playlist = selectedPlaylist.value;
   if (!isValidFilesList(playlist)) return 0;
-  return playlist!.files!.length;
+  return playlist!.playlist!.length;
 };
 
 const getFilesListMatchedCount = (): number => {
@@ -357,7 +357,7 @@ const getFilesListMatchedCount = (): number => {
   if (uriSet.size === 0) return 0;
   const playlist = selectedPlaylist.value;
   if (!isValidFilesList(playlist)) return 0;
-  return countMatchedFiles(playlist!.files!, uriSet);
+  return countMatchedFiles(playlist!.playlist!, uriSet);
 };
 
 const getPlaylistTotalFileCount = (playlist: Playlist): number => {
@@ -371,7 +371,7 @@ const getPlaylistTotalFileCount = (playlist: Playlist): number => {
     });
   }
   if (isValidFilesList(playlist)) {
-    count += playlist.files!.length;
+    count += playlist.playlist!.length;
   }
   return count;
 };
@@ -387,7 +387,7 @@ const getMatchedFileCount = (playlist: Playlist): number => {
     });
   }
   if (isValidFilesList(playlist)) {
-    matchedCount += countMatchedFiles(playlist.files!, uriSet);
+    matchedCount += countMatchedFiles(playlist.playlist!, uriSet);
   }
   return matchedCount;
 };

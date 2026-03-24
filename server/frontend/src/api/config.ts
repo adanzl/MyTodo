@@ -30,6 +30,7 @@ let localIpAvailable: boolean | null = null; // null 表示未检测，true/fals
 // 检测本地 IP 是否可用
 export async function checkLocalIpAvailable(): Promise<boolean> {
   try {
+    if (localIpAvailable === true) return true; // 已经是本地了
     // 根据当前页面的协议动态选择本地服务器的协议
     const isPageHttps = typeof window !== "undefined" && window.location.protocol === "https:";
     const protocol = isPageHttps ? "https" : "http";

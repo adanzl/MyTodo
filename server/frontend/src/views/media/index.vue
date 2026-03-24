@@ -292,7 +292,10 @@ import { PLAYLIST_REFRESH_INTERVAL } from "@/constants/playlist";
 
 const { start: startStatusRefresh, stop: stopStatusRefresh } = useInterval(
   async () => {
-    await refreshPlaylistStatus(true, true);
+    // 在定时器回调中再次检查自动刷新状态
+    if (autoRefreshEnabled.value) {
+      await refreshPlaylistStatus(true, true);
+    }
   },
   PLAYLIST_REFRESH_INTERVAL,
   { immediate: false, autoCleanup: true }
@@ -586,20 +589,20 @@ const handleBatchAddFiles = async (data: {
 
       // 添加文件到正式列表
       if (data.filesList) {
-        if (!Array.isArray(playlistInfo.files)) {
-          playlistInfo.files = [];
+        if (!Array.isArray(playlistInfo.playlist)) {
+          playlistInfo.playlist = [];
         }
         const existingUris = new Set(
-          playlistInfo.files.map((item: PlaylistItem | string) =>
+          playlistInfo.playlist.map((item: PlaylistItem | string) =>
             typeof item === "string" ? item : item?.uri || ""
           )
         );
         data.files.forEach(fileUri => {
           if (!existingUris.has(fileUri)) {
-            playlistInfo.files.push({ uri: fileUri });
+            playlistInfo.playlist.push({ uri: fileUri });
           }
         });
-        playlistInfo.total = playlistInfo.files.length;
+        playlistInfo.total = playlistInfo.playlist.length;
       }
 
       return playlistInfo;
@@ -658,16 +661,16 @@ const handleBatchRemoveFiles = async (data: {
       }
 
       // 从正式列表删除文件
-      if (data.filesList && Array.isArray(playlistInfo.files)) {
-        playlistInfo.files = playlistInfo.files.filter((item: PlaylistItem | string) => {
+      if (data.filesList && Array.isArray(playlistInfo.playlist)) {
+        playlistInfo.playlist = playlistInfo.playlist.filter((item: PlaylistItem | string) => {
           const uri = typeof item === "string" ? item : item?.uri || "";
           return !fileUriSet.has(uri);
         });
-        playlistInfo.total = playlistInfo.files.length;
-        if (playlistInfo.files.length === 0) {
+        playlistInfo.total = playlistInfo.playlist.length;
+        if (playlistInfo.playlist.length === 0) {
           playlistInfo.current_index = 0;
-        } else if (playlistInfo.current_index >= playlistInfo.files.length) {
-          playlistInfo.current_index = playlistInfo.files.length - 1;
+        } else if (playlistInfo.current_index >= playlistInfo.playlist.length) {
+          playlistInfo.current_index = playlistInfo.playlist.length - 1;
         }
       }
 

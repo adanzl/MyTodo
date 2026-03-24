@@ -105,15 +105,15 @@ export function useDragAndDrop(
     if (filesDragMode.value) {
       // 退出拖拽模式时，检查是否有变化
       const status = playlistStatus.value;
-      if (status && status.files && status.files.length > 0) {
-        const hasChanged = isOrderChanged(filesOriginalOrder.value || [], status.files);
+      if (status && status.playlist && status.playlist.length > 0) {
+        const hasChanged = isOrderChanged(filesOriginalOrder.value || [], status.playlist);
         if (hasChanged) {
           try {
             playlistLoading.value = true;
             await updateActivePlaylistData(playlistInfo => {
-              playlistInfo.files = [...(status.files || [])];
+              playlistInfo.playlist = [...(status.playlist || [])];
               playlistInfo.current_index = status.current_index;
-              playlistInfo.total = status.files.length;
+              playlistInfo.total = status.playlist.length;
               return playlistInfo;
             });
             ElMessage.success("排序已保存");
@@ -129,8 +129,8 @@ export function useDragAndDrop(
     } else {
       // 启用拖拽模式时，保存原始顺序并取消自动排序
       const status = playlistStatus.value;
-      if (status && status.files && status.files.length > 0) {
-        filesOriginalOrder.value = [...(status.files || [])];
+      if (status && status.playlist && status.playlist.length > 0) {
+        filesOriginalOrder.value = [...(status.playlist || [])];
       }
       filesSortOrder.value = null;
     }
@@ -354,17 +354,17 @@ export function useDragAndDrop(
     const status = playlistStatus.value;
     if (
       !status ||
-      !status.files ||
+      !status.playlist ||
       sourceIndex < 0 ||
-      sourceIndex >= status.files.length ||
+      sourceIndex >= status.playlist.length ||
       targetIndex < 0 ||
-      targetIndex >= status.files.length
+      targetIndex >= status.playlist.length
     ) {
       return;
     }
 
     // 只在内存中更新，不保存到后端（退出拖拽模式时再保存）
-    const list = [...(status.files || [])];
+    const list = [...(status.playlist || [])];
     const [removed] = list.splice(sourceIndex, 1);
     list.splice(targetIndex, 0, removed);
 

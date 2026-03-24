@@ -22,10 +22,10 @@
           </span>
           <template v-if="playlistStatus">
             <template v-if="
-              (getCurrentPreFiles()?.length || 0) + (playlistStatus.files?.length || 0) > 0
+              (getCurrentPreFiles()?.length || 0) + (playlistStatus.playlist?.length || 0) > 0
             ">
               共
-              {{ (getCurrentPreFiles()?.length || 0) + (playlistStatus.files?.length || 0) }}
+              {{ (getCurrentPreFiles()?.length || 0) + (playlistStatus.playlist?.length || 0) }}
               首，当前:
               <template v-if="
                 playlistStatus.pre_index !== undefined &&
@@ -42,7 +42,7 @@
                 {{ (getCurrentPreFiles()?.length || 0) + playlistStatus.current_index + 1 }}
               </template>
               <template v-else> - </template>
-              / {{ (getCurrentPreFiles()?.length || 0) + (playlistStatus.files?.length || 0) }}
+              / {{ (getCurrentPreFiles()?.length || 0) + (playlistStatus.playlist?.length || 0) }}
             </template>
             <template v-else> 共 0 首， 当前: - / 0 </template>
           </template>
@@ -57,8 +57,8 @@
         </el-button>
         <el-button type="default" size="small" plain circle @click="$emit('play')" class="items-center justify-center"
           :disabled="!playlistStatus ||
-            !playlistStatus.files ||
-            playlistStatus.files.length === 0 ||
+            !playlistStatus.playlist ||
+            playlistStatus.playlist.length === 0 ||
             !!playlistStatus.isPlaying ||
             playlistLoading
             " title="播放">
@@ -69,7 +69,7 @@
         </el-button>
         <el-button type="default" size="small" plain circle @click="$emit('play-pre')" :disabled="!playlistStatus ||
           ((!getCurrentPreFiles() || getCurrentPreFiles().length === 0) &&
-            (!playlistStatus.files || playlistStatus.files.length === 0)) ||
+            (!playlistStatus.playlist || playlistStatus.playlist.length === 0)) ||
           playlistLoading
           " title="上一首">
           <el-icon v-if="playing" size="12" class="animate-spin">
@@ -79,7 +79,7 @@
         </el-button>
         <el-button type="default" size="small" plain circle @click="$emit('play-next')" :disabled="!playlistStatus ||
           ((!getCurrentPreFiles() || getCurrentPreFiles().length === 0) &&
-            (!playlistStatus.files || playlistStatus.files.length === 0)) ||
+            (!playlistStatus.playlist || playlistStatus.playlist.length === 0)) ||
           playlistLoading
           " title="下一首">
           <el-icon v-if="playing" size="12" class="animate-spin">
@@ -96,7 +96,7 @@
         </el-button>
         <el-button v-show="showMoreActions" type="default" size="small" plain circle @click="$emit('clear')" :disabled="!playlistStatus ||
           ((!getCurrentPreFiles() || getCurrentPreFiles().length === 0) &&
-            (!playlistStatus.files || playlistStatus.files.length === 0)) ||
+            (!playlistStatus.playlist || playlistStatus.playlist.length === 0)) ||
           playlistLoading
           " title="清空列表（包括前置文件和正式文件）">
           <el-icon>
@@ -150,7 +150,7 @@
 
       <div v-if="
         (!getCurrentPreFiles() || getCurrentPreFiles().length === 0) &&
-        (!playlistStatus?.files || playlistStatus.files.length === 0)
+        (!playlistStatus?.playlist || playlistStatus.playlist.length === 0)
       " class="text-sm text-gray-400 text-center py-8">
         当前播放列表为空，点击"添加文件"开始构建播放列表
       </div>
@@ -260,7 +260,7 @@ const getPlaylistTotalDuration = () => {
   if (!status) return 0;
   const preFiles = getCurrentPreFiles();
   const preFilesDuration = calculateFilesTotalDuration(preFiles);
-  const files = status.files || [];
+  const files = status.playlist || [];
   const filesDuration = calculateFilesTotalDuration(files);
   return preFilesDuration + filesDuration;
 };

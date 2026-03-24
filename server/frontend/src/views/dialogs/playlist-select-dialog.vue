@@ -169,10 +169,10 @@ const getPreFilesCount = (weekdayIndex: number): number => {
 // 获取正式文件数量
 const getFilesListCount = (): number => {
   const playlist = selectedPlaylist.value;
-  if (!playlist || !playlist.files) {
+  if (!playlist || !playlist.playlist) {
     return 0;
   }
-  return Array.isArray(playlist.files) ? playlist.files.length : 0;
+  return Array.isArray(playlist.playlist) ? playlist.playlist.length : 0;
 };
 
 // 获取播放列表总文件数
@@ -187,7 +187,7 @@ const getPlaylistTotalFileCount = (playlist: Playlist): number => {
         0
       )
       : 0;
-  const filesCount = Array.isArray(playlist.files) ? playlist.files.length : 0;
+  const filesCount = Array.isArray(playlist.playlist) ? playlist.playlist.length : 0;
   return preCount + filesCount;
 };
 
@@ -229,8 +229,8 @@ const getMatchedFileCountInPlaylist = (playlist: Playlist): number => {
     });
   }
 
-  if (Array.isArray(playlist.files)) {
-    playlist.files.forEach((file) => {
+  if (Array.isArray(playlist.playlist)) {
+    playlist.playlist.forEach((file) => {
       const fileUri = file.uri || String(file);
       if (selectedFileUris.has(fileUri)) {
         matchedCount++;
@@ -271,12 +271,12 @@ const getMatchedFileCountInFilesList = (): number => {
   if (!playlist || !props.selectedFiles || props.selectedFiles.length === 0) {
     return 0;
   }
-  if (!Array.isArray(playlist.files)) {
+  if (!Array.isArray(playlist.playlist)) {
     return 0;
   }
   const selectedFileUris = getSelectedFileUris();
   let matchedCount = 0;
-  playlist.files.forEach((file) => {
+  playlist.playlist.forEach((file) => {
     const fileUri = file.uri || String(file);
     if (selectedFileUris.has(fileUri)) {
       matchedCount++;
