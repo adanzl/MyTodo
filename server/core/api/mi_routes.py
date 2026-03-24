@@ -95,7 +95,7 @@ def mi_stop() -> ResponseReturnValue:
     try:
         data: Dict[str, Any] = read_json_from_request()
         device_id = data.get('device_id')
-        device_did = request.args.get('device_did')
+        device_did = data.get('device_did')
         if not device_id or not device_did:
             return _err('device_id or device_did is required')
 
