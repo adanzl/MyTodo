@@ -1,34 +1,15 @@
 <template>
-  <div
-    class="flex items-center gap-1.5 bg-gray-50 rounded border-gray-500 pr-1"
-    :class="widthClass"
-  >
-    <el-button
-      type="default"
-      plain
-      size="small"
-      circle
-      @click.stop="handlePlayClick"
-      :disabled="isButtonDisabled"
-      :loading="isLoading && !isPlaying"
-      class="w-6! h-6! p-0! shrink-0 mr-1"
-    >
+  <div class="flex items-center gap-1.5 bg-gray-50 rounded border-gray-500 pr-1" :class="widthClass">
+    <el-button type="default" plain size="small" circle @click.stop="handlePlayClick" :disabled="isButtonDisabled"
+      :loading="isLoading && !isPlaying" class="w-6! h-6! p-0! shrink-0 mr-1">
       <span v-if="isPlaying">⏹</span>
-      <el-icon v-else-if="!isLoading" class="w-3! h-3!"><Headset /></el-icon>
+      <el-icon v-else-if="!isLoading" class="w-3! h-3!">
+        <Headset />
+      </el-icon>
     </el-button>
-    <el-slider
-      :model-value="progress"
-      :min="0"
-      :max="100"
-      :step="0.1"
-      size="small"
-      class="flex-1 min-width-[10px] player-slider"
-      :show-tooltip="false"
-      :disabled="!isPlaying || disabled"
-      @change="handleSeek"
-      @input="handleSeek"
-      @click.stop
-    >
+    <el-slider :model-value="progress" :min="0" :max="100" :step="0.1" size="small"
+      class="flex-1 min-width-[10px] player-slider" :show-tooltip="false" :disabled="!isPlaying || disabled"
+      @change="handleSeek" @input="handleSeek" @click.stop>
     </el-slider>
     <span class="text-xs text-gray-600 shrink-0 width-[35px]">
       {{ formattedDuration }}
@@ -41,14 +22,7 @@ import { computed, ref, watch } from "vue";
 import { Headset } from "@element-plus/icons-vue";
 import { formatDuration } from "@/utils/format";
 import type { Ref } from "vue";
-
-interface FileItem {
-  uri?: string;
-  path?: string;
-  name?: string;
-  duration?: number | null;
-  [key: string]: unknown;
-}
+import type { FileItem } from "@/types/tools/file";
 
 // useAudioPlayer 返回对象的类型
 interface AudioPlayer {
@@ -89,7 +63,7 @@ const emit = defineEmits<{
 
 // 从 file 对象中提取文件路径
 const getFilePath = (file: FileItem): string => {
-  return file?.uri || file?.path || file?.name || "";
+  return file?.uri || file?.path || (file?.file as string) || "";
 };
 
 // 加载状态：点击播放后，在媒体文件准备好之前锁定按钮
@@ -191,4 +165,3 @@ watch(
   --el-slider-button-wrapper-offset: -9px;
 }
 </style>
-

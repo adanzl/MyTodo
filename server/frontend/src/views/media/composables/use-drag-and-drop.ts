@@ -105,15 +105,15 @@ export function useDragAndDrop(
     if (filesDragMode.value) {
       // 退出拖拽模式时，检查是否有变化
       const status = playlistStatus.value;
-      if (status && status.playlist && status.playlist.length > 0) {
-        const hasChanged = isOrderChanged(filesOriginalOrder.value || [], status.playlist);
+      if (status && status.files && status.files.length > 0) {
+        const hasChanged = isOrderChanged(filesOriginalOrder.value || [], status.files);
         if (hasChanged) {
           try {
             playlistLoading.value = true;
             await updateActivePlaylistData(playlistInfo => {
-              playlistInfo.playlist = [...(status.playlist || [])];
+              playlistInfo.files = [...(status.files || [])];
               playlistInfo.current_index = status.current_index;
-              playlistInfo.total = status.playlist.length;
+              playlistInfo.total = status.files.length;
               return playlistInfo;
             });
             ElMessage.success("排序已保存");
@@ -129,8 +129,8 @@ export function useDragAndDrop(
     } else {
       // 启用拖拽模式时，保存原始顺序并取消自动排序
       const status = playlistStatus.value;
-      if (status && status.playlist && status.playlist.length > 0) {
-        filesOriginalOrder.value = [...(status.playlist || [])];
+      if (status && status.files && status.files.length > 0) {
+        filesOriginalOrder.value = [...(status.files || [])];
       }
       filesSortOrder.value = null;
     }
@@ -165,7 +165,7 @@ export function useDragAndDrop(
       }
     }
     playlistDragMode.value = !playlistDragMode.value;
-    
+
     // 进入拖拽模式时，关闭自动刷新（如果有回调）
     if (playlistDragMode.value && onToggleAutoRefresh) {
       onToggleAutoRefresh(false);
@@ -354,17 +354,17 @@ export function useDragAndDrop(
     const status = playlistStatus.value;
     if (
       !status ||
-      !status.playlist ||
+      !status.files ||
       sourceIndex < 0 ||
-      sourceIndex >= status.playlist.length ||
+      sourceIndex >= status.files.length ||
       targetIndex < 0 ||
-      targetIndex >= status.playlist.length
+      targetIndex >= status.files.length
     ) {
       return;
     }
 
     // 只在内存中更新，不保存到后端（退出拖拽模式时再保存）
-    const list = [...(status.playlist || [])];
+    const list = [...(status.files || [])];
     const [removed] = list.splice(sourceIndex, 1);
     list.splice(targetIndex, 0, removed);
 

@@ -1,32 +1,21 @@
 <template>
-  <el-drawer
-    v-model="internalVisible"
-    title="批量模式"
-    :size="1200"
-    direction="rtl"
-    header-class="h-12 mb-1!"
-    :before-close="handleClose"
-  >
-    <div
-      v-loading.fullscreen.lock="loading"
-      element-loading-text="加载中..."
-      class="flex gap-4 h-full"
-    >
+  <el-drawer v-model="internalVisible" title="批量模式" :size="1200" direction="rtl" header-class="h-12 mb-1!"
+    :before-close="handleClose">
+    <div v-loading.fullscreen.lock="loading" element-loading-text="加载中..." class="flex gap-4 h-full">
       <!-- 第一列：Batch List -->
       <div class="w-64 border rounded p-3 flex flex-col">
         <div class="flex items-center justify-between mb-3">
           <h3 class="text-base font-semibold">Batch列表</h3>
           <el-button type="primary" size="small" @click="handleCreateBatch" plain>
-            <el-icon><Plus /></el-icon>
+            <el-icon>
+              <Plus />
+            </el-icon>
           </el-button>
         </div>
         <div class="flex-1 overflow-y-auto space-y-2">
-          <div
-            v-for="batch in batchList"
-            :key="batch.id"
+          <div v-for="batch in batchList" :key="batch.id"
             class="border rounded px-3 py-2 hover:bg-gray-50 flex items-center gap-2"
-            :class="{ 'border-blue-500 bg-blue-50': batch.id === selectedBatchId }"
-          >
+            :class="{ 'border-blue-500 bg-blue-50': batch.id === selectedBatchId }">
             <div class="flex-1 cursor-pointer" @click="handleSelectBatch(batch.id)">
               <div class="text-sm font-medium truncate">{{ batch.name }}</div>
               <div class="text-xs text-gray-500 mt-1">
@@ -34,15 +23,10 @@
               </div>
             </div>
             <div class="flex items-center gap-1 shrink-0">
-              <el-button
-                type="default"
-                plain
-                size="small"
-                circle
-                @click.stop="handleDeleteBatch(batch.id)"
-                title="删除"
-              >
-                <el-icon><Delete /></el-icon>
+              <el-button type="default" plain size="small" circle @click.stop="handleDeleteBatch(batch.id)" title="删除">
+                <el-icon>
+                  <Delete />
+                </el-icon>
               </el-button>
             </div>
           </div>
@@ -59,74 +43,45 @@
             <h3 class="text-base font-semibold">
               {{ selectedBatch ? selectedBatch.name : "请选择一个Batch" }}
             </h3>
-            <el-button
-              v-if="selectedBatch"
-              type="default"
-              plain
-              size="small"
-              circle
-              @click="handleEditBatch(selectedBatch.id)"
-              title="编辑"
-            >
-              <el-icon><Edit /></el-icon>
+            <el-button v-if="selectedBatch" type="default" plain size="small" circle
+              @click="handleEditBatch(selectedBatch.id)" title="编辑">
+              <el-icon>
+                <Edit />
+              </el-icon>
             </el-button>
           </div>
           <div v-if="selectedBatch" class="flex items-center gap-2">
-            <el-button
-              type="default"
-              size="small"
-              @click="handleToggleSelectAll(!isAllFilesSelected)"
-              :class="{ 'text-blue-600!': isAllFilesSelected || isIndeterminate }"
-              plain
-              class="w-20!"
-            >
-              <el-icon v-if="isAllFilesSelected" class="mr-1"><Check /></el-icon>
-              <el-icon v-else-if="isIndeterminate" class="mr-1"><Minus /></el-icon>
+            <el-button type="default" size="small" @click="handleToggleSelectAll(!isAllFilesSelected)"
+              :class="{ 'text-blue-600!': isAllFilesSelected || isIndeterminate }" plain class="w-20!">
+              <el-icon v-if="isAllFilesSelected" class="mr-1">
+                <Check />
+              </el-icon>
+              <el-icon v-else-if="isIndeterminate" class="mr-1">
+                <Minus />
+              </el-icon>
               <span class="text-xs">全选</span>
             </el-button>
-            <el-button
-              type="primary"
-              size="small"
-              @click="handleOpenFileBrowser"
-              plain
-              class="w-20!"
-            >
-              <el-icon><Plus /></el-icon>
+            <el-button type="primary" size="small" @click="handleOpenFileBrowser" plain class="w-20!">
+              <el-icon>
+                <Plus />
+              </el-icon>
             </el-button>
-            <el-button
-              type="danger"
-              size="small"
-              @click="handleDeleteSelectedFiles"
-              :disabled="selectedFileIndices.length === 0"
-              plain
-              class="w-20!"
-            >
-              <el-icon><Delete /></el-icon>
-              <span v-if="selectedFileIndices.length > 0" class="ml-1 text-xs"
-                >({{ selectedFileIndices.length }})</span
-              >
+            <el-button type="danger" size="small" @click="handleDeleteSelectedFiles"
+              :disabled="selectedFileIndices.length === 0" plain class="w-20!">
+              <el-icon>
+                <Delete />
+              </el-icon>
+              <span v-if="selectedFileIndices.length > 0" class="ml-1 text-xs">({{ selectedFileIndices.length }})</span>
             </el-button>
           </div>
         </div>
         <div class="flex-1 overflow-y-auto">
-          <div
-            v-if="selectedBatch && selectedBatch.files && selectedBatch.files.length > 0"
-            class="space-y-1"
-          >
-            <div
-              v-for="(file, index) in selectedBatch.files"
-              :key="index"
+          <div v-if="selectedBatch && selectedBatch.files && selectedBatch.files.length > 0" class="space-y-1">
+            <div v-for="(file, index) in selectedBatch.files" :key="index"
               class="flex items-center gap-2 p-2 border border-blue-500 rounded hover:bg-gray-50 cursor-pointer"
-              :class="{ 'bg-blue-50': selectedFileIndices.includes(index) }"
-              @click="handleToggleFileSelection(index)"
-            >
-              <el-checkbox
-                :model-value="selectedFileIndices.includes(index)"
-                @change="handleToggleFileSelection(index)"
-                class="h-6!"
-                @click.stop
-                size="default"
-              >
+              :class="{ 'bg-blue-50': selectedFileIndices.includes(index) }" @click="handleToggleFileSelection(index)">
+              <el-checkbox :model-value="selectedFileIndices.includes(index)" @change="handleToggleFileSelection(index)"
+                class="h-6!" @click.stop size="default">
               </el-checkbox>
               <span class="text-xs text-gray-500 w-8">{{ index + 1 }}</span>
               <span class="flex-1 text-sm truncate" :title="getFileUri(file)">
@@ -145,56 +100,40 @@
         <div class="mb-3">
           <h3 class="text-base font-semibold mb-2">Playlist操作</h3>
           <div class="flex gap-2 mb-3">
-            <el-button
-              type="default"
-              size="small"
-              @click="handleAddFilesToPlaylist"
-              :disabled="
-                !selectedBatch ||
-                !selectedPlaylistId ||
-                selectedFileIndices.length === 0 ||
-                !hasSelectedLists
-              "
-              plain
-            >
-              <el-icon class="mr-1"><Plus /></el-icon>
+            <el-button type="default" size="small" @click="handleAddFilesToPlaylist" :disabled="!selectedBatch ||
+              !selectedPlaylistId ||
+              selectedFileIndices.length === 0 ||
+              !hasSelectedLists
+              " plain>
+              <el-icon class="mr-1">
+                <Plus />
+              </el-icon>
               添加到播放列表
             </el-button>
-            <el-button
-              type="default"
-              size="small"
-              @click="handleRemoveFilesFromPlaylist"
-              :disabled="
-                !selectedBatch ||
-                !selectedPlaylistId ||
-                selectedFileIndices.length === 0 ||
-                !hasSelectedLists
-              "
-              plain
-            >
-              <el-icon class="mr-1"><Delete /></el-icon>
+            <el-button type="default" size="small" @click="handleRemoveFilesFromPlaylist" :disabled="!selectedBatch ||
+              !selectedPlaylistId ||
+              selectedFileIndices.length === 0 ||
+              !hasSelectedLists
+              " plain>
+              <el-icon class="mr-1">
+                <Delete />
+              </el-icon>
               从播放列表删除
             </el-button>
           </div>
           <div class="mb-3">
             <div class="text-xs text-gray-500 mb-2">选择播放列表 进行批量操作</div>
             <div class="space-y-1 max-h-48 overflow-y-auto border rounded p-1">
-              <div
-                v-for="playlist in playlistCollection"
-                :key="playlist.id"
+              <div v-for="playlist in playlistCollection" :key="playlist.id"
                 class="flex items-center justify-between px-2 py-1.5 rounded cursor-pointer hover:bg-gray-50 transition-colors"
                 :class="{ 'bg-blue-50 border border-blue-200': playlist.id === selectedPlaylistId }"
-                @click="handleSelectPlaylist(playlist.id)"
-              >
+                @click="handleSelectPlaylist(playlist.id)">
                 <span class="text-sm flex-1">{{ playlist.name }}</span>
                 <span class="text-xs text-gray-500 ml-2 whitespace-nowrap">
                   {{ getMatchedFileCount(playlist) }} / {{ getPlaylistTotalFileCount(playlist) }}
                 </span>
               </div>
-              <div
-                v-if="playlistCollection.length === 0"
-                class="text-xs text-gray-400 text-center py-2"
-              >
+              <div v-if="playlistCollection.length === 0" class="text-xs text-gray-400 text-center py-2">
                 暂无播放列表
               </div>
             </div>
@@ -205,22 +144,14 @@
           <div class="border rounded p-2">
             <div class="text-xs font-semibold text-gray-600 mb-2">前置文件</div>
             <div class="space-y-1">
-              <div
-                v-for="(day, index) in ['周一', '周二', '周三', '周四', '周五', '周六', '周日']"
-                :key="index"
-                class="flex items-center gap-2"
-              >
-                <el-checkbox
-                  :model-value="selectedPreLists.includes(index)"
-                  @change="handleTogglePreList(index)"
-                  size="small"
-                >
+              <div v-for="(day, index) in ['周一', '周二', '周三', '周四', '周五', '周六', '周日']" :key="index"
+                class="flex items-center gap-2">
+                <el-checkbox :model-value="selectedPreLists.includes(index)" @change="handleTogglePreList(index)"
+                  size="small">
                 </el-checkbox>
-                <span
-                  class="text-xs flex-1 cursor-pointer hover:text-blue-500"
+                <span class="text-xs flex-1 cursor-pointer hover:text-blue-500"
                   :class="{ 'text-blue-600 font-medium': selectedPreLists.includes(index) }"
-                  @click="handleTogglePreList(index)"
-                >
+                  @click="handleTogglePreList(index)">
                   {{ day }}
                 </span>
                 <span class="text-xs text-gray-500 whitespace-nowrap">
@@ -232,17 +163,10 @@
           <!-- 正式文件列表 -->
           <div class="border rounded p-2">
             <div class="flex items-center gap-2 mb-2">
-              <el-checkbox
-                :model-value="selectedFilesList"
-                @change="handleToggleFilesList"
-                size="small"
-              >
+              <el-checkbox :model-value="selectedFilesList" @change="handleToggleFilesList" size="small">
               </el-checkbox>
-              <span
-                class="text-xs font-semibold text-gray-600 cursor-pointer hover:text-blue-500 flex-1"
-                :class="{ 'text-blue-600': selectedFilesList }"
-                @click="handleToggleFilesList()"
-              >
+              <span class="text-xs font-semibold text-gray-600 cursor-pointer hover:text-blue-500 flex-1"
+                :class="{ 'text-blue-600': selectedFilesList }" @click="handleToggleFilesList()">
                 正式文件
               </span>
               <span class="text-xs text-gray-500 whitespace-nowrap">
@@ -258,15 +182,9 @@
     </div>
 
     <!-- 文件浏览器对话框 -->
-    <FileDialog
-      :visible="fileBrowserDialogVisible"
-      @update:visible="fileBrowserDialogVisible = $event"
-      title="选择文件添加到Batch"
-      confirm-button-text="添加"
-      :confirm-loading="fileBrowserLoading"
-      @confirm="handleFileBrowserConfirm"
-      @close="handleCloseFileBrowser"
-    >
+    <FileDialog :visible="fileBrowserDialogVisible" @update:visible="fileBrowserDialogVisible = $event"
+      title="选择文件添加到Batch" confirm-button-text="添加" :confirm-loading="fileBrowserLoading"
+      @confirm="handleFileBrowserConfirm" @close="handleCloseFileBrowser">
     </FileDialog>
   </el-drawer>
 </template>
@@ -279,25 +197,14 @@ import { getRdsData, setRdsData } from "@/api/rds";
 import { logAndNoticeError } from "@/utils";
 import FileDialog from "@/views/dialogs/file-dialog.vue";
 
-import type { PlaylistItem } from "@/types/playlist";
-
-interface Playlist {
-  id: string;
-  name: string;
-  pre_lists?: PlaylistItem[][];
-  playlist?: PlaylistItem[];
-}
+import type { PlaylistItem, Playlist } from "@/types/playlist";
+import type { FileItem } from "@/types/tools/file";
 
 interface Batch {
   id: string;
   name: string;
   files: Array<{ uri: string } | string>;
   createTime?: string;
-}
-
-interface FileItem {
-  uri?: string;
-  [key: string]: unknown;
 }
 
 interface Props {
@@ -407,7 +314,7 @@ const isValidPreLists = (playlist: Playlist | null): boolean => {
 };
 
 const isValidFilesList = (playlist: Playlist | null): boolean => {
-  return !!(playlist?.playlist && Array.isArray(playlist.playlist));
+  return !!(playlist?.files && Array.isArray(playlist.files));
 };
 
 const countMatchedFiles = (fileList: PlaylistItem[], uriSet: Set<string>): number => {
@@ -441,7 +348,7 @@ const getPreMatchedFileCount = (weekdayIndex: number): number => {
 const getFilesListCount = (): number => {
   const playlist = selectedPlaylist.value;
   if (!isValidFilesList(playlist)) return 0;
-  return playlist!.playlist!.length;
+  return playlist!.files!.length;
 };
 
 const getFilesListMatchedCount = (): number => {
@@ -450,7 +357,7 @@ const getFilesListMatchedCount = (): number => {
   if (uriSet.size === 0) return 0;
   const playlist = selectedPlaylist.value;
   if (!isValidFilesList(playlist)) return 0;
-  return countMatchedFiles(playlist!.playlist!, uriSet);
+  return countMatchedFiles(playlist!.files!, uriSet);
 };
 
 const getPlaylistTotalFileCount = (playlist: Playlist): number => {
@@ -464,7 +371,7 @@ const getPlaylistTotalFileCount = (playlist: Playlist): number => {
     });
   }
   if (isValidFilesList(playlist)) {
-    count += playlist.playlist!.length;
+    count += playlist.files!.length;
   }
   return count;
 };
@@ -480,7 +387,7 @@ const getMatchedFileCount = (playlist: Playlist): number => {
     });
   }
   if (isValidFilesList(playlist)) {
-    matchedCount += countMatchedFiles(playlist.playlist!, uriSet);
+    matchedCount += countMatchedFiles(playlist.files!, uriSet);
   }
   return matchedCount;
 };

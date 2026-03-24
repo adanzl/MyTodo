@@ -3,131 +3,68 @@
     <!-- 3列布局：播放列表 | 文件列表 | 配置详情 -->
     <div class="flex gap-4 h-[calc(100vh-150px)] w-full min-w-0 overflow-hidden">
       <!-- 第一列：播放列表列表 -->
-      <PanelPlaylistList
-        :playlist-collection="playlistCollection"
-        :active-playlist-id="activePlaylistId"
-        :refreshing="playlistRefreshing"
-        :auto-refresh-enabled="autoRefreshEnabled"
-        :drag-mode="playlistDragMode"
-        @select="handleSelectPlaylist"
-        @create="handleCreatePlaylist"
-        @refresh="refreshPlaylistStatus"
-        @toggle-auto-refresh="handleToggleAutoRefresh"
-        @toggle-drag-mode="handleTogglePlaylistDragMode"
-        @menu-command="handlePlaylistMenuCommand"
-        @drag-start="handlePlaylistDragStart"
-        @drag-end="handlePlaylistDragEnd"
-        @drag-over="handlePlaylistDragOver"
-        @drop="handlePlaylistDrop"
-      >
+      <PanelPlaylistList :playlist-collection="playlistCollection" :active-playlist-id="activePlaylistId"
+        :refreshing="playlistRefreshing" :auto-refresh-enabled="autoRefreshEnabled" :drag-mode="playlistDragMode"
+        @select="handleSelectPlaylist" @create="handleCreatePlaylist" @refresh="refreshPlaylistStatus"
+        @toggle-auto-refresh="handleToggleAutoRefresh" @toggle-drag-mode="handleTogglePlaylistDragMode"
+        @menu-command="handlePlaylistMenuCommand" @drag-start="handlePlaylistDragStart"
+        @drag-end="handlePlaylistDragEnd" @drag-over="handlePlaylistDragOver" @drop="handlePlaylistDrop">
       </PanelPlaylistList>
 
       <!-- 第二列：文件列表 -->
-      <PanelFileList
-        :playlist-status="playlistStatus"
-        :active-playlist-id="activePlaylistId"
-        :editing-playlist-id="editingPlaylistId"
-        v-model:editing-playlist-name="editingPlaylistName"
-        :selected-weekday-index="selectedWeekdayIndex"
-        :pre-files-drag-mode="preFilesDragMode"
-        :pre-files-batch-delete-mode="preFilesBatchDeleteMode"
-        :selected-pre-file-indices="selectedPreFileIndices"
-        :pre-files-expanded="preFilesExpanded"
-        :files-drag-mode="filesDragMode"
-        :files-batch-delete-mode="filesBatchDeleteMode"
-        :selected-file-indices="selectedFileIndices"
-        :playlist-loading="playlistLoading"
-        :playing="playing"
-        :stopping="stopping"
-        :show-more-actions="showMoreActions"
-        :audio-player="audioPlayer"
-        @start-edit-name="handleStartEditPlaylistName"
-        @save-name="handleSavePlaylistName"
-        @cancel-edit-name="handleCancelEditPlaylistName"
-        @open-batch-drawer="batchDrawerVisible = true"
-        @play="handlePlayPlaylist"
-        @play-pre="handlePlayPre"
-        @play-next="handlePlayNext"
-        @stop="handleStopPlaylist"
-        @clear="handleClearPlaylist"
-        @toggle-more-actions="showMoreActions = !showMoreActions"
-        @select-weekday="handleSelectWeekday"
-        @open-file-browser-for-pre-files="handleOpenFileBrowserForPreFiles"
+      <PanelFileList :playlist-status="playlistStatus" :active-playlist-id="activePlaylistId"
+        :editing-playlist-id="editingPlaylistId" v-model:editing-playlist-name="editingPlaylistName"
+        :selected-weekday-index="selectedWeekdayIndex" :pre-files-drag-mode="preFilesDragMode"
+        :pre-files-batch-delete-mode="preFilesBatchDeleteMode" :selected-pre-file-indices="selectedPreFileIndices"
+        :pre-files-expanded="preFilesExpanded" :files-drag-mode="filesDragMode"
+        :files-batch-delete-mode="filesBatchDeleteMode" :selected-file-indices="selectedFileIndices"
+        :playlist-loading="playlistLoading" :playing="playing" :stopping="stopping" :show-more-actions="showMoreActions"
+        :audio-player="audioPlayer" @start-edit-name="handleStartEditPlaylistName" @save-name="handleSavePlaylistName"
+        @cancel-edit-name="handleCancelEditPlaylistName" @open-batch-drawer="batchDrawerVisible = true"
+        @play="handlePlayPlaylist" @play-pre="handlePlayPre" @play-next="handlePlayNext" @stop="handleStopPlaylist"
+        @clear="handleClearPlaylist" @toggle-more-actions="showMoreActions = !showMoreActions"
+        @select-weekday="handleSelectWeekday" @open-file-browser-for-pre-files="handleOpenFileBrowserForPreFiles"
         @toggle-pre-files-drag-mode="handleTogglePreFilesDragMode"
         @toggle-pre-files-batch-delete-mode="handleTogglePreFilesBatchDeleteMode"
-        @batch-delete-pre-files="handleBatchDeletePreFiles"
-        @clear-pre-files="handleClearPreFiles"
+        @batch-delete-pre-files="handleBatchDeletePreFiles" @clear-pre-files="handleClearPreFiles"
         @toggle-pre-files-expand="preFilesExpanded = !preFilesExpanded"
-        @toggle-pre-file-selection="handleTogglePreFileSelection"
-        @pre-file-drag-start="handlePreFileDragStart"
-        @pre-file-drag-end="handlePreFileDragEnd"
-        @pre-file-drag-over="handlePreFileDragOver"
-        @pre-file-drop="handlePreFileDrop"
-        @open-file-browser="handleOpenFileBrowser"
+        @toggle-pre-file-selection="handleTogglePreFileSelection" @pre-file-drag-start="handlePreFileDragStart"
+        @pre-file-drag-end="handlePreFileDragEnd" @pre-file-drag-over="handlePreFileDragOver"
+        @pre-file-drop="handlePreFileDrop" @open-file-browser="handleOpenFileBrowser"
         @toggle-files-drag-mode="handleToggleFilesDragMode"
-        @toggle-files-batch-delete-mode="handleToggleFilesBatchDeleteMode"
-        @batch-delete-files="handleBatchDeleteFiles"
-        @clear-files="handleClearFiles"
-        @toggle-file-selection="handleToggleFileSelection"
-        @file-drag-start="handleFileDragStart"
-        @file-drag-end="handleFileDragEnd"
-        @file-drag-over="handleFileDragOver"
-        @file-drop="handleFileDrop"
-        @play-file="handlePlayFileInBrowser"
-        @seek-file="handleSeekFile"
-        @move-pre-file-up="handleMovePreFileUp"
-        @move-pre-file-down="handleMovePreFileDown"
+        @toggle-files-batch-delete-mode="handleToggleFilesBatchDeleteMode" @batch-delete-files="handleBatchDeleteFiles"
+        @clear-files="handleClearFiles" @toggle-file-selection="handleToggleFileSelection"
+        @file-drag-start="handleFileDragStart" @file-drag-end="handleFileDragEnd" @file-drag-over="handleFileDragOver"
+        @file-drop="handleFileDrop" @play-file="handlePlayFileInBrowser" @seek-file="handleSeekFile"
+        @move-pre-file-up="handleMovePreFileUp" @move-pre-file-down="handleMovePreFileDown"
         @replace-pre-file="handleReplacePreFile"
         @open-playlist-selector-for-pre-file="handleOpenPlaylistSelectorForPreFile"
-        @play-on-device-for-pre-file="handlePlayOnDeviceForPreFile"
-        @delete-pre-file="handleDeletePreFile"
-        @move-file-up="handleMovePlaylistItemUp"
-        @move-file-down="handleMovePlaylistItemDown"
-        @replace-file="handleReplacePlaylistItem"
-        @open-playlist-selector-for-file="handleOpenPlaylistSelectorForFile"
-        @play-on-device-for-file="handlePlayOnDeviceForFile"
-        @delete-file="handleDeletePlaylistItem"
-      >
+        @play-on-device-for-pre-file="handlePlayOnDeviceForPreFile" @delete-pre-file="handleDeletePreFile"
+        @move-file-up="handleMovePlaylistItemUp" @move-file-down="handleMovePlaylistItemDown"
+        @replace-file="handleReplacePlaylistItem" @open-playlist-selector-for-file="handleOpenPlaylistSelectorForFile"
+        @play-on-device-for-file="handlePlayOnDeviceForFile" @delete-file="handleDeletePlaylistItem">
       </PanelFileList>
 
       <!-- 第三列：配置详情（Cron + 设备） -->
-      <PanelConfig
-        :playlist-status="playlistStatus"
-        :connected-device-list="connectedDeviceList"
-        :dlna-device-list="dlnaDeviceList"
-        :mi-device-list="miDeviceList"
-        :loading="loading"
-        :dlna-scanning="dlnaScanning"
-        :mi-scanning="miScanning"
-        :on-toggle-cron-enabled="handleTogglePlaylistCronEnabled"
-        :on-update-cron="handleUpdatePlaylistCron"
-        :on-update-duration="handleUpdatePlaylistDuration"
-        :on-update-trigger-button="handleUpdateTriggerButton"
-        :on-open-cron-builder="handleOpenCronBuilder"
-        :on-preview-cron="handlePreviewPlaylistCron"
+      <PanelConfig :playlist-status="playlistStatus" :connected-device-list="connectedDeviceList"
+        :dlna-device-list="dlnaDeviceList" :mi-device-list="miDeviceList" :loading="loading"
+        :dlna-scanning="dlnaScanning" :mi-scanning="miScanning"
+        :on-toggle-cron-enabled="handleTogglePlaylistCronEnabled" :on-update-cron="handleUpdatePlaylistCron"
+        :on-update-duration="handleUpdatePlaylistDuration" :on-update-trigger-button="handleUpdateTriggerButton"
+        :on-open-cron-builder="handleOpenCronBuilder" :on-preview-cron="handlePreviewPlaylistCron"
         :on-update-device-type="handleUpdatePlaylistDeviceType"
         :on-update-device-volume="handleUpdatePlaylistDeviceVolume"
         :on-update-device-address="handleUpdatePlaylistDeviceAddress"
-        :on-select-bluetooth-device="handleSelectBluetoothDevice"
-        :on-select-agent-device="handleSelectAgentDevice"
-        :on-select-mi-device="handleSelectMiDevice"
-        :on-scan-dlna-devices="scanDlnaDevices"
-        :on-scan-mi-devices="scanMiDevices"
-        :on-open-scan-dialog="handleOpenScanDialog"
-        :on-open-device-list="handleOpenAgentListDialog"
-      ></PanelConfig>
+        :on-select-bluetooth-device="handleSelectBluetoothDevice" :on-select-agent-device="handleSelectAgentDevice"
+        :on-select-mi-device="handleSelectMiDevice" :on-scan-dlna-devices="scanDlnaDevices"
+        :on-scan-mi-devices="scanMiDevices" :on-open-scan-dialog="handleOpenScanDialog"
+        :on-open-device-list="handleOpenAgentListDialog"></PanelConfig>
     </div>
 
     <!-- 文件浏览对话框 -->
-    <FileDialog
-      :visible="fileBrowserDialogVisible"
-      @update:visible="fileBrowserDialogVisible = $event"
-      title="选择文件添加到播放列表"
-      confirm-button-text="添加"
-      :confirm-loading="playlistLoading"
-      @confirm="handleFileBrowserConfirm"
-      @close="handleCloseFileBrowser"
-    >
+    <FileDialog :visible="fileBrowserDialogVisible" @update:visible="fileBrowserDialogVisible = $event"
+      title="选择文件添加到播放列表" confirm-button-text="添加" :confirm-loading="playlistLoading"
+      @confirm="handleFileBrowserConfirm" @close="handleCloseFileBrowser">
       <template #footer-prepend>
         <el-select v-model="fileBrowserTarget" size="small" class="w-37">
           <el-option label="添加到主列表" value="files"></el-option>
@@ -137,68 +74,35 @@
     </FileDialog>
 
     <!-- Cron 可视化生成弹窗 -->
-    <CronDialog
-      :visible="cronBuilderVisible"
-      :initial-cron="initialCronExpr"
-      @update:visible="cronBuilderVisible = $event"
-      @apply="handleCronBuilderApply"
-      @preview="handleCronBuilderPreview"
-      @close="handleCloseCronBuilder"
-    >
+    <CronDialog :visible="cronBuilderVisible" :initial-cron="initialCronExpr"
+      @update:visible="cronBuilderVisible = $event" @apply="handleCronBuilderApply" @preview="handleCronBuilderPreview"
+      @close="handleCloseCronBuilder">
     </CronDialog>
 
     <!-- Cron 预览弹窗 -->
-    <CronPreviewDialog
-      :visible="cronPreviewVisible"
-      :times="cronPreviewTimes"
-      @update:visible="cronPreviewVisible = $event"
-      @close="cronPreviewVisible = false"
-    >
+    <CronPreviewDialog :visible="cronPreviewVisible" :times="cronPreviewTimes"
+      @update:visible="cronPreviewVisible = $event" @close="cronPreviewVisible = false">
     </CronPreviewDialog>
 
     <!-- 扫描设备弹窗 -->
-    <ScanDeviceDialog
-      :visible="scanDialogVisible"
-      :device-list="deviceList"
-      :loading="loading"
-      @update:visible="scanDialogVisible = $event"
-      @refresh="handleUpdateDeviceList"
-      @connect="handleConnectDevice"
-      @close="handleCloseScanDialog"
-    >
+    <ScanDeviceDialog :visible="scanDialogVisible" :device-list="deviceList" :loading="loading"
+      @update:visible="scanDialogVisible = $event" @refresh="handleUpdateDeviceList" @connect="handleConnectDevice"
+      @close="handleCloseScanDialog">
     </ScanDeviceDialog>
 
     <!-- 设备管理抽屉 -->
-    <DevicesDrawer
-      :visible="agentListDialogVisible"
-      @update:visible="agentListDialogVisible = $event"
-    >
+    <DevicesDrawer :visible="agentListDialogVisible" @update:visible="agentListDialogVisible = $event">
     </DevicesDrawer>
 
     <!-- 播放列表选择器弹窗 -->
-    <PlaylistSelectDialog
-      :visible="playlistSelectorVisible"
-      :playlist-collection="playlistCollection"
-      :selected-files="playlistSelectorSelectedFiles"
-      @update:visible="playlistSelectorVisible = $event"
-    >
+    <PlaylistSelectDialog :visible="playlistSelectorVisible" :playlist-collection="playlistCollection"
+      :selected-files="playlistSelectorSelectedFiles" @update:visible="playlistSelectorVisible = $event">
     </PlaylistSelectDialog>
 
     <!-- 编辑名称对话框 -->
-    <el-dialog
-      v-model="editNameDialogVisible"
-      title="编辑播放列表名称"
-      width="400"
-      @close="handleCancelEditPlaylistName"
-    >
-      <el-input
-        v-model="editNameDialogName"
-        placeholder="请输入播放列表名称"
-        @keyup.enter="handleSavePlaylistName"
-        @keyup.esc="handleCancelEditPlaylistName"
-        clearable
-        autofocus
-      >
+    <el-dialog v-model="editNameDialogVisible" title="编辑播放列表名称" width="400" @close="handleCancelEditPlaylistName">
+      <el-input v-model="editNameDialogName" placeholder="请输入播放列表名称" @keyup.enter="handleSavePlaylistName"
+        @keyup.esc="handleCancelEditPlaylistName" clearable autofocus>
       </el-input>
       <template #footer>
         <el-button @click="handleCancelEditPlaylistName">取消</el-button>
@@ -207,14 +111,9 @@
     </el-dialog>
 
     <!-- 批量操作抽屉 -->
-    <BatchDrawer
-      :visible="batchDrawerVisible"
-      :playlist-collection="playlistCollection"
-      @update:visible="batchDrawerVisible = $event"
-      @refresh="refreshPlaylistStatus"
-      :on-add-files="handleBatchAddFiles"
-      :on-remove-files="handleBatchRemoveFiles"
-    >
+    <BatchDrawer :visible="batchDrawerVisible" :playlist-collection="playlistCollection"
+      @update:visible="batchDrawerVisible = $event" @refresh="refreshPlaylistStatus" :on-add-files="handleBatchAddFiles"
+      :on-remove-files="handleBatchRemoveFiles">
     </BatchDrawer>
   </div>
 </template>
@@ -687,20 +586,20 @@ const handleBatchAddFiles = async (data: {
 
       // 添加文件到正式列表
       if (data.filesList) {
-        if (!Array.isArray(playlistInfo.playlist)) {
-          playlistInfo.playlist = [];
+        if (!Array.isArray(playlistInfo.files)) {
+          playlistInfo.files = [];
         }
         const existingUris = new Set(
-          playlistInfo.playlist.map((item: PlaylistItem | string) =>
+          playlistInfo.files.map((item: PlaylistItem | string) =>
             typeof item === "string" ? item : item?.uri || ""
           )
         );
         data.files.forEach(fileUri => {
           if (!existingUris.has(fileUri)) {
-            playlistInfo.playlist.push({ uri: fileUri });
+            playlistInfo.files.push({ uri: fileUri });
           }
         });
-        playlistInfo.total = playlistInfo.playlist.length;
+        playlistInfo.total = playlistInfo.files.length;
       }
 
       return playlistInfo;
@@ -759,16 +658,16 @@ const handleBatchRemoveFiles = async (data: {
       }
 
       // 从正式列表删除文件
-      if (data.filesList && Array.isArray(playlistInfo.playlist)) {
-        playlistInfo.playlist = playlistInfo.playlist.filter((item: PlaylistItem | string) => {
+      if (data.filesList && Array.isArray(playlistInfo.files)) {
+        playlistInfo.files = playlistInfo.files.filter((item: PlaylistItem | string) => {
           const uri = typeof item === "string" ? item : item?.uri || "";
           return !fileUriSet.has(uri);
         });
-        playlistInfo.total = playlistInfo.playlist.length;
-        if (playlistInfo.playlist.length === 0) {
+        playlistInfo.total = playlistInfo.files.length;
+        if (playlistInfo.files.length === 0) {
           playlistInfo.current_index = 0;
-        } else if (playlistInfo.current_index >= playlistInfo.playlist.length) {
-          playlistInfo.current_index = playlistInfo.playlist.length - 1;
+        } else if (playlistInfo.current_index >= playlistInfo.files.length) {
+          playlistInfo.current_index = playlistInfo.files.length - 1;
         }
       }
 

@@ -1,25 +1,17 @@
 <template>
-  <el-dialog
-    v-model="internalVisible"
-    title="应用到列表"
-    width="900"
-    :before-close="handleClose">
+  <el-dialog v-model="internalVisible" title="应用到列表" width="900" :before-close="handleClose">
     <div class="flex gap-4 h-125">
       <!-- 左列：播放列表选择 -->
       <div class="w-64 flex flex-col border rounded p-3">
         <div class="text-sm font-semibold mb-2">选择播放列表</div>
         <div class="flex-1 overflow-y-auto space-y-2">
-          <div
-            v-for="playlist in playlistCollection"
-            :key="playlist.id"
+          <div v-for="playlist in playlistCollection" :key="playlist.id"
             class="flex items-center justify-between px-2 py-2 rounded cursor-pointer hover:bg-gray-50 transition-colors"
             :class="{ 'bg-blue-50 border border-blue-200': playlist.id === selectedPlaylistId }"
             @click="handleSelectPlaylist(playlist.id)">
             <span class="text-sm flex-1 truncate">{{ playlist.name }}</span>
             <span class="text-xs text-gray-500 ml-2 whitespace-nowrap">
-              <span
-                v-if="selectedFiles && selectedFiles.length > 0"
-                class="text-blue-600 font-medium">
+              <span v-if="selectedFiles && selectedFiles.length > 0" class="text-blue-600 font-medium">
                 {{ getMatchedFileCountInPlaylist(playlist) }}/{{ getPlaylistTotalFileCount(playlist) }}
               </span>
               <span v-else> {{ getPlaylistTotalFileCount(playlist) }} </span>
@@ -39,25 +31,18 @@
           <div class="mb-3">
             <div class="text-xs text-gray-600 mb-2 font-semibold">前置文件</div>
             <div class="space-y-1">
-              <div
-                v-for="(day, index) in ['周一', '周二', '周三', '周四', '周五', '周六', '周日']"
-                :key="index"
+              <div v-for="(day, index) in ['周一', '周二', '周三', '周四', '周五', '周六', '周日']" :key="index"
                 class="flex items-center gap-2 py-1">
-                <el-checkbox
-                  :model-value="selectedPreLists.includes(index)"
-                  @change="handleTogglePreList(index)"
+                <el-checkbox :model-value="selectedPreLists.includes(index)" @change="handleTogglePreList(index)"
                   size="small">
                 </el-checkbox>
-                <span
-                  class="text-xs flex-1 cursor-pointer hover:text-blue-500"
+                <span class="text-xs flex-1 cursor-pointer hover:text-blue-500"
                   :class="{ 'text-blue-600 font-medium': selectedPreLists.includes(index) }"
                   @click="handleTogglePreList(index)">
                   {{ day }}
                 </span>
                 <span class="text-xs text-gray-500 whitespace-nowrap">
-                  <span
-                    v-if="selectedFiles && selectedFiles.length > 0"
-                    class="text-blue-600 font-medium">
+                  <span v-if="selectedFiles && selectedFiles.length > 0" class="text-blue-600 font-medium">
                     {{ getMatchedFileCountInPreList(index) }}/{{ getPreFilesCount(index) }}
                   </span>
                   <span v-else> {{ getPreFilesCount(index) }} </span>
@@ -70,21 +55,14 @@
           <!-- 正式文件列表 -->
           <div class="border-t pt-3">
             <div class="flex items-center gap-2 py-1">
-              <el-checkbox
-                :model-value="selectedFilesList"
-                @change="handleToggleFilesList"
-                size="small">
+              <el-checkbox :model-value="selectedFilesList" @change="handleToggleFilesList" size="small">
               </el-checkbox>
-              <span
-                class="text-xs font-semibold text-gray-600 cursor-pointer hover:text-blue-500 flex-1"
-                :class="{ 'text-blue-600': selectedFilesList }"
-                @click="handleToggleFilesList()">
+              <span class="text-xs font-semibold text-gray-600 cursor-pointer hover:text-blue-500 flex-1"
+                :class="{ 'text-blue-600': selectedFilesList }" @click="handleToggleFilesList()">
                 正式文件
               </span>
               <span class="text-xs text-gray-500 whitespace-nowrap">
-                <span
-                  v-if="selectedFiles && selectedFiles.length > 0"
-                  class="text-blue-600 font-medium">
+                <span v-if="selectedFiles && selectedFiles.length > 0" class="text-blue-600 font-medium">
                   {{ getMatchedFileCountInFilesList() }}/{{ getFilesListCount() }}
                 </span>
                 <span v-else> {{ getFilesListCount() }} </span>
@@ -108,15 +86,11 @@
         </div>
         <div class="flex gap-2">
           <el-button @click="handleClose">取消</el-button>
-          <el-button
-            type="primary"
-            @click="handleCopy"
+          <el-button type="primary" @click="handleCopy"
             :disabled="!hasSelectedLists || !selectedFiles || selectedFiles.length === 0">
             复制到列表
           </el-button>
-          <el-button
-            type="danger"
-            @click="handleRemove"
+          <el-button type="danger" @click="handleRemove"
             :disabled="!hasSelectedLists || !selectedFiles || selectedFiles.length === 0">
             从列表删除
           </el-button>
@@ -130,19 +104,8 @@
 import { ref, computed, watch, onMounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { logAndNoticeError } from "@/utils";
-import type { PlaylistItem } from "@/types/playlist";
-
-interface Playlist {
-  id: string;
-  name: string;
-  pre_lists?: PlaylistItem[][];
-  playlist?: PlaylistItem[];
-}
-
-interface FileItem {
-  uri?: string;
-  [key: string]: unknown;
-}
+import type { Playlist } from "@/types/playlist";
+import type { FileItem } from "@/types/tools/file";
 
 interface Props {
   visible?: boolean;
@@ -206,10 +169,10 @@ const getPreFilesCount = (weekdayIndex: number): number => {
 // 获取正式文件数量
 const getFilesListCount = (): number => {
   const playlist = selectedPlaylist.value;
-  if (!playlist || !playlist.playlist) {
+  if (!playlist || !playlist.files) {
     return 0;
   }
-  return Array.isArray(playlist.playlist) ? playlist.playlist.length : 0;
+  return Array.isArray(playlist.files) ? playlist.files.length : 0;
 };
 
 // 获取播放列表总文件数
@@ -217,14 +180,14 @@ const getPlaylistTotalFileCount = (playlist: Playlist): number => {
   if (!playlist) return 0;
   const preCount =
     playlist.pre_lists &&
-    Array.isArray(playlist.pre_lists) &&
-    playlist.pre_lists.length === 7
+      Array.isArray(playlist.pre_lists) &&
+      playlist.pre_lists.length === 7
       ? playlist.pre_lists.reduce(
-          (sum, list) => sum + (Array.isArray(list) ? list.length : 0),
-          0
-        )
+        (sum, list) => sum + (Array.isArray(list) ? list.length : 0),
+        0
+      )
       : 0;
-  const filesCount = Array.isArray(playlist.playlist) ? playlist.playlist.length : 0;
+  const filesCount = Array.isArray(playlist.files) ? playlist.files.length : 0;
   return preCount + filesCount;
 };
 
@@ -266,8 +229,8 @@ const getMatchedFileCountInPlaylist = (playlist: Playlist): number => {
     });
   }
 
-  if (Array.isArray(playlist.playlist)) {
-    playlist.playlist.forEach((file) => {
+  if (Array.isArray(playlist.files)) {
+    playlist.files.forEach((file) => {
       const fileUri = file.uri || String(file);
       if (selectedFileUris.has(fileUri)) {
         matchedCount++;
@@ -308,12 +271,12 @@ const getMatchedFileCountInFilesList = (): number => {
   if (!playlist || !props.selectedFiles || props.selectedFiles.length === 0) {
     return 0;
   }
-  if (!Array.isArray(playlist.playlist)) {
+  if (!Array.isArray(playlist.files)) {
     return 0;
   }
   const selectedFileUris = getSelectedFileUris();
   let matchedCount = 0;
-  playlist.playlist.forEach((file) => {
+  playlist.files.forEach((file) => {
     const fileUri = file.uri || String(file);
     if (selectedFileUris.has(fileUri)) {
       matchedCount++;
@@ -509,4 +472,3 @@ onMounted(() => {
   autoSelectFirstPlaylist();
 });
 </script>
-

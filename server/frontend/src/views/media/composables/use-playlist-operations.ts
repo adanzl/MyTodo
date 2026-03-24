@@ -125,14 +125,14 @@ export function usePlaylistOperations(
       ElMessage.warning("播放列表不存在");
       return;
     }
-    if (!status.playlist || status.playlist.length === 0) {
+    if (!status.files || status.files.length === 0) {
       ElMessage.warning("播放列表为空，请先添加文件");
       return;
     }
     try {
       playing.value = true;
       await updateActivePlaylistData(playlistInfo => {
-        const list = Array.isArray(playlistInfo.playlist) ? playlistInfo.playlist : [];
+        const list = Array.isArray(playlistInfo.files) ? playlistInfo.files : [];
         playlistInfo.current_index = Math.max(
           0,
           Math.min(playlistInfo.current_index || 0, list.length - 1)
@@ -162,7 +162,7 @@ export function usePlaylistOperations(
       ElMessage.warning("播放列表不存在");
       return;
     }
-    if (!status.playlist || status.playlist.length === 0) {
+    if (!status.files || status.files.length === 0) {
       ElMessage.warning("播放列表为空，无法播放下一首");
       return;
     }
@@ -189,7 +189,7 @@ export function usePlaylistOperations(
       return;
     }
     const hasPreFiles = getCurrentPreFiles().length > 0;
-    const hasPlaylist = status.playlist && status.playlist.length > 0;
+    const hasPlaylist = status.files && status.files.length > 0;
     if (!hasPreFiles && !hasPlaylist) {
       ElMessage.warning("播放列表为空，无法播放上一首");
       return;

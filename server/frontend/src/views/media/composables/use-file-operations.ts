@@ -116,8 +116,8 @@ export function useFileOperations(
             ? Array.isArray(playlistInfo.pre_lists) && playlistInfo.pre_lists.length === 7
               ? [...(playlistInfo.pre_lists[weekdayIndex] || [])]
               : []
-            : Array.isArray(playlistInfo.playlist)
-              ? [...playlistInfo.playlist]
+            : Array.isArray(playlistInfo.files)
+              ? [...playlistInfo.files]
               : [];
 
         const existingUris = new Set<string>();
@@ -138,10 +138,10 @@ export function useFileOperations(
               playlistInfo.pre_lists[weekdayIndex] = list;
             }
           } else {
-            const list = [...playlistInfo.playlist];
+            const list = [...playlistInfo.files];
             if (replaceIndex >= 0 && replaceIndex < list.length) {
               list[replaceIndex] = { uri: filePaths[0] };
-              playlistInfo.playlist = list;
+              playlistInfo.files = list;
               playlistInfo.total = list.length;
             }
           }
@@ -164,7 +164,7 @@ export function useFileOperations(
           ensurePreListsInitialized(playlistInfo);
           playlistInfo.pre_lists[weekdayIndex] = targetList;
         } else {
-          playlistInfo.playlist = targetList;
+          playlistInfo.files = targetList;
           playlistInfo.total = targetList.length;
           if (targetList.length === 0) {
             playlistInfo.current_index = 0;
@@ -193,14 +193,14 @@ export function useFileOperations(
   // 上移播放列表项
   const handleMovePlaylistItemUp = async (index: number) => {
     const status = playlistStatus.value;
-    if (!status || index <= 0 || index >= status.playlist.length) return;
+    if (!status || index <= 0 || index >= status.files.length) return;
 
     try {
       playlistLoading.value = true;
       await updateActivePlaylistData(playlistInfo => {
-        const list = [...playlistInfo.playlist];
+        const list = [...playlistInfo.files];
         [list[index - 1], list[index]] = [list[index], list[index - 1]];
-        playlistInfo.playlist = list;
+        playlistInfo.files = list;
         if (playlistInfo.current_index === index) {
           playlistInfo.current_index = index - 1;
         } else if (playlistInfo.current_index === index - 1) {
@@ -220,14 +220,14 @@ export function useFileOperations(
   // 下移播放列表项
   const handleMovePlaylistItemDown = async (index: number) => {
     const status = playlistStatus.value;
-    if (!status || index < 0 || index >= status.playlist.length - 1) return;
+    if (!status || index < 0 || index >= status.files.length - 1) return;
 
     try {
       playlistLoading.value = true;
       await updateActivePlaylistData(playlistInfo => {
-        const list = [...playlistInfo.playlist];
+        const list = [...playlistInfo.files];
         [list[index], list[index + 1]] = [list[index + 1], list[index]];
-        playlistInfo.playlist = list;
+        playlistInfo.files = list;
         if (playlistInfo.current_index === index) {
           playlistInfo.current_index = index + 1;
         } else if (playlistInfo.current_index === index + 1) {
@@ -247,9 +247,9 @@ export function useFileOperations(
   // 删除播放列表项
   const handleDeletePlaylistItem = async (index: number) => {
     const status = playlistStatus.value;
-    if (!status || index < 0 || index >= status.playlist.length) return;
+    if (!status || index < 0 || index >= status.files.length) return;
 
-    const fileItem = status.playlist[index];
+    const fileItem = status.files[index];
     const fileName = fileItem?.uri?.split("/").pop() || "文件";
 
     try {
@@ -261,9 +261,9 @@ export function useFileOperations(
 
       playlistLoading.value = true;
       await updateActivePlaylistData(playlistInfo => {
-        const list = [...playlistInfo.playlist];
+        const list = [...playlistInfo.files];
         list.splice(index, 1);
-        playlistInfo.playlist = list;
+        playlistInfo.files = list;
         if (list.length === 0) {
           playlistInfo.current_index = 0;
         } else if (index < playlistInfo.current_index) {
@@ -287,7 +287,7 @@ export function useFileOperations(
   // 替换播放列表项
   const handleReplacePlaylistItem = async (index: number) => {
     const status = playlistStatus.value;
-    if (!status || index < 0 || index >= status.playlist.length) return;
+    if (!status || index < 0 || index >= status.files.length) return;
 
     replaceFileInfo.value = {
       type: "files",
@@ -465,7 +465,7 @@ export function useFileOperations(
   const handleBatchDeleteFiles = async () => {
     const status = playlistStatus.value;
     const selectedIndices = selectedFileIndices.value;
-    if (!status || !status.playlist || selectedIndices.length === 0) return;
+    if (!status || !status.files || selectedIndices.length === 0) return;
 
     const selectedCount = selectedIndices.length;
     try {
@@ -483,13 +483,13 @@ export function useFileOperations(
         const indicesToDelete = [...new Set(selectedIndices)].sort((a, b) => b - a);
 
         await updateActivePlaylistData(playlistInfo => {
-          const list = [...playlistInfo.playlist];
+          const list = [...playlistInfo.files];
           indicesToDelete.forEach(index => {
             if (index >= 0 && index < list.length) {
               list.splice(index, 1);
             }
           });
-          playlistInfo.playlist = list;
+          playlistInfo.files = list;
           if (list.length === 0) {
             playlistInfo.current_index = 0;
           } else {
@@ -550,11 +550,11 @@ export function useFileOperations(
   // 清空正式文件列表
   const handleClearFiles = async () => {
     const status = playlistStatus.value;
-    if (!status || !status.playlist || status.playlist.length === 0) return;
+    if (!status || !status.files || status.files.length === 0) return;
 
     try {
       await ElMessageBox.confirm(
-        `确定要清空正式文件列表吗？此操作将删除所有 ${status.playlist.length} 个正式文件。`,
+        `确定要清空正式文件列表吗？此操作将删除所有 ${status.files.length} 个正式文件。`,
         "确认清空",
         {
           confirmButtonText: "确定",
@@ -565,7 +565,7 @@ export function useFileOperations(
 
       await executeWithLoading(async () => {
         await updateActivePlaylistData(playlistInfo => {
-          playlistInfo.playlist = [];
+          playlistInfo.files = [];
           playlistInfo.total = 0;
           playlistInfo.current_index = 0;
           return playlistInfo;
@@ -584,7 +584,7 @@ export function useFileOperations(
 
     const preFiles = getCurrentPreFiles();
     const preFilesCount = (preFiles && preFiles.length) || 0;
-    const filesCount = (status.playlist && status.playlist.length) || 0;
+    const filesCount = (status.files && status.files.length) || 0;
     const totalCount = preFilesCount + filesCount;
 
     if (totalCount === 0) return;
@@ -605,7 +605,7 @@ export function useFileOperations(
 
       await executeWithLoading(async () => {
         await updateActivePlaylistData(playlistInfo => {
-          playlistInfo.playlist = [];
+          playlistInfo.files = [];
           ensurePreListsInitialized(playlistInfo);
           playlistInfo.pre_lists = playlistInfo.pre_lists.map(() => []);
           playlistInfo.total = 0;

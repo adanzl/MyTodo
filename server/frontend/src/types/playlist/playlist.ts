@@ -95,9 +95,9 @@ export interface Playlist {
    */
   name: string;
   /**
-   * 主播放列表（文件列表）
+   * Main playlist (file list)
    */
-  playlist: PlaylistItem[];
+  files: PlaylistItem[];
   /**
    * 前置文件列表（7 天，对应一周 7 天）
    * 每个元素是一天的前置文件列表

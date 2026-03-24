@@ -232,22 +232,29 @@ class PlaylistMgr:
         try:
             raw = rds_mgr.get(PLAYLIST_RDS_FULL_KEY)
             if raw:
-                self._playlist_raw = json.loads(raw.decode("utf-8"))
+                self._playlist_raw = json.loads(raw.decode("utf-8"))  # pyright: ignore[reportAttributeAccessIssue]
 
             # 清除所有播放列表的 isPlaying 状态（程序重启后，播放状态不应该保留）
             for playlist_id, playlist_data in self._playlist_raw.items():
                 if 'isPlaying' in playlist_data:
                     del playlist_data['isPlaying']
-
+            
                 # 迁移 pre_files 到 pre_lists（如果还没有 pre_lists）
                 pre_lists = playlist_data.get("pre_lists", [])
                 if not isinstance(pre_lists, list) or len(pre_lists) != 7:
                     # 如果 pre_lists 不存在或格式不正确，重新初始化
                     pre_files = playlist_data.get("pre_files", [])
-                    pre_lists = [list(pre_files) for _ in range(7)]  # 深拷贝到7个列表
+                    pre_lists = [list(pre_files) for _ in range(7)]  # 深拷贝到 7 个列表
                     playlist_data["pre_lists"] = pre_lists
                     action = "迁移" if "pre_lists" not in playlist_data else "修复"
                     log.info(f"[PlaylistMgr] {action} pre_files 到 pre_lists: {playlist_id}, 共 {len(pre_files)} 个文件")
+            
+                # 迁移 playlist 到 files（如果还没有 files）
+                if "files" not in playlist_data:
+                    old_playlist = playlist_data.get("playlist", [])
+                    if old_playlist:
+                        playlist_data["files"] = old_playlist
+                        log.info(f"[PlaylistMgr] 迁移 playlist 到 files: {playlist_id}, 共 {len(old_playlist)} 个文件")
 
             # 从 _playlist_raw 恢复游标状态到 _play_state，保留游标以便从上次位置继续
             # 只恢复那些在 _play_state 中不存在的播放列表（程序启动时的情况）
@@ -362,7 +369,7 @@ class PlaylistMgr:
                         log.error(f"[PlaylistMgr] 定时任务播放失败: {pid} - {p_name}, {msg}")
                 except Exception as e:
                     # 捕获 gevent 相关的异常，避免影响线程池 worker
-                    if isinstance(e, gevent.exceptions.LoopExit):
+                    if isinstance(e, gevent.exceptions.LoopExit):  # pyright: ignore[reportAttributeAccessIssue]
                         log.warning(f"[PlaylistMgr] 定时任务执行后发生 gevent LoopExit (可忽略): {pid} - {p_name}")
                     else:
                         log.error(f"[PlaylistMgr] 定时任务执行异常: {pid} - {p_name}, {e}")
@@ -521,7 +528,7 @@ class PlaylistMgr:
                                 else:
                                     files_to_fetch.add(file_uri)
 
-        # 检查 files/playlist
+        # Check files
         for file_item in playlist_data.get("files", []):
             if not file_item.get("duration"):
                 file_uri = file_item.get("uri")
@@ -558,7 +565,7 @@ class PlaylistMgr:
                             file_item["duration"] = file_durations[file_uri]
                             updated_count += 1
 
-        # 更新 files/playlist
+        # Update files
         files = playlist_data.get("files", [])
         for file_item in files:
             file_uri = file_item.get("uri")
@@ -654,20 +661,20 @@ class PlaylistMgr:
         # 在锁外启动线程
         thread_to_start.start()
 
-    def _validate_playlist(self, id: str) -> Tuple[Optional[Dict[str, Any]], int, Optional[str]]:
+    def _validate_playlist(self, id: str) -> Tuple[Dict[str, Any], int, str]:
         """验证播放列表是否存在且有效。"""
         if not self._playlist_raw or id not in self._playlist_raw:
-            return None, -1, "播放列表不存在"
+            return {}, -1, "播放列表不存在"
         playlist_data = self._playlist_raw[id]
         pre_lists = playlist_data.get("pre_lists", [])
         pre_files = _get_pre_list_for_today(pre_lists)  # 获取今天对应的前置文件列表
         files = playlist_data.get("files", [])
         if not files and not pre_files:
-            return None, -1, "播放列表为空"
+            return {}, -1, "播放列表为空"
         device_obj = self._device_map.get(id)
         if device_obj is None:
-            return None, -1, "设备不存在或未初始化"
-        return playlist_data, 0, None
+            return {}, -1, "设备不存在或未初始化"
+        return playlist_data, 0, 'SUCCESS'
 
     def _apply_device_volume(self, playlist_id: str, device: Any, playlist_data: Dict[str, Any]) -> None:
         """检查并设置设备音量（如果播放列表中有音量配置）。"""
@@ -705,12 +712,12 @@ class PlaylistMgr:
             pre_index = play_state["pre_index"]
             if pre_index < 0 or pre_index >= len(pre_files):
                 return None, f"pre_files 索引 {pre_index} 超出范围"
-            return pre_files[pre_index], None
+            return pre_files[pre_index], 'SUCCESS'
         else:
             file_index = play_state["file_index"]
             if file_index < 0 or file_index >= len(files):
                 return None, f"files 索引 {file_index} 超出范围"
-            return files[file_index], None
+            return files[file_index], 'SUCCESS'
 
     def _cleanup_play_state(self, id: str) -> None:
         """清理播放状态。"""
@@ -839,9 +846,9 @@ class PlaylistMgr:
 
     def _update_index_and_play(self,
                                id: str,
-                               in_pre_files: bool = None,
-                               pre_index: int = None,
-                               file_index: int = None) -> tuple[int, str]:
+                               in_pre_files: bool,
+                               pre_index: int,
+                               file_index: int) -> tuple[int, str]:
         """更新播放状态（游标），然后强制播放当前项。
 
         这是切歌（上一首/下一首/定时器触发）的核心逻辑，通过更新内部状态机
@@ -928,7 +935,7 @@ class PlaylistMgr:
                                                        in_pre_files=True,
                                                        pre_index=0,
                                                        file_index=playlist_data.get("current_index", 0))
-                return self._update_index_and_play(id, file_index=playlist_data.get("current_index", 0))
+                return self._update_index_and_play(id, in_pre_files=False, pre_index=0, file_index=playlist_data.get("current_index", 0))
 
             play_state = self._play_state[id]
 
@@ -942,13 +949,13 @@ class PlaylistMgr:
                                                        file_index=play_state["file_index"])
                 # pre_files 播放完了，开始播放 files（从保存的 file_index 开始）
                 if files and play_state["file_index"] < len(files):
-                    return self._update_index_and_play(id, in_pre_files=False, file_index=play_state["file_index"])
+                    return self._update_index_and_play(id, in_pre_files=False, pre_index=0, file_index=play_state["file_index"])
                 return -1, "没有更多文件可播放"
             else:
                 # 播放 files 的下一首（使用取余实现循环）
                 if files:
                     next_file_index = (play_state["file_index"] + 1) % len(files)
-                    return self._update_index_and_play(id, file_index=next_file_index)
+                    return self._update_index_and_play(id, in_pre_files=False, pre_index=0, file_index=next_file_index)
                 return -1, "没有更多文件可播放"
         except Exception as e:
             log.error(f"[PlaylistMgr] play_next error: id={id}, {e}", exc_info=True)
@@ -982,7 +989,7 @@ class PlaylistMgr:
                                                    file_index=playlist_data.get("current_index", 0))
             current_index = playlist_data.get("current_index", 0)
             prev_index = (current_index - 1) % len(files) if files else 0
-            return self._update_index_and_play(id, file_index=prev_index)
+            return self._update_index_and_play(id, in_pre_files=False, pre_index=0, file_index=prev_index)
 
         play_state = self._play_state[id]
 
@@ -999,7 +1006,7 @@ class PlaylistMgr:
             # 播放 files 的上一首
             prev_file_index = play_state["file_index"] - 1
             if prev_file_index >= 0:
-                return self._update_index_and_play(id, file_index=prev_file_index)
+                return self._update_index_and_play(id, in_pre_files=False, pre_index=0, file_index=prev_file_index)
             # files 在开头，回到 pre_files 的最后
             if pre_files:
                 return self._update_index_and_play(id, in_pre_files=True, pre_index=len(pre_files) - 1, file_index=0)
