@@ -19,7 +19,7 @@
         <ion-label>奖励</ion-label>
         <div slot="end" class="flex items-center">
           <Icon icon="mdi:star" class="text-red-500 w-5 h-5" />
-          <ion-label class="w-5 text-right">{{ valueRef.score ?? 0 }}</ion-label>
+          <ion-label class="w-5 text-right">{{ valueRef.score ?? 1 }}</ion-label>
         </div>
       </ion-item>
       <ion-item lines="none">
@@ -31,7 +31,7 @@
         </div>
       </ion-item>
     </ion-content>
-    <ion-footer class="!flex">
+    <ion-footer class="flex!">
       <ion-button class="flex-1 text-gray-400" fill="clear" @click="cancel()"> 取消 </ion-button>
       <ion-button class="flex-1 text-orange-400" fill="clear" @click="confirm()"> 确定 </ion-button>
     </ion-footer>
