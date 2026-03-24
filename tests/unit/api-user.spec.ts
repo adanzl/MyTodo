@@ -7,7 +7,7 @@ import {
   getUserInfo,
   getUserList,
   setUserData,
-} from "@/api/user";
+} from "@/api/api-user";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGet = vi.fn();

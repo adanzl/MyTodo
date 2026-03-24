@@ -1,12 +1,11 @@
 <template>
   <ion-segment-content id="tabPrize">
     <ion-item>
-      <ion-select label="类别" placeholder="选择类别" justify="start" :model-value="selectedCate" @ionChange="onCateChange">
-        <ion-select-option :value="cate" v-for="cate in lotteryCatList" :key="cate.id">
+      <ion-select label="类别" placeholder="选择类别" justify="start" :value="selectedCate?.id" @ionChange="onCateChange">
+        <ion-select-option :value="cate.id" v-for="cate in lotteryCatList" :key="cate.id">
           {{ cate.name }}
         </ion-select-option>
       </ion-select>
-      <ion-button class="ml-2" size="small" :disabled="true">管理</ion-button>
       <div class="flex w-1/3 items-center justify-center">
         <Icon icon="mdi:star" class="text-red-500 w-5 h-5" />
         <div class="text-left pl-1 font-bold w-12">{{ userScore }}</div>
@@ -95,7 +94,7 @@ import {
 import { Icon } from "@iconify/vue";
 import { getPicDisplayUrl } from "@/api/pic";
 import { PicDisplaySize } from "@/utils/ImgMgr";
-import { computed, inject, ref } from "vue";
+import { computed, inject, ref, watch } from "vue";
 import _ from "lodash";
 
 import DialogGift from "./dialogs/dialog-gift.vue";
@@ -127,6 +126,21 @@ const isAdmin = computed(() => globalVar?.user?.admin === 1);
 
 const isGiftModalOpen = ref(false);
 const editingGift = ref<any>(null);
+
+// 监听 selectedCate 变化，确保它在 lotteryCatList 中存在
+watch([() => props.lotteryCatList, () => props.selectedCate], ([catList, selectedCate]) => {
+  if (catList && catList.length > 0 && selectedCate) {
+    // 检查当前选中的是否在列表中
+    const exists = catList.some((item: any) => item.id === selectedCate.id);
+    if (!exists) {
+      // 如果不存在，通知父组件切换到第一个（"全部"）
+      emit("cate-change", catList[0]);
+    }
+  } else if (catList && catList.length > 0 && !selectedCate) {
+    // 如果没有选中项，通知父组件选中第一个（"全部"）
+    emit("cate-change", catList[0]);
+  }
+}, { immediate: true });
 
 
 
@@ -164,7 +178,11 @@ function onLoadMore(event: any) {
   emit("load-more", event);
 }
 function onCateChange(event: any) {
-  emit("cate-change", event.detail.value);
+  // event.detail.value 现在是 id，需要找到对应的完整对象
+  const selectedCate = props.lotteryCatList.find((cate: any) => cate.id === event.detail.value);
+  if (selectedCate) {
+    emit("cate-change", selectedCate);
+  }
 }
 
 function getCateName(cateId: number) {

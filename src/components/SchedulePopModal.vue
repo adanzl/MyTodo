@@ -126,7 +126,7 @@
               <!-- 开始时间 -->
               <ion-icon :icon="timeOutline" slot="start"> </ion-icon>
               <ion-label>开始时间</ion-label>
-              <label class="mr-[6px]">
+              <label class="mr-1.5">
                 {{ curScheduleData.allDay ? "全天" : curScheduleData.startTs?.format("HH:mm") }}
               </label>
             </ion-item>
@@ -281,12 +281,12 @@
               @ionChange="onSubtaskCheckboxChange($event, task)">
             </ion-checkbox>
             <div class="flex flex-1 h-full" @click="onSubtaskClk($event, task)">
-              <ion-label :class="{ 'line-through': subTaskChecked(task) }" class="!flex ml-2">
+              <ion-label :class="{ 'line-through': subTaskChecked(task) }" class="flex! ml-2">
                 <div class="flex-1">{{ task.name }}</div>
-                <Icon icon="mdi:star" class="text-red-500 w-5 h-5 mt-[2px] ml-1" />
+                <Icon icon="mdi:star" class="text-red-500 w-5 h-5 mt-0.5 ml-1" />
                 <span class="w-3 text-right mr-3">{{ task.score ?? 0 }}</span>
               </ion-label>
-              <div class="pre-img-group mt-[5px] bg-amber-700">
+              <div class="pre-img-group mt-1.25 bg-amber-700">
                 <div class="pre-img-block" v-for="(img, idx) in task.imgIds" :key="idx">
                   <img :src="imgs[img]" />
                 </div>

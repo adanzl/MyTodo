@@ -103,3 +103,36 @@ export async function getGiftAvgCost(params?: {
   }
   return rsp.data.data!;
 }
+
+/** 奖池管理相关接口 */
+export interface LotteryPool {
+  id?: number;
+  name: string;
+  cost?: number;
+  count?: number;
+  cate_list?: string;
+  total_count?: number;
+  remaining_count?: number;
+  start_time?: string;
+  end_time?: string;
+}
+
+export async function setLotteryPool(pool: LotteryPool): Promise<void> {
+  const rsp = await apiClient.post<ApiResponse<unknown>>("/setData", {
+    table: "t_gift_pool",
+    data: pool,
+  });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+}
+
+export async function delLotteryPool(id: number): Promise<void> {
+  const rsp = await apiClient.post<ApiResponse<unknown>>("/delData", {
+    table: "t_gift_pool",
+    id,
+  });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+}

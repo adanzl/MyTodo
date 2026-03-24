@@ -32,7 +32,7 @@
 
 <script lang="ts" setup>
 import { User } from "@/types/UserData";
-import { addScore, getUserList } from "@/api/user";
+import { addScore, getUserList } from "@/api/api-user";
 import { IonAvatar, IonImg } from "@ionic/vue";
 import { inject, onMounted, ref } from "vue";
 

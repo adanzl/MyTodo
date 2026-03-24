@@ -36,14 +36,15 @@
     </ion-segment>
     <ion-segment-view :style="{ height: `calc(100% - ${tabsHeight}px)` }">
       <LotteryTab
-        :lottery-cat-list="lotteryCatList"
+        :pool-list="poolList"
         :selected-cate="selectedCate"
         :wish-list="wishList"
         :lottery-data="lotteryDate"
         :user-score="globalVar.user.score"
         @cate-change="handleShopCateChange"
         @lottery="btnLotteryClk"
-        @remove-wish="btnRemoveWishClk" />
+        @remove-wish="btnRemoveWishClk"
+        @open-pool="btnPoolClk" />
       <TabPrize
         :lottery-cat-list="lotteryCatList"
         :selected-cate="selectedCate"
@@ -67,6 +68,7 @@
         @user-change="handleUserChange" />
     </ion-segment-view>
     <LotterySetting :is-open="lotterySetting.open" @willDismiss="onSettingDismiss" />
+    <LotteryPool :is-open="lotteryPool.open" @willDismiss="onPoolDismiss" @refresh="refreshCateList" />
   </ion-page>
 </template>
 
@@ -76,8 +78,8 @@ import { Icon } from "@iconify/vue";
 import EventBus, { C_EVENT } from "@/types/EventBus";
 import type { GiftCategoryItem, GiftListItem } from "@/api";
 import { getList, delData } from "@/api/data";
-import { doExchange, doLottery, getGiftData, getLotteryData } from "@/api/lottery";
-import { clearUserListCache, getUserList, setUserData } from "@/api/user";
+import { doExchange, doLottery, getGiftData, getLotteryData } from "@/api/api-lottery";
+import { clearUserListCache, getUserList, setUserData } from "@/api/api-user";
 import { getNetworkErrorMessage } from "@/utils/NetUtil";
 import { getCachedPicByName, PicDisplaySize } from "@/utils/ImgMgr";
 import {
@@ -92,17 +94,19 @@ import {
 import { giftOutline, heartOutline } from "ionicons/icons";
 import _ from "lodash";
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
-import LotteryTab from "./TabLottery.vue";
-import TabPrize from "./TabPrize.vue";
-import HistoryTab from "./TabHistory.vue";
+import LotteryTab from "./tab-lottery.vue";
+import TabPrize from "./tab-prize.vue";
+import HistoryTab from "./tab-history.vue";
 import LotterySetting from "./dialogs/lottery-setting.vue";
+import LotteryPool from "./dialogs/lottery-pool.vue";
 
 const PAGE_SIZE = 20;
 const lotterySetting = ref({ open: false });
+const lotteryPool = ref({ open: false });
 const globalVar: any = inject("globalVar");
 const isAdmin = computed(() => globalVar?.user?.admin === 1);
 const lotteryDate = ref<any>({});
-const segmentValue = ref("shop");
+const segmentValue = ref("lotterySpecial");  // Default to lottery special
 
 const wishList = ref<any>({
   progress: 30.2,
@@ -130,8 +134,9 @@ const scoreHistoryList = ref<any>({
   totalPage: 0,
 });
 const lotteryCatList = ref<any>([]);
+const poolList = ref<any[]>([]);
 const userList = ref<any>([]);
-const selectedCate = ref<any>({ id: 0, name: "全部", cost: lotteryDate.value.fee || 10 });
+const selectedCate = ref<any>(null);
 const selectedUser = ref<any>({ id: 0, name: "全部", score: 0 });
 const tabsHeight = ref(0);
 let observer: MutationObserver | null = null;
@@ -170,7 +175,9 @@ const onNavToCate = (cateId: number) => {
     };
   }
   segmentValue.value = "shop";
-  refreshGiftList(selectedCate.value.id);
+  if (selectedCate.value) {
+    refreshGiftList(selectedCate.value.id);
+  }
 };
 
 EventBus.$on(C_EVENT.LOTTERY_NAV_TO_CATE, onNavToCate);
@@ -191,11 +198,12 @@ function handleRefresh(event: any) {
   const cateId = selectedCate.value?.id === 0 ? undefined : selectedCate.value?.id;
   refreshGiftList(cateId, 1);
   refreshCateList();
+  refreshPoolList();
   refreshScoreHistoryList(selectedUser.value?.id, 1);
   getLotteryData()
     .then((data: any) => {
       lotteryDate.value = JSON.parse(data);
-      if (selectedCate.value.id == 0) {
+      if (selectedCate.value && selectedCate.value.id == 0) {
         selectedCate.value.cost = lotteryDate.value.fee;
       }
     })
@@ -207,7 +215,7 @@ function handleRefresh(event: any) {
 
 function handleSegmentChange(event: any) {
   segmentValue.value = event.detail.value;
-  if (segmentValue.value === "shop") {
+  if (segmentValue.value === "shop" && selectedCate.value) {
     refreshGiftList(selectedCate.value.id);
   }
 }
@@ -217,6 +225,16 @@ function btnSettingClk() {
 }
 function onSettingDismiss(event: any) {
   lotterySetting.value.open = false;
+  if (event.detail.role === "cancel") {
+    return;
+  }
+}
+
+function btnPoolClk() {
+  lotteryPool.value.open = true;
+}
+function onPoolDismiss(event: any) {
+  lotteryPool.value.open = false;
   if (event.detail.role === "cancel") {
     return;
   }
@@ -241,9 +259,41 @@ function refreshCateList() {
       const d = data.data;
       lotteryCatList.value = [...d];
       lotteryCatList.value.unshift({ id: 0, name: "全部", cost: lotteryDate.value.fee || 100 });
-      if (selectedCate.value.id == 0) {
-        selectedCate.value = lotteryCatList.value[0];
+      // 注意：不再在这里设置 selectedCate，交给子组件的 watch 处理
+    })
+    .catch((err) => {
+      EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+    });
+}
+function refreshPoolList() {
+  getList("t_gift_pool")
+    .then((data) => {
+      const pools = data?.data ?? [];
+      poolList.value = [...pools];
+      
+      // 在奖池列表前添加"全部"选项
+      if (poolList.value.length > 0) {
+        // 检查是否已存在 ID 为 0 的"全部"奖池
+        const hasAllPool = poolList.value.some((pool: any) => pool.id === 0);
+        if (!hasAllPool) {
+          poolList.value.unshift({
+            id: 0,
+            name: "全部",
+            cost: lotteryDate.value.fee || 10,
+            count: 1,
+          });
+        }
+      } else {
+        // 如果没有奖池数据，创建默认的"全部"奖池
+        poolList.value = [{
+          id: 0,
+          name: "全部",
+          cost: lotteryDate.value.fee || 10,
+          count: 1,
+        }];
       }
+      
+      // 注意：不再在这里设置 selectedCate，交给子组件的 watch 处理
     })
     .catch((err) => {
       EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));

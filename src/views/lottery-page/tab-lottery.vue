@@ -3,20 +3,28 @@
     <ion-content>
       <div class="flex flex-col h-full">
         <ion-item>
-          <div class="flex items-center justify-center">
-            <span>当前积分：</span>
-            <Icon icon="mdi:star" class="text-red-500 w-5 h-5" />
-            <div class="text-left pl-1 font-bold w-12">{{ userScore }}</div>
+          <div class="flex w-full">
+            <div class="flex flex-1 items-center">
+              <span>当前积分：</span>
+              <Icon icon="mdi:star" class="text-red-500 w-5 h-5" />
+              <div class="text-left pl-1 font-bold w-12">{{ userScore }}</div>
+            </div>
+            <div>
+              <ion-button @click="$emit('open-pool')" :disabled="!isAdmin">
+                奖池管理
+              </ion-button>
+            </div>
           </div>
         </ion-item>
         <ion-radio-group
-          :value="selectedCate"
+          :value="selectedCate?.id"
           class="radio-grid"
           @ionChange="onCateChangeFromRadio">
           <ion-radio
-            v-for="item in lotteryCatList"
+            v-for="item in poolList"
             :key="item.id"
-            :value="item"
+            :value="item.id"
+            :disabled="item.id !== 0 && (!item.cate_list || item.cate_list.length === 0)"
             label-placement="end"
             justify="start">
             <span class="text-black">{{ item.name }}</span>
@@ -26,7 +34,7 @@
           <ion-button
             @click="$emit('lottery')"
             size="default"
-            :disabled="userScore < lotteryCost">
+            :disabled="!selectedCate || userScore < lotteryCost">
             <div class="w-20 h-20 flex flex-col items-center justify-center">
               <span>立即抽奖</span>
               <div class="flex items-center justify-center mt-2">
@@ -103,9 +111,12 @@ import "swiper/css";
 import "swiper/css/free-mode";
 import { FreeMode } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
-import { computed, ref } from "vue";
+import { computed, inject, ref, watch } from "vue";
 import { getPicDisplayUrl } from "@/api/pic";
 import { PicDisplaySize } from "@/utils/ImgMgr";
+
+const globalVar: any = inject("globalVar");
+const isAdmin = computed(() => globalVar?.user?.admin === 1);
 
 /** 心愿单兼容 img/image 字段，转为可展示的图片 URL */
 function getWishImgUrl(item: { img?: string; image?: string }) {
@@ -116,7 +127,7 @@ function getWishImgUrl(item: { img?: string; image?: string }) {
 }
 
 const props = defineProps<{
-  lotteryCatList: any[];
+  poolList: any[];
   selectedCate: any;
   wishList: { progress: number; ids: number[]; data: any[] };
   lotteryData: any;
@@ -135,9 +146,25 @@ const emit = defineEmits<{
   (e: "cate-change", value: any): void;
   (e: "lottery"): void;
   (e: "remove-wish", item: any): void;
+  (e: "open-pool"): void;
 }>();
 
 const swiperRef = ref();
+
+// 监听 selectedCate 变化，确保它在 poolList 中存在
+watch([() => props.poolList, () => props.selectedCate], ([poolList, selectedCate]) => {
+  if (poolList && poolList.length > 0 && selectedCate) {
+    // 检查当前选中的是否在列表中
+    const exists = poolList.some((item: any) => item.id === selectedCate.id);
+    if (!exists) {
+      // 如果不存在，通知父组件切换到第一个
+      emit("cate-change", poolList[0]);
+    }
+  } else if (poolList && poolList.length > 0 && !selectedCate) {
+    // 如果没有选中项，通知父组件选中第一个
+    emit("cate-change", poolList[0]);
+  }
+}, { immediate: true });
 
 function setSwiperInstance(swiper: any) {
   swiperRef.value = swiper;
@@ -145,7 +172,11 @@ function setSwiperInstance(swiper: any) {
 }
 
 function onCateChangeFromRadio(event: any) {
-  emit("cate-change", event.detail.value);
+  // event.detail.value 现在是 id，需要找到对应的完整对象
+  const selectedPool = props.poolList.find((item: any) => item.id === event.detail.value);
+  if (selectedPool) {
+    emit("cate-change", selectedPool);
+  }
 }
 </script>
 

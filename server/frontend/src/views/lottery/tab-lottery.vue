@@ -1,21 +1,6 @@
 <template>
-  <div class="">
-    <div class="flex flex-wrap items-end gap-2 mb-2">
-      <div class="flex items-center">
-        <el-text class="w-24">普通抽奖费用</el-text>
-        <el-input v-model="lotterySettingData.fee" class="w-32! ml-2" type="number" />
-      </div>
-      <div class="flex items-center">
-        <el-text class="w-28">心愿单阈值</el-text>
-        <el-input v-model.number="lotterySettingData.wish_count_threshold" class="w-32! ml-2" type="number" placeholder="5" />
-        <el-tooltip content="进度达到后下一抽仅从心愿单池抽取并清零" placement="top">
-          <el-icon class="ml-1 cursor-help text-gray-400 hover:text-gray-600"><InfoFilled /></el-icon>
-        </el-tooltip>
-      </div>
-      <el-button type="primary" @click="handleUpdateFee">更新配置</el-button>
-    </div>
-    <el-divider />
-    <div class="flex items-center">
+  <div class="p-2">
+    <div class="flex items-center h-10">
       <el-radio-group size="large" v-model="selectedCateId" class="" @change="onCateChange">
         <el-radio-button v-for="item in lotteryCatList" :key="item.id" :value="item.id">
           {{ item.name }}
@@ -91,7 +76,7 @@
       </el-table-column>
       <el-table-column label="Exchange" width="100" align="center">
         <template #default="{ row }">
-          <el-checkbox v-model="row.exchange" :true-value="1" :false-value="0" :disabled="!row.edited" />
+          <el-checkbox v-model.number="row.exchange" :true-value="1" :false-value="0" :disabled="!row.edited" />
         </template>
       </el-table-column>
       <el-table-column label="Stock" width="100" align="center">
@@ -111,13 +96,13 @@
       <el-table-column label="启用" width="80">
         <template #default="{ row }">
           <div class="flex items-center pl-2">
-            <el-checkbox v-model="row.enable" size="large" :disabled="!row.edited" />
+            <el-checkbox v-model.number="row.enable" :true-value="1" :false-value="0" :disabled="!row.edited" />
           </div>
         </template>
       </el-table-column>
       <el-table-column label="心愿单" width="80" align="center">
         <template #default="{ row }">
-          <el-checkbox v-model="row.wish" :true-value="true" :false-value="false" :disabled="!row.edited" />
+          <el-checkbox v-model.number="row.wish" :true-value="1" :false-value="0" :disabled="!row.edited" />
         </template>
       </el-table-column>
       <el-table-column label="Operations">
@@ -212,44 +197,11 @@
 import { ref, onMounted, computed } from "vue";
 import { ElMessage } from "element-plus";
 import type { UploadFile } from "element-plus";
-import { Edit, Plus, InfoFilled } from "@element-plus/icons-vue";
+import { Edit, Plus } from "@element-plus/icons-vue";
 import { getList, getData, setData, delData } from "@/api/common";
-import { getRdsData, setRdsData } from "@/api/rds";
 import { uploadPic, getPicDisplayUrl } from "@/api/pic";
 import * as _ from "lodash-es";
-
-interface Gift {
-  id: number;
-  name: string;
-  img: string;
-  cate_id: number;
-  cost: number;
-  enable: boolean;
-  exchange: number;
-  stock: number;
-  wish: boolean;
-  edited?: boolean;
-}
-
-interface GiftApiData {
-  id: number;
-  name: string;
-  image: string;
-  cate_id: number;
-  cost: number;
-  enable: number;
-  exchange?: number;
-  stock?: number;
-  wish?: number;
-}
-
-interface GiftCategory {
-  id: number;
-  name: string;
-  cost?: number;
-  edited?: boolean;
-  count?: number;
-}
+import type { Gift, GiftApiData, GiftCategory } from "@/types/lottery";
 
 const PAGE_SIZE = 10;
 const selectedCateId = ref<number>(0);
@@ -273,7 +225,6 @@ const giftList = ref<{
 });
 const lotteryCatList = ref<GiftCategory[]>([]);
 const loading = ref(false);
-const lotterySettingData = ref({ fee: 10, wish_count_threshold: 5 });
 const modifyCateModel = ref(false);
 const lotteryCatPopList = ref<GiftCategory[]>([]);
 
@@ -344,20 +295,6 @@ const refreshGiftList = async (cateId: number, pageNum: number, pageSize: number
     ElMessage.error(JSON.stringify(err));
   } finally {
     loading.value = false;
-  }
-};
-
-const handleUpdateFee = async () => {
-  try {
-    const payload = {
-      fee: lotterySettingData.value.fee,
-      wish_count_threshold: lotterySettingData.value.wish_count_threshold ?? 5,
-    };
-    await setRdsData("lottery", 2, JSON.stringify(payload));
-    ElMessage.success("已更新：普通抽奖费用、心愿单阈值");
-  } catch (error) {
-    console.error("更新配置失败:", error);
-    ElMessage.error("更新配置失败");
   }
 };
 
@@ -506,25 +443,9 @@ const handleCateCancel = (item: GiftCategory, _idx: number) => {
   }
 };
 
-const getLotterySetting = async () => {
-  try {
-    const data = await getRdsData("lottery", 2);
-    if (data) {
-      const parsed = JSON.parse(data as string);
-      lotterySettingData.value = {
-        fee: parsed.fee ?? 10,
-        wish_count_threshold: parsed.wish_count_threshold ?? 5,
-      };
-    }
-  } catch (error) {
-    console.error("获取抽奖设置失败:", error);
-  }
-};
-
 onMounted(async () => {
   await refreshCateList();
   await refreshGiftList(0, 1, PAGE_SIZE);
-  await getLotterySetting();
 });
 </script>
 

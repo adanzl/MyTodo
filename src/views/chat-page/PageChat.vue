@@ -121,7 +121,7 @@ import { Icon } from "@iconify/vue";
 import EventBus, { C_EVENT } from "@/types/EventBus";
 import { getApiUrl } from "@/api/api-client";
 import { getChatSetting, setChatSetting } from "@/api/chat";
-import { getUserList } from "@/api/user";
+import { getUserList } from "@/api/api-user";
 import { getNetworkErrorMessage } from "@/utils/NetUtil";
 import {
   createGesture,
