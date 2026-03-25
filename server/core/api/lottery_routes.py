@@ -36,17 +36,17 @@ def do_lottery() -> ResponseReturnValue:
         log.info("===== [Do Lottery] " + json.dumps(args))
 
         user_id_raw = args.get("user_id")
-        cate_id_raw = args.get("cate_id")
+        pool_id_raw = args.get("pool_id")
 
         user_id, err = _parse_int(user_id_raw, "user_id")
         if err:
             return err
 
-        cate_id, err = _parse_int(cate_id_raw, "cate_id")
+        pool_id, err = _parse_int(pool_id_raw, "pool_id")
         if err:
             return err
 
-        return lottery_mgr.do_lottery(user_id, cate_id)
+        return lottery_mgr.do_lottery(user_id, pool_id)
     except Exception as e:
         log.error(e)
         return {"code": -1, "msg": "error: " + str(e)}

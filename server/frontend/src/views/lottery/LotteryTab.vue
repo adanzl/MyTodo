@@ -132,7 +132,7 @@
   <el-dialog v-model="modifyCateModel" title="类别管理" width="800" destroy-on-close>
     <el-table :data="lotteryCatPopList">
       <el-table-column property="id" label="ID" width="50" />
-      <el-table-column property="name" label="Name" width="100">
+      <el-table-column property="name" label="Name" width="150">
         <template #default="{ row }">
           <div class="flex items-center">
             <template v-if="row.edited">
@@ -141,32 +141,6 @@
             </template>
             <template v-else>
               <span> {{ row.name }} </span>
-            </template>
-          </div>
-        </template>
-      </el-table-column>
-      <el-table-column property="cost" label="Cost" width="150">
-        <template #default="{ row }">
-          <div class="flex items-center">
-            <template v-if="row.edited">
-              <el-input v-model="row.cost" size="small" clearable
-                @blur="handleCateBlur(row, 'cost', lotteryCatPopList.indexOf(row))" />
-            </template>
-            <template v-else>
-              <span> {{ row.cost }} </span>
-            </template>
-          </div>
-        </template>
-      </el-table-column>
-      <el-table-column label="中奖数量" width="100">
-        <template #default="{ row }">
-          <div class="flex items-center">
-            <template v-if="row.edited">
-              <el-input v-model="row.count" size="small" clearable
-                @blur="handleCateBlur(row, 'count', lotteryCatPopList.indexOf(row))" />
-            </template>
-            <template v-else>
-              <span> {{ row.count }} </span>
             </template>
           </div>
         </template>
@@ -245,8 +219,6 @@ const refreshCateList = async () => {
         lotteryCatPopList.value.push({
           id: item.id,
           name: item.name,
-          cost: item.cost,
-          count: item.count,
           edited: false,
         });
       });
@@ -409,8 +381,6 @@ const handleCateSave = async (item: GiftCategory, _idx: number) => {
     const data = {
       id: item.id,
       name: item.name,
-      cost: item.cost,
-      count: item.count,
     };
     await setData("t_gift_category", data);
     await refreshCateList();
@@ -437,7 +407,6 @@ const handleCateEdit = (item: GiftCategory) => {
 const handleCateCancel = (item: GiftCategory, _idx: number) => {
   if (item.id === -1) {
     item.name = "";
-    item.cost = 0;
   } else {
     item.edited = false;
   }

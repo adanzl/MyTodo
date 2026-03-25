@@ -54,7 +54,7 @@ class DbMgr:
         db_obj.init_app(app)
         self._initialized = True
 
-    def set_save(self, id: Optional[int], user_name: str, data: str) -> Dict[str, Any]:
+    def set_save(self, id: Optional[int], user_name: Optional[str], data: str) -> Dict[str, Any]:
         """
         保存或更新用户数据到 t_user_save 表。
         如果 id 存在，则更新；否则插入新记录。
@@ -87,6 +87,35 @@ class DbMgr:
             traceback.print_exc()
             return {"code": DB_CODE_ERROR, "msg": 'error ' + str(e)}
         return {"code": DB_CODE_SUCCESS, "msg": "ok", "data": id}
+
+    def get_save(self, id: Optional[int]) -> Dict[str, Any]:
+        """
+        根据 id 从 t_user_save 表获取用户保存的数据。
+        """
+        if id is None:
+            return {"code": DB_CODE_ERROR, "msg": "id is None"}
+        try:
+            metadata = MetaData()
+            table_obj = Table(TABLE_SAVE, metadata, autoload_with=db_obj.engine)
+            stmt = select(table_obj).where(table_obj.c.id == id)
+            result = db_obj.session.execute(stmt).fetchone()
+            if result:
+                # 获取所有列名
+                columns = [col.name for col in table_obj.columns]
+                data = dict(zip(columns, result))
+                # 尝试解析 data 字段的 JSON
+                if 'data' in data and isinstance(data['data'], str):
+                    try:
+                        data['data'] = json.loads(data['data'])
+                    except:
+                        pass
+            else:
+                data = {}
+        except Exception as e:
+            log.error(e)
+            traceback.print_exc()
+            return {"code": DB_CODE_ERROR, "msg": 'error ' + str(e)}
+        return {"code": DB_CODE_SUCCESS, "msg": "ok", "data": data}
 
     def get_data_idx(self, table: str, id: int, idx: int = 1) -> Dict[str, Any]:
         """根据 id 从指定表获取单个字段的数据。"""

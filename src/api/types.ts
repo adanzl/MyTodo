@@ -125,7 +125,7 @@ export interface GiftItem {
 /** doLottery 请求体 */
 export interface DoLotteryBody {
   user_id: number;
-  cate_id: number;
+  pool_id: number;
 }
 
 /** doLottery 返回：含 gift 信息 */

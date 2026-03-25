@@ -42,15 +42,9 @@ export async function getGiftData(id: number): Promise<GiftItem> {
   return rsp.data.data!;
 }
 
-export async function doLottery(
-  userId: number,
-  cateId: number
-): Promise<DoLotteryResult> {
-  const body: DoLotteryBody = { user_id: userId, cate_id: cateId };
-  const rsp = await apiClient.post<ApiResponse<DoLotteryResult>>(
-    "/doLottery",
-    body
-  );
+export async function doLottery(userId: number, poolId: number): Promise<DoLotteryResult> {
+  const body: DoLotteryBody = { user_id: userId, pool_id: poolId };
+  const rsp = await apiClient.post<ApiResponse<DoLotteryResult>>("/doLottery", body);
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
   }

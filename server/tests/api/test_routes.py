@@ -95,14 +95,14 @@ def test_write_log_ok_and_exception(client, monkeypatch):
 
 
 def test_get_save_ok(client, monkeypatch):
-    routes.db_mgr.get_save.return_value = {"code": 0, "data": {"id": 1, "content": "test"}}
+    routes.db_mgr.get_save.return_value = {"code": 0, "data": {"id": 1, "content": "test"}}  # type: ignore
 
     response = client.get('/getSave?id=1')
     assert response.status_code == 200
     data = response.get_json()
     assert data["code"] == 0
     assert data["data"]["content"] == "test"
-    routes.db_mgr.get_save.assert_called_once_with(1)
+    routes.db_mgr.get_save.assert_called_once_with(1)  # type: ignore
 
 
 def test_get_save_invalid_id(client):
@@ -114,14 +114,14 @@ def test_get_save_invalid_id(client):
 
 
 def test_set_save_ok(client, monkeypatch):
-    routes.db_mgr.set_save.return_value = {"code": 0}
+    routes.db_mgr.set_save.return_value = {"code": 0}  # type: ignore
 
     payload = {"id": 1, "user": "testuser", "data": {"key": "value"}}
     response = client.post('/setSave', json=payload)
 
     assert response.status_code == 200
     assert response.get_json()["code"] == 0
-    routes.db_mgr.set_save.assert_called_once_with(1, "testuser", '{"key": "value"}')
+    routes.db_mgr.set_save.assert_called_once_with(1, "testuser", '{"key": "value"}')  # type: ignore
 
 
 def test_set_save_missing_id(client):
@@ -132,12 +132,12 @@ def test_set_save_missing_id(client):
 
 
 def test_get_all_fields_split(client, monkeypatch):
-    routes.db_mgr.get_list.return_value = {"code": 0, "data": {"data": []}}
+    routes.db_mgr.get_list.return_value = {"code": 0, "data": {"data": []}}  # type: ignore
 
     resp = client.get('/getAll?table=t&pageNum=1&pageSize=2&fields=a,b&conditions=' + json.dumps({"x": 1}))
     assert resp.status_code == 200
-    routes.db_mgr.get_list.assert_called_once()
-    args, kwargs = routes.db_mgr.get_list.call_args
+    routes.db_mgr.get_list.assert_called_once()  # type: ignore
+    args, kwargs = routes.db_mgr.get_list.call_args  # type: ignore
     assert args[0] == 't'
     assert args[1] == 1
     assert args[2] == 2
@@ -154,33 +154,33 @@ def test_get_data_invalid_id(client):
 
 
 def test_get_data_fields_none_uses_data_idx(client, monkeypatch):
-    routes.db_mgr.get_data_idx.return_value = {"code": 0}
+    routes.db_mgr.get_data_idx.return_value = {"code": 0}  # type: ignore
 
     resp = client.get('/getData?table=t&id=1&idx=2')
     assert resp.status_code == 200
-    routes.db_mgr.get_data_idx.assert_called_once_with('t', 1, 2)
+    routes.db_mgr.get_data_idx.assert_called_once_with('t', 1, 2)  # type: ignore
 
 
 def test_get_data_fields_non_none_uses_get_data(client, monkeypatch):
-    routes.db_mgr.get_data.return_value = {"code": 0}
+    routes.db_mgr.get_data.return_value = {"code": 0}  # type: ignore
 
     resp = client.get('/getData?table=t&id=1&fields=a')
     assert resp.status_code == 200
-    routes.db_mgr.get_data.assert_called_once_with('t', 1, 'a')
+    routes.db_mgr.get_data.assert_called_once_with('t', 1, 'a')  # type: ignore
 
 
 def test_set_data_ok(client, monkeypatch):
-    routes.db_mgr.set_data.return_value = {"code": 0}
+    routes.db_mgr.set_data.return_value = {"code": 0}  # type: ignore
     resp = client.post('/setData', json={"table": "t", "data": []})
     assert resp.status_code == 200
-    routes.db_mgr.set_data.assert_called_once_with('t', [])
+    routes.db_mgr.set_data.assert_called_once_with('t', [])  # type: ignore
 
 
 def test_del_data_ok(client, monkeypatch):
-    routes.db_mgr.del_data.return_value = {"code": 0}
+    routes.db_mgr.del_data.return_value = {"code": 0}  # type: ignore
     resp = client.post('/delData', json={"table": "t", "id": 1})
     assert resp.status_code == 200
-    routes.db_mgr.del_data.assert_called_once_with('t', 1)
+    routes.db_mgr.del_data.assert_called_once_with('t', 1)  # type: ignore
 
 
 def test_del_data_invalid_id(client):
@@ -205,7 +205,7 @@ def test_query_no_sql(client):
 
 
 def test_get_rds_data_ok_and_exception(client, monkeypatch):
-    routes.rds_mgr.get_str.return_value = "v"
+    routes.rds_mgr.get_str.return_value = "v"  # type: ignore
     resp = client.get('/getRdsData?table=t&id=1')
     assert resp.status_code == 200
     assert resp.json["code"] == 0
@@ -217,15 +217,15 @@ def test_get_rds_data_ok_and_exception(client, monkeypatch):
 
 
 def test_get_rds_list_total_zero(client, monkeypatch):
-    routes.rds_mgr.llen.return_value = 0
+    routes.rds_mgr.llen.return_value = 0  # type: ignore
     resp = client.get('/getRdsList?key=k')
     assert resp.status_code == 200
     assert resp.json["data"]["totalCount"] == 0
 
 
 def test_get_rds_list_total_nonzero(client, monkeypatch):
-    routes.rds_mgr.llen.return_value = 5
-    routes.rds_mgr.lrange.return_value = ['a']
+    routes.rds_mgr.llen.return_value = 5  # type: ignore
+    routes.rds_mgr.lrange.return_value = ['a']  # type: ignore
     resp = client.get('/getRdsList?key=k&pageSize=2&startId=-1')
     assert resp.status_code == 200
     assert resp.json["code"] == 0
@@ -251,7 +251,7 @@ def test_set_rds_data_ok_and_exception(client):
 
 
 def test_chat_messages_ok_and_exception(client, monkeypatch):
-    routes.AILocal.get_chat_messages.return_value = []
+    routes.AILocal.get_chat_messages.return_value = []  # type: ignore
     resp = client.get('/chatMessages?conversation_id=c')
     assert resp.status_code == 200
     assert resp.json["code"] == 0
@@ -269,7 +269,7 @@ def test_route_index_ok(client, monkeypatch):
 
 
 def test_add_score_ok_and_invalid_user(client, monkeypatch):
-    routes.db_mgr.add_score.return_value = {"code": 0}
+    routes.db_mgr.add_score.return_value = {"code": 0}  # type: ignore
     resp = client.post('/addScore', json={"user": 1, "value": 1, "action": "a", "msg": "m"})
     assert resp.status_code == 200
 
@@ -286,38 +286,55 @@ def test_do_lottery_paths(client, monkeypatch):
     monkeypatch.setattr(lottery_mgr_mod.lottery_mgr, "_rds", mock_rds)
 
     # user not found
-    mock_db.get_data.return_value = {"code": -1}
-    resp = client.post('/doLottery', json={"user_id": 1, "cate_id": 1})
+    mock_db.get_data.return_value = {"code": -1}  # type: ignore
+    resp = client.post('/doLottery', json={"user_id": 1, "pool_id": 1})
     assert resp.status_code == 200
     assert resp.json["msg"] == "User not found"
 
-    # cate_id==0 no lottery data
-    mock_db.get_data.return_value = {"code": 0, "data": {"score": 100}}
+    # pool_id==0 no lottery data
+    mock_db.get_data.return_value = {"code": 0, "data": {"score": 100}}  # type: ignore
     mock_rds.get_str.return_value = None
-    resp = client.post('/doLottery', json={"user_id": 1, "cate_id": 0})
+    resp = client.post('/doLottery', json={"user_id": 1, "pool_id": 0})
     assert resp.status_code == 200
     assert resp.json["msg"] == "No lottery data"
 
     # cate_id==0 insufficient score
-    mock_rds.get_str.return_value = json.dumps({"fee": 10})
-    mock_db.get_data.return_value = {"code": 0, "data": {"score": 0}}
+    mock_rds.get_str.return_value = json.dumps({"fee": 10})  # type: ignore
+    mock_db.get_data.return_value = {"code": 0, "data": {"score": 0}}  # type: ignore
     resp = client.post('/doLottery', json={"user_id": 1, "cate_id": 0})
     assert resp.json["msg"] == "Not enough score"
 
     # cate_id!=0 category not found
-    mock_db.get_data.side_effect = [
-        {"code": 0, "data": {"score": 100}},
-        {"code": -1},
+    mock_db.get_data.side_effect = [  # type: ignore
+        {
+            "code": 0,
+            "data": {
+                "score": 100
+            }
+        },
+        {
+            "code": -1
+        },
     ]
     resp = client.post('/doLottery', json={"user_id": 1, "cate_id": 2})
     assert resp.json["msg"] == "Category not found"
 
     # cate_id!=0 no gifts
-    mock_db.get_data.side_effect = [
-        {"code": 0, "data": {"score": 100}},
-        {"code": 0, "data": {"cost": 10}},
+    mock_db.get_data.side_effect = [  # type: ignore
+        {
+            "code": 0,
+            "data": {
+                "score": 100
+            }
+        },
+        {
+            "code": 0,
+            "data": {
+                "cost": 10
+            }
+        },
     ]
-    mock_db.get_list.return_value = {"code": 0, "data": {"data": []}}
+    mock_db.get_list.return_value = {"code": 0, "data": {"data": []}}  # type: ignore
     resp = client.post('/doLottery', json={"user_id": 1, "cate_id": 2})
     assert resp.json["msg"] == "No available gifts"
 

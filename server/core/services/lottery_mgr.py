@@ -19,11 +19,11 @@ class LotteryMgr:
         self._db = db_mgr
         self._rds = rds_mgr
 
-    def do_lottery(self, user_id: int, cate_id: int) -> Dict[str, Any]:
+    def do_lottery(self, user_id: int, pool_id: int) -> Dict[str, Any]:
         """
         执行一次抽奖。每次抽均发奖。
         当 t_user.wish_progress 达到配置阈值后，本抽仅从心愿单池抽取，抽完后 wish_progress 清零；否则从全池抽取。
-        读取 category 的 count 字段，抽取 count 次，统一记录日志并返回。
+        读取 pool 的 cate_list 字段获取分类 ID 列表，从这些分类中抽取礼物，抽取 count 次，统一记录日志并返回。
         """
         # ========== 阶段 1：查询和校验 ==========
         user_data = self._db.get_data('t_user', user_id, "id,score,wish_progress,wish_list")
@@ -35,16 +35,16 @@ class LotteryMgr:
         wish_progress = int(ud.get('wish_progress')) or 0
         wish_list_str = ud.get('wish_list') or '[]'
 
-        # 获取抽奖配置
-        cate_cost, wish_threshold, draw_count = self._get_cost_wish_threshold_and_count(cate_id)
-        if cate_cost is None:
+        # 获取奖池配置（从 t_gift_pool 获取）
+        pool_cost, wish_threshold, draw_count, cate_ids = self._get_pool_config(pool_id)
+        if pool_cost is None:
             return {
                 "code": -1,
-                "msg": "No lottery data" if cate_id == 0 else "Category not found",
+                "msg": "No lottery data" if pool_id == 0 else "Pool not found",
             }
 
         # 校验积分（只扣一次费用）
-        if user_score < cate_cost:
+        if user_score < pool_cost:
             return {"code": -1, "msg": "Not enough score"}
 
         # ========== 阶段 2：执行抽奖 ==========
@@ -57,7 +57,7 @@ class LotteryMgr:
         # 步骤 1：判断是否心愿单抽奖
         if wish_progress >= wish_threshold:
             # 步骤 1.1：拉取心愿单内可抽奖数据
-            wish_pool = self._get_wish_pool(user_id, cate_id, wish_list_str)
+            wish_pool = self._get_wish_pool(user_id, wish_list_str)
 
             if wish_pool:
                 # 抽 1 个心愿单奖品
@@ -79,7 +79,7 @@ class LotteryMgr:
         remaining_draws = draw_count - len(won_gifts)
 
         if remaining_draws > 0:
-            full_pool = self._get_full_pool(cate_id)
+            full_pool = self._get_full_pool_by_categories(cate_ids)
             if not full_pool:
                 return {"code": -1, "msg": "No available gifts"}
 
@@ -123,7 +123,7 @@ class LotteryMgr:
 
         add_ret = self._db.add_score(
             user_id,
-            -cate_cost,  # 只扣一次费用
+            -pool_cost,  # 只扣一次费用
             'lottery',
             f"获得 {gift_info}",
             out_key=out_key_str,
@@ -137,7 +137,7 @@ class LotteryMgr:
         self._db.set_data('t_user', {'id': user_id, 'wish_progress': cur_progress})
 
         # ========== 阶段 5：记录日志并返回 ==========
-        log.info(f"Lottery success: user_id={user_id}, out_keys=[{out_key_str}], fee={cate_cost}")
+        log.info(f"Lottery success: user_id={user_id}, out_keys=[{out_key_str}], fee={pool_cost}")
 
         return {
             "code": 0,
@@ -145,40 +145,59 @@ class LotteryMgr:
             "data": {
                 "gift": won_gifts[0] if won_gifts else None,  # 兼容旧客户端
                 "gifts": won_gifts,
-                "fee": cate_cost,  # 单次费用
-                "single_fee": cate_cost,
+                "fee": pool_cost,  # 单次费用
+                "single_fee": pool_cost,
                 "count": len(won_gifts),
                 "won": True,
             },
         }
 
-    def _get_cost_wish_threshold_and_count(self, cate_id: int) -> tuple:
-        """返回 (费用，心愿单满额阈值，抽取次数)。cate_id==0 从 rds lottery:2 读 fee、wish_count_threshold；否则从 t_gift_category 读 cost、count，阈值默认 5。"""
+    def _get_pool_config(self, pool_id: int) -> tuple:
+        """
+        返回 (费用，心愿单满额阈值，抽取次数，分类 ID 列表)。
+        pool_id==0 从 rds lottery:2 读 fee、wish_count_threshold；
+        否则从 t_gift_pool 读 cost、count、cate_list。
+        Args:
+            pool_id: int - 奖池 ID
+        
+        Returns:
+            tuple: (费用，心愿单满额阈值，抽取次数，分类 ID 列表)
+        """
         default_threshold = 5
         default_count = 1
-        if cate_id == 0:
+        if pool_id == 0:
             raw = self._rds.get_str("lottery:2")
             if not raw:
-                return None, default_threshold, default_count
+                return None, default_threshold, default_count, []
             try:
                 cfg = json.loads(raw)
             except Exception:
-                return None, default_threshold, default_count
+                return None, default_threshold, default_count, []
             fee = cfg.get('fee')
             if fee is None:
-                return None, default_threshold, default_count
+                return None, default_threshold, default_count, []
             t = cfg.get('wish_count_threshold', default_threshold)
             t = max(1, int(t)) if isinstance(t, (int, float)) else default_threshold
             count = cfg.get('count', default_count)
             count = max(1, int(count)) if isinstance(count, (int, float)) else default_count
-            return fee, t, count
-        cat = self._db.get_data('t_gift_category', cate_id, "id,name,cost,count")
-        if cat.get('code') != 0:
-            return None, default_threshold, default_count
-        cat_data = cat['data']
-        count = cat_data.get('count', default_count)
+            return fee, t, count, []
+
+        pool = self._db.get_data('t_gift_pool', pool_id, "id,name,cost,count,cate_list")
+        if pool.get('code') != 0:
+            return None, default_threshold, default_count, []
+        pool_data = pool['data']
+        count = pool_data.get('count', default_count)
         count = max(1, int(count)) if isinstance(count, (int, float)) else default_count
-        return cat_data['cost'], default_threshold, count
+
+        # 解析 cate_list 字段（逗号分隔的字符串）为分类 ID 列表
+        cate_list_str = pool_data.get('cate_list') or ''
+        cate_ids = []
+        if cate_list_str and cate_list_str.strip():
+            cate_ids = [
+                int(x.strip()) for x in cate_list_str.split(',') if x.strip() and x.strip().lstrip('-').isdigit()
+            ]
+
+        return pool_data['cost'], default_threshold, count, cate_ids
 
     def _parse_wish_list_ids(self, wish_list_str: str) -> list:
         """将 t_user.wish_list（JSON 数组字符串，如 '[1,2,3]'）解析为礼物 id 列表。"""
@@ -192,23 +211,34 @@ class LotteryMgr:
             return []
         return [int(x) for x in arr if isinstance(x, (int, float)) and int(x) == x]
 
-    def _get_full_pool(self, cate_id: int) -> list:
-        """获取当前分类下的全量可用奖池（enable=1, stock>0）。"""
+    def _get_full_pool_by_categories(self, cate_ids: list) -> list:
+        """根据分类 ID 列表获取全量可用奖池（enable=1, stock>0）。"""
         cond = {'enable': 1, 'stock': ('>', 0)}
-        if cate_id != 0:
-            cond['cate_id'] = cate_id
-        res = self._db.get_list('t_gift', 1, 200, '*', cond)
+        if cate_ids:
+            # 直接在数据库查询时筛选分类
+            cond['cate_id'] = ('in', cate_ids)
+
+        res = self._db.get_list('t_gift', 1, 500, '*', cond)
         if res.get('code') != 0:
             return []
         return (res.get('data') or {}).get('data') or []
 
-    def _get_wish_pool(self, user_id: int, cate_id: int, wish_list_str: str) -> list:
-        """根据 t_user.wish_list 从全池中筛出用户心愿单内的可用礼物。"""
+    def _get_wish_pool(self, user_id: int, wish_list_str: str) -> list:
+        """根据 t_user.wish_list 筛出用户心愿单内的可用礼物（enable=1, stock>0）。"""
         ids = self._parse_wish_list_ids(wish_list_str)
         if not ids:
             return []
-        full = self._get_full_pool(cate_id)
-        return [g for g in full if g.get('id') in ids]
+        
+        # 直接从数据库查询心愿单中的礼物，不需要限制分类
+        cond = {
+            'enable': 1,
+            'stock': ('>', 0),
+            'id': ('in', ids)
+        }
+        res = self._db.get_list('t_gift', 1, len(ids), '*', cond)
+        if res.get('code') != 0:
+            return []
+        return (res.get('data') or {}).get('data') or []
 
     def _try_deduct_stock(self, gift_id: int) -> tuple[bool, bool]:
         """

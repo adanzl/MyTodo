@@ -99,7 +99,7 @@ def playlist_play() -> ResponseReturnValue:
         if err:
             return err
 
-        ret, msg = playlist_mgr.play(pid)
+        ret, msg = playlist_mgr.play(str(pid))
         if ret != 0:
             return _err(f"播放播放列表 {pid} 失败: {msg}")
         return _ok()
@@ -117,7 +117,7 @@ def playlist_play_next() -> ResponseReturnValue:
         if err:
             return err
 
-        ret, msg = playlist_mgr.play_next(pid)
+        ret, msg = playlist_mgr.play_next(str(pid))
         if ret != 0:
             return _err(f"播放下一首失败: {msg}")
         return _ok()
@@ -135,7 +135,7 @@ def playlist_play_pre() -> ResponseReturnValue:
         if err:
             return err
 
-        ret, msg = playlist_mgr.play_pre(pid)
+        ret, msg = playlist_mgr.play_pre(str(pid))
         if ret != 0:
             return _err(f"播放上一首失败: {msg}")
         return _ok()
@@ -157,7 +157,7 @@ def playlist_play_file() -> ResponseReturnValue:
             return _err("播放列表 id 不能为空")
         if not uri or not str(uri).strip():
             return _err("文件 uri 不能为空")
-        ret, msg = playlist_mgr.play_file_on_device(pid, str(uri).strip())
+        ret, msg = playlist_mgr.play_file_on_device(str(pid), str(uri).strip())
         if ret != 0:
             return _err(msg)
         return _ok(msg)
@@ -175,7 +175,7 @@ def playlist_stop() -> ResponseReturnValue:
         if err:
             return err
 
-        ret, msg = playlist_mgr.stop(pid)
+        ret, msg = playlist_mgr.stop(str(pid))
         if ret != 0:
             return _err(f"停止播放失败: {msg}")
         return _ok()

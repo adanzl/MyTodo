@@ -117,6 +117,8 @@ def get_all() -> ResponseReturnValue:
     conditions_str = request.args.get('conditions')
     conditions = json.loads(conditions_str) if conditions_str else None
     table = request.args.get('table')
+    if table is None:
+        return {"code": -1, "msg": "table is required"}
     # log.info("===== [Get All Data] " + json.dumps(request.args))
     if fields != '*':
         fields = fields.split(',')
@@ -134,7 +136,8 @@ def get_data() -> ResponseReturnValue:
     data_id, err = _parse_int(raw_id, 'id')
     if err:
         return err
-
+    if table is None or data_id is None:
+        return {"code": -1, "msg": "table or id is required"}
     if fields is None:
         return db_mgr.get_data_idx(table, data_id, idx)
     else:
@@ -150,6 +153,8 @@ def set_data() -> ResponseReturnValue:
     args: Dict[str, Any] = read_json_from_request()
     table = args.get('table')
     data = args.get('data')
+    if table is None or data is None:
+        return {"code": -1, "msg": "table or data is required"}
     log.info(
         f"===== [Set Data] {table}: {len(data) if hasattr(data, '__len__') else 0}"
     )
@@ -164,6 +169,9 @@ def del_data() -> ResponseReturnValue:
 
     raw_id = args.get('id')
     data_id, err = _parse_int(raw_id, 'id')
+    
+    if table is None or data_id is None:
+        return {"code": -1, "msg": "table or id is required"}
     if err:
         return err
 
@@ -203,6 +211,8 @@ def get_rds_list() -> ResponseReturnValue:
         log.info(
             f"===== [Get Rds List] {key}, pageSize={page_size}, startId={start_id}"
         )
+        if key is None:
+            return {"code": -1, "msg": "key is required"}
 
         total = rds_mgr.llen(key)
         if total == 0:
@@ -244,6 +254,8 @@ def set_rds_data() -> ResponseReturnValue:
         args: Dict[str, Any] = read_json_from_request()
         table = args.get('table')
         data = args.get('data')
+        if table is None or data is None:
+            return {"code": -1, "msg": "table or data is required"}
         log.info(
             f"===== [Set rds Data] {table}: {len(data) if hasattr(data, '__len__') else 0}"
         )
@@ -292,6 +304,8 @@ def add_score() -> ResponseReturnValue:
     value = args.get('value')
     action = args.get('action')
     msg = args.get('msg')
+    if value is None or action is None or user_id is None:
+        return {"code": -1, "msg": "value or action or user_id is required"}
     return db_mgr.add_score(user_id, value, action, msg)
 
 

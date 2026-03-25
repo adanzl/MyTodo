@@ -58,7 +58,5 @@ export interface GiftApiData {
 export interface GiftCategory {
   id: number;
   name: string;
-  cost?: number;
   edited?: boolean;
-  count?: number;
 }
