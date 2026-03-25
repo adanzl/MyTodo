@@ -2,7 +2,7 @@
  * 一个月的数据模型
  */
 import dayjs, { type Dayjs } from "dayjs";
-import type { DayData } from "./day-data";
+import type { DayData } from "./dayData";
 
 // 一个月的数据
 export class MonthData {

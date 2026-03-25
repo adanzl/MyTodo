@@ -273,13 +273,13 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Refresh, Plus, Document, Delete, Check, Minus } from "@element-plus/icons-vue";
-import FileDialog from "@/views/dialogs/file-dialog.vue";
-import MediaComponent from "@/components/media-component.vue";
+import FileDialog from "@/views/dialogs/FileDialog.vue";
+import MediaComponent from "@/components/MediaComponent.vue";
 import { formatSize } from "@/utils/format";
 import { getMediaFileUrl } from "@/utils/file";
 import { logAndNoticeError } from "@/utils/error";
-import { useAudioPlayer } from "@/composables/use-audio-player";
-import { useControllableInterval } from "@/composables/use-interval";
+import { useAudioPlayer } from "@/composables/useAudioPlayer";
+import { useControllableInterval } from "@/composables/useInterval";
 import { MEDIA_TASK_POLLING_INTERVAL } from "@/constants/media";
 import type { MediaTaskDetail, MediaFile } from "@/types/tools";
 import {
@@ -294,7 +294,7 @@ import {
   getMediaTaskDownloadUrl,
   saveMediaTaskResult,
   type MediaTask,
-} from "@/api/audio-merge";
+} from "@/api/audioMerge";
 
 // 音频合成相关状态
 const audioMergeLoading = ref(false);

@@ -2,7 +2,7 @@
  * 日程计划数据模型
  */
 import dayjs, { type Dayjs } from "dayjs";
-import { RepeatData } from "./repeat-data";
+import { RepeatData } from "./repeatData";
 import { Subtask } from "./subtask";
 
 // 日程计划数据

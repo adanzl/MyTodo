@@ -8,42 +8,42 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/home",
     name: "Home",
-    component: () => import("@/views/home.vue"),
+    component: () => import("@/views/PageHome.vue"),
   },
   {
     path: "/lottery",
     name: "Lottery",
-    component: () => import("@/views/lottery/index.vue"),
+    component: () => import("@/views/lottery/PageLottery.vue"),
   },
   {
     path: "/info",
     name: "Info",
-    component: () => import("@/views/my-todo/info.vue"),
+    component: () => import("@/views/my-todo/PageInfo.vue"),
   },
   {
     path: "/chat",
     name: "Chat",
-    component: () => import("@/views/my-todo/chat.vue"),
+    component: () => import("@/views/my-todo/PageChat.vue"),
   },
   {
     path: "/score",
     name: "Score",
-    component: () => import("@/views/my-todo/score.vue"),
+    component: () => import("@/views/my-todo/PageScore.vue"),
   },
   {
     path: "/timetable",
     name: "Timetable",
-    component: () => import("@/views/timetable.vue"),
+    component: () => import("@/views/PageTimetable.vue"),
   },
   {
     path: "/media",
     name: "Media",
-    component: () => import("@/views/media/index.vue"),
+    component: () => import("@/views/media/PageMedia.vue"),
   },
   {
     path: "/tools",
     name: "Tools",
-    component: () => import("@/views/tools/index.vue"),
+    component: () => import("@/views/tools/PageTools.vue"),
   },
 ];
 

@@ -61,7 +61,7 @@ declare module 'vue' {
     IIonChevronExpandSharp: typeof import('~icons/ion/chevron-expand-sharp')['default']
     IIonVolumeMediumOutline: typeof import('~icons/ion/volume-medium-outline')['default']
     IMdiStopCircleOutline: typeof import('~icons/mdi/stop-circle-outline')['default']
-    MediaComponent: typeof import('./src/components/media-component.vue')['default']
+    MediaComponent: typeof import('./src/components/MediaComponent.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
   }

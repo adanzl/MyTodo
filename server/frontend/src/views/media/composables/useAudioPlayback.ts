@@ -3,7 +3,7 @@
  * 处理浏览器内音频播放相关功能
  */
 import { ElMessage } from "element-plus";
-import { useAudioPlayer } from "@/composables/use-audio-player";
+import { useAudioPlayer } from "@/composables/useAudioPlayer";
 import { getMediaFileUrl } from "@/utils/file";
 import { logAndNoticeError } from "@/utils/error";
 import type { MediaFile } from "@/types/tools";

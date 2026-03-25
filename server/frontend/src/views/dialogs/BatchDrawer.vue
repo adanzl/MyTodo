@@ -195,7 +195,7 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import { Plus, Delete, Edit, Check, Minus } from "@element-plus/icons-vue";
 import { getRdsData, setRdsData } from "@/api/rds";
 import { logAndNoticeError } from "@/utils";
-import FileDialog from "@/views/dialogs/file-dialog.vue";
+import FileDialog from "@/views/dialogs/FileDialog.vue";
 
 import type { PlaylistItem, Playlist } from "@/types/playlist";
 import type { FileItem } from "@/types/tools/file";

@@ -4,11 +4,11 @@
 import dayjs, { type Dayjs } from "dayjs";
 import * as _ from "lodash-es";
 import { getUserInfo, setUserInfo } from "@/api/user";
-import { ScheduleData } from "../schedule/schedule-data";
+import { ScheduleData } from "../schedule/scheduleData";
 import { Subtask } from "../schedule/subtask";
 import { S_TS } from "@/utils/date";
-import type { UserData } from "./user-data";
-import type { ScheduleSave } from "../schedule/schedule-save";
+import type { UserData } from "./userData";
+import type { ScheduleSave } from "../schedule/scheduleSave";
 
 export class UData {
   static CmpScheduleData(

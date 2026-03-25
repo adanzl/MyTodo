@@ -568,12 +568,12 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Refresh, Plus, Delete, Edit, Close, Picture, Download } from "@element-plus/icons-vue";
-import MediaComponent from "@/components/media-component.vue";
+import MediaComponent from "@/components/MediaComponent.vue";
 import { getMediaFileUrl } from "@/utils/file";
 import { logAndNoticeError } from "@/utils/error";
 import { formatDuration } from "@/utils/format";
-import { useAudioPlayer } from "@/composables/use-audio-player";
-import { useControllableInterval } from "@/composables/use-interval";
+import { useAudioPlayer } from "@/composables/useAudioPlayer";
+import { useControllableInterval } from "@/composables/useInterval";
 import { MEDIA_TASK_POLLING_INTERVAL } from "@/constants/media";
 import type { TTSTask } from "@/types/tools/tts";
 import type { MediaFile } from "@/types/tools";
@@ -1552,6 +1552,7 @@ onUnmounted(() => {
   height: 100%;
   min-height: 0;
 }
+
 .tts-textarea-wrapper :deep(.el-textarea__inner) {
   height: 100% !important;
   max-height: 100%;

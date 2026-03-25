@@ -168,8 +168,8 @@ import { getWeekdayIndex } from "@/utils/date";
 import { calculateFilesTotalDuration } from "@/utils/file";
 import type { MediaFile } from "@/types/tools";
 import type { PlaylistStatus } from "@/types/playlist";
-import PreFilesList from "./pre-files-list.vue";
-import FilesList from "./files-list.vue";
+import PreFilesList from "./PreFilesList.vue";
+import FilesList from "./FilesList.vue";
 
 interface Props {
   playlistStatus: PlaylistStatus | null;
@@ -188,7 +188,7 @@ interface Props {
   playing: boolean;
   stopping: boolean;
   showMoreActions: boolean;
-  audioPlayer: ReturnType<typeof import("@/composables/use-audio-player").useAudioPlayer>;
+  audioPlayer: ReturnType<typeof import("@/composables/useAudioPlayer").useAudioPlayer>;
 }
 
 const props = defineProps<Props>();

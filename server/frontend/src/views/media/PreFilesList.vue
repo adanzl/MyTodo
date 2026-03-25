@@ -9,12 +9,11 @@
           <el-button
             v-for="(day, index) in ['周一', '周二', '周三', '周四', '周五', '周六', '周日']"
             :key="index"
-            :type="
-              selectedWeekdayIndex === index ||
+            :type="selectedWeekdayIndex === index ||
               (selectedWeekdayIndex === null && getWeekdayIndex() === index)
-                ? 'primary'
-                : 'default'
-            "
+              ? 'primary'
+              : 'default'
+              "
             size="small"
             plain
             @click="$emit('select-weekday', index)"
@@ -39,8 +38,8 @@
           共 {{ getCurrentPreFiles().length }} 首， 当前:
           {{
             playlistStatus?.pre_index !== undefined &&
-            playlistStatus.pre_index !== null &&
-            playlistStatus.pre_index >= 0
+              playlistStatus.pre_index !== null &&
+              playlistStatus.pre_index >= 0
               ? playlistStatus.pre_index + 1
               : "-"
           }}
@@ -61,9 +60,8 @@
           size="small"
           plain
           @click="$emit('open-file-browser')"
-          :disabled="
-            !playlistStatus || preFilesDragMode || preFilesBatchDeleteMode || playlistLoading
-          "
+          :disabled="!playlistStatus || preFilesDragMode || preFilesBatchDeleteMode || playlistLoading
+            "
         >
           +
         </el-button>
@@ -73,13 +71,12 @@
           plain
           class="w-8! h-6!"
           @click="$emit('toggle-drag-mode')"
-          :disabled="
-            !playlistStatus ||
+          :disabled="!playlistStatus ||
             !getCurrentPreFiles() ||
             getCurrentPreFiles().length === 0 ||
             preFilesBatchDeleteMode ||
             playlistLoading
-          "
+            "
           :title="preFilesDragMode ? '点击退出拖拽排序模式' : '点击进入拖拽排序模式'"
         >
           <el-icon v-if="preFilesDragMode"><Check /></el-icon>
@@ -91,13 +88,12 @@
           plain
           class="w-8! h-6!"
           @click="$emit('toggle-batch-delete-mode')"
-          :disabled="
-            !playlistStatus ||
+          :disabled="!playlistStatus ||
             !getCurrentPreFiles() ||
             getCurrentPreFiles().length === 0 ||
             preFilesDragMode ||
             playlistLoading
-          "
+            "
           :title="preFilesBatchDeleteMode ? '点击退出批量删除模式' : '点击进入批量删除模式'"
         >
           <el-icon v-if="preFilesBatchDeleteMode"><Check /></el-icon>
@@ -122,13 +118,12 @@
           class="w-8! h-6!"
           v-show="showMoreActions && !preFilesBatchDeleteMode"
           @click="$emit('clear')"
-          :disabled="
-            !playlistStatus ||
+          :disabled="!playlistStatus ||
             !getCurrentPreFiles() ||
             getCurrentPreFiles().length === 0 ||
             playlistLoading ||
             preFilesDragMode
-          "
+            "
           title="清空列表"
         >
           <el-icon><Delete /></el-icon>
@@ -158,7 +153,7 @@
           preFilesBatchDeleteMode && !preFilesDragMode
             ? $emit('toggle-selection', Number(index))
             : null
-        "
+          "
         @dragstart="(e: DragEvent) => $emit('drag-start', e, Number(index))"
         @dragend="(e: DragEvent) => $emit('drag-end', e)"
         @dragover.prevent="(e: DragEvent) => $emit('drag-over', e)"
@@ -308,7 +303,7 @@ import { getWeekdayIndex } from "@/utils/date";
 import { calculateFilesTotalDuration } from "@/utils/file";
 import type { MediaFile } from "@/types/tools";
 import type { PlaylistStatus } from "@/types/playlist";
-import MediaComponent from "@/components/media-component.vue";
+import MediaComponent from "@/components/MediaComponent.vue";
 
 interface Props {
   playlistStatus: PlaylistStatus | null;
@@ -319,7 +314,7 @@ interface Props {
   preFilesExpanded: boolean;
   playlistLoading: boolean;
   showMoreActions: boolean;
-  audioPlayer: ReturnType<typeof import("@/composables/use-audio-player").useAudioPlayer>;
+  audioPlayer: ReturnType<typeof import("@/composables/useAudioPlayer").useAudioPlayer>;
 }
 
 const props = defineProps<Props>();

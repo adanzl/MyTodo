@@ -1,8 +1,8 @@
 /**
  * 用户数据模型
  */
-import { ScheduleData } from "../schedule/schedule-data";
-import type { ScheduleSave } from "../schedule/schedule-save";
+import { ScheduleData } from "../schedule/scheduleData";
+import type { ScheduleSave } from "../schedule/scheduleSave";
 
 // 用户数据
 export class UserData {

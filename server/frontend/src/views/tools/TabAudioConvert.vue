@@ -290,17 +290,16 @@
               {{ convertCurrentTask.total_files ?? convertCurrentTask.progress.total ?? 0 }}
             </div>
             <el-progress
-              :percentage="
-                (convertCurrentTask.total_files ?? convertCurrentTask.progress.total ?? 0) > 0
-                  ? Math.round(
-                      ((convertCurrentTask.progress.processed ?? 0) /
-                        (convertCurrentTask.total_files ??
-                          convertCurrentTask.progress.total ??
-                          1)) *
-                        100
-                    )
-                  : 0
-              "
+              :percentage="(convertCurrentTask.total_files ?? convertCurrentTask.progress.total ?? 0) > 0
+                ? Math.round(
+                  ((convertCurrentTask.progress.processed ?? 0) /
+                    (convertCurrentTask.total_files ??
+                      convertCurrentTask.progress.total ??
+                      1)) *
+                  100
+                )
+                : 0
+                "
               :status="convertCurrentTask.status === 'processing' ? undefined : 'success'"
             />
             <div
@@ -417,9 +416,9 @@ import {
   Clock,
   InfoFilled,
 } from "@element-plus/icons-vue";
-import FileDialog from "@/views/dialogs/file-dialog.vue";
+import FileDialog from "@/views/dialogs/FileDialog.vue";
 import { logAndNoticeError } from "@/utils/error";
-import { useControllableInterval } from "@/composables/use-interval";
+import { useControllableInterval } from "@/composables/useInterval";
 import { CONVERT_TASK_POLLING_INTERVAL } from "@/constants/media";
 import type { ConvertTask } from "@/types/tools";
 import {
@@ -429,7 +428,7 @@ import {
   deleteConvertTask,
   updateConvertTask,
   startConvertTask,
-} from "@/api/audio-convert";
+} from "@/api/audioConvert";
 
 // 音频转码相关状态
 const convertLoading = ref(false);

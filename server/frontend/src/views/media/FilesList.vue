@@ -120,7 +120,7 @@ import { formatDuration } from "@/utils/format";
 import { calculateFilesTotalDuration } from "@/utils/file";
 import type { MediaFile } from "@/types/tools";
 import type { PlaylistStatus } from "@/types/playlist";
-import MediaComponent from "@/components/media-component.vue";
+import MediaComponent from "@/components/MediaComponent.vue";
 
 interface Props {
   playlistStatus: PlaylistStatus | null;
@@ -129,7 +129,7 @@ interface Props {
   selectedFileIndices: number[];
   playlistLoading: boolean;
   showMoreActions: boolean;
-  audioPlayer: ReturnType<typeof import("@/composables/use-audio-player").useAudioPlayer>;
+  audioPlayer: ReturnType<typeof import("@/composables/useAudioPlayer").useAudioPlayer>;
 }
 
 const props = defineProps<Props>();

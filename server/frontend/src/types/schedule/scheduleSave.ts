@@ -1,7 +1,7 @@
 /**
  * 日程存档数据模型
  */
-import { ScheduleData } from "./schedule-data";
+import { ScheduleData } from "./scheduleData";
 
 // 日程存档【每天】
 export class ScheduleSave {
