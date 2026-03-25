@@ -92,7 +92,7 @@ import {
   IonThumbnail,
 } from "@ionic/vue";
 import { Icon } from "@iconify/vue";
-import { getPicDisplayUrl } from "@/api/pic";
+import { getPicDisplayUrl } from "@/api/api-pic";
 import { PicDisplaySize } from "@/utils/ImgMgr";
 import { computed, inject, ref, watch } from "vue";
 import _ from "lodash";

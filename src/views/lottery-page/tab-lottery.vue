@@ -112,7 +112,7 @@ import "swiper/css/free-mode";
 import { FreeMode } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
 import { computed, inject, ref, watch } from "vue";
-import { getPicDisplayUrl } from "@/api/pic";
+import { getPicDisplayUrl } from "@/api/api-pic";
 import { PicDisplaySize } from "@/utils/ImgMgr";
 
 const globalVar: any = inject("globalVar");

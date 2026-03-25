@@ -143,7 +143,7 @@ import {
   IonToolbar,
   loadingController,
 } from "@ionic/vue";
-import { uploadPic, getPicDisplayUrl } from "@/api/pic";
+import { uploadPic, getPicDisplayUrl } from "@/api/api-pic";
 import { resizeImageToFile } from "@/utils/ImgMgr";
 import EventBus, { C_EVENT } from "@/types/EventBus";
 import { getNetworkErrorMessage } from "@/utils/NetUtil";

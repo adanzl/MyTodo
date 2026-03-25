@@ -1,6 +1,6 @@
 import LocalCache from "./LocalCache.ts";
 import { calcImgPos } from "./Math.ts";
-import { delPic, getPic, setPic, getPicDisplayUrl } from "@/api/pic";
+import { delPic, getPic, setPic, getPicDisplayUrl } from "@/api/api-pic";
 
 /** 图片展示尺寸 */
 export const PicDisplaySize = {

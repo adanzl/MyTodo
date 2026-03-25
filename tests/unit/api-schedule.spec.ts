@@ -1,7 +1,7 @@
 /**
  * api/schedule 单测：getSave、setSave、getScheduleList 成功与异常路径
  */
-import { getScheduleList, setSave } from "@/api/schedule";
+import { getScheduleList, setSave } from "@/api/api-schedule";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGet = vi.fn();

@@ -10,7 +10,6 @@ declare module 'vue' {
     AudioPreview: typeof import('./src/components/AudioPreview.vue')['default']
     CalendarCover: typeof import('./src/components/CalendarCover.vue')['default']
     CalendarTab: typeof import('./src/components/CalendarTab.vue')['default']
-    ChatSetting: typeof import('./src/components/ChatSetting.vue')['default']
     ColorMgr: typeof import('./src/components/ColorMgr.vue')['default']
     ColorPicker: typeof import('./src/components/ColorPicker.vue')['default']
     ColorSelector: typeof import('./src/components/ColorSelector.vue')['default']

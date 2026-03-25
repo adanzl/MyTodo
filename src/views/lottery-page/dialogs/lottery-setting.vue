@@ -87,7 +87,7 @@
 <script lang="ts" setup>
 import EventBus, { C_EVENT } from "@/types/EventBus";
 import { getLotteryData, getGiftAvgCost } from "@/api/api-lottery";
-import { getPicDisplayUrl } from "@/api/pic";
+import { getPicDisplayUrl } from "@/api/api-pic";
 import { getList, setData, delData } from "@/api/data";
 import { getNetworkErrorMessage } from "@/utils/NetUtil";
 import { PicDisplaySize } from "@/utils/ImgMgr";

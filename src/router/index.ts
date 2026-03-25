@@ -25,7 +25,7 @@ const routes: Array<RouteRecordRaw> = [
       },
       {
         path: 'tab3',
-        component: () => import('@/views/chat-page/PageChat.vue')
+        component: () => import('@/views/chat-page/page-chat.vue')
       },
       {
         path: 'tab4',

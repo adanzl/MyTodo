@@ -98,7 +98,7 @@ import { getColorOptions } from "@/types/ColorType";
 import { C_EVENT } from "@/types/EventBus";
 import { DayData, MonthData, ScheduleData, UData, UserData } from "@/types/UserData";
 import { LiveUpdateMgr } from "@/utils/AppUpdate";
-import { getSave } from "@/api/schedule";
+import { getSave } from "@/api/api-schedule";
 import {
   IonCol,
   IonGrid,

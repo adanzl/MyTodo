@@ -1,4 +1,4 @@
-import { getColorList } from "@/api/color";
+import { getColorList } from "@/api/api-color";
 import EventBus, { C_EVENT } from "@/types/EventBus";
 
 export interface ColorType {

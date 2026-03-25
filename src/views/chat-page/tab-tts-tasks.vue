@@ -503,7 +503,7 @@ import {
   startTtsTask,
   updateTtsTask,
   type TtsTaskItem,
-} from "@/api/tts";
+} from "@/api/api-tts";
 import type { RefresherCustomEvent } from "@ionic/vue";
 
 const props = withDefaults(

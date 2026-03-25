@@ -16,7 +16,7 @@ import {
   User,
   UserData,
 } from "@/types/UserData";
-import { getSave, setSave } from "@/api/schedule";
+import { getSave, setSave } from "@/api/api-schedule";
 import { getUserInfo } from "@/api/api-user";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import {

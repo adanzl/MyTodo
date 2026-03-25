@@ -51,7 +51,7 @@ import { Icon } from "@iconify/vue";
 import { volumeMediumOutline } from "ionicons/icons";
 import { ref } from "vue";
 import EventBus, { C_EVENT } from "@/types/EventBus";
-import { getAiChatMessages } from "@/api/chat";
+import { getAiChatMessages } from "@/api/api-chat";
 import { getNetworkErrorMessage } from "@/utils/NetUtil";
 import type { RefresherCustomEvent } from "@ionic/vue";
 

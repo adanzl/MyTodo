@@ -53,7 +53,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "json-summary", "html"],
-      include: ["src/utils/Auth.ts", "src/utils/LocalCache.ts", "src/api/user.ts", "src/api/chat.ts", "src/api/schedule.ts"],
+      include: ["src/utils/Auth.ts", "src/utils/LocalCache.ts", "src/api/user.ts", "src/api/api-chat.ts", "src/api/api-schedule.ts"],
       exclude: ["src/**/*.spec.ts", "src/**/*.d.ts", "node_modules"],
     },
   },

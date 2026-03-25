@@ -80,7 +80,7 @@
 
 <script setup lang="ts">
 import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
-import { getSave } from "@/api/schedule";
+import { getSave } from "@/api/api-schedule";
 import { getGroupOptions, getPriorityOptions } from "@/types/ScheduleType";
 import { getColorOptions } from "@/types/ColorType";
 import { S_TS, UserData } from "@/types/UserData";

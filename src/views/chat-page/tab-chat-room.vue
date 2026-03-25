@@ -49,7 +49,7 @@ import {
 } from "@ionic/vue";
 import { computed, ref, watch } from "vue";
 import EventBus, { C_EVENT } from "@/types/EventBus";
-import { getChatMessages } from "@/api/chat";
+import { getChatMessages } from "@/api/api-chat";
 import { getNetworkErrorMessage } from "@/utils/NetUtil";
 import type { RefresherCustomEvent } from "@ionic/vue";
 

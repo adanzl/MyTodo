@@ -257,7 +257,7 @@ import { C_EVENT } from "@/types/EventBus";
 import { GroupOptions, PriorityOptions } from "@/types/ScheduleType";
 import { User, UserData } from "@/types/UserData";
 import { getApiUrl, scheduleProactiveRefresh } from "@/api/api-client";
-import { getScheduleList } from "@/api/schedule";
+import { getScheduleList } from "@/api/api-schedule";
 import { getUserList } from "@/api/api-user";
 import { clearLoginCache, login } from "@/utils/Auth";
 import avatar from "@/assets/images/avatar.svg";

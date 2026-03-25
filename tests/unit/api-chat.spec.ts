@@ -5,7 +5,7 @@ import {
   getChatSetting,
   getConversationId,
   setChatSetting,
-} from "@/api/chat";
+} from "@/api/api-chat";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGet = vi.fn();

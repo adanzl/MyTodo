@@ -10,14 +10,14 @@ export {
   isLocalIpAvailable,
 } from "./api-client";
 
-export { getSave, setSave, getScheduleList } from "./schedule";
+export { getSave, setSave, getScheduleList } from "./api-schedule";
 export {
   getUserInfo,
   setUserData,
   getUserList,
   addScore,
   clearUserListCache,
-} from "./user";
+} from "./api-user";
 export {
   getConversationId,
   setConversationId,
@@ -27,14 +27,14 @@ export {
   getAiChatMessages,
   getChatMem,
   setChatMem,
-} from "./chat";
+} from "./api-chat";
 export {
   getLotteryData,
   setLotteryData,
   getGiftData,
   doLottery,
   doExchange,
-} from "./lottery";
+} from "./api-lottery";
 export {
   createTtsTask,
   getTtsTaskList,
@@ -44,8 +44,8 @@ export {
   deleteTtsTask,
   startTtsAnalysis,
   ocrTtsTask,
-} from "./tts";
-export type { TtsTaskItem, TtsTaskAnalysis } from "./tts";
+} from "./api-tts";
+export type { TtsTaskItem, TtsTaskAnalysis } from "./api-tts";
 export type {
   ApiResponse,
   ApiListResponse,
@@ -67,6 +67,6 @@ export type {
   UpdateTtsTaskBody,
   TtsTaskIdBody,
 } from "./types";
-export { getPic, getPicList, setPic, delPic } from "./pic";
-export { getColorList, setColor, delColor } from "./color";
+export { getPic, getPicList, setPic, delPic } from "./api-pic";
+export { getColorList, setColor, delColor } from "./api-color";
 export { getList, getRdsData, setRdsData, setData, delData } from "./data";

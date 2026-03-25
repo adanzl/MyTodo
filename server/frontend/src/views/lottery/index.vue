@@ -24,6 +24,11 @@
       @tab-change="handleTabChange"
       class="flex-1 flex flex-col overflow-hidden h-[calc(100vh-220px)] mt-2"
     >
+      <!-- 礼物维护页签 -->
+      <el-tab-pane label="礼物维护" name="lottery">
+        <TabLottery />
+      </el-tab-pane>
+
       <!-- 奖池维护页签 -->
       <el-tab-pane label="奖池维护" name="pool">
         <TabPool />
@@ -37,11 +42,11 @@ import { ref, onMounted } from "vue";
 import { ElMessage } from "element-plus";
 import { InfoFilled } from "@element-plus/icons-vue";
 import { getRdsData, setRdsData } from "@/api/rds";
-// import TabLottery from "./tab-lottery.vue";
+import TabLottery from "./tab-lottery.vue";
 import TabPool from "./tab-pool.vue";
 
 // 主页签控制
-const activeMainTab = ref("pool");
+const activeMainTab = ref("lottery");
 
 // 监听页签切换
 const handleTabChange = (tabName: string) => {
