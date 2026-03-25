@@ -59,9 +59,9 @@
 </template>
 
 <script lang="ts" setup>
-import { Subtask } from "@/types/UserData";
-import { cameraAndSetImage, getImage, loadAndSetImage } from "@/utils/ImgMgr";
-import { createTriggerController } from "@/utils/Overlay";
+import { Subtask } from "@/types/user-data";
+import { cameraAndSetImage, getImage, loadAndSetImage } from "@/utils/img-mgr";
+import { createTriggerController } from "@/utils/t-overlay";
 import { alertController, IonActionSheet, IonInput, IonToolbar } from "@ionic/vue";
 import { add, trashOutline } from "ionicons/icons";
 import { inject, onMounted, ref, watch } from "vue";

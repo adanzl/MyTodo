@@ -13,7 +13,7 @@ vi.mock("@/api/api-client", () => ({
   },
 }));
 
-vi.mock("@/types/EventBus", () => ({
+vi.mock("@/types/event-bus", () => ({
   default: { $emit: vi.fn() },
   C_EVENT: { UPDATE_SAVE: "updateSave" },
 }));

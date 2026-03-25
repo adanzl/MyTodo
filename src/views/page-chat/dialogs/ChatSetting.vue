@@ -52,9 +52,9 @@
 </template>
 
 <script lang="ts" setup>
-import EventBus, { C_EVENT } from "@/types/EventBus";
+import EventBus, { C_EVENT } from "@/types/event-bus";
 import { getChatMem, getChatSetting, getConversationId, setChatSetting } from "@/api/api-chat";
-import { getNetworkErrorMessage } from "@/utils/NetUtil";
+import { getNetworkErrorMessage } from "@/utils/net-util";
 import { inject, onMounted, ref } from "vue";
 import { IonTextarea, loadingController } from "@ionic/vue";
 

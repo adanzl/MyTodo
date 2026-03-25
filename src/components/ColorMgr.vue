@@ -88,10 +88,10 @@
 </style>
 <script lang="ts" setup>
 import ColorPicker from "@/components/ColorPicker.vue";
-import { ColorOptions, LoadColorData } from "@/types/ColorType";
-import { C_EVENT } from "@/types/EventBus";
+import { ColorOptions, LoadColorData } from "@/types/color-type";
+import { C_EVENT } from "@/types/event-bus";
 import { delColor, setColor } from "@/api/api-color";
-import { createTriggerController } from "@/utils/Overlay";
+import { createTriggerController } from "@/utils/t-overlay";
 import { alertController } from "@ionic/vue";
 import { colorPaletteOutline, removeCircleOutline, saveOutline } from "ionicons/icons";
 import _ from "lodash";

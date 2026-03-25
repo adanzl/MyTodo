@@ -146,9 +146,9 @@
 <script setup lang="ts">
 import FabButton from "@/components/FabButton.vue";
 import SchedulePop from "@/components/SchedulePopModal.vue";
-import { getColorOptions } from "@/types/ColorType";
-import { getGroupOptions, getPriorityOptions } from "@/types/ScheduleType";
-import { DayData, S_TS, ScheduleData, ScheduleSave, UData, UserData } from "@/types/UserData";
+import { getColorOptions } from "@/types/color-type";
+import { getGroupOptions, getPriorityOptions } from "@/types/schedule-type";
+import { DayData, S_TS, ScheduleData, ScheduleSave, UData, UserData } from "@/types/user-data";
 import { setSave } from "@/api/api-schedule";
 import { IonCheckbox, IonicSlides, IonReorder, IonReorderGroup } from "@ionic/vue";
 import "@ionic/vue/css/ionic-swiper.css";

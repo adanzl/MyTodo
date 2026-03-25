@@ -17,7 +17,7 @@ const routes: Array<RouteRecordRaw> = [
       },
       {
         path: 'tab1',
-        component: () => import('@/views/PageSchedule.vue')
+        component: () => import('@/views/page-schedule/PageSchedule.vue')
       },
       {
         path: 'tab2',
@@ -25,11 +25,11 @@ const routes: Array<RouteRecordRaw> = [
       },
       {
         path: 'tab3',
-        component: () => import('@/views/chat-page/page-chat.vue')
+        component: () => import('@/views/page-chat/PageChat.vue')
       },
       {
         path: 'tab4',
-        component: () => import('@/views/lottery-page/page-lottery.vue')
+        component: () => import('@/views/page-lottery/PageLottery.vue')
       },
       {
         path: 'tab0',

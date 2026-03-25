@@ -93,11 +93,11 @@ import {
 } from "@ionic/vue";
 import { Icon } from "@iconify/vue";
 import { getPicDisplayUrl } from "@/api/api-pic";
-import { PicDisplaySize } from "@/utils/ImgMgr";
+import { PicDisplaySize } from "@/utils/img-mgr";
 import { computed, inject, ref, watch } from "vue";
 import _ from "lodash";
 
-import DialogGift from "./dialogs/dialog-gift.vue";
+import DialogGift from "./dialogs/DialogGift.vue";
 
 const props = defineProps<{
   lotteryCatList: any[];

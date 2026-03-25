@@ -94,10 +94,10 @@
 <script setup lang="ts">
 import CalendarCover from "@/components/CalendarCover.vue";
 import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
-import { getColorOptions } from "@/types/ColorType";
-import { C_EVENT } from "@/types/EventBus";
-import { DayData, MonthData, ScheduleData, UData, UserData } from "@/types/UserData";
-import { LiveUpdateMgr } from "@/utils/AppUpdate";
+import { getColorOptions } from "@/types/color-type";
+import { C_EVENT } from "@/types/event-bus";
+import { DayData, MonthData, ScheduleData, UData, UserData } from "@/types/user-data";
+import { LiveUpdateMgr } from "@/utils/app-update";
 import { getSave } from "@/api/api-schedule";
 import {
   IonCol,

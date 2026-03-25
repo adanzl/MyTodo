@@ -1,5 +1,5 @@
-import EventBus, { C_EVENT } from "@/types/EventBus";
-import { UData, UserData } from "@/types/UserData";
+import EventBus, { C_EVENT } from "@/types/event-bus";
+import { UData, UserData } from "@/types/user-data";
 import { apiClient } from "./api-client";
 import type {
   ApiResponse,

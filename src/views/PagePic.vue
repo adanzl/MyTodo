@@ -52,8 +52,8 @@ import {
 } from "@ionic/vue";
 import { onMounted, ref } from "vue";
 import { trashOutline, createOutline } from "ionicons/icons";
-import { calcImgPos } from "@/utils/Math";
-import { loadAndSetImage, delImage } from "@/utils/ImgMgr";
+import { calcImgPos } from "@/utils/math-util";
+import { loadAndSetImage, delImage } from "@/utils/img-mgr";
 
 const canvasRef = ref<HTMLCanvasElement>();
 const canvasWidth = ref(400); // 设置canvas的宽度

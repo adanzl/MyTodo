@@ -85,17 +85,17 @@
 </template>
 
 <script lang="ts" setup>
-import EventBus, { C_EVENT } from "@/types/EventBus";
+import EventBus, { C_EVENT } from "@/types/event-bus";
 import { getLotteryData, getGiftAvgCost } from "@/api/api-lottery";
 import { getPicDisplayUrl } from "@/api/api-pic";
 import { getList, setData, delData } from "@/api/data";
-import { getNetworkErrorMessage } from "@/utils/NetUtil";
-import { PicDisplaySize } from "@/utils/ImgMgr";
+import { getNetworkErrorMessage } from "@/utils/net-util";
+import { PicDisplaySize } from "@/utils/img-mgr";
 import { computed, inject, ref } from "vue";
 import { alertController, loadingController } from "@ionic/vue";
 import { closeOutline, chevronBackOutline, serverOutline, checkmarkCircleOutline } from "ionicons/icons";
 import { Icon } from "@iconify/vue";
-import DialogGift from "./dialog-gift.vue";
+import DialogGift from "./DialogGift.vue";
 
 defineProps<{
   isOpen: boolean;

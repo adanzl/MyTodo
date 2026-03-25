@@ -1,7 +1,7 @@
 import { createApp } from "vue";
 import App from "./App.vue";
 import router from "./router";
-import EventBus from "@/types/EventBus";
+import EventBus from "@/types/event-bus";
 
 /* Core CSS required for Ionic components to work properly */
 import "@ionic/vue/css/core.css";

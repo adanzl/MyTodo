@@ -489,8 +489,8 @@ import {
 import { computed, onUnmounted, ref, watch } from "vue";
 import AudioPreview from "@/components/AudioPreview.vue";
 import FabButton from "@/components/FabButton.vue";
-import EventBus, { C_EVENT } from "@/types/EventBus";
-import { resizeImageToFile } from "@/utils/ImgMgr";
+import EventBus, { C_EVENT } from "@/types/event-bus";
+import { resizeImageToFile } from "@/utils/img-mgr";
 import {
   createTtsTask,
   deleteTtsTask,

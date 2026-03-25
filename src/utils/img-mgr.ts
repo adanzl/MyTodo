@@ -1,5 +1,5 @@
-import LocalCache from "./LocalCache.ts";
-import { calcImgPos } from "./Math.ts";
+import LocalCache from "./local-cache.ts";
+import { calcImgPos } from "./math-util.ts";
 import { delPic, getPic, setPic, getPicDisplayUrl } from "@/api/api-pic";
 
 /** 图片展示尺寸 */

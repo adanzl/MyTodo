@@ -48,9 +48,9 @@ import {
   IonSegmentContent,
 } from "@ionic/vue";
 import { computed, ref, watch } from "vue";
-import EventBus, { C_EVENT } from "@/types/EventBus";
+import EventBus, { C_EVENT } from "@/types/event-bus";
 import { getChatMessages } from "@/api/api-chat";
-import { getNetworkErrorMessage } from "@/utils/NetUtil";
+import { getNetworkErrorMessage } from "@/utils/net-util";
 import type { RefresherCustomEvent } from "@ionic/vue";
 
 export interface ChatMsg {

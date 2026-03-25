@@ -1,5 +1,5 @@
 import { getColorList } from "@/api/api-color";
-import EventBus, { C_EVENT } from "@/types/EventBus";
+import EventBus, { C_EVENT } from "@/types/event-bus";
 
 export interface ColorType {
   id: number;

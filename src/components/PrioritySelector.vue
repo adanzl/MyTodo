@@ -36,9 +36,9 @@
 
 <script lang="ts" setup>
 import { onMounted, ref, watch } from "vue";
-import { createTriggerController } from "@/utils/Overlay";
+import { createTriggerController } from "@/utils/t-overlay";
 import { IonRadioGroup, IonRadio } from "@ionic/vue";
-import { PriorityOptions } from "@/types/ScheduleType";
+import { PriorityOptions } from "@/types/schedule-type";
 
 const props = defineProps({
   trigger: {

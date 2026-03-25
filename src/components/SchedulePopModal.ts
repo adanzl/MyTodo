@@ -3,8 +3,8 @@ import GroupSelector from "@/components/GroupSelector.vue";
 import PrioritySelector from "@/components/PrioritySelector.vue";
 import RepeatSelector from "@/components/RepeatSelector.vue";
 import SubtaskPopModal from "@/components/SubtaskPopModal.vue";
-import { getColorOptions } from "@/types/ColorType";
-import IonIcons from "@/types/IonIcons";
+import { getColorOptions } from "@/types/color-type";
+import IonIcons from "@/types/ion-icons";
 import {
   buildCustomRepeatLabel,
   CUSTOM_REPEAT_ID,
@@ -14,9 +14,9 @@ import {
   getRepeatOptions,
   ReminderOptions,
   WEEK,
-} from "@/types/ScheduleType";
-import { ScheduleData, ScheduleSave, Subtask, UData } from "@/types/UserData";
-import { getImage } from "@/utils/ImgMgr";
+} from "@/types/schedule-type";
+import { ScheduleData, ScheduleSave, Subtask, UData } from "@/types/user-data";
+import { getImage } from "@/utils/img-mgr";
 import {
   alertController,
   createAnimation,

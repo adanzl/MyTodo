@@ -3,11 +3,11 @@
  * 日程存档/覆盖规则及与后端约定见：docs/业务说明.md § 日程规则
  */
 import avatar from "@/assets/images/avatar.svg";
-import { CUSTOM_REPEAT_ID, RepeatData } from "@/types/ScheduleType";
+import { CUSTOM_REPEAT_ID, RepeatData } from "@/types/schedule-type";
 import { addScore, getUserInfo } from "@/api/api-user";
 import dayjs from "dayjs";
 import _ from "lodash";
-import EventBus, { C_EVENT } from "@/types/EventBus";
+import EventBus, { C_EVENT } from "@/types/event-bus";
 
 export class User {
   id = -1;

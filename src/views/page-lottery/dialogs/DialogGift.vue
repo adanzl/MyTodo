@@ -144,9 +144,9 @@ import {
   loadingController,
 } from "@ionic/vue";
 import { uploadPic, getPicDisplayUrl } from "@/api/api-pic";
-import { resizeImageToFile } from "@/utils/ImgMgr";
-import EventBus, { C_EVENT } from "@/types/EventBus";
-import { getNetworkErrorMessage } from "@/utils/NetUtil";
+import { resizeImageToFile } from "@/utils/img-mgr";
+import EventBus, { C_EVENT } from "@/types/event-bus";
+import { getNetworkErrorMessage } from "@/utils/net-util";
 import { ref, watch } from "vue";
 import { closeOutline } from "ionicons/icons";
 import { setData } from "@/api/data";

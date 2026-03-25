@@ -111,18 +111,18 @@
 </template>
 
 <script setup lang="ts">
-import ChatRoomTab from "./tab-chat-room.vue";
-import AiChatTab from "./tab-ai-chat.vue";
-import TtsTasksTab from "./tab-tts-tasks.vue";
-import type { ChatMsg as AiChatMsg } from "./tab-ai-chat.vue";
-import ChatSetting from "./dialogs/chat-setting.vue";
+import ChatRoomTab from "./TabChatRoom.vue";
+import AiChatTab from "./TabAiChat.vue";
+import TtsTasksTab from "./TabTtsTasks.vue";
+import type { ChatMsg as AiChatMsg } from "./TabAiChat.vue";
+import ChatSetting from "./dialogs/ChatSetting.vue";
 import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import { Icon } from "@iconify/vue";
-import EventBus, { C_EVENT } from "@/types/EventBus";
+import EventBus, { C_EVENT } from "@/types/event-bus";
 import { getApiUrl } from "@/api/api-client";
 import { getChatSetting, setChatSetting } from "@/api/api-chat";
 import { getUserList } from "@/api/api-user";
-import { getNetworkErrorMessage } from "@/utils/NetUtil";
+import { getNetworkErrorMessage } from "@/utils/net-util";
 import {
   createGesture,
   IonCheckbox,

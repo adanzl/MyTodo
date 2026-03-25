@@ -152,8 +152,8 @@
 <script lang="ts" setup>
 import { setLotteryPool, delLotteryPool } from "@/api/api-lottery";
 import { getList } from "@/api/data";
-import { getNetworkErrorMessage } from "@/utils/NetUtil";
-import EventBus, { C_EVENT } from "@/types/EventBus";
+import { getNetworkErrorMessage } from "@/utils/net-util";
+import EventBus, { C_EVENT } from "@/types/event-bus";
 import { ref } from "vue";
 import { alertController, loadingController } from "@ionic/vue";
 import { checkmarkCircle, closeOutline } from "ionicons/icons";

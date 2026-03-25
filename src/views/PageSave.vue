@@ -81,9 +81,9 @@
 <script setup lang="ts">
 import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import { getSave } from "@/api/api-schedule";
-import { getGroupOptions, getPriorityOptions } from "@/types/ScheduleType";
-import { getColorOptions } from "@/types/ColorType";
-import { S_TS, UserData } from "@/types/UserData";
+import { getGroupOptions, getPriorityOptions } from "@/types/schedule-type";
+import { getColorOptions } from "@/types/color-type";
+import { S_TS, UserData } from "@/types/user-data";
 import { IonRefresher, IonRefresherContent } from "@ionic/vue";
 import dayjs from "dayjs";
 import { onMounted, ref } from "vue";

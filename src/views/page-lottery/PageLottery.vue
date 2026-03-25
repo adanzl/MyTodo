@@ -75,13 +75,13 @@
 <script setup lang="ts">
 import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import { Icon } from "@iconify/vue";
-import EventBus, { C_EVENT } from "@/types/EventBus";
+import EventBus, { C_EVENT } from "@/types/event-bus";
 import type { GiftCategoryItem, GiftListItem } from "@/api";
 import { getList, delData } from "@/api/data";
 import { doExchange, doLottery, getGiftData, getLotteryData } from "@/api/api-lottery";
 import { clearUserListCache, getUserList, setUserData } from "@/api/api-user";
-import { getNetworkErrorMessage } from "@/utils/NetUtil";
-import { getCachedPicByName, PicDisplaySize } from "@/utils/ImgMgr";
+import { getNetworkErrorMessage } from "@/utils/net-util";
+import { getCachedPicByName, PicDisplaySize } from "@/utils/img-mgr";
 import {
   IonButton,
   IonHeader,
@@ -94,11 +94,11 @@ import {
 import { giftOutline, heartOutline } from "ionicons/icons";
 import _ from "lodash";
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
-import LotteryTab from "./tab-lottery.vue";
-import TabPrize from "./tab-prize.vue";
-import HistoryTab from "./tab-history.vue";
-import LotterySetting from "./dialogs/lottery-setting.vue";
-import LotteryPool from "./dialogs/lottery-pool.vue";
+import LotteryTab from "./TabLottery.vue";
+import TabPrize from "./TabPrize.vue";
+import HistoryTab from "./TabHistory.vue";
+import LotterySetting from "./dialogs/LotterySetting.vue";
+import LotteryPool from "./dialogs/LotteryPool.vue";
 
 const PAGE_SIZE = 20;
 const lotterySetting = ref({ open: false });

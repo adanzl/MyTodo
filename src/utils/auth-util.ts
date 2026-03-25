@@ -4,7 +4,7 @@
  * - POST /api/auth/refresh：用 Cookie 中的 refresh_token 换取新 access_token
  * - POST /api/auth/logout：登出并清除服务端 Cookie
  */
-import EventBus, { C_EVENT } from "@/types/EventBus";
+import EventBus, { C_EVENT } from "@/types/event-bus";
 
 const KEY_ACCESS_TOKEN = "access_token";
 const KEY_ACCESS_TOKEN_EXPIRES_AT = "access_token_expires_at";

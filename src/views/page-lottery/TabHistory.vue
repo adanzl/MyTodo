@@ -74,8 +74,8 @@ import {
 } from "ionicons/icons";
 import dayjs from "dayjs";
 import { getList } from "@/api/data";
-import { getNetworkErrorMessage } from "@/utils/NetUtil";
-import EventBus, { C_EVENT } from "@/types/EventBus";
+import { getNetworkErrorMessage } from "@/utils/net-util";
+import EventBus, { C_EVENT } from "@/types/event-bus";
 
 const props = defineProps<{
   userList: any[];

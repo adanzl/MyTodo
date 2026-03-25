@@ -53,7 +53,7 @@ ion-modal {
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import { getPicDisplayUrl } from "@/api/api-pic";
-import { getCachedPicByName, PicDisplaySize } from "@/utils/ImgMgr";
+import { getCachedPicByName, PicDisplaySize } from "@/utils/img-mgr";
 
 interface RewardItem {
     value: string;

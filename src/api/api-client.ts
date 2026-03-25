@@ -1,5 +1,5 @@
-import EventBus, { C_EVENT } from "@/types/EventBus";
-import { clearLoginCache, getAccessToken, getTokenExpiresAt, refreshToken } from "@/utils/Auth";
+import EventBus, { C_EVENT } from "@/types/event-bus";
+import { clearLoginCache, getAccessToken, getTokenExpiresAt, refreshToken } from "@/utils/auth-util";
 import axios, { type AxiosRequestConfig, type InternalAxiosRequestConfig } from "axios";
 
 const REMOTE_URL = "https://leo-zhao.natapp4.cc/api";

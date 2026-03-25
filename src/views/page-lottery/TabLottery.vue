@@ -113,7 +113,7 @@ import { FreeMode } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
 import { computed, inject, ref, watch } from "vue";
 import { getPicDisplayUrl } from "@/api/api-pic";
-import { PicDisplaySize } from "@/utils/ImgMgr";
+import { PicDisplaySize } from "@/utils/img-mgr";
 
 const globalVar: any = inject("globalVar");
 const isAdmin = computed(() => globalVar?.user?.admin === 1);

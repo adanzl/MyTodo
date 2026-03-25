@@ -1,7 +1,7 @@
 /**
  * LocalCache 单测：set/get/remove/has，过期与异常路径
  */
-import { LocalCache } from "@/utils/LocalCache";
+import { LocalCache } from "@/utils/local-cache";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("LocalCache", () => {

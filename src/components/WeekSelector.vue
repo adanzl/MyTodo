@@ -34,7 +34,7 @@ ion-footer {
 </style>
 <script setup lang="ts">
 import { IonCheckbox } from "@ionic/vue";
-import { WEEK } from "@/types/ScheduleType";
+import { WEEK } from "@/types/schedule-type";
 import { ref } from "vue";
 const modal = ref();
 const props = defineProps({

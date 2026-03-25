@@ -2,10 +2,10 @@ import CalenderTab from "@/components/CalendarTab.vue";
 import FabButton from "@/components/FabButton.vue";
 import SchedulePop from "@/components/SchedulePopModal.vue";
 import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
-import { getColorOptions } from "@/types/ColorType";
-import EventBus, { C_EVENT } from "@/types/EventBus";
-import IonIcons from "@/types/IonIcons";
-import { getGroupOptions, getPriorityOptions } from "@/types/ScheduleType";
+import { getColorOptions } from "@/types/color-type";
+import EventBus, { C_EVENT } from "@/types/event-bus";
+import IonIcons from "@/types/ion-icons";
+import { getGroupOptions, getPriorityOptions } from "@/types/schedule-type";
 import {
   DayData,
   MonthData,
@@ -15,7 +15,7 @@ import {
   UData,
   User,
   UserData,
-} from "@/types/UserData";
+} from "@/types/user-data";
 import { getSave, setSave } from "@/api/api-schedule";
 import { getUserInfo } from "@/api/api-user";
 import { LocalNotifications } from "@capacitor/local-notifications";

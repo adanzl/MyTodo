@@ -10,7 +10,7 @@ import {
   refreshToken,
   setAccessToken,
   setTokenWithExpiry,
-} from "@/utils/Auth";
+} from "@/utils/auth-util";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockPost = vi.hoisted(() => vi.fn());

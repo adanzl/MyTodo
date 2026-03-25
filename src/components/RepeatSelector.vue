@@ -62,8 +62,8 @@ import {
   RepeatData,
   CUSTOM_REPEAT_ID,
   RepeatType,
-} from "@/types/ScheduleType";
-import { createTriggerController } from "@/utils/Overlay";
+} from "@/types/schedule-type";
+import { createTriggerController } from "@/utils/t-overlay";
 import { IonRadio, IonRadioGroup } from "@ionic/vue";
 import { onMounted, ref, watch } from "vue";
 import dayjs from "dayjs";
