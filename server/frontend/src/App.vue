@@ -38,8 +38,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { StarFilled } from "@element-plus/icons-vue";
-import Sidebar from "@/views/sidebar.vue";
-import Login from "@/views/login.vue";
+import Sidebar from "@/views/Sidebar.vue";
+import Login from "@/views/PageLogin.vue";
 import { useUserStore } from "@/stores/user";
 import {
   isLocalIpAvailable,
