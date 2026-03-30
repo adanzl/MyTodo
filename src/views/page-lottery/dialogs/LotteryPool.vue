@@ -18,17 +18,16 @@
                 <ion-item v-for="pool in poolList" :key="pool.id" button detail class="py-2 rounded-xl"
                     @click="editPool(pool)">
                     <div class="py-2">
-                        <div class="flex">
-                            <p class="w-9 shrink-0"> ID： </p>
-                            <p class="w-7 shrink-0">{{ pool.id }} </p>
-                            <p class="flex-1">{{ pool.name }}</p>
+                        <div class="flex items-center mb-1">
+                            <p class="flex items-center w-10 shrink-0"> ID: </p>
+                            <p class="flex items-center w-9 shrink-0">{{ pool.id }} </p>
+                            <p class="flex items-center flex-1">{{ pool.name }}</p>
                         </div>
                         <div class="flex text-xs mt-1">
-                            <p class="w-10"> 积分： </p>
-                            <p class="w-8">{{ pool.cost }} </p>
-                            <p class="w-15"> 中奖数量： </p>
-                            <p class="w-8">{{ pool.count }} </p>
-                            <p v-if="pool.count_mx" class="w-8 text-gray-500"> (最大：{{ pool.count_mx }}) </p>
+                            <p class="w-10 shrink-0"> 积分： </p>
+                            <p class="w-9 shrink-0">{{ pool.cost }} </p>
+                            <p class="w-15 shrink-0"> 中奖数： </p>
+                            <p class="w-8">{{ pool.count }} - {{ pool.count_mx }} </p>
                         </div>
                         <div class="flex text-xs mt-2">
                             <p class="w-9 shrink-0 "> 类别： </p>
@@ -79,27 +78,26 @@
 
                         <div class="grid grid-cols-3 gap-2">
                             <ion-item lines="full">
-                                <div class="w-12 shrink-0">积分</div>
                                 <ion-input v-model.number="editForm.cost" type="number" placeholder="积分"
-                                    inputmode="numeric" />
+                                    inputmode="numeric" label="积分" label-placement="stacked" />
                             </ion-item>
 
                             <ion-item lines="full">
-                                <div class="w-20 shrink-0">中奖数量</div>
                                 <ion-input v-model.number="editForm.count" type="number" placeholder="数量"
-                                    inputmode="numeric" />
+                                    inputmode="numeric" label="中奖数量" label-placement="stacked" />
                             </ion-item>
 
                             <ion-item lines="full">
-                                <div class="w-20 shrink-0">最大数量</div>
                                 <ion-input v-model.number="editForm.count_mx" type="number" placeholder="最大数量"
-                                    inputmode="numeric" />
+                                    inputmode="numeric" label="最大数量" label-placement="stacked" />
                             </ion-item>
                         </div>
 
                         <ion-item lines="none" class="rounded-md h-40! overflow-y-auto">
                             <div class="w-full py-2 ">
-                                <div class="text-sm font-medium text-gray-700 mb-2">类别 ID 列表</div>
+                                <div class="text-sm font-medium text-gray-700 mb-2">
+                                    类别列表 <span class="text-xs text-primary">(已选 {{ selectedCateCount }})</span>
+                                </div>
                                 <div class="flex flex-wrap gap-2">
                                     <ion-chip v-for="cate in lotteryCatList" :key="cate.id"
                                         :color="isSelectedCate(cate.id) ? 'primary' : 'medium'" :outline="false"
@@ -132,7 +130,7 @@ import { setLotteryPool, delLotteryPool } from "@/api/api-lottery";
 import { getList } from "@/api/data";
 import { getNetworkErrorMessage } from "@/utils/net-util";
 import EventBus, { C_EVENT } from "@/types/event-bus";
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { alertController, loadingController } from "@ionic/vue";
 import { checkmarkCircle, closeOutline } from "ionicons/icons";
 
@@ -238,6 +236,16 @@ function isSelectedCate(cateId: number): boolean {
     return selectedIds.includes(cateId);
 }
 
+// 计算已选择的类别数量
+const selectedCateCount = computed(() => {
+    if (!editForm.value.cate_list) return 0;
+    const selectedIds = String(editForm.value.cate_list)
+        .split(',')
+        .map((id: string) => Number(id.trim()))
+        .filter((id: number) => !isNaN(id));
+    return selectedIds.length;
+});
+
 // 切换类别选中状态
 function toggleCate(cateId: number) {
     const currentIds = editForm.value.cate_list
@@ -267,6 +275,12 @@ async function savePool() {
         return;
     }
 
+    // 立即显示加载菊花
+    const loading = await loadingController.create({
+        message: editingPool.value ? "更新中..." : "添加中...",
+    });
+    await loading.present();
+
     try {
         await setLotteryPool({
             id: editForm.value.id ?? undefined,
@@ -287,6 +301,8 @@ async function savePool() {
         emit("refresh");
     } catch (err: any) {
         EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+    } finally {
+        loading.dismiss();
     }
 }
 
