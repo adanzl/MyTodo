@@ -182,12 +182,20 @@ class LotteryMgr:
             count = max(1, int(count)) if isinstance(count, (int, float)) else default_count
             return fee, t, count, []
 
-        pool = self._db.get_data('t_gift_pool', pool_id, "id,name,cost,count,cate_list")
+        pool = self._db.get_data('t_gift_pool', pool_id, "id,name,cost,count,count_mx,cate_list")
         if pool.get('code') != 0:
             return None, default_threshold, default_count, []
         pool_data = pool['data']
-        count = pool_data.get('count', default_count)
-        count = max(1, int(count)) if isinstance(count, (int, float)) else default_count
+        
+        # 获取 count 和 count_mx，生成随机抽取次数
+        count_min = pool_data.get('count', default_count)
+        count_min = max(1, int(count_min)) if isinstance(count_min, (int, float)) else default_count
+        
+        count_mx = pool_data.get('count_mx', count_min)
+        count_mx = max(count_min, int(count_mx)) if isinstance(count_mx, (int, float)) else count_min
+        
+        # 在 count 到 count_mx 之间随机选择一个抽取次数
+        draw_count = random.randint(count_min, count_mx)
 
         # 解析 cate_list 字段（逗号分隔的字符串）为分类 ID 列表
         cate_list_str = pool_data.get('cate_list') or ''
@@ -197,7 +205,7 @@ class LotteryMgr:
                 int(x.strip()) for x in cate_list_str.split(',') if x.strip() and x.strip().lstrip('-').isdigit()
             ]
 
-        return pool_data['cost'], default_threshold, count, cate_ids
+        return pool_data['cost'], default_threshold, draw_count, cate_ids
 
     def _parse_wish_list_ids(self, wish_list_str: str) -> list:
         """将 t_user.wish_list（JSON 数组字符串，如 '[1,2,3]'）解析为礼物 id 列表。"""

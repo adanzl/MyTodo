@@ -46,25 +46,25 @@
           </div>
         </template>
       </el-table-column>
+      <el-table-column property="count_mx" label="最大数量" width="80">
+        <template #default="{ row }">
+          <div class="flex items-center">
+            <template v-if="row.edited">
+              <el-input v-model="row.count_mx" size="small" type="number" placeholder="0" clearable />
+            </template>
+            <template v-else>
+              <span>{{ row.count_mx ?? '-' }}</span>
+            </template>
+          </div>
+        </template>
+      </el-table-column>
       <el-table-column property="cate_list" label="分类列表" min-width="250">
         <template #default="{ row }">
           <div class="flex items-center">
             <template v-if="row.edited">
-              <el-select
-                v-model="row.cate_ids"
-                multiple
-                collapse-tags
-                collapse-tags-tooltip
-                size="small"
-                placeholder="选择分类"
-                style="width: 100%"
-              >
-                <el-option
-                  v-for="cate in categoryList"
-                  :key="cate.id"
-                  :label="cate.name"
-                  :value="cate.id"
-                />
+              <el-select v-model="row.cate_ids" multiple collapse-tags collapse-tags-tooltip size="small"
+                placeholder="选择分类" style="width: 100%">
+                <el-option v-for="cate in categoryList" :key="cate.id" :label="cate.name" :value="cate.id" />
               </el-select>
             </template>
             <template v-else>
@@ -92,21 +92,15 @@
         </template>
       </el-table-column>
     </el-table>
-    <el-pagination
-      layout="prev, pager, next"
-      :total="poolList.totalCount"
-      :page-size="PAGE_SIZE"
-      :current-page="poolList.pageNum"
-      class="mt-2"
-      background
-      @current-change="(page: number) => handlePageChange(page, PAGE_SIZE)"
-    />
+    <el-pagination layout="prev, pager, next" :total="poolList.totalCount" :page-size="PAGE_SIZE"
+      :current-page="poolList.pageNum" class="mt-2" background
+      @current-change="(page: number) => handlePageChange(page, PAGE_SIZE)" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import { Plus } from "@element-plus/icons-vue";
 import { getList, getData, setData, delData } from "@/api/common";
 import * as _ from "lodash-es";
@@ -116,6 +110,7 @@ interface PoolItem {
   name: string;
   cost?: number;
   count?: number;
+  count_mx?: number;
   cate_list?: string;
   cate_ids?: number[];
   cate_names?: string;
@@ -164,6 +159,7 @@ const refreshPoolList = async (pageNum: number, pageSize: number) => {
           name: item.name,
           cost: item.cost,
           count: item.count ?? 0,
+          count_mx: item.count_mx ?? 0,
           cate_list: item.cate_list || "",
           cate_ids: cateIds,
           cate_names: cateNames,
@@ -185,6 +181,7 @@ const onAddPoolClk = () => {
     name: "",
     cost: 0,
     count: 0,
+    count_mx: 0,
     cate_list: "",
     cate_ids: [],
     cate_names: "",
@@ -207,6 +204,7 @@ const handlePoolCancel = async (item: PoolItem, idx: number) => {
       item.name = data.name || item.name;
       item.cost = data.cost || item.cost;
       item.count = data.count ?? item.count;
+      item.count_mx = data.count_mx ?? item.count_mx;
       item.cate_list = data.cate_list ?? item.cate_list;
       // 重新解析分类
       const cateIds = item.cate_list ? item.cate_list.split(',').map(id => parseInt(id)).filter(id => !isNaN(id)) : [];
@@ -237,6 +235,7 @@ const handlePoolSave = async (item: PoolItem) => {
       name: item.name.trim(),
       cost: item.cost,
       count: item.count,
+      count_mx: item.count_mx,
       cate_list: cateListStr,
     };
     await setData("t_gift_pool", data);
@@ -250,12 +249,23 @@ const handlePoolSave = async (item: PoolItem) => {
 
 const handlePoolDelete = async (item: PoolItem) => {
   try {
+    await ElMessageBox.confirm(
+      `确定要删除奖池"${item.name}"吗？删除后无法恢复。`,
+      "确认删除",
+      {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning",
+      }
+    );
     await delData("t_gift_pool", item.id);
     await refreshPoolList(poolList.value.pageNum, poolList.value.pageSize);
     ElMessage.success("删除成功");
-  } catch (error) {
-    console.error("删除奖池失败:", error);
-    ElMessage.error("删除奖池失败");
+  } catch (error: any) {
+    if (error !== "cancel") {
+      console.error("删除奖池失败:", error);
+      ElMessage.error("删除奖池失败");
+    }
   }
 };
 
