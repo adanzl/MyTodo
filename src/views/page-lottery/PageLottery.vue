@@ -338,6 +338,7 @@ function refreshGiftList(
 ): Promise<void> {
   const filter: Record<string, number> = {
     enable: 1,
+    exchange: 1,
   };
   if (cateId) {
     filter["cate_id"] = cateId;
