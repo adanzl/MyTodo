@@ -104,6 +104,7 @@ export interface LotteryPool {
   name: string;
   cost?: number;
   count?: number;
+  count_mx?: number;
   cate_list?: string;
   total_count?: number;
   remaining_count?: number;

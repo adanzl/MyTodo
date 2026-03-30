@@ -125,19 +125,31 @@ export function usePlaylistOperations(
       ElMessage.warning("播放列表不存在");
       return;
     }
-    if (!status.playlist || status.playlist.length === 0) {
+    const hasPreFiles = getCurrentPreFiles().length > 0;
+    const hasPlaylist = status.playlist && status.playlist.length > 0;
+    if (!hasPreFiles && !hasPlaylist) {
       ElMessage.warning("播放列表为空，请先添加文件");
       return;
     }
     try {
       playing.value = true;
       await updateActivePlaylistData(playlistInfo => {
-        const list = Array.isArray(playlistInfo.playlist) ? playlistInfo.playlist : [];
-        playlistInfo.current_index = Math.max(
-          0,
-          Math.min(playlistInfo.current_index || 0, list.length - 1)
-        );
-        playlistInfo.total = list.length;
+        const playlist = Array.isArray(playlistInfo.playlist) ? playlistInfo.playlist : [];
+        const preFiles = getCurrentPreFiles();
+
+        // 如果有前置文件，确保 current_index 和 total 设置正确
+        if (preFiles.length > 0) {
+          // 有前置文件时，从头开始播放
+          playlistInfo.current_index = 0;
+          playlistInfo.total = playlist.length;
+        } else {
+          // 没有前置文件，从 playlist 的 current_index 开始
+          playlistInfo.current_index = Math.max(
+            0,
+            Math.min(playlistInfo.current_index || 0, playlist.length - 1)
+          );
+          playlistInfo.total = playlist.length;
+        }
         return playlistInfo;
       });
 
@@ -162,7 +174,9 @@ export function usePlaylistOperations(
       ElMessage.warning("播放列表不存在");
       return;
     }
-    if (!status.playlist || status.playlist.length === 0) {
+    const hasPreFiles = getCurrentPreFiles().length > 0;
+    const hasPlaylist = status.playlist && status.playlist.length > 0;
+    if (!hasPreFiles && !hasPlaylist) {
       ElMessage.warning("播放列表为空，无法播放下一首");
       return;
     }

@@ -654,7 +654,7 @@ class PlaylistMgr:
         # 在锁外启动线程
         thread_to_start.start()
 
-    def _validate_playlist(self, id: str) -> Tuple[Dict[str, Any], int, str]:
+    def _validate_playlist(self, id: str) -> Tuple[Dict[str, Any], int, str | None]:
         """验证播放列表是否存在且有效。"""
         if not self._playlist_raw or id not in self._playlist_raw:
             return {}, -1, "播放列表不存在"
@@ -667,7 +667,7 @@ class PlaylistMgr:
         device_obj = self._device_map.get(id)
         if device_obj is None:
             return {}, -1, "设备不存在或未初始化"
-        return playlist_data, 0, 'SUCCESS'
+        return playlist_data, 0, None
 
     def _apply_device_volume(self, playlist_id: str, device: Any, playlist_data: Dict[str, Any]) -> None:
         """检查并设置设备音量（如果播放列表中有音量配置）。"""
@@ -699,18 +699,18 @@ class PlaylistMgr:
         pre_lists = playlist_data.get("pre_lists", [])
         return _get_pre_list_for_today(pre_lists)
 
-    def _get_current_file(self, play_state: Dict[str, Any], pre_files: List, playlist: List) -> tuple[Any, str]:
+    def _get_current_file(self, play_state: Dict[str, Any], pre_files: List, playlist: List) -> tuple[Any, str | None]:
         """获取当前要播放的文件。"""
         if play_state["in_pre_files"]:
             pre_index = play_state["pre_index"]
             if pre_index < 0 or pre_index >= len(pre_files):
                 return None, f"pre_files 索引 {pre_index} 超出范围"
-            return pre_files[pre_index], 'SUCCESS'
+            return pre_files[pre_index], None
         else:
             file_index = play_state["file_index"]
             if file_index < 0 or file_index >= len(playlist):
                 return None, f"playlist 索引 {file_index} 超出范围"
-            return playlist[file_index], 'SUCCESS'
+            return playlist[file_index], None
 
     def _cleanup_play_state(self, id: str) -> None:
         """清理播放状态。"""
@@ -746,7 +746,7 @@ class PlaylistMgr:
 
         playlist_data, code, msg = self._validate_playlist(id)
         if code != 0:
-            return code, msg
+            return code, msg or "验证失败"
 
         pre_files = self._get_pre_files_for_today(playlist_data)  # 获取今天对应的前置文件列表
         playlist = playlist_data.get("playlist", [])
@@ -860,7 +860,7 @@ class PlaylistMgr:
         try:
             playlist_data, code, msg = self._validate_playlist(id)
             if code != 0:
-                return code, msg
+                return code, msg or "验证失败"
 
             pre_files = self._get_pre_files_for_today(playlist_data)  # 获取今天对应的前置文件列表
             playlist = playlist_data.get("playlist", [])
@@ -916,7 +916,7 @@ class PlaylistMgr:
         try:
             playlist_data, code, msg = self._validate_playlist(id)
             if code != 0:
-                return code, msg
+                return code, msg or "验证失败"
 
             pre_files = self._get_pre_files_for_today(playlist_data)  # 获取今天对应的前置文件列表
             playlist = playlist_data.get("playlist", [])
@@ -968,7 +968,7 @@ class PlaylistMgr:
         """
         playlist_data, code, msg = self._validate_playlist(id)
         if code != 0:
-            return code, msg
+            return code, msg or "验证失败"
 
         pre_files = self._get_pre_files_for_today(playlist_data)  # 获取今天对应的前置文件列表
         playlist = playlist_data.get("playlist", [])

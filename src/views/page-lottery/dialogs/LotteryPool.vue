@@ -1,152 +1,130 @@
 <template>
-  <ion-modal ref="modal" aria-hidden="false" id="lottery-pool" :is-open="isOpen" @didPresent="onModalPresent"
-    @willDismiss="onModalWillDismiss">
-    <ion-header>
-      <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-button fill="clear" @click="cancel()"> <ion-icon :icon="closeOutline" /></ion-button>
-        </ion-buttons>
-        <ion-title>奖池管理</ion-title>
-        <ion-buttons slot="end">
-          <ion-button @click="addPool">添加奖池</ion-button>
-        </ion-buttons>
-      </ion-toolbar>
-    </ion-header>
-    <ion-content class="ion-padding">
-      <!-- 奖池列表 -->
-      <ion-list>
-        <ion-item v-for="pool in poolList" :key="pool.id" button detail class="py-2 rounded-xl" @click="editPool(pool)">
-          <div class="py-2">
-            <div class="flex gap-2">{{ pool.name }}</div>
-            <div class="flex text-xs mt-1">
-              <p class="w-9 shrink-0 "> ID： </p>
-              <p class="w-7 " >{{ pool.id }} </p> 
-              <p class="w-10"> 积分： </p>
-              <p class="w-8" >{{ pool.cost }} </p>
-              <p class="w-15"> 中奖数量： </p>
-              <p class="w-8" >{{ pool.count }} </p>
-            </div>
-            <div class="flex text-xs mt-2">
-                <p class="w-9 shrink-0 "> 类别： </p>
-                <!-- 有类别时 -->
-                <div class="flex gap-1">
-                    <template v-if="pool.cateNames && pool.cateNames.length > 0">
-                        <div
-                            v-for="(name, idx) in pool.cateNames"
-                            :key="idx"
-                            class="text-xs px-1 py-1 rounded-sm bg-blue-100 text-blue-800">
-                            {{ name }}
-                        </div>
-                    </template>
-                    <!-- 无类别时 -->
-                    <div
-                        v-else
-                        color="medium"
-                        class="text-xs px-1 py-1 rounded-sm bg-gray-100 text-gray-800">
-                        无
-                    </div>
-                </div>
-            </div>
-          </div>
-          <div slot="end" class="flex flex-col gap-1" @click.stop>
-            <ion-button size="small" fill="outline" @click="editPool(pool)">编辑</ion-button>
-            <ion-button size="small" fill="outline" color="danger" @click="deletePool(pool)">
-              删除
-            </ion-button>
-          </div>
-        </ion-item>
-        <ion-item v-if="poolList.length === 0">
-          <ion-label class="text-gray-500">暂无奖池，请添加</ion-label>
-        </ion-item>
-      </ion-list>
-
-      <!-- 编辑/添加奖池对话框 -->
-      <ion-modal
-        ref="editModal"
-        id="lotteryPoolEditModal"
-        mode="ios"
-        aria-hidden="false"
-        class="backdrop"
-        :is-open="isEditDialogOpen"
-        @didPresent="onEditDialogPresent"
-        @willDismiss="onEditDialogWillDismiss">
-        <ion-item>
-          <ion-title>{{ editingPool ? '编辑奖池' : '添加奖池' }}</ion-title>
-        </ion-item>
+    <ion-modal ref="modal" aria-hidden="false" id="lottery-pool" :is-open="isOpen" @didPresent="onModalPresent"
+        @willDismiss="onModalWillDismiss">
+        <ion-header>
+            <ion-toolbar>
+                <ion-buttons slot="start">
+                    <ion-button fill="clear" @click="cancel()"> <ion-icon :icon="closeOutline" /></ion-button>
+                </ion-buttons>
+                <ion-title>奖池管理</ion-title>
+                <ion-buttons slot="end">
+                    <ion-button @click="addPool">添加奖池</ion-button>
+                </ion-buttons>
+            </ion-toolbar>
+        </ion-header>
         <ion-content class="ion-padding">
-          <div class="flex flex-col gap-1">
-            <ion-item lines="full" class="rounded-md">
-                <div class="w-12 shrink-0">ID</div>
-                <div class="flex-1 text-gray-500 ">{{ editForm.id }}</div>
-            </ion-item>
-            <ion-item lines="full" class="rounded-md">
-                <div class="w-12 shrink-0 ">名称</div>
-                <ion-input
-                v-model="editForm.name"
-                type="text"
-                placeholder="请输入奖池名称"
-                :clear-input="true"
-                />
-            </ion-item>
-            
-            <div class="grid grid-cols-2 gap-2">
-                <ion-item lines="full">
-                    <div class="w-12 shrink-0">积分</div>
-                    <ion-input
-                        v-model.number="editForm.cost"
-                        type="number"
-                        placeholder="积分"
-                        inputmode="numeric"
-                    />
-                </ion-item>
-                
-                <ion-item lines="full">
-                    <div class="w-20 shrink-0">中奖数量</div>
-                    <ion-input
-                        v-model.number="editForm.count"
-                        type="number"
-                        placeholder="数量"
-                        inputmode="numeric"
-                    />
-                </ion-item>
-            </div>
-            
-            <ion-item lines="none" class="rounded-md h-40! overflow-y-auto">
-                <div class="w-full py-2 ">
-                    <div class="text-sm font-medium text-gray-700 mb-2">类别 ID 列表</div>
-                    <div class="flex flex-wrap gap-2">
-                        <ion-chip
-                            v-for="cate in lotteryCatList"
-                            :key="cate.id"
-                            :color="isSelectedCate(cate.id) ? 'primary' : 'medium'"
-                            :outline="false"
-                            class="rounded-md px-2"
-                            @click="toggleCate(cate.id)">
-                                <ion-icon 
-                                    :icon="checkmarkCircle" 
-                                    :class="isSelectedCate(cate.id) ? 'text-blue-500' : 'text-gray-300'"
-                                    class="w-4 h-4 mr-1">
-                                </ion-icon>
-                            {{ cate.name }}
-                        </ion-chip>
+            <!-- 奖池列表 -->
+            <ion-list>
+                <ion-item v-for="pool in poolList" :key="pool.id" button detail class="py-2 rounded-xl"
+                    @click="editPool(pool)">
+                    <div class="py-2">
+                        <div class="flex">
+                            <p class="w-9 shrink-0"> ID： </p>
+                            <p class="w-7 shrink-0">{{ pool.id }} </p>
+                            <p class="flex-1">{{ pool.name }}</p>
+                        </div>
+                        <div class="flex text-xs mt-1">
+                            <p class="w-10"> 积分： </p>
+                            <p class="w-8">{{ pool.cost }} </p>
+                            <p class="w-15"> 中奖数量： </p>
+                            <p class="w-8">{{ pool.count }} </p>
+                            <p v-if="pool.count_mx" class="w-8 text-gray-500"> (最大：{{ pool.count_mx }}) </p>
+                        </div>
+                        <div class="flex text-xs mt-2">
+                            <p class="w-9 shrink-0 "> 类别： </p>
+                            <!-- 有类别时 -->
+                            <div class="flex gap-1">
+                                <template v-if="pool.cateNames && pool.cateNames.length > 0">
+                                    <div v-for="(name, idx) in pool.cateNames" :key="idx"
+                                        class="text-xs px-1 py-1 rounded-sm bg-blue-100 text-blue-800">
+                                        {{ name }}
+                                    </div>
+                                </template>
+                                <!-- 无类别时 -->
+                                <div v-else color="medium"
+                                    class="text-xs px-1 py-1 rounded-sm bg-gray-100 text-gray-800">
+                                    无
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <!-- 隐藏的 textarea，用于存储实际的 cate_list 值 -->
-                    <textarea
-                        v-model="editForm.cate_list"
-                        class="hidden"
-                        readonly>
+                    <div slot="end" class="flex flex-col gap-1" @click.stop>
+                        <ion-button size="small" fill="outline" @click="editPool(pool)">编辑</ion-button>
+                        <ion-button size="small" fill="outline" color="danger" @click="deletePool(pool)">
+                            删除
+                        </ion-button>
+                    </div>
+                </ion-item>
+                <ion-item v-if="poolList.length === 0">
+                    <ion-label class="text-gray-500">暂无奖池，请添加</ion-label>
+                </ion-item>
+            </ion-list>
+
+            <!-- 编辑/添加奖池对话框 -->
+            <ion-modal ref="editModal" id="lotteryPoolEditModal" mode="ios" aria-hidden="false" class="backdrop"
+                :is-open="isEditDialogOpen" @didPresent="onEditDialogPresent" @willDismiss="onEditDialogWillDismiss">
+                <ion-item>
+                    <ion-title>{{ editingPool ? '编辑奖池' : '添加奖池' }}</ion-title>
+                </ion-item>
+                <ion-content class="ion-padding">
+                    <div class="flex flex-col gap-1">
+                        <ion-item lines="full" class="rounded-md">
+                            <div class="w-12 shrink-0">ID</div>
+                            <div class="flex-1 text-gray-500 ">{{ editForm.id }}</div>
+                        </ion-item>
+                        <ion-item lines="full" class="rounded-md">
+                            <div class="w-12 shrink-0 ">名称</div>
+                            <ion-input v-model="editForm.name" type="text" placeholder="请输入奖池名称" :clear-input="true" />
+                        </ion-item>
+
+                        <div class="grid grid-cols-3 gap-2">
+                            <ion-item lines="full">
+                                <div class="w-12 shrink-0">积分</div>
+                                <ion-input v-model.number="editForm.cost" type="number" placeholder="积分"
+                                    inputmode="numeric" />
+                            </ion-item>
+
+                            <ion-item lines="full">
+                                <div class="w-20 shrink-0">中奖数量</div>
+                                <ion-input v-model.number="editForm.count" type="number" placeholder="数量"
+                                    inputmode="numeric" />
+                            </ion-item>
+
+                            <ion-item lines="full">
+                                <div class="w-20 shrink-0">最大数量</div>
+                                <ion-input v-model.number="editForm.count_mx" type="number" placeholder="最大数量"
+                                    inputmode="numeric" />
+                            </ion-item>
+                        </div>
+
+                        <ion-item lines="none" class="rounded-md h-40! overflow-y-auto">
+                            <div class="w-full py-2 ">
+                                <div class="text-sm font-medium text-gray-700 mb-2">类别 ID 列表</div>
+                                <div class="flex flex-wrap gap-2">
+                                    <ion-chip v-for="cate in lotteryCatList" :key="cate.id"
+                                        :color="isSelectedCate(cate.id) ? 'primary' : 'medium'" :outline="false"
+                                        class="rounded-md px-2" @click="toggleCate(cate.id)">
+                                        <ion-icon :icon="checkmarkCircle"
+                                            :class="isSelectedCate(cate.id) ? 'text-blue-500' : 'text-gray-300'"
+                                            class="w-4 h-4 mr-1">
+                                        </ion-icon>
+                                        {{ cate.name }}
+                                    </ion-chip>
+                                </div>
+                                <!-- 隐藏的 textarea，用于存储实际的 cate_list 值 -->
+                                <textarea v-model="editForm.cate_list" class="hidden" readonly>
                     </textarea>
-                </div>
-            </ion-item>
-          </div>
+                            </div>
+                        </ion-item>
+                    </div>
+                </ion-content>
+                <ion-footer class="flex!">
+                    <ion-button class="flex-1 text-gray-400" fill="clear" @click="cancelEdit()">取消</ion-button>
+                    <ion-button class="flex-1 text-orange-400" fill="clear" @click="savePool()">确定</ion-button>
+                </ion-footer>
+            </ion-modal>
         </ion-content>
-        <ion-footer class="flex!">
-          <ion-button class="flex-1 text-gray-400" fill="clear" @click="cancelEdit()">取消</ion-button>
-          <ion-button class="flex-1 text-orange-400" fill="clear" @click="savePool()">确定</ion-button>
-        </ion-footer>
-      </ion-modal>
-    </ion-content>
-  </ion-modal>
+    </ion-modal>
 </template>
 
 <script lang="ts" setup>
@@ -181,6 +159,7 @@ const editForm = ref({
     name: '',
     cost: 0,
     count: 1,
+    count_mx: 0 as number | undefined,
     cate_list: '',
 });
 
@@ -294,6 +273,7 @@ async function savePool() {
             name,
             cost: Number(editForm.value.cost) || 0,
             count: Number(editForm.value.count) || 1,
+            count_mx: editForm.value.count_mx !== undefined ? Number(editForm.value.count_mx) || 0 : undefined,
             cate_list: editForm.value.cate_list?.trim() ?? '',
         });
 
@@ -317,6 +297,7 @@ function addPool() {
         name: '',
         cost: 0,
         count: 1,
+        count_mx: undefined,
         cate_list: '',
     };
     editingPool.value = null;
@@ -330,6 +311,7 @@ function editPool(pool: any) {
         name: pool.name,
         cost: pool.cost,
         count: pool.count,
+        count_mx: pool.count_mx !== undefined ? pool.count_mx : undefined,
         cate_list: pool.cate_list || '',
     };
     editingPool.value = pool;

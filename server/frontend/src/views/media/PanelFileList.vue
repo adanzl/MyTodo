@@ -57,8 +57,8 @@
         </el-button>
         <el-button type="default" size="small" plain circle @click="$emit('play')" class="items-center justify-center"
           :disabled="!playlistStatus ||
-            !playlistStatus.playlist ||
-            playlistStatus.playlist.length === 0 ||
+            ((!getCurrentPreFiles() || getCurrentPreFiles().length === 0) &&
+              (!playlistStatus.playlist || playlistStatus.playlist.length === 0)) ||
             !!playlistStatus.isPlaying ||
             playlistLoading
             " title="播放">
