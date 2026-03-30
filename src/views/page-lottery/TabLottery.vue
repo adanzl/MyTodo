@@ -37,6 +37,9 @@
             :disabled="!selectedCate || userScore < lotteryCost">
             <div class="w-20 h-20 flex flex-col items-center justify-center">
               <span>立即抽奖</span>
+              <span class="mt-1 text-[10px]">
+                {{ selectedCate?.count || 1 }}{{ selectedCate?.count_mx ? ' - ' + selectedCate.count_mx : '' }} 件
+              </span>
               <div class="flex items-center justify-center mt-2">
                 <Icon icon="mdi:star" class="text-red-500 w-5 h-5" />
                 {{ lotteryCost }}

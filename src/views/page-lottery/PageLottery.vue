@@ -68,7 +68,7 @@
         @user-change="handleUserChange" />
     </ion-segment-view>
     <LotterySetting :is-open="lotterySetting.open" @willDismiss="onSettingDismiss" />
-    <LotteryPool :is-open="lotteryPool.open" @willDismiss="onPoolDismiss" @refresh="refreshCateList" />
+    <LotteryPool :is-open="lotteryPool.open" @willDismiss="onPoolDismiss" @refresh="handleFullRefresh" />
   </ion-page>
 </template>
 
@@ -192,6 +192,25 @@ onBeforeUnmount(() => {
 
 function onRefresh(event: any) {
   handleRefresh(event);
+}
+
+// 用于奖池管理弹窗关闭后的完整刷新（不需要 event.target.complete）
+function handleFullRefresh() {
+  const cateId = selectedCate.value?.id === 0 ? undefined : selectedCate.value?.id;
+  refreshGiftList(cateId, 1);
+  refreshCateList();
+  refreshPoolList();
+  refreshScoreHistoryList(selectedUser.value?.id, 1);
+  getLotteryData()
+    .then((data: any) => {
+      lotteryDate.value = JSON.parse(data);
+      if (selectedCate.value && selectedCate.value.id == 0) {
+        selectedCate.value.cost = lotteryDate.value.fee;
+      }
+    })
+    .catch((err) => {
+      EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+    });
 }
 
 function handleRefresh(event: any) {
