@@ -1,7 +1,8 @@
 # 服务器
 
 ## 命令别名
-``` shell
+
+```shell
 vim ~/.bashrc
 
 添加
@@ -50,13 +51,14 @@ sudo apt install -y python3-certbot-nginx
 -- acme.sh 续期（兼容网页申请的证书，更灵活
 curl https://get.acme.sh | sh -s email=adanzl@163.com
 source ~/.bashrc
+
 ### 查看证书状态
 
 `sudo certbot certificates`
 
 ### 手动续期
 
-``` text
+```text
 
 网页续期 https://app.zerossl.com/certificates
 
@@ -118,10 +120,10 @@ sudo certbot renew --dry-run --server https://acme.zerossl.com/v2/DV90 \
 # 可以配置 pre-hook 和 post-hook 自动处理
 安装证书
 合并证书  cat ca_bundle.crt >> certificate.crt
-配置nginx 
+配置nginx
 
     ssl                  on;
-    ssl_certificate      /etc/ssl/certificate.crt; 
+    ssl_certificate      /etc/ssl/certificate.crt;
     ssl_certificate_key  /etc/ssl/private.key;
 ```
 
@@ -154,15 +156,17 @@ sudo certbot renew --pre-hook "systemctl stop nginx" --post-hook "systemctl star
 `git pull && npx npm run build --  --mode=production && npx capawesome apps:liveupdates:generatemanifest --path dist npx cap copy`
 
 ## OpenFrp
+
 ### docker
-``` bash
+
+```bash
 # ssh channel
 docker run -d --name frpc_ssh \
     -v /var/run/docker.sock:/var/run/docker.sock \
     --restart unless-stopped --dns 223.5.5.5 \
     openfrp/frpc:latest \
     -u 9266c2d09e67a0b3a243ce228e77146f \
-    -p 1096970 
+    -p 1096970
 
 # web channel
 docker run -d --name frpc_web \
@@ -170,10 +174,11 @@ docker run -d --name frpc_web \
     --restart unless-stopped --dns 223.5.5.5 \
     openfrp/frpc:latest \
     -u 9266c2d09e67a0b3a243ce228e77146f \
-    -p 1098893 
-```        
+    -p 1098893
+```
 
 ### FreeDns 域名
+
 域名 leo-dify.mooo.com
 
 https://freedns.afraid.org/subdomain/edit.php?data_id=25288404
@@ -300,15 +305,6 @@ docker run -p 9096:10095 -itd -w /workspace/FunASR/runtime --privileged=true \
     bash -c "nohup bash /workspace/FunASR/runtime/run_server.sh --download-model-dir /workspace/models --vad-dir damo/speech_fsmn_vad_zh-cn-16k-common-onnx --model-dir damo/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-onnx  --punc-dir damo/punc_ct-transformer_cn-en-common-vocab471067-large-onnx --lm-dir damo/speech_ngram_lm_zh-cn-ai-wesp-fst --itn-dir thuduj12/fst_itn_zh --certfile 0 --hotword /workspace/models/hotwords.txt > /var/log/funasr.log 2>&1 & tail -f /var/log/funasr.log"
 ```
 
-## Ollama
-
-```bash
-docker run -d --device /dev/kfd --device /dev/dri \
-    -v /mnt/data/ollama:/root/.ollama --restart=always \
-    -p 9097:11434 \
-    --name Ollama ollama/ollama:rocm serve
-```
-
 ## Cosy-voice
 
 ```bash
@@ -354,7 +350,8 @@ sudo mkcert -cert-file /etc/ssl/self-signed/selfsigned.crt \
 | mysql         | 8002     | ollama         |  9097 |
 | DBGate        | 8003     | dify           |  9098 |
 | nginx         | 8848/443 | cosy-voice     | x9099 |
-| redis         | 6379     |                |       |
-| cockpit       | 9090     |                |       |
-| portainer     | 9000     | chrome         |  9103 |
-| redis_insight | 9001     | siyuan_note    |  9104 |
+| redis         | 6379     | openclaw       |  9100 |
+| cockpit       | 9090     | openclaw       |  9101 |
+| portainer     | 9000     | openclaw       |  9102 |
+| redis_insight | 9001     | chrome         |  9103 |
+|               |          |                |       |
