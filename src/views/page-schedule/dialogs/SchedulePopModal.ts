@@ -1,8 +1,8 @@
-import ColorSelector from "@/components/ColorSelector.vue";
-import GroupSelector from "@/components/GroupSelector.vue";
-import PrioritySelector from "@/components/PrioritySelector.vue";
-import RepeatSelector from "@/components/RepeatSelector.vue";
-import SubtaskPopModal from "@/components/SubtaskPopModal.vue";
+import ColorSelector from "./SelectorColor.vue";
+import GroupSelector from "./SelectorGroup.vue";
+import PrioritySelector from "./SelectorPriority.vue";
+import RepeatSelector from "./SelectorRepeat.vue";
+import SubtaskPopModal from "./SubtaskPopModal.vue";
 import { getColorOptions } from "@/types/color-type";
 import IonIcons from "@/types/ion-icons";
 import {
@@ -439,6 +439,9 @@ export default defineComponent({
       ...tab2Method,
       ...tab3Method,
       ...uiMethod,
+      // 导出 changeFlag 供 methods 使用
+      getChangeFlag: () => changeFlag,
+      setChangeFlag: (v: boolean) => { changeFlag = v; },
     };
   },
   data() {
@@ -462,6 +465,7 @@ export default defineComponent({
             text: "确定",
             handler: (e) => {
               this.curScheduleData.score = parseInt(e[0]);
+              this.setChangeFlag(true);
             },
           },
         ],

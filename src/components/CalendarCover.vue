@@ -145,7 +145,7 @@
 </template>
 <script setup lang="ts">
 import FabButton from "@/components/FabButton.vue";
-import SchedulePop from "@/components/SchedulePopModal.vue";
+import SchedulePop from "@/views/page-schedule/dialogs/SchedulePopModal.vue";
 import { getColorOptions } from "@/types/color-type";
 import { getGroupOptions, getPriorityOptions } from "@/types/schedule-type";
 import { DayData, S_TS, ScheduleData, ScheduleSave, UData, UserData } from "@/types/user-data";

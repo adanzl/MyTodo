@@ -67,7 +67,7 @@ import { createTriggerController } from "@/utils/t-overlay";
 import { IonRadio, IonRadioGroup } from "@ionic/vue";
 import { onMounted, ref, watch } from "vue";
 import dayjs from "dayjs";
-import WeekSelector from "@/components/WeekSelector.vue";
+import WeekSelector from "./SelectorWeek.vue";
 const props = defineProps({
   trigger: {
     type: String,

@@ -235,17 +235,21 @@ export class UData {
       const scheduleSave = save?.[schedule.id];
       if (scheduleSave && scheduleSave.scheduleOverride) {
         const os = scheduleSave.scheduleOverride;
-        // 处理覆盖问题
+        // 处理覆盖问题 - 使用 !== undefined 判断，支持默认值为 0 或 -1 的字段
         // 任务标题
-        os.title && (schedule.title = os.title);
-        // 颜色id
-        os.color && (schedule.color = os.color);
+        os.title !== undefined && (schedule.title = os.title);
+        // 颜色 id
+        os.color !== undefined && (schedule.color = os.color);
         // 优先级
-        os.priority && (schedule.priority = os.priority);
-        // 分组id
-        os.groupId && (schedule.groupId = os.groupId);
+        os.priority !== undefined && (schedule.priority = os.priority);
+        // 分组 id
+        os.groupId !== undefined && (schedule.groupId = os.groupId);
+        // 排序
+        os.order !== undefined && (schedule.order = os.order);
+        // 积分
+        os.score !== undefined && (schedule.score = os.score);
         // 子任务列表
-        os.subtasks && (schedule.subtasks = os.subtasks);
+        os.subtasks !== undefined && (schedule.subtasks = os.subtasks);
       }
       if (schedule.startTs && schedule.startTs.startOf("day").unix() <= ts) {
         if (schedule.startTs.startOf("day").unix() === ts) {

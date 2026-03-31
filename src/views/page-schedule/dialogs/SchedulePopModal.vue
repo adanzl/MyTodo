@@ -357,7 +357,7 @@
       :value="curScheduleData.priority" />
   </ion-modal>
 </template>
-<script lang="ts" src="@/components/SchedulePopModal.ts"></script>
+<script lang="ts" src="./SchedulePopModal.ts"></script>
 <style scoped>
 .schedule-datetime-time::part(wheel-item) {
   min-width: 100px;

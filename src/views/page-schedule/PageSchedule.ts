@@ -1,6 +1,6 @@
 import CalenderTab from "@/components/CalendarTab.vue";
 import FabButton from "@/components/FabButton.vue";
-import SchedulePop from "@/components/SchedulePopModal.vue";
+import SchedulePop from "@/views/page-schedule/dialogs/SchedulePopModal.vue";
 import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import { getColorOptions } from "@/types/color-type";
 import EventBus, { C_EVENT } from "@/types/event-bus";
