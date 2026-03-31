@@ -95,6 +95,17 @@
               </ion-checkbox>
             </div>
           </ion-item>
+          <ion-item lines="full" class="w-25 shrink-0">
+            <ion-label position="stacked">商城显示</ion-label>
+            <div class="flex items-center justify-center pt-1">
+              <ion-checkbox
+                class="scale-75 origin-center"
+                :model-value="!!newGift.show"
+                @ionChange="newGift.show = $event.detail.checked ? 1 : 0"
+                :disabled="!!editingGift && !isAdmin">
+              </ion-checkbox>
+            </div>
+          </ion-item>
         </div>
         <ion-item lines="full">
           <ion-label position="stacked">图片</ion-label>
@@ -174,6 +185,7 @@ const newGift = ref<{
   exchange?: number;
   stock?: number;
   wish?: number;
+  show?: number;
 }>({
   name: "",
   cost: 0,
@@ -182,6 +194,7 @@ const newGift = ref<{
   exchange: 1,
   stock: 1,
   wish: 1,
+  show: 1,
 });
 const newGiftPreview = ref<string>("");
 const newGiftFile = ref<File | null>(null);
@@ -194,14 +207,7 @@ watch(
     if (props.editingGift) {
       const item = props.editingGift;
       newGift.value = {
-        name: item.name ?? "",
-        cost: item.cost ?? 0,
-        cate_id: item.cate_id,
-        image: item.img ?? item.image ?? "",
-        enable: item.enable ?? 1,
-        exchange: item.exchange ?? 1,
-        stock: item.stock ?? 0,
-        wish: item.wish,
+        ...item
       };
       newGiftPreview.value = newGift.value.image
         ? getPicDisplayUrl(newGift.value.image)
@@ -268,6 +274,7 @@ async function saveGift() {
       stock: Number(newGift.value.stock) || 0,
       image: imageName,
       wish: newGift.value.wish ?? 1,
+      show: newGift.value.show ?? 1,
     });
     EventBus.$emit(C_EVENT.TOAST, isUpdate ? "更新成功" : "添加奖品成功");
     newGiftFile.value = null;

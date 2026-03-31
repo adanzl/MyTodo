@@ -339,7 +339,7 @@ async function refreshUserList() {
             wishList.value.data.push({
               id: item.id,
               name: item.name,
-              img: item.image,
+              image: item.image,
             });
           });
         }
@@ -350,14 +350,14 @@ async function refreshUserList() {
     });
 }
 
-function refreshGiftList(
+async function refreshGiftList(
   cateId?: number | undefined,
   pageNum: number = 1,
   append: boolean = false
 ): Promise<void> {
   const filter: Record<string, number> = {
     enable: 1,
-    exchange: 1,
+    show: 1,
   };
   if (cateId) {
     filter["cate_id"] = cateId;
@@ -365,8 +365,9 @@ function refreshGiftList(
   if (append) {
     loadingGifts.value = true;
   }
-  return getList<GiftListItem>("t_gift", filter, pageNum, PAGE_SIZE)
-    .then((data) => {
+  try {
+    try {
+      const data = await getList<GiftListItem>("t_gift", filter, pageNum, PAGE_SIZE);
       const d = data.data ?? [];
       if (!append) {
         giftList.value.data = [];
@@ -387,15 +388,7 @@ function refreshGiftList(
 
       _.forEach(d, (item) => {
         const row = {
-          id: item.id,
-          name: item.name,
-          img: item.image,
-          cate_id: item.cate_id,
-          cost: item.cost,
-          enable: item.enable,
-          exchange: item.exchange,
-          stock: item.stock,
-          wish: item.wish,
+          ...item,
           edited: false,
           cachedImgUrl: "" as string,
         };
@@ -409,13 +402,12 @@ function refreshGiftList(
           );
         }
       });
-    })
-    .catch((err) => {
+    } catch (err) {
       EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
-    })
-    .finally(() => {
-      loadingGifts.value = false;
-    });
+    }
+  } finally {
+    loadingGifts.value = false;
+  }
 }
 
 function loadMoreGifts(event: any) {
@@ -468,7 +460,7 @@ async function btnLotteryClk() {
               // 构建奖励列表
               const rewardList = wonGifts.map((gift) => ({
                 value: gift.name || "-",
-                img: gift.image || "",
+                image: gift.image || "",
                 rewardType: "gift" as const,
               }));
               // 只有一个元素时使用 REWARD，多个元素时使用 REWARD_LIST

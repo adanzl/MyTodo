@@ -8,7 +8,7 @@
         :value="selectValue"
         @ion-change="onCateChange">
         <ion-select-option :value="cate.id" v-for="cate in lotteryCatList" :key="cate.id">
-          {{ cate.name }}
+          {{ cate.name}}
         </ion-select-option>
       </ion-select>
       <div class="flex w-1/3 items-center justify-center">

@@ -28,11 +28,18 @@
         <ion-list v-if="categoryGiftList.length > 0">
           <ion-item v-for="item in categoryGiftList" :key="item.id"
             :class="{ '[&::part(native)]:bg-gray-300': !item.enable }" button lines="full" @click="openGiftEdit(item)">
-            <div slot="start" class="w-14 h-14 mr-2">
+            <div slot="start" class="w-14 h-14 mr-2 my-1">
               <img :src="getGiftImgUrl(item)" alt="" class="w-14 h-14 object-cover rounded" />
             </div>
             <ion-label>
-              <h2>[{{ item.id }}] {{ item.name }}</h2>
+              <h2 class="flex w-full ">
+                <div class="w-10">[{{ item.id }}]</div> 
+                <div class="flex-1">{{ item.name }}</div>
+                <div class="flex items-center text-[12px]">
+                  启用：
+                  <ion-icon :icon="item.enable ? checkmarkCircleOutline : checkmarkCircleOutline" class="w-3.5 h-3.5"></ion-icon>
+                </div>
+              </h2>
               <div class="flex items-center text-[12px] gap-1">
                 <Icon icon="mdi:star" class="text-red-500 w-3.5 h-3.5 inline " />
                 <div class="w-7">{{ item.cost }} </div>
@@ -40,11 +47,7 @@
                 <div class="w-6">{{ item.stock ?? 0 }} </div>
                 <div class="w-10">愿：{{ item.wish ? "是" : "否" }}</div>
                 <div class="w-10">兑: {{ item.exchange ? "是" : "否" }}</div>
-                <div class="flex items-center ">
-                  激活：
-                  <ion-icon :icon="item.enable ? checkmarkCircleOutline : checkmarkCircleOutline" class="w-3.5 h-3.5"></ion-icon>
-                </div>
-                
+                <div class="w-12">商城: {{ item.show ? "是" : "否" }}</div>
               </div>
             </ion-label>
           </ion-item>
@@ -253,15 +256,7 @@ async function onCateClick(cate: any) {
   getList("t_gift", filter, 1, 200)
     .then((data: any) => {
       categoryGiftList.value = (data?.data ?? []).map((item: any) => ({
-        id: item.id,
-        name: item.name,
-        img: item.image,
-        image: item.image,
-        cate_id: item.cate_id,
-        cost: item.cost,
-        enable: item.enable,
-        exchange: item.exchange,
-        stock: item.stock,
+        ...item
       }));
     })
     .catch((err: any) => {
@@ -301,15 +296,7 @@ function onGiftSaved() {
     getList("t_gift", filter, 1, 200)
       .then((data: any) => {
         categoryGiftList.value = (data?.data ?? []).map((item: any) => ({
-          id: item.id,
-          name: item.name,
-          img: item.image,
-          image: item.image,
-          cate_id: item.cate_id,
-          cost: item.cost,
-          enable: item.enable,
-          exchange: item.exchange,
-          stock: item.stock,
+          ...item,
         }));
       })
       .catch((err: any) => {

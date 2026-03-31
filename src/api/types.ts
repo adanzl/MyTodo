@@ -159,6 +159,8 @@ export interface GiftListItem {
   cost?: number;
   /** 是否可加入心愿单，1=是 0=否 */
   wish?: number;
+  /** 是否显示，1=显示 0=隐藏 */
+  show?: number;
   [key: string]: unknown;
 }
 

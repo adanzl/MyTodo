@@ -17,7 +17,7 @@
           </div>
         </ion-item>
         <ion-radio-group
-          :value="selectedCate?.id"
+          :value="localSelectedPool?.id"
           class="radio-grid"
           @ionChange="onCateChangeFromRadio">
           <ion-radio
@@ -34,12 +34,9 @@
           <ion-button
             @click="$emit('lottery')"
             size="default"
-            :disabled="!selectedCate || userScore < lotteryCost">
+            :disabled="!localSelectedPool || userScore < lotteryCost">
             <div class="w-20 h-20 flex flex-col items-center justify-center">
               <span>立即抽奖</span>
-              <span class="mt-1 text-[10px]">
-                {{ selectedCate?.count || 1 }}{{ selectedCate?.count_mx ? ' - ' + selectedCate.count_mx : '' }} 件
-              </span>
               <div class="flex items-center justify-center mt-2">
                 <Icon icon="mdi:star" class="text-red-500 w-5 h-5" />
                 {{ lotteryCost }}
@@ -114,7 +111,7 @@ import "swiper/css";
 import "swiper/css/free-mode";
 import { FreeMode } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
-import { computed, inject, ref } from "vue";
+import { computed, inject, ref, watch } from "vue";
 import { getPicDisplayUrl } from "@/api/api-pic";
 import { PicDisplaySize } from "@/utils/img-mgr";
 
@@ -137,12 +134,12 @@ const props = defineProps<{
   userScore: number;
 }>();
 
-/** 未选择类别(id===0)时使用 RDS 的 fee，否则使用所选类别的 cost */
+/** 未选择类别 (id===0) 时使用 RDS 的 fee，否则使用所选类别的 cost */
 const lotteryCost = computed(() => {
-  if (props.selectedCate?.id === 0) {
+  if (localSelectedPool.value?.id === 0) {
     return props.lotteryData?.fee ?? 10;
   }
-  return props.selectedCate?.cost ?? 10;
+  return localSelectedPool.value?.cost ?? 10;
 });
 
 const emit = defineEmits<{
@@ -153,6 +150,22 @@ const emit = defineEmits<{
 }>();
 
 const swiperRef = ref();
+
+// 本地维护选中的奖池状态，默认选中第一个（"全部"）
+const localSelectedPool = ref<any>(null);
+
+// 监听 poolList 变化，当 localSelectedPool 为空时自动选中第一个
+watch(
+  () => props.poolList,
+  (newList) => {
+    if (!localSelectedPool.value && newList.length > 0) {
+      localSelectedPool.value = newList[0];
+      // 触发选中事件，通知父组件
+      emit("cate-change", newList[0]);
+    }
+  },
+  { immediate: true }
+);
 
 // TabLottery 使用 poolList (奖池列表)，不监听 selectedCate (奖品类别)
 // 奖池选择通过 ion-radio-group 的 onCateChangeFromRadio 处理
@@ -166,6 +179,7 @@ function onCateChangeFromRadio(event: any) {
   // event.detail.value 现在是 id，需要找到对应的完整对象
   const selectedPool = props.poolList.find((item: any) => item.id === event.detail.value);
   if (selectedPool) {
+    localSelectedPool.value = selectedPool;
     emit("cate-change", selectedPool);
   }
 }
