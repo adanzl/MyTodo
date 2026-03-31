@@ -53,7 +53,7 @@
               </ion-select-option>
             </ion-select>
           </ion-item>
-          <ion-item lines="full" class="w-20 shrink-0">
+          <ion-item class="w-20 shrink-0 h">
             <ion-label position="stacked">积分</ion-label>
             <ion-input
               type="number"
@@ -61,6 +61,17 @@
               placeholder="消耗积分"
               @ionInput="newGift.cost = +$event.detail.value"
               :readonly="!!editingGift && !isAdmin" />
+          </ion-item>
+          <ion-item lines="full" class="w-16 shrink-0">
+            <ion-label position="stacked">兑换</ion-label>
+            <div class="flex items-center justify-center pt-1.5">
+              <ion-checkbox
+                class="scale-75 origin-center"
+                :checked="!!newGift.exchange"
+                @ionChange="newGift.exchange = $event.detail.checked ? 1 : 0"
+                :disabled="!!editingGift && !isAdmin">
+              </ion-checkbox>
+            </div>
           </ion-item>
         </div>
         <div class="flex gap-2 w-full">
@@ -74,19 +85,8 @@
               :readonly="!!editingGift && !isAdmin" />
           </ion-item>
           <ion-item lines="full" class="w-20 shrink-0">
-            <ion-label position="stacked">兑换</ion-label>
-            <div class="flex items-center justify-center pt-1">
-              <ion-checkbox
-                class="scale-75 origin-center"
-                :checked="!!newGift.exchange"
-                @ionChange="newGift.exchange = $event.detail.checked ? 1 : 0"
-                :disabled="!!editingGift && !isAdmin">
-              </ion-checkbox>
-            </div>
-          </ion-item>
-          <ion-item lines="full" class="w-20 shrink-0">
             <ion-label position="stacked">心愿单</ion-label>
-            <div class="flex items-center justify-center pt-1">
+            <div class="flex items-center justify-center pt-1.5">
               <ion-checkbox
                 class="scale-75 origin-center"
                 :model-value="!!newGift.wish"
@@ -95,9 +95,9 @@
               </ion-checkbox>
             </div>
           </ion-item>
-          <ion-item lines="full" class="w-25 shrink-0">
+          <ion-item lines="full" class="shrink-0 flex-1">
             <ion-label position="stacked">商城显示</ion-label>
-            <div class="flex items-center justify-center pt-1">
+            <div class="flex items-center justify-center pt-1.5">
               <ion-checkbox
                 class="scale-75 origin-center"
                 :model-value="!!newGift.show"
