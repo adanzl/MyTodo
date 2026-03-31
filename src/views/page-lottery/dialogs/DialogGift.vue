@@ -53,7 +53,7 @@
               </ion-select-option>
             </ion-select>
           </ion-item>
-          <ion-item class="w-20 shrink-0 h">
+          <ion-item lines="full" class="w-20 shrink-0 h">
             <ion-label position="stacked">积分</ion-label>
             <ion-input
               type="number"
