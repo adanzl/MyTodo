@@ -224,6 +224,7 @@ watch(
         exchange: 1,
         stock: 1,
         wish: 1,
+        show: 1,
       };
       newGiftPreview.value = "";
       newGiftFile.value = null;
