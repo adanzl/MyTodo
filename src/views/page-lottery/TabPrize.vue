@@ -32,14 +32,14 @@
         <div class="w-full m-2">
           <ion-label>
             <h2 class="flex">
-              <div class="w-8">[{{ item.id }}]</div>
-              {{ item.name }}
+              <div class="w-8 flex items-center text-[11px]">[{{ item.id }}]</div>
+              <div class="flex text-[15px] w-full">{{ item.name }}</div>
             </h2>
           </ion-label>
           <div class="flex items-center">
             <Icon icon="mdi:star" class="text-red-500 w-5 h-5" />
             <div class="text-left pl-1 pt-1 font-bold w-12">{{ item.cost }}</div>
-            <p class="text-sm ml-1 pt-1 w-18">{{ getCateName(item.cate_id) }}</p>
+            <p class="text-[12px] ml-1 pt-1 w-18">{{ getCateName(item.cate_id) }}</p>
             <p class="text-[10px] ml-1 pt-1"> {{ item.stock ?? 0 }}</p>
           </div>
         </div>
