@@ -53,7 +53,7 @@
               </ion-select-option>
             </ion-select>
           </ion-item>
-          <ion-item lines="full" class="w-18 shrink-0">
+          <ion-item lines="full" class="w-20 shrink-0">
             <ion-label position="stacked">积分</ion-label>
             <ion-input
               type="number"
@@ -64,7 +64,7 @@
           </ion-item>
         </div>
         <div class="flex gap-2 w-full">
-          <ion-item lines="full" class="w-18 shrink-0">
+          <ion-item lines="full" class="w-20 shrink-0">
             <ion-label position="stacked">库存</ion-label>
             <ion-input
               type="number"
@@ -73,7 +73,7 @@
               @ionInput="newGift.stock = +$event.detail.value"
               :readonly="!!editingGift && !isAdmin" />
           </ion-item>
-          <ion-item lines="full" class="w-18 shrink-0">
+          <ion-item lines="full" class="w-20 shrink-0">
             <ion-label position="stacked">兑换</ion-label>
             <div class="flex items-center justify-center pt-1">
               <ion-checkbox
@@ -89,7 +89,7 @@
             <div class="flex items-center justify-center pt-1">
               <ion-checkbox
                 class="scale-75 origin-center"
-                :checked="!!newGift.wish"
+                :model-value="!!newGift.wish"
                 @ionChange="newGift.wish = $event.detail.checked ? 1 : 0"
                 :disabled="!!editingGift && !isAdmin">
               </ion-checkbox>
@@ -201,7 +201,7 @@ watch(
         enable: item.enable ?? 1,
         exchange: item.exchange ?? 1,
         stock: item.stock ?? 0,
-        wish: item.wish ?? 1,
+        wish: item.wish,
       };
       newGiftPreview.value = newGift.value.image
         ? getPicDisplayUrl(newGift.value.image)

@@ -114,7 +114,7 @@ import "swiper/css";
 import "swiper/css/free-mode";
 import { FreeMode } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
-import { computed, inject, ref, watch } from "vue";
+import { computed, inject, ref } from "vue";
 import { getPicDisplayUrl } from "@/api/api-pic";
 import { PicDisplaySize } from "@/utils/img-mgr";
 
@@ -154,20 +154,8 @@ const emit = defineEmits<{
 
 const swiperRef = ref();
 
-// 监听 selectedCate 变化，确保它在 poolList 中存在
-watch([() => props.poolList, () => props.selectedCate], ([poolList, selectedCate]) => {
-  if (poolList && poolList.length > 0 && selectedCate) {
-    // 检查当前选中的是否在列表中
-    const exists = poolList.some((item: any) => item.id === selectedCate.id);
-    if (!exists) {
-      // 如果不存在，通知父组件切换到第一个
-      emit("cate-change", poolList[0]);
-    }
-  } else if (poolList && poolList.length > 0 && !selectedCate) {
-    // 如果没有选中项，通知父组件选中第一个
-    emit("cate-change", poolList[0]);
-  }
-}, { immediate: true });
+// TabLottery 使用 poolList (奖池列表)，不监听 selectedCate (奖品类别)
+// 奖池选择通过 ion-radio-group 的 onCateChangeFromRadio 处理
 
 function setSwiperInstance(swiper: any) {
   swiperRef.value = swiper;

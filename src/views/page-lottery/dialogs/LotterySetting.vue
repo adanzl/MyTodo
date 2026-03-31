@@ -40,7 +40,11 @@
                 <div class="w-6">{{ item.stock ?? 0 }} </div>
                 <div class="w-10">愿：{{ item.wish ? "是" : "否" }}</div>
                 <div class="w-10">兑: {{ item.exchange ? "是" : "否" }}</div>
-                <ion-icon :icon="item.enable ? checkmarkCircleOutline : checkmarkCircleOutline" class=""></ion-icon>
+                <div class="flex items-center ">
+                  激活：
+                  <ion-icon :icon="item.enable ? checkmarkCircleOutline : checkmarkCircleOutline" class="w-3.5 h-3.5"></ion-icon>
+                </div>
+                
               </div>
             </ion-label>
           </ion-item>

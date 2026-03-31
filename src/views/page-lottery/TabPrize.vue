@@ -1,7 +1,12 @@
 <template>
   <ion-segment-content id="tabPrize">
     <ion-item>
-      <ion-select label="类别" placeholder="选择类别" justify="start" :value="selectedCate?.id" @ionChange="onCateChange">
+      <ion-select 
+        label="类别" 
+        placeholder="选择类别" 
+        justify="start" 
+        :value="selectValue"
+        @ion-change="onCateChange">
         <ion-select-option :value="cate.id" v-for="cate in lotteryCatList" :key="cate.id">
           {{ cate.name }}
         </ion-select-option>
@@ -127,6 +132,9 @@ const isAdmin = computed(() => globalVar?.user?.admin === 1);
 const isGiftModalOpen = ref(false);
 const editingGift = ref<any>(null);
 
+// 本地维护 select 的值，避免响应式更新不同步
+const selectValue = ref<number | undefined>(undefined);
+
 // 监听 selectedCate 变化，确保它在 lotteryCatList 中存在
 watch([() => props.lotteryCatList, () => props.selectedCate], ([catList, selectedCate]) => {
   if (catList && catList.length > 0 && selectedCate) {
@@ -135,6 +143,9 @@ watch([() => props.lotteryCatList, () => props.selectedCate], ([catList, selecte
     if (!exists) {
       // 如果不存在，通知父组件切换到第一个（"全部"）
       emit("cate-change", catList[0]);
+    } else {
+      // 存在时才更新本地 select 值（不触发 emit，避免循环）
+      selectValue.value = selectedCate.id;
     }
   } else if (catList && catList.length > 0 && !selectedCate) {
     // 如果没有选中项，通知父组件选中第一个（"全部"）
@@ -178,12 +189,16 @@ function onLoadMore(event: any) {
   emit("load-more", event);
 }
 function onCateChange(event: any) {
-  // event.detail.value 现在是 id，需要找到对应的完整对象
+  // event.detail.value 是选中的 id
   const selectedCate = props.lotteryCatList.find((cate: any) => cate.id === event.detail.value);
   if (selectedCate) {
+    // 先更新本地值，让 UI 立即响应
+    selectValue.value = event.detail.value;
+    // 再通知父组件
     emit("cate-change", selectedCate);
   }
 }
+
 
 function getCateName(cateId: number) {
   const cate = _.find(props.lotteryCatList, { id: cateId });
