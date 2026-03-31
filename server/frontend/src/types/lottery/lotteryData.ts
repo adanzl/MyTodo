@@ -33,6 +33,7 @@ export interface Gift {
   exchange: number;
   stock: number;
   wish: boolean | number;
+  show: boolean | number;
   edited?: boolean;
 }
 
@@ -50,6 +51,7 @@ export interface GiftApiData {
   exchange?: number;
   stock?: number;
   wish?: number;
+  show?: number;
 }
 
 /**

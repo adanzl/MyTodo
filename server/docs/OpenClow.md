@@ -61,6 +61,9 @@ vim /mnt/data/openclaw/data/.openclaw/openclaw.json
 # 运行初始化脚本
 docker compose run --rm openclaw-cli onboard
 
+# 二次配置
+docker compose run --rm openclaw-cli configure
+
 # ollama base url
 http://host.docker.internal:9097
 ```

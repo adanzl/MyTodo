@@ -3,7 +3,7 @@
     <div class="flex items-center h-10">
       <el-radio-group size="large" v-model="selectedCateId" class="" @change="onCateChange">
         <el-radio-button v-for="item in lotteryCatList" :key="item.id" :value="item.id">
-          {{ item.name }}
+          {{ item.name }} {{  tableMaxHeight }}
         </el-radio-button>
       </el-radio-group>
       <el-button type="primary" class="ml-1" @click="modifyCateModel = true">
@@ -15,7 +15,7 @@
         <el-button type="primary" class="" @click="onAddGiftClk">添加奖品</el-button>
       </div>
     </div>
-    <el-table :data="giftList.data" v-loading="loading">
+    <el-table :data="giftList.data" v-loading="loading" :max-height="tableMaxHeight">
       <!-- 图片 -->
       <el-table-column width="130" label="Image">
         <template #default="{ row }">
@@ -74,7 +74,7 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column label="Exchange" width="100" align="center">
+      <el-table-column label="兑换" width="100" align="center">
         <template #default="{ row }">
           <el-checkbox v-model.number="row.exchange" :true-value="1" :false-value="0" :disabled="!row.edited" />
         </template>
@@ -96,16 +96,21 @@
       <el-table-column label="启用" width="80">
         <template #default="{ row }">
           <div class="flex items-center pl-2">
-            <el-checkbox v-model.number="row.enable" :true-value="1" :false-value="0" :disabled="!row.edited" />
+            <el-checkbox v-model="row.enable" :disabled="!row.edited" />
           </div>
         </template>
       </el-table-column>
       <el-table-column label="心愿单" width="80" align="center">
         <template #default="{ row }">
-          <el-checkbox v-model.number="row.wish" :true-value="1" :false-value="0" :disabled="!row.edited" />
+          <el-checkbox v-model="row.wish" :disabled="!row.edited" />
         </template>
       </el-table-column>
-      <el-table-column label="Operations">
+      <el-table-column label="显示" width="80" align="center">
+        <template #default="{ row }">
+          <el-checkbox v-model="row.show" :disabled="!row.edited" />
+        </template>
+      </el-table-column>
+      <el-table-column label="操作">
         <template #default="{ row }">
           <div class="flex flex-col gap-2 [&_.el-button+_.el-button]:ml-0!">
             <el-button v-if="row.id !== -1" class="w-16" size="small" type="danger" @click="handleGiftDel(row)">
@@ -125,8 +130,11 @@
         </template>
       </el-table-column>
     </el-table>
-    <el-pagination layout="prev, pager, next" :total="giftList.totalCount" :page-size="PAGE_SIZE"
+    <el-pagination layout="sizes, prev, pager, next" :total="giftList.totalCount"
+      v-model:page-size="PAGE_SIZE"
+      :page-sizes="[5, 10, 20]"
       :current-page="giftList.pageNum" class="mt-2" background
+      @size-change="handleSizeChange"
       @current-change="(page: number) => handlePageChange(page, PAGE_SIZE)" />
   </div>
   <el-dialog v-model="modifyCateModel" title="类别管理" width="800" destroy-on-close>
@@ -168,7 +176,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, computed, nextTick } from "vue";
 import { ElMessage } from "element-plus";
 import type { UploadFile } from "element-plus";
 import { Edit, Plus } from "@element-plus/icons-vue";
@@ -177,8 +185,19 @@ import { uploadPic, getPicDisplayUrl } from "@/api/pic";
 import * as _ from "lodash-es";
 import type { Gift, GiftApiData, GiftCategory } from "@/types/lottery";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = ref<number>(5);
 const selectedCateId = ref<number>(0);
+const tableMaxHeight = ref<number>(0);
+
+// 计算表格最大高度
+const calculateTableHeight = () => {
+  nextTick(() => {
+    const windowHeight = window.innerHeight;
+    const reservedSpace = 370;
+    tableMaxHeight.value = windowHeight - reservedSpace;
+  });
+};
+
 const selectedCate = computed(() => {
   return (
     lotteryCatList.value.find(item => item.id === selectedCateId.value) || lotteryCatList.value[0]
@@ -258,6 +277,7 @@ const refreshGiftList = async (cateId: number, pageNum: number, pageSize: number
           exchange: item.exchange ?? 0,
           stock: item.stock ?? 0,
           wish: (item.wish ?? 0) === 1,
+          show: (item.show ?? 0) === 1,
           edited: false,
         });
       });
@@ -273,7 +293,7 @@ const refreshGiftList = async (cateId: number, pageNum: number, pageSize: number
 const onCateChange = () => {
   const cate = selectedCate.value;
   if (cate) {
-    refreshGiftList(cate.id, 1, PAGE_SIZE);
+    refreshGiftList(cate.id, 1, PAGE_SIZE.value);
   }
 };
 
@@ -284,9 +304,10 @@ const onAddGiftClk = () => {
     img: "",
     cate_id: selectedCate.value.id,
     cost: 0,
-    enable: false,
+    enable: true,
     exchange: 0,
     stock: 0,
+    show: true,
     wish: false,
     edited: true,
   });
@@ -311,23 +332,27 @@ const handleGiftCancel = async (item: Gift, idx: number) => {
   if (item.id === -1) {
     giftList.value.data.splice(idx, 1);
   } else {
-    item.edited = false;
     try {
-      const data = await getData<GiftApiData>("t_gift", item.id);
-      Object.assign(item, {
-        id: data.id,
-        name: data.name,
-        img: data.image,
-        cate_id: data.cate_id,
-        cost: data.cost,
-        enable: data.enable === 1,
-        exchange: data.exchange ?? 0,
-        stock: data.stock ?? 0,
-        wish: (data.wish ?? 0) === 1,
-      });
+      // 获取所有字段的数据
+      const data = await getData<GiftApiData>("t_gift", item.id, "*");
+      console.log("取消编辑 - 获取到的数据:", data);
+      // 使用直接赋值的方式确保 Vue 响应式更新
+      item.id = data.id;
+      item.name = data.name;
+      item.img = data.image;
+      item.cate_id = data.cate_id;
+      item.cost = data.cost;
+      item.enable = data.enable === 1;
+      item.exchange = data.exchange ?? 0;
+      item.stock = data.stock ?? 0;
+      item.wish = (data.wish ?? 0) === 1;
+      item.show = (data.show ?? 0) === 1;
     } catch (error) {
       console.error("获取奖品数据失败:", error);
+      ElMessage.error("获取奖品数据失败");
+      // 出错时也将编辑状态设为 false
     }
+    item.edited = false;
   }
 };
 
@@ -343,6 +368,7 @@ const handleGiftSave = async (item: Gift) => {
       exchange: item.exchange ?? 0,
       stock: item.stock ?? 0,
       wish: item.wish ? 1 : 0,
+      show: item.show ? 1 : 0,
     };
     await setData("t_gift", data);
     await refreshGiftList(selectedCate.value.id, giftList.value.pageNum, giftList.value.pageSize);
@@ -370,6 +396,10 @@ const handleImageChange = async (file: UploadFile, row: Gift) => {
 
 const handlePageChange = (pageNum: number, pageSize: number) => {
   refreshGiftList(selectedCate.value.id, pageNum, pageSize);
+};
+
+const handleSizeChange = (pageSize: number) => {
+  refreshGiftList(selectedCate.value.id, 1, pageSize);
 };
 
 const handleCateBlur = (item: GiftCategory, key: string, _idx: number) => {
@@ -414,7 +444,9 @@ const handleCateCancel = (item: GiftCategory, _idx: number) => {
 
 onMounted(async () => {
   await refreshCateList();
-  await refreshGiftList(0, 1, PAGE_SIZE);
+  await refreshGiftList(0, 1, PAGE_SIZE.value);
+  calculateTableHeight();
+  window.addEventListener('resize', calculateTableHeight);
 });
 </script>
 
