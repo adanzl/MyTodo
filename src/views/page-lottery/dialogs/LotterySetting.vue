@@ -33,14 +33,14 @@
             </div>
             <ion-label>
               <h2 class="flex w-full ">
-                <div class="w-10">[{{ item.id }}]</div> 
+                <div class="w-10 flex items-center text-[14px]">[{{ item.id }}]</div> 
                 <div class="flex-1">{{ item.name }}</div>
                 <div class="flex items-center text-[12px]">
                   启用：
                   <ion-icon :icon="item.enable ? checkmarkCircleOutline : checkmarkCircleOutline" class="w-3.5 h-3.5"></ion-icon>
                 </div>
               </h2>
-              <div class="flex items-center text-[12px] gap-1">
+              <div class="flex items-center text-[12px] gap-1 mt-1.5">
                 <Icon icon="mdi:star" class="text-red-500 w-3.5 h-3.5 inline " />
                 <div class="w-7">{{ item.cost }} </div>
                 <ion-icon :icon="serverOutline" class=""></ion-icon>
