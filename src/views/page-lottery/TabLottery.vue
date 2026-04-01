@@ -19,7 +19,7 @@
         <ion-radio-group
           :value="localSelectedPool?.id"
           class="radio-grid"
-          @ionChange="onCateChangeFromRadio">
+          @ionChange="onPoolChangeFromRadio">
           <ion-radio
             v-for="item in poolList"
             :key="item.id"
@@ -127,7 +127,7 @@ function getWishImgUrl(item: { img?: string; image?: string }) {
 
 const props = defineProps<{
   poolList: any[];
-  selectedCate: any;
+  selectedPool: any;
   wishList: { progress: number; ids: number[]; data: any[] };
   lotteryData: any;
   userScore: number;
@@ -142,7 +142,7 @@ const lotteryCost = computed(() => {
 });
 
 const emit = defineEmits<{
-  (e: "cate-change", value: any): void;
+  (e: "pool-change", value: any): void;
   (e: "lottery"): void;
   (e: "remove-wish", item: any): void;
   (e: "open-pool"): void;
@@ -160,26 +160,25 @@ watch(
     if (!localSelectedPool.value && newList.length > 0) {
       localSelectedPool.value = newList[0];
       // 触发选中事件，通知父组件
-      emit("cate-change", newList[0]);
+      emit("pool-change", newList[0]);
     }
   },
   { immediate: true }
 );
 
-// TabLottery 使用 poolList (奖池列表)，不监听 selectedCate (奖品类别)
-// 奖池选择通过 ion-radio-group 的 onCateChangeFromRadio 处理
+// TabLottery 使用 poolList (奖池列表)，通过 localSelectedPool 维护选中状态
 
 function setSwiperInstance(swiper: any) {
   swiperRef.value = swiper;
   swiper.update();
 }
 
-function onCateChangeFromRadio(event: any) {
+function onPoolChangeFromRadio(event: any) {
   // event.detail.value 现在是 id，需要找到对应的完整对象
   const selectedPool = props.poolList.find((item: any) => item.id === event.detail.value);
   if (selectedPool) {
     localSelectedPool.value = selectedPool;
-    emit("cate-change", selectedPool);
+    emit("pool-change", selectedPool);
   }
 }
 </script>

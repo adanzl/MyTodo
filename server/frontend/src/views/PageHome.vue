@@ -114,7 +114,7 @@ const dialogForm = ref<{
 
 const refreshUserList = async () => {
   // 使用 store 刷新用户列表（会自动处理缓存）
-  await userStore.refreshUserList();
+  await userStore.refreshUserList(true);
 };
 
 const handleUpdateUser = async (item: UserWithExtras) => {

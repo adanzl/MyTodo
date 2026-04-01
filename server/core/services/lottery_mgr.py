@@ -32,7 +32,7 @@ class LotteryMgr:
         """
         if not pool:
             return None
-        
+
         # 提取所有礼物的库存作为权重
         weights = []
         for gift in pool:
@@ -40,7 +40,7 @@ class LotteryMgr:
             # 确保权重为正数
             weight = max(1, int(stock)) if isinstance(stock, (int, float)) else 1
             weights.append(weight)
-        
+
         # 使用 random.choices 进行加权随机选择（返回单个元素）
         selected = random.choices(pool, weights=weights, k=1)[0]
         return selected
@@ -185,8 +185,8 @@ class LotteryMgr:
     def _get_pool_config(self, pool_id: int) -> tuple:
         """
         返回 (费用，心愿单满额阈值，抽取次数，分类 ID 列表)。
-        pool_id==0 从 rds lottery:2 读 fee、wish_count_threshold；
-        否则从 t_gift_pool 读 cost、count、cate_list。
+        从 rds lottery:2 读 fee、wish_count_threshold；
+        从 t_gift_pool 读 cost、count、cate_list。
         Args:
             pool_id: int - 奖池 ID
         
@@ -195,37 +195,45 @@ class LotteryMgr:
         """
         default_threshold = 5
         default_count = 1
+
+        # 从 Redis 读取全局配置（fee 和 wish_count_threshold）
+        raw = self._rds.get_str("lottery:2")
+        if not raw:
+            return None, default_threshold, default_count, []
+        try:
+            cfg = json.loads(raw)
+        except Exception:
+            return None, default_threshold, default_count, []
+
+        # 获取心愿单阈值（所有奖池共用）
+        wish_threshold = cfg.get('wish_count_threshold', default_threshold)
+        wish_threshold = max(1, int(wish_threshold)) if isinstance(wish_threshold, (int, float)) else default_threshold
+
         if pool_id == 0:
-            raw = self._rds.get_str("lottery:2")
-            if not raw:
-                return None, default_threshold, default_count, []
-            try:
-                cfg = json.loads(raw)
-            except Exception:
-                return None, default_threshold, default_count, []
+            # pool_id==0 时使用 Redis 中的 fee
             fee = cfg.get('fee')
             if fee is None:
                 return None, default_threshold, default_count, []
-            t = cfg.get('wish_count_threshold', default_threshold)
-            t = max(1, int(t)) if isinstance(t, (int, float)) else default_threshold
+            fee = int(fee)
             count = cfg.get('count', default_count)
             count = max(1, int(count)) if isinstance(count, (int, float)) else default_count
-            return fee, t, count, []
+            return fee, wish_threshold, count, []
 
+        # 从数据库读取奖池配置
         pool = self._db.get_data('t_gift_pool', pool_id, "id,name,cost,count,count_mx,cate_list")
         if pool.get('code') != 0 or not pool.get('data'):
             # 奖池不存在
             return None, default_threshold, default_count, []
-        
+
         pool_data = pool['data']
-        
+
         # 获取 count 和 count_mx，生成随机抽取次数
         count_min = pool_data.get('count', default_count)
         count_min = max(1, int(count_min)) if isinstance(count_min, (int, float)) else default_count
-        
+
         count_mx = pool_data.get('count_mx', count_min)
         count_mx = max(count_min, int(count_mx)) if isinstance(count_mx, (int, float)) else count_min
-        
+
         # 在 count 到 count_mx 之间随机选择一个抽取次数
         draw_count = random.randint(count_min, count_mx)
 
@@ -237,7 +245,7 @@ class LotteryMgr:
                 int(x.strip()) for x in cate_list_str.split(',') if x.strip() and x.strip().lstrip('-').isdigit()
             ]
 
-        return pool_data['cost'], default_threshold, draw_count, cate_ids
+        return pool_data['cost'], wish_threshold, draw_count, cate_ids
 
     def _parse_wish_list_ids(self, wish_list_str: str) -> list:
         """将 t_user.wish_list（JSON 数组字符串，如 '[1,2,3]'）解析为礼物 id 列表。"""
@@ -268,13 +276,9 @@ class LotteryMgr:
         ids = self._parse_wish_list_ids(wish_list_str)
         if not ids:
             return []
-        
+
         # 直接从数据库查询心愿单中的礼物，不需要限制分类
-        cond = {
-            'enable': 1,
-            'stock': ('>', 0),
-            'id': ('in', ids)
-        }
+        cond = {'enable': 1, 'stock': ('>', 0), 'id': ('in', ids)}
         res = self._db.get_list('t_gift', 1, len(ids), '*', cond)
         if res.get('code') != 0:
             return []

@@ -8,7 +8,7 @@
         :value="selectValue"
         @ion-change="onCateChange">
         <ion-select-option :value="cate.id" v-for="cate in lotteryCatList" :key="cate.id">
-          {{ cate.name}}
+          {{ cate.name }}
         </ion-select-option>
       </ion-select>
       <div class="flex w-1/3 items-center justify-center">
@@ -152,11 +152,6 @@ watch([() => props.lotteryCatList, () => props.selectedCate], ([catList, selecte
     emit("cate-change", catList[0]);
   }
 }, { immediate: true });
-
-
-
-
-
 
 
 function openNewGift() {

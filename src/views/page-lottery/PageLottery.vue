@@ -37,11 +37,11 @@
     <ion-segment-view :style="{ height: `calc(100% - ${tabsHeight}px)` }">
       <LotteryTab
         :pool-list="poolList"
-        :selected-cate="selectedCate"
+        :selected-pool="selectedPool"
         :wish-list="wishList"
         :lottery-data="lotteryDate"
         :user-score="globalVar.user.score"
-        @cate-change="handleShopCateChange"
+        @pool-change="handlePoolChange"
         @lottery="btnLotteryClk"
         @remove-wish="btnRemoveWishClk"
         @open-pool="btnPoolClk" />
@@ -107,6 +107,7 @@ const globalVar: any = inject("globalVar");
 const isAdmin = computed(() => globalVar?.user?.admin === 1);
 const lotteryDate = ref<any>({});
 const segmentValue = ref("lotterySpecial");  // Default to lottery special
+const selectedPool = ref<any>(null);
 
 const wishList = ref<any>({
   progress: 30.2,  // 这个是个数
@@ -429,6 +430,10 @@ function loadMoreGifts(event: any) {
   });
 }
 
+function handlePoolChange(value: any) {
+  selectedPool.value = value;
+}
+
 function handleShopCateChange(value: any) {
   selectedCate.value = value;
   refreshGiftList(value?.id);
@@ -440,10 +445,10 @@ function handleUserChange(value: any) {
 
 async function btnLotteryClk() {
   const { alertController, loadingController } = await import("@ionic/vue");
-  const cateName = selectedCate.value?.name ?? "当前分类";
+  const poolName = selectedPool.value?.name ?? "当前奖池";
   const alert = await alertController.create({
     header: "确认抽奖",
-    message: `确定使用积分进行抽奖吗？\n（${cateName}）`,
+    message: `确定使用积分进行抽奖吗？\n（${poolName}）`,
     buttons: [
       { text: "取消", role: "cancel" },
       {
@@ -453,14 +458,14 @@ async function btnLotteryClk() {
           const loading = await loadingController.create({ message: "抽奖中..." });
           await loading.present();
           try {
-            const data = await doLottery(globalVar.user.id, selectedCate.value.id);
+            const data = await doLottery(globalVar.user.id, selectedPool.value.id);
             // 优先使用 gifts 数组（支持多个中奖礼物），兼容旧的 gift 字段
             const wonGifts: any[] = data.gifts || (data.gift ? [data.gift] : []);
             if (wonGifts.length > 0) {
               // 构建奖励列表
               const rewardList = wonGifts.map((gift) => ({
                 value: gift.name || "-",
-                image: gift.image || "",
+                img: gift.image || "",
                 rewardType: "gift" as const,
               }));
               // 只有一个元素时使用 REWARD，多个元素时使用 REWARD_LIST
