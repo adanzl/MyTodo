@@ -163,6 +163,7 @@ class LotteryMgr:
             return {"code": -1, "msg": f"写入积分历史失败：{add_ret.get('msg')}"}
 
         # ========== 阶段 4：更新用户状态 ==========
+        log.info(f"Update wish_progress: user_id={user_id}, old={wish_progress}, new={cur_progress}")
         self._db.set_data('t_user', {'id': user_id, 'wish_progress': cur_progress})
 
         # ========== 阶段 5：记录日志并返回 ==========
@@ -212,8 +213,10 @@ class LotteryMgr:
             return fee, t, count, []
 
         pool = self._db.get_data('t_gift_pool', pool_id, "id,name,cost,count,count_mx,cate_list")
-        if pool.get('code') != 0:
+        if pool.get('code') != 0 or not pool.get('data'):
+            # 奖池不存在
             return None, default_threshold, default_count, []
+        
         pool_data = pool['data']
         
         # 获取 count 和 count_mx，生成随机抽取次数

@@ -41,7 +41,7 @@
 import { ref, onMounted } from "vue";
 import { ElMessage } from "element-plus";
 import { InfoFilled } from "@element-plus/icons-vue";
-import { getRdsData, setRdsData } from "@/api/rds";
+import { getLotterySetting, setLotterySetting } from "@/api/api-lottery";
 import TabLottery from "./LotteryTab.vue";
 import TabPool from "./PoolTab.vue";
 
@@ -60,11 +60,10 @@ const lotterySettingData = ref({ fee: 10, wish_count_threshold: 5 });
 // 更新配置
 const handleUpdateFee = async () => {
   try {
-    const payload = {
+    await setLotterySetting({
       fee: lotterySettingData.value.fee,
       wish_count_threshold: lotterySettingData.value.wish_count_threshold ?? 5,
-    };
-    await setRdsData("lottery", 2, JSON.stringify(payload));
+    });
     ElMessage.success("已更新：普通抽奖费用、心愿单阈值");
   } catch (error) {
     console.error("更新配置失败:", error);
@@ -73,22 +72,16 @@ const handleUpdateFee = async () => {
 };
 
 // 获取配置
-const getLotterySetting = async () => {
+const getLotterySettingLocal = async () => {
   try {
-    const data = await getRdsData("lottery", 2);
-    if (data) {
-      const parsed = JSON.parse(data as string);
-      lotterySettingData.value = {
-        fee: parsed.fee ?? 10,
-        wish_count_threshold: parsed.wish_count_threshold ?? 5,
-      };
-    }
+    const setting = await getLotterySetting();
+    lotterySettingData.value = setting;
   } catch (error) {
     console.error("获取抽奖设置失败:", error);
   }
 };
 
 onMounted(async () => {
-  await getLotterySetting();
+  await getLotterySettingLocal();
 });
 </script>
