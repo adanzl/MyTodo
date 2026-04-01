@@ -50,13 +50,12 @@
             <div class="w-24 text-2xl text-blue-500 font-bold">心愿单</div>
             <div class="">
               <div class="text-right text-xs text-gray-500 mr-2">
-                进度满足时必定获得心愿单内容
-                {{ wishList.progress }}%
+                进度满时必得心愿单 当前：{{ wishList.progress }} / {{ lotteryData.wish_count_threshold }}
               </div>
               <progress
                 class="progress progress-primary w-56 h-3"
                 :value="wishList.progress"
-                max="100"></progress>
+                :max="lotteryData.wish_count_threshold"></progress>
             </div>
           </div>
           <swiper

@@ -3,7 +3,7 @@
     <div class="flex items-center h-10">
       <el-radio-group size="large" v-model="selectedCateId" class="" @change="onCateChange">
         <el-radio-button v-for="item in lotteryCatList" :key="item.id" :value="item.id">
-          {{ item.name }} {{  tableMaxHeight }}
+          {{ item.name }}
         </el-radio-button>
       </el-radio-group>
       <el-button type="primary" class="ml-1" @click="modifyCateModel = true">

@@ -67,7 +67,7 @@
         @refresh="onRefresh"
         @user-change="handleUserChange" />
     </ion-segment-view>
-    <LotterySetting :is-open="lotterySetting.open" @willDismiss="onSettingDismiss" />
+    <LotterySetting :is-open="lotterySetting.open" @willDismiss="onSettingDismiss" @saved="handleFullRefresh" />
     <LotteryPool :is-open="lotteryPool.open" @willDismiss="onPoolDismiss" @refresh="handleFullRefresh" />
   </ion-page>
 </template>
@@ -109,7 +109,7 @@ const lotteryDate = ref<any>({});
 const segmentValue = ref("lotterySpecial");  // Default to lottery special
 
 const wishList = ref<any>({
-  progress: 30.2,
+  progress: 30.2,  // 这个是个数
   ids: [],
   data: [],
 });

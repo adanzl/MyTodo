@@ -4,7 +4,7 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-button fill="clear" @click="cancel()"> <ion-icon :icon="closeOutline" /></ion-button>
+          <ion-button fill="clear" @click="close()"> <ion-icon :icon="closeOutline" /></ion-button>
         </ion-buttons>
         <ion-title>Lottery Setting</ion-title>
         <ion-buttons slot="end">
@@ -13,6 +13,13 @@
       </ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding">
+      <ion-item lines="full" >
+        <ion-input label="普通抽奖" v-model="lotteryData.fee" type="number"></ion-input>
+        <ion-input label="心愿单" v-model.number="lotteryData.wishCountThreshold" type="number"></ion-input>
+        <ion-button size="small" fill="outline" @click="saveLotterySetting">
+          <ion-icon :icon="saveOutline"></ion-icon>
+        </ion-button>
+      </ion-item>
       <!-- 当前类别礼物列表（点击类别后显示） -->
       <template v-if="selectedCateForGifts">
         <div class="flex items-center gap-2 mt-0 mb-1 h-8 pr-4">
@@ -93,14 +100,14 @@
 
 <script lang="ts" setup>
 import EventBus, { C_EVENT } from "@/types/event-bus";
-import { getLotteryData, getGiftAvgCost } from "@/api/api-lottery";
+import { getLotteryData, getGiftAvgCost, setLotteryData } from "@/api/api-lottery";
 import { getPicDisplayUrl } from "@/api/api-pic";
 import { getList, setData, delData } from "@/api/data";
 import { getNetworkErrorMessage } from "@/utils/net-util";
 import { PicDisplaySize } from "@/utils/img-mgr";
 import { computed, inject, ref } from "vue";
 import { alertController, loadingController } from "@ionic/vue";
-import { closeOutline, chevronBackOutline, serverOutline, checkmarkCircleOutline } from "ionicons/icons";
+import { closeOutline, chevronBackOutline, serverOutline, checkmarkCircleOutline, saveOutline } from "ionicons/icons";
 import { Icon } from "@iconify/vue";
 import DialogGift from "./DialogGift.vue";
 
@@ -110,18 +117,18 @@ defineProps<{
 
 const emit = defineEmits<{
   (e: "willDismiss", event: any): void;
+  (e: "saved"): void;
 }>();
 
 const globalVar: any = inject("globalVar");
 const isAdmin = computed(() => globalVar?.user?.admin === 1);
 
 const modal = ref();
-const lotteryData = ref<{ fee: number; giftList: any[] }>({
+const lotteryData = ref<{ fee: number; wishCountThreshold: number }>({
   fee: 10,
-  giftList: [],
+  wishCountThreshold: 0,
 });
 const lotteryCatList = ref<any[]>([]);
-const bModify = ref(false);
 /** 当前选中的类别（用于在设置页内显示该类别下的礼物） */
 const selectedCateForGifts = ref<any>(null);
 const categoryGiftList = ref<any[]>([]);
@@ -172,29 +179,11 @@ async function btnAvgCostClk() {
   }
 }
 
-const cancel = async () => {
-  if (bModify.value) {
-    const alert = await alertController.create({
-      header: "Confirm",
-      message: "确认放弃修改",
-      buttons: [
-        {
-          text: "OK",
-          handler: () => {
-            modal.value.$el!.dismiss({}, "cancel");
-          },
-        },
-        "Cancel",
-      ],
-    });
-    await alert.present();
-  } else {
-    modal.value.$el!.dismiss({}, "cancel");
-  }
+const close = async () => {
+  modal.value.$el!.dismiss({}, "cancel");
 };
 
 async function onModalPresent() {
-  bModify.value = false;
   selectedCateForGifts.value = null;
   categoryGiftList.value = [];
   isGiftDialogOpen.value = false;
@@ -210,7 +199,7 @@ async function onModalPresent() {
           const parsed = JSON.parse(data);
           lotteryData.value = {
             fee: parsed.fee ?? 10,
-            giftList: parsed.giftList ?? [],
+            wishCountThreshold: parsed.wish_count_threshold ?? 0,
           };
         }
       })
@@ -263,6 +252,21 @@ async function onCateClick(cate: any) {
       EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
     })
     .finally(() => loading.dismiss());
+}
+
+async function saveLotterySetting() {
+  try {
+    const data = {
+      fee: lotteryData.value.fee,
+      wish_count_threshold: lotteryData.value.wishCountThreshold,
+    };
+    await setLotteryData(JSON.stringify(data));
+    EventBus.$emit(C_EVENT.TOAST, "已更新：普通抽奖费用、心愿单阈值");
+    // 通知父组件数据已保存，需要刷新
+    emit("saved");
+  } catch (err: any) {
+    EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+  }
 }
 
 function backToCategoryList() {
