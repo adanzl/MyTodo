@@ -1,6 +1,12 @@
 <template>
   <div class="">
-    <div class="flex items-center">
+    <div class="flex items-center gap-3">
+      <el-select v-model="selectedAction" placeholder="全部动作" clearable @change="onActionChange" style="width: 150px">
+        <el-option label="全部" value="" />
+        <el-option label="抽奖" value="lottery" />
+        <el-option label="兑换" value="exchange" />
+        <el-option label="任务" value="schedule" />
+      </el-select>
       <el-radio-group size="large" v-model="selectedUserId" @change="onUserChange">
         <el-radio-button v-for="item in userList" :key="item.id" :value="item.id">
           {{ item.name }}
@@ -11,7 +17,8 @@
       :data="recordList.data"
       v-loading="loading"
       stripe
-      @row-click="onRowClick">
+      @row-click="onRowClick"
+      max-height="calc(100vh - 200px)">
       <el-table-column label="ID" prop="id" width="60"> </el-table-column>
       <el-table-column label="user" width="60">
         <template #default="{ row }">
@@ -86,7 +93,7 @@
       layout="sizes, prev, pager, next"
       :total="recordList.totalCount"
       :page-size="recordList.pageSize"
-      :page-sizes="[10, 20, 50]"
+      :page-sizes="[15, 20, 50]"
       :current-page="recordList.pageNum"
       class="mt-2"
       background
@@ -126,7 +133,7 @@ interface UserWithAll extends User {
   name: string;
 }
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 15;
 
 // 使用 Pinia Store
 const userStore = useUserStore();
@@ -154,6 +161,7 @@ const recordList = ref<{
 });
 const loading = ref(false);
 const selectedUserId = ref<number>(0);
+const selectedAction = ref<string>("");
 const selectedUser = computed(() => {
   return userList.value.find(item => item.id === selectedUserId.value) || userList.value[0];
 });
@@ -174,11 +182,27 @@ const getUserInfo = (id: number): UserWithAll | undefined => {
 const refreshRecordList = async (userId: number, pageNum: number, pageSize: number) => {
   loading.value = true;
   try {
-    let filter: Record<string, number> | undefined = undefined;
+    let filter: Record<string, any> = {};
+
+    // 用户筛选
     if (userId && userId !== 0) {
-      filter = { user_id: userId };
+      filter.user_id = userId;
     }
-    const response = await getList<ScoreHistory>("t_score_history", filter, pageNum, pageSize);
+
+    // action 筛选
+    if (selectedAction.value) {
+      if (selectedAction.value === "other") {
+        // 筛选非 lottery 和 exchange 的记录
+        filter.action = { not_in: ["lottery", "exchange"] };
+      } else {
+        filter.action = selectedAction.value;
+      }
+    }
+
+    // 如果 filter 为空，则传 undefined
+    const filterParam = Object.keys(filter).length > 0 ? filter : undefined;
+
+    const response = await getList<ScoreHistory>("t_score_history", filterParam, pageNum, pageSize);
     if (response && response.data) {
       const d = response.data.data || [];
       recordList.value.data = [];
@@ -206,6 +230,10 @@ const onUserChange = async () => {
   if (user) {
     await refreshRecordList(user.id, 1, PAGE_SIZE);
   }
+};
+
+const onActionChange = async () => {
+  await refreshRecordList(selectedUserId.value, 1, PAGE_SIZE);
 };
 
 const handlePageChange = (pageNum: number, pageSize: number) => {
