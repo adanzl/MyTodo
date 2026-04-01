@@ -216,7 +216,7 @@ import {
   getTaskStatus,
   getPdfDownloadUrl,
   deletePdf,
-} from "@/api/pdf";
+} from "@/api/api-pdf";
 
 import type { PdfTask } from "@/types/tools/pdf";
 

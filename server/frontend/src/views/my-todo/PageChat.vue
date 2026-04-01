@@ -67,7 +67,7 @@ import { ElMessage } from "element-plus";
 import { ArrowUp } from "@element-plus/icons-vue";
 import { io, type Socket } from "socket.io-client";
 import * as _ from "lodash-es";
-import { getRdsData, getRdsList } from "@/api/rds";
+import { getRdsData, getRdsList } from "@/api/api-rds";
 import { getApiUrl } from "@/api/config";
 import { useUserStore } from "@/stores/user";
 import type { User } from "@/types/user";

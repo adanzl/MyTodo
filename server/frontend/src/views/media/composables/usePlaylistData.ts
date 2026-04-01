@@ -3,7 +3,7 @@
  * 处理数据规范化、转换、保存等操作
  */
 import { type Ref } from "vue";
-import { playlistAction } from "@/api/playlist";
+import { playlistAction } from "@/api/api-playlist";
 import { normalizeFiles } from "@/utils/file";
 import { formatDateTime } from "@/utils/date";
 import { logAndNoticeError } from "@/utils/error";
@@ -50,9 +50,7 @@ export function usePlaylistData(
    * Get files from item (playlist property only)
    */
   const getFilesFromItem = (item: Partial<PlaylistApiData> | Partial<Playlist>): PlaylistItem[] => {
-    const filesData =
-      ("playlist" in item && Array.isArray(item.playlist) && item.playlist) ||
-      [];
+    const filesData = ("playlist" in item && Array.isArray(item.playlist) && item.playlist) || [];
     return toPlaylistItems(normalizeFiles(filesData, true));
   };
 
@@ -206,7 +204,7 @@ export function usePlaylistData(
       updatedAt:
         "updatedAt" in item && typeof item.updatedAt === "number" ? item.updatedAt : Date.now(),
       isPlaying: normalizeIsPlaying(item?.isPlaying),
-      order: item?.order,  // 保留 order 字段
+      order: item?.order, // 保留 order 字段
     };
   };
 
@@ -238,7 +236,7 @@ export function usePlaylistData(
       const collection = raw as PlaylistCollection;
       const playlists = normalizePlaylistArray(
         collection.playlists as PlaylistApiData[] | Playlist[]
-      ).sort((a, b) => (a.order ?? 999999) - (b.order ?? 999999));  // 按 order 字段排序
+      ).sort((a, b) => (a.order ?? 999999) - (b.order ?? 999999)); // 按 order 字段排序
       const activeId = playlists.some(item => item.id === collection.activePlaylistId)
         ? (collection.activePlaylistId as string | null)
         : playlists[0]?.id || null;
@@ -249,8 +247,7 @@ export function usePlaylistData(
     if (raw && !Array.isArray(raw) && "playlist" in raw) {
       const apiData = raw as PlaylistApiData;
       const playlistData =
-        ("playlist" in apiData && Array.isArray(apiData.playlist) && apiData.playlist) ||
-        [];
+        ("playlist" in apiData && Array.isArray(apiData.playlist) && apiData.playlist) || [];
       const migrated = normalizePlaylistItem({
         id: apiData.id || (apiData as any).playlist_id,
         name: apiData.name || DEFAULT_PLAYLIST_NAME,
@@ -516,10 +513,10 @@ export function usePlaylistData(
 
       const parsed = transformApiDataToPlaylistFormat(
         response.data as
-        | PlaylistApiData
-        | PlaylistApiData[]
-        | Record<string, PlaylistApiData>
-        | null
+          | PlaylistApiData
+          | PlaylistApiData[]
+          | Record<string, PlaylistApiData>
+          | null
       );
       const normalized = parsed
         ? normalizePlaylistCollection(parsed)
@@ -580,10 +577,10 @@ export function usePlaylistData(
 
         const parsed = transformApiDataToPlaylistFormat(
           response.data as
-          | PlaylistApiData
-          | PlaylistApiData[]
-          | Record<string, PlaylistApiData>
-          | null
+            | PlaylistApiData
+            | PlaylistApiData[]
+            | Record<string, PlaylistApiData>
+            | null
         );
 
         if (!parsed?.playlists?.length) {

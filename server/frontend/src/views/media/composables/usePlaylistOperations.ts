@@ -4,7 +4,7 @@
  */
 import { type Ref } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { playlistAction } from "@/api/playlist";
+import { playlistAction } from "@/api/api-playlist";
 import { logAndNoticeError } from "@/utils/error";
 import { logger } from "@/utils/logger";
 import { STORAGE_KEY_ACTIVE_PLAYLIST_ID } from "@/constants/playlist";

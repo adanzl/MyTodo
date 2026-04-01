@@ -180,8 +180,8 @@ import { ref, onMounted, computed, nextTick } from "vue";
 import { ElMessage } from "element-plus";
 import type { UploadFile } from "element-plus";
 import { Edit, Plus } from "@element-plus/icons-vue";
-import { getList, getData, setData, delData } from "@/api/common";
-import { uploadPic, getPicDisplayUrl } from "@/api/pic";
+import { getList, getData, setData, delData } from "@/api/api-common";
+import { uploadPic, getPicDisplayUrl } from "@/api/api-pic";
 import * as _ from "lodash-es";
 import type { Gift, GiftApiData, GiftCategory } from "@/types/lottery";
 

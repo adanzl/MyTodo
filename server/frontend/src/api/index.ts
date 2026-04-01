@@ -2,11 +2,11 @@
  * API 统一导出
  */
 export * from "./config";
-export * from "./common";
-export * from "./pic";
-export * from "./user";
-export * from "./rds";
-export * from "./devices";
-export * from "./audioMerge";
-export * from "./playlist";
+export * from "./api-common";
+export * from "./api-pic";
+export * from "./api-user";
+export * from "./api-rds";
+export * from "./api-devices";
+export * from "./api-audio-merge";
+export * from "./api-playlist";
 export * from "./cron";

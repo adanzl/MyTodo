@@ -287,7 +287,7 @@
 import { ref, onMounted } from "vue";
 import { ElMessage } from "element-plus";
 import { InfoFilled } from "@element-plus/icons-vue";
-import { getRdsData, setRdsData } from "@/api/rds";
+import { getRdsData, setRdsData } from "@/api/api-rds";
 import { logger } from "@/utils/logger";
 import type {
   Course,
@@ -722,41 +722,41 @@ const printTimetable = () => {
         </thead>
         <tbody>
           ${hourSlots.value
-            .map(hour => {
-              const row = [hour];
-              weekDays.value.forEach((day: Weekday) => {
-                const zhaozhaoCourses = getCoursesForHour(day, "zhaozhao", hour);
-                const cancanCourses = getCoursesForHour(day, "cancan", hour);
+      .map(hour => {
+        const row = [hour];
+        weekDays.value.forEach((day: Weekday) => {
+          const zhaozhaoCourses = getCoursesForHour(day, "zhaozhao", hour);
+          const cancanCourses = getCoursesForHour(day, "cancan", hour);
 
-                let cellContent = "";
-                if (zhaozhaoCourses.length > 0) {
-                  cellContent += zhaozhaoCourses
-                    .map(c => `${c.name} (${c.startTime}-${getEndTime(c)})`)
-                    .join("<br>");
-                }
-                if (cancanCourses.length > 0) {
-                  if (cellContent) cellContent += "<br>";
-                  cellContent += cancanCourses
-                    .map(c => `${c.name} (${c.startTime}-${getEndTime(c)})`)
-                    .join("<br>");
-                }
+          let cellContent = "";
+          if (zhaozhaoCourses.length > 0) {
+            cellContent += zhaozhaoCourses
+              .map(c => `${c.name} (${c.startTime}-${getEndTime(c)})`)
+              .join("<br>");
+          }
+          if (cancanCourses.length > 0) {
+            if (cellContent) cellContent += "<br>";
+            cellContent += cancanCourses
+              .map(c => `${c.name} (${c.startTime}-${getEndTime(c)})`)
+              .join("<br>");
+          }
 
-                row.push(cellContent || "");
-              });
+          row.push(cellContent || "");
+        });
 
-              return `
+        return `
                 <tr>
                   ${row
-                    .map((content, index) =>
-                      index === 0
-                        ? `<td style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold; background-color: #f9f9f9;">${content}</td>`
-                        : `<td style="border: 1px solid #000; padding: 8px; text-align: left; vertical-align: top; min-height: 40px;">${content}</td>`
-                    )
-                    .join("")}
+            .map((content, index) =>
+              index === 0
+                ? `<td style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold; background-color: #f9f9f9;">${content}</td>`
+                : `<td style="border: 1px solid #000; padding: 8px; text-align: left; vertical-align: top; min-height: 40px;">${content}</td>`
+            )
+            .join("")}
                 </tr>
               `;
-            })
-            .join("")}
+      })
+      .join("")}
         </tbody>
       </table>
     </div>

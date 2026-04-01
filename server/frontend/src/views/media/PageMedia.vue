@@ -144,7 +144,7 @@ import { useFileOperations } from "./composables/useFileOperations";
 import { useDragAndDrop } from "./composables/useDragAndDrop";
 import { usePlaylistNameEdit } from "./composables/usePlaylistNameEdit";
 import { ElMessage } from "element-plus";
-import { playFileOnDevice } from "@/api/playlist";
+import { playFileOnDevice } from "@/api/api-playlist";
 import type { MediaFile } from "@/types/tools";
 import { STORAGE_KEY_ACTIVE_PLAYLIST_ID } from "@/constants/playlist";
 

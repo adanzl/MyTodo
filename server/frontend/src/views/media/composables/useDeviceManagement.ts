@@ -9,7 +9,7 @@ import {
   scanMiDevices as apiScanMiDevices,
   scanDlnaDevices as apiScanDlnaDevices,
   getMiDeviceVolume as apiGetMiDeviceVolume,
-} from "@/api/devices";
+} from "@/api/api-devices";
 import { api } from "@/api/config";
 import { logAndNoticeError } from "@/utils/error";
 import type { BluetoothDevice, DlnaDevice, MiDevice, AgentDevice } from "@/types/device";
@@ -128,9 +128,9 @@ export function useDeviceManagement(
       if (response.code === 0) {
         // 处理返回数据可能是 { volume } 对象或直接是数字的情况
         const volumeData = response.data;
-        if (typeof volumeData === 'number') {
+        if (typeof volumeData === "number") {
           targetDevice.volume = volumeData;
-        } else if (volumeData && typeof volumeData === 'object' && 'volume' in volumeData) {
+        } else if (volumeData && typeof volumeData === "object" && "volume" in volumeData) {
           targetDevice.volume = volumeData.volume ?? undefined;
         } else {
           targetDevice.volume = volumeData as number | undefined;

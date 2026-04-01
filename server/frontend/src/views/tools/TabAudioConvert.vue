@@ -428,7 +428,7 @@ import {
   deleteConvertTask,
   updateConvertTask,
   startConvertTask,
-} from "@/api/audioConvert";
+} from "@/api/api-audio-convert";
 
 // 音频转码相关状态
 const convertLoading = ref(false);

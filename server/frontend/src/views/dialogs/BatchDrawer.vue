@@ -193,7 +193,7 @@
 import { ref, computed, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Plus, Delete, Edit, Check, Minus } from "@element-plus/icons-vue";
-import { getRdsData, setRdsData } from "@/api/rds";
+import { getRdsData, setRdsData } from "@/api/api-rds";
 import { logAndNoticeError } from "@/utils";
 import FileDialog from "@/views/dialogs/FileDialog.vue";
 

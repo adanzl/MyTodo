@@ -437,7 +437,7 @@ import {
   setDlnaDeviceVolume as apiSetDlnaDeviceVolume,
   stopDlnaDevice as apiStopDlnaDevice,
   setAgentConfig as apiSetAgentConfig,
-} from "@/api/devices";
+} from "@/api/api-devices";
 import type { MiDevice, AgentDevice, DlnaDevice, BluetoothDevice } from "@/types/device/device";
 
 interface Props {

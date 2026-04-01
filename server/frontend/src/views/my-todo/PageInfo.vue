@@ -29,7 +29,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { ElMessage } from "element-plus";
-import { getSave } from "@/api/user";
+import { getSave } from "@/api/api-user";
 import { UserData } from "@/types";
 import { S_TS } from "@/utils/date";
 

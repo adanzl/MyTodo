@@ -106,9 +106,9 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { CaretTop, CaretBottom, Present } from "@element-plus/icons-vue";
-import { getList } from "@/api/common";
-import { getPicDisplayUrl } from "@/api/pic";
-import { undoLottery } from "@/api/user";
+import { getList } from "@/api/api-common";
+import { getPicDisplayUrl } from "@/api/api-pic";
+import { undoLottery } from "@/api/api-user";
 import { ElMessage, ElMessageBox } from "element-plus";
 import * as _ from "lodash-es";
 import dayjs from "dayjs";

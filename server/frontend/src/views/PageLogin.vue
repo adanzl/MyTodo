@@ -47,7 +47,7 @@
 import { ref, onMounted, computed } from "vue";
 import { ElMessage } from "element-plus";
 import { useUserStore } from "@/stores/user";
-import { login as apiLogin } from "@/api/auth";
+import { login as apiLogin } from "@/api/api-auth";
 
 const emit = defineEmits<{
   "login-success": [userInfo: { id: number; name: string; icon: string }];

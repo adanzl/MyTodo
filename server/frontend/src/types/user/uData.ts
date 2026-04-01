@@ -3,7 +3,7 @@
  */
 import dayjs, { type Dayjs } from "dayjs";
 import * as _ from "lodash-es";
-import { getUserInfo, setUserInfo } from "@/api/user";
+import { getUserInfo, setUserInfo } from "@/api/api-user";
 import { ScheduleData } from "../schedule/scheduleData";
 import { Subtask } from "../schedule/subtask";
 import { S_TS } from "@/utils/date";

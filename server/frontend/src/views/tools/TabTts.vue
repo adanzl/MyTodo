@@ -588,7 +588,7 @@ import {
   getTtsTaskDownloadUrl,
   ocrTtsTask,
   analyzeTtsTask,
-} from "@/api/tts";
+} from "@/api/api-tts";
 
 // TTS 常量配置
 const DEFAULT_ROLE = "cosyvoice-v3-plus-leo-34ba9eaebae44039a4a9426af6389dcd"; // 默认音色：灿灿

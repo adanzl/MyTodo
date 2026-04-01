@@ -102,7 +102,7 @@
 import { ref, onMounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Plus } from "@element-plus/icons-vue";
-import { getList, getData, setData, delData } from "@/api/common";
+import { getList, getData, setData, delData } from "@/api/api-common";
 import * as _ from "lodash-es";
 
 interface PoolItem {

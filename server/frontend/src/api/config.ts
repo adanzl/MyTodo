@@ -4,7 +4,7 @@
 import axios, { type AxiosError, type AxiosRequestConfig, type AxiosResponse } from "axios";
 import { logAndNoticeError } from "@/utils/error";
 import { logger } from "@/utils/logger";
-import { getAccessToken, getTokenExpiresAt, refreshToken, setAccessToken } from "./auth";
+import { getAccessToken, getTokenExpiresAt, refreshToken, setAccessToken } from "./api-auth";
 
 // 与原版保持一致：支持远程和本地配置
 const REMOTE = {
@@ -36,7 +36,7 @@ export async function checkLocalIpAvailable(): Promise<boolean> {
     const protocol = isPageHttps ? "https" : "http";
     const port = isPageHttps ? LOCAL_HTTPS_PORT : LOCAL_HTTP_PORT;
     const url = `${protocol}://${LOCAL_IP}:${port}/`;
-    
+
     const controller = new AbortController();
     const TIMEOUT = 500;
     const timeoutId = setTimeout(() => controller.abort(), TIMEOUT); // 500ms超时
@@ -217,10 +217,7 @@ api.interceptors.request.use(
     const token = getAccessToken();
     const expiresAt = getTokenExpiresAt();
     const now = Date.now();
-    const needRefresh =
-      token &&
-      expiresAt &&
-      expiresAt - now < TOKEN_REFRESH_BUFFER_SEC * 1000;
+    const needRefresh = token && expiresAt && expiresAt - now < TOKEN_REFRESH_BUFFER_SEC * 1000;
     if (needRefresh) {
       try {
         await ensureRefreshed();
@@ -266,7 +263,9 @@ api.interceptors.response.use(
     return response;
   },
   async (error: AxiosError) => {
-    const cfg = error.config as (AxiosRequestConfig & { _retry?: boolean; _isFileUpload?: boolean }) | undefined;
+    const cfg = error.config as
+      | (AxiosRequestConfig & { _retry?: boolean; _isFileUpload?: boolean })
+      | undefined;
 
     // Ignore cancels
     if (
@@ -329,7 +328,10 @@ api.interceptors.response.use(
         logAndNoticeError(error, "资源未找到", { context: "API" });
       } else if (status === 403) {
         logAndNoticeError(error, "无权限访问", { context: "API" });
-      } else if (status === 401 || (status === 422 && /signature|token|invalid/i.test(errorMessage))) {
+      } else if (
+        status === 401 ||
+        (status === 422 && /signature|token|invalid/i.test(errorMessage))
+      ) {
         logAndNoticeError(error, "token无效，请重新登录", { context: "API" });
       } else {
         logAndNoticeError(error, errorMessage, { context: "API" });

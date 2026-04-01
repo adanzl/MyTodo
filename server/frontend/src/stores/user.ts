@@ -4,8 +4,8 @@
  */
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import { getAllUser } from "@/api/user";
-import { getAccessToken } from "@/api/auth";
+import { getAllUser } from "@/api/api-user";
+import { getAccessToken } from "@/api/api-auth";
 import { ElMessage } from "element-plus";
 import type { User } from "@/types/user";
 
