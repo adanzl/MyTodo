@@ -6,6 +6,13 @@
           {{ item.name }}
         </ion-select-option>
       </ion-select>
+      <!-- action 筛选 -->
+      <ion-select label="类型" :model-value="selectedAction" @ionChange="onActionChange" justify="start">
+        <ion-select-option value="">全部</ion-select-option>
+        <ion-select-option value="lottery">抽奖</ion-select-option>
+        <ion-select-option value="exchange">兑换</ion-select-option>
+        <ion-select-option value="schedule">任务</ion-select-option>
+      </ion-select>
       <div class="flex w-1/3 items-center justify-center">
         <Icon icon="mdi:star" class="text-red-500 w-5 h-5" />
         <div class="text-left pl-1 font-bold w-12">{{ userScore }}</div>
@@ -82,11 +89,13 @@ const props = defineProps<{
   selectedUser: any;
   scoreHistoryList: { data: any[] };
   userScore: number;
+  selectedAction?: string;
 }>();
 
 const emit = defineEmits<{
   (e: "refresh", event: any): void;
   (e: "user-change", value: any): void;
+  (e: "action-change", value: string): void;
 }>();
 
 function onRefresh(event: any) {
@@ -94,6 +103,9 @@ function onRefresh(event: any) {
 }
 function onUserChange(event: any) {
   emit("user-change", event.detail.value);
+}
+function onActionChange(event: any) {
+  emit("action-change", event.detail.value);
 }
 
 function getUserInfo(userId: number) {

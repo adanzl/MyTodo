@@ -64,8 +64,10 @@
         :selected-user="selectedUser"
         :score-history-list="scoreHistoryList"
         :user-score="globalVar.user.score"
+        :selected-action="selectedAction"
         @refresh="onRefresh"
-        @user-change="handleUserChange" />
+        @user-change="handleUserChange"
+        @action-change="handleActionChange" />
     </ion-segment-view>
     <LotterySetting :is-open="lotterySetting.open" @willDismiss="onSettingDismiss" @saved="handleFullRefresh" />
     <LotteryPool :is-open="lotteryPool.open" @willDismiss="onPoolDismiss" @refresh="handleFullRefresh" />
@@ -138,6 +140,7 @@ const poolList = ref<any[]>([]);
 const userList = ref<any>([]);
 const selectedCate = ref<any>(null);
 const selectedUser = ref<any>({ id: 0, name: "全部", score: 0 });
+const selectedAction = ref<string>("");
 const tabsHeight = ref(0);
 let observer: MutationObserver | null = null;
 
@@ -150,7 +153,7 @@ const updateTabsHeight = () => {
 
 onMounted(async () => {
   await refreshUserList();
-  handleRefresh({ target: { complete: () => {} } });
+  handleRefresh({ target: { complete: () => { } } });
 
   observer = new MutationObserver(() => {
     updateTabsHeight();
@@ -261,9 +264,23 @@ function onPoolDismiss(event: any) {
 
 function refreshScoreHistoryList(userId: number | undefined, pageNum: number) {
   let filter = undefined;
-  if (userId) {
-    filter = { user_id: userId };
+
+  // 构建筛选条件
+  const filterConditions: Record<string, any> = {};
+  if (userId && userId !== 0) {
+    filterConditions.user_id = userId;
   }
+
+  // action 筛选
+  if (selectedAction.value) {
+    filterConditions.action = selectedAction.value;
+  }
+
+  // 如果 filterConditions 不为空才使用
+  if (Object.keys(filterConditions).length > 0) {
+    filter = filterConditions;
+  }
+
   getList("t_score_history", filter, pageNum, PAGE_SIZE)
     .then((data) => {
       scoreHistoryList.value = data;
@@ -289,7 +306,7 @@ function refreshPoolList() {
     .then((data) => {
       const pools = data?.data ?? [];
       poolList.value = [...pools];
-      
+
       // 在奖池列表前添加"全部"选项
       if (poolList.value.length > 0) {
         // 检查是否已存在 ID 为 0 的"全部"奖池
@@ -311,7 +328,7 @@ function refreshPoolList() {
           count: 1,
         }];
       }
-      
+
       // 注意：不再在这里设置 selectedCate，交给子组件的 watch 处理
     })
     .catch((err) => {
@@ -441,6 +458,10 @@ function handleShopCateChange(value: any) {
 function handleUserChange(value: any) {
   selectedUser.value = value;
   refreshScoreHistoryList(value?.id, 1);
+}
+function handleActionChange(value: string) {
+  selectedAction.value = value;
+  refreshScoreHistoryList(selectedUser.value?.id, 1);
 }
 
 async function btnLotteryClk() {

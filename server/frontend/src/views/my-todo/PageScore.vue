@@ -191,12 +191,7 @@ const refreshRecordList = async (userId: number, pageNum: number, pageSize: numb
 
     // action 筛选
     if (selectedAction.value) {
-      if (selectedAction.value === "other") {
-        // 筛选非 lottery 和 exchange 的记录
-        filter.action = { not_in: ["lottery", "exchange"] };
-      } else {
-        filter.action = selectedAction.value;
-      }
+      filter.action = selectedAction.value;
     }
 
     // 如果 filter 为空，则传 undefined
