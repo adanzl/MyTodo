@@ -160,7 +160,7 @@ import EventBus, { C_EVENT } from "@/types/event-bus";
 import { getNetworkErrorMessage } from "@/utils/net-util";
 import { ref, watch } from "vue";
 import { closeOutline } from "ionicons/icons";
-import { setData } from "@/api/data";
+import { setGiftData } from "@/api/api-lottery";
 
 const props = defineProps<{
   isOpen: boolean;
@@ -263,7 +263,7 @@ async function saveGift() {
     }
 
     const isUpdate = !!props.editingGift;
-    await setData("t_gift", {
+    await setGiftData({
       id: isUpdate ? props.editingGift.id : undefined,
       name: newGift.value.name.trim(),
       cate_id:

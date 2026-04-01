@@ -100,9 +100,8 @@
 
 <script lang="ts" setup>
 import EventBus, { C_EVENT } from "@/types/event-bus";
-import { getLotteryData, getGiftAvgCost, setLotteryData } from "@/api/api-lottery";
+import { getLotteryData, getGiftAvgCost, setLotteryData, getGiftList, delGiftData, getGiftCategoryList, setGiftCategoryData, delGiftCategory } from "@/api/api-lottery";
 import { getPicDisplayUrl } from "@/api/api-pic";
-import { getList, setData, delData } from "@/api/data";
 import { getNetworkErrorMessage } from "@/utils/net-util";
 import { PicDisplaySize } from "@/utils/img-mgr";
 import { computed, inject, ref } from "vue";
@@ -206,8 +205,8 @@ async function onModalPresent() {
       .catch((err) => {
         EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
       }),
-    getList("t_gift_category")
-      .then((data: any) => {
+    getGiftCategoryList()
+      .then((data) => {
         lotteryCatList.value = data?.data ?? [];
       })
       .catch((err: any) => {
@@ -242,8 +241,8 @@ async function onCateClick(cate: any) {
   if (cate.id && cate.id !== 0) {
     filter.cate_id = cate.id;
   }
-  getList("t_gift", filter, 1, 200)
-    .then((data: any) => {
+  getGiftList({ conditions: filter, pageNum: 1, pageSize: 200 })
+    .then((data) => {
       categoryGiftList.value = (data?.data ?? []).map((item: any) => ({
         ...item
       }));
@@ -297,8 +296,8 @@ function onGiftSaved() {
     if (selectedCateForGifts.value.id && selectedCateForGifts.value.id !== 0) {
       filter.cate_id = selectedCateForGifts.value.id;
     }
-    getList("t_gift", filter, 1, 200)
-      .then((data: any) => {
+    getGiftList({ conditions: filter, pageNum: 1, pageSize: 20 })
+      .then((data) => {
         categoryGiftList.value = (data?.data ?? []).map((item: any) => ({
           ...item,
         }));
@@ -311,7 +310,7 @@ function onGiftSaved() {
 
 async function onGiftDelete(gift: any) {
   try {
-    await delData("t_gift", gift.id);
+    await delGiftData(gift.id);
     EventBus.$emit(C_EVENT.TOAST, "删除成功");
     categoryGiftList.value = categoryGiftList.value.filter((x: any) => x.id !== gift.id);
     closeGiftDialog();
@@ -338,12 +337,12 @@ async function addCate() {
             return;
           }
           try {
-            await setData("t_gift_category", {
+            await setGiftCategoryData({
               name,
             });
             EventBus.$emit(C_EVENT.TOAST, "添加成功");
-            getList("t_gift_category")
-              .then((res: any) => {
+            getGiftCategoryList()
+              .then((res) => {
                 const raw = res?.data ?? [];
                 const others = raw.filter((c: any) => c.id !== 0);
                 lotteryCatList.value = [
@@ -402,7 +401,7 @@ async function editCate(cate: any) {
                 EventBus.$emit(C_EVENT.TOAST, "请输入类别名称");
                 return;
               }
-              await setData("t_gift_category", {
+              await setGiftCategoryData({
                 id: cate.id,
                 name,
               });
@@ -436,7 +435,7 @@ async function deleteCate(cate: any) {
         role: "confirm",
         handler: async () => {
           try {
-            await delData("t_gift_category", cate.id);
+            await delGiftCategory(cate.id);
             EventBus.$emit(C_EVENT.TOAST, "删除成功");
             lotteryCatList.value = lotteryCatList.value.filter((x: any) => x.id !== cate.id);
             if (selectedCateForGifts.value?.id === cate.id) {

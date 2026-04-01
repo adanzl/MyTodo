@@ -126,8 +126,7 @@
 </template>
 
 <script lang="ts" setup>
-import { setLotteryPool, delLotteryPool } from "@/api/api-lottery";
-import { getList } from "@/api/data";
+import { setLotteryPool, delLotteryPool, getGiftPoolList, getGiftCategoryList } from "@/api/api-lottery";
 import { getNetworkErrorMessage } from "@/utils/net-util";
 import EventBus, { C_EVENT } from "@/types/event-bus";
 import { ref, computed } from "vue";
@@ -171,8 +170,8 @@ async function onModalPresent() {
     try {
         // 并行获取奖池数据和类别数据
         const [poolsData, categoriesData] = await Promise.all([
-            getList("t_gift_pool"),
-            getList("t_gift_category"),
+            getGiftPoolList(),
+            getGiftCategoryList(),
         ]);
 
         // 构建类别映射表（key 为 category id）

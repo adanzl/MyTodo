@@ -5,7 +5,10 @@
 import { apiClient } from "./api-client";
 import type {
   ApiResponse,
+  ApiPagedResponse,
   GiftItem,
+  GiftListItem,
+  GiftCategoryItem,
   DoLotteryBody,
   DoLotteryResult,
   DoExchangeResult,
@@ -131,3 +134,123 @@ export async function delLotteryPool(id: number): Promise<void> {
     throw new Error(rsp.data.msg);
   }
 }
+
+/** 获取奖品列表（支持分页和筛选） */
+export async function getGiftList(params?: {
+  /** 筛选条件，例如 { enable: 1, show: 1, cate_id: 5 } */
+  conditions?: Record<string, unknown>;
+  /** 页码，默认 1 */
+  pageNum?: number;
+  /** 每页数量，默认 10 */
+  pageSize?: number;
+}): Promise<ApiPagedResponse<GiftListItem>> {
+  const { conditions, pageNum = 1, pageSize = 10 } = params ?? {};
+  const rsp = await apiClient.get<ApiResponse<ApiPagedResponse<GiftListItem>>>("/getAll", {
+    params: {
+      table: "t_gift",
+      conditions: conditions ? JSON.stringify(conditions) : undefined,
+      pageNum,
+      pageSize,
+    },
+  });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data!;
+}
+
+/** 设置奖品数据（新增或更新） */
+export async function setGiftData(data: GiftListItem): Promise<void> {
+  const payload = { ...data };
+  if (payload.id === -1 || payload.id === undefined) {
+    delete payload.id;
+  }
+  const rsp = await apiClient.post<ApiResponse<unknown>>("/setData", {
+    table: "t_gift",
+    data: payload,
+  });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+}
+
+/** 删除奖品 */
+export async function delGiftData(id: number): Promise<void> {
+  const rsp = await apiClient.post<ApiResponse<unknown>>("/delData", {
+    table: "t_gift",
+    id,
+  });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+}
+
+/** 获取奖品类别列表 */
+export async function getGiftCategoryList(params?: {
+  conditions?: Record<string, unknown>;
+  pageNum?: number;
+  pageSize?: number;
+}): Promise<ApiPagedResponse<GiftCategoryItem>> {
+  const { conditions, pageNum = 1, pageSize = 10 } = params ?? {};
+  const rsp = await apiClient.get<ApiResponse<ApiPagedResponse<GiftCategoryItem>>>("/getAll", {
+    params: {
+      table: "t_gift_category",
+      conditions: conditions ? JSON.stringify(conditions) : undefined,
+      pageNum,
+      pageSize,
+    },
+  });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data!;
+}
+
+/** 设置奖品类别数据 */
+export async function setGiftCategoryData(data: GiftCategoryItem): Promise<void> {
+  const payload = { ...data };
+  if (payload.id === -1 || payload.id === undefined) {
+    delete payload.id;
+  }
+  const rsp = await apiClient.post<ApiResponse<unknown>>("/setData", {
+    table: "t_gift_category",
+    data: payload,
+  });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+}
+
+/** 删除奖品类别 */
+export async function delGiftCategory(id: number): Promise<void> {
+  const rsp = await apiClient.post<ApiResponse<unknown>>("/delData", {
+    table: "t_gift_category",
+    id,
+  });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+}
+
+/** 获取奖池列表 */
+export async function getGiftPoolList(params?: {
+  conditions?: Record<string, unknown>;
+  pageNum?: number;
+  pageSize?: number;
+}): Promise<ApiPagedResponse<LotteryPool>> {
+  const { conditions, pageNum = 1, pageSize = 10 } = params ?? {};
+  const rsp = await apiClient.get<ApiResponse<ApiPagedResponse<LotteryPool>>>("/getAll", {
+    params: {
+      table: "t_gift_pool",
+      conditions: conditions ? JSON.stringify(conditions) : undefined,
+      pageNum,
+      pageSize,
+    },
+  });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data!;
+}
+
+

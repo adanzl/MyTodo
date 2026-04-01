@@ -73,7 +73,7 @@ import {
   timeOutline,
 } from "ionicons/icons";
 import dayjs from "dayjs";
-import { getList } from "@/api/data";
+import { getGiftList } from "@/api/api-lottery";
 import { getNetworkErrorMessage } from "@/utils/net-util";
 import EventBus, { C_EVENT } from "@/types/event-bus";
 
@@ -118,16 +118,17 @@ async function onLotteryHistoryDetail(item: any) {
       // 获取所有唯一的 ID
       const uniqueIds = [...new Set(ids)];
 
-      // 使用 getList 接口批量获取奖品数据
-      const response = await getList<{ name: string; image: string }>(
-        "t_gift",
-        { id: { in: uniqueIds } }
-      );
+      // 使用 getGiftList 接口批量获取奖品数据
+      const response = await getGiftList({
+        conditions: { id: { in: uniqueIds } },
+        pageNum: 1,
+        pageSize: 1000,
+      });
 
       // 创建 ID 到奖品的映射
-      const giftMap = new Map<number, { name: string; image: string }>();
-      (response.data || []).forEach((gift) => {
-        giftMap.set((gift as any).id, gift);
+      const giftMap = new Map<number, any>();
+      (response.data || []).forEach((gift: any) => {
+        giftMap.set(gift.id, gift);
       });
 
       // 按照原始 IDs 的顺序重组数据（包括重复项）

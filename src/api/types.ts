@@ -153,10 +153,13 @@ export interface GiftCategoryItem {
 /** 礼品列表项（getList t_gift），wish=1 表示可加入心愿单 */
 export interface GiftListItem {
   id?: number;
-  name?: string;
+  name: string;  // 必填
   image?: string;
   cate_id?: number;
-  cost?: number;
+  cost: number;  // 必填
+  enable?: number;
+  exchange?: number;
+  stock: number;  // 必填
   /** 是否可加入心愿单，1=是 0=否 */
   wish?: number;
   /** 是否显示，1=显示 0=隐藏 */

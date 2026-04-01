@@ -76,9 +76,8 @@
 import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import { Icon } from "@iconify/vue";
 import EventBus, { C_EVENT } from "@/types/event-bus";
-import type { GiftCategoryItem, GiftListItem } from "@/api";
-import { getList, delData } from "@/api/data";
-import { doExchange, doLottery, getGiftData, getLotteryData } from "@/api/api-lottery";
+import { getList } from "@/api/data";
+import { doExchange, doLottery, getGiftData, getLotteryData, getGiftList, delGiftData, getGiftCategoryList, getGiftPoolList } from "@/api/api-lottery";
 import { clearUserListCache, getUserList, setUserData } from "@/api/api-user";
 import { getNetworkErrorMessage } from "@/utils/net-util";
 import { getCachedPicByName, PicDisplaySize } from "@/utils/img-mgr";
@@ -274,7 +273,7 @@ function refreshScoreHistoryList(userId: number | undefined, pageNum: number) {
     });
 }
 function refreshCateList() {
-  getList<GiftCategoryItem>("t_gift_category")
+  getGiftCategoryList()
     .then((data) => {
       const d = data.data;
       lotteryCatList.value = [...d];
@@ -286,7 +285,7 @@ function refreshCateList() {
     });
 }
 function refreshPoolList() {
-  getList("t_gift_pool")
+  getGiftPoolList()
     .then((data) => {
       const pools = data?.data ?? [];
       poolList.value = [...pools];
@@ -356,9 +355,10 @@ async function refreshGiftList(
   pageNum: number = 1,
   append: boolean = false
 ): Promise<void> {
-  const filter: Record<string, number> = {
+  const filter: Record<string, unknown> = {
     enable: 1,
     show: 1,
+    stock: ['>', 0],  // stock > 0
   };
   if (cateId) {
     filter["cate_id"] = cateId;
@@ -368,7 +368,7 @@ async function refreshGiftList(
   }
   try {
     try {
-      const data = await getList<GiftListItem>("t_gift", filter, pageNum, PAGE_SIZE);
+      const data = await getGiftList({ conditions: filter, pageNum, pageSize: PAGE_SIZE });
       const d = data.data ?? [];
       if (!append) {
         giftList.value.data = [];
@@ -585,7 +585,7 @@ async function btnDeleteGiftClk(item: any) {
         role: "confirm",
         handler: async () => {
           try {
-            await delData("t_gift", item.id);
+            await delGiftData(item.id);
             EventBus.$emit(C_EVENT.TOAST, "删除成功");
             refreshGiftList(selectedCate.value?.id, 1);
           } catch (err) {

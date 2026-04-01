@@ -360,14 +360,15 @@ class DbMgr:
                 query = select(*columns)
                 count_query = select(func.count()).select_from(table_obj)
 
-            # 条件过滤（支持 (op, value) 表示 >, <, >=, <=, !=, in；也支持 { in: [...] } 格式）
+            # 条件过滤（支持 (op, value) 或 [op, value] 表示 >, <, >=, <=, !=, in；也支持 { in: [...] } 格式）
             if conditions and isinstance(conditions, dict):
                 for k, v in conditions.items():
                     if k not in table_obj.columns:
                         continue
                     col = table_obj.columns[k]
-                    if isinstance(v, tuple) and len(v) == 2:
-                        op, val = v
+                    # 支持元组或列表格式：('>', value) 或 ['>', value]
+                    if (isinstance(v, (tuple, list)) or isinstance(v, list)) and len(v) == 2:
+                        op, val = v[0], v[1]
                         if op == '>':
                             query = query.where(col > val)
                             count_query = count_query.where(col > val)
