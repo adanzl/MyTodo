@@ -19,6 +19,32 @@ class LotteryMgr:
         self._db = db_mgr
         self._rds = rds_mgr
 
+    def _weighted_random_choice(self, pool: list) -> Optional[Dict[str, Any]]:
+        """
+        根据物品库存数量作为权重，进行加权随机选择。
+        库存越多的物品，被选中的概率越大。
+        
+        Args:
+            pool: 礼物列表，每个礼物必须包含 'stock' 字段
+            
+        Returns:
+            选中的礼物，如果池子为空则返回 None
+        """
+        if not pool:
+            return None
+        
+        # 提取所有礼物的库存作为权重
+        weights = []
+        for gift in pool:
+            stock = gift.get('stock', 0)
+            # 确保权重为正数
+            weight = max(1, int(stock)) if isinstance(stock, (int, float)) else 1
+            weights.append(weight)
+        
+        # 使用 random.choices 进行加权随机选择（返回单个元素）
+        selected = random.choices(pool, weights=weights, k=1)[0]
+        return selected
+
     def do_lottery(self, user_id: int, pool_id: int) -> Dict[str, Any]:
         """
         执行一次抽奖。每次抽均发奖。
@@ -60,7 +86,7 @@ class LotteryMgr:
             wish_pool = self._get_wish_pool(user_id, wish_list_str)
 
             if wish_pool:
-                # 抽 1 个心愿单奖品
+                # 从心愿单中随机选择一个（心愿单内不使用加权）
                 selected = random.choice(wish_pool)
 
                 # 尝试扣减库存
@@ -93,7 +119,10 @@ class LotteryMgr:
                 if not available_pool:
                     break  # 没有可用礼物了
 
-                selected = random.choice(available_pool)
+                # 使用加权随机选择，库存越多的物品被选中的概率越大
+                selected = self._weighted_random_choice(available_pool)
+                if selected is None:
+                    break  # 没有可用礼物了
 
                 # 尝试扣减库存
                 stock_success, need_remove = self._try_deduct_stock(selected['id'])
