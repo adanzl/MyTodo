@@ -22,7 +22,6 @@
 - **请求体**：任意文本（非 JSON）
 - **返回**：`{}`
 
-> 图片展示接口已迁移至 `core/api/pic_routes.py`（路径 `/pic/viewPic`），参见 [pic_routes.md](./pic_routes.md)。应用挂载在 `/api` 下时，完整路径为 `/api/pic/...`。
 
 ## Save 存储
 

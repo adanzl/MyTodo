@@ -23,28 +23,6 @@ def client(app):
     return app.test_client()
 
 
-# =========== viewPic（数据库图片）==========
-def test_view_pic_requires_id(client):
-    resp = client.get('/pic/viewPic')
-    assert resp.status_code == 400
-
-
-def test_view_pic_invalid_id(client):
-    resp = client.get('/pic/viewPic?id=abc')
-    assert resp.status_code == 400
-
-
-def test_view_pic_ok_and_not_found(client, monkeypatch):
-    monkeypatch.setattr(pic_routes, "render_template", lambda *a, **kw: "ok")
-
-    pic_routes.db_mgr.get_data_idx.return_value = {"code": 0, "data": "img"}
-    resp = client.get('/pic/viewPic?id=1')
-    assert resp.status_code == 200
-
-    pic_routes.db_mgr.get_data_idx.return_value = {"code": -1}
-    resp = client.get('/pic/viewPic?id=1')
-    assert resp.status_code == 404
-
 
 # =========== upload ==========
 def test_upload_requires_file(client):

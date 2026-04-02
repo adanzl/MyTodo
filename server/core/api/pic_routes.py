@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from flask import Blueprint, jsonify, render_template, request, send_file
+from flask import Blueprint, jsonify, request, send_file
 from flask.typing import ResponseReturnValue
 from werkzeug.exceptions import RequestEntityTooLarge
 
@@ -30,25 +30,6 @@ def _parse_int(value: Any, name: str) -> tuple[Optional[int], Optional[str]]:
     except (TypeError, ValueError):
         return None, f"{name} must be int"
 
-
-# =========== 数据库图片（兼容旧接口）==========
-@pic_bp.route("/viewPic", methods=['GET'])
-def view_pic() -> ResponseReturnValue:
-    """从数据库按 id 查看图片（base64 渲染）。"""
-    raw_id = request.args.get('id')
-    if raw_id is None:
-        return jsonify({'error': 'id is required'}), 400
-
-    log.info("===== [View Pic] " + raw_id)
-
-    pic_id, err = _parse_int(raw_id, 'id')
-    if err:
-        return jsonify({'error': err}), 400
-
-    p_data = db_mgr.get_data_idx(db_mgr.TABLE_PIC, pic_id)
-    if p_data['code'] == 0:
-        return render_template('image.html', image_data=p_data['data'])
-    return jsonify({'error': 'Image not found'}), 404
 
 
 # =========== 文件系统图片（上传/删除/查看）==========

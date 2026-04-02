@@ -76,11 +76,14 @@ export async function uploadPic(file: File): Promise<PicUploadResult> {
 /**
  * 将文件名或 base64 转成可展示的图片 URL
  * @param img 图片数据（文件名或 base64）
- * @param w 可选，目标宽度，建议用 PicDisplaySize.LIST(96) 或 PicDisplaySize.ITEM(160)
+ * @param w 可选，目标宽度，不传则使用原图
  * @param h 可选，目标高度，不传则使用原图
  */
 export function getPicDisplayUrl(img: string, w?: number, h?: number): string {
-  if (!img) return "";
+  if (!img) {
+    // 返回默认占位图（96x96）
+    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Crect fill='%23e5e7eb' width='96' height='96'/%3E%3C/svg%3E";
+  }
   if (img.startsWith("data:")) return img;
   const baseURL = getApiUrl();
   let url = `${baseURL}/pic/view?name=${encodeURIComponent(img)}`;

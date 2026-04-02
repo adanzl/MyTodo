@@ -31,11 +31,11 @@ export async function getImage(id?: number) {
 }
 
 /**
- * 根据文件名获取图片的本地缓存（data URL），若本地无缓存则从服务端拉取并写入缓存。
- * 适用于 `/pic/view?name=xxx&w=..&h=..` 这类按文件名访问的图片。
- * @param name  图片文件名，如 image_29.jpg
- * @param w     目标宽度，对应接口的 w 参数
- * @param h     目标高度，对应接口的 h 参数
+ * 根据文件名或 base64 获取图片的本地缓存（data URL），若本地无缓存则从服务端拉取并写入缓存。
+ * 适用于 `/pic/view?name=xxx&w=..&h=..` 这类按文件名访问的图片，也支持直接传入 base64。
+ * @param name  图片文件名（如 image_29.jpg）或 base64 数据
+ * @param w     目标宽度，对应接口的 w 参数（base64 时无效）
+ * @param h     目标高度，对应接口的 h 参数（base64 时无效）
  * @param ttl   缓存时长（秒），默认 1 小时
  */
 export async function getCachedPicByName(
@@ -45,6 +45,11 @@ export async function getCachedPicByName(
   ttl: number = 60 * 60
 ): Promise<string> {
   if (!name) return "";
+
+  // 如果已经是 base64，直接返回（无需缓存和网络请求）
+  if (name.startsWith("data:")) {
+    return name;
+  }
 
   const key = `pic_file_${name}_${w || 0}_${h || 0}`;
   const cached = LocalCache.get<string>(key);

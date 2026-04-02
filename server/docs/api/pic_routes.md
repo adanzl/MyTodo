@@ -4,17 +4,6 @@
 >
 > 图片相关 API，路径统一以 `/pic/` 为前缀。上传的图片保存在 `DEFAULT_BASE_DIR/pic` 目录下。
 
-## 数据库图片（兼容旧接口）
-
-### GET `/pic/viewPic`
-
-- **Query**
-  - `id`：string，必填
-- **行为**
-  - `db_mgr.get_data_idx(db_mgr.TABLE_PIC, id)`
-  - 成功：渲染 `image.html`
-  - 失败：`404` + `{"error":"Image not found"}`
-
 ## 文件系统图片（上传/删除/查看）
 
 ### POST `/pic/upload`

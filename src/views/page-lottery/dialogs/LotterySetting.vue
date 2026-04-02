@@ -102,8 +102,8 @@
 import EventBus, { C_EVENT } from "@/types/event-bus";
 import { getLotteryData, getGiftAvgCost, setLotteryData, getGiftList, delGiftData, getGiftCategoryList, setGiftCategoryData, delGiftCategory } from "@/api/api-lottery";
 import { getPicDisplayUrl } from "@/api/api-pic";
-import { getNetworkErrorMessage } from "@/utils/net-util";
 import { PicDisplaySize } from "@/utils/img-mgr";
+import { getNetworkErrorMessage } from "@/utils/net-util";
 import { computed, inject, ref } from "vue";
 import { alertController, loadingController } from "@ionic/vue";
 import { closeOutline, chevronBackOutline, serverOutline, checkmarkCircleOutline, saveOutline } from "ionicons/icons";
@@ -454,8 +454,6 @@ async function deleteCate(cate: any) {
 
 function getGiftImgUrl(item: { img?: string; image?: string }) {
   const raw = item.img ?? item.image;
-  if (!raw)
-    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Crect fill='%23e5e7eb' width='96' height='96'/%3E%3C/svg%3E";
   return getPicDisplayUrl(raw, PicDisplaySize.LIST, PicDisplaySize.LIST);
 }
 </script>

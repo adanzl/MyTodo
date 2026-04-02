@@ -89,8 +89,8 @@ class PicMgr:
     def delete(self, name: str) -> List[str]:
         """删除指定文件名的图片及其所有缓存变体。返回已删除的文件名列表。"""
         abs_path, err_msg = self.validate_path(name)
-        if err_msg:
-            raise ValueError(err_msg)
+        if abs_path is None:
+            raise ValueError(f"Invalid file name: {err_msg}")
         if not os.path.isfile(abs_path):
             raise FileNotFoundError("文件不存在")
 
@@ -136,9 +136,7 @@ class PicMgr:
             ensure_directory(os.path.dirname(cache_path))
             resized.save(cache_path, 'PNG', optimize=True)
 
-    def get_view_path(
-        self, name: str, w: Optional[int] = None, h: Optional[int] = None
-    ) -> Tuple[str, Optional[str]]:
+    def get_view_path(self, name: str, w: Optional[int] = None, h: Optional[int] = None) -> Tuple[str, Optional[str]]:
         """获取图片查看路径。
 
         无 w、h 时返回原图路径及 mimetype。
@@ -146,8 +144,8 @@ class PicMgr:
         返回 (path, mimetype)，mimetype 为 None 时由调用方推断。
         """
         abs_path, err_msg = self.validate_path(name)
-        if err_msg:
-            raise ValueError(err_msg)
+        if abs_path is None:
+            raise ValueError(f"Invalid file name: {err_msg}")
         if not os.path.isfile(abs_path):
             raise FileNotFoundError("Image not found")
 

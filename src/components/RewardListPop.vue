@@ -51,9 +51,7 @@ ion-modal {
 </style>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
 import { getPicDisplayUrl } from "@/api/api-pic";
-import { getCachedPicByName, PicDisplaySize } from "@/utils/img-mgr";
 
 interface RewardItem {
     value: string;
@@ -61,47 +59,15 @@ interface RewardItem {
     img?: string;
 }
 
-const props = defineProps({
+defineProps({
     rewardList: {
         type: Array as () => RewardItem[],
         default: () => [],
     },
 });
 
-const placeholder =
-    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Crect fill='%23e5e7eb' width='80' height='80'/%3E%3C/svg%3E";
-
-/** 缓存的礼品图 data URL 映射表 */
-const cachedImgMap = ref<Record<string, string>>({});
-
-function loadCachedImgs() {
-    props.rewardList.forEach((item) => {
-        if (item.rewardType === "gift" && item.img) {
-            const raw = item.img;
-            getCachedPicByName(raw, PicDisplaySize.ITEM, PicDisplaySize.ITEM).then(
-                (url) => {
-                    if (url) {
-                        cachedImgMap.value[raw] = url;
-                    }
-                }
-            );
-        }
-    });
-}
-
-watch(
-    () => props.rewardList,
-    () => {
-        cachedImgMap.value = {};
-        loadCachedImgs();
-    },
-    { immediate: true }
-);
-
-/** 优先使用缓存，无缓存时用接口 URL，无图时用占位 */
+/** 返回可展示的图片 URL，无图时自动返回占位图 */
 function getRewardImageUrl(img?: string): string {
-    if (!img) return placeholder;
-    if (cachedImgMap.value[img]) return cachedImgMap.value[img];
     return getPicDisplayUrl(img);
 }
 </script>

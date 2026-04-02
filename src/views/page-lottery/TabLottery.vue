@@ -117,11 +117,9 @@ import { PicDisplaySize } from "@/utils/img-mgr";
 const globalVar: any = inject("globalVar");
 const isAdmin = computed(() => globalVar?.user?.admin === 1);
 
-/** 心愿单兼容 img/image 字段，转为可展示的图片 URL */
+/** 心愿单兼容 img/image 的字段，转为可展示的图片 URL */
 function getWishImgUrl(item: { img?: string; image?: string }) {
   const raw = item.img ?? item.image;
-  if (!raw)
-    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Crect fill='%23e5e7eb' width='96' height='96'/%3E%3C/svg%3E";
   return getPicDisplayUrl(raw, PicDisplaySize.LIST, PicDisplaySize.LIST);
 }
 

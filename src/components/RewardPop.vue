@@ -45,9 +45,6 @@ const props = defineProps({
   },
 });
 
-const placeholder =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Crect fill='%23e5e7eb' width='80' height='80'/%3E%3C/svg%3E";
-
 /** 缓存的礼品图 data URL，弹窗内展示用 */
 const cachedImgUrl = ref("");
 
@@ -73,7 +70,6 @@ watch(
 /** 优先使用缓存，无缓存时用接口 URL，无图时用占位 */
 const rewardImgUrl = computed(() => {
   const raw = props.img;
-  if (!raw) return placeholder;
   if (cachedImgUrl.value) return cachedImgUrl.value;
   return getPicDisplayUrl(raw);
 });
