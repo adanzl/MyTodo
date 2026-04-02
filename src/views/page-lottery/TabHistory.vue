@@ -24,7 +24,7 @@
       </ion-refresher>
       <ion-item v-for="item in scoreHistoryList.data" :key="item.id" @click="onLotteryHistoryDetail(item)">
         <ion-avatar slot="start" class="w-12 h-12">
-          <img :src="getUserInfo(item.user_id).icon" />
+          <ion-img :src="getUserInfo(item.user_id).icon || ''" />
         </ion-avatar>
         <div class="flex flex-col w-full">
           <div class="flex">
@@ -64,6 +64,7 @@ import {
   IonAvatar,
   IonContent,
   IonIcon,
+  IonImg,
   IonItem,
   IonRefresher,
   IonRefresherContent,

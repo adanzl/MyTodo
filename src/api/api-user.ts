@@ -1,5 +1,6 @@
 import _ from "lodash";
 import { apiClient } from "./api-client";
+import { getPicDisplayUrl } from "./api-pic";
 import type {
   ApiResponse,
   UserInfo,
@@ -21,8 +22,13 @@ async function fetchUserList(): Promise<GetUserListResponse> {
   }
   const payload = rsp.data.data!;
   _.forEach(payload.data, (item: UserListItem) => {
+    // 处理 wish_list 字段
     if (item.wish_list && typeof item.wish_list === "string") {
       item.wish_list = JSON.parse(item.wish_list) as UserListItem["wish_list"];
+    }
+    // 处理 icon 字段：使用统一工具函数处理
+    if (item.icon && typeof item.icon === "string") {
+      item.icon = getPicDisplayUrl(item.icon);
     }
   });
   return payload;

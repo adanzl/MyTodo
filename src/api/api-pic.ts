@@ -85,6 +85,7 @@ export function getPicDisplayUrl(img: string, w?: number, h?: number): string {
     return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Crect fill='%23e5e7eb' width='96' height='96'/%3E%3C/svg%3E";
   }
   if (img.startsWith("data:")) return img;
+  if (img.startsWith("http://") || img.startsWith("https://")) return img;
   const baseURL = getApiUrl();
   let url = `${baseURL}/pic/view?name=${encodeURIComponent(img)}`;
   if (w != null && h != null && w > 0 && h > 0) {
