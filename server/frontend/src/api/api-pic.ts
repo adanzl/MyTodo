@@ -36,6 +36,7 @@ export async function uploadPic(file: File): Promise<ApiResponse<PicUploadResult
 export function getPicDisplayUrl(img: string, w?: number, h?: number): string {
   if (!img) return "";
   if (img.startsWith("data:")) return img;
+  if (img.startsWith("http://") || img.startsWith("https://")) return img;
   const baseURL = getBaseUrl();
   let url = `${baseURL}/api/pic/view?name=${encodeURIComponent(img)}`;
   if (w != null && h != null && w > 0 && h > 0) {

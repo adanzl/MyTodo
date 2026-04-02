@@ -8,6 +8,7 @@ import { getAllUser } from "@/api/api-user";
 import { getAccessToken } from "@/api/api-auth";
 import { ElMessage } from "element-plus";
 import type { User } from "@/types/user";
+import { getPicDisplayUrl } from "@/api/api-pic";
 
 export interface UserWithExtras extends User {
   wish_progress?: number;
@@ -71,7 +72,12 @@ export const useUserStore = defineStore("user", () => {
       try {
         const response = await getAllUser<UserWithExtras>();
         if (response && response.data) {
-          userList.value = response.data.data || [];
+          const users = response.data.data || [];
+          // 对所有用户的 icon 进行处理
+          userList.value = users.map(user => ({
+            ...user,
+            icon: getPicDisplayUrl(user.icon || ""),
+          }));
           lastFetchTime.value = Date.now();
         } else {
           userList.value = [];
@@ -105,7 +111,7 @@ export const useUserStore = defineStore("user", () => {
       bLogin: true,
       id: user.id,
       name: user.name,
-      ico: user.icon || null,
+      ico: getPicDisplayUrl(user.icon || ""),
     };
     localStorage.setItem(KEY_USER_ID, String(user.id));
   };
