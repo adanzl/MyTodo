@@ -176,8 +176,8 @@
           </ion-tab-button>
 
           <ion-tab-button tab="tabMy" href="/tabs/tab0">
-            <ion-icon :icon="squareOutline" />
-            <ion-label>课程表</ion-label>
+            <ion-icon :icon="musicalNotesOutline" />
+            <ion-label>媒体</ion-label>
           </ion-tab-button>
         </ion-tab-bar>
       </ion-tabs>
@@ -289,7 +289,7 @@ import {
   chatboxEllipsesOutline,
   colorPaletteOutline,
   shieldCheckmarkOutline,
-  squareOutline,
+  musicalNotesOutline,
   giftOutline,
 } from "ionicons/icons";
 import _ from "lodash";

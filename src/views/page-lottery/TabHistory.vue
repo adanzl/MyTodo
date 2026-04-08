@@ -55,6 +55,14 @@
           <span v-else>-</span>
         </div>
       </ion-item>
+      <ion-infinite-scroll
+        threshold="150px"
+        :disabled="!hasMore"
+        @ionInfinite="onLoadMore">
+        <ion-infinite-scroll-content
+          loading-spinner="crescent"
+          loading-text="加载更多..." />
+      </ion-infinite-scroll>
     </ion-content>
   </ion-segment-content>
 </template>
@@ -65,6 +73,8 @@ import {
   IonContent,
   IonIcon,
   IonImg,
+  IonInfiniteScroll,
+  IonInfiniteScrollContent,
   IonItem,
   IonRefresher,
   IonRefresherContent,
@@ -84,23 +94,31 @@ import dayjs from "dayjs";
 import { getGiftList } from "@/api/api-lottery";
 import { getNetworkErrorMessage } from "@/utils/net-util";
 import EventBus, { C_EVENT } from "@/types/event-bus";
+import { computed } from "vue";
 
 const props = defineProps<{
   userList: any[];
   selectedUser: any;
-  scoreHistoryList: { data: any[] };
+  scoreHistoryList: { data: any[]; pageNum?: number; totalPage?: number; totalCount?: number };
   userScore: number;
   selectedAction?: string;
+  hasMore?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: "refresh", event: any): void;
   (e: "user-change", value: any): void;
   (e: "action-change", value: string): void;
+  (e: "load-more", event: any): void;
 }>();
+
+const hasMore = computed(() => props.hasMore ?? false);
 
 function onRefresh(event: any) {
   emit("refresh", event);
+}
+function onLoadMore(event: any) {
+  emit("load-more", event);
 }
 function onUserChange(event: any) {
   emit("user-change", event.detail.value);

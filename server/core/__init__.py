@@ -48,7 +48,7 @@ def create_app():
     @app.before_request
     def _short_circuit_options():
         if request.method == 'OPTIONS':
-            request._start_time = time.time()
+            request._start_time = time.time() # pyright: ignore[reportAttributeAccessIssue]
             return '', 200
 
     # 配置限流（全局默认）
@@ -197,7 +197,7 @@ def create_app():
     @app.before_request
     def _record_start_time():
         """记录请求开始时间，用于计算响应时间"""
-        request._start_time = time.time()
+        request._start_time = time.time() # pyright: ignore[reportAttributeAccessIssue]
 
     @app.after_request
     def _log_access(response):
@@ -212,7 +212,7 @@ def create_app():
 
             # 计算响应时间
             if hasattr(request, '_start_time'):
-                response_time = (time.time() - request._start_time) * 1000  # 转换为毫秒
+                response_time = (time.time() - request._start_time) * 1000  # 转换为毫秒  # pyright: ignore[reportAttributeAccessIssue]
             else:
                 response_time = 0
 

@@ -74,6 +74,7 @@ class LotteryMgr:
             return {"code": -1, "msg": "Not enough score"}
 
         # ========== 阶段 2：执行抽奖 ==========
+        log.info(f"Do lottery, user: {user_id}, pool: {pool_id}, categories: {cate_ids}")
         won_gifts = []
         cur_progress = wish_progress
 

@@ -83,12 +83,12 @@ def _create_access_logger() -> tuple[logging.Logger, logging.Logger]:
     app_access_logger.setLevel(logging.INFO)
     app_access_logger.propagate = False
 
-    # 仅在生产环境创建访问日志文件，保留3天
+    # 仅在生产环境创建访问日志文件，保留10天
     if IS_PRODUCTION:
         log_file = f"{LOG_DIR}/access.log"
 
-        # 创建访问日志文件处理器（按天轮转，保留3天）
-        access_handler = TimedRotatingFileHandler(log_file, when="midnight", backupCount=3, encoding="utf-8")
+        # 创建访问日志文件处理器（按天轮转，保留10天）
+        access_handler = TimedRotatingFileHandler(log_file, when="midnight", backupCount=10, encoding="utf-8")
 
         # 配置访问日志格式：时间 方法 路径 状态码 响应时间 客户端IP User-Agent
         access_formatter = logging.Formatter('%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')

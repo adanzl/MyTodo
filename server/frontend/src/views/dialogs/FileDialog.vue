@@ -138,13 +138,29 @@ const emit = defineEmits<{
   close: [];
 }>();
 
-// 状态
-const fileBrowserPath = ref<string>(props.defaultPath);
+// 从 localStorage 获取上次的路径,如果没有则使用默认路径
+const STORAGE_KEY_LAST_PATH = "file_dialog_last_path";
+const getLastPath = () => {
+  try {
+    return localStorage.getItem(STORAGE_KEY_LAST_PATH) || props.defaultPath;
+  } catch {
+    return props.defaultPath;
+  }
+};
+const fileBrowserPath = ref<string>(getLastPath());
 const fileBrowserList = ref<FileBrowserItem[]>([]);
 const fileBrowserLoading = ref(false);
 const selectedFiles = ref<string[]>([]);
 const fileBrowserCanNavigateUp = ref(false);
-let lastFileBrowserPath = props.defaultPath;
+
+// 保存路径到 localStorage
+const saveLastPath = (path: string) => {
+  try {
+    localStorage.setItem(STORAGE_KEY_LAST_PATH, String(path || "").trim());
+  } catch (error) {
+    console.warn("Failed to save last path:", error);
+  }
+};
 
 // 更新是否可以向上导航
 const updateFileBrowserCanNavigateUp = () => {
@@ -287,12 +303,15 @@ const handleConfirm = () => {
     emit("confirm", [...selectedFiles.value]);
   }
 
-  lastFileBrowserPath = fileBrowserPath.value;
+  // 保存当前路径
+  saveLastPath(fileBrowserPath.value);
   handleClose();
 };
 
 // 处理关闭
 const handleClose = () => {
+  // 关闭时也保存路径,即使用户点击取消
+  saveLastPath(fileBrowserPath.value);
   selectedFiles.value = [];
   emit("close");
 };
@@ -315,11 +334,11 @@ watch(
   () => props.visible,
   newVal => {
     if (newVal) {
-      // 如果提供了 defaultPath，优先使用它；否则使用上次的路径
-      fileBrowserPath.value = props.defaultPath || lastFileBrowserPath;
-      lastFileBrowserPath = fileBrowserPath.value;
+      // 优先使用 localStorage 保存的路径，如果没有则使用 defaultPath
+      const savedPath = localStorage.getItem(STORAGE_KEY_LAST_PATH);
+      fileBrowserPath.value = savedPath || props.defaultPath;
       selectedFiles.value = [];
-      refreshFileBrowser();
+      setTimeout(() => refreshFileBrowser(), 0);
     } else {
       selectedFiles.value = [];
     }

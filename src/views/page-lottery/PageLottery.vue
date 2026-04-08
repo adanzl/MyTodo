@@ -65,9 +65,11 @@
         :score-history-list="scoreHistoryList"
         :user-score="globalVar.user.score"
         :selected-action="selectedAction"
+        :has-more="scoreHistoryHasMore"
         @refresh="onRefresh"
         @user-change="handleUserChange"
-        @action-change="handleActionChange" />
+        @action-change="handleActionChange"
+        @load-more="loadMoreScoreHistory" />
     </ion-segment-view>
     <LotterySetting :is-open="lotterySetting.open" @willDismiss="onSettingDismiss" @saved="handleFullRefresh" />
     <LotteryPool :is-open="lotteryPool.open" @willDismiss="onPoolDismiss" @refresh="handleFullRefresh" />
@@ -125,6 +127,13 @@ const giftList = ref<any>({
 const loadingGifts = ref(false);
 const giftListHasMore = computed(() => {
   const { pageNum, totalPage, data, totalCount } = giftList.value;
+  // 如果正在加载中，返回 false 防止重复触发
+  if (loadingGifts.value) return false;
+  if (totalCount > 0 && data.length < totalCount) return true;
+  return pageNum < totalPage;
+});
+const scoreHistoryHasMore = computed(() => {
+  const { pageNum, totalPage, data, totalCount } = scoreHistoryList.value;
   if (totalCount > 0 && data.length < totalCount) return true;
   return pageNum < totalPage;
 });
@@ -262,7 +271,7 @@ function onPoolDismiss(event: any) {
   }
 }
 
-function refreshScoreHistoryList(userId: number | undefined, pageNum: number) {
+async function refreshScoreHistoryList(userId: number | undefined, pageNum: number, append: boolean = false) {
   let filter = undefined;
 
   // 构建筛选条件
@@ -281,13 +290,20 @@ function refreshScoreHistoryList(userId: number | undefined, pageNum: number) {
     filter = filterConditions;
   }
 
-  getList("t_score_history", filter, pageNum, PAGE_SIZE)
-    .then((data) => {
+  try {
+    const data = await getList("t_score_history", filter, pageNum, PAGE_SIZE);
+    if (!append) {
       scoreHistoryList.value = data;
-    })
-    .catch((err) => {
-      EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
-    });
+    } else {
+      // 追加数据
+      scoreHistoryList.value.data.push(...data.data);
+      scoreHistoryList.value.pageNum = data.pageNum;
+      scoreHistoryList.value.totalCount = data.totalCount;
+      scoreHistoryList.value.totalPage = data.totalPage;
+    }
+  } catch (err) {
+    EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+  }
 }
 function refreshCateList() {
   getGiftCategoryList()
@@ -433,6 +449,7 @@ function loadMoreGifts(event: any) {
   const noMore =
     totalCount > 0 ? data.length >= totalCount : pageNum >= totalPage;
   if (loadingGifts.value || noMore) {
+    // 立即完成事件，防止重复触发
     event?.target?.complete();
     return;
   }
@@ -462,6 +479,25 @@ function handleUserChange(value: any) {
 function handleActionChange(value: string) {
   selectedAction.value = value;
   refreshScoreHistoryList(selectedUser.value?.id, 1);
+}
+
+function loadMoreScoreHistory(event: any) {
+  const { pageNum, totalPage, data, totalCount } = scoreHistoryList.value;
+  const noMore =
+    totalCount > 0 ? data.length >= totalCount : pageNum >= totalPage;
+  if (noMore) {
+    event?.target?.complete();
+    return;
+  }
+  refreshScoreHistoryList(
+    selectedUser.value?.id,
+    scoreHistoryList.value.pageNum + 1,
+    true
+  ).finally(() => {
+    nextTick(() => {
+      event?.target?.complete();
+    });
+  });
 }
 
 async function btnLotteryClk() {

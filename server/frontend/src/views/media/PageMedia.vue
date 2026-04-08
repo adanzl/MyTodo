@@ -102,7 +102,7 @@
     <!-- 编辑名称对话框 -->
     <el-dialog v-model="editNameDialogVisible" title="编辑播放列表名称" width="400" @close="handleCancelEditPlaylistName">
       <el-input v-model="editNameDialogName" placeholder="请输入播放列表名称" @keyup.enter="handleSavePlaylistName"
-        @keyup.esc="handleCancelEditPlaylistName" clearable autofocus>
+        @keyup.esc="handleCancelEditPlaylistName" clearable>
       </el-input>
       <template #footer>
         <el-button @click="handleCancelEditPlaylistName">取消</el-button>

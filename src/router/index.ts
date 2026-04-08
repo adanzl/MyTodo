@@ -21,7 +21,7 @@ const routes: Array<RouteRecordRaw> = [
       },
       {
         path: 'tab2',
-        component: () => import('@/views/PageCalendar.vue')
+        component: () => import('@/views/page-calendar/PageCalendar.vue')
       },
       {
         path: 'tab3',
@@ -33,7 +33,7 @@ const routes: Array<RouteRecordRaw> = [
       },
       {
         path: 'tab0',
-        component: () => import('@/views/PageTimetable.vue')
+        component: () => import('@/views/page-media/PageMedia.vue')
       }
     ]
   }

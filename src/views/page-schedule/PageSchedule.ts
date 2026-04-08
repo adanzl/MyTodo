@@ -1,4 +1,4 @@
-import CalenderTab from "@/components/CalendarTab.vue";
+import CalenderTab from "@/views/page-calendar/CalendarTab.vue";
 import FabButton from "@/components/FabButton.vue";
 import SchedulePop from "@/views/page-schedule/dialogs/SchedulePopModal.vue";
 import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";

@@ -92,7 +92,7 @@
   </ion-page>
 </template>
 <script setup lang="ts">
-import CalendarCover from "@/components/CalendarCover.vue";
+import CalendarCover from "@/views/page-calendar/CalendarCover.vue";
 import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import { getColorOptions } from "@/types/color-type";
 import { C_EVENT } from "@/types/event-bus";

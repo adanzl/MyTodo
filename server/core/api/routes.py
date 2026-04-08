@@ -155,9 +155,13 @@ def set_data() -> ResponseReturnValue:
     data = args.get('data')
     if table is None or data is None:
         return {"code": -1, "msg": "table or data is required"}
-    log.info(
-        f"===== [Set Data] {table}: {len(data) if hasattr(data, '__len__') else 0}"
-    )
+    # 增强奖池更新的日志记录
+    if table == 't_gift_pool':
+        log.info(f"===== [Set Data] {table}: {data}")
+    else:
+        log.info(
+            f"===== [Set Data] {table}: {len(data) if hasattr(data, '__len__') else 0}"
+        )
     return db_mgr.set_data(table, data)
 
 
