@@ -35,7 +35,7 @@
           </el-menu-item>
           <el-menu-item index="/statistics">
             <el-icon><PieChart /></el-icon>
-            <template #title>Statistics</template>
+            <template #title>统计</template>
           </el-menu-item>
         </el-sub-menu>
         <el-menu-item index="/timetable">

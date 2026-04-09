@@ -1,8 +1,8 @@
 <template>
   <div class="p-5" v-loading="loading" element-loading-text="加载中..." element-loading-background="rgba(255, 255, 255, 0.8)">
-    <el-card class="mb-5">
-      <el-form :inline="true" class="flex flex-wrap gap-2.5">
-        <el-form-item label="日期范围">
+    <el-card class="mb-0">
+      <el-form :inline="true" class="flex flex-wrap gap-2">
+        <el-form-item label="日期范围" class="mb-0!">
           <el-date-picker
             v-model="dateRange"
             type="daterange"
@@ -15,7 +15,7 @@
             @change="handleDateChange"
           />
         </el-form-item>
-        <el-form-item>
+        <el-form-item class="mb-0!">
           <el-button type="primary" @click="refreshStatistics">查询</el-button>
           <el-button @click="resetFilters">重置</el-button>
         </el-form-item>
@@ -30,87 +30,82 @@
 
           <!-- 任务统计 -->
           <el-row :gutter="15" class="mb-5">
-            <el-col :span="12">
-              <el-card class="h-24">
-                <div class="flex items-center gap-3.75">
-                  <div class="w-12 h-12 rounded-[10px] flex items-center justify-center text-2xl text-white bg-linear-to-br from-[#4facfe] to-[#00f2fe]">
+            <el-col :span="8">
+              <el-card class="h-22">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center text-lg text-white bg-linear-to-br from-[#4facfe] to-[#00f2fe]">
                     <el-icon><CircleCheck /></el-icon>
                   </div>
                   <div class="flex-1">
-                    <div class="text-2xl font-bold text-[#303133] mb-1">{{ zhaozhaoStats.taskCount }}</div>
-                    <div class="text-xs text-[#909399]">完成任务数</div>
+                    <div class="text-lg font-bold text-[#303133] mb-0">{{ zhaozhaoStats.taskCount }}</div>
+                    <div class="text-xs text-[#909399]">任务完成数</div>
                   </div>
                 </div>
               </el-card>
             </el-col>
-            <el-col :span="12">
-              <el-card class="h-24">
-                <div class="flex items-center gap-3.75">
-                  <div class="w-12 h-12 rounded-[10px] flex items-center justify-center text-2xl text-white bg-linear-to-br from-[#43e97b] to-[#38f9d7]">
+            <el-col :span="8">
+              <el-card class="h-22">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center text-lg text-white bg-linear-to-br from-[#43e97b] to-[#38f9d7]">
                     <el-icon><Coin /></el-icon>
                   </div>
                   <div class="flex-1">
-                    <div class="text-2xl font-bold text-[#303133] mb-1">{{ zhaozhaoStats.taskIncome }}</div>
+                    <div class="text-lg font-bold text-[#303133] mb-0">{{ zhaozhaoStats.taskIncome }}</div>
                     <div class="text-xs text-[#909399]">任务收益</div>
                   </div>
                 </div>
               </el-card>
             </el-col>
-          </el-row>
-
-          <!-- 抽奖统计 -->
-          <el-row :gutter="15" class="mb-5">
-            <el-col :span="12">
-              <el-card class="h-24">
-                <div class="flex items-center gap-3.75">
-                  <div class="w-12 h-12 rounded-[10px] flex items-center justify-center text-2xl text-white bg-linear-to-br from-[#667eea] to-[#764ba2]">
+            <el-col :span="8">
+              <el-card class="h-22">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center text-lg text-white bg-linear-to-br from-[#667eea] to-[#764ba2]">
                     <el-icon><Present /></el-icon>
                   </div>
                   <div class="flex-1">
-                    <div class="text-2xl font-bold text-[#303133] mb-1">{{ zhaozhaoStats.lotteryCount }}</div>
+                    <div class="text-lg font-bold text-[#303133] mb-0">{{ zhaozhaoStats.lotteryCount }}</div>
                     <div class="text-xs text-[#909399]">抽奖次数</div>
                   </div>
                 </div>
               </el-card>
             </el-col>
-            <el-col :span="12">
-              <el-card class="h-24">
-                <div class="flex items-center gap-3.75">
-                  <div class="w-12 h-12 rounded-[10px] flex items-center justify-center text-2xl text-white bg-linear-to-br from-[#f093fb] to-[#f5576c]">
+          </el-row>
+
+          <el-row :gutter="15" class="mb-5">
+            <el-col :span="8">
+              <el-card class="h-22">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center text-lg text-white bg-linear-to-br from-[#f093fb] to-[#f5576c]">
                     <el-icon><Money /></el-icon>
                   </div>
                   <div class="flex-1">
-                    <div class="text-2xl font-bold text-[#303133] mb-1">{{ zhaozhaoStats.lotteryCost }}</div>
+                    <div class="text-lg font-bold text-[#303133] mb-0">{{ zhaozhaoStats.lotteryCost }}</div>
                     <div class="text-xs text-[#909399]">抽奖花费</div>
                   </div>
                 </div>
               </el-card>
             </el-col>
-          </el-row>
-
-          <!-- 后台操作统计 -->
-          <el-row :gutter="15" class="mb-5">
-            <el-col :span="12">
-              <el-card class="h-24">
-                <div class="flex items-center gap-3.75">
-                  <div class="w-12 h-12 rounded-[10px] flex items-center justify-center text-2xl text-white bg-linear-to-br from-[#fa709a] to-[#fee140]">
+            <el-col :span="8">
+              <el-card class="h-22">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center text-lg text-white bg-linear-to-br from-[#fa709a] to-[#fee140]">
                     <el-icon><Setting /></el-icon>
                   </div>
                   <div class="flex-1">
-                    <div class="text-2xl font-bold text-[#303133] mb-1">{{ appAdminStats.taskCount }}</div>
+                    <div class="text-lg font-bold text-[#303133] mb-0">{{ zhaozhaoStats.adminCount }}</div>
                     <div class="text-xs text-[#909399]">后台操作数</div>
                   </div>
                 </div>
               </el-card>
             </el-col>
-            <el-col :span="12">
-              <el-card class="h-24">
-                <div class="flex items-center gap-3.75">
-                  <div class="w-12 h-12 rounded-[10px] flex items-center justify-center text-2xl text-white bg-linear-to-br from-[#30cfd0] to-[#330867]">
+            <el-col :span="8">
+              <el-card class="h-22">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center text-lg text-white bg-linear-to-br from-[#30cfd0] to-[#330867]">
                     <el-icon><TrendCharts /></el-icon>
                   </div>
                   <div class="flex-1">
-                    <div class="text-2xl font-bold text-[#303133] mb-1">{{ appAdminStats.taskIncome }}</div>
+                    <div class="text-lg font-bold text-[#303133] mb-0">{{ zhaozhaoStats.adminIncome }}</div>
                     <div class="text-xs text-[#909399]">操作汇总</div>
                   </div>
                 </div>
@@ -139,87 +134,82 @@
 
           <!-- 任务统计 -->
           <el-row :gutter="15" class="mb-5">
-            <el-col :span="12">
-              <el-card class="h-24">
-                <div class="flex items-center gap-3.75">
-                  <div class="w-12 h-12 rounded-[10px] flex items-center justify-center text-2xl text-white bg-linear-to-br from-[#4facfe] to-[#00f2fe]">
+            <el-col :span="8">
+              <el-card class="h-22">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center text-lg text-white bg-linear-to-br from-[#4facfe] to-[#00f2fe]">
                     <el-icon><CircleCheck /></el-icon>
                   </div>
                   <div class="flex-1">
-                    <div class="text-2xl font-bold text-[#303133] mb-1">{{ cancanStats.taskCount }}</div>
+                    <div class="text-lg font-bold text-[#303133] mb-0">{{ cancanStats.taskCount }}</div>
                     <div class="text-xs text-[#909399]">完成任务数</div>
                   </div>
                 </div>
               </el-card>
             </el-col>
-            <el-col :span="12">
-              <el-card class="h-24">
-                <div class="flex items-center gap-3.75">
-                  <div class="w-12 h-12 rounded-[10px] flex items-center justify-center text-2xl text-white bg-linear-to-br from-[#43e97b] to-[#38f9d7]">
+            <el-col :span="8">
+              <el-card class="h-22">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center text-lg text-white bg-linear-to-br from-[#43e97b] to-[#38f9d7]">
                     <el-icon><Coin /></el-icon>
                   </div>
                   <div class="flex-1">
-                    <div class="text-2xl font-bold text-[#303133] mb-1">{{ cancanStats.taskIncome }}</div>
+                    <div class="text-lg font-bold text-[#303133] mb-0">{{ cancanStats.taskIncome }}</div>
                     <div class="text-xs text-[#909399]">任务收益</div>
                   </div>
                 </div>
               </el-card>
             </el-col>
-          </el-row>
-
-          <!-- 抽奖统计 -->
-          <el-row :gutter="15" class="mb-5">
-            <el-col :span="12">
-              <el-card class="h-24">
-                <div class="flex items-center gap-3.75">
-                  <div class="w-12 h-12 rounded-[10px] flex items-center justify-center text-2xl text-white bg-linear-to-br from-[#667eea] to-[#764ba2]">
+            <el-col :span="8">
+              <el-card class="h-22">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center text-lg text-white bg-linear-to-br from-[#667eea] to-[#764ba2]">
                     <el-icon><Present /></el-icon>
                   </div>
                   <div class="flex-1">
-                    <div class="text-2xl font-bold text-[#303133] mb-1">{{ cancanStats.lotteryCount }}</div>
+                    <div class="text-lg font-bold text-[#303133] mb-0">{{ cancanStats.lotteryCount }}</div>
                     <div class="text-xs text-[#909399]">抽奖次数</div>
                   </div>
                 </div>
               </el-card>
             </el-col>
-            <el-col :span="12">
-              <el-card class="h-24">
-                <div class="flex items-center gap-3.75">
-                  <div class="w-12 h-12 rounded-[10px] flex items-center justify-center text-2xl text-white bg-linear-to-br from-[#f093fb] to-[#f5576c]">
+          </el-row>
+
+          <el-row :gutter="15" class="mb-5">
+            <el-col :span="8">
+              <el-card class="h-22">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center text-lg text-white bg-linear-to-br from-[#f093fb] to-[#f5576c]">
                     <el-icon><Money /></el-icon>
                   </div>
                   <div class="flex-1">
-                    <div class="text-2xl font-bold text-[#303133] mb-1">{{ cancanStats.lotteryCost }}</div>
+                    <div class="text-lg font-bold text-[#303133] mb-0">{{ cancanStats.lotteryCost }}</div>
                     <div class="text-xs text-[#909399]">抽奖花费</div>
                   </div>
                 </div>
               </el-card>
             </el-col>
-          </el-row>
-
-          <!-- 后台操作统计（与昭昭共用） -->
-          <el-row :gutter="15" class="mb-5">
-            <el-col :span="12">
-              <el-card class="h-24">
-                <div class="flex items-center gap-3.75">
-                  <div class="w-12 h-12 rounded-[10px] flex items-center justify-center text-2xl text-white bg-linear-to-br from-[#fa709a] to-[#fee140]">
+            <el-col :span="8">
+              <el-card class="h-22">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center text-lg text-white bg-linear-to-br from-[#fa709a] to-[#fee140]">
                     <el-icon><Setting /></el-icon>
                   </div>
                   <div class="flex-1">
-                    <div class="text-2xl font-bold text-[#303133] mb-1">{{ appAdminStats.taskCount }}</div>
+                    <div class="text-lg font-bold text-[#303133] mb-0">{{ cancanStats.adminCount }}</div>
                     <div class="text-xs text-[#909399]">后台操作数</div>
                   </div>
                 </div>
               </el-card>
             </el-col>
-            <el-col :span="12">
-              <el-card class="h-24">
-                <div class="flex items-center gap-3.75">
-                  <div class="w-12 h-12 rounded-[10px] flex items-center justify-center text-2xl text-white bg-linear-to-br from-[#30cfd0] to-[#330867]">
+            <el-col :span="8">
+              <el-card class="h-22">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center text-lg text-white bg-linear-to-br from-[#30cfd0] to-[#330867]">
                     <el-icon><TrendCharts /></el-icon>
                   </div>
                   <div class="flex-1">
-                    <div class="text-2xl font-bold text-[#303133] mb-1">{{ appAdminStats.taskIncome }}</div>
+                    <div class="text-lg font-bold text-[#303133] mb-0">{{ cancanStats.adminIncome }}</div>
                     <div class="text-xs text-[#909399]">操作汇总</div>
                   </div>
                 </div>
@@ -312,6 +302,8 @@ const zhaozhaoStats = ref({
   lotteryCost: 0,
   taskCount: 0,
   taskIncome: 0,
+  adminCount: 0,
+  adminIncome: 0,
 });
 const zhaozhaoCategoryStats = ref<CategoryStat[]>([]);
 
@@ -322,15 +314,10 @@ const cancanStats = ref({
   lotteryCost: 0,
   taskCount: 0,
   taskIncome: 0,
+  adminCount: 0,
+  adminIncome: 0,
 });
 const cancanCategoryStats = ref<CategoryStat[]>([]);
-
-// appAdmin 的统计数据
-const APPADMIN_USER_ID = 1;
-const appAdminStats = ref({
-  taskCount: 0,
-  taskIncome: 0,
-});
 
 // 处理日期变化
 const handleDateChange = () => {
@@ -417,6 +404,8 @@ const calculateUserStats = (
   let lotteryCost = 0;
   let taskCount = 0;
   let taskIncome = 0;
+  let adminCount = 0;
+  let adminIncome = 0;
   const categoryWinMap = new Map<number | null, { win_count: number; total_cost: number; cate_name: string }>();
 
   // 遍历历史记录进行统计
@@ -485,6 +474,12 @@ const calculateUserStats = (
         taskIncome += value;
       }
     }
+
+    // 统计后台操作（appAdmin）
+    if (action === "appAdmin") {
+      adminCount++;
+      adminIncome += value;
+    }
   });
 
   // 更新分类统计
@@ -503,6 +498,8 @@ const calculateUserStats = (
       lotteryCost,
       taskCount,
       taskIncome,
+      adminCount,
+      adminIncome,
     },
     categoryStats,
   };
@@ -514,11 +511,10 @@ const refreshStatistics = async () => {
   try {
     const giftMap = await fetchGiftMap();
 
-    // 并行获取三个用户的数据
-    const [zhaozhaoHistory, cancanHistory, appAdminHistory] = await Promise.all([
+    // 并行获取两个用户的数据
+    const [zhaozhaoHistory, cancanHistory] = await Promise.all([
       fetchScoreHistory(ZHAOZHAO_USER_ID),
       fetchScoreHistory(CANCAN_USER_ID),
-      fetchScoreHistory(APPADMIN_USER_ID),
     ]);
 
     // 计算昭昭的统计
@@ -530,20 +526,6 @@ const refreshStatistics = async () => {
     const cancanResult = calculateUserStats(cancanHistory, giftMap);
     cancanStats.value = cancanResult.stats;
     cancanCategoryStats.value = cancanResult.categoryStats;
-
-    // 计算 appAdmin 的统计（只统计任务）
-    let appAdminTaskCount = 0;
-    let appAdminTaskIncome = 0;
-    appAdminHistory.forEach((record) => {
-      if (record.action === "schedule" && record.value > 0) {
-        appAdminTaskCount++;
-        appAdminTaskIncome += record.value;
-      }
-    });
-    appAdminStats.value = {
-      taskCount: appAdminTaskCount,
-      taskIncome: appAdminTaskIncome,
-    };
   } catch (error) {
     console.error("统计失败:", error);
     ElMessage.error("统计失败");
