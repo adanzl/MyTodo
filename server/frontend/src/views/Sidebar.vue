@@ -33,6 +33,10 @@
             <el-icon><Star /></el-icon>
             <template #title>Score</template>
           </el-menu-item>
+          <el-menu-item index="/statistics">
+            <el-icon><PieChart /></el-icon>
+            <template #title>Statistics</template>
+          </el-menu-item>
         </el-sub-menu>
         <el-menu-item index="/timetable">
           <el-icon><Calendar /></el-icon>
@@ -64,6 +68,7 @@ import {
   Calendar,
   Platform,
   Setting,
+  PieChart,
 } from "@element-plus/icons-vue";
 import { useUserStore } from "@/stores/user";
 

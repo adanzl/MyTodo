@@ -108,25 +108,13 @@ import { ref, onMounted, computed } from "vue";
 import { CaretTop, CaretBottom, Present } from "@element-plus/icons-vue";
 import { getList } from "@/api/api-common";
 import { getPicDisplayUrl } from "@/api/api-pic";
-import { undoLottery } from "@/api/api-user";
+import { undoLottery } from "@/api/api-lottery";
+import type { ScoreHistory } from "@/api/api-score";
 import { ElMessage, ElMessageBox } from "element-plus";
 import * as _ from "lodash-es";
 import dayjs from "dayjs";
 import { useUserStore } from "@/stores/user";
 import type { User } from "@/types/user";
-
-interface ScoreHistory {
-  id: number;
-  user_id: number;
-  value: number;
-  action: string;
-  pre_value: number;
-  current: number;
-  msg: string;
-  dt: string;
-  out_key?: string;
-  user?: User;
-}
 
 interface UserWithAll extends User {
   id: number;

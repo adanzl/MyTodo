@@ -31,6 +31,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/my-todo/PageScore.vue"),
   },
   {
+    path: "/statistics",
+    name: "Statistics",
+    component: () => import("@/views/my-todo/PageStatistics.vue"),
+  },
+  {
     path: "/timetable",
     name: "Timetable",
     component: () => import("@/views/PageTimetable.vue"),

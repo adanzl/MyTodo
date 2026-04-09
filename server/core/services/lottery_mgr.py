@@ -262,10 +262,10 @@ class LotteryMgr:
 
     def _get_full_pool_by_categories(self, cate_ids: list) -> list:
         """根据分类 ID 列表获取全量可用奖池（enable=1, stock>0）。"""
-        cond = {'enable': 1, 'stock': ('>', 0)}
+        cond = {'enable': 1, 'stock': {'>': 0}}
         if cate_ids:
             # 直接在数据库查询时筛选分类
-            cond['cate_id'] = ('in', cate_ids)
+            cond['cate_id'] = {'in': cate_ids}
 
         res = self._db.get_list('t_gift', 1, 500, '*', cond)
         if res.get('code') != 0:
@@ -279,7 +279,7 @@ class LotteryMgr:
             return []
 
         # 直接从数据库查询心愿单中的礼物，不需要限制分类
-        cond = {'enable': 1, 'stock': ('>', 0), 'id': ('in', ids)}
+        cond = {'enable': 1, 'stock': {'>': 0}, 'id': {'in': ids}}
         res = self._db.get_list('t_gift', 1, len(ids), '*', cond)
         if res.get('code') != 0:
             return []

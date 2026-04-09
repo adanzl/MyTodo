@@ -71,7 +71,8 @@
 import { ref, onMounted, computed } from "vue";
 import { ElMessage } from "element-plus";
 import { Refresh } from "@element-plus/icons-vue";
-import { setUserInfo, addScore } from "@/api/api-user";
+import { setUserInfo } from "@/api/api-user";
+import { addScore } from "@/api/api-score";
 import { getLotterySetting } from "@/api/api-lottery";
 import { useUserStore, type UserWithExtras } from "@/stores/user";
 

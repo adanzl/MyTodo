@@ -183,7 +183,7 @@ class DbMgr:
             data: 要插入或更新的数据字典
             condition: 可选的更新条件字典，用于实现乐观锁。
                       例如：{"version": 5} 表示只有当 version 字段等于 5 时才更新
-                           {"version": (">", 3)} 表示只有当 version > 3 时才更新
+                           {"version": {">": 3}} 表示只有当 version > 3 时才更新
         """
         cnt = 0
         try:
@@ -360,42 +360,30 @@ class DbMgr:
                 query = select(*columns)
                 count_query = select(func.count()).select_from(table_obj)
 
-            # 条件过滤（支持 (op, value) 或 [op, value] 表示 >, <, >=, <=, !=, in；也支持 { in: [...] } 格式）
+            # 条件过滤（支持 { field: { ">=": val1, "<=": val2 } } 或 { field: { in: [...] } } 格式）
             if conditions and isinstance(conditions, dict):
                 for k, v in conditions.items():
                     if k not in table_obj.columns:
                         continue
                     col = table_obj.columns[k]
-                    # 支持元组或列表格式：('>', value) 或 ['>', value]
-                    if (isinstance(v, (tuple, list)) or isinstance(v, list)) and len(v) == 2:
-                        op, val = v[0], v[1]
-                        if op == '>':
-                            query = query.where(col > val)
-                            count_query = count_query.where(col > val)
-                        elif op == '<':
-                            query = query.where(col < val)
-                            count_query = count_query.where(col < val)
-                        elif op == '>=':
-                            query = query.where(col >= val)
-                            count_query = count_query.where(col >= val)
-                        elif op == '<=':
-                            query = query.where(col <= val)
-                            count_query = count_query.where(col <= val)
-                        elif op == '!=':
-                            query = query.where(col != val)
-                            count_query = count_query.where(col != val)
-                        elif op == 'in':
-                            query = query.where(col.in_(val))
-                            count_query = count_query.where(col.in_(val))
-                        else:
-                            query = query.where(col == val)
-                            count_query = count_query.where(col == val)
-                    elif isinstance(v, dict):
-                        # 支持 { field: { in: [...] } } 格式
+                    if isinstance(v, dict):
+                        # 支持 { field: { ">=": val1, "<=": val2 } } 或 { field: { in: [...] } } 格式
                         for op, val in v.items():
                             if op == 'in':
                                 query = query.where(col.in_(val))
                                 count_query = count_query.where(col.in_(val))
+                            elif op == '>=':
+                                query = query.where(col >= val)
+                                count_query = count_query.where(col >= val)
+                            elif op == '<=':
+                                query = query.where(col <= val)
+                                count_query = count_query.where(col <= val)
+                            elif op == '>':
+                                query = query.where(col > val)
+                                count_query = count_query.where(col > val)
+                            elif op == '<':
+                                query = query.where(col < val)
+                                count_query = count_query.where(col < val)
                             else:
                                 query = query.where(col == val)
                                 count_query = count_query.where(col == val)

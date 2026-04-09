@@ -391,7 +391,7 @@ async function refreshGiftList(
   const filter: Record<string, unknown> = {
     enable: 1,
     show: 1,
-    stock: ['>', 0],  // stock > 0
+    stock: {'>': 0},  // stock > 0
   };
   if (cateId) {
     filter["cate_id"] = cateId;
