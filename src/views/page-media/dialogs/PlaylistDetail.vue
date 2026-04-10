@@ -23,7 +23,7 @@
               size="small"
               :fill="selectedWeekday === index ? 'solid' : 'outline'"
               @click="selectedWeekday = index"
-              class="p-0! text-[11px]! flex-1!"
+              class="[&::part(native)]:p-0 text-[11px]! flex-1!"
               >
               {{ name }}
             </ion-button>
@@ -43,7 +43,7 @@
               <div class="w-13">{{ formatDuration(item.duration) }}</div>
             </div>
           </div>
-          <div v-else class="text-center text-gray-400 py-4">暂无曲目</div>
+          <div v-else class="text-center text-gray-400 py-4 text-sm">暂无曲目</div>
         </div>
 
         <!-- 主列表 -->
@@ -63,7 +63,7 @@
               <div class="w-13">{{ formatDuration(item.duration) }}</div>
             </div>
           </div>
-          <div v-else class="text-center text-gray-400 py-8">暂无曲目</div>
+          <div v-else class="text-center text-gray-400 py-8 text-sm">暂无曲目</div>
         </div>
 
       </div>
