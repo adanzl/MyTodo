@@ -268,34 +268,37 @@
     </el-row>
 
     <!-- 礼物列表弹窗 -->
-    <el-dialog v-model="giftDialogVisible" :title="`${currentCategoryName} - 礼物列表`" width="70%">
-      <el-table :data="giftList" stripe style="width: 100%">
-        <el-table-column prop="id" label="ID" width="80" align="center" />
-        <el-table-column label="图片" width="100" align="center">
-          <template #default="{ row }">
-            <el-image
-              v-if="row.image"
-              :src="getPicDisplayUrl(row.image)"
-              :preview-src-list="[getPicDisplayUrl(row.image)]"
-              :preview-teleported="true"
-              fit="cover"
-              class="w-15 h-15 cursor-pointer"
-            />
-            <span v-else>-</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="name" label="礼物名称" />
-        <el-table-column prop="cost" label="兑换价格" width="120" align="center" />
-        <el-table-column label="是否可兑换" width="120" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row.exchange ? 'success' : 'info'">
-              {{ row.exchange ? '是' : '否' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="win_count" label="中奖次数" width="120" align="center" />
-        <el-table-column prop="exchange_count" label="兑换次数" width="120" align="center" />
-      </el-table>
+    <el-dialog v-model="giftDialogVisible" :title="`${currentCategoryName} - 礼物列表`"
+      width="70%" style="height: 80vh;" top="10vh">
+      <div class="flex-1 overflow-hidden flex flex-col">
+        <el-table :data="giftList" stripe style="width: 100%"  :max-height="'calc(80vh - 120px)'">
+          <el-table-column prop="id" label="ID" width="80" align="center" />
+          <el-table-column label="图片" width="100" align="center">
+            <template #default="{ row }">
+              <el-image
+                v-if="row.image"
+                :src="getPicDisplayUrl(row.image)"
+                :preview-src-list="[getPicDisplayUrl(row.image)]"
+                :preview-teleported="true"
+                fit="cover"
+                class="w-15 h-15 cursor-pointer"
+              />
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="name" label="礼物名称" />
+          <el-table-column prop="cost" label="兑换价格" width="120" align="center" />
+          <el-table-column label="是否可兑换" width="120" align="center">
+            <template #default="{ row }">
+              <el-tag :type="row.exchange ? 'success' : 'info'">
+                {{ row.exchange ? '是' : '否' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="win_count" label="中奖次数" width="120" align="center" />
+          <el-table-column prop="exchange_count" label="兑换次数" width="120" align="center" />
+        </el-table>
+      </div>
     </el-dialog>
   </div>
 </template>
