@@ -26,7 +26,7 @@ class CategoryStat(TypedDict):
     gift_types: int  # 礼物种类数
     total_cost: float  # 总花费
     total_exchange_price: int  # 实际中奖礼物兑换价格总和
-    won_gifts: List[Dict[str, Any]]  # 中奖物品列表[{id, name, count, image, cost}]
+    won_gifts: List[Dict[str, Any]]  # 中奖物品列表[{id, name, count, image, cost, exchange}]
 
 
 class LotteryStatsResult(TypedDict):
@@ -145,14 +145,12 @@ class StatsMgr:
             gift_map = {g['id']: g for g in gifts}
 
             for gift_id, gift in gift_map.items():
-                log.info(f"lottery gift_id={gift_id}, cost={gift.get('cost')}, keys={list(gift.keys())}")
                 self._update_category(gift.get('cate_id'), gift_id, abs(value / len(gift_ids)), category_map, gift)
         else:  # exchange
             gift_id = int(out_key)
             res = self._db.get_data('t_gift', gift_id, '*')
             gift_data = res.get('data')
             if gift_data:
-                log.info(f"exchange gift_id={gift_id}, cost={gift_data.get('cost')}, keys={list(gift_data.keys())}")
                 self._update_category(gift_data.get('cate_id'), gift_id, abs(value), category_map, gift_data)
 
     def _update_category(self, cate_id: Optional[int], gift_id: int, cost: float, category_map: Dict, gift_info):
@@ -180,6 +178,7 @@ class StatsMgr:
                 'count': 0,
                 'image': gift_info.get('image', ''),
                 'cost': gift_info.get('cost', 0),
+                'exchange': gift_info.get('exchange', 0),
             }
         if gift_id in category_map[cate_id]['won_gifts_map']:
             category_map[cate_id]['won_gifts_map'][gift_id]['count'] += 1

@@ -347,16 +347,24 @@
           <template #default="{ row }">
             <el-image
               v-if="row.image"
-              :src="row.image"
-              :preview-src-list="[row.image]"
+              :src="getPicDisplayUrl(row.image)"
+              :preview-src-list="[getPicDisplayUrl(row.image)]"
+              :preview-teleported="true"
               fit="cover"
-              style="width: 60px; height: 60px; cursor: pointer"
+              class="w-15 h-15 cursor-pointer"
             />
             <span v-else>-</span>
           </template>
         </el-table-column>
         <el-table-column prop="name" label="礼物名称" />
         <el-table-column prop="cost" label="兑换价格" width="120" align="center" />
+        <el-table-column label="是否可兑换" width="120" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.exchange ? 'success' : 'info'">
+              {{ row.exchange ? '是' : '否' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="count" label="中奖次数" width="120" align="center" />
       </el-table>
     </el-dialog>
@@ -367,6 +375,7 @@
 import { ref, onMounted } from "vue";
 import { Present, Money, CircleCheck, Coin, Setting, TrendCharts, ShoppingCart, Wallet } from "@element-plus/icons-vue";
 import { getUserStats, type CategoryStat, type WonGift } from "@/api/api-stats";
+import { getPicDisplayUrl } from "@/api/api-pic";
 import { ElMessage } from "element-plus";
 import dayjs from "dayjs";
 
@@ -472,17 +481,12 @@ const refreshStatistics = async () => {
     // 批量获取两个用户的数据
     const result: any = await getUserStats([ZHAOZHAO_USER_ID, CANCAN_USER_ID], startDate, endDate);
 
-    console.log('API返回:', result);
     // result 可能是 { code: 0, data: [...] } 或直接是数组
     const dataArray = Array.isArray(result) ? result : (result?.data || []);
-    console.log('数据数组:', dataArray);
 
     // 找到对应用户的数据
     const zhaozhaoData = dataArray.find((item: any) => item.user_id === ZHAOZHAO_USER_ID);
     const cancanData = dataArray.find((item: any) => item.user_id === CANCAN_USER_ID);
-
-    console.log('昭昭数据:', zhaozhaoData);
-    console.log('灿灿数据:', cancanData);
 
     if (zhaozhaoData) {
       zhaozhaoStats.value = zhaozhaoData.stats;

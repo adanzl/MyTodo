@@ -17,6 +17,7 @@ export interface WonGift {
   count: number;
   image: string;
   cost: number;
+  exchange: number;
 }
 
 export interface CategoryStat {
