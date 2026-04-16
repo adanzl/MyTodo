@@ -177,9 +177,9 @@ class StatsMgr:
             gift_ids = list(stat['gift_ids'])
             total_exchange_price = 0
             if gift_ids:
-                res = self._db.get_list('t_gift', 1, len(gift_ids), 'exchange_score', {'id': {'in': gift_ids}})
+                res = self._db.get_list('t_gift', 1, len(gift_ids), 'cost', {'id': {'in': gift_ids}})
                 gifts = (res.get('data') or {}).get('data') or []
-                total_exchange_price = sum(g.get('exchange_score', 0) for g in gifts)
+                total_exchange_price = sum(g.get('cost', 0) for g in gifts)
 
             category_stats.append({
                 'cate_id': cate_id,
@@ -196,7 +196,7 @@ class StatsMgr:
         if not cate_id:
             return '未分类'
         res = self._db.get_data('t_gift_category', cate_id, 'name')
-        data = (res.get('data') or {}).get('data') or {}
+        data = res.get('data') or {}
         return data.get('name', f'分类{cate_id}')
 
 

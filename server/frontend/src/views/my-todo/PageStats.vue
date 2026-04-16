@@ -171,7 +171,7 @@
               <el-table-column prop="cate_name" label="分类名称" />
               <el-table-column prop="gift_types" label="礼物种类" width="120" align="center" />
               <el-table-column prop="win_count" label="中奖次数" width="120" align="center" />
-              <el-table-column prop="total_exchange_price" label="兑换价格总和" width="140" align="center" />
+              <el-table-column prop="total_exchange_price" label="兑换总价" width="140" align="center" />
             </el-table>
           </el-card>
         </div>
@@ -332,7 +332,7 @@
               <el-table-column prop="cate_name" label="分类名称" />
               <el-table-column prop="gift_types" label="礼物种类" width="120" align="center" />
               <el-table-column prop="win_count" label="中奖次数" width="120" align="center" />
-              <el-table-column prop="total_exchange_price" label="兑换价格总和" width="140" align="center" />
+              <el-table-column prop="total_exchange_price" label="兑换总价" width="140" align="center" />
             </el-table>
           </el-card>
         </div>
@@ -343,7 +343,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import { Present, Money, CircleCheck, Coin, Setting, TrendCharts } from "@element-plus/icons-vue";
+import { Present, Money, CircleCheck, Coin, Setting, TrendCharts, ShoppingCart, Wallet } from "@element-plus/icons-vue";
 import { getUserStats, type CategoryStat } from "@/api/api-stats";
 import { ElMessage } from "element-plus";
 import dayjs from "dayjs";
@@ -443,22 +443,28 @@ const refreshStatistics = async () => {
     const endDate = dateRange.value?.[1];
 
     // 批量获取两个用户的数据
-    const response = await getUserStats([ZHAOZHAO_USER_ID, CANCAN_USER_ID], startDate, endDate);
+    const result: any = await getUserStats([ZHAOZHAO_USER_ID, CANCAN_USER_ID], startDate, endDate);
 
-    if (response.code === 0 && response.data && Array.isArray(response.data)) {
-      // 找到对应用户的数据
-      const zhaozhaoData = response.data.find((item: any) => item.user_id === ZHAOZHAO_USER_ID);
-      const cancanData = response.data.find((item: any) => item.user_id === CANCAN_USER_ID);
+    console.log('API返回:', result);
+    // result 可能是 { code: 0, data: [...] } 或直接是数组
+    const dataArray = Array.isArray(result) ? result : (result?.data || []);
+    console.log('数据数组:', dataArray);
 
-      if (zhaozhaoData) {
-        zhaozhaoStats.value = zhaozhaoData.stats;
-        zhaozhaoCategoryStats.value = zhaozhaoData.categoryStats;
-      }
+    // 找到对应用户的数据
+    const zhaozhaoData = dataArray.find((item: any) => item.user_id === ZHAOZHAO_USER_ID);
+    const cancanData = dataArray.find((item: any) => item.user_id === CANCAN_USER_ID);
 
-      if (cancanData) {
-        cancanStats.value = cancanData.stats;
-        cancanCategoryStats.value = cancanData.categoryStats;
-      }
+    console.log('昭昭数据:', zhaozhaoData);
+    console.log('灿灿数据:', cancanData);
+
+    if (zhaozhaoData) {
+      zhaozhaoStats.value = zhaozhaoData.stats;
+      zhaozhaoCategoryStats.value = zhaozhaoData.categoryStats;
+    }
+
+    if (cancanData) {
+      cancanStats.value = cancanData.stats;
+      cancanCategoryStats.value = cancanData.categoryStats;
     }
   } catch (error) {
     console.error("统计失败:", error);
