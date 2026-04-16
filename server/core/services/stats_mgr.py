@@ -203,8 +203,10 @@ class StatsMgr:
         """构建分类统计列表"""
         category_stats = []
         for cate_id, stat in category_map.items():
-            # 将 won_gifts_map 转换为列表，按次数降序
-            won_gifts = sorted(stat.get('won_gifts_map', {}).values(), key=lambda x: x['count'], reverse=True)
+            # 将 won_gifts_map 转换为列表，按总次数降序
+            won_gifts = sorted(stat.get('won_gifts_map', {}).values(),
+                               key=lambda x: x['win_count'] + x['exchange_count'],
+                               reverse=True)
 
             category_stats.append({
                 'cate_id': cate_id,
