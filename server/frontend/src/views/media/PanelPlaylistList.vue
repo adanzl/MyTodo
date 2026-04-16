@@ -91,8 +91,11 @@
     </div>
     <div class="flex items-center justify-center mt-2 border rounded-md p-2 gap-2">
       <el-switch :model-value="autoRefreshEnabled"
-          @update:model-value="(value: boolean) => $emit('toggle-auto-refresh', value)" active-text="" inactive-text=""
-          active-color="#409eff" size="small" :disabled="dragMode" class="h-6!"
+          @update:model-value="(value: boolean) => $emit('toggle-auto-refresh', value)"
+          active-color="#409eff" size="default" :disabled="dragMode" class=""
+          active-text="自动"
+          inactive-text="自动"
+          inline-prompt
           :title="dragMode ? '排序模式下禁用' : '自动刷新'" />
       <el-button type="primary" plain @click="$emit('refresh')" :loading="refreshing" :icon="Refresh"
           :disabled="dragMode" :title="dragMode ? '排序模式下禁用' : '刷新播放列表'"
