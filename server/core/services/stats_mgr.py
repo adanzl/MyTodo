@@ -54,9 +54,13 @@ class StatsMgr:
             page, page_size = 1, 100
             while True:
                 history_list = self._db.get_list('t_score_history', page, page_size, '*', conditions)
-                if not history_list or not history_list.get('data'):
+                if not history_list or history_list.get('code') != 0:
                     break
-                records = history_list['data']
+
+                records = (history_list.get('data') or {}).get('data') or []
+                if not records:
+                    break
+
                 all_records.extend(records)
                 if len(records) < page_size:
                     break
@@ -70,6 +74,11 @@ class StatsMgr:
             category_map: Dict[int, Dict[str, Any]] = {}
 
             for record in all_records:
+                # 跳过非字典类型
+                if not isinstance(record, dict):
+                    log.warning(f"跳过无效记录: {type(record)}")
+                    continue
+
                 action, value, out_key = record.get('action'), record.get('value', 0), record.get('out_key')
 
                 if action == 'lottery':
