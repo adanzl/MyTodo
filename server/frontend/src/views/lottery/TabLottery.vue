@@ -11,11 +11,13 @@
           <Edit />
         </el-icon>
       </el-button>
-      <div class="flex-1 flex items-center justify-end">
-        <el-button type="primary" class="" @click="onAddGiftClk">添加奖品</el-button>
+      <div class="flex-1 flex items-center justify-end gap-2">
+        <el-input placeholder="请输入ID" v-model="searchId" size="small" class="w-30!" clearable @clear="onCateChange"></el-input>
+        <el-button type="primary" plain size="small" @click="onFilterClk">筛选</el-button>
+        <el-button type="primary" size="small" @click="onAddGiftClk">添加奖品</el-button>
       </div>
     </div>
-    <el-table :data="giftList.data" v-loading="loading" :max-height="tableMaxHeight">
+    <el-table :data="giftList.data" v-loading="loading" :max-height="tableMaxHeight" style="min-height: 200px">
       <!-- 图片 -->
       <el-table-column width="130" label="Image">
         <template #default="{ row }">
@@ -188,6 +190,7 @@ import type { Gift, GiftApiData, GiftCategory } from "@/types/lottery";
 const PAGE_SIZE = ref<number>(5);
 const selectedCateId = ref<number>(0);
 const tableMaxHeight = ref<number>(0);
+const searchId = ref<string>("");
 
 // 计算表格最大高度
 const calculateTableHeight = () => {
@@ -248,11 +251,15 @@ const refreshCateList = async () => {
   }
 };
 
-const refreshGiftList = async (cateId: number, pageNum: number, pageSize: number) => {
+const refreshGiftList = async (cateId: number, pageNum: number, pageSize: number, searchId?: string) => {
   loading.value = true;
   try {
-    let filter: Record<string, number> | undefined = undefined;
-    if (cateId && cateId !== 0) {
+    let filter: Record<string, string | number> | undefined = undefined;
+    // 如果有searchId，优先使用ID筛选
+    if (searchId && searchId.trim() !== "") {
+      filter = { id: searchId.trim() };
+    } else if (cateId && cateId !== 0) {
+      // 否则使用分类筛选
       filter = { cate_id: cateId };
     }
     const response = await getList<GiftApiData>("t_gift", filter, pageNum, pageSize);
@@ -291,13 +298,24 @@ const refreshGiftList = async (cateId: number, pageNum: number, pageSize: number
 };
 
 const onCateChange = () => {
+  // 切换分类时清除ID筛选
+  searchId.value = "";
   const cate = selectedCate.value;
   if (cate) {
     refreshGiftList(cate.id, 1, PAGE_SIZE.value);
   }
 };
 
+const onFilterClk = () => {
+  refreshGiftList(selectedCate.value.id, 1, PAGE_SIZE.value, searchId.value);
+};
+
 const onAddGiftClk = () => {
+  // 添加新奖品时，如果在ID筛选模式下，先清除筛选
+  if (searchId.value && searchId.value.trim() !== "") {
+    searchId.value = "";
+  }
+
   giftList.value.data.unshift({
     id: -1,
     name: "",
@@ -321,7 +339,7 @@ const handleGiftDel = async (item: Gift) => {
   try {
     item.edited = false;
     await delData("t_gift", item.id);
-    await refreshGiftList(selectedCate.value.id, giftList.value.pageNum, giftList.value.pageSize);
+    await refreshGiftList(selectedCate.value.id, giftList.value.pageNum, giftList.value.pageSize, searchId.value);
   } catch (error) {
     console.error("删除奖品失败:", error);
     ElMessage.error("删除奖品失败");
@@ -371,7 +389,7 @@ const handleGiftSave = async (item: Gift) => {
       show: item.show ? 1 : 0,
     };
     await setData("t_gift", data);
-    await refreshGiftList(selectedCate.value.id, giftList.value.pageNum, giftList.value.pageSize);
+    await refreshGiftList(selectedCate.value.id, giftList.value.pageNum, giftList.value.pageSize, searchId.value);
   } catch (error) {
     console.error("保存奖品失败:", error);
     ElMessage.error("保存奖品失败");
@@ -395,11 +413,11 @@ const handleImageChange = async (file: UploadFile, row: Gift) => {
 };
 
 const handlePageChange = (pageNum: number, pageSize: number) => {
-  refreshGiftList(selectedCate.value.id, pageNum, pageSize);
+  refreshGiftList(selectedCate.value.id, pageNum, pageSize, searchId.value);
 };
 
 const handleSizeChange = (pageSize: number) => {
-  refreshGiftList(selectedCate.value.id, 1, pageSize);
+  refreshGiftList(selectedCate.value.id, 1, pageSize, searchId.value);
 };
 
 const handleCateBlur = (item: GiftCategory, key: string, _idx: number) => {

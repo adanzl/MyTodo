@@ -42,8 +42,8 @@ import { ref, onMounted } from "vue";
 import { ElMessage } from "element-plus";
 import { InfoFilled } from "@element-plus/icons-vue";
 import { getLotterySetting, setLotterySetting } from "@/api/api-lottery";
-import TabLottery from "./LotteryTab.vue";
-import TabPool from "./PoolTab.vue";
+import TabLottery from "./TabLottery.vue";
+import TabPool from "./TabPool.vue";
 
 // 主页签控制
 const activeMainTab = ref("lottery");
