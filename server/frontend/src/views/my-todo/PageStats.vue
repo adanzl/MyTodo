@@ -340,12 +340,24 @@
     </el-row>
 
     <!-- 礼物列表弹窗 -->
-    <el-dialog v-model="giftDialogVisible" :title="`${currentCategoryName} - 礼物列表`" width="60%">
+    <el-dialog v-model="giftDialogVisible" :title="`${currentCategoryName} - 礼物列表`" width="70%">
       <el-table :data="giftList" stripe style="width: 100%">
+        <el-table-column prop="id" label="ID" width="80" align="center" />
+        <el-table-column label="图片" width="100" align="center">
+          <template #default="{ row }">
+            <el-image
+              v-if="row.image"
+              :src="row.image"
+              :preview-src-list="[row.image]"
+              fit="cover"
+              style="width: 60px; height: 60px; cursor: pointer"
+            />
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="name" label="礼物名称" />
-        <el-table-column prop="cost" label="抽奖成本" width="120" align="center" />
-        <el-table-column prop="exchange_score" label="兑换积分" width="120" align="center" />
-        <el-table-column prop="stock" label="库存" width="100" align="center" />
+        <el-table-column prop="cost" label="兑换价格" width="120" align="center" />
+        <el-table-column prop="count" label="中奖次数" width="120" align="center" />
       </el-table>
     </el-dialog>
   </div>
@@ -354,8 +366,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { Present, Money, CircleCheck, Coin, Setting, TrendCharts, ShoppingCart, Wallet } from "@element-plus/icons-vue";
-import { getUserStats, getCategoryGifts, type CategoryStat } from "@/api/api-stats";
-import type { Gift } from "@/types/lottery/lotteryData";
+import { getUserStats, type CategoryStat, type WonGift } from "@/api/api-stats";
 import { ElMessage } from "element-plus";
 import dayjs from "dayjs";
 
@@ -436,7 +447,7 @@ const cancanCategoryStats = ref<CategoryStat[]>([]);
 // 弹窗相关
 const giftDialogVisible = ref(false);
 const currentCategoryName = ref("");
-const giftList = ref<Gift[]>([]);
+const giftList = ref<WonGift[]>([]);
 
 // 处理日期变化
 const handleDateChange = () => {
@@ -491,18 +502,10 @@ const refreshStatistics = async () => {
 };
 
 // 点击分类行，显示礼物列表
-const handleCategoryClick = async (row: CategoryStat) => {
-  if (!row.cate_id) return;
-
+const handleCategoryClick = (row: CategoryStat) => {
   currentCategoryName.value = row.cate_name;
+  giftList.value = row.won_gifts || [];
   giftDialogVisible.value = true;
-
-  try {
-    giftList.value = await getCategoryGifts(row.cate_id);
-  } catch (error) {
-    console.error("获取礼物列表失败:", error);
-    ElMessage.error("获取礼物列表失败");
-  }
 };
 
 onMounted(() => {

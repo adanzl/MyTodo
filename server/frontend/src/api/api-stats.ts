@@ -1,5 +1,4 @@
 import { api } from "./config";
-import type { Gift } from "@/types/lottery/lotteryData";
 
 export interface UserStats {
   lotteryCount: number;
@@ -12,6 +11,14 @@ export interface UserStats {
   adminIncome: number;
 }
 
+export interface WonGift {
+  id: number;
+  name: string;
+  count: number;
+  image: string;
+  cost: number;
+}
+
 export interface CategoryStat {
   cate_id: number | null;
   cate_name: string;
@@ -19,6 +26,7 @@ export interface CategoryStat {
   gift_types: number;
   total_cost: number;
   total_exchange_price: number;
+  won_gifts: WonGift[];
 }
 
 export interface StatsResponse {
@@ -44,19 +52,4 @@ export const getUserStats = async (
     },
   });
   return response.data;
-};
-
-/**
- * 获取分类下的礼物列表
- */
-export const getCategoryGifts = async (cateId: number): Promise<Gift[]> => {
-  const response = await api.get("/getAll", {
-    params: {
-      table: "t_gift",
-      conditions: JSON.stringify({ cate_id: cateId }),
-      pageNum: 1,
-      pageSize: 1000,
-    },
-  });
-  return response.data?.data || [];
 };
