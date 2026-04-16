@@ -1,0 +1,47 @@
+import { api } from "./config";
+import type { ApiResponse } from "@/types/api";
+
+export interface UserStats {
+  lotteryCount: number;
+  lotteryCost: number;
+  exchangeCount: number;
+  exchangeCost: number;
+  taskCount: number;
+  taskIncome: number;
+  adminCount: number;
+  adminIncome: number;
+}
+
+export interface CategoryStat {
+  cate_id: number | null;
+  cate_name: string;
+  win_count: number;
+  gift_types: number;
+  total_cost: number;
+  total_exchange_price: number;
+}
+
+
+export interface StatsResponse {
+  user_id: number;
+  stats: UserStats;
+  categoryStats: CategoryStat[];
+}
+
+/**
+ * 获取用户统计数据
+ */
+export const getUserStats = (
+  userId: number | number[],
+  startDate?: string,
+  endDate?: string
+): Promise<ApiResponse<StatsResponse[]>> => {
+  const userIdStr = Array.isArray(userId) ? userId.join(",") : userId.toString();
+  return api.get("/lottery/stats", {
+    params: {
+      user_id: userIdStr,
+      start_date: startDate,
+      end_date: endDate,
+    },
+  });
+};

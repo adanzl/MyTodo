@@ -10,6 +10,7 @@ from core.services.lottery_mgr import lottery_mgr
 from core.utils import read_json_from_request
 from flask import Blueprint, request
 from flask.typing import ResponseReturnValue
+from core.services.stats_mgr import stats_mgr
 
 log = app_logger
 lottery_bp = Blueprint("lottery", __name__)
@@ -105,3 +106,30 @@ def gift_avg_cost() -> ResponseReturnValue:
     except Exception as e:
         log.error(e)
         return {"code": -1, "msg": "error: " + str(e)}
+
+
+@lottery_bp.route("/lottery/stats", methods=["GET"])
+def get_lottery_stats() -> ResponseReturnValue:
+    """获取用户统计数据"""
+    try:
+        user_id = request.args.get('user_id', type=str)
+        start_date = request.args.get('start_date', type=str)
+        end_date = request.args.get('end_date', type=str)
+
+        # 解析 user_id，支持单个ID或多个ID（逗号分隔）
+        if user_id:
+            user_ids = [int(uid.strip()) for uid in user_id.split(',') if uid.strip().isdigit()]
+        else:
+            user_ids = [3]
+
+        # 多个用户，并行获取并合并结果
+        results = []
+        for uid in user_ids:
+            result = stats_mgr.get_user_lottery_stats(uid, start_date, end_date)
+            results.append({'user_id': uid, 'stats': result['stats'], 'categoryStats': result['categoryStats']})
+
+        return {'code': 0, 'data': results}
+
+    except Exception as e:
+        log.error(e)
+        return {'code': -1, 'msg': f'统计失败: {str(e)}'}
