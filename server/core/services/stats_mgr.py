@@ -23,10 +23,9 @@ class CategoryStat(TypedDict):
     cate_id: Optional[int]  # 分类ID
     cate_name: str  # 分类名称
     win_count: int  # 中奖次数
-    gift_types: int  # 礼物种类数
+    exchange_count: int  # 兑换次数
     total_cost: float  # 总花费
-    total_exchange_price: int  # 实际中奖礼物兑换价格总和
-    won_gifts: List[Dict[str, Any]]  # 中奖物品列表[{id, name, count, image, cost, exchange}]
+    won_gifts: List[Dict[str, Any]]  # 中奖物品列表[{id, name, win_count, exchange_count, image, cost, exchange}]
 
 
 class LotteryStatsResult(TypedDict):
@@ -145,15 +144,22 @@ class StatsMgr:
             gift_map = {g['id']: g for g in gifts}
 
             for gift_id, gift in gift_map.items():
-                self._update_category(gift.get('cate_id'), gift_id, abs(value / len(gift_ids)), category_map, gift)
+                self._update_category(gift.get('cate_id'), gift_id, abs(value / len(gift_ids)), category_map, gift,
+                                      action)
         else:  # exchange
             gift_id = int(out_key)
             res = self._db.get_data('t_gift', gift_id, '*')
             gift_data = res.get('data')
             if gift_data:
-                self._update_category(gift_data.get('cate_id'), gift_id, abs(value), category_map, gift_data)
+                self._update_category(gift_data.get('cate_id'), gift_id, abs(value), category_map, gift_data, action)
 
-    def _update_category(self, cate_id: Optional[int], gift_id: int, cost: float, category_map: Dict, gift_info):
+    def _update_category(self,
+                         cate_id: Optional[int],
+                         gift_id: int,
+                         cost: float,
+                         category_map: Dict,
+                         gift_info,
+                         action: str = 'lottery'):
         """更新分类统计"""
         if cate_id is None:
             return
@@ -162,11 +168,17 @@ class StatsMgr:
                 'cate_id': cate_id,
                 'cate_name': self._get_category_name(cate_id),
                 'win_count': 0,
+                'exchange_count': 0,
                 'gift_ids': set(),
                 'total_cost': 0,
                 'won_gifts_map': {},  # {gift_id: {id, name, count, img}}
             }
-        category_map[cate_id]['win_count'] += 1
+
+        if action == 'lottery':
+            category_map[cate_id]['win_count'] += 1
+        else:  # exchange
+            category_map[cate_id]['exchange_count'] += 1
+
         category_map[cate_id]['gift_ids'].add(gift_id)
         category_map[cate_id]['total_cost'] += cost
 
@@ -175,25 +187,22 @@ class StatsMgr:
             category_map[cate_id]['won_gifts_map'][gift_id] = {
                 'id': gift_id,
                 'name': gift_info.get('name', ''),
-                'count': 0,
+                'win_count': 0,
+                'exchange_count': 0,
                 'image': gift_info.get('image', ''),
                 'cost': gift_info.get('cost', 0),
                 'exchange': gift_info.get('exchange', 0),
             }
-        if gift_id in category_map[cate_id]['won_gifts_map']:
-            category_map[cate_id]['won_gifts_map'][gift_id]['count'] += 1
+
+        if action == 'lottery':
+            category_map[cate_id]['won_gifts_map'][gift_id]['win_count'] += 1
+        else:  # exchange
+            category_map[cate_id]['won_gifts_map'][gift_id]['exchange_count'] += 1
 
     def _build_category_stats(self, category_map: Dict) -> List[CategoryStat]:
         """构建分类统计列表"""
         category_stats = []
         for cate_id, stat in category_map.items():
-            gift_ids = list(stat['gift_ids'])
-            total_exchange_price = 0
-            if gift_ids:
-                res = self._db.get_list('t_gift', 1, len(gift_ids), 'cost', {'id': {'in': gift_ids}})
-                gifts = (res.get('data') or {}).get('data') or []
-                total_exchange_price = sum(g.get('cost', 0) for g in gifts)
-
             # 将 won_gifts_map 转换为列表，按次数降序
             won_gifts = sorted(stat.get('won_gifts_map', {}).values(), key=lambda x: x['count'], reverse=True)
 
@@ -201,9 +210,8 @@ class StatsMgr:
                 'cate_id': cate_id,
                 'cate_name': stat['cate_name'],
                 'win_count': stat['win_count'],
-                'gift_types': len(stat['gift_ids']),
+                'exchange_count': stat.get('exchange_count', 0),
                 'total_cost': round(stat['total_cost'], 2),
-                'total_exchange_price': total_exchange_price,
                 'won_gifts': won_gifts,
             })
         return category_stats
