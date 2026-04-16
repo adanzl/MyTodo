@@ -12,6 +12,18 @@
     - `null` / `None` / 空字符串：返回整个集合
 - **返回**：`_ok(playlist)` 或 `_err(...)`
 
+## GET `/api/playlist/history`
+
+- **用途**：获取播放列表更新历史。
+- **Query**
+  - `limit`：int，可选，默认10，范围1-10
+    - 返回的历史记录数量
+- **返回**：`_ok({timestamp: json_str, ...})` 或 `_err(...)`
+  - 返回格式为字典，key 为时间戳（格式：`YYYY-MM-DD HH:MM:SS`），value 为该时刻的完整播放列表 JSON 字符串
+  - 按时间倒序排列（最新的在前）
+  - 最多保留10条历史记录
+- **存储方式**：使用 Redis Hash 结构存储，key 为 `schedule_play:playlist_collection_history`，field 为时间戳，value 为 JSON 字符串
+
 ## POST `/api/playlist/update`
 
 - **用途**：更新单个播放列表（必须包含 `id`）。

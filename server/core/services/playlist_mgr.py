@@ -20,6 +20,7 @@ from core.utils import time_to_seconds
 log = app_logger
 
 PLAYLIST_RDS_FULL_KEY = "schedule_play:playlist_collection"
+PLAYLIST_RDS_HISTORY_KEY = "schedule_play:playlist_collection_history"
 DEVICE_TYPES = {"device_agent", "bluetooth", "dlna", "mi"}
 
 _TS = lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -122,6 +123,33 @@ class PlaylistMgr:
 
         return result
 
+    def get_playlist_history(self, limit: int = 10) -> Dict[str, str]:
+        """获取播放列表历史记录（从 Redis Hash）。
+
+        Args:
+            limit: 返回的历史记录数量，默认10个。
+
+        Returns:
+            历史记录字典，格式为 {timestamp: json_str}，按时间倒序排列。
+        """
+        try:
+            # 从 Hash 中获取所有历史记录
+            history_dict = rds_mgr.hgetall(PLAYLIST_RDS_HISTORY_KEY)
+
+            if not history_dict:
+                return {}
+
+            # 按时间倒序排序，返回最新的 limit 条记录
+            sorted_keys = sorted(history_dict.keys(), reverse=True)
+            limited_keys = sorted_keys[:limit]
+
+            result = {key: history_dict[key] for key in limited_keys}
+            log.info(f"[PlaylistMgr] 获取播放列表历史记录: {len(result)} 条")
+            return result
+        except Exception as e:
+            log.error(f"[PlaylistMgr] get_playlist_history error: {e}", exc_info=True)
+            return {}
+
     def _start_rds_save_worker(self) -> None:
         """启动后台 greenlet 来处理 Redis 保存队列。
 
@@ -152,13 +180,44 @@ class PlaylistMgr:
         self._rds_save_greenlet = spawn(_rds_save_worker)
 
     def _save_playlist_to_rds(self) -> None:
-        """保存播放列表到 RDS"""
+        """保存播放列表到 RDS，同时保存历史记录"""
         try:
             json_str = json.dumps(self._playlist_raw, ensure_ascii=False)
             rds_mgr.set(PLAYLIST_RDS_FULL_KEY, json_str)
+
+            # 保存历史记录
+            self._save_playlist_history(json_str)
         except Exception as e:
             log.error(f"[PlaylistMgr] _save_playlist_to_rds error: {e}", exc_info=True)
             raise
+
+    def _save_playlist_history(self, json_str: str) -> None:
+        """保存播放列表历史记录到 Redis Hash，最多保留10个历史版本"""
+        try:
+            # 获取当前时间戳作为 field
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            # 使用 HSET 直接添加到 Hash
+            rds_mgr.hset(PLAYLIST_RDS_HISTORY_KEY, timestamp, json_str)
+
+            # 检查 Hash 大小，如果超过10个，删除最旧的
+            current_count = rds_mgr.hlen(PLAYLIST_RDS_HISTORY_KEY)
+            if current_count > 10:
+                # 获取所有 field（时间戳）
+                history_dict = rds_mgr.hgetall(PLAYLIST_RDS_HISTORY_KEY)
+                # 按时间排序，找出最旧的几个
+                sorted_keys = sorted(history_dict.keys())
+                keys_to_remove = sorted_keys[:current_count - 10]
+
+                # 批量删除最旧的记录
+                if keys_to_remove:
+                    rds_mgr.hdel(PLAYLIST_RDS_HISTORY_KEY, *keys_to_remove)
+                    log.info(f"[PlaylistMgr] 清理过期历史记录，删除 {len(keys_to_remove)} 个旧记录")
+
+            log.debug(f"[PlaylistMgr] 保存播放列表历史记录: {timestamp}")
+        except Exception as e:
+            log.error(f"[PlaylistMgr] _save_playlist_history error: {e}", exc_info=True)
+            # 历史记录保存失败不影响主流程，只记录错误
 
     def save_playlist(self, collection: Dict[str, Any]) -> int:
         """保存整个播放列表集合并持久化到 RDS。
@@ -238,7 +297,7 @@ class PlaylistMgr:
             for playlist_id, playlist_data in self._playlist_raw.items():
                 if 'isPlaying' in playlist_data:
                     del playlist_data['isPlaying']
-            
+
                 # 迁移 pre_files 到 pre_lists（如果还没有 pre_lists）
                 pre_lists = playlist_data.get("pre_lists", [])
                 if not isinstance(pre_lists, list) or len(pre_lists) != 7:
@@ -409,19 +468,13 @@ class PlaylistMgr:
                         grace = datetime.timedelta(seconds=15)
                         if now >= planned_end + grace:
                             p_name = playlist_data.get("name", "未知播放列表")
-                            log.warning(
-                                f"[PlaylistMgr] 播放列表时长守护任务检测到超时，尝试强制停止: {pid} - {p_name}, "
-                                f"计划结束时间: {planned_end}, 当前时间: {now}"
-                            )
+                            log.warning(f"[PlaylistMgr] 播放列表时长守护任务检测到超时，尝试强制停止: {pid} - {p_name}, "
+                                        f"计划结束时间: {planned_end}, 当前时间: {now}")
                             code, msg = self.stop(pid)
                             if code == 0:
-                                log.info(
-                                    f"[PlaylistMgr] 播放列表时长守护任务强制停止成功: {pid} - {p_name}"
-                                )
+                                log.info(f"[PlaylistMgr] 播放列表时长守护任务强制停止成功: {pid} - {p_name}")
                             else:
-                                log.error(
-                                    f"[PlaylistMgr] 播放列表时长守护任务强制停止失败: {pid} - {p_name}, {msg}"
-                                )
+                                log.error(f"[PlaylistMgr] 播放列表时长守护任务强制停止失败: {pid} - {p_name}, {msg}")
                 except Exception as e:
                     log.error(f"[PlaylistMgr] 播放列表时长守护任务执行异常: {e}", exc_info=True)
 
@@ -441,8 +494,8 @@ class PlaylistMgr:
 
         # 清理孤立的定时任务
         job_prefixes = [("playlist_cron_", "定时任务"), ("playlist_file_timer_", "文件定时器"),
-                        ("playlist_file_on_device_timer_", "单次推播文件定时器"),
-                        ("playlist_duration_timer_", "播放列表时长定时器"), ("playlist_stop_verify_", "停止验证任务")]
+                        ("playlist_file_on_device_timer_", "单次推播文件定时器"), ("playlist_duration_timer_", "播放列表时长定时器"),
+                        ("playlist_stop_verify_", "停止验证任务")]
         for job in scheduler.get_all_jobs():
             for prefix, name in job_prefixes:
                 if job.id.startswith(prefix):
@@ -454,9 +507,8 @@ class PlaylistMgr:
 
         # 清理孤立的状态记录
         state_dicts = [(self._scheduled_play_start_times, "定时任务播放开始时间"), (self._file_timers, "文件定时器"),
-                       (self._file_on_device_timers, "单次推播文件定时器"),
-                       (self._playlist_duration_timers, "播放列表时长定时器"), (self._play_state, "播放状态跟踪"),
-                       (self._last_play_sent_at, "最近发 play 时间")]
+                       (self._file_on_device_timers, "单次推播文件定时器"), (self._playlist_duration_timers, "播放列表时长定时器"),
+                       (self._play_state, "播放状态跟踪"), (self._last_play_sent_at, "最近发 play 时间")]
         for state_dict, name in state_dicts:
             for playlist_id in list(state_dict.keys()):
                 if playlist_id not in playlist_ids:
@@ -679,7 +731,8 @@ class PlaylistMgr:
                     log.info(f"[PlaylistMgr] Set device volume to {device_volume} for playlist {playlist_id}")
                 else:
                     log.warning(
-                        f"[PlaylistMgr] Set device volume failed: id={playlist_id}, code={volume_code}, msg={volume_msg}")
+                        f"[PlaylistMgr] Set device volume failed: id={playlist_id}, code={volume_code}, msg={volume_msg}"
+                    )
             except Exception as e:
                 log.warning(f"[PlaylistMgr] Set device volume error: id={playlist_id}, {e}")
 
@@ -837,11 +890,7 @@ class PlaylistMgr:
         log.info(f"[PlaylistMgr] play_file_on_device ok: id={playlist_id}, uri={file_uri[:80]}")
         return 0, "已在设备上开始播放"
 
-    def _update_index_and_play(self,
-                               id: str,
-                               in_pre_files: bool,
-                               pre_index: int,
-                               file_index: int) -> tuple[int, str]:
+    def _update_index_and_play(self, id: str, in_pre_files: bool, pre_index: int, file_index: int) -> tuple[int, str]:
         """更新播放状态（游标），然后强制播放当前项。
 
         这是切歌（上一首/下一首/定时器触发）的核心逻辑，通过更新内部状态机
@@ -928,7 +977,10 @@ class PlaylistMgr:
                                                        in_pre_files=True,
                                                        pre_index=0,
                                                        file_index=playlist_data.get("current_index", 0))
-                return self._update_index_and_play(id, in_pre_files=False, pre_index=0, file_index=playlist_data.get("current_index", 0))
+                return self._update_index_and_play(id,
+                                                   in_pre_files=False,
+                                                   pre_index=0,
+                                                   file_index=playlist_data.get("current_index", 0))
 
             play_state = self._play_state[id]
 
@@ -942,7 +994,10 @@ class PlaylistMgr:
                                                        file_index=play_state["file_index"])
                 # pre_files 播放完了，开始播放 playlist（从保存的 file_index 开始）
                 if playlist and play_state["file_index"] < len(playlist):
-                    return self._update_index_and_play(id, in_pre_files=False, pre_index=0, file_index=play_state["file_index"])
+                    return self._update_index_and_play(id,
+                                                       in_pre_files=False,
+                                                       pre_index=0,
+                                                       file_index=play_state["file_index"])
                 return -1, "没有更多文件可播放"
             else:
                 # 播放 playlist 的下一首（使用取余实现循环）

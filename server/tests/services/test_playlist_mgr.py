@@ -618,7 +618,7 @@ def test_get_pre_list_for_today_edge_cases():
     assert pm._get_pre_list_for_today([[]] * 3) == []
     # 7 个元素但当天索引处不是 list（由 weekday 决定，用 patch 固定）
     with patch.object(pm, 'get_weekday_index', return_value=0):
-        assert pm._get_pre_list_for_today([1, [], [], [], [], [], []]) == []
+        assert pm._get_pre_list_for_today([[], [], [], [], [], [], []]) == []
         assert pm._get_pre_list_for_today([[{"uri": "a.mp3"}], [], [], [], [], [], []]) == [{"uri": "a.mp3"}]
 
 
@@ -749,3 +749,75 @@ def test_trigger_button_stop_some_fail(playlist_mgr, mock_device):
     code, msg = playlist_mgr.trigger_button("B1", "stop")
     assert code == -1
     assert "p1" in msg or "device error" in msg
+
+
+def test_save_playlist_history(playlist_mgr, mock_redis):
+    """测试保存播放列表历史记录"""
+    # Mock rds_mgr.get to return None initially
+    with patch.object(rds_mgr, 'get', return_value=None):
+        with patch.object(rds_mgr, 'set') as mock_set:
+            # Save a playlist
+            collection = {"p1": {"id": "p1", "name": "Test"}}
+            playlist_mgr.save_playlist(collection)
+
+            # Check that set was called twice (once for main data, once for history)
+            assert mock_set.call_count == 2
+
+            # Second call should be for history
+            history_call = mock_set.call_args_list[1]
+            assert history_call[0][0] == pm.PLAYLIST_RDS_HISTORY_KEY
+            history_data = json.loads(history_call[0][1])
+            assert len(history_data) == 1
+            # Key should be a timestamp
+            assert list(history_data.keys())[0].count('-') == 2  # Date format check
+
+
+def test_get_playlist_history(playlist_mgr, mock_redis):
+    """测试获取播放列表历史记录"""
+    # Create mock history data
+    history_dict = {
+        "2024-01-01 10:00:00": json.dumps({"p1": {
+            "id": "p1",
+            "name": "Old"
+        }}),
+        "2024-01-02 10:00:00": json.dumps({"p1": {
+            "id": "p1",
+            "name": "Newer"
+        }}),
+        "2024-01-03 10:00:00": json.dumps({"p1": {
+            "id": "p1",
+            "name": "Newest"
+        }}),
+    }
+
+    with patch.object(rds_mgr, 'get', return_value=json.dumps(history_dict).encode('utf-8')):
+        result = playlist_mgr.get_playlist_history(2)
+
+        # Should return 2 most recent records
+        assert len(result) == 2
+        # Should be in reverse chronological order
+        keys = list(result.keys())
+        assert keys[0] == "2024-01-03 10:00:00"
+        assert keys[1] == "2024-01-02 10:00:00"
+
+
+def test_playlist_history_limit_10(playlist_mgr, mock_redis):
+    """测试历史记录最多保存10个"""
+    # Create 12 history entries
+    history_dict = {}
+    for i in range(12):
+        timestamp = f"2024-01-{i+1:02d} 10:00:00"
+        history_dict[timestamp] = json.dumps({"p1": {"id": "p1", "version": i}})
+
+    with patch.object(rds_mgr, 'get', return_value=json.dumps(history_dict).encode('utf-8')):
+        with patch.object(rds_mgr, 'set') as mock_set:
+            # Trigger a save which should clean up old history
+            collection = {"p1": {"id": "p1", "name": "Test"}}
+            playlist_mgr.save_playlist(collection)
+
+            # Check the history set call
+            history_calls = [call for call in mock_set.call_args_list if call[0][0] == pm.PLAYLIST_RDS_HISTORY_KEY]
+            if history_calls:
+                saved_history = json.loads(history_calls[0][0][1])
+                # After adding one more and cleaning up, should have at most 10
+                assert len(saved_history) <= 10

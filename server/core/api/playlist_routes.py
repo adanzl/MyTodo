@@ -34,6 +34,23 @@ def playlist_get() -> ResponseReturnValue:
         return _err(f'error: {str(e)}')
 
 
+@playlist_bp.route("/playlist/history", methods=['GET'])
+def playlist_history() -> ResponseReturnValue:
+    """获取播放列表更新历史。"""
+    try:
+        args = request.args
+        limit = args.get("limit", 10, type=int)
+        
+        # 限制最大值为10，最小值为1
+        limit = max(1, min(limit, 10))
+        
+        ret = playlist_mgr.get_playlist_history(limit)
+        return _ok(ret)
+    except Exception as e:
+        log.error(f"[PLAYLIST] History error: {e}")
+        return _err(f'error: {str(e)}')
+
+
 @playlist_bp.route("/playlist/update", methods=['POST'])
 def playlist_update() -> ResponseReturnValue:
     """更新单个播放列表（必须包含 id 字段）。"""

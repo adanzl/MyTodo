@@ -3,16 +3,6 @@
     <div class="flex items-center justify-between mb-3">
       <h3 class="text-base font-semibold">播放列表</h3>
       <div class="flex items-center gap-0">
-        <el-switch :model-value="autoRefreshEnabled"
-          @update:model-value="(value: boolean) => $emit('toggle-auto-refresh', value)" active-text="" inactive-text=""
-          active-color="#409eff" size="small" class="mr-2" :disabled="dragMode"
-          :title="dragMode ? '排序模式下禁用' : '自动刷新'" />
-        <el-button type="primary" size="small" plain @click="$emit('refresh')" :loading="refreshing"
-          :disabled="dragMode" :title="dragMode ? '排序模式下禁用' : '刷新播放列表'" class="w-7! h-6! p-0!">
-          <el-icon v-if="!refreshing">
-            <Refresh />
-          </el-icon>
-        </el-button>
         <el-button :type="dragMode ? 'success' : 'default'" size="small" plain @click="$emit('toggle-drag-mode')"
           :disabled="playlistCollection.length === 0 || refreshing" :title="dragMode ? '点击退出拖拽排序模式' : '点击进入拖拽排序模式'"
           class="w-7! h-6! p-0!">
@@ -99,12 +89,30 @@
     <div v-else class="flex-1 flex items-center justify-center text-sm text-gray-400">
       暂无播放列表，请点击"新建"创建
     </div>
+    <div class="flex items-center justify-center mt-2 border rounded-md p-2 gap-2">
+      <el-switch :model-value="autoRefreshEnabled"
+          @update:model-value="(value: boolean) => $emit('toggle-auto-refresh', value)" active-text="" inactive-text=""
+          active-color="#409eff" size="small" :disabled="dragMode" class="h-6!"
+          :title="dragMode ? '排序模式下禁用' : '自动刷新'" />
+      <el-button type="primary" plain @click="$emit('refresh')" :loading="refreshing" :icon="Refresh"
+          :disabled="dragMode" :title="dragMode ? '排序模式下禁用' : '刷新播放列表'"
+          class="w-7! h-6! ">
+      </el-button>
+      <el-button type="primary" size="small" @click="showHistory = true" :disabled="dragMode"
+          class="w-7! h-6!" plain :icon="List"
+          :title="dragMode ? '排序模式下禁用' : '播放列表历史'" />
+    </div>
+
+    <!-- 历史记录弹窗 -->
+    <PlaylistHistory v-model:visible="showHistory" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { Refresh, Plus, Headset, VideoPlay, Cpu, Check, Sort } from "@element-plus/icons-vue";
+import { ref } from "vue";
+import { Refresh, Plus, Headset, VideoPlay, Cpu, Check, Sort, List } from "@element-plus/icons-vue";
 import { getWeekdayIndex } from "@/utils/date";
+import PlaylistHistory from "./dialogs/PlaylistHistory.vue";
 import { calculateNextCronTimes } from "@/utils/cron";
 import { formatDateTimeWithWeekday } from "@/utils/date";
 import type { Playlist } from "@/types/playlist";
@@ -163,4 +171,6 @@ const handleDragLeave = (e: DragEvent) => {
     target.classList.remove("bg-gray-100", "border-t-2", "border-b-2", "border-blue-500");
   }
 };
+
+const showHistory = ref(false);
 </script>

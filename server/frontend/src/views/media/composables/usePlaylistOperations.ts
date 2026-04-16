@@ -4,7 +4,7 @@
  */
 import { type Ref } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { playlistAction } from "@/api/api-playlist";
+import { getPlaylist, playPlaylist, playNext, playPre, stopPlaylist } from "@/api/api-playlist";
 import { logAndNoticeError } from "@/utils/error";
 import { logger } from "@/utils/logger";
 import { STORAGE_KEY_ACTIVE_PLAYLIST_ID } from "@/constants/playlist";
@@ -26,7 +26,7 @@ export function usePlaylistOperations(
   // 加载播放列表
   const loadPlaylist = async () => {
     try {
-      const response = await playlistAction("get", "GET", {});
+      const response = await getPlaylist();
       if (response.code !== 0) {
         throw new Error(response.msg || "获取播放列表失败");
       }
@@ -153,7 +153,7 @@ export function usePlaylistOperations(
         return playlistInfo;
       });
 
-      const response = await playlistAction("play", "POST", { id: status.id });
+      const response = await playPlaylist(status.id);
       if (response.code !== 0) {
         throw new Error(response.msg || "播放失败");
       }
@@ -182,7 +182,7 @@ export function usePlaylistOperations(
     }
     try {
       playing.value = true;
-      const response = await playlistAction("playNext", "POST", { id: status.id });
+      const response = await playNext(status.id);
       if (response.code !== 0) {
         throw new Error(response.msg || "播放下一首失败");
       }
@@ -210,7 +210,7 @@ export function usePlaylistOperations(
     }
     try {
       playing.value = true;
-      const response = await playlistAction("playPre", "POST", { id: status.id });
+      const response = await playPre(status.id);
       if (response.code !== 0) {
         throw new Error(response.msg || "播放上一首失败");
       }
@@ -232,7 +232,7 @@ export function usePlaylistOperations(
     }
     try {
       stopping.value = true;
-      const response = await playlistAction("stop", "POST", { id: status.id });
+      const response = await stopPlaylist(status.id);
       if (response.code !== 0) {
         throw new Error(response.msg || "停止播放失败");
       }

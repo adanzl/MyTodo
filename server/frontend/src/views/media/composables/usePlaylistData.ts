@@ -3,7 +3,7 @@
  * 处理数据规范化、转换、保存等操作
  */
 import { type Ref } from "vue";
-import { playlistAction } from "@/api/api-playlist";
+import { getPlaylist, updatePlaylist, updateAllPlaylists } from "@/api/api-playlist";
 import { normalizeFiles } from "@/utils/file";
 import { formatDateTime } from "@/utils/date";
 import { logAndNoticeError } from "@/utils/error";
@@ -369,7 +369,7 @@ export function usePlaylistData(
         };
       });
 
-      const response = await playlistAction("updateAll", "POST", playlistDict);
+      const response = await updateAllPlaylists(playlistDict);
       if (response.code !== 0) {
         throw new Error(response.msg || "保存播放列表集合失败");
       }
@@ -390,10 +390,8 @@ export function usePlaylistData(
         throw new Error("播放列表数据格式错误");
       }
 
-      const response = await playlistAction(
-        "update",
-        "POST",
-        singlePlaylistData as unknown as Record<string, unknown>
+      const response = await updatePlaylist(
+        singlePlaylistData as unknown as Partial<PlaylistApiData>
       );
 
       if (response.code !== 0) {
@@ -506,7 +504,7 @@ export function usePlaylistData(
   const loadPlaylist = async () => {
     playlistLoading.value = true;
     try {
-      const response = await playlistAction("get", "GET", {});
+      const response = await getPlaylist();
       if (response.code !== 0) {
         throw new Error(response.msg || "获取播放列表失败");
       }
@@ -570,7 +568,7 @@ export function usePlaylistData(
           return;
         }
 
-        const response = await playlistAction("get", "GET", { id: activeId });
+        const response = await getPlaylist(activeId);
         if (response.code !== 0) {
           throw new Error(response.msg || "获取播放列表状态失败");
         }
