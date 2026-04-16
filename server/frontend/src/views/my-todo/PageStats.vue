@@ -164,10 +164,10 @@
           <el-card class="mt-5">
             <template #header>
               <div class="text-base font-bold">
-                <span>各分类中奖统计</span>
+                <span>分类中奖统计</span>
               </div>
             </template>
-            <el-table :data="zhaozhaoCategoryStats" stripe style="width: 100%">
+            <el-table :data="zhaozhaoCategoryStats" stripe style="width: 100%" @row-click="handleCategoryClick">
               <el-table-column prop="cate_name" label="分类名称" />
               <el-table-column prop="gift_types" label="礼物种类" width="120" align="center" />
               <el-table-column prop="win_count" label="中奖次数" width="120" align="center" />
@@ -325,10 +325,10 @@
           <el-card class="mt-5">
             <template #header>
               <div class="text-base font-bold">
-                <span>各分类中奖统计</span>
+                <span>分类中奖统计</span>
               </div>
             </template>
-            <el-table :data="cancanCategoryStats" stripe style="width: 100%">
+            <el-table :data="cancanCategoryStats" stripe style="width: 100%" @row-click="handleCategoryClick">
               <el-table-column prop="cate_name" label="分类名称" />
               <el-table-column prop="gift_types" label="礼物种类" width="120" align="center" />
               <el-table-column prop="win_count" label="中奖次数" width="120" align="center" />
@@ -338,13 +338,24 @@
         </div>
       </el-col>
     </el-row>
+
+    <!-- 礼物列表弹窗 -->
+    <el-dialog v-model="giftDialogVisible" :title="`${currentCategoryName} - 礼物列表`" width="60%">
+      <el-table :data="giftList" stripe style="width: 100%">
+        <el-table-column prop="name" label="礼物名称" />
+        <el-table-column prop="cost" label="抽奖成本" width="120" align="center" />
+        <el-table-column prop="exchange_score" label="兑换积分" width="120" align="center" />
+        <el-table-column prop="stock" label="库存" width="100" align="center" />
+      </el-table>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { Present, Money, CircleCheck, Coin, Setting, TrendCharts, ShoppingCart, Wallet } from "@element-plus/icons-vue";
-import { getUserStats, type CategoryStat } from "@/api/api-stats";
+import { getUserStats, getCategoryGifts, type CategoryStat } from "@/api/api-stats";
+import type { Gift } from "@/types/lottery/lotteryData";
 import { ElMessage } from "element-plus";
 import dayjs from "dayjs";
 
@@ -422,6 +433,11 @@ const cancanStats = ref({
 });
 const cancanCategoryStats = ref<CategoryStat[]>([]);
 
+// 弹窗相关
+const giftDialogVisible = ref(false);
+const currentCategoryName = ref("");
+const giftList = ref<Gift[]>([]);
+
 // 处理日期变化
 const handleDateChange = () => {
   refreshStatistics();
@@ -471,6 +487,21 @@ const refreshStatistics = async () => {
     ElMessage.error("统计失败");
   } finally {
     loading.value = false;
+  }
+};
+
+// 点击分类行，显示礼物列表
+const handleCategoryClick = async (row: CategoryStat) => {
+  if (!row.cate_id) return;
+
+  currentCategoryName.value = row.cate_name;
+  giftDialogVisible.value = true;
+
+  try {
+    giftList.value = await getCategoryGifts(row.cate_id);
+  } catch (error) {
+    console.error("获取礼物列表失败:", error);
+    ElMessage.error("获取礼物列表失败");
   }
 };
 
