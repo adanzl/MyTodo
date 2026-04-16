@@ -144,7 +144,7 @@ class PlaylistMgr:
             limited_keys = sorted_keys[:limit]
 
             result = {key: history_dict[key] for key in limited_keys}
-            log.info(f"[PlaylistMgr] 获取播放列表历史记录: {len(result)} 条")
+            # log.info(f"[PlaylistMgr] 获取播放列表历史记录: {len(result)} 条")
             return result
         except Exception as e:
             log.error(f"[PlaylistMgr] get_playlist_history error: {e}", exc_info=True)
