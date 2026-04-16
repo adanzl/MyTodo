@@ -144,15 +144,12 @@ class StatsMgr:
             gifts = (res.get('data') or {}).get('data') or []
             gift_map = {g['id']: g for g in gifts}
 
-            for gift_id in gift_ids:
-                gift = gift_map.get(gift_id)
-                if gift:
-                    self._update_category(gift.get('cate_id'), gift_id, abs(value / len(gift_ids)), category_map, gift)
+            for gift_id, gift in gift_map.items():
+                self._update_category(gift.get('cate_id'), gift_id, abs(value / len(gift_ids)), category_map, gift)
         else:  # exchange
             gift_id = int(out_key)
-            res = self._db.get_list('t_gift', 1, 1, '*', {'id': gift_id})
-            gifts = (res.get('data') or {}).get('data') or []
-            gift_data = gifts[0] if gifts else {}
+            res = self._db.get_data('t_gift', gift_id, '*')
+            gift_data = res.get('data')
             if gift_data:
                 self._update_category(gift_data.get('cate_id'), gift_id, abs(value), category_map, gift_data)
 
