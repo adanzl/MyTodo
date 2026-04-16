@@ -126,52 +126,16 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="15" class="mb-5">
-            <el-col :span="8">
-              <el-card class="h-22">
-                <div class="flex items-center gap-2">
-                  <div
-                    class="w-8 h-8 rounded-lg flex items-center justify-center text-lg text-white bg-linear-to-br from-[#fa709a] to-[#fee140]">
-                    <el-icon>
-                      <Setting />
-                    </el-icon>
-                  </div>
-                  <div class="flex-1">
-                    <div class="text-lg font-bold text-[#303133] mb-0">{{ zhaozhaoStats.adminCount }}</div>
-                    <div class="text-xs text-[#909399]">后台操作数</div>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-            <el-col :span="8">
-              <el-card class="h-22">
-                <div class="flex items-center gap-2">
-                  <div
-                    class="w-8 h-8 rounded-lg flex items-center justify-center text-lg text-white bg-linear-to-br from-[#30cfd0] to-[#330867]">
-                    <el-icon>
-                      <TrendCharts />
-                    </el-icon>
-                  </div>
-                  <div class="flex-1">
-                    <div class="text-lg font-bold text-[#303133] mb-0">{{ zhaozhaoStats.adminIncome }}</div>
-                    <div class="text-xs text-[#909399]">操作汇总</div>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-          </el-row>
-
           <el-card class="mt-5">
             <template #header>
               <div class="text-base font-bold">
-                <span>分类中奖统计</span>
+                <span>分类统计</span>
               </div>
             </template>
             <el-table :data="zhaozhaoCategoryStats" stripe style="width: 100%" @row-click="handleCategoryClick">
               <el-table-column prop="cate_name" label="分类名称" />
-              <el-table-column prop="gift_types" label="礼物种类" width="120" align="center" />
               <el-table-column prop="win_count" label="中奖次数" width="120" align="center" />
-              <el-table-column prop="total_exchange_price" label="兑换总价" width="140" align="center" />
+              <el-table-column prop="exchange_count" label="兑换次数" width="120" align="center" />
             </el-table>
           </el-card>
         </div>
@@ -287,52 +251,16 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="15" class="mb-5">
-            <el-col :span="8">
-              <el-card class="h-22">
-                <div class="flex items-center gap-2">
-                  <div
-                    class="w-8 h-8 rounded-lg flex items-center justify-center text-lg text-white bg-linear-to-br from-[#fa709a] to-[#fee140]">
-                    <el-icon>
-                      <Setting />
-                    </el-icon>
-                  </div>
-                  <div class="flex-1">
-                    <div class="text-lg font-bold text-[#303133] mb-0">{{ cancanStats.adminCount }}</div>
-                    <div class="text-xs text-[#909399]">后台操作数</div>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-            <el-col :span="8">
-              <el-card class="h-22">
-                <div class="flex items-center gap-2">
-                  <div
-                    class="w-8 h-8 rounded-lg flex items-center justify-center text-lg text-white bg-linear-to-br from-[#30cfd0] to-[#330867]">
-                    <el-icon>
-                      <TrendCharts />
-                    </el-icon>
-                  </div>
-                  <div class="flex-1">
-                    <div class="text-lg font-bold text-[#303133] mb-0">{{ cancanStats.adminIncome }}</div>
-                    <div class="text-xs text-[#909399]">操作汇总</div>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-          </el-row>
-
           <el-card class="mt-5">
             <template #header>
               <div class="text-base font-bold">
-                <span>分类中奖统计</span>
+                <span>分类统计</span>
               </div>
             </template>
             <el-table :data="cancanCategoryStats" stripe style="width: 100%" @row-click="handleCategoryClick">
               <el-table-column prop="cate_name" label="分类名称" />
-              <el-table-column prop="gift_types" label="礼物种类" width="120" align="center" />
               <el-table-column prop="win_count" label="中奖次数" width="120" align="center" />
-              <el-table-column prop="total_exchange_price" label="兑换总价" width="140" align="center" />
+              <el-table-column prop="exchange_count" label="兑换次数" width="120" align="center" />
             </el-table>
           </el-card>
         </div>
@@ -365,7 +293,8 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="count" label="中奖次数" width="120" align="center" />
+        <el-table-column prop="win_count" label="中奖次数" width="120" align="center" />
+        <el-table-column prop="exchange_count" label="兑换次数" width="120" align="center" />
       </el-table>
     </el-dialog>
   </div>
@@ -373,7 +302,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import { Present, Money, CircleCheck, Coin, Setting, TrendCharts, ShoppingCart, Wallet } from "@element-plus/icons-vue";
+import { Present, Money, CircleCheck, Coin, ShoppingCart, Wallet } from "@element-plus/icons-vue";
 import { getUserStats, type CategoryStat, type WonGift } from "@/api/api-stats";
 import { getPicDisplayUrl } from "@/api/api-pic";
 import { ElMessage } from "element-plus";

@@ -14,7 +14,8 @@ export interface UserStats {
 export interface WonGift {
   id: number;
   name: string;
-  count: number;
+  win_count: number;
+  exchange_count: number;
   image: string;
   cost: number;
   exchange: number;
@@ -24,9 +25,8 @@ export interface CategoryStat {
   cate_id: number | null;
   cate_name: string;
   win_count: number;
-  gift_types: number;
+  exchange_count: number;
   total_cost: number;
-  total_exchange_price: number;
   won_gifts: WonGift[];
 }
 
