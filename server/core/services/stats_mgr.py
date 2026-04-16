@@ -56,11 +56,11 @@ class StatsMgr:
                 res = self._db.get_list('t_score_history', page, page_size, '*', conditions)
                 if res.get('code') != 0:
                     break
-                
+
                 records = (res.get('data') or {}).get('data') or []
                 if not records:
                     break
-                
+
                 all_records.extend(records)
                 if len(records) < page_size:
                     break
@@ -139,8 +139,9 @@ class StatsMgr:
         """处理礼物记录（抽奖或兑换）"""
         if action == 'lottery':
             gift_ids = [int(id.strip()) for id in out_key.split(',') if id.strip().isdigit()]
-            gifts = self._db.get_list('t_gift', 1, len(gift_ids), '*', {'id': {'in': gift_ids}})
-            gift_map = {g['id']: g for g in (gifts.get('data') or [])}
+            res = self._db.get_list('t_gift', 1, len(gift_ids), '*', {'id': {'in': gift_ids}})
+            gifts = (res.get('data') or {}).get('data') or []
+            gift_map = {g['id']: g for g in gifts}
 
             for gift_id in gift_ids:
                 gift = gift_map.get(gift_id)
@@ -148,8 +149,8 @@ class StatsMgr:
                     self._update_category(gift.get('cate_id'), gift_id, abs(value / len(gift_ids)), category_map)
         else:  # exchange
             gift_id = int(out_key)
-            gift = self._db.get_list('t_gift', 1, 1, '*', {'id': gift_id})
-            gift_data = (gift.get('data') or [{}])[0] if gift else {}
+            res = self._db.get_list('t_gift', 1, 1, '*', {'id': gift_id})
+            gift_data = ((res.get('data') or {}).get('data') or [{}])[0]
             if gift_data:
                 self._update_category(gift_data.get('cate_id'), gift_id, abs(value), category_map)
 
@@ -176,8 +177,9 @@ class StatsMgr:
             gift_ids = list(stat['gift_ids'])
             total_exchange_price = 0
             if gift_ids:
-                gifts = self._db.get_list('t_gift', 1, len(gift_ids), 'exchange_score', {'id': {'in': gift_ids}})
-                total_exchange_price = sum(g.get('exchange_score', 0) for g in (gifts.get('data') or []))
+                res = self._db.get_list('t_gift', 1, len(gift_ids), 'exchange_score', {'id': {'in': gift_ids}})
+                gifts = (res.get('data') or {}).get('data') or []
+                total_exchange_price = sum(g.get('exchange_score', 0) for g in gifts)
 
             category_stats.append({
                 'cate_id': cate_id,
@@ -193,9 +195,9 @@ class StatsMgr:
         """获取分类名称"""
         if not cate_id:
             return '未分类'
-        cate = self._db.get_list('t_gift_category', 1, 1, '*', {'id': cate_id})
-        cate_data = (cate.get('data') or [{}])[0] if cate else {}
-        return cate_data.get('name', f'分类{cate_id}') if cate_data else f'分类{cate_id}'
+        res = self._db.get_data('t_gift_category', cate_id, 'name')
+        data = (res.get('data') or {}).get('data') or {}
+        return data.get('name', f'分类{cate_id}')
 
 
 stats_mgr = StatsMgr()
