@@ -53,14 +53,14 @@ class StatsMgr:
             all_records = []
             page, page_size = 1, 100
             while True:
-                history_list = self._db.get_list('t_score_history', page, page_size, '*', conditions)
-                if not history_list or history_list.get('code') != 0:
+                res = self._db.get_list('t_score_history', page, page_size, '*', conditions)
+                if res.get('code') != 0:
                     break
-
-                records = (history_list.get('data') or {}).get('data') or []
+                
+                records = (res.get('data') or {}).get('data') or []
                 if not records:
                     break
-
+                
                 all_records.extend(records)
                 if len(records) < page_size:
                     break
