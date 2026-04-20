@@ -527,13 +527,24 @@ export function usePlaylistData(
       return normalized;
     } catch (error) {
       logger.error("从接口加载播放列表失败:", error);
-      const fallback = normalizePlaylistCollection(null);
+      // 加载失败时保留现有数据，不要覆盖为fallback
+      // 避免将不完整的集合保存到后端
+      ElMessage.error("加载播放列表失败，保留当前数据");
 
-      playlistCollection.value = fallback.playlists;
-      restoreOrSetActivePlaylistId(fallback.playlists, fallback.activePlaylistId);
-      syncActivePlaylist(fallback.playlists);
+      // 如果当前没有任何数据，才使用fallback
+      if (!playlistCollection.value || playlistCollection.value.length === 0) {
+        const fallback = normalizePlaylistCollection(null);
+        playlistCollection.value = fallback.playlists;
+        restoreOrSetActivePlaylistId(fallback.playlists, fallback.activePlaylistId);
+        syncActivePlaylist(fallback.playlists);
+        return fallback;
+      }
 
-      return fallback;
+      // 否则返回当前数据，不进行任何修改
+      return {
+        playlists: playlistCollection.value,
+        activePlaylistId: activePlaylistId.value,
+      };
     } finally {
       playlistLoading.value = false;
     }
