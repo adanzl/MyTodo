@@ -42,7 +42,7 @@ def pdf_upload() -> ResponseReturnValue:
             return _err("未找到上传的文件")
 
         file = request.files['file']
-        if file.filename == '':
+        if not file.filename or file.filename == '':
             return _err("文件名不能为空")
 
         code, msg, task_id = pdf_mgr.create_task(file, file.filename)
@@ -70,8 +70,8 @@ def pdf_decrypt() -> ResponseReturnValue:
     try:
         data: Dict[str, Any] = read_json_from_request()
         body, err = parse_with_model(_PdfDecryptBody, data, err_factory=_err)
-        if err:
-            return err
+        if err or not body:
+            return err or _err("Invalid request body")
 
         code, msg = pdf_mgr.start_task(body.task_id, body.password)
         if code != 0:
@@ -140,8 +140,8 @@ def pdf_delete() -> ResponseReturnValue:
     try:
         data: Dict[str, Any] = read_json_from_request()
         body, err = parse_with_model(_PdfDeleteBody, data, err_factory=_err)
-        if err:
-            return err
+        if err or not body:
+            return err or _err("Invalid request body")
 
         code, msg = pdf_mgr.delete_task(body.task_id)
         if code != 0:

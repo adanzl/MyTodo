@@ -50,6 +50,17 @@ const routes: RouteRecordRaw[] = [
     name: "Tools",
     component: () => import("@/views/tools/PageTools.vue"),
   },
+  // 每日打卡
+  {
+    path: "/tasks",
+    name: "Tasks",
+    component: () => import("@/views/tasks/PageTasks.vue"),
+  },
+  {
+    path: "/tasks-preview",
+    name: "TasksPreview",
+    component: () => import("@/views/tasks/PageTasksPreview.vue"),
+  },
   // PDF阅读打卡系统 - 前台用户端
   {
     path: "/daily-tasks",

@@ -313,6 +313,7 @@ const handleClose = () => {
   // 关闭时也保存路径,即使用户点击取消
   saveLastPath(fileBrowserPath.value);
   selectedFiles.value = [];
+  emit("update:visible", false);
   emit("close");
 };
 
