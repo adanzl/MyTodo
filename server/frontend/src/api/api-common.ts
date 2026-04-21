@@ -64,3 +64,20 @@ export async function delData(table: string, id: number | string): Promise<Delet
   // 错误已在拦截器中处理，这里直接返回数据
   return response.data.data;
 }
+
+/**
+ * 获取音频文件时长
+ * @param path - 音频文件路径
+ */
+export async function getAudioDuration(path: string): Promise<number | null> {
+  try {
+    const res = await api.get("/media/getDuration", { params: { path } });
+    if (res.data.code === 0 && res.data.data) {
+      return res.data.data.duration;
+    }
+    return null;
+  } catch (error) {
+    console.error("获取音频时长失败:", error);
+    return null;
+  }
+}

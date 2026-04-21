@@ -41,6 +41,7 @@
             :model-value="isFileSelected(row)"
             @change="handleToggleSelection(row)"
             @click.stop
+            :disabled="!props.multiple && selectedFiles.length > 0 && !isFileSelected(row)"
           >
           </el-checkbox>
         </template>
@@ -120,6 +121,7 @@ interface Props {
   confirmButtonText?: string;
   confirmLoading?: boolean;
   mode?: "file" | "directory";
+  multiple?: boolean; // 是否多选，默认true
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -130,6 +132,7 @@ const props = withDefaults(defineProps<Props>(), {
   confirmButtonText: "确定",
   confirmLoading: false,
   mode: "file",
+  multiple: true,
 });
 
 const emit = defineEmits<{
@@ -236,6 +239,14 @@ const handleToggleSelection = (row: FileBrowserItem) => {
   if (row.isDirectory) return;
   const filePath =
     fileBrowserPath.value === "/" ? `/${row.name}` : `${fileBrowserPath.value}/${row.name}`;
+
+  // 单选模式：清除其他选中，只保留当前
+  if (!props.multiple) {
+    selectedFiles.value = [filePath];
+    return;
+  }
+
+  // 多选模式：切换选中状态
   const index = selectedFiles.value.indexOf(filePath);
   if (index > -1) {
     selectedFiles.value.splice(index, 1);
@@ -313,6 +324,7 @@ const handleClose = () => {
   // 关闭时也保存路径,即使用户点击取消
   saveLastPath(fileBrowserPath.value);
   selectedFiles.value = [];
+  emit("update:visible", false);
   emit("close");
 };
 

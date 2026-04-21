@@ -103,6 +103,10 @@
             <Delete />
           </el-icon>
         </el-button>
+        <el-button v-show="showMoreActions" type="default" size="small" plain circle @click="$emit('remove-duplicate')"
+          :disabled="playlistLoading" title="移除重复文件" :icon="FolderRemove" />
+        <el-button v-show="showMoreActions" type="default" size="small" plain circle @click="$emit('convert-mp3')"
+          :disabled="playlistLoading" title="转换列表为MP3" :icon="ScaleToOriginal" />
         <el-button type="default" size="small" plain circle @click="$emit('toggle-more-actions')" title="更多">
           <el-icon>
             <Menu />
@@ -162,7 +166,7 @@
 </template>
 
 <script setup lang="ts">
-import { Edit, Collection, Loading, Delete, Menu } from "@element-plus/icons-vue";
+import { Edit, Collection, Loading, Delete, Menu, ScaleToOriginal, FolderRemove } from "@element-plus/icons-vue";
 import { formatDuration } from "@/utils/format";
 import { getWeekdayIndex } from "@/utils/date";
 import { calculateFilesTotalDuration } from "@/utils/file";
@@ -241,6 +245,8 @@ defineEmits<{
   "open-playlist-selector-for-file": [file: MediaFile];
   "play-on-device-for-file": [file: MediaFile];
   "delete-file": [index: number];
+  "remove-duplicate": [];
+  "convert-mp3": [];
 }>();
 
 const getSelectedWeekdayIndex = () => {

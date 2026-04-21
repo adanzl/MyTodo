@@ -101,3 +101,21 @@ export async function reloadPlaylist(): Promise<ApiResponse<unknown>> {
   const rsp = await api.post("/playlist/reload", {});
   return rsp.data;
 }
+
+/**
+ * 将播放列表中的所有文件转换为MP3格式
+ * @param id 播放列表ID
+ */
+export async function convertPlaylistToMp3(id: string): Promise<ApiResponse<unknown>> {
+  const rsp = await api.post("/playlist/convertToMp3", { id });
+  return rsp.data;
+}
+
+/**
+ * 移除播放列表中的重复文件路径
+ * @param id 播放列表ID
+ */
+export async function removeDuplicateFiles(id: string): Promise<ApiResponse<unknown>> {
+  const rsp = await api.post("/playlist/removeDuplicate", { id });
+  return rsp.data;
+}

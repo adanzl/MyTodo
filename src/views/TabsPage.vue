@@ -161,8 +161,8 @@
           </ion-tab-button>
 
           <ion-tab-button tab="tabCalendar" href="/tabs/tab2">
-            <ion-icon :icon="calendarOutline" />
-            <ion-label>日历视图</ion-label>
+            <ion-icon :icon="bookOutline" />
+            <ion-label>阅读任务</ion-label>
           </ion-tab-button>
 
           <ion-tab-button tab="tabChat" href="/tabs/tab3">
@@ -285,7 +285,7 @@ import {
 import CryptoJS from "crypto-js";
 import {
   bookmarksOutline,
-  calendarOutline,
+  bookOutline,
   chatboxEllipsesOutline,
   colorPaletteOutline,
   shieldCheckmarkOutline,

@@ -50,6 +50,20 @@
           <el-icon><Setting /></el-icon>
           <template #title>工具</template>
         </el-menu-item>
+        <el-sub-menu index="daily-checkin">
+          <template #title>
+            <el-icon><Calendar /></el-icon>
+            <span>每日打卡</span>
+          </template>
+          <el-menu-item index="/tasks" @click="handleMenuSelect">
+            <el-icon><List /></el-icon>
+            <template #title>每日打卡</template>
+          </el-menu-item>
+          <el-menu-item index="/tasks-preview" @click="handleMenuSelect">
+            <el-icon><View /></el-icon>
+            <template #title>每日打卡预览</template>
+          </el-menu-item>
+        </el-sub-menu>
         <el-sub-menu index="pdf-checkin">
           <template #title>
             <el-icon><Reading /></el-icon>
@@ -106,6 +120,7 @@ import {
   Headset,
   SetUp,
   DataAnalysis,
+  View,
 } from "@element-plus/icons-vue";
 import { useUserStore } from "@/stores/user";
 

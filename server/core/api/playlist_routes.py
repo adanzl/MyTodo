@@ -40,10 +40,10 @@ def playlist_history() -> ResponseReturnValue:
     try:
         args = request.args
         limit = args.get("limit", 10, type=int)
-        
+
         # 限制最大值为10，最小值为1
         limit = max(1, min(limit, 10))
-        
+
         ret = playlist_mgr.get_playlist_history(limit)
         return _ok(ret)
     except Exception as e:
@@ -212,4 +212,40 @@ def playlist_reload() -> ResponseReturnValue:
         return _ok()
     except Exception as e:
         log.error(f"[PLAYLIST] Reload error: {e}")
+        return _err(f'error: {str(e)}')
+
+
+@playlist_bp.route("/playlist/convertToMp3", methods=['POST'])
+def playlist_convert_to_mp3() -> ResponseReturnValue:
+    """将播放列表中的所有文件转换为MP3格式，删除原始文件并替换为新文件。"""
+    try:
+        args: Dict[str, Any] = read_json_from_request()
+        pid, err = _require_playlist_id(args)
+        if err:
+            return err
+
+        ret, msg = playlist_mgr.convert_playlist_to_mp3(str(pid))
+        if ret != 0:
+            return _err(msg)
+        return _ok(msg)
+    except Exception as e:
+        log.error(f"[PLAYLIST] ConvertToMp3 error: {e}")
+        return _err(f'error: {str(e)}')
+
+
+@playlist_bp.route("/playlist/removeDuplicate", methods=['POST'])
+def playlist_remove_duplicate() -> ResponseReturnValue:
+    """移除播放列表中的重复文件路径。"""
+    try:
+        args: Dict[str, Any] = read_json_from_request()
+        pid, err = _require_playlist_id(args)
+        if err:
+            return err
+
+        ret, msg = playlist_mgr.playlist_remove_duplicate(str(pid))
+        if ret != 0:
+            return _err(msg)
+        return _ok(msg)
+    except Exception as e:
+        log.error(f"[PLAYLIST] Deduplicate error: {e}")
         return _err(f'error: {str(e)}')

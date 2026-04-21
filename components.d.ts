@@ -8,28 +8,19 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AudioPreview: typeof import('./src/components/AudioPreview.vue')['default']
-    CalendarCover: typeof import('./src/components/CalendarCover.vue')['default']
-    CalendarTab: typeof import('./src/components/CalendarTab.vue')['default']
     ColorMgr: typeof import('./src/components/ColorMgr.vue')['default']
     ColorPicker: typeof import('./src/components/ColorPicker.vue')['default']
-    ColorSelector: typeof import('./src/views/page-schedule/dialogs/SelectorColor.vue')['default']
     FabButton: typeof import('./src/components/FabButton.vue')['default']
     GConfig: typeof import('./src/components/GConfig.vue')['default']
-    GroupSelector: typeof import('./src/views/page-schedule/dialogs/SelectorGroup.vue')['default']
     IconMdiCalendarTodayOutline: typeof import('~icons/mdi/calendar-today-outline')['default']
     IconMdiCheckAll: typeof import('~icons/mdi/check-all')['default']
     IconMdiListStatus: typeof import('~icons/mdi/list-status')['default']
-    PrioritySelector: typeof import('./src/views/page-schedule/dialogs/SelectorPriority.vue')['default']
-    RepeatSelector: typeof import('./src/views/page-schedule/dialogs/SelectorRepeat.vue')['default']
     RewardListPop: typeof import('./src/components/RewardListPop.vue')['default']
     RewardPop: typeof import('./src/components/RewardPop.vue')['default']
     RewardSet: typeof import('./src/components/RewardSet.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
-    SchedulePopModal: typeof import('./src/views/page-schedule/dialogs/SchedulePopModal.vue')['default']
     ServerRemoteBadge: typeof import('./src/components/ServerRemoteBadge.vue')['default']
-    SubtaskPopModal: typeof import('./src/views/page-schedule/dialogs/SubtaskPopModal.vue')['default']
-    WeekSelector: typeof import('./src/views/page-schedule/dialogs/SelectorWeek.vue')['default']
     XunfeiIat: typeof import('./src/components/XunfeiIat.vue')['default']
   }
 }

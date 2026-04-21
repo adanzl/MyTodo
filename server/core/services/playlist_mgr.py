@@ -3,6 +3,8 @@ import json
 import sys
 import time
 import threading
+import os
+import shutil
 from collections import Counter
 from datetime import timedelta
 from queue import Queue, Empty
@@ -10,10 +12,10 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import gevent
 from gevent import spawn, sleep
-from core.utils import get_media_duration, check_cron_will_trigger_today, get_weekday_index
+from core.utils import get_media_duration, check_cron_will_trigger_today, get_weekday_index, run_subprocess_safe
 from core.db import rds_mgr
 from core.device import create_device
-from core.config import app_logger
+from core.config import app_logger, FFMPEG_PATH
 from core.services.scheduler_mgr import scheduler_mgr
 from core.utils import time_to_seconds
 
@@ -72,6 +74,7 @@ class PlaylistMgr:
         self._rds_save_queue = Queue()  # Redis 保存操作队列（用于从线程传递到 gevent 环境）
         self._rds_save_greenlet = None  # Redis 保存操作的 greenlet
         self._last_play_sent_at = {}  # 向设备发送 play 的时间 {playlist_id: datetime}，用于停止时判断是否需延迟再发 stop
+        self._convert_locks = {}  # 转换锁 {playlist_id: threading.Lock()}，防止转换过程中修改播放列表
         self.reload()
         self._start_rds_save_worker()  # 启动 Redis 保存操作的 worker
         self._ensure_playlist_duration_guard_job()  # 启动播放列表时长守护任务
@@ -228,6 +231,14 @@ class PlaylistMgr:
         Returns:
             0 表示成功。
         """
+        # 检查是否有任何播放列表正在转换
+        for playlist_id in collection.keys():
+            if playlist_id in self._convert_locks:
+                lock = self._convert_locks[playlist_id]
+                if lock.locked():
+                    log.warning(f"[PlaylistMgr] 播放列表 {playlist_id} 正在转换中，禁止修改")
+                    return -1
+
         self._playlist_raw = collection
         self._save_playlist_to_rds()
         # 更新设备映射
@@ -254,6 +265,13 @@ class PlaylistMgr:
             if not playlist_id:
                 log.error("[PlaylistMgr] update_single_playlist: playlist_data 中缺少 id 字段")
                 return -1
+
+            # 检查播放列表是否正在转换
+            if playlist_id in self._convert_locks:
+                lock = self._convert_locks[playlist_id]
+                if lock.locked():
+                    log.warning(f"[PlaylistMgr] 播放列表 {playlist_id} 正在转换中，禁止修改")
+                    return -1
 
             # 如果播放列表不存在，创建新播放列表
             if playlist_id not in self._playlist_raw:
@@ -1376,6 +1394,213 @@ class PlaylistMgr:
         scheduler.add_date_job(func=stop_playlist_task, job_id=job_id, run_date=run_date)
         self._playlist_duration_timers[id] = job_id
         log.info(f"[PlaylistMgr] 启动播放列表时长定时器: {id} - {p_name}, 将在 {duration_minutes} 分钟后停止播放")
+
+    def convert_playlist_to_mp3(self, playlist_id: str) -> tuple[int, str]:
+        """将播放列表中的所有文件转换为MP3格式，删除原始文件并替换为新文件。
+
+        Args:
+            playlist_id: 播放列表ID。
+
+        Returns:
+            (code, msg)。code=0 表示成功开始转换任务。
+        """
+        try:
+            if not self._playlist_raw or playlist_id not in self._playlist_raw:
+                return -1, "播放列表不存在"
+
+            # 获取或创建锁
+            lock = self._convert_locks.setdefault(playlist_id, threading.Lock())
+            if not lock.acquire(blocking=False):
+                log.warning(f"[PlaylistMgr] 播放列表 {playlist_id} 正在转换中")
+                return -1, "播放列表正在转换中，请稍后再试"
+
+            playlist_data = self._playlist_raw[playlist_id]
+            p_name = playlist_data.get("name", "未知播放列表")
+
+            # 收集所有文件URI
+            files_to_convert = set()
+            pre_lists = playlist_data.get("pre_lists", [])
+            if isinstance(pre_lists, list) and len(pre_lists) == 7:
+                for pre_list in pre_lists:
+                    if isinstance(pre_list, list):
+                        for item in pre_list:
+                            uri = item.get("uri")
+                            if uri:
+                                files_to_convert.add(uri)
+
+            for item in playlist_data.get("playlist", []):
+                uri = item.get("uri")
+                if uri:
+                    files_to_convert.add(uri)
+
+            if not files_to_convert:
+                lock.release()
+                return -1, "播放列表中没有可转换的文件"
+
+            unique_files = list(files_to_convert)
+            log.info(f"[PlaylistMgr] 开始转换播放列表 {playlist_id} - {p_name} 中的 {len(unique_files)} 个文件为MP3格式")
+
+            # 异步执行转换任务
+            def convert_task():
+                success_count = fail_count = 0
+                failed_files = []
+                try:
+                    for file_path in unique_files:
+                        try:
+                            if not os.path.exists(file_path):
+                                log.warning(f"[PlaylistMgr] 文件不存在，跳过: {file_path}")
+                                fail_count += 1
+                                failed_files.append(f"{file_path}: 文件不存在")
+                                continue
+
+                            if file_path.lower().endswith('.mp3'):
+                                log.info(f"[PlaylistMgr] 已是MP3，跳过: {file_path}")
+                                success_count += 1
+                                continue
+
+                            base_name = os.path.splitext(os.path.basename(file_path))[0]
+                            mp3_file_path = os.path.join(os.path.dirname(file_path), f"{base_name}.mp3")
+
+                            if os.path.exists(mp3_file_path):
+                                os.remove(mp3_file_path)
+
+                            cmds = [
+                                FFMPEG_PATH, '-loglevel', 'error', '-i', file_path, '-vn', '-codec:a', 'libmp3lame',
+                                '-q:a', '2', '-y', mp3_file_path
+                            ]
+                            log.info(f"[PlaylistMgr] 执行ffmpeg: {' '.join(cmds)}")
+                            returncode, stdout, stderr = run_subprocess_safe(cmds, timeout=300)
+
+                            if returncode == 0 and os.path.exists(mp3_file_path):
+                                os.remove(file_path)
+                                self._update_file_paths_in_playlist(playlist_data, file_path, mp3_file_path)
+                                success_count += 1
+                                log.info(f"[PlaylistMgr] 转换成功: {file_path} -> {mp3_file_path}")
+                            else:
+                                error_msg = stderr or stdout or '未知错误'
+                                fail_count += 1
+                                failed_files.append(f"{file_path}: {error_msg}")
+                                log.error(f"[PlaylistMgr] 转换失败: {file_path}, {error_msg}")
+                        except Exception as e:
+                            fail_count += 1
+                            failed_files.append(f"{file_path}: {str(e)}")
+                            log.error(f"[PlaylistMgr] 转换异常: {file_path}, {e}")
+
+                    # 通过队列通知gevent worker保存（避免在线程中直接操作Redis）
+                    self._rds_save_queue.put('save_playlist')
+                    if fail_count > 0:
+                        error_summary = f"部分文件转换失败: {', '.join(failed_files[:5])}"
+                        if len(failed_files) > 5:
+                            error_summary += f" 等共 {len(failed_files)} 个文件"
+                        log.warning(f"[PlaylistMgr] 转换完成: 成功 {success_count}, 失败 {fail_count}")
+                        result = (-1, error_summary)
+                    else:
+                        log.info(f"[PlaylistMgr] 转换完成: 全部 {success_count} 个文件成功")
+                        result = (0, f"播放列表 {p_name} 中的 {success_count} 个文件已成功转换为MP3格式")
+                except Exception as e:
+                    log.error(f"[PlaylistMgr] 转换任务异常: {playlist_id}, {e}", exc_info=True)
+                    result = (-1, f"转换任务异常: {str(e)}")
+                finally:
+                    lock.release()
+                    log.info(f"[PlaylistMgr] 播放列表 {playlist_id} 转换锁已释放")
+
+            threading.Thread(target=convert_task, daemon=True, name=f"PlaylistConvert_{playlist_id}").start()
+            return 0, f"已开始转换播放列表 {p_name} 中的文件为MP3格式，共 {len(unique_files)} 个文件"
+        except Exception as e:
+            log.error(f"[PlaylistMgr] convert_playlist_to_mp3 异常: {playlist_id}, {e}", exc_info=True)
+            return -1, f"转换失败: {str(e)}"
+
+    def _update_file_paths_in_playlist(self, playlist_data: Dict[str, Any], old_path: str, new_path: str) -> None:
+        """更新播放列表中的文件路径。
+
+        Args:
+            playlist_data: 播放列表数据。
+            old_path: 旧文件路径。
+            new_path: 新文件路径。
+        """
+        # 更新pre_lists中的文件路径
+        pre_lists = playlist_data.get("pre_lists", [])
+        if isinstance(pre_lists, list) and len(pre_lists) == 7:
+            for pre_list in pre_lists:
+                if isinstance(pre_list, list):
+                    for file_item in pre_list:
+                        if file_item.get("uri") == old_path:
+                            file_item["uri"] = new_path
+                            # 清除旧的duration，因为文件格式改变了
+                            if "duration" in file_item:
+                                del file_item["duration"]
+
+        # 更新playlist中的文件路径
+        playlist = playlist_data.get("playlist", [])
+        for file_item in playlist:
+            if file_item.get("uri") == old_path:
+                file_item["uri"] = new_path
+                # 清除旧的duration，因为文件格式改变了
+                if "duration" in file_item:
+                    del file_item["duration"]
+
+    def playlist_remove_duplicate(self, playlist_id: str) -> tuple[int, str]:
+        """移除播放列表中的重复文件路径。
+
+        Args:
+            playlist_id: 播放列表ID。
+
+        Returns:
+            (code, msg)。code=0 表示成功。
+        """
+        try:
+            if not self._playlist_raw or playlist_id not in self._playlist_raw:
+                return -1, "播放列表不存在"
+
+            playlist_data = self._playlist_raw[playlist_id]
+            p_name = playlist_data.get("name", "未知播放列表")
+
+            # 执行去重
+            removed_count = 0
+            seen_uris = set()
+
+            # 处理pre_lists
+            pre_lists = playlist_data.get("pre_lists", [])
+            if isinstance(pre_lists, list) and len(pre_lists) == 7:
+                for pre_list in pre_lists:
+                    if isinstance(pre_list, list):
+                        new_pre_list = []
+                        for item in pre_list:
+                            uri = item.get("uri")
+                            if uri and uri not in seen_uris:
+                                seen_uris.add(uri)
+                                new_pre_list.append(item)
+                            elif uri:
+                                removed_count += 1
+                        pre_list.clear()
+                        pre_list.extend(new_pre_list)
+
+            # 处理playlist
+            playlist = playlist_data.get("playlist", [])
+            new_playlist = []
+            for item in playlist:
+                uri = item.get("uri")
+                if uri and uri not in seen_uris:
+                    seen_uris.add(uri)
+                    new_playlist.append(item)
+                elif uri:
+                    removed_count += 1
+
+            playlist.clear()
+            playlist.extend(new_playlist)
+
+            if removed_count == 0:
+                return 0, f"播放列表 {p_name} 中没有重复文件"
+
+            # 通过队列异步保存
+            self._rds_save_queue.put('save_playlist')
+
+            log.info(f"[PlaylistMgr] 播放列表 {playlist_id} 已移除 {removed_count} 个重复文件")
+            return 0, f"已从播放列表 {p_name} 中移除 {removed_count} 个重复文件"
+
+        except Exception as e:
+            log.error(f"[PlaylistMgr] playlist_remove_duplicate 异常: {playlist_id}, {e}", exc_info=True)
+            return -1, f"去重失败: {str(e)}"
 
 
 # 全局实例
