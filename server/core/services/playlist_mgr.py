@@ -1486,7 +1486,8 @@ class PlaylistMgr:
                             failed_files.append(f"{file_path}: {str(e)}")
                             log.error(f"[PlaylistMgr] 转换异常: {file_path}, {e}")
 
-                    self._save_playlist_to_rds()
+                    # 通过队列通知gevent worker保存（避免在线程中直接操作Redis）
+                    self._rds_save_queue.put('save_playlist')
                     if fail_count > 0:
                         error_summary = f"部分文件转换失败: {', '.join(failed_files[:5])}"
                         if len(failed_files) > 5:
@@ -1537,6 +1538,69 @@ class PlaylistMgr:
                 # 清除旧的duration，因为文件格式改变了
                 if "duration" in file_item:
                     del file_item["duration"]
+
+    def playlist_remove_duplicate(self, playlist_id: str) -> tuple[int, str]:
+        """移除播放列表中的重复文件路径。
+
+        Args:
+            playlist_id: 播放列表ID。
+
+        Returns:
+            (code, msg)。code=0 表示成功。
+        """
+        try:
+            if not self._playlist_raw or playlist_id not in self._playlist_raw:
+                return -1, "播放列表不存在"
+
+            playlist_data = self._playlist_raw[playlist_id]
+            p_name = playlist_data.get("name", "未知播放列表")
+
+            # 执行去重
+            removed_count = 0
+            seen_uris = set()
+
+            # 处理pre_lists
+            pre_lists = playlist_data.get("pre_lists", [])
+            if isinstance(pre_lists, list) and len(pre_lists) == 7:
+                for pre_list in pre_lists:
+                    if isinstance(pre_list, list):
+                        new_pre_list = []
+                        for item in pre_list:
+                            uri = item.get("uri")
+                            if uri and uri not in seen_uris:
+                                seen_uris.add(uri)
+                                new_pre_list.append(item)
+                            elif uri:
+                                removed_count += 1
+                        pre_list.clear()
+                        pre_list.extend(new_pre_list)
+
+            # 处理playlist
+            playlist = playlist_data.get("playlist", [])
+            new_playlist = []
+            for item in playlist:
+                uri = item.get("uri")
+                if uri and uri not in seen_uris:
+                    seen_uris.add(uri)
+                    new_playlist.append(item)
+                elif uri:
+                    removed_count += 1
+
+            playlist.clear()
+            playlist.extend(new_playlist)
+
+            if removed_count == 0:
+                return 0, f"播放列表 {p_name} 中没有重复文件"
+
+            # 通过队列异步保存
+            self._rds_save_queue.put('save_playlist')
+
+            log.info(f"[PlaylistMgr] 播放列表 {playlist_id} 已移除 {removed_count} 个重复文件")
+            return 0, f"已从播放列表 {p_name} 中移除 {removed_count} 个重复文件"
+
+        except Exception as e:
+            log.error(f"[PlaylistMgr] playlist_remove_duplicate 异常: {playlist_id}, {e}", exc_info=True)
+            return -1, f"去重失败: {str(e)}"
 
 
 # 全局实例

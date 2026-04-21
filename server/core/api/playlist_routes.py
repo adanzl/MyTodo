@@ -231,3 +231,21 @@ def playlist_convert_to_mp3() -> ResponseReturnValue:
     except Exception as e:
         log.error(f"[PLAYLIST] ConvertToMp3 error: {e}")
         return _err(f'error: {str(e)}')
+
+
+@playlist_bp.route("/playlist/removeDuplicate", methods=['POST'])
+def playlist_remove_duplicate() -> ResponseReturnValue:
+    """移除播放列表中的重复文件路径。"""
+    try:
+        args: Dict[str, Any] = read_json_from_request()
+        pid, err = _require_playlist_id(args)
+        if err:
+            return err
+
+        ret, msg = playlist_mgr.playlist_remove_duplicate(str(pid))
+        if ret != 0:
+            return _err(msg)
+        return _ok(msg)
+    except Exception as e:
+        log.error(f"[PLAYLIST] Deduplicate error: {e}")
+        return _err(f'error: {str(e)}')
