@@ -42,7 +42,8 @@
         @play-on-device-for-pre-file="handlePlayOnDeviceForPreFile" @delete-pre-file="handleDeletePreFile"
         @move-file-up="handleMovePlaylistItemUp" @move-file-down="handleMovePlaylistItemDown"
         @replace-file="handleReplacePlaylistItem" @open-playlist-selector-for-file="handleOpenPlaylistSelectorForFile"
-        @play-on-device-for-file="handlePlayOnDeviceForFile" @delete-file="handleDeletePlaylistItem">
+        @play-on-device-for-file="handlePlayOnDeviceForFile" @delete-file="handleDeletePlaylistItem"
+        @remove-duplicate="handleRemoveDuplicate" @convert-mp3="handleConvertToMp3">
       </PanelFileList>
 
       <!-- 第三列：配置详情（Cron + 设备） -->
@@ -143,8 +144,8 @@ import { useAudioPlayback } from "./composables/useAudioPlayback";
 import { useFileOperations } from "./composables/useFileOperations";
 import { useDragAndDrop } from "./composables/useDragAndDrop";
 import { usePlaylistNameEdit } from "./composables/usePlaylistNameEdit";
-import { ElMessage } from "element-plus";
-import { playFileOnDevice } from "@/api/api-playlist";
+import { ElMessage, ElMessageBox } from "element-plus";
+import { playFileOnDevice, convertPlaylistToMp3, removeDuplicateFiles } from "@/api/api-playlist";
 import type { MediaFile } from "@/types/tools";
 import { STORAGE_KEY_ACTIVE_PLAYLIST_ID } from "@/constants/playlist";
 
@@ -536,6 +537,74 @@ const playOnDevice = async (file: MediaFile) => {
 };
 const handlePlayOnDeviceForPreFile = (file: MediaFile) => playOnDevice(file);
 const handlePlayOnDeviceForFile = (file: MediaFile) => playOnDevice(file);
+
+// 去重播放列表
+const handleRemoveDuplicate = async () => {
+  if (!activePlaylistId.value) {
+    ElMessage.warning("请先选择播放列表");
+    return;
+  }
+
+  try {
+    // 二次确认
+    await ElMessageBox.confirm(
+      "此操作将移除播放列表中的重复文件路径，是否继续？",
+      "确认去重",
+      {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning"
+      }
+    );
+
+    const result = await removeDuplicateFiles(activePlaylistId.value);
+    if (result.code === 0) {
+      ElMessage.success(result.msg || "去重成功");
+      // 刷新播放列表状态
+      await refreshPlaylistStatus();
+    } else {
+      ElMessage.error(result.msg || "去重失败");
+    }
+  } catch (error) {
+    if (error !== "cancel") {
+      console.error("去重失败:", error);
+      ElMessage.error("去重失败，请重试");
+    }
+  }
+};
+
+// 转换播放列表为MP3
+const handleConvertToMp3 = async () => {
+  if (!activePlaylistId.value) {
+    ElMessage.warning("请先选择播放列表");
+    return;
+  }
+
+  try {
+    // 二次确认
+    await ElMessageBox.confirm(
+      "此操作将把播放列表中的所有文件转换为MP3格式，并删除原始文件。转换过程在后台执行，可能需要较长时间。是否继续？",
+      "确认转换",
+      {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning"
+      }
+    );
+
+    const result = await convertPlaylistToMp3(activePlaylistId.value);
+    if (result.code === 0) {
+      ElMessage.success(result.msg || "已开始转换");
+    } else {
+      ElMessage.error(result.msg || "转换失败");
+    }
+  } catch (error) {
+    if (error !== "cancel") {
+      console.error("转换失败:", error);
+      ElMessage.error("转换失败，请重试");
+    }
+  }
+};
 
 // 批量添加文件到播放列表
 const handleBatchAddFiles = async (data: {

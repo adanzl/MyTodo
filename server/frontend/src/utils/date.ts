@@ -77,4 +77,23 @@ export function S_TS(dt: Dayjs | Date | string | undefined): string {
   return dayjs(dt).format("YYYY-MM-DD");
 }
 
+/**
+ * 格式化日期（简短）
+ * @param date - 日期对象
+ * @returns 格式化的日期字符串，如 "4/21"
+ */
+export function formatDateShort(date: Date): string {
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  return `${month}/${day}`;
+}
 
+/**
+ * 获取星期
+ * @param date - 日期对象
+ * @returns 星期字符串，如 "周一"
+ */
+export function getWeekDay(date: Date): string {
+  const weekDays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+  return weekDays[date.getDay()];
+}

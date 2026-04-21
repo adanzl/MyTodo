@@ -2,39 +2,59 @@
   <div class="p-2">
     <!-- 日期选择器 -->
     <div class="mb-4 flex items-center gap-4">
-      <span class="text-gray-700 font-medium">快速定位日期：</span>
-      <el-date-picker
-        v-model="startDate"
-        type="date"
-        placeholder="选择开始日期"
-        class="w-35!"
-        @change="handleDateChange"
-      />
-      <span class="text-gray-700 font-medium">显示天数：</span>
-      <el-input-number
-        v-model="dayCount"
-        :min="1"
-        :max="30"
-        :step="1"
-        class="w-28!"
-      />
-      <span class="text-gray-700 font-medium">布置对象：</span>
+      <el-button type="primary" size="small" @click="refreshTasks" :icon="Refresh" />
       <el-radio-group v-model="selectedUserId" @change="handleUserChange">
         <el-radio :value="0">全部</el-radio>
         <el-radio :value="3">灿灿</el-radio>
         <el-radio :value="4">昭昭</el-radio>
       </el-radio-group>
+      <div class="ml-auto flex items-center">
+        <el-switch v-model="showDetail" @change="handleDetailChange" :active-text="''" :inactive-text="'详情'" class="mr-2" />
+        <el-button size="small" :icon="ArrowLeft" @click="decreaseDays" class="mr-1" />
+        <el-date-picker
+          v-model="startDate"
+          type="date"
+          placeholder="选择开始日期"
+          class="w-35! mr-1"
+          size="small"
+          @change="handleDateChange"
+        />
+        <el-button size="small" @click="setToday" class="w-4 mr-1">今</el-button>
+        <el-button size="small" :icon="ArrowRight" @click="increaseDays" class="ml-0! mr-2" />
+        <span class="text-gray-700 mr-1 text-sm">显示天数</span>
+        <el-input-number
+          v-model="dayCount"
+          :min="1"
+          :max="30"
+          :step="1"
+          class="w-20!"
+          size="small"
+        />
+      </div>
     </div>
 
     <!-- 任务列表 -->
-    <el-table :data="taskList" v-loading="loading" stripe border style="width: 100%">
-      <el-table-column prop="name" label="任务名称" min-width="150" fixed />
+    <el-table
+      :data="displayData"
+      v-loading="loading"
+      border
+      style="width: 100%"
+      row-key="id"
+      :row-class-name="getRowClassName"
+    >
+      <el-table-column prop="name" label="任务名称" min-width="150" fixed>
+        <template #default="{ row }">
+          <div :class="row.isTask === false ? 'pl-6' : ''">
+            {{ row.name }}
+          </div>
+        </template>
+      </el-table-column>
 
       <!-- 动态生成10天的列 -->
       <el-table-column
-        v-for="(date, index) in weekDates"
-        :key="index"
-        width="120"
+        v-for="date in weekDates"
+        :key="date.getTime()"
+        width="110"
         align="center"
       >
         <template #header>
@@ -47,7 +67,12 @@
         </template>
         <template #default="{ row }">
           <div class="text-sm">
-            {{ getTaskProgress(row, date) }}
+            <span v-if="row.isTask !== false">
+              {{ getTaskProgress(row, date) }}
+            </span>
+            <span v-else>
+              {{ getMaterialStatus(row, date) }}
+            </span>
           </div>
         </template>
       </el-table-column>
@@ -71,7 +96,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
 import { ElMessage } from "element-plus";
+import { Refresh, ArrowLeft, ArrowRight } from "@element-plus/icons-vue";
 import { getTaskList, type Task } from "@/api/api-task";
+import { formatDateShort, getWeekDay } from "@/utils/date";
 
 // 状态管理
 const loading = ref(false);
@@ -81,6 +108,7 @@ const totalCount = ref(0);
 const pageNum = ref(1);
 const pageSize = ref(20);
 const selectedUserId = ref<number>(0);
+const showDetail = ref(false);
 
 // 从 localStorage 获取显示天数，默认 8
 const STORAGE_KEY_DAY_COUNT = "task_calendar_day_count";
@@ -106,8 +134,9 @@ const saveDayCount = (count: number) => {
 // 计算动态天数日期
 const weekDates = computed(() => {
   const dates = [];
+  const start = new Date(startDate.value);
   for (let i = 0; i < dayCount.value; i++) {
-    const date = new Date(startDate.value);
+    const date = new Date(start);
     date.setDate(date.getDate() + i);
     dates.push(date);
   }
@@ -118,6 +147,101 @@ const weekDates = computed(() => {
 watch(dayCount, (newVal) => {
   saveDayCount(newVal);
 });
+
+// 计算显示数据（包含任务和素材）
+const displayData = computed(() => {
+  if (!showDetail.value) {
+    return taskList.value;
+  }
+
+  const result: any[] = [];
+  taskList.value.forEach((task) => {
+    // 添加任务行
+    result.push({ ...task, isTask: true });
+
+    // 添加素材行
+    try {
+      const taskData = typeof task.data === "string" ? JSON.parse(task.data) : task.data;
+      const dailyMaterials = taskData.dailyMaterials || {};
+
+      // 收集所有素材
+      const allMaterials: Record<string, any> = {};
+      (Object.values(dailyMaterials) as any[][]).forEach((materials) => {
+        materials.forEach((m) => {
+          if (!allMaterials[m.id]) {
+            allMaterials[m.id] = { ...m, taskId: task.id };
+          }
+        });
+      });
+
+      // 添加素材行
+      Object.values(allMaterials).forEach((material: any) => {
+        result.push({
+          id: `task_${task.id}_material_${material.id}`,
+          name: `${material.name}`,
+          type: material.type,
+          taskId: task.id,
+          isTask: false,
+        });
+      });
+    } catch (error) {
+      console.error("解析任务数据失败:", error);
+    }
+  });
+
+  return result;
+});
+
+// 获取素材状态
+const getMaterialStatus = (row: any, date: Date) => {
+  const taskId = row.taskId;
+  if (!taskId) return "";
+
+  try {
+    const task = taskList.value.find((t) => t.id === taskId);
+    if (!task) return "";
+
+    const taskData = typeof task.data === "string" ? JSON.parse(task.data) : task.data;
+    const dailyMaterials = taskData.dailyMaterials || {};
+    const progress = taskData.progress || {};
+
+    // 计算这是任务的第几天
+    const taskStartDate = new Date(task.start_date);
+    const diffTime = date.getTime() - taskStartDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0 || diffDays >= task.duration) {
+      return "";
+    }
+
+    // 获取该天的素材列表
+    const dayNumber = diffDays + 1;
+    const materials = dailyMaterials[dayNumber] || [];
+
+    // 找到当前素材
+    const material = materials.find((m: any) => m.name === row.name);
+    if (!material) return "";
+
+    // 检查是否完成
+    const materialProgress = progress[material.id];
+    if (materialProgress && materialProgress[String(dayNumber)] === 1) {
+      return "✅";
+    }
+    return "❌";
+  } catch (error) {
+    return "";
+  }
+};
+
+// 详情开关变化
+const handleDetailChange = () => {
+  // 可以在这里添加额外的逻辑
+};
+
+// 获取行类名
+const getRowClassName = ({ row }: { row: any }) => {
+  return showDetail.value && row.isTask !== false ? 'bg-gray-50' : '';
+};
 
 // 获取任务列表
 const fetchTaskList = async () => {
@@ -149,7 +273,7 @@ const handleSizeChange = (size: number) => {
 
 // 日期变化
 const handleDateChange = () => {
-  // 可以在这里添加额外的逻辑
+  fetchTaskList();
 };
 
 // 用户选择变化
@@ -158,25 +282,39 @@ const handleUserChange = () => {
   fetchTaskList();
 };
 
-// 格式化日期（简短）
-const formatDateShort = (date: Date) => {
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  return `${month}/${day}`;
+// 刷新任务列表
+const refreshTasks = () => {
+  fetchTaskList();
 };
 
-// 获取星期
-const getWeekDay = (date: Date) => {
-  const weekDays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
-  return weekDays[date.getDay()];
+// 设置为今天
+const setToday = () => {
+  startDate.value = new Date();
+  fetchTaskList();
+};
+
+// 减少显示天数
+const decreaseDays = () => {
+  const newDate = new Date(startDate.value);
+  newDate.setDate(newDate.getDate() - dayCount.value);
+  startDate.value = newDate;
+  fetchTaskList();
+};
+
+// 增加显示天数
+const increaseDays = () => {
+  const newDate = new Date(startDate.value);
+  newDate.setDate(newDate.getDate() + dayCount.value);
+  startDate.value = newDate;
+  fetchTaskList();
 };
 
 // 获取任务在指定日期的进度
 const getTaskProgress = (task: Task, date: Date) => {
   try {
-    // 解析 data 字段
     const taskData = typeof task.data === "string" ? JSON.parse(task.data) : task.data;
     const dailyMaterials = taskData.dailyMaterials || {};
+    const progress = taskData.progress || {};
 
     // 计算这是任务的第几天
     const taskStartDate = new Date(task.start_date);
@@ -193,9 +331,14 @@ const getTaskProgress = (task: Task, date: Date) => {
     const materials = dailyMaterials[dayNumber] || [];
     const totalMaterials = materials.length;
 
-    // TODO: 这里需要从后端获取实际的完成情况
-    // 目前暂时显示 0/总数
-    const completedCount = 0;
+    // 从 progress 中统计完成数
+    let completedCount = 0;
+    materials.forEach((material: any) => {
+      const materialProgress = progress[material.id];
+      if (materialProgress && materialProgress[String(dayNumber)] === 1) {
+        completedCount++;
+      }
+    });
 
     return `${completedCount}/${totalMaterials}`;
   } catch (error) {

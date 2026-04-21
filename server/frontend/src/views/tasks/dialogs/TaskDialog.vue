@@ -14,7 +14,7 @@
           <el-row :gutter="20">
             <el-col :span="8">
               <el-form-item label="任务名称" required>
-                <el-input v-model="formData.name" placeholder="请输入任务名称" />
+                <el-input v-model="formData.name" placeholder="请输入任务名称" class="w-70!" />
               </el-form-item>
             </el-col>
             <el-col :span="8">
@@ -39,7 +39,7 @@
 
           <!-- 第二行：开始日期、总天数 -->
           <el-row :gutter="20">
-            <el-col :span="12">
+            <el-col :span="8">
               <el-form-item label="开始日期" required>
                 <el-date-picker
                   v-model="formData.start_date"
@@ -47,7 +47,7 @@
                   placeholder="选择开始日期"
                   format="YYYY-MM-DD"
                   value-format="YYYY-MM-DD"
-                  style="width: 100%"
+                  class="w-68!"
                 />
               </el-form-item>
             </el-col>
@@ -130,7 +130,8 @@
       append-to-body
       align-center
     >
-      <div class="flex gap-4" style="height: 500px;">
+      <div v-loading="materialLoading" element-loading-text="加载中..." style="min-height: 500px;">
+        <div class="flex gap-4" style="height: 500px;">
         <!-- 左侧：类别列表 -->
         <div class="w-48 border rounded overflow-y-auto">
           <div
@@ -149,7 +150,6 @@
           <el-table
             ref="materialTableRef"
             :data="materialList"
-            v-loading="materialLoading"
             @selection-change="handleMaterialSelectionChange"
             @row-click="handleRowClick"
             max-height="460"
@@ -164,6 +164,7 @@
             </el-table-column>
           </el-table>
         </div>
+      </div>
       </div>
       <template #footer>
         <el-button @click="showMaterialSelector = false">取消</el-button>
@@ -324,6 +325,7 @@ const removeMaterial = (day: number, index: number) => {
 
 // 加载分类列表
 const loadCategoryList = async () => {
+  materialLoading.value = true;
   try {
     const res = await getMaterialCategoryList(1, 1000);
     if (res.code === 0 && res.data) {
@@ -427,10 +429,6 @@ const handleSubmit = async () => {
   }
   if (!formData.value.start_date) {
     ElMessage.warning("请选择开始日期");
-    return;
-  }
-  if (selectedUsers.value.length === 0) {
-    ElMessage.warning("请选择布置对象");
     return;
   }
 

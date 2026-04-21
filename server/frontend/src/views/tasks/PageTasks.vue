@@ -31,7 +31,7 @@ import TabTasks from "./TabTasks.vue";
 import TabTaskCalendar from "./TabTaskCalendar.vue";
 
 // 主页签控制
-const activeMainTab = ref("tasks");
+const activeMainTab = ref("calendar");
 
 // 监听页签切换
 const handleTabChange = (tabName: string) => {
