@@ -137,7 +137,7 @@ const initForm = async () => {
 
 // 提交表单
 const handleSubmit = async () => {
-  if (!formData.value.name || !formData.value.path || !formData.value.cate_id) {
+  if (!formData.value.name || !formData.value.path) {
     ElMessage.warning("请填写必填项");
     return;
   }
@@ -158,7 +158,7 @@ const handleSubmit = async () => {
         name: formData.value.name,
         type: formData.value.type ?? 0,
         path: formData.value.path,
-        cate_id: formData.value.cate_id,
+        cate_id: formData.value.cate_id ?? 0,
       });
       ElMessage.success("添加成功");
     }

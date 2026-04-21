@@ -12,8 +12,13 @@
       </el-tab-pane>
 
       <!-- 任务管理页签 -->
-      <el-tab-pane label="任务管理" name="category">
-        <TabCategory />
+      <el-tab-pane label="任务管理" name="tasks">
+        <TabTasks />
+      </el-tab-pane>
+
+      <!-- 任务日历页签 -->
+      <el-tab-pane label="任务日历" name="calendar">
+        <TabTaskCalendar />
       </el-tab-pane>
     </el-tabs>
   </div>
@@ -22,10 +27,11 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import TabMaterial from "./TabMaterial.vue";
-import TabCategory from "./TabCategory.vue";
+import TabTasks from "./TabTasks.vue";
+import TabTaskCalendar from "./TabTaskCalendar.vue";
 
 // 主页签控制
-const activeMainTab = ref("material");
+const activeMainTab = ref("tasks");
 
 // 监听页签切换
 const handleTabChange = (tabName: string) => {

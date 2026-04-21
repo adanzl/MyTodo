@@ -231,7 +231,7 @@ import { Picture, Headset, VideoPlay, Edit, Delete, Plus, ArrowUp, ArrowDown, Re
 import type { Material } from "@/api/api-task";
 import { updateMaterial } from "@/api/api-task";
 import { getAudioDuration } from "@/api/api-common";
-import type { AudioFile, TaskDetail } from "@/types/tasks/taskDetail";
+import type { AudioFile, MaterialDetail } from "@/types/tasks/materialDetail";
 import * as pdfjsLib from "pdfjs-dist";
 import { getMediaFileUrl } from "@/utils/file";
 import { formatDuration } from "@/utils/format";
@@ -299,10 +299,10 @@ const audioPlayer = useAudioPlayer({
 
 // 当前页面绑定的音频ID列表
 const currentPageAudioIds = computed(() => {
-  if (selectedPageIndex.value === null || !taskDetailData.value?.pages) {
+  if (selectedPageIndex.value === null || !materialDetailData.value?.pages) {
     return [];
   }
-  const page = taskDetailData.value.pages[selectedPageIndex.value];
+  const page = materialDetailData.value.pages[selectedPageIndex.value];
   return page?.audioIds || [];
 });
 
@@ -318,8 +318,8 @@ const unboundAudios = computed(() => {
   return allAudios.value.filter(audio => !boundIds.has(audio.id));
 });
 
-// TaskDetail 数据
-const taskDetailData = ref<TaskDetail | null>(null);
+// MaterialDetail 数据
+const materialDetailData = ref<MaterialDetail | null>(null);
 
 // 监听 modelValue 变化
 watch(
@@ -339,12 +339,12 @@ watch(
   selectedAudioIds,
   (newIds) => {
     // 如果删除模式开启或正在初始化，不处理绑定逻辑
-    if (isDeleteMode.value || isInitializing || selectedPageIndex.value === null || !taskDetailData.value) {
+    if (isDeleteMode.value || isInitializing || selectedPageIndex.value === null || !materialDetailData.value) {
       previousSelectedIds = new Set(newIds);
       return;
     }
 
-    const page = taskDetailData.value.pages[selectedPageIndex.value];
+    const page = materialDetailData.value.pages[selectedPageIndex.value];
     if (!page) {
       previousSelectedIds = new Set(newIds);
       return;
@@ -454,8 +454,8 @@ const loadPdfPages = async (pdfPath: string) => {
     pdfPages.value = pages;
 
     // 更新 taskDetail 的 pdfLength
-    if (taskDetailData.value) {
-      taskDetailData.value.pdfLength = pages.length;
+    if (materialDetailData.value) {
+      materialDetailData.value.pdfLength = pages.length;
     }
 
     // 默认选中第一页
@@ -477,40 +477,40 @@ const initDetail = async () => {
   coursewareForm.value.name = props.materialData.name || "";
 
   // 解析 data 字段
-  let taskDetail: TaskDetail | null = null;
+  let materialDetail: MaterialDetail | null = null;
   if (typeof props.materialData.data === 'string') {
     try {
-      taskDetail = JSON.parse(props.materialData.data);
+      materialDetail = JSON.parse(props.materialData.data);
     } catch (e) {
       console.error('解析 data 失败:', e);
     }
   } else {
-    taskDetail = props.materialData.data || null;
+    materialDetail = props.materialData.data || null;
   }
 
-  coursewareForm.value.remark = taskDetail?.remark || "";
+  coursewareForm.value.remark = materialDetail?.remark || "";
 
   // 保存 taskDetail 数据
-  taskDetailData.value = taskDetail;
+  materialDetailData.value = materialDetail;
 
   // 根据素材类型加载不同的数据
   if (props.materialData.type === 0 && props.materialData.path) {
     // PDF 类型 - 使用 pdf.js 加载
     await loadPdfPages(props.materialData.path);
     // 从 data 中加载音频列表
-    allAudios.value = taskDetail?.audioList || [];
+    allAudios.value = materialDetail?.audioList || [];
 
     // 确保 pages 数组存在且长度足够
-    if (taskDetail) {
-      if (!taskDetail.pages) {
-        taskDetail.pages = [];
+    if (materialDetail) {
+      if (!materialDetail.pages) {
+        materialDetail.pages = [];
       }
       // 扩展 pages 数组以匹配 PDF 页数
-      while (taskDetail.pages.length < pdfPages.value.length) {
-        taskDetail.pages.push({ audioIds: [] });
+      while (materialDetail.pages.length < pdfPages.value.length) {
+        materialDetail.pages.push({ audioIds: [] });
       }
       // 更新 pdfLength
-      taskDetail.pdfLength = pdfPages.value.length;
+      materialDetail.pdfLength = pdfPages.value.length;
     }
   } else {
     // Video 类型 - 清空数据
@@ -553,8 +553,8 @@ const selectPage = async (index: number) => {
   selectedPageIndex.value = index;
 
   // 更新选中的音频ID列表为当前页面绑定的音频
-  if (taskDetailData.value && taskDetailData.value.pages[index]) {
-    const newIds = [...taskDetailData.value.pages[index].audioIds];
+  if (materialDetailData.value && materialDetailData.value.pages[index]) {
+    const newIds = [...materialDetailData.value.pages[index].audioIds];
     // 先清空再赋值，确保响应式更新
     selectedAudioIds.value = [];
     await nextTick();
@@ -585,8 +585,8 @@ const toggleDeleteMode = async () => {
   } else {
     // 退出删除模式时，恢复当前页面绑定的音频选中状态
     isInitializing = true;
-    if (selectedPageIndex.value !== null && taskDetailData.value && taskDetailData.value.pages[selectedPageIndex.value]) {
-      const newIds = [...taskDetailData.value.pages[selectedPageIndex.value].audioIds];
+    if (selectedPageIndex.value !== null && materialDetailData.value && materialDetailData.value.pages[selectedPageIndex.value]) {
+      const newIds = [...materialDetailData.value.pages[selectedPageIndex.value].audioIds];
       // 先清空再赋值，确保响应式更新
       selectedAudioIds.value = [];
       await nextTick();
@@ -604,9 +604,9 @@ const toggleDeleteMode = async () => {
 
 // 向上移动音频
 const moveAudioUp = (index: number) => {
-  if (!taskDetailData.value || selectedPageIndex.value === null) return;
+  if (!materialDetailData.value || selectedPageIndex.value === null) return;
 
-  const page = taskDetailData.value.pages[selectedPageIndex.value];
+  const page = materialDetailData.value.pages[selectedPageIndex.value];
   if (!page) return;
 
   // 交换位置
@@ -618,9 +618,9 @@ const moveAudioUp = (index: number) => {
 
 // 向下移动音频
 const moveAudioDown = (index: number) => {
-  if (!taskDetailData.value || selectedPageIndex.value === null) return;
+  if (!materialDetailData.value || selectedPageIndex.value === null) return;
 
-  const page = taskDetailData.value.pages[selectedPageIndex.value];
+  const page = materialDetailData.value.pages[selectedPageIndex.value];
   if (!page) return;
 
   // 交换位置
@@ -632,7 +632,7 @@ const moveAudioDown = (index: number) => {
 
 // 更新页面绑定
 const handleUpdatePageBinding = async () => {
-  if (selectedPageIndex.value === null || !taskDetailData.value) return;
+  if (selectedPageIndex.value === null || !materialDetailData.value) return;
 
   try {
     // 保存当前的绑定关系到后端
@@ -688,7 +688,7 @@ const handleClose = () => {
   selectedPageIndex.value = null;
   isDeleteMode.value = false;
   previousSelectedIds = new Set<string>();
-  taskDetailData.value = null;
+  materialDetailData.value = null;
   // 停止音频播放
   audioPlayer.clear();
 };
@@ -728,13 +728,13 @@ const handleAudioFileConfirm = async (filePaths: string[]) => {
     audioFileDialogVisible.value = false;
 
     // 确保 pages 数组存在且长度足够
-    if (taskDetailData.value && pdfPages.value.length > 0) {
-      if (!taskDetailData.value.pages) {
-        taskDetailData.value.pages = [];
+    if (materialDetailData.value && pdfPages.value.length > 0) {
+      if (!materialDetailData.value.pages) {
+        materialDetailData.value.pages = [];
       }
       // 扩展 pages 数组以匹配 PDF 页数
-      while (taskDetailData.value.pages.length < pdfPages.value.length) {
-        taskDetailData.value.pages.push({ audioIds: [] });
+      while (materialDetailData.value.pages.length < pdfPages.value.length) {
+        materialDetailData.value.pages.push({ audioIds: [] });
       }
     }
 
@@ -751,7 +751,7 @@ const saveMaterial = async () => {
 
   try {
     // 解析现有 data
-    let existingData: TaskDetail = { pages: [] };
+    let existingData: MaterialDetail = { pages: [] };
     if (typeof props.materialData.data === 'string') {
       try {
         existingData = JSON.parse(props.materialData.data);
@@ -767,12 +767,12 @@ const saveMaterial = async () => {
       existingData.pages = [];
     }
 
-    // 如果有 taskDetailData，使用最新的数据
-    if (taskDetailData.value) {
-      existingData.pages = taskDetailData.value.pages;
+    // 如果有 materialDetailData，使用最新的数据
+    if (materialDetailData.value) {
+      existingData.pages = materialDetailData.value.pages;
     }
 
-    const updatedData: TaskDetail = {
+    const updatedData: MaterialDetail = {
       ...existingData,
       audioList: allAudios.value,
       pdfLength: existingData.pdfLength,

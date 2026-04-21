@@ -55,17 +55,17 @@
     </el-table>
 
     <!-- 分页 -->
-    <div class="mt-4 flex justify-end">
-      <el-pagination
-        v-model:current-page="pageNum"
-        v-model:page-size="pageSize"
-        :page-sizes="[10, 20, 50, 100]"
-        :total="totalCount"
-        layout="total, sizes, prev, pager, next, jumper"
-        @size-change="handleSizeChange"
-        @current-change="handlePageChange"
-      />
-    </div>
+    <el-pagination
+      layout="sizes, prev, pager, next"
+      :total="totalCount"
+      v-model:page-size="pageSize"
+      :page-sizes="[10, 20, 50]"
+      :current-page="pageNum"
+      class="mt-2"
+      background
+      @size-change="handleSizeChange"
+      @current-change="handlePageChange"
+    />
 
     <!-- 素材编辑/新增对话框 -->
     <MaterialDialog

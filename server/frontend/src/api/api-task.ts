@@ -5,6 +5,7 @@
 import { getList, getData, setData, delData } from "./api-common";
 import type { PaginatedResponse } from "@/types/api";
 import type { TaskDetail } from "@/types/tasks/taskDetail";
+import type { MaterialDetail } from "@/types/tasks/materialDetail";
 
 /**
  * 素材数据结构
@@ -15,7 +16,7 @@ export interface Material {
   path: string;
   cate_id: number;
   type: number;
-  data?: string | TaskDetail; // 存储时为 JSON 字符串，读取时可能是对象
+  data?: string | MaterialDetail; // 存储时为 JSON 字符串，读取时可能是对象
 }
 
 /**
@@ -130,4 +131,78 @@ export async function updateMaterialCategory(
  */
 export async function deleteMaterialCategory(id: number): Promise<void> {
   await delData("t_material_category", id);
+}
+
+// ==================== 任务管理 API ====================
+
+/**
+ * 任务数据结构
+ */
+export interface Task {
+  id?: number;
+  name: string;
+  start_date: string;
+  duration: number;
+  user_id: string;
+  status?: number; // 1: 进行中, 2: 已结束, 0: 未开始， -1：未开启
+  data: string | TaskDetail;
+}
+
+/**
+ * 获取任务列表
+ * @param userId - 用户ID（可选，使用LIKE匹配）
+ * @param pageNum - 页码，默认1
+ * @param pageSize - 每页数量，默认20
+ */
+export async function getTaskList(
+  userId?: number,
+  pageNum: number = 1,
+  pageSize: number = 20
+): Promise<PaginatedResponse<Task>> {
+  const conditions: Record<string, any> = {};
+  if (userId && userId > 0) {
+    // 使用 LIKE 条件匹配 user_id 字段（如 "3,4" 中包含 "3"）
+    conditions.user_id = { like: `%${userId}%` };
+  }
+  return getList<Task>(
+    "t_task",
+    Object.keys(conditions).length > 0 ? conditions : undefined,
+    pageNum,
+    pageSize
+  );
+}
+
+/**
+ * 获取单个任务详情
+ * @param id - 任务ID
+ */
+export async function getTask(id: number, fields?: string): Promise<Task> {
+  return getData<Task>("t_task", id, fields);
+}
+
+/**
+ * 添加任务
+ * @param task - 任务数据
+ */
+export async function addTask(task: Omit<Task, "id">): Promise<Task> {
+  return setData<Task>("t_task", {
+    id: -1, // -1 表示新增
+    ...task,
+  });
+}
+
+/**
+ * 更新任务
+ * @param task - 任务数据（必须包含 id）
+ */
+export async function updateTask(task: Task): Promise<Task> {
+  return setData<Task>("t_task", task as unknown as Record<string, unknown>);
+}
+
+/**
+ * 删除任务
+ * @param id - 任务ID
+ */
+export async function deleteTask(id: number): Promise<void> {
+  await delData("t_task", id);
 }

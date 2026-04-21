@@ -118,7 +118,7 @@ import {
 import { ElMessage } from 'element-plus'
 import { getMaterial } from '@/api/api-task'
 import type { Material } from '@/api/api-task'
-import type { TaskDetail, AudioFile, Page } from '@/types/tasks/taskDetail'
+import type { MaterialDetail, AudioFile, Page } from '@/types/tasks/materialDetail'
 import * as pdfjsLib from 'pdfjs-dist'
 import { getMediaFileUrl } from '@/utils/file'
 
@@ -137,7 +137,7 @@ const route = useRoute()
 
 // 素材相关
 const materialData = ref<Material | null>(null)
-const taskDetail = ref<TaskDetail | null>(null)
+const materialDetail = ref<MaterialDetail | null>(null)
 
 // PDF相关
 const currentPage = ref(1)
@@ -385,7 +385,7 @@ const loadMaterial = async () => {
     materialData.value = material
 
     // 解析 data 字段
-    let detail: TaskDetail | null = null
+    let detail: MaterialDetail | null = null
     if (typeof material.data === 'string') {
       try {
         detail = JSON.parse(material.data)
@@ -395,7 +395,7 @@ const loadMaterial = async () => {
     } else {
       detail = material.data || null
     }
-    taskDetail.value = detail
+    materialDetail.value = detail
 
     // 如果是 PDF，加载缩略图
     if (material.type === 0 && material.path) {
@@ -408,7 +408,7 @@ const loadMaterial = async () => {
 }
 
 // 加载 PDF 缩略图
-const loadPdfPages = async (pdfPath: string, detail: TaskDetail | null) => {
+const loadPdfPages = async (pdfPath: string, detail: MaterialDetail | null) => {
   try {
     console.log('=== PDF 加载调试信息 ===')
     console.log('原始路径:', pdfPath)

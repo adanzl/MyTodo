@@ -367,11 +367,14 @@ class DbMgr:
                         continue
                     col = table_obj.columns[k]
                     if isinstance(v, dict):
-                        # 支持 { field: { ">=": val1, "<=": val2 } } 或 { field: { in: [...] } } 格式
+                        # 支持 { field: { ">=": val1, "<=": val2 } } 或 { field: { in: [...] } } 或 { field: { like: "%val%" } } 格式
                         for op, val in v.items():
                             if op == 'in':
                                 query = query.where(col.in_(val))
                                 count_query = count_query.where(col.in_(val))
+                            elif op == 'like':
+                                query = query.where(col.like(val))
+                                count_query = count_query.where(col.like(val))
                             elif op == '>=':
                                 query = query.where(col >= val)
                                 count_query = count_query.where(col >= val)
