@@ -21,7 +21,7 @@ const routes: Array<RouteRecordRaw> = [
       },
       {
         path: 'tab2',
-        component: () => import('@/views/page-calendar/PageCalendar.vue')
+        component: () => import('@/views/page-task/PageTask.vue')
       },
       {
         path: 'tab3',

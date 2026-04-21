@@ -408,15 +408,29 @@ const confirmAddMaterials = () => {
     dailyMaterials.value[selectedDay.value] = [];
   }
 
+  let addedCount = 0;
   selectedMaterials.value.forEach((material) => {
-    dailyMaterials.value[selectedDay.value].push({
-      id: material.id!,
-      name: material.name,
-      type: material.type,
-    });
+    // 检查是否已存在
+    const exists = dailyMaterials.value[selectedDay.value].some(
+      (m) => m.id === material.id
+    );
+
+    if (!exists) {
+      dailyMaterials.value[selectedDay.value].push({
+        id: material.id!,
+        name: material.name,
+        type: material.type,
+      });
+      addedCount++;
+    }
   });
 
-  ElMessage.success(`已添加 ${selectedMaterials.value.length} 个素材`);
+  if (addedCount > 0) {
+    ElMessage.success(`已添加 ${addedCount} 个素材`);
+  } else {
+    ElMessage.warning("所选素材已全部存在");
+  }
+
   showMaterialSelector.value = false;
   selectedMaterials.value = [];
 };
@@ -437,10 +451,17 @@ const handleSubmit = async () => {
     // 将选中的用户ID转换为字符串存储
     const userIdStr = selectedUsers.value.join(",");
 
+    // 计算结束日期
+    const startDate = new Date(formData.value.start_date || "");
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + (formData.value.duration || 1) - 1);
+    const endDateStr = endDate.toISOString().split('T')[0];
+
     // 构建任务数据，确保所有必需字段都有值
     const taskData: Omit<Task, "id"> = {
       name: formData.value.name || "",
       start_date: formData.value.start_date || "",
+      end_date: endDateStr,
       duration: formData.value.duration || 1,
       user_id: userIdStr,
       status: formData.value.status ?? 1,

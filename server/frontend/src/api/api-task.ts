@@ -142,6 +142,7 @@ export interface Task {
   id?: number;
   name: string;
   start_date: string;
+  end_date: string;
   duration: number;
   user_id: string;
   status?: number; // 1: 进行中, 2: 已结束, 0: 未开始， -1：未开启

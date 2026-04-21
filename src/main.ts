@@ -61,6 +61,7 @@ import {
   IonToast,
   IonToggle,
   IonToolbar,
+  IonMenuButton,
 } from "@ionic/vue";
 
 import { checkAndSwitchServer, initNet, isLocalIpAvailable } from "@/api/api-client";
@@ -98,6 +99,8 @@ app.component("ion-alert", IonAlert);
 app.component("ion-backdrop", IonBackdrop);
 app.component("ion-toggle", IonToggle);
 app.component("ion-modal", IonModal);
+app.component("ion-menu-button", IonMenuButton);
+
 // eslint-disable-next-line vue/multi-word-component-names
 app.component("Icon", Icon);
 app.component("iconify-icon", Icon);
