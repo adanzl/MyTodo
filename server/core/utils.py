@@ -255,7 +255,7 @@ def get_media_duration(file_path: str) -> Optional[int]:
 def _get_media_server_url() -> str:
     """获取媒体文件服务器的完整 URL。"""
     # 返回固定的服务器地址和端口
-    return "http://192.168.50.172:8848"
+    return "http://192.168.50.171:8848"
 
 
 def decode_url_path(path: str) -> str:
