@@ -217,7 +217,8 @@ const renderPages = async () => {
 const renderPageToCanvas = async (pageNum: number, canvas: HTMLCanvasElement) => {
     try {
         const page = await getPDFPage(currentPdf, pageNum);
-        await renderPDFPageToCanvas(page, canvas, 1.5);
+        // 不强制放大，交给工具函数按设备能力自适应缩放，避免安卓端白屏
+        await renderPDFPageToCanvas(page, canvas);
     } catch (error) {
         console.error('渲染页面失败:', error);
     }
