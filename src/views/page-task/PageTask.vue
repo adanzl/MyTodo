@@ -75,7 +75,7 @@
                 v-for="material in getTaskMaterials(task)"
                 :key="`${task.id}_${material.id}`"
                 class="relative flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow aspect-square cursor-pointer"
-                @click="openMaterialPlayer(task, material)"
+                @click="openMaterialPlayer(task, material.id)"
               >
                 <!-- 任务名称角标 -->
                 <div class="absolute top-1 left-1 text-xs text-gray-500 truncate max-w-[80%]">{{ task.name }}</div>
@@ -107,7 +107,7 @@
 </template>
 
 <script setup lang="ts">
-import { getTaskList, type Task, getMaterial } from '@/api/api-task';
+import { getTaskList, getMaterial, type Task } from '@/api/api-task';
 import { getMediaFileUrl } from '@/utils/file';
 import ServerRemoteBadge from '@/components/ServerRemoteBadge.vue';
 import MaterialPlayerDialog from './dialogs/MaterialPlayerDialog.vue';
@@ -186,13 +186,13 @@ const getTaskMaterials = (task: Task) => {
 };
 
 // 获取素材图标
-const getMaterialIcon = (type: string) => {
+const getMaterialIcon = (type: number) => {
     switch (type) {
-        case 'reading':
+        case 0:
             return documentTextOutline;
-        case 'audio':
+        case 1:
             return headsetOutline;
-        case 'video':
+        case 2:
             return videocamOutline;
         default:
             return documentTextOutline;
@@ -200,13 +200,13 @@ const getMaterialIcon = (type: string) => {
 };
 
 // 获取素材颜色
-const getMaterialColor = (type: string) => {
+const getMaterialColor = (type: number) => {
     switch (type) {
-        case 'reading':
+        case 0:
             return 'danger';
-        case 'audio':
+        case 1:
             return 'primary';
-        case 'video':
+        case 2:
             return 'tertiary';
         default:
             return 'medium';
@@ -236,20 +236,10 @@ const isMaterialCompleted = (task: Task, material: any, date: Date) => {
 };
 
 // 打开素材播放器
-const openMaterialPlayer = async (task: Task, material: any) => {
+const openMaterialPlayer = async (task: Task, materialId: number) => {
     try {
-        // 获取素材详情（包含 path）
-        const materialDetail = await getMaterial(material.id);
-        console.log('Material detail:', materialDetail);
-        console.log('Material path:', materialDetail.path);
-        
-        if (!materialDetail.path) {
-            console.error('Material path is empty:', materialDetail);
-            return;
-        }
-        
+        const materialDetail = await getMaterial(materialId);
         const url = getMediaFileUrl(materialDetail.path);
-        console.log('Generated URL:', url);
         
         selectedMaterial.value = {
             id: materialDetail.id,

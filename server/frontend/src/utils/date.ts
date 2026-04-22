@@ -97,3 +97,39 @@ export function getWeekDay(date: Date): string {
   const weekDays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
   return weekDays[date.getDay()];
 }
+
+/**
+ * 计算两个日期之间的天数差
+ * @param startDate - 开始日期（YYYY-MM-DD 格式字符串）
+ * @param targetDate - 目标日期（Date 对象）
+ * @returns 天数差（从0开始）
+ */
+export function getDaysDiff(startDate: string, targetDate: Date): number {
+  const start = dayjs(startDate);
+  const target = dayjs(targetDate);
+  return target.diff(start, "day");
+}
+
+/**
+ * 格式化日期为 YYYY-MM-DD
+ * @param date - 日期对象或字符串
+ * @returns 格式化的日期字符串
+ */
+export function formatDate(date: Date | string): string {
+  return dayjs(date).format("YYYY-MM-DD");
+}
+
+/**
+ * 生成连续日期数组
+ * @param startDate - 开始日期（Date 对象或字符串）
+ * @param count - 天数
+ * @returns 日期数组
+ */
+export function generateDateRange(startDate: Date | string, count: number): Date[] {
+  const dates: Date[] = [];
+  const start = dayjs(startDate);
+  for (let i = 0; i < count; i++) {
+    dates.push(start.add(i, "day").toDate());
+  }
+  return dates;
+}

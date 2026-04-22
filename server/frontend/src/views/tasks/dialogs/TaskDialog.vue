@@ -179,6 +179,7 @@ import { ref, watch, nextTick } from "vue";
 import { ElMessage } from "element-plus";
 import { Plus } from "@element-plus/icons-vue";
 import { addTask, updateTask, getMaterialList, getMaterialCategoryList, type Task, type Material, type MaterialCategory } from "@/api/api-task";
+import dayjs from "dayjs";
 
 interface Props {
   modelValue: boolean;
@@ -215,7 +216,7 @@ const dailyMaterials = ref<Record<number, Array<{ id: number; name: string; type
 
 const formData = ref<Partial<Task>>({
   name: "",
-  start_date: new Date().toISOString().split("T")[0],
+  start_date: dayjs().format('YYYY-MM-DD'),
   duration: 1,
   user_id: "",
   status: 1,
@@ -285,7 +286,7 @@ const handleClose = () => {
 const resetForm = () => {
   formData.value = {
     name: "",
-    start_date: new Date().toISOString().split("T")[0],
+    start_date: dayjs().format('YYYY-MM-DD'),
     duration: 1,
     user_id: "",
     status: 1,
@@ -452,10 +453,7 @@ const handleSubmit = async () => {
     const userIdStr = selectedUsers.value.join(",");
 
     // 计算结束日期
-    const startDate = new Date(formData.value.start_date || "");
-    const endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + (formData.value.duration || 1) - 1);
-    const endDateStr = endDate.toISOString().split('T')[0];
+    const endDateStr = dayjs(formData.value.start_date).add((formData.value.duration || 1) - 1, 'day').format('YYYY-MM-DD');
 
     // 构建任务数据，确保所有必需字段都有值
     const taskData: Omit<Task, "id"> = {

@@ -14,11 +14,34 @@
     </ion-header>
 
     <ion-content class="p-0">
+      <!-- 加载状态 -->
+      <div v-if="loading" class="flex justify-center items-center min-h-full">
+        <ion-spinner name="crescent"></ion-spinner>
+      </div>
+
       <!-- PDF 播放器 -->
-      <div class="flex justify-center items-center min-h-full">
+      <div v-else-if="material?.type === 0" class="flex justify-center items-center min-h-full">
         <canvas ref="pdfCanvas" class="max-w-full h-auto shadow-md"></canvas>
       </div>
 
+      <!-- 音频播放器 -->
+      <div v-else-if="material?.type === 1" class="flex justify-center items-center min-h-full">
+        <audio ref="audioPlayer" controls class="w-full">
+          <source :src="material.url" type="audio/mpeg" />
+        </audio>
+      </div>
+
+      <!-- 视频播放器 -->
+      <div v-else-if="material?.type === 2" class="flex justify-center items-center min-h-full">
+        <video ref="videoPlayer" controls class="w-full">
+          <source :src="material.url" type="video/mp4" />
+        </video>
+      </div>
+
+      <!-- 未知类型 -->
+      <div v-else class="text-center py-10 text-gray-500">
+        <p>不支持的素材类型</p>
+      </div>
     </ion-content>
   </ion-modal>
 </template>
@@ -34,6 +57,7 @@ import {
     IonButton,
     IonContent,
     IonIcon,
+    IonSpinner,
 } from '@ionic/vue';
 import { closeOutline } from 'ionicons/icons';
 import { loadPDF, getPDFPage, renderPDFPageToCanvas } from '@/utils/pdf-lib';
@@ -57,6 +81,7 @@ const emit = defineEmits<{
 const pdfCanvas = ref<HTMLCanvasElement | null>(null);
 const audioPlayer = ref<HTMLAudioElement | null>(null);
 const videoPlayer = ref<HTMLVideoElement | null>(null);
+const loading = ref(false);
 
 // 关闭弹窗
 const handleDismiss = () => {
@@ -82,6 +107,8 @@ const renderPDF = async (url: string) => {
         await renderPDFPageToCanvas(page, pdfCanvas.value, 1.5);
     } catch (error) {
         console.error('PDF 渲染失败:', error);
+    } finally {
+        loading.value = false;
     }
 };
 
@@ -90,12 +117,21 @@ watch(
     () => [props.isOpen, props.material] as const,
     ([isOpen, material]) => {
         if (isOpen && material) {
+            loading.value = true;
+            
             if (material.type === 0 && material.url) {
                 // 延迟渲染，等待 DOM 更新
                 setTimeout(() => {
                     renderPDF(material.url);
                 }, 100);
+            } else if (material.type === 1 || material.type === 2) {
+                // 音频和视频不需要加载，直接显示
+                loading.value = false;
+            } else {
+                loading.value = false;
             }
+        } else {
+            loading.value = false;
         }
     }
 );

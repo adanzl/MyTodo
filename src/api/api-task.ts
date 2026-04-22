@@ -137,6 +137,30 @@ export async function getMaterial(id: number): Promise<MaterialItem> {
 }
 
 /**
+ * 获取素材列表
+ * @param pageNum - 页码，默认1
+ * @param pageSize - 每页数量，默认20
+ */
+export async function getMaterialList(
+  pageNum: number = 1,
+  pageSize: number = 20
+): Promise<ApiResponse<ApiPagedResponse<MaterialItem>>> {
+  const rsp = await apiClient.get<ApiResponse<ApiPagedResponse<MaterialItem>>>("/getAll", {
+    params: {
+      table: "t_material",
+      pageNum,
+      pageSize,
+    },
+  });
+
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg || "获取素材列表失败");
+  }
+
+  return rsp.data;
+}
+
+/**
  * 添加任务
  * @param task - 任务数据
  */
