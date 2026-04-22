@@ -100,6 +100,7 @@ import { Refresh, ArrowLeft, ArrowRight } from "@element-plus/icons-vue";
 import { getTaskList, type Task } from "@/api/api-task";
 import { formatDateShort, getWeekDay, getDaysDiff, generateDateRange } from "@/utils/date";
 import dayjs from "dayjs";
+import { TaskDetail } from "@/types/tasks/taskDetail";
 
 // 状态管理
 const loading = ref(false);
@@ -195,9 +196,8 @@ const getMaterialStatus = (row: any, date: Date) => {
     const task = taskList.value.find((t) => t.id === taskId);
     if (!task) return "";
 
-    const taskData = typeof task.data === "string" ? JSON.parse(task.data) : task.data;
+    const taskData: TaskDetail = typeof task.data === "string" ? JSON.parse(task.data) : task.data;
     const dailyMaterials = taskData.dailyMaterials || {};
-    const progress = taskData.progress || {};
 
     // 计算这是任务的第几天
     const diffDays = getDaysDiff(task.start_date, date);
@@ -206,17 +206,15 @@ const getMaterialStatus = (row: any, date: Date) => {
       return "";
     }
 
-    // 获取该天的素材列表
-    const dayNumber = diffDays + 1;
-    const materials = dailyMaterials[dayNumber] || [];
+    // 获取该天的素材列表（使用0-based索引）
+    const materials = dailyMaterials[diffDays] || [];
 
     // 找到当前素材
     const material = materials.find((m: any) => m.name === row.name);
     if (!material) return "";
 
     // 检查是否完成
-    const materialProgress = progress[material.id];
-    if (materialProgress && materialProgress[String(dayNumber)] === 1) {
+    if (material.status === 1) {
       return "✅";
     }
     return "❌";
@@ -302,7 +300,6 @@ const getTaskProgress = (task: Task, date: Date) => {
   try {
     const taskData = typeof task.data === "string" ? JSON.parse(task.data) : task.data;
     const dailyMaterials = taskData.dailyMaterials || {};
-    const progress = taskData.progress || {};
 
     // 计算这是任务的第几天
     const diffDays = getDaysDiff(task.start_date, date);
@@ -312,19 +309,12 @@ const getTaskProgress = (task: Task, date: Date) => {
       return "-";
     }
 
-    // 获取该天的素材列表
-    const dayNumber = diffDays + 1;
-    const materials = dailyMaterials[dayNumber] || [];
+    // 获取该天的素材列表（使用0-based索引）
+    const materials = dailyMaterials[diffDays] || [];
     const totalMaterials = materials.length;
 
-    // 从 progress 中统计完成数
-    let completedCount = 0;
-    materials.forEach((material: any) => {
-      const materialProgress = progress[material.id];
-      if (materialProgress && materialProgress[String(dayNumber)] === 1) {
-        completedCount++;
-      }
-    });
+    // 统计完成数
+    const completedCount = materials.filter((m: any) => m.status === 1).length;
 
     return `${completedCount}/${totalMaterials}`;
   } catch (error) {

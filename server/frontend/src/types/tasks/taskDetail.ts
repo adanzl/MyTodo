@@ -1,7 +1,12 @@
 
 export interface TaskDetail {
-  // key  为 material_id
-  // value 为 素材进度map
-  //   进度map 的 key 为第x天，如果有1则表示那天完成了
-  progress: Record<string, Record<string, number>>;
+  // 每日素材配置
+  // key: 天数索引（从0开始）
+  // value: 该天的素材列表
+  dailyMaterials: Record<string, Array<{
+    id: number;
+    name: string;
+    type: number;
+    status?: number; // 1表示完成，0或未定义表示未完成
+  }>>;
 }

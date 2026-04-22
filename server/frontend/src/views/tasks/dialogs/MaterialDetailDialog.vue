@@ -775,7 +775,7 @@ const saveMaterial = async () => {
     const updatedData: MaterialDetail = {
       ...existingData,
       audioList: allAudios.value,
-      pdfLength: existingData.pdfLength,
+      pdfLength: pdfPages.value.length,
       remark: coursewareForm.value.remark,
     };
 

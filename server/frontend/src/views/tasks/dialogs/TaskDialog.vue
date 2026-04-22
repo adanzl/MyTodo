@@ -202,7 +202,7 @@ const emit = defineEmits<Emits>();
 const visible = ref(props.modelValue);
 const submitting = ref(false);
 const selectedUsers = ref<number[]>([]);
-const selectedDay = ref<number>(1);
+const selectedDay = ref<number>(0);
 const showMaterialSelector = ref(false);
 const materialLoading = ref(false);
 const materialList = ref<Material[]>([]);
@@ -292,7 +292,7 @@ const resetForm = () => {
     status: 1,
   };
   selectedUsers.value = [];
-  selectedDay.value = 1;
+  selectedDay.value = 0;
   dailyMaterials.value = {};
 };
 

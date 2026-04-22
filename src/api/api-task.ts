@@ -23,15 +23,46 @@ export interface Task {
  * 任务详情数据结构
  */
 export interface TaskDetail {
-  dailyMaterials?: {
-    [day: number]: MaterialItem[];
-  };
-  progress?: {
-    [materialId: string]: {
-      [day: string]: number; // 1 表示完成
-    };
-  };
+  // 每日素材配置
+  // key: 天数索引（从0开始）
+  // value: 该天的素材列表
+  dailyMaterials: Record<
+    string,
+    Array<{
+      id: number;
+      name: string;
+      type: number;
+      status?: number; // 1表示完成，0或未定义表示未完成
+    }>
+  >;
   [key: string]: any;
+}
+
+/**
+ * 音频文件
+ */
+export interface AudioFile {
+  id: string;
+  name: string;
+  duration: string;
+  path?: string;
+}
+
+/**
+ * 页面
+ */
+export interface Page {
+  audioIds: string[];
+}
+
+/**
+ * 素材详情
+ */
+export interface MaterialDetail {
+  pdfLength?: number;
+  audioList?: AudioFile[];
+  remark?: string;
+  pages: Page[];
 }
 
 /**
@@ -40,8 +71,10 @@ export interface TaskDetail {
 export interface MaterialItem {
   id: number;
   name: string;
-  type: string; // 'reading' | 'audio' | 'video'
-  path?: string;
+  path: string;
+  cate_id: number;
+  type: number;
+  data?: string | MaterialDetail;
   [key: string]: any;
 }
 
@@ -93,6 +126,13 @@ export async function getTaskList(
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg || "获取任务列表失败");
   }
+
+  // 解析 data 字段
+  const tasks = rsp.data.data?.data || [];
+  rsp.data.data!.data = tasks.map(task => ({
+    ...task,
+    data: typeof task.data === 'string' ? JSON.parse(task.data) : task.data,
+  }));
 
   return rsp.data;
 }
@@ -158,6 +198,39 @@ export async function getMaterialList(
   }
 
   return rsp.data;
+}
+
+/**
+ * 批量获取素材详情
+ * @param ids - 素材 ID 数组
+ */
+export async function getMaterialListByIds(ids: number[]): Promise<MaterialItem[]> {
+  if (ids.length === 0) return [];
+  
+  // 构建查询条件：id IN (...)
+  const conditions = {
+    id: { in: ids }
+  };
+  
+  const rsp = await apiClient.get<ApiResponse<ApiPagedResponse<MaterialItem>>>("/getAll", {
+    params: {
+      table: "t_material",
+      conditions: JSON.stringify(conditions),
+      pageNum: 1,
+      pageSize: ids.length,
+    },
+  });
+
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg || "批量获取素材失败");
+  }
+
+  // 解析 data 字段
+  const materials = rsp.data.data?.data || [];
+  return materials.map(material => ({
+    ...material,
+    data: typeof material.data === 'string' ? JSON.parse(material.data) : material.data,
+  }));
 }
 
 /**

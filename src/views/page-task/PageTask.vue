@@ -35,17 +35,8 @@
 
       <!-- 日期导航 -->
       <div class="mb-4 flex items-center justify-between">
-        <ion-button size="small" fill="clear" @click="decreaseDays">
-          <ion-icon :icon="chevronBackOutline" slot="icon-only"></ion-icon>
-        </ion-button>
-        
         <ion-datetime-button datetime="startDatePicker"></ion-datetime-button>
-        
         <ion-button size="small" fill="clear" @click="setToday">今</ion-button>
-        
-        <ion-button size="small" fill="clear" @click="increaseDays">
-          <ion-icon :icon="chevronForwardOutline" slot="icon-only"></ion-icon>
-        </ion-button>
       </div>
 
       <ion-modal :keep-contents-mounted="true">
@@ -72,25 +63,28 @@
           <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             <template v-for="task in displayTasks" :key="task.id">
               <div
-                v-for="material in getTaskMaterials(task)"
+                v-for="material in getTaskMaterialList(task)"
                 :key="`${task.id}_${material.id}`"
-                class="relative flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow aspect-square cursor-pointer"
-                @click="openMaterialPlayer(task, material.id)"
+                class="relative flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow aspect-square cursor-pointer "
+                @click="openMaterialPlayer(task, material)"
               >
                 <!-- 任务名称角标 -->
                 <div class="absolute top-1 left-1 text-xs text-gray-500 truncate max-w-[80%]">{{ task.name }}</div>
                 
                 <ion-icon
-                  :icon="getMaterialIcon(material.type)"
-                  :color="getMaterialColor(material.type)"
-                  class="text-3xl mb-2"
+                  :icon="documentTextOutline"
+                  :color="'primary'"
+                  class="text-3xl mb-1"
                 ></ion-icon>
-                <div class="text-sm font-medium text-center line-clamp-2 mt-6">{{ material.name }}</div>
-                <ion-icon
-                  :icon="isMaterialCompleted(task, material, currentDate) ? checkmarkCircle : closeCircle"
-                  :color="isMaterialCompleted(task, material, currentDate) ? 'success' : 'danger'"
-                  class="text-xl mt-2"
-                ></ion-icon>
+                <div class="text-sm font-medium text-center line-clamp-2 mb-1">{{ material.name }}</div>
+                <div class="mb-1 text-xs items-center flex">
+                    <ion-icon
+                      :icon="checkmarkCircle"
+                      :color="isMaterialCompleted(task, material, currentDate) ? 'success' : 'light'"
+                      class="text-xl"
+                    ></ion-icon>
+                    <div class="ml-2 text-gray-600"> 页数:  {{ (material.data as any).pdfLength }}</div>
+                </div>
               </div>
             </template>
           </div>
@@ -101,14 +95,15 @@
       <MaterialPlayerDialog
         v-model:is-open="showPlayerDialog"
         :material="selectedMaterial"
+        :task="selectedTask"
       />
     </ion-content>
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { getTaskList, getMaterial, type Task } from '@/api/api-task';
-import { getMediaFileUrl } from '@/utils/file';
+import { getTaskList, getMaterialListByIds, type Task, type MaterialItem } from '@/api/api-task';
+import { getTodayStr, diffDays } from '@/utils/date-util';
 import ServerRemoteBadge from '@/components/ServerRemoteBadge.vue';
 import MaterialPlayerDialog from './dialogs/MaterialPlayerDialog.vue';
 import {
@@ -128,19 +123,15 @@ import {
 } from '@ionic/vue';
 import {
     checkmarkCircle,
-    chevronBackOutline,
-    chevronForwardOutline,
-    closeCircle,
     documentTextOutline,
-    headsetOutline,
     refreshOutline,
-    videocamOutline,
 } from 'ionicons/icons';
 import { computed, inject, onMounted, ref } from 'vue';
 
 // 状态管理
 const loading = ref(false);
 const taskList = ref<Task[]>([]);
+const materialMap = ref<Map<number, MaterialItem>>(new Map());
 const startDate = ref(new Date());
 const currentDate = ref(new Date());
 const totalCount = ref(0);
@@ -149,6 +140,7 @@ const selectedUserId = ref('0');
 // 播放弹窗状态
 const showPlayerDialog = ref(false);
 const selectedMaterial = ref<any>(null);
+const selectedTask = ref<Task | null>(null);
 
 // 获取全局变量
 const globalVar: any = inject('globalVar');
@@ -163,94 +155,72 @@ const displayTasks = computed(() => {
     return taskList.value;
 });
 
-// 格式化日期
-const getTaskMaterials = (task: Task) => {
+// 获取任务当天的素材存档列表（从 task.data 中直接获取）
+const getTaskMaterialSaveList = (task: Task): any[] => {
     try {
         const taskData = typeof task.data === 'string' ? JSON.parse(task.data) : task.data;
         const dailyMaterials = taskData.dailyMaterials || {};
 
-        // 获取当前日期的素材
-        const taskStartDate = new Date(task.start_date);
-        const diffTime = currentDate.value.getTime() - taskStartDate.getTime();
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        // 计算当前日期是任务的第几天
+        const diffDaysCount = diffDays(currentDate.value, task.start_date);
 
-        if (diffDays < 0 || diffDays >= task.duration) {
+        if (diffDaysCount < 0 || diffDaysCount >= task.duration) {
             return [];
         }
 
-        const dayNumber = diffDays + 1;
-        return dailyMaterials[dayNumber] || [];
+        // 直接返回对应天数的素材存档数组
+        return dailyMaterials[diffDaysCount] || [];
     } catch (error) {
         return [];
     }
 };
 
-// 获取素材图标
-const getMaterialIcon = (type: number) => {
-    switch (type) {
-        case 0:
-            return documentTextOutline;
-        case 1:
-            return headsetOutline;
-        case 2:
-            return videocamOutline;
-        default:
-            return documentTextOutline;
-    }
+// 获取任务当天的素材基础信息列表
+const getTaskMaterialList = (task: Task): MaterialItem[] => {
+    const saves = getTaskMaterialSaveList(task);
+    return saves
+        .map((save: any) => materialMap.value.get(save.id))
+        .filter((m): m is MaterialItem => m !== undefined);
 };
 
-// 获取素材颜色
-const getMaterialColor = (type: number) => {
-    switch (type) {
-        case 0:
-            return 'danger';
-        case 1:
-            return 'primary';
-        case 2:
-            return 'tertiary';
-        default:
-            return 'medium';
-    }
-};
 
 // 检查素材是否完成
 const isMaterialCompleted = (task: Task, material: any, date: Date) => {
     try {
         const taskData = typeof task.data === 'string' ? JSON.parse(task.data) : task.data;
-        const progress = taskData.progress || {};
-
-        const taskStartDate = new Date(task.start_date);
-        const diffTime = date.getTime() - taskStartDate.getTime();
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-        if (diffDays < 0 || diffDays >= task.duration) {
-            return false;
+        
+        // 检查 dailyMaterials 中的 status
+        if (taskData.dailyMaterials) {
+            const diffDaysCount = diffDays(date, task.start_date);
+            if (diffDaysCount < 0 || diffDaysCount >= task.duration) {
+                return false;
+            }
+            
+            const dayKey = String(diffDaysCount); // dayKey 从 0 开始
+            const materials = taskData.dailyMaterials[dayKey];
+            if (materials) {
+                const found = materials.find((m: any) => m.id === material.id);
+                return found?.status === 1;
+            }
         }
-
-        const dayNumber = diffDays + 1;
-        const materialProgress = progress[material.id];
-        return materialProgress && materialProgress[String(dayNumber)] === 1;
+        
+        return false;
     } catch (error) {
         return false;
     }
 };
 
 // 打开素材播放器
-const openMaterialPlayer = async (task: Task, materialId: number) => {
-    try {
-        const materialDetail = await getMaterial(materialId);
-        const url = getMediaFileUrl(materialDetail.path);
-        
-        selectedMaterial.value = {
-            id: materialDetail.id,
-            name: materialDetail.name,
-            type: materialDetail.type,
-            url: url,
-        };
-        showPlayerDialog.value = true;
-    } catch (error) {
-        console.error('Failed to load material:', error);
-    }
+const openMaterialPlayer = async (task: Task, material: MaterialItem) => {
+    selectedMaterial.value = {
+        id: material.id,
+        name: material.name,
+        type: material.type,
+        data: material.data,
+        path: material.path,
+    };
+    selectedTask.value = task;
+    showPlayerDialog.value = true;
 };
 
 // 获取任务列表
@@ -268,16 +238,33 @@ const fetchTaskList = async () => {
             userId = globalVar?.user?.id;
         }
 
-        // 计算今天的日期字符串（YYYY-MM-DD）
-        const today = new Date();
-        const todayStr = today.toISOString().split('T')[0];
+        const todayStr = getTodayStr();
 
         // 查询条件：start_date <= today AND end_date >= today
         const res = await getTaskList(userId, 1, 100, todayStr, todayStr);
-        
+
         if (res.code === 0 && res.data) {
             taskList.value = res.data.data || [];
             totalCount.value = res.data.totalCount || 0;
+
+            // 收集所有素材 ID
+            const materialIds = new Set<number>();
+            taskList.value.forEach(task => {
+                const saves = getTaskMaterialSaveList(task);
+                saves.forEach((save: any) => {
+                    if (save && save.id) {
+                        materialIds.add(save.id);
+                    }
+                });
+            });
+
+            // 批量获取素材详情
+            if (materialIds.size > 0) {
+                const materials = await getMaterialListByIds(Array.from(materialIds));
+                materials.forEach(material => {
+                    materialMap.value.set(material.id, material);
+                });
+            }
         }
     } catch (error: any) {
         console.error('获取任务列表失败:', error);
@@ -310,23 +297,8 @@ const setToday = () => {
     fetchTaskList();
 };
 
-// 减少天数
-const decreaseDays = () => {
-    const newDate = new Date(startDate.value);
-    newDate.setDate(newDate.getDate() - 7);
-    startDate.value = newDate;
-    currentDate.value = newDate;
-    fetchTaskList();
-};
 
-// 增加天数
-const increaseDays = () => {
-    const newDate = new Date(startDate.value);
-    newDate.setDate(newDate.getDate() + 7);
-    startDate.value = newDate;
-    currentDate.value = newDate;
-    fetchTaskList();
-};
+
 
 // 下拉刷新
 const handleRefresh = async (event: any) => {
