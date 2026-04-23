@@ -2,7 +2,7 @@
 素材管理服务
 提供素材的增删改查功能
 """
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional
 from datetime import datetime, timedelta
 import calendar as calendar_module
 import json
@@ -61,15 +61,9 @@ class TaskMgr:
                 return {"code": -1, "msg": "获取任务列表失败", "data": None}
 
             tasks = result.get('data', {}).get('data', [])
-
+                        
             calendar_data: Dict[str, Dict[str, Any]] = {}
-
-            for day in range(1, days_in_month + 1):
-                current_date = datetime(year, month, day)
-                date_key = current_date.strftime('%Y-%m-%d')
-
-                calendar_data[date_key] = {'date': date_key, 'tasks': []}
-
+                        
             for task in tasks:
                 try:
                     task_id = task.get('id')
