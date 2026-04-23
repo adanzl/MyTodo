@@ -226,7 +226,6 @@
 <script setup lang="ts">
 import { ref, watch, computed, nextTick } from "vue";
 import { ElLoading, ElMessage } from "element-plus";
-import { useRouter } from "vue-router";
 import { Picture, Headset, VideoPlay, Edit, Delete, Plus, ArrowUp, ArrowDown, Reading } from "@element-plus/icons-vue";
 import type { Material } from "@/api/api-task";
 import { updateMaterial } from "@/api/api-task";
@@ -258,7 +257,6 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<Emits>();
 
-const router = useRouter();
 const visible = ref(false);
 
 // 课件表单
@@ -822,13 +820,7 @@ const playMaterial = () => {
   // 关闭弹窗
   handleClose();
 
-  // 跳转到每日打卡预览页面，携带素材ID
-  router.push({
-    path: "/pdf-checkin",
-    query: {
-      materialId: props.materialData.id,
-    },
-  });
+  // TODO: 跳转到预览页面
 };
 
 // 跳转到编辑

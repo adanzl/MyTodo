@@ -54,36 +54,6 @@
           <el-icon><List /></el-icon>
           <template #title>阅读打卡</template>
         </el-menu-item>
-        <el-sub-menu index="pdf-checkin">
-          <template #title>
-            <el-icon><Reading /></el-icon>
-            <span>PDF阅读打卡</span>
-          </template>
-          <el-menu-item index="/daily-tasks" @click="handleMenuSelect">
-            <el-icon><List /></el-icon>
-            <template #title>每日任务</template>
-          </el-menu-item>
-          <el-menu-item index="/admin/material-library" @click="handleMenuSelect">
-            <el-icon><Folder /></el-icon>
-            <template #title>资料库管理</template>
-          </el-menu-item>
-          <el-menu-item index="/admin/courseware-generate" @click="handleMenuSelect">
-            <el-icon><DocumentAdd /></el-icon>
-            <template #title>课件生成</template>
-          </el-menu-item>
-          <el-menu-item index="/admin/audio-edit" @click="handleMenuSelect">
-            <el-icon><Headset /></el-icon>
-            <template #title>课件生成-编辑音频</template>
-          </el-menu-item>
-          <el-menu-item index="/admin/task-settings" @click="handleMenuSelect">
-            <el-icon><SetUp /></el-icon>
-            <template #title>任务设置</template>
-          </el-menu-item>
-          <el-menu-item index="/admin/task-status" @click="handleMenuSelect">
-            <el-icon><DataAnalysis /></el-icon>
-            <template #title>任务状态</template>
-          </el-menu-item>
-        </el-sub-menu>
       </el-menu>
     </el-scrollbar>
   </el-aside>
@@ -103,13 +73,7 @@ import {
   Platform,
   Setting,
   PieChart,
-  Reading,
   List,
-  Folder,
-  DocumentAdd,
-  Headset,
-  SetUp,
-  DataAnalysis,
 } from "@element-plus/icons-vue";
 import { useUserStore } from "@/stores/user";
 
