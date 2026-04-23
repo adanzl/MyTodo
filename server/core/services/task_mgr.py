@@ -40,8 +40,17 @@ class TaskMgr:
             month = target_date.month
 
             days_in_month = calendar_module.monthrange(year, month)[1]
+            month_start = datetime(year, month, 1)
+            month_end = datetime(year, month, days_in_month, 23, 59, 59)
 
-            conditions: Dict[str, Any] = {}
+            conditions: Dict[str, Any] = {
+                'start_date': {
+                    '<=': month_end.strftime('%Y-%m-%d')
+                },
+                'end_date': {
+                    '>=': month_start.strftime('%Y-%m-%d')
+                }
+            }
             if user_id and user_id > 0:
                 conditions['user_id'] = {'like': f'%{user_id}%'}
 
@@ -113,7 +122,10 @@ class TaskMgr:
                     'year': year,
                     'month': month,
                     'days_in_month': days_in_month,
-                    'calendar': calendar_data
+                    'calendar': {
+                        item['date']: item
+                        for item in calendar_list
+                    }
                 }
             }
 
