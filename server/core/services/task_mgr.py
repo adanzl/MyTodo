@@ -61,9 +61,9 @@ class TaskMgr:
                 return {"code": -1, "msg": "获取任务列表失败", "data": None}
 
             tasks = result.get('data', {}).get('data', [])
-                        
+
             calendar_data: Dict[str, Dict[str, Any]] = {}
-                        
+
             for task in tasks:
                 try:
                     task_id = task.get('id')
@@ -88,6 +88,9 @@ class TaskMgr:
                             continue
 
                         date_key = current_date.strftime('%Y-%m-%d')
+
+                        if date_key not in calendar_data:
+                            calendar_data[date_key] = {'date': date_key, 'tasks': []}
 
                         materials_for_day = daily_materials.get(str(day_offset), [])
 
