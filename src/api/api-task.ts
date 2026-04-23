@@ -322,6 +322,56 @@ export async function updateTaskProgress(
     ...task,
     data: taskData,
   });
+}/**
+ * 任务日历数据结构
+ */
+export interface TaskCalendarItem {
+  date: string;
+  tasks: Array<{
+    task_id: number;
+    task_name: string;
+    completed: number;
+    total: number;
+    materials: Array<{
+      id: number;
+      name: string;
+      type: number;
+      status?: number;
+    }>;
+  }>;
 }
+
+/**
+ * 任务日历响应数据
+ */
+export interface TaskCalendarResponse {
+  calendar: Record<string, TaskCalendarItem>;
+  year: number;
+  month: number;
+  days_in_month: number;
+}
+
+/**
+ * 获取任务日历
+ * @param date - 日期(格式 YYYY-MM-DD)
+ * @param userId - 用户ID(可选)
+ */
+export async function getTaskCalendar(date: string, userId?: number): Promise<TaskCalendarResponse> {
+  const params: any = { date };
+  
+  if (userId && userId > 0) {
+    params.user_id = userId;
+  }
+  
+  const rsp = await apiClient.post<ApiResponse<TaskCalendarResponse>>("/task/calendar", params);
+
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg || "获取任务日历失败");
+  }
+
+  return rsp.data.data!;
+}
+
+
 
 

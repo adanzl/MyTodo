@@ -34,19 +34,13 @@
       </div>
 
       <!-- 日期导航 -->
-      <div class="mb-4 flex items-center justify-between">
-        <ion-datetime-button datetime="startDatePicker"></ion-datetime-button>
-        <ion-button size="small" fill="clear" @click="setToday">今</ion-button>
+      <div class="mb-4 flex items-center gap-2">
+        <ion-button fill="clear" color="primary" @click="btnCalendarClk">
+            <ion-icon slot="start" :icon="calendarOutline"></ion-icon>
+            <span class="ml-2">{{ currentDateStr }}</span>
+        </ion-button>
+        <ion-button size="small" fill="outline" @click="setToday">今</ion-button>
       </div>
-
-      <ion-modal :keep-contents-mounted="true">
-        <ion-datetime
-          id="startDatePicker"
-          presentation="date"
-          :value="startDate.toISOString()"
-          @ionChange="handleDateChange"
-        ></ion-datetime>
-      </ion-modal>
 
       <!-- 任务列表 -->
       <div v-if="loading" class="flex justify-center items-center py-10">
@@ -101,6 +95,13 @@
         :material="selectedMaterial"
         :task="selectedTask"
       />
+
+      <!-- 任务日历弹窗 -->
+      <TaskCalendar
+        v-model:is-open="showCalendarDialog"
+        :selected-date="currentDateStr"
+        @date-selected="handleDateSelected"
+      />
     </ion-content>
   </ion-page>
 </template>
@@ -110,13 +111,11 @@ import { getTaskList, getMaterialListByIds, type Task, type MaterialItem } from 
 import { getTodayStr, diffDays } from '@/utils/date-util';
 import ServerRemoteBadge from '@/components/ServerRemoteBadge.vue';
 import MaterialPlayerDialog from './dialogs/MaterialPlayerDialog.vue';
+import TaskCalendar from './dialogs/TaskCalendar.vue';
 import {
     IonButtons,
-    IonDatetime,
-    IonDatetimeButton,
     IonHeader,
     IonLabel,
-    IonModal,
     IonPage,
     IonRefresher,
     IonRefresherContent,
@@ -126,6 +125,7 @@ import {
     IonToolbar
 } from '@ionic/vue';
 import {
+    calendarOutline,
     checkmarkCircle,
     documentTextOutline,
     refreshOutline,
@@ -145,6 +145,14 @@ const selectedUserId = ref('0');
 const showPlayerDialog = ref(false);
 const selectedMaterial = ref<any>(null);
 const selectedTask = ref<Task | null>(null);
+
+// 日历弹窗状态
+const showCalendarDialog = ref(false);
+
+// 当前日期字符串
+const currentDateStr = computed(() => {
+    return currentDate.value.toISOString().split('T')[0];
+});
 
 // 获取全局变量
 const globalVar: any = inject('globalVar');
@@ -287,13 +295,6 @@ const handleUserChange = () => {
     fetchTaskList();
 };
 
-// 日期变化
-const handleDateChange = (event: any) => {
-    startDate.value = new Date(event.detail.value);
-    currentDate.value = new Date(event.detail.value);
-    fetchTaskList();
-};
-
 // 设置为今天
 const setToday = () => {
     startDate.value = new Date();
@@ -301,7 +302,15 @@ const setToday = () => {
     fetchTaskList();
 };
 
+// 处理日期选择
+const handleDateSelected = (dateStr: string) => {
+    currentDate.value = new Date(dateStr);
+    fetchTaskList();
+};
 
+const btnCalendarClk = () => {
+    showCalendarDialog.value = true;
+};
 
 
 // 下拉刷新

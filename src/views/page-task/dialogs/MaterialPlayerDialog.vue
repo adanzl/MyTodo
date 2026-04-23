@@ -75,7 +75,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, onMounted, onUnmounted } from 'vue';
 import {
     IonModal,
     IonHeader,
@@ -390,9 +390,17 @@ watch(
 
 // 监听窗口大小变化，判断横竖屏
 const checkOrientation = () => {
-    isLandscape.value = window.innerWidth > window.innerHeight;
+    if (typeof window !== 'undefined') {
+        isLandscape.value = window.innerWidth > window.innerHeight;
+    }
 };
 
-window.addEventListener('resize', checkOrientation);
-checkOrientation();
+onMounted(() => {
+    checkOrientation();
+    window.addEventListener('resize', checkOrientation);
+});
+
+onUnmounted(() => {
+    window.removeEventListener('resize', checkOrientation);
+});
 </script>
