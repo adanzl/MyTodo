@@ -25,7 +25,7 @@ class CalendarQuery(BaseModel):
     user_id: int | None = None
 
 
-@task_bp.route('/calendar', methods=['POST'])
+@task_bp.route('/task/calendar', methods=['POST'])
 def get_calendar() -> ResponseReturnValue:
     """查询任务日历，返回当月每天的任务素材完成情况"""
     json_data = read_json_from_request()
