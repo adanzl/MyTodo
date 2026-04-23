@@ -269,7 +269,7 @@ onBeforeUnmount(() => {
       @ionInput="onSeek($event)"
       @ionChange="onSeek($event)">
     </ion-range>
-    <span v-if="showTimeLabel" class="text-xs text-gray-600 shrink-0 min-w-16 tabular-nums">
+    <span v-if="showTimeLabel" class="text-xs text-gray-600 tabular-nums whitespace-nowrap">
       {{ formattedCurrent }} / {{ formattedDuration }}
     </span>
   </div>

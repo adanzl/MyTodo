@@ -21,8 +21,8 @@
             <div class="flex gap-2 max-w-full max-h-full" :class="isLandscape ? 'flex-row' : 'flex-col'">
               <!-- 左页/单页 -->
               <canvas ref="pdfCanvasLeft" class="shadow-md bg-white object-contain" :style="canvasStyle"></canvas>
-              <!-- 右页（横屏时显示） -->
-              <canvas v-if="isLandscape" ref="pdfCanvasRight" class="shadow-md bg-white object-contain" :style="canvasStyle"></canvas>
+              <!-- 右页（横屏时显示，但最后一页且总页数为奇数时不显示） -->
+              <canvas v-if="isLandscape && !isLastPageOdd" ref="pdfCanvasRight" class="shadow-md bg-white object-contain" :style="canvasStyle"></canvas>
             </div>
           </div>
           <div v-if="loading" class="absolute inset-0 flex justify-center items-center bg-white bg-opacity-80">
@@ -42,7 +42,7 @@
               :show-play-button="false"
             />
             <div class="text-sm text-gray-600">
-                {{ audioInfo }} {{ currentAudioSrcs.length > 1 ? `(${audioIdx + 1}/${currentAudioSrcs.length})` : '' }}
+                {{ currentAudioSrcs.length > 1 ? `(${audioIdx + 1}/${currentAudioSrcs.length})` : '' }}
             </div>
           </div>
           
@@ -53,13 +53,13 @@
             <ion-button fill="outline" :disabled="!currentAudioSrcs.length" @click="playAudio">
               <ion-icon slot="icon-only" :icon="isAudioPlaying ? pauseOutline : playOutline" />
             </ion-button>
-            <ion-button fill="outline" :disabled="currentPage >= totalPages - (isLandscape ? 1 : 0)" @click="nextPage">
+            <ion-button fill="outline" :disabled="currentPage >= getLastPagePosition" @click="nextPage">
               <ion-icon slot="icon-only" :icon="chevronForwardOutline" />
             </ion-button>
           </div>
           
           <div class="flex-1 flex justify-end">
-            <ion-button v-if="currentPage >= totalPages - (isLandscape ? 1 : 0)" color="success" @click="completeReading">
+            <ion-button v-if="currentPage >= getLastPagePosition" color="success" :disabled="isMaterialCompleted" @click="completeReading">
               完成
             </ion-button>
           </div>
@@ -152,6 +152,33 @@ const canvasStyle = computed(() => {
     };
 });
 
+// 判断是否是最后一页且总页数为奇数（横屏时只显示一页）
+const isLastPageOdd = computed(() => {
+    return isLandscape.value && 
+           totalPages.value % 2 === 1 && 
+           currentPage.value === totalPages.value;
+});
+
+// 判断当前素材是否已完成
+const isMaterialCompleted = computed(() => {
+    if (!props.material || !props.task) return false;
+    
+    const taskData = typeof props.task.data === 'string' 
+        ? JSON.parse(props.task.data) 
+        : props.task.data;
+    
+    if (taskData.dailyMaterials) {
+        for (const dayKey in taskData.dailyMaterials) {
+            const materials = taskData.dailyMaterials[dayKey];
+            const material = materials.find((m: any) => m.id === props.material?.id);
+            if (material && material.status === 1) {
+                return true;
+            }
+        }
+    }
+    return false;
+});
+
 // 关闭弹窗
 const handleDismiss = () => {
     stopAudio();
@@ -190,8 +217,8 @@ const renderPages = async () => {
         await renderPageToCanvas(currentPage.value, pdfCanvasLeft.value);
     }
 
-    // 渲染右页（横屏时）
-    if (isLandscape.value && pdfCanvasRight.value) {
+    // 渲染右页（横屏时，且不是最后一页奇数情况）
+    if (isLandscape.value && pdfCanvasRight.value && !isLastPageOdd.value) {
         const rightPageNum = currentPage.value + 1;
         if (rightPageNum <= totalPages.value) {
             await renderPageToCanvas(rightPageNum, pdfCanvasRight.value);
@@ -204,7 +231,7 @@ const renderPages = async () => {
     // 更新音频信息
     const audios = getCurrentPageAudios();
     if (audios.length > 0) {
-        audioInfo.value = ` ${audios.length} 个音频`;
+        audioInfo.value = ` ${audios.length} 音频`;
         // 自动加载所有音频
         currentAudioSrcs.value = audios.map((audio: any) => getMediaFileUrl(audio.path));
     } else {
@@ -252,6 +279,16 @@ const nextPage = () => {
         renderPages();
     }
 };
+
+// 获取当前应该显示的最后一页位置（用于判断按钮禁用和完成按钮显示）
+const getLastPagePosition = computed(() => {
+    if (isLandscape.value && totalPages.value % 2 === 1) {
+        // 横屏且总页数为奇数，最后一页单独显示
+        return totalPages.value;
+    }
+    // 其他情况，最后一页位置是 totalPages - 1（横屏）或 totalPages（竖屏）
+    return isLandscape.value ? totalPages.value - 1 : totalPages.value;
+});
 
 // 获取当前页的音频列表
 const getCurrentPageAudios = () => {

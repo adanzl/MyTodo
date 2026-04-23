@@ -53,7 +53,8 @@
             </el-col>
             <el-col :span="12">
               <el-form-item label="总天数" required>
-                <el-input-number v-model="formData.duration" :min="1" :max="365" class="w-10" />
+                <el-input-number v-model="formData.duration" :min="1" :max="365" class="w-10" size="small" />
+                <span class="ml-2 text-xs text-gray-600">到 {{ endDateStr }} 结束</span>
               </el-form-item>
             </el-col>
           </el-row>
@@ -74,22 +75,22 @@
           <!-- 左侧：天数列表 -->
           <div class="day-list w-48 border-r overflow-y-auto">
             <div
-              v-for="day in formData.duration || 1"
-              :key="day"
+              v-for="dayIndex in Array.from({ length: formData.duration || 1 }, (_, i) => i)"
+              :key="dayIndex"
               class="p-3 cursor-pointer hover:bg-gray-100 transition-all duration-200"
-              :class="{ 'bg-blue-50 border-l-4 border-blue-500': selectedDay === day }"
-              @click="selectedDay = day"
+              :class="{ 'bg-blue-50 border-l-4 border-blue-500': selectedDay === dayIndex }"
+              @click="selectedDay = dayIndex"
             >
-              <div class="font-medium">第{{ day }}天</div>
+              <div class="font-medium">第{{ dayIndex + 1 }}天</div>
               <div class="text-xs text-gray-500 mt-1">
-                {{ getDayMaterialCount(day) }} 个素材
+                {{ getDayMaterialCount(dayIndex) }} 个素材
               </div>
             </div>
           </div>
 
           <!-- 右侧：素材内容 -->
           <div class="material-content flex-1 p-4 overflow-y-auto">
-            <div v-if="!selectedDay" class="text-center text-gray-400 py-20">
+            <div v-if="selectedDay === -1" class="text-center text-gray-400 py-20">
               请选择左侧的天数
             </div>
             <div v-else>
@@ -175,7 +176,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from "vue";
+import { ref, watch, nextTick, computed } from "vue";
 import { ElMessage } from "element-plus";
 import { Plus } from "@element-plus/icons-vue";
 import { addTask, updateTask, getMaterialList, getMaterialCategoryList, type Task, type Material, type MaterialCategory } from "@/api/api-task";
@@ -202,7 +203,7 @@ const emit = defineEmits<Emits>();
 const visible = ref(props.modelValue);
 const submitting = ref(false);
 const selectedUsers = ref<number[]>([]);
-const selectedDay = ref<number>(0);
+const selectedDay = ref<number>(-1);
 const showMaterialSelector = ref(false);
 const materialLoading = ref(false);
 const materialList = ref<Material[]>([]);
@@ -220,6 +221,12 @@ const formData = ref<Partial<Task>>({
   duration: 1,
   user_id: "",
   status: 1,
+});
+
+// 计算结束日期
+const endDateStr = computed(() => {
+  if (!formData.value.start_date || !formData.value.duration) return '';
+  return dayjs(formData.value.start_date).add((formData.value.duration || 1) - 1, 'day').format('MM月DD日');
 });
 
 // 监听外部传入的 taskData
@@ -255,9 +262,14 @@ watch(
       } else {
         dailyMaterials.value = {};
       }
+
+      // 默认选中第一天
+      selectedDay.value = 0;
     } else {
       // 新建模式，初始化空数据
       dailyMaterials.value = {};
+      // 默认选中第一天
+      selectedDay.value = 0;
     }
   },
   { immediate: true, deep: true }
@@ -268,6 +280,16 @@ watch(
   () => props.modelValue,
   (newVal) => {
     visible.value = newVal;
+  }
+);
+
+// 监听 duration 变化，确保选中第一天
+watch(
+  () => formData.value.duration,
+  (newDuration) => {
+    if (newDuration && newDuration > 0) {
+      selectedDay.value = 0;
+    }
   }
 );
 
@@ -292,7 +314,7 @@ const resetForm = () => {
     status: 1,
   };
   selectedUsers.value = [];
-  selectedDay.value = 0;
+  selectedDay.value = -1;
   dailyMaterials.value = {};
 };
 

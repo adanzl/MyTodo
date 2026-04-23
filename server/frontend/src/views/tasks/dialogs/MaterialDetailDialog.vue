@@ -272,6 +272,7 @@ interface PdfPage {
   id: string;
   name: string;
   thumbnail: string;
+  audioIds?: string[];
 }
 
 const pdfPages = ref<PdfPage[]>([]);
@@ -398,7 +399,7 @@ watch(visible, (val) => {
 });
 
 // 加载 PDF 并生成缩略图
-const loadPdfPages = async (pdfPath: string) => {
+const loadPdfPages = async (pdfPath: string, materialDetail: MaterialDetail | null) => {
   pdfLoading.value = true;
   try {
     // 转换文件路径为 URL
@@ -443,10 +444,14 @@ const loadPdfPages = async (pdfPath: string) => {
         // 转换为 base64
         const thumbnail = canvas.toDataURL("image/jpeg", 0.9);
 
+        // 从 pages 数据中获取绑定的音频 ID
+        const pageData = materialDetail?.pages?.[pageNum - 1];
+
         pages.push({
           id: String(pageNum),
           name: `第${pageNum}页`,
           thumbnail: thumbnail,
+          audioIds: pageData?.audioIds || [],
         });
       }
     }
@@ -496,7 +501,7 @@ const initDetail = async () => {
   // 根据素材类型加载不同的数据
   if (props.materialData.type === 0 && props.materialData.path) {
     // PDF 类型 - 使用 pdf.js 加载
-    await loadPdfPages(props.materialData.path);
+    await loadPdfPages(props.materialData.path, materialDetail);
     // 从 data 中加载音频列表
     allAudios.value = materialDetail?.audioList || [];
 

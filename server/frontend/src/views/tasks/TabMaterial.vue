@@ -87,12 +87,17 @@
 
     <!-- 分类管理对话框 -->
     <CategoryDialog v-model="categoryDialogVisible" @change="handleCategoryChange" />
+
+    <!-- 素材预览弹窗 -->
+    <MaterialPreviewDialog
+      v-model="previewDialogVisible"
+      :material-id="previewMaterialId"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import { useRouter } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Edit, Refresh, Reading } from "@element-plus/icons-vue";
 import {
@@ -104,8 +109,8 @@ import {
 import CategoryDialog from "./dialogs/CategoryDialog.vue";
 import MaterialDialog from "./dialogs/MaterialDialog.vue";
 import MaterialDetailDialog from "./dialogs/MaterialDetailDialog.vue";
+import MaterialPreviewDialog from "./dialogs/MaterialPreviewDialog.vue";
 
-const router = useRouter();
 
 // 状态管理
 const loading = ref(false);
@@ -120,6 +125,8 @@ const categoryList = ref<{ id: number; name: string }[]>([]);
 // 对话框
 const materialDialogVisible = ref(false);
 const detailDialogVisible = ref(false);
+const previewDialogVisible = ref(false);
+const previewMaterialId = ref<number | null>(null);
 const isMaterialEdit = ref(false);
 const currentMaterial = ref<Partial<Material>>({});
 
@@ -275,12 +282,9 @@ const playMaterial = (row: Material) => {
   // 将完整的素材数据通过 sessionStorage 传递
   sessionStorage.setItem('previewMaterial', JSON.stringify(row));
 
-  router.push({
-    path: "/tasks-preview",
-    query: {
-      materialId: row.id,
-    },
-  });
+  // 打开预览弹窗
+  previewMaterialId.value = row.id;
+  previewDialogVisible.value = true;
 };
 
 // 获取分类名称

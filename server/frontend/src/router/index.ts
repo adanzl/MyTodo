@@ -56,11 +56,6 @@ const routes: RouteRecordRaw[] = [
     name: "Tasks",
     component: () => import("@/views/tasks/PageTasks.vue"),
   },
-  {
-    path: "/tasks-preview",
-    name: "TasksPreview",
-    component: () => import("@/views/tasks/PageTasksPreview.vue"),
-  },
   // PDF阅读打卡系统 - 前台用户端
   {
     path: "/daily-tasks",

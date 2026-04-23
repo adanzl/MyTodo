@@ -65,26 +65,30 @@
               <div
                 v-for="material in getTaskMaterialList(task)"
                 :key="`${task.id}_${material.id}`"
-                class="relative flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow aspect-square cursor-pointer "
+                class="relative flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow aspect-square cursor-pointer"
                 @click="openMaterialPlayer(task, material)"
               >
                 <!-- 任务名称角标 -->
-                <div class="absolute top-1 left-1 text-xs text-gray-500 truncate max-w-[80%]">{{ task.name }}</div>
+                <div class="absolute top-2 left-3 text-xs text-gray-500 truncate max-w-[80%] flex gap-2 items-center">
+                    <ion-icon
+                      :icon="checkmarkCircle"
+                      class="text-xl"
+                      :class="isMaterialCompleted(task, material, currentDate) ? 'text-green-400' : 'text-gray-300'"
+                    ></ion-icon>
+                    {{ task.name }}
+                </div>
                 
                 <ion-icon
                   :icon="documentTextOutline"
                   :color="'primary'"
-                  class="text-3xl mb-1"
+                  class="text-4xl mb-1 mt-6"
                 ></ion-icon>
                 <div class="text-sm font-medium text-center line-clamp-2 mb-1">{{ material.name }}</div>
-                <div class="mb-1 text-xs items-center flex">
-                    <ion-icon
-                      :icon="checkmarkCircle"
-                      :color="isMaterialCompleted(task, material, currentDate) ? 'success' : 'light'"
-                      class="text-xl"
-                    ></ion-icon>
-                    <div class="ml-2 text-gray-600"> 页数:  {{ (material.data as any).pdfLength }}</div>
+                <div class="mb-1 text-xs items-center flex gap-2">
+  
+                    <div class=" text-gray-600"> 页数:  {{ (material.data as any).pdfLength }}</div>
                 </div>
+                <div class=" text-[10px] flex items-center"> 点击阅读</div>
               </div>
             </template>
           </div>
@@ -188,14 +192,14 @@ const getTaskMaterialList = (task: Task): MaterialItem[] => {
 const isMaterialCompleted = (task: Task, material: any, date: Date) => {
     try {
         const taskData = typeof task.data === 'string' ? JSON.parse(task.data) : task.data;
-        
+
         // 检查 dailyMaterials 中的 status
         if (taskData.dailyMaterials) {
             const diffDaysCount = diffDays(date, task.start_date);
             if (diffDaysCount < 0 || diffDaysCount >= task.duration) {
                 return false;
             }
-            
+
             const dayKey = String(diffDaysCount); // dayKey 从 0 开始
             const materials = taskData.dailyMaterials[dayKey];
             if (materials) {
@@ -203,7 +207,7 @@ const isMaterialCompleted = (task: Task, material: any, date: Date) => {
                 return found?.status === 1;
             }
         }
-        
+
         return false;
     } catch (error) {
         return false;
