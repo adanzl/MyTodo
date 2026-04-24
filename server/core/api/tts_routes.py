@@ -72,8 +72,8 @@ class _TTSAnalyzeBody(BaseModel):
 def create_tts_task() -> ResponseReturnValue:
     json_data = read_json_from_request()
     body, err = parse_with_model(_CreateTTSTaskBody, json_data, err_factory=_err)
-    if err:
-        return err
+    if err or not body:
+        return err or _err("Invalid request body")
     create_kwargs = {
         'text': body.text,
         'name': body.name,
@@ -94,8 +94,8 @@ def create_tts_task() -> ResponseReturnValue:
 def update_tts_task() -> ResponseReturnValue:
     json_data = read_json_from_request()
     body, err = parse_with_model(_UpdateTTSTaskBody, json_data, err_factory=_err)
-    if err:
-        return err
+    if err or not body:
+        return err or _err("Invalid request body")
     code, msg = tts_mgr.update_task(
         task_id=body.task_id,
         name=body.name,
@@ -114,8 +114,8 @@ def update_tts_task() -> ResponseReturnValue:
 def start_tts_task() -> ResponseReturnValue:
     json_data = read_json_from_request()
     body, err = parse_with_model(_TaskIdBody, json_data, err_factory=_err)
-    if err:
-        return err
+    if err or not body:
+        return err or _err("Invalid request body")
     code, msg = tts_mgr.start_task(body.task_id)
     if code != 0:
         return _err(msg)
@@ -126,8 +126,8 @@ def start_tts_task() -> ResponseReturnValue:
 def stop_tts_task() -> ResponseReturnValue:
     json_data = read_json_from_request()
     body, err = parse_with_model(_TaskIdBody, json_data, err_factory=_err)
-    if err:
-        return err
+    if err or not body:
+        return err or _err("Invalid request body")
     code, msg = tts_mgr.stop_task(body.task_id)
     if code != 0:
         return _err(msg)
@@ -138,8 +138,8 @@ def stop_tts_task() -> ResponseReturnValue:
 def delete_tts_task() -> ResponseReturnValue:
     json_data = read_json_from_request()
     body, err = parse_with_model(_TaskIdBody, json_data, err_factory=_err)
-    if err:
-        return err
+    if err or not body:
+        return err or _err("Invalid request body")
     code, msg = tts_mgr.delete_task(body.task_id)
     if code != 0:
         return _err(msg)
@@ -250,8 +250,8 @@ def tts_ocr() -> ResponseReturnValue:
         # 合并 form-data 和 query 参数，使用 parse_with_model 验证
         args_data = {**request.form.to_dict(), **request.args.to_dict()}
         body, err = parse_with_model(_TTSOCRBody, args_data, err_factory=_err)
-        if err:
-            return err
+        if err or not body:
+            return err or _err("Invalid request body")
         task_id = body.task_id
 
         # 检查是否有上传的文件
@@ -264,7 +264,7 @@ def tts_ocr() -> ResponseReturnValue:
 
         # 保存上传的文件到临时目录
         image_paths, temp_dir = save_uploaded_files(files, temp_prefix='tts_ocr_')
-        if image_paths is None:
+        if image_paths is None or temp_dir is None:
             return _err("保存上传文件失败或没有有效的图片文件")
 
         # 启动 OCR 任务（异步执行）
@@ -302,8 +302,8 @@ def tts_analyze() -> ResponseReturnValue:
     try:
         json_data = read_json_from_request()
         body, err = parse_with_model(_TTSAnalyzeBody, json_data, err_factory=_err)
-        if err:
-            return err
+        if err or not body:
+            return err or _err("Invalid request body")
 
         code, msg = tts_mgr.start_analyze_article_task(body.task_id)
         if code != 0:

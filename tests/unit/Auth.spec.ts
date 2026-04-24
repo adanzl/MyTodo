@@ -4,6 +4,7 @@
 import {
   clearLoginCache,
   getAccessToken,
+  getRefreshToken,
   getTokenExpiresAt,
   login,
   logout,
@@ -58,27 +59,35 @@ describe("Auth", () => {
   });
 
   describe("clearLoginCache", () => {
-    it("移除 access_token、access_token_expires_at、saveUser、bAuth", () => {
+    it("移除 access_token、access_token_expires_at、refresh_token、saveUser、bAuth", () => {
       localStorage.setItem("access_token", "x");
       localStorage.setItem("access_token_expires_at", "123");
+      localStorage.setItem("refresh_token", "rt");
       localStorage.setItem("saveUser", "1");
       localStorage.setItem("bAuth", "1");
       clearLoginCache();
       expect(localStorage.getItem("access_token")).toBeNull();
       expect(localStorage.getItem("access_token_expires_at")).toBeNull();
+      expect(localStorage.getItem("refresh_token")).toBeNull();
       expect(localStorage.getItem("saveUser")).toBeNull();
       expect(localStorage.getItem("bAuth")).toBeNull();
     });
   });
 
   describe("login", () => {
-    it("成功且返回 access_token 时写入 localStorage", async () => {
+    it("成功且返回 access_token 时写入 localStorage；有 refresh_token 时一并存", async () => {
       mockPost.mockResolvedValueOnce({
-        data: { code: 0, access_token: "new_token", expires_in: 3600 },
+        data: {
+          code: 0,
+          access_token: "new_token",
+          refresh_token: "ref_rtk",
+          expires_in: 3600,
+        },
       });
       const result = await login(baseUrl, "user", "pass");
       expect(result.access_token).toBe("new_token");
       expect(getAccessToken()).toBe("new_token");
+      expect(getRefreshToken()).toBe("ref_rtk");
       expect(mockPost).toHaveBeenCalledWith(
         "https://example.com/api/auth/login",
         { username: "user", password: "pass" },
@@ -109,27 +118,36 @@ describe("Auth", () => {
   });
 
   describe("refreshToken", () => {
-    it("有旧 token 时请求头带 Authorization", async () => {
+    it("有 access 与 refresh 时 body 为 refresh_token，且头带 Authorization", async () => {
       setAccessToken("old_token");
+      localStorage.setItem("refresh_token", "the_rtk");
       mockPost.mockResolvedValueOnce({
         data: { access_token: "new_token", expires_in: 3600 },
       });
       await refreshToken(baseUrl);
       expect(mockPost).toHaveBeenCalledWith(
-        expect.any(String),
-        {},
+        "https://example.com/api/auth/refresh",
+        { refresh_token: "the_rtk" },
         expect.objectContaining({
-          headers: { Authorization: "Bearer old_token" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer old_token",
+          },
         })
       );
       expect(getAccessToken()).toBe("new_token");
     });
 
-    it("无旧 token 时请求头可为空对象", async () => {
+    it("无 refresh_token 时发空 body（仍可依赖 Cookie 续期）", async () => {
       mockPost.mockResolvedValueOnce({
         data: { access_token: "fresh", expires_in: 3600 },
       });
       await refreshToken(baseUrl);
+      expect(mockPost).toHaveBeenCalledWith(
+        "https://example.com/api/auth/refresh",
+        {},
+        expect.objectContaining({ headers: { "Content-Type": "application/json" } })
+      );
       expect(getAccessToken()).toBe("fresh");
     });
 

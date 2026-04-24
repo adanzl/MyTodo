@@ -7,8 +7,8 @@ from typing import Any, Dict
 
 from flask import Blueprint, jsonify
 from flask.typing import ResponseReturnValue
-from flask_jwt_extended import (create_access_token, create_refresh_token, get_jwt_identity, jwt_required,
-                                set_refresh_cookies, unset_jwt_cookies)
+from flask_jwt_extended import (create_access_token, create_refresh_token, decode_token, get_jwt_identity,
+                                set_refresh_cookies, unset_jwt_cookies, verify_jwt_in_request)
 
 from core.config import app_logger, config
 from core.db import db_obj
@@ -23,10 +23,7 @@ auth_bp = Blueprint('auth', __name__)
 
 @auth_bp.route("/auth/login", methods=["POST"])
 def auth_login() -> ResponseReturnValue:
-    """Username/password login.
-
-    Returns access_token in JSON and sets refresh_token as HttpOnly cookie.
-    """
+    """Return access+refresh in JSON, also Set-Cookie for same-origin web."""
     try:
         data: Dict[str, Any] = read_json_from_request()
         username = str(data.get('username') or '').strip()
@@ -70,6 +67,7 @@ def auth_login() -> ResponseReturnValue:
             "code": 0,
             "msg": "ok",
             "access_token": access_token,
+            "refresh_token": refresh_token,
             "expires_in": int(access_expires.total_seconds()),
             "user": user.to_dict(),
         })
@@ -82,9 +80,30 @@ def auth_login() -> ResponseReturnValue:
 
 
 @auth_bp.route("/auth/refresh", methods=["POST"])
-@jwt_required(refresh=True)
 def auth_refresh() -> ResponseReturnValue:
-    identity = get_jwt_identity()
+    """JSON `refresh_token` or cookie + verify_jwt (refresh)."""
+    data: Dict[str, Any] = read_json_from_request() or {}
+    body_rt = str(data.get("refresh_token") or "").strip()
+    identity: Any = None
+    if body_rt:
+        try:
+            claims = decode_token(body_rt)
+        except Exception as e:
+            log.warning("[Auth] refresh decode: %s", e)
+            return {"code": -1, "msg": "invalid refresh token"}, 401
+        ttype = claims.get("type") or claims.get("token_type")
+        if str(ttype or "").lower() != "refresh":
+            return {"code": -1, "msg": "invalid token type"}, 401
+        identity = claims.get("sub")
+    else:
+        try:
+            verify_jwt_in_request(refresh=True)
+            identity = get_jwt_identity()
+        except Exception as e:
+            log.warning("[Auth] refresh verify: %s", e)
+            return {"code": -1, "msg": "unauthorized"}, 401
+    if identity is None:
+        return {"code": -1, "msg": "unauthorized"}, 401
     access_expires = timedelta(days=int(config.JWT_ACCESS_DAYS))
     access_token = create_access_token(identity=identity, expires_delta=access_expires)
     return {

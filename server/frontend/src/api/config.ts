@@ -4,7 +4,7 @@
 import axios, { type AxiosError, type AxiosRequestConfig, type AxiosResponse } from "axios";
 import { logAndNoticeError } from "@/utils/error";
 import { logger } from "@/utils/logger";
-import { getAccessToken, getTokenExpiresAt, refreshToken, setAccessToken } from "./api-auth";
+import { getAccessToken, getTokenExpiresAt, notifyAuthSessionExpired, refreshToken, setAccessToken } from "./api-auth";
 
 // 与原版保持一致：支持远程和本地配置
 const REMOTE = {
@@ -189,7 +189,11 @@ async function ensureRefreshed(): Promise<string | null> {
     notifyRefreshWaiters(token);
     return token;
   } catch (e) {
-    setAccessToken(null);
+    const status = (e as AxiosError).response?.status;
+    if (status === 401) {
+      setAccessToken(null);
+      // 跳转登录由 /auth/refresh 401 的响应拦截分支统一 notify，避免与 ensure 重复
+    }
     notifyRefreshWaiters(null);
     throw e;
   } finally {
@@ -294,16 +298,25 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // 401 或 422（token 签名验证失败）-> 清除旧 token、尝试 refresh、重试一次
+    const urlStr = String(cfg?.url || "");
+    if (urlStr.includes("/auth/refresh") && error.response?.status === 401) {
+      setAccessToken(null);
+      notifyAuthSessionExpired();
+      return Promise.reject(error);
+    }
+
+    // 401 或 422（token 签名验证失败）-> 尝试 refresh 重试一次
+    const isRefreshRequest = urlStr.includes("/auth/refresh");
     const isTokenError =
-      error.response?.status === 401 ||
-      (error.response?.status === 422 &&
-        /signature|token|invalid/i.test(
-          String((error.response?.data as { msg?: string })?.msg || error.message || "")
-        ));
+      !isRefreshRequest &&
+      (error.response?.status === 401 ||
+        (error.response?.status === 422 &&
+          /signature|token|invalid/i.test(
+            String((error.response?.data as { msg?: string })?.msg || error.message || "")
+          )));
     if (isTokenError && cfg && !cfg._retry) {
       cfg._retry = true;
-      setAccessToken(null); // 清除可能无效的 token
+      // 不要在此 setAccessToken(null)，否则会清空 refresh_token，续期必败
       try {
         const newToken = await ensureRefreshed();
         if (newToken) {
@@ -312,7 +325,9 @@ api.interceptors.response.use(
         }
         return api.request(cfg);
       } catch (e) {
-        // fallthrough to normal error handling
+        if ((e as AxiosError)?.response?.status === 401) {
+          return Promise.reject(error);
+        }
       }
     }
 

@@ -294,6 +294,9 @@ import {
 } from "ionicons/icons";
 import _ from "lodash";
 import { inject, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
+
+const router = useRouter();
 
 const bLogin = ref(false);
 const userList = ref<any[]>([]);
@@ -442,13 +445,14 @@ function btnLogoff() {
   clearLoginCache();
 }
 
-/** 401 或 token 失效时：清空登录缓存并显示登录页 */
+/** 401 或 token 失效：关主界面、清缓存、回登录路由并出登录卡 */
 function goToLoginPage(toastMsg?: string) {
   bLogin.value = false;
   clearLoginCache();
   if (globalVar.user) {
     globalVar.user = undefined as any;
   }
+  void router.replace("/tabs/tab1");
   if (toastMsg) {
     eventBus.$emit(C_EVENT.TOAST, toastMsg);
   }

@@ -1,54 +1,48 @@
-/**
- * 认证模块：对接服务端 JWT 认证体系
- * - POST /api/auth/login：用户名密码登录，返回 access_token，refresh_token 通过 HttpOnly Cookie 下发
- * - POST /api/auth/refresh：用 Cookie 中的 refresh_token 换取新 access_token
- * - POST /api/auth/logout：登出并清除服务端 Cookie
- */
+/** 登录/续期/登出与 localStorage，refresh 存 A 时 XSS 可读（与 B 的 HttpOnly 不同） */
 import EventBus, { C_EVENT } from "@/types/event-bus";
 
-const KEY_ACCESS_TOKEN = "access_token";
-const KEY_ACCESS_TOKEN_EXPIRES_AT = "access_token_expires_at";
-/** 与登录相关的 localStorage 键，清空缓存时一并移除 */
-const LOGIN_CACHE_KEYS = [KEY_ACCESS_TOKEN, KEY_ACCESS_TOKEN_EXPIRES_AT, "saveUser", "bAuth"] as const;
+const KEY_ACCESS = "access_token";
+const KEY_EXPIRES_AT = "access_token_expires_at";
+const KEY_REFRESH = "refresh_token";
+const LOGIN_CACHE_KEYS = [KEY_ACCESS, KEY_EXPIRES_AT, KEY_REFRESH, "saveUser", "bAuth"] as const;
 
 export interface LoginResponse {
   code: number;
   msg: string;
   access_token: string;
+  refresh_token?: string;
   expires_in: number;
   user?: { id: number; name: string; icon?: string; admin?: number };
 }
 
 export function getAccessToken(): string | null {
-  return localStorage.getItem(KEY_ACCESS_TOKEN);
+  return localStorage.getItem(KEY_ACCESS);
 }
 
-/** 获取 token 过期时间戳（毫秒），未设置时返回 null */
 export function getTokenExpiresAt(): number | null {
-  const v = localStorage.getItem(KEY_ACCESS_TOKEN_EXPIRES_AT);
+  const v = localStorage.getItem(KEY_EXPIRES_AT);
   return v ? parseInt(v, 10) : null;
+}
+
+export function getRefreshToken(): string | null {
+  return localStorage.getItem(KEY_REFRESH);
 }
 
 export function setAccessToken(token: string | null): void {
   if (!token) {
-    localStorage.removeItem(KEY_ACCESS_TOKEN);
-    localStorage.removeItem(KEY_ACCESS_TOKEN_EXPIRES_AT);
+    localStorage.removeItem(KEY_ACCESS);
+    localStorage.removeItem(KEY_EXPIRES_AT);
     return;
   }
-  localStorage.setItem(KEY_ACCESS_TOKEN, token);
+  localStorage.setItem(KEY_ACCESS, token);
 }
 
-/** 设置 token 及其过期时间（expires_in 为秒） */
 export function setTokenWithExpiry(token: string, expiresInSeconds: number): void {
-  localStorage.setItem(KEY_ACCESS_TOKEN, token);
+  localStorage.setItem(KEY_ACCESS, token);
   const expiresAt = Date.now() + expiresInSeconds * 1000;
-  localStorage.setItem(KEY_ACCESS_TOKEN_EXPIRES_AT, String(expiresAt));
+  localStorage.setItem(KEY_EXPIRES_AT, String(expiresAt));
 }
 
-/**
- * 清空本地登录相关缓存（access_token、saveUser、bAuth 等），
- * 在 401/登录过期或登出时调用，避免旧缓存导致反复报错。
- */
 export function clearLoginCache(): void {
   for (const key of LOGIN_CACHE_KEYS) {
     localStorage.removeItem(key);
@@ -56,9 +50,6 @@ export function clearLoginCache(): void {
   EventBus.$emit(C_EVENT.LOGIN_CACHE_CLEARED);
 }
 
-/**
- * 登录。需在 getApiUrl() 已初始化的环境下调用，且请求会通过 apiClient 发出（withCredentials + 后续可带 token）。
- */
 export async function login(
   baseUrl: string,
   username: string,
@@ -75,12 +66,12 @@ export async function login(
     const expiresIn = data.expires_in ?? 86400;
     setTokenWithExpiry(data.access_token, expiresIn);
   }
+  if (data?.refresh_token) {
+    localStorage.setItem(KEY_REFRESH, data.refresh_token);
+  }
   return data;
 }
 
-/**
- * 刷新 access_token（依赖 Cookie 中的 refresh_token，需 withCredentials）。
- */
 export async function refreshToken(baseUrl: string): Promise<{
   access_token: string;
   expires_in: number;
@@ -88,13 +79,17 @@ export async function refreshToken(baseUrl: string): Promise<{
   const axios = (await import("axios")).default;
   const url = baseUrl.replace(/\/$/, "") + "/auth/refresh";
   const token = getAccessToken();
+  const r = getRefreshToken();
   const resp = await axios.post(
     url,
-    {},
+    r ? { refresh_token: r } : {},
     {
       withCredentials: true,
       timeout: 10000,
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
     }
   );
   const data = resp.data as { code?: number; access_token?: string; expires_in?: number };
@@ -108,9 +103,6 @@ export async function refreshToken(baseUrl: string): Promise<{
   };
 }
 
-/**
- * 登出：清除服务端 Cookie 并清除本地 access_token。
- */
 export async function logout(baseUrl: string): Promise<void> {
   const axios = (await import("axios")).default;
   const url = baseUrl.replace(/\/$/, "") + "/auth/logout";

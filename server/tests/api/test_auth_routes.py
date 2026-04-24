@@ -88,6 +88,7 @@ def test_login_success_with_plaintext_password(mock_db_obj, client):
     data = resp.get_json()
     assert data["code"] == 0
     assert "access_token" in data
+    assert "refresh_token" in data and data["refresh_token"]
     assert data["user"]["name"] == "test"
     assert "refresh_token_cookie" in resp.headers.get('Set-Cookie')
 
@@ -102,6 +103,7 @@ def test_login_success_with_md5_password(mock_db_obj, client):
     data = resp.get_json()
     assert data["code"] == 0
     assert "access_token" in data
+    assert "refresh_token" in data and data["refresh_token"]
 
 
 @patch('core.api.auth_routes.db_obj')
@@ -113,6 +115,7 @@ def test_login_success_with_null_password(mock_db_obj, client):
     data = resp.get_json()
     assert data["code"] == 0
     assert "access_token" in data
+    assert "refresh_token" in data and data["refresh_token"]
 
 
 def test_refresh_requires_cookie(client):
@@ -150,6 +153,22 @@ def test_refresh_success(mock_db_obj, client, app):
     data = refresh_resp.get_json()
     assert data["code"] == 0
     assert "access_token" in data
+
+
+@patch('core.api.auth_routes.db_obj')
+def test_refresh_success_with_json_body_no_cookies(mock_db_obj, app):
+    mock_user = User(id=1, name='test', icon='i.png', pwd='password123', score=100, admin=0)
+    mock_db_obj.session.query.return_value.filter.return_value.first.return_value = mock_user
+    with app.test_client() as client_nocookie:
+        login_resp = client_nocookie.post("/api/auth/login", json={"username": "test", "password": "password123"})
+        assert login_resp.status_code == 200
+        rt = login_resp.get_json()["refresh_token"]
+        assert rt
+        refresh_resp = client_nocookie.post("/api/auth/refresh", json={"refresh_token": rt})
+        assert refresh_resp.status_code == 200, refresh_resp.get_json()
+        data = refresh_resp.get_json()
+        assert data["code"] == 0
+        assert "access_token" in data
 
 
 def test_logout_always_ok(client):

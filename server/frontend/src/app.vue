@@ -37,10 +37,13 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from "vue";
+import { useRouter } from "vue-router";
+import { ElMessage } from "element-plus";
 import { StarFilled } from "@element-plus/icons-vue";
 import Sidebar from "@/views/Sidebar.vue";
 import Login from "@/views/PageLogin.vue";
 import { useUserStore } from "@/stores/user";
+import { setAuthSessionExpiredHandler } from "@/api/api-auth";
 import {
   isLocalIpAvailable,
   checkLocalIpAvailable,
@@ -49,6 +52,8 @@ import {
   LOCAL_IP,
   LOCAL_PORT,
 } from "@/api/config";
+
+const router = useRouter();
 
 // 使用 Pinia Store
 const userStore = useUserStore();
@@ -128,6 +133,11 @@ const handleLoginSuccess = (userInfo: { id: number; name: string; icon: string }
 let serverCheckInterval: ReturnType<typeof setInterval> | null = null;
 
 onMounted(async () => {
+  setAuthSessionExpiredHandler(() => {
+    userStore.clearCurUser();
+    void router.replace("/home");
+    ElMessage.warning("登录已过期，请重新登录");
+  });
   // 使用 store 刷新用户列表
   await userStore.refreshUserList();
   // 从 localStorage 恢复当前用户

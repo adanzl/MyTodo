@@ -13,14 +13,10 @@ export const apiClient = axios.create({
   withCredentials: true,
 });
 
-// token 即将过期时提前续期的缓冲时间（秒），1 小时
-const TOKEN_REFRESH_BUFFER_SEC = 3600;
+const TOKEN_REFRESH_BUFFER_SEC = 6 * 3600;
 
-// 请求拦截器：每次请求都从 localStorage 读取 token 并写入 headers
-// 若 token 即将过期则主动续期，实现「有请求就自动续期」
 apiClient.interceptors.request.use(
   async (cfg: InternalAxiosRequestConfig) => {
-    // 跳过 auth 相关接口，避免循环
     const url = String(cfg.url || "");
     if (url.includes("/auth/login") || url.includes("/auth/refresh")) {
       const token = getAccessToken();
@@ -41,7 +37,7 @@ apiClient.interceptors.request.use(
       try {
         await ensureRefreshed();
       } catch {
-        // 续期失败，继续使用当前 token，401 时由响应拦截器处理
+        /* 续期失败仍带旧 access，由 401 重试 */
       }
     }
 
@@ -58,7 +54,6 @@ let isRefreshing = false;
 let refreshWaiters: Array<(token: string | null) => void> = [];
 let proactiveRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 
-/** 提前刷新缓冲时间（秒），在 token 过期前多久触发 proactive refresh */
 const REFRESH_BUFFER_SEC = 300;
 
 function clearProactiveRefreshTimer(): void {
@@ -68,10 +63,6 @@ function clearProactiveRefreshTimer(): void {
   }
 }
 
-/**
- * 根据 expires_in 安排 proactive refresh，在 token 过期前刷新。
- * 刷新时机：取「80% 过期时间」与「过期前 5 分钟」中较早者。
- */
 export function scheduleProactiveRefresh(expiresInSeconds: number): void {
   clearProactiveRefreshTimer();
   if (expiresInSeconds <= 0) return;
@@ -85,7 +76,7 @@ export function scheduleProactiveRefresh(expiresInSeconds: number): void {
         scheduleProactiveRefresh(data.expires_in);
       }
     } catch {
-      // 静默失败，下次请求 401 时会走 ensureRefreshed
+      /* 静默；下次有请求会预刷新 / 或 401 重试 */
     }
   }, delayMs);
 }
@@ -107,9 +98,10 @@ async function ensureRefreshed(): Promise<string | null> {
     if (data?.expires_in) scheduleProactiveRefresh(data.expires_in);
     return token;
   } catch (e: any) {
-    clearProactiveRefreshTimer();
     if (e?.response?.status === 401) {
+      clearProactiveRefreshTimer();
       clearLoginCache();
+      EventBus.$emit(C_EVENT.AUTH_EXPIRED);
     }
     refreshWaiters.forEach((cb) => cb(null));
     refreshWaiters = [];
@@ -131,12 +123,8 @@ apiClient.interceptors.response.use(
           (cfg.headers = cfg.headers ?? ({} as typeof cfg.headers))["Authorization"] = `Bearer ${newToken}`;
         }
         return apiClient.request(cfg);
-      } catch (refreshErr: any) {
-        const status = refreshErr?.response?.status;
-        if (status === 401) {
-          clearLoginCache();
-          EventBus.$emit(C_EVENT.AUTH_EXPIRED);
-        }
+      } catch {
+        // 401 时已在 ensureRefreshed 中 clear + AUTH_EXPIRED
       }
     }
     return Promise.reject(error);
@@ -163,7 +151,6 @@ async function checkAddress(url: string, timeout = 500): Promise<boolean> {
   }
 }
 
-/** 本地服务器根 URL（与 server/frontend 一致，用于可用性检测） */
 function getLocalRootUrl(): string {
   const https = typeof window !== "undefined" && window.location.protocol === "https:";
   const port = LOCAL_PORTS[https ? "https" : "http"];
@@ -174,7 +161,6 @@ function getLocalApiUrl(): string {
   return getLocalRootUrl().replace(/\/$/, "") + "/api";
 }
 
-/** 本地可用性检测：HEAD 请求根路径。Ionic/Capacitor 下 origin 为 capacitor://localhost 或 ionic://localhost，服务端 CORS_ORIGINS 需包含二者 */
 export async function checkLocalAddressAvailable(): Promise<boolean> {
   if (window.location.protocol === "https:") return false;
   return checkAddress(getLocalRootUrl());
@@ -201,8 +187,11 @@ export function switchToRemote(): void {
 
 export async function checkAndSwitchServer(): Promise<void> {
   const ok = await checkLocalAddressAvailable();
-  if (ok && localIpAvailable !== true) switchToLocal();
-  else if (!ok && localIpAvailable !== false) switchToRemote();
+  if (ok && localIpAvailable !== true) {
+    switchToLocal();
+  } else if (!ok && localIpAvailable !== false) {
+    switchToRemote();
+  }
 }
 
 export function isLocalIpAvailable(): boolean | null {

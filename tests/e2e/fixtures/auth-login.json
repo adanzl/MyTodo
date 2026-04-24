@@ -2,6 +2,7 @@
   "code": 0,
   "msg": "ok",
   "access_token": "e2e-fake-token",
+  "refresh_token": "e2e-fake-refresh",
   "expires_in": 3600,
   "user": {
     "id": 1,
