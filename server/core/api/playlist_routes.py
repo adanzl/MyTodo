@@ -261,7 +261,7 @@ def playlist_set_current_index() -> ResponseReturnValue:
         pid = args.get("id")
         index = args.get("index")
         in_pre_files = args.get("in_pre_files", False)
-        
+
         if not pid:
             return _err("播放列表 id 不能为空")
         if index is None:
@@ -272,7 +272,7 @@ def playlist_set_current_index() -> ResponseReturnValue:
             return _err("索引值必须是整数")
         if index < 0:
             return _err("索引值不能为负数")
-        
+
         ret, msg = playlist_mgr.set_current_index(str(pid), index, bool(in_pre_files))
         if ret != 0:
             return _err(msg)

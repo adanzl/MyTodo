@@ -547,7 +547,7 @@ const setCurrentIndexHandler = async (file: MediaFile, index: number, isInPreFil
     ElMessage.warning("请先选择播放列表");
     return;
   }
-  
+
   try {
     const res = await setCurrentIndex(pid, index, isInPreFiles);
     if (res?.code === 0) {
