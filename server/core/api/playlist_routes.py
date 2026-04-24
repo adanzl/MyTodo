@@ -249,3 +249,34 @@ def playlist_remove_duplicate() -> ResponseReturnValue:
     except Exception as e:
         log.error(f"[PLAYLIST] Deduplicate error: {e}")
         return _err(f'error: {str(e)}')
+
+
+@playlist_bp.route("/playlist/setCurrentIndex", methods=['POST'])
+def playlist_set_current_index() -> ResponseReturnValue:
+    """设置播放列表的当前播放位置（游标）。"""
+    try:
+        args: Dict[str, Any] = read_json_from_request()
+        if not args:
+            return _err("请求数据不能为空")
+        pid = args.get("id")
+        index = args.get("index")
+        in_pre_files = args.get("in_pre_files", False)
+        
+        if not pid:
+            return _err("播放列表 id 不能为空")
+        if index is None:
+            return _err("索引值不能为空")
+        try:
+            index = int(index)
+        except (ValueError, TypeError):
+            return _err("索引值必须是整数")
+        if index < 0:
+            return _err("索引值不能为负数")
+        
+        ret, msg = playlist_mgr.set_current_index(str(pid), index, bool(in_pre_files))
+        if ret != 0:
+            return _err(msg)
+        return _ok(msg)
+    except Exception as e:
+        log.error(f"[PLAYLIST] SetCurrentIndex error: {e}")
+        return _err(f'error: {str(e)}')

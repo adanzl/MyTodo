@@ -85,6 +85,18 @@
               <DocumentCopy />
             </el-icon>
           </el-button>
+          <el-button
+            v-show="showPlaylistSelectorButton"
+            type="info"
+            size="small"
+            plain
+            circle
+            :icon="Location"
+            @click.stop="emit('set-current-index', file, index)"
+            :disabled="playlistLoading"
+            title="设定游标"
+          >
+          </el-button>
           <el-button v-show="showPlaylistSelectorButton" type="info" size="small" plain circle
             @click.stop="emit('play-on-device', file)" :disabled="playlistLoading" title="在设备上播放">
             <el-icon v-if="false" size="12" class="animate-spin">
@@ -115,6 +127,7 @@ import {
   Refresh,
   DocumentCopy,
   Minus,
+  Location,
 } from "@element-plus/icons-vue";
 import { formatDuration } from "@/utils/format";
 import { calculateFilesTotalDuration } from "@/utils/file";
@@ -151,6 +164,7 @@ const emit = defineEmits<{
   "move-down": [index: number];
   replace: [index: number];
   "open-playlist-selector": [file: MediaFile];
+  "set-current-index": [file: MediaFile, index: number];
   "play-on-device": [file: MediaFile];
   delete: [index: number];
 }>();

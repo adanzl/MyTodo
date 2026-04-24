@@ -39,9 +39,11 @@
         @move-pre-file-up="handleMovePreFileUp" @move-pre-file-down="handleMovePreFileDown"
         @replace-pre-file="handleReplacePreFile"
         @open-playlist-selector-for-pre-file="handleOpenPlaylistSelectorForPreFile"
+        @set-current-index-for-pre-file="handleSetCurrentIndexForPreFile"
         @play-on-device-for-pre-file="handlePlayOnDeviceForPreFile" @delete-pre-file="handleDeletePreFile"
         @move-file-up="handleMovePlaylistItemUp" @move-file-down="handleMovePlaylistItemDown"
         @replace-file="handleReplacePlaylistItem" @open-playlist-selector-for-file="handleOpenPlaylistSelectorForFile"
+        @set-current-index-for-file="handleSetCurrentIndexForFile"
         @play-on-device-for-file="handlePlayOnDeviceForFile" @delete-file="handleDeletePlaylistItem"
         @remove-duplicate="handleRemoveDuplicate" @convert-mp3="handleConvertToMp3">
       </PanelFileList>
@@ -145,7 +147,7 @@ import { useFileOperations } from "./composables/useFileOperations";
 import { useDragAndDrop } from "./composables/useDragAndDrop";
 import { usePlaylistNameEdit } from "./composables/usePlaylistNameEdit";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { playFileOnDevice, convertPlaylistToMp3, removeDuplicateFiles } from "@/api/api-playlist";
+import { playFileOnDevice, convertPlaylistToMp3, removeDuplicateFiles, setCurrentIndex } from "@/api/api-playlist";
 import type { MediaFile } from "@/types/tools";
 import { STORAGE_KEY_ACTIVE_PLAYLIST_ID } from "@/constants/playlist";
 
@@ -537,6 +539,37 @@ const playOnDevice = async (file: MediaFile) => {
 };
 const handlePlayOnDeviceForPreFile = (file: MediaFile) => playOnDevice(file);
 const handlePlayOnDeviceForFile = (file: MediaFile) => playOnDevice(file);
+
+// 设定游标（设置当前播放位置）
+const setCurrentIndexHandler = async (file: MediaFile, index: number, isInPreFiles: boolean) => {
+  const pid = activePlaylistId.value;
+  if (!pid) {
+    ElMessage.warning("请先选择播放列表");
+    return;
+  }
+  
+  try {
+    const res = await setCurrentIndex(pid, index, isInPreFiles);
+    if (res?.code === 0) {
+      ElMessage.success(res?.msg ?? "已设置当前位置");
+      // 刷新播放列表状态
+      await refreshPlaylistStatus();
+    } else {
+      ElMessage.error(res?.msg ?? "设置当前位置失败");
+    }
+  } catch (e) {
+    ElMessage.error("设置当前位置失败");
+    console.error(e);
+  }
+};
+
+const handleSetCurrentIndexForPreFile = (file: MediaFile, index: number) => {
+  setCurrentIndexHandler(file, index, true);
+};
+
+const handleSetCurrentIndexForFile = (file: MediaFile, index: number) => {
+  setCurrentIndexHandler(file, index, false);
+};
 
 // 去重播放列表
 const handleRemoveDuplicate = async () => {

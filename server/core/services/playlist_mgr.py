@@ -1602,6 +1602,68 @@ class PlaylistMgr:
             log.error(f"[PlaylistMgr] playlist_remove_duplicate 异常: {playlist_id}, {e}", exc_info=True)
             return -1, f"去重失败: {str(e)}"
 
+    def set_current_index(self, playlist_id: str, index: int, in_pre_files: bool = False) -> tuple[int, str]:
+        """设置播放列表的当前播放位置（游标）。
+
+        Args:
+            playlist_id: 播放列表ID。
+            index: 要设置的索引位置。
+            in_pre_files: 是否在前置文件中设置游标。
+
+        Returns:
+            (code, msg)。code=0 表示成功。
+        """
+        try:
+            playlist_data, code, msg = self._validate_playlist(playlist_id)
+            if code != 0:
+                return code, msg or "验证失败"
+
+            pre_files = self._get_pre_files_for_today(playlist_data)
+            playlist = playlist_data.get("playlist", [])
+
+            # 验证索引范围
+            if in_pre_files:
+                if not pre_files or index < 0 or index >= len(pre_files):
+                    return -1, f"前置文件索引 {index} 超出范围 (0-{len(pre_files)-1 if pre_files else -1})"
+            else:
+                if not playlist or index < 0 or index >= len(playlist):
+                    return -1, f"播放列表索引 {index} 超出范围 (0-{len(playlist)-1 if playlist else -1})"
+
+            # 初始化播放状态（如果不存在）
+            if playlist_id not in self._play_state:
+                self._init_play_state(playlist_id, playlist_data, pre_files)
+
+            play_state = self._play_state[playlist_id]
+
+            # 更新播放状态
+            play_state["in_pre_files"] = in_pre_files
+            if in_pre_files:
+                play_state["pre_index"] = index
+            else:
+                play_state["file_index"] = index
+
+            # 更新播放列表的 current_index（只对 playlist 生效）
+            if not in_pre_files and playlist:
+                playlist_data["current_index"] = index
+                playlist_data["updated_time"] = _TS()
+
+                # RDS 保存改为异步，避免阻塞操作
+                def save_async() -> None:
+                    try:
+                        self._save_playlist_to_rds()
+                    except Exception as e:
+                        log.warning(f"[PlaylistMgr] Async save current_index error: {e}")
+
+                spawn(save_async)
+
+            p_name = playlist_data.get("name", "未知播放列表")
+            log.info(f"[PlaylistMgr] 设置播放列表 {playlist_id} 游标: in_pre_files={in_pre_files}, index={index}")
+            return 0, f"已设置播放列表 {p_name} 的当前位置为第 {index + 1} 项"
+
+        except Exception as e:
+            log.error(f"[PlaylistMgr] set_current_index 异常: {playlist_id}, {e}", exc_info=True)
+            return -1, f"设置游标失败: {str(e)}"
+
 
 # 全局实例
 playlist_mgr = PlaylistMgr()

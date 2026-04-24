@@ -175,7 +175,7 @@
         >
           {{ file.uri ? file.uri.split("/").pop() : "" }}
         </span>
-        <div class="flex items-center gap-1 shrink-0" @mousedown.stop @click.stop>
+        <div class="flex items-center gap-0.5 shrink-0" @mousedown.stop @click.stop>
           <MediaComponent
             v-show="!preFilesBatchDeleteMode"
             :file="file"
@@ -246,6 +246,18 @@
             size="small"
             plain
             circle
+            :icon="Location"
+            @click.stop="$emit('set-current-index', file, Number(index))"
+            :disabled="playlistLoading"
+            title="设定游标"
+          >
+          </el-button>
+          <el-button
+            v-show="!preFilesBatchDeleteMode && !preFilesDragMode"
+            type="info"
+            size="small"
+            plain
+            circle
             @click.stop="$emit('play-on-device', file)"
             :disabled="playlistLoading"
             title="在设备上播放"
@@ -297,6 +309,7 @@ import {
   Minus,
   ArrowUp,
   ArrowDown,
+  Location,
 } from "@element-plus/icons-vue";
 import { formatDuration } from "@/utils/format";
 import { getWeekdayIndex } from "@/utils/date";
@@ -338,6 +351,7 @@ defineEmits<{
   "move-down": [index: number];
   replace: [index: number];
   "open-playlist-selector": [file: MediaFile];
+  "set-current-index": [file: MediaFile, index: number];
   "play-on-device": [file: MediaFile];
   delete: [index: number];
 }>();

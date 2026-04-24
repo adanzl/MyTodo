@@ -226,6 +226,7 @@
 <script setup lang="ts">
 import { ref, watch, computed, nextTick } from "vue";
 import { ElLoading, ElMessage } from "element-plus";
+import { useRouter } from "vue-router";
 import { Picture, Headset, VideoPlay, Edit, Delete, Plus, ArrowUp, ArrowDown, Reading } from "@element-plus/icons-vue";
 import type { Material } from "@/api/api-task";
 import { updateMaterial } from "@/api/api-task";
@@ -257,6 +258,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<Emits>();
 
+const router = useRouter();
 const visible = ref(false);
 
 // 课件表单
@@ -270,7 +272,6 @@ interface PdfPage {
   id: string;
   name: string;
   thumbnail: string;
-  audioIds?: string[];
 }
 
 const pdfPages = ref<PdfPage[]>([]);
@@ -397,7 +398,7 @@ watch(visible, (val) => {
 });
 
 // 加载 PDF 并生成缩略图
-const loadPdfPages = async (pdfPath: string, materialDetail: MaterialDetail | null) => {
+const loadPdfPages = async (pdfPath: string) => {
   pdfLoading.value = true;
   try {
     // 转换文件路径为 URL
@@ -442,14 +443,10 @@ const loadPdfPages = async (pdfPath: string, materialDetail: MaterialDetail | nu
         // 转换为 base64
         const thumbnail = canvas.toDataURL("image/jpeg", 0.9);
 
-        // 从 pages 数据中获取绑定的音频 ID
-        const pageData = materialDetail?.pages?.[pageNum - 1];
-
         pages.push({
           id: String(pageNum),
           name: `第${pageNum}页`,
           thumbnail: thumbnail,
-          audioIds: pageData?.audioIds || [],
         });
       }
     }
@@ -499,7 +496,7 @@ const initDetail = async () => {
   // 根据素材类型加载不同的数据
   if (props.materialData.type === 0 && props.materialData.path) {
     // PDF 类型 - 使用 pdf.js 加载
-    await loadPdfPages(props.materialData.path, materialDetail);
+    await loadPdfPages(props.materialData.path);
     // 从 data 中加载音频列表
     allAudios.value = materialDetail?.audioList || [];
 
@@ -820,7 +817,13 @@ const playMaterial = () => {
   // 关闭弹窗
   handleClose();
 
-  // TODO: 跳转到预览页面
+  // 跳转到每日打卡预览页面，携带素材ID
+  router.push({
+    path: "/pdf-checkin",
+    query: {
+      materialId: props.materialData.id,
+    },
+  });
 };
 
 // 跳转到编辑

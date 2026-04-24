@@ -119,3 +119,18 @@ export async function removeDuplicateFiles(id: string): Promise<ApiResponse<unkn
   const rsp = await api.post("/playlist/removeDuplicate", { id });
   return rsp.data;
 }
+
+/**
+ * 设置播放列表的当前播放位置（游标）
+ * @param id 播放列表ID
+ * @param index 索引位置
+ * @param in_pre_files 是否在前置文件中设置游标
+ */
+export async function setCurrentIndex(
+  id: string,
+  index: number,
+  in_pre_files: boolean = false
+): Promise<ApiResponse<unknown>> {
+  const rsp = await api.post("/playlist/setCurrentIndex", { id, index, in_pre_files });
+  return rsp.data;
+}
