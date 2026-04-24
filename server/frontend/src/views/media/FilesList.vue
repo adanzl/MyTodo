@@ -92,7 +92,7 @@
             plain
             circle
             :icon="Location"
-            @click.stop="emit('set-current-index', file, index)"
+            @click.stop="emit('set-current-index', index)"
             :disabled="playlistLoading"
             title="设定游标"
           >
@@ -164,7 +164,7 @@ const emit = defineEmits<{
   "move-down": [index: number];
   replace: [index: number];
   "open-playlist-selector": [file: MediaFile];
-  "set-current-index": [file: MediaFile, index: number];
+  "set-current-index": [index: number];
   "play-on-device": [file: MediaFile];
   delete: [index: number];
 }>();

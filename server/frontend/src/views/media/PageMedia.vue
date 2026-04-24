@@ -541,7 +541,7 @@ const handlePlayOnDeviceForPreFile = (file: MediaFile) => playOnDevice(file);
 const handlePlayOnDeviceForFile = (file: MediaFile) => playOnDevice(file);
 
 // 设定游标（设置当前播放位置）
-const setCurrentIndexHandler = async (file: MediaFile, index: number, isInPreFiles: boolean) => {
+const setCurrentIndexHandler = async (index: number, isInPreFiles: boolean) => {
   const pid = activePlaylistId.value;
   if (!pid) {
     ElMessage.warning("请先选择播放列表");
@@ -563,12 +563,12 @@ const setCurrentIndexHandler = async (file: MediaFile, index: number, isInPreFil
   }
 };
 
-const handleSetCurrentIndexForPreFile = (file: MediaFile, index: number) => {
-  setCurrentIndexHandler(file, index, true);
+const handleSetCurrentIndexForPreFile = (index: number) => {
+  setCurrentIndexHandler(index, true);
 };
 
-const handleSetCurrentIndexForFile = (file: MediaFile, index: number) => {
-  setCurrentIndexHandler(file, index, false);
+const handleSetCurrentIndexForFile = (index: number) => {
+  setCurrentIndexHandler(index, false);
 };
 
 // 去重播放列表

@@ -132,7 +132,7 @@
         @move-up="index => $emit('move-pre-file-up', index)" @move-down="index => $emit('move-pre-file-down', index)"
         @replace="index => $emit('replace-pre-file', index)"
         @open-playlist-selector="file => $emit('open-playlist-selector-for-pre-file', file)"
-        @set-current-index="(file, index) => $emit('set-current-index-for-pre-file', file, index)"
+        @set-current-index="index => $emit('set-current-index-for-pre-file', index)"
         @play-on-device="file => $emit('play-on-device-for-pre-file', file)"
         @delete="index => $emit('delete-pre-file', index)">
       </PreFilesList>
@@ -150,7 +150,7 @@
         @move-up="index => $emit('move-file-up', index)" @move-down="index => $emit('move-file-down', index)"
         @replace="index => $emit('replace-file', index)"
         @open-playlist-selector="file => $emit('open-playlist-selector-for-file', file)"
-        @set-current-index="(file, index) => $emit('set-current-index-for-file', file, index)"
+        @set-current-index="index => $emit('set-current-index-for-file', index)"
         @play-on-device="file => $emit('play-on-device-for-file', file)" @delete="index => $emit('delete-file', index)">
       </FilesList>
 
@@ -239,14 +239,14 @@ defineEmits<{
   "move-pre-file-down": [index: number];
   "replace-pre-file": [index: number];
   "open-playlist-selector-for-pre-file": [file: MediaFile];
-  "set-current-index-for-pre-file": [file: MediaFile, index: number];
+  "set-current-index-for-pre-file": [index: number];
   "play-on-device-for-pre-file": [file: MediaFile];
   "delete-pre-file": [index: number];
   "move-file-up": [index: number];
   "move-file-down": [index: number];
   "replace-file": [index: number];
   "open-playlist-selector-for-file": [file: MediaFile];
-  "set-current-index-for-file": [file: MediaFile, index: number];
+  "set-current-index-for-file": [index: number];
   "play-on-device-for-file": [file: MediaFile];
   "delete-file": [index: number];
   "remove-duplicate": [];
