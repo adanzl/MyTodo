@@ -241,7 +241,7 @@
             <el-icon><DocumentCopy /></el-icon>
           </el-button>
           <el-button
-            v-show="!preFilesBatchDeleteMode && !preFilesDragMode"
+            v-show="!preFilesBatchDeleteMode && !preFilesDragMode && showMoreActions"
             type="info"
             size="small"
             plain

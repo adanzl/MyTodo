@@ -86,7 +86,7 @@
             </el-icon>
           </el-button>
           <el-button
-            v-show="showPlaylistSelectorButton"
+            v-show="showPlaylistSelectorButton && showMoreButtons"
             type="info"
             size="small"
             plain
