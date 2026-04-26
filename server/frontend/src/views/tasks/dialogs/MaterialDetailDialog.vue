@@ -11,20 +11,22 @@
       <!-- 基本信息 -->
       <div class="">
         <el-descriptions :column="4" border>
-          <el-descriptions-item label="名称">{{ materialData?.name }}</el-descriptions-item>
-          <el-descriptions-item label="类型">
+          <el-descriptions-item label="名称" min-width="60">{{ materialData?.name }}</el-descriptions-item>
+          <el-descriptions-item label="类型" min-width="60">
             <el-tag :type="materialData?.type === 0 ? 'success' : 'warning'" size="small">
               {{ materialData?.type === 0 ? 'PDF' : 'Video' }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="路径">{{ materialData?.path }}</el-descriptions-item>
-          <el-descriptions-item label="操作">
-            <el-button type="primary" size="small" plain @click="playMaterial">
-              <el-icon :size="16" ><Reading /></el-icon>
-            </el-button>
-            <el-button type="primary" size="small" plain @click="gotoEditMaterial">
-              <el-icon :size="16"><Edit /></el-icon>
-            </el-button>
+          <el-descriptions-item label="路径" min-width="60">{{ materialData?.path }}</el-descriptions-item>
+          <el-descriptions-item label="操作" min-width="60">
+            <div class="flex"> 
+              <el-button type="primary" size="small" plain @click="playMaterial">
+                <el-icon :size="16" ><Reading /></el-icon>
+              </el-button>
+              <el-button type="primary" size="small" plain @click="gotoEditMaterial">
+                <el-icon :size="16"><Edit /></el-icon>
+              </el-button>
+            </div>
           </el-descriptions-item>
         </el-descriptions>
       </div>

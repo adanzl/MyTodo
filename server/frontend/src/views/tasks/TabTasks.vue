@@ -9,7 +9,7 @@
     </div>
 
     <!-- 表格 -->
-    <el-table :data="taskList" v-loading="loading" stripe border style="width: 100%">
+    <el-table :data="taskList" v-loading="loading" stripe border style="width: 100%" :max-height="tableMaxHeight">
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column prop="name" label="任务名称" min-width="200" />
       <el-table-column prop="start_date" label="开始日期" width="120" />
@@ -65,6 +65,17 @@ import { Refresh } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { onMounted, ref } from "vue";
 import TaskDialog from "./dialogs/TaskDialog.vue";
+
+
+const tableMaxHeight = ref<number>(0);
+  // 计算表格最大高度
+const calculateTableHeight = () => {
+  nextTick(() => {
+    const windowHeight = window.innerHeight;
+    const reservedSpace = 370;
+    tableMaxHeight.value = windowHeight - reservedSpace;
+  });
+};
 
 // 状态管理
 const loading = ref(false);
@@ -179,5 +190,7 @@ const handleDeleteTask = async (row: Task) => {
 // 初始化
 onMounted(() => {
   fetchTaskList();
+  calculateTableHeight();
+  window.addEventListener('resize', calculateTableHeight);
 });
 </script>

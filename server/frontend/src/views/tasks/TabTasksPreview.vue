@@ -36,7 +36,7 @@
         </div>
 
         <div v-else>
-            <div v-if="displayTasks.length === 0" class="text-center py-10 text-gray-500">
+            <div v-if="!hasDisplayableMaterials" class="text-center py-10 text-gray-500">
                 <p>暂无任务</p>
             </div>
 
@@ -115,6 +115,11 @@ const currentDateStr = computed(() => {
 // 显示的任务列表（直接使用 API 返回的数据）
 const displayTasks = computed(() => {
     return taskList.value;
+});
+
+// 检查是否有可显示的素材
+const hasDisplayableMaterials = computed(() => {
+    return taskList.value.some(task => getTaskMaterialList(task).length > 0);
 });
 
 // 获取任务当天的素材存档列表（从 task.data 中直接获取）

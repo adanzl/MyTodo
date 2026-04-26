@@ -26,7 +26,7 @@
     </div>
 
     <!-- 表格 -->
-    <el-table :data="materialList" v-loading="loading" stripe border style="width: 100%">
+    <el-table :data="materialList" v-loading="loading" stripe border style="width: 100%" :max-height="tableMaxHeight">
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column prop="name" label="名称" min-width="150" />
       <el-table-column label="类型" width="100">
@@ -111,6 +111,16 @@ import MaterialDialog from "./dialogs/MaterialDialog.vue";
 import MaterialDetailDialog from "./dialogs/MaterialDetailDialog.vue";
 import MaterialPreviewDialog from "./dialogs/MaterialPreviewDialog.vue";
 
+
+const tableMaxHeight = ref<number>(0);
+  // 计算表格最大高度
+const calculateTableHeight = () => {
+  nextTick(() => {
+    const windowHeight = window.innerHeight;
+    const reservedSpace = 370;
+    tableMaxHeight.value = windowHeight - reservedSpace;
+  });
+};
 
 // 状态管理
 const loading = ref(false);
@@ -306,5 +316,7 @@ const handleSizeChange = (size: number) => {
 onMounted(() => {
   fetchCategoryList();
   fetchMaterialList();
+  calculateTableHeight();
+  window.addEventListener('resize', calculateTableHeight);
 });
 </script>

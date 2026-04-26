@@ -337,6 +337,6 @@ const getTaskProgress = (task: Task, date: Date) => {
 onMounted(() => {
   fetchTaskList();
   calculateTableHeight();
-   window.addEventListener('resize', calculateTableHeight);
+  window.addEventListener('resize', calculateTableHeight);
 });
 </script>
