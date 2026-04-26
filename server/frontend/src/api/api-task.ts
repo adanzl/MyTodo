@@ -241,14 +241,14 @@ export async function deleteTask(id: number): Promise<void> {
  */
 export async function getMaterialListByIds(ids: number[]): Promise<MaterialItem[]> {
   if (ids.length === 0) return [];
-  
+
   // 构建查询条件：id IN (...)
   const conditions = {
     id: { in: ids }
   };
-  
+
   const response = await getList<Material>("t_material", conditions, 1, ids.length);
-  
+
   if (response.code !== 0 || !response.data) {
     throw new Error(response.msg || "批量获取素材失败");
   }
@@ -298,13 +298,13 @@ export interface TaskCalendarResponse {
  */
 export async function getTaskCalendar(date: string, userId?: number): Promise<TaskCalendarResponse> {
   const params: any = { date };
-  
+
   if (userId && userId > 0) {
     params.user_id = userId;
   }
-  
+
   const response = await api.post("/task/calendar", params);
-  
+
   if (response.data.code !== 0) {
     throw new Error(response.data.msg || "获取任务日历失败");
   }

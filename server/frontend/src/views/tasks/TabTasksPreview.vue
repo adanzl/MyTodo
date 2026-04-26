@@ -50,11 +50,9 @@
                             <!-- 任务名称角标 -->
                             <div
                                 class="absolute top-2 left-3 text-xs text-gray-500 truncate max-w-[80%] flex gap-2 items-center">
-                                <el-tag
-                                    :type="isMaterialCompleted(task, material, currentDate) ? 'success' : 'info'"
+                                <el-tag :type="isMaterialCompleted(task, material, currentDate) ? 'success' : 'info'"
                                     :effect="isMaterialCompleted(task, material, currentDate) ? 'dark' : 'plain'"
-                                    size="small"
-                                    class="flex-shrink-0">
+                                    size="small" class="flex-shrink-0">
                                     {{ isMaterialCompleted(task, material, currentDate) ? '已完成' : '未完成' }}
                                 </el-tag>
                                 <span class="truncate">{{ task.name }}</span>
