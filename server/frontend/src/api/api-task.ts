@@ -3,6 +3,7 @@
  * 提供素材的增删改查功能
  */
 import { getList, getData, setData, delData } from "./api-common";
+import { api } from "./config";
 import type { PaginatedResponse } from "@/types/api";
 import type { TaskDetail } from "@/types/tasks/taskDetail";
 import type { MaterialDetail } from "@/types/tasks/materialDetail";
@@ -17,6 +18,19 @@ export interface Material {
   cate_id: number;
   type: number;
   data?: string | MaterialDetail; // 存储时为 JSON 字符串，读取时可能是对象
+}
+
+/**
+ * 素材项数据结构（用于任务预览等场景）
+ */
+export interface MaterialItem {
+  id: number;
+  name: string;
+  path: string;
+  cate_id: number;
+  type: number;
+  data?: string | MaterialDetail;
+  [key: string]: any;
 }
 
 /**
@@ -154,17 +168,30 @@ export interface Task {
  * @param userId - 用户ID（可选，使用LIKE匹配）
  * @param pageNum - 页码，默认1
  * @param pageSize - 每页数量，默认20
+ * @param startDate - 开始日期（可选，格式 YYYY-MM-DD），查询 start_date <= startDate 的任务
+ * @param endDate - 结束日期（可选，格式 YYYY-MM-DD），查询 end_date >= endDate 的任务
  */
 export async function getTaskList(
   userId?: number,
   pageNum: number = 1,
-  pageSize: number = 20
+  pageSize: number = 20,
+  startDate?: string,
+  endDate?: string
 ): Promise<PaginatedResponse<Task>> {
   const conditions: Record<string, any> = {};
   if (userId && userId > 0) {
     // 使用 LIKE 条件匹配 user_id 字段（如 "3,4" 中包含 "3"）
     conditions.user_id = { like: `%${userId}%` };
   }
+
+  // 添加日期范围查询条件
+  if (startDate) {
+    conditions.start_date = { '<=': startDate };
+  }
+  if (endDate) {
+    conditions.end_date = { '>=': endDate };
+  }
+
   return getList<Task>(
     "t_task",
     Object.keys(conditions).length > 0 ? conditions : undefined,
@@ -206,4 +233,81 @@ export async function updateTask(task: Task): Promise<Task> {
  */
 export async function deleteTask(id: number): Promise<void> {
   await delData("t_task", id);
+}
+
+/**
+ * 批量获取素材详情
+ * @param ids - 素材 ID 数组
+ */
+export async function getMaterialListByIds(ids: number[]): Promise<MaterialItem[]> {
+  if (ids.length === 0) return [];
+  
+  // 构建查询条件：id IN (...)
+  const conditions = {
+    id: { in: ids }
+  };
+  
+  const response = await getList<Material>("t_material", conditions, 1, ids.length);
+  
+  if (response.code !== 0 || !response.data) {
+    throw new Error(response.msg || "批量获取素材失败");
+  }
+
+  // 解析 data 字段并转换为 MaterialItem
+  const materials = response.data.data || [];
+  return materials.map(material => ({
+    ...material,
+    id: material.id!, // 确保 id 存在
+    data: typeof material.data === 'string' ? JSON.parse(material.data) : material.data,
+  })) as MaterialItem[];
+}
+
+/**
+ * 任务日历数据结构
+ */
+export interface TaskCalendarItem {
+  date: string;
+  tasks: Array<{
+    task_id: number;
+    task_name: string;
+    completed: number;
+    total: number;
+    materials: Array<{
+      id: number;
+      name: string;
+      type: number;
+      status?: number;
+    }>;
+  }>;
+}
+
+/**
+ * 任务日历响应数据
+ */
+export interface TaskCalendarResponse {
+  calendar: Record<string, TaskCalendarItem>;
+  year: number;
+  month: number;
+  days_in_month: number;
+}
+
+/**
+ * 获取任务日历
+ * @param date - 日期(格式 YYYY-MM-DD)
+ * @param userId - 用户ID(可选)
+ */
+export async function getTaskCalendar(date: string, userId?: number): Promise<TaskCalendarResponse> {
+  const params: any = { date };
+  
+  if (userId && userId > 0) {
+    params.user_id = userId;
+  }
+  
+  const response = await api.post("/task/calendar", params);
+  
+  if (response.data.code !== 0) {
+    throw new Error(response.data.msg || "获取任务日历失败");
+  }
+
+  return response.data.data!;
 }

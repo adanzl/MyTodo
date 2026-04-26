@@ -1,11 +1,8 @@
 <template>
   <div class="p-1">
     <!-- 主页签 -->
-    <el-tabs
-      v-model="activeMainTab"
-      @tab-change="handleTabChange"
-      class="flex-1 flex flex-col overflow-hidden h-[calc(100vh-120px)] mt-2"
-    >
+    <el-tabs v-model="activeMainTab" @tab-change="handleTabChange"
+      class="flex-1 flex flex-col overflow-hidden h-[calc(100vh-120px)] mt-2">
       <!-- 素材管理页签 -->
       <el-tab-pane label="素材管理" name="material">
         <TabMaterial />
@@ -20,6 +17,11 @@
       <el-tab-pane label="任务日历" name="calendar">
         <TabTaskCalendar />
       </el-tab-pane>
+
+      <!-- 任务预览页签 -->
+      <el-tab-pane label="任务预览" name="preview">
+        <TabTasksPreview />
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -29,6 +31,7 @@ import { ref } from "vue";
 import TabMaterial from "./TabMaterial.vue";
 import TabTasks from "./TabTasks.vue";
 import TabTaskCalendar from "./TabTaskCalendar.vue";
+import TabTasksPreview from "./TabTasksPreview.vue";
 
 // 主页签控制
 const activeMainTab = ref("calendar");

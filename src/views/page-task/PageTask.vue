@@ -80,7 +80,7 @@
                 <div class="text-sm font-medium text-center line-clamp-2 mb-1">{{ material.name }}</div>
                 <div class="mb-1 text-xs items-center flex gap-2">
   
-                    <div class=" text-gray-600"> 页数:  {{ (material.data as any).pdfLength }}</div>
+                    <div class=" text-gray-600"> 页数:  {{ (material.data && typeof material.data === 'object' ? (material.data as any).pdfLength : '-') }}</div>
                 </div>
                 <div class=" text-[10px] flex items-center"> 点击阅读</div>
               </div>
@@ -173,16 +173,17 @@ const getTaskMaterialSaveList = (task: Task): any[] => {
         const taskData = typeof task.data === 'string' ? JSON.parse(task.data) : task.data;
         const dailyMaterials = taskData.dailyMaterials || {};
 
-        // 计算当前日期是任务的第几天
+        // 计算当前日期是任务的第几天（从0开始）
         const diffDaysCount = diffDays(currentDate.value, task.start_date);
 
         if (diffDaysCount < 0 || diffDaysCount >= task.duration) {
             return [];
         }
 
-        // 直接返回对应天数的素材存档数组
-        return dailyMaterials[diffDaysCount] || [];
+        // 直接返回对应天数的素材存档数组（索引从0开始）
+        return dailyMaterials[String(diffDaysCount)] || [];
     } catch (error) {
+        console.error('解析任务数据失败:', error);
         return [];
     }
 };
@@ -208,8 +209,8 @@ const isMaterialCompleted = (task: Task, material: any, date: Date) => {
                 return false;
             }
 
-            const dayKey = String(diffDaysCount); // dayKey 从 0 开始
-            const materials = taskData.dailyMaterials[dayKey];
+            // 使用从0开始的索引
+            const materials = taskData.dailyMaterials[String(diffDaysCount)];
             if (materials) {
                 const found = materials.find((m: any) => m.id === material.id);
                 return found?.status === 1;
