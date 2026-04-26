@@ -44,12 +44,11 @@ def create_app():
     app.config.setdefault("OPENAPI_SWAGGER_UI_URL", "https://cdn.jsdelivr.net/npm/swagger-ui-dist/")
     Api(app)
 
-    # OPTIONS 预检短路：必须在 limiter 之前注册，避免 OPTIONS 走限流等逻辑导致延迟
+    # OPTIONS 预检请求记录开始时间（不再短路，让 Flask-CORS 处理）
     @app.before_request
-    def _short_circuit_options():
+    def _record_options_start_time():
         if request.method == 'OPTIONS':
             request._start_time = time.time()  # pyright: ignore[reportAttributeAccessIssue]
-            return '', 200
 
     # 配置限流（全局默认）
     limiter = Limiter(
@@ -200,6 +199,13 @@ def create_app():
     def _record_start_time():
         """记录请求开始时间，用于计算响应时间"""
         request._start_time = time.time()  # pyright: ignore[reportAttributeAccessIssue]
+        
+        # CORS 调试日志：记录 OPTIONS 预检请求
+        if request.method == 'OPTIONS':
+            origin = request.headers.get('Origin', 'None')
+            path = request.path
+            log.debug(f"[CORS Debug] OPTIONS request: origin={origin}, path={path}")
+            log.debug(f"[CORS Debug] Allowed origins: {config.get_cors_origins()}")
 
     @app.after_request
     def _log_access(response):

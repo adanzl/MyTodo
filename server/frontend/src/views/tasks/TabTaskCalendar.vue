@@ -40,6 +40,7 @@
       border
       style="width: 100%"
       row-key="id"
+      :max-height="tableMaxHeight"
       :row-class-name="getRowClassName"
     >
       <el-table-column prop="name" label="任务名称" min-width="150" fixed>
@@ -102,6 +103,16 @@ import { formatDateShort, getWeekDay, getDaysDiff, generateDateRange } from "@/u
 import dayjs from "dayjs";
 import { TaskDetail } from "@/types/tasks/taskDetail";
 
+const tableMaxHeight = ref<number>(0);
+  
+// 计算表格最大高度
+const calculateTableHeight = () => {
+  nextTick(() => {
+    const windowHeight = window.innerHeight;
+    const reservedSpace = 370;
+    tableMaxHeight.value = windowHeight - reservedSpace;
+  });
+};
 // 状态管理
 const loading = ref(false);
 const taskList = ref<Task[]>([]);
@@ -325,5 +336,7 @@ const getTaskProgress = (task: Task, date: Date) => {
 // 初始化
 onMounted(() => {
   fetchTaskList();
+  calculateTableHeight();
+   window.addEventListener('resize', calculateTableHeight);
 });
 </script>

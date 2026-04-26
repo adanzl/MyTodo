@@ -250,10 +250,11 @@ const fetchTaskList = async () => {
             userId = globalVar?.user?.id;
         }
 
-        const todayStr = getTodayStr();
+        // 使用当前选中的日期，而不是今天
+        const selectedDateStr = currentDate.value.toISOString().split('T')[0];
 
-        // 查询条件：start_date <= today AND end_date >= today
-        const res = await getTaskList(userId, 1, 100, todayStr, todayStr);
+        // 查询条件：start_date <= selectedDate AND end_date >= selectedDate
+        const res = await getTaskList(userId, 1, 100, selectedDateStr, selectedDateStr);
 
         if (res.code === 0 && res.data) {
             taskList.value = res.data.data || [];

@@ -105,8 +105,10 @@ export function getWeekDay(date: Date): string {
  * @returns 天数差（从0开始）
  */
 export function getDaysDiff(startDate: string, targetDate: Date): number {
-  const start = dayjs(startDate);
-  const target = dayjs(targetDate);
+  // 确保startDate被正确解析为本地时间的开始（00:00:00）
+  const start = dayjs(startDate).startOf('day');
+  // 确保targetDate也被转换为同一天的开始（00:00:00）
+  const target = dayjs(targetDate).startOf('day');
   return target.diff(start, "day");
 }
 
