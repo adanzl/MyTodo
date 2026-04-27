@@ -119,18 +119,18 @@ class TaskMgr:
 
                             completed_count = sum(1 for m in materials_for_day if check_user_completed(m))
                         else:
-                            # 全部用户：需要所有用户都完成才算完成
-                            def all_users_completed(m):
+                            # 全部用户：素材有任何一个用户完成就算完成
+                            def any_user_completed(m):
                                 status = m.get('status')
                                 if not status:
                                     return False
                                 # 兼容旧格式：status 是整数，直接返回 false
                                 if isinstance(status, int):
                                     return False
-                                # 新格式：检查是否所有用户的状态都是 1
-                                return all(v == 1 for v in status.values())
+                                # 新格式：检查是否有任何用户的状态是 1
+                                return any(v == 1 for v in status.values())
 
-                            completed_count = sum(1 for m in materials_for_day if all_users_completed(m))
+                            completed_count = sum(1 for m in materials_for_day if any_user_completed(m))
 
                         calendar_data[date_key]['tasks'].append({
                             'task_id': task_id,
