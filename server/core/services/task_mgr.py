@@ -74,7 +74,9 @@ class TaskMgr:
                     task_data_str = task.get('data', '{}')
                     task_type = task.get('type', 0)
 
-                    log.info(f"处理任务: id={task_id}, name={task_name}, type={task_type}, start={start_date_str}, duration={duration}")
+                    log.info(
+                        f"处理任务: id={task_id}, name={task_name}, type={task_type}, start={start_date_str}, duration={duration}"
+                    )
 
                     if not start_date_str or duration <= 0:
                         continue
