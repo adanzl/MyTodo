@@ -107,15 +107,28 @@ class TaskMgr:
                         # status 现在是 Record<user_id, status>，根据 user_id 统计完成情况
                         if user_id and user_id > 0:
                             # 特定用户：只统计该用户的完成状态
-                            completed_count = sum(1 for m in materials_for_day
-                                                  if m.get('status') and m.get('status', {}).get(str(user_id)) == 1)
+                            def check_user_completed(m):
+                                status = m.get('status')
+                                if not status:
+                                    return False
+                                # 兼容旧格式：status 是整数，直接返回 false
+                                if isinstance(status, int):
+                                    return False
+                                # 新格式：status 是 Record
+                                return status.get(str(user_id)) == 1
+
+                            completed_count = sum(1 for m in materials_for_day if check_user_completed(m))
                         else:
                             # 全部用户：需要所有用户都完成才算完成
                             def all_users_completed(m):
-                                if not m.get('status'):
+                                status = m.get('status')
+                                if not status:
                                     return False
-                                # 检查是否所有用户的状态都是 1
-                                return all(v == 1 for v in m.get('status', {}).values())
+                                # 兼容旧格式：status 是整数，直接返回 false
+                                if isinstance(status, int):
+                                    return False
+                                # 新格式：检查是否所有用户的状态都是 1
+                                return all(v == 1 for v in status.values())
 
                             completed_count = sum(1 for m in materials_for_day if all_users_completed(m))
 
