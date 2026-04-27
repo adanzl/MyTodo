@@ -160,6 +160,7 @@ export interface Task {
   duration: number;
   user_id: string;
   status?: number; // 1: 进行中, 2: 已结束, 0: 未开始， -1：未开启
+  type: number; // 0:每日任务；1：持续性任务
   data: string | TaskDetail;
 }
 
@@ -184,12 +185,14 @@ export async function getTaskList(
     conditions.user_id = { like: `%${userId}%` };
   }
 
-  // 添加日期范围查询条件
-  if (startDate) {
-    conditions.start_date = { '<=': startDate };
-  }
+  // 添加日期范围查询条件：任务与视图有交集
   if (endDate) {
-    conditions.end_date = { '>=': endDate };
+    // 任务开始日期 <= 视图结束日期
+    conditions.start_date = { "<=": endDate };
+  }
+  if (startDate) {
+    // 任务结束日期 >= 视图开始日期
+    conditions.end_date = { ">=": startDate };
   }
 
   return getList<Task>(
@@ -244,7 +247,7 @@ export async function getMaterialListByIds(ids: number[]): Promise<MaterialItem[
 
   // 构建查询条件：id IN (...)
   const conditions = {
-    id: { in: ids }
+    id: { in: ids },
   };
 
   const response = await getList<Material>("t_material", conditions, 1, ids.length);
@@ -258,7 +261,7 @@ export async function getMaterialListByIds(ids: number[]): Promise<MaterialItem[
   return materials.map(material => ({
     ...material,
     id: material.id!, // 确保 id 存在
-    data: typeof material.data === 'string' ? JSON.parse(material.data) : material.data,
+    data: typeof material.data === "string" ? JSON.parse(material.data) : material.data,
   })) as MaterialItem[];
 }
 
@@ -296,7 +299,10 @@ export interface TaskCalendarResponse {
  * @param date - 日期(格式 YYYY-MM-DD)
  * @param userId - 用户ID(可选)
  */
-export async function getTaskCalendar(date: string, userId?: number): Promise<TaskCalendarResponse> {
+export async function getTaskCalendar(
+  date: string,
+  userId?: number
+): Promise<TaskCalendarResponse> {
   const params: any = { date };
 
   if (userId && userId > 0) {

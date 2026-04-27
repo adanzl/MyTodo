@@ -12,16 +12,16 @@
     <el-table :data="taskList" v-loading="loading" stripe border style="width: 100%" :max-height="tableMaxHeight">
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column prop="name" label="任务名称" min-width="200" />
+      <el-table-column prop="type" label="任务类型" width="100">
+        <template #default="{ row }">
+          <el-tag :type="row.type === 1 ? 'success' : 'primary'">{{ row.type === 1 ? '持续任务' : '每日任务' }}</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column prop="start_date" label="开始日期" width="120" />
       <el-table-column prop="duration" label="天数" width="80" />
       <el-table-column prop="user_id" label="布置对象" width="150">
         <template #default="{ row }">
           {{ getUserName(row.user_id) }}
-        </template>
-      </el-table-column>
-      <el-table-column prop="status" label="状态" width="100">
-        <template #default="{ row }">
-          <el-tag :type="getStatusType(row.status)">{{ getStatusText(row.status) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="280" fixed="right">
@@ -68,11 +68,11 @@ import TaskDialog from "./dialogs/TaskDialog.vue";
 
 
 const tableMaxHeight = ref<number>(0);
-  // 计算表格最大高度
+// 计算表格最大高度
 const calculateTableHeight = () => {
   nextTick(() => {
     const windowHeight = window.innerHeight;
-    const reservedSpace = 370;
+    const reservedSpace = 300;
     tableMaxHeight.value = windowHeight - reservedSpace;
   });
 };
@@ -130,28 +130,6 @@ const getUserName = (userId?: number) => {
   if (userIds.includes(3)) names.push("灿灿");
   if (userIds.includes(4)) names.push("昭昭");
   return names.join(", ") || "-";
-};
-
-// 获取状态文本
-const getStatusText = (status?: number) => {
-  const statusMap: Record<number, string> = {
-    "-1": "未开启",
-    0: "未开始",
-    1: "进行中",
-    2: "已结束",
-  };
-  return statusMap[status ?? 1] || "进行中";
-};
-
-// 获取状态类型
-const getStatusType = (status?: number) => {
-  const typeMap: Record<number, any> = {
-    "-1": "info",
-    0: "info",
-    1: "success",
-    2: "warning",
-  };
-  return typeMap[status ?? 1] || "success";
 };
 
 // 新建任务

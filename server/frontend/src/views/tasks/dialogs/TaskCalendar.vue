@@ -74,6 +74,7 @@ import { getTaskCalendar, type TaskCalendarResponse } from '@/api/api-task';
 interface Props {
     modelValue: boolean;
     selectedDate?: string; // 选中的日期 YYYY-MM-DD
+    userId?: number; // 用户ID
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -123,7 +124,7 @@ const fetchCalendarData = async () => {
     loading.value = true;
     try {
         const dateStr = currentDate.value.format('YYYY-MM-DD');
-        const data = await getTaskCalendar(dateStr);
+        const data = await getTaskCalendar(dateStr, props.userId);
         calendarData.value = data;
         generateCalendarDates(data.year, data.month);
     } catch (error) {

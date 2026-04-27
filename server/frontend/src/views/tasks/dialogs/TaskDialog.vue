@@ -30,8 +30,8 @@
             <el-col :span="8">
               <el-form-item label="布置对象" required>
                 <el-checkbox-group v-model="selectedUsers">
-                  <el-checkbox :label="3">灿灿</el-checkbox>
-                  <el-checkbox :label="4">昭昭</el-checkbox>
+                  <el-checkbox :value="3">灿灿</el-checkbox>
+                  <el-checkbox :value="4">昭昭</el-checkbox>
                 </el-checkbox-group>
               </el-form-item>
             </el-col>
@@ -51,10 +51,18 @@
                 />
               </el-form-item>
             </el-col>
-            <el-col :span="12">
+            <el-col :span="8">
               <el-form-item label="总天数" required>
                 <el-input-number v-model="formData.duration" :min="1" :max="365" class="w-10" size="small" />
                 <span class="ml-2 text-xs text-gray-600">到 {{ endDateStr }} 结束</span>
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="任务类型" required>
+                <el-select v-model="formData.type" placeholder="请选择任务类型" class="w-30!">
+                  <el-option label="每日任务" :value="0" />
+                  <el-option label="持续任务" :value="1" />
+                </el-select>
               </el-form-item>
             </el-col>
           </el-row>
@@ -72,8 +80,8 @@
         </div>
 
         <div class="checkin-content flex" style="height: 400px;">
-          <!-- 左侧：天数列表 -->
-          <div class="day-list w-48 border-r overflow-y-auto">
+          <!-- 左侧：天数列表（仅每日任务显示） -->
+          <div v-if="formData.type === 0" class="day-list w-48 border-r overflow-y-auto">
             <div
               v-for="dayIndex in Array.from({ length: formData.duration || 1 }, (_, i) => i)"
               :key="dayIndex"
@@ -90,16 +98,14 @@
 
           <!-- 右侧：素材内容 -->
           <div class="material-content flex-1 p-4 overflow-y-auto">
-            <div v-if="selectedDay === -1" class="text-center text-gray-400 py-20">
-              请选择左侧的天数
-            </div>
-            <div v-else>
-              <div v-if="getDayMaterials(selectedDay).length === 0" class="text-center text-gray-400 py-20">
+            <!-- 持续任务：显示所有素材 -->
+            <div v-if="formData.type === 1">
+              <div v-if="getAllMaterials().length === 0" class="text-center text-gray-400 py-20">
                 暂无素材，点击“添加素材”按钮添加
               </div>
               <div v-else class="space-y-2">
                 <div
-                  v-for="(material, index) in getDayMaterials(selectedDay)"
+                  v-for="(material, index) in getAllMaterials()"
                   :key="index"
                   class="material-item p-3 border rounded flex items-center justify-between hover:bg-gray-50 transition-all duration-200"
                 >
@@ -107,9 +113,35 @@
                     <div class="font-medium">{{ material.name }}</div>
                     <div class="text-xs text-gray-500 mt-1">类型：{{ getMaterialTypeName(material.type) }}</div>
                   </div>
-                  <el-button size="small" type="danger" link @click="removeMaterial(selectedDay, index)">
+                  <el-button size="small" type="danger" link @click="removeMaterialFromAll(index)">
                     删除
                   </el-button>
+                </div>
+              </div>
+            </div>
+            <!-- 每日任务：按天显示 -->
+            <div v-else>
+              <div v-if="selectedDay === -1" class="text-center text-gray-400 py-20">
+                请选择左侧的天数
+              </div>
+              <div v-else>
+                <div v-if="getDayMaterials(selectedDay).length === 0" class="text-center text-gray-400 py-20">
+                  暂无素材，点击“添加素材”按钮添加
+                </div>
+                <div v-else class="space-y-2">
+                  <div
+                    v-for="(material, index) in getDayMaterials(selectedDay)"
+                    :key="index"
+                    class="material-item p-3 border rounded flex items-center justify-between hover:bg-gray-50 transition-all duration-200"
+                  >
+                    <div class="flex-1">
+                      <div class="font-medium">{{ material.name }}</div>
+                      <div class="text-xs text-gray-500 mt-1">类型：{{ getMaterialTypeName(material.type) }}</div>
+                    </div>
+                    <el-button size="small" type="danger" link @click="removeMaterial(selectedDay, index)">
+                      删除
+                    </el-button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -221,6 +253,7 @@ const formData = ref<Partial<Task>>({
   duration: 1,
   user_id: "",
   status: 1,
+  type: 0,
 });
 
 // 计算结束日期
@@ -240,6 +273,7 @@ watch(
         duration: newData.duration || 1,
         user_id: newData.user_id || "",
         status: newData.status ?? 1,
+        type: newData.type ?? 0,
       };
 
       // 解析 user_id，如果是多个用户用逗号分隔
@@ -288,6 +322,20 @@ watch(
   () => formData.value.duration,
   (newDuration) => {
     if (newDuration && newDuration > 0) {
+      selectedDay.value = 0;
+    }
+  }
+);
+
+// 监听 type 变化，持续任务时默认选中第0天
+watch(
+  () => formData.value.type,
+  (newType) => {
+    if (newType === 1) {
+      // 持续任务：选中第0天
+      selectedDay.value = 0;
+    } else if (newType === 0) {
+      // 每日任务：选中第0天
       selectedDay.value = 0;
     }
   }
@@ -343,6 +391,31 @@ const removeMaterial = (day: number, index: number) => {
   const materials = dailyMaterials.value[day];
   if (materials) {
     materials.splice(index, 1);
+  }
+};
+
+// 获取所有素材（持续任务用）
+const getAllMaterials = () => {
+  // 持续任务只返回第0天的素材
+  return dailyMaterials.value[0] || [];
+};
+
+// 从所有素材中删除（持续任务用）
+const removeMaterialFromAll = (index: number) => {
+  const allMaterials = getAllMaterials();
+  if (index >= 0 && index < allMaterials.length) {
+    const materialToRemove = allMaterials[index];
+    // 找到并删除该素材
+    for (const day in dailyMaterials.value) {
+      const materials = dailyMaterials.value[Number(day)];
+      const matIndex = materials.findIndex(
+        (m) => m.id === materialToRemove.id && m.name === materialToRemove.name
+      );
+      if (matIndex !== -1) {
+        materials.splice(matIndex, 1);
+        break;
+      }
+    }
   }
 };
 
@@ -426,20 +499,23 @@ const confirmAddMaterials = () => {
     return;
   }
 
-  // 将选中的素材添加到当前选中的天数
-  if (!dailyMaterials.value[selectedDay.value]) {
-    dailyMaterials.value[selectedDay.value] = [];
+  // 持续任务：添加到第0天
+  const targetDay = formData.value.type === 1 ? 0 : selectedDay.value;
+
+  // 将选中的素材添加到目标天数
+  if (!dailyMaterials.value[targetDay]) {
+    dailyMaterials.value[targetDay] = [];
   }
 
   let addedCount = 0;
   selectedMaterials.value.forEach((material) => {
     // 检查是否已存在
-    const exists = dailyMaterials.value[selectedDay.value].some(
+    const exists = dailyMaterials.value[targetDay].some(
       (m) => m.id === material.id
     );
 
     if (!exists) {
-      dailyMaterials.value[selectedDay.value].push({
+      dailyMaterials.value[targetDay].push({
         id: material.id!,
         name: material.name,
         type: material.type,
@@ -484,6 +560,7 @@ const handleSubmit = async () => {
       end_date: endDateStr,
       duration: formData.value.duration || 1,
       user_id: userIdStr,
+      type: formData.value.type ?? 0,
       status: formData.value.status ?? 1,
       data: JSON.stringify({
         dailyMaterials: dailyMaterials.value,

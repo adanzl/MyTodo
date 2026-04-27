@@ -105,6 +105,7 @@ const props = defineProps<{
     isOpen: boolean;
     material: Material | null;
     task: any | null;
+    userId?: number;
 }>();
 
 const emit = defineEmits<{
@@ -161,7 +162,7 @@ const isLastPageOdd = computed(() => {
 
 // 判断当前素材是否已完成
 const isMaterialCompleted = computed(() => {
-    if (!props.material || !props.task) return false;
+    if (!props.material || !props.task) return true;
     
     const taskData = typeof props.task.data === 'string' 
         ? JSON.parse(props.task.data) 
@@ -171,8 +172,10 @@ const isMaterialCompleted = computed(() => {
         for (const dayKey in taskData.dailyMaterials) {
             const materials = taskData.dailyMaterials[dayKey];
             const material = materials.find((m: any) => m.id === props.material?.id);
-            if (material && material.status === 1) {
-                return true;
+            // status 现在是 Record<string, number>，key 为 user_id
+            const userId = props.userId;
+            if (material && userId && material.status) {
+                return material.status[String(userId)] === 1;
             }
         }
     }
@@ -342,13 +345,23 @@ const completeReading = async () => {
         
         // 找到当前 material 在 dailyMaterials 中的位置并更新 status
         if (taskData.dailyMaterials) {
+            const userId = props.userId;
+            if (!userId) {
+                console.error('无法获取用户ID');
+                return;
+            }
+            
             for (const dayKey in taskData.dailyMaterials) {
                 const materials = taskData.dailyMaterials[dayKey];
                 const materialIndex = materials.findIndex((m: any) => m.id === props.material?.id);
                 
                 if (materialIndex !== -1) {
-                    // 更新 status 为 1（完成）
-                    materials[materialIndex].status = 1;
+                    // 初始化 status 为 Record<string, number>
+                    if (!materials[materialIndex].status) {
+                        materials[materialIndex].status = {};
+                    }
+                    // 更新当前用户的 status 为 1（完成）
+                    materials[materialIndex].status[String(userId)] = 1;
                     break;
                 }
             }

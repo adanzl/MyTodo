@@ -4,15 +4,12 @@
             <!-- 用户筛选 -->
             <div class="mb-4 flex items-center gap-2">
                 <el-radio-group v-model="selectedUserId" @change="handleUserChange">
-                    <el-radio-button value="0">
-                        <span>全部</span>
-                    </el-radio-button>
-                    <el-radio-button value="3">
+                    <el-radio value="3">
                         <span>灿灿</span>
-                    </el-radio-button>
-                    <el-radio-button value="4">
+                    </el-radio>
+                    <el-radio value="4">
                         <span>昭昭</span>
-                    </el-radio-button>
+                    </el-radio>
                 </el-radio-group>
             </div>
 
@@ -52,7 +49,7 @@
                                 class="absolute top-2 left-3 text-xs text-gray-500 truncate max-w-[80%] flex gap-2 items-center">
                                 <el-tag :type="isMaterialCompleted(task, material, currentDate) ? 'success' : 'info'"
                                     :effect="isMaterialCompleted(task, material, currentDate) ? 'dark' : 'plain'"
-                                    size="small" class="flex-shrink-0">
+                                    size="small" class="shrink-0">
                                     {{ isMaterialCompleted(task, material, currentDate) ? '已完成' : '未完成' }}
                                 </el-tag>
                                 <span class="truncate">{{ task.name }}</span>
@@ -62,10 +59,7 @@
                                 <Document />
                             </el-icon>
                             <div class="text-sm font-medium text-center line-clamp-2 mb-1">{{ material.name }}</div>
-                            <div class="mb-1 text-xs items-center flex gap-2">
-                                <div class="text-gray-600">页数: {{ (material.data as any)?.pdfLength || 0 }}</div>
-                            </div>
-                            <div class="text-[10px] flex items-center">点击阅读</div>
+                            <div class="text-[10px] flex items-center mt-2">点击阅读</div>
                         </div>
                     </template>
                 </div>
@@ -76,7 +70,7 @@
         <MaterialPreviewDialog v-model="showPlayerDialog" :material-id="selectedMaterial?.id || null" />
 
         <!-- 任务日历弹窗 -->
-        <TaskCalendar v-model="showCalendarDialog" :selected-date="currentDateStr"
+        <TaskCalendar v-model="showCalendarDialog" :selected-date="currentDateStr" :user-id="Number(selectedUserId)"
             @date-selected="handleDateSelected" />
     </div>
 </template>
@@ -97,7 +91,7 @@ const materialMap = ref<Map<number, MaterialItem>>(new Map());
 const startDate = ref(new Date());
 const currentDate = ref(new Date());
 const totalCount = ref(0);
-const selectedUserId = ref('0');
+const selectedUserId = ref('3');
 
 // 播放弹窗状态
 const showPlayerDialog = ref(false);
@@ -109,129 +103,143 @@ const showCalendarDialog = ref(false);
 
 // 当前日期字符串
 const currentDateStr = computed(() => {
-    return currentDate.value.toISOString().split('T')[0];
+  return currentDate.value.toISOString().split('T')[0];
 });
 
 // 显示的任务列表（直接使用 API 返回的数据）
 const displayTasks = computed(() => {
-    return taskList.value;
+  return taskList.value;
 });
 
 // 检查是否有可显示的素材
 const hasDisplayableMaterials = computed(() => {
-    return taskList.value.some(task => getTaskMaterialList(task).length > 0);
+  return taskList.value.some(task => getTaskMaterialList(task).length > 0);
 });
 
 // 获取任务当天的素材存档列表（从 task.data 中直接获取）
 const getTaskMaterialSaveList = (task: Task): any[] => {
-    try {
-        const taskData = typeof task.data === 'string' ? JSON.parse(task.data) : task.data;
-        const dailyMaterials = taskData.dailyMaterials || {};
+  try {
+    const taskData = typeof task.data === 'string' ? JSON.parse(task.data) : task.data;
+    const dailyMaterials = taskData.dailyMaterials || {};
 
-        // 计算当前日期是任务的第几天
-        const diffDaysCount = getDaysDiff(task.start_date, currentDate.value);
+    // 计算当前日期是任务的第几天
+    const diffDaysCount = getDaysDiff(task.start_date, currentDate.value);
 
-        if (diffDaysCount < 0 || diffDaysCount >= task.duration) {
-            return [];
-        }
-
-        // 直接返回对应天数的素材存档数组
-        return dailyMaterials[diffDaysCount] || [];
-    } catch (error) {
-        return [];
+    if (diffDaysCount < 0 || diffDaysCount >= task.duration) {
+      return [];
     }
+
+    // type=1（持续任务）：只看第0天的素材
+    const materialsIndex = task.type === 1 ? 0 : diffDaysCount;
+    // 直接返回对应天数的素材存档数组
+    return dailyMaterials[materialsIndex] || [];
+  } catch (error) {
+    return [];
+  }
 };
 
 // 获取任务当天的素材基础信息列表
 const getTaskMaterialList = (task: Task): MaterialItem[] => {
-    const saves = getTaskMaterialSaveList(task);
-    return saves
-        .map((save: any) => materialMap.value.get(save.id))
-        .filter((m): m is MaterialItem => m !== undefined);
+  const saves = getTaskMaterialSaveList(task);
+  return saves
+    .map((save: any) => materialMap.value.get(save.id))
+    .filter((m): m is MaterialItem => m !== undefined);
 };
 
 // 检查素材是否完成
 const isMaterialCompleted = (task: Task, material: MaterialItem, date: Date) => {
-    try {
-        const taskData = typeof task.data === 'string' ? JSON.parse(task.data) : task.data;
+  try {
+    const taskData = typeof task.data === 'string' ? JSON.parse(task.data) : task.data;
 
-        // 检查 dailyMaterials 中的 status
-        if (taskData.dailyMaterials) {
-            const diffDaysCount = getDaysDiff(task.start_date, date);
-            if (diffDaysCount < 0 || diffDaysCount >= task.duration) {
-                return false;
-            }
+    // 检查 dailyMaterials 中的 status
+    if (taskData.dailyMaterials) {
+      const diffDaysCount = getDaysDiff(task.start_date, date);
+      if (diffDaysCount < 0 || diffDaysCount >= task.duration) {
+        return false;
+      }
 
-            const dayKey = String(diffDaysCount); // dayKey 从 0 开始
-            const materials = taskData.dailyMaterials[dayKey];
-            if (materials) {
-                const found = materials.find((m: any) => m.id === material.id);
-                return found?.status === 1;
-            }
+      // type=1（持续任务）：只看第0天的素材
+      const materialsIndex = task.type === 1 ? 0 : diffDaysCount;
+      const dayKey = String(materialsIndex);
+      const materials = taskData.dailyMaterials[dayKey];
+      if (materials) {
+        const found = materials.find((m: any) => m.id === material.id);
+        if (!found || !found.status) return false;
+
+        // status 现在是 Record<user_id, status>
+        const selectedId = Number(selectedUserId.value);
+        if (selectedId === 0) {
+          // 全部用户：检查是否有任意用户完成
+          return Object.values(found.status).some((s: any) => s === 1);
+        } else {
+          // 特定用户：检查该用户的状态
+          return found.status[String(selectedId)] === 1;
         }
-
-        return false;
-    } catch (error) {
-        return false;
+      }
     }
+
+    return false;
+  } catch (error) {
+    return false;
+  }
 };
 
 // 打开素材播放器
 const openMaterialPlayer = async (task: Task, material: MaterialItem) => {
-    selectedMaterial.value = material;
-    selectedTask.value = task;
+  selectedMaterial.value = material;
+  selectedTask.value = task;
 
-    // 将素材数据存储到 sessionStorage 供预览组件使用
-    sessionStorage.setItem('previewMaterial', JSON.stringify(material));
+  // 将素材数据存储到 sessionStorage 供预览组件使用
+  sessionStorage.setItem('previewMaterial', JSON.stringify(material));
 
-    showPlayerDialog.value = true;
+  showPlayerDialog.value = true;
 };
 
 // 获取任务列表
 const fetchTaskList = async () => {
-    loading.value = true;
-    try {
-        let userId: number | undefined;
+  loading.value = true;
+  try {
+    let userId: number | undefined;
 
-        // 根据选择的筛选条件，0 表示全部
-        const selectedId = Number(selectedUserId.value);
-        userId = selectedId === 0 ? undefined : selectedId;
+    // 根据选择的筛选条件，0 表示全部
+    const selectedId = Number(selectedUserId.value);
+    userId = selectedId === 0 ? undefined : selectedId;
 
-        // 使用当前选中的日期进行范围查询
-        const selectedDateStr = currentDate.value.toISOString().split('T')[0];
+    // 使用当前选中的日期进行范围查询
+    const selectedDateStr = currentDate.value.toISOString().split('T')[0];
 
-        // 查询条件：start_date <= selectedDate AND end_date >= selectedDate
-        const res = await getTaskList(userId, 1, 100, selectedDateStr, selectedDateStr);
+    // 查询条件：start_date <= selectedDate AND end_date >= selectedDate
+    const res = await getTaskList(userId, 1, 100, selectedDateStr, selectedDateStr);
 
-        if (res.code === 0 && res.data) {
-            taskList.value = res.data.data || [];
-            totalCount.value = res.data.totalCount || 0;
+    if (res.code === 0 && res.data) {
+      taskList.value = res.data.data || [];
+      totalCount.value = res.data.totalCount || 0;
 
-            // 收集所有素材 ID
-            const materialIds = new Set<number>();
-            taskList.value.forEach(task => {
-                const saves = getTaskMaterialSaveList(task);
-                saves.forEach((save: any) => {
-                    if (save && save.id) {
-                        materialIds.add(save.id);
-                    }
-                });
-            });
+      // 收集所有素材 ID
+      const materialIds = new Set<number>();
+      taskList.value.forEach(task => {
+        const saves = getTaskMaterialSaveList(task);
+        saves.forEach((save: any) => {
+          if (save && save.id) {
+            materialIds.add(save.id);
+          }
+        });
+      });
 
-            // 批量获取素材详情
-            if (materialIds.size > 0) {
-                const materials = await getMaterialListByIds(Array.from(materialIds));
-                materials.forEach(material => {
-                    materialMap.value.set(material.id!, material);
-                });
-            }
-        }
-    } catch (error: any) {
-        console.error('获取任务列表失败:', error);
-        ElMessage.error(error.message || '获取任务列表失败');
-    } finally {
-        loading.value = false;
+      // 批量获取素材详情
+      if (materialIds.size > 0) {
+        const materials = await getMaterialListByIds(Array.from(materialIds));
+        materials.forEach(material => {
+          materialMap.value.set(material.id!, material);
+        });
+      }
     }
+  } catch (error: any) {
+    console.error('获取任务列表失败:', error);
+    ElMessage.error(error.message || '获取任务列表失败');
+  } finally {
+    loading.value = false;
+  }
 };
 
 // 刷新任务（保留函数以备将来使用）
@@ -241,29 +249,29 @@ const fetchTaskList = async () => {
 
 // 用户选择变化（仅 Admin）
 const handleUserChange = () => {
-    fetchTaskList();
+  fetchTaskList();
 };
 
 // 设置为今天
 const setToday = () => {
-    startDate.value = new Date();
-    currentDate.value = new Date();
-    fetchTaskList();
+  startDate.value = new Date();
+  currentDate.value = new Date();
+  fetchTaskList();
 };
 
 // 处理日期选择
 const handleDateSelected = (dateStr: string) => {
-    currentDate.value = new Date(dateStr);
-    fetchTaskList();
+  currentDate.value = new Date(dateStr);
+  fetchTaskList();
 };
 
 const btnCalendarClk = () => {
-    showCalendarDialog.value = true;
+  showCalendarDialog.value = true;
 };
 
 // 初始化
 onMounted(() => {
-    fetchTaskList();
+  fetchTaskList();
 });
 </script>
 

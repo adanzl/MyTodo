@@ -117,7 +117,7 @@ const tableMaxHeight = ref<number>(0);
 const calculateTableHeight = () => {
   nextTick(() => {
     const windowHeight = window.innerHeight;
-    const reservedSpace = 370;
+    const reservedSpace = 300;
     tableMaxHeight.value = windowHeight - reservedSpace;
   });
 };

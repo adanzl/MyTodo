@@ -16,6 +16,7 @@ export interface Task {
   duration: number;
   user_id: string;
   status?: number; // 1: 进行中, 2: 已结束, 0: 未开始， -1：未开启
+  type: number; // 0:每日任务；1：持续性任务
   data: string | TaskDetail;
 }
 
@@ -32,7 +33,7 @@ export interface TaskDetail {
       id: number;
       name: string;
       type: number;
-      status?: number; // 1表示完成，0或未定义表示未完成
+      status?: Record<string, number>; // key: user_id, value: 1表示完成，0或未定义表示未完成
     }>
   >;
   [key: string]: any;

@@ -42,6 +42,8 @@
       row-key="id"
       :max-height="tableMaxHeight"
       :row-class-name="getRowClassName"
+      :row-style="getRowStyle"
+      :span-method="getSpanMethod"
     >
       <el-table-column prop="name" label="任务名称" min-width="150" fixed>
         <template #default="{ row }">
@@ -104,12 +106,12 @@ import dayjs from "dayjs";
 import { TaskDetail } from "@/types/tasks/taskDetail";
 
 const tableMaxHeight = ref<number>(0);
-  
+
 // 计算表格最大高度
 const calculateTableHeight = () => {
   nextTick(() => {
     const windowHeight = window.innerHeight;
-    const reservedSpace = 370;
+    const reservedSpace = 300;
     tableMaxHeight.value = windowHeight - reservedSpace;
   });
 };
@@ -161,6 +163,7 @@ const displayData = computed(() => {
   }
 
   const result: any[] = [];
+
   taskList.value.forEach((task) => {
     // 添加任务行
     result.push({ ...task, isTask: true });
@@ -170,23 +173,52 @@ const displayData = computed(() => {
       const taskData = typeof task.data === "string" ? JSON.parse(task.data) : task.data;
       const dailyMaterials = taskData.dailyMaterials || {};
 
-      // 收集所有素材
-      const allMaterials: Record<string, any> = {};
-      (Object.values(dailyMaterials) as any[][]).forEach((materials) => {
-        materials.forEach((m) => {
-          if (!allMaterials[m.id]) {
-            allMaterials[m.id] = { ...m, taskId: task.id };
-          }
-        });
-      });
+      // 收集素材
+      const materialsToDisplay: any[] = [];
 
-      // 添加素材行
-      Object.values(allMaterials).forEach((material: any) => {
+      if (task.type === 1) {
+        // type=1（持续任务）：只收集第0天的素材
+        const day0Materials = dailyMaterials[0] || [];
+        day0Materials.forEach((m: any) => {
+          materialsToDisplay.push({
+            ...m,
+            taskId: task.id,
+            taskType: task.type,
+            taskStartDate: task.start_date,
+            taskDuration: task.duration
+          });
+        });
+      } else {
+        // type=0（每日任务）：收集所有天的素材
+        const allMaterials: Record<string, any> = {};
+        (Object.values(dailyMaterials) as any[][]).forEach((materials) => {
+          materials.forEach((m) => {
+            if (!allMaterials[m.id]) {
+              allMaterials[m.id] = {
+                ...m,
+                taskId: task.id,
+                taskType: task.type,
+                taskStartDate: task.start_date,
+                taskDuration: task.duration
+              };
+            }
+          });
+        });
+        Object.values(allMaterials).forEach((material: any) => {
+          materialsToDisplay.push(material);
+        });
+      }
+
+      // 添加素材行到结果
+      materialsToDisplay.forEach((material: any) => {
         result.push({
           id: `task_${task.id}_material_${material.id}`,
           name: `${material.name}`,
           type: material.type,
           taskId: task.id,
+          taskType: material.taskType,
+          taskStartDate: material.taskStartDate,
+          taskDuration: material.taskDuration,
           isTask: false,
         });
       });
@@ -217,16 +249,26 @@ const getMaterialStatus = (row: any, date: Date) => {
       return "";
     }
 
-    // 获取该天的素材列表（使用0-based索引）
-    const materials = dailyMaterials[diffDays] || [];
+    // type=1（持续任务）：只看第0天的素材
+    const materialsIndex = task.type === 1 ? 0 : diffDays;
+    const materials = dailyMaterials[materialsIndex] || [];
 
     // 找到当前素材
     const material = materials.find((m: any) => m.name === row.name);
     if (!material) return "";
 
-    // 检查是否完成
-    if (material.status === 1) {
-      return "✅";
+    // 检查是否完成 - status 现在是 Record<user_id, status>
+    // 如果 selectedUserId 为 0（全部），检查是否所有用户都完成
+    if (material.status) {
+      if (selectedUserId.value === 0) {
+        // 全部用户：检查是否有任意用户完成
+        const hasCompleted = Object.values(material.status).some(s => s === 1);
+        return hasCompleted ? "✅" : "❌";
+      } else {
+        // 特定用户：检查该用户的状态
+        const userStatus = material.status[String(selectedUserId.value)];
+        return userStatus === 1 ? "✅" : "❌";
+      }
     }
     return "❌";
   } catch (error) {
@@ -244,11 +286,79 @@ const getRowClassName = ({ row }: { row: any }) => {
   return showDetail.value && row.isTask !== false ? 'bg-gray-50' : '';
 };
 
+// 设置行样式，详情模式下高亮任务行
+const getRowStyle = ({ row }: { row: any }) => {
+  if (showDetail.value && row.isTask !== false) {
+    return { backgroundColor: '#f0f9ff' };
+  }
+  return {};
+};
+
+// 合并单元格方法，type=1的任务和素材行只合并任务所在天的单元格
+const getSpanMethod = ({ row, columnIndex }: any) => {
+  // type=1（持续任务）的任务行
+  const isType1Task = row.isTask !== false && row.type === 1;
+  // 详情模式下的 type=1 素材行
+  const isType1Material = showDetail.value && row.isTask === false && row.taskType === 1;
+
+  if (!(isType1Task || isType1Material) || columnIndex < 1) {
+    return { rowspan: 1, colspan: 1 };
+  }
+
+  // 获取任务的开始日期和持续时间
+  const taskStartDate = isType1Task ? row.start_date : row.taskStartDate;
+  const taskDuration = isType1Task ? row.duration : row.taskDuration;
+
+  if (!taskStartDate || !taskDuration) {
+    return { rowspan: 1, colspan: 1 };
+  }
+
+  // 计算任务覆盖的日期范围
+  const startDate = dayjs(taskStartDate).startOf('day');
+  const endDate = startDate.add(taskDuration - 1, 'day').endOf('day');
+
+  // 检查当前列的日期是否在任务范围内
+  const currentDate = dayjs(weekDates.value[columnIndex - 1]).startOf('day');
+
+  if (currentDate.isBefore(startDate) || currentDate.isAfter(endDate)) {
+    return { rowspan: 1, colspan: 1 };
+  }
+
+  // 计算从当前列开始，后面还有多少列在任务范围内
+  let colspan = 1;
+  for (let i = columnIndex; i < weekDates.value.length; i++) {
+    const nextDate = dayjs(weekDates.value[i]).startOf('day');
+    if (nextDate.isBefore(endDate) || nextDate.isSame(endDate, 'day')) {
+      colspan++;
+    } else {
+      break;
+    }
+  }
+
+  // 判断当前列是否是视图中任务覆盖范围的第一列
+  const prevDate = columnIndex > 1 ? dayjs(weekDates.value[columnIndex - 2]).startOf('day') : null;
+  const isFirstInViewRange = columnIndex === 1 || (prevDate && prevDate.isBefore(startDate));
+  return isFirstInViewRange ? { rowspan: 1, colspan } : { rowspan: 0, colspan: 0 };
+};
+
 // 获取任务列表
 const fetchTaskList = async () => {
   loading.value = true;
   try {
-    const res = await getTaskList(selectedUserId.value, pageNum.value, pageSize.value);
+    // 计算视图的日期范围
+    const viewStartDate = weekDates.value[0];
+    const viewEndDate = weekDates.value[weekDates.value.length - 1];
+
+    const startDateStr = viewStartDate ? dayjs(viewStartDate).format('YYYY-MM-DD') : undefined;
+    const endDateStr = viewEndDate ? dayjs(viewEndDate).format('YYYY-MM-DD') : undefined;
+
+    const res = await getTaskList(
+      selectedUserId.value,
+      pageNum.value,
+      pageSize.value,
+      startDateStr,
+      endDateStr
+    );
     if (res.code === 0 && res.data) {
       taskList.value = res.data.data || [];
       totalCount.value = res.data.totalCount || 0;
@@ -320,12 +430,33 @@ const getTaskProgress = (task: Task, date: Date) => {
       return "-";
     }
 
-    // 获取该天的素材列表（使用0-based索引）
-    const materials = dailyMaterials[diffDays] || [];
+    let materials: any[] = [];
+
+    // type=1（持续任务）：只看第0天的素材
+    if (task.type === 1) {
+      materials = dailyMaterials[0] || [];
+    } else {
+      // type=0（每日任务）：获取该天的素材列表
+      materials = dailyMaterials[diffDays] || [];
+    }
+
     const totalMaterials = materials.length;
 
-    // 统计完成数
-    const completedCount = materials.filter((m: any) => m.status === 1).length;
+    // 统计完成数 - status 现在是 Record<user_id, status>
+    let completedCount = 0;
+    if (selectedUserId.value === 0) {
+      // 全部用户：素材有任何一个用户完成就算完成
+      completedCount = materials.filter((m: any) => {
+        if (!m.status) return false;
+        return Object.values(m.status).some((s: any) => s === 1);
+      }).length;
+    } else {
+      // 特定用户：检查该用户的状态
+      completedCount = materials.filter((m: any) => {
+        if (!m.status) return false;
+        return m.status[String(selectedUserId.value)] === 1;
+      }).length;
+    }
 
     return `${completedCount}/${totalMaterials}`;
   } catch (error) {

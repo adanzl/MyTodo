@@ -94,6 +94,7 @@
         v-model:is-open="showPlayerDialog"
         :material="selectedMaterial"
         :task="selectedTask"
+        :user-id="getCurrentUserId()"
       />
 
       <!-- 任务日历弹窗 -->
@@ -108,7 +109,7 @@
 
 <script setup lang="ts">
 import { getTaskList, getMaterialListByIds, type Task, type MaterialItem } from '@/api/api-task';
-import { getTodayStr, diffDays } from '@/utils/date-util';
+import { diffDays } from '@/utils/date-util';
 import ServerRemoteBadge from '@/components/ServerRemoteBadge.vue';
 import MaterialPlayerDialog from './dialogs/MaterialPlayerDialog.vue';
 import TaskCalendar from './dialogs/TaskCalendar.vue';
@@ -180,8 +181,11 @@ const getTaskMaterialSaveList = (task: Task): any[] => {
             return [];
         }
 
+        // type=1（持续任务）：始终显示第0天的素材
+        const materialsIndex = task.type === 1 ? 0 : diffDaysCount;
+        
         // 直接返回对应天数的素材存档数组（索引从0开始）
-        return dailyMaterials[String(diffDaysCount)] || [];
+        return dailyMaterials[String(materialsIndex)] || [];
     } catch (error) {
         console.error('解析任务数据失败:', error);
         return [];
@@ -209,17 +213,36 @@ const isMaterialCompleted = (task: Task, material: any, date: Date) => {
                 return false;
             }
 
+            // type=1（持续任务）：始终检查第0天的素材
+            const materialsIndex = task.type === 1 ? 0 : diffDaysCount;
+            
             // 使用从0开始的索引
-            const materials = taskData.dailyMaterials[String(diffDaysCount)];
+            const materials = taskData.dailyMaterials[String(materialsIndex)];
             if (materials) {
                 const found = materials.find((m: any) => m.id === material.id);
-                return found?.status === 1;
+                // status 现在是 Record<string, number>，key 为 user_id
+                const userId = getCurrentUserId();
+                
+                if (userId && found?.status) {
+                    return found.status[String(userId)] === 1;
+                }
+                return false;
             }
         }
 
         return false;
     } catch (error) {
         return false;
+    }
+};
+
+// 获取当前用户ID（与获取任务列表相同的逻辑）
+const getCurrentUserId = (): number | undefined => {
+    if (isAdmin.value) {
+        const selectedId = Number(selectedUserId.value);
+        return selectedId === 0 ? undefined : selectedId;
+    } else {
+        return globalVar?.user?.id;
     }
 };
 
@@ -240,16 +263,7 @@ const openMaterialPlayer = async (task: Task, material: MaterialItem) => {
 const fetchTaskList = async () => {
     loading.value = true;
     try {
-        let userId: number | undefined;
-
-        if (isAdmin.value) {
-            // Admin 用户：根据选择的筛选条件，0 表示全部
-            const selectedId = Number(selectedUserId.value);
-            userId = selectedId === 0 ? undefined : selectedId;
-        } else {
-            // 非 Admin 用户：只能看自己的
-            userId = globalVar?.user?.id;
-        }
+        const userId = getCurrentUserId();
 
         // 使用当前选中的日期，而不是今天
         const selectedDateStr = currentDate.value.toISOString().split('T')[0];
