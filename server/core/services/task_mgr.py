@@ -61,6 +61,7 @@ class TaskMgr:
                 return {"code": -1, "msg": "获取任务列表失败", "data": None}
 
             tasks = result.get('data', {}).get('data', [])
+            log.info(f"查询到 {len(tasks)} 个任务")
 
             calendar_data: Dict[str, Dict[str, Any]] = {}
 
@@ -71,6 +72,9 @@ class TaskMgr:
                     start_date_str = task.get('start_date', '')
                     duration = task.get('duration', 0)
                     task_data_str = task.get('data', '{}')
+                    task_type = task.get('type', 0)
+
+                    log.info(f"处理任务: id={task_id}, name={task_name}, type={task_type}, start={start_date_str}, duration={duration}")
 
                     if not start_date_str or duration <= 0:
                         continue
@@ -80,6 +84,7 @@ class TaskMgr:
 
                     task_data = json.loads(task_data_str) if isinstance(task_data_str, str) else task_data_str
                     daily_materials = task_data.get('dailyMaterials', {})
+                    task_type = task.get('type', 0)  # 获取任务类型
 
                     for day_offset in range(duration):
                         current_date = start_date + timedelta(days=day_offset)
@@ -92,7 +97,9 @@ class TaskMgr:
                         if date_key not in calendar_data:
                             calendar_data[date_key] = {'date': date_key, 'tasks': []}
 
-                        materials_for_day = daily_materials.get(str(day_offset), [])
+                        # type=1（持续任务）：所有素材都在第0天
+                        materials_index = 0 if task_type == 1 else day_offset
+                        materials_for_day = daily_materials.get(str(materials_index), [])
 
                         total_count = len(materials_for_day)
                         # status 现在是 Record<user_id, status>，根据 user_id 统计完成情况

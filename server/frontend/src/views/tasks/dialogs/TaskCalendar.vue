@@ -39,11 +39,11 @@
                 <div v-for="date in calendarDates" :key="date.dateStr"
                     class="aspect-square flex flex-col items-center justify-center p-1 rounded cursor-pointer relative border"
                     :class="{
-                        'bg-blue-100 border-blue-300': isToday(date.dateStr),
-                        'bg-blue-500 text-white border-blue-600': isSelectedDate(date.dateStr) && !isToday(date.dateStr),
-                        'bg-white border-gray-200': !isToday(date.dateStr) && !isSelectedDate(date.dateStr),
-                        'hover:bg-gray-50': !isToday(date.dateStr) && !isSelectedDate(date.dateStr),
-                        'opacity-50': !date.isCurrentMonth
+                      'bg-blue-100 border-blue-300': isToday(date.dateStr),
+                      'bg-blue-500 text-white border-blue-600': isSelectedDate(date.dateStr) && !isToday(date.dateStr),
+                      'bg-white border-gray-200': !isToday(date.dateStr) && !isSelectedDate(date.dateStr),
+                      'hover:bg-gray-50': !isToday(date.dateStr) && !isSelectedDate(date.dateStr),
+                      'opacity-50': !date.isCurrentMonth
                     }" @click="selectDate(date.dateStr)">
                     <!-- 未完成红点 -->
                     <div v-if="hasIncompleteTasks(date.dateStr)"
@@ -72,19 +72,19 @@ import { formatDate } from '@/utils/date';
 import { getTaskCalendar, type TaskCalendarResponse } from '@/api/api-task';
 
 interface Props {
-    modelValue: boolean;
-    selectedDate?: string; // 选中的日期 YYYY-MM-DD
-    userId?: number; // 用户ID
+  modelValue: boolean;
+  selectedDate?: string; // 选中的日期 YYYY-MM-DD
+  userId?: number; // 用户ID
 }
 
 const props = withDefaults(defineProps<Props>(), {
-    modelValue: false,
-    selectedDate: () => formatDate(new Date()),
+  modelValue: false,
+  selectedDate: () => formatDate(new Date()),
 });
 
 const emit = defineEmits<{
-    (e: 'update:modelValue', value: boolean): void;
-    (e: 'date-selected', date: string): void;
+  (e: 'update:modelValue', value: boolean): void;
+  (e: 'date-selected', date: string): void;
 }>();
 
 const visible = ref(false);
@@ -97,116 +97,116 @@ const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
 
 // 生成日历日期
 const calendarDates = ref<Array<{
-    dateStr: string;
-    day: number;
-    isCurrentMonth: boolean;
+  dateStr: string;
+  day: number;
+  isCurrentMonth: boolean;
 }>>([]);
 
 // 监听 modelValue 变化
 watch(
-    () => props.modelValue,
-    (val) => {
-        visible.value = val;
-        if (val) {
-            selectedDateInternal.value = props.selectedDate;
-            fetchCalendarData();
-        }
+  () => props.modelValue,
+  (val) => {
+    visible.value = val;
+    if (val) {
+      selectedDateInternal.value = props.selectedDate;
+      fetchCalendarData();
     }
+  }
 );
 
 // 监听 visible 变化
 watch(visible, (val) => {
-    emit('update:modelValue', val);
+  emit('update:modelValue', val);
 });
 
 // 获取日历数据
 const fetchCalendarData = async () => {
-    loading.value = true;
-    try {
-        const dateStr = currentDate.value.format('YYYY-MM-DD');
-        const data = await getTaskCalendar(dateStr, props.userId);
-        calendarData.value = data;
-        generateCalendarDates(data.year, data.month);
-    } catch (error) {
-        console.error('获取任务日历失败:', error);
-    } finally {
-        loading.value = false;
-    }
+  loading.value = true;
+  try {
+    const dateStr = currentDate.value.format('YYYY-MM-DD');
+    const data = await getTaskCalendar(dateStr, props.userId);
+    calendarData.value = data;
+    generateCalendarDates(data.year, data.month);
+  } catch (error) {
+    console.error('获取任务日历失败:', error);
+  } finally {
+    loading.value = false;
+  }
 };
 
 // 生成日历日期网格
 const generateCalendarDates = (year: number, month: number) => {
-    const dates: Array<{ dateStr: string; day: number; isCurrentMonth: boolean }> = [];
+  const dates: Array<{ dateStr: string; day: number; isCurrentMonth: boolean }> = [];
 
-    const firstDay = dayjs(`${year}-${month}-01`);
-    const lastDay = firstDay.endOf('month');
-    const startDay = firstDay.startOf('week');
-    const endDay = lastDay.endOf('week');
+  const firstDay = dayjs(`${year}-${month}-01`);
+  const lastDay = firstDay.endOf('month');
+  const startDay = firstDay.startOf('week');
+  const endDay = lastDay.endOf('week');
 
-    let current = startDay;
-    while (current.isBefore(endDay) || current.isSame(endDay)) {
-        dates.push({
-            dateStr: current.format('YYYY-MM-DD'),
-            day: current.date(),
-            isCurrentMonth: current.month() === month - 1
-        });
-        current = current.add(1, 'day');
-    }
+  let current = startDay;
+  while (current.isBefore(endDay) || current.isSame(endDay)) {
+    dates.push({
+      dateStr: current.format('YYYY-MM-DD'),
+      day: current.date(),
+      isCurrentMonth: current.month() === month - 1
+    });
+    current = current.add(1, 'day');
+  }
 
-    calendarDates.value = dates;
+  calendarDates.value = dates;
 };
 
 // 判断是否是今天
 const isToday = (dateStr: string) => {
-    return dateStr === formatDate(new Date());
+  return dateStr === formatDate(new Date());
 };
 
 // 判断是否是选中日期
 const isSelectedDate = (dateStr: string) => {
-    return selectedDateInternal.value === dateStr;
+  return selectedDateInternal.value === dateStr;
 };
 
 // 获取该日期的任务统计
 const getTaskStats = (dateStr: string) => {
-    const tasks = calendarData.value?.calendar[dateStr]?.tasks || [];
-    // completed 是已完成素材数，total 是总素材数
-    const totalMaterials = tasks.reduce((sum, t) => sum + t.total, 0);
-    const completedMaterials = tasks.reduce((sum, t) => sum + t.completed, 0);
-    return { total: totalMaterials, completed: completedMaterials };
+  const tasks = calendarData.value?.calendar[dateStr]?.tasks || [];
+  // completed 是已完成素材数，total 是总素材数
+  const totalMaterials = tasks.reduce((sum, t) => sum + t.total, 0);
+  const completedMaterials = tasks.reduce((sum, t) => sum + t.completed, 0);
+  return { total: totalMaterials, completed: completedMaterials };
 };
 
 // 判断是否有未完成任务
 const hasIncompleteTasks = (dateStr: string) => {
-    const stats = getTaskStats(dateStr);
-    return stats.total > 0 && stats.completed < stats.total;
+  const stats = getTaskStats(dateStr);
+  return stats.total > 0 && stats.completed < stats.total;
 };
 
 // 选择日期
 const selectDate = (dateStr: string) => {
-    selectedDateInternal.value = dateStr;
+  selectedDateInternal.value = dateStr;
 };
 
 // 上一月
 const prevMonth = () => {
-    currentDate.value = currentDate.value.subtract(1, 'month');
-    fetchCalendarData();
+  currentDate.value = currentDate.value.subtract(1, 'month');
+  fetchCalendarData();
 };
 
 // 下一月
 const nextMonth = () => {
-    currentDate.value = currentDate.value.add(1, 'month');
-    fetchCalendarData();
+  currentDate.value = currentDate.value.add(1, 'month');
+  fetchCalendarData();
 };
 
 // 确认选择
 const confirmSelection = () => {
-    emit('date-selected', selectedDateInternal.value);
-    handleClose();
+  emit('date-selected', selectedDateInternal.value);
+  handleClose();
 };
 
 // 关闭对话框
 const handleClose = () => {
-    visible.value = false;
+  visible.value = false;
 };
 </script>
 

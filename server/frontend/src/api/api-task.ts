@@ -279,7 +279,7 @@ export interface TaskCalendarItem {
       id: number;
       name: string;
       type: number;
-      status?: number;
+      status?: Record<string, number>; // key: user_id, value: 1表示完成
     }>;
   }>;
 }
