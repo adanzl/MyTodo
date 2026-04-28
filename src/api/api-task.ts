@@ -371,6 +371,31 @@ export async function getTaskCalendar(date: string, userId?: number): Promise<Ta
   }
 
   return rsp.data.data!;
+}/**
+ * 完成素材打卡
+ * @param taskId - 任务ID
+ * @param materialId - 素材ID
+ * @param date - 日期(格式 YYYY-MM-DD)
+ * @param userId - 用户ID
+ */
+export async function finishMaterial(
+  taskId: number,
+  materialId: number,
+  date: string,
+  userId: number
+): Promise<{ score: number }> {
+  const rsp = await apiClient.post<ApiResponse<{ success: boolean; score: number }>>("/task/finish", {
+    task_id: taskId,
+    material_id: materialId,
+    date,
+    user_id: userId,
+  });
+
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg || "完成素材打卡失败");
+  }
+
+  return rsp.data.data!;
 }
 
 

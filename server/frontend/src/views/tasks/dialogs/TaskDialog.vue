@@ -73,10 +73,36 @@
       <div class="checkin-section border rounded">
         <div class="flex items-center justify-between p-4 border-b">
           <h3 class="text-lg font-semibold">打卡活动配置</h3>
-          <el-button type="primary" size="small" @click="showMaterialSelector = true">
-            <el-icon><Plus /></el-icon>
-            添加素材
-          </el-button>
+          <div class="flex items-center gap-4">
+            <!-- 每日分数配置 -->
+            <span>{{ formData.type === 1 ? '完成奖励' : `第${selectedDay + 1}天星星` }}</span>
+            <el-input-number
+              v-if="formData.type === 1"
+              v-model="dailyScore[0]"
+              :min="0"
+              :max="1000"
+              :step="1"
+              placeholder="'奖励'"
+              class="w-36"
+              size="small"
+              :disabled="getAllMaterials().length === 0"
+            />
+            <el-input-number
+              v-else-if="selectedDay !== -1"
+              v-model="dailyScore[selectedDay]"
+              :min="0"
+              :max="1000"
+              :step="1"
+              :placeholder="'奖励'"
+              class="w-36"
+              size="small"
+              :disabled="getDayMaterials(selectedDay).length === 0"
+            />
+            <el-button type="primary" size="small" @click="showMaterialSelector = true">
+              <el-icon><Plus /></el-icon>
+              添加素材
+            </el-button>
+          </div>
         </div>
 
         <div class="checkin-content flex" style="height: 400px;">
@@ -246,6 +272,8 @@ const materialTableRef = ref();
 
 // 每日素材数据：{ dayNumber: [materials] }
 const dailyMaterials = ref<Record<number, Array<{ id: number; name: string; type: number }>>>({});
+// 每日分数数据：{ dayNumber: score }
+const dailyScore = ref<Record<number, number>>({});
 
 const formData = ref<Partial<Task>>({
   name: "",
@@ -284,17 +312,20 @@ watch(
         selectedUsers.value = [];
       }
 
-      // 初始化每日素材数据
+      // 初始化每日素材数据和每日分数
       if (newData.data) {
         try {
           const parsedData = typeof newData.data === 'string' ? JSON.parse(newData.data) : newData.data;
           dailyMaterials.value = parsedData.dailyMaterials || {};
+          dailyScore.value = parsedData.dailyScore || {};
         } catch (e) {
           console.error('解析任务数据失败:', e);
           dailyMaterials.value = {};
+          dailyScore.value = {};
         }
       } else {
         dailyMaterials.value = {};
+        dailyScore.value = {};
       }
 
       // 默认选中第一天
@@ -302,6 +333,7 @@ watch(
     } else {
       // 新建模式，初始化空数据
       dailyMaterials.value = {};
+      dailyScore.value = {};
       // 默认选中第一天
       selectedDay.value = 0;
     }
@@ -364,6 +396,7 @@ const resetForm = () => {
   selectedUsers.value = [];
   selectedDay.value = -1;
   dailyMaterials.value = {};
+  dailyScore.value = {};
 };
 
 // 获取某天的素材列表
@@ -463,7 +496,7 @@ watch(showMaterialSelector, async (newVal) => {
     await loadMaterialList();
     // 自动选中当前天数已添加的素材
     await nextTick();
-    const currentMaterials = getDayMaterials(selectedDay.value);
+    const currentMaterials = formData.value.type === 1 ? getAllMaterials() : getDayMaterials(selectedDay.value);
     const materialIds = new Set(currentMaterials.map((m) => m.id));
 
     // 使用表格的 toggleRowSelection 方法设置勾选状态
@@ -564,10 +597,10 @@ const handleSubmit = async () => {
       status: formData.value.status ?? 1,
       data: JSON.stringify({
         dailyMaterials: dailyMaterials.value,
+        dailyScore: dailyScore.value,
       }),
     };
 
-    console.log("提交任务数据:", taskData);
 
     if (props.isEdit && props.taskData?.id) {
       await updateTask({

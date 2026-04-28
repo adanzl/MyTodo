@@ -14,6 +14,11 @@
     </ion-header>
 
     <ion-content class="p-0">
+      <!-- 全屏加载遮罩 -->
+      <div v-if="submitting" class="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <ion-spinner name="crescent" class="text-white text-6xl"></ion-spinner>
+      </div>
+      
       <!-- PDF 播放器 -->
       <div v-if="material?.type === 0" class="flex flex-col h-full">
         <div class="flex-1 relative overflow-hidden bg-gray-100">
@@ -59,7 +64,7 @@
           </div>
           
           <div class="flex-1 flex justify-end">
-            <ion-button v-if="currentPage >= getLastPagePosition" color="success" :disabled="isMaterialCompleted" @click="completeReading">
+            <ion-button v-if="currentPage >= getLastPagePosition" color="success" :disabled="isMaterialCompleted || submitting" @click="completeReading">
               完成
             </ion-button>
           </div>
@@ -91,7 +96,8 @@ import { closeOutline, chevronBackOutline, chevronForwardOutline, playOutline, p
 import { loadPDF, getPDFPage, renderPDFPageToCanvas } from '@/utils/pdf-lib';
 import { getMediaFileUrl } from '@/utils/file';
 import AudioPreview from '@/components/AudioPreview.vue';
-import { updateTask, type Task } from '@/api/api-task';
+import { finishMaterial } from '@/api/api-task';
+import EventBus, { C_EVENT } from '@/types/event-bus';
 
 interface Material {
     id: number;
@@ -106,6 +112,7 @@ const props = defineProps<{
     material: Material | null;
     task: any | null;
     userId?: number;
+    date?: string; // 素材对应的日期
 }>();
 
 const emit = defineEmits<{
@@ -115,6 +122,7 @@ const emit = defineEmits<{
 const pdfCanvasLeft = ref<HTMLCanvasElement | null>(null);
 const pdfCanvasRight = ref<HTMLCanvasElement | null>(null);
 const loading = ref(false);
+const submitting = ref(false); // 提交状态
 const currentPage = ref(1);
 const totalPages = ref(0);
 const isLandscape = ref(false);
@@ -335,48 +343,34 @@ const stopAudio = () => {
 
 // 完成阅读
 const completeReading = async () => {
-    if (!props.material || !props.task) return;
+    if (!props.material || !props.task || !props.date || !props.userId) return;
     
+    submitting.value = true;
     try {
-        // 解析 task data
-        const taskData = typeof props.task.data === 'string' 
-            ? JSON.parse(props.task.data) 
-            : props.task.data;
+        const userId = props.userId;
         
-        // 找到当前 material 在 dailyMaterials 中的位置并更新 status
-        if (taskData.dailyMaterials) {
-            const userId = props.userId;
-            if (!userId) {
-                console.error('无法获取用户ID');
-                return;
-            }
-            
-            for (const dayKey in taskData.dailyMaterials) {
-                const materials = taskData.dailyMaterials[dayKey];
-                const materialIndex = materials.findIndex((m: any) => m.id === props.material?.id);
-                
-                if (materialIndex !== -1) {
-                    // 初始化 status 为 Record<string, number>
-                    if (!materials[materialIndex].status) {
-                        materials[materialIndex].status = {};
-                    }
-                    // 更新当前用户的 status 为 1（完成）
-                    materials[materialIndex].status[String(userId)] = 1;
-                    break;
-                }
-            }
+        // 使用服务端接口完成素材打卡
+        const result = await finishMaterial(
+            props.task.id,
+            props.material.id,
+            props.date, // 使用传入的日期
+            userId
+        );
+        
+        // 如果获得积分，弹出奖励弹窗
+        if (result.score > 0) {
+            EventBus.$emit(C_EVENT.REWARD, {
+                value: result.score,
+                rewardType: 'points',
+            });
         }
-        
-        // 保存任务
-        await updateTask({
-            ...props.task,
-            data: JSON.stringify(taskData),
-        } as Task);
         
         console.log('完成阅读，已保存');
         handleDismiss();
     } catch (error) {
         console.error('保存失败:', error);
+    } finally {
+        submitting.value = false;
     }
 };
 

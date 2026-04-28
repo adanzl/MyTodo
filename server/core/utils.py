@@ -159,7 +159,7 @@ def get_media_duration(file_path: str) -> Optional[int]:
     import shlex
 
     # 使用共享变量存储结果
-    result_container = {'duration': None, 'error': None, 'command': None}
+    result_container: Any = {'duration': None, 'error': None, 'command': None}
 
     def _run_ffprobe_in_thread():
         """在独立线程中运行 ffprobe"""
@@ -280,7 +280,7 @@ def decode_url_path(path: str) -> str:
 
 def validate_and_normalize_path(file_path: str,
                                 base_dir: str = '/opt/my_todo/data',
-                                must_be_file: bool = True) -> Tuple[Optional[str], Optional[str]]:
+                                must_be_file: bool = True) -> Tuple[Optional[str], str]:
     """验证和规范化文件路径。
 
     Args:
@@ -315,7 +315,7 @@ def validate_and_normalize_path(file_path: str,
     if must_be_file and not os.path.isfile(file_path):
         return None, "路径不是文件"
 
-    return file_path, None
+    return file_path, 'ok'
 
 
 def get_media_url(local_path: str) -> str:
@@ -597,7 +597,7 @@ def get_unique_filepath(directory: str, base_name: str, extension: str) -> str:
         counter += 1
 
 
-def _cleanup_directory(directory: str, file_paths: Optional[List[str]] = None, is_temp: bool = False) -> None:
+def _cleanup_directory(directory: Optional[str], file_paths: Optional[List[str]] = None, is_temp: bool = False) -> None:
     """内部辅助函数：清理目录和文件。
     
     Args:
@@ -605,6 +605,8 @@ def _cleanup_directory(directory: str, file_paths: Optional[List[str]] = None, i
         file_paths: 文件路径列表（可选）
         is_temp: 是否为临时目录（临时目录会尝试删除空目录）
     """
+    if not directory:
+        return
     try:
         # 删除指定文件
         if file_paths:

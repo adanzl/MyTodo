@@ -34,12 +34,23 @@
       </div>
 
       <!-- 日期导航 -->
-      <div class="mb-4 flex items-center gap-2">
-        <ion-button fill="clear" color="primary" @click="btnCalendarClk">
-            <ion-icon slot="start" :icon="calendarOutline"></ion-icon>
-            <span class="ml-2">{{ currentDateStr }}</span>
+      <div class="mb-4 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <ion-button fill="clear" color="primary" @click="btnCalendarClk">
+              <ion-icon slot="start" :icon="calendarOutline"></ion-icon>
+              <span class="ml-2">{{ currentDateStr }}</span>
+          </ion-button>
+          <ion-button size="small" fill="outline" @click="setToday">今</ion-button>
+        </div>
+        
+        <ion-button size="" class="w-10! m-0! [&::part(native)]:p-0" fill="clear" id="more-trigger">
+            <ion-icon slot="start" class="w-6 h-6" :icon="alertCircleOutline"></ion-icon>
         </ion-button>
-        <ion-button size="small" fill="outline" @click="setToday">今</ion-button>
+        
+        <!-- 更多选项 Popover -->
+        <ion-popover trigger="more-trigger" trigger-action="click" class="[--width:90vw] [--max-width:320px]">
+            <TaskProgressPopover :tasks="taskList" :user-id="getCurrentUserId() || 0" :date="currentDateStr" />
+        </ion-popover>
       </div>
 
       <!-- 任务列表 -->
@@ -95,6 +106,7 @@
         :material="selectedMaterial"
         :task="selectedTask"
         :user-id="getCurrentUserId()"
+        :date="selectedDate"
       />
 
       <!-- 任务日历弹窗 -->
@@ -112,6 +124,7 @@ import { getTaskList, getMaterialListByIds, type Task, type MaterialItem } from 
 import { diffDays } from '@/utils/date-util';
 import ServerRemoteBadge from '@/components/ServerRemoteBadge.vue';
 import MaterialPlayerDialog from './dialogs/MaterialPlayerDialog.vue';
+import TaskProgressPopover from './dialogs/TaskProgressPopover.vue';
 import TaskCalendar from './dialogs/TaskCalendar.vue';
 import {
     IonButtons,
@@ -126,6 +139,7 @@ import {
     IonToolbar
 } from '@ionic/vue';
 import {
+    alertCircleOutline,
     calendarOutline,
     checkmarkCircle,
     documentTextOutline,
@@ -135,7 +149,7 @@ import { computed, inject, onMounted, ref } from 'vue';
 
 // 状态管理
 const loading = ref(false);
-const taskList = ref<Task[]>([]);
+const taskList = ref<Task[]>([]); // 当前选中日期的任务
 const materialMap = ref<Map<number, MaterialItem>>(new Map());
 const startDate = ref(new Date());
 const currentDate = ref(new Date());
@@ -146,6 +160,7 @@ const selectedUserId = ref('0');
 const showPlayerDialog = ref(false);
 const selectedMaterial = ref<any>(null);
 const selectedTask = ref<Task | null>(null);
+const selectedDate = ref<string>(''); // 素材对应的日期
 
 // 日历弹窗状态
 const showCalendarDialog = ref(false);
@@ -183,7 +198,7 @@ const getTaskMaterialSaveList = (task: Task): any[] => {
 
         // type=1（持续任务）：始终显示第0天的素材
         const materialsIndex = task.type === 1 ? 0 : diffDaysCount;
-        
+
         // 直接返回对应天数的素材存档数组（索引从0开始）
         return dailyMaterials[String(materialsIndex)] || [];
     } catch (error) {
@@ -215,14 +230,14 @@ const isMaterialCompleted = (task: Task, material: any, date: Date) => {
 
             // type=1（持续任务）：始终检查第0天的素材
             const materialsIndex = task.type === 1 ? 0 : diffDaysCount;
-            
+
             // 使用从0开始的索引
             const materials = taskData.dailyMaterials[String(materialsIndex)];
             if (materials) {
                 const found = materials.find((m: any) => m.id === material.id);
                 // status 现在是 Record<string, number>，key 为 user_id
                 const userId = getCurrentUserId();
-                
+
                 if (userId && found?.status) {
                     return found.status[String(userId)] === 1;
                 }
@@ -256,6 +271,8 @@ const openMaterialPlayer = async (task: Task, material: MaterialItem) => {
         path: material.path,
     };
     selectedTask.value = task;
+    // 计算素材对应的日期
+    selectedDate.value = currentDate.value.toISOString().split('T')[0];
     showPlayerDialog.value = true;
 };
 

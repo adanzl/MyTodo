@@ -68,8 +68,8 @@ def get_duration() -> ResponseReturnValue:
 
         # 验证和规范化路径
         normalized_path, error_msg = validate_and_normalize_path(file_path, DEFAULT_BASE_DIR, must_be_file=True)
-        if error_msg:
-            return _err(error_msg)
+        if error_msg or not normalized_path:
+            return _err(error_msg) or _err("Invalid file path")
 
         # 获取媒体文件时长
         duration = get_media_duration(normalized_path)
@@ -149,14 +149,14 @@ def create_media_task() -> ResponseReturnValue:
     try:
         data = read_json_from_request()
         body, err = parse_with_model(_CreateMediaTaskBody, data, err_factory=_err)
-        if err:
-            return err
+        if err or not body:
+            return err or _err("Invalid request body")
         name = body.name
 
         code, msg, task_id = audio_merge_mgr.create_task(name)
 
-        if code != 0:
-            return _err(msg)
+        if code != 0 or not task_id:
+            return _err(msg) or _err("Failed to create task")
 
         task_info = audio_merge_mgr.get_task(task_id)
         return _ok(task_info)
@@ -195,8 +195,8 @@ def upload_file() -> ResponseReturnValue:
     try:
         args_data = {**request.form.to_dict(), **request.args.to_dict()}
         validated_args, err = parse_with_model(_UploadFileArgs, args_data, err_factory=_err)
-        if err:
-            return err
+        if err or not validated_args:
+            return err or _err("Invalid request arguments")
         task_id = validated_args.task_id
 
         if 'file' not in request.files:
@@ -214,7 +214,7 @@ def upload_file() -> ResponseReturnValue:
             return _err(f"文件大小超过限制 ({config.MAX_UPLOAD_FILE_SIZE // 1024 // 1024}MB)")
 
         file = request.files['file']
-        if file.filename == '':
+        if file.filename is None:
             return _err("文件名不能为空")
 
         # 验证文件类型
@@ -275,8 +275,8 @@ def add_file_by_path() -> ResponseReturnValue:
     try:
         data = read_json_from_request() or request.form.to_dict()
         body, err = parse_with_model(_AddFileByPathBody, data, err_factory=_err)
-        if err:
-            return err
+        if err or not body:
+            return err or _err("Invalid request body")
         task_id = body.task_id
         file_path = body.file_path
 
@@ -330,8 +330,8 @@ def delete_file() -> ResponseReturnValue:
     try:
         data = read_json_from_request() or request.form.to_dict()
         body, err = parse_with_model(_DeleteFileBody, data, err_factory=_err)
-        if err:
-            return err
+        if err or not body:
+            return err or _err("Invalid request body")
 
         code, msg = audio_merge_mgr.remove_file(body.task_id, body.file_index)
         if code != 0:
@@ -463,8 +463,8 @@ def delete_task() -> ResponseReturnValue:
     try:
         data = read_json_from_request() or request.form.to_dict()
         body, err = parse_with_model(_TaskIdBody, data, err_factory=_err)
-        if err:
-            return err
+        if err or not body:
+            return err or _err("Invalid request body")
 
         code, msg = audio_merge_mgr.delete_task(body.task_id)
         if code != 0:
@@ -494,8 +494,8 @@ def download_result() -> ResponseReturnValue:
     """
     try:
         args, err = parse_with_model(_TaskIdBody, request.args.to_dict(), err_factory=_err)
-        if err:
-            return err
+        if err or not args:
+            return err or _err("Invalid request arguments")
         task_id = args.task_id
 
         task_info = audio_merge_mgr.get_task(task_id)
@@ -535,8 +535,8 @@ def save_result() -> ResponseReturnValue:
     try:
         data = read_json_from_request() or request.form.to_dict()
         body, err = parse_with_model(_SaveResultBody, data, err_factory=_err)
-        if err:
-            return err
+        if err or not body:
+            return err or _err("Invalid request body")
         task_id = body.task_id
         target_path = body.target_path
 
@@ -615,16 +615,16 @@ def create_convert_task() -> ResponseReturnValue:
     try:
         data = read_json_from_request()
         body, err = parse_with_model(_CreateConvertTaskBody, data, err_factory=_err)
-        if err:
-            return err
+        if err or not body:
+            return err or _err("Invalid request body")
         name = body.name
         output_dir = body.output_dir
         overwrite = body.overwrite
 
         code, msg, task_id = audio_convert_mgr.create_task(name, output_dir=output_dir, overwrite=overwrite)
 
-        if code != 0:
-            return _err(msg)
+        if code != 0 or not task_id:
+            return _err(msg) or _err("Failed to create task")
 
         task_info = audio_convert_mgr.get_task(task_id)
         return _ok(task_info)
@@ -703,8 +703,21 @@ def update_convert_task() -> ResponseReturnValue:
             return _err("task_id 参数不能为空")
 
         # 至少需要提供一个要更新的字段
-        output_dir = data.get('output_dir')
-        overwrite = data.get('overwrite')
+        output_dir_raw = data.get('output_dir')
+        # 确保 output_dir 是字符串类型或 None
+        output_dir = str(output_dir_raw) if output_dir_raw is not None else None
+
+        overwrite_raw = data.get('overwrite')
+        # 将字符串形式的布尔值转换为真正的布尔类型
+        if overwrite_raw is not None:
+            if isinstance(overwrite_raw, bool):
+                overwrite = overwrite_raw
+            elif isinstance(overwrite_raw, str):
+                overwrite = overwrite_raw.lower() in ('true', '1', 'yes')
+            else:
+                overwrite = bool(overwrite_raw)
+        else:
+            overwrite = None
         if name is None and directory is None and output_dir is None and overwrite is None:
             return _err("至少需要提供一个要更新的字段（name、directory、output_dir 或 overwrite）")
 

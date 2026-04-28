@@ -165,5 +165,96 @@ class TaskMgr:
             log.error(f"获取任务日历失败: {e}")
             return {"code": -1, "msg": f"获取任务日历失败: {str(e)}", "data": None}
 
+    def finish_material(self, task_id: int, material_id: int, date_str: str, user_id: int) -> Dict[str, Any]:
+        """
+        完成素材打卡
+        
+        Args:
+            task_id: 任务ID
+            material_id: 素材ID
+            date_str: 日期字符串，格式 YYYY-MM-DD
+            user_id: 用户ID
+            
+        Returns:
+            操作结果
+        """
+        try:
+            # 获取任务信息
+            task_result = db_mgr.get_data(TABLE_TASK, task_id, '*')
+            if task_result.get('code') != 0 or not task_result.get('data'):
+                return {"code": -1, "msg": "任务不存在", "data": None}
+
+            task = task_result['data']
+
+            # 解析任务数据
+            task_data_str = task.get('data', '{}')
+            task_data = json.loads(task_data_str) if isinstance(task_data_str, str) else task_data_str
+            daily_materials = task_data.get('dailyMaterials', {})
+
+            # 计算天数索引
+            start_date_str = task.get('start_date', '')
+            if not start_date_str:
+                return {"code": -1, "msg": "任务开始日期不存在", "data": None}
+
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+            target_date = datetime.strptime(date_str, '%Y-%m-%d')
+            day_offset = (target_date - start_date).days
+
+            if day_offset < 0 or day_offset >= task.get('duration', 0):
+                return {"code": -1, "msg": "日期不在任务范围内", "data": None}
+
+            # type=1（持续任务）：所有素材都在第0天
+            materials_index = 0 if task.get('type', 0) == 1 else day_offset
+            materials_for_day = daily_materials.get(str(materials_index), [])
+
+            # 查找目标素材并更新状态
+            found = False
+            for material in materials_for_day:
+                if material.get('id') == material_id:
+                    # 初始化 status 字段
+                    if 'status' not in material:
+                        material['status'] = {}
+                    # 设置用户完成状态
+                    material['status'][str(user_id)] = 1
+                    found = True
+                    break
+
+            if not found:
+                return {"code": -1, "msg": "素材不存在于该天", "data": None}
+
+            # 保存更新后的任务数据
+            task_data['dailyMaterials'] = daily_materials
+            updated_data = json.dumps(task_data, ensure_ascii=False)
+
+            update_result = db_mgr.set_data(TABLE_TASK, {'id': task_id, 'data': updated_data})
+            if update_result.get('code') != 0:
+                return {"code": -1, "msg": "更新失败", "data": None}
+
+            # 检查是否完成当天所有素材，如果完成则加分
+            all_completed = all(m.get('status', {}).get(str(user_id)) == 1 for m in materials_for_day)
+
+            score_added = 0
+            if all_completed:
+                # 获取当日分数
+                score = task_data.get('dailyScore', {}).get(str(materials_index), 0)
+
+                if score > 0:
+                    # 添加积分
+                    add_score_result = db_mgr.add_score(user_id=user_id,
+                                                        value=score,
+                                                        action='task',
+                                                        msg=f'完成任务: {task.get("name", "")} 第{materials_index + 1}天')
+
+                    if add_score_result.get('code') != 0:
+                        log.error(f"添加积分失败: {add_score_result.get('msg')}")
+                    else:
+                        score_added = score
+
+            return {"code": 0, "msg": "ok", "data": {"success": True, "score": score_added}}
+
+        except Exception as e:
+            log.error(f"完成素材打卡失败: {e}")
+            return {"code": -1, "msg": f"完成素材打卡失败: {str(e)}", "data": None}
+
 
 task_mgr = TaskMgr()
