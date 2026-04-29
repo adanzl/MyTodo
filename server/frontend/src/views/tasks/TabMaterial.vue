@@ -31,8 +31,8 @@
       <el-table-column prop="name" label="名称" min-width="150" />
       <el-table-column label="类型" width="100">
         <template #default="{ row }">
-          <el-tag :type="row.type === 0 ? 'success' : 'warning'" size="small">
-            {{ row.type === 0 ? 'PDF' : 'Video' }}
+          <el-tag :type="row.type === 0 ? 'success' : (row.type === 1 ? 'primary' : 'info')" size="small">
+            {{ getMaterialTypeName(row.type) }}
           </el-tag>
         </template>
       </el-table-column>
@@ -47,7 +47,7 @@
             <el-button type="primary" size="small" plain @click="playMaterial(row)">
               <el-icon :size="16" ><Reading /></el-icon>
             </el-button>
-          <el-button size="small" @click="handleViewDetail(row)">详情</el-button>
+          <el-button size="small" @click="handleViewDetail(row)" :disabled="row.type != 0">详情</el-button>
           <el-button size="small" @click="handleEditMaterial(row)">编辑</el-button>
           <el-button size="small" type="danger" @click="handleDeleteMaterial(row)">删除</el-button>
         </template>
@@ -113,7 +113,7 @@ import MaterialPreviewDialog from "./dialogs/MaterialPreviewDialog.vue";
 
 
 const tableMaxHeight = ref<number>(0);
-  // 计算表格最大高度
+// 计算表格最大高度
 const calculateTableHeight = () => {
   nextTick(() => {
     const windowHeight = window.innerHeight;
@@ -304,6 +304,16 @@ const getCategoryName = (cateId: number): string => {
   }
   const category = categoryList.value.find((c) => c.id === cateId);
   return category?.name || `分类${cateId}`;
+};
+
+// 获取素材类型名称
+const getMaterialTypeName = (type: number): string => {
+  const typeMap: Record<number, string> = {
+    0: "PDF",
+    1: "视频",
+    2: "音频",
+  };
+  return typeMap[type] || "未知";
 };
 
 const handleSizeChange = (size: number) => {

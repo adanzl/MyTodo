@@ -120,7 +120,7 @@ def serve_media_file(filepath: str) -> ResponseReturnValue:
         mimetype = MIMETYPE_MAP.get(ext, 'application/octet-stream')
 
         log.info(f"[MEDIA] Serving file: {filepath} (MIME: {mimetype})")
-        return send_file(filepath, mimetype=mimetype)
+        return send_file(filepath, mimetype=mimetype, conditional=True)
     except HTTPException as e:
         # Re-raise HTTP exceptions (like aborts) directly
         raise e

@@ -1,5 +1,5 @@
 <template>
-  <ion-page id="main-content" main>
+  <ion-page id="main-content" main class="main-bg">
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
@@ -13,45 +13,43 @@
       </ion-toolbar>
     </ion-header>
 
-    <ion-content class="ion-padding">
+    <!-- 用户筛选（仅 admin 可见） -->
+    <div v-if="isAdmin" class="flex items-center gap-2 mx-2 ">
+      <ion-segment v-model="selectedUserId" @ionChange="handleUserChange">
+        <ion-segment-button value="0">
+          <ion-label>全部</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="3">
+          <ion-label>灿灿</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="4">
+          <ion-label>昭昭</ion-label>
+        </ion-segment-button>
+      </ion-segment>
+    </div>
+    <!-- 日期导航 -->
+    <div class="m-2 flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <ion-button fill="clear" color="primary" @click="btnCalendarClk">
+            <ion-icon slot="start" :icon="calendarOutline"></ion-icon>
+            <span class="ml-2">{{ currentDateStr }}</span>
+        </ion-button>
+        <ion-button size="small" fill="outline" @click="setToday">今</ion-button>
+      </div>
+      
+      <ion-button size="" class="w-10! m-0! [&::part(native)]:p-0" fill="clear" id="more-trigger">
+          <ion-icon slot="start" class="w-6 h-6" :icon="alertCircleOutline"></ion-icon>
+      </ion-button>
+      
+      <!-- 更多选项 Popover -->
+      <ion-popover trigger="more-trigger" trigger-action="click" class="[--width:90vw] [--max-width:320px]">
+          <TaskProgressPopover :tasks="taskList" :user-id="getCurrentUserId() || 0" :date="currentDateStr" />
+      </ion-popover>
+    </div>
+    <ion-content class="[&::part(scroll)]:px-4 ">
       <ion-refresher slot="fixed" @ionRefresh="handleRefresh">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
-
-      <!-- 用户筛选（仅 admin 可见） -->
-      <div v-if="isAdmin" class="mb-4 flex items-center gap-2">
-        <ion-segment v-model="selectedUserId" @ionChange="handleUserChange">
-          <ion-segment-button value="0">
-            <ion-label>全部</ion-label>
-          </ion-segment-button>
-          <ion-segment-button value="3">
-            <ion-label>灿灿</ion-label>
-          </ion-segment-button>
-          <ion-segment-button value="4">
-            <ion-label>昭昭</ion-label>
-          </ion-segment-button>
-        </ion-segment>
-      </div>
-
-      <!-- 日期导航 -->
-      <div class="mb-4 flex items-center justify-between gap-2">
-        <div class="flex items-center gap-2">
-          <ion-button fill="clear" color="primary" @click="btnCalendarClk">
-              <ion-icon slot="start" :icon="calendarOutline"></ion-icon>
-              <span class="ml-2">{{ currentDateStr }}</span>
-          </ion-button>
-          <ion-button size="small" fill="outline" @click="setToday">今</ion-button>
-        </div>
-        
-        <ion-button size="" class="w-10! m-0! [&::part(native)]:p-0" fill="clear" id="more-trigger">
-            <ion-icon slot="start" class="w-6 h-6" :icon="alertCircleOutline"></ion-icon>
-        </ion-button>
-        
-        <!-- 更多选项 Popover -->
-        <ion-popover trigger="more-trigger" trigger-action="click" class="[--width:90vw] [--max-width:320px]">
-            <TaskProgressPopover :tasks="taskList" :user-id="getCurrentUserId() || 0" :date="currentDateStr" />
-        </ion-popover>
-      </div>
 
       <!-- 任务列表 -->
       <div v-if="loading" class="flex justify-center items-center py-10">
@@ -84,7 +82,7 @@
                 </div>
                 
                 <ion-icon
-                  :icon="documentTextOutline"
+                  :icon="material.type === 1 ? videocamOutline : documentTextOutline"
                   :color="'primary'"
                   class="text-4xl mb-1 mt-6"
                 ></ion-icon>
@@ -107,6 +105,7 @@
         :task="selectedTask"
         :user-id="getCurrentUserId()"
         :date="selectedDate"
+        @completed="handleMaterialCompleted"
       />
 
       <!-- 任务日历弹窗 -->
@@ -136,7 +135,8 @@ import {
     IonSegment,
     IonSegmentButton,
     IonSpinner,
-    IonToolbar
+    IonToolbar,
+    IonPopover,
 } from '@ionic/vue';
 import {
     alertCircleOutline,
@@ -144,6 +144,7 @@ import {
     checkmarkCircle,
     documentTextOutline,
     refreshOutline,
+    videocamOutline,
 } from 'ionicons/icons';
 import { computed, inject, onMounted, ref } from 'vue';
 
@@ -259,6 +260,13 @@ const getCurrentUserId = (): number | undefined => {
     } else {
         return globalVar?.user?.id;
     }
+};
+
+// 处理素材完成事件
+const handleMaterialCompleted = () => {
+    console.log('素材已完成，刷新列表');
+    // 刷新任务列表以更新完成状态
+    fetchTaskList();
 };
 
 // 打开素材播放器

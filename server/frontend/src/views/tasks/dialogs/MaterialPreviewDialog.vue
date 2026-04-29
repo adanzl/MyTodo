@@ -9,8 +9,8 @@
     class="preview-fullscreen-dialog"
   >
     <div v-loading="loading" element-loading-text="加载中..." element-loading-background="rgba(0, 0, 0, 0.8)" class="relative w-full h-full flex flex-col bg-black overflow-hidden">
-      <!-- 双页展示区 -->
-      <div class="flex-1 flex justify-center items-center p-0 bg-black overflow-hidden relative min-h-0">
+      <!-- PDF双页展示区 -->
+      <div v-if="materialData?.type === 0" class="flex-1 flex justify-center items-center p-0 bg-black overflow-hidden relative min-h-0">
         <div class="flex gap-0 w-full h-full max-w-full relative [&_.page-spread:last-child]:after:hidden">
           <!-- 左页 -->
           <div class="flex-1 bg-[#e8e0f0] relative flex items-center justify-center overflow-hidden page-spread after:content-[''] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-0.5 after:bg-black left-page">
@@ -63,8 +63,30 @@
         </el-button>
       </div>
 
-      <!-- 底部控制栏 -->
-      <div class="flex items-center justify-between px-7 py-3 bg-white border-t border-[#3a3a3a] h-20 min-h-20">
+      <!-- 视频播放区 -->
+      <div v-else-if="materialData?.type === 1" class="flex-1 flex justify-center items-center p-0 bg-black overflow-hidden relative min-h-0">
+        <video
+          v-if="videoUrl"
+          ref="videoPlayerRef"
+          :src="videoUrl"
+          controls
+          preload="metadata"
+          class="max-w-full max-h-full w-full h-full object-contain"
+          @ended="handleVideoEnded"
+        ></video>
+        <div v-else class="flex items-center justify-center h-full text-gray-400">
+          <el-icon :size="80"><Picture /></el-icon>
+          <p>视频加载失败</p>
+        </div>
+
+        <!-- 返回按钮（悬浮） -->
+        <el-button circle class="absolute top-5 left-5 z-100 bg-black/60 border-none text-white w-10 h-10 backdrop-blur-md hover:bg-black/80" @click="goBack">
+          <el-icon><ArrowLeft /></el-icon>
+        </el-button>
+      </div>
+
+      <!-- 底部控制栏（仅PDF显示） -->
+      <div v-if="materialData?.type === 0" class="flex items-center justify-between px-7 py-3 bg-white border-t border-[#3a3a3a] h-20 min-h-20">
         <!-- 左侧：音频播放器 -->
         <div class="flex items-center gap-4 min-w-37.5 flex-1">
           <MediaComponent
@@ -117,6 +139,11 @@
         <div class="flex items-center justify-end min-w-37.5 flex-1">
           <span class="text-sm text-gray-800 max-w-50 overflow-hidden text-ellipsis whitespace-nowrap">{{ materialData?.name || '素材预览' }}</span>
         </div>
+      </div>
+
+      <!-- 底部控制栏（视频显示素材名称） -->
+      <div v-else-if="materialData?.type === 1" class="flex items-center justify-center px-7 py-3 bg-white border-t border-[#3a3a3a] h-20 min-h-20">
+        <span class="text-sm text-gray-800">{{ materialData?.name || '素材预览' }}</span>
       </div>
     </div>
   </el-dialog>
@@ -179,6 +206,10 @@ const currentPage = ref(1)
 const totalPages = ref(0)
 const pdfPages = ref<PdfPage[]>([])
 const allAudios = ref<AudioFile[]>([])
+
+// 视频相关
+const videoUrl = ref<string>('')
+const videoPlayerRef = ref<HTMLVideoElement | null>(null)
 
 // 当前双页
 const leftPage = computed(() => {
@@ -434,9 +465,20 @@ const handleKeyDown = (e: KeyboardEvent) => {
   }
 }
 
+// 停止视频播放
+const stopVideo = () => {
+  if (videoPlayerRef.value) {
+    videoPlayerRef.value.pause()
+    videoPlayerRef.value.src = ''
+  }
+  videoUrl.value = ''
+}
+
 // 关闭对话框
 const handleClose = () => {
   stopAllAudio()
+  // 停止视频播放
+  stopVideo()
   visible.value = false
   // 重置状态
   materialData.value = null
@@ -445,6 +487,14 @@ const handleClose = () => {
   allAudios.value = []
   currentPage.value = 1
   totalPages.value = 0
+}
+
+// 加载视频
+const loadVideo = (videoPath: string) => {
+  videoUrl.value = getMediaFileUrl(videoPath) || ''
+  if (!videoUrl.value) {
+    ElMessage.error('无法加载视频：路径无效')
+  }
 }
 
 // 加载素材
@@ -496,6 +546,9 @@ const loadMaterial = async () => {
     // 如果是 PDF，加载缩略图
     if (material.type === 0 && material.path) {
       await loadPdfPages(material.path, detail)
+    } else if (material.type === 1 && material.path) {
+      // 如果是视频，加载视频URL
+      loadVideo(material.path)
     }
 
     loading.value = false
@@ -585,6 +638,11 @@ const loadPdfPages = async (pdfPath: string, detail: MaterialDetail | null) => {
     console.error('加载 PDF 失败:', error)
     ElMessage.error('加载 PDF 失败')
   }
+}
+
+// 视频播放结束处理
+const handleVideoEnded = () => {
+  console.log('视频播放结束')
 }
 
 // 监听键盘事件

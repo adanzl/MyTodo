@@ -1,8 +1,8 @@
 <template>
+  <div class="text-lg font-semibold m-3">
+      任务进度
+  </div>
   <ion-content class="ion-padding">
-    <h4>
-        任务进度
-    </h4>
     <div v-if="taskProgressList.length === 0" class="text-center py-10 text-gray-500">
       <p>今天暂无任务</p>
     </div>
@@ -13,7 +13,7 @@
         :key="task.taskId"
         class="bg-white rounded-lg p-4 shadow"
       >
-        <div class="flex justify-between items-end  pt-2">
+        <div class="flex justify-between items-endy">
           <p class="font-semibold text-gray-800 text-xl">{{ task.taskName }}</p>
           <span class="text-sm text-gray-600">
             {{ task.completedMaterials }}/{{ task.totalMaterials }}

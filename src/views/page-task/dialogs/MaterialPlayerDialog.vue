@@ -71,9 +71,42 @@
         </div>
       </div>
 
-      <!-- 未知类型 -->
-      <div v-else class="text-center py-10 text-gray-500">
-        <p>不支持的素材类型</p>
+      <!-- 视频播放器 -->
+      <div v-else-if="material?.type === 1" class="flex flex-col h-full">
+        <div class="flex-1 relative overflow-hidden bg-black">
+          <video
+            ref="videoRef"
+            :src="getMediaFileUrl(material.path || '')"
+            controls
+            autoplay
+            preload="metadata"
+            playsinline
+            class="w-full h-full object-contain"
+            @ended="handleVideoEnded"
+            @play="isVideoPlaying = true"
+            @pause="isVideoPlaying = false"
+          />
+          <div v-if="loading" class="absolute inset-0 flex justify-center items-center bg-black bg-opacity-80">
+            <ion-spinner name="crescent" class="text-white text-4xl"></ion-spinner>
+          </div>
+        </div>
+        
+        <!-- 操作区 -->
+        <div class="flex justify-between items-center p-4 border-t bg-white">
+          <div class="flex-1"></div>
+          
+          <div class="flex gap-2">
+            <ion-button fill="outline" @click="toggleVideoPlay">
+              <ion-icon slot="icon-only" :icon="isVideoPlaying ? pauseOutline : playOutline" />
+            </ion-button>
+          </div>
+          
+          <div class="flex-1 flex justify-end">
+            <ion-button color="success" :disabled="isMaterialCompleted || submitting" @click="completeReading">
+              完成
+            </ion-button>
+          </div>
+        </div>
       </div>
     </ion-content>
   </ion-modal>
@@ -117,16 +150,21 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     (e: 'update:isOpen', value: boolean): void;
+    (e: 'completed'): void; // 完成素材阅读后触发
 }>();
 
 const pdfCanvasLeft = ref<HTMLCanvasElement | null>(null);
 const pdfCanvasRight = ref<HTMLCanvasElement | null>(null);
+const videoRef = ref<HTMLVideoElement | null>(null);
 const loading = ref(false);
 const submitting = ref(false); // 提交状态
 const currentPage = ref(1);
 const totalPages = ref(0);
 const isLandscape = ref(false);
 let currentPdf: any = null;
+
+// 视频信息
+const isVideoPlaying = ref(false);
 
 // 音频信息
 const audioInfo = ref('');
@@ -365,6 +403,9 @@ const completeReading = async () => {
             });
         }
         
+        // 通知父组件刷新列表
+        emit('completed');
+        
         console.log('完成阅读，已保存');
         handleDismiss();
     } catch (error) {
@@ -378,16 +419,24 @@ const completeReading = async () => {
 watch(
     () => [props.isOpen, props.material] as const,
     ([isOpen, material]) => {
-        console.log(material)
-        if (isOpen && material && material.type === 0 && material.path) {
+        if (isOpen && material) {
             loading.value = true;
-
+            
             setTimeout(() => {
-                if (!pdfCanvasLeft.value) {
+                if (material.type === 0 && material.path) {
+                    // PDF 类型
+                    if (!pdfCanvasLeft.value) {
+                        loading.value = false;
+                        return;
+                    }
+                    renderPDF(getMediaFileUrl(material.path));
+                } else if (material.type === 1 && material.path) {
+                    // 视频类型
                     loading.value = false;
-                    return;
+                    // 视频会自动加载和播放
+                } else {
+                    loading.value = false;
                 }
-                renderPDF(getMediaFileUrl(material.path));
             }, 300);
         } else {
             loading.value = false;
@@ -402,6 +451,21 @@ const checkOrientation = () => {
     }
 };
 
+// 切换视频播放/暂停
+const toggleVideoPlay = () => {
+    if (!videoRef.value) return;
+    if (isVideoPlaying.value) {
+        videoRef.value.pause();
+    } else {
+        videoRef.value.play();
+    }
+};
+
+// 视频播放结束处理
+const handleVideoEnded = () => {
+    isVideoPlaying.value = false;
+};
+
 onMounted(() => {
     checkOrientation();
     window.addEventListener('resize', checkOrientation);
@@ -409,5 +473,15 @@ onMounted(() => {
 
 onUnmounted(() => {
     window.removeEventListener('resize', checkOrientation);
+    // 清理视频资源
+    if (typeof window !== 'undefined' && videoRef.value) {
+        try {
+            videoRef.value.pause();
+            videoRef.value.src = '';
+            videoRef.value.load();
+        } catch (e) {
+            console.warn('Error cleaning up video element:', e);
+        }
+    }
 });
 </script>

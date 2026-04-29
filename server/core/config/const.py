@@ -64,6 +64,9 @@ def get_media_task_result_dir(task_id: str) -> str:
 # 允许的音频文件扩展名
 ALLOWED_AUDIO_EXTENSIONS = {'.mp3', '.wav', '.flac', '.aac', '.m4a', '.ogg', '.wma'}
 
+# 允许的视频文件扩展名
+ALLOWED_VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'}
+
 # 允许的 PDF 文件扩展名
 ALLOWED_PDF_EXTENSIONS = {'.pdf'}
 

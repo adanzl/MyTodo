@@ -52,7 +52,7 @@ export async function getMaterialList(
   pageNum: number = 1,
   pageSize: number = 20
 ): Promise<PaginatedResponse<Material>> {
-  const conditions = cateId ? { cate_id: cateId } : undefined;
+  const conditions = cateId !== undefined && cateId !== null ? { cate_id: cateId } : undefined;
   return getList<Material>("t_material", conditions, pageNum, pageSize);
 }
 

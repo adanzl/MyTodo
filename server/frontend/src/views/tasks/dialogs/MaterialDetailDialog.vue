@@ -19,7 +19,7 @@
           </el-descriptions-item>
           <el-descriptions-item label="路径" min-width="60">{{ materialData?.path }}</el-descriptions-item>
           <el-descriptions-item label="操作" min-width="60">
-            <div class="flex"> 
+            <div class="flex">
               <el-button type="primary" size="small" plain @click="playMaterial">
                 <el-icon :size="16" ><Reading /></el-icon>
               </el-button>
@@ -501,7 +501,7 @@ const initDetail = async () => {
     await loadPdfPages(props.materialData.path);
     // 从 data 中加载音频列表
     allAudios.value = materialDetail?.audioList || [];
-
+  
     // 确保 pages 数组存在且长度足够
     if (materialDetail) {
       if (!materialDetail.pages) {
@@ -515,7 +515,7 @@ const initDetail = async () => {
       materialDetail.pdfLength = pdfPages.value.length;
     }
   } else {
-    // Video 类型 - 清空数据
+    // 其他类型或未指定路径
     pdfPages.value = [];
     allAudios.value = [];
   }
