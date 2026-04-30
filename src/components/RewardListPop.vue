@@ -59,12 +59,9 @@ interface RewardItem {
     img?: string;
 }
 
-defineProps({
-    rewardList: {
-        type: Array as () => RewardItem[],
-        default: () => [],
-    },
-});
+defineProps<{
+    rewardList?: RewardItem[];
+}>();
 
 /** 返回可展示的图片 URL，无图时自动返回占位图 */
 function getRewardImageUrl(img?: string): string {

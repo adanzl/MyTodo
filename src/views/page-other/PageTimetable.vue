@@ -276,7 +276,7 @@ import { trashOutline, removeOutline, addOutline, refreshOutline } from "ionicon
 import { computed, onMounted, onUnmounted, onBeforeUnmount, ref } from "vue";
 
 // 课程数据 - 从RDS加载
-const timetableData = ref({});
+const timetableData = ref<Record<string, any[]>>({});
 
 // 响应式数据
 const selectedWeekday = ref("");
@@ -299,7 +299,7 @@ const initializeWeekday = () => {
   selectedWeekday.value = getCurrentWeekday();
 };
 
-const COURSE_COLORS = {
+const COURSE_COLORS: Record<number, { bg: string; border: string; hover: string }> = {
   1: { bg: "bg-blue-300", border: "border-blue-600", hover: "hover:bg-blue-400" },
   2: { bg: "bg-green-300", border: "border-green-400", hover: "hover:bg-green-400" },
   3: { bg: "bg-purple-300", border: "border-purple-400", hover: "hover:bg-purple-400" },
