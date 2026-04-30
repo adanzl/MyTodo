@@ -12,6 +12,7 @@
     <el-table :data="taskList" v-loading="loading" stripe border style="width: 100%" :max-height="tableMaxHeight">
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column prop="name" label="任务名称" min-width="200" />
+      <el-table-column prop="priority" label="优先级" min-width="30" />
       <el-table-column prop="type" label="任务类型" width="100">
         <template #default="{ row }">
           <el-tag :type="row.type === 1 ? 'success' : 'primary'">{{ row.type === 1 ? '持续任务' : '每日任务' }}</el-tag>

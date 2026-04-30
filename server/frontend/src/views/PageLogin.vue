@@ -3,6 +3,7 @@
     <template #header>用户登录</template>
     <div class="flex flex-col gap-2 items-center">
       <el-select
+        v-if="!loading"
         v-model="user.id"
         placeholder="请选择用户"
         class="w-60!"

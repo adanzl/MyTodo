@@ -32,7 +32,7 @@
             </el-icon>
         </div>
 
-        <div v-else>
+        <div v-else class=" max-h-[calc(100vh-15rem)] overflow-y-auto p-4">
             <div v-if="!hasDisplayableMaterials" class="text-center py-10 text-gray-500">
                 <p>暂无任务</p>
             </div>
@@ -41,8 +41,8 @@
                 <!-- 所有素材网格 -->
                 <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                     <template v-for="task in displayTasks" :key="task.id">
-                        <div v-for="material in getTaskMaterialList(task)" :key="`${task.id}_${material.id}`"
-                            class="relative flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow aspect-square cursor-pointer hover:shadow-md transition-shadow"
+                        <div v-for="material in getTaskMaterialList(task)" :key="`${task.id}_${material.id}` "
+                            class="relative flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow-md cursor-pointer hover:shadow-2xl transition-shadow"
                             @click="openMaterialPlayer(task, material)">
                             <!-- 任务名称角标 -->
                             <div
@@ -56,7 +56,8 @@
                             </div>
 
                             <el-icon :size="40" color="#409EFF" class="mb-1 mt-6">
-                                <Document />
+                                <Document v-if="material.type == 0"/>
+                                <VideoPlay v-else-if="material.type == 1"/>
                             </el-icon>
                             <div class="text-sm font-medium text-center line-clamp-2 mb-1">{{ material.name }}</div>
                             <div class="text-[10px] flex items-center mt-2">点击阅读</div>
@@ -78,7 +79,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
-import { Calendar, Document, Loading } from '@element-plus/icons-vue';
+import { Calendar, Document, Loading , VideoPlay } from '@element-plus/icons-vue';
 import { getTaskList, getMaterialListByIds, type Task, type MaterialItem } from '@/api/api-task';
 import { getDaysDiff } from '@/utils/date';
 import MaterialPreviewDialog from './dialogs/MaterialPreviewDialog.vue';

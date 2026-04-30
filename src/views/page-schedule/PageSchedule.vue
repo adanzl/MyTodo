@@ -60,7 +60,7 @@
         @touchstart="onScheduleListTouchStart">
         <ion-accordion-group :multiple="true" :value="['schedule']">
           <ion-accordion value="schedule">
-            <ion-item slot="header" color="light" class="schedule-group-item">
+            <ion-item slot="header" color="light" class="[&::part(native)]:min-h-7.5!">
               <div class="mr-3">{{ selectedDate?.dt.format("MM-DD") }}</div>
               <span class="mr-1 text-sm">当前有</span>
               <Icon icon="mdi:star" class="text-red-500 w-4 h-4 mr-1" />
@@ -80,14 +80,14 @@
                 <ion-item-sliding
                   v-for="schedule in selectedDate?.events.filter(bShowScheduleItem)"
                   :key="schedule.id">
-                  <ion-item lines="none">
+                  <ion-item lines="" class="">
                     <ion-checkbox
-                      style="--size: 26px; padding-right: 5px"
+                      class="[--size:26px] mr-2"
                       slot="start"
                       :checked="scheduleChecked(schedule.id)"
                       @ionChange="onScheduleCheckboxChange($event, selectedDate, schedule)">
                     </ion-checkbox>
-                    <div @click="btnScheduleClk($event, schedule)" class="flex w-full items-center">
+                    <div @click="btnScheduleClk($event, schedule)" class="flex w-full items-center pb-1">
                       <ion-label
                         :class="{
                           'line-through':
@@ -141,17 +141,17 @@
                     @click="btnScheduleClk($event, schedule)">
                     <ion-checkbox
                       disabled
-                      class="sub-checkbox"
+                      class="[--size:18px] [--border-radius:4px]"
                       :checked="
                         selectedDate &&
                         selectedDate.save &&
                         selectedDate.save[schedule.id]?.subtasks[sub.id] === 1
                       " />
-                    <span class="pl-2 text-base flex-1">{{ sub.name }}</span>
+                    <span class="pl-2 text-base ">{{ sub.name }}</span>
                     <Icon icon="mdi:star" class="text-red-500" />
                     <span class="w-5 text-right mr-6">{{ sub.score ?? 0 }}</span>
                   </div>
-                  <ion-item-options side="end">
+                  <ion-item-options side="end" class="mb-1">
                     <ion-item-option @click="btnScheduleAlarmClk">
                       <ion-icon :icon="alarmOutline"></ion-icon>
                     </ion-item-option>
@@ -159,7 +159,6 @@
                       <ion-icon :icon="trashOutline"></ion-icon>
                     </ion-item-option>
                   </ion-item-options>
-                  <div style="height: 1px; box-shadow: 0 0 0 0.1px #f00 inset;" class="mt-2"></div>
                 </ion-item-sliding>
               </ion-reorder-group>
             </div>
@@ -198,12 +197,4 @@
 </template>
 <script lang="ts" src="@/views/page-schedule/PageSchedule.ts"></script>
 <style lang="css" scoped>
-.schedule-group-item::part(native) {
-  height: 35px !important;
-  min-height: 0 !important;
-}
-.sub-checkbox {
-  --size: 18px;
-  --border-radius: 4px;
-}
 </style>

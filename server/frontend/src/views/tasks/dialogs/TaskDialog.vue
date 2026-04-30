@@ -10,7 +10,7 @@
       <!-- 上区域：任务信息 -->
       <div class="task-info-section p-2 border rounded">
         <el-form :model="formData" label-width="100px">
-          <!-- 第一行：名称、状态、对象 -->
+          <!-- 第一行:名称、优先级、对象 -->
           <el-row :gutter="20">
             <el-col :span="8">
               <el-form-item label="任务名称" required>
@@ -18,13 +18,16 @@
               </el-form-item>
             </el-col>
             <el-col :span="8">
-              <el-form-item label="状态">
-                <el-select v-model="formData.status" placeholder="请选择状态" class="w-30!">
-                  <el-option label="未开启" :value="-1" />
-                  <el-option label="未开始" :value="0" />
-                  <el-option label="进行中" :value="1" />
-                  <el-option label="已结束" :value="2" />
-                </el-select>
+              <el-form-item label="优先级">
+                <el-input-number
+                  v-model="formData.priority"
+                  :min="0" :max="10"
+                  :step="1" class="w-30!"
+                  size="small"
+                  placeholder="数字越小优先级越高" />
+                <el-tooltip content="数字越小优先级越高，高优先级任务没有完成低优先级任务会锁定" placement="bottom">
+                  <el-icon class="ml-2"><WarningFilled /></el-icon>
+                </el-tooltip>
               </el-form-item>
             </el-col>
             <el-col :span="8">
@@ -59,7 +62,7 @@
             </el-col>
             <el-col :span="8">
               <el-form-item label="任务类型" required>
-                <el-select v-model="formData.type" placeholder="请选择任务类型" class="w-30!">
+                <el-select v-if="visible" v-model="formData.type" placeholder="请选择任务类型" class="w-30!">
                   <el-option label="每日任务" :value="0" />
                   <el-option label="持续任务" :value="1" />
                 </el-select>
@@ -207,6 +210,7 @@
         <!-- 右侧：素材列表 -->
         <div class="flex-1 border rounded overflow-hidden">
           <el-table
+            v-if="!materialLoading"
             ref="materialTableRef"
             :data="materialList"
             @selection-change="handleMaterialSelectionChange"
@@ -236,7 +240,7 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, computed } from "vue";
 import { ElMessage } from "element-plus";
-import { Plus } from "@element-plus/icons-vue";
+import { Plus, WarningFilled } from "@element-plus/icons-vue";
 import { addTask, updateTask, getMaterialList, getMaterialCategoryList, type Task, type Material, type MaterialCategory } from "@/api/api-task";
 import dayjs from "dayjs";
 
@@ -282,6 +286,7 @@ const formData = ref<Partial<Task>>({
   user_id: "",
   status: 1,
   type: 0,
+  priority: 0,
 });
 
 // 计算结束日期
@@ -302,6 +307,7 @@ watch(
         user_id: newData.user_id || "",
         status: newData.status ?? 1,
         type: newData.type ?? 0,
+        priority: newData.priority ?? 0,
       };
 
       // 解析 user_id，如果是多个用户用逗号分隔
@@ -392,6 +398,7 @@ const resetForm = () => {
     duration: 1,
     user_id: "",
     status: 1,
+    priority: 0,
   };
   selectedUsers.value = [];
   selectedDay.value = -1;
@@ -586,7 +593,7 @@ const handleSubmit = async () => {
     // 计算结束日期
     const endDateStr = dayjs(formData.value.start_date).add((formData.value.duration || 1) - 1, 'day').format('YYYY-MM-DD');
 
-    // 构建任务数据，确保所有必需字段都有值
+    // 构建任务数据,确保所有必需字段都有值
     const taskData: Omit<Task, "id"> = {
       name: formData.value.name || "",
       start_date: formData.value.start_date || "",
@@ -595,6 +602,7 @@ const handleSubmit = async () => {
       user_id: userIdStr,
       type: formData.value.type ?? 0,
       status: formData.value.status ?? 1,
+      priority: formData.value.priority ?? 1,
       data: JSON.stringify({
         dailyMaterials: dailyMaterials.value,
         dailyScore: dailyScore.value,

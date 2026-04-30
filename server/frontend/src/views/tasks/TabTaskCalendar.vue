@@ -86,13 +86,14 @@
       layout="sizes, prev, pager, next"
       :total="totalCount"
       v-model:page-size="pageSize"
+      v-model:current-page="pageNum"
       :page-sizes="[10, 20, 50]"
-      :current-page="pageNum"
       class="mt-2"
       background
       @size-change="handleSizeChange"
       @current-change="handlePageChange"
     />
+
   </div>
 </template>
 

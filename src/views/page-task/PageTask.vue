@@ -46,7 +46,7 @@
           <TaskProgressPopover :tasks="taskList" :user-id="getCurrentUserId() || 0" :date="currentDateStr" />
       </ion-popover>
     </div>
-    <ion-content class="[&::part(scroll)]:px-4 ">
+    <ion-content class="[&::part(scroll)]:px-4 [&::part(scroll)]:pb-2">
       <ion-refresher slot="fixed" @ionRefresh="handleRefresh">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
@@ -69,7 +69,8 @@
                 v-for="material in getTaskMaterialList(task)"
                 :key="`${task.id}_${material.id}`"
                 class="relative flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow aspect-square cursor-pointer"
-                @click="openMaterialPlayer(task, material)"
+                :class="{ 'opacity-90': getLockedTasks(task).length > 0 }"
+                @click="handleMaterialClick(task, material)"
               >
                 <!-- 任务名称角标 -->
                 <div class="absolute top-2 left-3 text-xs text-gray-500 truncate max-w-[80%] flex gap-2 items-center">
@@ -87,11 +88,10 @@
                   class="text-4xl mb-1 mt-6"
                 ></ion-icon>
                 <div class="text-sm font-medium text-center line-clamp-2 mb-1">{{ material.name }}</div>
-                <div class="mb-1 text-xs items-center flex gap-2">
-  
-                    <div class=" text-gray-600"> 页数:  {{ (material.data && typeof material.data === 'object' ? (material.data as any).pdfLength : '-') }}</div>
+                <div v-if="getLockedTasks(task).length > 0" >
+                  <ion-icon :icon="lockClosed" class="text-2xl text-gray-500"></ion-icon>
                 </div>
-                <div class=" text-[10px] flex items-center"> 点击阅读</div>
+                <div v-else class=" text-[10px] flex items-center"> 点击阅读</div>
               </div>
             </template>
           </div>
@@ -125,6 +125,7 @@ import ServerRemoteBadge from '@/components/ServerRemoteBadge.vue';
 import MaterialPlayerDialog from './dialogs/MaterialPlayerDialog.vue';
 import TaskProgressPopover from './dialogs/TaskProgressPopover.vue';
 import TaskCalendar from './dialogs/TaskCalendar.vue';
+import EventBus, { C_EVENT } from '@/types/event-bus';
 import {
     IonButtons,
     IonHeader,
@@ -143,6 +144,7 @@ import {
     calendarOutline,
     checkmarkCircle,
     documentTextOutline,
+    lockClosed,
     refreshOutline,
     videocamOutline,
 } from 'ionicons/icons';
@@ -250,6 +252,32 @@ const isMaterialCompleted = (task: Task, material: any, date: Date) => {
     } catch (error) {
         return false;
     }
+};
+
+// 检查任务是否被锁定（有更高优先级任务未完成）
+const getLockedTasks = (task: Task): Task[] => {
+    const userId = getCurrentUserId();
+    if (!userId) return [];
+
+    return displayTasks.value.filter(t => {
+        if (t.id === task.id) return false;
+        if (t.priority == null || task.priority == null) return false;
+        if (t.priority >= task.priority) return false;
+        
+        const materials = getTaskMaterialList(t);
+        return materials.length > 0 && materials.some(m => !isMaterialCompleted(t, m, currentDate.value));
+    });
+};
+
+// 处理素材点击
+const handleMaterialClick = (task: Task, material: MaterialItem) => {
+    const lockedTasks = getLockedTasks(task);
+    if (lockedTasks.length > 0) {
+        const names = lockedTasks.map(t => t.name).join('、');
+        EventBus.$emit(C_EVENT.TOAST, `请先完成 "${names}"`);
+        return;
+    }
+    openMaterialPlayer(task, material);
 };
 
 // 获取当前用户ID（与获取任务列表相同的逻辑）
@@ -367,8 +395,4 @@ onMounted(() => {
 </script>
 
 <style scoped>
-ion-card {
-    --background: #fff;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
 </style>
