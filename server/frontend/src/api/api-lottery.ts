@@ -69,3 +69,4 @@ export async function undoLottery(historyId: number): Promise<{ user_id: number;
 
   return rsp.data.data;
 }
+

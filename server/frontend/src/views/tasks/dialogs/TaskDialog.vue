@@ -62,7 +62,7 @@
             </el-col>
             <el-col :span="8">
               <el-form-item label="任务类型" required>
-                <el-select v-if="visible" v-model="formData.type" placeholder="请选择任务类型" class="w-30!">
+                <el-select v-model="formData.type" placeholder="请选择任务类型" class="w-30!">
                   <el-option label="每日任务" :value="0" />
                   <el-option label="持续任务" :value="1" />
                 </el-select>

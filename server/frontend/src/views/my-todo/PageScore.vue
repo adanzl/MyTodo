@@ -54,16 +54,25 @@
           <span v-else>-</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="80" align="center" fixed="right">
+      <el-table-column label="操作" width="150" align="center" fixed="right">
         <template #default="{ row }">
-          <el-button
-            v-if="isGiftRecord(row)"
-            type="danger"
-            link
-            size="small"
-            @click.stop="onUndo(row)">
-            撤销
-          </el-button>
+          <div v-if="isGiftRecord(row)">
+            <el-button
+              type="danger"
+              link
+              size="small"
+              @click.stop="onUndo(row)">
+              撤销
+            </el-button>
+            <el-button
+              type="success"
+              link
+              size="large"
+              :icon="SuccessFilled"
+              v-if="row.status !== 1"
+              @click.stop="onConfirmGift(row)">
+            </el-button>
+          </div>
           <span v-else>-</span>
         </template>
       </el-table-column>
@@ -105,8 +114,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
-import { CaretTop, CaretBottom, Present } from "@element-plus/icons-vue";
-import { getList } from "@/api/api-common";
+import { CaretTop, CaretBottom, Present, SuccessFilled } from "@element-plus/icons-vue";
+import { getList, setData } from "@/api/api-common";
 import { getPicDisplayUrl } from "@/api/api-pic";
 import { undoLottery } from "@/api/api-lottery";
 import type { ScoreHistory } from "@/api/api-score";
@@ -285,6 +294,24 @@ async function onUndo(row: ScoreHistory) {
   } catch (err: unknown) {
     if (err === "cancel" || err === "close") return;
     const msg = err instanceof Error ? err.message : "撤销失败";
+    ElMessage.error(msg);
+  }
+}
+
+/**
+* 确认抽奖,表示奖品已发放
+*/
+async function onConfirmGift(row: ScoreHistory) {
+  if (!isGiftRecord(row)) return;
+  try {
+    await setData("t_score_history", {
+      id: row.id,
+      status: 1,
+    });
+    ElMessage.success("确认成功");
+    await refreshRecordList(selectedUserId.value, recordList.value.pageNum, recordList.value.pageSize);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "确认失败";
     ElMessage.error(msg);
   }
 }
