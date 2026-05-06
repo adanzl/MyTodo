@@ -18,7 +18,8 @@
           <ion-checkbox
             slot="start"
             @ionChange="onTaskCheckboxChange"
-            :checked="curSave?.state === 1">
+            :checked="curSave?.state === 1"
+            :disabled="!canModifyScheduleState()">
           </ion-checkbox>
           <ion-input
             placeholder="输入日程标题"
@@ -277,6 +278,7 @@
             <ion-checkbox
               slot="start"
               :checked="subTaskChecked(task)"
+              :disabled="!canModifyScheduleState()"
               class="ion-no-padding mt-1"
               @ionChange="onSubtaskCheckboxChange($event, task)">
             </ion-checkbox>

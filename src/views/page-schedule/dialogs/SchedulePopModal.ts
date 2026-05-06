@@ -65,6 +65,10 @@ export default defineComponent({
       type: Object,
       default: new ScheduleSave(),
     },
+    selectedDate: {
+      type: Object,
+      default: undefined,
+    },
   },
   emits: ["update:schedule", "update:save"],
   setup(props: any) {
@@ -99,6 +103,31 @@ export default defineComponent({
     };
     const reminderOptions = ref(ReminderOptions); //  提醒选项
     let changeFlag = false; // 改变标记 日程中可覆盖的值被修改的标记
+
+    // 判断是否可以修改完成状态（查看日期在今天及过去7天内可以修改）
+    const canModifyScheduleState = () => {
+      // 获取全局变量
+      const globalVar: any = inject("globalVar");
+      
+      // 检查是否为管理员
+      if (globalVar?.user?.admin === 1) {
+        return true;
+      }
+      
+      // 使用选中的日期来判断
+      const selectedDate = props.selectedDate?.dt;
+      if (!selectedDate) {
+        return true; // 如果没有选中日期，允许修改
+      }
+      
+      const now = dayjs().startOf('day');
+      const viewDate = selectedDate.startOf('day');
+      
+      // 计算天数差：viewDate - now，负数表示过去，正数表示未来
+      const diffDays = viewDate.diff(now, 'day');
+      // diffDays <= 0 表示今天或过去，diffDays >= -1 表示不超过1天
+      return diffDays <= 0 && diffDays >= -1;
+    };
 
     const refreshUI = () => {
       // console.log("refreshUI", curScheduleData.value, curSave.value, props);
@@ -433,6 +462,7 @@ export default defineComponent({
       buildCustomRepeatLabel,
       CUSTOM_REPEAT_ID,
       WEEK,
+      canModifyScheduleState, // 导出判断是否可以修改完成状态的函数
       ...refData,
       ...IonIcons,
       ...tab1Method,

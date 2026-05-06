@@ -85,6 +85,7 @@
                       class="[--size:26px] mr-2"
                       slot="start"
                       :checked="scheduleChecked(schedule.id)"
+                      :disabled="!canModifyScheduleState()"
                       @ionChange="onScheduleCheckboxChange($event, selectedDate, schedule)">
                     </ion-checkbox>
                     <div @click="btnScheduleClk($event, schedule)" class="flex w-full items-center pb-1">
@@ -140,7 +141,7 @@
                     :key="idx"
                     @click="btnScheduleClk($event, schedule)">
                     <ion-checkbox
-                      disabled
+                      :disabled="!canModifyScheduleState()"
                       class="[--size:18px] [--border-radius:4px]"
                       :checked="
                         selectedDate &&
@@ -171,6 +172,7 @@
         :modal="scheduleModal"
         :schedule="scheduleModalData"
         :save="scheduleSave"
+        :selected-date="selectedDate"
         @willDismiss="onScheduleModalDismiss">
       </SchedulePop>
       <ion-alert
