@@ -49,9 +49,10 @@
             </div>
           </div>
         </div>
-        <div slot="end" class="text-primary text-sm shrink-0 w-3 flex items-center justify-center">
+        <div slot="end" class="text-primary text-sm shrink-0 w-5 flex items-center justify-center">
           <Icon v-if="(item.action === 'lottery' || item.action === 'exchange') && item.out_key" icon="mdi:gift"
-            class="w-full h-5 cursor-pointer" />
+            class="w-full h-5 cursor-pointer" :class="{'text-green-500': item.status === 1, 'text-blue-500': item.status !== 1}" 
+            @click.stop="onConfirmGift(item)" />
           <span v-else>-</span>
         </div>
       </ion-item>
@@ -69,6 +70,7 @@
 
 <script setup lang="ts">
 import {
+  alertController,
   IonAvatar,
   IonContent,
   IonIcon,
@@ -94,7 +96,8 @@ import dayjs from "dayjs";
 import { getGiftList } from "@/api/api-lottery";
 import { getNetworkErrorMessage } from "@/utils/net-util";
 import EventBus, { C_EVENT } from "@/types/event-bus";
-import { computed } from "vue";
+import { computed, inject } from "vue";
+import { setData } from "@/api/data";
 
 const props = defineProps<{
   userList: any[];
@@ -112,6 +115,7 @@ const emit = defineEmits<{
   (e: "load-more", event: any): void;
 }>();
 
+const globalVar: any = inject("globalVar");
 const hasMore = computed(() => props.hasMore ?? false);
 
 function onRefresh(event: any) {
@@ -188,5 +192,41 @@ async function onLotteryHistoryDetail(item: any) {
   } else {
     EventBus.$emit(C_EVENT.TOAST, item.msg);
   }
+}
+
+/** 确认抽奖，表示奖品已发放 */
+async function onConfirmGift(row: any) {
+  if (!((row.action === 'lottery' || row.action === 'exchange') && row.out_key)) return;
+  
+  // 检查管理员权限
+  if (globalVar?.user?.admin !== 1) {
+    return;
+  }
+  
+  // 显示确认对话框
+  const alert = await alertController.create({
+    header: "确认奖品已发放",
+    message: row.msg,
+    buttons: [
+      { text: "取消", role: "cancel" },
+      {
+        text: "确定",
+        handler: async () => {
+          try {
+            await setData("t_score_history", {
+              id: row.id,
+              status: 1,
+            });
+            EventBus.$emit(C_EVENT.TOAST, "确认成功");
+            emit("refresh", null);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "确认失败";
+            EventBus.$emit(C_EVENT.TOAST, msg);
+          }
+        },
+      },
+    ],
+  });
+  await alert.present();
 }
 </script>
