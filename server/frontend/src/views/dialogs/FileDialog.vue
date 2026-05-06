@@ -341,6 +341,14 @@ const isConfirmDisabled = computed(() => {
   return selectedFiles.value.length === 0;
 });
 
+// 计算标题，如果有限制扩展名则显示在标题中
+const title = computed(() => {
+  if (props.extensions && props.extensions !== 'all' && props.mode === 'file') {
+    return `${props.title} (${props.extensions})`;
+  }
+  return props.title;
+});
+
 // 监听 visible 变化
 watch(
   () => props.visible,

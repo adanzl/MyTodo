@@ -21,6 +21,7 @@
           @clear="fetchMaterialList"
         />
         <el-button type="primary" plain size="small" @click="fetchMaterialList">筛选</el-button>
+        <el-button type="success" size="small" @click="handleBatchAdd">批量添加</el-button>
         <el-button type="primary" size="small" @click="handleAddMaterial">添加素材</el-button>
       </div>
     </div>
@@ -93,6 +94,13 @@
       v-model="previewDialogVisible"
       :material-id="previewMaterialId"
     />
+
+    <!-- 批量添加素材对话框 -->
+    <BatchAddMaterialDialog
+      v-model="batchAddDialogVisible"
+      :category-list="categoryList"
+      @success="handleBatchAddSuccess"
+    />
   </div>
 </template>
 
@@ -110,6 +118,7 @@ import CategoryDialog from "./dialogs/CategoryDialog.vue";
 import MaterialDialog from "./dialogs/MaterialDialog.vue";
 import MaterialDetailDialog from "./dialogs/MaterialDetailDialog.vue";
 import MaterialPreviewDialog from "./dialogs/MaterialPreviewDialog.vue";
+import BatchAddMaterialDialog from "./dialogs/MaterialBatchAdd.vue";
 
 
 const tableMaxHeight = ref<number>(0);
@@ -136,6 +145,7 @@ const categoryList = ref<{ id: number; name: string }[]>([]);
 const materialDialogVisible = ref(false);
 const detailDialogVisible = ref(false);
 const previewDialogVisible = ref(false);
+const batchAddDialogVisible = ref(false);
 const previewMaterialId = ref<number | null>(null);
 const isMaterialEdit = ref(false);
 const currentMaterial = ref<Partial<Material>>({});
@@ -180,6 +190,17 @@ const handleAddMaterial = () => {
   isMaterialEdit.value = false;
   currentMaterial.value = {};
   materialDialogVisible.value = true;
+};
+
+// 批量添加素材
+const handleBatchAdd = () => {
+  batchAddDialogVisible.value = true;
+};
+
+// 批量添加成功回调
+const handleBatchAddSuccess = () => {
+  fetchCategoryList();
+  fetchMaterialList();
 };
 
 // 查看详情

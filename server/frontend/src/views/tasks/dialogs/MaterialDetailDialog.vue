@@ -71,7 +71,7 @@
           <div class="border-t border-gray-200 p-3">
             <h4 class="text-xs font-semibold mb-2 text-gray-700">备注</h4>
             <el-input
-              v-model="coursewareForm.remark"
+              v-model="materialForm.remark"
               type="textarea"
               :rows="4"
               placeholder="请输入备注"
@@ -263,8 +263,8 @@ const emit = defineEmits<Emits>();
 const router = useRouter();
 const visible = ref(false);
 
-// 课件表单
-const coursewareForm = ref({
+// 素材表单
+const materialForm = ref({
   name: "",
   remark: "",
 });
@@ -476,7 +476,7 @@ const loadPdfPages = async (pdfPath: string) => {
 const initDetail = async () => {
   if (!props.materialData) return;
 
-  coursewareForm.value.name = props.materialData.name || "";
+  materialForm.value.name = props.materialData.name || "";
 
   // 解析 data 字段
   let materialDetail: MaterialDetail | null = null;
@@ -490,7 +490,7 @@ const initDetail = async () => {
     materialDetail = props.materialData.data || null;
   }
 
-  coursewareForm.value.remark = materialDetail?.remark || "";
+  materialForm.value.remark = materialDetail?.remark || "";
 
   // 保存 taskDetail 数据
   materialDetailData.value = materialDetail;
@@ -684,7 +684,7 @@ const handleClose = () => {
   // 重置状态
   pdfPages.value = [];
   allAudios.value = [];
-  coursewareForm.value = { name: "", remark: "" };
+  materialForm.value = { name: "", remark: "" };
   pdfLoading.value = false;
   selectedAudioIds.value = [];
   selectedPageIndex.value = null;
@@ -778,7 +778,7 @@ const saveMaterial = async () => {
       ...existingData,
       audioList: allAudios.value,
       pdfLength: pdfPages.value.length,
-      remark: coursewareForm.value.remark,
+      remark: materialForm.value.remark,
     };
 
     await updateMaterial({

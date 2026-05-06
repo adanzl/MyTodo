@@ -3,6 +3,7 @@
     "python-envs.pythonProjects": [],
     "cSpell.words": [
         "bluetoothctl",
+        "cmaps",
         "DGRAM",
         "DLNA",
         "dotenv",
@@ -18,6 +19,8 @@
         "natapp",
         "nokey",
         "noprint",
+        "pdfjs",
+        "Pinia",
         "pywsgi",
         "rpush",
         "rssi",

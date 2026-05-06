@@ -12,7 +12,7 @@
           <el-icon><HomeFilled /></el-icon>
           <template #title>Home</template>
         </el-menu-item>
-        <el-sub-menu index="mytodo">
+        <el-sub-menu index="my-todo">
           <template #title>
             <el-icon><Promotion /></el-icon>
             <span>MyTodo</span>
