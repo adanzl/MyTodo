@@ -52,9 +52,7 @@ class UsageMgr:
             # 插入数据
             result = db_mgr.set_data('t_usage', data)
 
-            if result.get('code') == 0:
-                log.info(f"[UsageMgr] 添加使用记录成功: type={type}, user_id={user_id}, duration={duration}")
-            else:
+            if result.get('code') != 0:
                 log.error(f"[UsageMgr] 添加使用记录失败: {result.get('msg')}")
 
             return result
@@ -127,6 +125,63 @@ class UsageMgr:
 
         except Exception as e:
             log.error(f"[UsageMgr] 删除使用记录异常: {e}", exc_info=True)
+            return {"code": -1, "msg": f'error: {str(e)}'}
+
+    def query_sum_usage(
+        self,
+        user_id: Optional[int] = None,
+        type: Optional[str] = None,
+        time_start: Optional[str] = None,
+        time_end: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        查询特定条件下的使用时间总长。
+
+        Args:
+            user_id: 用户ID（可选）
+            type: 使用类型（可选）
+            time_start: 开始时间范围起始（可选）
+            time_end: 开始时间范围结束（可选）
+
+        Returns:
+            总时长（秒）
+        """
+        try:
+            # 构建 SQL 查询
+            sql_parts = ["SELECT COALESCE(SUM(duration), 0) as total_duration FROM t_usage WHERE 1=1"]
+            params = []
+
+            if user_id is not None:
+                sql_parts.append("AND user_id = ?")
+                params.append(user_id)
+
+            if type:
+                sql_parts.append("AND type = ?")
+                params.append(type)
+
+            if time_start:
+                sql_parts.append("AND start_time >= ?")
+                params.append(time_start)
+
+            if time_end:
+                sql_parts.append("AND start_time <= ?")
+                params.append(time_end)
+
+            sql = " ".join(sql_parts)
+            log.debug(f"[UsageMgr] 查询总时长 SQL: {sql}, params: {params}")
+
+            # 执行查询
+            result = db_mgr.query(sql)
+
+            if result.get('code') == 0 and result.get('data'):
+                total_duration = result['data'][0]['total_duration'] if result['data'] else 0
+                return {"code": 0, "msg": "ok", "data": {"total_duration": total_duration}}
+            else:
+                log.error(f"[UsageMgr] 查询总时长失败: {result.get('msg')}")
+                return result
+
+        except Exception as e:
+            log.error(f"[UsageMgr] 查询总时长异常: {e}", exc_info=True)
             return {"code": -1, "msg": f'error: {str(e)}'}
 
 

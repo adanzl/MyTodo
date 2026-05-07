@@ -41,6 +41,14 @@ class DeleteUsageQuery(BaseModel):
     id: int
 
 
+class QuerySumQuery(BaseModel):
+    """查询使用总时长参数"""
+    user_id: int | None = None
+    type: str | None = None
+    time_start: str | None = None
+    time_end: str | None = None
+
+
 @usage_bp.route('/usage/add', methods=['POST'])
 def add_usage() -> ResponseReturnValue:
     """添加使用记录"""
@@ -86,3 +94,24 @@ def delete_usage() -> ResponseReturnValue:
 
     result = usage_mgr.delete_usage(id=body.id)
     return result
+
+
+@usage_bp.route('/usage/querySum', methods=['GET'])
+def query_sum_usage() -> ResponseReturnValue:
+    """查询使用总时长"""
+    try:
+        user_id = request.args.get('user_id', type=int)
+        type_param = request.args.get('type', type=str)
+        time_start = request.args.get('time_start', type=str)
+        time_end = request.args.get('time_end', type=str)
+
+        result = usage_mgr.query_sum_usage(
+            user_id=user_id,
+            type=type_param,
+            time_start=time_start,
+            time_end=time_end,
+        )
+        return result
+    except Exception as e:
+        log.error(f"[UsageRoutes] 查询总时长异常: {e}", exc_info=True)
+        return _err(f'error: {str(e)}')

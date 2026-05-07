@@ -41,13 +41,13 @@
             <!-- 音频播放信息 -->
             <AudioPreview 
               ref="audioPreviewRef"
-              :src="currentAudioSrcs"
+              :src="currentAudioSrcLst"
               width-class="max-w-30"
               :show-progress="false"
               :show-play-button="false"
             />
             <div class="text-sm text-gray-600">
-                {{ currentAudioSrcs.length > 1 ? `(${audioIdx + 1}/${currentAudioSrcs.length})` : '' }}
+                {{ currentAudioSrcLst.length > 1 ? `(${audioIdx + 1}/${currentAudioSrcLst.length})` : '' }}
             </div>
           </div>
           
@@ -55,7 +55,7 @@
             <ion-button fill="outline" :disabled="currentPage === 1" @click="prevPage">
               <ion-icon slot="icon-only" :icon="chevronBackOutline" />
             </ion-button>
-            <ion-button fill="outline" :disabled="!currentAudioSrcs.length" @click="playAudio">
+            <ion-button fill="outline" :disabled="!currentAudioSrcLst.length" @click="playAudio">
               <ion-icon slot="icon-only" :icon="isAudioPlaying ? pauseOutline : playOutline" />
             </ion-button>
             <ion-button fill="outline" :disabled="currentPage >= getLastPagePosition" @click="nextPage">
@@ -113,7 +113,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, onMounted, onUnmounted } from 'vue';
+import { ref, watch, computed, onMounted, onUnmounted, inject } from 'vue';
 import {
     IonModal,
     IonHeader,
@@ -130,7 +130,10 @@ import { loadPDF, getPDFPage, renderPDFPageToCanvas } from '@/utils/pdf-lib';
 import { getMediaFileUrl } from '@/utils/file';
 import AudioPreview from '@/components/AudioPreview.vue';
 import { finishMaterial } from '@/api/api-task';
+import { addUsage, type AddUsageBody, USAGE_TYPE_VIDEO, USAGE_TYPE_PDF } from '@/api';
 import EventBus, { C_EVENT } from '@/types/event-bus';
+
+const globalVar: any = inject('globalVar');
 
 interface Material {
     id: number;
@@ -168,8 +171,12 @@ const isVideoPlaying = ref(false);
 
 // 音频信息
 const audioInfo = ref('');
-const currentAudioSrcs = ref<string[]>([]);
+const currentAudioSrcLst = ref<string[]>([]);
 const audioPreviewRef = ref<any>(null);
+
+// 使用统计相关
+let usageTimer: number | null = null;
+let usageStartTime: number = 0;
 
 // 监听 AudioPreview 的播放状态
 const isAudioPlaying = computed(() => {
@@ -230,6 +237,7 @@ const isMaterialCompleted = computed(() => {
 
 // 关闭弹窗
 const handleDismiss = () => {
+    stopUsageTracking();
     stopAudio();
     emit('update:isOpen', false);
 };
@@ -282,10 +290,10 @@ const renderPages = async () => {
     if (audios.length > 0) {
         audioInfo.value = ` ${audios.length} 音频`;
         // 自动加载所有音频
-        currentAudioSrcs.value = audios.map((audio: any) => getMediaFileUrl(audio.path));
+        currentAudioSrcLst.value = audios.map((audio: any) => getMediaFileUrl(audio.path));
     } else {
         audioInfo.value = '无音频';
-        currentAudioSrcs.value = [];
+        currentAudioSrcLst.value = [];
     }
 };
 
@@ -370,13 +378,94 @@ const getCurrentPageAudios = () => {
 
 // 播放音频
 const playAudio = () => {
-    if (!currentAudioSrcs.value.length) return;
+    if (!currentAudioSrcLst.value.length) return;
     audioPreviewRef.value?.togglePlay();
 };
 
 // 停止音频
 const stopAudio = () => {
-    currentAudioSrcs.value = [];
+    currentAudioSrcLst.value = [];
+};
+
+// 开始使用统计追踪
+const startUsageTracking = () => {
+    if (!props.material) return;
+    
+    // 如果 userId 为空，尝试从全局变量获取
+    const userId = props.userId || globalVar?.user?.id;
+    if (!userId) {
+        console.warn('无法获取 userId，跳过使用统计');
+        return;
+    }
+    
+    console.log('开始使用统计追踪，素材类型:', props.material.type, 'userId:', userId);
+    
+    // 记录开始时间
+    usageStartTime = Date.now();
+    
+    // 清除之前的定时器
+    stopUsageTracking();
+    
+    // 设置定时器，每60秒上报一次
+    usageTimer = window.setInterval(() => {
+        reportUsage();
+    }, 60000);
+};
+
+// 停止使用统计追踪
+const stopUsageTracking = () => {
+    if (usageTimer !== null) {
+        clearInterval(usageTimer);
+        usageTimer = null;
+    }
+};
+
+// 上报使用记录
+const reportUsage = async () => {
+    if (!props.material) return;
+    
+    // 如果 userId 为空，尝试从全局变量获取
+    const userId = props.userId || globalVar?.user?.id;
+    if (!userId) {
+        console.warn('无法获取 userId，跳过上报');
+        return;
+    }
+    
+    // 视频素材特殊规则：检查是否在播放中
+    if (props.material.type === 1 && !isVideoPlaying.value) {
+        console.log('视频未在播放，跳过上报');
+        return;
+    }
+    
+    const now = Date.now();
+    const duration = Math.floor((now - usageStartTime) / 1000); // 转换为秒
+    
+    // 根据素材类型确定 type
+    let usageType = '';
+    if (props.material.type === 0) {
+        usageType = USAGE_TYPE_PDF;
+    } else if (props.material.type === 1) {
+        usageType = USAGE_TYPE_VIDEO;
+    }
+    
+    if (!usageType) return;
+    
+    try {
+        const usageData: AddUsageBody = {
+            type: usageType,
+            start_time: new Date(usageStartTime).toISOString(),
+            duration: duration,
+            user_id: userId,
+            out_key: props.material.id,
+        };
+        
+        await addUsage(usageData);
+        
+        // 更新开始时间为当前时间，用于下一次统计
+        usageStartTime = now;
+    } catch (error) {
+        console.error('上报使用记录失败:', error);
+    }
 };
 
 // 完成阅读
@@ -430,12 +519,17 @@ watch(
                         return;
                     }
                     renderPDF(getMediaFileUrl(material.path));
+                    // 开始使用统计
+                    startUsageTracking();
                 } else if (material.type === 1 && material.path) {
                     // 视频类型
                     loading.value = false;
                     // 视频会自动加载和播放
+                    // 开始使用统计
+                    startUsageTracking();
                 } else {
                     loading.value = false;
+                    console.log('未满足启动条件');
                 }
             }, 300);
         } else {

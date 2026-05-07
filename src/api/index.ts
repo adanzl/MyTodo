@@ -79,3 +79,5 @@ export type {
 export { getPic, getPicList, setPic, delPic } from "./api-pic";
 export { getColorList, setColor, delColor } from "./api-color";
 export { getList, getRdsData, setRdsData, setData, delData } from "./data";
+export { addUsage, USAGE_TYPE_VIDEO, USAGE_TYPE_PDF } from "./api-usage";
+export type { UsageItem as AddUsageBody } from "./api-usage";
