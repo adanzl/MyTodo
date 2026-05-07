@@ -5,6 +5,7 @@
         "bluetoothctl",
         "cmaps",
         "cosyvoice",
+        "daterange",
         "DGRAM",
         "DLNA",
         "dotenv",
