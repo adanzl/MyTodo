@@ -266,7 +266,7 @@ class UsageMgr:
                     # detail=0 或 out_key 为 None 时，直接存储总时长
                     abstract_data[user_id][date][usage_type] = total_duration
 
-            log.info(f"[UsageMgr] 查询统计摘要成功: users={len(abstract_data)}")
+            # log.info(f"[UsageMgr] 查询统计摘要成功: users={len(abstract_data)}")
             return {"code": 0, "msg": "ok", "data": abstract_data}
 
         except Exception as e:
