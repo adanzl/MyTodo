@@ -4,10 +4,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
+
+from sqlalchemy import text
 
 from core.config import app_logger
+from core.db import db_obj
 from core.db.db_mgr import db_mgr
 
 log = app_logger
@@ -182,6 +184,93 @@ class UsageMgr:
 
         except Exception as e:
             log.error(f"[UsageMgr] 查询总时长异常: {e}", exc_info=True)
+            return {"code": -1, "msg": f'error: {str(e)}'}
+
+    def get_usage_abstract(
+        self,
+        start_time: str,
+        end_time: str,
+        detail: int = 0,
+    ) -> Dict[str, Any]:
+        """
+        获取使用统计数据汇总。
+
+        Args:
+            start_time: 开始时间
+            end_time: 结束时间
+            detail: 是否区分 out_key (0=不区分, 1=区分)
+
+        Returns:
+            按用户、日期、类型分组的统计数据
+        """
+        try:
+            # 构建 SQL 查询
+            if detail == 1:
+                sql = """
+                    SELECT user_id,
+                           DATE(start_time) as date,
+                           type,
+                           out_key,
+                           SUM(duration) as total_duration
+                    FROM t_usage
+                    WHERE start_time >= :start_time AND start_time <= :end_time
+                    GROUP BY user_id, DATE(start_time), type, out_key
+                    ORDER BY user_id, date, type, out_key
+                """
+            else:
+                sql = """
+                    SELECT user_id,
+                           DATE(start_time) as date,
+                           type,
+                           SUM(duration) as total_duration
+                    FROM t_usage
+                    WHERE start_time >= :start_time AND start_time <= :end_time
+                    GROUP BY user_id, DATE(start_time), type
+                    ORDER BY user_id, date, type
+                """
+
+            log.debug(f"[UsageMgr] 查询统计摘要 SQL: {sql}, params: [{start_time}, {end_time}]")
+
+            # 执行查询
+            try:
+                query_result = db_obj.session.execute(text(sql), {'start_time': start_time, 'end_time': end_time})
+                rows = query_result.fetchall()
+                columns = query_result.keys()
+                data_list = [dict(zip(columns, row)) for row in rows] if rows else []
+            except Exception as query_err:
+                log.error(f"[UsageMgr] 执行查询失败: {query_err}")
+                return {"code": -1, "msg": f'查询失败: {str(query_err)}'}
+
+            # 组织数据结构：{user_id: {date: {type: {out_key: duration}}}}
+            abstract_data: Dict[str, Any] = {}
+
+            for row in data_list:
+                user_id = str(row['user_id'])
+                date = row['date']
+                usage_type = row['type']
+                total_duration = row['total_duration']
+                out_key = row.get('out_key')
+
+                if user_id not in abstract_data:
+                    abstract_data[user_id] = {}
+
+                if date not in abstract_data[user_id]:
+                    abstract_data[user_id][date] = {}
+
+                if usage_type not in abstract_data[user_id][date]:
+                    abstract_data[user_id][date][usage_type] = {}
+
+                if detail == 1 and out_key is not None:
+                    abstract_data[user_id][date][usage_type][str(out_key)] = total_duration
+                else:
+                    # detail=0 或 out_key 为 None 时，直接存储总时长
+                    abstract_data[user_id][date][usage_type] = total_duration
+
+            log.info(f"[UsageMgr] 查询统计摘要成功: users={len(abstract_data)}")
+            return {"code": 0, "msg": "ok", "data": abstract_data}
+
+        except Exception as e:
+            log.error(f"[UsageMgr] 查询统计摘要异常: {e}", exc_info=True)
             return {"code": -1, "msg": f'error: {str(e)}'}
 
 

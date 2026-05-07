@@ -115,3 +115,25 @@ def query_sum_usage() -> ResponseReturnValue:
     except Exception as e:
         log.error(f"[UsageRoutes] 查询总时长异常: {e}", exc_info=True)
         return _err(f'error: {str(e)}')
+
+
+@usage_bp.route('/usage/abstract', methods=['GET'])
+def get_usage_abstract() -> ResponseReturnValue:
+    """获取使用统计摘要"""
+    try:
+        start_time = request.args.get('start_time', type=str)
+        end_time = request.args.get('end_time', type=str)
+        detail = request.args.get('detail', type=int, default=0)
+
+        if not start_time or not end_time:
+            return _err('start_time and end_time are required')
+
+        result = usage_mgr.get_usage_abstract(
+            start_time=start_time,
+            end_time=end_time,
+            detail=detail,
+        )
+        return result
+    except Exception as e:
+        log.error(f"[UsageRoutes] 获取统计摘要异常: {e}", exc_info=True)
+        return _err(f'error: {str(e)}')
