@@ -177,6 +177,7 @@ const audioPreviewRef = ref<any>(null);
 // 使用统计相关
 let usageTimer: number | null = null;
 let usageStartTime: number = 0;
+let isTrackingActive: boolean = false; // 追踪是否活跃（页面可见且视频播放中）
 
 // 监听 AudioPreview 的播放状态
 const isAudioPlaying = computed(() => {
@@ -402,26 +403,56 @@ const startUsageTracking = () => {
     
     // 记录开始时间
     usageStartTime = Date.now();
+    isTrackingActive = true;
     
     // 清除之前的定时器
-    stopUsageTracking();
+    stopUsageTracking(false); // 不上报
     
-    // 设置定时器，每60秒上报一次
+    // 设置定时器，每30秒上报一次
     usageTimer = window.setInterval(() => {
-        reportUsage();
-    }, 60000);
+        if (isTrackingActive) {
+            reportUsageAndReset();
+        }
+    }, 30000);
 };
 
 // 停止使用统计追踪
-const stopUsageTracking = () => {
+const stopUsageTracking = async (shouldReport: boolean = true) => {
     if (usageTimer !== null) {
         clearInterval(usageTimer);
         usageTimer = null;
     }
+    
+    // 如果需要上报且正在追踪
+    if (shouldReport && isTrackingActive && usageStartTime > 0) {
+        const now = Date.now();
+        const duration = Math.floor((now - usageStartTime) / 1000);
+        console.log('停止追踪，上报时长:', duration);
+        await reportUsage(duration);
+    }
+    
+    isTrackingActive = false;
+    usageStartTime = 0;
+};
+
+// 上报使用记录并重置计时器
+const reportUsageAndReset = async () => {
+    if (!props.material || usageStartTime === 0) return;
+    
+    const now = Date.now();
+    const duration = Math.floor((now - usageStartTime) / 1000);
+    
+    if (duration <= 0) return;
+    
+    console.log('定时上报，时长:', duration);
+    await reportUsage(duration);
+    
+    // 重置开始时间，继续下一轮统计
+    usageStartTime = now;
 };
 
 // 上报使用记录
-const reportUsage = async () => {
+const reportUsage = async (duration: number) => {
     if (!props.material) return;
     
     // 如果 userId 为空，尝试从全局变量获取
@@ -437,8 +468,17 @@ const reportUsage = async () => {
         return;
     }
     
-    const now = Date.now();
-    const duration = Math.floor((now - usageStartTime) / 1000); // 转换为秒
+    if (duration <= 0) {
+        console.log('使用时长为0，跳过上报');
+        return;
+    }
+    
+    console.log('准备上报使用记录:', {
+        type: props.material.type,
+        duration: duration,
+        userId: userId,
+        materialId: props.material.id
+    });
     
     // 根据素材类型确定 type
     let usageType = '';
@@ -459,10 +499,9 @@ const reportUsage = async () => {
             out_key: props.material.id,
         };
         
+        console.log('发送上报请求:', usageData);
         await addUsage(usageData);
-        
-        // 更新开始时间为当前时间，用于下一次统计
-        usageStartTime = now;
+        console.log('上报成功');
     } catch (error) {
         console.error('上报使用记录失败:', error);
     }
@@ -545,6 +584,58 @@ const checkOrientation = () => {
     }
 };
 
+// 监听页面可见性变化（锁屏/切后台时暂停统计）
+const handleVisibilityChange = () => {
+    if (document.hidden) {
+        console.log('页面隐藏，暂停使用统计');
+        isTrackingActive = false;
+    } else {
+        console.log('页面可见，恢复使用统计');
+        // 重置开始时间为当前时间，避免计入隐藏期间的时长
+        if (usageStartTime > 0) {
+            usageStartTime = Date.now();
+        }
+        isTrackingActive = true;
+    }
+};
+
+// 监听浏览器关闭事件
+const handleBeforeUnload = () => {
+    if (isTrackingActive && usageStartTime > 0) {
+        const now = Date.now();
+        const duration = Math.floor((now - usageStartTime) / 1000);
+        
+        if (duration > 0 && props.material) {
+            const userId = props.userId || globalVar?.user?.id;
+            if (userId) {
+                let usageType = '';
+                if (props.material.type === 0) {
+                    usageType = USAGE_TYPE_PDF;
+                } else if (props.material.type === 1) {
+                    usageType = USAGE_TYPE_VIDEO;
+                }
+                
+                if (usageType) {
+                    // 使用 sendBeacon 确保浏览器关闭时也能发送
+                    const apiUrl = window.location.origin + '/usage/add';
+                    const data = JSON.stringify({
+                        type: usageType,
+                        start_time: new Date(usageStartTime).toISOString(),
+                        duration: duration,
+                        user_id: userId,
+                        out_key: props.material.id,
+                    });
+                    
+                    if (navigator.sendBeacon) {
+                        navigator.sendBeacon(apiUrl, new Blob([data], { type: 'application/json' }));
+                        console.log('通过 sendBeacon 上报最后时长:', duration);
+                    }
+                }
+            }
+        }
+    }
+};
+
 // 切换视频播放/暂停
 const toggleVideoPlay = () => {
     if (!videoRef.value) return;
@@ -563,10 +654,15 @@ const handleVideoEnded = () => {
 onMounted(() => {
     checkOrientation();
     window.addEventListener('resize', checkOrientation);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
 });
 
 onUnmounted(() => {
     window.removeEventListener('resize', checkOrientation);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    window.removeEventListener('beforeunload', handleBeforeUnload);
+    stopUsageTracking();
     // 清理视频资源
     if (typeof window !== 'undefined' && videoRef.value) {
         try {

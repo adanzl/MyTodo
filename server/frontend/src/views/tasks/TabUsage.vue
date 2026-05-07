@@ -176,13 +176,13 @@ const getCellValue = (userId: string, date: string, subKey: string) => {
     for (const type of Object.keys(typeData)) {
       const outKeys = typeData[type];
       if (typeof outKeys === 'object' && outKeys[subKey] !== undefined) {
-        return formatDuration(outKeys[subKey]);
+        return formatDurationToMinutes(outKeys[subKey]);
       }
     }
   } else {
     // detail=0: 直接按 type 查找
     if (typeData[subKey] !== undefined) {
-      return formatDuration(typeData[subKey]);
+      return formatDurationToMinutes(typeData[subKey]);
     }
   }
 
@@ -224,20 +224,14 @@ const handleReset = () => {
   showDetail.value = false;
 };
 
-// 格式化时长
-const formatDuration = (seconds: number): string => {
-  if (!seconds || seconds === 0) return "0秒";
+// 格式化时长为 MM:SS 格式
+const formatDurationToMinutes = (seconds: number): string => {
+  if (!seconds || seconds === 0) return "00:00";
 
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
+  const minutes = Math.floor(seconds / 60);
   const secs = seconds % 60;
 
-  const parts: string[] = [];
-  if (hours > 0) parts.push(`${hours}小时`);
-  if (minutes > 0) parts.push(`${minutes}分钟`);
-  if (secs > 0) parts.push(`${secs}秒`);
-
-  return parts.join("") || "0秒";
+  return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 };
 
 // 组件挂载时自动查询
