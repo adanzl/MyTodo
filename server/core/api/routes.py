@@ -576,3 +576,4 @@ def get_file_info() -> ResponseReturnValue:
     except Exception as e:
         log.error(f"Error getting file info: {e}")
         return {"code": -1, "msg": f"Error: {str(e)}"}
+

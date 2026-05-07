@@ -58,11 +58,6 @@ class _TaskIdBody(BaseModel):
     task_id: str
 
 
-class _TTSOCRBody(BaseModel):
-    """TTS OCR 请求体"""
-    task_id: str
-
-
 class _TTSAnalyzeBody(BaseModel):
     """TTS 分析文章请求体"""
     task_id: str
@@ -249,7 +244,7 @@ def tts_ocr() -> ResponseReturnValue:
     try:
         # 合并 form-data 和 query 参数，使用 parse_with_model 验证
         args_data = {**request.form.to_dict(), **request.args.to_dict()}
-        body, err = parse_with_model(_TTSOCRBody, args_data, err_factory=_err)
+        body, err = parse_with_model(_TaskIdBody, args_data, err_factory=_err)
         if err or not body:
             return err or _err("Invalid request body")
         task_id = body.task_id

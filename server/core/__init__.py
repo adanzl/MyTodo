@@ -102,6 +102,7 @@ def create_app():
     from core.api.tts_routes import tts_bp
     from core.api.ai_routes import ai_bp
     from core.api.task_routes import task_bp
+    from core.api.usage_routes import usage_bp
 
     app.register_blueprint(api_bp, url_prefix='/')
     app.register_blueprint(lottery_bp, url_prefix='/')
@@ -117,6 +118,7 @@ def create_app():
     app.register_blueprint(tts_bp, url_prefix='/')
     app.register_blueprint(ai_bp, url_prefix='/')
     app.register_blueprint(task_bp, url_prefix='/')
+    app.register_blueprint(usage_bp, url_prefix='/')
 
     # ========== JWT Auth ==========
     app.config['JWT_SECRET_KEY'] = config.JWT_SECRET_KEY
@@ -199,7 +201,7 @@ def create_app():
     def _record_start_time():
         """记录请求开始时间，用于计算响应时间"""
         request._start_time = time.time()  # pyright: ignore[reportAttributeAccessIssue]
-        
+
         # CORS 调试日志：记录 OPTIONS 预检请求
         if request.method == 'OPTIONS':
             origin = request.headers.get('Origin', 'None')
