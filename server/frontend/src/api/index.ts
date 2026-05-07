@@ -10,4 +10,5 @@ export * from "./api-devices";
 export * from "./api-audio-merge";
 export * from "./api-playlist";
 export * from "./api-task";
+export * from "./api-usage";
 export * from "./cron";

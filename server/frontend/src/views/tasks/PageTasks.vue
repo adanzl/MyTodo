@@ -22,6 +22,11 @@
       <el-tab-pane label="任务预览" name="preview">
         <TabTasksPreview />
       </el-tab-pane>
+
+      <!-- 使用统计页签 -->
+      <el-tab-pane label="使用统计" name="usage">
+        <TabUsage />
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -32,6 +37,7 @@ import TabMaterial from "./TabMaterial.vue";
 import TabTasks from "./TabTasks.vue";
 import TabTaskCalendar from "./TabTaskCalendar.vue";
 import TabTasksPreview from "./TabTasksPreview.vue";
+import TabUsage from "./TabUsage.vue";
 
 // 主页签控制
 const activeMainTab = ref("calendar");

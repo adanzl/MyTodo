@@ -204,7 +204,7 @@ class UsageMgr:
             按用户、日期、类型分组的统计数据
         """
         try:
-            # 构建 SQL 查询
+            # 构建 SQL 查询 - 使用 datetime() 函数确保时间格式一致
             if detail == 1:
                 sql = """
                     SELECT user_id,
@@ -213,7 +213,7 @@ class UsageMgr:
                            out_key,
                            SUM(duration) as total_duration
                     FROM t_usage
-                    WHERE start_time >= :start_time AND start_time <= :end_time
+                    WHERE datetime(start_time) >= datetime(:start_time) AND datetime(start_time) <= datetime(:end_time)
                     GROUP BY user_id, DATE(start_time), type, out_key
                     ORDER BY user_id, date, type, out_key
                 """
@@ -224,7 +224,7 @@ class UsageMgr:
                            type,
                            SUM(duration) as total_duration
                     FROM t_usage
-                    WHERE start_time >= :start_time AND start_time <= :end_time
+                    WHERE datetime(start_time) >= datetime(:start_time) AND datetime(start_time) <= datetime(:end_time)
                     GROUP BY user_id, DATE(start_time), type
                     ORDER BY user_id, date, type
                 """
