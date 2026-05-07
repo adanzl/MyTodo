@@ -1,0 +1,312 @@
+<template>
+  <el-dialog
+    v-model="visible"
+    title="快速添加素材"
+    width="1000px"
+    align-center
+    @close="handleClose"
+  >
+    <div class="flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+      <!-- 分配配置区 -->
+      <div class="allocation-section border rounded p-4">
+        <h3 class="text-lg font-semibold mb-3">分配配置</h3>
+        <el-form label-width="120px">
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item label="开始天数">
+                <el-input-number
+                  v-model="startDay"
+                  :min="1"
+                  :max="formData.duration || 1"
+                  :step="1"
+                  class="w-full"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="结束天数">
+                <el-input-number
+                  v-model="endDay"
+                  :min="startDay"
+                  :max="formData.duration || 1"
+                  :step="1"
+                  class="w-full"
+                />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-form-item label="分配方式">
+            <el-radio-group v-model="allocationType">
+              <el-radio :value="0">平均分配</el-radio>
+              <el-radio :value="1">循环分配</el-radio>
+              <el-radio :value="2">全部添加到每一天</el-radio>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item class="flex w-full ">
+            <div class="flex-1 text-gray-600">{{ descriptionText }}</div>
+            <span class="mr-4 text-gray-600">已选中 {{ selectedMaterials.length }} 个素材</span>
+            <el-button type="primary" @click="allocateMaterials" :disabled="selectedMaterials.length === 0">
+              <el-icon class="mr-1"><Check /></el-icon>
+              确认分配
+            </el-button>
+          </el-form-item>
+        </el-form>
+      </div>
+
+      <!-- 素材选择区 -->
+      <div class="material-selection-section border rounded p-4">
+        <h3 class="text-lg font-semibold mb-3">选择素材</h3>
+        <div v-loading="materialLoading" element-loading-text="加载中..." style="min-height: 300px;">
+          <div class="flex gap-4" style="height: 300px;">
+            <!-- 左侧：类别列表 -->
+            <div class="w-48 border rounded overflow-y-auto">
+              <div
+                v-for="cat in categoryList"
+                :key="cat.id"
+                class="p-3 cursor-pointer hover:bg-gray-100 transition-all duration-200 flex justify-between items-center"
+                :class="{ 'bg-blue-50 border-l-4 border-blue-500': selectedCategoryId === cat.id }"
+                @click="selectedCategoryId = cat.id"
+              >
+                <div class="font-medium">{{ cat.name }}</div>
+                <el-tag size="small" type="info">{{ getCategorySelectedCount(cat.id) }}</el-tag>
+              </div>
+            </div>
+
+            <!-- 右侧：素材列表 -->
+            <div class="flex-1 border rounded overflow-hidden">
+              <el-table
+                v-if="!materialLoading"
+                ref="materialTableRef"
+                :data="materialList"
+                @selection-change="handleMaterialSelectionChange"
+                @row-click="handleRowClick"
+                max-height="260"
+              >
+                <el-table-column type="selection" width="55" />
+                <el-table-column prop="id" label="ID" width="80" />
+                <el-table-column prop="name" label="素材名称" min-width="200" />
+                <el-table-column prop="type" label="类型" width="100">
+                  <template #default="{ row }">
+                    {{ getMaterialTypeName(row.type) }}
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </el-dialog>
+</template>
+
+<script setup lang="ts">
+import { ref, watch, computed } from "vue";
+import { ElMessage } from "element-plus";
+import { Check } from "@element-plus/icons-vue";
+import { getMaterialList, getMaterialCategoryList, type Material, type MaterialCategory, type Task } from "@/api/api-task";
+
+interface Props {
+  modelValue: boolean;
+  formData: Partial<Task>;
+}
+
+interface Emits {
+  (e: "update:modelValue", value: boolean): void;
+  (e: "allocated", materials: Array<{ id: number; name: string; type: number }>, startDay: number, endDay: number, allocationType: number): void;
+}
+
+const props = defineProps<Props>();
+const emit = defineEmits<Emits>();
+
+const visible = ref(props.modelValue);
+const materialLoading = ref(false);
+const materialList = ref<Material[]>([]);
+const selectedMaterials = ref<Material[]>([]);
+const categoryList = ref<MaterialCategory[]>([]);
+const selectedCategoryId = ref<number | undefined>(undefined);
+const materialTableRef = ref();
+
+// 分配配置
+const startDay = ref(1);
+const endDay = ref(1);
+const allocationType = ref(0); // 0: 平均分配, 1: 循环分配, 2: 全部添加到每一天
+
+// 监听外部传入的 modelValue
+watch(
+  () => props.modelValue,
+  (newVal) => {
+    visible.value = newVal;
+    if (newVal) {
+      // 初始化分配范围
+      startDay.value = 1;
+      endDay.value = props.formData.duration || 1;
+      allocationType.value = 0;
+      loadCategoryList();
+      loadMaterialList();
+    }
+  }
+);
+
+// 监听 visible 变化
+watch(visible, (newVal) => {
+  emit("update:modelValue", newVal);
+});
+
+// 获取素材类型名称
+const getMaterialTypeName = (type: number) => {
+  const typeMap: Record<number, string> = {
+    0: "PDF",
+    1: "视频",
+    2: "音频",
+  };
+  return typeMap[type] || "未知_" + type;
+};
+
+// 加载分类列表
+const loadCategoryList = async () => {
+  materialLoading.value = true;
+  try {
+    const res = await getMaterialCategoryList(1, 1000);
+    if (res.code === 0 && res.data) {
+      categoryList.value = res.data.data || [];
+      // 默认选中第一个类别
+      if (categoryList.value.length > 0) {
+        selectedCategoryId.value = categoryList.value[0].id;
+      }
+    }
+  } catch (error: any) {
+    console.error("获取分类列表失败:", error);
+  } finally {
+    materialLoading.value = false;
+  }
+};
+
+// 加载素材列表
+const loadMaterialList = async () => {
+  materialLoading.value = true;
+  try {
+    const res = await getMaterialList(selectedCategoryId.value, 1, 1000);
+    if (res.code === 0 && res.data) {
+      materialList.value = res.data.data || [];
+    }
+  } catch (error: any) {
+    ElMessage.error(error.message || "获取素材列表失败");
+  } finally {
+    materialLoading.value = false;
+  }
+};
+
+// 监听分类变化，重新加载素材
+watch(selectedCategoryId, () => {
+  if (visible.value) {
+    loadMaterialList();
+  }
+});
+
+// 素材选择变化
+const handleMaterialSelectionChange = (selection: Material[]) => {
+  selectedMaterials.value = selection;
+};
+
+// 行点击事件
+const handleRowClick = (row: Material) => {
+  // PDF类型：单选逻辑
+  if (row.type === 1) {
+    materialTableRef.value?.clearSelection();
+    materialTableRef.value?.toggleRowSelection(row, true);
+  } else {
+    // 非PDF类型：切换选中状态
+    materialTableRef.value?.toggleRowSelection(row);
+  }
+};
+
+// 获取某类别已选中的素材数量
+const getCategorySelectedCount = (categoryId: number) => {
+  // 获取该类别下的所有素材ID
+  const categoryMaterialIds = materialList.value
+    .filter(m => m.cate_id === categoryId)
+    .map(m => m.id);
+
+  // 统计已选中素材中属于该类别的数量
+  return selectedMaterials.value.filter(m => categoryMaterialIds.includes(m.id)).length;
+};
+
+// 计算描述文字
+const descriptionText = computed(() => {
+  if (selectedMaterials.value.length === 0) {
+    return '请先选择素材';
+  }
+
+  const totalDays = endDay.value - startDay.value + 1;
+
+  switch (allocationType.value) {
+    case 0: // 平均分配
+      const perDay = Math.floor(selectedMaterials.value.length / totalDays);
+      const remaining = selectedMaterials.value.length % totalDays;
+      if (remaining === 0) {
+        return `每天分配 ${perDay} 个素材`;
+      } else {
+        return `前 ${remaining} 天分配 ${perDay + 1} 个，其余天分配 ${perDay} 个`;
+      }
+    case 1: // 循环分配
+      return `循环分配 ${selectedMaterials.value.length} 个素材到 ${totalDays} 天`;
+    case 2: // 全部添加到每一天
+      return `每天分配 ${selectedMaterials.value.length} 个素材`;
+    default:
+      return '';
+  }
+});
+
+// 执行分配
+const allocateMaterials = () => {
+  if (selectedMaterials.value.length === 0) {
+    ElMessage.warning("请先选择素材");
+    return;
+  }
+
+  if (startDay.value > endDay.value) {
+    ElMessage.warning("起始天数不能大于结束天数");
+    return;
+  }
+
+  // 触发分配事件
+  emit("allocated",
+    selectedMaterials.value.map(m => ({
+      id: m.id!,
+      name: m.name,
+      type: m.type
+    })),
+    startDay.value,
+    endDay.value,
+    allocationType.value
+  );
+
+  ElMessage.success("素材分配成功");
+  handleClose();
+};
+
+// 关闭对话框
+const handleClose = () => {
+  visible.value = false;
+  resetForm();
+};
+
+// 重置表单
+const resetForm = () => {
+  selectedMaterials.value = [];
+  startDay.value = 1;
+  endDay.value = 1;
+  allocationType.value = 0;
+};
+</script>
+
+<style scoped>
+.material-item {
+  transition: all 0.2s ease;
+}
+
+.material-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+</style>

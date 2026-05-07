@@ -102,8 +102,12 @@
               :disabled="getDayMaterials(selectedDay).length === 0"
             />
             <el-button type="primary" size="small" @click="showMaterialSelector = true">
-              <el-icon><Plus /></el-icon>
+              <el-icon class="mr-1"><Plus /></el-icon>
               添加素材
+            </el-button>
+            <el-button type="success" size="small" @click="showQuickAdd = true">
+              <el-icon class="mr-1"><Plus /></el-icon>
+              快速添加
             </el-button>
           </div>
         </div>
@@ -234,6 +238,13 @@
         <el-button type="primary" @click="confirmAddMaterials">确定添加</el-button>
       </template>
     </el-dialog>
+
+    <!-- 快速添加弹窗 -->
+    <QuickAdd
+      v-model="showQuickAdd"
+      :form-data="formData"
+      @allocated="handleQuickAddAllocated"
+    />
   </el-dialog>
 </template>
 
@@ -243,6 +254,7 @@ import { ElMessage } from "element-plus";
 import { Plus, WarningFilled } from "@element-plus/icons-vue";
 import { addTask, updateTask, getMaterialList, getMaterialCategoryList, type Task, type Material, type MaterialCategory } from "@/api/api-task";
 import dayjs from "dayjs";
+import QuickAdd from "./QuickAdd.vue";
 
 interface Props {
   modelValue: boolean;
@@ -267,6 +279,7 @@ const submitting = ref(false);
 const selectedUsers = ref<number[]>([]);
 const selectedDay = ref<number>(-1);
 const showMaterialSelector = ref(false);
+const showQuickAdd = ref(false);
 const materialLoading = ref(false);
 const materialList = ref<Material[]>([]);
 const selectedMaterials = ref<Material[]>([]);
@@ -572,6 +585,138 @@ const confirmAddMaterials = () => {
 
   showMaterialSelector.value = false;
   selectedMaterials.value = [];
+};
+
+// 处理快速添加分配
+const handleQuickAddAllocated = (
+  materials: Array<{ id: number; name: string; type: number }>,
+  startDay: number,
+  endDay: number,
+  allocationType: number
+) => {
+  // 根据分配类型进行分配
+  switch (allocationType) {
+    case 0: // 平均分配
+      allocateMaterialsEvenly(materials, startDay, endDay);
+      break;
+    case 1: // 循环分配
+      allocateMaterialsCircularly(materials, startDay, endDay);
+      break;
+    case 2: // 全部添加到每一天
+      allocateMaterialsToAllDays(materials, startDay, endDay);
+      break;
+    default:
+      ElMessage.warning("未知的分配类型");
+  }
+};
+
+// 平均分配素材
+const allocateMaterialsEvenly = (
+  materials: Array<{ id: number; name: string; type: number }>,
+  startDay: number,
+  endDay: number
+) => {
+  const totalDays = endDay - startDay + 1;
+  const materialsPerDay = Math.floor(materials.length / totalDays);
+  const remainingMaterials = materials.length % totalDays;
+
+  let materialIndex = 0;
+  for (let day = startDay; day <= endDay; day++) {
+    // 转换为内部索引（从0开始）
+    const internalDay = day - 1;
+    if (!dailyMaterials.value[internalDay]) {
+      dailyMaterials.value[internalDay] = [];
+    }
+
+    // 计算当天应该分配的素材数量
+    const countForThisDay = materialsPerDay + (day - startDay < remainingMaterials ? 1 : 0);
+
+    for (let i = 0; i < countForThisDay && materialIndex < materials.length; i++) {
+      const material = materials[materialIndex];
+      // 检查是否已存在
+      const exists = dailyMaterials.value[internalDay].some(
+        (m) => m.id === material.id
+      );
+
+      if (!exists) {
+        dailyMaterials.value[internalDay].push({
+          id: material.id,
+          name: material.name,
+          type: material.type,
+        });
+      }
+      materialIndex++;
+    }
+  }
+
+  ElMessage.success(`已平均分配 ${materials.length} 个素材到 ${totalDays} 天`);
+};
+
+// 循环分配素材
+const allocateMaterialsCircularly = (
+  materials: Array<{ id: number; name: string; type: number }>,
+  startDay: number,
+  endDay: number
+) => {
+  const totalDays = endDay - startDay + 1;
+
+  for (let i = 0; i < materials.length; i++) {
+    // 转换为内部索引（从0开始）
+    const day = startDay + (i % totalDays);
+    const internalDay = day - 1;
+    if (!dailyMaterials.value[internalDay]) {
+      dailyMaterials.value[internalDay] = [];
+    }
+
+    const material = materials[i];
+    // 检查是否已存在
+    const exists = dailyMaterials.value[internalDay].some(
+      (m) => m.id === material.id
+    );
+
+    if (!exists) {
+      dailyMaterials.value[internalDay].push({
+        id: material.id,
+        name: material.name,
+        type: material.type,
+      });
+    }
+  }
+
+  ElMessage.success(`已循环分配 ${materials.length} 个素材到 ${totalDays} 天`);
+};
+
+// 将所有素材添加到每一天
+const allocateMaterialsToAllDays = (
+  materials: Array<{ id: number; name: string; type: number }>,
+  startDay: number,
+  endDay: number
+) => {
+  for (let day = startDay; day <= endDay; day++) {
+    // 转换为内部索引（从0开始）
+    const internalDay = day - 1;
+    if (!dailyMaterials.value[internalDay]) {
+      dailyMaterials.value[internalDay] = [];
+    }
+
+    materials.forEach((material) => {
+      // 检查是否已存在
+      const exists = dailyMaterials.value[internalDay].some(
+        (m) => m.id === material.id
+      );
+
+      if (!exists) {
+        dailyMaterials.value[internalDay].push({
+          id: material.id,
+          name: material.name,
+          type: material.type,
+        });
+      }
+    });
+  }
+
+  const totalDays = endDay - startDay + 1;
+  ElMessage.success(`已将 ${materials.length} 个素材添加到 ${totalDays} 天`);
 };
 
 // 提交表单
