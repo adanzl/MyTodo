@@ -13,7 +13,7 @@ from sqlalchemy import text
 from core.config import app_logger
 from core.db import db_obj
 from core.db.db_mgr import db_mgr
-from core.types.todo_data import ScheduleData, Subtask
+from core.types.todo_data import ScheduleData, ScheduleSave, Subtask
 
 log = app_logger
 

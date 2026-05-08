@@ -1,3 +1,8 @@
+from typing import Optional
+
+from flask import json
+
+
 class Subtask:
     """日程子任务数据类，对应前端 Subtask 类型"""
 
@@ -157,4 +162,4 @@ class ScheduleSave:
         self.state: int = 0
         self.subtasks: dict = {}
         self.score: Optional[int] = None
-        self.scheduleOverride: ScheduleData = {}
+        self.scheduleOverride: Optional[ScheduleData] = None
