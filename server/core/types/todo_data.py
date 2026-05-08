@@ -125,7 +125,6 @@ class ScheduleData:
     def set_save_info(self, state: int, subtask_states: dict, score: Optional[int]):
         """设置存档信息"""
         self.state = state
-        self.saveSubtasks = subtask_states
         self.saveScore = score
 
     def to_dict(self) -> dict:
@@ -148,7 +147,6 @@ class ScheduleData:
             'subtasks': self.subtasks,
             'userId': self.userId,
             'state': self.state,
-            'saveSubtasks': self.saveSubtasks,
             'saveScore': self.saveScore
         }
 
