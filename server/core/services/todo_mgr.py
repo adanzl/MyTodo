@@ -88,9 +88,20 @@ class TodoMgr:
             if not start_ts:
                 return False
 
+            # 统一转换为 naive datetime
+            log.info(f"[TodoMgr] start_ts raw: {start_ts}, type: {type(start_ts)}")
             start_dt = datetime.fromisoformat(start_ts.replace('Z', '+00:00'))
-            start_day = start_dt.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+            log.info(f"[TodoMgr] start_dt: {start_dt}, tzinfo: {start_dt.tzinfo}")
+            if start_dt.tzinfo is not None:
+                start_dt = start_dt.replace(tzinfo=None)
+            start_day = start_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+            
+            log.info(f"[TodoMgr] target_dt: {target_dt}, tzinfo: {target_dt.tzinfo}")
             target_day = target_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+            if target_day.tzinfo is not None:
+                target_day = target_day.replace(tzinfo=None)
+            
+            log.info(f"[TodoMgr] start_day: {start_day}, target_day: {target_day}")
 
             if start_day > target_day:
                 return False
