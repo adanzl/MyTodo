@@ -89,7 +89,7 @@ class TodoMgr:
                 return False
 
             start_dt = datetime.fromisoformat(start_ts.replace('Z', '+00:00'))
-            start_day = start_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+            start_day = start_dt.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
             target_day = target_dt.replace(hour=0, minute=0, second=0, microsecond=0)
 
             if start_day > target_day:
@@ -99,8 +99,10 @@ class TodoMgr:
                 return True
 
             repeat_end_ts = schedule.get('repeat_end_ts')
-            if repeat_end_ts and datetime.fromisoformat(repeat_end_ts.replace('Z', '+00:00')) < target_day:
-                return False
+            if repeat_end_ts:
+                repeat_end_dt = datetime.fromisoformat(repeat_end_ts.replace('Z', '+00:00')).replace(tzinfo=None)
+                if repeat_end_dt < target_day:
+                    return False
 
             repeat = schedule.get('repeat', 0)
 
