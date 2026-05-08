@@ -422,7 +422,7 @@ export default defineComponent({
           refData.selectedDate.value!.save[scheduleId]?.state === 1
         );
       },
-      // 判断是否可以修改完成状态（查看日期在今天及过去7天内可以修改）
+      // 判断是否可以修改完成状态（查看日期在今天及过去1天内可以修改）
       canModifyScheduleState: () => {
         // 检查是否为管理员
         if (refData.user.value?.admin === 1) {

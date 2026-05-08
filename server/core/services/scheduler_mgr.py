@@ -298,7 +298,7 @@ class SchedulerMgr:
         if event.exception:
             # 捕获 gevent 相关的异常，避免影响线程池 worker
             import gevent
-            if isinstance(event.exception, gevent.exceptions.LoopExit):
+            if isinstance(event.exception, gevent.exceptions.LoopExit):  # pyright: ignore[reportAttributeAccessIssue]
                 log.warning(f"任务执行后发生 gevent LoopExit (可忽略): {event.job_id}, 异常: {event.exception}")
             else:
                 log.error(f"任务执行失败: {event.job_id}, 异常: {event.exception}")

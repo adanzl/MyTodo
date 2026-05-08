@@ -103,6 +103,7 @@ def create_app():
     from core.api.ai_routes import ai_bp
     from core.api.task_routes import task_bp
     from core.api.usage_routes import usage_bp
+    from core.api.todo_routes import todo_bp
 
     app.register_blueprint(api_bp, url_prefix='/')
     app.register_blueprint(lottery_bp, url_prefix='/')
@@ -119,6 +120,7 @@ def create_app():
     app.register_blueprint(ai_bp, url_prefix='/')
     app.register_blueprint(task_bp, url_prefix='/')
     app.register_blueprint(usage_bp, url_prefix='/')
+    app.register_blueprint(todo_bp, url_prefix='/')
 
     # ========== JWT Auth ==========
     app.config['JWT_SECRET_KEY'] = config.JWT_SECRET_KEY
