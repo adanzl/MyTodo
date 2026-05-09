@@ -715,10 +715,35 @@ export default defineComponent({
             } else {
               // 编辑日程
               await updateTodo(_scheduleData.id, _scheduleData);
+              
+              // 如果有save信息（state或subtasks），则保存到存档
+              if (refData.selectedDate.value && (_scheduleData.state !== undefined || _scheduleData.subtasks)) {
+                const scheduleSave: any = {
+                  date: refData.selectedDate.value.dt.format('YYYY-MM-DD'),
+                  schedule_id: _scheduleData.id,
+                };
+                
+                if (_scheduleData.state !== undefined) {
+                  scheduleSave.state = _scheduleData.state;
+                }
+                
+                if (_scheduleData.subtasks !== undefined) {
+                  const subtaskStates: Record<number, number> = {};
+                  _scheduleData.subtasks.forEach((st: any) => {
+                    if (st.id !== -1 && st.state !== undefined) {
+                      subtaskStates[st.id] = st.state;
+                    }
+                  });
+                  if (Object.keys(subtaskStates).length > 0) {
+                    scheduleSave.subtasks = subtaskStates;
+                  }
+                }
+                
+                await saveTodo(scheduleSave);
+              }
             }
           } else if (role === "cur") {
             // 仅当天：保存特定日期的覆盖数据
-            // 从 ScheduleData 中提取日期信息构建 ScheduleSave
             if (refData.selectedDate.value) {
               const scheduleSave: Partial<ScheduleSave> = {
                 date: refData.selectedDate.value.dt.format('YYYY-MM-DD'),
