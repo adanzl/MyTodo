@@ -24,8 +24,8 @@ todo_bp = Blueprint('todo', __name__)
 def get_todo_calendar() -> ResponseReturnValue:
     """获取指定时间范围内的日历数据"""
     try:
-        start_time = request.args.get('start_time', type=str) or request.args.get('startTs', type=str)
-        end_time = request.args.get('end_time', type=str) or request.args.get('endTs', type=str)
+        start_time = request.args.get('start_time', type=str) or request.args.get('startTime', type=str)
+        end_time = request.args.get('end_time', type=str) or request.args.get('endTime', type=str)
         user_id = request.args.get('user_id', type=int) or request.args.get('userId', type=int)
 
         if not start_time or not end_time or user_id is None:
