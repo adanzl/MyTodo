@@ -15,7 +15,7 @@ import {
   ReminderOptions,
   WEEK,
 } from "@/types/schedule-type";
-import { ScheduleData, ScheduleSave, Subtask, UData } from "@/types/user-data";
+import { ScheduleData, Subtask, UData } from "@/types/user-data";
 import { getImage } from "@/utils/img-mgr";
 import {
   alertController,
@@ -61,22 +61,16 @@ export default defineComponent({
       type: Object,
       default: new ScheduleData(),
     },
-    save: {
-      type: Object,
-      default: new ScheduleSave(),
-    },
     selectedDate: {
       type: Object,
       default: undefined,
     },
   },
-  emits: ["update:schedule", "update:save"],
+  emits: ["update:schedule"],
   setup(props: any) {
     const refData = {
       // 当前日程
       curScheduleData: ref<ScheduleData>(ScheduleData.Copy(props.schedule)),
-      // 日程存档
-      curSave: ref<ScheduleSave>(ScheduleSave.Copy(props.save)),
       dateShowFlag: ref(false), // 开始日期选择器显示标记
       scheduleTab: ref(), // 日程tab
       scheduleDTComponent: ref(), // 日期选择器组件
@@ -133,7 +127,7 @@ export default defineComponent({
       // console.log("refreshUI", curScheduleData.value, curSave.value, props);
       // task 排序
       refData.curScheduleData.value?.subtasks.sort((a: Subtask, b: Subtask) => {
-        return UData.CmpScheduleSubtasks(a, b, refData.curSave.value);
+        return UData.CmpScheduleSubtasks(a, b);
       });
       refData.imgs.value = {};
       refData.curScheduleData.value?.subtasks.forEach((subtask) => {
@@ -153,13 +147,6 @@ export default defineComponent({
           refreshUI();
         }
       );
-      watch(
-        () => props.save,
-        () => {
-          refData.curSave.value = ScheduleSave.Copy(props.save);
-          refreshUI();
-        }
-      );
     });
 
     // ============ Tab1 ============
@@ -171,10 +158,10 @@ export default defineComponent({
       },
       // 任务状态改变
       onTaskCheckboxChange: (event: any) => {
-        refData.curSave.value!.state = event.detail.checked ? 1 : 0;
+        refData.curScheduleData.value!.state = event.detail.checked ? 1 : 0;
         if (event.detail.checked) {
           _.forEach(refData.curScheduleData.value.subtasks, (subtask) => {
-            refData.curSave.value!.subtasks[subtask.id] = 1;
+            subtask.state = 1; // 直接修改子任务状态
           });
         }
       },
@@ -304,19 +291,19 @@ export default defineComponent({
           });
         }
         eList.sort((a: Subtask, b: Subtask) => {
-          return UData.CmpScheduleSubtasks(a, b, refData.curSave.value);
+          return UData.CmpScheduleSubtasks(a, b);
         });
       },
       // 子任务状态改变
       onSubtaskCheckboxChange: (event: any, task?: Subtask) => {
         if (task) {
-          refData.curSave.value!.subtasks[task.id] = event.detail.checked ? 1 : 0;
+          // 新数据结构中，直接修改 subtask.state
+          task.state = event.detail.checked ? 1 : 0;
         }
-        // console.log("onSubtaskCheckboxChange", curSave.value, task);
         // task 排序
         nextTick(() => {
           refData.curScheduleData.value!.subtasks.sort((a: Subtask, b: Subtask) => {
-            return UData.CmpScheduleSubtasks(a, b, refData.curSave.value);
+            return UData.CmpScheduleSubtasks(a, b);
           });
         });
         // 如果所有子任务都完成了，整个任务变成完成状态
@@ -324,12 +311,12 @@ export default defineComponent({
           tab3Method.subTaskChecked(t)
         ).length;
         if (cnt === refData.curScheduleData.value.subtasks?.length) {
-          refData.curSave.value!.state = 1;
+          refData.curScheduleData.value.state = 1; // 修改为 schedule.state
         }
       },
       subTaskChecked: (task: Subtask) => {
-        // console.log("subTaskChecked", task, (curSave.value!.subtasks[task.id] || 0) === 1);
-        return (refData.curSave.value!.subtasks[task.id] || 0) === 1;
+        // 新数据结构中，子任务状态直接在 subtask.state 中
+        return (task.state || 0) === 1;
       },
       // 子任务更新
       onSubtaskChange: (task: Subtask) => {
@@ -398,14 +385,14 @@ export default defineComponent({
       {
         text: "保存当前日程",
         handler: () => {
-          props.modal?.$el.dismiss([refData.curScheduleData.value, refData.curSave.value], "cur");
+          props.modal?.$el.dismiss(refData.curScheduleData.value, "cur");
           refData.openSaveSheet.value = false;
         },
       },
       {
         text: "保存所有日程",
         handler: () => {
-          props.modal?.$el.dismiss([refData.curScheduleData.value, refData.curSave.value], "all");
+          props.modal?.$el.dismiss(refData.curScheduleData.value, "all");
           refData.openSaveSheet.value = false;
         },
       },
@@ -429,14 +416,13 @@ export default defineComponent({
         if (changeFlag && refData.curScheduleData.value.id !== -1) {
           refData.openSaveSheet.value = true;
         } else {
-          props.modal?.$el.dismiss([refData.curScheduleData.value, refData.curSave.value], "all");
+          props.modal?.$el.dismiss(refData.curScheduleData.value, "all");
         }
       },
       // 返回按钮
       btnBackClk: () => {
-        // console.log("cancel", props.save, props.schedule);
+        // console.log("cancel", props.schedule);
         refData.curScheduleData.value = ScheduleData.Copy(props.schedule);
-        refData.curSave.value = ScheduleSave.Copy(props.save);
         refData.openSaveSheet.value = false;
         changeFlag = false;
         refreshUI();

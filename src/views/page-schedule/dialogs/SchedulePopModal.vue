@@ -18,7 +18,7 @@
           <ion-checkbox
             slot="start"
             @ionChange="onTaskCheckboxChange"
-            :checked="curSave?.state === 1"
+            :checked="curScheduleData?.state === 1"
             :disabled="!canModifyScheduleState()">
           </ion-checkbox>
           <ion-input
@@ -58,7 +58,7 @@
             <ion-icon slot="start" :icon="colorPaletteOutline" />
             <span
               :style="{ 'background-color': getColorOptions(curScheduleData.color).tag }"
-              class="v-dot"></span>
+              class="v-dot ml-1 mb-0.5"></span>
           </ion-button>
           <ColorSelector
             trigger="btnColorSelect"
@@ -66,8 +66,8 @@
             :value="curScheduleData.color" />
           <ion-button @click="btnRewardClk" class="flex-1 text-base" fill="none">
             <Icon icon="mdi:gift-outline" class="text-red-500 w-[1.2em] h-[1.2em]" slot="start" />
-            <Icon icon="mdi:star" class="text-red-500 w-[1.4em] h-[1.4em]" />
-            <span>{{ curScheduleData.score ?? 0 }}</span>
+            <Icon icon="mdi:star" class="text-red-500 w-[1.4em] h-[1.4em] ml-1" />
+            <span class="text-[19px]">{{ curScheduleData.score ?? 0 }}</span>
           </ion-button>
         </ion-item>
       </ion-list>

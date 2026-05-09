@@ -257,7 +257,6 @@ import { C_EVENT } from "@/types/event-bus";
 import { GroupOptions, PriorityOptions } from "@/types/schedule-type";
 import { User, UserData } from "@/types/user-data";
 import { getApiUrl, scheduleProactiveRefresh } from "@/api/api-client";
-import { getScheduleList } from "@/api/api-schedule";
 import { getUserList } from "@/api/api-user";
 import { clearLoginCache, login } from "@/utils/auth-util";
 import avatar from "@/assets/images/avatar.svg";
@@ -343,12 +342,12 @@ onMounted(async () => {
     userList.value = userListData.data;
     const sUserId = localStorage.getItem("saveUser");
     const sUser = _.find(userListData.data, (u) => u.id.toString() === sUserId);
-    globalVar.scheduleListId = 1;
+    globalVar.scheduleListId = 3;
     if (sUser) {
       bLogin.value = true;
       curUser.value = sUser as typeof curUser.value;
       globalVar.user = sUser as typeof globalVar.user;
-      await updateScheduleGroup(sUser.id);
+      await updateScheduleGroup();
       LoadColorData();
     }
   } catch (e: any) {
@@ -362,16 +361,18 @@ onMounted(async () => {
   }
 });
 
-async function updateScheduleGroup(userId: number) {
-  const scheduleListData = await getScheduleList();
-  scheduleListSelectedId.value = globalVar.scheduleListId = 1;
-  scheduleListRef.value = [];
-  scheduleListData.data.forEach((item: any) => {
-    scheduleListRef.value.push({ id: item.id, name: item.name });
-    if (item.user_id === userId) {
-      scheduleListSelectedId.value = globalVar.scheduleListId = item.id;
+async function updateScheduleGroup() {
+  // 固定返回昭昭和灿灿两项
+  scheduleListSelectedId.value = globalVar.scheduleListId = 3;
+  scheduleListRef.value = [
+    { id: 3, name: '灿灿' },
+    { id: 4, name: '昭昭' }
+  ];
+  for (const item of scheduleListRef.value) {
+    if (item.id === globalVar.scheduleListId) {
+      scheduleListSelectedId.value = item.id;
     }
-  });
+  }
   eventBus.$emit(C_EVENT.UPDATE_SCHEDULE_GROUP, globalVar.scheduleListId);
 }
 function onMenuClose() {
@@ -431,7 +432,7 @@ async function btnLoginClick() {
     if (res?.expires_in) scheduleProactiveRefresh(res.expires_in);
     localStorage.setItem("saveUser", curUser.value.id.toString());
     try {
-      await updateScheduleGroup(curUser.value.id);
+      await updateScheduleGroup();
       LoadColorData();
     } catch (e) {
       console.warn("加载日程/颜色失败", e);

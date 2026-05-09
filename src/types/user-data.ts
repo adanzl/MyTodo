@@ -34,6 +34,7 @@ export class Subtask {
   order?: number = 0;
   score?: number = 0;
   imgIds: number[] = []; // 图片id列表
+  state?: number = 0; // 完成状态：0-未完成，1-已完成
   static Copy(o: Subtask): Subtask {
     return {
       id: o.id,
@@ -64,6 +65,8 @@ export class ScheduleData {
   order? = 0; // 排序 数字越大越靠后
   score?: number; // 积分
   subtasks: Subtask[] = []; // 子任务列表
+  state?: number = 0; // 完成状态：0-未完成，1-已完成
+  saveScore?: number; // 通过这个任务获得的积分
   static Copy(o: ScheduleData): ScheduleData {
     const ret = JSON.parse(JSON.stringify(o));
     ret.startTs = ret.startTs && dayjs(ret.startTs);
@@ -85,6 +88,8 @@ export class ScheduleData {
 
 // 日程存档【每天】
 export class ScheduleSave {
+  date?: string; // 日期 YYYY-MM-DD
+  scheduleId?: number; // 日程ID
   state: 0 | 1 = 0;
   subtasks: Record<number, number> = {}; // <number, number>;
   // 覆盖字段
@@ -325,10 +330,10 @@ export class UData {
     return (a.id ?? 0) - (b.id ?? 0);
   }
 
-  public static CmpScheduleSubtasks(a: Subtask, b: Subtask, save: ScheduleSave) {
-    // 状态
-    const sa: number = (save && save.subtasks && save.subtasks[a.id]) ?? 0;
-    const sb: number = (save && save.subtasks && save.subtasks[b.id]) ?? 0;
+  public static CmpScheduleSubtasks(a: Subtask, b: Subtask) {
+    // 新数据结构中，直接从 subtask.state 获取状态
+    const sa: number = a.state ?? 0;
+    const sb: number = b.state ?? 0;
     if (sa !== sb) {
       return sa - sb;
     }

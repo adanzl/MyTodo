@@ -9,15 +9,13 @@ import { getGroupOptions, getPriorityOptions } from "@/types/schedule-type";
 import {
   DayData,
   MonthData,
-  S_TS,
   ScheduleData,
   ScheduleSave,
   UData,
   User,
   UserData,
 } from "@/types/user-data";
-import { setSave } from "@/api/api-schedule";
-import { getTodoCalendar } from "@/api/api-todo";
+import { getTodoCalendar, createTodo, updateTodo, deleteTodo, saveTodo } from "@/api/api-todo";
 import { getUserInfo } from "@/api/api-user";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import {
@@ -39,12 +37,11 @@ import {
 } from "@ionic/vue";
 import "@ionic/vue/css/ionic-swiper.css";
 import dayjs from "dayjs";
-import _ from "lodash";
 import "swiper/css";
 import "swiper/css/effect-fade";
 import { Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
-import { defineComponent, inject, nextTick, onMounted, ref } from "vue";
+import { defineComponent, inject, onMounted, ref } from "vue";
 
 export default defineComponent({
   components: {
@@ -78,7 +75,8 @@ export default defineComponent({
     let scheduleListScrollY = 0;
     let lstTs = 0;
     const refData = {
-      userData: ref<UserData>(new UserData()),
+      userData: ref<UserData>(new UserData()), // 旧数据结构（兜底）
+      calendarData: ref<Record<string, any[]>>({}), // 新接口返回的日历数据 {date: ScheduleData[]}
       user: ref<User>(globalVar.user),
       slideArr: ref<any[]>([{}, {}, {}]), // 滑动数据
       bReorderDisabled: ref(true),
@@ -88,7 +86,6 @@ export default defineComponent({
       selectedDate: ref<DayData>(), // 选中日期
       scheduleModal: ref(), // 弹窗对象
       scheduleModalData: ref<ScheduleData>(),
-      scheduleSave: ref<ScheduleSave>(),
       isScheduleModalOpen: ref(false),
       filter: ref<any>({}),
       scheduleList: ref(),
@@ -109,41 +106,130 @@ export default defineComponent({
       }),
     };
 
-    // 初始化数据
+    // 初始化数据 - 使用新数据结构
     const updateScheduleData = () => {
+      const calendarData = refData.calendarData.value;
+      if (!calendarData || Object.keys(calendarData).length === 0) {
+        console.warn('[PageSchedule] calendarData is empty');
+        return;
+      }
+
       if (refData.bFold.value) {
+        // 周视图：生成3页
+        const currentWeekStart = currentDate.startOf('week');
+        const prevWeekStart = currentWeekStart.subtract(1, 'week');
+        const nextWeekStart = currentWeekStart.add(1, 'week');
         refData.slideArr.value = [
-          UData.createWeekData(
-            currentDate.subtract(1, "weeks"),
-            refData.userData.value,
-            refData.selectedDate
-          ),
-          UData.createWeekData(currentDate, refData.userData.value, refData.selectedDate),
-          UData.createWeekData(
-            currentDate.add(1, "weeks"),
-            refData.userData.value,
-            refData.selectedDate
-          ),
+          createWeekDataFromCalendar(prevWeekStart, {}), // 前一页
+          createWeekDataFromCalendar(currentWeekStart, calendarData), // 中间页（有数据）
+          createWeekDataFromCalendar(nextWeekStart, {}) // 后一页
         ];
-        // 输出一下接口数据，check是否和预期一致
-        console.log("[PageSchedule] userData:", refData.slideArr.value[1]);
       } else {
+        // 月视图：生成3页
+        const prevMonth = currentDate.subtract(1, 'month');
+        const nextMonth = currentDate.add(1, 'month');
         refData.slideArr.value = [
-          UData.createMonthData(
-            currentDate.subtract(1, "months"),
-            refData.userData.value,
-            refData.selectedDate
-          ),
-          UData.createMonthData(currentDate, refData.userData.value, refData.selectedDate),
-          UData.createMonthData(
-            currentDate.add(1, "months"),
-            refData.userData.value,
-            refData.selectedDate
-          ),
+          createMonthDataFromCalendar(prevMonth, {}), // 前一页
+          createMonthDataFromCalendar(currentDate, calendarData), // 中间页（有数据）
+          createMonthDataFromCalendar(nextMonth, {}) // 后一页
         ];
       }
-      // console.log("updateScheduleData", currentDate, slideArr.value);
+
+      console.log('[PageSchedule] slideArr updated:', refData.slideArr.value[1]);
     };
+
+    // 从 calendarData 创建周视图数据
+    const createWeekDataFromCalendar = (weekStart: dayjs.Dayjs, calendarData: Record<string, any[]>): any => {
+      const weekData: any = {
+        vid: 0,
+        weekStart: weekStart,
+        month: weekStart.month(), // 添加 month 字段，与 dayjs.month() 一致
+        weekArr: []
+      };
+
+      const week: any[] = [];
+      for (let i = 0; i < 7; i++) {
+        const currentDay = weekStart.add(i, 'day');
+        const dateStr = currentDay.format('YYYY-MM-DD');
+        const events = calendarData[dateStr] || [];
+        
+        // 排序：状态 -> order -> id
+        const sortedEvents = [...events].sort((a: any, b: any) => {
+          const sa = a.state ?? 0;
+          const sb = b.state ?? 0;
+          if (sa !== sb) return sa - sb;
+          const oa = a.order ?? 99999;
+          const ob = b.order ?? 99999;
+          if (oa !== ob) return oa - ob;
+          return (a.id ?? 0) - (b.id ?? 0);
+        });
+        
+        week.push({
+          dt: currentDay,
+          events: sortedEvents,
+          save: {}
+        });
+      }
+      weekData.weekArr = [week]; // 包装成二维数组
+
+      return weekData;
+    };
+
+    // 从 calendarData 创建月视图数据
+    const createMonthDataFromCalendar = (monthDate: dayjs.Dayjs, calendarData: Record<string, any[]>): any => {
+      const monthData: any = {
+        vid: 0,
+        month: monthDate.month(), // 使用 0-11，与 dayjs.month() 一致
+        year: monthDate.year(),
+        firstDayOfMonth: monthDate.startOf('month'),
+        weekArr: []
+      };
+
+      const startOfMonth = monthDate.startOf('month');
+      const endOfMonth = monthDate.endOf('month');
+      const startDate = startOfMonth.startOf('week');
+      const endDate = endOfMonth.endOf('week');
+
+      let currentWeek: any[] = [];
+      let current = startDate;
+
+      while (current <= endDate) {
+        const dateStr = current.format('YYYY-MM-DD');
+        const events = calendarData[dateStr] || [];
+        
+        // 排序：状态 -> order -> id
+        const sortedEvents = [...events].sort((a: any, b: any) => {
+          const sa = a.state ?? 0;
+          const sb = b.state ?? 0;
+          if (sa !== sb) return sa - sb;
+          const oa = a.order ?? 99999;
+          const ob = b.order ?? 99999;
+          if (oa !== ob) return oa - ob;
+          return (a.id ?? 0) - (b.id ?? 0);
+        });
+        
+        currentWeek.push({
+          dt: current,
+          events: sortedEvents,
+          save: {}
+        });
+
+        if (currentWeek.length === 7) {
+          monthData.weekArr.push(currentWeek);
+          currentWeek = [];
+        }
+
+        current = current.add(1, 'day');
+      }
+
+      // 处理最后一周不足7天的情况
+      if (currentWeek.length > 0) {
+        monthData.weekArr.push(currentWeek);
+      }
+
+      return monthData;
+    };
+
     // 初始化日历
     // 处理选中日期
     const chooseSelectedDate = () => {
@@ -152,7 +238,29 @@ export default defineComponent({
         console.warn("no weekArr");
         return;
       }
-      refData.selectedDate.value = undefined; // 清空选中日期
+      
+      // 如果已有选中日期，检查是否在新视图范围内
+      if (refData.selectedDate.value) {
+        // 检查月份是否匹配（处理跨周边界问题）
+        if (refData.selectedDate.value.dt.month() !== mm.month) {
+          // 月份不匹配，清空后重新选择
+          refData.selectedDate.value = undefined;
+        } else {
+          // 月份匹配，再检查日期是否在视图中
+          for (const week of mm.weekArr) {
+            for (const day of week) {
+              if (day.dt.unix() === refData.selectedDate.value.dt.unix()) {
+                // 在范围内，保持选中不变
+                return;
+              }
+            }
+          }
+          // 日期不在视图中，清空后重新选择
+          refData.selectedDate.value = undefined;
+        }
+      }
+      
+      // selectedDate 没有值，按规则选择
       const now = dayjs().startOf("day");
       if (!refData.selectedDate.value) {
         // 选今天
@@ -189,54 +297,31 @@ export default defineComponent({
       loading.present();
       
       try {
-        // 使用新接口获取日历数据
-        const now = dayjs();
-        const startTime = now.startOf('month').format('YYYY-MM-DD');
-        const endTime = now.endOf('month').format('YYYY-MM-DD');
-        const calendarData = await getTodoCalendar(startTime, endTime, id);
-        console.log('[PageSchedule] calendarData:', calendarData);
+        // 根据视图类型确定查询范围
+        let startTime: string;
+        let endTime: string;
         
-        // 转换为 UserData 格式
-        const userData = new UserData();
-        userData.id = id;
-        userData.userId = id;
+        // console.log('[PageSchedule] currentDate:', currentDate.format('YYYY-MM-DD'), 'bFold:', refData.bFold.value);
         
-        // 提取所有唯一的日程模板和完成状态
-        const scheduleMap = new Map<number, any>();
-        const saveMap: Record<string, any> = {};
-        
-        for (const [dateStr, schedules] of Object.entries(calendarData)) {
-          saveMap[dateStr] = {};
-          
-          for (const schedule of schedules as any[]) {
-            // 保存日程模板（去重）
-            if (!scheduleMap.has(schedule.id)) {
-              // 转换时间字段为 dayjs 对象
-              const convertedSchedule = {
-                ...schedule,
-                startTs: schedule.startTs ? dayjs(schedule.startTs) : undefined,
-                endTs: schedule.endTs ? dayjs(schedule.endTs) : undefined,
-                repeatEndTs: schedule.repeatEndTs ? dayjs(schedule.repeatEndTs) : undefined,
-              };
-              scheduleMap.set(schedule.id, convertedSchedule);
-            }
-            
-            // 保存完成状态
-            if (schedule.state !== undefined || schedule.saveScore !== undefined) {
-              saveMap[dateStr][schedule.id] = {
-                state: schedule.state || 0,
-                score: schedule.saveScore,
-              };
-            }
-          }
+        if (refData.bFold.value) {
+          // 周视图：只查询当前周
+          startTime = currentDate.startOf('week').format('YYYY-MM-DD');
+          endTime = currentDate.endOf('week').format('YYYY-MM-DD');
+        } else {
+          // 月视图：前后各扩展一个月
+          startTime = currentDate.startOf('month').subtract(1, 'month').format('YYYY-MM-DD');
+          endTime = currentDate.endOf('month').add(1, 'month').format('YYYY-MM-DD');
         }
         
-        userData.schedules = Array.from(scheduleMap.values());
-        userData.save = saveMap;
+        console.log('[PageSchedule] query range:', startTime, 'to', endTime);
         
-        console.log('[PageSchedule] converted userData:', userData);
-        refData.userData.value = userData;
-        globalVar.userData = userData;
+        const calendarData = await getTodoCalendar(startTime, endTime, id);
+        // console.log('[PageSchedule] calendarData:', calendarData);
+        
+        // 存储新数据
+        refData.calendarData.value = calendarData;
+        
+        // 更新显示
         updateScheduleData();
         chooseSelectedDate();
         setTimeout(() => {
@@ -267,28 +352,19 @@ export default defineComponent({
     });
     
     onIonViewDidEnter(() => {
-      console.log('[PageSchedule] onIonViewDidEnter');
       refreshAllData(globalVar.scheduleListId);
     });
 
     // 保存存档
-    const doSaveUserData = () => {
-      console.log("doSaveUserData", refData.userData.value);
-      setSave(globalVar.scheduleListId, refData.userData.value)
-        .then((res: any) => {
-          console.log("doSaveUserData", res.statusText);
-        })
-        .catch((err) => {
-          console.error("doSaveUserData", err);
-        });
-    };
     // ============ 工具栏 ============
     const toolbarMethod = {
       // 返回今天按钮
-      btnTodayClk: () => {
+      btnTodayClk: async () => {
         currentDate = dayjs().startOf("day");
-        refData.selectedDate.value = new DayData(dayjs().startOf("day"));
-        updateScheduleData();
+        await refreshAllData(globalVar.scheduleListId);
+        setTimeout(() => {
+          refData.swiperRef?.value?.update();
+        }, 100);
       },
       // 排序按钮
       btnSortClk: () => {
@@ -323,8 +399,9 @@ export default defineComponent({
     // ============ 日历 ============
     const calenderMethod = {
       // 滑动事件
-      slideChange: (obj: any) => {
-        updateScheduleData();
+      slideChange: async (obj: any) => {
+        // 重新获取数据（基于新的 currentDate）
+        await refreshAllData(globalVar.scheduleListId);
         obj.slideTo(1, 0, false);
         obj.update();
         chooseSelectedDate();
@@ -366,13 +443,29 @@ export default defineComponent({
         // console.log("onDaySelected", day);
       },
       // 日历折叠按钮
-      btnCalendarFoldClk: (value?: boolean) => {
+      btnCalendarFoldClk: async (value?: boolean) => {
         const v = value ?? !refData.bFold.value;
         if (v === refData.bFold.value) return;
+        
+        const savedDate = refData.selectedDate.value?.dt;
         refData.bFold.value = v;
-        // console.log("btnCalendarFoldClk", refData.bFold.value);
-        updateScheduleData();
-        // refData.selectedDate.value.$forceUpdate();
+        await refreshAllData(globalVar.scheduleListId);
+        
+        // 在新视图中恢复选中日期
+        if (savedDate) {
+          const mm = refData.slideArr.value[1];
+          if (mm.weekArr) {
+            for (const week of mm.weekArr) {
+              for (const day of week) {
+                if (day.dt.unix() === savedDate.unix()) {
+                  refData.selectedDate.value = day;
+                  break;
+                }
+              }
+            }
+          }
+        }
+        
         setTimeout(() => {
           refData.swiperRef.value.update();
         }, 100);
@@ -462,10 +555,9 @@ export default defineComponent({
       },
       // 日程完成状态
       scheduleChecked: (scheduleId: number) => {
-        return (
-          refData.selectedDate.value!.save &&
-          refData.selectedDate.value!.save[scheduleId]?.state === 1
-        );
+        // 从 events 中查找日程的 state
+        const schedule = refData.selectedDate.value?.events?.find((s: any) => s.id === scheduleId);
+        return schedule?.state === 1;
       },
       // 判断是否可以修改完成状态（查看日期在今天及过去1天内可以修改）
       canModifyScheduleState: () => {
@@ -489,23 +581,26 @@ export default defineComponent({
         return diffDays <= 0 && diffDays >= -1;
       },
       // 日程状态改变
-      onScheduleCheckboxChange: (_event: any, day: DayData | undefined, schedule: ScheduleData) => {
+      onScheduleCheckboxChange: async (_event: any, day: DayData | undefined, schedule: ScheduleData) => {
         if (day) {
-          const dKey = S_TS(day.dt);
-          if (!day.save) {
-            day.save = {};
+          console.log('[PageSchedule] onScheduleCheckboxChange', { day: day.dt.format('YYYY-MM-DD'), scheduleId: schedule.id });
+          const newState = _event.detail.checked ? 1 : 0;
+          try {
+            // 保存日程状态到存档
+            const scheduleSave: any = {
+              date: day.dt.format('YYYY-MM-DD'),
+              schedule_id: schedule.id,
+              state: newState,
+            };
+            console.log('[PageSchedule] saveTodo params:', scheduleSave);
+            await saveTodo(scheduleSave);
+            // 刷新显示
+            await refreshAllData(globalVar.scheduleListId);
+          } catch (err) {
+            console.error('[PageSchedule] 更新日程状态失败:', err);
+            refData.toastData.value.isOpen = true;
+            refData.toastData.value.text = '更新状态失败';
           }
-          const preSave = day.save[schedule.id] || new ScheduleSave();
-          preSave.state = _event.detail.checked ? 1 : 0;
-          UData.setScheduleSave(dKey, refData.userData.value as UserData, schedule, preSave);
-
-          nextTick(() => {
-            // schedule 排序 这玩意必须延后一帧，否则会导致checkbox状态错乱
-            day.events.sort((a: ScheduleData, b: ScheduleData) => {
-              return UData.CmpScheduleData(a, b, day.save);
-            });
-          });
-          doSaveUserData();
         }
       },
 
@@ -513,10 +608,6 @@ export default defineComponent({
       btnScheduleClk: (event: any, schedule: ScheduleData) => {
         refData.isScheduleModalOpen.value = true;
         refData.scheduleModalData.value = schedule;
-        refData.scheduleSave.value = refData.selectedDate.value?.save
-          ? refData.selectedDate.value?.save[schedule.id]
-          : undefined;
-        // console.log("btnScheduleClk", schedule, scheduleSave.value);
       },
       // 日程专注按钮
       btnScheduleAlarmClk: () => {
@@ -529,40 +620,46 @@ export default defineComponent({
         refData.scheduleDelConfirm.value.text =
           "确定要删除日程「" + (schedule.title || "未命名") + "」吗？删除后不可恢复。";
       },
-      onDelSchedulerConfirm: (event: any) => {
+      onDelSchedulerConfirm: async (event: any) => {
         refData.scheduleDelConfirm.value.isOpen = false;
         if (event.detail.role === "confirm") {
-          const idx = refData.userData.value.schedules.findIndex(
-            (s) => s.id === refData.scheduleDelConfirm.value.data.id
-          );
-          if (idx !== -1) {
-            refData.userData.value.schedules.splice(idx, 1);
+          const schedule = refData.scheduleDelConfirm.value.data;
+          try {
+            await deleteTodo(schedule.id);
+            // 刷新显示
+            await refreshAllData(globalVar.scheduleListId);
+            EventBus.$emit(C_EVENT.TOAST, "已删除日程");
+          } catch (err) {
+            console.error('[PageSchedule] 删除日程失败:', err);
+            refData.toastData.value.isOpen = true;
+            refData.toastData.value.text = '删除失败';
           }
-          updateScheduleData();
-          doSaveUserData();
-          EventBus.$emit(C_EVENT.TOAST, "已删除日程");
         }
       },
-      onReorder: (event: any) => {
+      onReorder: async (event: any) => {
         let eList = refData.selectedDate.value?.events.filter(scheduleListMethod.bShowScheduleItem);
-        // console.log(_.map(eList, 'order'));
         eList = event.detail.complete(eList);
-        // console.log(_.map(eList, 'order'));
         if (eList) {
-          let ii = eList[0].order ?? 0;
-          _.forEach(eList, (e) => {
-            const pre = _.find(refData.userData.value.schedules, (s) => s.id === e.id);
-            pre!.order = ii;
-            e.order = ii++;
-          });
+          try {
+            // 批量更新日程排序
+            const updates = eList.map((e, index) => ({
+              id: e.id,
+              order: index,
+            }));
+            
+            // 逐个更新
+            for (const update of updates) {
+              await updateTodo(update.id, { order: update.order });
+            }
+            
+            // 刷新显示
+            await refreshAllData(globalVar.scheduleListId);
+          } catch (err) {
+            console.error('[PageSchedule] 更新日程排序失败:', err);
+            refData.toastData.value.isOpen = true;
+            refData.toastData.value.text = '更新排序失败';
+          }
         }
-        // console.log(_.map(refData.selectedDate.value?.events, "order"));
-        refData.selectedDate.value?.events.sort((a: ScheduleData, b: ScheduleData) => {
-          return UData.CmpScheduleData(a, b, refData.selectedDate.value?.save);
-        });
-        // console.log(_.map(refData.selectedDate.value?.events, "order"));
-        doSaveUserData();
-        // console.log(eList);
       },
       // 总奖励
       countAllReward: (schedule: ScheduleData) => {
@@ -575,26 +672,45 @@ export default defineComponent({
       btnAddScheduleClk: async () => {
         // 清空数据
         refData.scheduleModalData.value = undefined;
-        refData.scheduleSave.value = undefined;
         refData.isScheduleModalOpen.value = true;
       },
       // 添加日程页面关闭回调
-      onScheduleModalDismiss: (event: any) => {
+      onScheduleModalDismiss: async (event: any) => {
         refData.isScheduleModalOpen.value = false;
         if (event.detail.role === "backdrop") return;
-        const [_scheduleData, _scheduleSave] = event.detail.data;
-        // console.log("onScheduleModalDismiss", _scheduleData, _scheduleSave, userData.value);
-        const dt = refData.selectedDate.value!.dt!;
-        const r = UData.updateSchedularData(
-          refData.userData.value,
-          _scheduleData,
-          _scheduleSave,
-          dt,
-          event.detail.role
-        );
-        if (r) {
-          updateScheduleData();
-          doSaveUserData();
+        
+        const _scheduleData = event.detail.data;
+        const role = event.detail.role; // "all" 或 "cur"
+        
+        try {
+          if (role === "all") {
+            // 应用到所有：新增或编辑日程模板
+            if (_scheduleData.id === -1) {
+              // 新增日程
+              const newId = await createTodo(_scheduleData);
+              _scheduleData.id = newId; // 更新ID
+            } else {
+              // 编辑日程
+              await updateTodo(_scheduleData.id, _scheduleData);
+            }
+          } else if (role === "cur") {
+            // 仅当天：保存特定日期的覆盖数据
+            // 从 ScheduleData 中提取日期信息构建 ScheduleSave
+            if (refData.selectedDate.value) {
+              const scheduleSave: Partial<ScheduleSave> = {
+                date: refData.selectedDate.value.dt.format('YYYY-MM-DD'),
+                scheduleOverride: _scheduleData,
+              };
+              await saveTodo(scheduleSave);
+            }
+          }
+          
+          // 刷新显示
+          await refreshAllData(globalVar.scheduleListId);
+        } catch (err) {
+          console.error('[PageSchedule] 保存日程失败:', err);
+          refData.toastData.value.isOpen = true;
+          refData.toastData.value.text = '保存失败';
         }
       },
     };

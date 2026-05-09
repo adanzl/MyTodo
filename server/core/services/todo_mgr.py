@@ -67,7 +67,8 @@ class TodoMgr:
                         continue
 
                     # 查找该日期的存档
-                    save = next((s for s in saves if s['schedule_id'] == schedule['id'] and s['date'] == date_str), None)
+                    save = next((s for s in saves if s['schedule_id'] == schedule['id'] and s['date'] == date_str),
+                                None)
 
                     # 创建 ScheduleData（会自动应用覆盖数据）
                     schedule_data = ScheduleData.from_db_rows(schedule, save)
@@ -90,7 +91,7 @@ class TodoMgr:
 
             start_dt = datetime.fromisoformat(start_ts.replace('Z', '+00:00')).replace(tzinfo=None)
             start_day = start_dt.replace(hour=0, minute=0, second=0, microsecond=0)
-            
+
             target_day = target_dt.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
 
             if start_day > target_day:
@@ -107,17 +108,17 @@ class TodoMgr:
 
             repeat = schedule.get('repeat', 0)
 
-            if repeat == 1: # daily
+            if repeat == 1:  # daily
                 return True
-            elif repeat == 2: # weekly
+            elif repeat == 2:  # weekly
                 return target_dt.isoweekday() % 7 == start_dt.isoweekday() % 7
-            elif repeat == 3: # monthly
+            elif repeat == 3:  # monthly
                 return target_dt.day == start_dt.day
-            elif repeat == 4: # annually
+            elif repeat == 4:  # annually
                 return target_dt.day == start_dt.day and target_dt.month == start_dt.month
-            elif repeat == 5: # workday
+            elif repeat == 5:  # workday
                 return target_dt.isoweekday() < 6
-            elif repeat == 6: # weekend
+            elif repeat == 6:  # weekend
                 return target_dt.isoweekday() >= 6
             elif repeat == 999:  # custom
                 repeat_data = json.loads(schedule['repeat_data']) if schedule.get('repeat_data') else {}
@@ -128,10 +129,7 @@ class TodoMgr:
             log.error(f"[TodoMgr] 判断日程显示异常: {e}", exc_info=True)
             return False
 
-    def create_todo(
-        self,
-        schedule_data: ScheduleData,
-    ) -> Dict[str, Any]:
+    def create_todo(self, schedule_data: ScheduleData) -> Dict[str, Any]:
         """
         创建日程。
 
@@ -187,12 +185,7 @@ class TodoMgr:
             log.error(f"[TodoMgr] 创建日程异常: {e}", exc_info=True)
             return {"code": -1, "msg": f'error: {str(e)}'}
 
-    def get_todo(
-        self,
-        todo_id: int,
-        date: str,
-        user_id: int,
-    ) -> Dict[str, Any]:
+    def get_todo(self, todo_id: int, date: str, user_id: int) -> Dict[str, Any]:
         """
         获取单个日程在指定日期的详情（含完成状态和覆盖数据）。
         模拟前端 createDayData 的逻辑，根据重复规则判断日程是否在指定日期显示，
@@ -238,11 +231,7 @@ class TodoMgr:
             log.error(f"[TodoMgr] 获取日程详情异常: {e}", exc_info=True)
             return {"code": -1, "msg": f'error: {str(e)}'}
 
-    def update_todo(
-        self,
-        todo_id: int,
-        schedule_data: ScheduleData,
-    ) -> Dict[str, Any]:
+    def update_todo(self, todo_id: int, schedule_data: ScheduleData) -> Dict[str, Any]:
         """
         更新日程模板，不处理存档
         Args:
@@ -254,22 +243,39 @@ class TodoMgr:
         """
         try:
             db_data = {
-                'id': todo_id,
-                'title': schedule_data.title,
-                'start_ts': schedule_data.startTs,
-                'end_ts': schedule_data.endTs,
-                'all_day': schedule_data.allDay,
-                'reminder': schedule_data.reminder,
-                'repeat': schedule_data.repeat,
-                'repeat_data': json.dumps(schedule_data.repeatData, ensure_ascii=False) if schedule_data.repeatData else None,
-                'repeat_end_ts': schedule_data.repeatEndTs,
-                'color': schedule_data.color,
-                'priority': schedule_data.priority,
-                'group_id': schedule_data.groupId,
-                'order_idx': schedule_data.order,
-                'score': schedule_data.score,
-                'subtasks': json.dumps([st.__dict__ for st in schedule_data.subtasks], ensure_ascii=False) if schedule_data.subtasks else None,
-                'user_id': schedule_data.userId,
+                'id':
+                todo_id,
+                'title':
+                schedule_data.title,
+                'start_ts':
+                schedule_data.startTs,
+                'end_ts':
+                schedule_data.endTs,
+                'all_day':
+                schedule_data.allDay,
+                'reminder':
+                schedule_data.reminder,
+                'repeat':
+                schedule_data.repeat,
+                'repeat_data':
+                json.dumps(schedule_data.repeatData, ensure_ascii=False) if schedule_data.repeatData else None,
+                'repeat_end_ts':
+                schedule_data.repeatEndTs,
+                'color':
+                schedule_data.color,
+                'priority':
+                schedule_data.priority,
+                'group_id':
+                schedule_data.groupId,
+                'order_idx':
+                schedule_data.order,
+                'score':
+                schedule_data.score,
+                'subtasks':
+                json.dumps([st.__dict__
+                            for st in schedule_data.subtasks], ensure_ascii=False) if schedule_data.subtasks else None,
+                'user_id':
+                schedule_data.userId,
             }
 
             result = db_mgr.set_data('t_schedule', db_data)
@@ -282,10 +288,7 @@ class TodoMgr:
             log.error(f"[TodoMgr] 更新日程异常: {e}", exc_info=True)
             return {"code": -1, "msg": f'error: {str(e)}'}
 
-    def delete_todo(
-        self,
-        todo_id: int,
-    ) -> Dict[str, Any]:
+    def delete_todo(self, todo_id: int) -> Dict[str, Any]:
         """
         删除日程。
 
@@ -321,16 +324,37 @@ class TodoMgr:
     def save_todo(self, schedule_save: ScheduleSave) -> Dict[str, Any]:
         """保存日程在指定日期的完成状态。"""
         try:
+            # 先查询是否存在该 schedule_id 和 date 组合的记录
+            query_sql = f"""
+                SELECT id FROM t_schedule_save 
+                WHERE schedule_id = {schedule_save.scheduleId} AND date = '{schedule_save.date}'
+            """
+            query_result = db_mgr.query(query_sql)
+            
             db_data = {
-                'schedule_id': schedule_save.scheduleId,
-                'date': schedule_save.date,
-                'state': schedule_save.state,
-                'subtasks': json.dumps(schedule_save.subtasks, ensure_ascii=False) if schedule_save.subtasks else None,
-                'score': schedule_save.score,
-                'schedule_override': json.dumps(schedule_save.scheduleOverride.to_dict(), ensure_ascii=False) if schedule_save.scheduleOverride else None,
+                'schedule_id':
+                schedule_save.scheduleId,
+                'date':
+                schedule_save.date,
+                'state':
+                schedule_save.state,
+                'subtasks':
+                json.dumps(schedule_save.subtasks, ensure_ascii=False) if schedule_save.subtasks else None,
+                'score':
+                schedule_save.score,
+                'schedule_override':
+                json.dumps(schedule_save.scheduleOverride.to_dict(), ensure_ascii=False)
+                if schedule_save.scheduleOverride else None,
             }
+            
+            # 如果存在记录，添加 id 用于更新
+            if query_result.get('code') == 0 and query_result.get('data') and len(query_result['data']) > 0:
+                db_data['id'] = query_result['data'][0]['id']
+            
             result = db_mgr.set_data('t_schedule_save', db_data)
-            log.info(f"[TodoMgr] 保存日程状态{'成功' if result.get('code') == 0 else '失败'}: schedule_id={schedule_save.scheduleId}, date={schedule_save.date}")
+            log.info(
+                f"[TodoMgr] 保存日程状态{'成功' if result.get('code') == 0 else '失败'}: schedule_id={schedule_save.scheduleId}, date={schedule_save.date}"
+            )
             return result
         except Exception as e:
             log.error(f"[TodoMgr] 保存日程状态异常: {e}", exc_info=True)

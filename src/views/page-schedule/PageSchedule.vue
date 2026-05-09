@@ -78,8 +78,8 @@
                 class="my-0">
                 <!-- 日程条目 -->
                 <ion-item-sliding
-                  v-for="schedule in selectedDate?.events.filter(bShowScheduleItem)"
-                  :key="schedule.id">
+                  v-for="(schedule, idx) in selectedDate?.events.filter(bShowScheduleItem)"
+                  :key="`${schedule.id}-${idx}`">
                   <ion-item lines="" class="">
                     <ion-checkbox
                       class="[--size:26px] mr-2"
@@ -89,13 +89,8 @@
                       @ionChange="onScheduleCheckboxChange($event, selectedDate, schedule)">
                     </ion-checkbox>
                     <div @click="btnScheduleClk($event, schedule)" class="flex w-full items-center pb-1">
-                      <ion-label
-                        :class="{
-                          'line-through':
-                            selectedDate?.save && selectedDate?.save[schedule.id]?.state === 1,
-                        }"
-                        class="pt-2.5 flex-1">
-                        <h2 class="truncate">
+                      <ion-label class="pt-2.5 flex-1">
+                        <h2 class="truncate" :class="{ 'line-through': schedule?.state === 1 }">
                           {{ schedule.title }}
                         </h2>
                         <div class="flex text-gray-400">
@@ -143,11 +138,7 @@
                     <ion-checkbox
                       :disabled="!canModifyScheduleState()"
                       class="[--size:18px] [--border-radius:4px]"
-                      :checked="
-                        selectedDate &&
-                        selectedDate.save &&
-                        selectedDate.save[schedule.id]?.subtasks[sub.id] === 1
-                      " />
+                      :checked="sub.state === 1" />
                     <span class="pl-2 text-base ">{{ sub.name }}</span>
                     <Icon icon="mdi:star" class="text-red-500" />
                     <span class="w-5 text-right mr-6">{{ sub.score ?? 0 }}</span>
@@ -171,7 +162,6 @@
         :is-open="isScheduleModalOpen"
         :modal="scheduleModal"
         :schedule="scheduleModalData"
-        :save="scheduleSave"
         :selected-date="selectedDate"
         @willDismiss="onScheduleModalDismiss">
       </SchedulePop>
@@ -198,5 +188,4 @@
   </ion-page>
 </template>
 <script lang="ts" src="@/views/page-schedule/PageSchedule.ts"></script>
-<style lang="css" scoped>
-</style>
+<style lang="css" scoped></style>
