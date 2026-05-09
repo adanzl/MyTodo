@@ -326,10 +326,16 @@ class TodoMgr:
         try:
             # 先查询是否存在该 schedule_id 和 date 组合的记录
             query_sql = f"""
-                SELECT id FROM t_schedule_save 
+                SELECT id, state, score FROM t_schedule_save 
                 WHERE schedule_id = {schedule_save.scheduleId} AND date = '{schedule_save.date}'
             """
             query_result = db_mgr.query(query_sql)
+            
+            old_state = 0
+            old_score = 0
+            if query_result.get('code') == 0 and query_result.get('data') and len(query_result['data']) > 0:
+                old_state = query_result['data'][0].get('state', 0)
+                old_score = query_result['data'][0].get('score', 0) or 0
             
             db_data = {
                 'schedule_id':
@@ -352,6 +358,37 @@ class TodoMgr:
                 db_data['id'] = query_result['data'][0]['id']
             
             result = db_mgr.set_data('t_schedule_save', db_data)
+            
+            # 如果状态改变，更新用户总积分
+            if old_state != schedule_save.state:
+                # 获取日程所属用户ID
+                schedule_query = db_mgr.query(f"SELECT user_id FROM t_schedule WHERE id = {schedule_save.scheduleId}")
+                if schedule_query.get('code') == 0 and schedule_query.get('data') and len(schedule_query['data']) > 0:
+                    user_id = schedule_query['data'][0]['user_id']
+                    # 更新用户积分
+                    user_query = db_mgr.query(f"SELECT score FROM t_user WHERE id = {user_id}")
+                    if user_query.get('code') == 0 and user_query.get('data') and len(user_query['data']) > 0:
+                        current_score = user_query['data'][0].get('score', 0) or 0
+                        # 从未完成变为完成：加新积分；从完成变为未完成：扣旧积分
+                        if old_state == 0 and schedule_save.state == 1:
+                            # 加上新获得的积分
+                            new_score_value = schedule_save.score or 0
+                            if new_score_value > 0:
+                                new_score = current_score + new_score_value
+                                log.info(f"[TodoMgr] 用户 {user_id} 获得 {new_score_value} 积分")
+                            else:
+                                new_score = current_score
+                        else:
+                            # 扣除之前获得的积分
+                            if old_score > 0:
+                                new_score = max(0, current_score - old_score)
+                                log.info(f"[TodoMgr] 用户 {user_id} 扣除 {old_score} 积分")
+                            else:
+                                new_score = current_score
+                        if new_score != current_score:
+                            db_mgr.set_data('t_user', {'id': user_id, 'score': new_score})
+                            log.info(f"[TodoMgr] 用户 {user_id} 当前总分: {new_score}")
+            
             log.info(
                 f"[TodoMgr] 保存日程状态{'成功' if result.get('code') == 0 else '失败'}: schedule_id={schedule_save.scheduleId}, date={schedule_save.date}"
             )

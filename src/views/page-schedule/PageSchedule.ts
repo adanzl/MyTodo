@@ -290,11 +290,14 @@ export default defineComponent({
       }
     };
 
-    const refreshAllData = async (id: number = 3) => {
-      const loading = await loadingController.create({
-        message: "Loading...",
-      });
-      loading.present();
+    const refreshAllData = async (id: number = 3, showLoading: boolean = true) => {
+      let loading: any;
+      if (showLoading) {
+        loading = await loadingController.create({
+          message: "Loading...",
+        });
+        loading.present();
+      }
       
       try {
         // 根据视图类型确定查询范围
@@ -332,7 +335,9 @@ export default defineComponent({
         refData.toastData.value.isOpen = true;
         refData.toastData.value.text = JSON.stringify(err);
       } finally {
-        loading.dismiss();
+        if (loading) {
+          loading.dismiss();
+        }
       }
     };
     eventBus.$on(C_EVENT.UPDATE_SCHEDULE_GROUP, () => {
@@ -583,8 +588,12 @@ export default defineComponent({
       // 日程状态改变
       onScheduleCheckboxChange: async (_event: any, day: DayData | undefined, schedule: ScheduleData) => {
         if (day) {
-          console.log('[PageSchedule] onScheduleCheckboxChange', { day: day.dt.format('YYYY-MM-DD'), scheduleId: schedule.id });
           const newState = _event.detail.checked ? 1 : 0;
+          const oldState = schedule.state ?? 0;
+          
+          // 乐观更新：立即更新本地数据
+          schedule.state = newState;
+          
           try {
             // 保存日程状态到存档
             const scheduleSave: any = {
@@ -592,12 +601,19 @@ export default defineComponent({
               schedule_id: schedule.id,
               state: newState,
             };
-            console.log('[PageSchedule] saveTodo params:', scheduleSave);
             await saveTodo(scheduleSave);
-            // 刷新显示
-            await refreshAllData(globalVar.scheduleListId);
+            
+            // 如果从未完成变为完成，且有积分，触发奖励事件
+            if (oldState === 0 && newState === 1 && schedule.score && schedule.score > 0) {
+              EventBus.$emit(C_EVENT.REWARD, {
+                rewardType: 'points',
+                value: schedule.score,
+              });
+            }
           } catch (err) {
             console.error('[PageSchedule] 更新日程状态失败:', err);
+            // 失败则回滚
+            schedule.state = oldState;
             refData.toastData.value.isOpen = true;
             refData.toastData.value.text = '更新状态失败';
           }
