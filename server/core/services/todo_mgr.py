@@ -76,7 +76,7 @@ class TodoMgr:
 
                 current_dt += timedelta(days=1)
 
-            log.info(f"[TodoMgr] 获取日历数据成功: user_id={user_id}, dates={len(result)}")
+            # log.info(f"[TodoMgr] 获取日历数据成功: user_id={user_id}, dates={len(result)}")
             return {"code": 0, "msg": "ok", "data": result}
         except Exception as e:
             log.error(f"[TodoMgr] 获取日历数据异常: {e}", exc_info=True)
@@ -346,8 +346,6 @@ class TodoMgr:
                 schedule_save.state,
                 'subtasks':
                 json.dumps(schedule_save.subtasks, ensure_ascii=False) if schedule_save.subtasks else None,
-                'score':
-                schedule_save.score,
                 'schedule_override':
                 json.dumps(schedule_save.scheduleOverride.to_dict(), ensure_ascii=False)
                 if schedule_save.scheduleOverride else None,
@@ -361,30 +359,33 @@ class TodoMgr:
             
             # 如果状态改变，更新用户总积分
             if old_state != schedule_save.state:
-                # 获取日程所属用户ID
-                schedule_query = db_mgr.query(f"SELECT user_id FROM t_schedule WHERE id = {schedule_save.scheduleId}")
+                # 获取日程所属用户ID和模板积分
+                schedule_query = db_mgr.query(f"SELECT user_id, score FROM t_schedule WHERE id = {schedule_save.scheduleId}")
                 if schedule_query.get('code') == 0 and schedule_query.get('data') and len(schedule_query['data']) > 0:
                     user_id = schedule_query['data'][0]['user_id']
+                    template_score = schedule_query['data'][0].get('score', 0) or 0
+                    
                     # 更新用户积分
                     user_query = db_mgr.query(f"SELECT score FROM t_user WHERE id = {user_id}")
                     if user_query.get('code') == 0 and user_query.get('data') and len(user_query['data']) > 0:
                         current_score = user_query['data'][0].get('score', 0) or 0
-                        # 从未完成变为完成：加新积分；从完成变为未完成：扣旧积分
+                        new_score = current_score
+                        
+                        # 从未完成变为完成：加积分（从日程模板获取）
                         if old_state == 0 and schedule_save.state == 1:
-                            # 加上新获得的积分
-                            new_score_value = schedule_save.score or 0
-                            if new_score_value > 0:
-                                new_score = current_score + new_score_value
-                                log.info(f"[TodoMgr] 用户 {user_id} 获得 {new_score_value} 积分")
-                            else:
-                                new_score = current_score
+                            if template_score > 0:
+                                new_score = current_score + template_score
+                                log.info(f"[TodoMgr] 用户 {user_id} 获得 {template_score} 积分")
+                                # 更新 t_schedule_save 中的 score
+                                db_mgr.set_data('t_schedule_save', {'id': db_data.get('id'), 'score': template_score})
+                        # 从完成变为未完成：扣积分（从 t_schedule_save 的旧记录获取）
                         else:
-                            # 扣除之前获得的积分
                             if old_score > 0:
                                 new_score = max(0, current_score - old_score)
                                 log.info(f"[TodoMgr] 用户 {user_id} 扣除 {old_score} 积分")
-                            else:
-                                new_score = current_score
+                                # 更新 t_schedule_save 中的 score 为 0
+                                db_mgr.set_data('t_schedule_save', {'id': db_data.get('id'), 'score': 0})
+                        
                         if new_score != current_score:
                             db_mgr.set_data('t_user', {'id': user_id, 'score': new_score})
                             log.info(f"[TodoMgr] 用户 {user_id} 当前总分: {new_score}")
