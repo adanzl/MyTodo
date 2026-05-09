@@ -26,6 +26,17 @@ class Subtask:
         instance.score = data.get('score')
         instance.imgIds = data.get('imgIds', [])
         return instance
+    
+    def to_dict(self) -> dict:
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'name': self.title,
+            'order': self.order,
+            'score': self.score,
+            'imgIds': self.imgIds,
+            'state': self.state,
+        }
 
 
 class ScheduleData:
@@ -144,7 +155,7 @@ class ScheduleData:
             'groupId': self.groupId,
             'order': self.order,
             'score': self.score,
-            'subtasks': self.subtasks,
+            'subtasks': [st.to_dict() for st in self.subtasks],
             'userId': self.userId,
             'state': self.state,
             'saveScore': self.saveScore

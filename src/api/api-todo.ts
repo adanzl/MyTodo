@@ -18,12 +18,9 @@ export async function getTodoCalendar(
   endTime: string,
   userId: number
 ): Promise<GetTodoCalendarResponse> {
-  const rsp = await apiClient.get<ApiResponse<GetTodoCalendarResponse>>(
-    "/todo/calendar",
-    {
-      params: { start_time: startTime, end_time: endTime, user_id: userId },
-    }
-  );
+  const rsp = await apiClient.get<ApiResponse<GetTodoCalendarResponse>>("/todo/calendar", {
+    params: { startTime: startTime, endTime: endTime, userId: userId },
+  });
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
   }

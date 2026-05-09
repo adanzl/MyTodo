@@ -107,6 +107,19 @@ export default defineComponent({
     };
 
     // 初始化数据 - 使用新数据结构
+    // 排序日程列表：状态 -> order -> id
+    const sortEvents = (events: ScheduleData[]) => {
+      return events.sort((a: ScheduleData, b: ScheduleData) => {
+        const sa = a.state ?? 0;
+        const sb = b.state ?? 0;
+        if (sa !== sb) return sa - sb;
+        const oa = a.order ?? 99999;
+        const ob = b.order ?? 99999;
+        if (oa !== ob) return oa - ob;
+        return (a.id ?? 0) - (b.id ?? 0);
+      });
+    };
+
     const updateScheduleData = () => {
       const calendarData = refData.calendarData.value;
       if (!calendarData || Object.keys(calendarData).length === 0) {
@@ -135,7 +148,6 @@ export default defineComponent({
         ];
       }
 
-      console.log('[PageSchedule] slideArr updated:', refData.slideArr.value[1]);
     };
 
     // 从 calendarData 创建周视图数据
@@ -154,15 +166,7 @@ export default defineComponent({
         const events = calendarData[dateStr] || [];
         
         // 排序：状态 -> order -> id
-        const sortedEvents = [...events].sort((a: any, b: any) => {
-          const sa = a.state ?? 0;
-          const sb = b.state ?? 0;
-          if (sa !== sb) return sa - sb;
-          const oa = a.order ?? 99999;
-          const ob = b.order ?? 99999;
-          if (oa !== ob) return oa - ob;
-          return (a.id ?? 0) - (b.id ?? 0);
-        });
+        const sortedEvents = sortEvents([...events]);
         
         week.push({
           dt: currentDay,
@@ -198,15 +202,7 @@ export default defineComponent({
         const events = calendarData[dateStr] || [];
         
         // 排序：状态 -> order -> id
-        const sortedEvents = [...events].sort((a: any, b: any) => {
-          const sa = a.state ?? 0;
-          const sb = b.state ?? 0;
-          if (sa !== sb) return sa - sb;
-          const oa = a.order ?? 99999;
-          const ob = b.order ?? 99999;
-          if (oa !== ob) return oa - ob;
-          return (a.id ?? 0) - (b.id ?? 0);
-        });
+        const sortedEvents = sortEvents([...events]);
         
         currentWeek.push({
           dt: current,
@@ -603,6 +599,13 @@ export default defineComponent({
             };
             await saveTodo(scheduleSave);
             
+            // 重新排序当前日期的事件列表
+            if (day.events) {
+              sortEvents(day.events);
+              // 触发响应式更新
+              refData.selectedDate.value!.events = [...day.events];
+            }
+            
             // 如果从未完成变为完成，且有积分，触发奖励事件
             if (oldState === 0 && newState === 1 && schedule.score && schedule.score > 0) {
               EventBus.$emit(C_EVENT.REWARD, {
@@ -610,6 +613,10 @@ export default defineComponent({
                 value: schedule.score,
               });
             }
+            // 重新加载用户信息以更新积分显示
+            getUserInfo(refData.user.value.id).then((userInfo: any) => {
+              refData.user.value = userInfo;
+            });
           } catch (err) {
             console.error('[PageSchedule] 更新日程状态失败:', err);
             // 失败则回滚
