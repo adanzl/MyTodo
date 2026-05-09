@@ -16,7 +16,8 @@ import {
   User,
   UserData,
 } from "@/types/user-data";
-import { getSave, setSave } from "@/api/api-schedule";
+import { setSave } from "@/api/api-schedule";
+import { getTodoCalendar } from "@/api/api-todo";
 import { getUserInfo } from "@/api/api-user";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import {
@@ -124,6 +125,8 @@ export default defineComponent({
             refData.selectedDate
           ),
         ];
+        // 输出一下接口数据，check是否和预期一致
+        console.log("[PageSchedule] userData:", refData.slideArr.value[1]);
       } else {
         refData.slideArr.value = [
           UData.createMonthData(
@@ -179,31 +182,73 @@ export default defineComponent({
       }
     };
 
-    const refreshAllData = async (id: number = 1) => {
+    const refreshAllData = async (id: number = 3) => {
       const loading = await loadingController.create({
         message: "Loading...",
       });
       loading.present();
-      // 获取数据
-      getSave(id)
-        .then((uData: any) => {
-          refData.userData.value = uData;
-          // console.log("getSave", userData.value);
-          globalVar.userData = uData;
-          updateScheduleData();
-          chooseSelectedDate();
-          setTimeout(() => {
-            refData.swiperRef?.value?.update();
-          }, 100);
-        })
-        .catch((err) => {
-          console.log("getSave", err);
-          refData.toastData.value.isOpen = true;
-          refData.toastData.value.text = JSON.stringify(err);
-        })
-        .finally(() => {
-          loading.dismiss();
-        });
+      
+      try {
+        // 使用新接口获取日历数据
+        const now = dayjs();
+        const startTime = now.startOf('month').format('YYYY-MM-DD');
+        const endTime = now.endOf('month').format('YYYY-MM-DD');
+        const calendarData = await getTodoCalendar(startTime, endTime, id);
+        console.log('[PageSchedule] calendarData:', calendarData);
+        
+        // 转换为 UserData 格式
+        const userData = new UserData();
+        userData.id = id;
+        userData.userId = id;
+        
+        // 提取所有唯一的日程模板和完成状态
+        const scheduleMap = new Map<number, any>();
+        const saveMap: Record<string, any> = {};
+        
+        for (const [dateStr, schedules] of Object.entries(calendarData)) {
+          saveMap[dateStr] = {};
+          
+          for (const schedule of schedules as any[]) {
+            // 保存日程模板（去重）
+            if (!scheduleMap.has(schedule.id)) {
+              // 转换时间字段为 dayjs 对象
+              const convertedSchedule = {
+                ...schedule,
+                startTs: schedule.startTs ? dayjs(schedule.startTs) : undefined,
+                endTs: schedule.endTs ? dayjs(schedule.endTs) : undefined,
+                repeatEndTs: schedule.repeatEndTs ? dayjs(schedule.repeatEndTs) : undefined,
+              };
+              scheduleMap.set(schedule.id, convertedSchedule);
+            }
+            
+            // 保存完成状态
+            if (schedule.state !== undefined || schedule.saveScore !== undefined) {
+              saveMap[dateStr][schedule.id] = {
+                state: schedule.state || 0,
+                score: schedule.saveScore,
+              };
+            }
+          }
+        }
+        
+        userData.schedules = Array.from(scheduleMap.values());
+        userData.save = saveMap;
+        
+        console.log('[PageSchedule] converted userData:', userData);
+        refData.userData.value = userData;
+        globalVar.userData = userData;
+        updateScheduleData();
+        chooseSelectedDate();
+        setTimeout(() => {
+          refData.swiperRef?.value?.update();
+        }, 100);
+      } catch (err) {
+        console.error('[PageSchedule] refreshAllData error:', err);
+        refData.toastData.value.isOpen = true;
+        refData.toastData.value.text = JSON.stringify(err);
+      } finally {
+        loading.dismiss();
+      }
     };
     eventBus.$on(C_EVENT.UPDATE_SCHEDULE_GROUP, () => {
       // console.log("UPDATE_SCHEDULE_GROUP", params);
@@ -216,14 +261,14 @@ export default defineComponent({
     });
     onMounted(() => {
       // console.log("onMounted page");
-      // refreshAllData();
-      onIonViewDidEnter(() => {
-        // console.log("onIonViewDidEnter");
-        refreshAllData(globalVar.scheduleListId);
-      });
       eventBus.$on(C_EVENT.MENU_CLOSE, (params: any) => {
         refData.filter.value = params;
       });
+    });
+    
+    onIonViewDidEnter(() => {
+      console.log('[PageSchedule] onIonViewDidEnter');
+      refreshAllData(globalVar.scheduleListId);
     });
 
     // 保存存档
