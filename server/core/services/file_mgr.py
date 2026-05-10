@@ -82,7 +82,7 @@ class FileMgr:
 
             # 递归模式：扫描所有子目录和文件
             if recursive:
-                return self._scan_recursive(path)
+                return self._scan_recursive(path, extensions_filter)
 
             # 非递归模式：只列出当前目录
             items = self._sort_items(self._list_items(path, entries))
@@ -188,10 +188,11 @@ class FileMgr:
             allowed_exts = {'.mp3', '.wav', '.aac', '.ogg', '.m4a', '.flac', '.wma', '.mp4'}
         elif extensions_filter == "video":
             allowed_exts = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'}
-        elif extensions_filter.startswith("."):
-            allowed_exts = {ext.strip().lower() for ext in extensions_filter.split(",")}
         else:
-            allowed_exts = None
+            # 处理逗号分隔的扩展名列表（如 "pdf,mp4,avi"）
+            ext_list = [ext.strip().lower() for ext in extensions_filter.split(",")]
+            # 确保每个扩展名都有 . 前缀
+            allowed_exts = {ext if ext.startswith('.') else f'.{ext}' for ext in ext_list}
 
         if allowed_exts:
             items = [
@@ -201,12 +202,20 @@ class FileMgr:
         
         return items
 
-    def _scan_recursive(self, root_path: str, depth: int = 0, max_depth: int = 10, max_items: int = 1000) -> Dict[str, Any]:
+    def _scan_recursive(
+        self,
+        root_path: str,
+        extensions_filter: str = "all",
+        depth: int = 0,
+        max_depth: int = 10,
+        max_items: int = 1000
+    ) -> Dict[str, Any]:
         """
         递归扫描目录，返回树形结构
         
         Args:
             root_path: 根目录路径
+            extensions_filter: 文件扩展名过滤
             depth: 当前递归深度
             max_depth: 最大递归深度
             max_items: 最大项目数
@@ -237,6 +246,10 @@ class FileMgr:
         # 构建当前目录的项列表
         items = self._sort_items(self._list_items(root_path, entries))
         
+        # 过滤文件（保留所有目录，只过滤文件）
+        if extensions_filter and extensions_filter != "all":
+            items = self._filter_by_extensions(items, extensions_filter)
+        
         # 为每个子目录递归添加 subItems
         total_items = len(items)
         for item in items:
@@ -246,7 +259,13 @@ class FileMgr:
                 break
                 
             if item["isDirectory"] and item.get("path"):
-                sub_result = self._scan_recursive(item["path"], depth + 1, max_depth, max_items - total_items)
+                sub_result = self._scan_recursive(
+                    item["path"],
+                    extensions_filter,
+                    depth + 1,
+                    max_depth,
+                    max_items - total_items
+                )
                 item["subItems"] = sub_result["data"] if sub_result["code"] == 0 else []
                 total_items += len(item["subItems"])
         

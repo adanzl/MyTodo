@@ -30,22 +30,22 @@
           </el-button>
           <el-button size="small" type="danger" @click="clearMaterialList">清空列表</el-button>
         </div>
-        <el-table :data="materialList" border max-height="300" size="small" row-key="path">
-          <el-table-column prop="name" label="名称" min-width="120">
+        <el-table :data="materialList" border max-height="300" size="small">
+          <el-table-column prop="name" label="名称" min-width="120" show-overflow-tooltip>
             <template #default="{ row }">
-              <div class="flex items-center gap-2">
-                <el-icon v-if="row.isFolder">
-                  <folder />
+              <div class="flex items-center gap-2 whitespace-nowrap overflow-hidden text-ellipsis">
+                <el-icon v-if="row.isFolder" :size="16">
+                  <Folder />
                 </el-icon>
-                <span>{{ row.name }}</span>
+                <span class="truncate">{{ row.name }}</span>
               </div>
             </template>
           </el-table-column>
           <el-table-column prop="path" label="路径" min-width="200" show-overflow-tooltip />
-          <el-table-column label="分类" width="150">
+          <el-table-column label="分类" width="200">
             <template #default="{ row }">
-              <el-cascader v-model="row.cate_id" :options="cascaderOptions" :props="cascaderProps" placeholder="选择分类"
-                clearable size="small" class="w-full" />
+              <span v-if="row.folderPath" class="text-blue-600">{{ row.folderPath }}</span>
+              <span v-else>{{ getCategoryName(row.cate_id) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="类型" width="80">
@@ -100,6 +100,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
+import { Folder } from "@element-plus/icons-vue";
 import { addMaterial, addMaterialCategory } from "@/api/api-task";
 import { listDirectory, type DirectoryItem } from "@/api/api-file";
 import FileDialog from "@/views/dialogs/FileDialog.vue";
@@ -117,6 +118,7 @@ interface MaterialItem {
   type: number;
   isFolder?: boolean; // 是否为文件夹
   children?: MaterialItem[]; // 子项（用于树形展示）
+  folderPath?: string; // 所属文件夹完整路径（用于动态创建分类）
 }
 
 const props = defineProps<Props>();
@@ -185,6 +187,12 @@ const cascaderOptions = computed(() => {
   return buildCascaderOptions(props.categoryList || []);
 });
 
+// 获取分类名称
+const getCategoryName = (cateId: number): string => {
+  const category = props.categoryList.find(c => c.id === cateId);
+  return category ? category.name : '未分类';
+};
+
 // 监听 cascaderValue 变化，更新 defaultCateId
 watch(cascaderValue, (val) => {
   if (val !== undefined && val !== null) {
@@ -236,17 +244,45 @@ const handleDirectoryConfirm = async (dirPaths: string[]) => {
 
   const dirPath = dirPaths[0];
   scanning.value = true;
+  
   try {
-    // 递归扫描目录
-    const result = await listDirectory(dirPath, 'all', true);
+    // 递归扫描目录，只获取 PDF 和视频文件
+    const extensions = 'pdf,mp4,avi,mkv,mov,wmv,flv,webm';
+    const result = await listDirectory(dirPath, extensions, true);
 
     if (!result || !Array.isArray(result)) {
       ElMessage.error('扫描目录失败');
+      scanning.value = false;
       return;
     }
 
-    // 将扫描结果转换为 MaterialItem 树形结构
-    const scannedItems = convertScanResultToMaterials(result, dirPath);
+    // 获取当前选中分类的完整路径名称
+    const getBaseCategoryPath = (): string => {
+      if (!cascaderValue.value) return '';
+
+      // 从 cascaderOptions 中查找完整路径
+      const findPath = (options: any[], targetId: number, path: string[] = []): string[] | null => {
+        for (const option of options) {
+          const newPath = [...path, option.name];
+          if (option.id === targetId) {
+            return newPath;
+          }
+          if (option.children && option.children.length > 0) {
+            const result = findPath(option.children, targetId, newPath);
+            if (result) return result;
+          }
+        }
+        return null;
+      };
+
+      const pathNames = findPath(cascaderOptions.value, cascaderValue.value);
+      return pathNames ? pathNames.join('/') : '';
+    };
+
+    const baseCategoryPath = getBaseCategoryPath();
+
+    // 将扫描结果转换为 MaterialItem（服务器已过滤，直接转换）
+    const scannedItems = convertScanResultToMaterials(result, baseCategoryPath);
 
     // 添加到素材列表
     materialList.value.push(...scannedItems);
@@ -261,49 +297,58 @@ const handleDirectoryConfirm = async (dirPaths: string[]) => {
   }
 };
 
-// 将扫描结果转换为 MaterialItem
+// 将扫描结果转换为 MaterialItem（扁平化）
 const convertScanResultToMaterials = (
   items: DirectoryItem[],
-  rootPath: string
+  baseCategoryPath?: string // 基础分类路径（如 "咱们裸熊/sub"）
 ): MaterialItem[] => {
-  return items.map(item => {
-    const material: MaterialItem = {
-      name: item.name,
-      path: item.path || '',
-      cate_id: defaultCateId.value || props.categoryList[0]?.id || 1,
-      type: 0, // 默认 PDF，后续根据文件名判断
-      isFolder: item.isDirectory,
-    };
+  const result: MaterialItem[] = [];
 
-    // 如果是文件夹，递归处理子项
-    if (item.isDirectory && item.subItems) {
-      material.children = convertScanResultToMaterials(item.subItems, rootPath);
-    } else if (!item.isDirectory) {
-      // 根据文件扩展名判断类型
-      const ext = item.name.split('.').pop()?.toLowerCase();
-      if (ext === 'pdf') {
-        material.type = 0;
-      } else if (['mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm'].includes(ext || '')) {
-        material.type = 1;
+  // 文件扩展名到类型的映射
+  const extToType: Record<string, number> = {
+    'pdf': 0,
+    'mp4': 1, 'avi': 1, 'mkv': 1, 'mov': 1, 'wmv': 1, 'flv': 1, 'webm': 1
+  };
+
+  const processItems = (items: DirectoryItem[], currentCategoryPath?: string) => {
+    items.forEach(item => {
+      if (item.isDirectory) {
+        // 构建当前文件夹的完整分类路径
+        const folderCategoryPath = currentCategoryPath
+          ? `${currentCategoryPath}/${item.name}`
+          : (baseCategoryPath ? `${baseCategoryPath}/${item.name}` : item.name);
+
+        // 递归处理子项
+        if (item.subItems && item.subItems.length > 0) {
+          processItems(item.subItems, folderCategoryPath);
+        }
+      } else {
+        // 处理文件（服务器已过滤，这里只需确定类型）
+        const ext = item.name.split('.').pop()?.toLowerCase();
+        const type = ext ? extToType[ext] : -1;
+
+        // 理论上不会走到这里，因为服务器已经过滤了
+        if (type !== -1) {
+          result.push({
+            name: item.name,
+            path: item.path || '',
+            cate_id: defaultCateId.value || props.categoryList[0]?.id || 1,
+            type: type,
+            isFolder: false,
+            folderPath: currentCategoryPath || baseCategoryPath, // 记录完整分类路径
+          });
+        }
       }
-      // 其他类型跳过（不添加）
-    }
+    });
+  };
 
-    return material;
-  }).filter(item => !item.isFolder || (item.children && item.children.length > 0));
+  processItems(items, baseCategoryPath);
+  return result;
 };
 
-// 统计文件数量
+// 统计文件数量（扁平化后直接返回长度）
 const countFiles = (items: MaterialItem[]): number => {
-  let count = 0;
-  for (const item of items) {
-    if (!item.isFolder) {
-      count++;
-    } else if (item.children) {
-      count += countFiles(item.children);
-    }
-  }
-  return count;
+  return items.length;
 };
 
 
@@ -311,17 +356,39 @@ const countFiles = (items: MaterialItem[]): number => {
 const handleFileConfirm = (filePaths: string[]) => {
   if (!filePaths?.length) return;
 
+  // 支持的文件扩展名映射
+  const supportedExtensions: Record<string, number> = {
+    'pdf': 0,
+    'mp4': 1, 'avi': 1, 'mkv': 1, 'mov': 1, 'wmv': 1, 'flv': 1, 'webm': 1
+  };
+
+  let addedCount = 0;
+  let skippedCount = 0;
+
   filePaths.forEach((filePath) => {
     const fileName = filePath.split('/').pop() || filePath;
-    materialList.value.push({
-      name: fileName.replace(/\.[^/.]+$/, ""),
-      path: filePath,
-      cate_id: defaultCateId.value || props.categoryList[0]?.id || 1,
-      type: defaultType.value,
-    });
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    const type = ext ? supportedExtensions[ext] : -1;
+
+    // 只添加支持的类型
+    if (type !== -1) {
+      materialList.value.push({
+        name: fileName.replace(/\.[^/.]+$/, ""),
+        path: filePath,
+        cate_id: defaultCateId.value || props.categoryList[0]?.id || 1,
+        type: type,
+      });
+      addedCount++;
+    } else {
+      skippedCount++;
+    }
   });
 
-  ElMessage.success(`已添加 ${filePaths.length} 个文件`);
+  if (addedCount > 0) {
+    ElMessage.success(`已添加 ${addedCount} 个文件${skippedCount > 0 ? `，跳过 ${skippedCount} 个不支持的文件` : ''}`);
+  } else {
+    ElMessage.warning('没有可添加的文件（仅支持 PDF 和视频文件）');
+  }
 };
 
 // 移除素材
@@ -379,12 +446,80 @@ const handleSubmit = async () => {
 
   submitting.value = true;
   errors.value = [];
-  const failedItems: string[] = [];
 
-  // 扁平化素材列表（将树形结构转为平面列表）
+  // 扁平化素材列表
   const flatMaterials = flattenMaterials(materialList.value);
 
-  for (const material of flatMaterials) {
+  try {
+    // 1. 收集并创建新分类
+    const categoryMap = await createMissingCategories(flatMaterials);
+
+    // 2. 更新文件的 cate_id
+    updateMaterialCategoryIds(flatMaterials, categoryMap);
+
+    // 3. 批量添加素材
+    const failedItems = await addMaterialsBatch(flatMaterials);
+
+    // 4. 处理结果
+    handleSubmissionResult(flatMaterials, failedItems);
+  } catch (error: any) {
+    console.error('批量添加失败:', error);
+    ElMessage.error('批量添加失败');
+  } finally {
+    submitting.value = false;
+  }
+};
+
+// 收集并创建缺失的分类
+const createMissingCategories = async (materials: MaterialItem[]): Promise<Map<string, number>> => {
+  const categoryMap = new Map<string, number>();
+  const categoriesToCreate = new Set<string>();
+
+  // 收集所有需要创建的分类
+  for (const material of materials) {
+    if (material.folderPath && !categoryMap.has(material.folderPath)) {
+      const categoryName = material.folderPath.split('/').pop() || material.folderPath;
+      const existingCategory = props.categoryList.find(c => c.name === categoryName);
+
+      if (existingCategory) {
+        categoryMap.set(material.folderPath, existingCategory.id);
+      } else {
+        categoriesToCreate.add(material.folderPath);
+      }
+    }
+  }
+
+  // 创建新分类
+  for (const folderPath of categoriesToCreate) {
+    const categoryName = folderPath.split('/').pop() || folderPath;
+    try {
+      const result = await addMaterialCategory({ name: categoryName, parent: -1 });
+      if (result?.id) {
+        categoryMap.set(folderPath, result.id);
+      }
+    } catch (error: any) {
+      console.error(`创建分类 "${categoryName}" 失败:`, error);
+      throw new Error(`创建分类 "${categoryName}" 失败`);
+    }
+  }
+
+  return categoryMap;
+};
+
+// 更新素材的分类ID
+const updateMaterialCategoryIds = (materials: MaterialItem[], categoryMap: Map<string, number>) => {
+  for (const material of materials) {
+    if (material.folderPath && categoryMap.has(material.folderPath)) {
+      material.cate_id = categoryMap.get(material.folderPath)!;
+    }
+  }
+};
+
+// 批量添加素材
+const addMaterialsBatch = async (materials: MaterialItem[]): Promise<string[]> => {
+  const failedItems: string[] = [];
+
+  for (const material of materials) {
     try {
       await addMaterial(material);
     } catch (error: any) {
@@ -393,18 +528,25 @@ const handleSubmit = async () => {
     }
   }
 
-  const successCount = flatMaterials.length - failedItems.length;
+  return failedItems;
+};
+
+// 处理提交结果
+const handleSubmissionResult = (materials: MaterialItem[], failedItems: string[]) => {
+  const successCount = materials.length - failedItems.length;
+
   if (!failedItems.length) {
     ElMessage.success(`成功添加 ${successCount} 个素材`);
     emit("success");
     visible.value = false;
     materialList.value = [];
+    errors.value = [];
   } else {
-    errors.value = failedItems.map((name) => `添加失败: ${name}`);
+    errors.value = failedItems.map(name => `添加失败: ${name}`);
     ElMessage.warning(`添加完成：成功 ${successCount} 个，失败 ${failedItems.length} 个`);
-    materialList.value = materialList.value.filter((m) => failedItems.includes(m.name));
+    // 保留失败的项
+    materialList.value = materialList.value.filter(m => failedItems.includes(m.name));
   }
-  submitting.value = false;
 };
 
 // 扁平化素材列表
