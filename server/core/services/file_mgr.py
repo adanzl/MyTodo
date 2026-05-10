@@ -201,12 +201,15 @@ class FileMgr:
         
         return items
 
-    def _scan_recursive(self, root_path: str) -> Dict[str, Any]:
+    def _scan_recursive(self, root_path: str, depth: int = 0, max_depth: int = 10, max_items: int = 1000) -> Dict[str, Any]:
         """
         递归扫描目录，返回树形结构
         
         Args:
             root_path: 根目录路径
+            depth: 当前递归深度
+            max_depth: 最大递归深度
+            max_items: 最大项目数
             
         Returns:
             {
@@ -216,6 +219,11 @@ class FileMgr:
                 "currentPath": "..."
             }
         """
+        # 检查递归深度
+        if depth > max_depth:
+            log.warning(f"Max depth {max_depth} reached for {root_path}")
+            return {"code": 0, "msg": "ok", "data": [], "currentPath": root_path}
+        
         try:
             entries = os.listdir(root_path)
         except PermissionError:
@@ -230,10 +238,17 @@ class FileMgr:
         items = self._sort_items(self._list_items(root_path, entries))
         
         # 为每个子目录递归添加 subItems
+        total_items = len(items)
         for item in items:
+            # 检查总数限制
+            if total_items >= max_items:
+                log.warning(f"Max items {max_items} reached, stopping recursion")
+                break
+                
             if item["isDirectory"] and item.get("path"):
-                sub_result = self._scan_recursive(item["path"])
+                sub_result = self._scan_recursive(item["path"], depth + 1, max_depth, max_items - total_items)
                 item["subItems"] = sub_result["data"] if sub_result["code"] == 0 else []
+                total_items += len(item["subItems"])
         
         return {"code": 0, "msg": "ok", "data": items, "currentPath": root_path}
 

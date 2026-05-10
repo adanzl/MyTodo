@@ -94,7 +94,7 @@
 
   <!-- 目录扫描对话框 -->
   <FileDialog v-model:visible="directoryDialogVisible" title="选择要扫描的目录" mode="directory" :multiple="false"
-    @confirm="handleDirectoryConfirm" />
+    :confirm-loading="scanning" confirm-button-text="开始扫描" @confirm="handleDirectoryConfirm" />
 </template>
 
 <script setup lang="ts">
