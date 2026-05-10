@@ -368,7 +368,7 @@ const computedTitle = computed(() => {
 });
 
 // 获取行的类名（目前不使用行高亮，统一使用 checkbox）
-const getRowClassName = ({ row }: { row: FileBrowserItem }) => {
+const getRowClassName = ({ }: { row: FileBrowserItem }) => {
   return "";
 };
 

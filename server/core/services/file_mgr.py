@@ -105,6 +105,10 @@ class FileMgr:
         items: List[Dict[str, Any]] = []
         
         for entry in entries:
+            # 跳过特殊目录
+            if entry in ('lost+found',):
+                continue
+                
             entry_path = os.path.join(path, entry)
             try:
                 stat_info = os.stat(entry_path)
@@ -120,7 +124,7 @@ class FileMgr:
                 }
                 items.append(item)
             except (OSError, PermissionError) as e:
-                log.warning(f"Cannot access {entry_path}: {e}")
+                log.debug(f"Cannot access {entry_path}: {e}")
                 items.append({
                     "name": entry,
                     "path": entry_path,
@@ -214,6 +218,10 @@ class FileMgr:
         """
         try:
             entries = os.listdir(root_path)
+        except PermissionError:
+            # 权限拒绝，跳过该目录
+            log.debug(f"Permission denied for {root_path}, skipping")
+            return {"code": 0, "msg": "ok", "data": [], "currentPath": root_path}
         except Exception as e:
             log.error(f"Cannot list directory {root_path}: {e}")
             return {"code": -1, "msg": f"无法读取目录: {str(e)}", "data": []}
