@@ -216,19 +216,22 @@ const isLastPageOdd = computed(() => {
 
 // 判断当前素材是否已完成
 const isMaterialCompleted = computed(() => {
-    if (!props.material || !props.task) return true;
+    if (!props.material || !props.task) return false;
+    
+    const userId = props.userId;
+    if (!userId) return false;
     
     const taskData = typeof props.task.data === 'string' 
         ? JSON.parse(props.task.data) 
         : props.task.data;
     
-    if (taskData.dailyMaterials) {
-        for (const dayKey in taskData.dailyMaterials) {
-            const materials = taskData.dailyMaterials[dayKey];
+    if (taskData.dailyMaterials && props.date) {
+        // 只检查当前日期下的素材状态
+        const materials = taskData.dailyMaterials[props.date];
+        if (materials) {
             const material = materials.find((m: any) => m.id === props.material?.id);
             // status 现在是 Record<string, number>，key 为 user_id
-            const userId = props.userId;
-            if (material && userId && material.status) {
+            if (material && material.status) {
                 return material.status[String(userId)] === 1;
             }
         }
