@@ -1,11 +1,5 @@
 <template>
-  <el-dialog
-    v-model="visible"
-    :title="isEdit ? '编辑任务' : '新建任务'"
-    width="1200px"
-    align-center
-    @close="handleClose"
-  >
+  <el-dialog v-model="visible" :title="isEdit ? '编辑任务' : '新建任务'" width="1200px" align-center @close="handleClose">
     <div class="max-h-[90vh] overflow-y-auto overflow-x-hidden flex flex-col gap-4">
       <!-- 上区域：任务信息 -->
       <div class="task-info-section p-2 border rounded">
@@ -19,14 +13,12 @@
             </el-col>
             <el-col :span="8">
               <el-form-item label="优先级">
-                <el-input-number
-                  v-model="formData.priority"
-                  :min="0" :max="10"
-                  :step="1" class="w-30!"
-                  size="small"
+                <el-input-number v-model="formData.priority" :min="0" :max="10" :step="1" class="w-30!" size="small"
                   placeholder="数字越小优先级越高" />
                 <el-tooltip content="数字越小优先级越高，高优先级任务没有完成低优先级任务会锁定" placement="bottom">
-                  <el-icon class="ml-2"><WarningFilled /></el-icon>
+                  <el-icon class="ml-2">
+                    <WarningFilled />
+                  </el-icon>
                 </el-tooltip>
               </el-form-item>
             </el-col>
@@ -44,14 +36,8 @@
           <el-row :gutter="20">
             <el-col :span="8">
               <el-form-item label="开始日期" required>
-                <el-date-picker
-                  v-model="formData.start_date"
-                  type="date"
-                  placeholder="选择开始日期"
-                  format="YYYY-MM-DD"
-                  value-format="YYYY-MM-DD"
-                  class="w-68!"
-                />
+                <el-date-picker v-model="formData.start_date" type="date" placeholder="选择开始日期" format="YYYY-MM-DD"
+                  value-format="YYYY-MM-DD" class="w-68!" />
               </el-form-item>
             </el-col>
             <el-col :span="8">
@@ -79,34 +65,21 @@
           <div class="flex items-center gap-4">
             <!-- 每日分数配置 -->
             <span>{{ formData.type === 1 ? '完成奖励' : `第${selectedDay + 1}天星星` }}</span>
-            <el-input-number
-              v-if="formData.type === 1"
-              v-model="dailyScore[0]"
-              :min="0"
-              :max="1000"
-              :step="1"
-              placeholder="'奖励'"
-              class="w-36"
-              size="small"
-              :disabled="getAllMaterials().length === 0"
-            />
-            <el-input-number
-              v-else-if="selectedDay !== -1"
-              v-model="dailyScore[selectedDay]"
-              :min="0"
-              :max="1000"
-              :step="1"
-              :placeholder="'奖励'"
-              class="w-36"
-              size="small"
-              :disabled="getDayMaterials(selectedDay).length === 0"
-            />
+            <el-input-number v-if="formData.type === 1" v-model="dailyScore[0]" :min="0" :max="1000" :step="1"
+              placeholder="'奖励'" class="w-36" size="small" :disabled="getAllMaterials().length === 0" />
+            <el-input-number v-else-if="selectedDay !== -1" v-model="dailyScore[selectedDay]" :min="0" :max="1000"
+              :step="1" :placeholder="'奖励'" class="w-36" size="small"
+              :disabled="getDayMaterials(selectedDay).length === 0" />
             <el-button type="primary" size="small" @click="showMaterialSelector = true">
-              <el-icon class="mr-1"><Plus /></el-icon>
+              <el-icon class="mr-1">
+                <Plus />
+              </el-icon>
               添加素材
             </el-button>
             <el-button type="success" size="small" @click="showQuickAdd = true">
-              <el-icon class="mr-1"><Plus /></el-icon>
+              <el-icon class="mr-1">
+                <Plus />
+              </el-icon>
               快速添加
             </el-button>
           </div>
@@ -115,14 +88,11 @@
         <div class="checkin-content flex" style="height: 400px;">
           <!-- 左侧：天数列表（仅每日任务显示） -->
           <div v-if="formData.type === 0" class="day-list w-48 border-r overflow-y-auto">
-            <div
-              v-for="dayIndex in Array.from({ length: formData.duration || 1 }, (_, i) => i)"
-              :key="dayIndex"
+            <div v-for="dayIndex in Array.from({ length: formData.duration || 1 }, (_, i) => i)" :key="dayIndex"
               class="p-3 cursor-pointer hover:bg-gray-100 transition-all duration-200"
               :class="{ 'bg-blue-50 border-l-4 border-blue-500': selectedDay === dayIndex }"
-              @click="selectedDay = dayIndex"
-            >
-              <div class="font-medium">第{{ dayIndex + 1 }}天</div>
+              @click="selectedDay = dayIndex">
+              <div class="font-medium">第{{ dayIndex + 1 }}天 <span class="text-[12px] ml-1">{{ getDayDate(dayIndex) }}</span></div>
               <div class="text-xs text-gray-500 mt-1">
                 {{ getDayMaterialCount(dayIndex) }} 个素材
               </div>
@@ -137,11 +107,8 @@
                 暂无素材，点击“添加素材”按钮添加
               </div>
               <div v-else class="space-y-2">
-                <div
-                  v-for="(material, index) in getAllMaterials()"
-                  :key="index"
-                  class="material-item p-3 border rounded flex items-center justify-between hover:bg-gray-50 transition-all duration-200"
-                >
+                <div v-for="(material, index) in getAllMaterials()" :key="index"
+                  class="material-item p-3 border rounded flex items-center justify-between hover:bg-gray-50 transition-all duration-200">
                   <div class="flex-1">
                     <div class="font-medium">{{ material.name }}</div>
                     <div class="text-xs text-gray-500 mt-1">类型：{{ getMaterialTypeName(material.type) }}</div>
@@ -162,11 +129,8 @@
                   暂无素材，点击“添加素材”按钮添加
                 </div>
                 <div v-else class="space-y-2">
-                  <div
-                    v-for="(material, index) in getDayMaterials(selectedDay)"
-                    :key="index"
-                    class="material-item p-3 border rounded flex items-center justify-between hover:bg-gray-50 transition-all duration-200"
-                  >
+                  <div v-for="(material, index) in getDayMaterials(selectedDay)" :key="index"
+                    class="material-item p-3 border rounded flex items-center justify-between hover:bg-gray-50 transition-all duration-200">
                     <div class="flex-1">
                       <div class="font-medium">{{ material.name }}</div>
                       <div class="text-xs text-gray-500 mt-1">类型：{{ getMaterialTypeName(material.type) }}</div>
@@ -189,49 +153,34 @@
     </template>
 
     <!-- 素材选择器弹窗 -->
-    <el-dialog
-      v-model="showMaterialSelector"
-      title="选择素材"
-      width="900px"
-      append-to-body
-      align-center
-    >
+    <el-dialog v-model="showMaterialSelector" title="选择素材" width="900px" append-to-body align-center>
       <div v-loading="materialLoading" element-loading-text="加载中..." style="min-height: 500px;">
         <div class="flex gap-4" style="height: 500px;">
-        <!-- 左侧：类别列表 -->
-        <div class="w-48 border rounded overflow-y-auto">
-          <div
-            v-for="cat in categoryList"
-            :key="cat.id"
-            class="p-3 cursor-pointer hover:bg-gray-100 transition-all duration-200"
-            :class="{ 'bg-blue-50 border-l-4 border-blue-500': selectedCategoryId === cat.id }"
-            @click="selectedCategoryId = cat.id"
-          >
-            <div class="font-medium">{{ cat.name }}</div>
+          <!-- 左侧：类别列表 -->
+          <div class="w-48 border rounded overflow-y-auto">
+            <div v-for="cat in categoryList" :key="cat.id"
+              class="p-3 cursor-pointer hover:bg-gray-100 transition-all duration-200"
+              :class="{ 'bg-blue-50 border-l-4 border-blue-500': selectedCategoryId === cat.id }"
+              @click="selectedCategoryId = cat.id">
+              <div class="font-medium">{{ cat.name }}</div>
+            </div>
+          </div>
+
+          <!-- 右侧：素材列表 -->
+          <div class="flex-1 border rounded overflow-hidden">
+            <el-table v-if="!materialLoading" ref="materialTableRef" :data="materialList"
+              @selection-change="handleMaterialSelectionChange" @row-click="handleRowClick" max-height="460">
+              <el-table-column type="selection" width="55" />
+              <el-table-column prop="id" label="ID" width="80" />
+              <el-table-column prop="name" label="素材名称" min-width="200" />
+              <el-table-column prop="type" label="类型" width="100">
+                <template #default="{ row }">
+                  {{ getMaterialTypeName(row.type) }}
+                </template>
+              </el-table-column>
+            </el-table>
           </div>
         </div>
-
-        <!-- 右侧：素材列表 -->
-        <div class="flex-1 border rounded overflow-hidden">
-          <el-table
-            v-if="!materialLoading"
-            ref="materialTableRef"
-            :data="materialList"
-            @selection-change="handleMaterialSelectionChange"
-            @row-click="handleRowClick"
-            max-height="460"
-          >
-            <el-table-column type="selection" width="55" />
-            <el-table-column prop="id" label="ID" width="80" />
-            <el-table-column prop="name" label="素材名称" min-width="200" />
-            <el-table-column prop="type" label="类型" width="100">
-              <template #default="{ row }">
-                {{ getMaterialTypeName(row.type) }}
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
-      </div>
       </div>
       <template #footer>
         <el-button @click="showMaterialSelector = false">取消</el-button>
@@ -240,11 +189,7 @@
     </el-dialog>
 
     <!-- 快速添加弹窗 -->
-    <QuickAdd
-      v-model="showQuickAdd"
-      :form-data="formData"
-      @allocated="handleQuickAddAllocated"
-    />
+    <QuickAdd v-model="showQuickAdd" :form-data="formData" @allocated="handleQuickAddAllocated" />
   </el-dialog>
 </template>
 
@@ -427,6 +372,12 @@ const getDayMaterials = (day: number) => {
 // 获取某天的素材数量
 const getDayMaterialCount = (day: number) => {
   return getDayMaterials(day).length;
+};
+
+// 获取某天的具体日期
+const getDayDate = (dayIndex: number) => {
+  if (!formData.value.start_date) return '';
+  return dayjs(formData.value.start_date).add(dayIndex, 'day').format('MM月DD日');
 };
 
 // 获取素材类型名称

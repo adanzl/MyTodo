@@ -39,6 +39,7 @@ export interface MaterialItem {
 export interface MaterialCategory {
   id: number;
   name: string;
+  parent?: number; // 父级ID，-1表示顶级目录
 }
 
 /**
@@ -97,12 +98,15 @@ export async function deleteMaterial(id: number): Promise<void> {
  * 获取素材分类列表
  * @param pageNum - 页码，默认1
  * @param pageSize - 每页数量，默认20
+ * @param parent - 父级ID筛选（可选），不传则获取所有分类
  */
 export async function getMaterialCategoryList(
   pageNum: number = 1,
-  pageSize: number = 20
+  pageSize: number = 20,
+  parent?: number | null
 ): Promise<PaginatedResponse<MaterialCategory>> {
-  return getList<MaterialCategory>("t_material_category", undefined, pageNum, pageSize);
+  const conditions = parent !== undefined && parent !== null ? { parent } : undefined;
+  return getList<MaterialCategory>("t_material_category", conditions, pageNum, pageSize);
 }
 
 /**

@@ -4,7 +4,7 @@
  */
 import { ref, type Ref } from "vue";
 import { ElMessage } from "element-plus";
-import { api } from "@/api/config";
+import { listDirectory } from "@/api/api-file";
 import { logAndNoticeError } from "@/utils";
 
 export interface FileBrowserOptions {
@@ -79,15 +79,12 @@ export function useFileBrowser(options: FileBrowserOptions = {}): UseFileBrowser
     try {
       fileBrowserLoading.value = true;
       const path = fileBrowserPath.value || defaultPath;
-      const rsp = await api.get("/listDirectory", {
-        params: { path: path, extensions: extensions },
-      });
-      if (rsp.data.code === 0) {
-        fileBrowserList.value = rsp.data.data || [];
-        updateFileBrowserCanNavigateUp();
-      } else {
-        ElMessage.error(rsp.data.msg || "获取文件列表失败");
-      }
+      const items = await listDirectory(path, extensions);
+        
+      // 直接使用完整数据
+      fileBrowserList.value = items as any;
+        
+      updateFileBrowserCanNavigateUp();
     } catch (error) {
       logAndNoticeError(error as Error, "获取文件列表失败");
     } finally {

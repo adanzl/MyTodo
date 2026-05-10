@@ -1,127 +1,155 @@
 <template>
   <div class="p-2">
-    <!-- 工具栏 -->
-    <div class="flex items-center h-10 mb-2">
-      <el-radio-group size="large" v-model="selectedCateId" @change="onCateChange">
-        <el-radio-button v-for="item in categoryList" :key="item.id" :value="item.id">
+    <!-- 面包屑导航 + 工具栏 -->
+    <div class="flex items-center justify-between h-10 mb-2 bg-gray-50 px-3 py-2 rounded">
+      <!-- 左侧：面包屑导航 -->
+      <el-breadcrumb separator="/" class="flex-1">
+        <el-breadcrumb-item v-for="(item, index) in breadcrumbList" :key="item.id"
+          @click="handleBreadcrumbClick(item, index)" class="cursor-pointer hover:text-primary">
           {{ item.name }}
-        </el-radio-button>
-      </el-radio-group>
-      <el-button type="primary" class="ml-1" @click="openCategoryDialog">
-        <el-icon><Edit /></el-icon>
-      </el-button>
-      <div class="flex-1 flex items-center justify-end gap-2">
-        <el-button type="primary" plain size="small" @click="fetchMaterialList" :icon="Refresh" />
-        <el-input
-          v-model="searchKeyword"
-          placeholder="搜索素材名称"
-          size="small"
-          class="w-40!"
-          clearable
-          @clear="fetchMaterialList"
-        />
-        <el-button type="primary" plain size="small" @click="fetchMaterialList">筛选</el-button>
+        </el-breadcrumb-item>
+      </el-breadcrumb>
+
+      <!-- 右侧：操作按钮 -->
+      <div class="flex items-center gap-2 ml-4">
+        <el-button type="primary" plain size="small" @click="fetchCurrentList" :icon="Refresh" />
+        <el-input v-model="searchKeyword" placeholder="搜索名称" size="small" class="w-40!" clearable
+          @clear="fetchCurrentList" />
+        <el-button type="primary" plain size="small" @click="fetchCurrentList">筛选</el-button>
         <el-button type="success" size="small" @click="handleBatchAdd">批量添加</el-button>
         <el-button type="primary" size="small" @click="handleAddMaterial">添加素材</el-button>
+        <el-button type="warning" size="small" @click="handleAddFolder">新建文件夹</el-button>
       </div>
     </div>
 
     <!-- 表格 -->
-    <el-table :data="materialList" v-loading="loading" stripe border style="width: 100%" :max-height="tableMaxHeight">
-      <el-table-column prop="id" label="ID" width="80" />
-      <el-table-column prop="name" label="名称" min-width="150" />
+    <el-table :data="currentList" v-loading="loading" stripe border style="width: 100%" :height="tableMaxHeight"
+      class="[&_.el-table__cell]:!py-0" @row-dblclick="handleRowDblClick">
+      <el-table-column label="名称" min-width="200">
+        <template #default="{ row }">
+          <div class="flex items-center gap-2"
+            :class="row.type === 'folder' ? 'cursor-pointer hover:bg-gray-100 pl-1 text-blue-500' : 'pl-1'"
+            @click="row.type === 'folder' && handleEnterFolder(row)">
+            <el-icon v-if="row.type === 'folder'" :size="20">
+              <Folder />
+            </el-icon>
+            <el-icon v-else-if="row.type === 0" :size="20">
+              <Document />
+            </el-icon>
+            <el-icon v-else-if="row.type === 1" :size="20">
+              <VideoCamera />
+            </el-icon>
+            <el-icon v-else-if="row.type === 2" :size="20">
+              <Headset />
+            </el-icon>
+            <span>{{ row.name }}</span>
+          </div>
+        </template>
+      </el-table-column>
       <el-table-column label="类型" width="100">
         <template #default="{ row }">
-          <el-tag :type="row.type === 0 ? 'success' : (row.type === 1 ? 'primary' : 'info')" size="small">
-            {{ getMaterialTypeName(row.type) }}
-          </el-tag>
+          <div style="display: flex; align-items: center;">
+            <el-tag v-if="row.type === 'folder'" type="info" size="small">文件夹</el-tag>
+            <el-tag v-else-if="row.type === 0" type="success" size="small">PDF</el-tag>
+            <el-tag v-else-if="row.type === 1" type="warning" size="small">视频</el-tag>
+            <el-tag v-else-if="row.type === 2" type="info" size="small">音频</el-tag>
+          </div>
         </template>
       </el-table-column>
-      <el-table-column prop="path" label="路径" min-width="200" show-overflow-tooltip />
-      <el-table-column label="分类" width="120">
+      <el-table-column prop="path" label="路径" min-width="200" show-overflow-tooltip>
         <template #default="{ row }">
-          {{ getCategoryName(row.cate_id) }}
+          <div style="display: flex; align-items: center; overflow: hidden;">
+            {{ row.path }}
+          </div>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="250" fixed="right">
+      <el-table-column label="操作" width="280" fixed="right">
         <template #default="{ row }">
-            <el-button type="primary" size="small" plain @click="playMaterial(row)">
-              <el-icon :size="16" ><Reading /></el-icon>
-            </el-button>
-          <el-button size="small" @click="handleViewDetail(row)" :disabled="row.type != 0">详情</el-button>
-          <el-button size="small" @click="handleEditMaterial(row)">编辑</el-button>
-          <el-button size="small" type="danger" @click="handleDeleteMaterial(row)">删除</el-button>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <template v-if="row.type === 'folder'">
+              <el-button size="small" @click="handleEditFolder(row)">编辑</el-button>
+              <el-button size="small" type="danger" @click="handleDeleteFolder(row)">删除</el-button>
+            </template>
+            <template v-else>
+              <el-button type="primary" size="small" plain @click="playMaterial(row)">
+                <el-icon :size="16">
+                  <Reading />
+                </el-icon>
+              </el-button>
+              <el-button size="small" @click="handleViewDetail(row)" :disabled="row.type != 0">详情</el-button>
+              <el-button size="small" @click="handleEditMaterial(row)">编辑</el-button>
+              <el-button size="small" type="danger" @click="handleDeleteMaterial(row)">删除</el-button>
+            </template>
+          </div>
         </template>
       </el-table-column>
     </el-table>
 
-    <!-- 分页 -->
-    <el-pagination
-      layout="sizes, prev, pager, next"
-      :total="totalCount"
-      v-model:page-size="pageSize"
-      :page-sizes="[10, 20, 50]"
-      :current-page="pageNum"
-      class="mt-2"
-      background
-      @size-change="handleSizeChange"
-      @current-change="handlePageChange"
-    />
-
     <!-- 素材编辑/新增对话框 -->
-    <MaterialDialog
-      v-model="materialDialogVisible"
-      :is-edit="isMaterialEdit"
-      :material-data="currentMaterial"
-      :category-list="categoryList"
-      @success="handleMaterialSuccess"
-      @view-detail="handleViewDetailFromEdit"
-    />
+    <MaterialDialog v-model="materialDialogVisible" :is-edit="isMaterialEdit" :material-data="currentMaterial"
+      :category-list="batchAddCategoryList" :default-cate-id="currentParentId" @success="handleMaterialSuccess"
+      @view-detail="handleViewDetailFromEdit" />
 
     <!-- 素材详情对话框 -->
-    <MaterialDetailDialog
-      v-model="detailDialogVisible"
-      :material-data="currentMaterial"
-      @update:modelValue="handleDetailDialogClose"
-      @edit="handleEditFromDetail"
-    />
-
-    <!-- 分类管理对话框 -->
-    <CategoryDialog v-model="categoryDialogVisible" @change="handleCategoryChange" />
+    <MaterialDetailDialog v-model="detailDialogVisible" :material-data="currentMaterial"
+      @update:modelValue="handleDetailDialogClose" @edit="handleEditFromDetail" />
 
     <!-- 素材预览弹窗 -->
-    <MaterialPreviewDialog
-      v-model="previewDialogVisible"
-      :material-id="previewMaterialId"
-    />
+    <MaterialPreviewDialog v-model="previewDialogVisible" :material-id="previewMaterialId" />
 
     <!-- 批量添加素材对话框 -->
-    <BatchAddMaterialDialog
-      v-model="batchAddDialogVisible"
-      :category-list="categoryList"
-      @success="handleBatchAddSuccess"
-    />
+    <BatchAddMaterialDialog v-model="batchAddDialogVisible" :category-list="batchAddCategoryList"
+      :default-cate-id="currentParentId" @success="handleBatchAddSuccess" />
+
+    <!-- 文件夹编辑/新增对话框 -->
+    <el-dialog v-model="folderDialogVisible" :title="isFolderEdit ? '编辑文件夹' : '新建文件夹'" width="400">
+      <el-form :model="currentFolder" label-width="100px">
+        <el-form-item label="文件夹名称">
+          <el-input v-model="currentFolder.name" placeholder="请输入文件夹名称" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="folderDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSaveFolder">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, nextTick } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { Edit, Refresh, Reading } from "@element-plus/icons-vue";
+import { Refresh, Reading, Folder, Document, VideoCamera, Headset } from "@element-plus/icons-vue";
 import {
   getMaterialList,
   getMaterialCategoryList,
+  addMaterialCategory,
+  updateMaterialCategory,
+  deleteMaterialCategory,
   deleteMaterial,
   type Material,
+  type MaterialCategory,
 } from "@/api/api-task";
-import CategoryDialog from "./dialogs/CategoryDialog.vue";
 import MaterialDialog from "./dialogs/MaterialDialog.vue";
 import MaterialDetailDialog from "./dialogs/MaterialDetailDialog.vue";
 import MaterialPreviewDialog from "./dialogs/MaterialPreviewDialog.vue";
 import BatchAddMaterialDialog from "./dialogs/MaterialBatchAdd.vue";
 
+interface FolderItem extends MaterialCategory {
+  type: 'folder';
+}
 
-const tableMaxHeight = ref<number>(0);
+interface MixedItem {
+  id?: number;
+  name: string;
+  type: 'folder' | number;
+  path?: string;
+  cate_id?: number;
+  data?: any;
+  parent?: number;
+}
+
+const tableMaxHeight = ref<number>(600); // 设置默认高度，避免初始抖动
 // 计算表格最大高度
 const calculateTableHeight = () => {
   nextTick(() => {
@@ -133,62 +161,237 @@ const calculateTableHeight = () => {
 
 // 状态管理
 const loading = ref(false);
-const materialList = ref<Material[]>([]);
-const totalCount = ref(0);
-const pageNum = ref(1);
-const pageSize = ref(20);
+const currentList = ref<MixedItem[]>([]);
 const searchKeyword = ref("");
-const selectedCateId = ref<number | undefined>(undefined); // undefined 表示全部
-const categoryList = ref<{ id: number; name: string }[]>([]);
+
+// 面包屑导航
+interface BreadcrumbItem {
+  id: number;
+  name: string;
+  parent?: number;
+}
+const breadcrumbList = ref<BreadcrumbItem[]>([
+  { id: -1, name: '根目录', parent: undefined }
+]);
+const currentParentId = ref<number>(-1); // 当前所在父级ID
 
 // 对话框
 const materialDialogVisible = ref(false);
 const detailDialogVisible = ref(false);
 const previewDialogVisible = ref(false);
 const batchAddDialogVisible = ref(false);
+const folderDialogVisible = ref(false);
 const previewMaterialId = ref<number | null>(null);
 const isMaterialEdit = ref(false);
 const currentMaterial = ref<Partial<Material>>({});
+const currentFolder = ref<Partial<FolderItem>>({});
+const isFolderEdit = ref(false);
+const batchAddCategoryList = ref<{ id: number; name: string }[]>([]); // 批量添加用的分类列表
 
-// 分类对话框
-const categoryDialogVisible = ref(false);
-
-// 获取分类列表
+// 获取分类列表（用于素材的cate_id）
 const fetchCategoryList = async () => {
   try {
-    const res = await getMaterialCategoryList(1, 100); // 获取所有分类
-    console.log('分类列表响应:', res);
+    const res = await getMaterialCategoryList(1, 1000);
     if (res.code === 0 && res.data) {
-      categoryList.value = res.data.data || [];
-      console.log('分类列表数据:', categoryList.value);
-      // 默认选中第一个分类
-      if (categoryList.value.length > 0 && selectedCateId.value === undefined) {
-        const firstCategory = categoryList.value.find(c => c.id !== undefined);
-        if (firstCategory) {
-          selectedCateId.value = firstCategory.id;
-        }
-      }
+      const list = res.data.data || [];
+      batchAddCategoryList.value = list;
+      return list;
     }
   } catch (error: any) {
     console.error("获取分类列表失败:", error);
   }
+  return [];
 };
 
-// 打开分类管理对话框
-const openCategoryDialog = () => {
-  categoryDialogVisible.value = true;
+// 获取当前目录下的内容（文件夹 + 素材）
+const fetchCurrentList = async () => {
+  loading.value = true;
+  try {
+    // 获取所有分类，然后手动过滤
+    const categoriesRes = await getMaterialCategoryList(1, 1000);
+    const folders: FolderItem[] = [];
+    if (categoriesRes.code === 0 && categoriesRes.data) {
+      const allCategories = categoriesRes.data.data || [];
+      // 过滤出当前父级下的子文件夹
+      const filteredCategories = allCategories.filter((cat: MaterialCategory) => {
+        const catParent = cat.parent ?? -1; // null 视为 -1
+        return catParent === currentParentId.value;
+      });
+
+      filteredCategories.forEach((cat: MaterialCategory) => {
+        // 确保 id 存在（id 可能是 0）
+        if (cat.id === undefined || cat.id === null) {
+          return;
+        }
+        folders.push({
+          ...cat,
+          type: 'folder' as const
+        });
+      });
+    }
+
+    // 获取所有素材，然后手动过滤（固定1000条）
+    const materialsRes = await getMaterialList(undefined, 1, 1000);
+    let materials: Material[] = [];
+    if (materialsRes.code === 0 && materialsRes.data) {
+      const allMaterials = materialsRes.data.data || [];
+      // 过滤出当前父级下的素材
+      materials = allMaterials.filter(m => {
+        const materialCateId = m.cate_id ?? -1; // null/undefined 视为 -1
+        return materialCateId === currentParentId.value;
+      });
+    }
+
+    // 合并文件夹和素材
+    let mixedList: MixedItem[] = [
+      ...folders.map(f => ({
+        id: f.id,
+        name: f.name,
+        type: 'folder' as const,
+        parent: f.parent
+      })),
+      ...materials.map(m => ({
+        id: m.id,
+        name: m.name,
+        type: m.type,
+        path: m.path,
+        cate_id: m.cate_id,
+        data: m.data
+      }))
+    ];
+
+    // 前端搜索过滤
+    if (searchKeyword.value) {
+      mixedList = mixedList.filter((item) =>
+        item.name.toLowerCase().includes(searchKeyword.value.toLowerCase())
+      );
+    }
+
+    currentList.value = mixedList;
+  } catch (error: any) {
+    console.error("获取列表失败:", error);
+    ElMessage.error(error.message || "获取列表失败");
+  } finally {
+    loading.value = false;
+  }
 };
 
-// 分类变化回调
-const handleCategoryChange = () => {
-  fetchCategoryList();
-  fetchMaterialList();
+// 面包屑点击
+const handleBreadcrumbClick = (item: BreadcrumbItem, index: number) => {
+  // 截断面包屑到点击的位置
+  breadcrumbList.value = breadcrumbList.value.slice(0, index + 1);
+  currentParentId.value = item.id;
+  fetchCurrentList();
+};
+
+// 进入文件夹
+const handleEnterFolder = (row: MixedItem) => {
+  if (row.type !== 'folder') {
+    return;
+  }
+  // id 可能是 0，需要用 undefined/null 判断
+  if (row.id === undefined || row.id === null) {
+    ElMessage.error('文件夹数据异常，无法进入');
+    return;
+  }
+
+  breadcrumbList.value.push({
+    id: row.id,
+    name: row.name,
+    parent: currentParentId.value
+  });
+  currentParentId.value = row.id;
+  fetchCurrentList();
+};
+
+// 双击行进入文件夹
+const handleRowDblClick = (row: MixedItem) => {
+  if (row.type === 'folder') {
+    handleEnterFolder(row);
+  } else {
+    playMaterial(row as any);
+  }
+};
+
+// 新建文件夹
+const handleAddFolder = () => {
+  isFolderEdit.value = false;
+  currentFolder.value = {
+    name: '',
+    parent: currentParentId.value
+  };
+  folderDialogVisible.value = true;
+};
+
+// 编辑文件夹
+const handleEditFolder = (row: MixedItem) => {
+  isFolderEdit.value = true;
+  currentFolder.value = {
+    id: row.id,
+    name: row.name,
+    parent: row.parent
+  };
+  folderDialogVisible.value = true;
+};
+
+// 保存文件夹
+const handleSaveFolder = async () => {
+  if (!currentFolder.value.name) {
+    ElMessage.warning("文件夹名称不能为空");
+    return;
+  }
+
+  try {
+    if (isFolderEdit.value && currentFolder.value.id) {
+      // 更新
+      await updateMaterialCategory({
+        id: currentFolder.value.id,
+        name: currentFolder.value.name,
+        parent: currentFolder.value.parent
+      } as MaterialCategory);
+      ElMessage.success("更新成功");
+    } else {
+      // 新增
+      await addMaterialCategory({
+        name: currentFolder.value.name,
+        parent: currentFolder.value.parent ?? -1
+      });
+      ElMessage.success("创建成功");
+    }
+    folderDialogVisible.value = false;
+    fetchCurrentList();
+  } catch (error: any) {
+    ElMessage.error(error.message || "操作失败");
+  }
+};
+
+// 删除文件夹
+const handleDeleteFolder = async (row: MixedItem) => {
+  try {
+    await ElMessageBox.confirm("确定要删除该文件夹吗？", "提示", {
+      confirmButtonText: "确定",
+      cancelButtonText: "取消",
+      type: "warning",
+    });
+
+    if (row.id) {
+      await deleteMaterialCategory(row.id);
+      ElMessage.success("删除成功");
+      fetchCurrentList();
+    }
+  } catch (error: any) {
+    if (error !== "cancel") {
+      ElMessage.error(error.message || "删除失败");
+    }
+  }
 };
 
 // 新增素材
 const handleAddMaterial = () => {
   isMaterialEdit.value = false;
-  currentMaterial.value = {};
+  currentMaterial.value = {
+    cate_id: currentParentId.value
+  };
   materialDialogVisible.value = true;
 };
 
@@ -199,8 +402,7 @@ const handleBatchAdd = () => {
 
 // 批量添加成功回调
 const handleBatchAddSuccess = () => {
-  fetchCategoryList();
-  fetchMaterialList();
+  fetchCurrentList();
 };
 
 // 查看详情
@@ -213,8 +415,7 @@ const handleViewDetail = (row: Material) => {
 const handleDetailDialogClose = (val: boolean) => {
   detailDialogVisible.value = val;
   if (!val) {
-    // 刷新列表
-    fetchMaterialList();
+    fetchCurrentList();
   }
 };
 
@@ -249,7 +450,7 @@ const handleDeleteMaterial = async (row: Material) => {
 
     await deleteMaterial(row.id!);
     ElMessage.success("删除成功");
-    fetchMaterialList();
+    fetchCurrentList();
   } catch (error: any) {
     if (error !== "cancel") {
       ElMessage.error(error.message || "删除失败");
@@ -259,51 +460,7 @@ const handleDeleteMaterial = async (row: Material) => {
 
 // 素材操作成功回调
 const handleMaterialSuccess = () => {
-  fetchCategoryList();
-  fetchMaterialList();
-};
-
-// 分类切换
-const onCateChange = () => {
-  pageNum.value = 1;
-  fetchMaterialList();
-};
-
-// 获取素材列表
-const fetchMaterialList = async () => {
-  loading.value = true;
-  try {
-    // cate_id 为 undefined 时不传筛选条件
-    const cateId = selectedCateId.value !== undefined ? selectedCateId.value : undefined;
-    const res = await getMaterialList(cateId, pageNum.value, pageSize.value);
-    console.log("获取素材列表响应:", res);
-    if (res.code === 0 && res.data) {
-      let list = res.data.data || [];
-      console.log("素材列表:", list);
-      // 前端搜索过滤
-      if (searchKeyword.value) {
-        list = list.filter((item) =>
-          item.name.toLowerCase().includes(searchKeyword.value.toLowerCase())
-        );
-      }
-      materialList.value = list;
-      totalCount.value = res.data.totalCount || 0;
-    } else {
-      console.error("获取素材列表失败:", res);
-    }
-  } catch (error: any) {
-    console.error("获取素材列表异常:", error);
-    ElMessage.error(error.message || "获取素材列表失败");
-  } finally {
-    loading.value = false;
-    detailDialogVisible.value = false;
-  }
-};
-
-// 分页变化
-const handlePageChange = (page: number) => {
-  pageNum.value = page;
-  fetchMaterialList();
+  fetchCurrentList();
 };
 
 // 播放/预览素材
@@ -318,35 +475,10 @@ const playMaterial = (row: Material) => {
   previewDialogVisible.value = true;
 };
 
-// 获取分类名称
-const getCategoryName = (cateId: number): string => {
-  if (!categoryList.value || categoryList.value.length === 0) {
-    return `分类${cateId}`;
-  }
-  const category = categoryList.value.find((c) => c.id === cateId);
-  return category?.name || `分类${cateId}`;
-};
-
-// 获取素材类型名称
-const getMaterialTypeName = (type: number): string => {
-  const typeMap: Record<number, string> = {
-    0: "PDF",
-    1: "视频",
-    2: "音频",
-  };
-  return typeMap[type] || "未知";
-};
-
-const handleSizeChange = (size: number) => {
-  pageSize.value = size;
-  pageNum.value = 1;
-  fetchMaterialList();
-};
-
 // 初始化
 onMounted(() => {
   fetchCategoryList();
-  fetchMaterialList();
+  fetchCurrentList();
   calculateTableHeight();
   window.addEventListener('resize', calculateTableHeight);
 });

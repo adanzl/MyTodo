@@ -103,7 +103,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
 import { ElMessage } from "element-plus";
-import { api } from "@/api/config";
+import { listDirectory } from "@/api/api-file";
 import { formatSize } from "@/utils/format";
 import { logAndNoticeError } from "@/utils";
 
@@ -183,13 +183,12 @@ const refreshFileBrowser = async () => {
     } else {
       params.extensions = props.extensions;
     }
-    const response = await api.get("/listDirectory", { params });
-    if (response.data.code === 0) {
-      fileBrowserList.value = response.data.data || [];
-      updateFileBrowserCanNavigateUp();
-    } else {
-      ElMessage.error(response.data.msg || "获取文件列表失败");
-    }
+    const items = await listDirectory(path, params.extensions);
+    
+    // 直接使用完整数据
+    fileBrowserList.value = items as any;
+    
+    updateFileBrowserCanNavigateUp();
   } catch (error) {
     logAndNoticeError(error as Error, "获取文件列表失败");
   } finally {

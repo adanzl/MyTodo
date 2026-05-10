@@ -1,10 +1,5 @@
 <template>
-  <el-dialog
-    v-model="visible"
-    :title="isEdit ? '编辑素材' : '新增素材'"
-    width="500px"
-    @close="handleClose"
-  >
+  <el-dialog v-model="visible" :title="isEdit ? '编辑素材' : '新增素材'" width="500px" @close="handleClose">
     <el-form :model="formData" label-width="100px">
       <el-form-item label="名称" required>
         <el-input v-model="formData.name" placeholder="请输入素材名称" />
@@ -17,24 +12,13 @@
       </el-form-item>
       <el-form-item label="路径" required>
         <div class="flex gap-2">
-          <el-input
-            v-model="formData.path"
-            placeholder="请输入素材路径"
-            :title="formData.path"
-            show-overflow-tooltip
-          />
+          <el-input v-model="formData.path" placeholder="请输入素材路径" :title="formData.path" show-overflow-tooltip />
           <el-button @click="openFileBrowser">浏览</el-button>
         </div>
       </el-form-item>
       <el-form-item label="分类" required>
-        <el-select v-model="formData.cate_id" placeholder="请选择分类">
-          <el-option
-            v-for="item in (categoryList || [])"
-            :key="item.id"
-            :label="item.name"
-            :value="item.id"
-          />
-        </el-select>
+        <el-cascader v-model="cascaderValue" :options="cascaderOptions" :props="cascaderProps" placeholder="请选择分类"
+          clearable style="width: 100%" />
       </el-form-item>
     </el-form>
     <template #footer>
@@ -45,17 +29,12 @@
   </el-dialog>
 
   <!-- 文件选择对话框 -->
-  <FileDialog
-    v-model:visible="fileDialogVisible"
-    :title="formData.type === 0 ? '选择PDF文件' : '选择视频文件'"
-    :extensions="formData.type === 0 ? '.pdf' : '.mp4,.avi,.mkv,.mov'"
-    mode="file"
-    @confirm="handleFileConfirm"
-  />
+  <FileDialog v-model:visible="fileDialogVisible" :title="formData.type === 0 ? '选择PDF文件' : '选择视频文件'"
+    :extensions="formData.type === 0 ? '.pdf' : '.mp4,.avi,.mkv,.mov'" mode="file" @confirm="handleFileConfirm" />
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
 import { ElMessage } from "element-plus";
 import {
   addMaterial,
@@ -69,6 +48,7 @@ interface Props {
   isEdit: boolean;
   materialData?: Partial<Material>;
   categoryList?: { id: number; name: string }[];
+  defaultCateId?: number; // 默认分类ID
 }
 
 interface Emits {
@@ -92,6 +72,60 @@ const formData = ref<Partial<Material>>({
   cate_id: 1,
 });
 const fileDialogVisible = ref(false);
+
+// Cascader 配置
+const cascaderValue = ref<number | null>(null);
+const cascaderProps = {
+  value: 'id',
+  label: 'name',
+  children: 'children',
+  checkStrictly: true, // 可以选择任意级别
+  emitPath: false // 只返回选中节点的ID
+};
+
+// 构建树形结构
+const buildCascaderOptions = (categories: { id: number; name: string; parent?: number }[]) => {
+  const map = new Map<number, any>();
+  const roots: any[] = [];
+
+  // 创建映射
+  categories.forEach(item => {
+    map.set(item.id, { ...item, children: [] });
+  });
+
+  // 构建树形结构
+  categories.forEach(item => {
+    const node = map.get(item.id);
+    if (node) {
+      const parentId = item.parent ?? -1;
+      if (parentId === -1) {
+        roots.push(node);
+      } else {
+        const parent = map.get(parentId);
+        if (parent) {
+          if (!parent.children) {
+            parent.children = [];
+          }
+          parent.children.push(node);
+        }
+      }
+    }
+  });
+
+  return roots;
+};
+
+// 计算级联选项
+const cascaderOptions = computed(() => {
+  return buildCascaderOptions(props.categoryList || []);
+});
+
+// 监听 cascaderValue 变化，更新 formData.cate_id
+watch(cascaderValue, (val) => {
+  if (val !== undefined && val !== null) {
+    formData.value.cate_id = val;
+  }
+});
 
 // 监听 modelValue 变化
 watch(
@@ -125,12 +159,23 @@ const initForm = async () => {
     console.log('编辑模式 - cate_id:', formData.value.cate_id, '类型:', typeof formData.value.cate_id);
   } else {
     // 新增模式，重置表单
+    let defaultCategoryId = 0;
+
+    // 优先使用传入的默认分类ID
+    if (props.defaultCateId !== undefined && categories.some(cate => cate.id === props.defaultCateId)) {
+      defaultCategoryId = props.defaultCateId;
+    } else if (categories.length > 0) {
+      // 否则使用第一个分类
+      defaultCategoryId = categories[0].id;
+    }
+
     formData.value = {
       name: "",
       type: 0,
       path: "",
-      cate_id: categories.length > 0 ? categories[0].id : 0,
+      cate_id: defaultCategoryId,
     };
+    cascaderValue.value = defaultCategoryId;
   }
 };
 
