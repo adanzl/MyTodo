@@ -148,15 +148,20 @@ class FileMgr:
                 current_text = ''
                 i = 0
                 while i < len(s):
-                    if s[i].isdigit():
+                    # 只处理 ASCII 数字 (0-9)
+                    if s[i].isdigit() and s[i] in '0123456789':
                         num_str = ''
-                        while i < len(s) and s[i].isdigit():
+                        while i < len(s) and s[i].isdigit() and s[i] in '0123456789':
                             num_str += s[i]
                             i += 1
                         if current_text:
                             parts.append((0, current_text.lower()))
                             current_text = ''
-                        parts.append((1, int(num_str)))
+                        try:
+                            parts.append((1, int(num_str)))
+                        except ValueError:
+                            # 如果转换失败，当作普通文本处理
+                            parts.append((0, num_str.lower()))
                     else:
                         current_text += s[i]
                         i += 1

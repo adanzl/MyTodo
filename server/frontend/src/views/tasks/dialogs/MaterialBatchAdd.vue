@@ -30,8 +30,17 @@
           </el-button>
           <el-button size="small" type="danger" @click="clearMaterialList">清空列表</el-button>
         </div>
-        <el-table :data="materialList" border max-height="300" size="small">
-          <el-table-column prop="name" label="名称" min-width="120" />
+        <el-table :data="materialList" border max-height="300" size="small" row-key="path">
+          <el-table-column prop="name" label="名称" min-width="120">
+            <template #default="{ row }">
+              <div class="flex items-center gap-2">
+                <el-icon v-if="row.isFolder">
+                  <folder />
+                </el-icon>
+                <span>{{ row.name }}</span>
+              </div>
+            </template>
+          </el-table-column>
           <el-table-column prop="path" label="路径" min-width="200" show-overflow-tooltip />
           <el-table-column label="分类" width="150">
             <template #default="{ row }">
@@ -41,7 +50,8 @@
           </el-table-column>
           <el-table-column label="类型" width="80">
             <template #default="{ row }">
-              <el-tag v-if="row.type === 0" type="success" size="small">PDF</el-tag>
+              <el-tag v-if="row.isFolder" type="info" size="small">文件夹</el-tag>
+              <el-tag v-else-if="row.type === 0" type="success" size="small">PDF</el-tag>
               <el-tag v-else-if="row.type === 1" type="primary" size="small">视频</el-tag>
             </template>
           </el-table-column>
@@ -81,12 +91,17 @@
   <!-- 文件选择对话框 -->
   <FileDialog v-model:visible="fileDialogVisible" title="批量选择文件" :extensions="getExtensionsByType(defaultType)"
     :mode="defaultType === 3 ? 'directory' : 'file'" :multiple="true" @confirm="handleFileConfirm" />
+
+  <!-- 目录扫描对话框 -->
+  <FileDialog v-model:visible="directoryDialogVisible" title="选择要扫描的目录" mode="directory" :multiple="false"
+    @confirm="handleDirectoryConfirm" />
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { addMaterial } from "@/api/api-task";
+import { addMaterial, addMaterialCategory } from "@/api/api-task";
+import { listDirectory, type DirectoryItem } from "@/api/api-file";
 import FileDialog from "@/views/dialogs/FileDialog.vue";
 
 interface Props {
@@ -100,6 +115,8 @@ interface MaterialItem {
   path: string;
   cate_id: number;
   type: number;
+  isFolder?: boolean; // 是否为文件夹
+  children?: MaterialItem[]; // 子项（用于树形展示）
 }
 
 const props = defineProps<Props>();
@@ -117,9 +134,11 @@ const visible = computed({
 const defaultCateId = ref<number>();
 const defaultType = ref<number>(0);
 const fileDialogVisible = ref(false);
+const directoryDialogVisible = ref(false); // 目录选择对话框
 const materialList = ref<MaterialItem[]>([]);
 const errors = ref<string[]>([]);
 const submitting = ref(false);
+const scanning = ref(false); // 扫描中状态
 
 // Cascader 配置
 const cascaderValue = ref<number | null>(null);
@@ -202,7 +221,89 @@ const getExtensionsByType = (type: number): string => {
 
 // 打开文件浏览器
 const openFileBrowser = () => {
-  fileDialogVisible.value = true;
+  if (defaultType.value === 3) {
+    // 文件夹类型：打开目录扫描对话框
+    directoryDialogVisible.value = true;
+  } else {
+    // 其他类型：打开文件选择对话框
+    fileDialogVisible.value = true;
+  }
+};
+
+// 目录选择确认
+const handleDirectoryConfirm = async (dirPaths: string[]) => {
+  if (!dirPaths || dirPaths.length === 0) return;
+
+  const dirPath = dirPaths[0];
+  scanning.value = true;
+  try {
+    // 递归扫描目录
+    const result = await listDirectory(dirPath, 'all', true);
+
+    if (!result || !Array.isArray(result)) {
+      ElMessage.error('扫描目录失败');
+      return;
+    }
+
+    // 将扫描结果转换为 MaterialItem 树形结构
+    const scannedItems = convertScanResultToMaterials(result, dirPath);
+
+    // 添加到素材列表
+    materialList.value.push(...scannedItems);
+
+    ElMessage.success(`已扫描 ${countFiles(scannedItems)} 个文件`);
+    directoryDialogVisible.value = false;
+  } catch (error: any) {
+    console.error('扫描目录失败:', error);
+    ElMessage.error(error.message || '扫描目录失败');
+  } finally {
+    scanning.value = false;
+  }
+};
+
+// 将扫描结果转换为 MaterialItem
+const convertScanResultToMaterials = (
+  items: DirectoryItem[],
+  rootPath: string
+): MaterialItem[] => {
+  return items.map(item => {
+    const material: MaterialItem = {
+      name: item.name,
+      path: item.path || '',
+      cate_id: defaultCateId.value || props.categoryList[0]?.id || 1,
+      type: 0, // 默认 PDF，后续根据文件名判断
+      isFolder: item.isDirectory,
+    };
+
+    // 如果是文件夹，递归处理子项
+    if (item.isDirectory && item.subItems) {
+      material.children = convertScanResultToMaterials(item.subItems, rootPath);
+    } else if (!item.isDirectory) {
+      // 根据文件扩展名判断类型
+      const ext = item.name.split('.').pop()?.toLowerCase();
+      if (ext === 'pdf') {
+        material.type = 0;
+      } else if (['mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm'].includes(ext || '')) {
+        material.type = 1;
+      }
+      // 其他类型跳过（不添加）
+    }
+
+    return material;
+  }).filter(item => !item.isFolder || (item.children && item.children.length > 0));
+};
+
+// 统计文件数量
+const countFiles = (items: MaterialItem[]): number => {
+  let count = 0;
+  for (const item of items) {
+    if (!item.isFolder) {
+      count++;
+    } else if (item.children) {
+      count += countFiles(item.children);
+    }
+  }
+  return count;
 };
 
 
@@ -280,7 +381,10 @@ const handleSubmit = async () => {
   errors.value = [];
   const failedItems: string[] = [];
 
-  for (const material of materialList.value) {
+  // 扁平化素材列表（将树形结构转为平面列表）
+  const flatMaterials = flattenMaterials(materialList.value);
+
+  for (const material of flatMaterials) {
     try {
       await addMaterial(material);
     } catch (error: any) {
@@ -289,7 +393,7 @@ const handleSubmit = async () => {
     }
   }
 
-  const successCount = materialList.value.length - failedItems.length;
+  const successCount = flatMaterials.length - failedItems.length;
   if (!failedItems.length) {
     ElMessage.success(`成功添加 ${successCount} 个素材`);
     emit("success");
@@ -301,6 +405,23 @@ const handleSubmit = async () => {
     materialList.value = materialList.value.filter((m) => failedItems.includes(m.name));
   }
   submitting.value = false;
+};
+
+// 扁平化素材列表
+const flattenMaterials = (items: MaterialItem[]): MaterialItem[] => {
+  const result: MaterialItem[] = [];
+
+  for (const item of items) {
+    if (!item.isFolder) {
+      // 文件直接添加
+      result.push(item);
+    } else if (item.children) {
+      // 文件夹递归处理子项
+      result.push(...flattenMaterials(item.children));
+    }
+  }
+
+  return result;
 };
 
 // 监听对话框打开，重置数据

@@ -1,11 +1,6 @@
 <template>
-  <el-dialog
-    :model-value="visible"
-    @update:model-value="$emit('update:visible', $event)"
-    :title="title"
-    width="800"
-    :before-close="handleClose"
-  >
+  <el-dialog :model-value="visible" @update:model-value="$emit('update:visible', $event)" :title="computedTitle"
+    width="800" :before-close="handleClose">
     <div class="m-4">
       <div class="flex items-center gap-2 mb-2">
         <el-input :model-value="fileBrowserPath" placeholder="当前路径" readonly> </el-input>
@@ -25,24 +20,19 @@
         </span>
       </div>
     </div>
-    <el-table
-      :data="fileBrowserList"
-      stripe
-      class="w-full"
-      v-loading="fileBrowserLoading"
-      :height="400"
-      @row-click="handleRowClick"
-    >
+    <el-table :data="fileBrowserList" stripe class="w-full" v-loading="fileBrowserLoading" :height="400"
+      @row-click="handleRowClick" @row-dblclick="handleRowDblClick" :row-class-name="getRowClassName">
       <el-table-column width="55">
         <template #default="{ row }">
-          <!-- 目录模式下，文件不显示 checkbox -->
-          <el-checkbox
-            v-if="mode !== 'directory' && !row.isDirectory"
-            :model-value="isFileSelected(row)"
-            @change="handleToggleSelection(row)"
-            @click.stop
-            :disabled="!props.multiple && selectedFiles.length > 0 && !isFileSelected(row)"
-          >
+          <!-- 目录模式：显示目录的 checkbox -->
+          <el-checkbox v-if="mode === 'directory' && row.isDirectory" :model-value="isFileSelected(row)"
+            @change="handleToggleSelection(row)" @click.stop
+            :disabled="!props.multiple && selectedFiles.length > 0 && !isFileSelected(row)">
+          </el-checkbox>
+          <!-- 文件模式：只显示文件的 checkbox -->
+          <el-checkbox v-else-if="mode !== 'directory' && !row.isDirectory" :model-value="isFileSelected(row)"
+            @change="handleToggleSelection(row)" @click.stop
+            :disabled="!props.multiple && selectedFiles.length > 0 && !isFileSelected(row)">
           </el-checkbox>
         </template>
       </el-table-column>
@@ -63,12 +53,13 @@
       </el-table-column>
       <el-table-column label="状态" width="100">
         <template #default="{ row }">
-          <!-- 目录模式下，文件不显示状态 -->
-          <el-tag
-            v-if="mode !== 'directory' && !row.isDirectory && isFileSelected(row)"
-            type="success"
-            size="small"
-          >
+          <!-- 目录模式：显示目录的选中状态 -->
+          <el-tag v-if="mode === 'directory' && row.isDirectory && isFileSelected(row)" type="success" size="small">
+            已选择
+          </el-tag>
+          <!-- 文件模式：显示文件的选中状态 -->
+          <el-tag v-else-if="mode !== 'directory' && !row.isDirectory && isFileSelected(row)" type="success"
+            size="small">
             已选择
           </el-tag>
         </template>
@@ -79,17 +70,12 @@
         <div class="flex items-center justify-between">
           <span class="text-sm text-gray-500">
             <span v-if="mode === 'file'">提示：点击文件可切换选择状态，双击目录可进入</span>
-            <span v-else>提示：选择目录作为转存目标，双击目录可进入</span>
+            <span v-else>提示：双击目录可进入，点击确定选择当前目录</span>
           </span>
           <div class="flex gap-2 items-center">
             <slot name="footer-prepend"></slot>
             <el-button @click="handleClose">取消</el-button>
-            <el-button
-              type="primary"
-              @click="handleConfirm"
-              :loading="confirmLoading"
-              :disabled="isConfirmDisabled"
-            >
+            <el-button type="primary" @click="handleConfirm" :loading="confirmLoading" :disabled="isConfirmDisabled">
               {{ confirmButtonText
               }}<span v-if="mode === 'file'"> ({{ selectedFiles.length }})</span>
             </el-button>
@@ -184,10 +170,10 @@ const refreshFileBrowser = async () => {
       params.extensions = props.extensions;
     }
     const items = await listDirectory(path, params.extensions);
-    
+
     // 直接使用完整数据
     fileBrowserList.value = items as any;
-    
+
     updateFileBrowserCanNavigateUp();
   } catch (error) {
     logAndNoticeError(error as Error, "获取文件列表失败");
@@ -220,43 +206,69 @@ const handleGoToHome = () => {
 // 行点击处理
 const handleRowClick = (row: FileBrowserItem) => {
   if (row.isDirectory) {
+    // 目录模式：单选时单击切换选中，多选时无操作
+    if (props.mode === "directory") {
+      if (!props.multiple) {
+        handleToggleSelection(row);
+      }
+      return;
+    }
+    // 文件模式：单击目录进入
     const newPath =
       fileBrowserPath.value === "/" ? `/${row.name}` : `${fileBrowserPath.value}/${row.name}`;
     fileBrowserPath.value = newPath;
     updateFileBrowserCanNavigateUp();
     refreshFileBrowser();
   } else {
-    // 目录模式下，点击文件不做任何操作
+    // 目录模式下不处理文件点击
     if (props.mode !== "directory") {
       handleToggleSelection(row);
     }
   }
 };
 
-// 切换文件选择状态
+// 行双击处理：双击目录进入
+const handleRowDblClick = (row: FileBrowserItem) => {
+  if (row.isDirectory) {
+    const newPath =
+      fileBrowserPath.value === "/" ? `/${row.name}` : `${fileBrowserPath.value}/${row.name}`;
+    fileBrowserPath.value = newPath;
+    updateFileBrowserCanNavigateUp();
+    refreshFileBrowser();
+  }
+};
+
+// 切换选择状态（支持文件和目录）
 const handleToggleSelection = (row: FileBrowserItem) => {
-  if (row.isDirectory) return;
-  const filePath =
+  const itemPath =
     fileBrowserPath.value === "/" ? `/${row.name}` : `${fileBrowserPath.value}/${row.name}`;
 
   // 单选模式：清除其他选中，只保留当前
   if (!props.multiple) {
-    selectedFiles.value = [filePath];
+    selectedFiles.value = [itemPath];
     return;
   }
 
   // 多选模式：切换选中状态
-  const index = selectedFiles.value.indexOf(filePath);
+  const index = selectedFiles.value.indexOf(itemPath);
   if (index > -1) {
     selectedFiles.value.splice(index, 1);
   } else {
-    selectedFiles.value.push(filePath);
+    selectedFiles.value.push(itemPath);
   }
 };
 
 // 检查文件是否被选中
 const isFileSelected = (row: FileBrowserItem): boolean => {
-  if (row.isDirectory) return false;
+  if (row.isDirectory) {
+    // 目录模式下，检查目录是否被选中
+    if (props.mode === "directory") {
+      const dirPath =
+        fileBrowserPath.value === "/" ? `/${row.name}` : `${fileBrowserPath.value}/${row.name}`;
+      return selectedFiles.value.includes(dirPath);
+    }
+    return false;
+  }
   const filePath =
     fileBrowserPath.value === "/" ? `/${row.name}` : `${fileBrowserPath.value}/${row.name}`;
   return selectedFiles.value.includes(filePath);
@@ -340,13 +352,25 @@ const isConfirmDisabled = computed(() => {
   return selectedFiles.value.length === 0;
 });
 
-// 计算标题，如果有限制扩展名则显示在标题中
-const title = computed(() => {
+// 计算标题：添加单选/多选标识和扩展名信息
+const computedTitle = computed(() => {
+  let baseTitle = props.title;
+
+  // 添加单选/多选标识
+  baseTitle += props.multiple ? '（多选）' : '（单选）';
+
+  // 文件模式且有限制扩展名时，显示扩展名
   if (props.extensions && props.extensions !== 'all' && props.mode === 'file') {
-    return `${props.title} (${props.extensions})`;
+    baseTitle += ` (${props.extensions})`;
   }
-  return props.title;
+
+  return baseTitle;
 });
+
+// 获取行的类名（目前不使用行高亮，统一使用 checkbox）
+const getRowClassName = ({ row }: { row: FileBrowserItem }) => {
+  return "";
+};
 
 // 监听 visible 变化
 watch(
