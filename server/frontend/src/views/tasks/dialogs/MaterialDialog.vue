@@ -145,20 +145,22 @@ watch(visible, (val) => {
 
 // 初始化表单
 const initForm = async () => {
-  // 使用外层传入的分类列表，如果没有则加载
+  // 使用外层传入的分类列表,如果没有则加载
   const categories = props.categoryList || [];
 
   if (props.isEdit && props.materialData?.id) {
-    // 编辑模式，填充数据 - 确保类型一致
+    // 编辑模式,填充数据 - 确保类型一致
     formData.value = {
       name: props.materialData.name || "",
       type: props.materialData.type ?? 0,
       path: props.materialData.path || "",
       cate_id: Number(props.materialData.cate_id) ?? 0,
     };
-    console.log('编辑模式 - cate_id:', formData.value.cate_id, '类型:', typeof formData.value.cate_id);
+    // 同步设置 cascaderValue
+    cascaderValue.value = Number(props.materialData.cate_id) ?? null;
+    console.log('编辑模式 - cate_id:', formData.value.cate_id, 'cascaderValue:', cascaderValue.value, '类型:', typeof formData.value.cate_id);
   } else {
-    // 新增模式，重置表单
+    // 新增模式,重置表单
     let defaultCategoryId = 0;
 
     // 优先使用传入的默认分类ID

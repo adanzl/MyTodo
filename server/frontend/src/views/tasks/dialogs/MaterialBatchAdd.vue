@@ -94,7 +94,7 @@
 
   <!-- 目录扫描对话框 -->
   <FileDialog v-model:visible="directoryDialogVisible" title="选择要扫描的目录" mode="directory" :multiple="false"
-    :confirm-loading="scanning" confirm-button-text="开始扫描" @confirm="handleDirectoryConfirm" />
+    :confirm-loading="submitting" confirm-button-text="开始扫描" @confirm="handleDirectoryConfirm" />
 </template>
 
 <script setup lang="ts">
@@ -140,7 +140,6 @@ const directoryDialogVisible = ref(false); // 目录选择对话框
 const materialList = ref<MaterialItem[]>([]);
 const errors = ref<string[]>([]);
 const submitting = ref(false);
-const scanning = ref(false); // 扫描中状态
 
 // Cascader 配置
 const cascaderValue = ref<number | null>(null);
@@ -206,10 +205,10 @@ watch(
   ([list, defaultId, isVisible]) => {
     if (isVisible && list && list.length > 0) {
       // 如果有传入的默认分类ID且在列表中，优先使用
-      if (defaultId !== undefined && list.some((cate: { id: number; name: string }) => cate.id === defaultId)) {
+      if (defaultId !== undefined && defaultId !== null && list.some((cate: { id: number; name: string }) => cate.id === defaultId)) {
         defaultCateId.value = defaultId;
         cascaderValue.value = defaultId;
-      } else if (!defaultCateId.value || !list.some((cate: { id: number; name: string }) => cate.id === defaultCateId.value)) {
+      } else if (defaultCateId.value === undefined || defaultCateId.value === null || !list.some((cate: { id: number; name: string }) => cate.id === defaultCateId.value)) {
         // 如果当前默认分类不在列表中，使用第一个分类
         defaultCateId.value = list[0].id;
         cascaderValue.value = list[0].id;
@@ -243,8 +242,8 @@ const handleDirectoryConfirm = async (dirPaths: string[]) => {
   if (!dirPaths || dirPaths.length === 0) return;
 
   const dirPath = dirPaths[0];
-  scanning.value = true;
-  
+  submitting.value = true;
+
   try {
     // 递归扫描目录，只获取 PDF 和视频文件
     const extensions = 'pdf,mp4,avi,mkv,mov,wmv,flv,webm';
@@ -252,13 +251,20 @@ const handleDirectoryConfirm = async (dirPaths: string[]) => {
 
     if (!result || !Array.isArray(result)) {
       ElMessage.error('扫描目录失败');
-      scanning.value = false;
+      submitting.value = false;
       return;
     }
 
     // 获取当前选中分类的完整路径名称
     const getBaseCategoryPath = (): string => {
-      if (!cascaderValue.value) return '';
+      // 如果 cascaderValue 为空或为 0，尝试使用 defaultCateId
+      const targetId = (cascaderValue.value !== undefined && cascaderValue.value !== null && cascaderValue.value !== 0)
+        ? cascaderValue.value
+        : defaultCateId.value;
+
+      if (!targetId && targetId !== 0) {
+        return '';
+      }
 
       // 从 cascaderOptions 中查找完整路径
       const findPath = (options: any[], targetId: number, path: string[] = []): string[] | null => {
@@ -275,7 +281,7 @@ const handleDirectoryConfirm = async (dirPaths: string[]) => {
         return null;
       };
 
-      const pathNames = findPath(cascaderOptions.value, cascaderValue.value);
+      const pathNames = findPath(cascaderOptions.value, targetId);
       return pathNames ? pathNames.join('/') : '';
     };
 
@@ -293,7 +299,7 @@ const handleDirectoryConfirm = async (dirPaths: string[]) => {
     console.error('扫描目录失败:', error);
     ElMessage.error(error.message || '扫描目录失败');
   } finally {
-    scanning.value = false;
+    submitting.value = false;
   }
 };
 
@@ -329,13 +335,15 @@ const convertScanResultToMaterials = (
 
         // 理论上不会走到这里，因为服务器已经过滤了
         if (type !== -1) {
+          const fileFolderPath = currentCategoryPath || baseCategoryPath;
+
           result.push({
             name: item.name,
             path: item.path || '',
             cate_id: defaultCateId.value || props.categoryList[0]?.id || 1,
             type: type,
             isFolder: false,
-            folderPath: currentCategoryPath || baseCategoryPath, // 记录完整分类路径
+            folderPath: fileFolderPath, // 记录完整分类路径
           });
         }
       }
@@ -476,15 +484,33 @@ const createMissingCategories = async (materials: MaterialItem[]): Promise<Map<s
   const categoriesToCreate = new Set<string>();
 
   // 收集所有需要创建的分类
+  // 首先收集所有唯一的 folderPath
+  const allFolderPaths = new Set<string>();
   for (const material of materials) {
-    if (material.folderPath && !categoryMap.has(material.folderPath)) {
-      const categoryName = material.folderPath.split('/').pop() || material.folderPath;
+    if (material.folderPath) {
+      allFolderPaths.add(material.folderPath);
+
+      // 同时添加所有父路径
+      const parts = material.folderPath.split('/');
+      for (let i = 1; i < parts.length; i++) {
+        const parentPath = parts.slice(0, i).join('/');
+        if (parentPath) {
+          allFolderPaths.add(parentPath);
+        }
+      }
+    }
+  }
+
+  // 然后处理每个 folderPath
+  for (const folderPath of allFolderPaths) {
+    if (!categoryMap.has(folderPath)) {
+      const categoryName = folderPath.split('/').pop() || folderPath;
       const existingCategory = props.categoryList.find(c => c.name === categoryName);
 
       if (existingCategory) {
-        categoryMap.set(material.folderPath, existingCategory.id);
+        categoryMap.set(folderPath, existingCategory.id);
       } else {
-        categoriesToCreate.add(material.folderPath);
+        categoriesToCreate.add(folderPath);
       }
     }
   }
@@ -492,10 +518,27 @@ const createMissingCategories = async (materials: MaterialItem[]): Promise<Map<s
   // 创建新分类
   for (const folderPath of categoriesToCreate) {
     const categoryName = folderPath.split('/').pop() || folderPath;
+
+    // 获取父分类ID
+    let parentId = -1; // 默认根目录
+    const parentPath = folderPath.split('/').slice(0, -1).join('/');
+    if (parentPath && categoryMap.has(parentPath)) {
+      parentId = categoryMap.get(parentPath)!;
+    }
+
     try {
-      const result = await addMaterialCategory({ name: categoryName, parent: -1 });
-      if (result?.id) {
-        categoryMap.set(folderPath, result.id);
+      const result = await addMaterialCategory({ name: categoryName, parent: parentId });
+
+      // 处理不同的返回格式
+      let newCategoryId: number | undefined;
+      if (typeof result === 'number') {
+        newCategoryId = result;
+      } else if (result && typeof result === 'object' && 'id' in result) {
+        newCategoryId = (result as any).id;
+      }
+
+      if (newCategoryId !== undefined) {
+        categoryMap.set(folderPath, newCategoryId);
       }
     } catch (error: any) {
       console.error(`创建分类 "${categoryName}" 失败:`, error);
@@ -521,9 +564,18 @@ const addMaterialsBatch = async (materials: MaterialItem[]): Promise<string[]> =
 
   for (const material of materials) {
     try {
-      await addMaterial(material);
+      // 清理前端专用字段，只提交数据库需要的字段
+      const materialData = {
+        name: material.name,
+        path: material.path,
+        cate_id: material.cate_id,
+        type: material.type,
+      };
+
+      await addMaterial(materialData);
     } catch (error: any) {
-      console.error(`添加素材 "${material.name}" 失败:`, error);
+      console.error(`[添加失败] ${material.name}:`, error);
+      console.error(`[错误详情]`, error.response?.data || error.message);
       failedItems.push(material.name);
     }
   }

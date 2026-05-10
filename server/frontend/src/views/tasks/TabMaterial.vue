@@ -25,6 +25,7 @@
     <!-- 表格 -->
     <el-table :data="currentList" v-loading="loading" stripe border style="width: 100%" :height="tableMaxHeight"
       class="[&_.el-table__cell]:!py-0" @row-dblclick="handleRowDblClick">
+      <el-table-column prop="id" label="ID" width="80" />
       <el-table-column label="名称" min-width="200">
         <template #default="{ row }">
           <div class="flex items-center gap-2"
@@ -102,10 +103,15 @@
       :default-cate-id="currentParentId" @success="handleBatchAddSuccess" />
 
     <!-- 文件夹编辑/新增对话框 -->
-    <el-dialog v-model="folderDialogVisible" :title="isFolderEdit ? '编辑文件夹' : '新建文件夹'" width="400">
+    <el-dialog v-model="folderDialogVisible" :title="isFolderEdit ? '编辑文件夹' : '新建文件夹'" width="500">
       <el-form :model="currentFolder" label-width="100px">
         <el-form-item label="文件夹名称">
           <el-input v-model="currentFolder.name" placeholder="请输入文件夹名称" />
+        </el-form-item>
+        <el-form-item label="所属分类">
+          <el-cascader v-model="currentFolder.parent" :options="folderCategoryOptions"
+            :props="{ value: 'id', label: 'name', children: 'children', emitPath: false, checkStrictly: true }"
+            placeholder="选择父级分类（不选则为根目录）" clearable class="w-full" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -187,6 +193,7 @@ const currentMaterial = ref<Partial<Material>>({});
 const currentFolder = ref<Partial<FolderItem>>({});
 const isFolderEdit = ref(false);
 const batchAddCategoryList = ref<{ id: number; name: string }[]>([]); // 批量添加用的分类列表
+const folderCategoryOptions = ref<any[]>([]); // 文件夹分类级联选项
 
 // 获取分类列表（用于素材的cate_id）
 const fetchCategoryList = async () => {
@@ -195,12 +202,48 @@ const fetchCategoryList = async () => {
     if (res.code === 0 && res.data) {
       const list = res.data.data || [];
       batchAddCategoryList.value = list;
+      // 构建级联选项
+      folderCategoryOptions.value = buildCategoryTree(list);
       return list;
     }
   } catch (error: any) {
     console.error("获取分类列表失败:", error);
   }
   return [];
+};
+
+// 构建分类树形结构
+const buildCategoryTree = (categories: MaterialCategory[]): any[] => {
+  const categoryMap = new Map<number, any>();
+  const tree: any[] = [];
+
+  // 先创建所有节点的映射
+  categories.forEach(cat => {
+    if (cat.id === undefined || cat.id === null) return;
+    categoryMap.set(cat.id, {
+      id: cat.id,
+      name: cat.name,
+      parent: cat.parent ?? -1,
+      children: []
+    });
+  });
+
+  // 构建树形结构
+  categoryMap.forEach(node => {
+    const parentId = node.parent ?? -1;
+    if (parentId === -1 || !categoryMap.has(parentId)) {
+      // 根节点
+      tree.push(node);
+    } else {
+      // 子节点
+      const parent = categoryMap.get(parentId);
+      if (parent) {
+        parent.children.push(node);
+      }
+    }
+  });
+
+  return tree;
 };
 
 // 获取当前目录下的内容（文件夹 + 素材）
@@ -318,7 +361,7 @@ const handleAddFolder = () => {
   isFolderEdit.value = false;
   currentFolder.value = {
     name: '',
-    parent: currentParentId.value
+    parent: -1  // 默认为根目录
   };
   folderDialogVisible.value = true;
 };
@@ -329,7 +372,7 @@ const handleEditFolder = (row: MixedItem) => {
   currentFolder.value = {
     id: row.id,
     name: row.name,
-    parent: row.parent
+    parent: row.parent ?? -1
   };
   folderDialogVisible.value = true;
 };
@@ -347,7 +390,7 @@ const handleSaveFolder = async () => {
       await updateMaterialCategory({
         id: currentFolder.value.id,
         name: currentFolder.value.name,
-        parent: currentFolder.value.parent
+        parent: currentFolder.value.parent ?? -1
       } as MaterialCategory);
       ElMessage.success("更新成功");
     } else {
