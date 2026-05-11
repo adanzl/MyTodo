@@ -48,7 +48,7 @@
       </el-table-column>
       <el-table-column label="类型" width="80" align="center">
         <template #default="{ row }">
-          <div class="flex items-center justify-center" >
+          <div class="flex items-center justify-center">
             <el-tag v-if="row.type === 'folder'" type="info" size="small">目录</el-tag>
             <el-tag v-else-if="row.type === 0" type="success" size="small">PDF</el-tag>
             <el-tag v-else-if="row.type === 1" type="warning" size="small">视频</el-tag>
@@ -122,7 +122,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick, onUnmounted } from "vue";
+import { ref, onMounted, nextTick, onUnmounted, h } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Refresh, Reading, Folder, Document, VideoCamera, Headset } from "@element-plus/icons-vue";
 import {
@@ -249,18 +249,13 @@ const buildCategoryTree = (categories: MaterialCategory[]): any[] => {
 const fetchCurrentList = async () => {
   loading.value = true;
   try {
-    // 获取所有目录，然后手动过滤
-    const categoriesRes = await getMaterialCategoryList(1, 1000);
+    // 获取当前父级下的子目录
+    const categoriesRes = await getMaterialCategoryList(1, 1000, currentParentId.value);
     const folders: FolderItem[] = [];
     if (categoriesRes.code === 0 && categoriesRes.data) {
-      const allCategories = categoriesRes.data.data || [];
-      // 过滤出当前父级下的子文件夹
-      const filteredCategories = allCategories.filter((cat: MaterialCategory) => {
-        const catParent = cat.parent ?? -1; // null 视为 -1
-        return catParent === currentParentId.value;
-      });
+      const categories = categoriesRes.data.data || [];
 
-      filteredCategories.forEach((cat: MaterialCategory) => {
+      categories.forEach((cat: MaterialCategory) => {
         // 确保 id 存在（id 可能是 0）
         if (cat.id === undefined || cat.id === null) {
           return;
@@ -272,16 +267,11 @@ const fetchCurrentList = async () => {
       });
     }
 
-    // 获取所有素材，然后手动过滤（固定1000条）
-    const materialsRes = await getMaterialList(undefined, 1, 1000);
+    // 获取当前父级下的素材（固定1000条）
+    const materialsRes = await getMaterialList(currentParentId.value, 1, 1000);
     let materials: Material[] = [];
     if (materialsRes.code === 0 && materialsRes.data) {
-      const allMaterials = materialsRes.data.data || [];
-      // 过滤出当前父级下的素材
-      materials = allMaterials.filter(m => {
-        const materialCateId = m.cate_id ?? -1; // null/undefined 视为 -1
-        return materialCateId === currentParentId.value;
-      });
+      materials = materialsRes.data.data || [];
     }
 
     // 合并文件夹和素材
@@ -410,19 +400,41 @@ const handleSaveFolder = async () => {
 // 删除文件夹
 const handleDeleteFolder = async (row: MixedItem) => {
   try {
-    await ElMessageBox.confirm("确定要删除该文件夹吗？", "提示", {
-      confirmButtonText: "确定",
-      cancelButtonText: "取消",
-      type: "warning",
-    });
+    // 创建带复选框的确认对话框
+    const deleteMaterials = ref(false);
+
+    await ElMessageBox.confirm(
+      h('div', { class: 'flex flex-col gap-3' }, [
+        h('p', null, '确定要删除该目录吗？'),
+        h('p', { class: 'text-sm text-gray-500' }, '此操作将删除该目录及其所有子目录。'),
+        h('label', { class: 'flex items-center gap-2 mt-2 cursor-pointer' }, [
+          h('input', {
+            type: 'checkbox',
+            checked: deleteMaterials.value,
+            onChange: (e: Event) => {
+              deleteMaterials.value = (e.target as HTMLInputElement).checked;
+            },
+            class: 'w-4 h-4'
+          }),
+          h('span', null, '同时删除目录下的所有素材')
+        ])
+      ]),
+      "提示",
+      {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning",
+        distinguishCancelAndClose: true,
+      }
+    );
 
     if (row.id) {
-      await deleteMaterialCategory(row.id);
+      await deleteMaterialCategory(row.id, deleteMaterials.value);
       ElMessage.success("删除成功");
       fetchCurrentList();
     }
   } catch (error: any) {
-    if (error !== "cancel") {
+    if (error !== "cancel" && error !== "close") {
       ElMessage.error(error.message || "删除失败");
     }
   }

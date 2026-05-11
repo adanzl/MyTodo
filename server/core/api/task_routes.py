@@ -11,6 +11,7 @@ from flask.typing import ResponseReturnValue
 from pydantic import BaseModel
 
 from core.config import app_logger
+from core.db.db_mgr import db_mgr
 from core.services.task_mgr import task_mgr
 from core.tools.validation import parse_with_model
 from core.utils import _err, _ok, read_json_from_request
@@ -54,4 +55,24 @@ def finish_material() -> ResponseReturnValue:
         return err or _err('Invalid request body')
 
     result = task_mgr.finish_material(body.task_id, body.material_id, body.date, body.user_id)
+    return result
+
+
+@task_bp.route('/material/category/delete', methods=['POST'])
+def delete_material_category() -> ResponseReturnValue:
+    """删除素材分类（文件夹）"""
+    json_data = read_json_from_request()
+    if not json_data or 'id' not in json_data:
+        return _err('Invalid request body')
+
+    category_id = json_data.get('id')
+    if not isinstance(category_id, int):
+        return _err('Invalid category id')
+
+    # 获取是否删除素材的参数，默认为 False
+    delete_materials = json_data.get('deleteMaterials', False)
+    if not isinstance(delete_materials, bool):
+        return _err('Invalid deleteMaterials parameter')
+
+    result = task_mgr.delete_material_category(category_id, delete_materials)
     return result

@@ -146,9 +146,16 @@ export async function updateMaterialCategory(
 /**
  * 删除素材分类
  * @param id - 分类ID
+ * @param deleteMaterials - 是否删除类别下的素材，默认 false
  */
-export async function deleteMaterialCategory(id: number): Promise<void> {
-  await delData("t_material_category", id);
+export async function deleteMaterialCategory(id: number, deleteMaterials: boolean = false): Promise<void> {
+  const response = await api.post('/material/category/delete', {
+    id,
+    deleteMaterials
+  });
+  if (response.data.code !== 0) {
+    throw new Error(response.data.msg || '删除失败');
+  }
 }
 
 // ==================== 任务管理 API ====================
