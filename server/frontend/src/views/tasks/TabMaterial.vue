@@ -8,7 +8,7 @@
       <el-button type="primary" plain size="small" @click="fetchCurrentList">筛选</el-button>
       <el-button type="success" size="small" @click="handleBatchAdd">批量添加</el-button>
       <el-button type="primary" size="small" @click="handleAddMaterial">添加素材</el-button>
-      <el-button type="warning" size="small" @click="handleAddFolder">新建目录f</el-button>
+      <el-button type="warning" size="small" @click="handleAddFolder">新建目录</el-button>
     </div>
 
     <!-- 面包屑导航 -->
