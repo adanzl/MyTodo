@@ -1,6 +1,6 @@
 /**
- * 将已安装的 pdfjs-dist 中的 wasm / cmaps / standard_fonts / iccs 复制到 public/pdfjs/，
- * 运行时从本站加载（不走 CDN）。由 postinstall、predev、prebuild 及 Vite buildStart 触发。
+ * 将已安装的 pdfjs-dist 中的 wasm / cmaps / standard_fonts / iccs 复制到 public/pdfjs/。
+ * 构建时 Vite 会复制到 dist/pdfjs/，并由 vite 插件再镜像到 dist/web/pdfjs/（与 base=/web/ 的 URL /web/pdfjs/ 一致）。
  */
 import fs from 'fs'
 import path from 'path'

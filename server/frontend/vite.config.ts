@@ -1,5 +1,6 @@
 import { execSync } from "node:child_process";
-import { dirname, resolve } from "path";
+import fs from "node:fs";
+import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
@@ -27,12 +28,37 @@ function pdfjsCopyAssetsPlugin() {
   };
 }
 
+/**
+ * base 为 `/web/` 时，`public/pdfjs` 会复制到 `dist/pdfjs/`，但运行时请求 URL 为 `/web/pdfjs/wasm/...`。
+ * 以 dist 为站点根部署时，物理路径应对应 `dist/web/pdfjs/`，否则静态服务器会命中 SPA 回退返回 index.html，
+ * WASM 会得到 HTML（魔数错误）。构建完成后把 pdfjs 镜像到 `dist/web/pdfjs/`。
+ */
+function pdfjsMirrorForWebBasePlugin() {
+  return {
+    name: "pdfjs-mirror-web-base",
+    closeBundle() {
+      const distDir = join(__viteConfigDir, "dist");
+      const srcDir = join(distDir, "pdfjs");
+      const destDir = join(distDir, "web", "pdfjs");
+      if (!fs.existsSync(srcDir)) {
+        console.warn("[pdfjs-mirror] 未找到 dist/pdfjs，请先安装依赖并执行 pdfjs:copy-assets");
+        return;
+      }
+      fs.mkdirSync(join(distDir, "web"), { recursive: true });
+      fs.rmSync(destDir, { recursive: true, force: true });
+      fs.cpSync(srcDir, destDir, { recursive: true });
+      console.log("[pdfjs-mirror] 已生成 dist/web/pdfjs（与 /web/pdfjs/ URL 对齐）");
+    },
+  };
+}
+
 // https://vite.dev/config/
 // 生产用 base: "/"，构建输出 /assets/...，由 deploy.js 统一改为 /web/assets/（Vite 用 /web/ 或 /web 都会拼成 /webassets/）
 export default defineConfig({
   base: "/web/",
   plugins: [
     pdfjsCopyAssetsPlugin(),
+    pdfjsMirrorForWebBasePlugin(),
     vue(),
     // 自动导入 Element Plus API（ElMessage, ElNotification 等）
     AutoImport({
