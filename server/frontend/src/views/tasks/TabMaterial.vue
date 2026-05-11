@@ -429,9 +429,23 @@ const handleDeleteFolder = async (row: MixedItem) => {
     );
 
     if (row.id) {
-      await deleteMaterialCategory(row.id, deleteMaterials.value);
-      ElMessage.success("删除成功");
-      fetchCurrentList();
+      // 显示 loading 消息
+      const loadingMsg = ElMessage({
+        message: '正在删除...',
+        type: 'info',
+        duration: 0, // 不自动关闭
+        icon: h('el-icon-loading', { class: 'is-loading' })
+      });
+
+      try {
+        await deleteMaterialCategory(row.id, deleteMaterials.value);
+        loadingMsg.close();
+        ElMessage.success("删除成功");
+        fetchCurrentList();
+      } catch (error: any) {
+        loadingMsg.close();
+        throw error;
+      }
     }
   } catch (error: any) {
     if (error !== "cancel" && error !== "close") {
