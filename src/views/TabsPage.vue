@@ -342,11 +342,11 @@ onMounted(async () => {
     userList.value = userListData.data;
     const sUserId = localStorage.getItem("saveUser");
     const sUser = _.find(userListData.data, (u) => u.id.toString() === sUserId);
-    globalVar.scheduleListId = 3;
     if (sUser) {
       bLogin.value = true;
       curUser.value = sUser as typeof curUser.value;
       globalVar.user = sUser as typeof globalVar.user;
+      globalVar.scheduleListId = sUser.id; // 使用当前用户ID
       await updateScheduleGroup();
       LoadColorData();
     }
@@ -363,11 +363,15 @@ onMounted(async () => {
 
 async function updateScheduleGroup() {
   // 固定返回昭昭和灿灿两项
-  scheduleListSelectedId.value = globalVar.scheduleListId = 3;
   scheduleListRef.value = [
     { id: 3, name: '灿灿' },
     { id: 4, name: '昭昭' }
   ];
+  
+  // 如果当前用户ID在列表中，则自动选择，否则选第一个
+  const userId = curUser.value?.id;
+  const existsInList = scheduleListRef.value.some(item => item.id === userId);
+  scheduleListSelectedId.value = globalVar.scheduleListId = existsInList ? userId! : scheduleListRef.value[0].id;
   for (const item of scheduleListRef.value) {
     if (item.id === globalVar.scheduleListId) {
       scheduleListSelectedId.value = item.id;
