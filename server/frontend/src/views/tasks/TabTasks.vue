@@ -2,25 +2,25 @@
   <div class="p-2">
     <!-- 工具栏 -->
     <div class="flex items-center h-10 mb-2">
-      <div class="flex flex-1 items-center justify-end gap-2">
-        <el-button type="primary" size="small" @click="refreshTasks" :icon="Refresh"/>
+      <div class="flex flex-1 items-center gap-1">
+        <el-button type="primary" plain size="small" @click="refreshTasks" :icon="Refresh"/>
         <el-button type="primary" size="small" @click="handleAddTask">新建任务</el-button>
       </div>
     </div>
 
     <!-- 表格 -->
     <el-table :data="taskList" v-loading="loading" stripe border style="width: 100%" :max-height="tableMaxHeight">
-      <el-table-column prop="id" label="ID" width="80" />
+      <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="name" label="任务名称" min-width="200" />
-      <el-table-column prop="priority" label="优先级" min-width="30" />
-      <el-table-column prop="type" label="任务类型" width="100">
+      <el-table-column prop="priority" label="优先级" min-width="30" align="center" />
+      <el-table-column prop="type" label="任务类型" width="100" align="center">
         <template #default="{ row }">
           <el-tag :type="row.type === 1 ? 'success' : 'primary'">{{ row.type === 1 ? '持续任务' : '每日任务' }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="start_date" label="开始日期" width="120" />
-      <el-table-column prop="duration" label="天数" width="80" />
-      <el-table-column prop="user_id" label="布置对象" width="150">
+      <el-table-column prop="duration" label="天数" width="70" align="center" />
+      <el-table-column prop="user_id" label="布置对象" width="120">
         <template #default="{ row }">
           {{ getUserName(row.user_id) }}
         </template>

@@ -25,7 +25,7 @@
     <!-- 表格 -->
     <el-table :data="currentList" v-loading="loading" stripe border style="width: 100%" :height="tableMaxHeight"
       class="[&_.el-table__cell]:py-0!" @row-dblclick="handleRowDblClick">
-      <el-table-column prop="id" label="ID" width="65" />
+      <el-table-column prop="id" label="ID" width="70" />
       <el-table-column label="名称" min-width="200">
         <template #default="{ row }">
           <div class="flex items-center gap-2"
@@ -47,10 +47,10 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column label="类型" width="80">
+      <el-table-column label="类型" width="80" align="center">
         <template #default="{ row }">
-          <div style="display: flex; align-items: center;">
-            <el-tag v-if="row.type === 'folder'" type="info" size="small">文件夹</el-tag>
+          <div class="flex items-center justify-center" >
+            <el-tag v-if="row.type === 'folder'" type="info" size="small">目录</el-tag>
             <el-tag v-else-if="row.type === 0" type="success" size="small">PDF</el-tag>
             <el-tag v-else-if="row.type === 1" type="warning" size="small">视频</el-tag>
             <el-tag v-else-if="row.type === 2" type="info" size="small">音频</el-tag>

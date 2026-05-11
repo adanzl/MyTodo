@@ -45,6 +45,7 @@
       :row-style="getRowStyle"
       :span-method="getSpanMethod"
     >
+      <el-table-column prop="id" label="ID" width="70" fixed/>
       <el-table-column prop="name" label="任务名称" min-width="150" fixed>
         <template #default="{ row }">
           <div :class="row.isTask === false ? 'pl-6' : ''">
