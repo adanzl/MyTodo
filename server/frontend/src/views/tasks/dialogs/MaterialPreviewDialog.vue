@@ -162,15 +162,11 @@ import {
 import { ElMessage } from 'element-plus'
 import type { Material } from '@/api/api-task'
 import type { MaterialDetail, AudioFile, Page } from '@/types/tasks/materialDetail'
-import * as pdfjsLib from 'pdfjs-dist'
 import { getMediaFileUrl } from '@/utils/file'
+import { loadPdfDocument, renderPdfPageToDataUrl } from '@/utils/pdf-lib'
 import { useAudioPlayer } from '@/composables/useAudioPlayer'
 import MediaComponent from '@/components/MediaComponent.vue'
 import { formatTime } from '@/utils/date'
-
-// 设置 PDF.js worker
-import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker
 
 interface Props {
   modelValue: boolean
@@ -569,44 +565,26 @@ const loadPdfPages = async (pdfPath: string, detail: MaterialDetail | null) => {
       return
     }
 
-    const loadingTask = pdfjsLib.getDocument({
-      url: pdfUrl,
-      cMapUrl: '//cdnjs.cloudflare.com/ajax/libs/pdf.js/' + pdfjsLib.version + '/cmaps/',
-      cMapPacked: true,
-    })
-
-    const pdf = await loadingTask.promise
+    const pdf = await loadPdfDocument(pdfUrl)
 
     const pages: PdfPage[] = []
 
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       const page = await pdf.getPage(pageNum)
-      const viewport = page.getViewport({ scale: 1.0 })
-      const canvas = document.createElement('canvas')
-      const context = canvas.getContext('2d')
+      const thumbnail = await renderPdfPageToDataUrl(page, {
+        scale: 1.0,
+        mimeType: 'image/jpeg',
+        quality: 0.9,
+      })
 
-      if (context) {
-        canvas.height = viewport.height
-        canvas.width = viewport.width
+      const pageData = detail?.pages?.[pageNum - 1]
 
-        await page.render({
-          canvasContext: context,
-          viewport: viewport,
-          canvas: canvas as any,
-        }).promise
-
-        const thumbnail = canvas.toDataURL('image/jpeg', 0.9)
-
-        // 从 pages 数据中获取绑定的音频 ID
-        const pageData = detail?.pages?.[pageNum - 1]
-
-        pages.push({
-          id: String(pageNum),
-          name: `第${pageNum}页`,
-          thumbnail: thumbnail,
-          audioIds: pageData?.audioIds || [],
-        })
-      }
+      pages.push({
+        id: String(pageNum),
+        name: `第${pageNum}页`,
+        thumbnail,
+        audioIds: pageData?.audioIds || [],
+      })
     }
 
     pdfPages.value = pages

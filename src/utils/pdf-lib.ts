@@ -11,12 +11,40 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 const isAndroid = /Android/i.test(navigator.userAgent);
 
 /**
+ * `public/pdfjs/` 与 BASE_URL 对齐；资源由 `npm run pdfjs:copy-assets` 从 `node_modules/pdfjs-dist` 复制（postinstall / predev / prebuild），与 worker 同版本，无需 CDN。
+ */
+export function getPdfjsAssetsRoot(): string {
+  const base = import.meta.env.BASE_URL ?? '/';
+  const relative = base.endsWith('/') ? `${base}pdfjs/` : `${base}/pdfjs/`;
+  if (typeof window !== 'undefined') {
+    try {
+      return new URL(relative, window.location.href).href;
+    } catch {
+      /* ignore */
+    }
+  }
+  return relative;
+}
+
+/** wasm / cmaps 等：一律使用复制到 public 的副本 */
+function getPdfjsBinaryAssetUrls() {
+  const root = getPdfjsAssetsRoot();
+  return {
+    wasmUrl: `${root}wasm/`,
+    cMapUrl: `${root}cmaps/`,
+    standardFontDataUrl: `${root}standard_fonts/`,
+    iccUrl: `${root}iccs/`,
+  };
+}
+
+/**
  * 加载 PDF 文档
  * @param url - PDF 文件 URL
  * @returns PDF 文档对象
  */
 export async function loadPDF(url: string) {
   try {
+    const assets = getPdfjsBinaryAssetUrls();
     let loadingTask = pdfjsLib.getDocument({
       url,
       // 安卓 WebView 经常出现 worker 初始化失败，默认走主线程可避免白屏
@@ -24,6 +52,7 @@ export async function loadPDF(url: string) {
       // 提升兼容性，避免部分设备字体/解码异常
       useSystemFonts: true,
       isEvalSupported: false,
+      ...assets,
     } as any);
 
     try {
@@ -37,6 +66,7 @@ export async function loadPDF(url: string) {
           disableWorker: true,
           useSystemFonts: true,
           isEvalSupported: false,
+          ...assets,
         } as any);
       } else {
         throw workerError;

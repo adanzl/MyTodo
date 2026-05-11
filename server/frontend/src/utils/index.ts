@@ -9,4 +9,5 @@ export * from "./cron";
 export * from "./file";
 export * from "./playlist";
 export * from "./image";
+export * from "./pdf-lib";
 export * from "./schedule";

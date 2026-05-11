@@ -1,3 +1,6 @@
+import { execSync } from "node:child_process";
+import { dirname } from "path";
+import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import legacy from "@vitejs/plugin-legacy";
 import Vue from "@vitejs/plugin-vue";
@@ -7,6 +10,25 @@ import Icons from "unplugin-icons/vite";
 import Components from "unplugin-vue-components/vite";
 import { defineConfig } from "vitest/config";
 import { VitePWA } from "vite-plugin-pwa";
+
+const __viteConfigDir = dirname(fileURLToPath(import.meta.url));
+
+/** dev/build 启动时把 pdfjs-dist 的 wasm/cmaps 等拷到 public/pdfjs（与 npm 脚本同源） */
+function pdfjsCopyAssetsPlugin() {
+  return {
+    name: "pdfjs-copy-assets",
+    buildStart() {
+      try {
+        execSync("node scripts/copy-pdfjs-assets.mjs", {
+          cwd: __viteConfigDir,
+          stdio: "inherit",
+        });
+      } catch {
+        console.warn("[vite] pdfjs-copy-assets 失败，请先在该目录执行 npm install");
+      }
+    },
+  };
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -24,6 +46,7 @@ export default defineConfig({
     },
   },
   plugins: [
+    pdfjsCopyAssetsPlugin(),
     Icons({ compiler: "vue3", autoInstall: true }),
     Components({
       resolvers: [

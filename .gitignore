@@ -38,6 +38,10 @@ npm-debug.log*
 /server/static/*
 !/server/static/README.md
 /dist
+# pdfjs-dist 离线资源（npm run pdfjs:copy-assets 生成，勿提交）
+/public/pdfjs/
+/server/frontend/public/pdfjs/
+
 android/.idea/
 **/__pycache__
 device_agent/config.properties

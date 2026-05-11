@@ -234,15 +234,11 @@ import type { Material } from "@/api/api-task";
 import { updateMaterial } from "@/api/api-task";
 import { getAudioDuration } from "@/api/api-common";
 import type { AudioFile, MaterialDetail } from "@/types/tasks/materialDetail";
-import * as pdfjsLib from "pdfjs-dist";
 import { getMediaFileUrl } from "@/utils/file";
+import { loadPdfDocument, renderPdfPageToDataUrl } from "@/utils/pdf-lib";
 import { formatDuration } from "@/utils/format";
 import { useAudioPlayer } from "@/composables/useAudioPlayer";
 import FileDialog from "@/views/dialogs/FileDialog.vue";
-
-// 设置 PDF.js worker - 使用本地 worker
-import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 interface Props {
   modelValue: boolean;
@@ -412,13 +408,7 @@ const loadPdfPages = async (pdfPath: string) => {
       return;
     }
 
-    const loadingTask = pdfjsLib.getDocument({
-      url: pdfUrl,
-      cMapUrl: "//cdnjs.cloudflare.com/ajax/libs/pdf.js/" + pdfjsLib.version + "/cmaps/",
-      cMapPacked: true,
-    });
-
-    const pdf = await loadingTask.promise;
+    const pdf = await loadPdfDocument(pdfUrl);
     console.log("PDF 加载成功，页数:", pdf.numPages);
 
     const pages: PdfPage[] = [];
@@ -426,31 +416,17 @@ const loadPdfPages = async (pdfPath: string) => {
     // 遍历所有页面生成缩略图
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
+      const thumbnail = await renderPdfPageToDataUrl(page, {
+        scale: 1.0,
+        mimeType: "image/jpeg",
+        quality: 0.9,
+      });
 
-      // 设置缩放比例生成缩略图（增大到 1.0）
-      const viewport = page.getViewport({ scale: 1.0 });
-      const canvas = document.createElement("canvas");
-      const context = canvas.getContext("2d");
-
-      if (context) {
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-
-        await page.render({
-          canvasContext: context,
-          viewport: viewport,
-          canvas: canvas as any,
-        }).promise;
-
-        // 转换为 base64
-        const thumbnail = canvas.toDataURL("image/jpeg", 0.9);
-
-        pages.push({
-          id: String(pageNum),
-          name: `第${pageNum}页`,
-          thumbnail: thumbnail,
-        });
-      }
+      pages.push({
+        id: String(pageNum),
+        name: `第${pageNum}页`,
+        thumbnail,
+      });
     }
 
     pdfPages.value = pages;

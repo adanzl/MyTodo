@@ -4,6 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "pdfjs:copy-assets": "node scripts/copy-pdfjs-assets.mjs",
+    "postinstall": "npm run pdfjs:copy-assets",
+    "predev": "npm run pdfjs:copy-assets",
+    "prebuild": "npm run pdfjs:copy-assets",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",

@@ -1,17 +1,38 @@
+import { execSync } from "node:child_process";
+import { dirname, resolve } from "path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
-import { resolve } from "path";
 import Icons from "unplugin-icons/vite";
 import IconsResolver from "unplugin-icons/resolver";
 import Components from "unplugin-vue-components/vite";
 import { ElementPlusResolver } from "unplugin-vue-components/resolvers";
 import AutoImport from "unplugin-auto-import/vite";
 
+const __viteConfigDir = dirname(fileURLToPath(import.meta.url));
+
+function pdfjsCopyAssetsPlugin() {
+  return {
+    name: "pdfjs-copy-assets",
+    buildStart() {
+      try {
+        execSync("node scripts/copy-pdfjs-assets.mjs", {
+          cwd: __viteConfigDir,
+          stdio: "inherit",
+        });
+      } catch {
+        console.warn("[vite] pdfjs-copy-assets 失败，请在 server/frontend 下执行 npm install");
+      }
+    },
+  };
+}
+
 // https://vite.dev/config/
 // 生产用 base: "/"，构建输出 /assets/...，由 deploy.js 统一改为 /web/assets/（Vite 用 /web/ 或 /web 都会拼成 /webassets/）
 export default defineConfig({
   base: "/web/",
   plugins: [
+    pdfjsCopyAssetsPlugin(),
     vue(),
     // 自动导入 Element Plus API（ElMessage, ElNotification 等）
     AutoImport({
