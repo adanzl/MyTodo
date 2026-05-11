@@ -1,7 +1,7 @@
 <template>
   <el-dialog v-model="visible" title="批量添加素材" width="1200px" :close-on-click-modal="false" align-center
     :before-close="handleBeforeClose">
-    <div v-loading="submitting" element-loading-text="正在添加素材..." class="h-[70vh] min-h-100 overflow-y-auto">
+    <div v-loading="submitting" element-loading-text="正在添加素材..." class="h-[75vh] min-h-100 overflow-y-auto">
       <!-- 配置区域 -->
       <div class="mb-4 p-4 bg-gray-50 rounded">
         <div class="grid grid-cols-2 gap-4 mb-4">
