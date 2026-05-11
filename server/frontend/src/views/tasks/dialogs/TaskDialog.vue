@@ -159,7 +159,18 @@
           <!-- 左侧：类别选择 -->
           <div class="w-58 border rounded p-3 overflow-y-auto">
             <el-tree :data="cascaderOptions" :props="treeProps" node-key="id" :indent="10"
-              @node-click="handleTreeSelect" highlight-current accordion />
+              @node-click="handleTreeSelect" highlight-current accordion>
+              <template #default="{ node, data }">
+                <div class="flex items-center justify-between w-full pr-2">
+                  <el-tooltip :content="node.label" placement="top" :disabled="node.label.length <= 10">
+                    <span class="truncate max-w-32">{{ node.label }}</span>
+                  </el-tooltip>
+                  <el-tag size="small" type="primary" v-if="getMaterialCategorySelectedCount(data.id) > 0">
+                    {{ getMaterialCategorySelectedCount(data.id) }}
+                  </el-tag>
+                </div>
+              </template>
+            </el-tree>
           </div>
 
           <!-- 右侧：素材列表 -->
@@ -228,6 +239,12 @@ const categoryList = ref<MaterialCategory[]>([]);
 const selectedCategoryId = ref<number | undefined>(undefined);
 const materialTableRef = ref();
 
+// 缓存每个类别的选中数量（key: categoryId, value: count）
+const materialCategorySelectedCountCache = ref<Map<number, number>>(new Map());
+
+// 是否正在恢复选中状态（用于防止循环触发事件）
+const isRestoringMaterialSelection = ref(false);
+
 // Tree 配置
 const treeProps = {
   label: 'name',
@@ -268,6 +285,25 @@ const buildCascaderOptions = (categories: MaterialCategory[]) => {
 const cascaderOptions = computed(() => {
   return buildCascaderOptions(categoryList.value);
 });
+
+/**
+ * 获取某类别已选中的素材数量（带缓存）
+ */
+const getMaterialCategorySelectedCount = (categoryId: number) => {
+  // 先从缓存中获取
+  if (materialCategorySelectedCountCache.value.has(categoryId)) {
+    return materialCategorySelectedCountCache.value.get(categoryId) || 0;
+  }
+
+  // 缓存中没有，计算并缓存
+  const categoryMaterialIds = materialList.value
+    .filter(m => m.cate_id === categoryId)
+    .map(m => m.id);
+
+  const count = selectedMaterials.value.filter(m => categoryMaterialIds.includes(m.id)).length;
+  materialCategorySelectedCountCache.value.set(categoryId, count);
+  return count;
+};
 
 // 树节点点击事件
 const handleTreeSelect = (data: any) => {
@@ -465,7 +501,7 @@ const removeMaterialFromAll = (index: number) => {
   }
 };
 
-// 加载分类列表
+// 加载目录列表
 const loadCategoryList = async () => {
   materialLoading.value = true;
   try {
@@ -478,7 +514,7 @@ const loadCategoryList = async () => {
       }
     }
   } catch (error: any) {
-    console.error("获取分类列表失败:", error);
+    console.error("获取目录列表失败:", error);
   }
 };
 
@@ -489,15 +525,47 @@ const loadMaterialList = async () => {
     const res = await getMaterialList(selectedCategoryId.value, 1, 1000);
     if (res.code === 0 && res.data) {
       materialList.value = res.data.data || [];
+
+      // 重新计算当前类别的选中数量缓存
+      if (selectedCategoryId.value !== undefined) {
+        const categoryMaterialIds = materialList.value
+          .filter(m => m.cate_id === selectedCategoryId.value)
+          .map(m => m.id);
+        const count = selectedMaterials.value.filter(m => categoryMaterialIds.includes(m.id)).length;
+        materialCategorySelectedCountCache.value.set(selectedCategoryId.value, count);
+      }
     }
   } catch (error: any) {
     ElMessage.error(error.message || "获取素材列表失败");
   } finally {
     materialLoading.value = false;
+
+    // loading 结束后恢复勾选状态
+    await nextTick();
+    if (materialTableRef.value) {
+      // 设置标志位，防止触发 selection-change 事件
+      isRestoringMaterialSelection.value = true;
+
+      // 先清空表格的所有选中
+      materialTableRef.value.clearSelection();
+
+      // 收集需要恢复的行
+      const rowsToRestore = materialList.value.filter(row =>
+        selectedMaterials.value.some(m => m.id === row.id)
+      );
+
+      // 批量恢复选中
+      rowsToRestore.forEach(row => {
+        materialTableRef.value.toggleRowSelection(row, true);
+      });
+
+      // 恢复标志位
+      isRestoringMaterialSelection.value = false;
+    }
   }
 };
 
-// 监听分类变化，重新加载素材
+// 监听目录变化，重新加载素材
 watch(selectedCategoryId, () => {
   if (showMaterialSelector.value) {
     loadMaterialList();
@@ -521,9 +589,23 @@ watch(showMaterialSelector, async (newVal) => {
   }
 });
 
-// 素材选择变化
 const handleMaterialSelectionChange = (selection: Material[]) => {
-  selectedMaterials.value = selection;
+  if (isRestoringMaterialSelection.value) return;
+
+  const currentIds = new Set(materialList.value.map(m => m.id));
+  selectedMaterials.value = [
+    ...selectedMaterials.value.filter(m => !currentIds.has(m.id)),
+    ...selection
+  ];
+
+  Array.from(materialCategorySelectedCountCache.value.keys()).forEach(catId => {
+    if (materialList.value.some(m => m.cate_id === catId)) {
+      const count = materialList.value
+        .filter(m => m.cate_id === catId && selectedMaterials.value.some(sm => sm.id === m.id))
+        .length;
+      materialCategorySelectedCountCache.value.set(catId, count);
+    }
+  });
 };
 
 // 行点击事件
@@ -578,6 +660,7 @@ const confirmAddMaterials = () => {
 
   showMaterialSelector.value = false;
   selectedMaterials.value = [];
+  materialCategorySelectedCountCache.value.clear();
 };
 
 // 处理快速添加分配

@@ -9,27 +9,29 @@
     <div class="flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
       <!-- 分配配置区 -->
       <div class="allocation-section border rounded p-4">
-        <h3 class="text-lg font-semibold mb-3">分配配置</h3>
+        <h3 class="font-semibold mb-3">分配配置</h3>
         <el-form label-width="120px">
-          <el-row :gutter="20">
-            <el-col :span="12">
+          <el-row>
+            <el-col :span="6">
               <el-form-item label="开始天数">
                 <el-input-number
                   v-model="startDay"
                   :min="1"
                   :max="formData.duration || 1"
                   :step="1"
+                  size="small"
                   class="w-full"
                 />
               </el-form-item>
             </el-col>
-            <el-col :span="12">
+            <el-col :span="6">
               <el-form-item label="结束天数">
                 <el-input-number
                   v-model="endDay"
                   :min="startDay"
                   :max="formData.duration || 1"
                   :step="1"
+                  size="small"
                   class="w-full"
                 />
               </el-form-item>
@@ -42,7 +44,7 @@
               <el-radio :value="2">全部添加到每一天</el-radio>
             </el-radio-group>
           </el-form-item>
-          <el-form-item class="flex w-full ">
+          <el-form-item class="flex w-full">
             <div class="flex-1 text-gray-600">{{ descriptionText }}</div>
             <span class="mr-4 text-gray-600">已选中 {{ selectedMaterials.length }} 个素材</span>
             <el-button type="primary" @click="allocateMaterials" :disabled="selectedMaterials.length === 0">
@@ -55,21 +57,24 @@
 
       <!-- 素材选择区 -->
       <div class="material-selection-section border rounded p-4">
-        <h3 class="text-lg font-semibold mb-3">选择素材</h3>
+        <h3 class="font-semibold mb-3">选择素材</h3>
         <div v-loading="materialLoading" element-loading-text="加载中..." style="min-height: 300px;">
-          <div class="flex gap-4" style="height: 300px;">
-            <!-- 左侧：类别列表 -->
-            <div class="w-48 border rounded overflow-y-auto">
-              <div
-                v-for="cat in categoryList"
-                :key="cat.id"
-                class="p-3 cursor-pointer hover:bg-gray-100 transition-all duration-200 flex justify-between items-center"
-                :class="{ 'bg-blue-50 border-l-4 border-blue-500': selectedCategoryId === cat.id }"
-                @click="selectedCategoryId = cat.id"
-              >
-                <div class="font-medium">{{ cat.name }}</div>
-                <el-tag size="small" type="info">{{ getCategorySelectedCount(cat.id) }}</el-tag>
-              </div>
+          <div class="flex gap-4" style="height: 400px;">
+            <!-- 左侧：类别选择 -->
+            <div class="w-60 border rounded p-1 overflow-y-auto">
+              <el-tree :data="cascaderOptions" :props="treeProps" node-key="id"
+                @node-click="handleTreeSelect" highlight-current accordion :indent="6">
+                <template #default="{ node, data }">
+                  <div class="flex items-center justify-between w-full pr-2">
+                    <el-tooltip :content="node.label" placement="top" :disabled="node.label.length <= 10">
+                      <span class="truncate max-w-32">{{ node.label }}</span>
+                    </el-tooltip>
+                    <el-tag size="small" type="primary" v-if="getCategorySelectedCount(data.id) > 0">
+                      {{ getCategorySelectedCount(data.id) }}
+                    </el-tag>
+                  </div>
+                </template>
+              </el-tree>
             </div>
 
             <!-- 右侧：素材列表 -->
@@ -100,11 +105,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, nextTick } from "vue";
 import { ElMessage } from "element-plus";
 import { Check } from "@element-plus/icons-vue";
 import { getMaterialList, getMaterialCategoryList, type Material, type MaterialCategory, type Task } from "@/api/api-task";
 
+// ==================== 类型定义 ====================
 interface Props {
   modelValue: boolean;
   formData: Partial<Task>;
@@ -115,9 +121,11 @@ interface Emits {
   (e: "allocated", materials: Array<{ id: number; name: string; type: number }>, startDay: number, endDay: number, allocationType: number): void;
 }
 
+// ==================== Props & Emits ====================
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
+// ==================== 响应式数据 ====================
 const visible = ref(props.modelValue);
 const materialLoading = ref(false);
 const materialList = ref<Material[]>([]);
@@ -126,33 +134,27 @@ const categoryList = ref<MaterialCategory[]>([]);
 const selectedCategoryId = ref<number | undefined>(undefined);
 const materialTableRef = ref();
 
+// 缓存每个类别的选中数量（key: categoryId, value: count）
+const categorySelectedCountCache = ref<Map<number, number>>(new Map());
+
+// 是否正在恢复选中状态（用于防止循环触发事件）
+const isRestoringSelection = ref(false);
+
 // 分配配置
 const startDay = ref(1);
 const endDay = ref(1);
 const allocationType = ref(0); // 0: 平均分配, 1: 循环分配, 2: 全部添加到每一天
 
-// 监听外部传入的 modelValue
-watch(
-  () => props.modelValue,
-  (newVal) => {
-    visible.value = newVal;
-    if (newVal) {
-      // 初始化分配范围
-      startDay.value = 1;
-      endDay.value = props.formData.duration || 1;
-      allocationType.value = 0;
-      loadCategoryList();
-      loadMaterialList();
-    }
-  }
-);
+// ==================== Tree 配置 ====================
+const treeProps = {
+  label: 'name',
+  children: 'children'
+};
 
-// 监听 visible 变化
-watch(visible, (newVal) => {
-  emit("update:modelValue", newVal);
-});
-
-// 获取素材类型名称
+// ==================== 工具函数 ====================
+/**
+ * 获取素材类型名称
+ */
 const getMaterialTypeName = (type: number) => {
   const typeMap: Record<number, string> = {
     0: "PDF",
@@ -162,76 +164,68 @@ const getMaterialTypeName = (type: number) => {
   return typeMap[type] || "未知_" + type;
 };
 
-// 加载分类列表
-const loadCategoryList = async () => {
-  materialLoading.value = true;
-  try {
-    const res = await getMaterialCategoryList(1, 1000);
-    if (res.code === 0 && res.data) {
-      categoryList.value = res.data.data || [];
-      // 默认选中第一个类别
-      if (categoryList.value.length > 0) {
-        selectedCategoryId.value = categoryList.value[0].id;
+/**
+ * 构建树形结构
+ */
+const buildCascaderOptions = (categories: MaterialCategory[]) => {
+  const map = new Map<number, any>();
+  const roots: any[] = [];
+
+  categories.forEach(item => {
+    map.set(item.id, { ...item, children: [] });
+  });
+
+  categories.forEach(item => {
+    const node = map.get(item.id);
+    if (node) {
+      const parentId = item.parent ?? -1;
+      if (parentId === -1) {
+        roots.push(node);
+      } else {
+        const parent = map.get(parentId);
+        if (parent) {
+          if (!parent.children) {
+            parent.children = [];
+          }
+          parent.children.push(node);
+        }
       }
     }
-  } catch (error: any) {
-    console.error("获取分类列表失败:", error);
-  } finally {
-    materialLoading.value = false;
-  }
+  });
+
+  return roots;
 };
 
-// 加载素材列表
-const loadMaterialList = async () => {
-  materialLoading.value = true;
-  try {
-    const res = await getMaterialList(selectedCategoryId.value, 1, 1000);
-    if (res.code === 0 && res.data) {
-      materialList.value = res.data.data || [];
-    }
-  } catch (error: any) {
-    ElMessage.error(error.message || "获取素材列表失败");
-  } finally {
-    materialLoading.value = false;
-  }
-};
-
-// 监听分类变化，重新加载素材
-watch(selectedCategoryId, () => {
-  if (visible.value) {
-    loadMaterialList();
-  }
+// ==================== 计算属性 ====================
+/**
+ * 计算级联选项
+ */
+const cascaderOptions = computed(() => {
+  return buildCascaderOptions(categoryList.value);
 });
 
-// 素材选择变化
-const handleMaterialSelectionChange = (selection: Material[]) => {
-  selectedMaterials.value = selection;
-};
-
-// 行点击事件
-const handleRowClick = (row: Material) => {
-  // PDF类型：单选逻辑
-  if (row.type === 1) {
-    materialTableRef.value?.clearSelection();
-    materialTableRef.value?.toggleRowSelection(row, true);
-  } else {
-    // 非PDF类型：切换选中状态
-    materialTableRef.value?.toggleRowSelection(row);
-  }
-};
-
-// 获取某类别已选中的素材数量
+/**
+ * 获取某类别已选中的素材数量（带缓存）
+ */
 const getCategorySelectedCount = (categoryId: number) => {
-  // 获取该类别下的所有素材ID
+  // 先从缓存中获取
+  if (categorySelectedCountCache.value.has(categoryId)) {
+    return categorySelectedCountCache.value.get(categoryId) || 0;
+  }
+
+  // 缓存中没有，计算并缓存
   const categoryMaterialIds = materialList.value
     .filter(m => m.cate_id === categoryId)
     .map(m => m.id);
 
-  // 统计已选中素材中属于该类别的数量
-  return selectedMaterials.value.filter(m => categoryMaterialIds.includes(m.id)).length;
+  const count = selectedMaterials.value.filter(m => categoryMaterialIds.includes(m.id)).length;
+  categorySelectedCountCache.value.set(categoryId, count);
+  return count;
 };
 
-// 计算描述文字
+/**
+ * 计算描述文字
+ */
 const descriptionText = computed(() => {
   if (selectedMaterials.value.length === 0) {
     return '请先选择素材';
@@ -257,7 +251,124 @@ const descriptionText = computed(() => {
   }
 });
 
-// 执行分配
+// ==================== 数据加载 ====================
+/**
+ * 加载目录列表
+ */
+const loadCategoryList = async () => {
+  materialLoading.value = true;
+  try {
+    const res = await getMaterialCategoryList(1, 1000);
+    if (res.code === 0 && res.data) {
+      categoryList.value = res.data.data || [];
+      // 默认选中第一个类别
+      if (categoryList.value.length > 0) {
+        selectedCategoryId.value = categoryList.value[0].id;
+      }
+    }
+  } catch (error: any) {
+    console.error("获取目录列表失败:", error);
+  } finally {
+    materialLoading.value = false;
+  }
+};
+
+/**
+ * 加载素材列表
+ */
+const loadMaterialList = async () => {
+  materialLoading.value = true;
+  try {
+    const res = await getMaterialList(selectedCategoryId.value, 1, 1000);
+    if (res.code === 0 && res.data) {
+      materialList.value = res.data.data || [];
+
+      // 重新计算当前类别的选中数量缓存
+      if (selectedCategoryId.value !== undefined) {
+        const categoryMaterialIds = materialList.value
+          .filter(m => m.cate_id === selectedCategoryId.value)
+          .map(m => m.id);
+        const count = selectedMaterials.value.filter(m => categoryMaterialIds.includes(m.id)).length;
+        categorySelectedCountCache.value.set(selectedCategoryId.value, count);
+      }
+    }
+  } catch (error: any) {
+    ElMessage.error(error.message || "获取素材列表失败");
+  } finally {
+    materialLoading.value = false;
+
+    // loading 结束后恢复勾选状态
+    await nextTick();
+    if (materialTableRef.value) {
+      // 设置标志位，防止触发 selection-change 事件
+      isRestoringSelection.value = true;
+
+      // 先清空表格的所有选中
+      materialTableRef.value.clearSelection();
+
+      // 收集需要恢复的行
+      const rowsToRestore = materialList.value.filter(row =>
+        selectedMaterials.value.some(m => m.id === row.id)
+      );
+
+      // 批量恢复选中
+      rowsToRestore.forEach(row => {
+        materialTableRef.value.toggleRowSelection(row, true);
+      });
+
+      // 恢复标志位
+      isRestoringSelection.value = false;
+    }
+  }
+};
+
+// ==================== 事件处理 ====================
+/**
+ * 树节点点击事件
+ */
+const handleTreeSelect = (data: any) => {
+  selectedCategoryId.value = data.id;
+};
+
+/**
+ * 素材选择变化（跨类别累加）
+ */
+const handleMaterialSelectionChange = (selection: Material[]) => {
+  if (isRestoringSelection.value) return;
+
+  const currentIds = new Set(materialList.value.map(m => m.id));
+  selectedMaterials.value = [
+    ...selectedMaterials.value.filter(m => !currentIds.has(m.id)),
+    ...selection
+  ];
+
+  Array.from(categorySelectedCountCache.value.keys()).forEach(catId => {
+    if (materialList.value.some(m => m.cate_id === catId)) {
+      const count = materialList.value
+        .filter(m => m.cate_id === catId && selectedMaterials.value.some(sm => sm.id === m.id))
+        .length;
+      categorySelectedCountCache.value.set(catId, count);
+    }
+  });
+};
+
+/**
+ * 行点击事件（PDF单选，其他多选）
+ */
+const handleRowClick = (row: Material) => {
+  if (row.type === 1) {
+    // PDF类型：单选逻辑
+    materialTableRef.value?.clearSelection();
+    materialTableRef.value?.toggleRowSelection(row, true);
+  } else {
+    // 非PDF类型：切换选中状态
+    materialTableRef.value?.toggleRowSelection(row);
+  }
+};
+
+/**
+ * 执行分配
+ */
 const allocateMaterials = () => {
   if (selectedMaterials.value.length === 0) {
     ElMessage.warning("请先选择素材");
@@ -285,28 +396,52 @@ const allocateMaterials = () => {
   handleClose();
 };
 
-// 关闭对话框
+// ==================== 生命周期 & 监听 ====================
+// 监听外部传入的 modelValue
+watch(
+  () => props.modelValue,
+  (newVal) => {
+    visible.value = newVal;
+    if (newVal) {
+      // 初始化分配范围
+      startDay.value = 1;
+      endDay.value = props.formData.duration || 1;
+      allocationType.value = 0;
+      loadCategoryList();
+      loadMaterialList();
+    }
+  }
+);
+
+// 监听 visible 变化
+watch(visible, (newVal) => {
+  emit("update:modelValue", newVal);
+});
+
+// 监听目录变化，重新加载素材
+watch(selectedCategoryId, () => {
+  if (visible.value) {
+    loadMaterialList();
+  }
+});
+
+// ==================== 对话框管理 ====================
+/**
+ * 关闭对话框
+ */
 const handleClose = () => {
   visible.value = false;
   resetForm();
 };
 
-// 重置表单
+/**
+ * 重置表单
+ */
 const resetForm = () => {
   selectedMaterials.value = [];
   startDay.value = 1;
   endDay.value = 1;
   allocationType.value = 0;
+  categorySelectedCountCache.value.clear();
 };
 </script>
-
-<style scoped>
-.material-item {
-  transition: all 0.2s ease;
-}
-
-.material-item:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-</style>

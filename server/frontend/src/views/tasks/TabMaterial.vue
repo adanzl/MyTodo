@@ -108,10 +108,10 @@
         <el-form-item label="文件夹名称">
           <el-input v-model="currentFolder.name" placeholder="请输入文件夹名称" />
         </el-form-item>
-        <el-form-item label="所属分类">
+        <el-form-item label="所属目录">
           <el-cascader v-model="currentFolder.parent" :options="folderCategoryOptions"
             :props="{ value: 'id', label: 'name', children: 'children', emitPath: false, checkStrictly: true }"
-            placeholder="选择父级分类（不选则为根目录）" clearable class="w-full" />
+            placeholder="选择父级目录（不选则为根目录）" clearable class="w-full" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -192,10 +192,10 @@ const isMaterialEdit = ref(false);
 const currentMaterial = ref<Partial<Material>>({});
 const currentFolder = ref<Partial<FolderItem>>({});
 const isFolderEdit = ref(false);
-const batchAddCategoryList = ref<{ id: number; name: string }[]>([]); // 批量添加用的分类列表
-const folderCategoryOptions = ref<any[]>([]); // 文件夹分类级联选项
+const batchAddCategoryList = ref<{ id: number; name: string }[]>([]); // 批量添加用的目录列表
+const folderCategoryOptions = ref<any[]>([]); // 文件夹目录级联选项
 
-// 获取分类列表（用于素材的cate_id）
+// 获取目录列表（用于素材的cate_id）
 const fetchCategoryList = async () => {
   try {
     const res = await getMaterialCategoryList(1, 1000);
@@ -207,12 +207,12 @@ const fetchCategoryList = async () => {
       return list;
     }
   } catch (error: any) {
-    console.error("获取分类列表失败:", error);
+    console.error("获取目录列表失败:", error);
   }
   return [];
 };
 
-// 构建分类树形结构
+// 构建目录树形结构
 const buildCategoryTree = (categories: MaterialCategory[]): any[] => {
   const categoryMap = new Map<number, any>();
   const tree: any[] = [];
@@ -250,7 +250,7 @@ const buildCategoryTree = (categories: MaterialCategory[]): any[] => {
 const fetchCurrentList = async () => {
   loading.value = true;
   try {
-    // 获取所有分类，然后手动过滤
+    // 获取所有目录，然后手动过滤
     const categoriesRes = await getMaterialCategoryList(1, 1000);
     const folders: FolderItem[] = [];
     if (categoriesRes.code === 0 && categoriesRes.data) {

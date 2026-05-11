@@ -16,8 +16,8 @@
           <el-button @click="openFileBrowser">浏览</el-button>
         </div>
       </el-form-item>
-      <el-form-item label="分类" required>
-        <el-cascader v-model="cascaderValue" :options="cascaderOptions" :props="cascaderProps" placeholder="请选择分类"
+      <el-form-item label="目录" required>
+        <el-cascader v-model="cascaderValue" :options="cascaderOptions" :props="cascaderProps" placeholder="请选择目录"
           clearable style="width: 100%" />
       </el-form-item>
     </el-form>
@@ -48,7 +48,7 @@ interface Props {
   isEdit: boolean;
   materialData?: Partial<Material>;
   categoryList?: { id: number; name: string }[];
-  defaultCateId?: number; // 默认分类ID
+  defaultCateId?: number; // 默认目录ID
 }
 
 interface Emits {
@@ -145,7 +145,7 @@ watch(visible, (val) => {
 
 // 初始化表单
 const initForm = async () => {
-  // 使用外层传入的分类列表,如果没有则加载
+  // 使用外层传入的目录列表,如果没有则加载
   const categories = props.categoryList || [];
 
   if (props.isEdit && props.materialData?.id) {
@@ -163,11 +163,11 @@ const initForm = async () => {
     // 新增模式,重置表单
     let defaultCategoryId = 0;
 
-    // 优先使用传入的默认分类ID
+    // 优先使用传入的默认目录ID
     if (props.defaultCateId !== undefined && categories.some(cate => cate.id === props.defaultCateId)) {
       defaultCategoryId = props.defaultCateId;
     } else if (categories.length > 0) {
-      // 否则使用第一个分类
+      // 否则使用第一个目录
       defaultCategoryId = categories[0].id;
     }
 

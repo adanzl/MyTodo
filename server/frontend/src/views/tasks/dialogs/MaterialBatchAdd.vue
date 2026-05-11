@@ -1,13 +1,13 @@
 <template>
-  <el-dialog v-model="visible" title="批量添加素材" width="1000px" :close-on-click-modal="false" align-center
+  <el-dialog v-model="visible" title="批量添加素材" width="1200px" :close-on-click-modal="false" align-center
     :before-close="handleBeforeClose">
     <div v-loading="submitting" element-loading-text="正在添加素材..." class="h-[70vh] min-h-100 overflow-y-auto">
       <!-- 配置区域 -->
       <div class="mb-4 p-4 bg-gray-50 rounded">
         <div class="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <label class="block text-sm font-medium mb-2">分类</label>
-            <el-cascader v-model="cascaderValue" :options="cascaderOptions" :props="cascaderProps" placeholder="选择分类"
+            <label class="block text-sm font-medium mb-2">目录</label>
+            <el-cascader v-model="cascaderValue" :options="cascaderOptions" :props="cascaderProps" placeholder="选择目录"
               clearable class="w-full" />
           </div>
           <div>
@@ -15,7 +15,7 @@
             <el-radio-group v-model="defaultType">
               <el-radio :value="0">PDF</el-radio>
               <el-radio :value="1">视频</el-radio>
-              <el-radio :value="3">文件夹</el-radio>
+              <el-radio :value="3">目录</el-radio>
             </el-radio-group>
           </div>
         </div>
@@ -42,7 +42,7 @@
             </template>
           </el-table-column>
           <el-table-column prop="path" label="路径" min-width="200" show-overflow-tooltip />
-          <el-table-column label="分类" width="200" show-overflow-tooltip>
+          <el-table-column label="目录" width="200" show-overflow-tooltip>
             <template #default="{ row }">
               <span v-if="row.folderPath" class="text-blue-600">{{ row.folderPath }}</span>
               <span v-else>{{ getCategoryName(row.cate_id) }}</span>
@@ -50,7 +50,7 @@
           </el-table-column>
           <el-table-column label="类型" width="80">
             <template #default="{ row }">
-              <el-tag v-if="row.isFolder" type="info" size="small">文件夹</el-tag>
+              <el-tag v-if="row.isFolder" type="info" size="small">目录</el-tag>
               <el-tag v-else-if="row.type === 0" type="success" size="small">PDF</el-tag>
               <el-tag v-else-if="row.type === 1" type="primary" size="small">视频</el-tag>
             </template>
@@ -108,7 +108,7 @@ import FileDialog from "@/views/dialogs/FileDialog.vue";
 interface Props {
   modelValue: boolean;
   categoryList: Array<{ id: number; name: string }>;
-  defaultCateId?: number; // 默认分类ID
+  defaultCateId?: number; // 默认目录ID
 }
 
 interface MaterialItem {
@@ -118,7 +118,7 @@ interface MaterialItem {
   type: number;
   isFolder?: boolean; // 是否为文件夹
   children?: MaterialItem[]; // 子项（用于树形展示）
-  folderPath?: string; // 所属文件夹完整路径（用于动态创建分类）
+  folderPath?: string; // 所属文件夹完整路径（用于动态创建目录）
 }
 
 const props = defineProps<Props>();
@@ -187,10 +187,10 @@ const cascaderOptions = computed(() => {
   return buildCascaderOptions(props.categoryList || []);
 });
 
-// 获取分类名称
+// 获取目录名称
 const getCategoryName = (cateId: number): string => {
   const category = props.categoryList.find(c => c.id === cateId);
-  return category ? category.name : '未分类';
+  return category ? category.name : '未知';
 };
 
 // 监听 cascaderValue 变化，更新 defaultCateId
@@ -200,17 +200,17 @@ watch(cascaderValue, (val) => {
   }
 });
 
-// 初始化默认分类
+// 初始化默认目录
 watch(
   () => [props.categoryList, props.defaultCateId, visible.value] as const,
   ([list, defaultId, isVisible]) => {
     if (isVisible && list && list.length > 0) {
-      // 如果有传入的默认分类ID且在列表中，优先使用
+      // 如果有传入的默认目录ID且在列表中，优先使用
       if (defaultId !== undefined && defaultId !== null && list.some((cate: { id: number; name: string }) => cate.id === defaultId)) {
         defaultCateId.value = defaultId;
         cascaderValue.value = defaultId;
       } else if (defaultCateId.value === undefined || defaultCateId.value === null || !list.some((cate: { id: number; name: string }) => cate.id === defaultCateId.value)) {
-        // 如果当前默认分类不在列表中，使用第一个分类
+        // 如果当前默认目录不在列表中，使用第一个目录
         defaultCateId.value = list[0].id;
         cascaderValue.value = list[0].id;
       }
@@ -256,7 +256,7 @@ const handleDirectoryConfirm = async (dirPaths: string[]) => {
       return;
     }
 
-    // 获取当前选中分类的完整路径名称
+    // 获取当前选中目录的完整路径名称
     const getBaseCategoryPath = (): string => {
       // 优先使用 cascaderValue，如果为空则使用 defaultCateId
       const targetId = (cascaderValue.value !== undefined && cascaderValue.value !== null)
@@ -307,7 +307,7 @@ const handleDirectoryConfirm = async (dirPaths: string[]) => {
 // 将扫描结果转换为 MaterialItem（扁平化）
 const convertScanResultToMaterials = (
   items: DirectoryItem[],
-  baseCategoryPath?: string // 基础分类路径（如 "咱们裸熊/sub"）
+  baseCategoryPath?: string // 基础目录路径（如 "咱们裸熊/sub"）
 ): MaterialItem[] => {
   const result: MaterialItem[] = [];
 
@@ -320,7 +320,7 @@ const convertScanResultToMaterials = (
   const processItems = (items: DirectoryItem[], currentCategoryPath?: string) => {
     items.forEach(item => {
       if (item.isDirectory) {
-        // 构建当前文件夹的完整分类路径
+        // 构建当前文件夹的完整目录路径
         const folderCategoryPath = currentCategoryPath
           ? `${currentCategoryPath}/${item.name}`
           : (baseCategoryPath ? `${baseCategoryPath}/${item.name}` : item.name);
@@ -344,7 +344,7 @@ const convertScanResultToMaterials = (
             cate_id: defaultCateId.value || props.categoryList[0]?.id || 1,
             type: type,
             isFolder: false,
-            folderPath: fileFolderPath, // 记录完整分类路径
+            folderPath: fileFolderPath, // 记录完整目录路径
           });
         }
       }
@@ -460,7 +460,7 @@ const handleSubmit = async () => {
   const flatMaterials = flattenMaterials(materialList.value);
 
   try {
-    // 1. 收集并创建新分类
+    // 1. 收集并创建新目录
     const categoryMap = await createMissingCategories(flatMaterials);
 
     // 2. 更新文件的 cate_id
@@ -479,12 +479,12 @@ const handleSubmit = async () => {
   }
 };
 
-// 收集并创建缺失的分类
+// 收集并创建缺失的目录
 const createMissingCategories = async (materials: MaterialItem[]): Promise<Map<string, number>> => {
   const categoryMap = new Map<string, number>();
   const categoriesToCreate = new Set<string>();
 
-  // 收集所有需要创建的分类
+  // 收集所有需要创建的目录
   // 首先收集所有唯一的 folderPath
   const allFolderPaths = new Set<string>();
   for (const material of materials) {
@@ -516,11 +516,11 @@ const createMissingCategories = async (materials: MaterialItem[]): Promise<Map<s
     }
   }
 
-  // 创建新分类
+  // 创建新目录
   for (const folderPath of categoriesToCreate) {
     const categoryName = folderPath.split('/').pop() || folderPath;
 
-    // 获取父分类ID
+    // 获取父目录ID
     let parentId = -1; // 默认根目录
     const parentPath = folderPath.split('/').slice(0, -1).join('/');
     if (parentPath && categoryMap.has(parentPath)) {
@@ -542,15 +542,15 @@ const createMissingCategories = async (materials: MaterialItem[]): Promise<Map<s
         categoryMap.set(folderPath, newCategoryId);
       }
     } catch (error: any) {
-      console.error(`创建分类 "${categoryName}" 失败:`, error);
-      throw new Error(`创建分类 "${categoryName}" 失败`);
+      console.error(`创建目录 "${categoryName}" 失败:`, error);
+      throw new Error(`创建目录 "${categoryName}" 失败`);
     }
   }
 
   return categoryMap;
 };
 
-// 更新素材的分类ID
+// 更新素材的目录ID
 const updateMaterialCategoryIds = (materials: MaterialItem[], categoryMap: Map<string, number>) => {
   for (const material of materials) {
     if (material.folderPath && categoryMap.has(material.folderPath)) {
