@@ -350,7 +350,7 @@ const handleAddFolder = () => {
   isFolderEdit.value = false;
   currentFolder.value = {
     name: '',
-    parent: -1  // 默认为根目录
+    parent: currentParentId.value  // 默认为当前目录
   };
   folderDialogVisible.value = true;
 };
@@ -391,6 +391,8 @@ const handleSaveFolder = async () => {
       ElMessage.success("创建成功");
     }
     folderDialogVisible.value = false;
+    // 刷新分类列表和当前列表
+    await fetchCategoryList();
     fetchCurrentList();
   } catch (error: any) {
     ElMessage.error(error.message || "操作失败");
