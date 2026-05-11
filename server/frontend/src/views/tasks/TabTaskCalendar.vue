@@ -1,8 +1,8 @@
 <template>
   <div class="p-2">
     <!-- 日期选择器 -->
-    <div class="mb-4 flex items-center gap-4">
-      <el-button type="primary" size="small" @click="refreshTasks" :icon="Refresh" />
+    <div class="mb-4 flex items-center gap-4 h-10">
+      <el-button type="primary" plain size="small" @click="refreshTasks" :icon="Refresh" />
       <el-radio-group v-model="selectedUserId" @change="handleUserChange">
         <el-radio :value="0">全部</el-radio>
         <el-radio :value="3">灿灿</el-radio>

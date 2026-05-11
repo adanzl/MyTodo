@@ -2,14 +2,7 @@
   <div class="p-2">
     <!-- 工具栏 -->
     <div class="flex items-center h-10 mb-2 gap-2">
-      <div class="flex-1">
-      </div>
-      <el-switch
-        v-model="showDetail"
-        active-text="详情"
-        inactive-text=""
-        @change="handleQuery"
-      />
+
       <div class="flex">
         <el-date-picker
           v-model="dateRange"
@@ -20,11 +13,17 @@
           size="small"
           class="w-55! mr-3"
         />
-        <el-button type="primary" size="small" @click="handleQuery" :loading="loading">
+        <el-button type="primary" size="small" @click="handleQuery" :disabled="loading">
           查询
         </el-button>
         <el-button size="small" @click="handleReset">重置</el-button>
       </div>
+      <el-switch
+        v-model="showDetail"
+        active-text="详情"
+        inactive-text=""
+        @change="handleQuery"
+      />
     </div>
 
     <!-- 统计摘要卡片 -->

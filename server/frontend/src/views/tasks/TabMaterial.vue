@@ -1,25 +1,24 @@
 <template>
   <div class="p-2">
-    <!-- 面包屑导航 + 工具栏 -->
-    <div class="flex items-center justify-between h-10 mb-2 bg-gray-50 px-3 py-2 rounded">
-      <!-- 左侧：面包屑导航 -->
+    <!-- 工具栏 -->
+    <div class="flex items-center h-10 mb-2 gap-2">
+      <el-button type="primary" plain size="small" @click="fetchCurrentList" :icon="Refresh" />
+      <el-input v-model="searchKeyword" placeholder="搜索名称" size="small" class="w-40!" clearable
+        @clear="fetchCurrentList" />
+      <el-button type="primary" plain size="small" @click="fetchCurrentList">筛选</el-button>
+      <el-button type="success" size="small" @click="handleBatchAdd">批量添加</el-button>
+      <el-button type="primary" size="small" @click="handleAddMaterial">添加素材</el-button>
+      <el-button type="warning" size="small" @click="handleAddFolder">新建目录f</el-button>
+    </div>
+
+    <!-- 面包屑导航 -->
+    <div class="flex items-center h-8 mb-2 bg-gray-50 px-3 py-2 rounded">
       <el-breadcrumb separator="/" class="flex-1">
         <el-breadcrumb-item v-for="(item, index) in breadcrumbList" :key="item.id"
           @click="handleBreadcrumbClick(item, index)" class="cursor-pointer hover:text-primary">
           {{ item.name }}
         </el-breadcrumb-item>
       </el-breadcrumb>
-
-      <!-- 右侧：操作按钮 -->
-      <div class="flex items-center gap-2 ml-4">
-        <el-button type="primary" plain size="small" @click="fetchCurrentList" :icon="Refresh" />
-        <el-input v-model="searchKeyword" placeholder="搜索名称" size="small" class="w-40!" clearable
-          @clear="fetchCurrentList" />
-        <el-button type="primary" plain size="small" @click="fetchCurrentList">筛选</el-button>
-        <el-button type="success" size="small" @click="handleBatchAdd">批量添加</el-button>
-        <el-button type="primary" size="small" @click="handleAddMaterial">添加素材</el-button>
-        <el-button type="warning" size="small" @click="handleAddFolder">新建文件夹</el-button>
-      </div>
     </div>
 
     <!-- 表格 -->
