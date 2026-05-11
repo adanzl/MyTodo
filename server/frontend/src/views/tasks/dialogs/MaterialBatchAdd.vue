@@ -1,7 +1,7 @@
 <template>
-  <el-dialog v-model="visible" title="批量添加素材" width="1000px" :close-on-click-modal="false"
+  <el-dialog v-model="visible" title="批量添加素材" width="1000px" :close-on-click-modal="false" align-center
     :before-close="handleBeforeClose">
-    <div v-loading="submitting" element-loading-text="正在添加素材..." class="max-h-[80vh] min-h-100 overflow-y-auto">
+    <div v-loading="submitting" element-loading-text="正在添加素材..." class="h-[70vh] min-h-100 overflow-y-auto">
       <!-- 配置区域 -->
       <div class="mb-4 p-4 bg-gray-50 rounded">
         <div class="grid grid-cols-2 gap-4 mb-4">
@@ -22,7 +22,7 @@
       </div>
 
       <!-- 已添加列表 -->
-      <div class="mb-4">
+      <div class="mb-4 flex flex-col">
         <div class="flex items-center justify-between mb-2">
           <h4 class="text-sm font-medium flex-1">待添加素材 ({{ materialList.length }} 条)</h4>
           <el-button size="small" :type="defaultType === 3 ? 'primary' : 'info'" @click="openFileBrowser">
@@ -30,7 +30,7 @@
           </el-button>
           <el-button size="small" type="danger" @click="clearMaterialList">清空列表</el-button>
         </div>
-        <el-table :data="materialList" border max-height="300" size="small">
+        <el-table :data="materialList" border size="small" :height="tableHeight">
           <el-table-column prop="name" label="名称" min-width="120" show-overflow-tooltip>
             <template #default="{ row }">
               <div class="flex items-center gap-2 whitespace-nowrap overflow-hidden text-ellipsis">
@@ -42,7 +42,7 @@
             </template>
           </el-table-column>
           <el-table-column prop="path" label="路径" min-width="200" show-overflow-tooltip />
-          <el-table-column label="分类" width="200">
+          <el-table-column label="分类" width="200" show-overflow-tooltip>
             <template #default="{ row }">
               <span v-if="row.folderPath" class="text-blue-600">{{ row.folderPath }}</span>
               <span v-else>{{ getCategoryName(row.cate_id) }}</span>
@@ -98,7 +98,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Folder } from "@element-plus/icons-vue";
 import { addMaterial, addMaterialCategory } from "@/api/api-task";
@@ -140,6 +140,7 @@ const directoryDialogVisible = ref(false); // 目录选择对话框
 const materialList = ref<MaterialItem[]>([]);
 const errors = ref<string[]>([]);
 const submitting = ref(false);
+const tableHeight = ref<number>(400); // 表格高度
 
 // Cascader 配置
 const cascaderValue = ref<number | null>(null);
@@ -257,12 +258,12 @@ const handleDirectoryConfirm = async (dirPaths: string[]) => {
 
     // 获取当前选中分类的完整路径名称
     const getBaseCategoryPath = (): string => {
-      // 如果 cascaderValue 为空或为 0，尝试使用 defaultCateId
-      const targetId = (cascaderValue.value !== undefined && cascaderValue.value !== null && cascaderValue.value !== 0)
+      // 优先使用 cascaderValue，如果为空则使用 defaultCateId
+      const targetId = (cascaderValue.value !== undefined && cascaderValue.value !== null)
         ? cascaderValue.value
         : defaultCateId.value;
 
-      if (!targetId && targetId !== 0) {
+      if (targetId === undefined || targetId === null) {
         return '';
       }
 
@@ -617,6 +618,13 @@ const flattenMaterials = (items: MaterialItem[]): MaterialItem[] => {
 
   return result;
 };
+// 计算表格最大高度
+const calculateTableHeight = () => {
+  nextTick(() => {
+    const windowHeight = window.innerHeight;
+    tableHeight.value = windowHeight - 480;
+  });
+};
 
 // 监听对话框打开，重置数据
 watch(visible, (newVal) => {
@@ -624,5 +632,9 @@ watch(visible, (newVal) => {
     materialList.value = [];
     errors.value = [];
   }
+});
+onMounted(async () => {
+  calculateTableHeight();
+  window.addEventListener('resize', calculateTableHeight);
 });
 </script>

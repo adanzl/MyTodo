@@ -309,13 +309,19 @@ const handleConfirm = () => {
     .trim();
 
   if (modeValue === "directory") {
-    // 目录模式：传递当前路径
-    const currentPath = fileBrowserPath.value || props.defaultPath || "/mnt/ext_base";
-    if (!currentPath || String(currentPath).trim() === "") {
-      ElMessage.warning("请先选择一个目录");
-      return;
+    // 目录模式：优先返回选中的目录，如果没有选中则返回当前路径
+    if (selectedFiles.value.length > 0) {
+      // 有选中的目录，返回选中的目录
+      emit("confirm", [...selectedFiles.value]);
+    } else {
+      // 没有选中，返回当前路径
+      const currentPath = fileBrowserPath.value || props.defaultPath || "/mnt/ext_base";
+      if (!currentPath || String(currentPath).trim() === "") {
+        ElMessage.warning("请先选择一个目录");
+        return;
+      }
+      emit("confirm", [String(currentPath)]);
     }
-    emit("confirm", [String(currentPath)]);
   } else {
     // 文件模式：传递选中的文件
     if (selectedFiles.value.length === 0) {

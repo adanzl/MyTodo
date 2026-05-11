@@ -24,7 +24,7 @@
 
     <!-- 表格 -->
     <el-table :data="currentList" v-loading="loading" stripe border style="width: 100%" :height="tableMaxHeight"
-      class="[&_.el-table__cell]:!py-0" @row-dblclick="handleRowDblClick">
+      class="[&_.el-table__cell]:py-0!" @row-dblclick="handleRowDblClick">
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column label="名称" min-width="200">
         <template #default="{ row }">

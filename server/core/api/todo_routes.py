@@ -58,8 +58,20 @@ def create_todo() -> ResponseReturnValue:
         schedule_data.repeatEndTs = json_data.get('repeatEndTs') or json_data.get('repeat_end_ts')
         schedule_data.color = json_data.get('color', 0)
         schedule_data.priority = json_data.get('priority', -1)
-        schedule_data.groupId = json_data.get('groupId') if json_data.get('groupId') is not None else json_data.get('group_id', -1)
-        schedule_data.order = json_data.get('order') if json_data.get('order') is not None else json_data.get('order_idx', 0)
+        # 处理 groupId，确保是 int 类型
+        group_id_val = json_data.get('groupId')
+        if group_id_val is None:
+            group_id_val = json_data.get('group_id')
+        if group_id_val is None:
+            group_id_val = -1
+        schedule_data.groupId = int(group_id_val) if group_id_val is not None else -1
+        # 处理 order，确保是 int 类型
+        order_val = json_data.get('order')
+        if order_val is None:
+            order_val = json_data.get('order_idx')
+        if order_val is None:
+            order_val = 0
+        schedule_data.order = int(order_val) if order_val is not None else 0
         schedule_data.score = json_data.get('score')
         schedule_data.userId = json_data.get('userId') or json_data.get('user_id')
 
@@ -83,7 +95,7 @@ def get_todo() -> ResponseReturnValue:
         todo_id = request.args.get('id', type=int)
         date = request.args.get('date')
         user_id = request.args.get('user_id', type=int)
-        
+
         if todo_id is None or not date or user_id is None:
             return _err('id, date and user_id are required')
 
@@ -114,17 +126,29 @@ def update_todo() -> ResponseReturnValue:
         schedule_data.repeatEndTs = json_data.get('repeatEndTs') or json_data.get('repeat_end_ts')
         schedule_data.color = json_data.get('color', 0)
         schedule_data.priority = json_data.get('priority', -1)
-        schedule_data.groupId = json_data.get('groupId') if json_data.get('groupId') is not None else json_data.get('group_id', -1)
-        schedule_data.order = json_data.get('order') if json_data.get('order') is not None else json_data.get('order_idx', 0)
+        # 处理 groupId，确保是 int 类型
+        group_id_val = json_data.get('groupId')
+        if group_id_val is None:
+            group_id_val = json_data.get('group_id')
+        if group_id_val is None:
+            group_id_val = -1
+        schedule_data.groupId = int(group_id_val) if group_id_val is not None else -1
+        # 处理 order，确保是 int 类型
+        order_val = json_data.get('order')
+        if order_val is None:
+            order_val = json_data.get('order_idx')
+        if order_val is None:
+            order_val = 0
+        schedule_data.order = int(order_val) if order_val is not None else 0
         schedule_data.score = json_data.get('score')
         schedule_data.userId = json_data.get('userId') or json_data.get('user_id')
-        
+
         # 解析子任务
         subtasks_raw = json_data.get('subtasks', [])
         if isinstance(subtasks_raw, list):
             from core.types.todo_data import Subtask
             schedule_data.subtasks = [Subtask.from_dict(st) for st in subtasks_raw]
-        
+
         result = todo_mgr.update_todo(todo_id=todo_id, schedule_data=schedule_data)
         return result
     except Exception as e:
@@ -172,8 +196,10 @@ def save_todo() -> ResponseReturnValue:
             schedule_save.scheduleOverride.title = override_data.get('title', '')
             schedule_save.scheduleOverride.color = override_data.get('color', 0)
             schedule_save.scheduleOverride.priority = override_data.get('priority', -1)
-            schedule_save.scheduleOverride.groupId = override_data.get('groupId', -1)
-            schedule_save.scheduleOverride.order = override_data.get('order', 0)
+            schedule_save.scheduleOverride.groupId = int(
+                override_data.get('groupId')) if override_data.get('groupId') is not None else -1
+            schedule_save.scheduleOverride.order = int(
+                override_data.get('order')) if override_data.get('order') is not None else 0
             schedule_save.scheduleOverride.score = override_data.get('score')
 
         if schedule_save.scheduleId is None or not schedule_save.date:
