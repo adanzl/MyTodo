@@ -98,7 +98,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, watch, onUnmounted } from "vue";
 import { ElMessage } from "element-plus";
 import { Refresh, ArrowLeft, ArrowRight } from "@element-plus/icons-vue";
 import { getTaskList, type Task } from "@/api/api-task";
@@ -470,5 +470,16 @@ onMounted(() => {
   fetchTaskList();
   calculateTableHeight();
   window.addEventListener('resize', calculateTableHeight);
+
+  // 监听刷新事件
+  const handleRefresh = () => {
+    fetchTaskList();
+  };
+  window.addEventListener('refresh-calendar-tab', handleRefresh);
+
+  onUnmounted(() => {
+    window.removeEventListener('resize', calculateTableHeight);
+    window.removeEventListener('refresh-calendar-tab', handleRefresh);
+  });
 });
 </script>

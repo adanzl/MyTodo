@@ -246,7 +246,8 @@ export default defineComponent({
           for (const week of mm.weekArr) {
             for (const day of week) {
               if (day.dt.unix() === refData.selectedDate.value.dt.unix()) {
-                // 在范围内，保持选中不变
+                // 在范围内，更新为新的对象引用以获取最新数据
+                refData.selectedDate.value = day;
                 return;
               }
             }

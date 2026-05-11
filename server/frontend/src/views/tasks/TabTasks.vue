@@ -64,7 +64,7 @@ import {
 } from "@/api/api-task";
 import { Refresh } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { onMounted, ref } from "vue";
+import { onMounted, ref, onUnmounted } from "vue";
 import TaskDialog from "./dialogs/TaskDialog.vue";
 
 
@@ -171,5 +171,16 @@ onMounted(() => {
   fetchTaskList();
   calculateTableHeight();
   window.addEventListener('resize', calculateTableHeight);
+
+  // 监听刷新事件
+  const handleRefresh = () => {
+    fetchTaskList();
+  };
+  window.addEventListener('refresh-tasks-tab', handleRefresh);
+
+  onUnmounted(() => {
+    window.removeEventListener('resize', calculateTableHeight);
+    window.removeEventListener('refresh-tasks-tab', handleRefresh);
+  });
 });
 </script>

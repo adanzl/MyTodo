@@ -69,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { ElMessage } from "element-plus";
 import { getUsageAbstract } from "@/api/api-usage";
 import dayjs from "dayjs";
@@ -237,6 +237,16 @@ const formatDurationToMinutes = (seconds: number): string => {
 // 组件挂载时自动查询
 onMounted(() => {
   handleQuery();
+
+  // 监听刷新事件
+  const handleRefresh = () => {
+    handleQuery();
+  };
+  window.addEventListener('refresh-usage-tab', handleRefresh);
+
+  onUnmounted(() => {
+    window.removeEventListener('refresh-usage-tab', handleRefresh);
+  });
 });
 </script>
 

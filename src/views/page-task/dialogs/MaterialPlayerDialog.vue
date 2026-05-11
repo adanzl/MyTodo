@@ -64,7 +64,7 @@
           </div>
           
           <div class="flex-1 flex justify-end">
-            <ion-button v-if="currentPage >= getLastPagePosition" color="success" :disabled="isMaterialCompleted || submitting" @click="completeReading">
+            <ion-button v-if="isAdmin || currentPage >= getLastPagePosition" color="success" :disabled="isMaterialCompleted || submitting" @click="completeReading">
               完成
             </ion-button>
           </div>
@@ -134,6 +134,11 @@ import { addUsage, type AddUsageBody, USAGE_TYPE_VIDEO, USAGE_TYPE_PDF } from '@
 import EventBus, { C_EVENT } from '@/types/event-bus';
 
 const globalVar: any = inject('globalVar');
+
+// 是否为 admin
+const isAdmin = computed(() => {
+    return globalVar?.user?.admin === 1;
+});
 
 interface Material {
     id: number;
@@ -240,7 +245,8 @@ const isMaterialCompleted = computed(() => {
 });
 
 // 关闭弹窗
-const handleDismiss = () => {
+const handleDismiss = async () => {
+    await stopUsageTracking();
     stopAudio();
     emit('update:isOpen', false);
 };
@@ -394,23 +400,21 @@ const stopAudio = () => {
 const startUsageTracking = () => {
     if (!props.material) return;
     
-    // 如果 userId 为空，尝试从全局变量获取
     const userId = props.userId || globalVar?.user?.id;
     if (!userId) {
         console.warn('无法获取 userId，跳过使用统计');
         return;
     }
     
-    console.log('开始使用统计追踪，素材类型:', props.material.type, 'userId:', userId);
+    // 清除之前的定时器
+    if (usageTimer !== null) {
+        clearInterval(usageTimer);
+        usageTimer = null;
+    }
     
-    // 记录开始时间
     usageStartTime = Date.now();
     isTrackingActive = true;
     
-    // 清除之前的定时器
-    stopUsageTracking(false); // 不上报
-    
-    // 设置定时器，每30秒上报一次
     usageTimer = window.setInterval(() => {
         if (isTrackingActive) {
             reportUsageAndReset();
@@ -420,21 +424,19 @@ const startUsageTracking = () => {
 
 // 停止使用统计追踪
 const stopUsageTracking = async (shouldReport: boolean = true) => {
-    console.log('stopUsageTracking 调用, shouldReport:', shouldReport, 'isTrackingActive:', isTrackingActive, 'usageStartTime:', usageStartTime);
+    if (!isTrackingActive && usageStartTime === 0) {
+        return;
+    }
     
     if (usageTimer !== null) {
         clearInterval(usageTimer);
         usageTimer = null;
     }
     
-    // 如果需要上报且正在追踪
     if (shouldReport && isTrackingActive && usageStartTime > 0) {
         const now = Date.now();
         const duration = Math.floor((now - usageStartTime) / 1000);
-        console.log('停止追踪，计算时长:', duration, '秒');
         await reportUsage(duration);
-    } else {
-        console.log('不上报原因 - shouldReport:', shouldReport, 'isTrackingActive:', isTrackingActive, 'usageStartTime:', usageStartTime);
     }
     
     isTrackingActive = false;
@@ -450,10 +452,7 @@ const reportUsageAndReset = async () => {
     
     if (duration <= 0) return;
     
-    console.log('定时上报，时长:', duration);
     await reportUsage(duration);
-    
-    // 重置开始时间，继续下一轮统计
     usageStartTime = now;
 };
 
@@ -461,32 +460,18 @@ const reportUsageAndReset = async () => {
 const reportUsage = async (duration: number) => {
     if (!props.material) return;
     
-    // 如果 userId 为空，尝试从全局变量获取
     const userId = props.userId || globalVar?.user?.id;
     if (!userId) {
         console.warn('无法获取 userId，跳过上报');
         return;
     }
     
-    // 视频素材特殊规则：检查是否在播放中
     if (props.material.type === 1 && !isVideoPlaying.value) {
-        console.log('视频未在播放，跳过上报');
         return;
     }
     
-    if (duration <= 0) {
-        console.log('使用时长为0，跳过上报');
-        return;
-    }
+    if (duration <= 0) return;
     
-    console.log('准备上报使用记录:', {
-        type: props.material.type,
-        duration: duration,
-        userId: userId,
-        materialId: props.material.id
-    });
-    
-    // 根据素材类型确定 type
     let usageType = '';
     if (props.material.type === 0) {
         usageType = USAGE_TYPE_PDF;
@@ -505,9 +490,7 @@ const reportUsage = async (duration: number) => {
             out_key: props.material.id,
         };
         
-        console.log('发送上报请求:', usageData);
         await addUsage(usageData);
-        console.log('上报成功');
     } catch (error) {
         console.error('上报使用记录失败:', error);
     }
@@ -558,23 +541,17 @@ watch(
             
             setTimeout(() => {
                 if (material.type === 0 && material.path) {
-                    // PDF 类型
                     if (!pdfCanvasLeft.value) {
                         loading.value = false;
                         return;
                     }
                     renderPDF(getMediaFileUrl(material.path));
-                    // 开始使用统计
                     startUsageTracking();
                 } else if (material.type === 1 && material.path) {
-                    // 视频类型
                     loading.value = false;
-                    // 视频会自动加载和播放
-                    // 开始使用统计
                     startUsageTracking();
                 } else {
                     loading.value = false;
-                    console.log('未满足启动条件');
                 }
             }, 300);
         } else {
@@ -593,11 +570,8 @@ const checkOrientation = () => {
 // 监听页面可见性变化（锁屏/切后台时暂停统计）
 const handleVisibilityChange = () => {
     if (document.hidden) {
-        console.log('页面隐藏，暂停使用统计');
         isTrackingActive = false;
     } else {
-        console.log('页面可见，恢复使用统计');
-        // 重置开始时间为当前时间，避免计入隐藏期间的时长
         if (usageStartTime > 0) {
             usageStartTime = Date.now();
         }
@@ -622,7 +596,6 @@ const handleBeforeUnload = () => {
                 }
                 
                 if (usageType) {
-                    // 使用 sendBeacon 确保浏览器关闭时也能发送
                     const apiUrl = window.location.origin + '/usage/add';
                     const data = JSON.stringify({
                         type: usageType,
@@ -634,7 +607,6 @@ const handleBeforeUnload = () => {
                     
                     if (navigator.sendBeacon) {
                         navigator.sendBeacon(apiUrl, new Blob([data], { type: 'application/json' }));
-                        console.log('通过 sendBeacon 上报最后时长:', duration);
                     }
                 }
             }
@@ -678,7 +650,5 @@ onUnmounted(() => {
             console.warn('Error cleaning up video element:', e);
         }
     }
-    // 最后再停止统计并上报
-    stopUsageTracking();
 });
 </script>

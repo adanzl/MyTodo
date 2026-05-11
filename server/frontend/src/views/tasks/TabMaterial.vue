@@ -123,7 +123,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from "vue";
+import { ref, onMounted, nextTick, onUnmounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Refresh, Reading, Folder, Document, VideoCamera, Headset } from "@element-plus/icons-vue";
 import {
@@ -524,5 +524,16 @@ onMounted(() => {
   fetchCurrentList();
   calculateTableHeight();
   window.addEventListener('resize', calculateTableHeight);
+
+  // 监听刷新事件
+  const handleRefresh = () => {
+    fetchCurrentList();
+  };
+  window.addEventListener('refresh-material-tab', handleRefresh);
+
+  onUnmounted(() => {
+    window.removeEventListener('resize', calculateTableHeight);
+    window.removeEventListener('refresh-material-tab', handleRefresh);
+  });
 });
 </script>
