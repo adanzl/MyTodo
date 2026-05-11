@@ -42,5 +42,16 @@ if [ -f "frontend/dist/favicon.ico" ]; then
     cp -f frontend/dist/favicon.ico static/favicon.ico
 fi
 
+# 复制 web/pdfjs 目录（PDF.js 资源文件）
+if [ -d "frontend/dist/web/pdfjs" ]; then
+    echo "📁 复制 web/pdfjs 目录..."
+    mkdir -p static/web
+    rm -rf static/web/pdfjs
+    cp -r frontend/dist/web/pdfjs static/web/
+    echo "✅ web/pdfjs 目录已复制"
+else
+    echo "⚠️  未找到 web/pdfjs 目录"
+fi
+
 echo "🎉 部署完成！"
 
