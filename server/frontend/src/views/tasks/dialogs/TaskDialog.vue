@@ -153,17 +153,13 @@
     </template>
 
     <!-- 素材选择器弹窗 -->
-    <el-dialog v-model="showMaterialSelector" title="选择素材" width="900px" append-to-body align-center>
+    <el-dialog v-model="showMaterialSelector" title="选择素材" width="1100px" append-to-body align-center>
       <div v-loading="materialLoading" element-loading-text="加载中..." style="min-height: 500px;">
         <div class="flex gap-4" style="height: 500px;">
-          <!-- 左侧：类别列表 -->
-          <div class="w-48 border rounded overflow-y-auto">
-            <div v-for="cat in categoryList" :key="cat.id"
-              class="p-3 cursor-pointer hover:bg-gray-100 transition-all duration-200"
-              :class="{ 'bg-blue-50 border-l-4 border-blue-500': selectedCategoryId === cat.id }"
-              @click="selectedCategoryId = cat.id">
-              <div class="font-medium">{{ cat.name }}</div>
-            </div>
+          <!-- 左侧：类别选择 -->
+          <div class="w-58 border rounded p-3 overflow-y-auto">
+            <el-tree :data="cascaderOptions" :props="treeProps" node-key="id" :indent="10"
+              @node-click="handleTreeSelect" highlight-current accordion />
           </div>
 
           <!-- 右侧：素材列表 -->
@@ -231,6 +227,52 @@ const selectedMaterials = ref<Material[]>([]);
 const categoryList = ref<MaterialCategory[]>([]);
 const selectedCategoryId = ref<number | undefined>(undefined);
 const materialTableRef = ref();
+
+// Tree 配置
+const treeProps = {
+  label: 'name',
+  children: 'children',
+};
+
+// 构建树形结构
+const buildCascaderOptions = (categories: MaterialCategory[]) => {
+  const map = new Map<number, any>();
+  const roots: any[] = [];
+
+  categories.forEach(item => {
+    map.set(item.id, { ...item, children: [] });
+  });
+
+  categories.forEach(item => {
+    const node = map.get(item.id);
+    if (node) {
+      const parentId = item.parent ?? -1;
+      if (parentId === -1) {
+        roots.push(node);
+      } else {
+        const parent = map.get(parentId);
+        if (parent) {
+          if (!parent.children) {
+            parent.children = [];
+          }
+          parent.children.push(node);
+        }
+      }
+    }
+  });
+
+  return roots;
+};
+
+// 计算级联选项
+const cascaderOptions = computed(() => {
+  return buildCascaderOptions(categoryList.value);
+});
+
+// 树节点点击事件
+const handleTreeSelect = (data: any) => {
+  selectedCategoryId.value = data.id;
+};
 
 // 每日素材数据：{ dayNumber: [materials] }
 const dailyMaterials = ref<Record<number, Array<{ id: number; name: string; type: number }>>>({});

@@ -41,7 +41,7 @@
                 <!-- 所有素材网格 -->
                 <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                     <template v-for="task in displayTasks" :key="task.id">
-                        <div v-for="material in getTaskMaterialList(task)" :key="`${task.id}_${material.id}` "
+                        <div v-for="material in getTaskMaterialList(task)" :key="`${task.id}_${material.id}`"
                             class="relative flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow-md cursor-pointer hover:shadow-2xl transition-shadow"
                             @click="openMaterialPlayer(task, material)">
                             <!-- 任务名称角标 -->
@@ -77,9 +77,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { ElMessage } from 'element-plus';
-import { Calendar, Document, Loading , VideoPlay } from '@element-plus/icons-vue';
+import { Calendar, Document, Loading, VideoPlay } from '@element-plus/icons-vue';
 import { getTaskList, getMaterialListByIds, type Task, type MaterialItem } from '@/api/api-task';
 import { getDaysDiff } from '@/utils/date';
 import MaterialPreviewDialog from './dialogs/MaterialPreviewDialog.vue';
@@ -273,6 +273,17 @@ const btnCalendarClk = () => {
 // 初始化
 onMounted(() => {
   fetchTaskList();
+
+  // 监听刷新事件
+  const handleRefresh = () => {
+    fetchTaskList();
+  };
+  window.addEventListener('refresh-preview-tab', handleRefresh);
+
+  // 组件卸载时移除监听器
+  onUnmounted(() => {
+    window.removeEventListener('refresh-preview-tab', handleRefresh);
+  });
 });
 </script>
 

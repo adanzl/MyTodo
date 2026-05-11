@@ -32,7 +32,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import TabMaterial from "./TabMaterial.vue";
 import TabTasks from "./TabTasks.vue";
 import TabTaskCalendar from "./TabTaskCalendar.vue";
@@ -46,6 +46,14 @@ const activeMainTab = ref("calendar");
 const handleTabChange = (tabName: string) => {
   console.log("切换到页签:", tabName);
 };
+
+// 监听页签变化，切换到预览页签时触发刷新
+watch(activeMainTab, (newTab) => {
+  if (newTab === 'preview') {
+    // 通过事件总线或 provide/inject 通知子组件刷新
+    window.dispatchEvent(new CustomEvent('refresh-preview-tab'));
+  }
+});
 </script>
 
 <style scoped>

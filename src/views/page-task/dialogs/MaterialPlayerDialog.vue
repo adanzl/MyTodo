@@ -241,7 +241,6 @@ const isMaterialCompleted = computed(() => {
 
 // 关闭弹窗
 const handleDismiss = () => {
-    stopUsageTracking();
     stopAudio();
     emit('update:isOpen', false);
 };
@@ -421,6 +420,8 @@ const startUsageTracking = () => {
 
 // 停止使用统计追踪
 const stopUsageTracking = async (shouldReport: boolean = true) => {
+    console.log('stopUsageTracking 调用, shouldReport:', shouldReport, 'isTrackingActive:', isTrackingActive, 'usageStartTime:', usageStartTime);
+    
     if (usageTimer !== null) {
         clearInterval(usageTimer);
         usageTimer = null;
@@ -430,8 +431,10 @@ const stopUsageTracking = async (shouldReport: boolean = true) => {
     if (shouldReport && isTrackingActive && usageStartTime > 0) {
         const now = Date.now();
         const duration = Math.floor((now - usageStartTime) / 1000);
-        console.log('停止追踪，上报时长:', duration);
+        console.log('停止追踪，计算时长:', duration, '秒');
         await reportUsage(duration);
+    } else {
+        console.log('不上报原因 - shouldReport:', shouldReport, 'isTrackingActive:', isTrackingActive, 'usageStartTime:', usageStartTime);
     }
     
     isTrackingActive = false;
@@ -665,7 +668,6 @@ onUnmounted(() => {
     window.removeEventListener('resize', checkOrientation);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
     window.removeEventListener('beforeunload', handleBeforeUnload);
-    stopUsageTracking();
     // 清理视频资源
     if (typeof window !== 'undefined' && videoRef.value) {
         try {
@@ -676,5 +678,7 @@ onUnmounted(() => {
             console.warn('Error cleaning up video element:', e);
         }
     }
+    // 最后再停止统计并上报
+    stopUsageTracking();
 });
 </script>
