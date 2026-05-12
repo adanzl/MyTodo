@@ -82,6 +82,19 @@ export async function setUserData(data: SetUserDataPayload): Promise<void> {
   clearUserListCache();
 }
 
+/**
+ * 更新用户信息（安全接口）
+ * 只允许更新：id, name, icon, admin, wish_list
+ * 禁止更新：score, wish_progress（这些字段由系统自动管理）
+ */
+export async function updateUser(data: { id: number; name?: string; icon?: string; admin?: number; wish_list?: number[] }): Promise<void> {
+  const rsp = await apiClient.post<ApiResponse<unknown>>("/user/update", data);
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  clearUserListCache();
+}
+
 export async function addScore(
   user: number,
   action: string,

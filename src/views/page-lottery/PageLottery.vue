@@ -82,7 +82,7 @@ import { Icon } from "@iconify/vue";
 import EventBus, { C_EVENT } from "@/types/event-bus";
 import { getList } from "@/api/data";
 import { doExchange, doLottery, getGiftData, getLotteryData, getGiftList, delGiftData, getGiftCategoryList, getGiftPoolList } from "@/api/api-lottery";
-import { clearUserListCache, getUserList, setUserData } from "@/api/api-user";
+import { clearUserListCache, getUserList, updateUser } from "@/api/api-user";
 import { getNetworkErrorMessage } from "@/utils/net-util";
 import { getCachedPicByName, PicDisplaySize } from "@/utils/img-mgr";
 import {
@@ -363,6 +363,7 @@ async function refreshUserList() {
       const sUser = _.find(uList.data, (u) => u.id === globalVar.user.id);
       if (sUser) {
         globalVar.user.score = sUser.score ?? globalVar.user.score;
+        globalVar.user.wish_progress = sUser.wish_progress ?? globalVar.user.wish_progress;
         wishList.value.progress = sUser.wish_progress ?? 0;
         if (sUser.wish_list) {
           wishList.value.ids = sUser.wish_list;
@@ -560,7 +561,10 @@ async function btnRemoveWishClk(item: any) {
         text: "OK",
         handler: () => {
           _.remove(globalVar.user.wish_list, (i: number) => i === item.id);
-          setUserData(globalVar.user)
+          updateUser({ 
+            id: globalVar.user.id,
+            wish_list: globalVar.user.wish_list 
+          })
             .then(() => {
               EventBus.$emit(C_EVENT.TOAST, "移除心愿成功");
               _.remove(wishList.value.ids, (i: number) => i === item.id);
@@ -582,7 +586,10 @@ async function btnAddWishClk(item: any) {
     globalVar.user.wish_list = [];
   }
   globalVar.user.wish_list.push(item.id);
-  setUserData(globalVar.user)
+  updateUser({ 
+    id: globalVar.user.id,
+    wish_list: globalVar.user.wish_list 
+  })
     .then(() => {
       EventBus.$emit(C_EVENT.TOAST, "添加心愿成功");
       wishList.value.ids.push(item.id);
