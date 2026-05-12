@@ -28,6 +28,7 @@ export interface Playlist {
   current_index?: number;
   isPlaying?: boolean;
   in_pre_files?: boolean;
+  order?: number;
 }
 
 /**

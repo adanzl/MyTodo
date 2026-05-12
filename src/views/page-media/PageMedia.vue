@@ -49,7 +49,7 @@
                 </div>
               </div>
               <div class="flex items-center gap-2 ml-2">
-                  <ion-button @click="playPlaylistItem(playlist)" :disabled="!isAdmin">
+                  <ion-button @click.stop="playPlaylistItem(playlist)" :disabled="!isAdmin">
                    <ion-icon :icon="playlist.isPlaying ? pauseOutline : playOutline" class="inline-block w-5 h-5" />
                   </ion-button>
               </div>
@@ -87,7 +87,7 @@ import {
     playOutline,
     pauseOutline,
 } from 'ionicons/icons';
-import { getPlaylists, playPlaylist, pausePlaylist, type Playlist } from '@/api/api-playlist';
+import { getPlaylists, playPlaylist, stopPlaylist, type Playlist } from '@/api/api-playlist';
 import { getNextCronTime } from '@/utils/cron-util';
 import PlaylistDetail from './dialogs/PlaylistDetail.vue';
 import EventBus, { C_EVENT } from '@/types/event-bus';
@@ -115,7 +115,7 @@ const loadPlaylists = async () => {
                 ),
                 // 对主列表排序
                 playlist: playlist.playlist ? [...playlist.playlist].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)) : []
-            }));
+            })).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)); // 对播放列表本身排序
         }
     } catch (error) {
         console.error('加载播放列表失败:', error);
@@ -152,10 +152,10 @@ const closeDetailModal = () => {
 const playPlaylistItem = async (playlist: Playlist) => {
     try {
         const response = playlist.isPlaying 
-            ? await pausePlaylist(playlist.id)
+            ? await stopPlaylist(playlist.id)
             : await playPlaylist(playlist.id);
         if (response.code === 0) {
-            EventBus.$emit(C_EVENT.TOAST, playlist.isPlaying ? '已暂停' : '开始播放');
+            EventBus.$emit(C_EVENT.TOAST, playlist.isPlaying ? '已停止' : '开始播放');
             // 刷新列表以更新状态
             await loadPlaylists();
         } else {
