@@ -95,7 +95,9 @@ class LotteryMgr:
 
                 if stock_success:
                     # 步骤 1.1.1：成功扣减
-                    won_gifts.append(selected.copy())
+                    selected_copy = selected.copy()
+                    selected_copy['_from_wish'] = True  # 标记为心愿单礼物
+                    won_gifts.append(selected_copy)
                     cur_progress = 0  # 清空心愿单进度
                     has_wish_draw = True
                 else:
@@ -129,7 +131,9 @@ class LotteryMgr:
                 stock_success, need_remove = self._try_deduct_stock(selected['id'])
 
                 if stock_success:
-                    won_gifts.append(selected.copy())
+                    selected_copy = selected.copy()
+                    selected_copy['_from_wish'] = False  # 标记为普通礼物
+                    won_gifts.append(selected_copy)
 
                     # 如果库存扣成 0，加入排除列表
                     if need_remove:
@@ -149,7 +153,16 @@ class LotteryMgr:
 
         # ========== 阶段 3：写入日志 ==========
         out_key_str = ','.join(str(g['id']) for g in won_gifts)
-        gift_info = ', '.join(f"[{g['id']}]{g['name']}" for g in won_gifts)
+        
+        # 在心愿单礼物名字前加 * 标记
+        gift_info_parts = []
+        for g in won_gifts:
+            gift_id = g['id']
+            gift_name = g['name']
+            # 如果是心愿单抽中的，在名字前加 *
+            marker = "*" if g.get('_from_wish', False) else ""
+            gift_info_parts.append(f"[{gift_id}]{marker}{gift_name}")
+        gift_info = ', '.join(gift_info_parts)
 
         add_ret = self._db.add_score(
             user_id,
