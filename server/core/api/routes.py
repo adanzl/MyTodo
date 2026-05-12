@@ -156,6 +156,38 @@ def set_data() -> ResponseReturnValue:
     return db_mgr.set_data(table, data)
 
 
+@api_bp.route("/user/update", methods=['POST'])
+def update_user() -> ResponseReturnValue:
+    """
+    更新用户信息（安全接口）
+    只允许更新：name, icon, admin, wish_list
+    禁止更新：score, wish_progress（这些字段由系统自动管理）
+    """
+    args: Dict[str, Any] = read_json_from_request()
+    log.info(f"===== [Update User] {args}")
+    
+    # 必须包含 id
+    user_id = args.get('id')
+    if user_id is None:
+        return {"code": -1, "msg": "user id is required"}
+    
+    # 定义允许更新的字段白名单
+    allowed_fields = {'id', 'name', 'icon', 'admin', 'wish_list'}
+    
+    # 过滤数据，只保留允许的字段
+    filtered_data = {}
+    for key, value in args.items():
+        if key in allowed_fields:
+            filtered_data[key] = value
+        else:
+            log.warning(f"[Update User] 拒绝更新不允许的字段: {key}")
+    
+    if not filtered_data or 'id' not in filtered_data:
+        return {"code": -1, "msg": "no valid fields to update"}
+    
+    return db_mgr.set_data('t_user', filtered_data)
+
+
 @api_bp.route("/delData", methods=['POST'])
 def del_data() -> ResponseReturnValue:
     args: Dict[str, Any] = read_json_from_request()
