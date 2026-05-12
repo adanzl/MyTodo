@@ -1,23 +1,23 @@
 <template>
   <div class="p-2">
-    <div class="flex items-center h-10">
-      <el-radio-group size="large" v-model="selectedCateId" @change="onCateChange">
+    <div class="flex items-center gap-2 h-10">
+      <el-input placeholder="请输入ID" v-model="searchId" size="small" class="w-30!" clearable
+        @clear="onCateChange"></el-input>
+      <el-button type="primary" plain size="small" @click="onFilterClk">筛选</el-button>
+      <el-button type="primary" size="small" @click="onAddGiftClk">添加奖品</el-button>
+      <el-button type="success" size="small" class="ml-1" @click="modifyCateModel = true">
+        编辑类别
+      </el-button>
+    </div>
+    <div class="flex py-2">
+      <el-radio-group size="default" v-model="selectedCateId" @change="onCateChange">
         <el-radio-button v-for="item in lotteryCatList" :key="item.id" :value="item.id">
           {{ item.name }}
         </el-radio-button>
       </el-radio-group>
-      <el-button type="primary" class="ml-1" @click="modifyCateModel = true">
-        <el-icon>
-          <Edit />
-        </el-icon>
-      </el-button>
-      <div class="flex-1 flex items-center justify-end gap-2">
-        <el-input placeholder="请输入ID" v-model="searchId" size="small" class="w-30!" clearable @clear="onCateChange"></el-input>
-        <el-button type="primary" plain size="small" @click="onFilterClk">筛选</el-button>
-        <el-button type="primary" size="small" @click="onAddGiftClk">添加奖品</el-button>
-      </div>
+
     </div>
-    <el-table :data="giftList.data" v-loading="loading" :max-height="tableMaxHeight" style="min-height: 200px">
+    <el-table :data="giftList.data" v-loading="loading" :max-height="tableMaxHeight" style="min-height: 200px" border>
       <!-- 图片 -->
       <el-table-column width="130" label="Image">
         <template #default="{ row }">
@@ -26,18 +26,26 @@
               <!-- 图片 -->
               <div class="flex items-center w-24">
                 <template v-if="!row.img">
-                  <el-upload class="flex items-center justify-center bg-white w-full h-full" action="#"
+                  <el-upload class="flex items-center justify-center bg-gray-100 w-full h-24" action="#"
                     list-type="picture-card" :limit="1" :auto-upload="false" :show-file-list="false"
                     :on-change="(file: UploadFile) => handleImageChange(file, row)">
-                    <el-icon>
-                      <Plus />
+                    <el-icon :size="40" color="#999">
+                      <Present />
                     </el-icon>
                   </el-upload>
                 </template>
                 <template v-else>
-                  <div class="relative z-50 w-full h-full">
-                    <el-image class="w-24 cursor-pointer z-99!" :src="getPicDisplayUrl(row.img)"
-                      :preview-src-list="[getPicDisplayUrl(row.img)]" :preview-teleported="true" fit="contain" />
+                  <div class="relative z-50 w-full h-24">
+                    <el-image class="w-full h-full cursor-pointer z-99!" :src="getPicDisplayUrl(row.img)"
+                      :preview-src-list="[getPicDisplayUrl(row.img)]" :preview-teleported="true" fit="contain">
+                      <template #error>
+                        <div class="w-full h-full flex items-center justify-center bg-gray-100">
+                          <el-icon :size="40" color="#999">
+                            <Present />
+                          </el-icon>
+                        </div>
+                      </template>
+                    </el-image>
                     <el-upload class="absolute bottom-0 right-0 z-100!" action="#" :show-file-list="false"
                       :auto-upload="false" :on-change="(file: UploadFile) => handleImageChange(file, row)">
                       <el-button size="small" type="primary" circle>
@@ -51,9 +59,17 @@
               </div>
             </template>
             <template v-else>
-              <div class="relative w-24">
-                <el-image class="w-24 cursor-pointer z-9999!" :src="getPicDisplayUrl(row.img)"
-                  :preview-src-list="[getPicDisplayUrl(row.img)]" :preview-teleported="true" fit="contain" />
+              <div class="relative w-24 h-24">
+                <el-image class="w-full h-full cursor-pointer z-9999!" :src="getPicDisplayUrl(row.img)"
+                  :preview-src-list="[getPicDisplayUrl(row.img)]" :preview-teleported="true" fit="contain">
+                  <template #error>
+                    <div class="w-full h-full flex items-center justify-center bg-gray-100">
+                      <el-icon :size="40" color="#999">
+                        <Present />
+                      </el-icon>
+                    </div>
+                  </template>
+                </el-image>
               </div>
             </template>
           </div>
@@ -132,11 +148,8 @@
         </template>
       </el-table-column>
     </el-table>
-    <el-pagination layout="sizes, prev, pager, next" :total="giftList.totalCount"
-      v-model:page-size="PAGE_SIZE"
-      :page-sizes="[5, 10, 20]"
-      :current-page="giftList.pageNum" class="mt-2" background
-      @size-change="handleSizeChange"
+    <el-pagination layout="sizes, prev, pager, next" :total="giftList.totalCount" v-model:page-size="PAGE_SIZE"
+      :page-sizes="[5, 10, 20]" :current-page="giftList.pageNum" class="mt-2" background @size-change="handleSizeChange"
       @current-change="(page: number) => handlePageChange(page, PAGE_SIZE)" />
   </div>
   <el-dialog v-model="modifyCateModel" title="类别管理" width="800" destroy-on-close>
@@ -181,7 +194,7 @@
 import { ref, onMounted, computed, nextTick } from "vue";
 import { ElMessage } from "element-plus";
 import type { UploadFile } from "element-plus";
-import { Edit, Plus } from "@element-plus/icons-vue";
+import { Edit, Plus, Present } from "@element-plus/icons-vue";
 import { getList, getData, setData, delData } from "@/api/api-common";
 import { uploadPic, getPicDisplayUrl } from "@/api/api-pic";
 import * as _ from "lodash-es";

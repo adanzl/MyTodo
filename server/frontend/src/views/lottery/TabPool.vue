@@ -1,7 +1,7 @@
 <template>
   <div class="p-2">
     <div class="flex items-center justify-between mb-0">
-      <el-button type="primary" @click="onAddPoolClk" class="h-9.5! mt-px">
+      <el-button type="primary" @click="onAddPoolClk" class="mt-px" size="small">
         <el-icon>
           <Plus />
         </el-icon>
