@@ -13,11 +13,7 @@
         </el-radio-button>
       </el-radio-group>
     </div>
-    <el-table
-      :data="recordList.data"
-      v-loading="loading"
-      stripe
-      @row-click="onRowClick"
+    <el-table :data="recordList.data" v-loading="loading" stripe @row-click="onRowClick"
       max-height="calc(100vh - 200px)">
       <el-table-column label="ID" prop="id" width="60"> </el-table-column>
       <el-table-column label="user" width="60">
@@ -36,8 +32,12 @@
       <el-table-column label="Value" width="70">
         <template #default="{ row }">
           <div class="flex items-center gap-1 w-full">
-            <el-icon v-if="row.value > 0" color="#67C23A" :size="16"><CaretTop /></el-icon>
-            <el-icon v-else color="#F56C6C" :size="16"><CaretBottom /></el-icon>
+            <el-icon v-if="row.value > 0" color="#67C23A" :size="16">
+              <CaretTop />
+            </el-icon>
+            <el-icon v-else color="#F56C6C" :size="16">
+              <CaretBottom />
+            </el-icon>
             <span class="flex-1 text-center">{{ row.value }}</span>
           </div>
         </template>
@@ -46,9 +46,7 @@
       <el-table-column label="MSG" prop="msg"> </el-table-column>
       <el-table-column label="" width="60" align="center" class-name="text-primary">
         <template #default="{ row }">
-          <el-icon
-            v-if="isGiftRecord(row)"
-            :size="20">
+          <el-icon v-if="isGiftRecord(row)" :size="20">
             <Present />
           </el-icon>
           <span v-else>-</span>
@@ -57,19 +55,10 @@
       <el-table-column label="操作" width="150" align="center" fixed="right">
         <template #default="{ row }">
           <div v-if="isGiftRecord(row)">
-            <el-button
-              type="danger"
-              link
-              size="small"
-              @click.stop="onUndo(row)">
+            <el-button type="danger" link size="small" @click.stop="onUndo(row)">
               撤销
             </el-button>
-            <el-button
-              type="success"
-              link
-              size="large"
-              :icon="SuccessFilled"
-              v-if="row.status !== 1"
+            <el-button type="success" link size="large" :icon="SuccessFilled" v-if="row.status !== 1"
               @click.stop="onConfirmGift(row)">
             </el-button>
           </div>
@@ -77,38 +66,28 @@
         </template>
       </el-table-column>
     </el-table>
-    <el-dialog
-      v-model="giftDialogVisible"
-      title="奖品详情"
-      width="800px"
-      align-center
-      @close="giftDialogData = []">
+    <el-dialog v-model="giftDialogVisible" title="奖品详情" width="800px" align-center @close="giftDialogData = []">
       <div v-if="giftDialogData && giftDialogData.length > 0" class="flex flex-wrap gap-4 py-2 justify-center w-full">
-        <div
-          v-for="(gift, index) in giftDialogData"
-          :key="index"
+        <div v-for="(gift, index) in giftDialogData" :key="index"
           class="flex flex-col items-center gap-2 p-3 border border-gray-200 rounded-lg min-w-50">
-          <el-image
-            v-if="gift.image"
-            :src="getPicDisplayUrl(gift.image)"
-            class="w-48 h-48 object-contain rounded"
-            fit="contain" />
+          <el-image :src="getPicDisplayUrl(gift.image)" class="w-48 h-48 object-contain rounded" fit="contain">
+            <template #error>
+              <div class="w-48 h-48 flex items-center justify-center bg-gray-100 rounded">
+                <el-icon :size="48" color="#909399">
+                  <Present />
+                </el-icon>
+              </div>
+            </template>
+          </el-image>
           <div class="font-medium text-sm text-center">{{ gift.name || "-" }}</div>
         </div>
       </div>
       <div v-else class="text-center py-8 text-gray-500">暂无奖品信息</div>
     </el-dialog>
-    <el-pagination
-      layout="sizes, prev, pager, next"
-      :total="recordList.totalCount"
-      :page-size="recordList.pageSize"
-      :page-sizes="[15, 20, 50]"
-      :current-page="recordList.pageNum"
-      class="mt-2"
-      background
+    <el-pagination layout="sizes, prev, pager, next" :total="recordList.totalCount" :page-size="recordList.pageSize"
+      :page-sizes="[15, 20, 50]" :current-page="recordList.pageNum" class="mt-2" background
       @size-change="(size: number) => handlePageChange(recordList.pageNum, size)"
-      @current-change="(page: number) => handlePageChange(page, recordList.pageSize)"
-    />
+      @current-change="(page: number) => handlePageChange(page, recordList.pageSize)" />
   </div>
 </template>
 

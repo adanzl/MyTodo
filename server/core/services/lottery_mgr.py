@@ -164,11 +164,11 @@ class LotteryMgr:
             return {"code": -1, "msg": f"写入积分历史失败：{add_ret.get('msg')}"}
 
         # ========== 阶段 4：更新用户状态 ==========
-        log.info(f"Update wish_progress: user_id={user_id}, old={wish_progress}, new={cur_progress}")
+        log.info(f"Update wish_progress: user_id={user_id}, old={wish_progress}, new={cur_progress}, wish_list={wish_list_str}")
         self._db.set_data('t_user', {'id': user_id, 'wish_progress': cur_progress})
 
         # ========== 阶段 5：记录日志并返回 ==========
-        log.info(f"Lottery success: user_id={user_id}, out_keys=[{out_key_str}], fee={pool_cost}")
+        log.info(f"Lottery success: user_id={user_id}, out_keys=[{out_key_str}], fee={pool_cost}, wish_draw={has_wish_draw}")
 
         return {
             "code": 0,

@@ -356,9 +356,12 @@ class TodoMgr:
                 db_data['id'] = query_result['data'][0]['id']
 
             result = db_mgr.set_data('t_schedule_save', db_data)
+            
+            # 获取保存后的记录ID（新插入或更新的记录ID）
+            save_id = result.get('data') if result.get('code') == 0 else None
 
             # 如果状态改变，更新用户总积分
-            if old_state != schedule_save.state:
+            if old_state != schedule_save.state and result.get('code') == 0:
                 # 获取日程所属用户ID和模板积分
                 schedule_query = db_mgr.query(
                     f"SELECT user_id, score FROM t_schedule WHERE id = {schedule_save.scheduleId}")
@@ -377,15 +380,17 @@ class TodoMgr:
                             if template_score > 0:
                                 new_score = current_score + template_score
                                 log.info(f"[TodoMgr] 用户 {user_id} 获得 {template_score} 积分")
-                                # 更新 t_schedule_save 中的 score
-                                db_mgr.set_data('t_schedule_save', {'id': db_data.get('id'), 'score': template_score})
+                                # 更新 t_schedule_save 中的 score（使用刚插入/更新的记录ID）
+                                if save_id is not None:
+                                    db_mgr.set_data('t_schedule_save', {'id': save_id, 'score': template_score})
                         # 从完成变为未完成：扣积分（从 t_schedule_save 的旧记录获取）
                         else:
                             if old_score > 0:
                                 new_score = max(0, current_score - old_score)
                                 log.info(f"[TodoMgr] 用户 {user_id} 扣除 {old_score} 积分")
-                                # 更新 t_schedule_save 中的 score 为 0
-                                db_mgr.set_data('t_schedule_save', {'id': db_data.get('id'), 'score': 0})
+                                # 更新 t_schedule_save 中的 score 为 0（使用刚插入/更新的记录ID）
+                                if save_id is not None:
+                                    db_mgr.set_data('t_schedule_save', {'id': save_id, 'score': 0})
 
                         if new_score != current_score:
                             db_mgr.set_data('t_user', {'id': user_id, 'score': new_score})

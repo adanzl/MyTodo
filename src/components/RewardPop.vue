@@ -67,10 +67,11 @@ watch(
   { immediate: true }
 );
 
-/** 优先使用缓存，无缓存时用接口 URL，无图时用占位 */
+/** 优先使用缓存,无缓存时用接口 URL,无图时用占位 */
 const rewardImgUrl = computed(() => {
   const raw = props.img;
   if (cachedImgUrl.value) return cachedImgUrl.value;
+  // 即使没有缓存,也要通过 getPicDisplayUrl 获取默认占位图
   return getPicDisplayUrl(raw);
 });
 </script>
