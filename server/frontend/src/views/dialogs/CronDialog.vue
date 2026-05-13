@@ -224,7 +224,7 @@ const emit = defineEmits<{
 const internalVisible = ref(props.visible);
 
 const cronBuilder = ref<CronBuilder>({
-  second: "*",
+  second: "0",
   secondCustom: "",
   minute: "*",
   minuteCustom: "",

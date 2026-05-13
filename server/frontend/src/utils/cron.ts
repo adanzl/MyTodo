@@ -269,7 +269,7 @@ export function calculateNextCronTimes(cronExpr: string, count = 3): string[] {
  * 生成 Cron 表达式
  */
 export function generateCronExpression(builder: CronBuilder): string {
-  const second = builder.second === "custom" ? builder.secondCustom || "*" : builder.second || "*";
+  const second = builder.second === "custom" ? builder.secondCustom || "0" : builder.second || "0";
   const minute = builder.minute === "custom" ? builder.minuteCustom || "*" : builder.minute || "*";
   const hour = builder.hour === "custom" ? builder.hourCustom || "*" : builder.hour || "*";
   const day = builder.day === "custom" ? builder.dayCustom || "*" : builder.day || "*";
