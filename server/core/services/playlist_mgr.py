@@ -19,28 +19,36 @@ from core.config import app_logger, FFMPEG_PATH
 from core.services.scheduler_mgr import scheduler_mgr
 from core.utils import time_to_seconds
 
+# P0 阶段：常量与纯函数已迁出到 core/services/playlist/。
+# 为保持 `from core.services.playlist_mgr import PLAYLIST_RDS_FULL_KEY / _TS / _get_pre_list_for_today`
+# 这类外部引用不破坏，这里继续以原名重新导出。
+from core.services.playlist.constants import (
+    PLAYLIST_RDS_FULL_KEY,
+    PLAYLIST_RDS_HISTORY_KEY,
+    DEVICE_TYPES,
+    _TS,
+)
+from core.services.playlist.pre_lists import get_pre_list_at as _pl_get_pre_list_at
+from core.services.playlist.repository import PlaylistRepository
+
 log = app_logger
-
-PLAYLIST_RDS_FULL_KEY = "schedule_play:playlist_collection"
-PLAYLIST_RDS_HISTORY_KEY = "schedule_play:playlist_collection_history"
-DEVICE_TYPES = {"device_agent", "bluetooth", "dlna", "mi"}
-
-_TS = lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _get_pre_list_for_today(pre_lists: List[List]) -> List:
     """获取今天对应的前置文件列表。
 
+    本函数保留在 `playlist_mgr` 命名空间，是为了让 `patch('core.services.playlist_mgr.get_weekday_index')`
+    这种现有的测试 patch 方式继续生效；核心逻辑委托给 `playlist.pre_lists.get_pre_list_at`。
+
     Args:
-        pre_lists: pre_lists 数组，固定7个元素，分别代表周一到周日。
+        pre_lists: pre_lists 数组，固定 7 个元素，分别代表周一到周日。
 
     Returns:
         今天对应的前置文件列表。
     """
     if not pre_lists or len(pre_lists) != 7:
         return []
-    weekday_index = get_weekday_index()
-    return pre_lists[weekday_index] if isinstance(pre_lists[weekday_index], list) else []
+    return _pl_get_pre_list_at(pre_lists, get_weekday_index())
 
 
 class PlaylistMgr:
@@ -72,9 +80,13 @@ class PlaylistMgr:
         self._duration_blacklist = Counter()  # 获取时长失败的黑名单 {file_uri: failure_count}
         self._needs_reload = False  # 标记是否需要重新从 RDS 加载
         self._rds_save_queue = Queue()  # Redis 保存操作队列（用于从线程传递到 gevent 环境）
-        self._rds_save_greenlet = None  # Redis 保存操作的 greenlet
         self._last_play_sent_at = {}  # 向设备发送 play 的时间 {playlist_id: datetime}，用于停止时判断是否需延迟再发 stop
         self._convert_locks = {}  # 转换锁 {playlist_id: threading.Lock()}，防止转换过程中修改播放列表
+        # P1: RDS 读写逻辑迁出到 PlaylistRepository。用 provider 避免 _playlist_raw 重赋值导致引用过期。
+        self._repo = PlaylistRepository(
+            playlist_raw_provider=lambda: self._playlist_raw,
+            rds_save_queue=self._rds_save_queue,
+        )
         self.reload()
         self._start_rds_save_worker()  # 启动 Redis 保存操作的 worker
         self._ensure_playlist_duration_guard_job()  # 启动播放列表时长守护任务
@@ -153,74 +165,31 @@ class PlaylistMgr:
             log.error(f"[PlaylistMgr] get_playlist_history error: {e}", exc_info=True)
             return {}
 
+    # ------------------------------------------------------------------
+    # P1: 下面 4 个 _*_to_rds / _start_rds_save_worker 方法保留为 thin wrapper，
+    # 实际实现已迁入 core/services/playlist/repository.PlaylistRepository。
+    # 保留 wrapper 的目的：
+    #   1) 业务代码内 `self._save_playlist_to_rds()` / `monkeypatch.setattr(instance, ...)`
+    #      仍能命中实例方法；
+    #   2) `monkeypatch.setattr(pm.PlaylistMgr, "_start_rds_save_worker", ...)`
+    #      这种类级 patch 仍能拦截 worker 启动。
+    # ------------------------------------------------------------------
+
     def _start_rds_save_worker(self) -> None:
-        """启动后台 greenlet 来处理 Redis 保存队列。
-
-        这是一个单例 worker，确保只有一个 greenlet 在运行。
-        它从 `_rds_save_queue` 中获取保存请求，并在 gevent 上下文中
-        安全地执行 Redis I/O，解决了从独立线程直接写 Redis 的并发问题。
-        """
-        if self._rds_save_greenlet is not None and not self._rds_save_greenlet.dead:
-            return  # 已经启动
-
-        def _rds_save_worker() -> None:
-            """在 gevent 环境中处理 Redis 保存操作"""
-            while True:
-                try:
-                    # 检查队列中是否有保存操作
-                    try:
-                        operation = self._rds_save_queue.get(timeout=1.0)
-                        if operation == 'save_playlist':
-                            self._save_playlist_to_rds()
-                    except Empty:
-                        # 超时或队列为空，继续循环
-                        pass
-                    sleep(0.1)  # 短暂休眠，避免 CPU 占用过高
-                except Exception as e:
-                    log.error(f"[PlaylistMgr] Redis 保存 worker 异常: {e}", exc_info=True)
-                    sleep(1.0)  # 出错后等待更长时间
-
-        self._rds_save_greenlet = spawn(_rds_save_worker)
+        """启动后台 greenlet 来处理 Redis 保存队列（委托给 repository）。"""
+        self._repo.start_save_worker()
 
     def _save_playlist_to_rds(self) -> None:
-        """保存播放列表到 RDS，同时保存历史记录"""
-        try:
-            json_str = json.dumps(self._playlist_raw, ensure_ascii=False)
-            rds_mgr.set(PLAYLIST_RDS_FULL_KEY, json_str)
+        """保存播放列表到 RDS，同时保存历史记录（委托给 repository）。"""
+        self._repo.save()
 
-            # 保存历史记录
-            self._save_playlist_history(json_str)
-        except Exception as e:
-            log.error(f"[PlaylistMgr] _save_playlist_to_rds error: {e}", exc_info=True)
-            raise
+    def _save_playlist_to_rds_safely(self) -> None:
+        """异步持久化用：吞掉异常，避免 spawn 出去的 greenlet 因 Redis 失败影响主流程。"""
+        self._repo.save_safely()
 
     def _save_playlist_history(self, json_str: str) -> None:
-        """保存播放列表历史记录到 Redis Hash，最多保留10个历史版本"""
-        try:
-            # 获取当前时间戳作为 field
-            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-            # 使用 HSET 直接添加到 Hash
-            rds_mgr.hset(PLAYLIST_RDS_HISTORY_KEY, timestamp, json_str)
-
-            # 检查 Hash 大小，如果超过10个，删除最旧的
-            current_count = rds_mgr.hlen(PLAYLIST_RDS_HISTORY_KEY)
-            if current_count > 10:
-                # 获取所有 field（时间戳）
-                history_dict = rds_mgr.hgetall(PLAYLIST_RDS_HISTORY_KEY)
-                # 按时间排序，找出最旧的几个
-                sorted_keys = sorted(history_dict.keys())
-                keys_to_remove = sorted_keys[:current_count - 10]
-
-                # 批量删除最旧的记录
-                if keys_to_remove:
-                    rds_mgr.hdel(PLAYLIST_RDS_HISTORY_KEY, *keys_to_remove)
-                    log.info(f"[PlaylistMgr] 清理过期历史记录，删除 {len(keys_to_remove)} 个旧记录")
-
-            log.debug(f"[PlaylistMgr] 保存播放列表历史记录: {timestamp}")
-        except Exception as e:
-            log.error(f"[PlaylistMgr] _save_playlist_history error: {e}", exc_info=True)
-            # 历史记录保存失败不影响主流程，只记录错误
+        """保存播放列表历史记录到 Redis Hash（委托给 repository）。"""
+        self._repo._save_history(json_str)
 
     def save_playlist(self, collection: Dict[str, Any]) -> int:
         """保存整个播放列表集合并持久化到 RDS。
@@ -311,11 +280,9 @@ class PlaylistMgr:
             if raw:
                 self._playlist_raw = json.loads(raw.decode("utf-8"))  # pyright: ignore[reportAttributeAccessIssue]
 
-            # 清除所有播放列表的 isPlaying 状态（程序重启后，播放状态不应该保留）
+            # 保留 isPlaying / 定时器固化字段，便于进程重启后由 _restore_timers_from_persistence 恢复 APScheduler 任务。
+            migrated = False
             for playlist_id, playlist_data in self._playlist_raw.items():
-                if 'isPlaying' in playlist_data:
-                    del playlist_data['isPlaying']
-
                 # 迁移 pre_files 到 pre_lists（如果还没有 pre_lists）
                 pre_lists = playlist_data.get("pre_lists", [])
                 if not isinstance(pre_lists, list) or len(pre_lists) != 7:
@@ -325,6 +292,7 @@ class PlaylistMgr:
                     playlist_data["pre_lists"] = pre_lists
                     action = "迁移" if "pre_lists" not in playlist_data else "修复"
                     log.info(f"[PlaylistMgr] {action} pre_files 到 pre_lists: {playlist_id}, 共 {len(pre_files)} 个文件")
+                    migrated = True
 
             # 从 _playlist_raw 恢复游标状态到 _play_state，保留游标以便从上次位置继续
             # 只恢复那些在 _play_state 中不存在的播放列表（程序启动时的情况）
@@ -335,7 +303,26 @@ class PlaylistMgr:
                     current_index = playlist_data.get("current_index", 0)
                     pre_lists = playlist_data.get("pre_lists", [])
                     pre_files = _get_pre_list_for_today(pre_lists)  # 获取今天对应的前置文件列表
-                    if pre_files:
+                    if playlist_data.get("isPlaying"):
+                        if "play_in_pre_files" in playlist_data or "play_pre_index" in playlist_data:
+                            self._play_state[playlist_id] = {
+                                "in_pre_files": bool(playlist_data.get("play_in_pre_files")),
+                                "pre_index": int(playlist_data.get("play_pre_index", 0)),
+                                "file_index": current_index,
+                            }
+                        elif pre_files:
+                            self._play_state[playlist_id] = {
+                                "in_pre_files": True,
+                                "pre_index": 0,
+                                "file_index": current_index
+                            }
+                        else:
+                            self._play_state[playlist_id] = {
+                                "in_pre_files": False,
+                                "pre_index": 0,
+                                "file_index": current_index
+                            }
+                    elif pre_files:
                         # 如果有 pre_files，从 pre_files 开始（从头开始）
                         self._play_state[playlist_id] = {
                             "in_pre_files": True,
@@ -355,15 +342,18 @@ class PlaylistMgr:
             for pid in playlist_ids_to_remove:
                 self._play_state.pop(pid, None)
 
-            # 清除运行时状态（这些状态不应该在重启后保留）
+            # 清除内存运行时状态；正在播的列表由 _restore_timers_from_persistence 根据 RDS 字段恢复
             self._playing_playlists.clear()
             self._scheduled_play_start_times.clear()
 
-            # 如果清除了 isPlaying 状态，保存回 RDS
-            if self._playlist_raw:
-                self._save_playlist_to_rds()
+            if migrated:
+                try:
+                    self._save_playlist_to_rds()
+                except Exception as e:
+                    log.warning(f"[PlaylistMgr] reload 迁移结果保存失败: {e}")
 
             self._refresh_device_map()
+            self._restore_timers_from_persistence()
             self._needs_reload = False
             log.info(f"[PlaylistMgr] Load success: {len(self._playlist_raw)} playlists")
             return 0
@@ -473,7 +463,8 @@ class PlaylistMgr:
             def _guard_task() -> None:
                 try:
                     now = datetime.datetime.now()
-                    # 遍历所有有记录的定时任务播放开始时间
+                    grace = timedelta(seconds=15)
+                    # 1) 内存中的定时任务开始时间（与现有逻辑兼容）
                     for pid, start_time in list(self._scheduled_play_start_times.items()):
                         playlist_data = self._playlist_raw.get(pid, {})
                         schedule = playlist_data.get("schedule", {}) or {}
@@ -482,8 +473,6 @@ class PlaylistMgr:
                             continue
 
                         planned_end = start_time + timedelta(minutes=duration_minutes)
-                        # 预留一点缓冲（例如 15 秒），避免因为时间上的微小偏差导致过早停止
-                        grace = datetime.timedelta(seconds=15)
                         if now >= planned_end + grace:
                             p_name = playlist_data.get("name", "未知播放列表")
                             log.warning(f"[PlaylistMgr] 播放列表时长守护任务检测到超时，尝试强制停止: {pid} - {p_name}, "
@@ -492,6 +481,27 @@ class PlaylistMgr:
                             if code == 0:
                                 log.info(f"[PlaylistMgr] 播放列表时长守护任务强制停止成功: {pid} - {p_name}")
                             else:
+                                log.error(f"[PlaylistMgr] 播放列表时长守护任务强制停止失败: {pid} - {p_name}, {msg}")
+
+                    # 2) 以 RDS 固化的 duration_timer_at 兜底（进程重启后 _scheduled_play_start_times 可能为空）
+                    for pid, playlist_data in list(self._playlist_raw.items()):
+                        if not playlist_data.get("isPlaying"):
+                            continue
+                        schedule = playlist_data.get("schedule", {}) or {}
+                        if schedule.get("duration", 0) <= 0:
+                            continue
+                        dta = playlist_data.get("duration_timer_at")
+                        if not dta:
+                            continue
+                        try:
+                            end_dt = datetime.datetime.strptime(str(dta).strip(), "%Y-%m-%d %H:%M:%S")
+                        except (ValueError, TypeError):
+                            continue
+                        if now >= end_dt + grace:
+                            p_name = playlist_data.get("name", "未知播放列表")
+                            log.warning(f"[PlaylistMgr] 播放列表时长守护任务(固化时间)检测到超时: {pid} - {p_name}")
+                            code, msg = self.stop(pid)
+                            if code != 0:
                                 log.error(f"[PlaylistMgr] 播放列表时长守护任务强制停止失败: {pid} - {p_name}, {msg}")
                 except Exception as e:
                     log.error(f"[PlaylistMgr] 播放列表时长守护任务执行异常: {e}", exc_info=True)
@@ -504,6 +514,49 @@ class PlaylistMgr:
                 log.error("[PlaylistMgr] 启动播放列表时长守护任务失败")
         except Exception as e:
             log.error(f"[PlaylistMgr] 初始化播放列表时长守护任务异常: {e}", exc_info=True)
+
+    def _restore_timers_from_persistence(self) -> None:
+        """reload / 冷启动后根据 RDS 中固化的定时器字段恢复 APScheduler 任务。"""
+        if sys.platform != "linux" or not self._playlist_raw:
+            return
+        now = datetime.datetime.now()
+        for pid, p_data in list(self._playlist_raw.items()):
+            if not p_data.get("isPlaying"):
+                continue
+            if pid not in self._device_map:
+                log.warning(f"[PlaylistMgr] reload 恢复定时器: 无设备映射，跳过 {pid}")
+                continue
+            self._playing_playlists.add(pid)
+            schedule = p_data.get("schedule") or {}
+            dur_min = int(schedule.get("duration", 0) or 0)
+            dta = p_data.get("duration_timer_at")
+            if dur_min > 0 and dta:
+                try:
+                    end_dt = datetime.datetime.strptime(str(dta).strip(), "%Y-%m-%d %H:%M:%S")
+                    self._scheduled_play_start_times[pid] = end_dt - timedelta(minutes=dur_min)
+                    if end_dt <= now:
+                        self.stop(pid)
+                        continue
+                    remaining_min = max((end_dt - now).total_seconds() / 60.0, 1.0 / 60.0)
+                    self._start_playlist_duration_timer(pid, remaining_min)
+                except (ValueError, TypeError) as e:
+                    log.warning(f"[PlaylistMgr] reload 恢复 duration_timer_at 失败 {pid}: {e}")
+
+            p_data = self._playlist_raw.get(pid)
+            if not p_data or not p_data.get("isPlaying"):
+                continue
+            fta = p_data.get("file_timer_at")
+            if fta:
+                try:
+                    file_end = datetime.datetime.strptime(str(fta).strip(), "%Y-%m-%d %H:%M:%S")
+                    if file_end <= now:
+                        spawn(lambda p=pid: self._on_file_timer_fire(p))
+                    else:
+                        self._start_file_timer(pid, (file_end - now).total_seconds())
+                except (ValueError, TypeError) as e:
+                    log.warning(f"[PlaylistMgr] reload 恢复 file_timer_at 失败 {pid}: {e}")
+            else:
+                log.warning(f"[PlaylistMgr] reload 恢复: isPlaying=True 但缺少 file_timer_at，无法恢复切歌定时器: {pid}")
 
     def _cleanup_orphaned_cron_jobs(self) -> None:
         """清理孤立的定时任务和状态。"""
@@ -792,8 +845,14 @@ class PlaylistMgr:
         self._playing_playlists.discard(id)
         self._play_state.pop(id, None)
         playlist_data = self._playlist_raw.get(id)
-        if playlist_data and 'isPlaying' in playlist_data:
-            del playlist_data['isPlaying']
+        if playlist_data:
+            need_save = False
+            for key in ("isPlaying", "play_in_pre_files", "play_pre_index", "duration_timer_at", "file_timer_at"):
+                if key in playlist_data:
+                    del playlist_data[key]
+                    need_save = True
+            if need_save:
+                spawn(self._save_playlist_to_rds_safely)
 
     def play(self, id: str, force: bool = False) -> tuple[int, str]:
         """开始播放指定播放列表。
@@ -856,6 +915,9 @@ class PlaylistMgr:
         # 标记为正在播放
         self._playing_playlists.add(id)
         playlist_data['isPlaying'] = True
+        playlist_data["play_in_pre_files"] = bool(play_state["in_pre_files"])
+        playlist_data["play_pre_index"] = int(play_state["pre_index"])
+        spawn(self._save_playlist_to_rds_safely)
         self._clear_timer(id, self._file_timers)
 
         # 启动文件定时器
@@ -1196,6 +1258,74 @@ class PlaylistMgr:
         else:
             return -1, f"不支持的操作: {action}"
 
+    def _on_file_timer_fire(self, pid: str) -> None:
+        """文件播放结束定时器触发：根据设备进度微调后切下一首。"""
+        device = self._device_map.get(pid, {}).get("obj")
+        if device:
+            try:
+                code, status = device.get_status()
+                if code == 0:
+                    device_state = status.get("state", "")
+                    duration_str = status.get("duration", "00:00:00")
+                    position_str = status.get("position", "00:00:00")
+                    try:
+                        wait_seconds = time_to_seconds(duration_str) - time_to_seconds(position_str)
+                    except (ValueError, AttributeError) as e:
+                        log.warning(
+                            f"[PlaylistMgr] 计算等待时间失败: {pid}, duration={duration_str}, position={position_str}, {e}")
+                        wait_seconds = 0
+
+                    if device_state == "STOPPED":
+                        try:
+                            device.stop()
+                        except Exception as e:
+                            log.warning(f"[PlaylistMgr] 停止已停止的设备异常: {pid}, {e}")
+                    elif wait_seconds >= 2:
+                        wait_seconds = min(wait_seconds, 5)
+                        time.sleep(wait_seconds)
+                else:
+                    log.warning(f"[PlaylistMgr] 获取设备状态失败: {pid}, {status.get('error', '未知错误')}")
+            except Exception as e:
+                log.error(f"[PlaylistMgr] 检查播放状态异常: {pid}, {e}")
+
+        self._clear_timer(pid, self._file_timers)
+
+        if pid not in self._play_state:
+            log.warning(f"[PlaylistMgr] 文件定时器触发时播放状态丢失: {pid}，重新初始化")
+            playlist_data = self._playlist_raw.get(pid)
+            if playlist_data:
+                pre_files = self._get_pre_files_for_today(playlist_data)
+                self._init_play_state(pid, playlist_data, pre_files)
+            else:
+                log.error(f"[PlaylistMgr] 文件定时器触发时播放列表数据不存在: {pid}")
+                return
+
+        device_stop = self._device_map.get(pid, {}).get("obj")
+        if device_stop:
+            try:
+                stop_code, stop_msg = device_stop.stop()
+                if stop_code != 0:
+                    log.warning(f"[PlaylistMgr] 停止当前播放失败: {pid}, {stop_msg}")
+            except Exception as e:
+                log.warning(f"[PlaylistMgr] 停止当前播放异常: {pid}, {e}")
+
+        try:
+            result = self.play_next(pid)
+            if result[0] != 0:
+                log.warning(f"[PlaylistMgr] 定时器触发播放下一首失败: {pid}, {result[1]}")
+                self._clear_timer(pid, self._file_timers)
+                self._clear_timer(pid, self._file_on_device_timers)
+                self._playing_playlists.discard(pid)
+                self._play_state.pop(pid, None)
+                playlist_data = self._playlist_raw.get(pid)
+                if playlist_data:
+                    playlist_data.pop("isPlaying", None)
+                    playlist_data.pop("file_timer_at", None)
+                    spawn(self._save_playlist_to_rds_safely)
+        except Exception as e:
+            log.error(f"[PlaylistMgr] 定时器触发播放下一首异常: {pid}, {e}", exc_info=True)
+            self._cleanup_play_state(pid)
+
     def _start_file_timer(self, id: str, duration_seconds: float) -> None:
         """启动单个文件播放结束后的切歌定时器。
 
@@ -1213,79 +1343,15 @@ class PlaylistMgr:
             scheduler.remove_job(job_id)
 
         def __play_next_task(pid=id) -> None:
-            """定时器触发时，判断position，如果比duration小超过2s则等一下差值"""
-            device = self._device_map.get(pid, {}).get("obj")
-            wait_seconds = 0
-            if device:
-                try:
-                    code, status = device.get_status()
-                    if code == 0:
-                        device_state = status.get("state", "")
-                        duration_str = status.get("duration", "00:00:00")
-                        position_str = status.get("position", "00:00:00")
-                        # 安全计算等待时间
-                        try:
-                            wait_seconds = time_to_seconds(duration_str) - time_to_seconds(position_str)
-                        except (ValueError, AttributeError) as e:
-                            log.warning(
-                                f"[PlaylistMgr] 计算等待时间失败: {pid}, duration={duration_str}, position={position_str}, {e}")
-                            wait_seconds = 0
+            self._on_file_timer_fire(pid)
 
-                        # 如果设备状态是 STOPPED，说明文件已经播放完成，不需要等待
-                        if device_state == "STOPPED":
-                            try:
-                                device.stop()
-                            except Exception as e:
-                                log.warning(f"[PlaylistMgr] 停止已停止的设备异常: {pid}, {e}")
-                            wait_seconds = 0
-                        elif wait_seconds >= 2:
-                            # 如果还有剩余时间，等待一下（最多等待5秒，避免等待过久）
-                            wait_seconds = min(wait_seconds, 5)
-                            time.sleep(wait_seconds)
-                    else:
-                        # 获取状态失败，记录警告但继续执行切换下一首
-                        log.warning(f"[PlaylistMgr] 获取设备状态失败: {pid}, {status.get('error', '未知错误')}")
-                except Exception as e:
-                    log.error(f"[PlaylistMgr] 检查播放状态异常: {pid}, {e}")
-
-            # 清除定时器（避免重复触发）
-            self._clear_timer(pid, self._file_timers)
-
-            # 确保播放状态存在，如果不存在则初始化
-            if pid not in self._play_state:
-                log.warning(f"[PlaylistMgr] 文件定时器触发时播放状态丢失: {pid}，重新初始化")
-                playlist_data = self._playlist_raw.get(pid)
-                if playlist_data:
-                    pre_files = self._get_pre_files_for_today(playlist_data)  # 获取今天对应的前置文件列表
-                    self._init_play_state(pid, playlist_data, pre_files)
-                else:
-                    log.error(f"[PlaylistMgr] 文件定时器触发时播放列表数据不存在: {pid}")
-                    return
-
-            # 在播放下一首之前，先停止当前播放，避免设备自动重播导致重复播放
-            if device:
-                try:
-                    stop_code, stop_msg = device.stop()
-                    if stop_code != 0:
-                        log.warning(f"[PlaylistMgr] 停止当前播放失败: {pid}, {stop_msg}")
-                except Exception as e:
-                    log.warning(f"[PlaylistMgr] 停止当前播放异常: {pid}, {e}")
-
-            # 播放下一首
-            try:
-                result = self.play_next(pid)
-                # 如果播放失败，清理播放状态，避免任务一直显示“播放中”但实际已停止
-                if result[0] != 0:
-                    log.warning(f"[PlaylistMgr] 定时器触发播放下一首失败: {pid}, {result[1]}")
-                    self._cleanup_play_state(pid)
-            except Exception as e:
-                log.error(f"[PlaylistMgr] 定时器触发播放下一首异常: {pid}, {e}", exc_info=True)
-                self._cleanup_play_state(pid)
-
-        # 使用 DateTrigger 在指定时间后执行
         run_date = datetime.datetime.now() + timedelta(seconds=duration_seconds)
         scheduler.add_date_job(func=__play_next_task, job_id=job_id, run_date=run_date)
         self._file_timers[id] = job_id
+        p_data = self._playlist_raw.get(id)
+        if p_data is not None:
+            p_data["file_timer_at"] = run_date.strftime("%Y-%m-%d %H:%M:%S")
+            spawn(self._save_playlist_to_rds_safely)
         p_name = self._playlist_raw.get(id, {}).get("name", "未知播放列表")
         log.info(f"[PlaylistMgr] 启动文件定时器: {id} - {p_name}, 将在 {duration_seconds} 秒后播放下一首")
 
@@ -1338,7 +1404,7 @@ class PlaylistMgr:
                 scheduler.remove_job(job_id)
             del timer_dict[id]
 
-    def _start_playlist_duration_timer(self, id: str, duration_minutes: int) -> None:
+    def _start_playlist_duration_timer(self, id: str, duration_minutes: float) -> None:
         """启动播放列表整体时长限制定时器。
 
         该定时器会在指定分钟数后触发，自动调用 stop() 方法来停止播放列表，
@@ -1346,7 +1412,7 @@ class PlaylistMgr:
 
         Args:
             id: 播放列表 ID。
-            duration_minutes: 播放时长限制（分钟）。
+            duration_minutes: 播放时长限制（分钟），可为小数（reload 恢复剩余时间用）。
         """
         scheduler = scheduler_mgr
         job_id = f"playlist_duration_timer_{id}"
@@ -1373,6 +1439,11 @@ class PlaylistMgr:
                     self._clear_timer(pid, self._playlist_duration_timers)
                     self._clear_timer(pid, self._file_timers)
                     self._scheduled_play_start_times.pop(pid, None)
+                    p_data = self._playlist_raw.get(pid)
+                    if p_data:
+                        p_data.pop("duration_timer_at", None)
+                        p_data.pop("file_timer_at", None)
+                        spawn(self._save_playlist_to_rds_safely)
                     return
 
                 # 先清理定时器
@@ -1393,6 +1464,10 @@ class PlaylistMgr:
         run_date = datetime.datetime.now() + timedelta(minutes=duration_minutes)
         scheduler.add_date_job(func=stop_playlist_task, job_id=job_id, run_date=run_date)
         self._playlist_duration_timers[id] = job_id
+        p_data = self._playlist_raw.get(id)
+        if p_data is not None:
+            p_data["duration_timer_at"] = run_date.strftime("%Y-%m-%d %H:%M:%S")
+            spawn(self._save_playlist_to_rds_safely)
         log.info(f"[PlaylistMgr] 启动播放列表时长定时器: {id} - {p_name}, 将在 {duration_minutes} 分钟后停止播放")
 
     def convert_playlist_to_mp3(self, playlist_id: str) -> tuple[int, str]:
