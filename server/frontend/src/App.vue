@@ -1,6 +1,6 @@
 <template>
   <el-container class="h-screen">
-    <Sidebar />
+    <Sidebar @collapse-change="handleCollapseChange" />
     <el-container v-if="userStore.curUser.bLogin">
       <el-header class="flex justify-between items-center bg-blue-50 px-6">
         <div class="flex items-center gap-2">
@@ -52,6 +52,13 @@ import {
 
 // 使用 Pinia Store
 const userStore = useUserStore();
+
+// 侧边栏折叠状态
+const isSidebarCollapsed = ref(false);
+
+const handleCollapseChange = (collapsed: boolean) => {
+  isSidebarCollapsed.value = collapsed;
+};
 
 // 服务器状态
 const localIpStatus = ref<boolean | null>(null);
