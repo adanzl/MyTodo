@@ -12,32 +12,26 @@
           <el-icon><HomeFilled /></el-icon>
           <template #title>Home</template>
         </el-menu-item>
-        <el-sub-menu index="my-todo">
-          <template #title>
-            <el-icon><Promotion /></el-icon>
-            <span>MyTodo</span>
-          </template>
-          <el-menu-item index="/lottery" @click="handleMenuSelect">
-            <el-icon><Present /></el-icon>
-            <template #title>抽奖设置</template>
-          </el-menu-item>
-          <el-menu-item index="/chat">
-            <el-icon><Menu /></el-icon>
-            <template #title>Chat</template>
-          </el-menu-item>
-          <el-menu-item index="/info">
-            <el-icon><Document /></el-icon>
-            <template #title>Info</template>
-          </el-menu-item>
-          <el-menu-item index="/score">
-            <el-icon><Star /></el-icon>
-            <template #title>Score</template>
-          </el-menu-item>
-          <el-menu-item index="/statistics">
-            <el-icon><PieChart /></el-icon>
-            <template #title>统计</template>
-          </el-menu-item>
-        </el-sub-menu>
+        <el-menu-item index="/lottery" @click="handleMenuSelect">
+          <el-icon><Present /></el-icon>
+          <template #title>抽奖设置</template>
+        </el-menu-item>
+        <el-menu-item index="/chat">
+          <el-icon><ChatRound /></el-icon>
+          <template #title>Chat</template>
+        </el-menu-item>
+        <el-menu-item index="/schedule">
+          <el-icon><Timer /></el-icon>
+          <template #title>日程</template>
+        </el-menu-item>
+        <el-menu-item index="/score">
+          <el-icon><Star /></el-icon>
+          <template #title>Score</template>
+        </el-menu-item>
+        <el-menu-item index="/statistics">
+          <el-icon><PieChart /></el-icon>
+          <template #title>统计</template>
+        </el-menu-item>
         <el-menu-item index="/timetable">
           <el-icon><Calendar /></el-icon>
           <template #title>课程表</template>
@@ -64,16 +58,15 @@ import { ref } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import {
   HomeFilled,
-  Promotion,
+  ChatRound,
   Present,
-  Menu,
-  Document,
   Star,
   Calendar,
   Platform,
   Setting,
   PieChart,
   List,
+  Timer,
 } from "@element-plus/icons-vue";
 import { useUserStore } from "@/stores/user";
 

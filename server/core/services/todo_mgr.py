@@ -356,7 +356,7 @@ class TodoMgr:
                 db_data['id'] = query_result['data'][0]['id']
 
             result = db_mgr.set_data('t_schedule_save', db_data)
-            
+
             # 获取保存后的记录ID（新插入或更新的记录ID）
             save_id = result.get('data') if result.get('code') == 0 else None
 
@@ -402,6 +402,42 @@ class TodoMgr:
             return result
         except Exception as e:
             log.error(f"[TodoMgr] 保存日程状态异常: {e}", exc_info=True)
+            return {"code": -1, "msg": f'error: {str(e)}'}
+
+    def get_todo_list(self, user_id: int, page_num: int = 1, page_size: int = 20) -> Dict[str, Any]:
+        """获取日程列表（分页）"""
+        try:
+            # 使用 db_mgr.get_list 方法
+            result = db_mgr.get_list(table='t_schedule',
+                                     page_num=page_num,
+                                     page_size=page_size,
+                                     conditions={'user_id': user_id})
+
+            if result.get('code') != 0:
+                return result
+
+            schedules = result['data'].get('data', []) if result.get('data') else []
+
+            # 转换为 ScheduleData 格式
+            schedule_list = []
+            for schedule in schedules:
+                schedule_data = ScheduleData.from_db_rows(schedule)
+                schedule_list.append(schedule_data.to_dict())
+
+            # 构建返回数据
+            return {
+                "code": 0,
+                "msg": "ok",
+                "data": {
+                    "data": schedule_list,
+                    "totalCount": result['data'].get('totalCount', 0),
+                    "pageNum": page_num,
+                    "pageSize": page_size,
+                    "totalPage": result['data'].get('totalPage', 0)
+                }
+            }
+        except Exception as e:
+            log.error(f"[TodoMgr] 获取日程列表异常: {e}", exc_info=True)
             return {"code": -1, "msg": f'error: {str(e)}'}
 
 

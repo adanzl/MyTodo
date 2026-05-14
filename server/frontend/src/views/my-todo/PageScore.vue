@@ -1,13 +1,13 @@
 <template>
   <div class="">
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-3 h-10 ">
       <el-select v-model="selectedAction" placeholder="全部动作" clearable @change="onActionChange" style="width: 150px">
         <el-option label="全部" value="" />
         <el-option label="抽奖" value="lottery" />
         <el-option label="兑换" value="exchange" />
         <el-option label="任务" value="schedule" />
       </el-select>
-      <el-radio-group size="large" v-model="selectedUserId" @change="onUserChange">
+      <el-radio-group size="default" v-model="selectedUserId" @change="onUserChange">
         <el-radio-button v-for="item in userList" :key="item.id" :value="item.id">
           {{ item.name }}
         </el-radio-button>

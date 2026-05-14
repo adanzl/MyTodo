@@ -42,6 +42,28 @@ def get_todo_calendar() -> ResponseReturnValue:
         return _err(f'error: {str(e)}')
 
 
+@todo_bp.route('/todo/list', methods=['GET'])
+def get_todo_list() -> ResponseReturnValue:
+    """获取日程列表（分页）"""
+    try:
+        user_id = request.args.get('user_id', type=int)
+        page_num = request.args.get('page_num', 1, type=int)
+        page_size = request.args.get('page_size', 20, type=int)
+
+        if user_id is None:
+            return _err('user_id is required')
+
+        result = todo_mgr.get_todo_list(
+            user_id=user_id,
+            page_num=page_num,
+            page_size=page_size,
+        )
+        return result
+    except Exception as e:
+        log.error(f"[TodoRoutes] 获取日程列表异常: {e}", exc_info=True)
+        return _err(f'error: {str(e)}')
+
+
 @todo_bp.route('/todo/create', methods=['POST'])
 def create_todo() -> ResponseReturnValue:
     """创建日程"""

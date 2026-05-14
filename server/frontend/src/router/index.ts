@@ -16,9 +16,9 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/lottery/PageLottery.vue"),
   },
   {
-    path: "/info",
-    name: "Info",
-    component: () => import("@/views/my-todo/PageInfo.vue"),
+    path: "/schedule",
+    name: "Schedule",
+    component: () => import("@/views/schedule/PageSchedule.vue"),
   },
   {
     path: "/chat",
