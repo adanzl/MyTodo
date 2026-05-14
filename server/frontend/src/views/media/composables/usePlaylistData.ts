@@ -360,10 +360,11 @@ export function usePlaylistData(
       collection.forEach((item, index) => {
         if (!item.id) return;
 
-        // Directly pass raw data, let backend handle it
+        // 设备字段只保留嵌套 `device.{type,address,...}`，剥掉根级兼容字段
+        const { device_type: _dt, device_address: _da, ...rest } = item;
         playlistDict[item.id] = {
-          ...item,
-          order: index, // Set order value
+          ...rest,
+          order: index,
           total: Array.isArray(item.playlist) ? item.playlist.length : 0,
           updated_time: formatDateTime(),
         };

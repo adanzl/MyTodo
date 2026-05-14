@@ -549,9 +549,9 @@ def get_file_type_by_magic_number(file) -> Optional[str]:
         b'fLaC': 'flac',
         b'RIFF': 'wav',  # WAV and AVI
         b'OggS': 'ogg',
-        b'\x00\x00\x00\x18ftypM4A': 'm4a',
-        b'\x00\x00\x00\x14ftypmp42': 'mp4',
-        b'\x00\x00\x00 ftyp': 'mp4',  # common for mp4 and mov
+        b'\x00\x00\x00\x18ftypM4A': 'm4a', # cspell:disable-line 
+        b'\x00\x00\x00\x14ftypmp42': 'mp4',  # cspell:disable-line 
+        b'\x00\x00\x00 ftyp': 'mp4',  # common for mp4 and mov # cspell:disable-line 
         b'\x30\x26\xb2\x75\x8e\x66\xcf\x11': 'wma',  # WMA/WMV
     }
 
