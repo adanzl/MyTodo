@@ -27,7 +27,7 @@ class Subtask:
         instance.score = data.get('score')
         instance.imgIds = data.get('imgIds', [])
         return instance
-    
+
     def to_dict(self) -> dict:
         """转换为字典"""
         return {
@@ -165,6 +165,7 @@ class ScheduleData:
 
 class ScheduleSave:
     """日程存档数据类，对应前端 ScheduleSave 类型"""
+
     def __init__(self):
         self.id: int = -1
         self.date: str = ""
