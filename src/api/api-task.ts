@@ -19,6 +19,8 @@ export interface Task {
   priority?: number; // 任务优先级 数字越小优先级越高，高优先级任务没有完成低优先级任务会锁定
   type: number; // 0:每日任务；1：持续性任务
   data: string | TaskDetail;
+  lock?: boolean; // 任务是否被锁定
+  msg?: string; // 锁定提示信息
 }
 
 /**
@@ -82,19 +84,45 @@ export interface MaterialItem {
 
 /**
  * 获取任务列表
- * @param userId - 用户ID（可选，使用LIKE匹配）
+ * @param userId - 用户ID
  * @param pageNum - 页码，默认1
- * @param pageSize - 每页数量，默认10
+ * @param pageSize - 每页数量，默认20
  * @param startDate - 开始日期（可选，格式 YYYY-MM-DD）
  * @param endDate - 结束日期（可选，格式 YYYY-MM-DD）
  */
 export async function getTaskList(
   userId?: number,
   pageNum: number = 1,
-  pageSize: number = 10,
+  pageSize: number = 20,
   startDate?: string,
   endDate?: string
 ): Promise<ApiResponse<ApiPagedResponse<Task>>> {
+  // 如果有 userId 和 startDate，使用新的带锁定状态的 API
+  if (userId && userId > 0 && startDate) {
+    const rsp = await apiClient.get<ApiResponse<ApiPagedResponse<Task>>>("/task/list", {
+      params: {
+        user_id: userId,
+        date: startDate,
+        pageNum,
+        pageSize,
+      },
+    });
+
+    if (rsp.data.code !== 0) {
+      throw new Error(rsp.data.msg || "获取任务列表失败");
+    }
+
+    // 解析 data 字段
+    const tasks = rsp.data.data?.data || [];
+    rsp.data.data!.data = tasks.map(task => ({
+      ...task,
+      data: typeof task.data === 'string' ? JSON.parse(task.data) : task.data,
+    }));
+
+    return rsp.data;
+  }
+  
+  // 否则使用原有的通用 API
   const params: any = {
     table: "t_task",
     pageNum,

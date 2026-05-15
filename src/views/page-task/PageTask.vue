@@ -66,7 +66,7 @@
                 v-for="material in getTaskMaterialList(task)"
                 :key="`${task.id}_${material.id}`"
                 class="relative flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow aspect-square cursor-pointer"
-                :class="{ 'opacity-90': getLockedTasks(task).length > 0 }"
+                :class="{ 'opacity-90': task.lock }"
                 @click="handleMaterialClick(task, material)"
               >
                 <!-- 任务名称角标 -->
@@ -85,7 +85,7 @@
                   class="text-4xl mb-1 mt-6"
                 ></ion-icon>
                 <div class="text-sm font-medium text-center line-clamp-2 mb-1">{{ material.name }}</div>
-                <div v-if="getLockedTasks(task).length > 0" >
+                <div v-if="task.lock" >
                   <ion-icon :icon="lockClosed" class="text-2xl text-gray-500"></ion-icon>
                 </div>
                 <div v-else class=" text-[10px] flex items-center"> 点击阅读</div>
@@ -251,27 +251,11 @@ const isMaterialCompleted = (task: Task, material: any, date: Date) => {
     }
 };
 
-// 检查任务是否被锁定（有更高优先级任务未完成）
-const getLockedTasks = (task: Task): Task[] => {
-    const userId = getCurrentUserId();
-    if (!userId) return [];
-
-    return displayTasks.value.filter(t => {
-        if (t.id === task.id) return false;
-        if (t.priority == null || task.priority == null) return false;
-        if (t.priority >= task.priority) return false;
-        
-        const materials = getTaskMaterialList(t);
-        return materials.length > 0 && materials.some(m => !isMaterialCompleted(t, m, currentDate.value));
-    });
-};
-
 // 处理素材点击
 const handleMaterialClick = (task: Task, material: MaterialItem) => {
-    const lockedTasks = getLockedTasks(task);
-    if (lockedTasks.length > 0) {
-        const names = lockedTasks.map(t => t.name).join('、');
-        EventBus.$emit(C_EVENT.TOAST, `请先完成 "${names}"`);
+    // 直接使用后端返回的锁定状态
+    if (task.lock) {
+        EventBus.$emit(C_EVENT.TOAST, task.msg || '任务已锁定');
         return;
     }
     openMaterialPlayer(task, material);
@@ -318,7 +302,13 @@ const fetchTaskList = async () => {
         // 使用当前选中的日期，而不是今天
         const selectedDateStr = currentDate.value.toISOString().split('T')[0];
 
-        // 查询条件：start_date <= selectedDate AND end_date >= selectedDate
+        if (!userId) {
+            taskList.value = [];
+            totalCount.value = 0;
+            return;
+        }
+
+        // 使用新的 API，带锁定状态检查
         const res = await getTaskList(userId, 1, 100, selectedDateStr, selectedDateStr);
 
         if (res.code === 0 && res.data) {
