@@ -91,6 +91,9 @@ class TaskMgr:
                     daily_materials = task_data.get('dailyMaterials', {})
                     task_type = task.get('type', 0)  # 获取任务类型
 
+                    # 获取前置日程数据（JSON格式：{"user_id": [todo_ids]}）
+                    pre_todo = json.loads(task.get('pre_todo', '{}'))
+
                     for day_offset in range(duration):
                         current_date = start_date + timedelta(days=day_offset)
 
@@ -140,7 +143,8 @@ class TaskMgr:
                             'task_name': task_name,
                             'total': total_count,
                             'completed': completed_count,
-                            'materials': materials_for_day
+                            'materials': materials_for_day,
+                            'pre_todo': pre_todo
                         })
 
                 except Exception as e:
@@ -274,12 +278,10 @@ class TaskMgr:
             # 递归获取所有子类别ID
             def get_all_children_ids(parent_id: int) -> List[int]:
                 children_ids = []
-                result = db_mgr.get_list(
-                    TABLE_MATERIAL_CATEGORY,
-                    page_num=1,
-                    page_size=1000,
-                    conditions={'parent': parent_id}
-                )
+                result = db_mgr.get_list(TABLE_MATERIAL_CATEGORY,
+                                         page_num=1,
+                                         page_size=1000,
+                                         conditions={'parent': parent_id})
                 if result.get('code') == 0:
                     children = result.get('data', {}).get('data', [])
                     for child in children:
@@ -296,24 +298,20 @@ class TaskMgr:
             # 如果不删除素材，检查是否有素材
             if not delete_materials:
                 for cat_id in all_category_ids:
-                    materials_result = db_mgr.get_list(
-                        TABLE_MATERIAL,
-                        page_num=1,
-                        page_size=1,
-                        conditions={'cate_id': cat_id}
-                    )
+                    materials_result = db_mgr.get_list(TABLE_MATERIAL,
+                                                       page_num=1,
+                                                       page_size=1,
+                                                       conditions={'cate_id': cat_id})
                     if materials_result.get('code') == 0 and materials_result.get('data', {}).get('total', 0) > 0:
                         return {"code": -1, "msg": f"该目录或其子目录下还有素材，无法删除（可勾选'同时删除素材'）", "data": None}
 
             # 如果删除素材，先删除所有类别下的素材
             if delete_materials:
                 for cat_id in all_category_ids:
-                    materials_result = db_mgr.get_list(
-                        TABLE_MATERIAL,
-                        page_num=1,
-                        page_size=1000,
-                        conditions={'cate_id': cat_id}
-                    )
+                    materials_result = db_mgr.get_list(TABLE_MATERIAL,
+                                                       page_num=1,
+                                                       page_size=1000,
+                                                       conditions={'cate_id': cat_id})
                     if materials_result.get('code') == 0:
                         materials = materials_result.get('data', {}).get('data', [])
                         for material in materials:
