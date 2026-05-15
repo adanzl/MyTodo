@@ -64,6 +64,28 @@ def get_todo_list() -> ResponseReturnValue:
         return _err(f'error: {str(e)}')
 
 
+@todo_bp.route('/todo/listByTime', methods=['GET'])
+def get_todo_list_by_time() -> ResponseReturnValue:
+    """按时间范围获取日程列表"""
+    try:
+        start_time = request.args.get('start_time', type=str) or request.args.get('startTime', type=str)
+        end_time = request.args.get('end_time', type=str) or request.args.get('endTime', type=str)
+        user_id = request.args.get('user_id', type=int) or request.args.get('userId', type=int)
+
+        if not start_time or not end_time or user_id is None:
+            return _err('start_time, end_time and user_id are required')
+
+        result = todo_mgr.get_todo_list_by_time_range(
+            start_time=start_time,
+            end_time=end_time,
+            user_id=user_id,
+        )
+        return result
+    except Exception as e:
+        log.error(f"[TodoRoutes] 按时间范围获取日程列表异常: {e}", exc_info=True)
+        return _err(f'error: {str(e)}')
+
+
 @todo_bp.route('/todo/create', methods=['POST'])
 def create_todo() -> ResponseReturnValue:
     """创建日程"""

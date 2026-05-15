@@ -21,23 +21,121 @@ log = app_logger
 class TodoMgr:
     """Todo 管理类，封装日程数据的操作"""
 
-    def get_todo_calendar(self, start_time: str, end_time: str, user_id: int) -> Dict[str, Any]:
-        """获取指定时间范围内的日历数据，返回每天的 ScheduleData 列表。"""
+    def _convert_schedules_to_list(self, schedules: List[dict]) -> List[dict]:
+        """将数据库日程记录转换为 ScheduleData 列表"""
+        return [ScheduleData.from_db_rows(schedule).to_dict() for schedule in schedules]
+
+    def get_todo_list_by_time_range(self, start_time: str, end_time: str, user_id: int) -> Dict[str, Any]:
+        """
+        按时间范围获取日程列表
+        
+        Args:
+            start_time: 开始时间（格式：YYYY-MM-DD）
+            end_time: 结束时间（格式：YYYY-MM-DD）
+            user_id: 用户ID
+            
+        Returns:
+            日程列表数据
+        """
         try:
-            # 1. 获取用户的可能在时间范围内显示的日程模板
-            # 条件：已开始(start_ts <= end_time) 且
-            #   - repeat=1(每天): repeat_end_ts IS NULL OR repeat_end_ts >= start_time
-            #   - repeat!=1: end_ts IS NULL OR end_ts >= start_time
+            schedules_result = self._get_schedules_in_time_range(start_time, end_time, user_id)
+            if schedules_result.get('code') != 0:
+                return schedules_result
+
+            schedule_list = self._convert_schedules_to_list(schedules_result['data'])
+
+            return {
+                "code": 0,
+                "msg": "ok",
+                "data": {
+                    "data": schedule_list,
+                    "totalCount": len(schedule_list),
+                    "pageNum": 1,
+                    "pageSize": len(schedule_list),
+                    "totalPage": 1
+                }
+            }
+        except Exception as e:
+            log.error(f"[TodoMgr] 按时间范围获取日程列表异常: {e}", exc_info=True)
+            return {"code": -1, "msg": f'error: {str(e)}'}
+
+    def get_todo_list(self, user_id: int, page_num: int = 1, page_size: int = 20) -> Dict[str, Any]:
+        """
+        获取日程列表（分页）
+        
+        Args:
+            user_id: 用户ID
+            page_num: 页码，默认1
+            page_size: 每页数量，默认20
+            
+        Returns:
+            日程列表数据，包含分页信息
+        """
+        try:
+            result = db_mgr.get_list(table='t_schedule',
+                                     page_num=page_num,
+                                     page_size=page_size,
+                                     conditions={'user_id': user_id})
+
+            if result.get('code') != 0:
+                return result
+
+            schedules = result['data'].get('data', []) if result.get('data') else []
+            schedule_list = self._convert_schedules_to_list(schedules)
+
+            return {
+                "code": 0,
+                "msg": "ok",
+                "data": {
+                    "data": schedule_list,
+                    "totalCount": result['data'].get('totalCount', 0),
+                    "pageNum": page_num,
+                    "pageSize": page_size,
+                    "totalPage": result['data'].get('totalPage', 0)
+                }
+            }
+        except Exception as e:
+            log.error(f"[TodoMgr] 获取日程列表异常: {e}", exc_info=True)
+            return {"code": -1, "msg": f'error: {str(e)}'}
+
+    def _get_schedules_in_time_range(self, start_time: str, end_time: str, user_id: int) -> Dict[str, Any]:
+        """
+        获取用户在指定时间范围内的日程模板。
+        
+        Args:
+            start_time: 开始时间（格式：YYYY-MM-DD）
+            end_time: 结束时间（格式：YYYY-MM-DD）
+            user_id: 用户ID
+            
+        Returns:
+            包含日程列表的字典，格式为 {"code": 0, "msg": "ok", "data": [schedules]}
+        """
+        try:
+            # 获取用户的可能在时间范围内显示的日程模板
             schedules_sql = f"""
                 SELECT * FROM t_schedule 
-                WHERE user_id = {user_id} 
+                WHERE user_id = {user_id}
                   AND start_ts <= '{end_time}'
                   AND (
                     (repeat != 0 AND (repeat_end_ts IS NULL OR repeat_end_ts >= '{start_time}'))
-                    OR (repeat == 0 AND (end_ts IS NULL OR end_ts >= '{start_time}'))
+                    OR (repeat = 0 AND (end_ts IS NULL OR end_ts >= '{start_time}'))
                   )
             """
             schedules_result = db_mgr.query(schedules_sql)
+
+            if schedules_result.get('code') != 0:
+                return schedules_result
+
+            return {"code": 0, "msg": "ok", "data": schedules_result['data']}
+        except Exception as e:
+            log.error(f"[TodoMgr] 获取时间范围内日程异常: {e}", exc_info=True)
+            return {"code": -1, "msg": f'error: {str(e)}'}
+
+    def get_todo_calendar(self, start_time: str, end_time: str, user_id: int) -> Dict[str, Any]:
+        """获取指定时间范围内的日历数据，返回每天的 ScheduleData 列表。"""
+        try:
+            # 1. 获取时间范围内的日程模板
+            schedules_result = self._get_schedules_in_time_range(start_time, end_time, user_id)
             if schedules_result.get('code') != 0:
                 return schedules_result
 
@@ -76,7 +174,6 @@ class TodoMgr:
 
                 current_dt += timedelta(days=1)
 
-            # log.info(f"[TodoMgr] 获取日历数据成功: user_id={user_id}, dates={len(result)}")
             return {"code": 0, "msg": "ok", "data": result}
         except Exception as e:
             log.error(f"[TodoMgr] 获取日历数据异常: {e}", exc_info=True)
@@ -188,16 +285,14 @@ class TodoMgr:
     def get_todo(self, todo_id: int, date: str, user_id: int) -> Dict[str, Any]:
         """
         获取单个日程在指定日期的详情（含完成状态和覆盖数据）。
-        模拟前端 createDayData 的逻辑，根据重复规则判断日程是否在指定日期显示，
-        并合并该日期的存档数据（state、subtask_states、override_data）。
-
+        
         Args:
             todo_id: 日程ID
             date: 日期（格式：YYYY-MM-DD）
             user_id: 用户ID
 
         Returns:
-            日程详情数据， ScheduleData 
+            日程详情数据
         """
         try:
             # 1. 从 t_schedule 表获取日程模板
@@ -209,15 +304,11 @@ class TodoMgr:
             if not row:
                 return {"code": -1, "msg": "日程不存在或无权限"}
 
-            # 从 t_schedule_save 表获取该日期的存档数据
-            save_sql = f"""
-                SELECT *
-                FROM t_schedule_save 
-                WHERE schedule_id = {todo_id} AND date = '{date}'
-            """
+            # 2. 从 t_schedule_save 表获取该日期的存档数据
+            save_sql = f"SELECT * FROM t_schedule_save WHERE schedule_id = {todo_id} AND date = '{date}'"
             save_result = db_mgr.query(save_sql)
 
-            # 合并数据创建 ScheduleData
+            # 3. 合并数据创建 ScheduleData
             save_row_dict = None
             if save_result.get('code') == 0 and save_result.get('data'):
                 save_row_dict = save_result['data'][0]
@@ -324,7 +415,7 @@ class TodoMgr:
     def save_todo(self, schedule_save: ScheduleSave) -> Dict[str, Any]:
         """保存日程在指定日期的完成状态。"""
         try:
-            # 先查询是否存在该 schedule_id 和 date 组合的记录
+            # 1. 查询是否存在该 schedule_id 和 date 组合的记录
             query_sql = f"""
                 SELECT id, state, score FROM t_schedule_save 
                 WHERE schedule_id = {schedule_save.scheduleId} AND date = '{schedule_save.date}'
@@ -333,10 +424,14 @@ class TodoMgr:
 
             old_state = 0
             old_score = 0
-            if query_result.get('code') == 0 and query_result.get('data') and len(query_result['data']) > 0:
-                old_state = query_result['data'][0].get('state', 0)
-                old_score = query_result['data'][0].get('score', 0) or 0
+            existing_record = None
 
+            if query_result.get('code') == 0 and query_result.get('data'):
+                existing_record = query_result['data'][0]
+                old_state = existing_record.get('state', 0)
+                old_score = existing_record.get('score', 0) or 0
+
+            # 2. 准备保存数据
             db_data = {
                 'schedule_id':
                 schedule_save.scheduleId,
@@ -352,93 +447,76 @@ class TodoMgr:
             }
 
             # 如果存在记录，添加 id 用于更新
-            if query_result.get('code') == 0 and query_result.get('data') and len(query_result['data']) > 0:
-                db_data['id'] = query_result['data'][0]['id']
+            if existing_record:
+                db_data['id'] = existing_record['id']
 
+            # 3. 保存或更新记录
             result = db_mgr.set_data('t_schedule_save', db_data)
-
-            # 获取保存后的记录ID（新插入或更新的记录ID）
             save_id = result.get('data') if result.get('code') == 0 else None
 
-            # 如果状态改变，更新用户总积分
+            # 4. 如果状态改变，更新用户总积分
             if old_state != schedule_save.state and result.get('code') == 0:
-                # 获取日程所属用户ID和模板积分
-                schedule_query = db_mgr.query(
-                    f"SELECT user_id, score FROM t_schedule WHERE id = {schedule_save.scheduleId}")
-                if schedule_query.get('code') == 0 and schedule_query.get('data') and len(schedule_query['data']) > 0:
-                    user_id = schedule_query['data'][0]['user_id']
-                    template_score = schedule_query['data'][0].get('score', 0) or 0
+                self._update_user_score(schedule_save.scheduleId, old_state, schedule_save.state, old_score, save_id)
 
-                    # 更新用户积分
-                    user_query = db_mgr.query(f"SELECT score FROM t_user WHERE id = {user_id}")
-                    if user_query.get('code') == 0 and user_query.get('data') and len(user_query['data']) > 0:
-                        current_score = user_query['data'][0].get('score', 0) or 0
-                        new_score = current_score
-
-                        # 从未完成变为完成：加积分（从日程模板获取）
-                        if old_state == 0 and schedule_save.state == 1:
-                            if template_score > 0:
-                                new_score = current_score + template_score
-                                log.info(f"[TodoMgr] 用户 {user_id} 获得 {template_score} 积分")
-                                # 更新 t_schedule_save 中的 score（使用刚插入/更新的记录ID）
-                                if save_id is not None:
-                                    db_mgr.set_data('t_schedule_save', {'id': save_id, 'score': template_score})
-                        # 从完成变为未完成：扣积分（从 t_schedule_save 的旧记录获取）
-                        else:
-                            if old_score > 0:
-                                new_score = max(0, current_score - old_score)
-                                log.info(f"[TodoMgr] 用户 {user_id} 扣除 {old_score} 积分")
-                                # 更新 t_schedule_save 中的 score 为 0（使用刚插入/更新的记录ID）
-                                if save_id is not None:
-                                    db_mgr.set_data('t_schedule_save', {'id': save_id, 'score': 0})
-
-                        if new_score != current_score:
-                            db_mgr.set_data('t_user', {'id': user_id, 'score': new_score})
-                            log.info(f"[TodoMgr] 用户 {user_id} 当前总分: {new_score}")
-
-            log.info(
-                f"[TodoMgr] 保存日程状态{'成功' if result.get('code') == 0 else '失败'}: schedule_id={schedule_save.scheduleId}, date={schedule_save.date}, state={schedule_save.state}"
-            )
+            log.info(f"[TodoMgr] 保存日程状态{'成功' if result.get('code') == 0 else '失败'}: "
+                     f"schedule_id={schedule_save.scheduleId}, date={schedule_save.date}, state={schedule_save.state}")
             return result
         except Exception as e:
             log.error(f"[TodoMgr] 保存日程状态异常: {e}", exc_info=True)
             return {"code": -1, "msg": f'error: {str(e)}'}
 
-    def get_todo_list(self, user_id: int, page_num: int = 1, page_size: int = 20) -> Dict[str, Any]:
-        """获取日程列表（分页）"""
+    def _update_user_score(self, schedule_id: int, old_state: int, new_state: int, old_score: int,
+                           save_id: Optional[int]) -> None:
+        """
+        根据日程状态变化更新用户积分
+        
+        Args:
+            schedule_id: 日程ID
+            old_state: 旧状态
+            new_state: 新状态
+            old_score: 旧积分
+            save_id: 保存记录ID
+        """
         try:
-            # 使用 db_mgr.get_list 方法
-            result = db_mgr.get_list(table='t_schedule',
-                                     page_num=page_num,
-                                     page_size=page_size,
-                                     conditions={'user_id': user_id})
+            # 获取日程所属用户ID和模板积分
+            schedule_query = db_mgr.query(f"SELECT user_id, score FROM t_schedule WHERE id = {schedule_id}")
 
-            if result.get('code') != 0:
-                return result
+            if not (schedule_query.get('code') == 0 and schedule_query.get('data')):
+                return
 
-            schedules = result['data'].get('data', []) if result.get('data') else []
+            user_id = schedule_query['data'][0]['user_id']
+            template_score = schedule_query['data'][0].get('score', 0) or 0
 
-            # 转换为 ScheduleData 格式
-            schedule_list = []
-            for schedule in schedules:
-                schedule_data = ScheduleData.from_db_rows(schedule)
-                schedule_list.append(schedule_data.to_dict())
+            # 获取用户当前积分
+            user_query = db_mgr.query(f"SELECT score FROM t_user WHERE id = {user_id}")
 
-            # 构建返回数据
-            return {
-                "code": 0,
-                "msg": "ok",
-                "data": {
-                    "data": schedule_list,
-                    "totalCount": result['data'].get('totalCount', 0),
-                    "pageNum": page_num,
-                    "pageSize": page_size,
-                    "totalPage": result['data'].get('totalPage', 0)
-                }
-            }
+            if not (user_query.get('code') == 0 and user_query.get('data')):
+                return
+
+            current_score = user_query['data'][0].get('score', 0) or 0
+            new_score = current_score
+
+            # 从未完成变为完成：加积分
+            if old_state == 0 and new_state == 1:
+                if template_score > 0:
+                    new_score = current_score + template_score
+                    log.info(f"[TodoMgr] 用户 {user_id} 获得 {template_score} 积分")
+                    if save_id is not None:
+                        db_mgr.set_data('t_schedule_save', {'id': save_id, 'score': template_score})
+            # 从完成变为未完成：扣积分
+            else:
+                if old_score > 0:
+                    new_score = max(0, current_score - old_score)
+                    log.info(f"[TodoMgr] 用户 {user_id} 扣除 {old_score} 积分")
+                    if save_id is not None:
+                        db_mgr.set_data('t_schedule_save', {'id': save_id, 'score': 0})
+
+            # 更新用户积分
+            if new_score != current_score:
+                db_mgr.set_data('t_user', {'id': user_id, 'score': new_score})
+                log.info(f"[TodoMgr] 用户 {user_id} 当前总分: {new_score}")
         except Exception as e:
-            log.error(f"[TodoMgr] 获取日程列表异常: {e}", exc_info=True)
-            return {"code": -1, "msg": f'error: {str(e)}'}
+            log.error(f"[TodoMgr] 更新用户积分异常: {e}", exc_info=True)
 
 
 todo_mgr = TodoMgr()

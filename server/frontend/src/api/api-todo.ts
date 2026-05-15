@@ -44,6 +44,31 @@ export async function getTodoList(
 }
 
 /**
+ * 按时间范围获取待办事项列表
+ * @param startTime - 开始时间（格式：YYYY-MM-DD）
+ * @param endTime - 结束时间（格式：YYYY-MM-DD）
+ * @param userId - 用户ID
+ * @returns 待办事项列表数据
+ */
+export async function getTodoListByTime(
+  startTime: string,
+  endTime: string,
+  userId: number
+): Promise<{ data: ScheduleData[]; totalCount: number; pageNum: number; pageSize: number }> {
+  const rsp = await api.get<ApiResponse<any>>("/todo/listByTime", {
+    params: {
+      start_time: startTime,
+      end_time: endTime,
+      user_id: userId,
+    },
+  });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
+
+/**
  * 获取单个待办事项详情
  * @param todoId - 待办事项ID
  * @param date - 日期（格式：YYYY-MM-DD）
