@@ -83,8 +83,8 @@
           <div class="flex ion-justify-content-around ion-padding w-full">
             <div class="ion-text-center" v-if="curScheduleData.startTs">
               <div class="flex items-baseline font-bold text-red-500">
-                {{ curScheduleData.startTs.format("MM-DD") + "," }}
-                <p class="text-xs">{{ WEEK[curScheduleData.startTs.day()] }}</p>
+                {{ curScheduleData.startTs ? curScheduleData.startTs.format("MM-DD") + "," : "" }}
+                <p class="text-xs">{{ WEEK[curScheduleData.startTs?.day() ?? 0] }}</p>
               </div>
               <ion-label color="tertiary" class="text-xs/4">
                 {{ curScheduleData.allDay ? "全天" : curScheduleData?.startTs?.format("HH:mm") }}
@@ -96,8 +96,8 @@
             </div>
             <div class="ion-text-center" v-if="curScheduleData.endTs">
               <div class="flex items-baseline font-bold text-red-500">
-                {{ curScheduleData.endTs.format("MM-DD") + "," }}
-                <p class="text-xs">{{ WEEK[curScheduleData.endTs.day()] }}</p>
+                {{ curScheduleData.endTs ? curScheduleData.endTs.format("MM-DD") + "," : "" }}
+                <p class="text-xs">{{ WEEK[curScheduleData.endTs?.day() ?? 0] }}</p>
               </div>
               <ion-label color="tertiary" class="text-xs/4">
                 {{ curScheduleData.allDay ? "全天" : curScheduleData?.endTs?.format("HH:mm") }}
@@ -193,9 +193,9 @@
           <ion-label class="ml-1">重复停止</ion-label>
           <ion-label class="text-right mr-0">
             {{
-              curScheduleData?.repeatEndTs === undefined
+              !curScheduleData?.repeatEndTs
                 ? "无"
-                : curScheduleData?.repeatEndTs.format("YYYY-MM-DD")
+                : curScheduleData.repeatEndTs.format("YYYY-MM-DD")
             }}
           </ion-label>
           <ion-modal
