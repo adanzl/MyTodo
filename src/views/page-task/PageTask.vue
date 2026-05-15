@@ -16,9 +16,6 @@
     <!-- 用户筛选（仅 admin 可见） -->
     <div v-if="isAdmin" class="flex items-center gap-2 mx-2 ">
       <ion-segment v-model="selectedUserId" @ionChange="handleUserChange">
-        <ion-segment-button value="0">
-          <ion-label>全部</ion-label>
-        </ion-segment-button>
         <ion-segment-button value="3">
           <ion-label>灿灿</ion-label>
         </ion-segment-button>
@@ -157,7 +154,7 @@ const materialMap = ref<Map<number, MaterialItem>>(new Map());
 const startDate = ref(new Date());
 const currentDate = ref(new Date());
 const totalCount = ref(0);
-const selectedUserId = ref('0');
+const selectedUserId = ref('3');
 
 // 播放弹窗状态
 const showPlayerDialog = ref(false);
