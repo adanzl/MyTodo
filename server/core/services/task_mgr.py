@@ -449,7 +449,7 @@ class TaskMgr:
                 if not task['lock'] and self._has_uncompleted_materials(task, user_id, target_date):
                     if highest_uncompleted_priority is None or (priority is not None and priority < highest_uncompleted_priority):
                         highest_uncompleted_priority = priority
-                        highest_uncompleted_task_name = task.get('name', '')
+                        highest_uncompleted_task_name = task.get('title', '')
             
             return tasks
             
