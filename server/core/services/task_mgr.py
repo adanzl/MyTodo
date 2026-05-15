@@ -449,7 +449,7 @@ class TaskMgr:
                 if not task['lock'] and self._has_uncompleted_materials(task, user_id, target_date):
                     if highest_uncompleted_priority is None or (priority is not None and priority < highest_uncompleted_priority):
                         highest_uncompleted_priority = priority
-                        highest_uncompleted_task_name = task.get('title', '')
+                        highest_uncompleted_task_name = task.get('name', '')
             
             return tasks
             
@@ -538,8 +538,8 @@ class TaskMgr:
                 if not saves:
                     # 没有存档记录，视为未完成
                     # 获取日程名称
-                    name_result = db_mgr.get_data('t_schedule', todo_id, 'name')
-                    name = name_result.get('data', {}).get('name', f'日程{todo_id}') if name_result.get('code') == 0 else f'日程{todo_id}'
+                    name_result = db_mgr.get_data('t_schedule', todo_id, 'title')
+                    name = name_result.get('data', {}).get('title', f'日程{todo_id}') if name_result.get('code') == 0 else f'日程{todo_id}'
                     incomplete_names.append(name)
                     continue
                 
@@ -547,8 +547,8 @@ class TaskMgr:
                 if state != 1:
                     # 有未完成的前置日程
                     # 获取日程名称
-                    name_result = db_mgr.get_data('t_schedule', todo_id, 'name')
-                    name = name_result.get('data', {}).get('name', f'日程{todo_id}') if name_result.get('code') == 0 else f'日程{todo_id}'
+                    name_result = db_mgr.get_data('t_schedule', todo_id, 'title')
+                    name = name_result.get('data', {}).get('title', f'日程{todo_id}') if name_result.get('code') == 0 else f'日程{todo_id}'
                     incomplete_names.append(name)
             
             # 所有前置日程都完成了
