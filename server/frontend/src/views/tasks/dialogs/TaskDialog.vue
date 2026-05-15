@@ -48,10 +48,72 @@
             </el-col>
             <el-col :span="8">
               <el-form-item label="任务类型" required>
-                <el-select v-model="formData.type" placeholder="请选择任务类型" class="w-30!">
-                  <el-option label="每日任务" :value="0" />
-                  <el-option label="持续任务" :value="1" />
-                </el-select>
+                <el-radio-group v-model="formData.type">
+                  <el-radio :value="0">每日任务</el-radio>
+                  <el-radio :value="1">持续任务</el-radio>
+                </el-radio-group>
+              </el-form-item>
+            </el-col>
+          </el-row>
+
+          <!-- 第三行：前置日程 -->
+          <el-row :gutter="20">
+            <el-col :span="24">
+              <el-form-item label="前置日程">
+                <div class="flex gap-4 items-center w-full">
+                  <el-tooltip content="完成了每天的规定日程才能开始当前任务" placement="bottom">
+                    <el-icon class="">
+                      <WarningFilled />
+                    </el-icon>
+                  </el-tooltip>
+                  <!-- 灿灿日程 -->
+                  <div class="flex items-center gap-1 w-[40%]">
+                    <span class="w-10 text-sm text-gray-600">灿灿:</span>
+                    <el-select
+                      :disabled="!selectedUsers.includes(3)"
+                      v-model="preTodoCancan"
+                      multiple
+                      filterable
+                      clearable
+                      placeholder="请选择灿灿的前置日程"
+                      class="flex-1"
+                      collapse-tags
+                      collapse-tags-tooltip
+                      max-collapse-tags="3"
+                    >
+                      <el-option
+                        v-for="todo in cancanTodos"
+                        :key="'cancan_' + todo.id"
+                        :label="todo.title"
+                        :value="todo.id"
+                      />
+                    </el-select>
+                  </div>
+                  <!-- 昭昭日程 -->
+                  <div class="flex items-center gap-1 w-[40%]">
+                    <span class="w-10 text-sm text-gray-600">昭昭:</span>
+                    <el-select
+                      :disabled="!selectedUsers.includes(4)"
+                      v-model="preTodoZhaozhao"
+                      multiple
+                      filterable
+                      clearable
+                      placeholder="请选择昭昭的前置日程"
+                      class="flex-1"
+                      collapse-tags
+                      collapse-tags-tooltip
+                      max-collapse-tags="3"
+                    >
+                      <el-option
+                        v-for="todo in zhaozhaoTodos"
+                        :key="'zhaozhao_' + todo.id"
+                        :label="todo.title"
+                        :value="todo.id"
+                      />
+                    </el-select>
+                  </div>
+
+                </div>
               </el-form-item>
             </el-col>
           </el-row>
@@ -201,10 +263,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, computed } from "vue";
+import { ref, watch, nextTick, computed, onMounted } from "vue";
 import { ElMessage } from "element-plus";
 import { Plus, WarningFilled } from "@element-plus/icons-vue";
 import { addTask, updateTask, getMaterialList, getMaterialCategoryList, type Task, type Material, type MaterialCategory } from "@/api/api-task";
+import { getTodoList } from "@/api/api-todo";
 import dayjs from "dayjs";
 import QuickAdd from "./QuickAdd.vue";
 
@@ -238,6 +301,12 @@ const selectedMaterials = ref<Material[]>([]);
 const categoryList = ref<MaterialCategory[]>([]);
 const selectedCategoryId = ref<number | undefined>(undefined);
 const materialTableRef = ref();
+
+// 前置日程相关
+const preTodoZhaozhao = ref<number[]>([]); // 昭昭的前置日程ID列表
+const preTodoCancan = ref<number[]>([]); // 灿灿的前置日程ID列表
+const zhaozhaoTodos = ref<Array<{ id: number; title: string }>>([]);
+const cancanTodos = ref<Array<{ id: number; title: string }>>([]);
 
 // 缓存每个类别的选中数量（key: categoryId, value: count）
 const materialCategorySelectedCountCache = ref<Map<number, number>>(new Map());
@@ -342,7 +411,7 @@ watch(
         duration: newData.duration || 1,
         user_id: newData.user_id || "",
         status: newData.status ?? 1,
-        type: newData.type ?? 0,
+        type: Number(newData.type) ?? 0,
         priority: newData.priority ?? 0,
       };
 
@@ -352,6 +421,22 @@ watch(
         selectedUsers.value = userIds.filter((id) => [3, 4].includes(id));
       } else {
         selectedUsers.value = [];
+      }
+
+      // 初始化前置日程ID
+      if (newData.pre_todo) {
+        try {
+          const preTodoData = typeof newData.pre_todo === 'string' ? JSON.parse(newData.pre_todo) : newData.pre_todo;
+          preTodoZhaozhao.value = Array.isArray(preTodoData['4']) ? preTodoData['4'] : [];
+          preTodoCancan.value = Array.isArray(preTodoData['3']) ? preTodoData['3'] : [];
+        } catch (e) {
+          console.error('解析前置日程数据失败:', e);
+          preTodoZhaozhao.value = [];
+          preTodoCancan.value = [];
+        }
+      } else {
+        preTodoZhaozhao.value = [];
+        preTodoCancan.value = [];
       }
 
       // 初始化每日素材数据和每日分数
@@ -376,6 +461,8 @@ watch(
       // 新建模式，初始化空数据
       dailyMaterials.value = {};
       dailyScore.value = {};
+      preTodoZhaozhao.value = [];
+      preTodoCancan.value = [];
       // 默认选中第一天
       selectedDay.value = 0;
     }
@@ -440,6 +527,8 @@ const resetForm = () => {
   selectedDay.value = -1;
   dailyMaterials.value = {};
   dailyScore.value = {};
+  preTodoZhaozhao.value = [];
+  preTodoCancan.value = [];
 };
 
 // 获取某天的素材列表
@@ -518,6 +607,36 @@ const loadCategoryList = async () => {
   }
 };
 
+// 加载日程列表
+const loadTodoList = async () => {
+  try {
+    // 清空现有数据
+    zhaozhaoTodos.value = [];
+    cancanTodos.value = [];
+
+    // 根据选中的用户加载对应的日程
+    if (selectedUsers.value.includes(4)) {
+      // 昭昭 (user_id=4)
+      const result = await getTodoList(4, 1, 1000);
+      zhaozhaoTodos.value = (result.data || []).map((todo: any) => ({
+        id: todo.id,
+        title: todo.title
+      }));
+    }
+
+    if (selectedUsers.value.includes(3)) {
+      // 灿灿 (user_id=3)
+      const result = await getTodoList(3, 1, 1000);
+      cancanTodos.value = (result.data || []).map((todo: any) => ({
+        id: todo.id,
+        title: todo.title
+      }));
+    }
+  } catch (error: any) {
+    console.error("获取日程列表失败:", error);
+  }
+};
+
 // 加载素材列表
 const loadMaterialList = async () => {
   materialLoading.value = true;
@@ -571,6 +690,14 @@ watch(selectedCategoryId, () => {
     loadMaterialList();
   }
 });
+
+// 监听用户选择变化，重新加载日程列表
+watch(selectedUsers, () => {
+  if (visible.value) {
+    loadTodoList();
+  }
+});
+
 watch(showMaterialSelector, async (newVal) => {
   if (newVal) {
     await loadCategoryList();
@@ -587,6 +714,11 @@ watch(showMaterialSelector, async (newVal) => {
       }
     });
   }
+});
+
+// 组件挂载时加载日程列表
+onMounted(() => {
+  loadTodoList();
 });
 
 const handleMaterialSelectionChange = (selection: Material[]) => {
@@ -815,6 +947,14 @@ const handleSubmit = async () => {
     const endDateStr = dayjs(formData.value.start_date).add((formData.value.duration || 1) - 1, 'day').format('YYYY-MM-DD');
 
     // 构建任务数据,确保所有必需字段都有值
+    const preTodoData: Record<string, number[]> = {};
+    if (preTodoZhaozhao.value.length > 0) {
+      preTodoData['4'] = preTodoZhaozhao.value;
+    }
+    if (preTodoCancan.value.length > 0) {
+      preTodoData['3'] = preTodoCancan.value;
+    }
+
     const taskData: Omit<Task, "id"> = {
       name: formData.value.name || "",
       start_date: formData.value.start_date || "",
@@ -824,6 +964,7 @@ const handleSubmit = async () => {
       type: formData.value.type ?? 0,
       status: formData.value.status ?? 1,
       priority: formData.value.priority ?? 1,
+      pre_todo: Object.keys(preTodoData).length > 0 ? JSON.stringify(preTodoData) : undefined,
       data: JSON.stringify({
         dailyMaterials: dailyMaterials.value,
         dailyScore: dailyScore.value,

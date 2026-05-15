@@ -148,13 +148,16 @@ export async function updateMaterialCategory(
  * @param id - 分类ID
  * @param deleteMaterials - 是否删除类别下的素材，默认 false
  */
-export async function deleteMaterialCategory(id: number, deleteMaterials: boolean = false): Promise<void> {
-  const response = await api.post('/material/category/delete', {
+export async function deleteMaterialCategory(
+  id: number,
+  deleteMaterials: boolean = false
+): Promise<void> {
+  const response = await api.post("/material/category/delete", {
     id,
-    deleteMaterials
+    deleteMaterials,
   });
   if (response.data.code !== 0) {
-    throw new Error(response.data.msg || '删除失败');
+    throw new Error(response.data.msg || "删除失败");
   }
 }
 
@@ -174,6 +177,7 @@ export interface Task {
   priority?: number; // 任务优先级 数字越小优先级越高，高优先级任务没有完成低优先级任务会锁定
   type: number; // 0:每日任务；1：持续性任务
   data: string | TaskDetail;
+  pre_todo?: string; // 前置日程JSON字符串，格式：{"user_id": [todo_ids]}
 }
 
 /**

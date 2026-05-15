@@ -45,6 +45,17 @@
           <span v-else>-</span>
         </template>
       </el-table-column>
+      <el-table-column label="操作" width="100" align="center" fixed="right">
+        <template #default="{ row }">
+          <el-button 
+            type="danger" 
+            size="small" 
+            :icon="Delete"
+            @click="handleDelete(row)"
+            circle
+          />
+        </template>
+      </el-table-column>
     </el-table>
 
     <!-- 空状态 -->
@@ -68,10 +79,10 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import { ElMessage } from "element-plus";
-import { Refresh } from "@element-plus/icons-vue";
+import { ElMessage, ElMessageBox } from "element-plus";
+import { Refresh, Delete } from "@element-plus/icons-vue";
 import dayjs from "dayjs";
-import { getTodoList } from "@/api/api-todo";
+import { getTodoList, deleteTodo } from "@/api/api-todo";
 import type { ScheduleData } from "@/api/api-todo";
 
 const loading = ref(false);
@@ -152,6 +163,29 @@ const getRepeatDataText = (repeatData: any): string => {
 const formatTime = (time: string): string => {
   if (!time) return '-';
   return dayjs(time).format('YYYY-MM-DD');
+};
+
+const handleDelete = async (row: ScheduleData) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除日程「${row.title}」吗？`,
+      '删除确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    );
+    
+    await deleteTodo(row.id);
+    ElMessage.success('删除成功');
+    refreshData();
+  } catch (err) {
+    if (err !== 'cancel') {
+      console.error('删除日程失败:', err);
+      ElMessage.error('删除日程失败');
+    }
+  }
 };
 
 onMounted(() => {
