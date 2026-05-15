@@ -12,9 +12,11 @@ export interface ScheduleData {
   reminder: string;
   repeat: string;
   repeatEndTs: string;
+  score?: number;
   subtasks?: Array<{
     id: number;
-    name: string;
+    name?: string;
+    title?: string;
   }>;
 }
 

@@ -21,7 +21,8 @@ class Subtask:
         """从字典创建实例"""
         instance = cls()
         instance.id = data.get('id', -1)
-        instance.title = data.get('title', '')
+        # 兼容 name 和 title 字段
+        instance.title = data.get('name') or data.get('title', '')
         instance.order = data.get('order', 0)
         instance.score = data.get('score')
         instance.imgIds = data.get('imgIds', [])

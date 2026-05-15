@@ -267,7 +267,7 @@ import { ref, watch, nextTick, computed, onMounted } from "vue";
 import { ElMessage } from "element-plus";
 import { Plus, WarningFilled } from "@element-plus/icons-vue";
 import { addTask, updateTask, getMaterialList, getMaterialCategoryList, type Task, type Material, type MaterialCategory } from "@/api/api-task";
-import { getTodoList } from "@/api/api-todo";
+import { getTodoListByTime } from "@/api/api-todo";
 import dayjs from "dayjs";
 import QuickAdd from "./QuickAdd.vue";
 
@@ -614,10 +614,18 @@ const loadTodoList = async () => {
     zhaozhaoTodos.value = [];
     cancanTodos.value = [];
 
+    // 使用任务的开始和结束时间作为范围
+    if (!formData.value.start_date || !formData.value.duration) {
+      return;
+    }
+
+    const startDate = formData.value.start_date;
+    const endDate = dayjs(startDate).add(formData.value.duration - 1, 'day').format('YYYY-MM-DD');
+
     // 根据选中的用户加载对应的日程
     if (selectedUsers.value.includes(4)) {
       // 昭昭 (user_id=4)
-      const result = await getTodoList(4, 1, 1000);
+      const result = await getTodoListByTime(startDate, endDate, 4);
       zhaozhaoTodos.value = (result.data || []).map((todo: any) => ({
         id: todo.id,
         title: todo.title
@@ -626,7 +634,7 @@ const loadTodoList = async () => {
 
     if (selectedUsers.value.includes(3)) {
       // 灿灿 (user_id=3)
-      const result = await getTodoList(3, 1, 1000);
+      const result = await getTodoListByTime(startDate, endDate, 3);
       cancanTodos.value = (result.data || []).map((todo: any) => ({
         id: todo.id,
         title: todo.title

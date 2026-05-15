@@ -1,8 +1,9 @@
 <template>
-  <div class="m-4">
+  <div class="schedule-container">
     <!-- 筛选区域 -->
-    <div class="flex items-center gap-3 h-10">
+    <div class="filter-bar">
       <el-button :icon="Refresh" plain type="primary" @click="refreshData" :loading="loading" />
+      <el-button type="primary" :icon="Plus" @click="handleAdd">添加日程</el-button>
       <el-radio-group v-model="selectedUserId" @change="onUserChange">
         <el-radio-button :value="3">灿灿</el-radio-button>
         <el-radio-button :value="4">昭昭</el-radio-button>
@@ -10,15 +11,15 @@
     </div>
 
     <!-- 日程列表 -->
-    <el-table :data="scheduleList" v-loading="loading" stripe max-height="calc(100vh - 200px)">
+    <el-table :data="scheduleList" v-loading="loading" stripe border max-height="calc(100vh - 200px)">
       <el-table-column label="ID" prop="id" width="60" />
       <el-table-column label="标题" prop="title" min-width="200" />
-      <el-table-column label="开始时间" width="180">
+      <el-table-column label="开始时间" prop="startTs" width="180">
         <template #default="{ row }">
           {{ formatTime(row.startTs) }}
         </template>
       </el-table-column>
-      <el-table-column label="结束时间" width="180">
+      <el-table-column label="结束时间" prop="endTs" width="180">
         <template #default="{ row }">
           {{ formatTime(row.endTs) }}
         </template>
@@ -32,7 +33,7 @@
           <span v-else>-</span>
         </template>
       </el-table-column>
-      <el-table-column label="重复结束" width="180">
+      <el-table-column label="重复结束" prop="repeatEndTs" width="180">
         <template #default="{ row }">
           {{ formatTime(row.repeatEndTs) }}
         </template>
@@ -45,11 +46,23 @@
           <span v-else>-</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="100" align="center" fixed="right">
+      <el-table-column label="分数" width="60" align="center">
         <template #default="{ row }">
-          <el-button 
-            type="danger" 
-            size="small" 
+          <span>{{ row.score ?? '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="150" align="center" fixed="right">
+        <template #default="{ row }">
+          <el-button
+            type="primary"
+            size="small"
+            :icon="Edit"
+            @click="handleEdit(row)"
+            circle
+          />
+          <el-button
+            type="danger"
+            size="small"
             :icon="Delete"
             @click="handleDelete(row)"
             circle
@@ -69,10 +82,18 @@
       :page-size="pageSize"
       :page-sizes="[15, 20, 50]"
       :current-page="pageNum"
-      class="mt-4"
+      class="pagination"
       background
       @size-change="handleSizeChange"
       @current-change="handlePageChange"
+    />
+
+    <!-- 编辑对话框 -->
+    <TodoDialog
+      v-model:visible="dialogVisible"
+      :todo-data="currentTodo"
+      :is-edit="isEditMode"
+      @success="refreshData"
     />
   </div>
 </template>
@@ -80,10 +101,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { Refresh, Delete } from "@element-plus/icons-vue";
+import { Refresh, Delete, Edit, Plus } from "@element-plus/icons-vue";
 import dayjs from "dayjs";
 import { getTodoList, deleteTodo } from "@/api/api-todo";
 import type { ScheduleData } from "@/api/api-todo";
+import TodoDialog from "./dialogs/TodoDialog.vue";
 
 const loading = ref(false);
 const selectedUserId = ref<number>(3); // 默认选中灿灿
@@ -91,6 +113,9 @@ const scheduleList = ref<ScheduleData[]>([]);
 const pageNum = ref(1);
 const pageSize = ref(15);
 const total = ref(0);
+const dialogVisible = ref(false);
+const currentTodo = ref<ScheduleData | null>(null);
+const isEditMode = ref(false);
 
 const fetchScheduleList = async (userId: number, page: number = 1, size: number = 15) => {
   loading.value = true;
@@ -176,7 +201,7 @@ const handleDelete = async (row: ScheduleData) => {
         type: 'warning',
       }
     );
-    
+
     await deleteTodo(row.id);
     ElMessage.success('删除成功');
     refreshData();
@@ -188,9 +213,37 @@ const handleDelete = async (row: ScheduleData) => {
   }
 };
 
+const handleEdit = (row: ScheduleData) => {
+  currentTodo.value = row;
+  isEditMode.value = true;
+  dialogVisible.value = true;
+};
+
+const handleAdd = () => {
+  currentTodo.value = null;
+  isEditMode.value = false;
+  dialogVisible.value = true;
+};
+
 onMounted(() => {
   fetchScheduleList(selectedUserId.value);
 });
 </script>
 
-<style scoped></style>
+<style scoped>
+.schedule-container {
+  padding: 16px;
+}
+
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 40px;
+  margin-bottom: 16px;
+}
+
+.pagination {
+  margin-top: 16px;
+}
+</style>
