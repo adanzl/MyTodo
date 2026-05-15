@@ -3,16 +3,19 @@ import type { ApiResponse } from "@/types/api";
 
 export interface ScheduleData {
   id: number;
-  user_id: number;
+  userId: number;
   title: string;
   startTs: string;
   endTs: string;
   allDay: boolean;
   order: number;
-  reminder: string;
+  reminder: number;
   repeat: string;
   repeatEndTs: string;
   score?: number;
+  color?: number;
+  priority?: number;
+  groupId?: number;
   subtasks?: Array<{
     id: number;
     name?: string;

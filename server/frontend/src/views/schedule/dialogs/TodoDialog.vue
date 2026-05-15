@@ -71,15 +71,19 @@
 
       <el-form-item label="子任务">
         <div class="w-full">
-          <div v-for="(subtask, index) in (formData.subtasks || [])" :key="index" class="flex justify-between items-center p-2 mb-1 bg-gray-50 rounded">
-            <span>{{ subtask.name || subtask.title }}</span>
+          <div v-for="(subtask, index) in (formData.subtasks || [])" :key="index" class="flex items-center gap-2 p-2 mb-1 bg-gray-50 rounded">
+            <el-input
+              v-model="subtask.name"
+              placeholder="请输入子任务名称"
+              size="small"
+            />
             <el-button
               type="danger"
               size="small"
               @click="removeSubtask(index)"
-              link
+              circle
             >
-              删除
+              <el-icon><Delete /></el-icon>
             </el-button>
           </div>
           <el-button
@@ -108,6 +112,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
 import { ElMessage } from 'element-plus';
+import { Delete } from '@element-plus/icons-vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import dayjs from 'dayjs';
 import { updateTodo, createTodo } from '@/api/api-todo';
@@ -144,6 +149,12 @@ const formData = ref<Partial<ScheduleData>>({
   allDay: false,
   score: 0,
   subtasks: [],
+  userId: 0,
+  color: 0,
+  priority: -1,
+  groupId: -1,
+  order: 0,
+  reminder: 0,
 });
 
 const rules: FormRules = {
@@ -174,6 +185,12 @@ watch(() => props.todoData, (newData) => {
       allDay: newData.allDay || false,
       score: newData.score || 0,
       subtasks: newData.subtasks || [],
+      userId: newData.userId,
+      color: newData.color || 0,
+      priority: newData.priority || -1,
+      groupId: newData.groupId || -1,
+      order: newData.order || 0,
+      reminder: newData.reminder || 0,
     };
   } else if (!isEdit.value) {
     // 添加模式，重置表单
@@ -192,16 +209,13 @@ watch(() => props.todoData, (newData) => {
 }, { immediate: true });
 
 const addSubtask = () => {
-  const name = prompt('请输入子任务名称：');
-  if (name && name.trim()) {
-    if (!formData.value.subtasks) {
-      formData.value.subtasks = [];
-    }
-    formData.value.subtasks.push({
-      id: Date.now(),
-      name: name.trim()
-    });
+  if (!formData.value.subtasks) {
+    formData.value.subtasks = [];
   }
+  formData.value.subtasks.push({
+    id: Date.now(),
+    name: ''
+  });
 };
 
 const removeSubtask = (index: number) => {
@@ -222,11 +236,20 @@ const handleSubmit = async () => {
     await formRef.value.validate();
     submitting.value = true;
 
+    // 过滤掉 undefined 和 null 的字段
+    const submitData: any = {};
+    Object.keys(formData.value).forEach(key => {
+      const value = (formData.value as any)[key];
+      if (value !== undefined && value !== null) {
+        submitData[key] = value;
+      }
+    });
+
     if (isEdit.value && formData.value.id) {
-      await updateTodo(formData.value.id, formData.value);
+      await updateTodo(formData.value.id, submitData);
       ElMessage.success('更新成功');
     } else {
-      await createTodo(formData.value);
+      await createTodo(submitData);
       ElMessage.success('添加成功');
     }
 
