@@ -7,5 +7,5 @@ from core.tools.async_util import run_async
 from core.tools.json_util import serialize_data, serialize_object_list
 from core.tools.useragent_fix import patch_fake_useragent, SafeUserAgent
 
-__all__ = ['run_async', 'patch_fake_useragent', 'SafeUserAgent', 'serialize_data', 'serialize_object_list']
-
+__all__ = ['run_async', 'patch_fake_useragent',
+           'SafeUserAgent', 'serialize_data', 'serialize_object_list']
