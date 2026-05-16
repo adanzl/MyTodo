@@ -194,7 +194,7 @@
 import { ref, onMounted, computed, nextTick } from "vue";
 import { ElMessage } from "element-plus";
 import type { UploadFile } from "element-plus";
-import { Edit, Plus, Present } from "@element-plus/icons-vue";
+import { Edit, Present } from "@element-plus/icons-vue";
 import { getList, getData, setData, delData } from "@/api/api-common";
 import { uploadPic, getPicDisplayUrl } from "@/api/api-pic";
 import * as _ from "lodash-es";

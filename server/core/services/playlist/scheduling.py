@@ -81,27 +81,36 @@ class PlaylistScheduling:
                 p_name = self._playlist_raw_provider().get(pid, {}).get("name", "未知播放列表")
                 try:
                     if pid in self._playing_playlists_provider():
-                        log.info(f"[PlaylistScheduling] 定时任务触发时播放列表正在播放中，跳过: {pid} - {p_name}")
+                        log.info(
+                            f"[PlaylistScheduling] 定时任务触发时播放列表正在播放中，跳过: {pid} - {p_name}")
                         return
                     code, msg = self._on_play(pid, force=False)
                     if code == 0:
-                        log.info(f"[PlaylistScheduling] 定时任务播放成功: {pid} - {p_name}")
+                        log.info(
+                            f"[PlaylistScheduling] 定时任务播放成功: {pid} - {p_name}")
                     else:
-                        log.error(f"[PlaylistScheduling] 定时任务播放失败: {pid} - {p_name}, {msg}")
+                        log.error(
+                            f"[PlaylistScheduling] 定时任务播放失败: {pid} - {p_name}, {msg}")
                 except Exception as e:
                     if isinstance(e, gevent.exceptions.LoopExit):  # pyright: ignore[reportAttributeAccessIssue]
-                        log.warning(f"[PlaylistScheduling] 定时任务执行后发生 gevent LoopExit (可忽略): {pid} - {p_name}")
+                        log.warning(
+                            f"[PlaylistScheduling] 定时任务执行后发生 gevent LoopExit (可忽略): {pid} - {p_name}")
                     else:
-                        log.error(f"[PlaylistScheduling] 定时任务执行异常: {pid} - {p_name}, {e}")
+                        log.error(
+                            f"[PlaylistScheduling] 定时任务执行异常: {pid} - {p_name}, {e}")
 
-            success = scheduler_mgr.add_cron_job(func=cron_play_task, job_id=job_id, cron_expression=cron_expression)
+            success = scheduler_mgr.add_cron_job(
+                func=cron_play_task, job_id=job_id, cron_expression=cron_expression)
             playlist_name = playlist_data.get("name", "未知播放列表")
             if success:
-                log.info(f"[PlaylistScheduling] 创建定时任务成功: {playlist_id}, {playlist_name}, cron: {cron_expression}")
+                log.info(
+                    f"[PlaylistScheduling] 创建定时任务成功: {playlist_id}, {playlist_name}, cron: {cron_expression}")
             else:
-                log.error(f"[PlaylistScheduling] 创建定时任务失败: {playlist_id}, {playlist_name}, cron: {cron_expression}")
+                log.error(
+                    f"[PlaylistScheduling] 创建定时任务失败: {playlist_id}, {playlist_name}, cron: {cron_expression}")
         except Exception as e:
-            log.error(f"[PlaylistScheduling] refresh_cron_job error: id={playlist_id}, {e}", exc_info=True)
+            log.error(
+                f"[PlaylistScheduling] refresh_cron_job error: id={playlist_id}, {e}", exc_info=True)
             raise
 
     # ===== duration guard =====
@@ -120,12 +129,15 @@ class PlaylistScheduling:
 
                     # 1) 内存中的开始时间（在线触发的常规路径）
                     for pid, start_time in list(self._scheduled_play_start_times.items()):
-                        schedule = (playlist_raw.get(pid, {}) or {}).get("schedule", {}) or {}
+                        schedule = (playlist_raw.get(pid, {}) or {}
+                                    ).get("schedule", {}) or {}
                         duration_minutes = schedule.get("duration", 0)
                         if duration_minutes <= 0:
                             continue
-                        planned_end = start_time + timedelta(minutes=duration_minutes)
-                        self._force_stop_if_expired(pid, planned_end, now, grace, source="内存开始时间")
+                        planned_end = start_time + \
+                            timedelta(minutes=duration_minutes)
+                        self._force_stop_if_expired(
+                            pid, planned_end, now, grace, source="内存开始时间")
 
                     # 2) RDS 固化的 duration_timer_at（进程重启 _scheduled_play_start_times 可能为空时兜底）
                     for pid, playlist_data in list(playlist_raw.items()):
@@ -138,20 +150,26 @@ class PlaylistScheduling:
                         if not dta:
                             continue
                         try:
-                            end_dt = datetime.datetime.strptime(str(dta).strip(), "%Y-%m-%d %H:%M:%S")
+                            end_dt = datetime.datetime.strptime(
+                                str(dta).strip(), "%Y-%m-%d %H:%M:%S")
                         except (ValueError, TypeError):
                             continue
-                        self._force_stop_if_expired(pid, end_dt, now, grace, source="固化时间")
+                        self._force_stop_if_expired(
+                            pid, end_dt, now, grace, source="固化时间")
                 except Exception as e:
-                    log.error(f"[PlaylistScheduling] 播放列表时长守护任务执行异常: {e}", exc_info=True)
+                    log.error(
+                        f"[PlaylistScheduling] 播放列表时长守护任务执行异常: {e}", exc_info=True)
 
-            added = scheduler_mgr.add_interval_job(func=_guard_task, job_id=self._GUARD_JOB_ID, seconds=30)
+            added = scheduler_mgr.add_interval_job(
+                func=_guard_task, job_id=self._GUARD_JOB_ID, seconds=30)
             if added:
-                log.info("[PlaylistScheduling] 启动播放列表时长守护任务成功: 每 30 秒检查一次超时播放列表")
+                log.info(
+                    "[PlaylistScheduling] 启动播放列表时长守护任务成功: 每 30 秒检查一次超时播放列表")
             else:
                 log.error("[PlaylistScheduling] 启动播放列表时长守护任务失败")
         except Exception as e:
-            log.error(f"[PlaylistScheduling] 初始化播放列表时长守护任务异常: {e}", exc_info=True)
+            log.error(
+                f"[PlaylistScheduling] 初始化播放列表时长守护任务异常: {e}", exc_info=True)
 
     # ===== reload 后恢复 =====
 
@@ -167,7 +185,8 @@ class PlaylistScheduling:
             if not p_data.get("isPlaying"):
                 continue
             if pid not in self._devices_provider():
-                log.warning(f"[PlaylistScheduling] reload 恢复定时器: 无设备映射，跳过 {pid}")
+                log.warning(
+                    f"[PlaylistScheduling] reload 恢复定时器: 无设备映射，跳过 {pid}")
                 continue
             self._playing_playlists_provider().add(pid)
 
@@ -176,14 +195,18 @@ class PlaylistScheduling:
             dta = p_data.get("duration_timer_at")
             if dur_min > 0 and dta:
                 try:
-                    end_dt = datetime.datetime.strptime(str(dta).strip(), "%Y-%m-%d %H:%M:%S")
+                    end_dt = datetime.datetime.strptime(
+                        str(dta).strip(), "%Y-%m-%d %H:%M:%S")
                     if end_dt <= now:
                         self._on_stop(pid)
                         continue
-                    remaining_min = max((end_dt - now).total_seconds() / 60.0, 1.0 / 60.0)
-                    self.start_playlist_duration_timer(pid, remaining_min, start_at=end_dt - timedelta(minutes=dur_min))
+                    remaining_min = max(
+                        (end_dt - now).total_seconds() / 60.0, 1.0 / 60.0)
+                    self.start_playlist_duration_timer(
+                        pid, remaining_min, start_at=end_dt - timedelta(minutes=dur_min))
                 except (ValueError, TypeError) as e:
-                    log.warning(f"[PlaylistScheduling] reload 恢复 duration_timer_at 失败 {pid}: {e}")
+                    log.warning(
+                        f"[PlaylistScheduling] reload 恢复 duration_timer_at 失败 {pid}: {e}")
 
             p_data = playlist_raw.get(pid)
             if not p_data or not p_data.get("isPlaying"):
@@ -191,15 +214,19 @@ class PlaylistScheduling:
             fta = p_data.get("file_timer_at")
             if fta:
                 try:
-                    file_end = datetime.datetime.strptime(str(fta).strip(), "%Y-%m-%d %H:%M:%S")
+                    file_end = datetime.datetime.strptime(
+                        str(fta).strip(), "%Y-%m-%d %H:%M:%S")
                     if file_end <= now:
                         spawn(lambda p=pid: self._on_file_timer_fire(p))
                     else:
-                        self.start_file_timer(pid, (file_end - now).total_seconds())
+                        self.start_file_timer(
+                            pid, (file_end - now).total_seconds())
                 except (ValueError, TypeError) as e:
-                    log.warning(f"[PlaylistScheduling] reload 恢复 file_timer_at 失败 {pid}: {e}")
+                    log.warning(
+                        f"[PlaylistScheduling] reload 恢复 file_timer_at 失败 {pid}: {e}")
             else:
-                log.warning(f"[PlaylistScheduling] reload 恢复: isPlaying=True 但缺少 file_timer_at，无法恢复切歌定时器: {pid}")
+                log.warning(
+                    f"[PlaylistScheduling] reload 恢复: isPlaying=True 但缺少 file_timer_at，无法恢复切歌定时器: {pid}")
 
     # ===== 孤儿清理 =====
 
@@ -243,7 +270,8 @@ class PlaylistScheduling:
             self._on_file_timer_fire(pid)
 
         run_date = datetime.datetime.now() + timedelta(seconds=duration_seconds)
-        scheduler_mgr.add_date_job(func=__play_next_task, job_id=job_id, run_date=run_date)
+        scheduler_mgr.add_date_job(
+            func=__play_next_task, job_id=job_id, run_date=run_date)
         self._file_timers[id] = job_id
         playlist_raw = self._playlist_raw_provider()
         p_data = playlist_raw.get(id)
@@ -251,7 +279,8 @@ class PlaylistScheduling:
             p_data["file_timer_at"] = run_date.strftime("%Y-%m-%d %H:%M:%S")
             self._save_async()
         p_name = playlist_raw.get(id, {}).get("name", "未知播放列表")
-        log.info(f"[PlaylistScheduling] 启动文件定时器: {id} - {p_name}, 将在 {duration_seconds} 秒后播放下一首")
+        log.info(
+            f"[PlaylistScheduling] 启动文件定时器: {id} - {p_name}, 将在 {duration_seconds} 秒后播放下一首")
 
     def start_file_on_device_timer(self, playlist_id: str, duration_seconds: float) -> None:
         """启动单次推播文件定时器，到时间后停止设备。"""
@@ -267,15 +296,20 @@ class PlaylistScheduling:
             stop_code, stop_msg = devices.safe_stop(pid)
             p_name = self._playlist_raw_provider().get(pid, {}).get("name", "未知播放列表")
             if stop_code == 0:
-                log.info(f"[PlaylistScheduling] 单次推播文件定时器触发，已停止设备: {pid} - {p_name}")
+                log.info(
+                    f"[PlaylistScheduling] 单次推播文件定时器触发，已停止设备: {pid} - {p_name}")
             else:
-                log.warning(f"[PlaylistScheduling] 单次推播文件定时器触发，停止设备失败: {pid} - {p_name}, {stop_msg}")
+                log.warning(
+                    f"[PlaylistScheduling] 单次推播文件定时器触发，停止设备失败: {pid} - {p_name}, {stop_msg}")
 
         run_date = datetime.datetime.now() + timedelta(seconds=duration_seconds)
-        scheduler_mgr.add_date_job(func=_stop_device_task, job_id=job_id, run_date=run_date)
+        scheduler_mgr.add_date_job(
+            func=_stop_device_task, job_id=job_id, run_date=run_date)
         self._file_on_device_timers[playlist_id] = job_id
-        p_name = self._playlist_raw_provider().get(playlist_id, {}).get("name", "未知播放列表")
-        log.info(f"[PlaylistScheduling] 启动单次推播文件定时器: {playlist_id} - {p_name}, 将在 {duration_seconds} 秒后停止设备")
+        p_name = self._playlist_raw_provider().get(
+            playlist_id, {}).get("name", "未知播放列表")
+        log.info(
+            f"[PlaylistScheduling] 启动单次推播文件定时器: {playlist_id} - {p_name}, 将在 {duration_seconds} 秒后停止设备")
 
     def start_playlist_duration_timer(self, id: str, duration_minutes: float, start_at: datetime.datetime | None = None) -> None:
         """启动播放列表整体时长限制定时器。
@@ -289,20 +323,25 @@ class PlaylistScheduling:
         playlist_raw = self._playlist_raw_provider()
         p_name = playlist_raw.get(id, {}).get("name", "未知播放列表")
 
+        # 如果定时器已经存在，不要重置它（避免每次切歌都重置倒计时）
         if scheduler_mgr.get_job(job_id):
-            scheduler_mgr.remove_job(job_id)
+            log.debug(
+                f"[PlaylistScheduling] 播放列表时长定时器已存在，跳过重启: {id} - {p_name}")
+            return
 
         def stop_playlist_task(pid=id) -> None:
             pl_raw = self._playlist_raw_provider()
             p_name_inner = pl_raw.get(pid, {}).get("name", "未知播放列表")
-            log.info(f"[PlaylistScheduling] 播放列表时长定时器触发: {pid} - {p_name_inner}")
+            log.info(
+                f"[PlaylistScheduling] 播放列表时长定时器触发: {pid} - {p_name_inner}")
             try:
                 self.clear_playlist_duration_timer(pid)
                 self.clear_file_timer(pid)
                 self._scheduled_play_start_times.pop(pid, None)
 
                 if pid not in self._playing_playlists_provider():
-                    log.info(f"[PlaylistScheduling] 播放列表时长定时器触发时播放列表已不在播放中，仅清理: {pid} - {p_name_inner}")
+                    log.info(
+                        f"[PlaylistScheduling] 播放列表时长定时器触发时播放列表已不在播放中，仅清理: {pid} - {p_name_inner}")
                     p_data = pl_raw.get(pid)
                     if p_data:
                         p_data.pop("duration_timer_at", None)
@@ -312,21 +351,28 @@ class PlaylistScheduling:
 
                 code, msg = self._on_stop(pid)
                 if code == 0:
-                    log.info(f"[PlaylistScheduling] 播放列表时长定时器停止播放成功: {pid} - {p_name_inner}")
+                    log.info(
+                        f"[PlaylistScheduling] 播放列表时长定时器停止播放成功: {pid} - {p_name_inner}")
                 else:
-                    log.error(f"[PlaylistScheduling] 播放列表时长定时器停止播放失败: {pid} - {p_name_inner}, {msg}")
+                    log.error(
+                        f"[PlaylistScheduling] 播放列表时长定时器停止播放失败: {pid} - {p_name_inner}, {msg}")
             except Exception as e:
-                log.error(f"[PlaylistScheduling] 播放列表时长定时器执行异常: {pid} - {p_name_inner}, {e}", exc_info=True)
+                log.error(
+                    f"[PlaylistScheduling] 播放列表时长定时器执行异常: {pid} - {p_name_inner}, {e}", exc_info=True)
 
         run_date = datetime.datetime.now() + timedelta(minutes=duration_minutes)
-        scheduler_mgr.add_date_job(func=stop_playlist_task, job_id=job_id, run_date=run_date)
+        scheduler_mgr.add_date_job(
+            func=stop_playlist_task, job_id=job_id, run_date=run_date)
         self._playlist_duration_timers[id] = job_id
-        self._scheduled_play_start_times[id] = start_at or datetime.datetime.now()
+        self._scheduled_play_start_times[id] = start_at or datetime.datetime.now(
+        )
         p_data = playlist_raw.get(id)
         if p_data is not None:
-            p_data["duration_timer_at"] = run_date.strftime("%Y-%m-%d %H:%M:%S")
+            p_data["duration_timer_at"] = run_date.strftime(
+                "%Y-%m-%d %H:%M:%S")
             self._save_async()
-        log.info(f"[PlaylistScheduling] 启动播放列表时长定时器: {id} - {p_name}, 将在 {duration_minutes} 分钟后停止播放")
+        log.info(
+            f"[PlaylistScheduling] 启动播放列表时长定时器: {id} - {p_name}, 将在 {duration_minutes} 分钟后停止播放")
 
     def schedule_one_shot(self, job_id: str, delay_seconds: float, func: Callable[..., Any]) -> None:
         """通用一次性任务（如 stop 后的 verify）。会先 idempotent 清掉同名旧任务。"""
@@ -368,12 +414,14 @@ class PlaylistScheduling:
     ) -> None:
         if now < planned_end + grace:
             return
-        p_name = (self._playlist_raw_provider().get(pid, {}) or {}).get("name", "未知播放列表")
+        p_name = (self._playlist_raw_provider().get(
+            pid, {}) or {}).get("name", "未知播放列表")
         log.warning(f"[PlaylistScheduling] 播放列表时长守护任务({source})检测到超时，强制停止: "
                     f"{pid} - {p_name}, 计划结束: {planned_end}, 当前: {now}")
         code, msg = self._on_stop(pid)
         if code != 0:
-            log.error(f"[PlaylistScheduling] 播放列表时长守护任务({source})强制停止失败: {pid} - {p_name}, {msg}")
+            log.error(
+                f"[PlaylistScheduling] 播放列表时长守护任务({source})强制停止失败: {pid} - {p_name}, {msg}")
 
     # ===== read-only accessors（兼容现有测试直接读 dict 的写法）=====
 

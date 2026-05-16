@@ -70,6 +70,9 @@ class AsrClient:
         self.text_print_2pass_offline = ""
 
     def end_asr(self):
+        if self.ws is None:
+            log.info(">>[ASR] End (ws is None)")
+            return
         if len(self.buffer):
             s_data = self.buffer
             self.buffer = bytearray()
@@ -115,10 +118,15 @@ class AsrClient:
                     self.text_print = self.text_print_2pass_offline + self.text_print_2pass_online
                 else:
                     self.text_print_2pass_online = ""
-                    self.text_print = self.text_print_2pass_offline + "{}".format(text)
+                    self.text_print = self.text_print_2pass_offline + "{}".format(
+                        text)
                     self.text_print_2pass_offline += "{}".format(text)
                 self.text_print = self.text_print[-ASR_MX_WORDS:]
-            msg = {"type": "recognition", "content": self.text_print, "timestamp": timestamp}
+            msg = {
+                "type": "recognition",
+                "content": self.text_print,
+                "timestamp": timestamp
+            }
             log.info(f">>[ASR] Receive result: {msg} , {self.sid}")
             self.text_all = self.text_print
             self.text_print = ""
@@ -163,7 +171,7 @@ class AsrClient:
             self.connect(sid, sample_rate)
             # socketio.emit("message", {"type": "recognition", "content": "OK"}, room=sid)
         if self.is_running:
-            while len(self.buffer) >= self.package_size:
+            while self.ws and len(self.buffer) >= self.package_size:
                 s_data = self.buffer[:self.package_size]
                 self.buffer = self.buffer[self.package_size:]
                 self.ws.send_bytes(s_data)

@@ -6,12 +6,13 @@
 下载文件:
   - data.db
   - logs/app.log
+  - logs/app.log.YYYY-MM-DD (最近3天的日志)
 """
 
 import subprocess
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 def download_single_file(remote_host, remote_path, local_path, file_desc):
@@ -74,6 +75,19 @@ def download_files_from_server():
             'desc': '应用日志'
         }
     ]
+    
+    # 添加最近3天的日志文件
+    today = datetime.now()
+    for i in range(1, 4):  # 1, 2, 3 天前
+        date = today - timedelta(days=i)
+        date_str = date.strftime('%Y-%m-%d')
+        log_filename = f'app.log.{date_str}'
+        
+        files_to_download.append({
+            'remote': f'/mnt/data/project/MyTodo/server/logs/{log_filename}',
+            'local': os.path.join(script_dir, 'logs', log_filename),
+            'desc': f'应用日志 ({date_str})'
+        })
     
     print("=" * 60)
     print("从服务器下载文件")
