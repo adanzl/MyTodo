@@ -56,370 +56,17 @@
       <ion-icon :icon="add" size="large"></ion-icon>
     </FabButton>
     <!-- 全屏详情弹窗 -->
-    <ion-modal
-      :is-open="!!selectedTask"
-      class="[--width:100%] [--height:100%] [--border-radius:0] [--box-shadow:none]"
-      :initial-breakpoint="1"
-      :breakpoints="[0, 1]"
-      @didDismiss="closeDetailModal">
-      <ion-header>
-        <ion-toolbar>
-          <ion-buttons slot="start">
-            <ion-button @click="closeDetailModal">
-              <ion-icon :icon="closeOutline" />
-            </ion-button>
-          </ion-buttons>
-          <ion-title>{{ selectedTask?.name || selectedTask?.task_id || "任务详情" }}</ion-title>
-          <ion-buttons slot="end" class="mr-2">
-            <ion-button @click="scrollToAnalysis" color="primary" class="mr-3!">分析</ion-button>
-            <ion-button :disabled="!canGoPrev" @click="goPrev">
-              <ion-icon :icon="arrowUpOutline" />
-            </ion-button>
-            <ion-button :disabled="!canGoNext" @click="goNext">
-              <ion-icon :icon="arrowDownOutline" />
-            </ion-button>
-          </ion-buttons>
-        </ion-toolbar>
-      </ion-header>
-      <ion-content class="ion-padding">
-        <template v-if="selectedTask">
-          <div class="space-y-3">
-            <div class="flex items-center justify-between flex-wrap gap-3">
-              <div class="flex items-center gap-2 shrink-0">
-                <ion-button
-                  size="small"
-                  fill="outline"
-                  class="[--border-width:1px]"
-                  @click.stop="openRenameDialog"
-                  shape="round">
-                  <ion-icon :icon="createOutline" slot="icon-only" />
-                </ion-button>
-                <ion-badge
-                  :color="statusColor(selectedTask.status)"
-                  class="p-1.5 -text-[10px] h-7 flex items-center">
-                  {{ statusLabel(selectedTask.status) }}
-                </ion-badge>
-                <ion-button
-                  size="small"
-                  color="primary"
-                  :disabled="
-                    isTaskBusy ||
-                    selectedTask.status === 'processing' ||
-                    generateVoiceLock ||
-                    !(selectedTask.text || '').trim()
-                  "
-                  @click.stop="handleStartTask">
-                  生成语音
-                </ion-button>
-              </div>
-              <span class="text-sm text-gray-500 flex-1 truncate">
-                {{ (selectedTask.error_message || "").slice(0, 80) }}
-                {{ (selectedTask.error_message || "").length > 80 ? "…" : "" }}
-              </span>
-            </div>
-
-            <!-- 识别（仿 server/frontend TTS.vue：选择图片后 OCR 结果追加到任务文本） -->
-            <div class="rounded-lg border border-gray-300 px-3 py-2 flex items-center gap-3">
-              <!-- 已选图片与添加按钮同一行，点击图片可预览 -->
-              <div class="flex items-center gap-2 flex-1 min-w-0">
-                <ion-button
-                  size="small"
-                  fill="clear"
-                  class="flex items-center justify-center w-10 h-14 rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-primary hover:text-primary"
-                  @click="pickImages">
-                  <ion-icon :icon="imageOutline" slot="icon-only" class="text-2xl" />
-                  <div class="absolute top-0.5 p-0! overflow-hidden! items-center justify-center">
-                    <span class="text-xs">{{ selectedImages.length }}</span>
-                  </div>
-                </ion-button>
-                <!-- ocr 图片列表 -->
-                <div class="ocr-image-list flex flex-1 items-center gap-2 mr-2 overflow-x-auto">
-                  <input
-                    ref="imageInputRef"
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    class="hidden"
-                    @change="onImageFileChange" />
-                  <div
-                    v-for="(file, idx) in selectedImages"
-                    :key="idx"
-                    class="relative w-14 h-14 shrink-0 cursor-pointer active:opacity-80"
-                    @click="openOcrPreview(idx)">
-                    <div class="absolute inset-0 rounded-lg overflow-hidden border border-gray-200">
-                      <img
-                        :src="getOcrImageUrl(idx)"
-                        :alt="file.name"
-                        class="w-full h-full object-cover" />
-                    </div>
-                    <ion-button
-                      size="small"
-                      fill="solid"
-                      color="dark"
-                      class="absolute top-0 right-0 min-w-0! min-h-0! w-6! h-6! max-w-6! max-h-6! p-0! aspect-square! rounded-full! overflow-hidden! flex! items-center! justify-center! shadow [--color:white] [--border-radius:50%]"
-                      sharp="round"
-                      @click.stop="removeOcrImage(idx)">
-                      <ion-icon
-                        :icon="closeCircleOutline"
-                        slot="icon-only"
-                        class="w-5! h-5! block shrink-0" />
-                    </ion-button>
-                  </div>
-                </div>
-              </div>
-              <div class="flex items-center shrink-0">
-                <ion-button
-                  size="small"
-                  color="primary"
-                  :disabled="isTaskBusy || selectedImages.length === 0 || ocrLoading"
-                  class="w-10! h-12! p-0!"
-                  style="--padding-start: 0; --padding-end: 0"
-                  @click="runOcr">
-                  {{ ocrLoading ? "识别中…" : "识别" }}
-                </ion-button>
-              </div>
-            </div>
-
-            <!-- 图片预览弹窗 -->
-            <ion-modal
-              :is-open="previewOcrIndex >= 0"
-              class="[--width:100%] [--height:100%] [--border-radius:0] [--box-shadow:none]"
-              :initial-breakpoint="1"
-              :breakpoints="[0, 1]"
-              @didDismiss="previewOcrIndex = -1">
-              <ion-header>
-                <ion-toolbar>
-                  <ion-buttons slot="start">
-                    <ion-button @click="previewOcrIndex = -1">
-                      <ion-icon :icon="closeOutline" />
-                    </ion-button>
-                  </ion-buttons>
-                  <ion-title>{{ selectedImages[previewOcrIndex]?.name || "图片预览" }}</ion-title>
-                  <ion-buttons slot="end" class="mr-2">
-                    <ion-button color="danger" fill="clear" @click="removeOcrImageInPreview">
-                      移除
-                    </ion-button>
-                    <ion-button :disabled="previewOcrIndex <= 0" @click="previewOcrPrev">
-                      <ion-icon :icon="arrowUpOutline" />
-                    </ion-button>
-                    <ion-button
-                      :disabled="
-                        previewOcrIndex < 0 || previewOcrIndex >= selectedImages.length - 1
-                      "
-                      @click="previewOcrNext">
-                      <ion-icon :icon="arrowDownOutline" />
-                    </ion-button>
-                  </ion-buttons>
-                </ion-toolbar>
-              </ion-header>
-              <ion-content class="ion-padding">
-                <div
-                  v-if="previewOcrIndex >= 0 && selectedImages[previewOcrIndex]"
-                  class="flex items-center justify-center min-h-full">
-                  <img
-                    :src="getOcrImageUrl(previewOcrIndex)"
-                    :alt="selectedImages[previewOcrIndex].name"
-                    class="max-w-full max-h-[85vh] object-contain" />
-                </div>
-              </ion-content>
-            </ion-modal>
-            <div
-              v-if="selectedTask.ocr_running || selectedTask.analysis_running"
-              class="flex gap-2 text-sm text-amber-600">
-              <span v-if="selectedTask.ocr_running">OCR 进行中</span>
-              <span v-if="selectedTask.analysis_running">解析进行中</span>
-            </div>
-            <!-- 音频 -->
-            <div v-if="selectedTask.status === 'success'" class="flex gap-2">
-              <AudioPreview
-                :src="getTtsDownloadUrl(selectedTask.task_id)"
-                :duration-seconds="selectedTask.duration ?? undefined"
-                class="flex-1" />
-              <ion-button
-                size="small"
-                color="primary"
-                fill="clear"
-                :disabled="downloadButtonLock"
-                @click="handleDownloadTtsAudio">
-                下载
-              </ion-button>
-            </div>
-
-            <div class="rounded-lg bg-gray-100 p-2">
-              <ion-textarea
-                v-model="editText"
-                placeholder="请输入要转换为语音的文本"
-                :disabled="isTaskBusy"
-                class="text-gray-800 rounded-lg min-h-25 [--padding-start:8px] [--padding-end:8px] [--padding-top:1px] [--padding-bottom:8px]"
-                :auto-grow="true"
-                :rows="4" />
-            </div>
-
-            <!-- 分析内容（参考 server/frontend TTS.vue） -->
-            <div
-              ref="analysisSectionRef"
-              class="rounded-lg border border-gray-300 px-3 flex flex-col gap-1 min-h-30">
-              <div class="flex items-center justify-between">
-                <h4 class="text-sm font-semibold text-gray-700">分析内容</h4>
-                <ion-button
-                  size="small"
-                  color="primary"
-                  :disabled="!editText.trim() || isTaskBusy"
-                  @click="runAnalysis">
-                  分析
-                </ion-button>
-              </div>
-              <template v-if="!selectedTask.analysis">
-                <div class="text-xs text-gray-400">
-                  暂无分析结果，可在服务端对该任务执行「分析」后刷新查看。
-                </div>
-              </template>
-              <template v-else>
-                <div class="space-y-3 text-xs pr-1 py-1">
-                  <!-- 美词 -->
-                  <div v-if="selectedTask.analysis.words?.length" class="flex gap-3">
-                    <div
-                      class="w-10 h-6 rounded-md bg-blue-50 border border-blue-300 flex items-center justify-center shrink-0">
-                      <span class="text-[11px] leading-tight text-blue-700 text-center">美词</span>
-                    </div>
-                    <div class="flex-1 flex flex-wrap gap-1 items-start">
-                      <span
-                        v-for="(w, idx) in selectedTask.analysis.words"
-                        :key="idx"
-                        class="inline-block px-2 py-0.5 rounded bg-blue-100 text-blue-800">
-                        {{ w }}
-                      </span>
-                    </div>
-                  </div>
-                  <!-- 精彩句段 -->
-                  <div v-if="selectedTask.analysis.sentence?.length" class="flex gap-3">
-                    <div
-                      class="w-10 h-10 rounded-md bg-emerald-50 border border-emerald-300 flex items-center justify-center shrink-0">
-                      <span class="text-[11px] leading-tight text-emerald-700 text-center">
-                        精彩<br />句段
-                      </span>
-                    </div>
-                    <div class="flex-1 space-y-1">
-                      <p
-                        v-for="(s, idx) in selectedTask.analysis.sentence"
-                        :key="idx"
-                        class="leading-snug text-gray-700">
-                        {{ s }}
-                      </p>
-                    </div>
-                  </div>
-                  <!-- 好句花园（摘要） -->
-                  <div v-if="selectedTask.analysis.abstract" class="flex gap-3">
-                    <div
-                      class="w-10 h-10 rounded-md bg-amber-50 border border-amber-300 flex items-center justify-center shrink-0">
-                      <span class="text-[11px] leading-tight text-amber-700 text-center">
-                        好句<br />花园
-                      </span>
-                    </div>
-                    <div class="flex-1">
-                      <p class="leading-snug text-gray-700">
-                        {{ selectedTask.analysis.abstract }}
-                      </p>
-                    </div>
-                  </div>
-                  <!-- 涂鸦 -->
-                  <div v-if="selectedTask.analysis.doodle" class="flex gap-3">
-                    <div
-                      class="w-10 h-6 rounded-md bg-pink-50 border border-pink-300 flex items-center justify-center shrink-0">
-                      <span class="text-[11px] leading-tight text-pink-700 text-center">涂鸦</span>
-                    </div>
-                    <div class="flex-1">
-                      <p class="leading-snug text-gray-700">
-                        {{ selectedTask.analysis.doodle }}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </template>
-            </div>
-            <div class="grid grid-cols-2 gap-3 text-sm">
-              <div class="rounded bg-gray-50 p-2">
-                <span class="text-gray-500">模型</span>
-                <ion-select
-                  v-model="editModel"
-                  placeholder="默认"
-                  :disabled="isTaskBusy"
-                  interface="popover"
-                  class="min-h-8 block w-full mt-1">
-                  <ion-select-option value="">默认</ion-select-option>
-                  <ion-select-option value="cosyvoice-v3-flash"
-                    >cosyvoice-v3-flash</ion-select-option
-                  >
-                  <ion-select-option value="cosyvoice-v3-plus">cosyvoice-v3-plus</ion-select-option>
-                </ion-select>
-              </div>
-              <div class="rounded bg-gray-50 p-2">
-                <span class="text-gray-500">音色</span>
-                <ion-select
-                  v-model="editRole"
-                  placeholder="无"
-                  :disabled="isTaskBusy"
-                  interface="popover"
-                  class="min-h-8 block w-full mt-1">
-                  <ion-select-option value="">无</ion-select-option>
-                  <ion-select-option value="cosyvoice-v3-plus-leo-34ba9eaebae44039a4a9426af6389dcd">
-                    灿灿
-                  </ion-select-option>
-                </ion-select>
-              </div>
-              <div v-if="selectedTask.total_chars != null" class="rounded bg-gray-50 p-2">
-                <span class="text-gray-500">字数</span>
-                <div>{{ selectedTask.total_chars }}</div>
-              </div>
-              <div class="rounded bg-gray-50 p-2">
-                <span class="text-gray-500">时长</span>
-                <div>{{ formatDuration(selectedTask.duration) }}</div>
-              </div>
-              <div class="rounded bg-gray-50 p-2">
-                <span class="text-gray-500">语速</span>
-                <div class="flex items-center gap-2 mt-1">
-                  <ion-button
-                    size="small"
-                    fill="clear"
-                    @click="editSpeed = Math.max(0.5, Math.round((editSpeed - 0.1) * 10) / 10)"
-                    >−</ion-button
-                  >
-                  <span class="min-w-10 text-center">{{ editSpeed }}</span>
-                  <ion-button
-                    size="small"
-                    fill="clear"
-                    @click="editSpeed = Math.min(2, Math.round((editSpeed + 0.1) * 10) / 10)"
-                    >+</ion-button
-                  >
-                </div>
-              </div>
-              <div class="rounded bg-gray-50 p-2">
-                <span class="text-gray-500">音量</span>
-                <div class="flex items-center gap-2 mt-1">
-                  <ion-button size="small" fill="clear" @click="editVol = Math.max(0, editVol - 10)"
-                    >−</ion-button
-                  >
-                  <span class="min-w-10 text-center">{{ editVol }}</span>
-                  <ion-button
-                    size="small"
-                    fill="clear"
-                    @click="editVol = Math.min(100, editVol + 10)"
-                    >+</ion-button
-                  >
-                </div>
-              </div>
-            </div>
-
-            <div class="ion-padding-top ion-padding-bottom flex items-center gap-2">
-              <ion-button expand="block" @click="saveAndClose" class="flex-1">确定</ion-button>
-              <ion-button color="danger" @click="confirmDelete">
-                <ion-icon :icon="trashOutline" />
-              </ion-button>
-            </div>
-          </div>
-        </template>
-      </ion-content>
-    </ion-modal>
+    <TtsTaskDialog
+      :selected-task="selectedTask"
+      :can-go-prev="canGoPrev"
+      :can-go-next="canGoNext"
+      @close="closeDetailModal"
+      @prev="goPrev"
+      @next="goNext"
+      @open-rename="openRenameDialog"
+      @task-updated="handleTaskUpdated"
+      @task-deleted="handleTaskDeleted"
+      ref="ttsTaskDialogRef" />
     <!-- 改名弹窗（样式类似 alert，Tailwind 实现） -->
     <ion-modal
       :is-open="renameModalOpen"
@@ -469,43 +116,24 @@ import {
   IonRefresher,
   IonRefresherContent,
   IonSegmentContent,
-  IonSelect,
-  IonSelectOption,
-  IonTextarea,
   alertController,
   loadingController,
 } from "@ionic/vue";
-import {
-  arrowDownOutline,
-  arrowUpOutline,
-  closeOutline,
-  add,
-  trashOutline,
-  closeCircleOutline,
-  imageOutline,
-  createOutline,
-  checkmarkCircleOutline,
-} from "ionicons/icons";
+import { add, checkmarkCircleOutline } from "ionicons/icons";
 import { computed, onUnmounted, ref, watch } from "vue";
-import AudioPreview from "@/components/AudioPreview.vue";
 import FabButton from "@/components/FabButton.vue";
 import EventBus, { C_EVENT } from "@/types/event-bus";
-import { resizeImageToFile } from "@/utils/img-mgr";
 import {
   createTtsTask,
-  deleteTtsTask,
-  downloadTtsAudio,
   getTtsTask,
-  getTtsDownloadUrl,
   getTtsTaskList,
-  ocrTtsTask,
-  startTtsAnalysis,
-  startTtsTask,
   updateTtsTask,
   type TtsTaskItem,
 } from "@/api/api-tts";
 import type { RefresherCustomEvent } from "@ionic/vue";
+import TtsTaskDialog from "./dialogs/TtsTask.vue";
 
+// ==================== Props ====================
 const props = withDefaults(
   defineProps<{
     /** 仅在此页签激活时显示 FabButton */
@@ -514,137 +142,55 @@ const props = withDefaults(
   { active: false }
 );
 
+// ==================== Constants ====================
+const STATUS_LABELS: Record<string, string> = {
+  pending: "等待",
+  processing: "处理",
+  success: "成功",
+  failed: "失败",
+  uploaded: "已上传",
+};
+
+const ADD_COOL_DOWN_MS = 1500;
+const PROCESSING_POLL_MS = 3000;
+const LIST_REFRESH_MS = 5000;
+
+// ==================== State ====================
 const tasks = ref<TtsTaskItem[]>([]);
 const loading = ref(false);
 const error = ref("");
 const selectedTask = ref<TtsTaskItem | null>(null);
-const analysisSectionRef = ref<HTMLElement | null>(null);
-/** 弹窗内可编辑的语速、音量、文本、角色（确定时提交），仿 server/frontend TTS.vue */
-const editSpeed = ref<number>(1);
-const editVol = ref<number>(50);
-const editText = ref<string>("");
-const editRole = ref<string>("");
-const editModel = ref<string>("");
-/** 识别：已选图片、预览 URL 缓存、隐藏 input、加载态 */
-const selectedImages = ref<File[]>([]);
-const ocrImageUrls = ref<string[]>([]);
-const imageInputRef = ref<HTMLInputElement | null>(null);
-const ocrLoading = ref(false);
-/** 当前预览的图片下标，-1 表示未打开 */
-const previewOcrIndex = ref(-1);
-/** 添加按钮防短时间多点：创建中或冷却期内为 true */
+
+/** 添加按钮防短时间多点 */
 const addButtonCooling = ref(false);
-const ADD_COOL_DOWN_MS = 1500;
-/** 下载按钮点击后锁住 1s */
-const downloadButtonLock = ref(false);
-const DOWNLOAD_LOCK_MS = 1000;
-/** 生成语音按钮点击后禁用 1s */
-const generateVoiceLock = ref(false);
-const GENERATE_VOICE_LOCK_MS = 1000;
+
 /** 改名弹窗 */
 const renameModalOpen = ref(false);
 const renameInputValue = ref("");
-/** 详情页「处理中」时定时刷新当前任务的定时器 */
+
+/** TTS 任务对话框引用 */
+const ttsTaskDialogRef = ref<InstanceType<typeof TtsTaskDialog> | null>(null);
+
+/** 定时器 */
 let processingPollTimer: ReturnType<typeof setInterval> | null = null;
-const PROCESSING_POLL_MS = 3000;
-/** 页签激活时每 5s 刷新列表的定时器 */
 let listRefreshTimer: ReturnType<typeof setInterval> | null = null;
-const LIST_REFRESH_MS = 5000;
-
-/** 任务是否忙（TTS 生成中或 OCR/分析子任务中），仿 frontend TTS.vue */
-const isTaskBusy = computed(
-  () =>
-    !!(
-      selectedTask.value?.status === "processing" ||
-      selectedTask.value?.ocr_running ||
-      selectedTask.value?.analysis_running
-    )
-);
-
-watch(selectedTask, (t) => {
-  if (t) {
-    editSpeed.value = t.speed ?? 1;
-    editVol.value = t.vol ?? 50;
-    editText.value = t.text ?? "";
-    editRole.value = t.role ?? "";
-    editModel.value = t.model ?? "";
-  } else {
-    clearSelectedImages();
-  }
-});
-
-/** 详情页打开且任务状态为「处理中」时定时刷新当前任务信息 */
-watch(
-  () => ({ task: selectedTask.value, status: selectedTask.value?.status }),
-  ({ task, status }) => {
-    if (processingPollTimer) {
-      clearInterval(processingPollTimer);
-      processingPollTimer = null;
-    }
-    if (task && status === "processing") {
-      const poll = async () => {
-        if (!selectedTask.value || selectedTask.value.status !== "processing") return;
-        const taskId = selectedTask.value.task_id;
-        try {
-          const updated = await getTtsTask(taskId);
-          // 仅当详情弹窗仍在该任务时更新 selectedTask，避免关闭弹窗后被轮询结果重新打开
-          if (selectedTask.value?.task_id === taskId) {
-            selectedTask.value = updated;
-          }
-          const idx = tasks.value.findIndex((t) => t.task_id === taskId);
-          if (idx >= 0) tasks.value[idx] = updated;
-        } catch {
-          // 忽略单次刷新失败，下次轮询再试
-        }
-      };
-      poll();
-      processingPollTimer = setInterval(poll, PROCESSING_POLL_MS);
-    }
-  },
-  { immediate: true }
-);
-
-onUnmounted(() => {
-  if (processingPollTimer) clearInterval(processingPollTimer);
-  if (listRefreshTimer) clearInterval(listRefreshTimer);
-});
-
-function getOcrImageUrl(index: number): string {
-  return ocrImageUrls.value[index] ?? "";
-}
-
-function openOcrPreview(index: number) {
-  previewOcrIndex.value = index;
-}
-
-function removeOcrImageInPreview() {
-  if (previewOcrIndex.value < 0) return;
-  removeOcrImage(previewOcrIndex.value);
-}
-
-function previewOcrPrev() {
-  if (previewOcrIndex.value > 0) previewOcrIndex.value--;
-}
-
-function previewOcrNext() {
-  if (previewOcrIndex.value < selectedImages.value.length - 1) previewOcrIndex.value++;
-}
-
+// ==================== Computed ====================
 const currentIndex = computed(() => {
   if (!selectedTask.value || tasks.value.length === 0) return -1;
-  const idx = tasks.value.findIndex((t) => t.task_id === selectedTask.value!.task_id);
-  return idx;
+  return tasks.value.findIndex((t) => t.task_id === selectedTask.value!.task_id);
 });
+
 const canGoPrev = computed(() => currentIndex.value > 0);
+
 const canGoNext = computed(
   () => currentIndex.value >= 0 && currentIndex.value < tasks.value.length - 1
 );
 
+// ==================== Detail Modal Operations ====================
 async function openDetail(task: TtsTaskItem) {
-  const loading = await loadingController.create({
-    message: "Loading...",
-  });
+  const loading = await loadingController.create({ message: "Loading..." });
   loading.present();
+  
   try {
     const full = await getTtsTask(task.task_id);
     selectedTask.value = full;
@@ -656,307 +202,36 @@ async function openDetail(task: TtsTaskItem) {
   }
 }
 
-/** 关闭详情弹窗并停止刷新当前任务的定时器 */
 function closeDetailModal() {
-  if (processingPollTimer) {
-    clearInterval(processingPollTimer);
-    processingPollTimer = null;
-  }
+  stopProcessingPoll();
   selectedTask.value = null;
 }
 
 async function goPrev() {
   if (!canGoPrev.value) return;
-  const prev = tasks.value[currentIndex.value - 1];
-  const loading = await loadingController.create({ message: "Loading..." });
-  loading.present();
-  try {
-    selectedTask.value = await getTtsTask(prev.task_id);
-  } catch {
-    selectedTask.value = prev;
-  } finally {
-    loading.dismiss();
-  }
+  await navigateToTask(currentIndex.value - 1);
 }
 
 async function goNext() {
   if (!canGoNext.value) return;
-  const next = tasks.value[currentIndex.value + 1];
+  await navigateToTask(currentIndex.value + 1);
+}
+
+async function navigateToTask(index: number) {
+  const task = tasks.value[index];
   const loading = await loadingController.create({ message: "Loading..." });
   loading.present();
+  
   try {
-    selectedTask.value = await getTtsTask(next.task_id);
+    selectedTask.value = await getTtsTask(task.task_id);
   } catch {
-    selectedTask.value = next;
+    selectedTask.value = task;
   } finally {
     loading.dismiss();
   }
 }
 
-function scrollToAnalysis() {
-  analysisSectionRef.value?.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
-async function confirmDelete() {
-  const task = selectedTask.value;
-  if (!task) return;
-  const alert = await alertController.create({
-    header: "删除任务",
-    message: `确定删除任务「${task.name || task.task_id}」吗？此操作不可恢复。`,
-    buttons: [
-      { text: "取消", role: "cancel" },
-      {
-        text: "删除",
-        role: "destructive",
-        handler: async () => {
-          try {
-            await deleteTtsTask(task.task_id);
-            const idx = tasks.value.findIndex((t) => t.task_id === task.task_id);
-            if (idx >= 0) tasks.value.splice(idx, 1);
-            selectedTask.value = null;
-            EventBus.$emit(C_EVENT.TOAST, "已删除");
-          } catch (e: any) {
-            EventBus.$emit(C_EVENT.TOAST, e?.message ?? "删除失败");
-          }
-        },
-      },
-    ],
-  });
-  await alert.present();
-}
-
-function openRenameDialog() {
-  const task = selectedTask.value;
-  if (!task) return;
-  renameInputValue.value = task.name || task.task_id || "";
-  renameModalOpen.value = true;
-}
-
-/** 把任务正文的第一行文字追加到改名输入框末尾 */
-function appendFirstLineToRename() {
-  const text = selectedTask.value?.text ?? "";
-  const firstLine = text.split(/\r?\n/)[0]?.trim() ?? "";
-  renameInputValue.value = (renameInputValue.value ?? "") + firstLine;
-}
-
-async function confirmRename() {
-  const task = selectedTask.value;
-  if (!task) return;
-  const newName = (renameInputValue.value ?? "").trim();
-  if (!newName) {
-    EventBus.$emit(C_EVENT.TOAST, "名称不能为空");
-    return;
-  }
-  try {
-    await updateTtsTask(task.task_id, { name: newName });
-    const t = tasks.value.find((x) => x.task_id === task.task_id);
-    if (t) t.name = newName;
-    if (selectedTask.value?.task_id === task.task_id) {
-      selectedTask.value = { ...selectedTask.value, name: newName };
-    }
-    EventBus.$emit(C_EVENT.TOAST, "已改名");
-    renameModalOpen.value = false;
-  } catch (e: any) {
-    EventBus.$emit(C_EVENT.TOAST, e?.message ?? "改名失败");
-  }
-}
-
-async function doStartTask(task: TtsTaskItem) {
-  generateVoiceLock.value = true;
-  try {
-    await startTtsTask(task.task_id);
-    EventBus.$emit(C_EVENT.TOAST, "任务已开始处理");
-    await loadTasks();
-    const updated = tasks.value.find((t) => t.task_id === task.task_id);
-    if (updated) {
-      try {
-        selectedTask.value = await getTtsTask(updated.task_id);
-      } catch {
-        selectedTask.value = updated;
-      }
-    }
-  } catch (e: any) {
-    EventBus.$emit(C_EVENT.TOAST, e?.message ?? "启动任务失败");
-  } finally {
-    setTimeout(() => {
-      generateVoiceLock.value = false;
-    }, GENERATE_VOICE_LOCK_MS);
-  }
-}
-
-async function handleStartTask() {
-  const task = selectedTask.value;
-  if (!task) return;
-  if (isTaskBusy.value || task.status === "processing" || generateVoiceLock.value) return;
-  const hasVoiceData = task.status === "success";
-  if (hasVoiceData) {
-    const alert = await alertController.create({
-      header: "确认生成",
-      message: `该任务已有语音数据，重新生成将覆盖。确定要开始吗？`,
-      buttons: [
-        { text: "取消", role: "cancel" },
-        { text: "确定", role: "confirm", handler: () => doStartTask(task) },
-      ],
-    });
-    await alert.present();
-  } else {
-    await doStartTask(task);
-  }
-}
-
-async function runAnalysis() {
-  const task = selectedTask.value;
-  if (!task) return;
-  try {
-    await startTtsAnalysis(task.task_id);
-    EventBus.$emit(C_EVENT.TOAST, "分析已启动，请稍后刷新查看结果");
-  } catch (e: any) {
-    EventBus.$emit(C_EVENT.TOAST, e?.message ?? "发起分析失败");
-  }
-}
-
-async function handleDownloadTtsAudio() {
-  if (downloadButtonLock.value) return;
-  const task = selectedTask.value;
-  if (!task) return;
-  downloadButtonLock.value = true;
-  try {
-    const name = (task.name || task.task_id).replace(/[/\\?%*:|"<>]/g, "_");
-    const fileName = await downloadTtsAudio(task.task_id, `${name}.mp3`);
-    EventBus.$emit(C_EVENT.TOAST, `已开始下载：${fileName}`);
-  } catch (e: any) {
-    EventBus.$emit(C_EVENT.TOAST, e?.message ?? "下载失败");
-  } finally {
-    setTimeout(() => {
-      downloadButtonLock.value = false;
-    }, DOWNLOAD_LOCK_MS);
-  }
-}
-
-function pickImages() {
-  imageInputRef.value?.click();
-}
-
-async function onImageFileChange(e: Event) {
-  const input = e.target as HTMLInputElement;
-  const files = input.files;
-  if (!files?.length) {
-    input.value = "";
-    return;
-  }
-  try {
-    const list = Array.from(files);
-    const resized = await Promise.all(list.map((f) => resizeImageToFile(f)));
-    resized.forEach((f) => {
-      selectedImages.value.push(f);
-      ocrImageUrls.value.push(URL.createObjectURL(f));
-    });
-  } catch (err: any) {
-    EventBus.$emit(C_EVENT.TOAST, err?.message ?? "图片处理失败");
-  } finally {
-    input.value = "";
-  }
-}
-
-function removeOcrImage(index: number) {
-  if (ocrImageUrls.value[index]) {
-    URL.revokeObjectURL(ocrImageUrls.value[index]);
-  }
-  ocrImageUrls.value.splice(index, 1);
-  selectedImages.value.splice(index, 1);
-  if (previewOcrIndex.value === index) {
-    previewOcrIndex.value = -1;
-  } else if (previewOcrIndex.value > index) {
-    previewOcrIndex.value--;
-  }
-}
-
-function clearSelectedImages() {
-  ocrImageUrls.value.forEach((url) => URL.revokeObjectURL(url));
-  ocrImageUrls.value = [];
-  selectedImages.value = [];
-  previewOcrIndex.value = -1;
-  if (imageInputRef.value) imageInputRef.value.value = "";
-}
-
-async function runOcr() {
-  const task = selectedTask.value;
-  if (!task) return;
-  if (selectedImages.value.length === 0) {
-    EventBus.$emit(C_EVENT.TOAST, "请先选择图片");
-    return;
-  }
-  if (isTaskBusy.value) {
-    EventBus.$emit(C_EVENT.TOAST, "任务正在处理中或正在执行分析，无法执行识别");
-    return;
-  }
-  const loading = await loadingController.create({ message: "Loading…" });
-  loading.present();
-  try {
-    ocrLoading.value = true;
-    await ocrTtsTask(task.task_id, selectedImages.value);
-    clearSelectedImages();
-    EventBus.$emit(C_EVENT.TOAST, "识别已启动，结果将追加到任务文本，请稍后刷新");
-    await loadTasks();
-    const updated = tasks.value.find((t) => t.task_id === task.task_id);
-    if (updated) {
-      try {
-        selectedTask.value = await getTtsTask(updated.task_id);
-      } catch {
-        selectedTask.value = updated;
-      }
-    }
-  } catch (e: any) {
-    EventBus.$emit(C_EVENT.TOAST, e?.message ?? "识别失败");
-  } finally {
-    loading.dismiss();
-    ocrLoading.value = false;
-  }
-}
-
-async function saveAndClose() {
-  const task = selectedTask.value;
-  if (!task) return;
-  try {
-    await updateTtsTask(task.task_id, {
-      text: editText.value,
-      role: editRole.value || undefined,
-      model: editModel.value || undefined,
-      speed: Number(editSpeed.value),
-      vol: Number(editVol.value),
-    });
-    const t = tasks.value.find((x) => x.task_id === task.task_id);
-    if (t) {
-      t.text = editText.value;
-      t.role = editRole.value || undefined;
-      t.model = editModel.value || undefined;
-      t.speed = Number(editSpeed.value);
-      t.vol = Number(editVol.value);
-    }
-    if (selectedTask.value?.task_id === task.task_id) {
-      selectedTask.value = {
-        ...selectedTask.value,
-        text: editText.value,
-        role: editRole.value || undefined,
-        model: editModel.value || undefined,
-        speed: t?.speed ?? editSpeed.value,
-        vol: t?.vol ?? editVol.value,
-      };
-    }
-    EventBus.$emit(C_EVENT.TOAST, "已保存");
-  } catch (e: any) {
-    EventBus.$emit(C_EVENT.TOAST, e?.message ?? "保存失败");
-  }
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  pending: "等待",
-  processing: "处理",
-  success: "成功",
-  failed: "失败",
-  uploaded: "已上传",
-};
-
+// ==================== Utility Functions ====================
 function statusLabel(status: string): string {
   return STATUS_LABELS[status] ?? status;
 }
@@ -992,6 +267,7 @@ function formatDuration(seconds: number | null | undefined): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+// ==================== Task List Operations ====================
 async function loadTasks() {
   loading.value = true;
   error.value = "";
@@ -1010,15 +286,18 @@ async function onRefresh(e: RefresherCustomEvent) {
   e.target.complete();
 }
 
-/** 点击添加按钮：创建新 TTS 任务并打开其详情弹窗（防短时间多点） */
+/** 点击添加按钮：创建新 TTS 任务并打开其详情弹窗 */
 async function createAndOpenTask() {
   if (addButtonCooling.value) return;
+  
   addButtonCooling.value = true;
   const loading = await loadingController.create({ message: "Loading..." });
   loading.present();
+  
   try {
     const { task_id } = await createTtsTask({ text: "" });
     await loadTasks();
+    
     const task = tasks.value.find((t) => t.task_id === task_id);
     if (task) {
       try {
@@ -1026,7 +305,9 @@ async function createAndOpenTask() {
       } catch {
         selectedTask.value = task;
       }
-    } else EventBus.$emit(C_EVENT.TOAST, "已创建，请从列表打开");
+    } else {
+      EventBus.$emit(C_EVENT.TOAST, "已创建，请从列表打开");
+    }
   } catch (e: any) {
     EventBus.$emit(C_EVENT.TOAST, e?.message ?? "创建失败");
   } finally {
@@ -1037,7 +318,106 @@ async function createAndOpenTask() {
   }
 }
 
-loadTasks();
+// ==================== Task Update Handlers ====================
+async function handleTaskUpdated(updatedTask: TtsTaskItem) {
+  selectedTask.value = updatedTask;
+  const idx = tasks.value.findIndex((t) => t.task_id === updatedTask.task_id);
+  if (idx >= 0) {
+    tasks.value[idx] = updatedTask;
+  } else {
+    tasks.value.unshift(updatedTask);
+  }
+}
+
+function handleTaskDeleted(taskId: string) {
+  const idx = tasks.value.findIndex((t) => t.task_id === taskId);
+  if (idx >= 0) {
+    tasks.value.splice(idx, 1);
+  }
+  selectedTask.value = null;
+}
+
+// ==================== Rename Operations ====================
+function openRenameDialog() {
+  const task = selectedTask.value;
+  if (!task) return;
+  renameInputValue.value = task.name || task.task_id || "";
+  renameModalOpen.value = true;
+}
+
+function appendFirstLineToRename() {
+  const text = ttsTaskDialogRef.value?.editText ?? selectedTask.value?.text ?? "";
+  const firstLine = text.split(/\r?\n/)[0]?.trim() ?? "";
+  renameInputValue.value = (renameInputValue.value ?? "") + firstLine;
+}
+
+async function confirmRename() {
+  const task = selectedTask.value;
+  if (!task) return;
+  
+  const newName = (renameInputValue.value ?? "").trim();
+  if (!newName) {
+    EventBus.$emit(C_EVENT.TOAST, "名称不能为空");
+    return;
+  }
+  
+  try {
+    await updateTtsTask(task.task_id, { name: newName });
+    const t = tasks.value.find((x) => x.task_id === task.task_id);
+    if (t) t.name = newName;
+    if (selectedTask.value?.task_id === task.task_id) {
+      selectedTask.value = { ...selectedTask.value, name: newName };
+    }
+    EventBus.$emit(C_EVENT.TOAST, "已改名");
+    renameModalOpen.value = false;
+  } catch (e: any) {
+    EventBus.$emit(C_EVENT.TOAST, e?.message ?? "改名失败");
+  }
+}
+
+// ==================== Polling Management ====================
+function startProcessingPoll(taskId: string) {
+  stopProcessingPoll();
+  
+  const poll = async () => {
+    if (!selectedTask.value || selectedTask.value.status !== "processing") return;
+    
+    try {
+      const updated = await getTtsTask(taskId);
+      if (selectedTask.value?.task_id === taskId) {
+        selectedTask.value = updated;
+      }
+      const idx = tasks.value.findIndex((t) => t.task_id === taskId);
+      if (idx >= 0) tasks.value[idx] = updated;
+    } catch {
+      // 忽略单次刷新失败
+    }
+  };
+  
+  poll();
+  processingPollTimer = setInterval(poll, PROCESSING_POLL_MS);
+}
+
+function stopProcessingPoll() {
+  if (processingPollTimer) {
+    clearInterval(processingPollTimer);
+    processingPollTimer = null;
+  }
+}
+
+// ==================== Lifecycle & Watchers ====================
+/** 详情页打开且任务状态为「处理中」时定时刷新当前任务信息 */
+watch(
+  () => ({ task: selectedTask.value, status: selectedTask.value?.status }),
+  ({ task, status }) => {
+    if (task && status === "processing") {
+      startProcessingPoll(task.task_id);
+    } else {
+      stopProcessingPoll();
+    }
+  },
+  { immediate: true }
+);
 
 /** TTS 页签激活时自动刷新列表，并定时刷新 */
 watch(
@@ -1053,15 +433,19 @@ watch(
     }
   }
 );
+
+onUnmounted(() => {
+  stopProcessingPoll();
+  if (listRefreshTimer) {
+    clearInterval(listRefreshTimer);
+    listRefreshTimer = null;
+  }
+});
+
+// 初始化加载
+loadTasks();
 </script>
 
 <style scoped>
-.ocr-image-list {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.ocr-image-list::-webkit-scrollbar {
-  display: none;
-}
+/* 此文件无需额外样式 */
 </style>

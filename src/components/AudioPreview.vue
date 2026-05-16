@@ -2,6 +2,7 @@
 import { IonButton, IonIcon, IonRange } from "@ionic/vue";
 import { playOutline, stopOutline } from "ionicons/icons";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { isUCOrQuarkBrowser } from "@/utils/browser-util";
 
 const props = withDefaults(
   defineProps<{
@@ -27,11 +28,17 @@ const currentTime = ref(0);
 const duration = ref(props.durationSeconds ?? 0);
 const progress = ref(0);
 const currentAudioIndex = ref(0);
-const audioElements = ref<HTMLAudioElement[]>([]); // 预创建的 audio 元素数组
+const isSeeking = ref(false);
+
+const isLegacyAudioWebView = isUCOrQuarkBrowser();
+const timeupdateMinIntervalMs = isLegacyAudioWebView ? 400 : 200;
 
 /** 避免 :ref 回调每次渲染重复 addEventListener（多个 ended 会把索引误判进 else 分支） */
 let audioBindAbort: AbortController | null = null;
 let boundAudioEl: HTMLAudioElement | null = null;
+/** 程序更新进度条时屏蔽 ion-range 误触发的 seek（UC/X5 常见） */
+let suppressRangeSeek = false;
+let lastTimeupdateAt = 0;
 
 function teardownAudioBindings() {
   audioBindAbort?.abort();
@@ -39,13 +46,14 @@ function teardownAudioBindings() {
   boundAudioEl = null;
 }
 
-// 获取当前播放的音频 URL
-const currentSrc = computed(() => {
-  if (Array.isArray(props.src)) {
-    return props.src[currentAudioIndex.value] || '';
-  }
-  return props.src;
+const srcList = computed((): string[] => {
+  const s = props.src;
+  if (s == null || s === "") return [];
+  return Array.isArray(s) ? s.filter(Boolean) : [s];
 });
+
+// 获取当前播放的音频 URL
+const currentSrc = computed(() => srcList.value[currentAudioIndex.value] ?? "");
 
 function formatSeconds(s: number): string {
   if (!s || s < 0) return "0:00";
@@ -75,7 +83,17 @@ function togglePlay() {
   audio.play().catch((e) => console.warn("Audio play failed", e));
 }
 
+function setProgressFromAudio(pct: number, time: number) {
+  suppressRangeSeek = true;
+  progress.value = pct;
+  currentTime.value = time;
+  queueMicrotask(() => {
+    suppressRangeSeek = false;
+  });
+}
+
 function onSeek(e: CustomEvent) {
+  if (suppressRangeSeek) return;
   const v = (e.detail?.value as number) ?? 0;
   const audio = audioRef.value;
   if (!audio || !(duration.value > 0)) return;
@@ -83,6 +101,31 @@ function onSeek(e: CustomEvent) {
   audio.currentTime = target;
   currentTime.value = target;
   progress.value = v;
+}
+
+/** X5/UC 会误触发 ended，导致短片段循环重播 */
+function isAudioActuallyEnded(el: HTMLAudioElement): boolean {
+  const d = el.duration;
+  if (!(d > 0) || !isFinite(d)) return true;
+  return el.currentTime >= d - 0.35 || el.ended;
+}
+
+function playNextInList(el: HTMLAudioElement, nextUrl: string, nextIdx: number) {
+  el.pause();
+  el.src = nextUrl;
+  currentAudioIndex.value = nextIdx;
+  isPlaying.value = true;
+  currentTime.value = 0;
+  setProgressFromAudio(0, 0);
+
+  el.addEventListener(
+    "canplay",
+    function playWhenReady() {
+      el.removeEventListener("canplay", playWhenReady);
+      el.play().catch((e) => console.warn("Audio play failed", e));
+    },
+    { once: true }
+  );
 }
 
 function bindAudio(el: HTMLAudioElement | null) {
@@ -104,52 +147,23 @@ function bindAudio(el: HTMLAudioElement | null) {
   el.addEventListener(
     "ended",
     () => {
-      // 如果是数组且有下一个音频，继续播放
-      if (currentAudioIndex.value < audioElements.value.length - 1) {
+      if (!isAudioActuallyEnded(el)) return;
+
+      const list = srcList.value;
+      if (currentAudioIndex.value < list.length - 1) {
         const nextIdx = currentAudioIndex.value + 1;
-        const nextAudio = audioElements.value[nextIdx];
-
-        if (nextAudio) {
-          el.src = nextAudio.src;
-          currentAudioIndex.value = nextIdx;
-          isPlaying.value = true;
-          currentTime.value = 0;
-          progress.value = 0;
-
-          el.addEventListener(
-            "canplay",
-            function playWhenReady() {
-              el.removeEventListener("canplay", playWhenReady);
-              el.play().catch((e) => console.warn("Audio play failed", e));
-            },
-            { once: true }
-          );
-        }
-      } else if (props.loop && audioElements.value.length > 0) {
-        const firstAudio = audioElements.value[0];
-
-        if (firstAudio) {
-          el.src = firstAudio.src;
-          currentAudioIndex.value = 0;
-          isPlaying.value = true;
-          currentTime.value = 0;
-          progress.value = 0;
-
-          el.addEventListener(
-            "canplay",
-            function playWhenReady() {
-              el.removeEventListener("canplay", playWhenReady);
-              el.play().catch((e) => console.warn("Audio play failed", e));
-            },
-            { once: true }
-          );
-        }
-      } else {
-        isPlaying.value = false;
-        currentTime.value = 0;
-        progress.value = 0;
-        currentAudioIndex.value = 0;
+        const nextUrl = list[nextIdx];
+        if (nextUrl) playNextInList(el, nextUrl, nextIdx);
+        return;
       }
+      if (props.loop && list.length > 0) {
+        playNextInList(el, list[0], 0);
+        return;
+      }
+      isPlaying.value = false;
+      currentTime.value = 0;
+      setProgressFromAudio(0, 0);
+      currentAudioIndex.value = 0;
     },
     { signal }
   );
@@ -165,10 +179,16 @@ function bindAudio(el: HTMLAudioElement | null) {
   el.addEventListener(
     "timeupdate",
     () => {
-      currentTime.value = el.currentTime;
+      if (isSeeking.value) return;
+      const now = performance.now();
+      if (now - lastTimeupdateAt < timeupdateMinIntervalMs) return;
+      lastTimeupdateAt = now;
+
       const d = duration.value || el.duration;
       if (d > 0) {
-        progress.value = (el.currentTime / d) * 100;
+        setProgressFromAudio((el.currentTime / d) * 100, el.currentTime);
+      } else {
+        currentTime.value = el.currentTime;
       }
     },
     { signal }
@@ -199,22 +219,12 @@ watch(
   (newSrc) => {
     if (!newSrc || (Array.isArray(newSrc) && newSrc.length === 0)) {
       unbindAudio();
-      audioElements.value = [];
       duration.value = props.durationSeconds ?? 0;
       currentTime.value = 0;
       progress.value = 0;
       isPlaying.value = false;
       currentAudioIndex.value = 0;
       return;
-    }
-    if (Array.isArray(newSrc)) {
-      audioElements.value = newSrc.map((url) => {
-        const audio = new Audio(url);
-        audio.preload = "auto";
-        return audio;
-      });
-    } else {
-      audioElements.value = [];
     }
     duration.value = props.durationSeconds ?? 0;
     currentTime.value = 0;
@@ -247,6 +257,9 @@ onBeforeUnmount(() => {
       :ref="(el) => bindAudio(el as HTMLAudioElement | null)"
       :src="currentSrc"
       preload="metadata"
+      playsinline
+      webkit-playsinline
+      x5-playsinline
       class="hidden" />
     <ion-button
       v-if="showPlayButton"
@@ -266,6 +279,8 @@ onBeforeUnmount(() => {
       :step="1"
       class="flex-1 min-w-0"
       :disabled="!hasAudioSource || !isPlaying"
+      @ionKnobMoveStart="isSeeking = true"
+      @ionKnobMoveEnd="isSeeking = false"
       @ionInput="onSeek($event)"
       @ionChange="onSeek($event)">
     </ion-range>

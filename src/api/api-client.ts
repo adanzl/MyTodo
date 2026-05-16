@@ -139,14 +139,23 @@ async function checkAddress(url: string, timeout = 500): Promise<boolean> {
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeout);
-    const res = await fetch(url.replace(/\/?$/, "/"), {
-      method: "HEAD",
+    // 使用 no-cors 模式进行简单的连通性检查，避免CORS预检请求
+    await fetch(url.replace(/\/?$/, "/"), {
+      method: "GET", // 改用 GET 方法，更可靠
       signal: ctrl.signal,
       cache: "no-store",
+      mode: "no-cors", // 使用 no-cors 避免跨域问题
     });
     clearTimeout(t);
-    return res.ok;
-  } catch {
+    // no-cors 模式下，只要能连接成功（不抛异常）就认为可达
+    return true;
+  } catch (error: any) {
+    // 如果是超时错误，说明服务器不可达
+    if (error.name === 'AbortError') {
+      console.debug("[checkAddress] Timeout checking address:", url);
+    } else {
+      console.warn("[checkAddress] Failed to check address:", url, error);
+    }
     return false;
   }
 }
@@ -174,7 +183,9 @@ function setBaseUrl(url: string): void {
 export function switchToLocal(): void {
   if (localIpAvailable === true) return;
   localIpAvailable = true;
-  setBaseUrl(getLocalApiUrl());
+  const localUrl = getLocalApiUrl();
+  console.log("[API Client] Switching to local server:", localUrl);
+  setBaseUrl(localUrl);
   EventBus.$emit(C_EVENT.SERVER_SWITCH, false);
 }
 

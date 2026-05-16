@@ -152,35 +152,37 @@
           </ion-toolbar>
         </ion-footer>
       </ion-menu>
-      <ion-tabs>
-        <ion-router-outlet></ion-router-outlet>
-        <ion-tab-bar slot="bottom">
-          <ion-tab-button tab="tabHome" href="/tabs/tab1">
-            <ion-icon :icon="shieldCheckmarkOutline" />
-            <ion-label>日程浏览</ion-label>
-          </ion-tab-button>
+      <div class="ion-page" id="main-content">
+        <ion-tabs>
+          <ion-router-outlet></ion-router-outlet>
+          <ion-tab-bar slot="bottom">
+            <ion-tab-button tab="tabHome" href="/tabs/tab1">
+              <ion-icon :icon="shieldCheckmarkOutline" />
+              <ion-label>日程浏览</ion-label>
+            </ion-tab-button>
 
-          <ion-tab-button tab="tabCalendar" href="/tabs/tab2">
-            <ion-icon :icon="bookOutline" />
-            <ion-label>阅读任务</ion-label>
-          </ion-tab-button>
+            <ion-tab-button tab="tabCalendar" href="/tabs/tab2">
+              <ion-icon :icon="bookOutline" />
+              <ion-label>阅读任务</ion-label>
+            </ion-tab-button>
 
-          <ion-tab-button tab="tabChat" href="/tabs/tab3">
-            <ion-icon :icon="chatboxEllipsesOutline" />
-            <ion-label>智能对话</ion-label>
-          </ion-tab-button>
+            <ion-tab-button tab="tabChat" href="/tabs/tab3">
+              <ion-icon :icon="chatboxEllipsesOutline" />
+              <ion-label>智能对话</ion-label>
+            </ion-tab-button>
 
-          <ion-tab-button tab="tabLottery" href="/tabs/tab4">
-            <ion-icon :icon="giftOutline" />
-            <ion-label>神秘宝藏</ion-label>
-          </ion-tab-button>
+            <ion-tab-button tab="tabLottery" href="/tabs/tab4">
+              <ion-icon :icon="giftOutline" />
+              <ion-label>神秘宝藏</ion-label>
+            </ion-tab-button>
 
-          <ion-tab-button tab="tabMy" href="/tabs/tab0">
-            <ion-icon :icon="musicalNotesOutline" />
-            <ion-label>媒体</ion-label>
-          </ion-tab-button>
-        </ion-tab-bar>
-      </ion-tabs>
+            <ion-tab-button tab="tabMy" href="/tabs/tab0">
+              <ion-icon :icon="musicalNotesOutline" />
+              <ion-label>媒体</ion-label>
+            </ion-tab-button>
+          </ion-tab-bar>
+        </ion-tabs>
+      </div>
       <ColorMgr trigger="btnColor" />
     </div>
     <div v-else class="bg-white h-full flex justify-center items-center px-4">
