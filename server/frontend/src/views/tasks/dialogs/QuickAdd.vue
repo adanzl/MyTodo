@@ -36,6 +36,23 @@
                 />
               </el-form-item>
             </el-col>
+            <el-col :span="12">
+              <el-form-item label="分配基数">
+                <div class="flex items-center">
+                  <el-checkbox v-model="useBatchSize" />
+                  <el-input-number
+                    v-model="batchSize"
+                    :min="1"
+                    :max="10"
+                    :step="1"
+                    size="small"
+                    class="w-25! ml-2"
+                    :disabled="!useBatchSize"
+                  />
+                  <span class="ml-2 text-gray-600 text-xs" v-if="useBatchSize">每次分配 {{ batchSize }} 个素材</span>
+                </div>
+              </el-form-item>
+            </el-col>
           </el-row>
           <el-form-item label="分配方式">
             <el-radio-group v-model="allocationType">
@@ -85,7 +102,7 @@
                 :data="materialList"
                 @selection-change="handleMaterialSelectionChange"
                 @row-click="handleRowClick"
-                max-height="260"
+                height="100%"
               >
                 <el-table-column type="selection" width="55" />
                 <el-table-column prop="id" label="ID" width="80" />
@@ -144,6 +161,8 @@ const isRestoringSelection = ref(false);
 const startDay = ref(1);
 const endDay = ref(1);
 const allocationType = ref(0); // 0: 平均分配, 1: 循环分配, 2: 全部添加到每一天
+const useBatchSize = ref(false); // 是否启用分配基数
+const batchSize = ref(1); // 分配基数：每次分配的素材数量
 
 // ==================== Tree 配置 ====================
 const treeProps = {
@@ -232,18 +251,35 @@ const descriptionText = computed(() => {
   }
 
   const totalDays = endDay.value - startDay.value + 1;
+  // 只有平均分配和循环分配才显示基数信息
+  const showBatchInfo = useBatchSize.value && allocationType.value !== 2;
+  const batchInfo = showBatchInfo ? `（每次${batchSize.value}个）` : '';
 
   switch (allocationType.value) {
     case 0: // 平均分配
-      const perDay = Math.floor(selectedMaterials.value.length / totalDays);
-      const remaining = selectedMaterials.value.length % totalDays;
-      if (remaining === 0) {
-        return `每天分配 ${perDay} 个素材`;
+      if (useBatchSize.value && batchSize.value > 1) {
+        // 启用基数：强制每天分配 batchSize 个素材
+        const requiredMaterials = totalDays * batchSize.value;
+        if (selectedMaterials.value.length >= requiredMaterials) {
+          const remaining = selectedMaterials.value.length - requiredMaterials;
+          return `每天分配 ${batchSize.value} 个素材，共需 ${requiredMaterials} 个，将舍弃 ${remaining} 个多余素材`;
+        } else {
+          const canFillDays = Math.floor(selectedMaterials.value.length / batchSize.value);
+          const unfilledDays = totalDays - canFillDays;
+          return `每天分配 ${batchSize.value} 个素材，素材不足，只能填充 ${canFillDays} 天，剩余 ${unfilledDays} 天不分配`;
+        }
       } else {
-        return `前 ${remaining} 天分配 ${perDay + 1} 个，其余天分配 ${perDay} 个`;
+        // 未启用基数：原有逻辑
+        const perDay = Math.floor(selectedMaterials.value.length / totalDays);
+        const remaining = selectedMaterials.value.length % totalDays;
+        if (remaining === 0) {
+          return `每天分配 ${perDay} 个素材${batchInfo}`;
+        } else {
+          return `前 ${remaining} 天分配 ${perDay + 1} 个，其余天分配 ${perDay} 个${batchInfo}`;
+        }
       }
     case 1: // 循环分配
-      return `循环分配 ${selectedMaterials.value.length} 个素材到 ${totalDays} 天`;
+      return `循环分配 ${selectedMaterials.value.length} 个素材到 ${totalDays} 天${batchInfo}`;
     case 2: // 全部添加到每一天
       return `每天分配 ${selectedMaterials.value.length} 个素材`;
     default:
@@ -380,13 +416,59 @@ const allocateMaterials = () => {
     return;
   }
 
-  // 触发分配事件
-  emit("allocated",
-    selectedMaterials.value.map(m => ({
+  // 根据 useBatchSize、batchSize 和 allocationType 对素材进行分组处理
+  let processedMaterials: Array<{ id: number; name: string; type: number }> = [];
+  
+  if (!useBatchSize.value || batchSize.value === 1) {
+    // 未启用基数或基数为1，直接传递所有素材
+    processedMaterials = selectedMaterials.value.map(m => ({
       id: m.id!,
       name: m.name,
       type: m.type
-    })),
+    }));
+  } else if (allocationType.value === 0) {
+    // 启用基数且为平均分配：强制每天分配 batchSize 个素材
+    const totalDays = endDay.value - startDay.value + 1;
+    const requiredMaterials = totalDays * batchSize.value;
+    
+    if (selectedMaterials.value.length >= requiredMaterials) {
+      // 素材充足：只取需要的数量，舍弃多余的
+      const materialsToUse = selectedMaterials.value.slice(0, requiredMaterials);
+      processedMaterials = materialsToUse.map(m => ({
+        id: m.id!,
+        name: m.name,
+        type: m.type
+      }));
+    } else {
+      // 素材不足：只取可用的素材
+      processedMaterials = selectedMaterials.value.map(m => ({
+        id: m.id!,
+        name: m.name,
+        type: m.type
+      }));
+    }
+  } else {
+    // 其他分配方式：按批次复制素材
+    const batches = Math.ceil(selectedMaterials.value.length / batchSize.value);
+    for (let i = 0; i < batches; i++) {
+      const start = i * batchSize.value;
+      const end = Math.min(start + batchSize.value, selectedMaterials.value.length);
+      const batch = selectedMaterials.value.slice(start, end);
+      
+      // 将这批素材添加到结果中
+      batch.forEach(m => {
+        processedMaterials.push({
+          id: m.id!,
+          name: m.name,
+          type: m.type
+        });
+      });
+    }
+  }
+
+  // 触发分配事件
+  emit("allocated",
+    processedMaterials,
     startDay.value,
     endDay.value,
     allocationType.value
@@ -442,6 +524,8 @@ const resetForm = () => {
   startDay.value = 1;
   endDay.value = 1;
   allocationType.value = 0;
+  useBatchSize.value = false;
+  batchSize.value = 1;
   categorySelectedCountCache.value.clear();
 };
 </script>
