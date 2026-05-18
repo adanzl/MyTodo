@@ -6,6 +6,7 @@
         <el-option label="抽奖" value="lottery" />
         <el-option label="兑换" value="exchange" />
         <el-option label="任务" value="schedule" />
+        <el-option label="管理" value="appAdmin" />
       </el-select>
       <el-radio-group size="default" v-model="selectedUserId" @change="onUserChange">
         <el-radio-button v-for="item in userList" :key="item.id" :value="item.id">

@@ -38,7 +38,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/timetable",
     name: "Timetable",
-    component: () => import("@/views/PageTimetable.vue"),
+    component: () => import("@/views/timetable/PageTimetable.vue"),
   },
   {
     path: "/media",
