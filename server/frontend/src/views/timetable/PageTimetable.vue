@@ -23,7 +23,7 @@
       </div>
     </div>
 
-    <div class="overflow-x-auto" v-loading="loading">
+    <div class="overflow-x-auto relative" v-loading="loading">
       <table class="w-full border-collapse bg-white shadow-lg rounded-lg overflow-hidden">
         <thead>
           <tr class="bg-gray-50">
@@ -130,6 +130,26 @@
           </tr>
         </tfoot>
       </table>
+
+      <!-- 当前时间线 -->
+      <div
+        v-if="currentTimeLine.visible"
+        class="absolute pointer-events-none z-20"
+        :style="{
+          top: `${currentTimeLine.top + 120}px`,
+          left: '30px',
+          right: '0'
+        }"
+      >
+        <div class="flex items-center">
+          <div class="w-20 text-right pr-2 flex-shrink-0">
+            <span class="text-xs font-bold text-red-500 bg-white px-1 rounded shadow">
+              {{ new Date().getHours().toString().padStart(2, '0') }}:{{ new Date().getMinutes().toString().padStart(2, '0') }}
+            </span>
+          </div>
+          <div class="flex-1 h-0.5 bg-red-500"></div>
+        </div>
+      </div>
 
       <!-- 空状态提示 -->
       <div
@@ -281,6 +301,7 @@ const loading = ref(false);
 const showEditModal = ref(false);
 const filterChild = ref<FilterChild>("all");
 const lastSaveTime = ref<string>("");
+const currentTimeLine = ref<{ top: number; visible: boolean }>({ top: 0, visible: false });
 const editingCourse = ref<EditingCourse>({
   day: "",
   child: "zhaozhao",
@@ -609,6 +630,31 @@ const reloadTimetable = async () => {
 };
 
 /**
+ * 更新当前时间线位置
+ */
+const updateCurrentTimeLine = () => {
+  const now = new Date();
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+
+  // 检查是否在当前显示的时间范围内
+  if (currentHour < HOUR_START || currentHour > HOUR_END) {
+    currentTimeLine.value.visible = false;
+    return;
+  }
+
+  // 计算相对于表格顶部的位置
+  const hourIndex = currentHour - HOUR_START;
+  const minuteOffset = (currentMinute / 60) * CELL_HEIGHT;
+  const top = hourIndex * CELL_HEIGHT + minuteOffset;
+
+  currentTimeLine.value = {
+    top,
+    visible: true,
+  };
+};
+
+/**
  * 格式化时间为本地字符串
  */
 const formatDateTime = (date: Date): string => {
@@ -764,6 +810,9 @@ const loadTimetableData = async () => {
 
       timetableData.value = rawData;
     }
+
+    // 初始化当前时间线
+    updateCurrentTimeLine();
   } catch (error) {
     logger.error("加载数据失败:", error);
     timetableData.value = {};
@@ -775,6 +824,9 @@ const loadTimetableData = async () => {
 // ============ 生命周期 ============
 onMounted(async () => {
   await loadTimetableData();
+
+  // 每5s更新一次当前时间线
+  setInterval(updateCurrentTimeLine, 5000);
 });
 </script>
 
