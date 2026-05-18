@@ -3,9 +3,9 @@
     <!-- 工具栏 -->
     <div class="flex items-center h-10 mb-2 gap-2">
       <el-button type="primary" plain size="small" @click="fetchCurrentList" :icon="Refresh" />
-      <el-input v-model="searchMatId" placeholder="搜索ID" size="small" class="w-40!" clearable
+      <el-input v-model="searchMatId" placeholder="素材ID" size="small" class="w-20!" clearable
         @clear="fetchCurrentList" />
-      <el-button type="primary" plain size="small" @click="fetchCurrentList">筛选</el-button>
+      <el-button type="primary" plain size="small" @click="fetchCurrentList">定位</el-button>
       <el-button type="success" size="small" @click="handleBatchAdd">批量添加</el-button>
       <el-button type="primary" size="small" @click="handleAddMaterial">添加素材</el-button>
       <el-button type="warning" size="small" @click="handleAddFolder">新建目录</el-button>

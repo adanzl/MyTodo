@@ -2,7 +2,7 @@
   <div class="p-1">
     <!-- 配置区域 -->
      <el-card>
-       <div class="flex flex-wrap items-end gap-2 mb-2">
+       <div class="flex flex-wrap gap-2">
          <div class="flex items-center">
            <el-text class="w-24">普通抽奖费用</el-text>
            <el-input v-model="lotterySettingData.fee" class="w-32! ml-2" type="number" />
@@ -50,8 +50,15 @@ const activeMainTab = ref("lottery");
 
 // 监听页签切换
 const handleTabChange = (tabName: string) => {
-  // 页签切换时的处理逻辑（如果需要）
-  console.log("切换到页签:", tabName);
+  const eventMap: Record<string, string> = {
+    'lottery': 'refresh-lottery-tab',
+    'pool': 'refresh-pool-tab'
+  };
+
+  const eventName = eventMap[tabName];
+  if (eventName) {
+    window.dispatchEvent(new CustomEvent(eventName));
+  }
 };
 
 // 配置数据

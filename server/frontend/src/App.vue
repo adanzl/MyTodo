@@ -19,7 +19,7 @@
           </el-tag>
         </div>
       </el-header>
-      <el-main>
+      <el-main >
         <router-view></router-view>
       </el-main>
     </el-container>

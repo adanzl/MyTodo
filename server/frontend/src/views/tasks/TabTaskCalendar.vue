@@ -8,6 +8,7 @@
         <el-radio :value="3">灿灿</el-radio>
         <el-radio :value="4">昭昭</el-radio>
       </el-radio-group>
+      <span class="text-xs">（注：# 表示当天没有配置素材；- 表示当天没有任务）</span>
       <div class="ml-auto flex items-center">
         <el-switch v-model="showDetail" @change="handleDetailChange" :active-text="''" :inactive-text="'详情'" class="mr-2" />
         <el-button size="small" :icon="ArrowLeft" @click="decreaseDays" class="mr-1" />
@@ -443,6 +444,8 @@ const getTaskProgress = (task: Task, date: Date) => {
     }
 
     const totalMaterials = materials.length;
+    if (totalMaterials === 0)
+      return "#";
 
     // 统计完成数 - status 现在是 Record<user_id, status>
     let completedCount = 0;

@@ -10,14 +10,14 @@
       </el-button>
     </div>
     <div class="flex py-2">
-      <el-radio-group size="default" v-model="selectedCateId" @change="onCateChange">
+      <el-radio-group size="default" v-model="selectedCateId" @change="onCateChange" >
         <el-radio-button v-for="item in lotteryCatList" :key="item.id" :value="item.id">
           {{ item.name }}
         </el-radio-button>
       </el-radio-group>
 
     </div>
-    <el-table :data="giftList.data" v-loading="loading" :max-height="tableMaxHeight" style="min-height: 200px" border>
+    <el-table :data="giftList.data" v-loading="loading" :max-height="tableMaxHeight" style="min-height: 200px">
       <!-- 图片 -->
       <el-table-column width="130" label="Image">
         <template #default="{ row }">
@@ -138,7 +138,7 @@
               @click="handleGiftCancel(row, giftList.data.indexOf(row))">
               Cancel
             </el-button>
-            <el-button v-else size="small" class="w-16" @click="handleCateEdit(row)">
+            <el-button v-else size="small" class="w-16" @click="handleGiftEdit(row)">
               Edit
             </el-button>
             <el-button v-if="row.edited" class="w-16" size="small" type="primary" @click="handleGiftSave(row)">
@@ -152,42 +152,7 @@
       :page-sizes="[5, 10, 20]" :current-page="giftList.pageNum" class="mt-2" background @size-change="handleSizeChange"
       @current-change="(page: number) => handlePageChange(page, PAGE_SIZE)" />
   </div>
-  <el-dialog v-model="modifyCateModel" title="类别管理" width="800" destroy-on-close>
-    <el-table :data="lotteryCatPopList">
-      <el-table-column property="id" label="ID" width="50" />
-      <el-table-column property="name" label="Name" width="150">
-        <template #default="{ row }">
-          <div class="flex items-center">
-            <template v-if="row.edited">
-              <el-input v-model="row.name" size="small"
-                @blur="handleCateBlur(row, 'name', lotteryCatPopList.indexOf(row))" />
-            </template>
-            <template v-else>
-              <span> {{ row.name }} </span>
-            </template>
-          </div>
-        </template>
-      </el-table-column>
-      <el-table-column label="OP">
-        <template #default="{ row }">
-          <el-button v-if="row.edited" class="w-16" size="small" type="primary"
-            @click="handleCateSave(row, lotteryCatPopList.indexOf(row))">
-            Save
-          </el-button>
-          <el-button v-if="row.edited" class="w-16" size="small"
-            @click="handleCateCancel(row, lotteryCatPopList.indexOf(row))">
-            Cancel
-          </el-button>
-          <el-button v-else size="small" class="w-16" @click="handleCateEdit(row)">
-            Edit
-          </el-button>
-          <el-button v-if="row.id !== -1" class="w-16" size="small" type="danger" @click="handleCateDelete(row)">
-            Delete
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-  </el-dialog>
+  <LotteryCategoryDialog v-model="modifyCateModel" @refresh="handleCategoryRefresh" />
 </template>
 
 <script setup lang="ts">
@@ -199,6 +164,7 @@ import { getList, getData, setData, delData } from "@/api/api-common";
 import { uploadPic, getPicDisplayUrl } from "@/api/api-pic";
 import * as _ from "lodash-es";
 import type { Gift, GiftApiData, GiftCategory } from "@/types/lottery";
+import LotteryCategoryDialog from "./dialogs/LotteryCategory.vue";
 
 const PAGE_SIZE = ref<number>(5);
 const selectedCateId = ref<number>(0);
@@ -209,7 +175,7 @@ const searchId = ref<string>("");
 const calculateTableHeight = () => {
   nextTick(() => {
     const windowHeight = window.innerHeight;
-    const reservedSpace = 370;
+    const reservedSpace = 410;
     tableMaxHeight.value = windowHeight - reservedSpace;
   });
 };
@@ -235,7 +201,6 @@ const giftList = ref<{
 const lotteryCatList = ref<GiftCategory[]>([]);
 const loading = ref(false);
 const modifyCateModel = ref(false);
-const lotteryCatPopList = ref<GiftCategory[]>([]);
 
 const refreshCateList = async () => {
   try {
@@ -247,16 +212,6 @@ const refreshCateList = async () => {
       if (selectedCateId.value === 0 && lotteryCatList.value.length > 0) {
         selectedCateId.value = lotteryCatList.value[0].id;
       }
-
-      lotteryCatPopList.value = [];
-      lotteryCatPopList.value.push({ id: -1, name: "", edited: true });
-      _.forEach(d, (item: GiftCategory) => {
-        lotteryCatPopList.value.push({
-          id: item.id,
-          name: item.name,
-          edited: false,
-        });
-      });
     }
   } catch (err) {
     console.error(err);
@@ -433,44 +388,19 @@ const handleSizeChange = (pageSize: number) => {
   refreshGiftList(selectedCate.value.id, 1, pageSize, searchId.value);
 };
 
-const handleCateBlur = (item: GiftCategory, key: string, _idx: number) => {
-  console.log("handleCateBlur", item, key);
-};
-
-const handleCateSave = async (item: GiftCategory, _idx: number) => {
-  try {
-    const data = {
-      id: item.id,
-      name: item.name,
-    };
-    await setData("t_gift_category", data);
-    await refreshCateList();
-  } catch (error) {
-    console.error("保存类别失败:", error);
-    ElMessage.error("保存类别失败");
-  }
-};
-
-const handleCateDelete = async (item: GiftCategory) => {
-  try {
-    await delData("t_gift_category", item.id);
-    await refreshCateList();
-  } catch (error) {
-    console.error("删除类别失败:", error);
-    ElMessage.error("删除类别失败");
-  }
-};
-
-const handleCateEdit = (item: GiftCategory) => {
+const handleGiftEdit = (item: Gift) => {
   item.edited = true;
 };
 
-const handleCateCancel = (item: GiftCategory, _idx: number) => {
-  if (item.id === -1) {
-    item.name = "";
-  } else {
-    item.edited = false;
+// 类别管理对话框刷新回调
+const handleCategoryRefresh = async () => {
+  await refreshCateList();
+  // 如果当前选中的分类被删除，重置为第一个分类
+  if (!lotteryCatList.value.some(cat => cat.id === selectedCateId.value)) {
+    selectedCateId.value = lotteryCatList.value.length > 0 ? lotteryCatList.value[0].id : 0;
   }
+  // 重新加载奖品列表
+  await refreshGiftList(selectedCate.value.id, 1, PAGE_SIZE.value, searchId.value);
 };
 
 onMounted(async () => {

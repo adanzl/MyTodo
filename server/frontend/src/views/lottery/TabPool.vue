@@ -1,6 +1,12 @@
 <template>
   <div class="p-2">
-    <div class="flex items-center justify-between mb-0">
+    <div class="flex items-center h-10">
+      <el-button @click="refreshPoolList(poolList.pageNum, poolList.pageSize)"
+          size="small" type="primary" plain>
+        <el-icon>
+          <Refresh />
+        </el-icon>
+      </el-button>
       <el-button type="primary" @click="onAddPoolClk" class="mt-px" size="small">
         <el-icon>
           <Plus />
@@ -9,8 +15,8 @@
       </el-button>
     </div>
     <el-table :data="poolList.data" v-loading="loading">
-      <el-table-column property="id" label="ID" width="80" />
-      <el-table-column property="name" label="奖池名称" width="200">
+      <el-table-column property="id" label="ID" width="60" />
+      <el-table-column property="name" label="奖池名称" min-width="120">
         <template #default="{ row }">
           <div class="flex items-center">
             <template v-if="row.edited">
@@ -22,21 +28,19 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column property="cost" label="费用" width="100">
+      <el-table-column property="cost" label="费用" width="80" align="center">
         <template #default="{ row }">
-          <div class="flex items-center">
-            <template v-if="row.edited">
-              <el-input v-model="row.cost" size="small" type="number" placeholder="0" clearable />
-            </template>
-            <template v-else>
-              <span>{{ row.cost ?? '-' }}</span>
-            </template>
-          </div>
+          <template v-if="row.edited">
+            <el-input v-model="row.cost" size="small" type="number" placeholder="0" clearable />
+          </template>
+          <template v-else>
+            <span>{{ row.cost ?? '-' }}</span>
+          </template>
         </template>
       </el-table-column>
-      <el-table-column property="count" label="数量" width="80">
+      <el-table-column property="count" label="数量" width="80" align="center">
         <template #default="{ row }">
-          <div class="flex items-center">
+          <div class="flex items-center justify-center">
             <template v-if="row.edited">
               <el-input v-model="row.count" size="small" type="number" placeholder="0" clearable />
             </template>
@@ -46,9 +50,9 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column property="count_mx" label="最大数量" width="80">
+      <el-table-column property="count_mx" label="最大数量" width="80" align="center">
         <template #default="{ row }">
-          <div class="flex items-center">
+          <div class="flex items-center justify-center">
             <template v-if="row.edited">
               <el-input v-model="row.count_mx" size="small" type="number" placeholder="0" clearable />
             </template>
@@ -63,12 +67,12 @@
           <div class="flex items-center">
             <template v-if="row.edited">
               <el-select v-model="row.cate_ids" multiple collapse-tags collapse-tags-tooltip size="small"
-                placeholder="选择分类" style="width: 100%">
+                placeholder="选择分类" style="width: 100%" :max-collapse-tags="5">
                 <el-option v-for="cate in categoryList" :key="cate.id" :label="cate.name" :value="cate.id" />
               </el-select>
             </template>
             <template v-else>
-              <span>{{ row.cate_names || '-' }}</span>
+              <span>{{ row.cate_names && row.cate_names.length > 0 ? row.cate_names : '-' }}</span>
             </template>
           </div>
         </template>
@@ -99,9 +103,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { Plus } from "@element-plus/icons-vue";
+import { Plus, Refresh } from "@element-plus/icons-vue";
 import { getList, getData, setData, delData } from "@/api/api-common";
 import * as _ from "lodash-es";
 
@@ -279,7 +283,7 @@ const getCategoryNames = (cateIds: number[], categories: Array<{ id: number; nam
   const names = cateIds
     .map(id => categories.find(c => c.id === id)?.name)
     .filter(name => name) as string[];
-  return names.join('、');
+  return names.length > 0 ? names.join('、') : '';
 };
 
 // 加载所有分类
@@ -297,6 +301,16 @@ const refreshCategoryList = async () => {
 onMounted(() => {
   refreshCategoryList();
   refreshPoolList(1, PAGE_SIZE);
+
+  // 监听刷新事件
+  const handleRefresh = () => {
+    refreshPoolList(poolList.value.pageNum, poolList.value.pageSize);
+  };
+  window.addEventListener('refresh-pool-tab', handleRefresh);
+
+  onUnmounted(() => {
+    window.removeEventListener('refresh-pool-tab', handleRefresh);
+  });
 });
 </script>
 
