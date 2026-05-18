@@ -152,9 +152,10 @@ async function checkAddress(url: string, timeout = 500): Promise<boolean> {
   } catch (error: any) {
     // 如果是超时错误，说明服务器不可达
     if (error.name === 'AbortError') {
-      console.debug("[checkAddress] Timeout checking address:", url);
+      // 静默处理超时，避免频繁报错
     } else {
-      console.warn("[checkAddress] Failed to check address:", url, error);
+      // 仅在非超时错误时输出警告
+      console.debug("[checkAddress] Failed to check address:", url, error.message);
     }
     return false;
   }

@@ -3,7 +3,7 @@
     <!-- 工具栏 -->
     <div class="flex items-center h-10 mb-2 gap-2">
       <el-button type="primary" plain size="small" @click="fetchCurrentList" :icon="Refresh" />
-      <el-input v-model="searchKeyword" placeholder="搜索名称" size="small" class="w-40!" clearable
+      <el-input v-model="searchMatId" placeholder="搜索ID" size="small" class="w-40!" clearable
         @clear="fetchCurrentList" />
       <el-button type="primary" plain size="small" @click="fetchCurrentList">筛选</el-button>
       <el-button type="success" size="small" @click="handleBatchAdd">批量添加</el-button>
@@ -132,6 +132,7 @@ import {
   updateMaterialCategory,
   deleteMaterialCategory,
   deleteMaterial,
+  getMaterialParentChain,
   type Material,
   type MaterialCategory,
 } from "@/api/api-task";
@@ -167,7 +168,7 @@ const calculateTableHeight = () => {
 // 状态管理
 const loading = ref(false);
 const currentList = ref<MixedItem[]>([]);
-const searchKeyword = ref("");
+const searchMatId = ref("");
 
 // 面包屑导航
 interface BreadcrumbItem {
@@ -249,6 +250,12 @@ const buildCategoryTree = (categories: MaterialCategory[]): any[] => {
 const fetchCurrentList = async () => {
   loading.value = true;
   try {
+    // 如果有搜索ID，先定位到对应目录
+    if (searchMatId.value) {
+      await navigateToMaterialById(searchMatId.value.trim());
+      searchMatId.value = ''; // 清空搜索框
+    }
+
     // 获取当前父级下的子目录
     const categoriesRes = await getMaterialCategoryList(1, 1000, currentParentId.value);
     const folders: FolderItem[] = [];
@@ -275,7 +282,7 @@ const fetchCurrentList = async () => {
     }
 
     // 合并文件夹和素材
-    let mixedList: MixedItem[] = [
+    const mixedList: MixedItem[] = [
       ...folders.map(f => ({
         id: f.id,
         name: f.name,
@@ -292,19 +299,46 @@ const fetchCurrentList = async () => {
       }))
     ];
 
-    // 前端搜索过滤
-    if (searchKeyword.value) {
-      mixedList = mixedList.filter((item) =>
-        item.name.toLowerCase().includes(searchKeyword.value.toLowerCase())
-      );
-    }
-
     currentList.value = mixedList;
   } catch (error: any) {
     console.error("获取列表失败:", error);
     ElMessage.error(error.message || "获取列表失败");
   } finally {
     loading.value = false;
+  }
+};
+
+// 根据素材ID导航到对应目录
+const navigateToMaterialById = async (matIdStr: string) => {
+  const matId = Number(matIdStr);
+  if (isNaN(matId)) {
+    ElMessage.warning('请输入有效的素材ID');
+    return;
+  }
+
+  try {
+    // 获取素材的父目录链
+    const chain = await getMaterialParentChain(matId);
+    if (!chain || chain.length === 0) {
+      ElMessage.error('素材不存在或无法访问');
+      return;
+    }
+
+    // 设置面包屑导航
+    breadcrumbList.value = chain.map(item => ({
+      id: item.id,
+      name: item.name,
+      parent: item.parent ?? undefined
+    }));
+
+    // 设置当前父级ID为素材所在目录
+    const lastCategory = chain[chain.length - 1];
+    currentParentId.value = lastCategory.id;
+
+    ElMessage.success(`已定位到素材所在目录`);
+  } catch (error: any) {
+    console.error('导航失败:', error);
+    ElMessage.error(error.message || '导航失败');
   }
 };
 

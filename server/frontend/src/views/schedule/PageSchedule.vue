@@ -1,10 +1,10 @@
 <template>
-  <div class="schedule-container">
+  <div class="p-4">
     <!-- 筛选区域 -->
-    <div class="filter-bar">
-      <el-button :icon="Refresh" plain type="primary" @click="refreshData" :loading="loading" />
-      <el-button type="primary" :icon="Plus" @click="handleAdd">添加日程</el-button>
-      <el-radio-group v-model="selectedUserId" @change="onUserChange">
+    <div class="h-10 flex items-center gap-2 mb-2">
+      <el-button :icon="Refresh" plain type="primary" size="small" @click="refreshData" :loading="loading" />
+      <el-button type="primary" size="small" :icon="Plus" @click="handleAdd">添加日程</el-button>
+      <el-radio-group v-model="selectedUserId" @change="onUserChange" class="ml-2">
         <el-radio-button :value="3">灿灿</el-radio-button>
         <el-radio-button :value="4">昭昭</el-radio-button>
       </el-radio-group>
@@ -14,31 +14,35 @@
     <el-table :data="scheduleList" v-loading="loading" stripe border max-height="calc(100vh - 200px)">
       <el-table-column label="ID" prop="id" width="60" />
       <el-table-column label="标题" prop="title" min-width="200" />
-      <el-table-column label="开始时间" prop="startTs" width="180">
+      <el-table-column label="开始时间" prop="startTs" width="110" align="center">
         <template #default="{ row }">
           {{ formatTime(row.startTs) }}
         </template>
       </el-table-column>
-      <el-table-column label="结束时间" prop="endTs" width="180">
+      <el-table-column label="结束时间" prop="endTs" width="110" align="center">
         <template #default="{ row }">
           {{ formatTime(row.endTs) }}
         </template>
       </el-table-column>
-      <el-table-column label="重复" width="100" align="center">
+      <el-table-column label="重复" width="80" align="center">
         <template #default="{ row }">
-          <el-tooltip v-if="row.repeat === 999 && row.repeatData" :content="getRepeatDataText(row.repeatData)" placement="top">
-            <el-tag type="primary" size="small">自定义</el-tag>
-          </el-tooltip>
-          <el-tag v-else-if="row.repeat" type="primary" size="small">{{ getRepeatText(row.repeat) }}</el-tag>
-          <span v-else>-</span>
+          <div class="h-6 flex items-center justify-center w-full">
+            <span v-if="!row.repeat">-</span>
+            <el-tag v-else type="primary" size="small">
+              <el-tooltip v-if="row.repeat === 999 && row.repeatData" :content="getRepeatDataText(row.repeatData)" placement="top">
+                自定义
+              </el-tooltip>
+              <span v-else>{{ getRepeatText(row.repeat) }}</span>
+            </el-tag>
+          </div>
         </template>
       </el-table-column>
-      <el-table-column label="重复结束" prop="repeatEndTs" width="180">
+      <el-table-column label="重复结束" prop="repeatEndTs" width="110" align="center">
         <template #default="{ row }">
           {{ formatTime(row.repeatEndTs) }}
         </template>
       </el-table-column>
-      <el-table-column label="子任务" width="100" align="center">
+      <el-table-column label="子任务" width="80" align="center">
         <template #default="{ row }">
           <el-tag v-if="row.subtasks && row.subtasks.length > 0" type="info" size="small">
             {{ row.subtasks.length }} 个
@@ -49,6 +53,15 @@
       <el-table-column label="分数" width="60" align="center">
         <template #default="{ row }">
           <span>{{ row.score ?? '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="优先级" width="70" align="center">
+        <template #default="{ row }">
+          <span v-if="row.priority === 0 || row.priority === -1">Ⅰ</span>
+          <span v-else-if="row.priority === 1">Ⅱ</span>
+          <span v-else-if="row.priority === 2">Ⅲ</span>
+          <span v-else-if="row.priority === 3">Ⅳ</span>
+          <span v-else>-</span>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="150" align="center" fixed="right">
@@ -82,7 +95,7 @@
       :page-size="pageSize"
       :page-sizes="[15, 20, 50]"
       :current-page="pageNum"
-      class="pagination"
+      class="mt-2"
       background
       @size-change="handleSizeChange"
       @current-change="handlePageChange"
@@ -229,21 +242,3 @@ onMounted(() => {
   fetchScheduleList(selectedUserId.value);
 });
 </script>
-
-<style scoped>
-.schedule-container {
-  padding: 16px;
-}
-
-.filter-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  height: 40px;
-  margin-bottom: 16px;
-}
-
-.pagination {
-  margin-top: 16px;
-}
-</style>

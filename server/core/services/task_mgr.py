@@ -558,5 +558,69 @@ class TaskMgr:
             log.error(f"检查前置日程完成状态失败: {e}")
             return False, [f'日程{todo_id}' for todo_id in todo_ids]
 
+    def get_material_parent_chain(self, material_id: int) -> Dict[str, Any]:
+        """
+        获取素材的父目录链（从当前目录到根目录）
+        
+        Args:
+            material_id: 素材ID
+            
+        Returns:
+            包含目录链的列表，从当前目录到根目录
+        """
+        try:
+            # 获取素材信息
+            material = db_mgr.get_data(TABLE_MATERIAL, material_id, '*')
+            if material.get('code') != 0 or not material.get('data'):
+                return {"code": -1, "msg": "素材不存在", "data": None}
+            
+            cate_id = material['data'].get('cate_id', -1)
+            if cate_id == -1 or cate_id is None:
+                # 根目录
+                return {
+                    "code": 0,
+                    "msg": "success",
+                    "data": [
+                        {"id": -1, "name": "根目录", "parent": None}
+                    ]
+                }
+            
+            # 构建目录链
+            chain = []
+            current_id = cate_id
+            visited = set()  # 防止循环引用
+            
+            while current_id != -1 and current_id not in visited:
+                visited.add(current_id)
+                category = db_mgr.get_data(TABLE_MATERIAL_CATEGORY, current_id, '*')
+                
+                if category.get('code') != 0 or not category.get('data'):
+                    break
+                
+                cat_data = category['data']
+                chain.append({
+                    "id": cat_data['id'],
+                    "name": cat_data['name'],
+                    "parent": cat_data.get('parent', -1)
+                })
+                
+                current_id = cat_data.get('parent', -1)
+            
+            # 添加根目录
+            chain.append({"id": -1, "name": "根目录", "parent": None})
+            
+            # 反转，使根目录在前
+            chain.reverse()
+            
+            return {
+                "code": 0,
+                "msg": "success",
+                "data": chain
+            }
+            
+        except Exception as e:
+            log.error(f"获取素材父目录链失败: {e}")
+            return {"code": -1, "msg": f"获取失败: {str(e)}", "data": None}
+
 
 task_mgr = TaskMgr()

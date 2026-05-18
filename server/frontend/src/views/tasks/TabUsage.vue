@@ -204,7 +204,6 @@ const handleQuery = async () => {
     const result = await getUsageAbstract(startTime, endTime, showDetail.value ? 1 : 0);
     rawData.value = result.data || {};
 
-    ElMessage.success("查询成功");
   } catch (error: any) {
     console.error("查询失败:", error);
     ElMessage.error(error.message || "查询失败");

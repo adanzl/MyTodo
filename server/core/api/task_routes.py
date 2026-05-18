@@ -81,9 +81,20 @@ def delete_material_category() -> ResponseReturnValue:
 @task_bp.route('/task/list', methods=['GET'])
 def get_task_list() -> ResponseReturnValue:
     """获取任务列表（带锁定状态检查）"""
-    user_id = request.args.get('user_id', type=int)
+    user_id = request.args.get('userId', type=int)
     date = request.args.get('date')
     page_num = request.args.get('pageNum', 1, type=int)
     page_size = request.args.get('pageSize', 20, type=int)
     
     return task_mgr.get_task_list(user_id, date, page_num, page_size)
+
+
+@task_bp.route('/task/parent', methods=['GET'])
+def get_material_parent_chain() -> ResponseReturnValue:
+    """获取素材的父目录链"""
+    material_id = request.args.get('materialId', type=int)
+    if not material_id:
+        return _err('Invalid materialId')
+    
+    result = task_mgr.get_material_parent_chain(material_id)
+    return result

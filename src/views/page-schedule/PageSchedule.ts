@@ -313,7 +313,7 @@ export default defineComponent({
           endTime = currentDate.endOf('month').add(1, 'month').format('YYYY-MM-DD');
         }
         
-        console.log('[PageSchedule] query range:', startTime, 'to', endTime);
+        // console.log('[PageSchedule] query range:', startTime, 'to', endTime);
         
         const calendarData = await getTodoCalendar(startTime, endTime, id);
         // console.log('[PageSchedule] calendarData:', calendarData);

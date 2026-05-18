@@ -161,6 +161,20 @@ export async function deleteMaterialCategory(
   }
 }
 
+/**
+ * 获取素材的父目录链
+ * @param materialId - 素材ID
+ */
+export async function getMaterialParentChain(materialId: number): Promise<Array<{ id: number; name: string; parent?: number | null }>> {
+  const response = await api.get("/task/parent", {
+    params: { materialId }
+  });
+  if (response.data.code !== 0) {
+    throw new Error(response.data.msg || "获取父目录链失败");
+  }
+  return response.data.data || [];
+}
+
 // ==================== 任务管理 API ====================
 
 /**

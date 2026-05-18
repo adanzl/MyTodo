@@ -115,17 +115,27 @@ console.log(`当前 Vue 版本是：${app.version}`);
 
 router.isReady().then(async () => {
   initNet();
-  // 定时检测本地/远程地址：本地可用时每 5 秒检查，本地不可用时每 60 秒检查（减少 console 的 ERR_CONNECTION_TIMED_OUT 输出）
-  const CHECK_WHEN_LOCAL_MS = 5000;
-  const CHECK_WHEN_REMOTE_MS = 60000;
+  // 定时检测本地/远程地址：使用指数退避策略，初始 5s，失败后翻倍，最多 5 分钟
+  const BASE_CHECK_MS = 5000;
+  const MAX_CHECK_MS = 300000;
+  let currentCheckInterval = BASE_CHECK_MS;
 
   function scheduleNextCheck() {
-    const interval =
-      isLocalIpAvailable() === false ? CHECK_WHEN_REMOTE_MS : CHECK_WHEN_LOCAL_MS;
-    setTimeout(() => {
-      checkAndSwitchServer();
+    setTimeout(async () => {
+      const wasLocal = isLocalIpAvailable() === true;
+      await checkAndSwitchServer();
+      const isLocal = isLocalIpAvailable() === true;
+      
+      // 状态变化或成功连接本地时重置间隔
+      if (wasLocal !== isLocal || isLocal) {
+        currentCheckInterval = BASE_CHECK_MS;
+      } else {
+        // 失败则翻倍，上限 5 分钟
+        currentCheckInterval = Math.min(currentCheckInterval * 2, MAX_CHECK_MS);
+      }
+      
       scheduleNextCheck();
-    }, interval);
+    }, currentCheckInterval);
   }
   scheduleNextCheck();
   app.mount("#app");

@@ -79,7 +79,7 @@
                       class="flex-1"
                       collapse-tags
                       collapse-tags-tooltip
-                      max-collapse-tags="3"
+                      :max-collapse-tags="3"
                     >
                       <el-option
                         v-for="todo in cancanTodos"
@@ -102,7 +102,7 @@
                       class="flex-1"
                       collapse-tags
                       collapse-tags-tooltip
-                      max-collapse-tags="3"
+                      :max-collapse-tags="3"
                     >
                       <el-option
                         v-for="todo in zhaozhaoTodos"
@@ -155,8 +155,9 @@
               :class="{ 'bg-blue-50 border-l-4 border-blue-500': selectedDay === dayIndex }"
               @click="selectedDay = dayIndex">
               <div class="font-medium">第{{ dayIndex + 1 }}天 <span class="text-[12px] ml-1">{{ getDayDate(dayIndex) }}</span></div>
-              <div class="text-xs text-gray-500 mt-1">
-                {{ getDayMaterialCount(dayIndex) }} 个素材
+              <div class="text-xs text-gray-500 mt-1 flex justify-between">
+                <div>{{ getDayMaterialCount(dayIndex) }} 个素材</div>
+                <div v-if="isToday(dayIndex)">今</div>
               </div>
             </div>
           </div>
@@ -173,7 +174,10 @@
                   class="material-item p-3 border rounded flex items-center justify-between hover:bg-gray-50 transition-all duration-200">
                   <div class="flex-1">
                     <div class="font-medium">{{ material.name }}</div>
-                    <div class="text-xs text-gray-500 mt-1">类型：{{ getMaterialTypeName(material.type) }}</div>
+                    <div class="text-xs text-gray-500 mt-1 flex gap-3">
+                      <div>类型：{{ getMaterialTypeName(material.type) }}</div>
+                      <div>ID：{{ material.id }}</div>
+                    </div>
                   </div>
                   <el-button size="small" type="danger" link @click="removeMaterialFromAll(index)">
                     删除
@@ -195,7 +199,10 @@
                     class="material-item p-3 border rounded flex items-center justify-between hover:bg-gray-50 transition-all duration-200">
                     <div class="flex-1">
                       <div class="font-medium">{{ material.name }}</div>
-                      <div class="text-xs text-gray-500 mt-1">类型：{{ getMaterialTypeName(material.type) }}</div>
+                      <div class="text-xs text-gray-500 mt-1 flex gap-3">
+                        <div>类型：{{ getMaterialTypeName(material.type) }}</div>
+                        <div>ID：{{ material.id }}</div>
+                      </div>
                     </div>
                     <el-button size="small" type="danger" link @click="removeMaterial(selectedDay, index)">
                       删除
@@ -545,6 +552,13 @@ const getDayMaterialCount = (day: number) => {
 const getDayDate = (dayIndex: number) => {
   if (!formData.value.start_date) return '';
   return dayjs(formData.value.start_date).add(dayIndex, 'day').format('MM月DD日');
+};
+
+// 判断是否是今天
+const isToday = (dayIndex: number) => {
+  if (!formData.value.start_date) return false;
+  const dayDate = dayjs(formData.value.start_date).add(dayIndex, 'day').format('YYYY-MM-DD');
+  return dayDate === dayjs().format('YYYY-MM-DD');
 };
 
 // 获取素材类型名称

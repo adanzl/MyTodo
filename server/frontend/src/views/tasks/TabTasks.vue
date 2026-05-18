@@ -18,7 +18,7 @@
           <el-tag :type="row.type === 1 ? 'success' : 'primary'">{{ row.type === 1 ? '持续任务' : '每日任务' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="start_date" label="开始日期" width="120" />
+      <el-table-column prop="start_date" label="开始日期" width="110" />
       <el-table-column prop="duration" label="天数" width="70" align="center" />
       <el-table-column prop="user_id" label="布置对象" width="120">
         <template #default="{ row }">

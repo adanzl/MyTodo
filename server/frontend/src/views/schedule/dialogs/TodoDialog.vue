@@ -66,7 +66,16 @@
       </el-form-item>
 
       <el-form-item label="分数" prop="score">
-        <el-input-number v-model="formData.score" :min="0" :max="100" style="width: 100%" />
+        <el-input-number v-model="formData.score" :min="0" :max="100" step="1" />
+      </el-form-item>
+
+      <el-form-item label="优先级" prop="priority">
+        <el-select v-model="formData.priority" placeholder="选择优先级">
+          <el-option label="Ⅰ" :value="0" />
+          <el-option label="Ⅱ" :value="1" />
+          <el-option label="Ⅲ" :value="2" />
+          <el-option label="Ⅳ" :value="3" />
+        </el-select>
       </el-form-item>
 
       <el-form-item label="子任务">
@@ -187,7 +196,7 @@ watch(() => props.todoData, (newData) => {
       subtasks: newData.subtasks || [],
       userId: newData.userId,
       color: newData.color || 0,
-      priority: newData.priority || -1,
+      priority: newData.priority === -1 ? 0 : (newData.priority || 0),
       groupId: newData.groupId || -1,
       order: newData.order || 0,
       reminder: newData.reminder || 0,

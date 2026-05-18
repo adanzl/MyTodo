@@ -101,7 +101,7 @@ export async function getTaskList(
   if (userId && userId > 0 && startDate) {
     const rsp = await apiClient.get<ApiResponse<ApiPagedResponse<Task>>>("/task/list", {
       params: {
-        user_id: userId,
+        userId,
         date: startDate,
         pageNum,
         pageSize,
