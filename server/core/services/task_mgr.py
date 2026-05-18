@@ -340,8 +340,11 @@ class TaskMgr:
             log.error(f'删除素材分类失败: {e}')
             return {"code": -1, "msg": f"删除失败: {str(e)}", "data": None}
 
-    def get_task_list(self, user_id: Optional[int] = None, date: Optional[str] = None, 
-                      page_num: int = 1, page_size: int = 20) -> Dict[str, Any]:
+    def get_task_list(self,
+                      user_id: Optional[int] = None,
+                      date: Optional[str] = None,
+                      page_num: int = 1,
+                      page_size: int = 20) -> Dict[str, Any]:
         """
         获取任务列表
         
@@ -357,34 +360,37 @@ class TaskMgr:
         try:
             # 构建查询条件
             conditions: Dict[str, Any] = {}
-            
+
             if user_id and user_id > 0:
                 conditions['user_id'] = {'like': f'%{user_id}%'}
-            
+
             if date:
                 conditions['start_date'] = {'<=': date}
                 conditions['end_date'] = {'>=': date}
-            
+
             # 获取任务列表
             result = db_mgr.get_list(TABLE_TASK, page_num=page_num, page_size=page_size, conditions=conditions)
-            
+
             if result.get('code') != 0:
                 return result
-            
+
             tasks = result.get('data', {}).get('data', [])
-            
+
             # 检查任务锁定状态
             if tasks:
                 tasks = self.check_task_lock(tasks, user_id, date)
                 result['data']['data'] = tasks
-            
+
             return result
-            
+
         except Exception as e:
             log.error(f"获取任务列表失败: {e}")
             return {"code": -1, "msg": f"获取任务列表失败: {str(e)}", "data": None}
 
-    def check_task_lock(self, tasks: List[Dict[str, Any]], user_id: Optional[int] = None, date_str: Optional[str] = None) -> List[Dict[str, Any]]:
+    def check_task_lock(self,
+                        tasks: List[Dict[str, Any]],
+                        user_id: Optional[int] = None,
+                        date_str: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         检查任务列表中的锁定状态
         
@@ -402,20 +408,20 @@ class TaskMgr:
                 task['lock'] = False
                 task['msg'] = ''
             return tasks
-        
+
         try:
             target_date = datetime.strptime(date_str, '%Y-%m-%d')
-            
+
             # 按优先级排序任务（数字越小优先级越高）
             sorted_tasks = sorted(tasks, key=lambda x: x.get('priority', 999))
-            
+
             # 记录最高优先级的未完成任务
             highest_uncompleted_priority = None
             highest_uncompleted_task_name = None
-            
+
             for task in sorted_tasks:
                 priority = task.get('priority')
-                
+
                 # 如果任务没有优先级，不锁定
                 if priority is None:
                     task['lock'] = False
@@ -428,31 +434,32 @@ class TaskMgr:
                     else:
                         task['lock'] = False
                         task['msg'] = ''
-                
+
                 # 检查 pre_todo 对应的日程是否完成
                 pre_todo_str = task.get('pre_todo', '{}')
                 pre_todo = json.loads(pre_todo_str) if isinstance(pre_todo_str, str) else pre_todo_str
-                
+
                 if pre_todo and isinstance(pre_todo, dict):
                     # pre_todo 格式: {"user_id": [todo_ids]}
                     todo_ids = pre_todo.get(str(user_id), [])
-                    
+
                     if todo_ids and isinstance(todo_ids, list):
                         # 检查所有前置日程是否完成
                         all_completed, incomplete_names = self._check_schedules_completed(todo_ids, user_id, date_str)
-                        
+
                         if not all_completed:
                             task['lock'] = True
                             task['msg'] = f'请先完成前置日程：{"、".join(incomplete_names)}'
-                
+
                 # 如果当前任务有未完成的素材，记录优先级
                 if not task['lock'] and self._has_uncompleted_materials(task, user_id, target_date):
-                    if highest_uncompleted_priority is None or (priority is not None and priority < highest_uncompleted_priority):
+                    if highest_uncompleted_priority is None or (priority is not None
+                                                                and priority < highest_uncompleted_priority):
                         highest_uncompleted_priority = priority
                         highest_uncompleted_task_name = task.get('name', '')
-            
+
             return tasks
-            
+
         except Exception as e:
             log.error(f"检查任务锁定状态失败: {e}")
             # 出错时返回原始任务列表，不锁定
@@ -460,7 +467,7 @@ class TaskMgr:
                 task['lock'] = False
                 task['msg'] = ''
             return tasks
-    
+
     def _has_uncompleted_materials(self, task: Dict[str, Any], user_id: int, target_date: datetime) -> bool:
         """
         检查任务在指定日期是否有未完成的素材
@@ -477,35 +484,35 @@ class TaskMgr:
             start_date = datetime.strptime(task.get('start_date', ''), '%Y-%m-%d')
             duration = task.get('duration', 0)
             day_offset = (target_date - start_date).days
-            
+
             if day_offset < 0 or day_offset >= duration:
                 return False
-            
+
             # 解析任务数据
             task_data_str = task.get('data', '{}')
             task_data = json.loads(task_data_str) if isinstance(task_data_str, str) else task_data_str
             daily_materials = task_data.get('dailyMaterials', {})
-            
+
             # type=1（持续任务）：所有素材都在第0天
             materials_index = 0 if task.get('type', 0) == 1 else day_offset
             materials_for_day = daily_materials.get(str(materials_index), [])
-            
+
             if not materials_for_day:
                 return False
-            
+
             # 检查是否有任何素材未完成
             for material in materials_for_day:
                 status = material.get('status', {})
                 # 兼容旧格式或该用户未完成
                 if isinstance(status, int) or status.get(str(user_id)) != 1:
                     return True
-            
+
             return False
-            
+
         except Exception as e:
             log.error(f"检查任务素材完成状态失败: {e}")
             return True
-    
+
     def _check_schedules_completed(self, todo_ids: List[int], user_id: int, date_str: str) -> tuple:
         """
         检查前置日程是否都已完成
@@ -521,39 +528,40 @@ class TaskMgr:
         try:
             if not todo_ids:
                 return True, []
-            
+
             incomplete_names = []
-            
+
             # 查询 t_schedule_save 表，检查这些日程在指定日期的完成状态
             for todo_id in todo_ids:
                 result = db_mgr.query(
-                    f"SELECT state FROM t_schedule_save WHERE schedule_id = {todo_id} AND date = '{date_str}'"
-                )
-                
+                    f"SELECT state FROM t_schedule_save WHERE schedule_id = {todo_id} AND date = '{date_str}'")
+
                 if result.get('code') != 0:
                     log.error(f"查询日程状态失败: {result.get('msg')}")
                     return False, [f'日程{todo_id}']
-                
+
                 saves = result.get('data', [])
                 if not saves:
                     # 没有存档记录，视为未完成
                     # 获取日程名称
                     name_result = db_mgr.get_data('t_schedule', todo_id, 'title')
-                    name = name_result.get('data', {}).get('title', f'日程{todo_id}') if name_result.get('code') == 0 else f'日程{todo_id}'
+                    name = name_result.get('data', {}).get(
+                        'title', f'日程{todo_id}') if name_result.get('code') == 0 else f'日程{todo_id}'
                     incomplete_names.append(name)
                     continue
-                
+
                 state = saves[0].get('state', 0)
                 if state != 1:
                     # 有未完成的前置日程
                     # 获取日程名称
                     name_result = db_mgr.get_data('t_schedule', todo_id, 'title')
-                    name = name_result.get('data', {}).get('title', f'日程{todo_id}') if name_result.get('code') == 0 else f'日程{todo_id}'
+                    name = name_result.get('data', {}).get(
+                        'title', f'日程{todo_id}') if name_result.get('code') == 0 else f'日程{todo_id}'
                     incomplete_names.append(name)
-            
+
             # 所有前置日程都完成了
             return len(incomplete_names) == 0, incomplete_names
-            
+
         except Exception as e:
             log.error(f"检查前置日程完成状态失败: {e}")
             return False, [f'日程{todo_id}' for todo_id in todo_ids]
@@ -573,51 +581,37 @@ class TaskMgr:
             material = db_mgr.get_data(TABLE_MATERIAL, material_id, '*')
             if material.get('code') != 0 or not material.get('data'):
                 return {"code": -1, "msg": "素材不存在", "data": None}
-            
+
             cate_id = material['data'].get('cate_id', -1)
             if cate_id == -1 or cate_id is None:
                 # 根目录
-                return {
-                    "code": 0,
-                    "msg": "success",
-                    "data": [
-                        {"id": -1, "name": "根目录", "parent": None}
-                    ]
-                }
-            
+                return {"code": 0, "msg": "success", "data": [{"id": -1, "name": "根目录", "parent": None}]}
+
             # 构建目录链
             chain = []
             current_id = cate_id
             visited = set()  # 防止循环引用
-            
+
             while current_id != -1 and current_id not in visited:
                 visited.add(current_id)
                 category = db_mgr.get_data(TABLE_MATERIAL_CATEGORY, current_id, '*')
-                
+
                 if category.get('code') != 0 or not category.get('data'):
                     break
-                
+
                 cat_data = category['data']
-                chain.append({
-                    "id": cat_data['id'],
-                    "name": cat_data['name'],
-                    "parent": cat_data.get('parent', -1)
-                })
-                
+                chain.append({"id": cat_data['id'], "name": cat_data['name'], "parent": cat_data.get('parent', -1)})
+
                 current_id = cat_data.get('parent', -1)
-            
+
             # 添加根目录
             chain.append({"id": -1, "name": "根目录", "parent": None})
-            
+
             # 反转，使根目录在前
             chain.reverse()
-            
-            return {
-                "code": 0,
-                "msg": "success",
-                "data": chain
-            }
-            
+
+            return {"code": 0, "msg": "success", "data": chain}
+
         except Exception as e:
             log.error(f"获取素材父目录链失败: {e}")
             return {"code": -1, "msg": f"获取失败: {str(e)}", "data": None}
