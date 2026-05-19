@@ -3,7 +3,7 @@
     <!-- 工具栏 -->
     <div class="flex items-center h-10 mb-2">
       <div class="flex flex-1 items-center gap-4">
-        <el-button type="primary" plain size="small" @click="refreshHistory" :icon="Refresh"/>
+        <el-button type="primary" plain size="small" @click="fetchHistoryList" :icon="Refresh"/>
         <el-radio-group v-model="filterUserId" @change="handleFilterChange">
           <el-radio :value="undefined">全部</el-radio>
           <el-radio :value="3">灿灿</el-radio>
@@ -22,19 +22,33 @@
 
     <!-- 表格 -->
     <el-table :data="historyList" v-loading="loading" stripe border style="width: 100%" :max-height="tableMaxHeight">
-      <el-table-column prop="id" label="ID" width="70" />
+      <el-table-column prop="id" label="ID" width="60" />
       <el-table-column prop="date_str" label="日期" width="110" />
-      <el-table-column prop="user_id" label="用户" width="100">
+      <el-table-column prop="user_id" label="用户" width="60" align="center">
         <template #default="{ row }">
           {{ getUserName(row.user_id) }}
         </template>
       </el-table-column>
-      <el-table-column prop="task_id" label="任务" min-width="200">
+      <el-table-column prop="task_id" label="任务" min-width="100">
         <template #default="{ row }">
           {{ getTaskName(row.task_id) }}
         </template>
       </el-table-column>
-      <el-table-column prop="material_id" label="素材ID" width="100" />
+      <el-table-column prop="task_type" label="任务类型" width="90" align="center">
+        <template #default="{ row }">
+          {{ getTaskType(row.task_id) }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="material_id" label="素材" min-width="200">
+        <template #default="{ row }">
+          {{ getMaterialName(row.material_id) }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="material_type" label="素材类型" width="90" align="center">
+        <template #default="{ row }">
+          {{ getMaterialType(row.material_id) }}
+        </template>
+      </el-table-column>
       <el-table-column prop="state" label="状态" width="80" align="center">
         <template #default="{ row }">
           <el-tag :type="row.state === 1 ? 'success' : 'info'">
@@ -42,7 +56,11 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="dt" label="操作时间" width="160" />
+      <el-table-column prop="dt" label="操作时间" width="170">
+        <template #default="{ row }">
+          {{ row.dt ? dayjs(row.dt).format('YYYY-MM-DD HH:mm:ss') : '-' }}
+        </template>
+      </el-table-column>
     </el-table>
 
     <!-- 分页 -->
@@ -61,10 +79,11 @@
 </template>
 
 <script setup lang="ts">
-import { getTaskHistoryList, getTaskList, type TaskHistory, type Task } from "@/api/api-task";
+import { getTaskHistoryList, getTaskList, getMaterialListByIds, type TaskHistory, type Task } from "@/api/api-task";
 import { Refresh } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 import { onMounted, ref, onUnmounted, nextTick } from "vue";
+import dayjs from "dayjs";
 
 const tableMaxHeight = ref<number>(0);
 
@@ -88,6 +107,7 @@ const pageSize = ref(20);
 const filterUserId = ref<number | undefined>(undefined);
 const filterTaskId = ref<number | undefined>(undefined);
 const taskList = ref<Task[]>([]);
+const materialMap = ref<Map<number, { name: string; type: number }>>(new Map());
 
 // 获取任务列表（用于下拉框）
 const fetchTaskList = async () => {
@@ -114,17 +134,18 @@ const fetchHistoryList = async () => {
     if (res.code === 0 && res.data) {
       historyList.value = res.data.data || [];
       totalCount.value = res.data.totalCount || 0;
+
+      // 批量获取素材名称
+      const materialIds = [...new Set(historyList.value.map(h => h.material_id))];
+      if (materialIds.length > 0) {
+        await fetchMaterialNames(materialIds);
+      }
     }
   } catch (error: any) {
     ElMessage.error(error.message || "获取任务历史记录失败");
   } finally {
     loading.value = false;
   }
-};
-
-// 刷新历史记录
-const refreshHistory = () => {
-  fetchHistoryList();
 };
 
 // 筛选条件变化
@@ -156,6 +177,42 @@ const getUserName = (userId: number) => {
 const getTaskName = (taskId: number) => {
   const task = taskList.value.find(t => t.id === taskId);
   return task ? task.name : `任务${taskId}`;
+};
+
+// 获取任务类型
+const getTaskType = (taskId: number) => {
+  const task = taskList.value.find(t => t.id === taskId);
+  if (!task) return '-';
+  return task.type === 1 ? '持续任务' : '每日任务';
+};
+
+// 批量获取素材名称
+const fetchMaterialNames = async (materialIds: number[]) => {
+  try {
+    const materials = await getMaterialListByIds(materialIds);
+    materials.forEach(material => {
+      materialMap.value.set(material.id, { name: material.name, type: material.type });
+    });
+  } catch (error: any) {
+    console.error("批量获取素材失败:", error);
+  }
+};
+
+// 获取素材名称
+const getMaterialName = (materialId: number) => {
+  return materialMap.value.get(materialId)?.name || `素材${materialId}`;
+};
+
+// 获取素材类型
+const getMaterialType = (materialId: number) => {
+  const type = materialMap.value.get(materialId)?.type;
+  if (type === undefined) return '-';
+  const typeMap: Record<number, string> = {
+    0: 'PDF',
+    1: '视频',
+    2: '音频'
+  };
+  return typeMap[type] || `未知_${type}`;
 };
 
 // 初始化
