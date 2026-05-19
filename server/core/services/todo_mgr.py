@@ -39,13 +39,11 @@ class TodoMgr:
             日程列表数据
         """
         try:
-            schedules_result = self._get_schedules_in_time_range(
-                start_time, end_time, user_id)
+            schedules_result = self._get_schedules_in_time_range(start_time, end_time, user_id)
             if schedules_result.get('code') != 0:
                 return schedules_result
 
-            schedule_list = self._convert_schedules_to_list(
-                schedules_result['data'])
+            schedule_list = self._convert_schedules_to_list(schedules_result['data'])
 
             return {
                 "code": 0,
@@ -83,8 +81,7 @@ class TodoMgr:
             if result.get('code') != 0:
                 return result
 
-            schedules = result['data'].get(
-                'data', []) if result.get('data') else []
+            schedules = result['data'].get('data', []) if result.get('data') else []
             schedule_list = self._convert_schedules_to_list(schedules)
 
             return {
@@ -139,8 +136,7 @@ class TodoMgr:
         """获取指定时间范围内的日历数据，返回每天的 ScheduleData 列表。"""
         try:
             # 1. 获取时间范围内的日程模板
-            schedules_result = self._get_schedules_in_time_range(
-                start_time, end_time, user_id)
+            schedules_result = self._get_schedules_in_time_range(start_time, end_time, user_id)
             if schedules_result.get('code') != 0:
                 return schedules_result
 
@@ -191,13 +187,10 @@ class TodoMgr:
             if not start_ts:
                 return False
 
-            start_dt = datetime.fromisoformat(
-                start_ts.replace('Z', '+00:00')).replace(tzinfo=None)
-            start_day = start_dt.replace(
-                hour=0, minute=0, second=0, microsecond=0)
+            start_dt = datetime.fromisoformat(start_ts.replace('Z', '+00:00')).replace(tzinfo=None)
+            start_day = start_dt.replace(hour=0, minute=0, second=0, microsecond=0)
 
-            target_day = target_dt.replace(
-                hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+            target_day = target_dt.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
 
             if start_day > target_day:
                 return False
@@ -207,8 +200,7 @@ class TodoMgr:
 
             repeat_end_ts = schedule.get('repeat_end_ts')
             if repeat_end_ts:
-                repeat_end_dt = datetime.fromisoformat(
-                    repeat_end_ts.replace('Z', '+00:00')).replace(tzinfo=None)
+                repeat_end_dt = datetime.fromisoformat(repeat_end_ts.replace('Z', '+00:00')).replace(tzinfo=None)
                 if repeat_end_dt < target_day:
                     return False
 
@@ -227,8 +219,7 @@ class TodoMgr:
             elif repeat == 6:  # weekend
                 return target_dt.isoweekday() >= 6
             elif repeat == 999:  # custom
-                repeat_data = json.loads(schedule['repeat_data']) if schedule.get(
-                    'repeat_data') else {}
+                repeat_data = json.loads(schedule['repeat_data']) if schedule.get('repeat_data') else {}
                 return (target_dt.isoweekday() % 7) in repeat_data.get('week', [])
             else:
                 return False
@@ -309,8 +300,7 @@ class TodoMgr:
 
             schedule = ScheduleData.from_db_rows(row, save_row_dict)
 
-            log.info(
-                f"[TodoMgr] 获取日程详情成功: todo_id={todo_id}, date={date}, user_id={user_id}")
+            log.info(f"[TodoMgr] 获取日程详情成功: todo_id={todo_id}, date={date}, user_id={user_id}")
             return {"code": 0, "msg": "ok", "data": schedule.to_dict()}
 
         except Exception as e:
@@ -373,8 +363,7 @@ class TodoMgr:
                 DELETE FROM t_schedule_save 
                 WHERE schedule_id = :schedule_id
             """
-            db_obj.session.execute(text(delete_save_sql), {
-                                   'schedule_id': todo_id})
+            db_obj.session.execute(text(delete_save_sql), {'schedule_id': todo_id})
 
             # 2. 再删除 t_schedule 中的日程数据
             result = db_mgr.del_data('t_schedule', todo_id)
@@ -412,11 +401,16 @@ class TodoMgr:
 
             # 2. 准备保存数据
             db_data = {
-                'schedule_id': schedule_save.scheduleId,
-                'date': schedule_save.date,
-                'state': schedule_save.state,
-                'subtasks': serialize_data(schedule_save.subtasks),
-                'schedule_override': serialize_data(schedule_save.scheduleOverride.to_dict() if schedule_save.scheduleOverride else None),
+                'schedule_id':
+                schedule_save.scheduleId,
+                'date':
+                schedule_save.date,
+                'state':
+                schedule_save.state,
+                'subtasks':
+                serialize_data(schedule_save.subtasks),
+                'schedule_override':
+                serialize_data(schedule_save.scheduleOverride.to_dict() if schedule_save.scheduleOverride else None),
             }
 
             # 如果存在记录，添加 id 用于更新
@@ -429,8 +423,7 @@ class TodoMgr:
 
             # 4. 如果状态改变，更新用户总积分
             if old_state != schedule_save.state and result.get('code') == 0:
-                self._update_user_score(
-                    schedule_save.scheduleId, old_state, schedule_save.state, old_score, save_id)
+                self._update_user_score(schedule_save.scheduleId, old_state, schedule_save.state, old_score, save_id)
 
             log.info(f"[TodoMgr] 保存日程状态{'成功' if result.get('code') == 0 else '失败'}: "
                      f"schedule_id={schedule_save.scheduleId}, date={schedule_save.date}, state={schedule_save.state}")
@@ -453,8 +446,7 @@ class TodoMgr:
         """
         try:
             # 获取日程所属用户ID和模板积分
-            schedule_query = db_mgr.query(
-                f"SELECT user_id, score FROM t_schedule WHERE id = {schedule_id}")
+            schedule_query = db_mgr.query(f"SELECT user_id, score FROM t_schedule WHERE id = {schedule_id}")
 
             if not (schedule_query.get('code') == 0 and schedule_query.get('data')):
                 return
@@ -463,8 +455,7 @@ class TodoMgr:
             template_score = schedule_query['data'][0].get('score', 0) or 0
 
             # 获取用户当前积分
-            user_query = db_mgr.query(
-                f"SELECT score FROM t_user WHERE id = {user_id}")
+            user_query = db_mgr.query(f"SELECT score FROM t_user WHERE id = {user_id}")
 
             if not (user_query.get('code') == 0 and user_query.get('data')):
                 return
@@ -476,23 +467,20 @@ class TodoMgr:
             if old_state == 0 and new_state == 1:
                 if template_score > 0:
                     new_score = current_score + template_score
-                    log.info(f"[TodoMgr] 用户 {user_id} 获得 {template_score} 积分")
+                    log.info(f"[TodoMgr] 用户 {user_id} 获得 {template_score} 积分，当前总分: {new_score}")
                     if save_id is not None:
-                        db_mgr.set_data('t_schedule_save', {
-                                        'id': save_id, 'score': template_score})
+                        db_mgr.set_data('t_schedule_save', {'id': save_id, 'score': template_score})
             # 从完成变为未完成：扣积分
             else:
                 if old_score > 0:
                     new_score = max(0, current_score - old_score)
-                    log.info(f"[TodoMgr] 用户 {user_id} 扣除 {old_score} 积分")
+                    log.info(f"[TodoMgr] 用户 {user_id} 扣除 {old_score} 积分，当前总分: {new_score}")
                     if save_id is not None:
-                        db_mgr.set_data('t_schedule_save', {
-                                        'id': save_id, 'score': 0})
+                        db_mgr.set_data('t_schedule_save', {'id': save_id, 'score': 0})
 
             # 更新用户积分
             if new_score != current_score:
                 db_mgr.set_data('t_user', {'id': user_id, 'score': new_score})
-                log.info(f"[TodoMgr] 用户 {user_id} 当前总分: {new_score}")
         except Exception as e:
             log.error(f"[TodoMgr] 更新用户积分异常: {e}", exc_info=True)
 

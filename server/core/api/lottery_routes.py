@@ -34,7 +34,6 @@ def do_lottery() -> ResponseReturnValue:
     """执行抽奖"""
     try:
         args: Dict[str, Any] = read_json_from_request()
-        log.info("===== [Do Lottery] " + json.dumps(args))
 
         user_id_raw = args.get("user_id")
         pool_id_raw = args.get("pool_id")
@@ -58,7 +57,7 @@ def exchange() -> ResponseReturnValue:
     """执行兑换：扣库存、扣积分并记录历史。"""
     try:
         args: Dict[str, Any] = read_json_from_request()
-        log.info("===== [Exchange] " + json.dumps(args))
+        log.info("=> [Exchange] " + json.dumps(args))
 
         user_id_raw = args.get("user_id")
         gift_id_raw = args.get("gift_id")

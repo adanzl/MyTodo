@@ -205,7 +205,7 @@ def playlist_stop() -> ResponseReturnValue:
 def playlist_reload() -> ResponseReturnValue:
     """重新从 RDS 中加载 playlist 数据。"""
     try:
-        log.info("===== [Playlist Reload]")
+        log.info("=> [Playlist Reload]")
         ret = playlist_mgr.reload()
         if ret != 0:
             return _err("重新加载播放列表失败")

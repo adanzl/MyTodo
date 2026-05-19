@@ -20,7 +20,7 @@ def dlna_scan() -> ResponseReturnValue:
     """扫描 DLNA 设备。"""
     try:
         timeout = request.args.get('timeout', 5.0, type=float)
-        log.info(f"===== [DLNA Scan] timeout={timeout}")
+        log.info(f"=> [DLNA Scan] timeout={timeout}")
         return _ok(scan_devices_sync(timeout))
     except Exception as e:
         log.error(f"[DLNA] Scan error: {e}")

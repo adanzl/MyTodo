@@ -346,3 +346,45 @@ export async function getTaskCalendar(
 
   return response.data.data!;
 }
+
+// ==================== 任务历史记录 API ====================
+
+/**
+ * 任务历史记录数据结构
+ */
+export interface TaskHistory {
+  id?: number;
+  user_id: number;
+  task_id: number;
+  material_id: number;
+  reward?: number;
+  dt?: string;
+  state?: number;
+  date_str: string;
+}
+
+/**
+ * 获取任务历史记录列表
+ * @param userId - 用户ID（可选）
+ * @param taskId - 任务ID（可选）
+ * @param pageNum - 页码，默认1
+ * @param pageSize - 每页数量，默认20
+ */
+export async function getTaskHistoryList(
+  userId?: number,
+  taskId?: number,
+  pageNum: number = 1,
+  pageSize: number = 20
+): Promise<PaginatedResponse<TaskHistory>> {
+  const conditions: Record<string, any> = {};
+
+  if (userId && userId > 0) {
+    conditions.user_id = userId;
+  }
+
+  if (taskId && taskId > 0) {
+    conditions.task_id = taskId;
+  }
+
+  return getList<TaskHistory>("t_task_history", conditions, pageNum, pageSize);
+}

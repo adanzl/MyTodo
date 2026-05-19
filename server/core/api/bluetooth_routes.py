@@ -22,7 +22,7 @@ def bluetooth_scan() -> ResponseReturnValue:
     """扫描蓝牙设备（通过 device_agent 服务）。"""
     try:
         timeout = request.args.get('timeout', 5.0, type=float)
-        log.info(f"===== [Bluetooth Scan] timeout={timeout}")
+        log.info(f"=> [Bluetooth Scan] timeout={timeout}")
         devices = bluetooth_mgr.scan_devices_sync(timeout)
         return _ok(devices)
     except Exception as e:
@@ -35,7 +35,7 @@ def bluetooth_get_device() -> ResponseReturnValue:
     """获取指定蓝牙设备信息（通过 device_agent 服务）。"""
     try:
         address = request.args.get('address')
-        log.info(f"===== [Bluetooth Get Device] address={address}")
+        log.info(f"=> [Bluetooth Get Device] address={address}")
         if not address:
             return _err("address is required")
         device = bluetooth_mgr.get_device(address)
@@ -52,7 +52,7 @@ def bluetooth_connect() -> ResponseReturnValue:
     """连接蓝牙设备（通过 device_agent 服务）。"""
     try:
         args: Dict[str, Any] = read_json_from_request()
-        log.info(f"===== [Bluetooth Connect] {json.dumps(args)}")
+        log.info(f"=> [Bluetooth Connect] {json.dumps(args)}")
         address = args.get('address')
         if not address:
             return _err("address is required")
@@ -70,7 +70,7 @@ def bluetooth_disconnect() -> ResponseReturnValue:
     """断开蓝牙设备（通过 device_agent 服务）。"""
     try:
         args: Dict[str, Any] = read_json_from_request()
-        log.info(f"===== [Bluetooth Disconnect] {json.dumps(args)}")
+        log.info(f"=> [Bluetooth Disconnect] {json.dumps(args)}")
         address = args.get('address')
         if not address:
             return _err("address is required")
@@ -87,7 +87,7 @@ def bluetooth_disconnect() -> ResponseReturnValue:
 def bluetooth_get_paired() -> ResponseReturnValue:
     """获取系统已配对的蓝牙设备列表（通过 device_agent 服务）。"""
     try:
-        log.info("===== [Bluetooth Get Paired Devices]")
+        log.info("=> [Bluetooth Get Paired Devices]")
         devices = bluetooth_mgr.get_paired_devices()
         return _ok(devices)
     except Exception as e:

@@ -20,7 +20,7 @@ def mi_scan() -> ResponseReturnValue:
     """扫描小米设备（同步模式）。"""
     try:
         timeout = request.args.get('timeout', 5.0, type=float)
-        log.info(f"===== [MI Scan] timeout={timeout}")
+        log.info(f"=> [MI Scan] timeout={timeout}")
         devices = scan_devices_sync(timeout)
         return _ok(devices)
     except Exception as e:

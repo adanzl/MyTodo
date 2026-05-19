@@ -20,12 +20,7 @@ class FileMgr:
         """初始化管理器"""
         self.default_base_dir = config.DEFAULT_BASE_DIR
 
-    def list_directory(
-        self,
-        path: str,
-        extensions_filter: str = "all",
-        recursive: bool = False
-    ) -> Dict[str, Any]:
+    def list_directory(self, path: str, extensions_filter: str = "all", recursive: bool = False) -> Dict[str, Any]:
         """
         列出目录内容
         
@@ -50,7 +45,7 @@ class FileMgr:
                     break
                 path = decoded
 
-            log.info(f"===== [List Directory] path={path}, extensions={extensions_filter}, recursive={recursive}")
+            log.info(f"=> [List Directory] path={path}, extensions={extensions_filter}, recursive={recursive}")
 
             # 处理路径
             if not path:
@@ -59,8 +54,7 @@ class FileMgr:
                 return {"code": -1, "msg": "Invalid path: Path traversal not allowed"}
             else:
                 path = os.path.abspath(
-                    path if os.path.isabs(path) else os.path.join(self.default_base_dir, path.lstrip('/'))
-                )
+                    path if os.path.isabs(path) else os.path.join(self.default_base_dir, path.lstrip('/')))
 
             if not os.path.exists(path):
                 log.warning(f"Path does not exist: {path}, using default directory: {self.default_base_dir}")
@@ -86,7 +80,7 @@ class FileMgr:
 
             # 非递归模式：只列出当前目录
             items = self._sort_items(self._list_items(path, entries))
-            
+
             # 过滤
             if extensions_filter and extensions_filter != "all":
                 items = self._filter_by_extensions(items, extensions_filter)
@@ -103,17 +97,17 @@ class FileMgr:
     def _list_items(self, path: str, entries: List[str]) -> List[Dict[str, Any]]:
         """列出目录项"""
         items: List[Dict[str, Any]] = []
-        
+
         for entry in entries:
             # 跳过特殊目录
-            if entry in ('lost+found',):
+            if entry in ('lost+found', ):
                 continue
-                
+
             entry_path = os.path.join(path, entry)
             try:
                 stat_info = os.stat(entry_path)
                 is_dir = os.path.isdir(entry_path) if os.path.exists(entry_path) else False
-                
+
                 item = {
                     "name": entry,
                     "path": entry_path,
@@ -134,11 +128,12 @@ class FileMgr:
                     "accessible": False,
                 })
                 continue
-        
+
         return items
 
     def _sort_items(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """自然排序目录项"""
+
         def natural_sort_key(item: Dict[str, Any]):
             name = item["name"]
             is_dir = item["isDirectory"]
@@ -178,11 +173,7 @@ class FileMgr:
         items.sort(key=natural_sort_key)
         return items
 
-    def _filter_by_extensions(
-        self,
-        items: List[Dict[str, Any]],
-        extensions_filter: str
-    ) -> List[Dict[str, Any]]:
+    def _filter_by_extensions(self, items: List[Dict[str, Any]], extensions_filter: str) -> List[Dict[str, Any]]:
         """根据扩展名过滤"""
         if extensions_filter == "audio":
             allowed_exts = {'.mp3', '.wav', '.aac', '.ogg', '.m4a', '.flac', '.wma', '.mp4'}
@@ -199,17 +190,15 @@ class FileMgr:
                 item for item in items
                 if item["isDirectory"] or os.path.splitext(item["name"])[1].lower() in allowed_exts
             ]
-        
+
         return items
 
-    def _scan_recursive(
-        self,
-        root_path: str,
-        extensions_filter: str = "all",
-        depth: int = 0,
-        max_depth: int = 10,
-        max_items: int = 1000
-    ) -> Dict[str, Any]:
+    def _scan_recursive(self,
+                        root_path: str,
+                        extensions_filter: str = "all",
+                        depth: int = 0,
+                        max_depth: int = 10,
+                        max_items: int = 1000) -> Dict[str, Any]:
         """
         递归扫描目录，返回树形结构
         
@@ -232,7 +221,7 @@ class FileMgr:
         if depth > max_depth:
             log.warning(f"Max depth {max_depth} reached for {root_path}")
             return {"code": 0, "msg": "ok", "data": [], "currentPath": root_path}
-        
+
         try:
             entries = os.listdir(root_path)
         except PermissionError:
@@ -242,14 +231,14 @@ class FileMgr:
         except Exception as e:
             log.error(f"Cannot list directory {root_path}: {e}")
             return {"code": -1, "msg": f"无法读取目录: {str(e)}", "data": []}
-        
+
         # 构建当前目录的项列表
         items = self._sort_items(self._list_items(root_path, entries))
-        
+
         # 过滤文件（保留所有目录，只过滤文件）
         if extensions_filter and extensions_filter != "all":
             items = self._filter_by_extensions(items, extensions_filter)
-        
+
         # 为每个子目录递归添加 subItems
         total_items = len(items)
         for item in items:
@@ -257,18 +246,13 @@ class FileMgr:
             if total_items >= max_items:
                 log.warning(f"Max items {max_items} reached, stopping recursion")
                 break
-                
+
             if item["isDirectory"] and item.get("path"):
-                sub_result = self._scan_recursive(
-                    item["path"],
-                    extensions_filter,
-                    depth + 1,
-                    max_depth,
-                    max_items - total_items
-                )
+                sub_result = self._scan_recursive(item["path"], extensions_filter, depth + 1, max_depth,
+                                                  max_items - total_items)
                 item["subItems"] = sub_result["data"] if sub_result["code"] == 0 else []
                 total_items += len(item["subItems"])
-        
+
         return {"code": 0, "msg": "ok", "data": items, "currentPath": root_path}
 
     def get_file_info(self, file_path: str) -> Dict[str, Any]:
@@ -310,8 +294,7 @@ class FileMgr:
 
             # 处理相对路径
             file_path = os.path.abspath(
-                file_path if os.path.isabs(file_path) else os.path.join(self.default_base_dir, file_path.lstrip('/'))
-            )
+                file_path if os.path.isabs(file_path) else os.path.join(self.default_base_dir, file_path.lstrip('/')))
 
             # 验证路径在允许的目录内
             if not file_path.startswith(config.ALLOWED_DIR):
@@ -334,8 +317,8 @@ class FileMgr:
 
             # 判断是否为媒体文件
             media_extensions = {
-                '.mp3', '.wav', '.aac', '.ogg', '.m4a', '.flac', '.wma', '.mp4',
-                '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'
+                '.mp3', '.wav', '.aac', '.ogg', '.m4a', '.flac', '.wma', '.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv',
+                '.webm'
             }
             file_ext = os.path.splitext(file_path)[1].lower()
             is_media_file = file_ext in media_extensions

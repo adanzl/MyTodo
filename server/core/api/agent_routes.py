@@ -70,7 +70,7 @@ def agent_heartbeat() -> ResponseReturnValue:
         client_ip = _get_client_ip()
 
         log.debug(
-            f"===== [Agent Heartbeat] client_ip={client_ip}, address={data.address}, name={data.name}, actions={data.actions}"
+            f"=> [Agent Heartbeat] client_ip={client_ip}, address={data.address}, name={data.name}, actions={data.actions}"
         )
         agent_mgr.handle_heartbeat(client_ip=client_ip, data=data)
         return _ok()
@@ -101,7 +101,7 @@ def agent_event() -> ResponseReturnValue:
             return _err(f'error: {str(err)}')
 
         client_ip = _get_client_ip()
-        log.info(f"===== [Agent Event] client_ip={client_ip}, {req}")
+        log.info(f"=> [Agent Event] client_ip={client_ip}, {req}")
 
         code, msg = agent_mgr.handle_event(client_ip=client_ip,
                                            key=data.key,
@@ -175,7 +175,7 @@ def agent_mock() -> ResponseReturnValue:
         if err or not data:
             return _err(f'error: {str(err)}')
 
-        log.info(f"===== [Agent Mock] {req}")
+        log.info(f"=> [Agent Mock] {req}")
 
         agent = agent_mgr.get_agent(data.agent_id)
         if not agent:
@@ -209,7 +209,7 @@ def agent_config_update() -> ResponseReturnValue:
         if err or not data:
             return _err(f'error: {str(err)}')
 
-        log.info(f"===== [Agent Config Update] agent_id={data.agent_id}, config={data.config}")
+        log.info(f"=> [Agent Config Update] agent_id={data.agent_id}, config={data.config}")
 
         code, msg = agent_mgr.update_agent_config(data)
         if code == 0:

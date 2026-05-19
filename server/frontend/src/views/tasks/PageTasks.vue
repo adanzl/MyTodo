@@ -27,24 +27,41 @@
       <el-tab-pane label="使用统计" name="usage">
         <TabUsage />
       </el-tab-pane>
+
+      <!-- 任务记录页签 -->
+      <el-tab-pane label="任务记录" name="history">
+        <TabTaskHistory />
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, watch, onMounted } from "vue";
 import TabMaterial from "./TabMaterial.vue";
 import TabTasks from "./TabTasks.vue";
 import TabTaskCalendar from "./TabTaskCalendar.vue";
 import TabTasksPreview from "./TabTasksPreview.vue";
 import TabUsage from "./TabUsage.vue";
+import TabTaskHistory from "./TabTaskHistory.vue";
 
 // 主页签控制
+const STORAGE_KEY = 'tasks-active-tab';
 const activeMainTab = ref("calendar");
+
+// 从 localStorage 加载上次选中的页签
+onMounted(() => {
+  const savedTab = localStorage.getItem(STORAGE_KEY);
+  if (savedTab) {
+    activeMainTab.value = savedTab;
+  }
+});
 
 // 监听页签切换
 const handleTabChange = (tabName: string) => {
   console.log("切换到页签:", tabName);
+  // 保存到 localStorage
+  localStorage.setItem(STORAGE_KEY, tabName);
 };
 
 // 监听页签变化，切换到对应页签时触发刷新
@@ -54,7 +71,8 @@ watch(activeMainTab, (newTab) => {
     'tasks': 'refresh-tasks-tab',
     'calendar': 'refresh-calendar-tab',
     'preview': 'refresh-preview-tab',
-    'usage': 'refresh-usage-tab'
+    'usage': 'refresh-usage-tab',
+    'history': 'refresh-history-tab'
   };
 
   const eventName = eventMap[newTab];

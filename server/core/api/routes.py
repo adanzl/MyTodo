@@ -17,9 +17,7 @@ log = app_logger
 api_bp = Blueprint('api', __name__)
 
 
-def _parse_int(
-        value: Any,
-        name: str) -> tuple[Optional[int], Optional[ResponseReturnValue]]:
+def _parse_int(value: Any, name: str) -> tuple[Optional[int], Optional[ResponseReturnValue]]:
     """把输入解析为 int。失败时返回错误响应。"""
     if value is None or value == "":
         return None, {"code": -1, "msg": f"{name} is required"}
@@ -58,7 +56,7 @@ def server_log() -> ResponseReturnValue:
 def write_log() -> ResponseReturnValue:
     try:
         args = request.get_data().decode('utf-8')
-        log.info("===== [Write Log] " + args)
+        log.info("=> [Write Log] " + args)
     except Exception as e:
         log.error(e)
     return {}
@@ -68,7 +66,7 @@ def write_log() -> ResponseReturnValue:
 @api_bp.route("/getSave", methods=['GET'])
 def get_save() -> ResponseReturnValue:
     raw_id = request.args.get('id')
-    log.info(f"===== [Get Save] id={raw_id}")
+    log.info(f"=> [Get Save] id={raw_id}")
 
     save_id, err = _parse_int(raw_id, 'id')
     if err:
@@ -80,7 +78,7 @@ def get_save() -> ResponseReturnValue:
 @api_bp.route("/setSave", methods=['POST'])
 def set_save() -> ResponseReturnValue:
     args: Dict[str, Any] = read_json_from_request()
-    log.info("===== [Set Save] " + json.dumps(args))
+    log.info("=> [Set Save] " + json.dumps(args))
 
     raw_id = args.get('id')
     save_id, err = _parse_int(raw_id, 'id')
@@ -116,7 +114,7 @@ def get_all() -> ResponseReturnValue:
     table = request.args.get('table')
     if table is None:
         return {"code": -1, "msg": "table is required"}
-    # log.info("===== [Get All Data] " + json.dumps(request.args))
+    # log.info("=> [Get All Data] " + json.dumps(request.args))
     if fields != '*':
         fields = fields.split(',')
     return db_mgr.get_list(table, page_num, page_size, fields, conditions)
@@ -128,7 +126,7 @@ def get_data() -> ResponseReturnValue:
     raw_id = request.args.get('id')
     idx = request.args.get('idx', default=1, type=int)
     fields = request.args.get('fields')
-    # log.info("===== [Get Data] " + json.dumps(request.args))
+    # log.info("=> [Get Data] " + json.dumps(request.args))
 
     data_id, err = _parse_int(raw_id, 'id')
     if err:
@@ -152,7 +150,7 @@ def set_data() -> ResponseReturnValue:
     data = args.get('data')
     if table is None or data is None:
         return {"code": -1, "msg": "table or data is required"}
-    log.info(f"===== [Set Data] {table}: {data}")
+    log.info(f"=> [Set Data] {table}: {data}")
     return db_mgr.set_data(table, data)
 
 
@@ -164,16 +162,16 @@ def update_user() -> ResponseReturnValue:
     禁止更新：score, wish_progress（这些字段由系统自动管理）
     """
     args: Dict[str, Any] = read_json_from_request()
-    log.info(f"===== [Update User] {args}")
-    
+    log.info(f"=> [Update User] {args}")
+
     # 必须包含 id
     user_id = args.get('id')
     if user_id is None:
         return {"code": -1, "msg": "user id is required"}
-    
+
     # 定义允许更新的字段白名单
     allowed_fields = {'id', 'name', 'icon', 'admin', 'wish_list'}
-    
+
     # 过滤数据，只保留允许的字段
     filtered_data = {}
     for key, value in args.items():
@@ -181,22 +179,22 @@ def update_user() -> ResponseReturnValue:
             filtered_data[key] = value
         else:
             log.warning(f"[Update User] 拒绝更新不允许的字段: {key}")
-    
+
     if not filtered_data or 'id' not in filtered_data:
         return {"code": -1, "msg": "no valid fields to update"}
-    
+
     return db_mgr.set_data('t_user', filtered_data)
 
 
 @api_bp.route("/delData", methods=['POST'])
 def del_data() -> ResponseReturnValue:
     args: Dict[str, Any] = read_json_from_request()
-    log.info("===== [Del Data] " + json.dumps(args))
+    log.info("=> [Del Data] " + json.dumps(args))
     table = args.get('table')
 
     raw_id = args.get('id')
     data_id, err = _parse_int(raw_id, 'id')
-    
+
     if table is None or data_id is None:
         return {"code": -1, "msg": "table or id is required"}
     if err:
@@ -208,7 +206,7 @@ def del_data() -> ResponseReturnValue:
 @api_bp.route("/query", methods=['POST'])
 def query() -> ResponseReturnValue:
     args: Dict[str, Any] = read_json_from_request()
-    log.info("===== [Query Data] " + json.dumps(args))
+    log.info("=> [Query Data] " + json.dumps(args))
     sql = args.get('sql')
     if not sql:
         return {"code": -1, "msg": "sql is required"}
@@ -220,7 +218,7 @@ def get_rds_data() -> ResponseReturnValue:
     try:
         table = request.args.get('table')
         raw_id = request.args.get('id')
-        # log.info(f"===== [Get Rds Data] {table}-{raw_id}")
+        # log.info(f"=> [Get Rds Data] {table}-{raw_id}")
         key = f"{table}:{raw_id}"
         return {"code": 0, "msg": "ok", "data": rds_mgr.get_str(key)}
     except Exception as e:
@@ -235,9 +233,7 @@ def get_rds_list() -> ResponseReturnValue:
         key = request.args.get('key')
         page_size = request.args.get('pageSize', 20, type=int)
         start_id = request.args.get('startId', -1, type=int)
-        log.info(
-            f"===== [Get Rds List] {key}, pageSize={page_size}, startId={start_id}"
-        )
+        log.info(f"=> [Get Rds List] {key}, pageSize={page_size}, startId={start_id}")
         if key is None:
             return {"code": -1, "msg": "key is required"}
 
@@ -283,9 +279,7 @@ def set_rds_data() -> ResponseReturnValue:
         data = args.get('data')
         if table is None or data is None:
             return {"code": -1, "msg": "table or data is required"}
-        log.info(
-            f"===== [Set rds Data] {table}: {len(data) if hasattr(data, '__len__') else 0}"
-        )
+        log.info(f"=> [Set rds Data] {table}: {len(data) if hasattr(data, '__len__') else 0}")
         rid = data.get('id') if isinstance(data, dict) else None
         value = data.get('value') if isinstance(data, dict) else None
         rds_mgr.set(f"{table}:{rid}", value)
@@ -298,16 +292,12 @@ def set_rds_data() -> ResponseReturnValue:
 @api_bp.route("/chatMessages", methods=['GET'])
 def chat_messages() -> ResponseReturnValue:
     try:
-        log.info("===== [Chat Messages] " + json.dumps(request.args, ensure_ascii=False))
+        log.info("=> [Chat Messages] " + json.dumps(request.args, ensure_ascii=False))
         c_id = request.args.get('conversation_id')
         limit = request.args.get('limit')
         first_id = request.args.get('first_id')
         user = request.args.get('user')
-        return {
-            "code": 0,
-            "msg": "ok",
-            "data": AILocal.get_chat_messages(c_id, limit, user, first_id)
-        }
+        return {"code": 0, "msg": "ok", "data": AILocal.get_chat_messages(c_id, limit, user, first_id)}
     except Exception as e:
         log.error(e)
         return {"code": -1, "msg": 'error' + str(e)}
@@ -321,7 +311,7 @@ def route_index() -> ResponseReturnValue:
 @api_bp.route("/addScore", methods=['POST'])
 def add_score() -> ResponseReturnValue:
     args: Dict[str, Any] = read_json_from_request()
-    log.info("===== [Add Score] " + json.dumps(args, ensure_ascii=False))
+    log.info("=> [Add Score] " + json.dumps(args, ensure_ascii=False))
 
     user_id_raw = args.get('user')
     user_id, err = _parse_int(user_id_raw, 'user')
@@ -341,7 +331,7 @@ def add_rds_list() -> ResponseReturnValue:
     """向Redis列表中插入数据（列表尾部插入）"""
     try:
         args: Dict[str, Any] = read_json_from_request()
-        log.info("===== [Add Rds List] " + json.dumps(args))
+        log.info("=> [Add Rds List] " + json.dumps(args))
 
         key = args.get('key')
         value = args.get('value')
@@ -363,7 +353,7 @@ def list_directory() -> ResponseReturnValue:
     path = request.args.get('path', '')
     extensions_filter = request.args.get('extensions', 'audio')
     recursive = request.args.get('recursive', 'false').lower() == 'true'
-    
+
     result = file_mgr.list_directory(path, extensions_filter, recursive)
     return result
 
@@ -374,4 +364,3 @@ def get_file_info() -> ResponseReturnValue:
     file_path = request.args.get('path', '')
     result = file_mgr.get_file_info(file_path)
     return result
-

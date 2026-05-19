@@ -54,6 +54,7 @@ def finish_material() -> ResponseReturnValue:
     if err or not body:
         return err or _err('Invalid request body')
 
+    log.info(f"=> [Task Finish] {json_data}")
     result = task_mgr.finish_material(body.task_id, body.material_id, body.date, body.user_id)
     return result
 
@@ -69,6 +70,7 @@ def delete_material_category() -> ResponseReturnValue:
     if not isinstance(category_id, int):
         return _err('Invalid category id')
 
+    log.info(f"=> [Task Delete Material Category] {json_data}")
     # 获取是否删除素材的参数，默认为 False
     delete_materials = json_data.get('deleteMaterials', False)
     if not isinstance(delete_materials, bool):
