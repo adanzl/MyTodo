@@ -312,7 +312,13 @@ const fetchTaskList = async () => {
         const res = await getTaskList(userId, 1, 100, selectedDateStr, selectedDateStr);
 
         if (res.code === 0 && res.data) {
-            taskList.value = res.data.data || [];
+            // 按优先级排序（数字越小优先级越高）
+            const tasks = res.data.data || [];
+            taskList.value = tasks.sort((a, b) => {
+                const priorityA = a.priority ?? Number.MAX_SAFE_INTEGER;
+                const priorityB = b.priority ?? Number.MAX_SAFE_INTEGER;
+                return priorityA - priorityB;
+            });
             totalCount.value = res.data.totalCount || 0;
 
             // 收集所有素材 ID

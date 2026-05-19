@@ -1,6 +1,7 @@
 <template>
     <div class="p-4">
         <div class="flex gap-5 h-10">
+            <el-button size="small" @click="fetchTaskList" :loading="loading" :icon="Refresh" type="primary" plain />
             <!-- 用户筛选 -->
             <div class="mb-4 flex items-center gap-2">
                 <el-radio-group v-model="selectedUserId" @change="handleUserChange">
@@ -22,6 +23,7 @@
                     <span class="ml-2">{{ currentDateStr }}</span>
                 </el-button>
                 <el-button size="small" @click="setToday">今</el-button>
+
             </div>
         </div>
 
@@ -45,13 +47,14 @@
                             @click="openMaterialPlayer(task, material)">
                             <!-- 任务名称角标 -->
                             <div
-                                class="absolute top-2 left-3 text-xs text-gray-500 truncate max-w-[80%] flex gap-2 items-center">
+                                class="absolute top-2 left-3 text-xs text-gray-500 max-w-[90%] flex gap-2 items-center min-w-0 w-full">
                                 <el-tag :type="isMaterialCompleted(task, material, currentDate) ? 'success' : 'info'"
                                     :effect="isMaterialCompleted(task, material, currentDate) ? 'dark' : 'plain'"
                                     size="small" class="shrink-0">
                                     {{ isMaterialCompleted(task, material, currentDate) ? '已完成' : '未完成' }}
                                 </el-tag>
-                                <span class="truncate">{{ task.name }}</span>
+                                <span class="truncate flex-1 min-w-0">{{ task.name }}</span>
+                                <span class="shrink-0">{{ task.priority }}</span>
                             </div>
 
                             <el-icon :size="40" color="#409EFF" class="mb-1 mt-6">
@@ -78,7 +81,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { ElMessage } from 'element-plus';
-import { Calendar, Document, Loading, VideoPlay } from '@element-plus/icons-vue';
+import { Calendar, Document, Loading, VideoPlay, Refresh } from '@element-plus/icons-vue';
 import { getTaskList, getMaterialListByIds, type Task, type MaterialItem } from '@/api/api-task';
 import { getDaysDiff } from '@/utils/date';
 import MaterialPreviewDialog from './dialogs/MaterialPreviewDialog.vue';
@@ -106,9 +109,14 @@ const currentDateStr = computed(() => {
   return currentDate.value.toISOString().split('T')[0];
 });
 
-// 显示的任务列表（直接使用 API 返回的数据）
+// 显示的任务列表（按优先级排序）
 const displayTasks = computed(() => {
-  return taskList.value;
+  return [...taskList.value].sort((a, b) => {
+    // 优先级数值越小，优先级越高
+    const priorityA = a.priority || 999;
+    const priorityB = b.priority || 999;
+    return priorityA - priorityB;
+  });
 });
 
 // 检查是否有可显示的素材
@@ -241,11 +249,6 @@ const fetchTaskList = async () => {
     loading.value = false;
   }
 };
-
-// 刷新任务（保留函数以备将来使用）
-// const refreshTasks = () => {
-//   fetchTaskList();
-// };
 
 // 用户选择变化（仅 Admin）
 const handleUserChange = () => {

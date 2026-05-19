@@ -198,11 +198,11 @@ export interface Task {
 
 /**
  * 获取任务列表
- * @param userId - 用户ID（可选，使用LIKE匹配）
+ * @param userId - 用户ID（可选）
  * @param pageNum - 页码，默认1
  * @param pageSize - 每页数量，默认20
- * @param startDate - 开始日期（可选，格式 YYYY-MM-DD），查询 start_date <= startDate 的任务
- * @param endDate - 结束日期（可选，格式 YYYY-MM-DD），查询 end_date >= endDate 的任务
+ * @param startDate - 开始日期（可选，格式 YYYY-MM-DD）
+ * @param endDate - 结束日期（可选，格式 YYYY-MM-DD）
  */
 export async function getTaskList(
   userId?: number,
@@ -211,28 +211,23 @@ export async function getTaskList(
   startDate?: string,
   endDate?: string
 ): Promise<PaginatedResponse<Task>> {
-  const conditions: Record<string, any> = {};
-  if (userId && userId > 0) {
-    // 使用 LIKE 条件匹配 user_id 字段（如 "3,4" 中包含 "3"）
-    conditions.user_id = { like: `%${userId}%` };
-  }
-
-  // 添加日期范围查询条件：任务与视图有交集
-  if (endDate) {
-    // 任务开始日期 <= 视图结束日期
-    conditions.start_date = { "<=": endDate };
-  }
-  if (startDate) {
-    // 任务结束日期 >= 视图开始日期
-    conditions.end_date = { ">=": startDate };
-  }
-
-  return getList<Task>(
-    "t_task",
-    Object.keys(conditions).length > 0 ? conditions : undefined,
+  const params: Record<string, any> = {
     pageNum,
     pageSize
-  );
+  };
+  
+  if (userId && userId > 0) {
+    params.userId = userId;
+  }
+  
+  // 使用 date 参数查询指定日期的任务
+  const date = startDate || endDate;
+  if (date) {
+    params.date = date;
+  }
+
+  const response = await api.get("/task/list", { params });
+  return response.data;
 }
 
 /**
