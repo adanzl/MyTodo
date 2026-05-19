@@ -243,6 +243,19 @@ class TaskMgr:
             if update_result.get('code') != 0:
                 return {"code": -1, "msg": "更新失败", "data": None}
 
+            # 在 t_task_history 表中插入记录
+            history_data = {
+                'user_id': user_id,
+                'task_id': task_id,
+                'material_id': material_id,
+                'date_str': date_str,
+                'state': 1,  # 1表示完成
+                'reward': 0  # 初始奖励为0，后续可根据业务逻辑调整
+            }
+            history_result = db_mgr.set_data('t_task_history', history_data)
+            if history_result.get('code') != 0:
+                log.error(f"插入任务历史记录失败: {history_result.get('msg')}")
+
             # 检查是否完成当天所有素材，如果完成则加分
             all_completed = all(m.get('status', {}).get(str(user_id)) == 1 for m in materials_for_day)
 
