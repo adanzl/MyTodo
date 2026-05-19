@@ -104,10 +104,10 @@
                 @row-click="handleRowClick"
                 height="100%"
               >
-                <el-table-column type="selection" width="55" />
-                <el-table-column prop="id" label="ID" width="80" />
-                <el-table-column prop="name" label="素材名称" min-width="200" />
-                <el-table-column prop="type" label="类型" width="100">
+                <el-table-column type="selection" width="40" />
+                <el-table-column prop="id" label="ID" width="60" />
+                <el-table-column prop="name" label="素材名称" min-width="220" />
+                <el-table-column prop="type" label="类型" width="80">
                   <template #default="{ row }">
                     {{ getMaterialTypeName(row.type) }}
                   </template>
@@ -418,7 +418,7 @@ const allocateMaterials = () => {
 
   // 根据 useBatchSize、batchSize 和 allocationType 对素材进行分组处理
   let processedMaterials: Array<{ id: number; name: string; type: number }> = [];
-  
+
   if (!useBatchSize.value || batchSize.value === 1) {
     // 未启用基数或基数为1，直接传递所有素材
     processedMaterials = selectedMaterials.value.map(m => ({
@@ -430,7 +430,7 @@ const allocateMaterials = () => {
     // 启用基数且为平均分配：强制每天分配 batchSize 个素材
     const totalDays = endDay.value - startDay.value + 1;
     const requiredMaterials = totalDays * batchSize.value;
-    
+
     if (selectedMaterials.value.length >= requiredMaterials) {
       // 素材充足：只取需要的数量，舍弃多余的
       const materialsToUse = selectedMaterials.value.slice(0, requiredMaterials);
@@ -454,7 +454,7 @@ const allocateMaterials = () => {
       const start = i * batchSize.value;
       const end = Math.min(start + batchSize.value, selectedMaterials.value.length);
       const batch = selectedMaterials.value.slice(start, end);
-      
+
       // 将这批素材添加到结果中
       batch.forEach(m => {
         processedMaterials.push({

@@ -38,27 +38,27 @@ interface Props {
   hour: string;
   childName: "zhaozhao" | "cancan";
   day: Weekday;
+  courseColors?: Record<CourseColorId, CourseColor>;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  courseColors: () => ({
+    1: { bg: "bg-blue-300", border: "border-blue-400", hover: "hover:bg-blue-400" },
+    2: { bg: "bg-green-300", border: "border-green-400", hover: "hover:bg-green-400" },
+    3: { bg: "bg-purple-300", border: "border-purple-400", hover: "hover:bg-purple-400" },
+    4: { bg: "bg-orange-300", border: "border-orange-400", hover: "hover:bg-orange-400" },
+    5: { bg: "bg-pink-300", border: "border-pink-400", hover: "hover:bg-pink-400" },
+  }),
+});
 
 const emit = defineEmits<{
   (e: "edit", day: Weekday, child: "zhaozhao" | "cancan", startTime: string): void;
 }>();
 
-// 课程颜色常量
-const COURSE_COLORS: Record<CourseColorId, CourseColor> = {
-  1: { bg: "bg-blue-300", border: "border-blue-400", hover: "hover:bg-blue-400" },
-  2: { bg: "bg-green-300", border: "border-green-400", hover: "hover:bg-green-400" },
-  3: { bg: "bg-purple-300", border: "border-purple-400", hover: "hover:bg-purple-400" },
-  4: { bg: "bg-orange-300", border: "border-orange-400", hover: "hover:bg-orange-400" },
-  5: { bg: "bg-pink-300", border: "border-pink-400", hover: "hover:bg-pink-400" },
-};
-
 // 计算属性
 const courseColor = computed(() => {
   const colorId = (props.course.colorId || 1) as CourseColorId;
-  return COURSE_COLORS[colorId] || COURSE_COLORS[1];
+  return props.courseColors[colorId] || props.courseColors[1];
 });
 
 const endTime = computed(() => {

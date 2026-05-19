@@ -227,7 +227,7 @@
         <div class="flex gap-4" style="height: 500px;">
           <!-- 左侧：类别选择 -->
           <div class="w-58 border rounded p-3 overflow-y-auto">
-            <el-tree :data="cascaderOptions" :props="treeProps" node-key="id" :indent="10"
+            <el-tree ref="categoryTreeRef" :data="cascaderOptions" :props="treeProps" node-key="id" :indent="10"
               @node-click="handleTreeSelect" highlight-current accordion>
               <template #default="{ node, data }">
                 <div class="flex items-center justify-between w-full pr-2">
@@ -245,11 +245,11 @@
           <!-- 右侧：素材列表 -->
           <div class="flex-1 border rounded overflow-hidden">
             <el-table v-if="!materialLoading" ref="materialTableRef" :data="materialList"
-              @selection-change="handleMaterialSelectionChange" @row-click="handleRowClick" max-height="460">
-              <el-table-column type="selection" width="55" />
-              <el-table-column prop="id" label="ID" width="80" />
+              @selection-change="handleMaterialSelectionChange" @row-click="handleRowClick" height="100%">
+              <el-table-column type="selection" width="40" />
+              <el-table-column prop="id" label="ID" width="60" />
               <el-table-column prop="name" label="素材名称" min-width="200" />
-              <el-table-column prop="type" label="类型" width="100">
+              <el-table-column prop="type" label="类型" width="80">
                 <template #default="{ row }">
                   {{ getMaterialTypeName(row.type) }}
                 </template>
@@ -308,6 +308,7 @@ const selectedMaterials = ref<Material[]>([]);
 const categoryList = ref<MaterialCategory[]>([]);
 const selectedCategoryId = ref<number | undefined>(undefined);
 const materialTableRef = ref();
+const categoryTreeRef = ref();
 
 // 前置日程相关
 const preTodoZhaozhao = ref<number[]>([]); // 昭昭的前置日程ID列表
@@ -735,6 +736,12 @@ watch(showMaterialSelector, async (newVal) => {
         materialTableRef.value?.toggleRowSelection(row, true);
       }
     });
+
+    // 确保 el-tree 正确高亮显示选中的节点
+    await nextTick();
+    if (selectedCategoryId.value !== undefined && categoryTreeRef.value) {
+      categoryTreeRef.value.setCurrentKey(selectedCategoryId.value);
+    }
   }
 });
 

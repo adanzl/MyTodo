@@ -49,7 +49,7 @@
                 </div>
               </div>
               <div class="flex items-center gap-2 ml-2">
-                  <ion-button @click.stop="playPlaylistItem(playlist)" :disabled="!isAdmin">
+                  <ion-button @click.stop="playPlaylistItem(playlist)" :disabled="!isAdmin" fill="outline">
                    <ion-icon :icon="playlist.isPlaying ? pauseOutline : playOutline" class="inline-block w-5 h-5" />
                   </ion-button>
               </div>

@@ -1,6 +1,6 @@
 <template>
     <div class="p-4">
-        <div class="flex gap-5">
+        <div class="flex gap-5 h-10">
             <!-- 用户筛选 -->
             <div class="mb-4 flex items-center gap-2">
                 <el-radio-group v-model="selectedUserId" @change="handleUserChange">
@@ -31,8 +31,7 @@
                 <Loading />
             </el-icon>
         </div>
-
-        <div v-else class=" max-h-[calc(100vh-15rem)] overflow-y-auto p-4">
+        <div v-else class=" h-[calc(100vh-15rem)] overflow-y-auto p-4 border border-gray-300">
             <div v-if="!hasDisplayableMaterials" class="text-center py-10 text-gray-500">
                 <p>暂无任务</p>
             </div>

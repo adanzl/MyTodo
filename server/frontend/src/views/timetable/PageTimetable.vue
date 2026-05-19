@@ -6,19 +6,19 @@
         <p class="text-sm text-gray-600">
           当前显示: {{ filterDisplayText }} (共 {{ courseCount }} 门课程)
         </p>
-        <p v-if="lastSaveTime" class="text-xs text-gray-500 mt-1">
-          最后保存: {{ lastSaveTime }}
+        <p class="text-xs text-gray-500 mt-1">
+          最后更新: {{ lastSaveTime }}
         </p>
       </div>
-      <div class="flex items-center space-x-4">
-        <el-radio-group v-model="filterChild" size="default">
+      <div class="flex items-center">
+        <el-radio-group v-model="filterChild" size="default" class="mr-8">
           <el-radio-button value="all">全部</el-radio-button>
           <el-radio-button value="zhaozhao">昭昭</el-radio-button>
           <el-radio-button value="cancan">灿灿</el-radio-button>
         </el-radio-group>
         <el-button plain type="primary" @click="reloadTimetable" :loading="loading" :icon="Refresh" />
         <el-button @click="saveTimetable" type="primary" :loading="loading" :disabled="loading">
-          保存
+          <IMdiContentSave v-if="!loading" />
         </el-button>
       </div>
     </div>
@@ -27,15 +27,14 @@
       <table class="w-full border-collapse bg-white shadow-lg rounded-lg overflow-hidden">
         <thead>
           <tr class="bg-gray-50">
-            <th
-              class="border border-gray-200 px-2 py-2 text-center font-semibold text-gray-700 min-w-20"
-            >
+            <th class="border border-gray-200 p-2 text-center font-semibold text-gray-700 min-w-20">
               时间
             </th>
             <th
               v-for="day in weekDays"
               :key="day"
-              class="border border-gray-200 px-2 py-2 text-center font-semibold text-gray-700 min-w-32"
+              class="border border-gray-200 p-2 text-center font-semibold text-gray-700 min-w-32"
+              :class="{ 'bg-yellow-100': isToday(day) }"
               :colspan="filterChild === 'all' ? 2 : 1"
             >
               {{ day }}
@@ -47,12 +46,14 @@
               <th
                 v-if="shouldShowSubHeaders || filterChild === 'zhaozhao'"
                 class="border border-gray-200 px-1 py-1 text-center"
+                :class="{ 'bg-yellow-50': isToday(day) }"
               >
                 <div class="text-xs text-gray-600 font-medium">{{ CHILDREN_MAP.zhaozhao }}</div>
               </th>
               <th
                 v-if="shouldShowSubHeaders || filterChild === 'cancan'"
                 class="border border-gray-200 px-1 py-1 text-center"
+                :class="{ 'bg-yellow-50': isToday(day) }"
               >
                 <div class="text-xs text-gray-600 font-medium">{{ CHILDREN_MAP.cancan }}</div>
               </th>
@@ -62,7 +63,7 @@
         <tbody>
           <tr v-for="hour in hourSlots" :key="hour" class="hover:bg-gray-50">
             <td
-              class="border border-gray-200 px-2 py-2 text-center text-sm font-bold text-gray-600 bg-gray-50"
+              class="border border-gray-200 p-2 text-center text-sm font-bold text-gray-600 bg-gray-50"
             >
               {{ hour }}
             </td>
@@ -71,6 +72,7 @@
               <td
                 v-if="shouldShowSubHeaders || filterChild === 'zhaozhao'"
                 class="border border-gray-200 relative"
+                :class="{ 'bg-yellow-50': isToday(day) }"
                 :style="{ height: `${CELL_HEIGHT}px` }"
               >
                 <div
@@ -84,6 +86,7 @@
                     :hour="hour"
                     :child-name="'zhaozhao'"
                     :day="day"
+                    :course-colors="COURSE_COLORS"
                     @edit="editCourse"
                   />
                 </div>
@@ -92,6 +95,7 @@
               <td
                 v-if="shouldShowSubHeaders || filterChild === 'cancan'"
                 class="border border-gray-200 relative"
+                :class="{ 'bg-yellow-50': isToday(day) }"
                 :style="{ height: `${CELL_HEIGHT}px` }"
               >
                 <div
@@ -105,6 +109,7 @@
                     :hour="hour"
                     :child-name="'cancan'"
                     :day="day"
+                    :course-colors="COURSE_COLORS"
                     @edit="editCourse"
                   />
                 </div>
@@ -114,15 +119,14 @@
         </tbody>
         <tfoot>
           <tr class="bg-gray-50">
-            <th
-              class="border border-gray-200 px-2 py-2 text-center font-semibold text-gray-700 min-w-20"
-            >
+            <th class="border border-gray-200 p-2 text-center font-semibold text-gray-700 min-w-20">
               时间
             </th>
             <th
               v-for="day in weekDays"
               :key="day"
-              class="border border-gray-200 px-2 py-2 text-center font-semibold text-gray-700 min-w-32"
+              class="border border-gray-200 p-2 text-center font-semibold text-gray-700 min-w-32"
+              :class="{ 'bg-yellow-100': isToday(day) }"
               :colspan="filterChild === 'all' ? 2 : 1"
             >
               {{ day }}
@@ -142,9 +146,9 @@
         }"
       >
         <div class="flex items-center">
-          <div class="w-20 text-right pr-2 flex-shrink-0">
+          <div class="w-20 text-right pr-2 shrink-0">
             <span class="text-xs font-bold text-red-500 bg-white px-1 rounded shadow">
-              {{ new Date().getHours().toString().padStart(2, '0') }}:{{ new Date().getMinutes().toString().padStart(2, '0') }}
+              {{ dayjs().format('HH:mm') }}
             </span>
           </div>
           <div class="flex-1 h-0.5 bg-red-500"></div>
@@ -238,7 +242,7 @@
                 parseInt(id as string) === editingCourse.colorId
                   ? 'border-gray-800 scale-110'
                   : 'border-gray-300',
-                getCourseColor({ colorId: parseInt(id as string) as CourseColorId }).bg,
+                getCourseColor(parseInt(id as string) as CourseColorId).bg,
               ]"
               @click="editingCourse.colorId = parseInt(id as string) as CourseColorId"
               :title="color"
@@ -261,6 +265,7 @@
 import { ref, computed, onMounted } from "vue";
 import { ElMessage } from "element-plus";
 import { InfoFilled, Refresh } from "@element-plus/icons-vue";
+import dayjs from "dayjs";
 import { getRdsData, setRdsData } from "@/api/api-rds";
 import { logger } from "@/utils/logger";
 import CourseBlock from "./components/CourseBlock.vue";
@@ -280,6 +285,14 @@ const CHILDREN_MAP: Record<string, string> = {
   cancan: "灿灿",
 };
 
+const WEEK_DAYS: Weekday[] = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+const HOUR_START = 8;
+const HOUR_END = 22;
+const TIME_STEP_MINUTES = 10;
+const DEFAULT_DURATION = 30;
+const CELL_HEIGHT = 80; // px
+
+// 课程颜色配置
 const COURSE_COLORS: Record<CourseColorId, CourseColor> = {
   1: { bg: "bg-blue-300", border: "border-blue-400", hover: "hover:bg-blue-400" },
   2: { bg: "bg-green-300", border: "border-green-400", hover: "hover:bg-green-400" },
@@ -287,13 +300,6 @@ const COURSE_COLORS: Record<CourseColorId, CourseColor> = {
   4: { bg: "bg-orange-300", border: "border-orange-400", hover: "hover:bg-orange-400" },
   5: { bg: "bg-pink-300", border: "border-pink-400", hover: "hover:bg-pink-400" },
 };
-
-const WEEK_DAYS: Weekday[] = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
-const HOUR_START = 8;
-const HOUR_END = 22;
-const TIME_STEP_MINUTES = 10;
-const DEFAULT_DURATION = 30;
-const CELL_HEIGHT = 80; // px
 
 // ============ 响应式数据 ============
 const timetableData = ref<TimetableData>({});
@@ -313,6 +319,15 @@ const editingCourse = ref<EditingCourse>({
 
 // ============ 计算属性 ============
 const weekDays = computed(() => WEEK_DAYS);
+
+// 获取今天是星期几（0=周一, 1=周二, ..., 6=周日）
+const todayIndex = computed(() => {
+  return dayjs().day() - 1; // dayjs: 0=周日, 1=周一, ..., 7=周六
+});
+
+const isToday = (day: Weekday): boolean => {
+  return weekDays.value.indexOf(day) === todayIndex.value;
+};
 
 const hourSlots = computed(() => {
   const slots: string[] = [];
@@ -362,9 +377,9 @@ const shouldShowSubHeaders = computed(() => filterChild.value === "all");
 /**
  * 获取课程颜色配置
  */
-const getCourseColor = (course: Course | { colorId?: CourseColorId }): CourseColor => {
-  const colorId = (course.colorId || 1) as CourseColorId;
-  return COURSE_COLORS[colorId] || COURSE_COLORS[1];
+const getCourseColor = (colorId?: CourseColorId): CourseColor => {
+  const id = (colorId || 1) as CourseColorId;
+  return COURSE_COLORS[id] || COURSE_COLORS[1];
 };
 
 /**
@@ -633,9 +648,9 @@ const reloadTimetable = async () => {
  * 更新当前时间线位置
  */
 const updateCurrentTimeLine = () => {
-  const now = new Date();
-  const currentHour = now.getHours();
-  const currentMinute = now.getMinutes();
+  const now = dayjs();
+  const currentHour = now.hour();
+  const currentMinute = now.minute();
 
   // 检查是否在当前显示的时间范围内
   if (currentHour < HOUR_START || currentHour > HOUR_END) {
@@ -658,13 +673,7 @@ const updateCurrentTimeLine = () => {
  * 格式化时间为本地字符串
  */
 const formatDateTime = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  const seconds = String(date.getSeconds()).padStart(2, "0");
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  return dayjs(date).format("YYYY-MM-DD HH:mm:ss");
 };
 
 /**

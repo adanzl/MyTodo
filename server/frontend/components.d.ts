@@ -71,6 +71,7 @@ declare module 'vue' {
     ElUpload: typeof import('element-plus/es')['ElUpload']
     IIonChevronExpandSharp: typeof import('~icons/ion/chevron-expand-sharp')['default']
     IIonVolumeMediumOutline: typeof import('~icons/ion/volume-medium-outline')['default']
+    IMdiContentSave: typeof import('~icons/mdi/content-save')['default']
     IMdiStopCircleOutline: typeof import('~icons/mdi/stop-circle-outline')['default']
     MediaComponent: typeof import('./src/components/MediaComponent.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
