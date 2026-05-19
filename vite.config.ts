@@ -1,5 +1,6 @@
 import { execSync } from "node:child_process";
-import { dirname } from "path";
+import { writeFileSync } from "node:fs";
+import { dirname, join } from "path";
 import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import legacy from "@vitejs/plugin-legacy";
@@ -8,12 +9,24 @@ import path from "path";
 import IconsResolver from "unplugin-icons/resolver";
 import Icons from "unplugin-icons/vite";
 import Components from "unplugin-vue-components/vite";
-import { defineConfig } from "vitest/config";
+import { defineConfig, type Plugin } from "vitest/config";
 import { VitePWA } from "vite-plugin-pwa";
 
 const __viteConfigDir = dirname(fileURLToPath(import.meta.url));
 
-/** dev/build 启动时把 pdfjs-dist 的 wasm/cmaps 等拷到 public/pdfjs（与 npm 脚本同源） */
+function resolveAppVersion(): string {
+  if (process.env.APP_VERSION) return process.env.APP_VERSION;
+  try {
+    return execSync("git rev-parse --short HEAD", {
+      cwd: __viteConfigDir,
+      encoding: "utf-8",
+    }).trim();
+  } catch {
+    return `${process.env.npm_package_version ?? "0.0.1"}-${Date.now()}`;
+  }
+}
+
+/** dev/build 启动时把 pdfjs-dist 的 wasm 等拷到 public/pdfjs（与 npm 脚本同源） */
 function pdfjsCopyAssetsPlugin() {
   return {
     name: "pdfjs-copy-assets",
@@ -30,13 +43,37 @@ function pdfjsCopyAssetsPlugin() {
   };
 }
 
+function appVersionJsonPlugin(version: string): Plugin {
+  return {
+    name: "app-version-json",
+    apply: "build",
+    closeBundle() {
+      const outDir = join(__viteConfigDir, "dist");
+      writeFileSync(
+        join(outDir, "version.json"),
+        JSON.stringify({ version, builtAt: new Date().toISOString() }, null, 2),
+        "utf-8",
+      );
+      console.log(`[build] version.json → ${version}`);
+    },
+  };
+}
+
+const appVersion = resolveAppVersion();
+
 // https://vitejs.dev/config/
 export default defineConfig({
   assetsInclude: ["**/*.svg"],
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
   build: {
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
+        entryFileNames: "assets/[name]-[hash].js",
+        chunkFileNames: "assets/[name]-[hash].js",
+        assetFileNames: "assets/[name]-[hash][extname]",
         manualChunks(id) {
           if (id.includes("node_modules")) {
             return id.toString().split("node_modules/")[1].split("/")[0].toString();
@@ -57,9 +94,22 @@ export default defineConfig({
     }),
     Vue(),
     VitePWA({
-      registerType: "autoUpdate",
-      manifest: { theme_color: "#BD34FE" },
+      registerType: "prompt",
+      injectRegister: "auto",
+      workbox: {
+        navigateFallback: "index.html",
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+      },
+      manifest: {
+        name: "MyTodo",
+        short_name: "MyTodo",
+        theme_color: "#2196F3",
+        background_color: "#ffffff",
+        display: "standalone",
+        start_url: "/",
+      },
     }),
+    appVersionJsonPlugin(appVersion),
     legacy(),
     tailwindcss(),
   ] as any,

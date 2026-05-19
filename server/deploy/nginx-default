@@ -337,19 +337,35 @@ server {
     }
 
 
+    # Ionic 客户端（root: /mnt/data/project/MyTodo/dist）
     location / {
-        try_files $uri $uri/ /index.html index;
-        
-        # 缓存 HTML 文件（较短时间，因为可能更新）
-        location ~* \.(html|htm)$ {
-            expires 1h;
-            add_header Cache-Control "public, must-revalidate";
+        try_files $uri $uri/ /index.html;
+
+        # 入口、版本文件、Service Worker：禁止长期缓存
+        location = /index.html {
+            add_header Cache-Control "no-cache, no-store, must-revalidate";
+            add_header Pragma "no-cache";
+            expires -1;
         }
-        
-        # 缓存静态资源（较长时间）
-        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|json)$ {
-            expires 7d;
-            add_header Cache-Control "public, immutable";
+        location = /version.json {
+            add_header Cache-Control "no-cache, no-store, must-revalidate";
+            expires -1;
+        }
+        location ~* ^/(sw\.js|workbox-.*\.js|manifest\.webmanifest)$ {
+            add_header Cache-Control "no-cache, no-store, must-revalidate";
+            expires -1;
+        }
+
+        # Vite 带 hash 的构建产物：长期缓存
+        location ~* ^/assets/.+\.(js|css|mjs|png|jpg|jpeg|gif|ico|svg|woff2?|ttf|eot|wasm)$ {
+            expires 365d;
+            add_header Cache-Control "public, max-age=31536000, immutable";
+        }
+
+        # 其他 HTML（若有）
+        location ~* \.(html|htm)$ {
+            add_header Cache-Control "no-cache, no-store, must-revalidate";
+            expires -1;
         }
     }
 

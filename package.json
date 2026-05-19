@@ -9,7 +9,7 @@
     "predev": "npm run pdfjs:copy-assets",
     "prebuild": "npm run pdfjs:copy-assets",
     "dev": "vite",
-    "build": "vue-tsc && vite build && npx capawesome apps:liveupdates:generatemanifest --path dist",
+    "build": "vue-tsc && vite build",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
     "test:e2e": "cypress run",

@@ -65,6 +65,7 @@ import {
 } from "@ionic/vue";
 
 import { checkAndSwitchServer, initNet, isLocalIpAvailable } from "@/api/api-client";
+import { initWebUpdate } from "@/utils/web-update";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
 import isToday from "dayjs/plugin/isToday";
@@ -112,6 +113,8 @@ console.log(`当前 Vue 版本是：${app.version}`);
 // GConfig.init__();
 // https://ionicframework.com/docs/vue/pwa
 // npm cache verify
+
+initWebUpdate(router);
 
 router.isReady().then(async () => {
   initNet();
