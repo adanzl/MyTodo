@@ -5,7 +5,8 @@
         <el-option label="全部" value="" />
         <el-option label="抽奖" value="lottery" />
         <el-option label="兑换" value="exchange" />
-        <el-option label="任务" value="schedule" />
+        <el-option label="日程" value="schedule" />
+        <el-option label="任务" value="task" />
         <el-option label="管理" value="appAdmin" />
       </el-select>
       <el-radio-group size="default" v-model="selectedUserId" @change="onUserChange">

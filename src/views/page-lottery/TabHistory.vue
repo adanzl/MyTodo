@@ -11,7 +11,8 @@
         <ion-select-option value="">全部</ion-select-option>
         <ion-select-option value="lottery">抽奖</ion-select-option>
         <ion-select-option value="exchange">兑换</ion-select-option>
-        <ion-select-option value="schedule">任务</ion-select-option>
+        <ion-select-option value="schedule">日程</ion-select-option>
+        <ion-select-option value="task">任务</ion-select-option>
         <ion-select-option value="appAdmin">管理</ion-select-option>
       </ion-select>
       <div class="flex w-1/3 items-center justify-center">
