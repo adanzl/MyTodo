@@ -23,7 +23,7 @@
                     <span class="ml-2">{{ currentDateStr }}</span>
                 </el-button>
                 <el-button size="small" @click="setToday">今</el-button>
-
+                <span class="items-baseline text-xs text-gray-500">注：此页面的锁定图标只是标识锁定状态，不是真的锁定</span>
             </div>
         </div>
 
@@ -62,7 +62,12 @@
                                 <VideoPlay v-else-if="material.type == 1"/>
                             </el-icon>
                             <div class="text-sm font-medium text-center line-clamp-2 mb-1">{{ material.name }}</div>
-                            <div class="text-[10px] flex items-center mt-2">点击阅读</div>
+                            <div v-if="task.lock" class="mt-2">
+                                <el-icon :size="24" class="text-gray-500">
+                                    <Lock />
+                                </el-icon>
+                            </div>
+                            <div v-else class="text-[10px] flex items-center mt-2">点击阅读</div>
                         </div>
                     </template>
                 </div>
@@ -81,7 +86,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { ElMessage } from 'element-plus';
-import { Calendar, Document, Loading, VideoPlay, Refresh } from '@element-plus/icons-vue';
+import { Calendar, Document, Loading, VideoPlay, Refresh, Lock } from '@element-plus/icons-vue';
 import { getTaskList, getMaterialListByIds, type Task, type MaterialItem } from '@/api/api-task';
 import { getDaysDiff } from '@/utils/date';
 import MaterialPreviewDialog from './dialogs/MaterialPreviewDialog.vue';

@@ -194,6 +194,8 @@ export interface Task {
   type: number; // 0:每日任务；1：持续性任务
   data: string | TaskDetail;
   pre_todo?: string; // 前置日程JSON字符串，格式：{"user_id": [todo_ids]}
+  lock?: boolean; // 任务是否锁定
+  msg?: string; // 锁定提示信息
 }
 
 /**
