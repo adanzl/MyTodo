@@ -215,13 +215,13 @@ export async function getTaskList(
 ): Promise<PaginatedResponse<Task>> {
   const params: Record<string, any> = {
     pageNum,
-    pageSize
+    pageSize,
   };
-  
+
   if (userId && userId > 0) {
     params.userId = userId;
   }
-  
+
   // 使用 date 参数查询指定日期的任务
   const date = startDate || endDate;
   if (date) {
