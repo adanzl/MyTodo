@@ -176,15 +176,31 @@ server {
     }
     default_type application/octet-stream;
 
+    # 管理端 frontend（static/，base /web/）
     location /web {
         alias /mnt/data/project/MyTodo/server/static;
         index index.html;
         try_files $uri $uri/ /web/index.html;
         autoindex on;
 
-        # 缓存静态资源
-        expires 7d;
-        add_header Cache-Control "public, immutable";
+        # 入口 HTML：刷新即拉最新（不长期缓存）
+        location = /web/index.html {
+            add_header Cache-Control "no-cache, no-store, must-revalidate";
+            add_header Pragma "no-cache";
+            expires -1;
+        }
+
+        # Vite 带 hash 的构建产物：长期缓存
+        location ~* ^/web/assets/.+\.(js|css|mjs|png|jpg|jpeg|gif|ico|svg|woff2?|ttf|eot|wasm)$ {
+            expires 365d;
+            add_header Cache-Control "public, max-age=31536000, immutable";
+        }
+
+        # PDF.js 等资源目录（文件名无 hash）
+        location ^~ /web/web/pdfjs/ {
+            expires 7d;
+            add_header Cache-Control "public, must-revalidate";
+        }
     }
 
     location /cockpit-secret/ {
