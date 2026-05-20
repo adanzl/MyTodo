@@ -29,11 +29,11 @@ def client(app):
 def test_agent_heartbeat_ok_calls_mgr(client, monkeypatch):
     calls = {}
 
-    def fake_handle_heartbeat(*, client_ip, address, name, actions):
+    def fake_handle_heartbeat(*, client_ip, data):
         calls["client_ip"] = client_ip
-        calls["address"] = address
-        calls["name"] = name
-        calls["actions"] = actions
+        calls["address"] = data.address
+        calls["name"] = data.name
+        calls["actions"] = data.actions
 
     monkeypatch.setattr(agent_routes.agent_mgr, "handle_heartbeat", fake_handle_heartbeat)
 

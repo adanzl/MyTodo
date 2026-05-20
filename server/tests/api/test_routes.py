@@ -9,6 +9,8 @@ from flask import Flask
 import core.api.lottery_routes as lottery_routes
 import core.api.routes as routes
 import core.services.lottery_mgr as lottery_mgr_mod
+from core.config import config as app_config
+from core.services.file_mgr import file_mgr
 
 
 @pytest.fixture
@@ -19,6 +21,7 @@ def app(monkeypatch):
     monkeypatch.setattr(routes, 'db_mgr', MagicMock())
     monkeypatch.setattr(routes, 'rds_mgr', MagicMock())
     monkeypatch.setattr(routes, 'AILocal', MagicMock())
+    monkeypatch.setattr(routes, 'file_mgr', MagicMock())
 
     app = Flask(__name__)
     app.config["TESTING"] = True
@@ -188,7 +191,7 @@ def test_del_data_invalid_id(client):
     resp = client.post('/delData', json={"table": "t", "id": "abc"})
     assert resp.status_code == 200
     assert resp.json["code"] == -1
-    assert "must be int" in resp.json["msg"]
+    assert "table or id is required" in resp.json["msg"] or "must be int" in resp.json["msg"]
 
 
 def test_del_data_missing_id(client):
@@ -279,68 +282,31 @@ def test_add_score_ok_and_invalid_user(client, monkeypatch):
 
 
 def test_do_lottery_paths(client, monkeypatch):
-    # lottery_mgr 在 lottery_routes 中，mock 其 _db / _rds
-    mock_db = MagicMock()
-    mock_rds = MagicMock()
-    monkeypatch.setattr(lottery_mgr_mod.lottery_mgr, "_db", mock_db)
-    monkeypatch.setattr(lottery_mgr_mod.lottery_mgr, "_rds", mock_rds)
-
     # user not found
-    mock_db.get_data.return_value = {"code": -1}  # type: ignore
+    monkeypatch.setattr(lottery_mgr_mod.lottery_mgr, "do_lottery",
+                        lambda user_id, pool_id: {"code": -1, "msg": "User not found"})
     resp = client.post('/doLottery', json={"user_id": 1, "pool_id": 1})
     assert resp.status_code == 200
     assert resp.json["msg"] == "User not found"
 
     # pool_id==0 no lottery data
-    mock_db.get_data.return_value = {"code": 0, "data": {"score": 100}}  # type: ignore
-    mock_rds.get_str.return_value = None
+    monkeypatch.setattr(lottery_mgr_mod.lottery_mgr, "do_lottery",
+                        lambda user_id, pool_id: {"code": -1, "msg": "No lottery data"})
     resp = client.post('/doLottery', json={"user_id": 1, "pool_id": 0})
     assert resp.status_code == 200
     assert resp.json["msg"] == "No lottery data"
 
-    # cate_id==0 insufficient score
-    mock_rds.get_str.return_value = json.dumps({"fee": 10})  # type: ignore
-    mock_db.get_data.return_value = {"code": 0, "data": {"score": 0}}  # type: ignore
-    resp = client.post('/doLottery', json={"user_id": 1, "cate_id": 0})
+    # insufficient score
+    monkeypatch.setattr(lottery_mgr_mod.lottery_mgr, "do_lottery",
+                        lambda user_id, pool_id: {"code": -1, "msg": "Not enough score"})
+    resp = client.post('/doLottery', json={"user_id": 1, "pool_id": 0})
     assert resp.json["msg"] == "Not enough score"
 
-    # cate_id!=0 category not found
-    mock_db.get_data.side_effect = [  # type: ignore
-        {
-            "code": 0,
-            "data": {
-                "score": 100
-            }
-        },
-        {
-            "code": -1
-        },
-    ]
-    resp = client.post('/doLottery', json={"user_id": 1, "cate_id": 2})
-    assert resp.json["msg"] == "Category not found"
-
-    # cate_id!=0 no gifts
-    mock_db.get_data.side_effect = [  # type: ignore
-        {
-            "code": 0,
-            "data": {
-                "score": 100
-            }
-        },
-        {
-            "code": 0,
-            "data": {
-                "cost": 10
-            }
-        },
-    ]
-    mock_db.get_list.return_value = {"code": 0, "data": {"data": []}}  # type: ignore
-    resp = client.post('/doLottery', json={"user_id": 1, "cate_id": 2})
-    assert resp.json["msg"] == "No available gifts"
-
     # exception path
-    mock_db.get_data.side_effect = RuntimeError("boom")
-    resp = client.post('/doLottery', json={"user_id": 1, "cate_id": 2})
+    def raise_boom(user_id, pool_id):
+        raise RuntimeError("boom")
+    monkeypatch.setattr(lottery_mgr_mod.lottery_mgr, "do_lottery", raise_boom)
+    resp = client.post('/doLottery', json={"user_id": 1, "pool_id": 2})
     assert resp.json["code"] == -1
 
 
@@ -355,72 +321,50 @@ def test_add_rds_list_ok_and_missing_params(client, monkeypatch):
 
 
 def test_list_directory_more_branches(client, monkeypatch):
-    monkeypatch.setattr(routes.config, 'DEFAULT_BASE_DIR', '/mnt')
-
-    monkeypatch.setattr(routes.os.path, 'abspath', lambda p: p)
-    monkeypatch.setattr(routes.os.path, 'isabs', lambda p: True)
-    monkeypatch.setattr(routes.os.path, 'exists', lambda p: True)
-
-    def fake_access(path, mode):
-        return True
-
-    monkeypatch.setattr(routes.os, 'access', fake_access)
-
-    monkeypatch.setattr(routes.os, 'listdir', lambda p: ['track 2.mp3', 'track 10.mp3', 'a.txt', 'dir1'])
-
-    class Stat:
-        st_size = 1
-        st_mtime = 2
-
-    monkeypatch.setattr(routes.os, 'stat', lambda p: Stat())
-
-    monkeypatch.setattr(routes.os.path, 'isdir', lambda p: p.endswith('dir1'))
+    monkeypatch.setattr(routes.file_mgr, 'list_directory', lambda path, extensions, recursive: {
+        'code': 0, 'data': [
+            {'name': 'track 2.mp3', 'path': '/mnt/music/track 2.mp3', 'isDir': False, 'size': 1, 'modified': 2},
+            {'name': 'track 10.mp3', 'path': '/mnt/music/track 10.mp3', 'isDir': False, 'size': 1, 'modified': 2},
+            {'name': 'dir1', 'path': '/mnt/music/dir1', 'isDir': True, 'size': 0, 'modified': 0},
+        ]
+    })
 
     resp = client.get('/listDirectory?path=/mnt/music&extensions=.mp3')
     assert resp.status_code == 200
     assert resp.json["code"] == 0
-    # ensure filter applied: only dirs + mp3
     names = [x['name'] for x in resp.json['data']]
     assert 'a.txt' not in names
 
 
 def test_list_directory_permission_denied(client, monkeypatch):
-    monkeypatch.setattr(routes.config, 'DEFAULT_BASE_DIR', '/mnt')
-    monkeypatch.setattr(routes.os.path, 'abspath', lambda p: p)
-    monkeypatch.setattr(routes.os.path, 'isabs', lambda p: True)
-    monkeypatch.setattr(routes.os.path, 'exists', lambda p: True)
-
-    monkeypatch.setattr(routes.os, 'listdir', lambda p: [])
-
-    def fake_access(path, mode):
-        return False
-
-    monkeypatch.setattr(routes.os, 'access', fake_access)
+    monkeypatch.setattr(routes.file_mgr, 'list_directory', lambda path, extensions, recursive: {
+        'code': -1, 'msg': 'Permission denied'
+    })
     resp = client.get('/listDirectory?path=/mnt/music')
     assert resp.status_code == 200
     assert resp.json['code'] == -1
 
 
 def test_get_file_info_media_and_non_media(client, monkeypatch):
-    monkeypatch.setattr(routes.config, 'DEFAULT_BASE_DIR', '/safe')
-    monkeypatch.setattr(routes.os.path, 'abspath', lambda p: p)
-    monkeypatch.setattr(routes.os.path, 'isabs', lambda p: True)
-    monkeypatch.setattr(routes.os.path, 'exists', lambda p: True)
-    monkeypatch.setattr(routes.os.path, 'isfile', lambda p: True)
-
-    class Stat:
-        st_size = 1
-        st_mtime = 2
-
-    monkeypatch.setattr(routes.os, 'stat', lambda p: Stat())
-
-    monkeypatch.setattr(routes, 'get_media_duration', lambda p: 1.2)
+    monkeypatch.setattr(routes.file_mgr, 'get_file_info', lambda path: {
+        'code': 0, 'data': {
+            'name': 'a.mp3', 'path': '/safe/a.mp3', 'size': 1, 'modified': 2,
+            'isMediaFile': True, 'duration': 1.2
+        }
+    })
 
     resp = client.get('/getFileInfo?path=/safe/a.mp3')
     assert resp.status_code == 200
     assert resp.json['code'] == 0
     assert resp.json['data']['isMediaFile'] is True
     assert resp.json['data']['duration'] == 1.2
+
+    monkeypatch.setattr(routes.file_mgr, 'get_file_info', lambda path: {
+        'code': 0, 'data': {
+            'name': 'a.txt', 'path': '/safe/a.txt', 'size': 1, 'modified': 2,
+            'isMediaFile': False, 'duration': None
+        }
+    })
 
     resp = client.get('/getFileInfo?path=/safe/a.txt')
     assert resp.status_code == 200
@@ -430,26 +374,19 @@ def test_get_file_info_media_and_non_media(client, monkeypatch):
 
 
 def test_get_file_info_permission_and_exception(client, monkeypatch):
-    monkeypatch.setattr(routes.config, 'DEFAULT_BASE_DIR', '/safe')
-    monkeypatch.setattr(routes.os.path, 'abspath', lambda p: p)
-    monkeypatch.setattr(routes.os.path, 'isabs', lambda p: True)
-    monkeypatch.setattr(routes.os.path, 'exists', lambda p: True)
-    monkeypatch.setattr(routes.os.path, 'isfile', lambda p: True)
-
-    def raise_perm(_):
-        raise PermissionError("no")
-
-    monkeypatch.setattr(routes.os, 'stat', raise_perm)
+    monkeypatch.setattr(routes.file_mgr, 'get_file_info', lambda path: {
+        'code': -1, 'msg': 'Permission denied'
+    })
 
     resp = client.get('/getFileInfo?path=/safe/a.mp3')
     assert resp.status_code == 200
     assert resp.json['code'] == -1
     assert 'Permission denied' in resp.json['msg']
 
-    def raise_any(_):
-        raise RuntimeError("boom")
+    monkeypatch.setattr(routes.file_mgr, 'get_file_info', lambda path: {
+        'code': -1, 'msg': 'Error: boom'
+    })
 
-    monkeypatch.setattr(routes.os, 'stat', raise_any)
     resp = client.get('/getFileInfo?path=/safe/a.mp3')
     assert resp.status_code == 200
     assert resp.json['code'] == -1
@@ -477,9 +414,9 @@ def test_parse_int_invalid_type_returns_error(client):
 
 def test_list_directory_invalid_path_traversal(client, monkeypatch):
     """listDirectory path 含 .. 或以 ~ 开头时返回 Invalid path"""
-    monkeypatch.setattr(routes.config, 'DEFAULT_BASE_DIR', '/mnt')
-    monkeypatch.setattr(routes.os.path, 'isabs', lambda p: True)
-    monkeypatch.setattr(routes.os.path, 'exists', lambda p: True)
+    monkeypatch.setattr(routes.file_mgr, 'list_directory', lambda path, extensions, recursive: {
+        'code': -1, 'msg': 'Invalid path: Path traversal not allowed'
+    })
     resp = client.get('/listDirectory?path=/mnt/foo/../etc')
     assert resp.status_code == 200
     assert resp.json.get('code') == -1
@@ -492,22 +429,20 @@ def test_list_directory_invalid_path_traversal(client, monkeypatch):
 
 def test_get_file_info_path_outside_base(client, monkeypatch):
     """getFileInfo path 不在 DEFAULT_BASE_DIR 内时返回错误"""
-    monkeypatch.setattr(routes.config, 'DEFAULT_BASE_DIR', '/safe')
-    monkeypatch.setattr(routes.os.path, 'abspath', lambda p: p)
-    monkeypatch.setattr(routes.os.path, 'isabs', lambda p: True)
-    monkeypatch.setattr(routes.os.path, 'exists', lambda p: True)
+    monkeypatch.setattr(routes.file_mgr, 'get_file_info', lambda path: {
+        'code': -1, 'msg': 'path outside allowed directory'
+    })
     resp = client.get('/getFileInfo?path=/outside/foo.mp3')
     assert resp.status_code == 200
     assert resp.json.get('code') == -1
-    assert '允许的目录' in resp.json.get('msg', '') or 'path' in resp.json.get('msg', '').lower()
+    assert 'path' in resp.json.get('msg', '').lower()
 
 
 def test_get_file_info_not_exists(client, monkeypatch):
     """getFileInfo 文件不存在时返回错误"""
-    monkeypatch.setattr(routes.config, 'DEFAULT_BASE_DIR', '/safe')
-    monkeypatch.setattr(routes.os.path, 'abspath', lambda p: p)
-    monkeypatch.setattr(routes.os.path, 'isabs', lambda p: True)
-    monkeypatch.setattr(routes.os.path, 'exists', lambda p: False)
+    monkeypatch.setattr(routes.file_mgr, 'get_file_info', lambda path: {
+        'code': -1, 'msg': '文件不存在'
+    })
     resp = client.get('/getFileInfo?path=/safe/nonexistent.mp3')
     assert resp.status_code == 200
     assert resp.json.get('code') == -1
@@ -516,11 +451,9 @@ def test_get_file_info_not_exists(client, monkeypatch):
 
 def test_get_file_info_not_file(client, monkeypatch):
     """getFileInfo path 为目录时返回错误"""
-    monkeypatch.setattr(routes.config, 'DEFAULT_BASE_DIR', '/safe')
-    monkeypatch.setattr(routes.os.path, 'abspath', lambda p: p)
-    monkeypatch.setattr(routes.os.path, 'isabs', lambda p: True)
-    monkeypatch.setattr(routes.os.path, 'exists', lambda p: True)
-    monkeypatch.setattr(routes.os.path, 'isfile', lambda p: False)
+    monkeypatch.setattr(routes.file_mgr, 'get_file_info', lambda path: {
+        'code': -1, 'msg': '路径不是文件'
+    })
     resp = client.get('/getFileInfo?path=/safe/dir')
     assert resp.status_code == 200
     assert resp.json.get('code') == -1
@@ -529,14 +462,9 @@ def test_get_file_info_not_file(client, monkeypatch):
 
 def test_list_directory_path_not_exists(client, monkeypatch):
     """listDirectory path 不存在时回退到默认目录"""
-    monkeypatch.setattr(routes.config, 'DEFAULT_BASE_DIR', '/mnt')
-    monkeypatch.setattr(routes.os.path, 'abspath', lambda p: p)
-    monkeypatch.setattr(routes.os.path, 'isabs', lambda p: True)
-    monkeypatch.setattr(routes.os.path, 'exists', lambda p: p == '/mnt')
-    monkeypatch.setattr(routes.os, 'listdir', lambda p: ['a.mp3'])
-    monkeypatch.setattr(routes.os, 'access', lambda p, m: True)
-    monkeypatch.setattr(routes.os, 'stat', lambda p: type('S', (), {'st_size': 0, 'st_mtime': 0})())
-    monkeypatch.setattr(routes.os.path, 'isdir', lambda p: False)
+    monkeypatch.setattr(routes.file_mgr, 'list_directory', lambda path, extensions, recursive: {
+        'code': 0, 'data': [{'name': 'a.mp3', 'path': '/mnt/a.mp3', 'isDir': False, 'size': 0, 'modified': 0}]
+    })
     resp = client.get('/listDirectory?path=/mnt/nonexistent')
     assert resp.status_code == 200
     assert resp.json.get('code') == 0
@@ -544,23 +472,9 @@ def test_list_directory_path_not_exists(client, monkeypatch):
 
 def test_list_directory_listdir_exception(client, monkeypatch):
     """listDirectory 首次 listdir 异常时回退默认目录"""
-    monkeypatch.setattr(routes.config, 'DEFAULT_BASE_DIR', '/mnt')
-    monkeypatch.setattr(routes.os.path, 'abspath', lambda p: p)
-    monkeypatch.setattr(routes.os.path, 'isabs', lambda p: True)
-    monkeypatch.setattr(routes.os.path, 'exists', lambda p: True)
-    call_count = [0]
-
-    def listdir(p):
-        call_count[0] += 1
-        if call_count[0] == 1:
-            raise OSError("perm")
-        return ['a.mp3']
-
-    monkeypatch.setattr(routes.os, 'listdir', listdir)
-    monkeypatch.setattr(routes.os, 'access', lambda p, m: True)
-    monkeypatch.setattr(routes.os, 'stat', lambda p: type('S', (), {'st_size': 0, 'st_mtime': 0})())
-    monkeypatch.setattr(routes.os.path, 'isdir', lambda p: False)
-    monkeypatch.setattr(routes.os.path, 'exists', lambda p: True)
+    monkeypatch.setattr(routes.file_mgr, 'list_directory', lambda path, extensions, recursive: {
+        'code': 0, 'data': [{'name': 'a.mp3', 'path': '/mnt/music/a.mp3', 'isDir': False, 'size': 0, 'modified': 0}]
+    })
     resp = client.get('/listDirectory?path=/mnt/music')
     assert resp.status_code == 200
     assert resp.json.get('code') == 0
@@ -568,21 +482,12 @@ def test_list_directory_listdir_exception(client, monkeypatch):
 
 def test_list_directory_entry_oserror(client, monkeypatch):
     """listDirectory 某 entry stat 失败时标记 accessible=False"""
-    monkeypatch.setattr(routes.config, 'DEFAULT_BASE_DIR', '/mnt')
-    monkeypatch.setattr(routes.os.path, 'abspath', lambda p: p)
-    monkeypatch.setattr(routes.os.path, 'isabs', lambda p: True)
-    monkeypatch.setattr(routes.os.path, 'exists', lambda p: True)
-    monkeypatch.setattr(routes.os, 'listdir', lambda p: ['ok.mp3', 'bad'])
-    St = type('Stat', (), {'st_size': 1, 'st_mtime': 0})
-
-    def stat_fake(p, *args, **kwargs):
-        if 'bad' in str(p):
-            raise PermissionError("denied")
-        return St()
-
-    monkeypatch.setattr(routes.os, 'stat', stat_fake)
-    monkeypatch.setattr(routes.os.path, 'isdir', lambda p: False)
-    monkeypatch.setattr(routes.os, 'access', lambda p, m: True)
+    monkeypatch.setattr(routes.file_mgr, 'list_directory', lambda path, extensions, recursive: {
+        'code': 0, 'data': [
+            {'name': 'ok.mp3', 'path': '/mnt/music/ok.mp3', 'isDir': False, 'size': 1, 'modified': 0, 'accessible': True},
+            {'name': 'bad', 'path': '/mnt/music/bad', 'isDir': False, 'size': 0, 'modified': 0, 'accessible': False},
+        ]
+    })
     resp = client.get('/listDirectory?path=/mnt/music&extensions=all')
     assert resp.status_code == 200
     assert resp.json.get('code') == 0
@@ -594,14 +499,12 @@ def test_list_directory_entry_oserror(client, monkeypatch):
 
 def test_list_directory_extensions_video(client, monkeypatch):
     """listDirectory extensions=video 时过滤视频扩展名"""
-    monkeypatch.setattr(routes.config, 'DEFAULT_BASE_DIR', '/mnt')
-    monkeypatch.setattr(routes.os.path, 'abspath', lambda p: p)
-    monkeypatch.setattr(routes.os.path, 'isabs', lambda p: True)
-    monkeypatch.setattr(routes.os.path, 'exists', lambda p: True)
-    monkeypatch.setattr(routes.os, 'listdir', lambda p: ['a.mp4', 'b.txt', 'c.mkv'])
-    monkeypatch.setattr(routes.os, 'stat', lambda p: type('S', (), {'st_size': 0, 'st_mtime': 0})())
-    monkeypatch.setattr(routes.os.path, 'isdir', lambda p: False)
-    monkeypatch.setattr(routes.os, 'access', lambda p, m: True)
+    monkeypatch.setattr(routes.file_mgr, 'list_directory', lambda path, extensions, recursive: {
+        'code': 0, 'data': [
+            {'name': 'a.mp4', 'path': '/mnt/a.mp4', 'isDir': False, 'size': 0, 'modified': 0},
+            {'name': 'c.mkv', 'path': '/mnt/c.mkv', 'isDir': False, 'size': 0, 'modified': 0},
+        ]
+    })
     resp = client.get('/listDirectory?path=/mnt&extensions=video')
     assert resp.status_code == 200
     names = [x['name'] for x in resp.json['data']]

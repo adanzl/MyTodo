@@ -164,7 +164,7 @@ def test_get_unique_filepath_exists_twice(mock_exists):
 @patch('core.utils.os.path.abspath', side_effect=lambda p: p)
 def test_validate_and_normalize_path_ok(mock_abspath, mock_isabs, mock_isfile, mock_exists):
     path, err = validate_and_normalize_path('/mnt/file.txt', base_dir='/mnt')
-    assert err is None
+    assert err == 'ok'
     assert path == '/mnt/file.txt'
 
 
@@ -259,7 +259,7 @@ def test_validate_and_normalize_path_rejects_path_traversal():
 @patch('core.utils.os.path.join', side_effect=lambda a, b: f"{a}/{b}")
 def test_validate_and_normalize_path_relative_path_ok(mock_join, mock_isfile, mock_exists, mock_abspath, mock_isabs):
     path, err = validate_and_normalize_path("ext_base/a.mp3", base_dir="/mnt")
-    assert err is None
+    assert err == 'ok'
     assert path.startswith("/mnt/")
 
 

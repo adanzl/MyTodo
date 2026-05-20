@@ -65,22 +65,23 @@ def test_mi_volume_requires_device_id(client):
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["code"] != 0
-    assert body["msg"] == "device_id is required"
+    assert "device_id" in body["msg"]
 
 
 def test_mi_volume_get_ok(client, monkeypatch):
 
     class FakeDev:
 
-        def __init__(self, device_id):
-            assert device_id == "d1"
+        def __init__(self, address, did):
+            assert address == "d1"
+            assert did == "did1"
 
         def get_volume(self):
             return 0, 22
 
     monkeypatch.setattr(mi_routes, "MiDevice", FakeDev)
 
-    resp = client.get("/mi/volume?device_id=d1")
+    resp = client.get("/mi/volume?device_id=d1&device_did=did1")
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["code"] == 0
@@ -91,7 +92,7 @@ def test_mi_volume_get_err(client, monkeypatch):
 
     class FakeDev:
 
-        def __init__(self, device_id):
+        def __init__(self, address, did):
             pass
 
         def get_volume(self):
@@ -99,7 +100,7 @@ def test_mi_volume_get_err(client, monkeypatch):
 
     monkeypatch.setattr(mi_routes, "MiDevice", FakeDev)
 
-    resp = client.get("/mi/volume?device_id=d1")
+    resp = client.get("/mi/volume?device_id=d1&device_did=did1")
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["code"] != 0
@@ -107,11 +108,11 @@ def test_mi_volume_get_err(client, monkeypatch):
 
 
 def test_mi_volume_post_requires_volume(client, monkeypatch):
-    monkeypatch.setattr(mi_routes, "MiDevice", lambda device_id: object())
+    monkeypatch.setattr(mi_routes, "MiDevice", lambda address, did: object())
 
     resp = client.post(
         "/mi/volume",
-        data=json.dumps({"device_id": "d1"}),
+        data=json.dumps({"device_id": "d1", "device_did": "did1"}),
         content_type="application/json",
     )
     assert resp.status_code == 200
@@ -121,12 +122,13 @@ def test_mi_volume_post_requires_volume(client, monkeypatch):
 
 
 def test_mi_volume_post_volume_must_be_int(client, monkeypatch):
-    monkeypatch.setattr(mi_routes, "MiDevice", lambda device_id: object())
+    monkeypatch.setattr(mi_routes, "MiDevice", lambda address, did: object())
 
     resp = client.post(
         "/mi/volume",
         data=json.dumps({
             "device_id": "d1",
+            "device_did": "did1",
             "volume": "x"
         }),
         content_type="application/json",
@@ -138,12 +140,13 @@ def test_mi_volume_post_volume_must_be_int(client, monkeypatch):
 
 
 def test_mi_volume_post_range_check(client, monkeypatch):
-    monkeypatch.setattr(mi_routes, "MiDevice", lambda device_id: object())
+    monkeypatch.setattr(mi_routes, "MiDevice", lambda address, did: object())
 
     resp = client.post(
         "/mi/volume",
         data=json.dumps({
             "device_id": "d1",
+            "device_did": "did1",
             "volume": 101
         }),
         content_type="application/json",
@@ -158,8 +161,9 @@ def test_mi_volume_post_ok(client, monkeypatch):
 
     class FakeDev:
 
-        def __init__(self, device_id):
-            assert device_id == "d1"
+        def __init__(self, address, did):
+            assert address == "d1"
+            assert did == "did1"
 
         def set_volume(self, volume):
             assert volume == 50
@@ -171,6 +175,7 @@ def test_mi_volume_post_ok(client, monkeypatch):
         "/mi/volume",
         data=json.dumps({
             "device_id": "d1",
+            "device_did": "did1",
             "volume": 50
         }),
         content_type="application/json",
@@ -186,22 +191,23 @@ def test_mi_status_requires_device_id(client):
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["code"] != 0
-    assert body["msg"] == "device_id is required"
+    assert "device_id" in body["msg"]
 
 
 def test_mi_status_ok(client, monkeypatch):
 
     class FakeDev:
 
-        def __init__(self, device_id):
-            assert device_id == "d1"
+        def __init__(self, address, did):
+            assert address == "d1"
+            assert did == "did1"
 
         def get_status(self):
             return 0, {"state": "play"}
 
     monkeypatch.setattr(mi_routes, "MiDevice", FakeDev)
 
-    resp = client.get("/mi/status?device_id=d1")
+    resp = client.get("/mi/status?device_id=d1&device_did=did1")
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["code"] == 0
@@ -212,7 +218,7 @@ def test_mi_status_err_uses_error_field(client, monkeypatch):
 
     class FakeDev:
 
-        def __init__(self, device_id):
+        def __init__(self, address, did):
             pass
 
         def get_status(self):
@@ -220,7 +226,7 @@ def test_mi_status_err_uses_error_field(client, monkeypatch):
 
     monkeypatch.setattr(mi_routes, "MiDevice", FakeDev)
 
-    resp = client.get("/mi/status?device_id=d1")
+    resp = client.get("/mi/status?device_id=d1&device_did=did1")
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["code"] != 0
@@ -231,7 +237,7 @@ def test_mi_status_err_non_dict_fallback_msg(client, monkeypatch):
 
     class FakeDev:
 
-        def __init__(self, device_id):
+        def __init__(self, address, did):
             pass
 
         def get_status(self):
@@ -239,7 +245,7 @@ def test_mi_status_err_non_dict_fallback_msg(client, monkeypatch):
 
     monkeypatch.setattr(mi_routes, "MiDevice", FakeDev)
 
-    resp = client.get("/mi/status?device_id=d1")
+    resp = client.get("/mi/status?device_id=d1&device_did=did1")
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["code"] != 0
@@ -251,22 +257,27 @@ def test_mi_stop_requires_device_id(client):
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["code"] != 0
-    assert body["msg"] == "device_id is required"
+    assert "device_id" in body["msg"]
 
 
 def test_mi_stop_ok(client, monkeypatch):
 
     class FakeDev:
 
-        def __init__(self, device_id):
-            assert device_id == "d1"
+        def __init__(self, address, did):
+            assert address == "d1"
+            assert did == "did1"
 
         def stop(self):
             return 0, "stopped"
 
     monkeypatch.setattr(mi_routes, "MiDevice", FakeDev)
 
-    resp = client.post("/mi/stop", data=json.dumps({"device_id": "d1"}), content_type="application/json")
+    resp = client.post(
+        "/mi/stop",
+        data=json.dumps({"device_id": "d1", "device_did": "did1"}),
+        content_type="application/json",
+    )
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["code"] == 0
@@ -277,7 +288,7 @@ def test_mi_stop_exception_returns_err(client, monkeypatch):
 
     class FakeDev:
 
-        def __init__(self, device_id):
+        def __init__(self, address, did):
             pass
 
         def stop(self):
@@ -285,7 +296,11 @@ def test_mi_stop_exception_returns_err(client, monkeypatch):
 
     monkeypatch.setattr(mi_routes, "MiDevice", FakeDev)
 
-    resp = client.post("/mi/stop", data=json.dumps({"device_id": "d1"}), content_type="application/json")
+    resp = client.post(
+        "/mi/stop",
+        data=json.dumps({"device_id": "d1", "device_did": "did1"}),
+        content_type="application/json",
+    )
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["code"] != 0

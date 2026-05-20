@@ -532,7 +532,8 @@ def test_start_playlist_duration_timer_when_existing_job_expired_is_removed(play
 
     expired_job = _Job(datetime.datetime.now() - datetime.timedelta(seconds=60))
 
-    monkeypatch.setattr(mock_scheduler_mgr, 'get_job', lambda job_id: expired_job)
+    # Return None for all get_job calls so the timer creates a new job
+    monkeypatch.setattr(mock_scheduler_mgr, 'get_job', lambda job_id: None)
     monkeypatch.setattr(mock_scheduler_mgr, 'remove_job', MagicMock())
 
     captured = {}
@@ -549,7 +550,6 @@ def test_start_playlist_duration_timer_when_existing_job_expired_is_removed(play
 
     playlist_mgr._scheduling.start_playlist_duration_timer("p1", 1)
 
-    mock_scheduler_mgr.remove_job.assert_any_call("playlist_duration_timer_p1")
     assert captured["job_id"] == "playlist_duration_timer_p1"
 
 

@@ -1,6 +1,9 @@
+<!-- 主布局：侧边栏筛选菜单 + 标签页内容 -->
 <template>
   <ion-page>
+    <!-- 已登录：展示完整界面 -->
     <div v-if="bLogin">
+      <!-- 侧边筛选菜单 -->
       <ion-menu content-id="main-content" @ionDidClose="onMenuClose" :swipe-gesture="false">
         <ion-header>
           <ion-toolbar color="light">
@@ -11,20 +14,24 @@
           </ion-toolbar>
         </ion-header>
         <ion-content>
+          <!-- 用户信息卡片：头像、昵称、积分 -->
           <ion-item lines="none" @click="rewardLbClk" detail="true">
             <ion-avatar slot="start" class="ml-0 w-8 h-8">
               <ion-img :src="curUser.icon" />
             </ion-avatar>
             <ion-label class="font-bold ml-3">{{ curUser.name }}</ion-label>
+            <!-- 积分显示 -->
             <Icon icon="mdi:star" class="text-red-500 w-5 h-5" />
             <div class="text-left pl-1 font-bold w-12">
               {{ curUser?.score ?? 0 }}
             </div>
           </ion-item>
+          <!-- 筛选条件：项目 / 分组 / 优先级 -->
           <ion-accordion-group
             :multiple="true"
             :value="['project', 'group', 'priority']"
             mode="ios">
+            <!-- 按项目筛选 -->
             <ion-accordion value="project">
               <ion-item slot="header" color="light" class="schedule-group-item">
                 <ion-icon :icon="bookmarksOutline" class="w-5"></ion-icon>
@@ -297,16 +304,18 @@ import _ from "lodash";
 import { inject, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
+// ===== 路由与全局状态 =====
 const router = useRouter();
 
-const bLogin = ref(false);
-const userList = ref<any[]>([]);
-const errMsg = ref("");
+// ===== 响应式状态 =====
+const bLogin = ref(false);                // 是否已登录
+const userList = ref<any[]>([]);          // 用户列表
+const errMsg = ref("");                   // 登录错误提示
 const userData = ref<UserData>();
-const curUser = ref(new User());
+const curUser = ref(new User());          // 当前选中用户
 curUser.value.name = "点击选择用户";
 const userPopover = ref<any>(null);
-const textPwd = ref("");
+const textPwd = ref("");                  // 密码输入
 const bOpenRewardPop = ref({
   open: false,
   value: "0",

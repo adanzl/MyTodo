@@ -32,13 +32,17 @@ def app():
 
 
 @pytest.fixture(scope='function')
-def db_mgr(app):
+def db_mgr(monkeypatch, app):
     db_manager._initialized = False
     if 'sqlalchemy' in app.extensions:
         with app.app_context():
             db_obj.engine.dispose()
         del app.extensions['sqlalchemy']
 
+    monkeypatch.setattr('core.db.db_mgr.DB_NAME', 'test_data.db')
+    import os
+    if os.path.exists('test_data.db'):
+        os.remove('test_data.db')
     db_manager.init(app)
 
     with app.app_context():
@@ -223,5 +227,5 @@ def test_get_data_idx_not_found(db_mgr):
 def test_add_score_user_not_found(db_mgr):
     with db_mgr.app.app_context():
         result = db_mgr.add_score(user_id=999, value=10, action='test', msg='test')
-        assert result['code'] == -1
+        assert result['code'] == -2
         assert '用户不存在' in result['msg']
