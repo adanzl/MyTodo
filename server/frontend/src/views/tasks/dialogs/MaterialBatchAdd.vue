@@ -13,9 +13,9 @@
           <div>
             <label class="block text-sm font-medium mb-2">类型</label>
             <el-radio-group v-model="defaultType">
-              <el-radio label="0">PDF</el-radio>
-              <el-radio label="1">视频</el-radio>
-              <el-radio label="3">目录</el-radio>
+              <el-radio :value="0">PDF</el-radio>
+              <el-radio :value="1">视频</el-radio>
+              <el-radio :value="3">目录</el-radio>
             </el-radio-group>
           </div>
         </div>
@@ -103,7 +103,7 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import { Folder } from "@element-plus/icons-vue";
 import { addMaterial, addMaterialCategory } from "@/api/api-task";
 import { listDirectory, type DirectoryItem } from "@/api/api-file";
-import { sortByName, sortMaterials } from "@/utils/file";
+import { sortMaterials, buildCategoryTree, CATEGORY_CASCADER_PROPS } from "@/utils/file";
 import FileDialog from "@/views/dialogs/FileDialog.vue";
 
 interface Props {
@@ -145,60 +145,10 @@ const tableHeight = ref<number>(400); // 表格高度
 
 // Cascader 配置
 const cascaderValue = ref<number | null>(null);
-const cascaderProps = {
-  value: 'id',
-  label: 'name',
-  children: 'children',
-  checkStrictly: true,
-  emitPath: false
-};
-
-// 构建树形结构
-const buildCascaderOptions = (categories: { id: number; name: string; parent?: number }[]) => {
-  const map = new Map<number, any>();
-  const roots: any[] = [];
-
-  categories.forEach(item => {
-    map.set(item.id, { ...item, children: [] });
-  });
-
-  categories.forEach(item => {
-    const node = map.get(item.id);
-    if (node) {
-      const parentId = item.parent ?? -1;
-      if (parentId === -1) {
-        roots.push(node);
-      } else {
-        const parent = map.get(parentId);
-        if (parent) {
-          if (!parent.children) {
-            parent.children = [];
-          }
-          parent.children.push(node);
-        }
-      }
-    }
-  });
-
-  // 递归排序：英文/数字在前，中文在后
-  const sortNodes = (nodes: any[]) => {
-    sortByName(nodes);
-    nodes.forEach(node => {
-      if (node.children && node.children.length > 0) {
-        sortNodes(node.children);
-      }
-    });
-  };
-
-  sortNodes(roots);
-
-  return roots;
-};
+const cascaderProps = CATEGORY_CASCADER_PROPS;
 
 // 计算级联选项
-const cascaderOptions = computed(() => {
-  return buildCascaderOptions(props.categoryList || []);
-});
+const cascaderOptions = computed(() => buildCategoryTree(props.categoryList || []));
 
 // 获取目录名称
 const getCategoryName = (cateId: number): string => {

@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="visible" title="快速添加素材" width="1000px" align-center @close="handleClose">
+  <el-dialog v-model="visible" title="快速添加素材" width="1200px" align-center @close="handleClose">
     <div class="flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
       <!-- 分配配置区 -->
       <div class="allocation-section border rounded p-4">
@@ -8,13 +8,13 @@
           <el-row>
             <el-col :span="6">
               <el-form-item label="开始天数">
-                <el-input-number v-model="startDay" :min="1" :max="formData.duration || 1" :step="1" size="small"
+                <el-input-number v-model="startDay" :min="1" :max="endDay" :step="1" size="small"
                   class="w-full" />
               </el-form-item>
             </el-col>
             <el-col :span="6">
               <el-form-item label="结束天数">
-                <el-input-number v-model="endDay" :min="startDay" :max="formData.duration || 1" :step="1" size="small"
+                <el-input-number v-model="endDay" :min="startDay" :max="365" :step="1" size="small"
                   class="w-full" />
               </el-form-item>
             </el-col>
@@ -97,9 +97,12 @@ import { ref, watch, computed, nextTick } from "vue";
 import { ElMessage } from "element-plus";
 import { Check } from "@element-plus/icons-vue";
 import { getMaterialList, getMaterialCategoryList, type Material, type MaterialCategory, type Task } from "@/api/api-task";
-import { sortByName } from "@/utils/file";
+import { sortByName, buildCategoryTree } from "@/utils/file";
 
 // ==================== 类型定义 ====================
+type TaskMaterialItem = { id: number; name: string; type: number };
+type DailyMaterialMap = Record<number, TaskMaterialItem[]>;
+
 interface Props {
   modelValue: boolean;
   formData: Partial<Task>;
@@ -107,7 +110,7 @@ interface Props {
 
 interface Emits {
   (e: "update:modelValue", value: boolean): void;
-  (e: "allocated", materials: Array<{ id: number; name: string; type: number }>, startDay: number, endDay: number, allocationType: number): void;
+  (e: "allocated", dailyUpdates: DailyMaterialMap, endDay: number): void;
 }
 
 // ==================== Props & Emits ====================
@@ -156,44 +159,9 @@ const getMaterialTypeName = (type: number) => {
 };
 
 /**
- * 构建树形结构
- */
-const buildCascaderOptions = (categories: MaterialCategory[]) => {
-  const map = new Map<number, any>();
-  const roots: any[] = [];
-
-  categories.forEach(item => {
-    map.set(item.id, { ...item, children: [] });
-  });
-
-  categories.forEach(item => {
-    const node = map.get(item.id);
-    if (node) {
-      const parentId = item.parent ?? -1;
-      if (parentId === -1) {
-        roots.push(node);
-      } else {
-        const parent = map.get(parentId);
-        if (parent) {
-          if (!parent.children) {
-            parent.children = [];
-          }
-          parent.children.push(node);
-        }
-      }
-    }
-  });
-
-  return roots;
-};
-
-// ==================== 计算属性 ====================
-/**
  * 计算级联选项
  */
-const cascaderOptions = computed(() => {
-  return buildCascaderOptions(categoryList.value);
-});
+const cascaderOptions = computed(() => buildCategoryTree(categoryList.value));
 
 /**
  * 获取某类别已选中的素材数量（带缓存）
@@ -379,6 +347,93 @@ const handleRowClick = (row: Material) => {
   }
 };
 
+const ensureDay = (result: DailyMaterialMap, internalDay: number): TaskMaterialItem[] => {
+  if (!result[internalDay]) {
+    result[internalDay] = [];
+  }
+  return result[internalDay];
+};
+
+const addMaterialToDay = (result: DailyMaterialMap, internalDay: number, material: TaskMaterialItem) => {
+  const dayList = ensureDay(result, internalDay);
+  if (!dayList.some((m) => m.id === material.id)) {
+    dayList.push(material);
+  }
+};
+
+const allocateEvenly = (
+  materials: TaskMaterialItem[],
+  start: number,
+  end: number,
+  useBatch: boolean,
+  perDay: number
+): DailyMaterialMap => {
+  const result: DailyMaterialMap = {};
+  const totalDays = end - start + 1;
+  let materialIndex = 0;
+
+  if (useBatch && perDay > 1) {
+    const fillDays = Math.min(totalDays, Math.floor(materials.length / perDay));
+    for (let d = 0; d < fillDays; d++) {
+      const internalDay = start + d - 1;
+      for (let i = 0; i < perDay && materialIndex < materials.length; i++) {
+        addMaterialToDay(result, internalDay, materials[materialIndex++]);
+      }
+    }
+    return result;
+  }
+
+  const materialsPerDay = Math.floor(materials.length / totalDays);
+  const remaining = materials.length % totalDays;
+
+  for (let day = start; day <= end; day++) {
+    const internalDay = day - 1;
+    const countForThisDay = materialsPerDay + (day - start < remaining ? 1 : 0);
+    for (let i = 0; i < countForThisDay && materialIndex < materials.length; i++) {
+      addMaterialToDay(result, internalDay, materials[materialIndex++]);
+    }
+  }
+  return result;
+};
+
+const allocateCircularly = (materials: TaskMaterialItem[], start: number, end: number): DailyMaterialMap => {
+  const result: DailyMaterialMap = {};
+  const totalDays = end - start + 1;
+  for (let i = 0; i < materials.length; i++) {
+    addMaterialToDay(result, start + (i % totalDays) - 1, materials[i]);
+  }
+  return result;
+};
+
+const allocateToAllDays = (materials: TaskMaterialItem[], start: number, end: number): DailyMaterialMap => {
+  const result: DailyMaterialMap = {};
+  for (let day = start; day <= end; day++) {
+    const internalDay = day - 1;
+    materials.forEach((material) => addMaterialToDay(result, internalDay, material));
+  }
+  return result;
+};
+
+const computeDailyAllocation = (
+  materials: TaskMaterialItem[],
+  start: number,
+  end: number,
+  allocationType: number,
+  useBatch: boolean,
+  perDay: number
+): DailyMaterialMap => {
+  switch (allocationType) {
+    case 0:
+      return allocateEvenly(materials, start, end, useBatch, perDay);
+    case 1:
+      return allocateCircularly(materials, start, end);
+    case 2:
+      return allocateToAllDays(materials, start, end);
+    default:
+      return {};
+  }
+};
+
 /**
  * 执行分配
  */
@@ -393,65 +448,40 @@ const allocateMaterials = () => {
     return;
   }
 
-  // 根据 useBatchSize、batchSize 和 allocationType 对素材进行分组处理
-  let processedMaterials: Array<{ id: number; name: string; type: number }> = [];
+  const materials: TaskMaterialItem[] = selectedMaterials.value.map((m) => ({
+    id: m.id!,
+    name: m.name,
+    type: m.type,
+  }));
 
-  if (!useBatchSize.value || batchSize.value === 1) {
-    // 未启用基数或基数为1，直接传递所有素材
-    processedMaterials = selectedMaterials.value.map(m => ({
-      id: m.id!,
-      name: m.name,
-      type: m.type
-    }));
-  } else if (allocationType.value === 0) {
-    // 启用基数且为平均分配：强制每天分配 batchSize 个素材
+  // 平均分配且素材充足时，只使用所需数量
+  let materialsToAllocate = materials;
+  if (
+    useBatchSize.value &&
+    batchSize.value > 1 &&
+    allocationType.value === 0
+  ) {
     const totalDays = endDay.value - startDay.value + 1;
     const requiredMaterials = totalDays * batchSize.value;
-
-    if (selectedMaterials.value.length >= requiredMaterials) {
-      // 素材充足：只取需要的数量，舍弃多余的
-      const materialsToUse = selectedMaterials.value.slice(0, requiredMaterials);
-      processedMaterials = materialsToUse.map(m => ({
-        id: m.id!,
-        name: m.name,
-        type: m.type
-      }));
-    } else {
-      // 素材不足：只取可用的素材
-      processedMaterials = selectedMaterials.value.map(m => ({
-        id: m.id!,
-        name: m.name,
-        type: m.type
-      }));
-    }
-  } else {
-    // 其他分配方式：按批次复制素材
-    const batches = Math.ceil(selectedMaterials.value.length / batchSize.value);
-    for (let i = 0; i < batches; i++) {
-      const start = i * batchSize.value;
-      const end = Math.min(start + batchSize.value, selectedMaterials.value.length);
-      const batch = selectedMaterials.value.slice(start, end);
-
-      // 将这批素材添加到结果中
-      batch.forEach(m => {
-        processedMaterials.push({
-          id: m.id!,
-          name: m.name,
-          type: m.type
-        });
-      });
+    if (materials.length >= requiredMaterials) {
+      materialsToAllocate = materials.slice(0, requiredMaterials);
     }
   }
 
-  // 触发分配事件
-  emit("allocated",
-    processedMaterials,
+  const dailyUpdates = computeDailyAllocation(
+    materialsToAllocate,
     startDay.value,
     endDay.value,
-    allocationType.value
+    allocationType.value,
+    useBatchSize.value,
+    batchSize.value
   );
 
-  ElMessage.success("素材分配成功");
+  const filledDays = Object.keys(dailyUpdates).length;
+  const allocatedCount = Object.values(dailyUpdates).reduce((sum, list) => sum + list.length, 0);
+  emit("allocated", dailyUpdates, endDay.value);
+
+  ElMessage.success(`素材分配成功，共 ${allocatedCount} 个素材分配到 ${filledDays} 天`);
   handleClose();
 };
 

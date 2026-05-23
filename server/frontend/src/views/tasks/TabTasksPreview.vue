@@ -5,12 +5,8 @@
             <!-- 用户筛选 -->
             <div class="mb-4 flex items-center gap-2">
                 <el-radio-group v-model="selectedUserId" @change="handleUserChange">
-                    <el-radio value="3">
-                        <span>灿灿</span>
-                    </el-radio>
-                    <el-radio value="4">
-                        <span>昭昭</span>
-                    </el-radio>
+                    <el-radio :value="3">灿灿</el-radio>
+                    <el-radio :value="4">昭昭</el-radio>
                 </el-radio-group>
             </div>
 
@@ -41,35 +37,33 @@
             <div v-else class="space-y-4">
                 <!-- 所有素材网格 -->
                 <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                    <template v-for="task in displayTasks" :key="task.id">
-                        <div v-for="material in getTaskMaterialList(task)" :key="`${task.id}_${material.id}`"
+                    <div v-for="item in displayMaterials" :key="`${item.task.id}_${item.material.id}`"
                             class="relative flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow-md cursor-pointer hover:shadow-2xl transition-shadow"
-                            @click="openMaterialPlayer(task, material)">
+                            @click="openMaterialPlayer(item.task, item.material)">
                             <!-- 任务名称角标 -->
                             <div
                                 class="absolute top-2 left-3 text-xs text-gray-500 max-w-[90%] flex gap-2 items-center min-w-0 w-full">
-                                <el-tag :type="isMaterialCompleted(task, material, currentDate) ? 'success' : 'info'"
-                                    :effect="isMaterialCompleted(task, material, currentDate) ? 'dark' : 'plain'"
+                                <el-tag :type="item.completed ? 'success' : 'info'"
+                                    :effect="item.completed ? 'dark' : 'plain'"
                                     size="small" class="shrink-0">
-                                    {{ isMaterialCompleted(task, material, currentDate) ? '已完成' : '未完成' }}
+                                    {{ item.completed ? '已完成' : '未完成' }}
                                 </el-tag>
-                                <span class="truncate flex-1 min-w-0">{{ task.name }}</span>
-                                <span class="shrink-0">{{ task.priority }}</span>
+                                <span class="truncate flex-1 min-w-0">{{ item.task.name }}</span>
+                                <span class="shrink-0">{{ item.task.priority }}</span>
                             </div>
 
                             <el-icon :size="40" color="#409EFF" class="mb-1 mt-6">
-                                <Document v-if="material.type == 0"/>
-                                <VideoPlay v-else-if="material.type == 1"/>
+                                <Document v-if="item.material.type == 0"/>
+                                <VideoPlay v-else-if="item.material.type == 1"/>
                             </el-icon>
-                            <div class="text-sm font-medium text-center line-clamp-2 mb-1">{{ material.name }}</div>
-                            <div v-if="task.lock" class="mt-2">
+                            <div class="text-sm font-medium text-center line-clamp-2 mb-1">{{ item.material.name }}</div>
+                            <div v-if="item.task.lock" class="mt-2">
                                 <el-icon :size="24" class="text-gray-500">
                                     <Lock />
                                 </el-icon>
                             </div>
                             <div v-else class="text-[10px] flex items-center mt-2">点击阅读</div>
                         </div>
-                    </template>
                 </div>
             </div>
         </div>
@@ -99,7 +93,7 @@ const materialMap = ref<Map<number, MaterialItem>>(new Map());
 const startDate = ref(new Date());
 const currentDate = ref(new Date());
 const totalCount = ref(0);
-const selectedUserId = ref('3');
+const selectedUserId = ref(3);
 
 // 播放弹窗状态
 const showPlayerDialog = ref(false);
@@ -114,20 +108,8 @@ const currentDateStr = computed(() => {
   return currentDate.value.toISOString().split('T')[0];
 });
 
-// 显示的任务列表（按优先级排序）
-const displayTasks = computed(() => {
-  return [...taskList.value].sort((a, b) => {
-    // 优先级数值越小，优先级越高
-    const priorityA = a.priority || 999;
-    const priorityB = b.priority || 999;
-    return priorityA - priorityB;
-  });
-});
-
 // 检查是否有可显示的素材
-const hasDisplayableMaterials = computed(() => {
-  return taskList.value.some(task => getTaskMaterialList(task).length > 0);
-});
+const hasDisplayableMaterials = computed(() => displayMaterials.value.length > 0);
 
 // 获取任务当天的素材存档列表（从 task.data 中直接获取）
 const getTaskMaterialSaveList = (task: Task): any[] => {
@@ -196,6 +178,24 @@ const isMaterialCompleted = (task: Task, material: MaterialItem, date: Date) => 
     return false;
   }
 };
+
+// 显示的素材列表（未完成优先，其次按任务优先级排序）
+const displayMaterials = computed(() => {
+  const items = taskList.value.flatMap(task =>
+    getTaskMaterialList(task).map(material => ({
+      task,
+      material,
+      completed: isMaterialCompleted(task, material, currentDate.value),
+      priority: task.priority || 999,
+    }))
+  );
+  return items.sort((a, b) => {
+    if (a.completed !== b.completed) {
+      return a.completed ? 1 : -1;
+    }
+    return a.priority - b.priority;
+  });
+});
 
 // 打开素材播放器
 const openMaterialPlayer = async (task: Task, material: MaterialItem) => {

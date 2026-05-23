@@ -4,39 +4,92 @@
 import { api } from "@/api/config";
 import type { FileItem, NormalizedFile } from "@/types/tools";
 
+const NAME_COLLATOR = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
+
+function compareByName(a: string, b: string): number {
+  return NAME_COLLATOR.compare(a, b);
+}
+
 /**
  * 通用排序函数：按名称自然排序（英文/数字在前，中文在后）
- * @param items - 待排序的数组
- * @param getName - 获取名称的函数，默认为 item.name
- * @returns 排序后的数组（原地排序）
  */
 export function sortByName<T extends { name: string }>(items: T[]): T[] {
-  return items.sort((a, b) =>
-    a.name.localeCompare(b.name, 'en', { numeric: true, sensitivity: 'base' })
-  );
+  return items.sort((a, b) => compareByName(a.name, b.name));
+}
+
+export type CategoryItem = { id: number; name: string; parent?: number };
+export type CategoryTreeNode<T extends CategoryItem = CategoryItem> = T & {
+  children: CategoryTreeNode<T>[];
+};
+
+/** el-cascader 目录选择器通用配置 */
+export const CATEGORY_CASCADER_PROPS = {
+  value: 'id',
+  label: 'name',
+  children: 'children',
+  checkStrictly: true,
+  emitPath: false,
+} as const;
+
+/**
+ * 递归按名称自然排序树节点
+ */
+export function sortTreeByName<T extends { name: string; children?: T[] }>(nodes: T[]): T[] {
+  sortByName(nodes);
+  for (const node of nodes) {
+    if (node.children?.length) {
+      sortTreeByName(node.children);
+    }
+  }
+  return nodes;
+}
+
+/**
+ * 将扁平目录列表构建为已排序的树形结构
+ */
+export function buildCategoryTree<T extends CategoryItem>(categories: T[]): CategoryTreeNode<T>[] {
+  const map = new Map<number, CategoryTreeNode<T>>();
+  const roots: CategoryTreeNode<T>[] = [];
+
+  for (const item of categories) {
+    if (item.id == null) continue;
+    map.set(item.id, { ...item, children: [] });
+  }
+
+  for (const item of categories) {
+    if (item.id == null) continue;
+
+    const node = map.get(item.id);
+    if (!node) continue;
+
+    const parentId = item.parent ?? -1;
+    if (parentId === -1 || !map.has(parentId)) {
+      roots.push(node);
+      continue;
+    }
+
+    map.get(parentId)!.children.push(node);
+  }
+
+  return sortTreeByName(roots);
 }
 
 /**
  * 素材列表排序：先目录后文件，再按名称自然排序
- * @param items - 待排序的素材数组
- * @param isFolderFn - 判断是否为目录的函数，默认为 item.type === 'folder' 或 item.isFolder
- * @returns 排序后的数组（原地排序）
  */
 export function sortMaterials<T extends { name: string; type?: string | number; isFolder?: boolean }>(
   items: T[],
   isFolderFn?: (item: T) => boolean
 ): T[] {
-  const isFolder = isFolderFn || ((item) => item.type === 'folder' || item.isFolder === true);
+  const isFolder = isFolderFn ?? ((item) => item.type === 'folder' || item.isFolder === true);
 
   return items.sort((a, b) => {
-    // 先按类型排序：目录排在前面
     const aIsFolder = isFolder(a);
     const bIsFolder = isFolder(b);
-    if (aIsFolder && !bIsFolder) return -1;
-    if (!aIsFolder && bIsFolder) return 1;
-
-    // 同类型按名称排序：使用 'en' locale 实现英文/数字在前
-    return a.name.localeCompare(b.name, 'en', { numeric: true, sensitivity: 'base' });
+    if (aIsFolder !== bIsFolder) {
+      return aIsFolder ? -1 : 1;
+    }
+    return compareByName(a.name, b.name);
   });
 }
 

@@ -5,7 +5,7 @@
       <div class="flex flex-1 items-center gap-4">
         <el-button type="primary" plain size="small" @click="fetchHistoryList" :icon="Refresh"/>
         <el-radio-group v-model="filterUserId" @change="handleFilterChange">
-          <el-radio :value="undefined">全部</el-radio>
+          <el-radio :value="0">全部</el-radio>
           <el-radio :value="3">灿灿</el-radio>
           <el-radio :value="4">昭昭</el-radio>
         </el-radio-group>
@@ -103,8 +103,8 @@ const totalCount = ref(0);
 const pageNum = ref(1);
 const pageSize = ref(20);
 
-// 筛选条件
-const filterUserId = ref<number | undefined>(undefined);
+// 筛选条件（0 表示全部用户）
+const filterUserId = ref(0);
 const filterTaskId = ref<number | undefined>(undefined);
 const taskList = ref<Task[]>([]);
 const materialMap = ref<Map<number, { name: string; type: number }>>(new Map());
@@ -125,8 +125,9 @@ const fetchTaskList = async () => {
 const fetchHistoryList = async () => {
   loading.value = true;
   try {
+    const userId = filterUserId.value === 0 ? undefined : filterUserId.value;
     const res = await getTaskHistoryList(
-      filterUserId.value,
+      userId,
       filterTaskId.value,
       pageNum.value,
       pageSize.value

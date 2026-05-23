@@ -136,7 +136,7 @@ import {
   type Material,
   type MaterialCategory,
 } from "@/api/api-task";
-import { sortMaterials } from "@/utils/file";
+import { sortMaterials, buildCategoryTree } from "@/utils/file";
 import MaterialDialog from "./dialogs/MaterialDialog.vue";
 import MaterialDetailDialog from "./dialogs/MaterialDetailDialog.vue";
 import MaterialPreviewDialog from "./dialogs/MaterialPreviewDialog.vue";
@@ -211,40 +211,6 @@ const fetchCategoryList = async () => {
     console.error("获取目录列表失败:", error);
   }
   return [];
-};
-
-// 构建目录树形结构
-const buildCategoryTree = (categories: MaterialCategory[]): any[] => {
-  const categoryMap = new Map<number, any>();
-  const tree: any[] = [];
-
-  // 先创建所有节点的映射
-  categories.forEach(cat => {
-    if (cat.id === undefined || cat.id === null) return;
-    categoryMap.set(cat.id, {
-      id: cat.id,
-      name: cat.name,
-      parent: cat.parent ?? -1,
-      children: []
-    });
-  });
-
-  // 构建树形结构
-  categoryMap.forEach(node => {
-    const parentId = node.parent ?? -1;
-    if (parentId === -1 || !categoryMap.has(parentId)) {
-      // 根节点
-      tree.push(node);
-    } else {
-      // 子节点
-      const parent = categoryMap.get(parentId);
-      if (parent) {
-        parent.children.push(node);
-      }
-    }
-  });
-
-  return tree;
 };
 
 // 获取当前目录下的内容（文件夹 + 素材）

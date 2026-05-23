@@ -41,7 +41,7 @@ import {
   updateMaterial,
   type Material,
 } from "@/api/api-task";
-import { sortByName } from "@/utils/file";
+import { buildCategoryTree, CATEGORY_CASCADER_PROPS } from "@/utils/file";
 import FileDialog from "@/views/dialogs/FileDialog.vue";
 
 interface Props {
@@ -76,62 +76,10 @@ const fileDialogVisible = ref(false);
 
 // Cascader 配置
 const cascaderValue = ref<number | null>(null);
-const cascaderProps = {
-  value: 'id',
-  label: 'name',
-  children: 'children',
-  checkStrictly: true, // 可以选择任意级别
-  emitPath: false // 只返回选中节点的ID
-};
-
-// 构建树形结构
-const buildCascaderOptions = (categories: { id: number; name: string; parent?: number }[]) => {
-  const map = new Map<number, any>();
-  const roots: any[] = [];
-
-  // 创建映射
-  categories.forEach(item => {
-    map.set(item.id, { ...item, children: [] });
-  });
-
-  // 构建树形结构
-  categories.forEach(item => {
-    const node = map.get(item.id);
-    if (node) {
-      const parentId = item.parent ?? -1;
-      if (parentId === -1) {
-        roots.push(node);
-      } else {
-        const parent = map.get(parentId);
-        if (parent) {
-          if (!parent.children) {
-            parent.children = [];
-          }
-          parent.children.push(node);
-        }
-      }
-    }
-  });
-
-  // 递归排序：英文/数字在前，中文在后
-  const sortNodes = (nodes: any[]) => {
-    sortByName(nodes);
-    nodes.forEach(node => {
-      if (node.children && node.children.length > 0) {
-        sortNodes(node.children);
-      }
-    });
-  };
-
-  sortNodes(roots);
-
-  return roots;
-};
+const cascaderProps = CATEGORY_CASCADER_PROPS;
 
 // 计算级联选项
-const cascaderOptions = computed(() => {
-  return buildCascaderOptions(props.categoryList || []);
-});
+const cascaderOptions = computed(() => buildCategoryTree(props.categoryList || []));
 
 // 监听 cascaderValue 变化，更新 formData.cate_id
 watch(cascaderValue, (val) => {
