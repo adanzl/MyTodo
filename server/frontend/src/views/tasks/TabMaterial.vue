@@ -136,6 +136,7 @@ import {
   type Material,
   type MaterialCategory,
 } from "@/api/api-task";
+import { sortMaterials } from "@/utils/file";
 import MaterialDialog from "./dialogs/MaterialDialog.vue";
 import MaterialDetailDialog from "./dialogs/MaterialDetailDialog.vue";
 import MaterialPreviewDialog from "./dialogs/MaterialPreviewDialog.vue";
@@ -298,6 +299,9 @@ const fetchCurrentList = async () => {
         data: m.data
       }))
     ];
+
+    // 排序：先目录后文件，名称自然排序
+    sortMaterials(mixedList);
 
     currentList.value = mixedList;
   } catch (error: any) {

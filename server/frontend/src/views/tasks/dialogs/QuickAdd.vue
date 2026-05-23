@@ -1,11 +1,5 @@
 <template>
-  <el-dialog
-    v-model="visible"
-    title="快速添加素材"
-    width="1000px"
-    align-center
-    @close="handleClose"
-  >
+  <el-dialog v-model="visible" title="快速添加素材" width="1000px" align-center @close="handleClose">
     <div class="flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
       <!-- 分配配置区 -->
       <div class="allocation-section border rounded p-4">
@@ -14,41 +8,22 @@
           <el-row>
             <el-col :span="6">
               <el-form-item label="开始天数">
-                <el-input-number
-                  v-model="startDay"
-                  :min="1"
-                  :max="formData.duration || 1"
-                  :step="1"
-                  size="small"
-                  class="w-full"
-                />
+                <el-input-number v-model="startDay" :min="1" :max="formData.duration || 1" :step="1" size="small"
+                  class="w-full" />
               </el-form-item>
             </el-col>
             <el-col :span="6">
               <el-form-item label="结束天数">
-                <el-input-number
-                  v-model="endDay"
-                  :min="startDay"
-                  :max="formData.duration || 1"
-                  :step="1"
-                  size="small"
-                  class="w-full"
-                />
+                <el-input-number v-model="endDay" :min="startDay" :max="formData.duration || 1" :step="1" size="small"
+                  class="w-full" />
               </el-form-item>
             </el-col>
             <el-col :span="12">
               <el-form-item label="分配基数">
                 <div class="flex items-center">
                   <el-checkbox v-model="useBatchSize" />
-                  <el-input-number
-                    v-model="batchSize"
-                    :min="1"
-                    :max="10"
-                    :step="1"
-                    size="small"
-                    class="w-25! ml-2"
-                    :disabled="!useBatchSize"
-                  />
+                  <el-input-number v-model="batchSize" :min="1" :max="10" :step="1" size="small" class="w-25! ml-2"
+                    :disabled="!useBatchSize" />
                   <span class="ml-2 text-gray-600 text-xs" v-if="useBatchSize">每次分配 {{ batchSize }} 个素材</span>
                 </div>
               </el-form-item>
@@ -65,7 +40,9 @@
             <div class="flex-1 text-gray-600">{{ descriptionText }}</div>
             <span class="mr-4 text-gray-600">已选中 {{ selectedMaterials.length }} 个素材</span>
             <el-button type="primary" @click="allocateMaterials" :disabled="selectedMaterials.length === 0">
-              <el-icon class="mr-1"><Check /></el-icon>
+              <el-icon class="mr-1">
+                <Check />
+              </el-icon>
               确认分配
             </el-button>
           </el-form-item>
@@ -79,8 +56,8 @@
           <div class="flex gap-4" style="height: 400px;">
             <!-- 左侧：类别选择 -->
             <div class="w-60 border rounded p-1 overflow-y-auto">
-              <el-tree :data="cascaderOptions" :props="treeProps" node-key="id"
-                @node-click="handleTreeSelect" highlight-current accordion :indent="6">
+              <el-tree :data="cascaderOptions" :props="treeProps" node-key="id" @node-click="handleTreeSelect"
+                highlight-current accordion :indent="6">
                 <template #default="{ node, data }">
                   <div class="flex items-center justify-between w-full pr-2">
                     <el-tooltip :content="node.label" placement="top" :disabled="node.label.length <= 10">
@@ -96,14 +73,8 @@
 
             <!-- 右侧：素材列表 -->
             <div class="flex-1 border rounded overflow-hidden">
-              <el-table
-                v-if="!materialLoading"
-                ref="materialTableRef"
-                :data="materialList"
-                @selection-change="handleMaterialSelectionChange"
-                @row-click="handleRowClick"
-                height="100%"
-              >
+              <el-table v-if="!materialLoading" ref="materialTableRef" :data="materialList"
+                @selection-change="handleMaterialSelectionChange" @row-click="handleRowClick" height="100%">
                 <el-table-column type="selection" width="40" />
                 <el-table-column prop="id" label="ID" width="60" />
                 <el-table-column prop="name" label="素材名称" min-width="220" />
@@ -126,6 +97,7 @@ import { ref, watch, computed, nextTick } from "vue";
 import { ElMessage } from "element-plus";
 import { Check } from "@element-plus/icons-vue";
 import { getMaterialList, getMaterialCategoryList, type Material, type MaterialCategory, type Task } from "@/api/api-task";
+import { sortByName } from "@/utils/file";
 
 // ==================== 类型定义 ====================
 interface Props {
@@ -317,7 +289,12 @@ const loadMaterialList = async () => {
   try {
     const res = await getMaterialList(selectedCategoryId.value, 1, 1000);
     if (res.code === 0 && res.data) {
-      materialList.value = res.data.data || [];
+      let materials = res.data.data || [];
+
+      // 排序：按名称自然排序
+      sortByName(materials);
+
+      materialList.value = materials;
 
       // 重新计算当前类别的选中数量缓存
       if (selectedCategoryId.value !== undefined) {

@@ -5,6 +5,42 @@ import { api } from "@/api/config";
 import type { FileItem, NormalizedFile } from "@/types/tools";
 
 /**
+ * 通用排序函数：按名称自然排序（英文/数字在前，中文在后）
+ * @param items - 待排序的数组
+ * @param getName - 获取名称的函数，默认为 item.name
+ * @returns 排序后的数组（原地排序）
+ */
+export function sortByName<T extends { name: string }>(items: T[]): T[] {
+  return items.sort((a, b) =>
+    a.name.localeCompare(b.name, 'en', { numeric: true, sensitivity: 'base' })
+  );
+}
+
+/**
+ * 素材列表排序：先目录后文件，再按名称自然排序
+ * @param items - 待排序的素材数组
+ * @param isFolderFn - 判断是否为目录的函数，默认为 item.type === 'folder' 或 item.isFolder
+ * @returns 排序后的数组（原地排序）
+ */
+export function sortMaterials<T extends { name: string; type?: string | number; isFolder?: boolean }>(
+  items: T[],
+  isFolderFn?: (item: T) => boolean
+): T[] {
+  const isFolder = isFolderFn || ((item) => item.type === 'folder' || item.isFolder === true);
+
+  return items.sort((a, b) => {
+    // 先按类型排序：目录排在前面
+    const aIsFolder = isFolder(a);
+    const bIsFolder = isFolder(b);
+    if (aIsFolder && !bIsFolder) return -1;
+    if (!aIsFolder && bIsFolder) return 1;
+
+    // 同类型按名称排序：使用 'en' locale 实现英文/数字在前
+    return a.name.localeCompare(b.name, 'en', { numeric: true, sensitivity: 'base' });
+  });
+}
+
+/**
  * 从文件项中提取文件名
  */
 export function getFileName(fileItem: FileItem | null | undefined): string {

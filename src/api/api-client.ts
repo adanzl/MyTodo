@@ -145,6 +145,9 @@ async function checkAddress(url: string, timeout = 500): Promise<boolean> {
       signal: ctrl.signal,
       cache: "no-store",
       mode: "no-cors", // 使用 no-cors 避免跨域问题
+      // 添加额外的选项以减少浏览器扩展的干扰
+      credentials: "omit", // 不发送凭据，减少扩展拦截的可能性
+      redirect: "follow", // 自动跟随重定向
     });
     clearTimeout(t);
     // no-cors 模式下，只要能连接成功（不抛异常）就认为可达

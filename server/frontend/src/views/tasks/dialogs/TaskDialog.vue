@@ -69,47 +69,21 @@
                   <!-- 灿灿日程 -->
                   <div class="flex items-center gap-1 w-[40%]">
                     <span class="w-10 text-sm text-gray-600">灿灿:</span>
-                    <el-select
-                      :disabled="!selectedUsers.includes(3)"
-                      v-model="preTodoCancan"
-                      multiple
-                      filterable
-                      clearable
-                      placeholder="请选择灿灿的前置日程"
-                      class="flex-1"
-                      collapse-tags
-                      collapse-tags-tooltip
-                      :max-collapse-tags="3"
-                    >
-                      <el-option
-                        v-for="todo in cancanTodos"
-                        :key="'cancan_' + todo.id"
-                        :label="todo.title"
-                        :value="todo.id"
-                      />
+                    <el-select :disabled="!selectedUsers.includes(3)" v-model="preTodoCancan" multiple filterable
+                      clearable placeholder="请选择灿灿的前置日程" class="flex-1" collapse-tags collapse-tags-tooltip
+                      :max-collapse-tags="3">
+                      <el-option v-for="todo in cancanTodos" :key="'cancan_' + todo.id" :label="todo.title"
+                        :value="todo.id" />
                     </el-select>
                   </div>
                   <!-- 昭昭日程 -->
                   <div class="flex items-center gap-1 w-[40%]">
                     <span class="w-10 text-sm text-gray-600">昭昭:</span>
-                    <el-select
-                      :disabled="!selectedUsers.includes(4)"
-                      v-model="preTodoZhaozhao"
-                      multiple
-                      filterable
-                      clearable
-                      placeholder="请选择昭昭的前置日程"
-                      class="flex-1"
-                      collapse-tags
-                      collapse-tags-tooltip
-                      :max-collapse-tags="3"
-                    >
-                      <el-option
-                        v-for="todo in zhaozhaoTodos"
-                        :key="'zhaozhao_' + todo.id"
-                        :label="todo.title"
-                        :value="todo.id"
-                      />
+                    <el-select :disabled="!selectedUsers.includes(4)" v-model="preTodoZhaozhao" multiple filterable
+                      clearable placeholder="请选择昭昭的前置日程" class="flex-1" collapse-tags collapse-tags-tooltip
+                      :max-collapse-tags="3">
+                      <el-option v-for="todo in zhaozhaoTodos" :key="'zhaozhao_' + todo.id" :label="todo.title"
+                        :value="todo.id" />
                     </el-select>
                   </div>
 
@@ -154,7 +128,8 @@
               class="p-3 cursor-pointer hover:bg-gray-100 transition-all duration-200"
               :class="{ 'bg-blue-50 border-l-4 border-blue-500': selectedDay === dayIndex }"
               @click="selectedDay = dayIndex">
-              <div class="font-medium">第{{ dayIndex + 1 }}天 <span class="text-[12px] ml-1">{{ getDayDate(dayIndex) }}</span></div>
+              <div class="font-medium">第{{ dayIndex + 1 }}天 <span class="text-[12px] ml-1">{{ getDayDate(dayIndex)
+                  }}</span></div>
               <div class="text-xs text-gray-500 mt-1 flex justify-between">
                 <div>{{ getDayMaterialCount(dayIndex) }} 个素材</div>
                 <div v-if="isToday(dayIndex)">今</div>
@@ -275,6 +250,7 @@ import { ElMessage } from "element-plus";
 import { Plus, WarningFilled } from "@element-plus/icons-vue";
 import { addTask, updateTask, getMaterialList, getMaterialCategoryList, type Task, type Material, type MaterialCategory } from "@/api/api-task";
 import { getTodoListByTime } from "@/api/api-todo";
+import { sortByName } from "@/utils/file";
 import dayjs from "dayjs";
 import QuickAdd from "./QuickAdd.vue";
 
@@ -666,7 +642,12 @@ const loadMaterialList = async () => {
   try {
     const res = await getMaterialList(selectedCategoryId.value, 1, 1000);
     if (res.code === 0 && res.data) {
-      materialList.value = res.data.data || [];
+      let materials = res.data.data || [];
+
+      // 排序：按名称自然排序
+      sortByName(materials);
+
+      materialList.value = materials;
 
       // 重新计算当前类别的选中数量缓存
       if (selectedCategoryId.value !== undefined) {

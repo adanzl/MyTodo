@@ -46,6 +46,8 @@ export async function checkLocalIpAvailable(): Promise<boolean> {
         method: "HEAD", // 使用HEAD方法更轻量
         signal: controller.signal,
         mode: "no-cors", // 避免CORS问题
+        credentials: "omit", // 不发送凭据，减少扩展拦截的可能性
+        redirect: "follow", // 自动跟随重定向
       });
       clearTimeout(timeoutId);
       return true;

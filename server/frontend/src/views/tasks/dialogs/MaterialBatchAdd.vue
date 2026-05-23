@@ -13,9 +13,9 @@
           <div>
             <label class="block text-sm font-medium mb-2">类型</label>
             <el-radio-group v-model="defaultType">
-              <el-radio :value="0">PDF</el-radio>
-              <el-radio :value="1">视频</el-radio>
-              <el-radio :value="3">目录</el-radio>
+              <el-radio label="0">PDF</el-radio>
+              <el-radio label="1">视频</el-radio>
+              <el-radio label="3">目录</el-radio>
             </el-radio-group>
           </div>
         </div>
@@ -103,6 +103,7 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import { Folder } from "@element-plus/icons-vue";
 import { addMaterial, addMaterialCategory } from "@/api/api-task";
 import { listDirectory, type DirectoryItem } from "@/api/api-file";
+import { sortByName, sortMaterials } from "@/utils/file";
 import FileDialog from "@/views/dialogs/FileDialog.vue";
 
 interface Props {
@@ -178,6 +179,18 @@ const buildCascaderOptions = (categories: { id: number; name: string; parent?: n
       }
     }
   });
+
+  // 递归排序：英文/数字在前，中文在后
+  const sortNodes = (nodes: any[]) => {
+    sortByName(nodes);
+    nodes.forEach(node => {
+      if (node.children && node.children.length > 0) {
+        sortNodes(node.children);
+      }
+    });
+  };
+
+  sortNodes(roots);
 
   return roots;
 };
@@ -294,6 +307,9 @@ const handleDirectoryConfirm = async (dirPaths: string[]) => {
     // 添加到素材列表
     materialList.value.push(...scannedItems);
 
+    // 排序：先目录后文件，名称自然排序
+    sortMaterials(materialList.value);
+
     ElMessage.success(`已扫描 ${countFiles(scannedItems)} 个文件`);
     directoryDialogVisible.value = false;
   } catch (error: any) {
@@ -394,6 +410,9 @@ const handleFileConfirm = (filePaths: string[]) => {
   });
 
   if (addedCount > 0) {
+    // 排序：先目录后文件，名称自然排序
+    sortMaterials(materialList.value);
+
     ElMessage.success(`已添加 ${addedCount} 个文件${skippedCount > 0 ? `，跳过 ${skippedCount} 个不支持的文件` : ''}`);
   } else {
     ElMessage.warning('没有可添加的文件（仅支持 PDF 和视频文件）');

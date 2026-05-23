@@ -41,6 +41,7 @@ import {
   updateMaterial,
   type Material,
 } from "@/api/api-task";
+import { sortByName } from "@/utils/file";
 import FileDialog from "@/views/dialogs/FileDialog.vue";
 
 interface Props {
@@ -111,6 +112,18 @@ const buildCascaderOptions = (categories: { id: number; name: string; parent?: n
       }
     }
   });
+
+  // 递归排序：英文/数字在前，中文在后
+  const sortNodes = (nodes: any[]) => {
+    sortByName(nodes);
+    nodes.forEach(node => {
+      if (node.children && node.children.length > 0) {
+        sortNodes(node.children);
+      }
+    });
+  };
+
+  sortNodes(roots);
 
   return roots;
 };

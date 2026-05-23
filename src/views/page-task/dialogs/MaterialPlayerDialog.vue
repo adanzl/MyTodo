@@ -1,19 +1,18 @@
 <template>
-  <ion-modal :is-open="isOpen" @did-dismiss="handleDismiss" :presenting-element="$parent.$el"
-  class="[--width:100%] [--height:100%] [--border-radius:0] [--box-shadow:none]"
+  <ion-modal
+    :is-open="isOpen"
+    @did-dismiss="handleDismiss"
+    class="[--width:100%] [--height:100%] [--border-radius:0] [--box-shadow:none]"
   >
-    <ion-header>
-      <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-button @click="handleDismiss">
-            <ion-icon :icon="closeOutline" />
-          </ion-button>
-        </ion-buttons>
-        <ion-title>{{ material?.name }}</ion-title>
-      </ion-toolbar>
-    </ion-header>
-
-    <ion-content class="p-0">
+    <ion-content class="p-0" fullscreen>
+      <!-- 浮动关闭按钮 -->
+      <div class="absolute top-4 left-4 z-50 flex items-start gap-5 max-w-[calc(100%-2rem)]">
+        <ion-button @click="handleDismiss" fill="clear" color="light" class="bg-gray-500 rounded-full shrink-0">
+          <ion-icon :icon="closeOutline" />
+        </ion-button>
+        <span v-if="!isLandscape" class="text-gray-500 text-lg font-bold truncate">{{ material?.name }}</span>
+      </div>
+      
       <!-- 全屏加载遮罩 -->
       <div v-if="submitting" class="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
         <ion-spinner name="crescent" class="text-white text-6xl"></ion-spinner>
@@ -63,7 +62,8 @@
             </ion-button>
           </div>
           
-          <div class="flex-1 flex justify-end">
+          <div class="flex-1 flex justify-end items-center gap-2 min-w-0">
+            <span v-if="isLandscape" class="text-gray-500 text-sm font-bold truncate">{{ material?.name }}</span>
             <ion-button v-if="isAdmin || currentPage >= getLastPagePosition" color="success" :disabled="isMaterialCompleted || submitting" @click="completeReading">
               完成
             </ion-button>
@@ -101,7 +101,8 @@
             </ion-button>
           </div>
           
-          <div class="flex-1 flex justify-end">
+          <div class="flex-1 flex justify-end items-center gap-2 min-w-0">
+            <span v-if="isLandscape" class="text-gray-500 text-sm font-bold truncate">{{ material?.name }}</span>
             <ion-button color="success" :disabled="isMaterialCompleted || submitting" @click="completeReading">
               完成
             </ion-button>
@@ -244,11 +245,23 @@ const isMaterialCompleted = computed(() => {
     return false;
 });
 
-// 关闭弹窗
-const handleDismiss = async () => {
-    await stopUsageTracking();
-    stopAudio();
+// 关闭弹窗（先关 UI，统计上报放后台，避免等网络）
+const handleDismiss = () => {
+    if (!props.isOpen) return;
     emit('update:isOpen', false);
+    stopAudio();
+    void stopUsageTracking();
+    pauseVideo();
+};
+
+const pauseVideo = () => {
+    if (!videoRef.value) return;
+    try {
+        videoRef.value.pause();
+        isVideoPlaying.value = false;
+    } catch (e) {
+        console.warn('Error pausing video:', e);
+    }
 };
 
 
@@ -423,24 +436,27 @@ const startUsageTracking = () => {
 };
 
 // 停止使用统计追踪
-const stopUsageTracking = async (shouldReport: boolean = true) => {
+const stopUsageTracking = (shouldReport: boolean = true) => {
     if (!isTrackingActive && usageStartTime === 0) {
         return;
     }
-    
+
     if (usageTimer !== null) {
         clearInterval(usageTimer);
         usageTimer = null;
     }
-    
-    if (shouldReport && isTrackingActive && usageStartTime > 0) {
-        const now = Date.now();
-        const duration = Math.floor((now - usageStartTime) / 1000);
-        await reportUsage(duration);
-    }
-    
+
+    const capturedStartTime = usageStartTime;
+    const wasActive = isTrackingActive;
     isTrackingActive = false;
     usageStartTime = 0;
+
+    if (shouldReport && wasActive && capturedStartTime > 0) {
+        const duration = Math.floor((Date.now() - capturedStartTime) / 1000);
+        if (duration > 0) {
+            void reportUsage(duration, capturedStartTime, true);
+        }
+    }
 };
 
 // 上报使用记录并重置计时器
@@ -456,40 +472,43 @@ const reportUsageAndReset = async () => {
     usageStartTime = now;
 };
 
-// 上报使用记录
-const reportUsage = async (duration: number) => {
+// 上报使用记录（isFinalReport：关闭弹窗时的末次上报，不要求视频仍在播放）
+const reportUsage = async (duration: number, startTime?: number, isFinalReport = false) => {
     if (!props.material) return;
-    
+
     const userId = props.userId || globalVar?.user?.id;
     if (!userId) {
         console.warn('无法获取 userId，跳过上报');
         return;
     }
-    
-    if (props.material.type === 1 && !isVideoPlaying.value) {
+
+    if (!isFinalReport && props.material.type === 1 && !isVideoPlaying.value) {
         return;
     }
-    
+
     if (duration <= 0) return;
-    
+
+    const usageStart = startTime ?? usageStartTime;
+    if (!usageStart) return;
+
     let usageType = '';
     if (props.material.type === 0) {
         usageType = USAGE_TYPE_PDF;
     } else if (props.material.type === 1) {
         usageType = USAGE_TYPE_VIDEO;
     }
-    
+
     if (!usageType) return;
-    
+
     try {
         const usageData: AddUsageBody = {
             type: usageType,
-            start_time: new Date(usageStartTime).toISOString(),
+            start_time: new Date(usageStart).toISOString(),
             duration: duration,
             user_id: userId,
             out_key: props.material.id,
         };
-        
+
         await addUsage(usageData);
     } catch (error) {
         console.error('上报使用记录失败:', error);

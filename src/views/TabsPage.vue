@@ -436,7 +436,7 @@ async function btnLoginClick() {
   const pwdOk =
     curUser.value.pwd === null || curUser.value.pwd === CryptoJS.MD5(textPwd.value).toString();
   if (!pwdOk) {
-    errMsg.value = "密码错误";
+    errMsg.value = "密码错误 " + CryptoJS.MD5(textPwd.value).toString();
     return;
   }
   errMsg.value = "";
