@@ -54,21 +54,20 @@
       </div>
 
       <div v-else>
-        <div v-if="displayTasks.length === 0" class="text-center py-10 text-gray-500">
+        <div v-if="displayMaterials.length === 0" class="text-center py-10 text-gray-500">
           <p>暂无任务</p>
         </div>
 
         <div v-else class="space-y-4">
           <!-- 所有素材网格 -->
           <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            <template v-for="task in displayTasks" :key="task.id">
-              <div
-                v-for="material in getTaskMaterialList(task)"
-                :key="`${task.id}_${material.id}`"
-                class="relative flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow aspect-square cursor-pointer"
-                :class="{ 'opacity-90': task.lock }"
-                @click="handleMaterialClick(task, material)"
-              >
+            <div
+              v-for="{ task, material } in displayMaterials"
+              :key="`${task.id}_${material.id}`"
+              class="relative flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow aspect-square cursor-pointer"
+              :class="{ 'opacity-90': task.lock }"
+              @click="handleMaterialClick(task, material)"
+            >
                 <!-- 任务名称角标 -->
                 <div class="absolute top-2 left-3 text-xs text-gray-500 truncate max-w-[80%] flex gap-2 items-center">
                     <ion-icon
@@ -89,8 +88,7 @@
                   <ion-icon :icon="lockClosed" class="text-2xl text-gray-500"></ion-icon>
                 </div>
                 <div v-else class=" text-[10px] flex items-center"> 点击阅读</div>
-              </div>
-            </template>
+            </div>
           </div>
         </div>
       </div>
@@ -178,9 +176,29 @@ const isAdmin = computed(() => {
     return globalVar?.user?.admin === 1;
 });
 
-// 显示的任务列表（直接使用 API 返回的数据）
-const displayTasks = computed(() => {
-    return taskList.value;
+interface DisplayMaterialItem {
+    task: Task;
+    material: MaterialItem;
+}
+
+// 扁平化素材列表：未完成优先，其次按任务优先级（数字越小优先级越高）
+const displayMaterials = computed((): DisplayMaterialItem[] => {
+    const items: DisplayMaterialItem[] = [];
+    for (const task of taskList.value) {
+        for (const material of getTaskMaterialList(task)) {
+            items.push({ task, material });
+        }
+    }
+    return items.sort((a, b) => {
+        const completedA = isMaterialCompleted(a.task, a.material, currentDate.value);
+        const completedB = isMaterialCompleted(b.task, b.material, currentDate.value);
+        if (completedA !== completedB) {
+            return completedA ? 1 : -1;
+        }
+        const priorityA = a.task.priority ?? Number.MAX_SAFE_INTEGER;
+        const priorityB = b.task.priority ?? Number.MAX_SAFE_INTEGER;
+        return priorityA - priorityB;
+    });
 });
 
 // 获取任务当天的素材存档列表（从 task.data 中直接获取）
@@ -312,13 +330,7 @@ const fetchTaskList = async () => {
         const res = await getTaskList(userId, 1, 100, selectedDateStr, selectedDateStr);
 
         if (res.code === 0 && res.data) {
-            // 按优先级排序（数字越小优先级越高）
-            const tasks = res.data.data || [];
-            taskList.value = tasks.sort((a, b) => {
-                const priorityA = a.priority ?? Number.MAX_SAFE_INTEGER;
-                const priorityB = b.priority ?? Number.MAX_SAFE_INTEGER;
-                return priorityA - priorityB;
-            });
+            taskList.value = res.data.data || [];
             totalCount.value = res.data.totalCount || 0;
 
             // 收集所有素材 ID
