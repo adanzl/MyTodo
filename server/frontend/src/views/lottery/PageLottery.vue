@@ -33,6 +33,11 @@
       <el-tab-pane label="奖池维护" name="pool">
         <TabPool />
       </el-tab-pane>
+
+      <!-- 礼物记录页签 -->
+      <el-tab-pane label="礼物记录" name="history">
+        <TabLotteryHistory />
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -44,6 +49,7 @@ import { InfoFilled } from "@element-plus/icons-vue";
 import { getLotterySetting, setLotterySetting } from "@/api/api-lottery";
 import TabLottery from "./TabLottery.vue";
 import TabPool from "./TabPool.vue";
+import TabLotteryHistory from "./TabLotteryHistory.vue";
 
 // 主页签控制
 const activeMainTab = ref("lottery");
@@ -52,7 +58,8 @@ const activeMainTab = ref("lottery");
 const handleTabChange = (tabName: string) => {
   const eventMap: Record<string, string> = {
     'lottery': 'refresh-lottery-tab',
-    'pool': 'refresh-pool-tab'
+    'pool': 'refresh-pool-tab',
+    'history': 'refresh-lottery-history-tab',
   };
 
   const eventName = eventMap[tabName];

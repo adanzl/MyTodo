@@ -145,7 +145,7 @@
                 暂无素材，点击“添加素材”按钮添加
               </div>
               <div v-else class="space-y-2">
-                <div v-for="(material, index) in getAllMaterials()" :key="index"
+                <div v-for="(material, index) in getAllMaterials()" :key="material.id"
                   class="material-item p-3 border rounded flex items-center justify-between hover:bg-gray-50 transition-all duration-200">
                   <div class="flex-1">
                     <div class="font-medium">{{ material.name }}</div>
@@ -154,9 +154,19 @@
                       <div>ID：{{ material.id }}</div>
                     </div>
                   </div>
-                  <el-button size="small" type="danger" link @click="removeMaterialFromAll(index)">
-                    删除
-                  </el-button>
+                  <div class="flex items-center gap-1">
+                    <el-button size="small" type="primary" link @click="moveMaterialUp(0, index)"
+                      :disabled="index === 0">
+                      <el-icon :size="16"><ArrowUp /></el-icon>
+                    </el-button>
+                    <el-button size="small" type="primary" link @click="moveMaterialDown(0, index)"
+                      :disabled="index === getAllMaterials().length - 1">
+                      <el-icon :size="16"><ArrowDown /></el-icon>
+                    </el-button>
+                    <el-button size="small" type="danger" link @click="removeMaterialFromAll(index)">
+                      删除
+                    </el-button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -170,7 +180,7 @@
                   暂无素材，点击“添加素材”按钮添加
                 </div>
                 <div v-else class="space-y-2">
-                  <div v-for="(material, index) in getDayMaterials(selectedDay)" :key="index"
+                  <div v-for="(material, index) in getDayMaterials(selectedDay)" :key="material.id"
                     class="material-item p-3 border rounded flex items-center justify-between hover:bg-gray-50 transition-all duration-200">
                     <div class="flex-1">
                       <div class="font-medium">{{ material.name }}</div>
@@ -179,9 +189,19 @@
                         <div>ID：{{ material.id }}</div>
                       </div>
                     </div>
-                    <el-button size="small" type="danger" link @click="removeMaterial(selectedDay, index)">
-                      删除
-                    </el-button>
+                    <div class="flex items-center gap-1">
+                      <el-button size="small" type="primary" link @click="moveMaterialUp(selectedDay, index)"
+                        :disabled="index === 0">
+                        <el-icon :size="16"><ArrowUp /></el-icon>
+                      </el-button>
+                      <el-button size="small" type="primary" link @click="moveMaterialDown(selectedDay, index)"
+                        :disabled="index === getDayMaterials(selectedDay).length - 1">
+                        <el-icon :size="16"><ArrowDown /></el-icon>
+                      </el-button>
+                      <el-button size="small" type="danger" link @click="removeMaterial(selectedDay, index)">
+                        删除
+                      </el-button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -247,7 +267,7 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, computed, onMounted } from "vue";
 import { ElMessage } from "element-plus";
-import { Plus, WarningFilled } from "@element-plus/icons-vue";
+import { Plus, WarningFilled, ArrowUp, ArrowDown } from "@element-plus/icons-vue";
 import { addTask, updateTask, getMaterialList, getMaterialCategoryList, type Task, type Material, type MaterialCategory } from "@/api/api-task";
 import { getTodoListByTime } from "@/api/api-todo";
 import { sortByName, buildCategoryTree } from "@/utils/file";
@@ -518,6 +538,20 @@ const removeMaterial = (day: number, index: number) => {
   if (materials) {
     materials.splice(index, 1);
   }
+};
+
+// 向上移动素材
+const moveMaterialUp = (day: number, index: number) => {
+  const materials = dailyMaterials.value[day];
+  if (!materials || index <= 0) return;
+  [materials[index - 1], materials[index]] = [materials[index], materials[index - 1]];
+};
+
+// 向下移动素材
+const moveMaterialDown = (day: number, index: number) => {
+  const materials = dailyMaterials.value[day];
+  if (!materials || index >= materials.length - 1) return;
+  [materials[index], materials[index + 1]] = [materials[index + 1], materials[index]];
 };
 
 // 获取所有素材（持续任务用）

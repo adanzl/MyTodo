@@ -12,7 +12,18 @@
 import subprocess
 import os
 import sys
+import tempfile
 from datetime import datetime, timedelta
+
+
+def _ssh_control_path():
+    """SSH 复用连接的 ControlPath（仅 Unix/macOS 有效）。"""
+    return os.path.join(tempfile.gettempdir(), '.ssh_ctrl_%r@%h:%p')
+
+
+def _use_ssh_multiplexing():
+    """Windows OpenSSH 不支持 ControlMaster，会报 getsockname failed。"""
+    return sys.platform != 'win32'
 
 
 def download_single_file(remote_host, remote_path, local_path, file_desc):
@@ -98,42 +109,52 @@ def download_files_from_server():
     if not os.path.exists(logs_dir):
         os.makedirs(logs_dir, exist_ok=True)
 
-    # 使用 ControlMaster 复用 SSH 连接（跨平台兼容）
-    # 先建立主连接
-    control_path = os.path.join('/tmp', '.ssh_ctrl_%r@%h:%p')
-
-    print(f"\n建立 SSH 连接 ...")
-    try:
-        # 建立主控连接
-        master_cmd = [
-            'ssh', '-o', 'ControlMaster=yes', '-o', f'ControlPath={control_path}', '-o', 'ControlPersist=600',
-            remote_host, 'echo connected'
-        ]
-
-        result = subprocess.run(master_cmd, capture_output=True, text=True, timeout=30)
-
-        if result.returncode != 0:
-            print(f"✗ SSH 连接失败: {result.stderr}")
-            return 0, len(files_to_download)
-
-        print("✓ SSH 连接已建立\n")
-
-    except Exception as e:
-        print(f"✗ 建立 SSH 连接失败: {e}")
-        return 0, len(files_to_download)
-
-    # 使用复用的连接下载所有文件
     success_count = 0
     fail_count = 0
+    control_path = _ssh_control_path()
+
+    if _use_ssh_multiplexing():
+        print(f"\n建立 SSH 连接 ...")
+        try:
+            master_cmd = [
+                'ssh', '-o', 'ControlMaster=yes', '-o', f'ControlPath={control_path}',
+                '-o', 'ControlPersist=600', remote_host, 'echo connected'
+            ]
+            result = subprocess.run(master_cmd, capture_output=True, text=True, timeout=30)
+            if result.returncode != 0:
+                print(f"✗ SSH 连接失败: {result.stderr}")
+                return 0, len(files_to_download)
+            print("✓ SSH 连接已建立\n")
+        except Exception as e:
+            print(f"✗ 建立 SSH 连接失败: {e}")
+            return 0, len(files_to_download)
+    else:
+        print(f"\n测试 SSH 连接 ...")
+        try:
+            result = subprocess.run(
+                ['ssh', remote_host, 'echo connected'],
+                capture_output=True, text=True, timeout=30
+            )
+            if result.returncode != 0:
+                print(f"✗ SSH 连接失败: {result.stderr}")
+                return 0, len(files_to_download)
+            print("✓ SSH 连接正常\n")
+        except Exception as e:
+            print(f"✗ 建立 SSH 连接失败: {e}")
+            return 0, len(files_to_download)
 
     for file_info in files_to_download:
-        # 确保本地目录存在
         local_dir = os.path.dirname(file_info['local'])
         if local_dir and not os.path.exists(local_dir):
             os.makedirs(local_dir, exist_ok=True)
 
-        # 使用 ControlPath 复用连接
-        cmd = ['scp', '-o', f'ControlPath={control_path}', f'{remote_host}:{file_info["remote"]}', file_info['local']]
+        if _use_ssh_multiplexing():
+            cmd = [
+                'scp', '-o', f'ControlPath={control_path}',
+                f'{remote_host}:{file_info["remote"]}', file_info['local']
+            ]
+        else:
+            cmd = ['scp', f'{remote_host}:{file_info["remote"]}', file_info['local']]
 
         print(f"[{file_info['desc']}]")
         print(f"  远程: {file_info['remote']}")
@@ -141,7 +162,6 @@ def download_files_from_server():
 
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-
             if result.returncode == 0:
                 print(f"  ✓ 下载成功")
                 if os.path.exists(file_info['local']):
@@ -154,7 +174,6 @@ def download_files_from_server():
             else:
                 print(f"  ✗ 下载失败: {result.stderr.strip()}")
                 fail_count += 1
-
         except subprocess.TimeoutExpired:
             print(f"  ✗ 下载超时")
             fail_count += 1
@@ -162,12 +181,12 @@ def download_files_from_server():
             print(f"  ✗ 错误: {e}")
             fail_count += 1
 
-    # 关闭主控连接
-    try:
-        close_cmd = ['ssh', '-o', f'ControlPath={control_path}', '-O', 'exit', remote_host]
-        subprocess.run(close_cmd, capture_output=True, timeout=5)
-    except:
-        pass
+    if _use_ssh_multiplexing():
+        try:
+            close_cmd = ['ssh', '-o', f'ControlPath={control_path}', '-O', 'exit', remote_host]
+            subprocess.run(close_cmd, capture_output=True, timeout=5)
+        except Exception:
+            pass
 
     return success_count, fail_count
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import random
 from collections import Counter
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import core.db.rds_mgr as rds_mgr
 from core.config import app_logger
@@ -44,6 +44,35 @@ class LotteryMgr:
         # 使用 random.choices 进行加权随机选择（返回单个元素）
         selected = random.choices(pool, weights=weights, k=1)[0]
         return selected
+
+    def _add_gift_history_records(
+        self,
+        user_id: int,
+        gifts: List[Dict[str, Any]],
+        *,
+        pool_id: Optional[int],
+        status: int,
+        msg: str,
+    ) -> None:
+        """写入 t_gift_history 礼物记录（抽奖/兑换各一条）。"""
+        for gift in gifts:
+            gift_id = gift.get('id')
+            if gift_id is None:
+                continue
+            gift_name = gift.get('name') or ''
+            history_data = {
+                'gitf_id': int(gift_id),
+                'gitf_name': gift_name,
+                'user_id': user_id,
+                'gift_cate_id': gift.get('cate_id'),
+                'gitf_pool_id': pool_id,
+                'status': status,
+                'wish': 1 if gift.get('_from_wish') else 0,
+                'msg': msg,
+            }
+            ret = self._db.set_data('t_gift_history', history_data)
+            if ret.get('code') != 0:
+                log.error(f"写入礼物历史失败 [user_id={user_id}, gift_id={gift_id}]: {ret.get('msg')}")
 
     def do_lottery(self, user_id: int, pool_id: int) -> Dict[str, Any]:
         """
@@ -175,6 +204,14 @@ class LotteryMgr:
         if add_ret.get('code') != 0:
             log.error(f"写入积分历史失败：{add_ret.get('msg')}")
             return {"code": -1, "msg": f"写入积分历史失败：{add_ret.get('msg')}"}
+
+        self._add_gift_history_records(
+            user_id,
+            won_gifts,
+            pool_id=pool_id,
+            status=1,
+            msg=f"获得 {gift_info}",
+        )
 
         # ========== 阶段 4：更新用户状态 ==========
         log.info(f"Update wish_progress: user_id={user_id}, old={wish_progress}, new={cur_progress}, wish_list={wish_list_str}")
@@ -401,6 +438,15 @@ class LotteryMgr:
         )
         if add_ret.get('code') != 0:
             return add_ret
+
+        exchange_msg = f"兑换[{gift.get('id')}]{gift.get('name', '')}"
+        self._add_gift_history_records(
+            user_id,
+            [gift],
+            pool_id=None,
+            status=2,
+            msg=exchange_msg,
+        )
 
         log.info(f"Exchange: user_id={user_id}, gift_id={gift_id}, cost={cost}")
         return {

@@ -16,7 +16,7 @@
         </el-menu-item>
         <el-menu-item index="/lottery" @click="handleMenuSelect">
           <el-icon><Present /></el-icon>
-          <template #title>抽奖设置</template>
+          <template #title>抽奖</template>
         </el-menu-item>
         <el-menu-item index="/chat">
           <el-icon><ChatRound /></el-icon>
