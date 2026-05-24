@@ -6,6 +6,7 @@ const POLL_MS = 5 * 60 * 1000;
 const PROMPT_KEY = "app-update-prompted";
 
 let promptOpen = false;
+let versionCheckInFlight = false;
 
 async function promptReload(onConfirm: () => void): Promise<void> {
   if (promptOpen) return;
@@ -33,6 +34,7 @@ async function promptReload(onConfirm: () => void): Promise<void> {
       ],
     });
     await alert.present();
+    await alert.onDidDismiss();
   } finally {
     promptOpen = false;
   }
@@ -60,7 +62,10 @@ function initPwaUpdate(): void {
 
 async function checkRemoteVersion(): Promise<void> {
   if (!import.meta.env.PROD) return;
+  if (promptOpen || sessionStorage.getItem(PROMPT_KEY) === "1") return;
+  if (versionCheckInFlight) return;
 
+  versionCheckInFlight = true;
   try {
     const res = await fetch(VERSION_URL, { cache: "no-store" });
     if (!res.ok) return;
@@ -74,6 +79,8 @@ async function checkRemoteVersion(): Promise<void> {
     }
   } catch {
     // 网络异常时跳过
+  } finally {
+    versionCheckInFlight = false;
   }
 }
 
