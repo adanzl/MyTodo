@@ -210,7 +210,7 @@ class LotteryMgr:
             won_gifts,
             pool_id=pool_id,
             status=1,
-            msg=f"获得 {gift_info}",
+            msg=f"费用{pool_cost}，获得 {gift_info}",
         )
 
         # ========== 阶段 4：更新用户状态 ==========
