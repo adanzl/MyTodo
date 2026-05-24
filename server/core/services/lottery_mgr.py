@@ -443,7 +443,7 @@ class LotteryMgr:
         self._add_gift_history_records(
             user_id,
             [gift],
-            pool_id=None,
+            pool_id=-1,
             status=2,
             msg=exchange_msg,
         )
