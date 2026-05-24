@@ -1,6 +1,6 @@
 <template>
-  <el-dialog v-model="visible" title="快速添加素材" width="1200px" align-center @close="handleClose">
-    <div class="flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+  <el-dialog v-model="visible" title="快速添加素材" width="1100px" align-center @close="handleClose">
+    <div class="flex flex-col gap-4 max-h-[90vh] overflow-y-auto min-h-[500px]">
       <!-- 分配配置区 -->
       <div class="allocation-section border rounded p-4">
         <h3 class="font-semibold mb-3">分配配置</h3>
@@ -182,6 +182,13 @@ const getCategorySelectedCount = (categoryId: number) => {
   return count;
 };
 
+/** 启用分配基数时，素材可填充的天数（余数不足基数时占最后一天） */
+const getBatchFillDays = (materialCount: number, perDay: number) => {
+  const fullDays = Math.floor(materialCount / perDay);
+  const remainder = materialCount % perDay;
+  return remainder > 0 ? fullDays + 1 : fullDays;
+};
+
 /**
  * 计算描述文字
  */
@@ -204,9 +211,16 @@ const descriptionText = computed(() => {
           const remaining = selectedMaterials.value.length - requiredMaterials;
           return `每天分配 ${batchSize.value} 个素材，共需 ${requiredMaterials} 个，将舍弃 ${remaining} 个多余素材`;
         } else {
-          const canFillDays = Math.floor(selectedMaterials.value.length / batchSize.value);
+          const count = selectedMaterials.value.length;
+          const perDay = batchSize.value;
+          const fullDays = Math.floor(count / perDay);
+          const remainder = count % perDay;
+          const canFillDays = getBatchFillDays(count, perDay);
           const unfilledDays = totalDays - canFillDays;
-          return `每天分配 ${batchSize.value} 个素材，素材不足，只能填充 ${canFillDays} 天，剩余 ${unfilledDays} 天不分配`;
+          if (remainder > 0) {
+            return `每天分配 ${perDay} 个素材，素材不足，前 ${fullDays} 天每天 ${perDay} 个，最后 1 天 ${remainder} 个，剩余 ${unfilledDays} 天不分配`;
+          }
+          return `每天分配 ${perDay} 个素材，素材不足，只能填充 ${canFillDays} 天，剩余 ${unfilledDays} 天不分配`;
         }
       } else {
         // 未启用基数：原有逻辑
@@ -373,10 +387,19 @@ const allocateEvenly = (
   let materialIndex = 0;
 
   if (useBatch && perDay > 1) {
-    const fillDays = Math.min(totalDays, Math.floor(materials.length / perDay));
-    for (let d = 0; d < fillDays; d++) {
+    const fullDays = Math.floor(materials.length / perDay);
+    const remainder = materials.length % perDay;
+    const fillDays = Math.min(totalDays, getBatchFillDays(materials.length, perDay));
+
+    for (let d = 0; d < fullDays && d < fillDays; d++) {
       const internalDay = start + d - 1;
-      for (let i = 0; i < perDay && materialIndex < materials.length; i++) {
+      for (let i = 0; i < perDay; i++) {
+        addMaterialToDay(result, internalDay, materials[materialIndex++]);
+      }
+    }
+    if (remainder > 0 && fullDays < fillDays) {
+      const internalDay = start + fullDays - 1;
+      for (let i = 0; i < remainder; i++) {
         addMaterialToDay(result, internalDay, materials[materialIndex++]);
       }
     }
