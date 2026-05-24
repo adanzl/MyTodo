@@ -36,7 +36,7 @@
 
       <!-- 礼物记录页签 -->
       <el-tab-pane label="礼物记录" name="history">
-        <TabLotteryHistory />
+        <TabGiftHistory />
       </el-tab-pane>
     </el-tabs>
   </div>
@@ -49,13 +49,17 @@ import { InfoFilled } from "@element-plus/icons-vue";
 import { getLotterySetting, setLotterySetting } from "@/api/api-lottery";
 import TabLottery from "./TabLottery.vue";
 import TabPool from "./TabPool.vue";
-import TabLotteryHistory from "./TabLotteryHistory.vue";
+import TabGiftHistory from "./TabGiftHistory.vue";
 
 // 主页签控制
+const STORAGE_KEY = "lottery-active-tab";
+const VALID_TABS = ["lottery", "pool", "history"] as const;
 const activeMainTab = ref("lottery");
 
 // 监听页签切换
 const handleTabChange = (tabName: string) => {
+  localStorage.setItem(STORAGE_KEY, tabName);
+
   const eventMap: Record<string, string> = {
     'lottery': 'refresh-lottery-tab',
     'pool': 'refresh-pool-tab',
@@ -96,6 +100,11 @@ const getLotterySettingLocal = async () => {
 };
 
 onMounted(async () => {
+  const savedTab = localStorage.getItem(STORAGE_KEY);
+  if (savedTab && VALID_TABS.includes(savedTab as (typeof VALID_TABS)[number])) {
+    activeMainTab.value = savedTab;
+  }
+
   await getLotterySettingLocal();
 });
 </script>

@@ -51,7 +51,6 @@ class LotteryMgr:
         gifts: List[Dict[str, Any]],
         *,
         pool_id: Optional[int],
-        status: int,
         msg: str,
     ) -> None:
         """写入 t_gift_history 礼物记录（抽奖/兑换各一条）。"""
@@ -66,7 +65,7 @@ class LotteryMgr:
                 'user_id': user_id,
                 'gift_cate_id': gift.get('cate_id'),
                 'gitf_pool_id': pool_id,
-                'status': status,
+                'status': 1,
                 'wish': 1 if gift.get('_from_wish') else 0,
                 'msg': msg,
             }
@@ -209,7 +208,6 @@ class LotteryMgr:
             user_id,
             won_gifts,
             pool_id=pool_id,
-            status=1,
             msg=f"费用{pool_cost}，获得 {gift_info}",
         )
 
@@ -444,7 +442,6 @@ class LotteryMgr:
             user_id,
             [gift],
             pool_id=-1,
-            status=2,
             msg=exchange_msg,
         )
 

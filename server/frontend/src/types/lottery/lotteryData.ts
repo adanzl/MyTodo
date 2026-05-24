@@ -62,3 +62,20 @@ export interface GiftCategory {
   name: string;
   edited?: boolean;
 }
+
+/**
+ * 礼物历史记录
+ */
+export interface GiftHistory {
+  id: number;
+  gitf_id: number;
+  gitf_name: string;
+  dt: string;
+  status: number;
+  user_id: number;
+  gift_cate_id?: number;
+  gitf_pool_id?: number;
+  msg?: string;
+  wish?: number;
+  user?: { id: number; name: string };
+}
