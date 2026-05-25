@@ -17,11 +17,15 @@
         value="lotterySpecial"
         content-id="tabLottery"
         layout="icon-start"
-        class="text-blue-500">
+        class="text-blue-500 [&::part(native)]:px-0">
         <ion-icon :icon="heartOutline" class="w-4 h-4"></ion-icon>
         <ion-label class="ml-1">抽奖</ion-label>
       </ion-segment-button>
-      <ion-segment-button value="shop" content-id="tabPrize" layout="icon-start" class="text-blue-500">
+      <ion-segment-button
+        value="shop"
+        content-id="tabPrize"
+        layout="icon-start"
+        class="text-blue-500 [&::part(native)]:px-0">
         <ion-icon :icon="giftOutline" class="w-4 h-4"></ion-icon>
         <ion-label class="ml-1">商店</ion-label>
       </ion-segment-button>
@@ -29,7 +33,7 @@
         value="history"
         content-id="tabHistory"
         layout="icon-start"
-        class="text-blue-500">
+        class="text-blue-500 [&::part(native)]:px-0">
         <Icon icon="material-symbols:history" class="w-4 h-4" />
         <ion-label class="ml-1">积分史</ion-label>
       </ion-segment-button>
@@ -37,7 +41,7 @@
         value="giftHistory"
         content-id="tabGiftHistory"
         layout="icon-start"
-        class="text-blue-500">
+        class="text-blue-500 [&::part(native)]:px-0">
         <ion-icon :icon="receiptOutline" class="w-4 h-4"></ion-icon>
         <ion-label class="ml-1">记录</ion-label>
       </ion-segment-button>
@@ -78,11 +82,16 @@
         @user-change="handleUserChange"
         @action-change="handleActionChange"
         @load-more="loadMoreScoreHistory" />
-      <TabGiftHistory
-        :user-list="userList" />
+      <TabGiftHistory :user-list="userList" :user-score="globalVar.user.score" />
     </ion-segment-view>
-    <LotterySetting :is-open="lotterySetting.open" @willDismiss="onSettingDismiss" @saved="handleFullRefresh" />
-    <LotteryPool :is-open="lotteryPool.open" @willDismiss="onPoolDismiss" @refresh="handleFullRefresh" />
+    <LotterySetting
+      :is-open="lotterySetting.open"
+      @willDismiss="onSettingDismiss"
+      @saved="handleFullRefresh" />
+    <LotteryPool
+      :is-open="lotteryPool.open"
+      @willDismiss="onPoolDismiss"
+      @refresh="handleFullRefresh" />
   </ion-page>
 </template>
 
@@ -91,7 +100,16 @@ import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import { Icon } from "@iconify/vue";
 import EventBus, { C_EVENT } from "@/types/event-bus";
 import { getList } from "@/api/data";
-import { doExchange, doLottery, getGiftData, getLotteryData, getGiftList, delGiftData, getGiftCategoryList, getGiftPoolList } from "@/api/api-lottery";
+import {
+  doExchange,
+  doLottery,
+  getGiftData,
+  getLotteryData,
+  getGiftList,
+  delGiftData,
+  getGiftCategoryList,
+  getGiftPoolList,
+} from "@/api/api-lottery";
 import { clearUserListCache, getUserList, updateUser } from "@/api/api-user";
 import { getNetworkErrorMessage } from "@/utils/net-util";
 import { getCachedPicByName, PicDisplaySize } from "@/utils/img-mgr";
@@ -120,11 +138,11 @@ const lotteryPool = ref({ open: false });
 const globalVar: any = inject("globalVar");
 const isAdmin = computed(() => globalVar?.user?.admin === 1);
 const lotteryDate = ref<any>({});
-const segmentValue = ref("lotterySpecial");  // Default to lottery special
+const segmentValue = ref("lotterySpecial"); // Default to lottery special
 const selectedPool = ref<any>(null);
 
 const wishList = ref<any>({
-  progress: 30.2,  // 这个是个数
+  progress: 30.2, // 这个是个数
   ids: [],
   data: [],
 });
@@ -177,7 +195,7 @@ const updateTabsHeight = () => {
 
 onMounted(async () => {
   await refreshUserList();
-  handleRefresh({ target: { complete: () => { } } });
+  handleRefresh({ target: { complete: () => {} } });
 
   observer = new MutationObserver(() => {
     updateTabsHeight();
@@ -295,7 +313,11 @@ function onPoolDismiss(event: any) {
   }
 }
 
-async function refreshScoreHistoryList(userId: number | undefined, pageNum: number, append: boolean = false) {
+async function refreshScoreHistoryList(
+  userId: number | undefined,
+  pageNum: number,
+  append: boolean = false
+) {
   let filter = undefined;
 
   // 构建筛选条件
@@ -361,12 +383,14 @@ function refreshPoolList() {
         }
       } else {
         // 如果没有奖池数据，创建默认的"全部"奖池
-        poolList.value = [{
-          id: 0,
-          name: "全部",
-          cost: lotteryDate.value.fee || 10,
-          count: 1,
-        }];
+        poolList.value = [
+          {
+            id: 0,
+            name: "全部",
+            cost: lotteryDate.value.fee || 10,
+            count: 1,
+          },
+        ];
       }
 
       // 注意：不再在这里设置 selectedCate，交给子组件的 watch 处理
@@ -416,7 +440,7 @@ async function refreshGiftList(
   const filter: Record<string, unknown> = {
     enable: 1,
     show: 1,
-    stock: {'>': 0},  // stock > 0
+    stock: { ">": 0 }, // stock > 0
   };
   if (cateId) {
     filter["cate_id"] = cateId;
@@ -454,11 +478,9 @@ async function refreshGiftList(
         giftList.value.data.push(row);
         const name = item.image;
         if (name) {
-          getCachedPicByName(name, PicDisplaySize.LIST, PicDisplaySize.LIST).then(
-            (url) => {
-              row.cachedImgUrl = url;
-            }
-          );
+          getCachedPicByName(name, PicDisplaySize.LIST, PicDisplaySize.LIST).then((url) => {
+            row.cachedImgUrl = url;
+          });
         }
       });
     } catch (err) {
@@ -471,8 +493,7 @@ async function refreshGiftList(
 
 function loadMoreGifts(event: any) {
   const { pageNum, totalPage, data, totalCount } = giftList.value;
-  const noMore =
-    totalCount > 0 ? data.length >= totalCount : pageNum >= totalPage;
+  const noMore = totalCount > 0 ? data.length >= totalCount : pageNum >= totalPage;
   if (loadingGifts.value || noMore) {
     // 立即完成事件，防止重复触发
     event?.target?.complete();
@@ -508,21 +529,18 @@ function handleActionChange(value: string) {
 
 function loadMoreScoreHistory(event: any) {
   const { pageNum, totalPage, data, totalCount } = scoreHistoryList.value;
-  const noMore =
-    totalCount > 0 ? data.length >= totalCount : pageNum >= totalPage;
+  const noMore = totalCount > 0 ? data.length >= totalCount : pageNum >= totalPage;
   if (noMore) {
     event?.target?.complete();
     return;
   }
-  refreshScoreHistoryList(
-    selectedUser.value?.id,
-    scoreHistoryList.value.pageNum + 1,
-    true
-  ).finally(() => {
-    nextTick(() => {
-      event?.target?.complete();
-    });
-  });
+  refreshScoreHistoryList(selectedUser.value?.id, scoreHistoryList.value.pageNum + 1, true).finally(
+    () => {
+      nextTick(() => {
+        event?.target?.complete();
+      });
+    }
+  );
 }
 
 async function btnLotteryClk() {
@@ -586,9 +604,9 @@ async function btnRemoveWishClk(item: any) {
         text: "OK",
         handler: () => {
           _.remove(globalVar.user.wish_list, (i: number) => i === item.id);
-          updateUser({ 
+          updateUser({
             id: globalVar.user.id,
-            wish_list: globalVar.user.wish_list 
+            wish_list: globalVar.user.wish_list,
           })
             .then(() => {
               EventBus.$emit(C_EVENT.TOAST, "移除心愿成功");
@@ -611,9 +629,9 @@ async function btnAddWishClk(item: any) {
     globalVar.user.wish_list = [];
   }
   globalVar.user.wish_list.push(item.id);
-  updateUser({ 
+  updateUser({
     id: globalVar.user.id,
-    wish_list: globalVar.user.wish_list 
+    wish_list: globalVar.user.wish_list,
   })
     .then(() => {
       EventBus.$emit(C_EVENT.TOAST, "添加心愿成功");

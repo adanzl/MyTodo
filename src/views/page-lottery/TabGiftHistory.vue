@@ -35,6 +35,7 @@
             label-placement="end"
             justify="start"
             :checked="onlyWish"
+            class="text-sm"
             @ionChange="onWishChange">
             仅心愿单
           </ion-checkbox>
@@ -349,6 +350,9 @@ function onLoadMore(event: CustomEvent) {
 }
 
 async function onToggleVerify(item: GiftHistoryItem) {
+  if (!isAdmin.value) {
+    return;
+  }
   const nextStatus = item.status === 2 ? 1 : 2;
   try {
     await setData("t_gift_history", { id: item.id, status: nextStatus });
