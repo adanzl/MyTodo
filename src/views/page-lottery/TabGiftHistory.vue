@@ -181,6 +181,7 @@ const onlyWish = ref(false);
 const poolList = ref<RecordTypeOption[]>([]);
 const poolMap = ref(new Map<number, string>());
 const cateMap = ref(new Map<number, string>());
+let refreshSequence = 0;
 
 const filteredUserList = computed(() =>
   props.userList.filter((item) => item.id !== 0)
@@ -235,91 +236,123 @@ function buildFilter(): Record<string, unknown> | undefined {
   return Object.keys(filter).length > 0 ? filter : undefined;
 }
 
-async function loadPoolMap() {
-  try {
-    const data = await getGiftPoolList({ pageNum: 1, pageSize: 500 });
-    const list = data.data ?? [];
-    poolList.value = list.map((item) => ({
-      id: Number(item.id),
-      name: item.name,
-    }));
-    poolMap.value = new Map(
-      poolList.value.map((item) => [item.id, item.name || `奖池${item.id}`])
-    );
-  } catch (err) {
-    EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
-  }
+async function fetchPoolOptions() {
+  const data = await getGiftPoolList({ pageNum: 1, pageSize: 500 });
+  const list = data.data ?? [];
+  const options = list.map((item) => ({
+    id: Number(item.id),
+    name: item.name,
+  }));
+  return {
+    list: options,
+    map: new Map(options.map((item) => [item.id, item.name || `奖池${item.id}`])),
+  };
 }
 
-async function loadCateMap() {
-  try {
-    const data = await getGiftCategoryList({ pageNum: 1, pageSize: 500 });
-    const list = data.data ?? [];
-    cateMap.value = new Map(
-      list
-        .filter((item) => item.id != null)
-        .map((item) => [Number(item.id), item.name || String(item.id)])
-    );
-  } catch (err) {
-    EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
-  }
+async function fetchCateLookup() {
+  const data = await getGiftCategoryList({ pageNum: 1, pageSize: 500 });
+  const list = data.data ?? [];
+  return new Map(
+    list
+      .filter((item) => item.id != null)
+      .map((item) => [Number(item.id), item.name || String(item.id)])
+  );
 }
 
-async function refreshRecordList(pageNum: number, append: boolean = false) {
+async function fetchRecordPage(
+  filter: Record<string, unknown> | undefined,
+  pageNum: number,
+  pageSize: number
+) {
+  const data = await getList<GiftHistoryItem>("t_gift_history", filter, pageNum, pageSize);
+  const rows = data.data ?? [];
+  const mappedRows: GiftHistoryItem[] = rows.map((item) => ({
+    ...item,
+    id: Number(item.id ?? 0),
+    user_id: Number(item.user_id ?? 0),
+    gift_id: Number(item.gift_id ?? 0),
+    gift_name: item.gift_name ?? "",
+    gift_pool_id: item.gift_pool_id,
+  }));
+
+  return {
+    data: mappedRows,
+    pageNum: Number(data.pageNum) || pageNum,
+    pageSize: Number(data.pageSize) || pageSize,
+    totalCount: Number(data.totalCount) || 0,
+    totalPage: Number(data.totalPage) || 0,
+  };
+}
+
+async function refreshRecordList(pageNum: number, append: boolean = false, reloadMeta: boolean = false) {
+  const requestId = ++refreshSequence;
+  const filter = buildFilter();
+  const pageSize = recordList.value.pageSize;
   loading.value = true;
   try {
-    const data = await getList<GiftHistoryItem>(
-      "t_gift_history",
-      buildFilter(),
-      pageNum,
-      recordList.value.pageSize
-    );
+    const [recordResult, poolResult, cateResult] = await Promise.allSettled([
+      fetchRecordPage(filter, pageNum, pageSize),
+      reloadMeta ? fetchPoolOptions() : Promise.resolve(null),
+      reloadMeta ? fetchCateLookup() : Promise.resolve(null),
+    ]);
 
-    const rows = data.data ?? [];
-    const mappedRows: GiftHistoryItem[] = rows.map((item) => ({
-      ...item,
-      id: Number(item.id ?? 0),
-      user_id: Number(item.user_id ?? 0),
-      gift_id: Number(item.gift_id ?? 0),
-      gift_name: item.gift_name ?? "",
-      gift_pool_id: item.gift_pool_id,
-    }));
+    if (requestId !== refreshSequence) {
+      return;
+    }
+
+    if (poolResult.status === "fulfilled" && poolResult.value) {
+      poolList.value = poolResult.value.list;
+      poolMap.value = poolResult.value.map;
+    } else if (poolResult.status === "rejected") {
+      EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(poolResult.reason));
+    }
+
+    if (cateResult.status === "fulfilled" && cateResult.value) {
+      cateMap.value = cateResult.value;
+    } else if (cateResult.status === "rejected") {
+      EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(cateResult.reason));
+    }
+
+    if (recordResult.status !== "fulfilled") {
+      EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(recordResult.reason));
+      return;
+    }
+
+    const nextPage = recordResult.value;
 
     if (!append) {
       recordList.value = {
-        data: mappedRows,
-        pageNum: Number(data.pageNum) || pageNum,
-        pageSize: Number(data.pageSize) || recordList.value.pageSize,
-        totalCount: Number(data.totalCount) || 0,
-        totalPage: Number(data.totalPage) || 0,
+        data: nextPage.data,
+        pageNum: nextPage.pageNum,
+        pageSize: nextPage.pageSize,
+        totalCount: nextPage.totalCount,
+        totalPage: nextPage.totalPage,
       };
       return;
     }
 
-    recordList.value.data.push(...mappedRows);
-    recordList.value.pageNum = Number(data.pageNum) || pageNum;
-    recordList.value.pageSize = Number(data.pageSize) || recordList.value.pageSize;
-    recordList.value.totalCount = Number(data.totalCount) || recordList.value.totalCount;
-    recordList.value.totalPage = Number(data.totalPage) || recordList.value.totalPage;
-  } catch (err) {
-    EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+    recordList.value.data.push(...nextPage.data);
+    recordList.value.pageNum = nextPage.pageNum;
+    recordList.value.pageSize = nextPage.pageSize;
+    recordList.value.totalCount = nextPage.totalCount;
+    recordList.value.totalPage = nextPage.totalPage;
   } finally {
-    loading.value = false;
+    if (requestId === refreshSequence) {
+      loading.value = false;
+    }
   }
 }
 
 function handleFilterRefresh() {
-  refreshRecordList(1);
+  void refreshRecordList(1);
 }
 
 function handleManualRefresh() {
-  loadPoolMap();
-  loadCateMap();
-  refreshRecordList(1);
+  void refreshRecordList(1, false, true);
 }
 
 function onRefresh(event: CustomEvent) {
-  Promise.all([loadPoolMap(), loadCateMap(), refreshRecordList(1)]).finally(() => {
+  refreshRecordList(1, false, true).finally(() => {
     event.target && (event.target as HTMLIonRefresherElement).complete();
   });
 }
@@ -344,7 +377,7 @@ function onLoadMore(event: CustomEvent) {
     event.target && (event.target as HTMLIonInfiniteScrollElement).complete();
     return;
   }
-  refreshRecordList(recordList.value.pageNum + 1, true).finally(() => {
+  void refreshRecordList(recordList.value.pageNum + 1, true).finally(() => {
     event.target && (event.target as HTMLIonInfiniteScrollElement).complete();
   });
 }
@@ -394,9 +427,8 @@ function handleExternalRefresh() {
 }
 
 onMounted(async () => {
-  await Promise.all([loadPoolMap(), loadCateMap()]);
-  await refreshRecordList(1);
   window.addEventListener(REFRESH_EVENT, handleExternalRefresh);
+  await refreshRecordList(1, false, true);
 });
 
 onBeforeUnmount(() => {

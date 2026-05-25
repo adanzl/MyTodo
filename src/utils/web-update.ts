@@ -4,9 +4,49 @@ import type { Router } from "vue-router";
 const VERSION_URL = `${import.meta.env.BASE_URL}version.json`.replace(/\/+/g, "/");
 const POLL_MS = 5 * 60 * 1000;
 const PROMPT_KEY = "app-update-prompted";
+const PENDING_VERSION_KEY = "app-update-pending-version";
 
 let promptOpen = false;
 let versionCheckInFlight = false;
+let pwaUpdateSW: ((reloadPage?: boolean) => Promise<void> | void) | null = null;
+let applyingUpdate = false;
+
+function clearAppliedPendingVersion(): void {
+  if (sessionStorage.getItem(PENDING_VERSION_KEY) === __APP_VERSION__) {
+    sessionStorage.removeItem(PENDING_VERSION_KEY);
+    sessionStorage.removeItem(PROMPT_KEY);
+  }
+}
+
+function hardReload(targetVersion?: string): void {
+  const url = new URL(window.location.href);
+  if (targetVersion) {
+    url.searchParams.set("_v", targetVersion);
+  }
+  url.searchParams.set("_ts", String(Date.now()));
+  window.location.replace(url.toString());
+}
+
+async function applyUpdate(targetVersion?: string): Promise<void> {
+  if (applyingUpdate) return;
+
+  applyingUpdate = true;
+  try {
+    sessionStorage.removeItem(PROMPT_KEY);
+    if (targetVersion) {
+      sessionStorage.setItem(PENDING_VERSION_KEY, targetVersion);
+    }
+
+    if (pwaUpdateSW) {
+      await pwaUpdateSW(true);
+      return;
+    }
+
+    hardReload(targetVersion);
+  } finally {
+    applyingUpdate = false;
+  }
+}
 
 async function promptReload(onConfirm: () => void): Promise<void> {
   if (promptOpen) return;
@@ -45,12 +85,11 @@ function initPwaUpdate(): void {
 
   import("virtual:pwa-register")
     .then(({ registerSW }) => {
-      const updateSW = registerSW({
+      pwaUpdateSW = registerSW({
         immediate: true,
         onNeedRefresh() {
           void promptReload(() => {
-            sessionStorage.removeItem(PROMPT_KEY);
-            void updateSW(true);
+            void applyUpdate();
           });
         },
       });
@@ -72,9 +111,11 @@ async function checkRemoteVersion(): Promise<void> {
 
     const data = (await res.json()) as { version?: string };
     if (data.version && data.version !== __APP_VERSION__) {
+      if (sessionStorage.getItem(PENDING_VERSION_KEY) === data.version) {
+        return;
+      }
       await promptReload(() => {
-        sessionStorage.removeItem(PROMPT_KEY);
-        window.location.reload();
+        void applyUpdate(data.version);
       });
     }
   } catch {
@@ -118,6 +159,7 @@ export function setupChunkReloadGuard(router: Router): void {
 
 /** 生产环境：PWA 更新提示、版本轮询、chunk 加载失败自动恢复 */
 export function initWebUpdate(router: Router): void {
+  clearAppliedPendingVersion();
   setupChunkReloadGuard(router);
   if (!import.meta.env.PROD) return;
   initPwaUpdate();
