@@ -74,14 +74,28 @@ export function buildCategoryTree<T extends CategoryItem>(categories: T[]): Cate
   return sortTreeByName(roots);
 }
 
+export type MaterialSortKey = 'name' | 'id';
+export type SortOrder = 'asc' | 'desc';
+
+export interface SortMaterialsOptions<T> {
+  sortBy?: MaterialSortKey;
+  order?: SortOrder;
+  isFolderFn?: (item: T) => boolean;
+}
+
 /**
- * 素材列表排序：先目录后文件，再按名称自然排序
+ * 素材列表排序：先目录后文件，再按指定字段排序
  */
-export function sortMaterials<T extends { name: string; type?: string | number; isFolder?: boolean }>(
+export function sortMaterials<T extends { id?: number; name: string; type?: string | number; isFolder?: boolean }>(
   items: T[],
-  isFolderFn?: (item: T) => boolean
+  options: SortMaterialsOptions<T> = {}
 ): T[] {
-  const isFolder = isFolderFn ?? ((item) => item.type === 'folder' || item.isFolder === true);
+  const {
+    sortBy = 'name',
+    order = 'asc',
+    isFolderFn,
+  } = options;
+  const isFolder = isFolderFn ?? ((item: T) => item.type === 'folder' || item.isFolder === true);
 
   return items.sort((a, b) => {
     const aIsFolder = isFolder(a);
@@ -89,6 +103,18 @@ export function sortMaterials<T extends { name: string; type?: string | number; 
     if (aIsFolder !== bIsFolder) {
       return aIsFolder ? -1 : 1;
     }
+
+    let compareResult = 0;
+    if (sortBy === 'id') {
+      compareResult = (a.id ?? 0) - (b.id ?? 0);
+    } else {
+      compareResult = compareByName(a.name, b.name);
+    }
+
+    if (compareResult !== 0) {
+      return order === 'desc' ? -compareResult : compareResult;
+    }
+
     return compareByName(a.name, b.name);
   });
 }

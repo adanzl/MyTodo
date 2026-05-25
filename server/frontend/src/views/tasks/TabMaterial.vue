@@ -9,6 +9,16 @@
       <el-button type="success" size="small" @click="handleBatchAdd">批量添加</el-button>
       <el-button type="primary" size="small" @click="handleAddMaterial">添加素材</el-button>
       <el-button type="warning" size="small" @click="handleAddFolder">新建目录</el-button>
+      <div class="ml-auto flex items-center gap-2">
+        <span class="text-sm text-gray-600">排序：</span>
+        <el-radio-group v-model="sortType" size="small" @change="handleSortChange">
+          <el-radio-button value="name">名称</el-radio-button>
+          <el-radio-button value="id">添加顺序</el-radio-button>
+        </el-radio-group>
+        <el-button size="small" @click="toggleSortOrder">
+          {{ sortOrder === 'asc' ? '正序' : '倒序' }}
+        </el-button>
+      </div>
     </div>
 
     <!-- 面包屑导航 -->
@@ -136,7 +146,7 @@ import {
   type Material,
   type MaterialCategory,
 } from "@/api/api-task";
-import { sortMaterials, buildCategoryTree } from "@/utils/file";
+import { sortMaterials, buildCategoryTree, type SortOrder } from "@/utils/file";
 import MaterialDialog from "./dialogs/MaterialDialog.vue";
 import MaterialDetailDialog from "./dialogs/MaterialDetailDialog.vue";
 import MaterialPreviewDialog from "./dialogs/MaterialPreviewDialog.vue";
@@ -157,6 +167,31 @@ interface MixedItem {
 }
 
 const tableMaxHeight = ref<number>(600); // 设置默认高度，避免初始抖动
+const SORT_STORAGE_KEY = 'tasks-material-sort-type';
+const SORT_ORDER_STORAGE_KEY = 'tasks-material-sort-order';
+type SortType = 'name' | 'id';
+
+const sortType = ref<SortType>('name');
+const sortOrder = ref<SortOrder>('asc');
+
+const sortCurrentItems = (items: MixedItem[]) => {
+  return sortMaterials(items, {
+    sortBy: sortType.value,
+    order: sortOrder.value,
+  });
+};
+
+const handleSortChange = () => {
+  localStorage.setItem(SORT_STORAGE_KEY, sortType.value);
+  localStorage.setItem(SORT_ORDER_STORAGE_KEY, sortOrder.value);
+  currentList.value = sortCurrentItems([...currentList.value]);
+};
+
+const toggleSortOrder = () => {
+  sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
+  handleSortChange();
+};
+
 // 计算表格最大高度
 const calculateTableHeight = () => {
   nextTick(() => {
@@ -266,10 +301,7 @@ const fetchCurrentList = async () => {
       }))
     ];
 
-    // 排序：先目录后文件，名称自然排序
-    sortMaterials(mixedList);
-
-    currentList.value = mixedList;
+    currentList.value = sortCurrentItems(mixedList);
   } catch (error: any) {
     console.error("获取列表失败:", error);
     ElMessage.error(error.message || "获取列表失败");
@@ -551,6 +583,22 @@ const playMaterial = (row: Material) => {
 
 // 初始化
 onMounted(() => {
+  const savedSortType = localStorage.getItem(SORT_STORAGE_KEY);
+  if (savedSortType === 'create_time') {
+    sortType.value = 'id';
+    localStorage.setItem(SORT_STORAGE_KEY, 'id');
+    sortOrder.value = 'desc';
+    localStorage.setItem(SORT_ORDER_STORAGE_KEY, 'desc');
+  } else if (savedSortType === 'name' || savedSortType === 'id') {
+    sortType.value = savedSortType;
+  }
+
+  const savedSortOrder = localStorage.getItem(SORT_ORDER_STORAGE_KEY);
+  if (savedSortOrder === 'asc' || savedSortOrder === 'desc') {
+    sortOrder.value = savedSortOrder;
+  } else if (savedSortType === 'id') {
+    sortOrder.value = 'desc';
+  }
   fetchCategoryList();
   fetchCurrentList();
   calculateTableHeight();
