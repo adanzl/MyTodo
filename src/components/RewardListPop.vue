@@ -1,7 +1,7 @@
 <template>
   <ion-modal id="reward-list-modal" class="backdrop">
     <div class="p-3 flex border-b border-gray-400 mx-6">
-      <span class="text-center w-full">恭喜获得</span>
+      <span class="text-center w-full">获得</span>
     </div>
     <div class="flex flex-col h-full items-center justify-center p-4">
       <!-- 礼物列表容器：单个元素时居中，多个元素时 2 列网格 -->

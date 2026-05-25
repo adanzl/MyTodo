@@ -31,7 +31,15 @@
         layout="icon-start"
         class="text-blue-500">
         <Icon icon="material-symbols:history" class="w-4 h-4" />
-        <ion-label class="ml-1">积分历史</ion-label>
+        <ion-label class="ml-1">积分史</ion-label>
+      </ion-segment-button>
+      <ion-segment-button
+        value="giftHistory"
+        content-id="tabGiftHistory"
+        layout="icon-start"
+        class="text-blue-500">
+        <ion-icon :icon="receiptOutline" class="w-4 h-4"></ion-icon>
+        <ion-label class="ml-1">记录</ion-label>
       </ion-segment-button>
     </ion-segment>
     <ion-segment-view :style="{ height: `calc(100% - ${tabsHeight}px)` }">
@@ -70,6 +78,8 @@
         @user-change="handleUserChange"
         @action-change="handleActionChange"
         @load-more="loadMoreScoreHistory" />
+      <TabGiftHistory
+        :user-list="userList" />
     </ion-segment-view>
     <LotterySetting :is-open="lotterySetting.open" @willDismiss="onSettingDismiss" @saved="handleFullRefresh" />
     <LotteryPool :is-open="lotteryPool.open" @willDismiss="onPoolDismiss" @refresh="handleFullRefresh" />
@@ -94,12 +104,13 @@ import {
   IonSegmentButton,
   IonSegmentView,
 } from "@ionic/vue";
-import { giftOutline, heartOutline } from "ionicons/icons";
+import { giftOutline, heartOutline, receiptOutline } from "ionicons/icons";
 import _ from "lodash";
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import LotteryTab from "./TabLottery.vue";
 import TabPrize from "./TabPrize.vue";
 import HistoryTab from "./TabHistory.vue";
+import TabGiftHistory from "./TabGiftHistory.vue";
 import LotterySetting from "./dialogs/LotterySetting.vue";
 import LotteryPool from "./dialogs/LotteryPool.vue";
 
@@ -152,6 +163,10 @@ const selectedUser = ref<any>({ id: 0, name: "全部", score: 0 });
 const selectedAction = ref<string>("");
 const tabsHeight = ref(0);
 let observer: MutationObserver | null = null;
+
+function notifyGiftHistoryRefresh() {
+  window.dispatchEvent(new CustomEvent("lottery-gift-history-refresh"));
+}
 
 const updateTabsHeight = () => {
   const tabs = document.querySelector("ion-tab-bar");
@@ -222,6 +237,9 @@ function handleFullRefresh() {
     })
     .catch((err) => {
       EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+    })
+    .finally(() => {
+      notifyGiftHistoryRefresh();
     });
 }
 
@@ -241,13 +259,19 @@ function handleRefresh(event: any) {
     .catch((err) => {
       EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
     })
-    .finally(() => event.target.complete());
+    .finally(() => {
+      notifyGiftHistoryRefresh();
+      event.target.complete();
+    });
 }
 
 function handleSegmentChange(event: any) {
   segmentValue.value = event.detail.value;
   if (segmentValue.value === "shop" && selectedCate.value) {
     refreshGiftList(selectedCate.value.id);
+  }
+  if (segmentValue.value === "giftHistory") {
+    notifyGiftHistoryRefresh();
   }
 }
 
@@ -538,6 +562,7 @@ async function btnLotteryClk() {
             EventBus.$emit(C_EVENT.TOAST, "抽奖成功");
             clearUserListCache();
             await refreshUserList();
+            notifyGiftHistoryRefresh();
           } catch (err) {
             EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
           } finally {
@@ -626,6 +651,7 @@ async function btnExchangeClk(item: any) {
             clearUserListCache();
             await refreshUserList();
             refreshGiftList(selectedCate.value?.id, 1);
+            notifyGiftHistoryRefresh();
           } catch (err) {
             EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
           }

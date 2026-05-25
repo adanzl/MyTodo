@@ -1,20 +1,25 @@
 <template>
   <ion-modal id="main" class="backdrop">
     <div class="p-4 flex border-b border-gray-400 mx-6">
-      <span class="text-center w-full">恭喜获得</span>
+      <span class="text-center w-full">获得</span>
     </div>
-    <div class="flex flex-col h-full items-center justify-center" v-if="props.rewardType === 'points'">
+    <div
+      class="flex flex-col h-full items-center justify-center"
+      v-if="props.rewardType === 'points'">
       <Icon icon="mdi:gift-outline" class="text-red-500 mt-0 w-16 h-16" />
       <div class="font-bold text-[30px] flex mt-4 items-center">
         <Icon icon="mdi:star" class="text-red-500" />
         <div class="ml-2">{{ props.value }}</div>
       </div>
     </div>
-    <div class="flex flex-col h-full items-center" v-else>
-      <img :src="rewardImgUrl" class="max-w-[50%] max-h-[50%] mt-5 object-contain" alt="" />
-      <div class="font-bold text-[30px] flex mt-4 items-center">
+    <div class="flex flex-col h-full items-center justify-center gap-2" v-else>
+      <img :src="rewardImgUrl" class="max-w-[50%] max-h-[50%] object-contain" alt="" />
+      <div class="font-bold text-[30px] flex items-center">
         <div class="">{{ props.value }}</div>
       </div>
+    </div>
+    <div class="items-center text-xm px-4 py-2" v-if="props.msg">
+      <div class="">{{ props.msg }}</div>
     </div>
   </ion-modal>
 </template>
@@ -43,6 +48,10 @@ const props = defineProps({
     type: String,
     default: "",
   },
+  msg: {
+    type: String,
+    default: "",
+  },
 });
 
 /** 缓存的礼品图 data URL，弹窗内展示用 */
@@ -54,11 +63,9 @@ function loadCachedImg() {
     cachedImgUrl.value = "";
     return;
   }
-  getCachedPicByName(raw, PicDisplaySize.ITEM, PicDisplaySize.ITEM).then(
-    (url) => {
-      cachedImgUrl.value = url || "";
-    }
-  );
+  getCachedPicByName(raw, PicDisplaySize.ITEM, PicDisplaySize.ITEM).then((url) => {
+    cachedImgUrl.value = url || "";
+  });
 }
 
 watch(

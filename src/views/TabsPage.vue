@@ -243,6 +243,7 @@
       :value="bOpenRewardPop.value"
       :reward-type="bOpenRewardPop.rewardType"
       :img="bOpenRewardPop.img"
+      :msg="bOpenRewardPop.msg"
       @willDismiss="bOpenRewardPop.open = false" />
     <RewardListPop
       :is-open="bOpenRewardListPop.open"
@@ -321,6 +322,7 @@ const bOpenRewardPop = ref({
   value: "0",
   rewardType: "points",
   img: avatar,
+  msg:"",
 });
 const bOpenRewardListPop = ref({
   open: false,
@@ -486,6 +488,7 @@ eventBus.$on(C_EVENT.REWARD, (params: any) => {
   bOpenRewardPop.value.value = String(params.value);
   bOpenRewardPop.value.rewardType = params.rewardType;
   bOpenRewardPop.value.img = params.img;
+  bOpenRewardPop.value.msg = params.msg;
 });
 eventBus.$on(C_EVENT.REWARD_LIST, (params: any) => {
   bOpenRewardListPop.value.open = true;
