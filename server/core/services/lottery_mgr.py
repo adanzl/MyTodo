@@ -60,11 +60,11 @@ class LotteryMgr:
                 continue
             gift_name = gift.get('name') or ''
             history_data = {
-                'gitf_id': int(gift_id),
-                'gitf_name': gift_name,
+                'gift_id': int(gift_id),
+                'gift_name': gift_name,
                 'user_id': user_id,
                 'gift_cate_id': gift.get('cate_id'),
-                'gitf_pool_id': pool_id,
+                'gift_pool_id': pool_id,
                 'status': 1,
                 'wish': 1 if gift.get('_from_wish') else 0,
                 'msg': msg,

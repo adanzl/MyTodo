@@ -50,13 +50,13 @@
       <el-table-column label="类型" width="60" align="center">
         <template #default="{ row }">
           <div class="flex items-center justify-center">
-            <el-tag :type="isExchange(row.gitf_pool_id) ? 'warning' : 'primary'" size="small">
-              {{ getRecordTypeLabel(row.gitf_pool_id) }}
+            <el-tag :type="isExchange(row.gift_pool_id) ? 'warning' : 'primary'" size="small">
+              {{ getRecordTypeLabel(row.gift_pool_id) }}
             </el-tag>
           </div>
         </template>
       </el-table-column>
-      <el-table-column label="礼物" min-width="100" prop="gitf_name" show-overflow-tooltip />
+      <el-table-column label="礼物" min-width="100" prop="gift_name" show-overflow-tooltip />
       <el-table-column label="分类" width="90">
         <template #default="{ row }">
           {{ getCateLabel(row.gift_cate_id) }}
@@ -74,7 +74,7 @@
       </el-table-column>
       <el-table-column label="奖池" width="110">
         <template #default="{ row }">
-          {{ getPoolLabel(row.gitf_pool_id) }}
+          {{ getPoolLabel(row.gift_pool_id) }}
         </template>
       </el-table-column>
       <el-table-column label="时间" prop="dt" width="180" />
@@ -225,12 +225,12 @@ const buildFilter = (): Record<string, unknown> => {
     filter.user_id = selectedUserId.value;
   }
   if (selectedRecordType.value === "exchange") {
-    filter.gitf_pool_id = -1;
+    filter.gift_pool_id = -1;
   } else if (selectedRecordType.value === "lottery") {
     if (selectedPoolId.value > 0) {
-      filter.gitf_pool_id = selectedPoolId.value;
+      filter.gift_pool_id = selectedPoolId.value;
     } else {
-      filter.gitf_pool_id = { ">": -1 };
+      filter.gift_pool_id = { ">": -1 };
     }
   }
   if (onlyWish.value) {
@@ -330,7 +330,7 @@ const onGiftClick = async (row: GiftHistory) => {
   try {
     const response = await getList<GiftDetail>(
       "t_gift",
-      { id: row.gitf_id },
+      { id: row.gift_id },
       1,
       1
     );

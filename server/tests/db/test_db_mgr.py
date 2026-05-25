@@ -97,7 +97,7 @@ def test_set_and_get_save(db_mgr):
 
 def test_del_data(db_mgr):
     with db_mgr.app.app_context():
-        result = db_mgr.set_save(id=None, user_name='todelete', data='{}')
+        result = db_mgr.set_save(id=None, user_name='to_delete', data='{}')
         record_id = result['data']
 
         del_result = db_mgr.del_data(TABLE_SAVE, record_id)
@@ -178,7 +178,7 @@ def test_query(db_mgr):
 def test_get_list(db_mgr):
     with db_mgr.app.app_context():
         for i in range(25):
-            db_mgr.set_save(id=None, user_name=f'user_{i}', data=f'{{"val":{i}}}')
+            db_mgr.set_save(id=None, user_name=f'user_{i}', data=json.dumps({"val": i}))
 
         list_result = db_mgr.get_list(TABLE_SAVE, page_num=1, page_size=10)
         assert list_result['code'] == 0
@@ -229,3 +229,58 @@ def test_add_score_user_not_found(db_mgr):
         result = db_mgr.add_score(user_id=999, value=10, action='test', msg='test')
         assert result['code'] == -2
         assert '用户不存在' in result['msg']
+
+
+def test_gift_history_fields(db_mgr):
+    with db_mgr.app.app_context():
+        db_obj.session.execute(text("DROP TABLE IF EXISTS t_gift_history"))
+        db_obj.session.execute(text("""
+        CREATE TABLE t_gift_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            gift_id INTEGER,
+            gift_name TEXT,
+            user_id INTEGER,
+            gift_cate_id INTEGER,
+            gift_pool_id INTEGER,
+            status INTEGER,
+            wish INTEGER,
+            msg TEXT,
+            dt TEXT
+        )
+        """))
+        db_obj.session.commit()
+
+        create_result = db_mgr.set_data('t_gift_history', {
+            'gift_id': 101,
+            'gift_name': '测试礼物',
+            'gift_pool_id': 3,
+            'user_id': 1,
+            'gift_cate_id': 9,
+            'status': 1,
+            'wish': 0,
+            'msg': 'gift history test',
+            'dt': '2026-05-25 15:30:00',
+        })
+        assert create_result['code'] == 0
+        record_id = create_result['data']
+
+        raw_result = db_mgr.query(
+            f"SELECT gift_id, gift_name, gift_pool_id FROM t_gift_history WHERE id = {record_id}"
+        )
+        assert raw_result['code'] == 0
+        assert raw_result['data'][0]['gift_id'] == 101
+        assert raw_result['data'][0]['gift_name'] == '测试礼物'
+        assert raw_result['data'][0]['gift_pool_id'] == 3
+
+        get_result = db_mgr.get_data('t_gift_history', record_id, '*')
+        assert get_result['code'] == 0
+        assert get_result['data']['gift_id'] == 101
+        assert get_result['data']['gift_name'] == '测试礼物'
+        assert get_result['data']['gift_pool_id'] == 3
+
+        list_result = db_mgr.get_list('t_gift_history', conditions={'gift_pool_id': 3})
+        assert list_result['code'] == 0
+        assert list_result['data']['totalCount'] == 1
+        assert list_result['data']['data'][0]['gift_id'] == 101
+        assert list_result['data']['data'][0]['gift_name'] == '测试礼物'
+        assert list_result['data']['data'][0]['gift_pool_id'] == 3
