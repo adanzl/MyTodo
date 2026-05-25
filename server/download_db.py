@@ -12,13 +12,19 @@
 import subprocess
 import os
 import sys
-import tempfile
 from datetime import datetime, timedelta
 
 
 def _ssh_control_path():
-    """SSH 复用连接的 ControlPath（仅 Unix/macOS 有效）。"""
-    return os.path.join(tempfile.gettempdir(), '.ssh_ctrl_%r@%h:%p')
+    """SSH 复用连接的 ControlPath（仅 Unix/macOS 有效）。
+
+    macOS 上 `tempfile.gettempdir()` 常常是 `/var/folders/.../T` 这类很长的路径，
+    再拼上 `%r@%h:%p` 后容易超过 Unix domain socket 的长度限制，导致：
+    `unix_listener: path "... too long for Unix domain socket"`
+
+    这里改用更短的固定目录 `/tmp`，并使用 OpenSSH 的 `%C` 哈希占位符缩短文件名。
+    """
+    return os.path.join('/tmp', 'ssh_mux_%C')
 
 
 def _use_ssh_multiplexing():
