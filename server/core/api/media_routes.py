@@ -69,8 +69,8 @@ def get_duration() -> ResponseReturnValue:
 
         # 验证和规范化路径
         normalized_path, error_msg = validate_and_normalize_path(file_path, DEFAULT_BASE_DIR, must_be_file=True)
-        if error_msg or not normalized_path:
-            return _err(error_msg) or _err("Invalid file path")
+        if not normalized_path:
+            return _err(error_msg or "Invalid file path")
 
         # 获取媒体文件时长
         duration = get_media_duration(normalized_path)
@@ -283,7 +283,7 @@ def add_file_by_path() -> ResponseReturnValue:
 
         # 验证文件路径
         normalized_path, error_msg = validate_and_normalize_path(file_path)
-        if error_msg or not normalized_path:
+        if not normalized_path:
             return _err(error_msg or "文件路径无效")
         file_path = normalized_path
 
@@ -543,7 +543,7 @@ def save_result() -> ResponseReturnValue:
 
         # 验证目标路径
         normalized_path, error_msg = validate_and_normalize_path(target_path, must_be_file=False)
-        if error_msg or not normalized_path:
+        if not normalized_path:
             return _err(error_msg or "目标路径无效")
         target_path = normalized_path
 
@@ -758,7 +758,7 @@ def update_convert_task() -> ResponseReturnValue:
         # 验证目录路径（如果提供了）
         if directory is not None:
             normalized_path, error_msg = validate_and_normalize_path(directory, must_be_file=False)
-            if error_msg or not normalized_path:
+            if not normalized_path:
                 return _err(error_msg or "目录路径无效")
             directory = normalized_path
 

@@ -289,7 +289,7 @@ def validate_and_normalize_path(file_path: str,
         must_be_file: 是否必须是文件（True）或可以是目录（False）。
 
     Returns:
-        (规范化后的路径, 错误消息)，如果成功则错误消息为 None。
+        (规范化后的路径, 错误消息)，成功时错误消息为 'ok'。
     """
     if not file_path:
         return None, "文件路径不能为空"
