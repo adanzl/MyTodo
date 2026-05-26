@@ -189,7 +189,7 @@ def test_start_task_success(mock_run_task_async, convert_mgr: AudioConvertMgr, t
 
     assert code == 0
     assert msg == "转码任务已启动"
-    mock_run_task_async.assert_called_once_with(task_id, convert_mgr._convert_directory)
+    mock_run_task_async.assert_called_once_with(task_id, convert_mgr._run_convert)
 
 
 def test_start_task_already_processing(convert_mgr: AudioConvertMgr):
@@ -255,7 +255,7 @@ def test_convert_directory_success(mock_run_subprocess, convert_mgr: AudioConver
         return original_exists(path)
 
     with patch('os.path.exists', side_effect=mock_exists):
-        convert_mgr._convert_directory(task)
+        convert_mgr._run_convert(task)
 
     assert task.status == TASK_STATUS_SUCCESS
     assert task.progress['processed'] == 2
@@ -285,7 +285,7 @@ def test_convert_directory_with_failure(mock_run_subprocess, convert_mgr: AudioC
         return original_exists(path)
 
     with patch('os.path.exists', side_effect=mock_exists):
-        convert_mgr._convert_directory(task)
+        convert_mgr._run_convert(task)
 
     assert task.status == TASK_STATUS_FAILED
     assert task.progress['processed'] == 2
@@ -331,7 +331,7 @@ def test_convert_directory_no_files(convert_mgr: AudioConvertMgr, tmp_path, monk
     convert_mgr.update_task(task_id, directory=str(tmp_path))
     task = convert_mgr._get_task(task_id)
 
-    convert_mgr._convert_directory(task)
+    convert_mgr._run_convert(task)
 
     assert task.status == TASK_STATUS_SUCCESS
     assert task.progress['total'] == 0
@@ -349,7 +349,7 @@ def test_convert_directory_stopped(convert_mgr: AudioConvertMgr, tmp_path, monke
     task = convert_mgr._get_task(task_id)
 
     convert_mgr._stop_flags[task_id] = True
-    convert_mgr._convert_directory(task)
+    convert_mgr._run_convert(task)
 
     assert task.status == TASK_STATUS_FAILED
     assert "任务已被停止" in task.error_message

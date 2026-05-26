@@ -12,7 +12,7 @@ import shutil
 from datetime import datetime
 
 from flask import Blueprint, request, send_file, abort
-from werkzeug.exceptions import HTTPException
+from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 from flask.typing import ResponseReturnValue
 from werkzeug.utils import secure_filename
 
@@ -40,6 +40,7 @@ class _CreateConvertTaskBody(BaseModel):
     name: str = Field(default_factory=lambda: datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     output_dir: str | None = None
     overwrite: bool | None = None
+    source_type: str | None = None
 
 
 log = app_logger
@@ -620,8 +621,12 @@ def create_convert_task() -> ResponseReturnValue:
         name = body.name
         output_dir = body.output_dir
         overwrite = body.overwrite
+        source_type = body.source_type
 
-        code, msg, task_id = audio_convert_mgr.create_task(name, output_dir=output_dir, overwrite=overwrite)
+        code, msg, task_id = audio_convert_mgr.create_task(name,
+                                                           output_dir=output_dir,
+                                                           overwrite=overwrite,
+                                                           source_type=source_type)
 
         if code != 0 or not task_id:
             return _err(msg) or _err("Failed to create task")
@@ -632,6 +637,33 @@ def create_convert_task() -> ResponseReturnValue:
     except Exception as e:
         log.error(f"[AudioConvert] 创建任务失败: {e}")
         return _err(f"创建任务失败: {str(e)}")
+
+
+@limiter.limit("10 per minute; 50 per hour")
+@media_bp.route("/media/convert/upload", methods=['POST'])
+def upload_convert_files() -> ResponseReturnValue:
+    """上传待转码文件到指定任务。"""
+    try:
+        args_data = {**request.form.to_dict(), **request.args.to_dict()}
+        body, err = parse_with_model(_TaskIdBody, args_data, err_factory=_err)
+        if err or not body:
+            return err or _err("Invalid request body")
+
+        task_id = body.task_id
+        files = request.files.getlist('file') or request.files.getlist('files[]')
+        code, msg = audio_convert_mgr.upload_files(task_id, files)
+        if code != 0:
+            return _err(msg)
+
+        task_info = audio_convert_mgr.get_task(task_id)
+        return _ok(task_info)
+
+    except RequestEntityTooLarge:
+        log.error("[AudioConvert] 上传文件失败: 文件太大")
+        return _err("文件太大，超过服务器限制")
+    except Exception as e:
+        log.error(f"[AudioConvert] 上传文件失败: {e}")
+        return _err(f"上传文件失败: {str(e)}")
 
 
 @media_bp.route("/media/convert/get", methods=['POST'])
@@ -708,6 +740,8 @@ def update_convert_task() -> ResponseReturnValue:
         output_dir = str(output_dir_raw) if output_dir_raw is not None else None
 
         overwrite_raw = data.get('overwrite')
+        source_type_raw = data.get('source_type')
+        source_type = str(source_type_raw) if source_type_raw is not None else None
         # 将字符串形式的布尔值转换为真正的布尔类型
         if overwrite_raw is not None:
             if isinstance(overwrite_raw, bool):
@@ -718,8 +752,8 @@ def update_convert_task() -> ResponseReturnValue:
                 overwrite = bool(overwrite_raw)
         else:
             overwrite = None
-        if name is None and directory is None and output_dir is None and overwrite is None:
-            return _err("至少需要提供一个要更新的字段（name、directory、output_dir 或 overwrite）")
+        if name is None and directory is None and output_dir is None and overwrite is None and source_type is None:
+            return _err("至少需要提供一个要更新的字段（name、directory、output_dir、overwrite 或 source_type）")
 
         # 验证目录路径（如果提供了）
         if directory is not None:
@@ -732,7 +766,8 @@ def update_convert_task() -> ResponseReturnValue:
                                                   name=name,
                                                   directory=directory,
                                                   output_dir=output_dir,
-                                                  overwrite=overwrite)
+                                                  overwrite=overwrite,
+                                                  source_type=source_type)
         if code != 0:
             return _err(msg)
 
