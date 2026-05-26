@@ -1,7 +1,7 @@
 <template>
-  <div class="flex gap-4 h-[calc(100vh-220px)]">
+  <div class="flex gap-4 h-[calc(100vh-220px)] min-w-0 overflow-hidden">
     <!-- 左侧：任务列表 -->
-    <div class="w-64 border rounded p-3 flex flex-col">
+    <div class="w-64 shrink-0 border rounded p-3 flex flex-col">
       <div class="flex items-center justify-between mb-3">
         <h3 class="text-base font-semibold">任务列表</h3>
         <div class="flex items-center gap-1">
@@ -77,7 +77,7 @@
     </div>
 
     <!-- 中间：文件列表 -->
-    <div class="flex-1 border rounded p-3 flex flex-col min-h-0" v-if="convertCurrentTask">
+    <div class="flex-1 min-w-0 border rounded p-3 flex flex-col min-h-0" v-if="convertCurrentTask">
       <div class="flex items-center justify-between mb-3 shrink-0">
         <div class="flex items-center gap-2 flex-1">
           <h3 class="text-base font-semibold">文件列表: {{ convertCurrentTask.name }}</h3>
@@ -99,33 +99,48 @@
 
       <div class="flex-1 flex flex-col gap-3 min-h-0">
         <!-- 任务信息 -->
-        <div class="flex items-center gap-4 shrink-0">
-          <el-tag
-            :type="getConvertStatusTagType(convertCurrentTask.status)"
-            size="small"
-            class="w-16 text-center shrink-0"
-          >
-            {{ getConvertStatusText(convertCurrentTask.status) }}
-          </el-tag>
-          <el-tooltip
-            v-if="convertCurrentTask.error_message"
-            :content="`错误: ${convertCurrentTask.error_message}`"
-            placement="top"
-            class="flex-1 min-w-0 max-w-md"
-          >
-            <span class="text-red-500 text-xs truncate block max-w-md cursor-help">
-              错误: {{ convertCurrentTask.error_message }}
-            </span>
-          </el-tooltip>
+        <div class="flex items-center justify-between gap-4 shrink-0">
+          <div class="flex items-center gap-4 min-w-0 flex-1">
+            <el-tag
+              :type="getConvertStatusTagType(convertCurrentTask.status)"
+              size="small"
+              class="w-16 text-center shrink-0"
+            >
+              {{ getConvertStatusText(convertCurrentTask.status) }}
+            </el-tag>
+            <el-tooltip
+              v-if="convertCurrentTask.error_message"
+              :content="`错误: ${convertCurrentTask.error_message}`"
+              placement="top"
+              class="min-w-0 max-w-md"
+            >
+              <span class="text-red-500 text-xs truncate block max-w-md cursor-help">
+                错误: {{ convertCurrentTask.error_message }}
+              </span>
+            </el-tooltip>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="text-sm text-gray-600">转码来源</span>
+            <el-radio-group
+              v-model="convertSourceType"
+              size="small"
+              :disabled="isDirectoryOperationDisabled"
+              @change="handleConvertSourceTypeChange"
+            >
+              <el-radio-button label="directory">目录</el-radio-button>
+              <el-radio-button label="upload">上传文件</el-radio-button>
+            </el-radio-group>
+          </div>
         </div>
 
         <!-- 目录选择 -->
-        <div class="border rounded p-3 flex flex-col gap-2">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <h4 class="text-sm font-semibold">转码目录</h4>
+        <div v-if="!isUploadSource" class="border rounded p-3 flex flex-col gap-2 w-full min-w-0 min-h-20">
+          <div class="flex items-start justify-between gap-3 min-w-0">
+            <div class="flex items-center gap-2 min-w-0 flex-1 h-6">
+              <h4 class="text-sm font-semibold leading-5">转码目录</h4>
               <span
                 v-if="
+                  isSourceTypeSynced &&
                   convertCurrentTask.total_files !== null &&
                   convertCurrentTask.total_files !== undefined
                 "
@@ -153,6 +168,74 @@
           </div>
         </div>
 
+        <!-- 上传文件 -->
+        <div v-else class="border rounded p-3 flex flex-col gap-2 w-full min-w-0 min-h-20">
+          <div class="flex items-start justify-between gap-3 min-w-0">
+            <div class="flex items-center gap-2 min-w-0 flex-1 h-6">
+              <h4 class="text-sm font-semibold leading-5">上传待转码文件</h4>
+              <span
+                v-if="
+                  isSourceTypeSynced &&
+                  convertCurrentTask.total_files !== null &&
+                  convertCurrentTask.total_files !== undefined
+                "
+                class="text-xs text-gray-500"
+              >
+                已上传文件数: {{ convertCurrentTask.total_files }}
+              </span>
+            </div>
+            <div class="flex items-center gap-2 shrink-0 self-start">
+              <el-upload
+                class="shrink-0 flex items-center"
+                v-model:file-list="convertUploadFileList"
+                :auto-upload="false"
+                :show-file-list="false"
+                :multiple="true"
+                :disabled="isDirectoryOperationDisabled"
+                :accept="CONVERT_UPLOAD_ACCEPT"
+                @change="handleConvertUploadSelectionChange"
+              >
+                <template #trigger>
+                  <el-button type="primary" v-bind="smallTextButtonProps" :disabled="isDirectoryOperationDisabled">
+                    选择文件
+                  </el-button>
+                </template>
+              </el-upload>
+              <el-button
+                type="success"
+                v-bind="smallTextButtonProps"
+                :disabled="isDirectoryOperationDisabled || convertSelectedUploadFiles.length === 0"
+                :loading="convertLoading"
+                @click="handleConvertUploadFiles"
+              >
+                上传
+              </el-button>
+              <el-button
+                type="info"
+                v-bind="smallTextButtonProps"
+                :disabled="convertSelectedUploadFiles.length === 0"
+                @click="handleConvertClearSelectedUploads"
+              >
+                清空
+              </el-button>
+            </div>
+          </div>
+          <div v-if="convertSelectedUploadFiles.length > 0" class="text-sm text-gray-600 min-w-0">
+            已选择 {{ convertSelectedUploadFiles.length }} 个文件：
+            <span class="text-xs text-gray-500 break-all">
+              {{ convertSelectedUploadFileNames.join("、") }}
+            </span>
+          </div>
+          <div v-else class="text-sm text-gray-400">
+            请选择音频或视频文件并上传到当前任务，再开始转码
+          </div>
+          <el-progress
+            v-if="convertUploadProgress > 0"
+            :percentage="convertUploadProgress"
+            :status="convertUploadProgress === 100 ? 'success' : undefined"
+          />
+        </div>
+
         <!-- 文件列表 -->
         <div class="border rounded p-3 flex flex-col gap-2 flex-1 min-h-0 overflow-hidden">
           <h4 class="text-sm font-semibold shrink-0">文件列表</h4>
@@ -168,44 +251,49 @@
               <el-icon
                 class="shrink-0"
                 :class="{
-                  'text-green-500': getFileStatus(file) === 'success',
-                  'text-red-500': getFileStatus(file) === 'failed',
-                  'text-yellow-500': getFileStatus(file) === 'processing',
-                  'text-gray-400': getFileStatus(file) === 'pending',
+                  'text-green-500': file.status === 'success',
+                  'text-red-500': file.status === 'failed',
+                  'text-yellow-500': file.status === 'processing',
+                  'text-gray-400': file.status === 'pending',
                 }"
               >
-                <Check v-if="getFileStatus(file) === 'success'" />
-                <Close v-else-if="getFileStatus(file) === 'failed'" />
-                <Loading v-else-if="getFileStatus(file) === 'processing'" />
+                <Check v-if="file.status === 'success'" />
+                <Close v-else-if="file.status === 'failed'" />
+                <Loading v-else-if="file.status === 'processing'" />
                 <Clock v-else />
               </el-icon>
               <div class="flex-1 min-w-0 flex items-center gap-3 text-sm">
                 <div class="flex-1 min-w-0 truncate" :title="file.path">
-                  {{ getFileName(file) }}
+                  {{ basename(file.path) }}
                 </div>
                 <div class="flex items-center gap-2 text-xs text-gray-500 shrink-0">
-                  <span v-if="file.size">{{ formatFileSize(file.size) }}</span>
+                  <span v-if="file.size">{{ formatSize(file.size) }}</span>
                   <span v-if="file.duration">{{ formatDuration(file.duration) }}</span>
                 </div>
-                <div
-                  v-if="getFileError(file)"
-                  class="text-xs text-red-500 truncate max-w-xs"
-                  :title="getFileError(file)"
-                >
-                  {{ getFileError(file) }}
+                <div v-if="file.error" class="text-xs text-red-500 truncate max-w-xs" :title="file.error">
+                  {{ file.error }}
                 </div>
               </div>
+              <a
+                v-if="file.status === 'success' && convertCurrentTask && file.outputPath"
+                class="text-xs text-blue-600 hover:text-blue-800 shrink-0 whitespace-nowrap"
+                :href="getConvertFileDownloadUrl(convertCurrentTask.task_id, file.outputPath)"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                下载
+              </a>
             </div>
           </div>
           <div v-else class="flex-1 flex items-center justify-center text-sm text-gray-400 min-h-0">
-            暂无文件，请先选择转码目录
+            {{ isUploadSource ? "暂无文件，请先选择并上传文件" : "暂无文件，请先选择转码目录" }}
           </div>
         </div>
       </div>
     </div>
 
     <!-- 中间：空状态 -->
-    <div class="flex-1 border rounded p-3 flex flex-col" v-else>
+    <div class="flex-1 min-w-0 border rounded p-3 flex flex-col" v-else>
       <div class="flex items-center justify-between mb-3 shrink-0">
         <h3 class="text-base font-semibold">文件列表</h3>
       </div>
@@ -215,7 +303,7 @@
     </div>
 
     <!-- 右侧：输出目录和转码进度 -->
-    <div class="w-80 border rounded p-3 flex flex-col" v-if="convertCurrentTask">
+    <div class="w-80 shrink-0 border rounded p-3 flex flex-col" v-if="convertCurrentTask">
       <div class="flex items-center justify-between mb-3">
         <h3 class="text-base font-semibold">输出信息</h3>
       </div>
@@ -242,8 +330,8 @@
           </el-button>
         </div>
 
-        <!-- 输出目录名称 -->
-        <div class="border rounded p-3 flex flex-col gap-2">
+        <!-- 输出目录名称（仅目录转码） -->
+        <div v-if="!isUploadSource" class="border rounded p-3 flex flex-col gap-2">
           <div class="flex items-center justify-between">
             <h4 class="text-sm font-semibold">输出目录名称</h4>
           </div>
@@ -264,18 +352,7 @@
               保存
             </el-button>
           </div>
-          <div class="text-xs text-gray-400 flex items-center gap-1">
-            <span>文件将保存在转码目录下的此文件夹中</span>
-            <el-tooltip
-              v-if="convertCurrentTask?.directory && convertCurrentTask?.output_dir"
-              :content="`${convertCurrentTask.directory}/${convertCurrentTask.output_dir}`"
-              placement="top"
-            >
-              <el-icon class="cursor-help text-gray-400 hover:text-gray-600">
-                <InfoFilled />
-              </el-icon>
-            </el-tooltip>
-          </div>
+          <div class="text-xs text-gray-400">文件将保存在转码目录下的此文件夹中</div>
         </div>
 
         <!-- 转码进度 -->
@@ -286,20 +363,10 @@
           <h4 class="text-sm font-semibold">转码进度</h4>
           <div v-if="convertCurrentTask.progress" class="space-y-2">
             <div class="text-sm text-gray-600">
-              已处理: {{ convertCurrentTask.progress.processed ?? 0 }} /
-              {{ convertCurrentTask.total_files ?? convertCurrentTask.progress.total ?? 0 }}
+              已处理: {{ convertCurrentTask.progress.processed ?? 0 }} / {{ convertTotalFiles }}
             </div>
             <el-progress
-              :percentage="(convertCurrentTask.total_files ?? convertCurrentTask.progress.total ?? 0) > 0
-                ? Math.round(
-                  ((convertCurrentTask.progress.processed ?? 0) /
-                    (convertCurrentTask.total_files ??
-                      convertCurrentTask.progress.total ??
-                      1)) *
-                  100
-                )
-                : 0
-                "
+              :percentage="convertProgressPercent"
               :status="convertCurrentTask.status === 'processing' ? undefined : 'success'"
             />
             <div
@@ -321,17 +388,14 @@
           <h4 class="text-sm font-semibold">转码结果</h4>
           <div class="text-sm text-gray-600">
             <div>转码完成！所有文件已保存到输出目录</div>
-            <div v-if="convertCurrentTask.progress" class="mt-2">
-              共转换
-              {{ convertCurrentTask.total_files ?? convertCurrentTask.progress.total ?? 0 }} 个文件
-            </div>
+            <div v-if="convertCurrentTask.progress" class="mt-2">共转换 {{ convertTotalFiles }} 个文件</div>
           </div>
         </div>
       </div>
     </div>
 
     <!-- 右侧：空状态 -->
-    <div class="w-80 border rounded p-3 flex flex-col" v-else>
+    <div class="w-80 shrink-0 border rounded p-3 flex flex-col" v-else>
       <h3 class="text-base font-semibold mb-3">输出信息</h3>
       <div class="flex-1 flex items-center justify-center text-sm text-gray-400">
         请从左侧选择一个任务查看输出信息
@@ -348,7 +412,7 @@
       :default-path="convertCurrentTask?.directory || undefined"
       :confirm-loading="convertLoading"
       @confirm="handleConvertDirectoryConfirm"
-      @close="handleConvertCloseDirectoryBrowser"
+      @close="convertDirectoryDialogVisible = false"
     >
     </FileDialog>
 
@@ -357,7 +421,7 @@
       v-model="convertCreateTaskDialogVisible"
       title="创建转码任务"
       width="400px"
-      @close="convertNewTaskName = ''"
+      @close="handleConvertCreateTaskDialogClose"
     >
       <el-form>
         <el-form-item label="任务名称">
@@ -366,6 +430,12 @@
             placeholder="请输入任务名称"
             @keyup.enter="handleConvertCreateTaskConfirm"
           />
+        </el-form-item>
+        <el-form-item label="转码来源">
+          <el-radio-group v-model="convertNewTaskSourceType">
+            <el-radio value="directory">目录</el-radio>
+            <el-radio value="upload">上传文件</el-radio>
+          </el-radio-group>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -405,32 +475,37 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import {
-  Refresh,
-  Plus,
-  Delete,
-  Edit,
-  Check,
-  Close,
-  Loading,
-  Clock,
-  InfoFilled,
-} from "@element-plus/icons-vue";
+import type { UploadFile, UploadFiles, UploadUserFile } from "element-plus";
+import { Refresh, Plus, Delete, Edit, Check, Close, Loading, Clock } from "@element-plus/icons-vue";
 import FileDialog from "@/views/dialogs/FileDialog.vue";
 import { logAndNoticeError } from "@/utils/error";
+import { formatDuration, formatSize } from "@/utils/format";
 import { useControllableInterval } from "@/composables/useInterval";
 import { CONVERT_TASK_POLLING_INTERVAL } from "@/constants/media";
-import type { ConvertTask } from "@/types/tools";
+import type { ConvertSourceType, ConvertTask } from "@/types/tools";
 import {
   getConvertTaskList,
   createConvertTask,
   getConvertTask,
   deleteConvertTask,
   updateConvertTask,
+  uploadConvertFiles,
   startConvertTask,
+  getConvertFileDownloadUrl,
 } from "@/api/api-audio-convert";
 
-// 音频转码相关状态
+const CONVERT_UPLOAD_ACCEPT =
+  ".mp3,.wav,.flac,.aac,.m4a,.ogg,.wma,.mp4,.avi,.mkv,.mov,.wmv,.flv,.webm,.m4v,.3gp,.asf,.vob,.ts,.mts,.m2ts";
+const STATUS_MAP: Record<string, { tag: string; text: string }> = {
+  pending: { tag: "info", text: "等待" },
+  processing: { tag: "warning", text: "处理" },
+  success: { tag: "success", text: "成功" },
+  failed: { tag: "danger", text: "失败" },
+};
+const smallIconButtonProps = { size: "small" as const, plain: true, class: "!w-8 !h-6 !p-0" };
+const smallTextButtonProps = { size: "small" as const, plain: true, class: "!h-5 !text-xs !px-2" };
+const mediumTextButtonProps = { size: "small" as const, plain: true, class: "!h-7 !text-xs" };
+
 const convertLoading = ref(false);
 const convertTaskList = ref<ConvertTask[]>([]);
 const convertCurrentTask = ref<ConvertTask | null>(null);
@@ -438,466 +513,291 @@ const convertDirectoryDialogVisible = ref(false);
 const convertOutputDir = ref("mp3");
 const convertOutputDirChanged = ref(false);
 const convertOverwrite = ref(true);
-const convertOverwriteChanged = ref(false);
+const convertSourceType = ref<ConvertSourceType>("directory");
 const convertCreateTaskDialogVisible = ref(false);
 const convertNewTaskName = ref("");
+const convertNewTaskSourceType = ref<ConvertSourceType>("directory");
 const convertRenameTaskDialogVisible = ref(false);
 const convertRenameTaskName = ref("");
+const convertUploadFileList = ref<UploadUserFile[]>([]);
+const convertUploadProgress = ref(0);
 
-// 按钮公共属性
-const smallIconButtonProps = { size: "small" as const, plain: true, class: "!w-8 !h-6 !p-0" };
-const smallTextButtonProps = { size: "small" as const, plain: true, class: "!h-5 !text-xs !px-2" };
-const mediumTextButtonProps = { size: "small" as const, plain: true, class: "!h-7 !text-xs" };
+const basename = (path: string) => path.split("/").pop() || path;
+const getConvertStatusTagType = (status: string) => STATUS_MAP[status]?.tag ?? "info";
+const getConvertStatusText = (status: string) => STATUS_MAP[status]?.text ?? "未知";
+const confirmAction = (message: string, title = "提示") =>
+  ElMessageBox.confirm(message, title, {
+    confirmButtonText: "确定",
+    cancelButtonText: "取消",
+    type: "warning",
+  })
+    .then(() => true)
+    .catch(() => false);
 
-// 加载转码任务列表
-const loadConvertTaskList = async () => {
+const withLoading = async (action: () => Promise<void>, errorMessage: string) => {
   try {
     convertLoading.value = true;
-    const response = await getConvertTaskList();
-    if (response.code === 0) {
-      convertTaskList.value = response.data.tasks || [];
-      if (convertTaskList.value.length > 0 && !convertCurrentTask.value) {
-        await handleConvertViewTask(convertTaskList.value[0].task_id);
-      }
-    } else {
-      ElMessage.error(response.msg || "获取任务列表失败");
-    }
+    await action();
   } catch (error) {
-    logAndNoticeError(error as Error, "获取任务列表失败");
+    logAndNoticeError(error as Error, errorMessage);
   } finally {
     convertLoading.value = false;
   }
 };
 
-// 打开创建任务对话框
+const resetUpload = (clearFiles = false) => {
+  convertUploadProgress.value = 0;
+  if (clearFiles) convertUploadFileList.value = [];
+};
+
+const applyTask = (task: ConvertTask) => {
+  convertCurrentTask.value = task;
+  const index = convertTaskList.value.findIndex(item => item.task_id === task.task_id);
+  if (index >= 0) convertTaskList.value[index] = { ...task };
+  convertOutputDir.value = task.output_dir || "mp3";
+  convertOutputDirChanged.value = false;
+  convertOverwrite.value = task.overwrite !== false;
+  convertSourceType.value = (task.source_type || "directory") as ConvertSourceType;
+  resetUpload(true);
+};
+
+const syncTask = async (taskId?: string) => {
+  const id = taskId ?? convertCurrentTask.value?.task_id;
+  if (!id) return;
+  applyTask((await getConvertTask(id)).data);
+};
+
+const reloadCurrentTask = (taskId?: string) =>
+  withLoading(() => syncTask(taskId), "获取任务信息失败");
+
+const patchTask = async (
+  payload: Parameters<typeof updateConvertTask>[1],
+  successMessage: string,
+  errorMessage: string
+) => {
+  const task = convertCurrentTask.value;
+  if (!task) return;
+  await withLoading(async () => {
+    await updateConvertTask(task.task_id, payload);
+    ElMessage.success(successMessage);
+    await syncTask();
+  }, errorMessage);
+};
+
+const loadConvertTaskList = () =>
+  withLoading(async () => {
+    convertTaskList.value = (await getConvertTaskList()).data.tasks || [];
+    if (convertTaskList.value.length && !convertCurrentTask.value) {
+      await syncTask(convertTaskList.value[0].task_id);
+    }
+  }, "获取任务列表失败");
+
+const handleConvertViewTask = (taskId: string) => reloadCurrentTask(taskId);
+
 const handleConvertCreateTask = () => {
-  // 设置默认任务名为当前时间
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  const hours = String(now.getHours()).padStart(2, "0");
-  const minutes = String(now.getMinutes()).padStart(2, "0");
-  const seconds = String(now.getSeconds()).padStart(2, "0");
-  convertNewTaskName.value = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  convertNewTaskName.value = new Date().toISOString().slice(0, 19).replace("T", " ");
   convertCreateTaskDialogVisible.value = true;
 };
 
-// 确认创建任务
-const handleConvertCreateTaskConfirm = async () => {
-  if (!convertNewTaskName.value.trim()) {
-    ElMessage.warning("请输入任务名称");
-    return;
-  }
-
-  try {
-    convertLoading.value = true;
-    const response = await createConvertTask({
-      name: convertNewTaskName.value.trim(),
-    });
-
-    if (response.code === 0) {
-      ElMessage.success("任务创建成功");
-      convertCreateTaskDialogVisible.value = false;
-      convertNewTaskName.value = "";
-      await loadConvertTaskList();
-      handleConvertViewTask(response.data.task_id);
-    } else {
-      ElMessage.error(response.msg || "创建任务失败");
-    }
-  } catch (error) {
-    logAndNoticeError(error as Error, "创建任务失败");
-  } finally {
-    convertLoading.value = false;
-  }
+const handleConvertCreateTaskDialogClose = () => {
+  convertNewTaskName.value = "";
+  convertNewTaskSourceType.value = "directory";
 };
 
-// 打开改名对话框
+const handleConvertCreateTaskConfirm = async () => {
+  if (!convertNewTaskName.value.trim()) return ElMessage.warning("请输入任务名称");
+  await withLoading(async () => {
+    const { data } = await createConvertTask({
+      name: convertNewTaskName.value.trim(),
+      source_type: convertNewTaskSourceType.value,
+    });
+    ElMessage.success("任务创建成功");
+    convertCreateTaskDialogVisible.value = false;
+    await loadConvertTaskList();
+    if (data?.task_id) await syncTask(data.task_id);
+  }, "创建任务失败");
+};
+
 const handleConvertRenameTask = () => {
-  if (!convertCurrentTask.value) {
-    return;
-  }
+  if (!convertCurrentTask.value) return;
   convertRenameTaskName.value = convertCurrentTask.value.name;
   convertRenameTaskDialogVisible.value = true;
 };
 
-// 确认改名
 const handleConvertRenameTaskConfirm = async () => {
-  if (!convertCurrentTask.value) {
-    return;
-  }
-
-  if (!convertRenameTaskName.value.trim()) {
-    ElMessage.warning("请输入任务名称");
-    return;
-  }
-
-  try {
-    convertLoading.value = true;
-    const response = await updateConvertTask(convertCurrentTask.value.task_id, {
-      name: convertRenameTaskName.value.trim(),
-    });
-
-    if (response.code === 0) {
-      ElMessage.success("任务名称修改成功");
-      convertRenameTaskDialogVisible.value = false;
-      convertRenameTaskName.value = "";
-      await handleConvertViewTask(convertCurrentTask.value.task_id);
-    } else {
-      ElMessage.error(response.msg || "修改任务名称失败");
-    }
-  } catch (error) {
-    logAndNoticeError(error as Error, "修改任务名称失败");
-  } finally {
-    convertLoading.value = false;
-  }
+  if (!convertRenameTaskName.value.trim()) return ElMessage.warning("请输入任务名称");
+  await patchTask({ name: convertRenameTaskName.value.trim() }, "任务名称修改成功", "修改任务名称失败");
+  convertRenameTaskDialogVisible.value = false;
+  convertRenameTaskName.value = "";
 };
 
-// 查看转码任务
-const handleConvertViewTask = async (taskId: string) => {
-  try {
-    convertLoading.value = true;
-    const response = await getConvertTask(taskId);
-    if (response.code === 0) {
-      convertCurrentTask.value = response.data;
-      // 同步更新任务列表中对应任务的状态
-      const taskIndex = convertTaskList.value.findIndex(t => t.task_id === taskId);
-      if (taskIndex !== -1) {
-        convertTaskList.value[taskIndex] = { ...response.data };
-      }
-      // 初始化输出目录名称
-      convertOutputDir.value = response.data.output_dir || "mp3";
-      convertOutputDirChanged.value = false;
-      // 初始化覆盖选项
-      convertOverwrite.value = response.data.overwrite !== false; // 默认为 true
-      convertOverwriteChanged.value = false;
-    } else {
-      ElMessage.error(response.msg || "获取任务信息失败");
-    }
-  } catch (error) {
-    logAndNoticeError(error as Error, "获取任务信息失败");
-  } finally {
-    convertLoading.value = false;
-  }
-};
-
-// 删除转码任务
 const handleConvertDeleteTask = async (taskId: string) => {
-  const confirmed = await ElMessageBox.confirm("确定要删除该任务吗？", "提示", {
-    confirmButtonText: "确定",
-    cancelButtonText: "取消",
-    type: "warning",
-  }).catch(() => false);
-
-  if (!confirmed) return;
-
-  try {
-    convertLoading.value = true;
-    const response = await deleteConvertTask(taskId);
-    if (response.code === 0) {
-      ElMessage.success("任务删除成功");
-      await loadConvertTaskList();
-      if (convertCurrentTask.value && convertCurrentTask.value.task_id === taskId) {
-        if (convertTaskList.value && convertTaskList.value.length > 0) {
-          await handleConvertViewTask(convertTaskList.value[0].task_id);
-        } else {
-          convertCurrentTask.value = null;
-        }
-      }
-    } else {
-      ElMessage.error(response.msg || "删除任务失败");
+  if (!(await confirmAction("确定要删除该任务吗？"))) return;
+  await withLoading(async () => {
+    await deleteConvertTask(taskId);
+    ElMessage.success("任务删除成功");
+    convertTaskList.value = (await getConvertTaskList()).data.tasks || [];
+    if (convertCurrentTask.value?.task_id !== taskId) return;
+    if (convertTaskList.value.length) await syncTask(convertTaskList.value[0].task_id);
+    else {
+      convertCurrentTask.value = null;
+      resetUpload(true);
     }
-  } catch (error) {
-    logAndNoticeError(error as Error, "删除任务失败");
-  } finally {
-    convertLoading.value = false;
-  }
+  }, "删除任务失败");
 };
 
-// 打开目录选择对话框
 const handleConvertOpenDirectoryBrowser = () => {
-  if (!convertCurrentTask.value) {
-    ElMessage.warning("请先创建或选择任务");
-    return;
-  }
+  if (!convertCurrentTask.value) return ElMessage.warning("请先创建或选择任务");
   convertDirectoryDialogVisible.value = true;
 };
 
-// 处理目录选择确认
 const handleConvertDirectoryConfirm = async (filePaths: string[]) => {
-  if (!convertCurrentTask.value) {
-    return;
-  }
-
-  if (filePaths.length === 0) {
-    return;
-  }
-
-  const directoryPath = filePaths[0];
-
-  try {
-    convertLoading.value = true;
-    const response = await updateConvertTask(convertCurrentTask.value.task_id, {
-      directory: directoryPath,
-    });
-
-    if (response.code === 0) {
-      ElMessage.success("目录设置成功");
-      await handleConvertViewTask(convertCurrentTask.value.task_id);
-      convertDirectoryDialogVisible.value = false;
-    } else {
-      ElMessage.error(response.msg || "设置目录失败");
-    }
-  } catch (error) {
-    logAndNoticeError(error as Error, "设置目录失败");
-  } finally {
-    convertLoading.value = false;
-  }
-};
-
-// 关闭目录选择对话框
-const handleConvertCloseDirectoryBrowser = () => {
+  if (!filePaths.length) return;
+  await patchTask({ directory: filePaths[0], source_type: "directory" }, "目录设置成功", "设置目录失败");
   convertDirectoryDialogVisible.value = false;
 };
 
-// 输出目录名称变化处理
+const handleConvertSourceTypeChange = (value: string | number | boolean) => {
+  convertSourceType.value = value as ConvertSourceType;
+  if (convertSourceType.value !== "upload") resetUpload(true);
+};
+
+const handleConvertUploadSelectionChange = (_file: UploadFile, files: UploadFiles) => {
+  convertUploadFileList.value = files;
+  if (convertUploadProgress.value === 100) convertUploadProgress.value = 0;
+};
+
+const handleConvertClearSelectedUploads = () => resetUpload(true);
+
+const handleConvertUploadFiles = async () => {
+  const task = convertCurrentTask.value;
+  const files = convertSelectedUploadFiles.value;
+  if (!task || !files.length) return ElMessage.warning("请先选择待上传文件");
+  await withLoading(async () => {
+    convertUploadProgress.value = 0;
+    await uploadConvertFiles(task.task_id, files, p => {
+      convertUploadProgress.value = p;
+    });
+    convertUploadProgress.value = 100;
+    ElMessage.success("文件上传成功");
+    resetUpload(true);
+    await syncTask();
+    setTimeout(() => {
+      if (convertUploadProgress.value === 100) convertUploadProgress.value = 0;
+    }, 500);
+  }, "文件上传失败");
+};
+
 const handleConvertOutputDirChange = () => {
-  if (!convertCurrentTask.value) {
-    return;
-  }
-  const currentValue = convertCurrentTask.value.output_dir || "mp3";
-  convertOutputDirChanged.value = convertOutputDir.value !== currentValue;
+  if (!convertCurrentTask.value) return;
+  convertOutputDirChanged.value =
+    convertOutputDir.value !== (convertCurrentTask.value.output_dir || "mp3");
 };
 
-// 保存输出目录名称
 const handleConvertSaveOutputDir = async () => {
-  if (!convertCurrentTask.value) {
-    return;
-  }
-
-  if (!convertOutputDir.value.trim()) {
-    ElMessage.error("输出目录名称不能为空");
-    return;
-  }
-
-  try {
-    convertLoading.value = true;
-    const response = await updateConvertTask(convertCurrentTask.value.task_id, {
-      output_dir: convertOutputDir.value.trim(),
-    });
-
-    if (response.code === 0) {
-      ElMessage.success("输出目录名称保存成功");
-      await handleConvertViewTask(convertCurrentTask.value.task_id);
-    } else {
-      ElMessage.error(response.msg || "保存输出目录名称失败");
-    }
-  } catch (error) {
-    logAndNoticeError(error as Error, "保存输出目录名称失败");
-  } finally {
-    convertLoading.value = false;
-  }
+  if (!convertOutputDir.value.trim()) return ElMessage.error("输出目录名称不能为空");
+  await patchTask({ output_dir: convertOutputDir.value.trim() }, "输出目录名称保存成功", "保存输出目录名称失败");
 };
 
-// 覆盖选项变化处理
 const handleConvertOverwriteChange = () => {
-  if (!convertCurrentTask.value) {
-    return;
-  }
-  const currentValue = convertCurrentTask.value.overwrite !== false; // 默认为 true
-  convertOverwriteChanged.value = convertOverwrite.value !== currentValue;
-
-  // 如果改变了，自动保存
-  if (convertOverwriteChanged.value) {
-    handleConvertSaveOverwrite();
+  const task = convertCurrentTask.value;
+  if (!task) return;
+  if (convertOverwrite.value !== (task.overwrite !== false)) {
+    void patchTask({ overwrite: convertOverwrite.value }, "覆盖选项保存成功", "保存覆盖选项失败");
   }
 };
 
-// 保存覆盖选项
-const handleConvertSaveOverwrite = async () => {
-  if (!convertCurrentTask.value) {
-    return;
-  }
-
-  try {
-    convertLoading.value = true;
-    const response = await updateConvertTask(convertCurrentTask.value.task_id, {
-      overwrite: convertOverwrite.value,
-    });
-
-    if (response.code === 0) {
-      ElMessage.success("覆盖选项保存成功");
-      await handleConvertViewTask(convertCurrentTask.value.task_id);
-    } else {
-      ElMessage.error(response.msg || "保存覆盖选项失败");
-    }
-  } catch (error) {
-    logAndNoticeError(error as Error, "保存覆盖选项失败");
-  } finally {
-    convertLoading.value = false;
-  }
-};
-
-// 开始转码
 const handleConvertStart = async () => {
-  if (!convertCurrentTask.value) {
-    return;
-  }
+  const task = convertCurrentTask.value;
+  if (!task) return;
+  if (isUploadSource.value && !convertFileList.value.length) return ElMessage.warning("请先上传待转码文件");
+  if (!isUploadSource.value && !task.directory) return ElMessage.warning("请先选择转码目录");
+  const message = isUploadSource.value
+    ? `确定要开始转码吗？将转换当前任务中已上传的 ${convertFileList.value.length} 个文件。`
+    : `确定要开始转码吗？将转换 "${task.name}"。`;
+  if (!(await confirmAction(message, "确认转码"))) return;
+  await withLoading(async () => {
+    await startConvertTask(task.task_id);
+    ElMessage.success("转码任务已启动");
+    convertTaskList.value = (await getConvertTaskList()).data.tasks || [];
+    await syncTask();
+    startPolling();
+  }, "启动任务失败");
+};
 
-  if (!convertCurrentTask.value.directory) {
-    ElMessage.warning("请先选择转码目录");
-    return;
-  }
-
-  const confirmed = await ElMessageBox.confirm(
-    `确定要开始转码吗？将转换 "${convertCurrentTask.value.name}" 。`,
-    "确认转码",
-    {
-      confirmButtonText: "确定",
-      cancelButtonText: "取消",
-      type: "warning",
-    }
-  ).catch(() => false);
-
-  if (!confirmed) return;
-
+const { start: startPolling, stop: stopPolling } = useControllableInterval(async () => {
+  const task = convertCurrentTask.value;
+  if (!task?.task_id) return stopPolling();
   try {
-    convertLoading.value = true;
-    const response = await startConvertTask(convertCurrentTask.value.task_id);
-    if (response.code === 0) {
-      ElMessage.success("转码任务已启动");
-      await loadConvertTaskList();
-      await handleConvertViewTask(convertCurrentTask.value.task_id);
-      startConvertPollingTaskStatus();
-    } else {
-      ElMessage.error(response.msg || "启动任务失败");
+    const { data } = await getConvertTask(task.task_id);
+    applyTask(data);
+    if (data.status !== "processing") {
+      convertTaskList.value = (await getConvertTaskList()).data.tasks || [];
+      stopPolling();
     }
   } catch (error) {
-    logAndNoticeError(error as Error, "启动任务失败");
-  } finally {
-    convertLoading.value = false;
+    logAndNoticeError(error as Error, "刷新任务状态失败");
   }
-};
+}, CONVERT_TASK_POLLING_INTERVAL);
 
-// 轮询转码任务状态
-const { start: startConvertPolling, stop: stopConvertPolling } = useControllableInterval(
-  async () => {
-    if (!convertCurrentTask.value) {
-      stopConvertPolling();
-      return;
-    }
-
-    // 先更新任务列表，确保状态同步
-    await loadConvertTaskList();
-
-    // 检查当前任务状态，如果不再是 processing，则停止轮询
-    if (convertCurrentTask.value.status !== "processing") {
-      // 停止轮询前，再次更新任务列表和当前任务，确保状态是最新的
-      await handleConvertViewTask(convertCurrentTask.value.task_id);
-      stopConvertPolling();
-      return;
-    }
-
-    // 更新当前任务详情
-    await handleConvertViewTask(convertCurrentTask.value.task_id);
-  },
-  CONVERT_TASK_POLLING_INTERVAL,
-  { immediate: false }
-);
-
-const startConvertPollingTaskStatus = () => {
-  startConvertPolling();
-};
-
-// 转码状态映射
-const CONVERT_STATUS_MAP: Record<string, { tag: string; text: string }> = {
-  pending: { tag: "info", text: "等待" },
-  processing: { tag: "warning", text: "处理" },
-  success: { tag: "success", text: "成功" },
-  failed: { tag: "danger", text: "失败" },
-};
-
-// 获取转码状态标签类型
-const getConvertStatusTagType = (status: string): string => {
-  return CONVERT_STATUS_MAP[status]?.tag || "info";
-};
-
-// 获取转码状态文本
-const getConvertStatusText = (status: string): string => {
-  return CONVERT_STATUS_MAP[status]?.text || "未知";
-};
-
-// 计算属性
 const isTaskProcessing = computed(() => convertCurrentTask.value?.status === "processing");
-const isStartConvertDisabled = computed(
-  () => !convertCurrentTask.value?.directory || isTaskProcessing.value
+const isUploadSource = computed(() => convertSourceType.value === "upload");
+const isSourceTypeSynced = computed(
+  () =>
+    !!convertCurrentTask.value &&
+    convertSourceType.value ===
+      ((convertCurrentTask.value.source_type || "directory") as ConvertSourceType)
 );
+const isStartConvertDisabled = computed(() => {
+  const task = convertCurrentTask.value;
+  if (!task || isTaskProcessing.value || !isSourceTypeSynced.value) return true;
+  return isUploadSource.value ? !convertFileList.value.length : !task.directory;
+});
 const isDirectoryOperationDisabled = computed(() => isTaskProcessing.value);
+const convertSelectedUploadFiles = computed(() => {
+  const files: File[] = [];
+  for (const item of convertUploadFileList.value) {
+    if (item.raw) files.push(item.raw as File);
+  }
+  return files;
+});
+const convertSelectedUploadFileNames = computed(() =>
+  convertSelectedUploadFiles.value.map(f => f.name)
+);
+const convertTotalFiles = computed(() => {
+  const task = convertCurrentTask.value;
+  return task?.total_files ?? task?.progress?.total ?? 0;
+});
+const convertProgressPercent = computed(() => {
+  const task = convertCurrentTask.value;
+  if (!task?.progress || !convertTotalFiles.value) return 0;
+  return Math.round(((task.progress.processed ?? 0) / convertTotalFiles.value) * 100);
+});
 
-// 文件列表
+const resolveOutputPath = (task: ConvertTask, inputPath: string, stored?: string) => {
+  if (stored) return stored;
+  if (task.file_status?.[inputPath]?.status !== "success" || !task.resolved_output_dir) return;
+  const name = basename(inputPath);
+  const dot = name.lastIndexOf(".");
+  return `${task.resolved_output_dir}/${dot > 0 ? name.slice(0, dot) : name}.mp3`;
+};
+
 const convertFileList = computed(() => {
-  if (!convertCurrentTask.value?.file_status) {
-    return [];
-  }
-  return Object.keys(convertCurrentTask.value.file_status).map(filePath => {
-    const fileStatus = convertCurrentTask.value!.file_status![filePath];
-    return {
-      path: filePath,
-      status: fileStatus.status || "pending",
-      error: fileStatus.error,
-      size: fileStatus.size,
-      duration: fileStatus.duration,
-    };
-  });
+  const task = convertCurrentTask.value;
+  if (!task?.file_status || !isSourceTypeSynced.value) return [];
+  return Object.entries(task.file_status).map(([path, file]) => ({
+    path,
+    outputPath: resolveOutputPath(task, path, file.output_path),
+    status: file.status || "pending",
+    error: file.error,
+    size: file.size,
+    duration: file.duration,
+  }));
 });
 
-// 获取文件名
-const getFileName = (file: { path: string }) => {
-  return file.path.split("/").pop() || file.path;
-};
-
-// 获取文件状态
-const getFileStatus = (file: {
-  status: string;
-}): "success" | "failed" | "processing" | "pending" => {
-  return file.status as "success" | "failed" | "processing" | "pending";
-};
-
-// 获取文件错误信息
-const getFileError = (file: { error?: string }): string | undefined => {
-  return file.error;
-};
-
-// 格式化文件大小
-const formatFileSize = (bytes?: number): string => {
-  if (!bytes) return "";
-  const units = ["B", "KB", "MB", "GB"];
-  let size = bytes;
-  let unitIndex = 0;
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex++;
-  }
-  return `${size.toFixed(1)} ${units[unitIndex]}`;
-};
-
-// 格式化时长
-const formatDuration = (seconds?: number): string => {
-  if (!seconds) return "";
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  }
-  return `${minutes}:${secs.toString().padStart(2, "0")}`;
-};
-
-onMounted(() => {
-  loadConvertTaskList();
-});
-
+onMounted(loadConvertTaskList);
 onUnmounted(() => {
-  stopConvertPolling();
+  stopPolling();
+  resetUpload(true);
 });
 </script>

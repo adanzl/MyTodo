@@ -42,12 +42,11 @@ import Sidebar from "@/views/Sidebar.vue";
 import Login from "@/views/PageLogin.vue";
 import { useUserStore } from "@/stores/user";
 import {
-  isLocalIpAvailable,
-  checkLocalIpAvailable,
-  switchToLocal,
-  switchToRemote,
+  getCurrentLocalPort,
   LOCAL_IP,
-  LOCAL_PORT,
+  startServerMonitor,
+  stopServerMonitor,
+  subscribeServerStatus,
 } from "@/api/config";
 
 // 使用 Pinia Store
@@ -62,42 +61,12 @@ const handleCollapseChange = (collapsed: boolean) => {
 
 // 服务器状态
 const localIpStatus = ref<boolean | null>(null);
-
-// 检测并切换服务器
-const checkAndSwitchServer = async () => {
-  const isAvailable = await checkLocalIpAvailable();
-
-  // 获取当前状态
-  const currentStatus = isLocalIpAvailable();
-
-  if (isAvailable && currentStatus !== true) {
-    // 本地可用且当前不是本地，尝试切换到本地
-    switchToLocal();
-    // 重新获取状态（switchToLocal 可能因为协议问题没有切换）
-    const newStatus = isLocalIpAvailable();
-    localIpStatus.value = newStatus;
-
-    if (newStatus === true) {
-      console.log(`[Server Switch] ✅ 切换到本地服务器: ${LOCAL_IP}:${LOCAL_PORT}`);
-    } else {
-      // 未能切换（可能是协议不匹配）
-      console.log(`[Server Switch] ⚠️ 检测到本地服务器可用，但因协议不匹配无法切换`);
-    }
-  } else if (!isAvailable && currentStatus !== false) {
-    // 本地不可用且当前不是远程，切换到远程
-    switchToRemote();
-    localIpStatus.value = false;
-    console.log("[Server Switch] 🔄 切换到远程服务器");
-  } else {
-    // 状态未变化，只更新显示
-    localIpStatus.value = currentStatus;
-  }
-};
+let unsubscribeServerStatus: (() => void) | null = null;
 
 // 服务器状态显示
 const serverStatusText = computed(() => {
   if (localIpStatus.value === true) {
-    return `本地 (${LOCAL_IP}:${LOCAL_PORT})`;
+    return `本地 (${LOCAL_IP}:${getCurrentLocalPort()})`;
   } else if (localIpStatus.value === false) {
     return "远程";
   } else {
@@ -132,31 +101,36 @@ const handleLoginSuccess = (userInfo: { id: number; name: string; icon: string }
   }
 };
 
-let serverCheckInterval: ReturnType<typeof setInterval> | null = null;
-
 onMounted(async () => {
   // 使用 store 刷新用户列表
   await userStore.refreshUserList();
   // 从 localStorage 恢复当前用户
   await userStore.restoreCurUser();
 
-  // 立即执行一次检测
-  await checkAndSwitchServer();
+  unsubscribeServerStatus = subscribeServerStatus((isUsingLocalServer, changed) => {
+    const previousStatus = localIpStatus.value;
+    localIpStatus.value = isUsingLocalServer;
 
-  // 创建定时任务，每 5 秒检测一次
-  serverCheckInterval = setInterval(async () => {
-    await checkAndSwitchServer();
-  }, 5000);
+    if (!changed || previousStatus === null) {
+      return;
+    }
 
-  console.log("[Server Monitor] 服务器监控已启动，每 5 秒检测一次");
+    if (isUsingLocalServer) {
+      console.log(`[Server Switch] ✅ 切换到本地服务器: ${LOCAL_IP}:${getCurrentLocalPort()}`);
+      return;
+    }
+
+    console.log("[Server Switch] 🔄 切换到远程服务器");
+  });
+
+  await startServerMonitor();
 });
 
 // 组件卸载时清除定时器
 onBeforeUnmount(() => {
-  if (serverCheckInterval) {
-    clearInterval(serverCheckInterval);
-    console.log("[Server Monitor] 服务器监控已停止");
-  }
+  unsubscribeServerStatus?.();
+  unsubscribeServerStatus = null;
+  stopServerMonitor();
 });
 </script>
 

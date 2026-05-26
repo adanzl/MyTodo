@@ -348,17 +348,10 @@ const handleMaterialSelectionChange = (selection: Material[]) => {
 };
 
 /**
- * 行点击事件（PDF单选，其他多选）
+ * 行点击事件：切换选中状态
  */
 const handleRowClick = (row: Material) => {
-  if (row.type === 1) {
-    // PDF类型：单选逻辑
-    materialTableRef.value?.clearSelection();
-    materialTableRef.value?.toggleRowSelection(row, true);
-  } else {
-    // 非PDF类型：切换选中状态
-    materialTableRef.value?.toggleRowSelection(row);
-  }
+  materialTableRef.value?.toggleRowSelection(row);
 };
 
 const ensureDay = (result: DailyMaterialMap, internalDay: number): TaskMaterialItem[] => {

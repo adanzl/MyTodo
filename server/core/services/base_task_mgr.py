@@ -31,6 +31,7 @@ class FileInfo(TypedDict, total=False):
     index: int
     status: str
     error: str
+    output_path: str
 
 
 @dataclass(kw_only=True)
@@ -69,11 +70,11 @@ class BaseTaskMgr(ABC, Generic[TTask]):
     def _get_task(self, task_id: str) -> Optional[TTask]:
         return self._tasks.get(task_id)
 
-    def _get_task_or_err(self, task_id: str) -> Tuple[Optional[TTask], Optional[str]]:
+    def _get_task_or_err(self, task_id: str) -> Tuple[Optional[TTask], str]:
         task = self._get_task(task_id)
         if not task:
             return None, '任务不存在'
-        return task, None
+        return task, 'ok'
 
     def _get_task_meta_file(self) -> str:
         return os.path.join(self._base_dir, self.TASK_META_FILE)
@@ -128,7 +129,7 @@ class BaseTaskMgr(ABC, Generic[TTask]):
     def stop_task(self, task_id: str) -> Tuple[int, str]:
         with self._task_lock.gen_wlock():
             task, err = self._get_task_or_err(task_id)
-            if err:
+            if task is None:
                 return -1, err
             if task.status != TASK_STATUS_PROCESSING:
                 return -1, '任务未在处理中'
@@ -208,7 +209,7 @@ class BaseTaskMgr(ABC, Generic[TTask]):
     def delete_task(self, task_id: str) -> Tuple[int, str]:
         with self._task_lock.gen_wlock():
             task, err = self._get_task_or_err(task_id)
-            if err:
+            if task is None:
                 return -1, err
 
             if task.status == TASK_STATUS_PROCESSING:

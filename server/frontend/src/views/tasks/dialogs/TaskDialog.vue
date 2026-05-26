@@ -748,16 +748,9 @@ const handleMaterialSelectionChange = (selection: Material[]) => {
   });
 };
 
-// 行点击事件
+// 行点击事件：切换选中状态
 const handleRowClick = (row: Material) => {
-  // PDF类型：单选逻辑
-  if (row.type === 1) {
-    materialTableRef.value?.clearSelection();
-    materialTableRef.value?.toggleRowSelection(row, true);
-  } else {
-    // 非PDF类型：切换选中状态
-    materialTableRef.value?.toggleRowSelection(row);
-  }
+  materialTableRef.value?.toggleRowSelection(row);
 };
 
 // 确认添加素材

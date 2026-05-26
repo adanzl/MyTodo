@@ -24,71 +24,204 @@ const LOCAL_BASE_URL = `https://${LOCAL_IP}:${LOCAL_HTTPS_PORT}`;
 // 如果需要切换回 HTTP，使用下面这行
 // const LOCAL_BASE_URL = `http://${LOCAL_IP}:${LOCAL_HTTP_PORT}`;
 
-// 全局变量：保存 IP 可用性检测结果
-let localIpAvailable: boolean | null = null; // null 表示未检测，true/false 表示检测结果
+type ServerMode = "local" | "remote";
+type ServerStatusListener = (isLocal: boolean, changed: boolean) => void;
+
+// 本地连通性探测结果，null 表示尚未探测
+let localIpAvailable: boolean | null = null;
+// 当前实际使用的服务器
+let activeServerMode: ServerMode = "remote";
+// 复用进行中的探测，避免并发重复探测
+let localIpCheckPromise: Promise<boolean> | null = null;
+let serverMonitorTimer: ReturnType<typeof setTimeout> | null = null;
+let serverMonitorRunning = false;
+let consecutiveLocalProbeFailures = 0;
+const serverStatusListeners = new Set<ServerStatusListener>();
+
+const LOCAL_IP_CHECK_TIMEOUT = 500;
+const SERVER_CHECK_BASE_INTERVAL_MS = 5000;
+const SERVER_CHECK_MAX_INTERVAL_MS = 60000;
+
+function isPageHttps(): boolean {
+  return typeof window !== "undefined" && window.location.protocol === "https:";
+}
+
+function getCurrentLocalPort(): number {
+  return isPageHttps() ? LOCAL_HTTPS_PORT : LOCAL_HTTP_PORT;
+}
+
+function getLocalServerOrigin(): string {
+  const protocol = isPageHttps() ? "https" : "http";
+  const port = getCurrentLocalPort();
+  return `${protocol}://${LOCAL_IP}:${port}`;
+}
+
+function getRemoteServerOrigin(): string {
+  return REMOTE.url || "http://localhost:8000";
+}
+
+function ensureApiSuffix(url: string): string {
+  return url.endsWith("/api") ? url : url.endsWith("/") ? `${url}api` : `${url}/api`;
+}
+
+function markLocalProbeSuccess(): void {
+  localIpAvailable = true;
+  consecutiveLocalProbeFailures = 0;
+}
+
+function markLocalProbeFailure(): void {
+  localIpAvailable = false;
+  consecutiveLocalProbeFailures += 1;
+}
+
+function getNextServerCheckDelay(isLocalAvailable: boolean): number {
+  if (isLocalAvailable) {
+    return SERVER_CHECK_BASE_INTERVAL_MS;
+  }
+
+  return Math.min(
+    SERVER_CHECK_BASE_INTERVAL_MS * 2 ** consecutiveLocalProbeFailures,
+    SERVER_CHECK_MAX_INTERVAL_MS
+  );
+}
+
+function emitServerStatus(isLocal: boolean, changed: boolean): void {
+  serverStatusListeners.forEach(listener => listener(isLocal, changed));
+}
+
+function ensureTrailingSlash(url: string): string {
+  return url.replace(/\/?$/, "/");
+}
+
+async function checkAddress(url: string, timeout = LOCAL_IP_CHECK_TIMEOUT): Promise<boolean> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    await fetch(ensureTrailingSlash(url), {
+      method: "GET", // 改用 GET 方法，更可靠
+      signal: controller.signal,
+      cache: "no-store",
+      mode: "no-cors", // 避免CORS问题
+      credentials: "omit", // 不发送凭据，减少扩展拦截的可能性
+      redirect: "follow", // 自动跟随重定向
+    });
+    // no-cors 模式下，只要请求未抛异常就认为服务可达
+    return true;
+  } catch (error) {
+    if ((error as Error).name !== "AbortError") {
+      logger.debug("[API Config] Failed to check address", {
+        url,
+        error: (error as Error).message,
+      });
+    }
+    return false;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function probeLocalServer(): Promise<boolean> {
+  try {
+    const isAvailable = await checkAddress(getLocalServerOrigin());
+    if (isAvailable) {
+      markLocalProbeSuccess();
+      return true;
+    }
+  } catch {
+    // 静默降级到失败分支，避免探测流程打断业务
+  }
+
+  markLocalProbeFailure();
+  return false;
+}
+
+function applyServerMode(mode: ServerMode): void {
+  const nextBaseUrl = ensureApiSuffix(mode === "local" ? getLocalServerOrigin() : getRemoteServerOrigin());
+  const changed = activeServerMode !== mode || api.defaults.baseURL !== nextBaseUrl;
+
+  activeServerMode = mode;
+  api.defaults.baseURL = nextBaseUrl;
+
+  if (mode === "local") {
+    localIpAvailable = true;
+  }
+
+  if (changed) {
+    logger.info(`[API Config] Switched to ${mode} server: ${nextBaseUrl}`);
+  }
+}
 
 // 检测本地 IP 是否可用
 export async function checkLocalIpAvailable(): Promise<boolean> {
-  try {
-    if (localIpAvailable === true) return true; // 已经是本地了
-    // 根据当前页面的协议动态选择本地服务器的协议
-    const isPageHttps = typeof window !== "undefined" && window.location.protocol === "https:";
-    const protocol = isPageHttps ? "https" : "http";
-    const port = isPageHttps ? LOCAL_HTTPS_PORT : LOCAL_HTTP_PORT;
-    const url = `${protocol}://${LOCAL_IP}:${port}/`;
-
-    const controller = new AbortController();
-    const TIMEOUT = 500;
-    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT); // 500ms超时
-
-    try {
-      await fetch(url, {
-        method: "HEAD", // 使用HEAD方法更轻量
-        signal: controller.signal,
-        mode: "no-cors", // 避免CORS问题
-        credentials: "omit", // 不发送凭据，减少扩展拦截的可能性
-        redirect: "follow", // 自动跟随重定向
-      });
-      clearTimeout(timeoutId);
-      return true;
-    } catch (error: any) {
-      clearTimeout(timeoutId);
-      return false;
-    }
-  } catch (error) {
-    return false;
+  if (!localIpCheckPromise) {
+    localIpCheckPromise = probeLocalServer();
   }
+
+  try {
+    return await localIpCheckPromise;
+  } finally {
+    localIpCheckPromise = null;
+  }
+}
+
+export async function checkAndSwitchServer(): Promise<boolean> {
+  const localAvailable = await checkLocalIpAvailable();
+  applyServerMode(localAvailable ? "local" : "remote");
+  return localAvailable;
+}
+
+async function runServerMonitorCycle(): Promise<void> {
+  const previousMode = activeServerMode;
+  const isLocal = await checkAndSwitchServer();
+  const nextDelay = getNextServerCheckDelay(isLocal);
+
+  if (!serverMonitorRunning) {
+    return;
+  }
+
+  emitServerStatus(isLocal, previousMode !== activeServerMode);
+  serverMonitorTimer = setTimeout(() => {
+    void runServerMonitorCycle();
+  }, nextDelay);
+}
+
+export async function startServerMonitor(): Promise<void> {
+  if (serverMonitorRunning) {
+    return;
+  }
+
+  serverMonitorRunning = true;
+  logger.info(
+    `[Server Monitor] Started, base ${SERVER_CHECK_BASE_INTERVAL_MS / 1000}s, max ${SERVER_CHECK_MAX_INTERVAL_MS / 1000}s`
+  );
+  await runServerMonitorCycle();
+}
+
+export function stopServerMonitor(): void {
+  serverMonitorRunning = false;
+  if (serverMonitorTimer) {
+    clearTimeout(serverMonitorTimer);
+    serverMonitorTimer = null;
+  }
+  logger.info("[Server Monitor] Stopped");
+}
+
+export function subscribeServerStatus(listener: ServerStatusListener): () => void {
+  serverStatusListeners.add(listener);
+  return () => {
+    serverStatusListeners.delete(listener);
+  };
 }
 
 // 切换到本地服务器
 export function switchToLocal(): void {
-  if (localIpAvailable === true) return; // 已经是本地了
-
-  // 根据当前页面的协议动态选择本地服务器的协议
-  const isPageHttps = typeof window !== "undefined" && window.location.protocol === "https:";
-  const protocol = isPageHttps ? "https" : "http";
-  const port = isPageHttps ? LOCAL_HTTPS_PORT : LOCAL_HTTP_PORT;
-  const localBaseUrl = `${protocol}://${LOCAL_IP}:${port}`;
-
-  localIpAvailable = true;
-  const newApiBaseUrl = `${localBaseUrl}/api`;
-  api.defaults.baseURL = newApiBaseUrl;
-  logger.info(`[API Config] Switched to local server: ${newApiBaseUrl}`);
+  applyServerMode("local");
 }
 
 // 切换到远程服务器
 export function switchToRemote(): void {
-  if (localIpAvailable === false) return; // 已经是远程了
-
-  localIpAvailable = false;
-  const remoteUrl = REMOTE.url || "http://localhost:8000";
-  const newApiBaseUrl = remoteUrl.endsWith("/api")
-    ? remoteUrl
-    : remoteUrl.endsWith("/")
-      ? `${remoteUrl}api`
-      : `${remoteUrl}/api`;
-  api.defaults.baseURL = newApiBaseUrl;
-  logger.info(`[API Config] Switched to remote server: ${newApiBaseUrl}`);
+  applyServerMode("remote");
 }
 
 // 初始化 BASE_URL：优先使用环境变量，否则默认使用远程
@@ -100,16 +233,12 @@ if (import.meta.env.VITE_API_BASE_URL) {
   logger.info(`[API Config] Using base URL from environment: ${BASE_URL}`);
 } else {
   // 默认使用远程服务器
-  BASE_URL = REMOTE.url || "http://localhost:8000";
+  BASE_URL = getRemoteServerOrigin();
   logger.info(`[API Config] Initial base URL (remote): ${BASE_URL}`);
 }
 
 // 确保 baseURL 以 /api 结尾
-const API_BASE_URL = BASE_URL.endsWith("/api")
-  ? BASE_URL
-  : BASE_URL.endsWith("/")
-    ? `${BASE_URL}api`
-    : `${BASE_URL}/api`;
+const API_BASE_URL = ensureApiSuffix(BASE_URL);
 
 /**
  * 获取当前实际使用的 API URL（不含 /api 后缀）
@@ -126,36 +255,22 @@ export function getApiUrl(): string {
  * 优先使用本地 IP（如果可用），否则使用远程 URL
  */
 export function getBaseUrl(): string {
-  if (localIpAvailable === true) {
-    // 根据当前页面的协议动态选择本地服务器的协议
-    const isPageHttps = typeof window !== "undefined" && window.location.protocol === "https:";
-    const protocol = isPageHttps ? "https" : "http";
-    const port = isPageHttps ? LOCAL_HTTPS_PORT : LOCAL_HTTP_PORT;
-    return `${protocol}://${LOCAL_IP}:${port}`;
-  } else if (localIpAvailable === false) {
-    return REMOTE.url || "http://localhost:8000";
-  } else {
-    // 检测中，返回当前的 BASE_URL
-    return getApiUrl();
-  }
+  return getApiUrl();
 }
 
 /**
- * 检查本地 IP 是否可用（供外部调用）
+ * 返回当前是否正在使用本地服务器
  */
 export function isLocalIpAvailable(): boolean | null {
-  return localIpAvailable;
+  return activeServerMode === "local";
 }
-
-// 导出当前使用的端口（用于显示）
-const LOCAL_PORT = LOCAL_BASE_URL.startsWith("https://") ? LOCAL_HTTPS_PORT : LOCAL_HTTP_PORT;
 
 export {
   API_BASE_URL,
   BASE_URL as REMOTE_BASE_URL,
   REMOTE,
   LOCAL_IP,
-  LOCAL_PORT,
+  getCurrentLocalPort,
   LOCAL_HTTP_PORT,
   LOCAL_HTTPS_PORT,
   LOCAL_BASE_URL,
@@ -260,7 +375,17 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response: AxiosResponse) => {
     if (response.data && typeof response.data === "object" && "code" in response.data) {
-      if (response.data.code !== 0) {
+      const rawCode = (response.data as { code: unknown }).code;
+      const normalizedCode =
+        typeof rawCode === "string" && rawCode.trim() !== "" && !Number.isNaN(Number(rawCode.trim()))
+          ? Number(rawCode.trim())
+          : rawCode;
+      const isSuccessCode = normalizedCode === 0;
+
+      // 兼容部分后端/代理把数值 code 序列化成字符串的情况。
+      (response.data as { code: unknown }).code = normalizedCode;
+
+      if (!isSuccessCode) {
         const error = new Error(response.data.msg || "请求失败") as AxiosError;
         error.response = response;
         return Promise.reject(error);

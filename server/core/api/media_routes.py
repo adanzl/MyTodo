@@ -804,3 +804,28 @@ def start_convert_task() -> ResponseReturnValue:
     except Exception as e:
         log.error(f"[AudioConvert] 启动任务失败: {e}")
         return _err(f"启动任务失败: {str(e)}")
+
+
+@limiter.limit("60 per minute; 300 per hour")
+@media_bp.route("/media/convert/download", methods=['GET'])
+def download_convert_file() -> ResponseReturnValue:
+    """下载单个转码结果 MP3 文件。"""
+    try:
+        task_id = request.args.get('task_id')
+        output_path = request.args.get('output_path')
+        if not task_id or not output_path:
+            return _err("task_id 和 output_path 参数不能为空")
+
+        output_file, err = audio_convert_mgr.get_convert_output_file(task_id, output_path)
+        if err or not output_file:
+            return _err(err or "文件不存在")
+
+        return send_file(
+            output_file,
+            as_attachment=True,
+            download_name=os.path.basename(output_file),
+        )
+
+    except Exception as e:
+        log.error(f"[AudioConvert] 下载文件失败: {e}")
+        return _err(f"下载文件失败: {str(e)}")

@@ -115,6 +115,8 @@ export interface ConvertTaskProgress {
   current_file?: string;
 }
 
+export type ConvertSourceType = "directory" | "upload";
+
 /**
  * 音频转码任务接口
  */
@@ -132,6 +134,10 @@ export interface ConvertTask {
    */
   status: string;
   /**
+   * 转码来源类型
+   */
+  source_type?: ConvertSourceType;
+  /**
    * 转码目录
    */
   directory?: string;
@@ -139,6 +145,10 @@ export interface ConvertTask {
    * 输出目录名称，默认为 'mp3'
    */
   output_dir?: string;
+  /**
+   * 实际输出目录路径
+   */
+  resolved_output_dir?: string;
   /**
    * 是否覆盖同名文件，默认为 true
    */
@@ -163,5 +173,6 @@ export interface ConvertTask {
     error?: string;
     size?: number;
     duration?: number;
+    output_path?: string;
   }>;
 }

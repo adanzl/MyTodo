@@ -29,18 +29,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
 import PdfTool from "./TabPdfTool.vue";
 import AudioMerge from "./TabAudioMerge.vue";
 import AudioConvert from "./TabAudioConvert.vue";
 import TTS from "./TabTts.vue";
 
 // 主页签控制
+const STORAGE_KEY = "tools-active-tab";
+const VALID_TABS = ["tts_tool", "pdf_tool", "audio_merge", "audio_convert"] as const;
 const activeMainTab = ref("tts_tool");
+
+onMounted(() => {
+  const savedTab = localStorage.getItem(STORAGE_KEY);
+  if (savedTab && VALID_TABS.includes(savedTab as (typeof VALID_TABS)[number])) {
+    activeMainTab.value = savedTab;
+  }
+});
 
 // 监听页签切换
 const handleTabChange = (tabName: string) => {
-  // 页签切换时的处理逻辑（如果需要）
-  console.log("切换到页签:", tabName);
+  localStorage.setItem(STORAGE_KEY, tabName);
 };
 </script>
