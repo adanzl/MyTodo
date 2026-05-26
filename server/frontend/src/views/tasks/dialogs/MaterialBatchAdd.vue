@@ -98,7 +98,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from "vue";
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Folder } from "@element-plus/icons-vue";
 import { addMaterial, addMaterialCategory } from "@/api/api-task";
@@ -106,9 +106,24 @@ import { listDirectory, type DirectoryItem } from "@/api/api-file";
 import { sortMaterials, buildCategoryTree, CATEGORY_CASCADER_PROPS } from "@/utils/file";
 import FileDialog from "@/views/dialogs/FileDialog.vue";
 
+type CategoryOption = { id: number; name: string; parent?: number };
+
+const FILE_TYPE_BY_EXTENSION: Record<string, number> = {
+  pdf: 0,
+  mp4: 1,
+  avi: 1,
+  mkv: 1,
+  mov: 1,
+  wmv: 1,
+  flv: 1,
+  webm: 1,
+};
+
+const SCAN_EXTENSIONS = Object.keys(FILE_TYPE_BY_EXTENSION).join(",");
+
 interface Props {
   modelValue: boolean;
-  categoryList: Array<{ id: number; name: string }>;
+  categoryList: CategoryOption[];
   defaultCateId?: number; // 默认目录ID
 }
 
@@ -154,6 +169,84 @@ const cascaderOptions = computed(() => buildCategoryTree(props.categoryList || [
 const getCategoryName = (cateId: number): string => {
   const category = props.categoryList.find(c => c.id === cateId);
   return category ? category.name : '未知';
+};
+
+const buildCategoryPathMaps = (categories: CategoryOption[]) => {
+  const categoryById = new Map(categories.map(category => [category.id, category]));
+  const pathById = new Map<number, string>();
+
+  const resolvePath = (categoryId: number, visited = new Set<number>()): string => {
+    if (pathById.has(categoryId)) {
+      return pathById.get(categoryId)!;
+    }
+
+    if (visited.has(categoryId)) {
+      return categoryById.get(categoryId)?.name || '';
+    }
+
+    const category = categoryById.get(categoryId);
+    if (!category) {
+      return '';
+    }
+
+    visited.add(categoryId);
+    const parentId = category.parent;
+    const parentPath = parentId === undefined || parentId === null || parentId === -1
+      ? ''
+      : resolvePath(parentId, visited);
+    visited.delete(categoryId);
+
+    const fullPath = parentPath ? `${parentPath}/${category.name}` : category.name;
+    pathById.set(categoryId, fullPath);
+    return fullPath;
+  };
+
+  const idByPath = new Map<string, number>();
+  for (const category of categories) {
+    const fullPath = resolvePath(category.id);
+    if (fullPath) {
+      idByPath.set(fullPath, category.id);
+    }
+  }
+
+  return { pathById, idByPath };
+};
+
+const categoryPathMaps = computed(() => buildCategoryPathMaps(props.categoryList || []));
+
+const getSelectedCategoryId = (): number => {
+  return cascaderValue.value ?? defaultCateId.value ?? props.categoryList[0]?.id ?? 1;
+};
+
+const getSelectedCategoryPath = (): string => {
+  const targetId = cascaderValue.value ?? defaultCateId.value;
+  if (targetId === undefined || targetId === null) {
+    return '';
+  }
+  return categoryPathMaps.value.pathById.get(targetId) || '';
+};
+
+const getFileType = (name: string): number => {
+  const ext = name.split('.').pop()?.toLowerCase();
+  return ext ? (FILE_TYPE_BY_EXTENSION[ext] ?? -1) : -1;
+};
+
+const resetDialogState = () => {
+  materialList.value = [];
+  errors.value = [];
+};
+
+const confirmDiscardChanges = async (): Promise<boolean> => {
+  if (materialList.value.length === 0) {
+    return true;
+  }
+
+  try {
+    await ElMessageBox.confirm("确定要关闭并清空所有待添加素材吗？", "提示", { type: "warning" });
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 // 监听 cascaderValue 变化，更新 defaultCateId
@@ -209,50 +302,13 @@ const handleDirectoryConfirm = async (dirPaths: string[]) => {
   submitting.value = true;
 
   try {
-    // 递归扫描目录，只获取 PDF 和视频文件
-    const extensions = 'pdf,mp4,avi,mkv,mov,wmv,flv,webm';
-    const result = await listDirectory(dirPath, extensions, true);
+    const result = await listDirectory(dirPath, SCAN_EXTENSIONS, true);
 
     if (!result || !Array.isArray(result)) {
       ElMessage.error('扫描目录失败');
-      submitting.value = false;
       return;
     }
-
-    // 获取当前选中目录的完整路径名称
-    const getBaseCategoryPath = (): string => {
-      // 优先使用 cascaderValue，如果为空则使用 defaultCateId
-      const targetId = (cascaderValue.value !== undefined && cascaderValue.value !== null)
-        ? cascaderValue.value
-        : defaultCateId.value;
-
-      if (targetId === undefined || targetId === null) {
-        return '';
-      }
-
-      // 从 cascaderOptions 中查找完整路径
-      const findPath = (options: any[], targetId: number, path: string[] = []): string[] | null => {
-        for (const option of options) {
-          const newPath = [...path, option.name];
-          if (option.id === targetId) {
-            return newPath;
-          }
-          if (option.children && option.children.length > 0) {
-            const result = findPath(option.children, targetId, newPath);
-            if (result) return result;
-          }
-        }
-        return null;
-      };
-
-      const pathNames = findPath(cascaderOptions.value, targetId);
-      return pathNames ? pathNames.join('/') : '';
-    };
-
-    const baseCategoryPath = getBaseCategoryPath();
-
-    // 将扫描结果转换为 MaterialItem（服务器已过滤，直接转换）
-    const scannedItems = convertScanResultToMaterials(result, baseCategoryPath);
+    const scannedItems = convertScanResultToMaterials(result, getSelectedCategoryPath());
 
     // 添加到素材列表
     materialList.value.push(...scannedItems);
@@ -260,7 +316,7 @@ const handleDirectoryConfirm = async (dirPaths: string[]) => {
     // 排序：先目录后文件，名称自然排序
     sortMaterials(materialList.value);
 
-    ElMessage.success(`已扫描 ${countFiles(scannedItems)} 个文件`);
+    ElMessage.success(`已扫描 ${scannedItems.length} 个文件`);
     directoryDialogVisible.value = false;
   } catch (error: any) {
     console.error('扫描目录失败:', error);
@@ -276,41 +332,28 @@ const convertScanResultToMaterials = (
   baseCategoryPath?: string // 基础目录路径（如 "咱们裸熊/sub"）
 ): MaterialItem[] => {
   const result: MaterialItem[] = [];
-
-  // 文件扩展名到类型的映射
-  const extToType: Record<string, number> = {
-    'pdf': 0,
-    'mp4': 1, 'avi': 1, 'mkv': 1, 'mov': 1, 'wmv': 1, 'flv': 1, 'webm': 1
-  };
+  const defaultCategoryId = getSelectedCategoryId();
 
   const processItems = (items: DirectoryItem[], currentCategoryPath?: string) => {
     items.forEach(item => {
       if (item.isDirectory) {
-        // 构建当前文件夹的完整目录路径
         const folderCategoryPath = currentCategoryPath
           ? `${currentCategoryPath}/${item.name}`
           : (baseCategoryPath ? `${baseCategoryPath}/${item.name}` : item.name);
 
-        // 递归处理子项
         if (item.subItems && item.subItems.length > 0) {
           processItems(item.subItems, folderCategoryPath);
         }
       } else {
-        // 处理文件（服务器已过滤，这里只需确定类型）
-        const ext = item.name.split('.').pop()?.toLowerCase();
-        const type = ext ? extToType[ext] : -1;
-
-        // 理论上不会走到这里，因为服务器已经过滤了
+        const type = getFileType(item.name);
         if (type !== -1) {
-          const fileFolderPath = currentCategoryPath || baseCategoryPath;
-
           result.push({
             name: item.name,
             path: item.path || '',
-            cate_id: defaultCateId.value || props.categoryList[0]?.id || 1,
-            type: type,
+            cate_id: defaultCategoryId,
+            type,
             isFolder: false,
-            folderPath: fileFolderPath, // 记录完整目录路径
+            folderPath: currentCategoryPath || baseCategoryPath,
           });
         }
       }
@@ -321,37 +364,24 @@ const convertScanResultToMaterials = (
   return result;
 };
 
-// 统计文件数量（扁平化后直接返回长度）
-const countFiles = (items: MaterialItem[]): number => {
-  return items.length;
-};
-
-
 // 文件选择确认
 const handleFileConfirm = (filePaths: string[]) => {
   if (!filePaths?.length) return;
 
-  // 支持的文件扩展名映射
-  const supportedExtensions: Record<string, number> = {
-    'pdf': 0,
-    'mp4': 1, 'avi': 1, 'mkv': 1, 'mov': 1, 'wmv': 1, 'flv': 1, 'webm': 1
-  };
-
   let addedCount = 0;
   let skippedCount = 0;
+  const defaultCategoryId = getSelectedCategoryId();
 
   filePaths.forEach((filePath) => {
     const fileName = filePath.split('/').pop() || filePath;
-    const ext = fileName.split('.').pop()?.toLowerCase();
-    const type = ext ? supportedExtensions[ext] : -1;
+    const type = getFileType(fileName);
 
-    // 只添加支持的类型
     if (type !== -1) {
       materialList.value.push({
         name: fileName.replace(/\.[^/.]+$/, ""),
         path: filePath,
-        cate_id: defaultCateId.value || props.categoryList[0]?.id || 1,
-        type: type,
+        cate_id: defaultCategoryId,
+        type,
       });
       addedCount++;
     } else {
@@ -380,38 +410,25 @@ const clearMaterialList = async () => {
 
   try {
     await ElMessageBox.confirm("确定要清空所有待添加素材吗？", "提示", { type: "warning" });
-    materialList.value = [];
-    errors.value = [];
+    resetDialogState();
   } catch { }
 };
 
 // 取消按钮
 const handleCancel = async () => {
-  if (materialList.value.length > 0) {
-    try {
-      await ElMessageBox.confirm("确定要关闭并清空所有待添加素材吗？", "提示", { type: "warning" });
-    } catch {
-      return;
-    }
+  if (!await confirmDiscardChanges()) {
+    return;
   }
-  // 直接清空，不再调用 clearMaterialList（避免二次确认）
-  materialList.value = [];
-  errors.value = [];
+  resetDialogState();
   visible.value = false;
 };
 
 // 关闭前确认（用于点击右上角关闭按钮）
 const handleBeforeClose = async (done?: () => void) => {
-  if (materialList.value.length > 0) {
-    try {
-      await ElMessageBox.confirm("确定要关闭并清空所有待添加素材吗？", "提示", { type: "warning" });
-    } catch {
-      return;
-    }
+  if (!await confirmDiscardChanges()) {
+    return;
   }
-  // 直接清空，不再调用 clearMaterialList（避免二次确认）
-  materialList.value = [];
-  errors.value = [];
+  resetDialogState();
   done ? done() : (visible.value = false);
 };
 
@@ -424,22 +441,16 @@ const handleSubmit = async () => {
 
   submitting.value = true;
   errors.value = [];
-
-  // 扁平化素材列表
-  const flatMaterials = flattenMaterials(materialList.value);
+  const materials = [...materialList.value];
 
   try {
-    // 1. 收集并创建新目录
-    const categoryMap = await createMissingCategories(flatMaterials);
+    const categoryMap = await createMissingCategories(materials);
 
-    // 2. 更新文件的 cate_id
-    updateMaterialCategoryIds(flatMaterials, categoryMap);
+    updateMaterialCategoryIds(materials, categoryMap);
 
-    // 3. 批量添加素材
-    const failedItems = await addMaterialsBatch(flatMaterials);
+    const failedItems = await addMaterialsBatch(materials);
 
-    // 4. 处理结果
-    handleSubmissionResult(flatMaterials, failedItems);
+    handleSubmissionResult(materials, failedItems);
   } catch (error: any) {
     console.error('批量添加失败:', error);
     ElMessage.error('批量添加失败');
@@ -451,10 +462,8 @@ const handleSubmit = async () => {
 // 收集并创建缺失的目录
 const createMissingCategories = async (materials: MaterialItem[]): Promise<Map<string, number>> => {
   const categoryMap = new Map<string, number>();
-  const categoriesToCreate = new Set<string>();
+  const existingCategoryPathMap = categoryPathMaps.value.idByPath;
 
-  // 收集所有需要创建的目录
-  // 首先收集所有唯一的 folderPath
   const allFolderPaths = new Set<string>();
   for (const material of materials) {
     if (material.folderPath) {
@@ -471,22 +480,23 @@ const createMissingCategories = async (materials: MaterialItem[]): Promise<Map<s
     }
   }
 
-  // 然后处理每个 folderPath
-  for (const folderPath of allFolderPaths) {
-    if (!categoryMap.has(folderPath)) {
-      const categoryName = folderPath.split('/').pop() || folderPath;
-      const existingCategory = props.categoryList.find(c => c.name === categoryName);
-
-      if (existingCategory) {
-        categoryMap.set(folderPath, existingCategory.id);
-      } else {
-        categoriesToCreate.add(folderPath);
-      }
+  const sortedFolderPaths = Array.from(allFolderPaths).sort((a, b) => {
+    const depthDiff = a.split('/').length - b.split('/').length;
+    if (depthDiff !== 0) {
+      return depthDiff;
     }
-  }
 
-  // 创建新目录
-  for (const folderPath of categoriesToCreate) {
+    return a.localeCompare(b, 'zh-CN', { numeric: true, sensitivity: 'base' });
+  });
+
+  // 目录必须按层级从浅到深创建，否则第一个子目录会在父目录尚未存在时落到根目录
+  for (const folderPath of sortedFolderPaths) {
+    const existingCategoryId = existingCategoryPathMap.get(folderPath);
+    if (existingCategoryId !== undefined) {
+      categoryMap.set(folderPath, existingCategoryId);
+      continue;
+    }
+
     const categoryName = folderPath.split('/').pop() || folderPath;
 
     // 获取父目录ID
@@ -498,8 +508,6 @@ const createMissingCategories = async (materials: MaterialItem[]): Promise<Map<s
 
     try {
       const result = await addMaterialCategory({ name: categoryName, parent: parentId });
-
-      // 处理不同的返回格式
       let newCategoryId: number | undefined;
       if (typeof result === 'number') {
         newCategoryId = result;
@@ -571,22 +579,6 @@ const handleSubmissionResult = (materials: MaterialItem[], failedItems: string[]
   }
 };
 
-// 扁平化素材列表
-const flattenMaterials = (items: MaterialItem[]): MaterialItem[] => {
-  const result: MaterialItem[] = [];
-
-  for (const item of items) {
-    if (!item.isFolder) {
-      // 文件直接添加
-      result.push(item);
-    } else if (item.children) {
-      // 文件夹递归处理子项
-      result.push(...flattenMaterials(item.children));
-    }
-  }
-
-  return result;
-};
 // 计算表格最大高度
 const calculateTableHeight = () => {
   nextTick(() => {
@@ -598,12 +590,15 @@ const calculateTableHeight = () => {
 // 监听对话框打开，重置数据
 watch(visible, (newVal) => {
   if (newVal) {
-    materialList.value = [];
-    errors.value = [];
+    resetDialogState();
   }
 });
-onMounted(async () => {
+onMounted(() => {
   calculateTableHeight();
   window.addEventListener('resize', calculateTableHeight);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', calculateTableHeight);
 });
 </script>

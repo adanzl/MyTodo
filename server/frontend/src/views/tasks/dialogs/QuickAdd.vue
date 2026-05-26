@@ -56,7 +56,7 @@
           <div class="flex gap-4" style="height: 400px;">
             <!-- 左侧：类别选择 -->
             <div class="w-60 border rounded p-1 overflow-y-auto">
-              <el-tree :data="cascaderOptions" :props="treeProps" node-key="id" @node-click="handleTreeSelect"
+              <el-tree ref="categoryTreeRef" :data="cascaderOptions" :props="treeProps" node-key="id" @node-click="handleTreeSelect"
                 highlight-current accordion :indent="6">
                 <template #default="{ node, data }">
                   <div class="flex items-center justify-between w-full pr-2">
@@ -124,6 +124,7 @@ const materialList = ref<Material[]>([]);
 const selectedMaterials = ref<Material[]>([]);
 const categoryList = ref<MaterialCategory[]>([]);
 const selectedCategoryId = ref<number | undefined>(undefined);
+const categoryTreeRef = ref();
 const materialTableRef = ref();
 
 // 缓存每个类别的选中数量（key: categoryId, value: count）
@@ -162,6 +163,13 @@ const getMaterialTypeName = (type: number) => {
  * 计算级联选项
  */
 const cascaderOptions = computed(() => buildCategoryTree(categoryList.value));
+
+const syncCategoryTreeCurrentKey = async () => {
+  await nextTick();
+  if (selectedCategoryId.value !== undefined && categoryTreeRef.value) {
+    categoryTreeRef.value.setCurrentKey(selectedCategoryId.value);
+  }
+};
 
 /**
  * 获取某类别已选中的素材数量（带缓存）
@@ -254,6 +262,7 @@ const loadCategoryList = async () => {
       // 默认选中第一个类别
       if (categoryList.value.length > 0) {
         selectedCategoryId.value = categoryList.value[0].id;
+        await syncCategoryTreeCurrentKey();
       }
     }
   } catch (error: any) {
@@ -526,6 +535,7 @@ watch(visible, (newVal) => {
 // 监听目录变化，重新加载素材
 watch(selectedCategoryId, () => {
   if (visible.value) {
+    void syncCategoryTreeCurrentKey();
     loadMaterialList();
   }
 });
