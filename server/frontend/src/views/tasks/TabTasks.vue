@@ -12,7 +12,7 @@
     <el-table :data="taskList" v-loading="loading" stripe border style="width: 100%" :max-height="tableMaxHeight">
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="name" label="任务名称" min-width="200" />
-      <el-table-column prop="priority" label="优先级" min-width="40" align="center" />
+      <el-table-column prop="priority" label="优先级" min-width="80" align="center" />
       <el-table-column prop="type" label="任务类型" width="100" align="center">
         <template #default="{ row }">
           <el-tag :type="row.type === 1 ? 'success' : 'primary'">{{ row.type === 1 ? '持续任务' : '每日任务' }}</el-tag>
@@ -45,7 +45,7 @@
           <span v-else class="text-gray-400">-</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="180" fixed="right">
+      <el-table-column label="操作" min-width="130" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="handleEditTask(row)">编辑</el-button>
           <el-button size="small" type="danger" @click="handleDeleteTask(row)">删除</el-button>
