@@ -1,5 +1,11 @@
 <template>
-  <el-dialog v-model="visible" title="快速添加素材" width="1100px" align-center @close="handleClose">
+  <el-dialog
+    v-model="visible"
+    title="快速添加素材"
+    width="1100px"
+    align-center
+    @close="handleClose"
+  >
     <div class="flex flex-col gap-4 max-h-[90vh] overflow-y-auto min-h-[500px]">
       <!-- 分配配置区 -->
       <div class="allocation-section border rounded p-4">
@@ -8,23 +14,45 @@
           <el-row>
             <el-col :span="6">
               <el-form-item label="开始天数">
-                <el-input-number v-model="startDay" :min="1" :max="endDay" :step="1" size="small"
-                  class="w-full" />
+                <el-input-number
+                  v-model="startDay"
+                  :min="1"
+                  :max="endDay"
+                  :step="1"
+                  size="small"
+                  class="w-full"
+                />
               </el-form-item>
             </el-col>
             <el-col :span="6">
               <el-form-item label="结束天数">
-                <el-input-number v-model="endDay" :min="startDay" :max="365" :step="1" size="small"
-                  class="w-full" />
+                <el-input-number
+                  v-model="endDay"
+                  :min="startDay"
+                  :max="365"
+                  :step="1"
+                  size="small"
+                  class="w-full"
+                  :disabled="useBatchSize && autoExtendDays"
+                />
               </el-form-item>
             </el-col>
-            <el-col :span="12">
+            <el-col :span="10">
               <el-form-item label="分配基数">
-                <div class="flex items-center">
+                <div class="flex items-center flex-wrap gap-x-2">
                   <el-checkbox v-model="useBatchSize" />
-                  <el-input-number v-model="batchSize" :min="1" :max="10" :step="1" size="small" class="w-25! ml-2"
-                    :disabled="!useBatchSize" />
-                  <span class="ml-2 text-gray-600 text-xs" v-if="useBatchSize">每次分配 {{ batchSize }} 个素材</span>
+                  <el-input-number
+                    v-model="batchSize"
+                    :min="1"
+                    :max="10"
+                    :step="1"
+                    size="small"
+                    class="w-22!"
+                    :disabled="!useBatchSize"
+                  />
+                  <el-checkbox v-model="autoExtendDays" :disabled="!useBatchSize">
+                    扩展天数
+                  </el-checkbox>
                 </div>
               </el-form-item>
             </el-col>
@@ -39,7 +67,11 @@
           <el-form-item class="flex w-full">
             <div class="flex-1 text-gray-600">{{ descriptionText }}</div>
             <span class="mr-4 text-gray-600">已选中 {{ selectedMaterials.length }} 个素材</span>
-            <el-button type="primary" @click="allocateMaterials" :disabled="selectedMaterials.length === 0">
+            <el-button
+              type="primary"
+              @click="allocateMaterials"
+              :disabled="selectedMaterials.length === 0"
+            >
               <el-icon class="mr-1">
                 <Check />
               </el-icon>
@@ -52,18 +84,34 @@
       <!-- 素材选择区 -->
       <div class="material-selection-section border rounded p-4">
         <h3 class="font-semibold mb-3">选择素材</h3>
-        <div v-loading="materialLoading" element-loading-text="加载中..." style="min-height: 300px;">
-          <div class="flex gap-4" style="height: 400px;">
+        <div v-loading="materialLoading" element-loading-text="加载中..." style="min-height: 300px">
+          <div class="flex gap-4" style="height: 400px">
             <!-- 左侧：类别选择 -->
             <div class="w-60 border rounded p-1 overflow-y-auto">
-              <el-tree ref="categoryTreeRef" :data="cascaderOptions" :props="treeProps" node-key="id" @node-click="handleTreeSelect"
-                highlight-current accordion :indent="6">
+              <el-tree
+                ref="categoryTreeRef"
+                :data="cascaderOptions"
+                :props="treeProps"
+                node-key="id"
+                @node-click="handleTreeSelect"
+                highlight-current
+                accordion
+                :indent="6"
+              >
                 <template #default="{ node, data }">
                   <div class="flex items-center justify-between w-full pr-2">
-                    <el-tooltip :content="node.label" placement="top" :disabled="node.label.length <= 10">
+                    <el-tooltip
+                      :content="node.label"
+                      placement="top"
+                      :disabled="node.label.length <= 10"
+                    >
                       <span class="truncate max-w-32">{{ node.label }}</span>
                     </el-tooltip>
-                    <el-tag size="small" type="primary" v-if="getCategorySelectedCount(data.id) > 0">
+                    <el-tag
+                      size="small"
+                      type="primary"
+                      v-if="getCategorySelectedCount(data.id) > 0"
+                    >
                       {{ getCategorySelectedCount(data.id) }}
                     </el-tag>
                   </div>
@@ -73,8 +121,14 @@
 
             <!-- 右侧：素材列表 -->
             <div class="flex-1 border rounded overflow-hidden">
-              <el-table v-if="!materialLoading" ref="materialTableRef" :data="materialList"
-                @selection-change="handleMaterialSelectionChange" @row-click="handleRowClick" height="100%">
+              <el-table
+                v-if="!materialLoading"
+                ref="materialTableRef"
+                :data="materialList"
+                @selection-change="handleMaterialSelectionChange"
+                @row-click="handleRowClick"
+                height="100%"
+              >
                 <el-table-column type="selection" width="40" />
                 <el-table-column prop="id" label="ID" width="60" />
                 <el-table-column prop="name" label="素材名称" min-width="220" />
@@ -96,7 +150,13 @@
 import { ref, watch, computed, nextTick } from "vue";
 import { ElMessage } from "element-plus";
 import { Check } from "@element-plus/icons-vue";
-import { getMaterialList, getMaterialCategoryList, type Material, type MaterialCategory, type Task } from "@/api/api-task";
+import {
+  getMaterialList,
+  getMaterialCategoryList,
+  type Material,
+  type MaterialCategory,
+  type Task,
+} from "@/api/api-task";
 import { sortByName, buildCategoryTree } from "@/utils/file";
 
 // ==================== 类型定义 ====================
@@ -139,11 +199,12 @@ const endDay = ref(1);
 const allocationType = ref(0); // 0: 平均分配, 1: 循环分配, 2: 全部添加到每一天
 const useBatchSize = ref(false); // 是否启用分配基数
 const batchSize = ref(1); // 分配基数：每次分配的素材数量
+const autoExtendDays = ref(true); // 扩展天数：按素材数量自动调整结束天数
 
 // ==================== Tree 配置 ====================
 const treeProps = {
-  label: 'name',
-  children: 'children'
+  label: "name",
+  children: "children",
 };
 
 // ==================== 工具函数 ====================
@@ -197,27 +258,48 @@ const getBatchFillDays = (materialCount: number, perDay: number) => {
   return remainder > 0 ? fullDays + 1 : fullDays;
 };
 
+/** 扩展天数开启时，根据素材数量同步结束天数 */
+const syncEndDayFromMaterials = () => {
+  if (
+    !useBatchSize.value ||
+    !autoExtendDays.value ||
+    allocationType.value !== 0 ||
+    selectedMaterials.value.length === 0
+  ) {
+    return;
+  }
+  const neededDays = getBatchFillDays(selectedMaterials.value.length, batchSize.value);
+  const targetEnd = Math.min(365, startDay.value + neededDays - 1);
+  if (targetEnd >= startDay.value) {
+    endDay.value = targetEnd;
+  }
+};
+
 /**
  * 计算描述文字
  */
 const descriptionText = computed(() => {
   if (selectedMaterials.value.length === 0) {
-    return '请先选择素材';
+    return "请先选择素材";
   }
 
   const totalDays = endDay.value - startDay.value + 1;
   // 只有平均分配和循环分配才显示基数信息
   const showBatchInfo = useBatchSize.value && allocationType.value !== 2;
-  const batchInfo = showBatchInfo ? `（每次${batchSize.value}个）` : '';
+  const batchInfo = showBatchInfo ? `（每次${batchSize.value}个）` : "";
 
   switch (allocationType.value) {
     case 0: // 平均分配
-      if (useBatchSize.value && batchSize.value > 1) {
-        // 启用基数：强制每天分配 batchSize 个素材
+      if (useBatchSize.value) {
+        // 启用基数：每天固定分配 batchSize 个素材
         const requiredMaterials = totalDays * batchSize.value;
         if (selectedMaterials.value.length >= requiredMaterials) {
           const remaining = selectedMaterials.value.length - requiredMaterials;
-          return `每天分配 ${batchSize.value} 个素材，共需 ${requiredMaterials} 个，将舍弃 ${remaining} 个多余素材`;
+          if (remaining === 0) {
+            return `每天分配 ${batchSize.value} 个素材，共 ${totalDays} 天，分配全部 ${selectedMaterials.value.length} 个素材`;
+          }
+          const capHint = autoExtendDays.value ? "（已达 365 天上限）" : "";
+          return `每天分配 ${batchSize.value} 个素材，共需 ${requiredMaterials} 个，将舍弃 ${remaining} 个多余素材${capHint}`;
         } else {
           const count = selectedMaterials.value.length;
           const perDay = batchSize.value;
@@ -245,7 +327,7 @@ const descriptionText = computed(() => {
     case 2: // 全部添加到每一天
       return `每天分配 ${selectedMaterials.value.length} 个素材`;
     default:
-      return '';
+      return "";
   }
 });
 
@@ -292,7 +374,9 @@ const loadMaterialList = async () => {
         const categoryMaterialIds = materialList.value
           .filter(m => m.cate_id === selectedCategoryId.value)
           .map(m => m.id);
-        const count = selectedMaterials.value.filter(m => categoryMaterialIds.includes(m.id)).length;
+        const count = selectedMaterials.value.filter(m =>
+          categoryMaterialIds.includes(m.id)
+        ).length;
         categorySelectedCountCache.value.set(selectedCategoryId.value, count);
       }
     }
@@ -343,14 +427,14 @@ const handleMaterialSelectionChange = (selection: Material[]) => {
   const currentIds = new Set(materialList.value.map(m => m.id));
   selectedMaterials.value = [
     ...selectedMaterials.value.filter(m => !currentIds.has(m.id)),
-    ...selection
+    ...selection,
   ];
 
   Array.from(categorySelectedCountCache.value.keys()).forEach(catId => {
     if (materialList.value.some(m => m.cate_id === catId)) {
-      const count = materialList.value
-        .filter(m => m.cate_id === catId && selectedMaterials.value.some(sm => sm.id === m.id))
-        .length;
+      const count = materialList.value.filter(
+        m => m.cate_id === catId && selectedMaterials.value.some(sm => sm.id === m.id)
+      ).length;
       categorySelectedCountCache.value.set(catId, count);
     }
   });
@@ -370,9 +454,13 @@ const ensureDay = (result: DailyMaterialMap, internalDay: number): TaskMaterialI
   return result[internalDay];
 };
 
-const addMaterialToDay = (result: DailyMaterialMap, internalDay: number, material: TaskMaterialItem) => {
+const addMaterialToDay = (
+  result: DailyMaterialMap,
+  internalDay: number,
+  material: TaskMaterialItem
+) => {
   const dayList = ensureDay(result, internalDay);
-  if (!dayList.some((m) => m.id === material.id)) {
+  if (!dayList.some(m => m.id === material.id)) {
     dayList.push(material);
   }
 };
@@ -388,7 +476,7 @@ const allocateEvenly = (
   const totalDays = end - start + 1;
   let materialIndex = 0;
 
-  if (useBatch && perDay > 1) {
+  if (useBatch) {
     const fullDays = Math.floor(materials.length / perDay);
     const remainder = materials.length % perDay;
     const fillDays = Math.min(totalDays, getBatchFillDays(materials.length, perDay));
@@ -421,7 +509,11 @@ const allocateEvenly = (
   return result;
 };
 
-const allocateCircularly = (materials: TaskMaterialItem[], start: number, end: number): DailyMaterialMap => {
+const allocateCircularly = (
+  materials: TaskMaterialItem[],
+  start: number,
+  end: number
+): DailyMaterialMap => {
   const result: DailyMaterialMap = {};
   const totalDays = end - start + 1;
   for (let i = 0; i < materials.length; i++) {
@@ -430,11 +522,15 @@ const allocateCircularly = (materials: TaskMaterialItem[], start: number, end: n
   return result;
 };
 
-const allocateToAllDays = (materials: TaskMaterialItem[], start: number, end: number): DailyMaterialMap => {
+const allocateToAllDays = (
+  materials: TaskMaterialItem[],
+  start: number,
+  end: number
+): DailyMaterialMap => {
   const result: DailyMaterialMap = {};
   for (let day = start; day <= end; day++) {
     const internalDay = day - 1;
-    materials.forEach((material) => addMaterialToDay(result, internalDay, material));
+    materials.forEach(material => addMaterialToDay(result, internalDay, material));
   }
   return result;
 };
@@ -473,7 +569,7 @@ const allocateMaterials = () => {
     return;
   }
 
-  const materials: TaskMaterialItem[] = selectedMaterials.value.map((m) => ({
+  const materials: TaskMaterialItem[] = selectedMaterials.value.map(m => ({
     id: m.id!,
     name: m.name,
     type: m.type,
@@ -481,11 +577,7 @@ const allocateMaterials = () => {
 
   // 平均分配且素材充足时，只使用所需数量
   let materialsToAllocate = materials;
-  if (
-    useBatchSize.value &&
-    batchSize.value > 1 &&
-    allocationType.value === 0
-  ) {
+  if (useBatchSize.value && allocationType.value === 0) {
     const totalDays = endDay.value - startDay.value + 1;
     const requiredMaterials = totalDays * batchSize.value;
     if (materials.length >= requiredMaterials) {
@@ -514,7 +606,7 @@ const allocateMaterials = () => {
 // 监听外部传入的 modelValue
 watch(
   () => props.modelValue,
-  (newVal) => {
+  newVal => {
     visible.value = newVal;
     if (newVal) {
       // 初始化分配范围
@@ -528,7 +620,7 @@ watch(
 );
 
 // 监听 visible 变化
-watch(visible, (newVal) => {
+watch(visible, newVal => {
   emit("update:modelValue", newVal);
 });
 
@@ -539,6 +631,18 @@ watch(selectedCategoryId, () => {
     loadMaterialList();
   }
 });
+
+watch(
+  () => [
+    selectedMaterials.value.length,
+    batchSize.value,
+    startDay.value,
+    autoExtendDays.value,
+    useBatchSize.value,
+    allocationType.value,
+  ],
+  () => syncEndDayFromMaterials()
+);
 
 // ==================== 对话框管理 ====================
 /**
@@ -559,6 +663,7 @@ const resetForm = () => {
   allocationType.value = 0;
   useBatchSize.value = false;
   batchSize.value = 1;
+  autoExtendDays.value = true;
   categorySelectedCountCache.value.clear();
 };
 </script>
