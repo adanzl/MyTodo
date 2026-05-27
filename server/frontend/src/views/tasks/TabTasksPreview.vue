@@ -56,7 +56,13 @@
                                 <Document v-if="item.material.type == 0"/>
                                 <VideoPlay v-else-if="item.material.type == 1"/>
                             </el-icon>
-                            <div class="text-sm font-medium text-center line-clamp-2 mb-1">{{ item.material.name }}</div>
+                            <el-tooltip :content="`[${item.material.id}]${item.material.name}`" placement="top"
+                                :show-after="400" popper-class="max-w-xs wrap-break-word">
+                                <div
+                                    class="w-full min-w-0 mb-1 px-1 text-sm font-medium text-center text-gray-900 line-clamp-2 wrap-break-word">
+                                    {{ item.material.name }}
+                                </div>
+                            </el-tooltip>
                             <div v-if="item.task.lock" class="mt-2">
                                 <el-icon :size="24" class="text-gray-500">
                                     <Lock />
