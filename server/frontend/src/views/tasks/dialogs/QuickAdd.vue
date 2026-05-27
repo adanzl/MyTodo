@@ -419,16 +419,28 @@ const handleTreeSelect = (data: any) => {
 };
 
 /**
- * 素材选择变化（跨类别累加）
+ * 素材选择变化（跨类别累加，顺序按勾选先后）
  */
 const handleMaterialSelectionChange = (selection: Material[]) => {
   if (isRestoringSelection.value) return;
 
   const currentIds = new Set(materialList.value.map(m => m.id));
-  selectedMaterials.value = [
-    ...selectedMaterials.value.filter(m => !currentIds.has(m.id)),
-    ...selection,
-  ];
+  const selectionIds = new Set(selection.map(m => m.id));
+
+  // 保留其他类别顺序；当前类别去掉已取消勾选的项
+  const next = selectedMaterials.value.filter(
+    m => !currentIds.has(m.id!) || selectionIds.has(m.id)
+  );
+
+  // 新勾选的项按本次 selection 顺序追加到末尾（单次多选时为表格顺序）
+  const existingIds = new Set(next.map(m => m.id));
+  for (const m of selection) {
+    if (!existingIds.has(m.id)) {
+      next.push(m);
+      existingIds.add(m.id);
+    }
+  }
+  selectedMaterials.value = next;
 
   Array.from(categorySelectedCountCache.value.keys()).forEach(catId => {
     if (materialList.value.some(m => m.cate_id === catId)) {
