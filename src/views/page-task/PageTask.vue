@@ -83,7 +83,11 @@
                   :color="'primary'"
                   class="text-4xl mb-1 mt-6"
                 ></ion-icon>
-                <div class="text-sm font-medium text-center line-clamp-2 mb-1">{{ material.name }}</div>
+                <div
+                  class="text-sm font-medium text-center mb-1 overflow-hidden wrap-anywhere [-webkit-box-orient:vertical] [-webkit-line-clamp:2] [display:-webkit-box]"
+                >
+                  {{ material.name }}
+                </div>
                 <div v-if="task.lock" >
                   <ion-icon :icon="lockClosed" class="text-2xl text-gray-500"></ion-icon>
                 </div>
@@ -399,5 +403,4 @@ onMounted(() => {
 });
 </script>
 
-<style scoped>
-</style>
+<style scoped></style>
