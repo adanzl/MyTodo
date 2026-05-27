@@ -58,7 +58,7 @@
 
           <!-- 第三行：前置日程 -->
           <el-row :gutter="20">
-            <el-col :span="24">
+            <el-col :span="16">
               <el-form-item label="前置日程">
                 <div class="flex gap-4 items-center w-full">
                   <el-tooltip content="完成了每天的规定日程才能开始当前任务" placement="bottom">
@@ -87,6 +87,22 @@
                     </el-select>
                   </div>
 
+                </div>
+              </el-form-item>
+            </el-col>
+          </el-row>
+
+          <el-row :gutter="20">
+            <el-col :span="24">
+              <el-form-item label="禁用时段">
+                <div class="flex gap-2 w-full items-center">
+                  <TimeRange
+                    v-for="(_, index) in blockTimes"
+                    :key="index"
+                    v-model="blockTimes[index]"
+                    @remove="blockTimes.splice(index, 1)"
+                  />
+                  <el-button type="primary" link @click="addBlockTime" :icon="Plus"></el-button>
                 </div>
               </el-form-item>
             </el-col>
@@ -268,11 +284,12 @@
 import { ref, watch, nextTick, computed, onMounted } from "vue";
 import { ElMessage } from "element-plus";
 import { Plus, WarningFilled, ArrowUp, ArrowDown } from "@element-plus/icons-vue";
-import { addTask, updateTask, getMaterialList, getMaterialCategoryList, type Task, type Material, type MaterialCategory } from "@/api/api-task";
+import { addTask, updateTask, getMaterialList, getMaterialCategoryList, getCommonBlockTimeSlots, type Task, type Material, type MaterialCategory, type TaskBlockTimeSlot } from "@/api/api-task";
 import { getTodoListByTime } from "@/api/api-todo";
 import { sortByName, buildCategoryTree } from "@/utils/file";
 import dayjs from "dayjs";
 import QuickAdd from "./QuickAdd.vue";
+import TimeRange from "../components/TimeRange.vue";
 
 interface Props {
   modelValue: boolean;
@@ -355,6 +372,11 @@ const handleTreeSelect = (data: any) => {
 const dailyMaterials = ref<Record<number, Array<{ id: number; name: string; type: number }>>>({});
 // 每日分数数据：{ dayNumber: score }
 const dailyScore = ref<Record<number, number>>({});
+const blockTimes = ref<TaskBlockTimeSlot[]>([]);
+
+const addBlockTime = () => {
+  blockTimes.value.push({ start: "00:00:00", end: "08:00:00" });
+};
 
 const createDefaultFormData = (): Partial<Task> => ({
   name: "",
@@ -413,6 +435,8 @@ watch(
         preTodoCancan.value = [];
       }
 
+      blockTimes.value = getCommonBlockTimeSlots(newData.block_time);
+
       // 初始化每日素材数据和每日分数
       if (newData.data) {
         try {
@@ -439,6 +463,7 @@ watch(
       dailyScore.value = {};
       preTodoZhaozhao.value = [];
       preTodoCancan.value = [];
+      blockTimes.value = [];
       selectedDay.value = 0;
     }
   },
@@ -497,6 +522,7 @@ const resetForm = () => {
   dailyScore.value = {};
   preTodoZhaozhao.value = [];
   preTodoCancan.value = [];
+  blockTimes.value = [];
 };
 
 // 获取某天的素材列表
@@ -858,6 +884,10 @@ const handleSubmit = async () => {
       status: formData.value.status ?? 1,
       priority: formData.value.priority ?? 1,
       pre_todo: Object.keys(preTodoData).length > 0 ? JSON.stringify(preTodoData) : undefined,
+      block_time: (() => {
+        const time = blockTimes.value.filter((s) => s.start && s.end && s.start < s.end);
+        return time.length ? [{ role: "common", time }] : [];
+      })(),
       data: JSON.stringify({
         dailyMaterials: dailyMaterials.value,
         dailyScore: dailyScore.value,

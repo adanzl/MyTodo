@@ -400,6 +400,34 @@ class TaskMgr:
             log.error(f"获取任务列表失败: {e}")
             return {"code": -1, "msg": f"获取任务列表失败: {str(e)}", "data": None}
 
+    @staticmethod
+    def _is_in_block_time_now(block_time_raw: Any, date_str: str) -> bool:
+        """今天且当前时刻在 common 禁用时段内（左闭右开）。"""
+        now = datetime.now()
+        if date_str != now.strftime('%Y-%m-%d'):
+            return False
+        rules = block_time_raw
+        if isinstance(rules, str):
+            try:
+                rules = json.loads(rules)
+            except json.JSONDecodeError:
+                return False
+        if not isinstance(rules, list):
+            return False
+        common = next((r for r in rules if r.get('role') in (None, '', 'common')), None)
+        if not common:
+            return False
+        t = now.time()
+        for slot in common.get('time') or []:
+            try:
+                start = datetime.strptime(slot['start'], '%H:%M:%S').time()
+                end = datetime.strptime(slot['end'], '%H:%M:%S').time()
+                if start <= t < end:
+                    return True
+            except (KeyError, TypeError, ValueError):
+                continue
+        return False
+
     def check_task_lock(self,
                         tasks: List[Dict[str, Any]],
                         user_id: Optional[int] = None,
@@ -463,6 +491,10 @@ class TaskMgr:
                         if not all_completed:
                             task['lock'] = True
                             task['msg'] = f'请先完成前置日程：{"、".join(incomplete_names)}'
+
+                if not task.get('lock') and self._is_in_block_time_now(task.get('block_time'), date_str):
+                    task['lock'] = True
+                    task['msg'] = '当前处于禁用时段'
 
                 # 如果当前任务有未完成的素材，记录优先级
                 if not task['lock'] and self._has_uncompleted_materials(task, user_id, target_date):

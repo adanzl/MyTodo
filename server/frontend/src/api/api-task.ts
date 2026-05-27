@@ -194,8 +194,44 @@ export interface Task {
   type: number; // 0:每日任务；1：持续性任务
   data: string | TaskDetail;
   pre_todo?: string; // 前置日程JSON字符串，格式：{"user_id": [todo_ids]}
+  block_time?: TaskBlockTimeRule[];
   lock?: boolean; // 任务是否锁定
   msg?: string; // 锁定提示信息
+}
+
+export interface TaskBlockTimeSlot {
+  start: string;
+  end: string;
+}
+
+export interface TaskBlockTimeRule {
+  role: string;
+  time: TaskBlockTimeSlot[];
+}
+
+function parseBlockTimeRules(raw: unknown): TaskBlockTimeRule[] {
+  if (!raw) return [];
+  let data: unknown = raw;
+  if (typeof data === "string") {
+    try {
+      data = JSON.parse(data);
+    } catch {
+      return [];
+    }
+  }
+  if (Array.isArray(data)) return data as TaskBlockTimeRule[];
+  if (data && typeof data === "object") return [data as TaskBlockTimeRule];
+  return [];
+}
+
+export function normalizeTask(task: Task): Task {
+  return { ...task, block_time: parseBlockTimeRules(task.block_time) };
+}
+
+/** 取 common 规则的禁用时段（列表展示、编辑表单用） */
+export function getCommonBlockTimeSlots(rules?: TaskBlockTimeRule[]): TaskBlockTimeSlot[] {
+  const rule = rules?.find((r) => r.role === "common" || !r.role);
+  return rule?.time?.filter((s) => s.start && s.end) ?? [];
 }
 
 /**
@@ -229,7 +265,11 @@ export async function getTaskList(
   }
 
   const response = await api.get("/task/list", { params });
-  return response.data;
+  const result = response.data as PaginatedResponse<Task>;
+  if (result.code === 0 && result.data?.data) {
+    result.data.data = result.data.data.map(normalizeTask);
+  }
+  return result;
 }
 
 /**
@@ -237,7 +277,7 @@ export async function getTaskList(
  * @param id - 任务ID
  */
 export async function getTask(id: number, fields?: string): Promise<Task> {
-  return getData<Task>("t_task", id, fields);
+  return normalizeTask(await getData<Task>("t_task", id, fields));
 }
 
 /**
@@ -245,10 +285,12 @@ export async function getTask(id: number, fields?: string): Promise<Task> {
  * @param task - 任务数据
  */
 export async function addTask(task: Omit<Task, "id">): Promise<Task> {
-  return setData<Task>("t_task", {
-    id: -1, // -1 表示新增
-    ...task,
-  });
+  return normalizeTask(
+    await setData<Task>("t_task", {
+      id: -1, // -1 表示新增
+      ...task,
+    })
+  );
 }
 
 /**
@@ -256,7 +298,9 @@ export async function addTask(task: Omit<Task, "id">): Promise<Task> {
  * @param task - 任务数据（必须包含 id）
  */
 export async function updateTask(task: Task): Promise<Task> {
-  return setData<Task>("t_task", task as unknown as Record<string, unknown>);
+  return normalizeTask(
+    await setData<Task>("t_task", task as unknown as Record<string, unknown>)
+  );
 }
 
 /**

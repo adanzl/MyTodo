@@ -12,7 +12,7 @@
     <el-table :data="taskList" v-loading="loading" stripe border style="width: 100%" :max-height="tableMaxHeight">
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="name" label="任务名称" min-width="200" />
-      <el-table-column prop="priority" label="优先级" min-width="30" align="center" />
+      <el-table-column prop="priority" label="优先级" min-width="40" align="center" />
       <el-table-column prop="type" label="任务类型" width="100" align="center">
         <template #default="{ row }">
           <el-tag :type="row.type === 1 ? 'success' : 'primary'">{{ row.type === 1 ? '持续任务' : '每日任务' }}</el-tag>
@@ -25,7 +25,27 @@
           {{ getUserName(row.user_id) }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="280" fixed="right">
+      <el-table-column label="禁用时段" width="150">
+        <template #default="{ row }">
+          <template v-if="blockSlots(row).length">
+            <el-tooltip placement="top" :disabled="blockSlots(row).length <= 1">
+              <template #content>
+                <div v-for="(slot, index) in blockSlots(row)" :key="index">
+                  {{ slot.start.slice(0, 5) }} - {{ slot.end.slice(0, 5) }}
+                </div>
+              </template>
+              <div class="flex items-center gap-1 py-1">
+                <TimeRange :model-value="blockSlots(row)[0]" readonly />
+                <el-tag v-if="blockSlots(row).length > 1" class="text-xs text-gray-500 shrink-0" size="small" type="info">
+                  +{{ blockSlots(row).length - 1 }}
+                </el-tag>
+              </div>
+            </el-tooltip>
+          </template>
+          <span v-else class="text-gray-400">-</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="180" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="handleEditTask(row)">编辑</el-button>
           <el-button size="small" type="danger" @click="handleDeleteTask(row)">删除</el-button>
@@ -60,13 +80,17 @@
 import {
   deleteTask,
   getTaskList,
+  getCommonBlockTimeSlots,
   type Task,
 } from "@/api/api-task";
 import { Refresh } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { onMounted, ref, onUnmounted } from "vue";
+import { onMounted, ref, onUnmounted, nextTick } from "vue";
+import TimeRange from "./components/TimeRange.vue";
 import TaskDialog from "./dialogs/TaskDialog.vue";
 
+
+const blockSlots = (row: Task) => getCommonBlockTimeSlots(row.block_time);
 
 const tableMaxHeight = ref<number>(0);
 // 计算表格最大高度
