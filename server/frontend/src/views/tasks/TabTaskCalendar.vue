@@ -107,11 +107,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, onUnmounted } from "vue";
+import { ref, computed, onMounted, watch, onUnmounted, nextTick } from "vue";
 import { ElMessage } from "element-plus";
 import { Refresh, ArrowLeft, ArrowRight } from "@element-plus/icons-vue";
 import { getTaskList, type Task } from "@/api/api-task";
-import { formatDateShort, getWeekDay, getDaysDiff, generateDateRange } from "@/utils/date";
+import { formatDateShort, getWeekDay, generateDateRange, getWorkdayIndex, isRestDay } from "@/utils/date";
 import dayjs from "dayjs";
 import { TaskDetail } from "@/types/tasks/taskDetail";
 
@@ -253,14 +253,15 @@ const getMaterialStatus = (row: any, date: Date) => {
     const dailyMaterials = taskData.dailyMaterials || {};
 
     // 计算这是任务的第几天
-    const diffDays = getDaysDiff(task.start_date, date);
+    if (isRestDay(task.rest_days, date)) return "休";
+    const workdayIdx = getWorkdayIndex(task.start_date, date, task.rest_days);
 
-    if (diffDays < 0 || diffDays >= task.duration) {
+    if (workdayIdx < 0 || workdayIdx >= task.duration) {
       return "";
     }
 
     // type=1（持续任务）：只看第0天的素材
-    const materialsIndex = task.type === 1 ? 0 : diffDays;
+    const materialsIndex = task.type === 1 ? 0 : workdayIdx;
     const materials = dailyMaterials[materialsIndex] || [];
 
     // 找到当前素材
@@ -438,10 +439,15 @@ const getTaskProgress = (task: Task, date: Date) => {
     const dailyMaterials = taskData.dailyMaterials || {};
 
     // 计算这是任务的第几天
-    const diffDays = getDaysDiff(task.start_date, date);
+    if (isRestDay(task.rest_days, date)) {
+      const w = getWorkdayIndex(task.start_date, date, task.rest_days);
+      if (w < 0 || w >= task.duration) return "-";
+      return "休";
+    }
+    const workdayIdx = getWorkdayIndex(task.start_date, date, task.rest_days);
 
     // 如果日期在任务开始前或结束后，显示 "-"
-    if (diffDays < 0 || diffDays >= task.duration) {
+    if (workdayIdx < 0 || workdayIdx >= task.duration) {
       return "-";
     }
 
@@ -452,7 +458,7 @@ const getTaskProgress = (task: Task, date: Date) => {
       materials = dailyMaterials[0] || [];
     } else {
       // type=0（每日任务）：获取该天的素材列表
-      materials = dailyMaterials[diffDays] || [];
+      materials = dailyMaterials[workdayIdx] || [];
     }
 
     const totalMaterials = materials.length;

@@ -58,7 +58,7 @@
 
           <!-- 第三行：前置日程 -->
           <el-row :gutter="20">
-            <el-col :span="16">
+            <el-col :span="24">
               <el-form-item label="前置日程">
                 <div class="flex gap-4 items-center w-full">
                   <el-tooltip content="完成了每天的规定日程才能开始当前任务" placement="bottom">
@@ -71,7 +71,7 @@
                     <span class="w-10 text-sm text-gray-600">灿灿:</span>
                     <el-select :disabled="!selectedUsers.includes(3)" v-model="preTodoCancan" multiple filterable
                       clearable placeholder="请选择灿灿的前置日程" class="flex-1" collapse-tags collapse-tags-tooltip
-                      :max-collapse-tags="3">
+                      :max-collapse-tags="2">
                       <el-option v-for="todo in cancanTodos" :key="'cancan_' + todo.id" :label="todo.title"
                         :value="todo.id" />
                     </el-select>
@@ -93,7 +93,7 @@
           </el-row>
 
           <el-row :gutter="20">
-            <el-col :span="24">
+            <el-col :span="12">
               <el-form-item label="禁用时段">
                 <div class="flex gap-2 w-full items-center">
                   <TimeRange
@@ -103,6 +103,27 @@
                     @remove="blockTimes.splice(index, 1)"
                   />
                   <el-button type="primary" link @click="addBlockTime" :icon="Plus"></el-button>
+                </div>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="休息日">
+                <div class="flex items-center gap-1 min-w-0 h-7">
+                  <div
+                    class="min-w-0 cursor-pointer text-xs wrap-break-word leading-4 flex items-center hover:text-[#409EFF]"
+                    @click="showRestDaysDialog = true"
+                  >
+                    <span v-if="restDaysSummary" class="text-gray-600">{{ restDaysSummary }}</span>
+                    <span v-else class="text-gray-400">无，点击设置</span>
+                  </div>
+                  <el-icon
+                    v-if="restDaysSummary"
+                    class="shrink-0 cursor-pointer text-gray-400 hover:text-gray-600"
+                    :size="16"
+                    @click.stop="clearRestDays"
+                  >
+                    <Close />
+                  </el-icon>
                 </div>
               </el-form-item>
             </el-col>
@@ -140,15 +161,20 @@
         <div class="checkin-content flex" style="height: 400px;">
           <!-- 左侧：天数列表（仅每日任务显示） -->
           <div v-if="formData.type === 0" class="day-list w-48 border-r overflow-y-auto">
-            <div v-for="dayIndex in Array.from({ length: formData.duration || 1 }, (_, i) => i)" :key="dayIndex"
+            <div
+              v-for="item in workdaySchedules"
+              :key="item.dayIndex"
               class="p-3 cursor-pointer hover:bg-gray-100 transition-all duration-200"
-              :class="{ 'bg-blue-50 border-l-4 border-blue-500': selectedDay === dayIndex }"
-              @click="selectedDay = dayIndex">
-              <div class="font-medium">第{{ dayIndex + 1 }}天 <span class="text-[12px] ml-1">{{ getDayDate(dayIndex)
-                  }}</span></div>
+              :class="{ 'bg-blue-50 border-l-4 border-blue-500': selectedDay === item.dayIndex }"
+              @click="selectedDay = item.dayIndex"
+            >
+              <div class="font-medium">
+                第{{ item.dayIndex + 1 }}天
+                <span class="text-[12px] ml-1">{{ item.dateLabel }}</span>
+              </div>
               <div class="text-xs text-gray-500 mt-1 flex justify-between">
-                <div>{{ getDayMaterialCount(dayIndex) }} 个素材</div>
-                <div v-if="isToday(dayIndex)">今</div>
+                <div>{{ item.materialCount }} 个素材</div>
+                <div v-if="item.isToday">今</div>
               </div>
             </div>
           </div>
@@ -277,19 +303,29 @@
 
     <!-- 快速添加弹窗 -->
     <QuickAdd v-model="showQuickAdd" :form-data="formData" @allocated="handleQuickAddAllocated" />
+
+    <!-- 休息日维护弹窗 -->
+    <RestDaysDialog
+      v-model="showRestDaysDialog"
+      v-model:restDays="formData.rest_days"
+      v-model:summary="restDaysSummary"
+      @confirmed="handleRestDaysConfirmed"
+    />
   </el-dialog>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, nextTick, computed, onMounted } from "vue";
 import { ElMessage } from "element-plus";
-import { Plus, WarningFilled, ArrowUp, ArrowDown } from "@element-plus/icons-vue";
+import { Plus, WarningFilled, ArrowUp, ArrowDown, Close } from "@element-plus/icons-vue";
 import { addTask, updateTask, getMaterialList, getMaterialCategoryList, getCommonBlockTimeSlots, type Task, type Material, type MaterialCategory, type TaskBlockTimeSlot } from "@/api/api-task";
 import { getTodoListByTime } from "@/api/api-todo";
 import { sortByName, buildCategoryTree } from "@/utils/file";
+import { getDateByWorkdayIndex, getTaskEndDate, type RestDaysRule } from "@/utils/date";
 import dayjs from "dayjs";
 import QuickAdd from "./QuickAdd.vue";
 import TimeRange from "../components/TimeRange.vue";
+import RestDaysDialog from "./RestDaysDialog.vue";
 
 interface Props {
   modelValue: boolean;
@@ -315,6 +351,7 @@ const selectedUsers = ref<number[]>([]);
 const selectedDay = ref<number>(-1);
 const showMaterialSelector = ref(false);
 const showQuickAdd = ref(false);
+const showRestDaysDialog = ref(false);
 const materialLoading = ref(false);
 const materialList = ref<Material[]>([]);
 const selectedMaterials = ref<Material[]>([]);
@@ -390,10 +427,45 @@ const createDefaultFormData = (): Partial<Task> => ({
 
 const formData = ref<Partial<Task>>(createDefaultFormData());
 
+const restDaysSummary = ref("");
+
+const workdaySchedules = computed(() => {
+  const duration = formData.value.duration || 1;
+  const start = formData.value.start_date;
+  if (!start) return [];
+  const rest = formData.value.rest_days;
+  const today = dayjs().format("YYYY-MM-DD");
+  return Array.from({ length: duration }, (_, dayIndex) => {
+    const d = getDateByWorkdayIndex(start, dayIndex, rest);
+    const dateStr = d.format("YYYY-MM-DD");
+    return {
+      dayIndex,
+      dateLabel: d.format("MM月DD日"),
+      isToday: dateStr === today,
+      materialCount: (dailyMaterials.value[dayIndex] || []).length,
+    };
+  });
+});
+
+const handleRestDaysConfirmed = (_rule: RestDaysRule) => {
+  // v-model:restDays 已更新 formData.rest_days，这里只做 UI 兜底修正
+  const duration = formData.value.duration || 1;
+  if (selectedDay.value >= duration) selectedDay.value = duration - 1;
+  if (selectedDay.value < 0) selectedDay.value = 0;
+};
+
+const clearRestDays = () => {
+  formData.value.rest_days = { weekdays: [], dates: [], work_dates: [] };
+  restDaysSummary.value = "";
+  // 清空后确保左侧仍选中第 1 天
+  selectedDay.value = 0;
+};
+
 // 计算结束日期
 const endDateStr = computed(() => {
   if (!formData.value.start_date || !formData.value.duration) return '';
-  return dayjs(formData.value.start_date).add((formData.value.duration || 1) - 1, 'day').format('MM月DD日');
+  const end = getTaskEndDate(formData.value.start_date, formData.value.duration || 1, formData.value.rest_days);
+  return end ? dayjs(end).format("MM月DD日") : "";
 });
 
 // 监听外部传入的 taskData
@@ -406,6 +478,7 @@ watch(
         start_date: newData.start_date || "",
         duration: newData.duration || 1,
         user_id: newData.user_id || "",
+        rest_days: newData.rest_days,
         status: newData.status ?? 1,
         type: Number(newData.type) ?? 0,
         priority: newData.priority ?? 0,
@@ -523,29 +596,12 @@ const resetForm = () => {
   preTodoZhaozhao.value = [];
   preTodoCancan.value = [];
   blockTimes.value = [];
+  showRestDaysDialog.value = false;
 };
 
 // 获取某天的素材列表
 const getDayMaterials = (day: number) => {
   return dailyMaterials.value[day] || [];
-};
-
-// 获取某天的素材数量
-const getDayMaterialCount = (day: number) => {
-  return getDayMaterials(day).length;
-};
-
-// 获取某天的具体日期
-const getDayDate = (dayIndex: number) => {
-  if (!formData.value.start_date) return '';
-  return dayjs(formData.value.start_date).add(dayIndex, 'day').format('MM月DD日');
-};
-
-// 判断是否是今天
-const isToday = (dayIndex: number) => {
-  if (!formData.value.start_date) return false;
-  const dayDate = dayjs(formData.value.start_date).add(dayIndex, 'day').format('YYYY-MM-DD');
-  return dayDate === dayjs().format('YYYY-MM-DD');
 };
 
 // 获取素材类型名称
@@ -635,7 +691,7 @@ const loadTodoList = async () => {
     }
 
     const startDate = formData.value.start_date;
-    const endDate = dayjs(startDate).add(formData.value.duration - 1, 'day').format('YYYY-MM-DD');
+    const endDate = getTaskEndDate(startDate, formData.value.duration, formData.value.rest_days);
 
     // 根据选中的用户加载对应的日程
     if (selectedUsers.value.includes(4)) {
@@ -863,7 +919,7 @@ const handleSubmit = async () => {
     const userIdStr = selectedUsers.value.join(",");
 
     // 计算结束日期
-    const endDateStr = dayjs(formData.value.start_date).add((formData.value.duration || 1) - 1, 'day').format('YYYY-MM-DD');
+    const endDateStr = getTaskEndDate(formData.value.start_date, formData.value.duration || 1, formData.value.rest_days);
 
     // 构建任务数据,确保所有必需字段都有值
     const preTodoData: Record<string, number[]> = {};
@@ -880,6 +936,8 @@ const handleSubmit = async () => {
       end_date: endDateStr,
       duration: formData.value.duration || 1,
       user_id: userIdStr,
+      // sqlite 不支持直接绑定 dict，对齐 data 字段：统一存 JSON 字符串
+      rest_days: formData.value.rest_days ? JSON.stringify(formData.value.rest_days) : undefined,
       type: formData.value.type ?? 0,
       status: formData.value.status ?? 1,
       priority: formData.value.priority ?? 1,

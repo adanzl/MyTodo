@@ -4,17 +4,14 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
-
 from flask import Blueprint, request
 from flask.typing import ResponseReturnValue
 from pydantic import BaseModel
 
 from core.config import app_logger
-from core.db.db_mgr import db_mgr
-from core.services.task_mgr import task_mgr
+from core.services.task.task_mgr import task_mgr
 from core.tools.validation import parse_with_model
-from core.utils import _err, _ok, read_json_from_request
+from core.utils import _err, read_json_from_request
 
 log = app_logger
 task_bp = Blueprint('task', __name__)
@@ -89,6 +86,16 @@ def get_task_list() -> ResponseReturnValue:
     page_size = request.args.get('pageSize', 20, type=int)
     
     return task_mgr.get_task_list(user_id, date, page_num, page_size)
+
+
+@task_bp.route('/task/update', methods=['POST'])
+def update_task() -> ResponseReturnValue:
+    """新增/更新任务（写路径规范化 end_date/rest_days）"""
+    json_data = read_json_from_request()
+    if not isinstance(json_data, dict):
+        return _err('Invalid request body')
+    result = task_mgr.update_task(json_data)
+    return result
 
 
 @task_bp.route('/task/parent', methods=['GET'])

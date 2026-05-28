@@ -12,7 +12,7 @@
     <el-table :data="taskList" v-loading="loading" stripe border style="width: 100%" :max-height="tableMaxHeight">
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="name" label="任务名称" min-width="200" />
-      <el-table-column prop="priority" label="优先级" min-width="80" align="center" />
+      <el-table-column prop="priority" label="优先级" width="80" align="center" />
       <el-table-column prop="type" label="任务类型" width="100" align="center">
         <template #default="{ row }">
           <el-tag :type="row.type === 1 ? 'success' : 'primary'">{{ row.type === 1 ? '持续任务' : '每日任务' }}</el-tag>
@@ -23,6 +23,22 @@
       <el-table-column prop="user_id" label="布置对象" width="120">
         <template #default="{ row }">
           {{ getUserName(row.user_id) }}
+        </template>
+      </el-table-column>
+      <!-- 休息日 -->
+      <el-table-column label="休息日" width="120">
+        <template #default="{ row }">
+          <el-tooltip
+            v-if="restDaysText(row)"
+            :content="restDaysText(row)"
+            placement="top"
+            :show-after="300"
+          >
+            <span class="text-xs text-gray-700 cursor-default block truncate max-w-[100px]">
+              {{ restDaysText(row) }}
+            </span>
+          </el-tooltip>
+          <span v-else class="text-gray-400">-</span>
         </template>
       </el-table-column>
       <el-table-column label="禁用时段" width="150">
@@ -45,7 +61,7 @@
           <span v-else class="text-gray-400">-</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" min-width="130" fixed="right">
+      <el-table-column label="操作" width="140" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="handleEditTask(row)">编辑</el-button>
           <el-button size="small" type="danger" @click="handleDeleteTask(row)">删除</el-button>
@@ -88,9 +104,12 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import { onMounted, ref, onUnmounted, nextTick } from "vue";
 import TimeRange from "./components/TimeRange.vue";
 import TaskDialog from "./dialogs/TaskDialog.vue";
+import { formatRestDaysFullText } from "@/utils/date";
 
 
 const blockSlots = (row: Task) => getCommonBlockTimeSlots(row.block_time);
+
+const restDaysText = (task: Task) => formatRestDaysFullText(task.rest_days);
 
 const tableMaxHeight = ref<number>(0);
 // 计算表格最大高度

@@ -3,6 +3,149 @@
  */
 import dayjs, { type Dayjs } from "dayjs";
 
+export type RestDaysRule = {
+  weekdays?: number[]; // 0=周日..6=周六
+  dates?: string[]; // YYYY-MM-DD，强制休息
+  work_dates?: string[]; // YYYY-MM-DD，强制工作（覆盖 weekdays/dates）
+};
+
+const DAY_FMT = "YYYY-MM-DD";
+
+function toDayKey(dt: Dayjs | Date | string): string {
+  return dayjs(dt).startOf("day").format(DAY_FMT);
+}
+
+function normalizeWeekdays(raw?: unknown): number[] {
+  if (!Array.isArray(raw)) return [];
+  const set = new Set<number>();
+  for (const v of raw) {
+    const n = typeof v === "number" ? v : Number(v);
+    if (!Number.isFinite(n)) continue;
+    const i = Math.trunc(n);
+    if (i >= 0 && i <= 6) set.add(i);
+  }
+  return Array.from(set).sort((a, b) => a - b);
+}
+
+function normalizeDateList(raw?: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const set = new Set<string>();
+  for (const v of raw) {
+    if (typeof v !== "string") continue;
+    const d = dayjs(v, DAY_FMT, true);
+    if (!d.isValid()) continue;
+    set.add(d.format(DAY_FMT));
+  }
+  return Array.from(set).sort();
+}
+
+export function parseRestDays(restDays: unknown): Required<RestDaysRule> {
+  let obj: any = restDays;
+  if (!obj) return { weekdays: [], dates: [], work_dates: [] };
+  if (typeof obj === "string") {
+    try {
+      obj = JSON.parse(obj);
+    } catch {
+      return { weekdays: [], dates: [], work_dates: [] };
+    }
+  }
+  if (!obj || typeof obj !== "object") return { weekdays: [], dates: [], work_dates: [] };
+  return {
+    weekdays: normalizeWeekdays(obj.weekdays),
+    dates: normalizeDateList(obj.dates),
+    work_dates: normalizeDateList(obj.work_dates),
+  };
+}
+
+export function isRestDay(restDays: unknown, date: Dayjs | Date | string): boolean {
+  const rule = parseRestDays(restDays);
+  const dayKey = toDayKey(date);
+  // work_dates 覆盖一切
+  if (rule.work_dates.includes(dayKey)) return false;
+  if (rule.dates.includes(dayKey)) return true;
+  if (rule.weekdays.length === 0) return false;
+  const weekday = dayjs(dayKey, DAY_FMT, true).day(); // 0=周日..6=周六
+  return rule.weekdays.includes(weekday);
+}
+
+/**
+ * 计算 date 对应的“工作日序号”(0-based)，休息日不计入序号。
+ * - date < startDate: 返回 -1
+ * - 休息日当天：返回与前一个工作日相同的序号（单调不减）
+ */
+export function getWorkdayIndex(startDate: string, date: Dayjs | Date | string, restDays?: unknown): number {
+  const start = dayjs(startDate).startOf("day");
+  const target = dayjs(date).startOf("day");
+  if (!start.isValid() || !target.isValid()) return -1;
+  if (target.isBefore(start)) return -1;
+
+  let idx = -1;
+  const dayDiff = target.diff(start, "day");
+  for (let i = 0; i <= dayDiff; i++) {
+    const cur = start.add(i, "day");
+    if (isRestDay(restDays, cur)) continue;
+    idx++;
+  }
+  return idx;
+}
+
+/**
+ * 给定工作日序号 idx(0-based)，反推出实际日期（会跳过休息日）。
+ * idx < 0 时返回 startDate 当天（用于容错）
+ */
+export function getDateByWorkdayIndex(startDate: string, idx: number, restDays?: unknown): Dayjs {
+  const start = dayjs(startDate).startOf("day");
+  if (!start.isValid()) return dayjs().startOf("day");
+  if (idx <= 0) {
+    // idx=0 代表第1个工作日；可能 start 本身是休息日，需要向后找
+    let d = start;
+    while (isRestDay(restDays, d)) d = d.add(1, "day");
+    return d;
+  }
+
+  let d = start;
+  let seen = -1;
+  while (true) {
+    if (!isRestDay(restDays, d)) {
+      seen++;
+      if (seen === idx) return d;
+    }
+    d = d.add(1, "day");
+  }
+}
+
+/** 任务结束日期（最后一个工作日），返回 YYYY-MM-DD */
+export function getTaskEndDate(startDate: string, duration: number, restDays?: unknown): string {
+  if (!duration || duration <= 0) return "";
+  const end = getDateByWorkdayIndex(startDate, duration - 1, restDays);
+  return end.format(DAY_FMT);
+}
+
+const WEEKDAY_LABELS_ZH: Record<number, string> = {
+  0: "周日",
+  1: "周一",
+  2: "周二",
+  3: "周三",
+  4: "周四",
+  5: "周五",
+  6: "周六",
+};
+
+export function formatRestDaysFullText(restDays: unknown): string {
+  const rule = parseRestDays(restDays);
+  const parts: string[] = [];
+  if (rule.weekdays.length) {
+    parts.push(`每周休：${rule.weekdays.map((d) => WEEKDAY_LABELS_ZH[d] ?? String(d)).join("、")}`);
+  }
+  if (rule.dates.length) {
+    parts.push(`指定休：${rule.dates.join("、")}`);
+  }
+  if (rule.work_dates.length) {
+    parts.push(`补班：${rule.work_dates.join("、")}`);
+  }
+  return parts.join("；");
+}
+
 /**
  * 格式化日期时间为字符串
  * @returns 格式化的日期时间字符串，格式：YYYY-MM-DD HH:MM:SS

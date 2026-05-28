@@ -189,6 +189,8 @@ export interface Task {
   end_date: string;
   duration: number;
   user_id: string;
+  /** 休息日规则(JSON 或 JSON字符串)。0=周日..6=周六；dates/work_dates 为 YYYY-MM-DD */
+  rest_days?: string | { weekdays?: number[]; dates?: string[]; work_dates?: string[] };
   status?: number; // 1: 进行中, 2: 已结束, 0: 未开始， -1：未开启
   priority?: number; // 任务优先级 数字越小优先级越高，高优先级任务没有完成低优先级任务会锁定
   type: number; // 0:每日任务；1：持续性任务
@@ -209,28 +211,12 @@ export interface TaskBlockTimeRule {
   time: TaskBlockTimeSlot[];
 }
 
-function parseBlockTimeRules(raw: unknown): TaskBlockTimeRule[] {
-  if (!raw) return [];
-  let data: unknown = raw;
-  if (typeof data === "string") {
-    try {
-      data = JSON.parse(data);
-    } catch {
-      return [];
-    }
-  }
-  if (Array.isArray(data)) return data as TaskBlockTimeRule[];
-  if (data && typeof data === "object") return [data as TaskBlockTimeRule];
-  return [];
-}
-
-export function normalizeTask(task: Task): Task {
-  return { ...task, block_time: parseBlockTimeRules(task.block_time) };
-}
-
 /** 取 common 规则的禁用时段（列表展示、编辑表单用） */
-export function getCommonBlockTimeSlots(rules?: TaskBlockTimeRule[]): TaskBlockTimeSlot[] {
-  const rule = rules?.find((r) => r.role === "common" || !r.role);
+export function getCommonBlockTimeSlots(rules?: unknown): TaskBlockTimeSlot[] {
+  if (!rules) return [];
+  // 约定：后端存/返 JSON string；这里不做过多兜底校验
+  const arr = (typeof rules === "string" ? (JSON.parse(rules) as TaskBlockTimeRule[]) : (rules as TaskBlockTimeRule[])) ?? [];
+  const rule = arr.find((r) => r.role === "common" || !r.role);
   return rule?.time?.filter((s) => s.start && s.end) ?? [];
 }
 
@@ -266,9 +252,6 @@ export async function getTaskList(
 
   const response = await api.get("/task/list", { params });
   const result = response.data as PaginatedResponse<Task>;
-  if (result.code === 0 && result.data?.data) {
-    result.data.data = result.data.data.map(normalizeTask);
-  }
   return result;
 }
 
@@ -277,7 +260,7 @@ export async function getTaskList(
  * @param id - 任务ID
  */
 export async function getTask(id: number, fields?: string): Promise<Task> {
-  return normalizeTask(await getData<Task>("t_task", id, fields));
+  return await getData<Task>("t_task", id, fields);
 }
 
 /**
@@ -285,12 +268,12 @@ export async function getTask(id: number, fields?: string): Promise<Task> {
  * @param task - 任务数据
  */
 export async function addTask(task: Omit<Task, "id">): Promise<Task> {
-  return normalizeTask(
-    await setData<Task>("t_task", {
-      id: -1, // -1 表示新增
-      ...task,
-    })
-  );
+  const response = await api.post("/task/update", { id: -1, ...task });
+  const result = response.data as { code: number; msg?: string; data?: Task };
+  if (result.code !== 0 || !result.data) {
+    throw new Error(result.msg || "添加任务失败");
+  }
+  return result.data;
 }
 
 /**
@@ -298,9 +281,12 @@ export async function addTask(task: Omit<Task, "id">): Promise<Task> {
  * @param task - 任务数据（必须包含 id）
  */
 export async function updateTask(task: Task): Promise<Task> {
-  return normalizeTask(
-    await setData<Task>("t_task", task as unknown as Record<string, unknown>)
-  );
+  const response = await api.post("/task/update", task as unknown as Record<string, unknown>);
+  const result = response.data as { code: number; msg?: string; data?: Task };
+  if (result.code !== 0 || !result.data) {
+    throw new Error(result.msg || "更新任务失败");
+  }
+  return result.data;
 }
 
 /**

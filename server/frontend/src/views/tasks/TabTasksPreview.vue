@@ -133,7 +133,8 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
 import { ElMessage } from "element-plus";
 import { Calendar, Document, Loading, VideoPlay, Refresh, Lock, CircleCheckFilled } from "@element-plus/icons-vue";
 import { getTaskList, getMaterialListByIds, type Task, type MaterialItem } from "@/api/api-task";
-import { getDaysDiff } from "@/utils/date";
+import dayjs from "dayjs";
+import { getWorkdayIndex, isRestDay } from "@/utils/date";
 import MaterialPreviewDialog from "./dialogs/MaterialPreviewDialog.vue";
 import TaskCalendar from "./dialogs/TaskCalendar.vue";
 
@@ -157,7 +158,7 @@ const showCalendarDialog = ref(false);
 
 // 当前日期字符串
 const currentDateStr = computed(() => {
-  return currentDate.value.toISOString().split("T")[0];
+  return dayjs(currentDate.value).format("YYYY-MM-DD");
 });
 
 // 检查是否有可显示的素材（按任务分组后的总数）
@@ -169,15 +170,18 @@ const getTaskMaterialSaveList = (task: Task): any[] => {
     const taskData = typeof task.data === "string" ? JSON.parse(task.data) : task.data;
     const dailyMaterials = taskData.dailyMaterials || {};
 
-    // 计算当前日期是任务的第几天
-    const diffDaysCount = getDaysDiff(task.start_date, currentDate.value);
+    // 休息日：不计入 duration，直接不出素材
+    if (isRestDay(task.rest_days, currentDate.value)) return [];
 
-    if (diffDaysCount < 0 || diffDaysCount >= task.duration) {
+    // 计算当前日期是任务的第几个工作日
+    const workdayIdx = getWorkdayIndex(task.start_date, currentDate.value, task.rest_days);
+
+    if (workdayIdx < 0 || workdayIdx >= task.duration) {
       return [];
     }
 
     // type=1（持续任务）：只看第0天的素材
-    const materialsIndex = task.type === 1 ? 0 : diffDaysCount;
+    const materialsIndex = task.type === 1 ? 0 : workdayIdx;
     // 直接返回对应天数的素材存档数组
     return dailyMaterials[materialsIndex] || [];
   } catch (error) {
@@ -200,13 +204,14 @@ const isMaterialCompleted = (task: Task, material: MaterialItem, date: Date) => 
 
     // 检查 dailyMaterials 中的 status
     if (taskData.dailyMaterials) {
-      const diffDaysCount = getDaysDiff(task.start_date, date);
-      if (diffDaysCount < 0 || diffDaysCount >= task.duration) {
+      if (isRestDay(task.rest_days, date)) return false;
+      const workdayIdx = getWorkdayIndex(task.start_date, date, task.rest_days);
+      if (workdayIdx < 0 || workdayIdx >= task.duration) {
         return false;
       }
 
       // type=1（持续任务）：只看第0天的素材
-      const materialsIndex = task.type === 1 ? 0 : diffDaysCount;
+      const materialsIndex = task.type === 1 ? 0 : workdayIdx;
       const dayKey = String(materialsIndex);
       const materials = taskData.dailyMaterials[dayKey];
       if (materials) {
@@ -340,7 +345,7 @@ const fetchTaskList = async () => {
     userId = selectedId === 0 ? undefined : selectedId;
 
     // 使用当前选中的日期进行范围查询
-    const selectedDateStr = currentDate.value.toISOString().split("T")[0];
+    const selectedDateStr = dayjs(currentDate.value).format("YYYY-MM-DD");
 
     // 查询条件：start_date <= selectedDate AND end_date >= selectedDate
     const res = await getTaskList(userId, 1, 100, selectedDateStr, selectedDateStr);
