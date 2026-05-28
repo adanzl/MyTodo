@@ -291,6 +291,12 @@ class TaskMgr:
 
             tasks = result.get('data', {}).get('data', [])
             if tasks:
+                if date:
+                    target_d = datetime.strptime(date, "%Y-%m-%d").date()
+                    tasks = [
+                        t for t in tasks
+                        if not is_rest_day(parse_rest_days(t.get("rest_days")), target_d)
+                    ]
                 tasks = self.check_task_lock(tasks, user_id, date)
                 result['data']['data'] = tasks
             return result
