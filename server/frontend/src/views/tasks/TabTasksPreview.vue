@@ -1,96 +1,112 @@
 <template>
-    <div class="p-4">
-        <div class="flex gap-5 h-10">
-            <el-button size="small" @click="fetchTaskList" :loading="loading" :icon="Refresh" type="primary" plain />
-            <!-- 用户筛选 -->
-            <div class="mb-4 flex items-center gap-2">
-                <el-radio-group v-model="selectedUserId" @change="handleUserChange">
-                    <el-radio :value="3">灿灿</el-radio>
-                    <el-radio :value="4">昭昭</el-radio>
-                </el-radio-group>
-            </div>
+  <div class="p-2">
+    <div class="flex gap-4 h-10 items-center mb-4">
+      <el-button size="small" @click="fetchTaskList" :icon="Refresh" type="primary" plain />
+      <!-- 用户筛选 -->
+      <el-radio-group v-model="selectedUserId" @change="handleUserChange">
+        <el-radio :value="3">灿灿</el-radio>
+        <el-radio :value="4">昭昭</el-radio>
+      </el-radio-group>
 
-            <!-- 日期导航 -->
-            <div class="mb-4 flex items-center gap-2">
-                <el-button type="primary" plain @click="btnCalendarClk">
-                    <el-icon>
-                        <Calendar />
-                    </el-icon>
-                    <span class="ml-2">{{ currentDateStr }}</span>
-                </el-button>
-                <el-button size="small" @click="setToday">今</el-button>
-                <span class="items-baseline text-xs text-gray-500">注：此页面的锁定图标只是标识锁定状态，不是真的锁定</span>
-            </div>
-        </div>
-
-        <!-- 任务列表 -->
-        <div v-if="loading" class="flex justify-center items-center py-10">
-            <el-icon class="is-loading" :size="40" color="#409eff">
-                <Loading />
-            </el-icon>
-        </div>
-        <div v-else class=" h-[calc(100vh-15rem)] overflow-y-auto p-4 border border-gray-300">
-            <div v-if="!hasDisplayableMaterials" class="text-center py-10 text-gray-500">
-                <p>暂无任务</p>
-            </div>
-
-            <div v-else class="space-y-4">
-                <!-- 所有素材网格 -->
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                    <div v-for="item in displayMaterials" :key="`${item.task.id}_${item.material.id}`"
-                            class="relative flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow-md cursor-pointer hover:shadow-2xl transition-shadow"
-                            @click="openMaterialPlayer(item.task, item.material)">
-                            <!-- 任务名称角标 -->
-                            <div
-                                class="absolute top-2 left-3 text-xs text-gray-500 max-w-[90%] flex gap-2 items-center min-w-0 w-full">
-                                <el-tag :type="item.completed ? 'success' : 'info'"
-                                    :effect="item.completed ? 'dark' : 'plain'"
-                                    size="small" class="shrink-0">
-                                    {{ item.completed ? '已完成' : '未完成' }}
-                                </el-tag>
-                                <span class="truncate flex-1 min-w-0">{{ item.task.name }}</span>
-                                <span class="shrink-0">{{ item.task.priority }}</span>
-                            </div>
-
-                            <el-icon :size="40" color="#409EFF" class="mb-1 mt-6">
-                                <Document v-if="item.material.type == 0"/>
-                                <VideoPlay v-else-if="item.material.type == 1"/>
-                            </el-icon>
-                            <el-tooltip :content="`[${item.material.id}]${item.material.name}`" placement="top"
-                                :show-after="400" popper-class="max-w-xs wrap-break-word">
-                                <div
-                                    class="w-full min-w-0 mb-1 px-1 text-sm font-medium text-center text-gray-900 line-clamp-2 wrap-break-word">
-                                    {{ item.material.name }}
-                                </div>
-                            </el-tooltip>
-                            <div v-if="item.task.lock" class="mt-2">
-                                <el-icon :size="24" class="text-gray-500">
-                                    <Lock />
-                                </el-icon>
-                            </div>
-                            <div v-else class="text-[10px] flex items-center mt-2">点击阅读</div>
-                        </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 素材播放弹窗 -->
-        <MaterialPreviewDialog v-model="showPlayerDialog" :material-id="selectedMaterial?.id || null" />
-
-        <!-- 任务日历弹窗 -->
-        <TaskCalendar v-model="showCalendarDialog" :selected-date="currentDateStr" :user-id="Number(selectedUserId)"
-            @date-selected="handleDateSelected" />
+      <!-- 日期导航 -->
+      <div class="flex items-center gap-2">
+        <el-button type="primary" plain @click="btnCalendarClk">
+          <el-icon>
+            <Calendar />
+          </el-icon>
+          <span class="ml-2">{{ currentDateStr }}</span>
+        </el-button>
+        <el-button size="small" @click="setToday">今</el-button>
+        <span class="items-baseline text-xs text-gray-500"
+          >注：此页面的锁定图标只是标识锁定状态，不是真的锁定</span
+        >
+      </div>
     </div>
+
+    <!-- 任务列表 -->
+    <div v-if="loading" class="flex justify-center items-center py-10">
+      <el-icon class="is-loading" :size="40" color="#409eff">
+        <Loading />
+      </el-icon>
+    </div>
+    <div v-else class="h-[calc(100vh-15rem)] overflow-y-auto p-4 border border-gray-300">
+      <div v-if="!hasDisplayableMaterials" class="text-center py-10 text-gray-500">
+        <p>暂无任务</p>
+      </div>
+
+      <div v-else class="space-y-4">
+        <!-- 所有素材网格 -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          <div
+            v-for="item in displayMaterials"
+            :key="`${item.task.id}_${item.material.id}`"
+            class="relative flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow-md cursor-pointer hover:shadow-2xl transition-shadow"
+            @click="openMaterialPlayer(item.task, item.material)"
+          >
+            <!-- 任务名称角标 -->
+            <div
+              class="absolute top-2 left-3 text-xs text-gray-500 max-w-[90%] flex gap-2 items-center min-w-0 w-full"
+            >
+              <el-tag
+                :type="item.completed ? 'success' : 'info'"
+                :effect="item.completed ? 'dark' : 'plain'"
+                size="small"
+                class="shrink-0"
+              >
+                {{ item.completed ? "已完成" : "未完成" }}
+              </el-tag>
+              <span class="truncate flex-1 min-w-0">{{ item.task.name }}</span>
+              <span class="shrink-0">{{ item.task.priority }}</span>
+            </div>
+
+            <el-icon :size="40" color="#409EFF" class="mb-1 mt-6">
+              <Document v-if="item.material.type == 0" />
+              <VideoPlay v-else-if="item.material.type == 1" />
+            </el-icon>
+            <el-tooltip
+              :content="`[${item.material.id}]${item.material.name}`"
+              placement="top"
+              :show-after="400"
+              popper-class="max-w-xs wrap-break-word"
+            >
+              <div
+                class="w-full min-w-0 mb-1 px-1 text-sm font-medium text-center text-gray-900 line-clamp-2 wrap-break-word"
+              >
+                {{ item.material.name }}
+              </div>
+            </el-tooltip>
+            <div v-if="item.task.lock" class="mt-2">
+              <el-icon :size="24" class="text-gray-500">
+                <Lock />
+              </el-icon>
+            </div>
+            <div v-else class="text-[10px] flex items-center mt-2">点击阅读</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 素材播放弹窗 -->
+    <MaterialPreviewDialog v-model="showPlayerDialog" :material-id="selectedMaterial?.id || null" />
+
+    <!-- 任务日历弹窗 -->
+    <TaskCalendar
+      v-model="showCalendarDialog"
+      :selected-date="currentDateStr"
+      :user-id="Number(selectedUserId)"
+      @date-selected="handleDateSelected"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { ElMessage } from 'element-plus';
-import { Calendar, Document, Loading, VideoPlay, Refresh, Lock } from '@element-plus/icons-vue';
-import { getTaskList, getMaterialListByIds, type Task, type MaterialItem } from '@/api/api-task';
-import { getDaysDiff } from '@/utils/date';
-import MaterialPreviewDialog from './dialogs/MaterialPreviewDialog.vue';
-import TaskCalendar from './dialogs/TaskCalendar.vue';
+import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ElMessage } from "element-plus";
+import { Calendar, Document, Loading, VideoPlay, Refresh, Lock } from "@element-plus/icons-vue";
+import { getTaskList, getMaterialListByIds, type Task, type MaterialItem } from "@/api/api-task";
+import { getDaysDiff } from "@/utils/date";
+import MaterialPreviewDialog from "./dialogs/MaterialPreviewDialog.vue";
+import TaskCalendar from "./dialogs/TaskCalendar.vue";
 
 // 状态管理
 const loading = ref(false);
@@ -111,7 +127,7 @@ const showCalendarDialog = ref(false);
 
 // 当前日期字符串
 const currentDateStr = computed(() => {
-  return currentDate.value.toISOString().split('T')[0];
+  return currentDate.value.toISOString().split("T")[0];
 });
 
 // 检查是否有可显示的素材
@@ -120,7 +136,7 @@ const hasDisplayableMaterials = computed(() => displayMaterials.value.length > 0
 // 获取任务当天的素材存档列表（从 task.data 中直接获取）
 const getTaskMaterialSaveList = (task: Task): any[] => {
   try {
-    const taskData = typeof task.data === 'string' ? JSON.parse(task.data) : task.data;
+    const taskData = typeof task.data === "string" ? JSON.parse(task.data) : task.data;
     const dailyMaterials = taskData.dailyMaterials || {};
 
     // 计算当前日期是任务的第几天
@@ -150,7 +166,7 @@ const getTaskMaterialList = (task: Task): MaterialItem[] => {
 // 检查素材是否完成
 const isMaterialCompleted = (task: Task, material: MaterialItem, date: Date) => {
   try {
-    const taskData = typeof task.data === 'string' ? JSON.parse(task.data) : task.data;
+    const taskData = typeof task.data === "string" ? JSON.parse(task.data) : task.data;
 
     // 检查 dailyMaterials 中的 status
     if (taskData.dailyMaterials) {
@@ -185,20 +201,28 @@ const isMaterialCompleted = (task: Task, material: MaterialItem, date: Date) => 
   }
 };
 
-// 显示的素材列表（未完成优先，其次按任务优先级排序）
+// 显示的素材列表（扁平化后排序见 sort 比较器）
 const displayMaterials = computed(() => {
   const items = taskList.value.flatMap(task =>
     getTaskMaterialList(task).map(material => ({
       task,
       material,
       completed: isMaterialCompleted(task, material, currentDate.value),
-      priority: task.priority || 999,
+      priority: task.priority ?? 999,
     }))
   );
   return items.sort((a, b) => {
+    // 1) 每日任务 > 持续任务（type=1 视为持续任务）
+    const aPersistent = a.task.type === 1;
+    const bPersistent = b.task.type === 1;
+    if (aPersistent !== bPersistent) {
+      return aPersistent ? 1 : -1;
+    }
+    // 2) 未完成 > 已完成
     if (a.completed !== b.completed) {
       return a.completed ? 1 : -1;
     }
+    // 3) 优先级数字小 > 数字大
     return a.priority - b.priority;
   });
 });
@@ -209,7 +233,7 @@ const openMaterialPlayer = async (task: Task, material: MaterialItem) => {
   selectedTask.value = task;
 
   // 将素材数据存储到 sessionStorage 供预览组件使用
-  sessionStorage.setItem('previewMaterial', JSON.stringify(material));
+  sessionStorage.setItem("previewMaterial", JSON.stringify(material));
 
   showPlayerDialog.value = true;
 };
@@ -225,7 +249,7 @@ const fetchTaskList = async () => {
     userId = selectedId === 0 ? undefined : selectedId;
 
     // 使用当前选中的日期进行范围查询
-    const selectedDateStr = currentDate.value.toISOString().split('T')[0];
+    const selectedDateStr = currentDate.value.toISOString().split("T")[0];
 
     // 查询条件：start_date <= selectedDate AND end_date >= selectedDate
     const res = await getTaskList(userId, 1, 100, selectedDateStr, selectedDateStr);
@@ -254,8 +278,8 @@ const fetchTaskList = async () => {
       }
     }
   } catch (error: any) {
-    console.error('获取任务列表失败:', error);
-    ElMessage.error(error.message || '获取任务列表失败');
+    console.error("获取任务列表失败:", error);
+    ElMessage.error(error.message || "获取任务列表失败");
   } finally {
     loading.value = false;
   }
@@ -291,11 +315,11 @@ onMounted(() => {
   const handleRefresh = () => {
     fetchTaskList();
   };
-  window.addEventListener('refresh-preview-tab', handleRefresh);
+  window.addEventListener("refresh-preview-tab", handleRefresh);
 
   // 组件卸载时移除监听器
   onUnmounted(() => {
-    window.removeEventListener('refresh-preview-tab', handleRefresh);
+    window.removeEventListener("refresh-preview-tab", handleRefresh);
   });
 });
 </script>

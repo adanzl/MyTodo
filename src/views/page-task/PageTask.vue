@@ -185,7 +185,10 @@ interface DisplayMaterialItem {
     material: MaterialItem;
 }
 
-// 扁平化素材列表：未完成优先，其次按任务优先级（数字越小优先级越高）
+// 扁平化素材列表排序：
+// 1) 每日任务 > 持续任务（type=1 视为持续任务）
+// 2) 未完成 > 已完成
+// 3) 优先级数字小 > 数字大
 const displayMaterials = computed((): DisplayMaterialItem[] => {
     const items: DisplayMaterialItem[] = [];
     for (const task of taskList.value) {
@@ -194,6 +197,12 @@ const displayMaterials = computed((): DisplayMaterialItem[] => {
         }
     }
     return items.sort((a, b) => {
+        const isContinuousA = a.task.type === 1;
+        const isContinuousB = b.task.type === 1;
+        if (isContinuousA !== isContinuousB) {
+            return isContinuousA ? 1 : -1;
+        }
+
         const completedA = isMaterialCompleted(a.task, a.material, currentDate.value);
         const completedB = isMaterialCompleted(b.task, b.material, currentDate.value);
         if (completedA !== completedB) {

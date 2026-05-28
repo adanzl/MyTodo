@@ -1,7 +1,7 @@
 <template>
   <div class="p-2">
-    <!-- 日期选择器 -->
     <div class="mb-4 flex items-center gap-4 h-10">
+      <!-- 日期选择器 -->
       <el-button type="primary" plain size="small" @click="refreshTasks" :icon="Refresh" />
       <el-radio-group v-model="selectedUserId" @change="handleUserChange">
         <el-radio :value="0">全部</el-radio>
@@ -10,7 +10,13 @@
       </el-radio-group>
       <span class="text-xs">（注：# 表示当天没有配置素材；- 表示当天没有任务）</span>
       <div class="ml-auto flex items-center">
-        <el-switch v-model="showDetail" @change="handleDetailChange" :active-text="''" :inactive-text="'详情'" class="mr-2" />
+        <el-switch
+          v-model="showDetail"
+          @change="handleDetailChange"
+          :active-text="''"
+          :inactive-text="'详情'"
+          class="mr-2"
+        />
         <el-button size="small" :icon="ArrowLeft" @click="decreaseDays" class="mr-1" />
         <el-date-picker
           v-model="startDate"
@@ -46,22 +52,24 @@
       :row-style="getRowStyle"
       :span-method="getSpanMethod"
     >
-      <el-table-column prop="id" label="ID" width="70" fixed/>
+      <el-table-column prop="id" label="ID" width="70" fixed />
       <el-table-column prop="name" label="任务名称" min-width="150" fixed>
         <template #default="{ row }">
+          <div :class="[row.type === 1 ? 'text-[#67C23A]' : 'text-[#409EFF]']">
+            {{ row.name }} 
+          </div>
+        </template>
+      </el-table-column>
+      <el-table-column prop="priority" label="优先级" min-width="20" align="center">
+        <template #default="{ row }">
           <div :class="row.isTask === false ? 'pl-6' : ''">
-            {{ row.name }}
+            {{ row.priority }}
           </div>
         </template>
       </el-table-column>
 
       <!-- 动态生成10天的列 -->
-      <el-table-column
-        v-for="date in weekDates"
-        :key="date.getTime()"
-        width="110"
-        align="center"
-      >
+      <el-table-column v-for="date in weekDates" :key="date.getTime()" width="110" align="center">
         <template #header>
           <div class="text-sm font-medium">
             {{ formatDateShort(date) }}
@@ -95,7 +103,6 @@
       @size-change="handleSizeChange"
       @current-change="handlePageChange"
     />
-
   </div>
 </template>
 
@@ -155,7 +162,7 @@ const weekDates = computed(() => {
 });
 
 // 监听显示天数变化，保存到 localStorage
-watch(dayCount, (newVal) => {
+watch(dayCount, newVal => {
   saveDayCount(newVal);
 });
 
@@ -167,7 +174,7 @@ const displayData = computed(() => {
 
   const result: any[] = [];
 
-  taskList.value.forEach((task) => {
+  taskList.value.forEach(task => {
     // 添加任务行
     result.push({ ...task, isTask: true });
 
@@ -188,21 +195,21 @@ const displayData = computed(() => {
             taskId: task.id,
             taskType: task.type,
             taskStartDate: task.start_date,
-            taskDuration: task.duration
+            taskDuration: task.duration,
           });
         });
       } else {
         // type=0（每日任务）：收集所有天的素材
         const allMaterials: Record<string, any> = {};
-        (Object.values(dailyMaterials) as any[][]).forEach((materials) => {
-          materials.forEach((m) => {
+        (Object.values(dailyMaterials) as any[][]).forEach(materials => {
+          materials.forEach(m => {
             if (!allMaterials[m.id]) {
               allMaterials[m.id] = {
                 ...m,
                 taskId: task.id,
                 taskType: task.type,
                 taskStartDate: task.start_date,
-                taskDuration: task.duration
+                taskDuration: task.duration,
               };
             }
           });
@@ -239,7 +246,7 @@ const getMaterialStatus = (row: any, date: Date) => {
   if (!taskId) return "";
 
   try {
-    const task = taskList.value.find((t) => t.id === taskId);
+    const task = taskList.value.find(t => t.id === taskId);
     if (!task) return "";
 
     const taskData: TaskDetail = typeof task.data === "string" ? JSON.parse(task.data) : task.data;
@@ -286,13 +293,13 @@ const handleDetailChange = () => {
 
 // 获取行类名
 const getRowClassName = ({ row }: { row: any }) => {
-  return showDetail.value && row.isTask !== false ? 'bg-gray-50' : '';
+  return showDetail.value && row.isTask !== false ? "bg-gray-50" : "";
 };
 
 // 设置行样式，详情模式下高亮任务行
 const getRowStyle = ({ row }: { row: any }) => {
   if (showDetail.value && row.isTask !== false) {
-    return { backgroundColor: '#f0f9ff' };
+    return { backgroundColor: "#f0f9ff" };
   }
   return {};
 };
@@ -304,7 +311,10 @@ const getSpanMethod = ({ row, columnIndex }: any) => {
   // 详情模式下的 type=1 素材行
   const isType1Material = showDetail.value && row.isTask === false && row.taskType === 1;
 
-  if (!(isType1Task || isType1Material) || columnIndex < 1) {
+  // 表格前三列是固定列（ID、任务名称、优先级），日期列从第 4 列开始
+  const DATE_COL_START = 3;
+
+  if (!(isType1Task || isType1Material) || columnIndex < DATE_COL_START) {
     return { rowspan: 1, colspan: 1 };
   }
 
@@ -317,11 +327,16 @@ const getSpanMethod = ({ row, columnIndex }: any) => {
   }
 
   // 计算任务覆盖的日期范围
-  const startDate = dayjs(taskStartDate).startOf('day');
-  const endDate = startDate.add(taskDuration - 1, 'day').endOf('day');
+  const startDate = dayjs(taskStartDate).startOf("day");
+  const endDate = startDate.add(taskDuration - 1, "day").endOf("day");
 
   // 检查当前列的日期是否在任务范围内
-  const currentDate = dayjs(weekDates.value[columnIndex - 1]).startOf('day');
+  const dateIdx = columnIndex - DATE_COL_START;
+  if (dateIdx < 0 || dateIdx >= weekDates.value.length) {
+    return { rowspan: 1, colspan: 1 };
+  }
+
+  const currentDate = dayjs(weekDates.value[dateIdx]).startOf("day");
 
   if (currentDate.isBefore(startDate) || currentDate.isAfter(endDate)) {
     return { rowspan: 1, colspan: 1 };
@@ -329,18 +344,15 @@ const getSpanMethod = ({ row, columnIndex }: any) => {
 
   // 计算从当前列开始，后面还有多少列在任务范围内
   let colspan = 1;
-  for (let i = columnIndex; i < weekDates.value.length; i++) {
-    const nextDate = dayjs(weekDates.value[i]).startOf('day');
-    if (nextDate.isBefore(endDate) || nextDate.isSame(endDate, 'day')) {
-      colspan++;
-    } else {
-      break;
-    }
+  for (let i = dateIdx + 1; i < weekDates.value.length; i++) {
+    const nextDate = dayjs(weekDates.value[i]).startOf("day");
+    if (nextDate.isAfter(endDate)) break;
+    colspan++;
   }
 
   // 判断当前列是否是视图中任务覆盖范围的第一列
-  const prevDate = columnIndex > 1 ? dayjs(weekDates.value[columnIndex - 2]).startOf('day') : null;
-  const isFirstInViewRange = columnIndex === 1 || (prevDate && prevDate.isBefore(startDate));
+  const prevDate = dateIdx > 0 ? dayjs(weekDates.value[dateIdx - 1]).startOf("day") : null;
+  const isFirstInViewRange = dateIdx === 0 || (prevDate && prevDate.isBefore(startDate));
   return isFirstInViewRange ? { rowspan: 1, colspan } : { rowspan: 0, colspan: 0 };
 };
 
@@ -352,8 +364,8 @@ const fetchTaskList = async () => {
     const viewStartDate = weekDates.value[0];
     const viewEndDate = weekDates.value[weekDates.value.length - 1];
 
-    const startDateStr = viewStartDate ? dayjs(viewStartDate).format('YYYY-MM-DD') : undefined;
-    const endDateStr = viewEndDate ? dayjs(viewEndDate).format('YYYY-MM-DD') : undefined;
+    const startDateStr = viewStartDate ? dayjs(viewStartDate).format("YYYY-MM-DD") : undefined;
+    const endDateStr = viewEndDate ? dayjs(viewEndDate).format("YYYY-MM-DD") : undefined;
 
     const res = await getTaskList(
       selectedUserId.value,
@@ -409,13 +421,13 @@ const setToday = () => {
 
 // 减少显示天数
 const decreaseDays = () => {
-  startDate.value = dayjs(startDate.value).subtract(dayCount.value, 'day').toDate();
+  startDate.value = dayjs(startDate.value).subtract(dayCount.value, "day").toDate();
   fetchTaskList();
 };
 
 // 增加显示天数
 const increaseDays = () => {
-  startDate.value = dayjs(startDate.value).add(dayCount.value, 'day').toDate();
+  startDate.value = dayjs(startDate.value).add(dayCount.value, "day").toDate();
   fetchTaskList();
 };
 
@@ -444,8 +456,7 @@ const getTaskProgress = (task: Task, date: Date) => {
     }
 
     const totalMaterials = materials.length;
-    if (totalMaterials === 0)
-      return "#";
+    if (totalMaterials === 0) return "#";
 
     // 统计完成数 - status 现在是 Record<user_id, status>
     let completedCount = 0;
@@ -473,17 +484,17 @@ const getTaskProgress = (task: Task, date: Date) => {
 onMounted(() => {
   fetchTaskList();
   calculateTableHeight();
-  window.addEventListener('resize', calculateTableHeight);
+  window.addEventListener("resize", calculateTableHeight);
 
   // 监听刷新事件
   const handleRefresh = () => {
     fetchTaskList();
   };
-  window.addEventListener('refresh-calendar-tab', handleRefresh);
+  window.addEventListener("refresh-calendar-tab", handleRefresh);
 
   onUnmounted(() => {
-    window.removeEventListener('resize', calculateTableHeight);
-    window.removeEventListener('refresh-calendar-tab', handleRefresh);
+    window.removeEventListener("resize", calculateTableHeight);
+    window.removeEventListener("refresh-calendar-tab", handleRefresh);
   });
 });
 </script>
