@@ -4,21 +4,26 @@
     @did-dismiss="handleDismiss"
     class="[--width:100%] [--height:100%] [--border-radius:0] [--box-shadow:none]"
   >
-    <ion-content class="p-0 [--overflow:hidden] overflow-hidden" fullscreen :scroll-y="false">
-      <!-- 浮动关闭按钮 + 标题（避开状态栏 / UC 浏览器顶栏） -->
+    <ion-content class="p-0 h-full [--overflow:hidden] [--padding-top:0] overflow-hidden" :scroll-y="false">
+      <!-- 浮动关闭按钮 + 标题（仅浮层偏移，不占用内容区高度） -->
       <div
-        class="absolute left-4 z-50 flex items-start gap-5 max-w-[calc(100%-2rem)] top-[calc(1rem+env(safe-area-inset-top,var(--ion-safe-area-top,0)))] max-md:top-[calc(1rem+max(env(safe-area-inset-top,0),var(--ion-safe-area-top,0),28px))]"
+        class="absolute inset-x-0 top-0 z-50 flex items-start gap-3 px-4 pt-3 max-md:pt-[max(0.75rem,env(safe-area-inset-top,0px),28px)] pointer-events-none"
       >
-        <ion-button
-          @click="handleDismiss"
-          fill="clear"
-          color="light"
-          size="small"
-          class="bg-gray-500 rounded-full shrink-0 m-0 w-12 h-8 min-h-8 [--padding-start:0] [--padding-end:0]"
-        >
-          <ion-icon :icon="closeOutline" class="text-lg" />
-        </ion-button>
-        <span v-if="!isLandscape" class="text-gray-500 text-lg font-bold truncate">{{ material?.name }}</span>
+        <div class="pointer-events-auto flex items-start gap-3 min-w-0 max-w-full">
+          <ion-button
+            @click="handleDismiss"
+            fill="clear"
+            color="light"
+            size="small"
+            class="bg-gray-500/90 rounded-full shrink-0 m-0 w-8 h-8 min-h-8 [--padding-start:0] [--padding-end:0]"
+          >
+            <ion-icon :icon="closeOutline" class="text-lg" />
+          </ion-button>
+          <span
+            v-if="!isLandscape"
+            class="text-gray-500 text-lg font-bold truncate drop-shadow-sm"
+          >{{ material?.name }}</span>
+        </div>
       </div>
 
       <!-- 全屏加载遮罩 -->
@@ -79,20 +84,25 @@
         </div>
       </div>
 
-      <!-- 视频播放器 -->
+      <!-- 视频播放器（禁用原生 controls，避免 UC 注入下载按钮；用底部栏控制播放） -->
       <div v-else-if="material?.type === 1" class="flex flex-col h-full">
         <div class="flex-1 relative overflow-hidden bg-black">
           <video
             ref="videoRef"
             :src="getMediaFileUrl(material.path || '')"
-            controls
             autoplay
             preload="metadata"
             playsinline
+            webkit-playsinline="true"
+            x5-playsinline="true"
+            x5-video-player-type="h5-page"
+            controlslist="nodownload nofullscreen noremoteplayback"
+            disablePictureInPicture
             class="w-full h-full object-contain"
             @ended="handleVideoEnded"
             @play="isVideoPlaying = true"
             @pause="isVideoPlaying = false"
+            @click="toggleVideoPlay"
           />
           <div v-if="loading" class="absolute inset-0 flex justify-center items-center bg-black bg-opacity-80">
             <ion-spinner name="crescent" class="text-white text-4xl"></ion-spinner>
@@ -266,6 +276,17 @@ const pauseVideo = () => {
     } catch (e) {
         console.warn('Error pausing video:', e);
     }
+};
+
+/** UC / 微信 X5 内核：同层播放，避免原生控件与下载按钮盖住页面 */
+const applyVideoCompat = () => {
+    const el = videoRef.value;
+    if (!el) return;
+    el.setAttribute('playsinline', 'true');
+    el.setAttribute('webkit-playsinline', 'true');
+    el.setAttribute('x5-playsinline', 'true');
+    el.setAttribute('x5-video-player-type', 'h5-page');
+    el.removeAttribute('controls');
 };
 
 
@@ -572,6 +593,7 @@ watch(
                     startUsageTracking();
                 } else if (material.type === 1 && material.path) {
                     loading.value = false;
+                    applyVideoCompat();
                     startUsageTracking();
                 } else {
                     loading.value = false;
