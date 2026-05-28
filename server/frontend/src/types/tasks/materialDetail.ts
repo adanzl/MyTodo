@@ -9,9 +9,16 @@ export interface Page {
   audioIds: string[];
 }
 
+export interface SubtitleFile {
+  path: string;
+  label?: string;
+  lang?: string;
+}
+
 export interface MaterialDetail {
   pdfLength?: number;
   audioList?: AudioFile[];
+  subtitleList?: SubtitleFile[];
   remark?: string;
   pages: Page[];
 }

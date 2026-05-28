@@ -98,12 +98,22 @@
             x5-video-player-type="h5-page"
             controlslist="nodownload nofullscreen noremoteplayback"
             disablePictureInPicture
-            class="w-full h-full object-contain"
+            class="w-full h-full object-contain [&::cue]:bg-black/65 [&::cue]:text-white [&::cue]:text-base [&::cue]:leading-snug"
             @ended="handleVideoEnded"
             @play="isVideoPlaying = true"
             @pause="isVideoPlaying = false"
             @click="toggleVideoPlay"
-          />
+            @loadedmetadata="syncSubtitleTracks"
+          >
+            <track
+              v-for="(track, index) in subtitleTracks"
+              :key="`${track.src}-${index}`"
+              kind="subtitles"
+              :src="track.src"
+              :srclang="track.lang"
+              :label="track.label"
+            />
+          </video>
           <div v-if="loading" class="absolute inset-0 flex justify-center items-center bg-black bg-opacity-80">
             <ion-spinner name="crescent" class="text-white text-4xl"></ion-spinner>
           </div>
@@ -123,10 +133,22 @@
             </ion-button>
           </div>
           
-          <div class="flex gap-2">
+          <div class="flex gap-2 items-center">
             <ion-button fill="outline" @click="toggleVideoPlay">
               <ion-icon slot="icon-only" :icon="isVideoPlaying ? pauseOutline : playOutline" />
             </ion-button>
+            <ion-button
+              v-if="subtitleTracks.length"
+              fill="outline"
+              :color="activeSubtitleIndex >= 0 ? 'primary' : 'medium'"
+              @click="toggleSubtitle"
+            >
+              <ion-icon slot="icon-only" :icon="textOutline" />
+            </ion-button>
+            <span
+              v-if="subtitleTracks.length && activeSubtitleIndex >= 0"
+              class="text-xs text-gray-500 max-w-24 truncate"
+            >{{ subtitleTracks[activeSubtitleIndex]?.label }}</span>
           </div>
           
           <div class="flex-1 flex justify-end items-center gap-2 min-w-0">
@@ -146,8 +168,16 @@ import { addUsage, type AddUsageBody, USAGE_TYPE_PDF, USAGE_TYPE_VIDEO } from '@
 import { finishMaterial } from '@/api/api-task';
 import AudioPreview from '@/components/AudioPreview.vue';
 import EventBus, { C_EVENT } from '@/types/event-bus';
+import type { MaterialDetail } from '@/api/api-task';
 import { getMediaFileUrl } from '@/utils/file';
 import { getPDFPage, loadPDF, renderPDFPageToCanvas } from '@/utils/pdf-lib';
+import {
+    applySubtitleTrack,
+    hideAllSubtitleTracks,
+    resolveSubtitleTracks,
+    revokeSubtitleTracks,
+    type ResolvedSubtitleTrack,
+} from '@/utils/subtitle';
 import {
     IonButton,
     IonContent,
@@ -155,8 +185,8 @@ import {
     IonModal,
     IonSpinner,
 } from '@ionic/vue';
-import { chevronBackOutline, chevronForwardOutline, closeOutline, pauseOutline, playOutline } from 'ionicons/icons';
-import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue';
+import { chevronBackOutline, chevronForwardOutline, closeOutline, pauseOutline, playOutline, textOutline } from 'ionicons/icons';
+import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
 const globalVar: any = inject('globalVar');
 
@@ -198,6 +228,9 @@ let currentPdf: any = null;
 
 // 视频信息
 const isVideoPlaying = ref(false);
+const subtitleTracks = ref<ResolvedSubtitleTrack[]>([]);
+const activeSubtitleIndex = ref(-1);
+let subtitleLoadToken = 0;
 
 // 音频信息
 const audioInfo = ref('');
@@ -270,12 +303,71 @@ const isMaterialCompleted = computed(() => {
 });
 
 // 关闭弹窗（先关 UI，统计上报放后台，避免等网络）
+const clearSubtitleTracks = () => {
+    hideAllSubtitleTracks(videoRef.value);
+    revokeSubtitleTracks(subtitleTracks.value);
+    subtitleTracks.value = [];
+    activeSubtitleIndex.value = -1;
+};
+
+const parseMaterialDetail = (): MaterialDetail | null => {
+    if (!props.material?.data) return null;
+    try {
+        return typeof props.material.data === 'string'
+            ? JSON.parse(props.material.data)
+            : props.material.data;
+    } catch {
+        return null;
+    }
+};
+
+const loadVideoSubtitles = async (videoPath: string) => {
+    const token = ++subtitleLoadToken;
+    clearSubtitleTracks();
+
+    const tracks = await resolveSubtitleTracks(videoPath, parseMaterialDetail());
+    if (token !== subtitleLoadToken) {
+        revokeSubtitleTracks(tracks);
+        return;
+    }
+
+    subtitleTracks.value = tracks;
+    await nextTick();
+    syncSubtitleTracks();
+};
+
+const syncSubtitleTracks = () => {
+    if (activeSubtitleIndex.value >= 0) {
+        applySubtitleTrack(videoRef.value, activeSubtitleIndex.value);
+    } else {
+        hideAllSubtitleTracks(videoRef.value);
+    }
+};
+
+const toggleSubtitle = () => {
+    if (!subtitleTracks.value.length || !videoRef.value) return;
+
+    if (activeSubtitleIndex.value < 0) {
+        activeSubtitleIndex.value = 0;
+    } else {
+        const next = activeSubtitleIndex.value + 1;
+        activeSubtitleIndex.value = next >= subtitleTracks.value.length ? -1 : next;
+    }
+
+    if (activeSubtitleIndex.value >= 0) {
+        applySubtitleTrack(videoRef.value, activeSubtitleIndex.value);
+    } else {
+        hideAllSubtitleTracks(videoRef.value);
+    }
+};
+
 const handleDismiss = () => {
     if (!props.isOpen) return;
     emit('update:isOpen', false);
     stopAudio();
     void stopUsageTracking();
     pauseVideo();
+    clearSubtitleTracks();
 };
 
 const pauseVideo = () => {
@@ -604,6 +696,7 @@ watch(
                 } else if (material.type === 1 && material.path) {
                     loading.value = false;
                     applyVideoCompat();
+                    void loadVideoSubtitles(material.path);
                     startUsageTracking();
                 } else {
                     loading.value = false;
@@ -611,6 +704,7 @@ watch(
             }, 300);
         } else {
             loading.value = false;
+            clearSubtitleTracks();
         }
     }
 );
@@ -695,6 +789,7 @@ onUnmounted(() => {
     window.removeEventListener('resize', checkOrientation);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
     window.removeEventListener('beforeunload', handleBeforeUnload);
+    clearSubtitleTracks();
     // 清理视频资源
     if (typeof window !== 'undefined' && videoRef.value) {
         try {

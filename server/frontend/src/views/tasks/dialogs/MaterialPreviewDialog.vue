@@ -71,9 +71,19 @@
           :src="videoUrl"
           controls
           preload="metadata"
-          class="max-w-full max-h-full w-full h-full object-contain"
+          class="max-w-full max-h-full w-full h-full object-contain [&::cue]:bg-black/65 [&::cue]:text-white [&::cue]:text-base [&::cue]:leading-snug"
           @ended="handleVideoEnded"
-        ></video>
+          @loadedmetadata="syncSubtitleTracks"
+        >
+          <track
+            v-for="(track, index) in subtitleTracks"
+            :key="`${track.src}-${index}`"
+            kind="subtitles"
+            :src="track.src"
+            :srclang="track.lang"
+            :label="track.label"
+          />
+        </video>
         <div v-else class="flex items-center justify-center h-full text-gray-400">
           <el-icon :size="80"><Picture /></el-icon>
           <p>视频加载失败</p>
@@ -141,16 +151,30 @@
         </div>
       </div>
 
-      <!-- 底部控制栏（视频显示素材名称） -->
-      <div v-else-if="materialData?.type === 1" class="flex items-center justify-center px-7 py-3 bg-white border-t border-[#3a3a3a] h-20 min-h-20">
-        <span class="text-sm text-gray-800">{{ materialData?.name || '素材预览' }}</span>
+      <!-- 底部控制栏（视频） -->
+      <div v-else-if="materialData?.type === 1" class="flex items-center justify-between px-7 py-3 bg-white border-t border-[#3a3a3a] h-20 min-h-20">
+        <div class="flex items-center gap-2 min-w-0">
+          <el-button
+            v-if="subtitleTracks.length"
+            :type="activeSubtitleIndex >= 0 ? 'primary' : 'default'"
+            plain
+            @click="toggleSubtitle"
+          >
+            字幕
+          </el-button>
+          <span
+            v-if="subtitleTracks.length && activeSubtitleIndex >= 0"
+            class="text-xs text-gray-500 truncate max-w-40"
+          >{{ subtitleTracks[activeSubtitleIndex]?.label }}</span>
+        </div>
+        <span class="text-sm text-gray-800 truncate">{{ materialData?.name || '素材预览' }}</span>
       </div>
     </div>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import {
   ArrowLeft,
   VideoPlay,
@@ -164,6 +188,13 @@ import type { Material } from '@/api/api-task'
 import type { MaterialDetail, AudioFile, Page } from '@/types/tasks/materialDetail'
 import { getMediaFileUrl } from '@/utils/file'
 import { loadPdfDocument, renderPdfPageToDataUrl } from '@/utils/pdf-lib'
+import {
+  applySubtitleTrack,
+  hideAllSubtitleTracks,
+  resolveSubtitleTracks,
+  revokeSubtitleTracks,
+  type ResolvedSubtitleTrack,
+} from '@/utils/subtitle'
 import { useAudioPlayer } from '@/composables/useAudioPlayer'
 import MediaComponent from '@/components/MediaComponent.vue'
 import { formatTime } from '@/utils/date'
@@ -206,6 +237,9 @@ const allAudios = ref<AudioFile[]>([])
 // 视频相关
 const videoUrl = ref<string>('')
 const videoPlayerRef = ref<HTMLVideoElement | null>(null)
+const subtitleTracks = ref<ResolvedSubtitleTrack[]>([])
+const activeSubtitleIndex = ref(-1)
+let subtitleLoadToken = 0
 
 // 当前双页
 const leftPage = computed(() => {
@@ -461,6 +495,53 @@ const handleKeyDown = (e: KeyboardEvent) => {
   }
 }
 
+const clearSubtitleTracks = () => {
+  hideAllSubtitleTracks(videoPlayerRef.value)
+  revokeSubtitleTracks(subtitleTracks.value)
+  subtitleTracks.value = []
+  activeSubtitleIndex.value = -1
+}
+
+const loadVideoSubtitles = async (videoPath: string) => {
+  const token = ++subtitleLoadToken
+  clearSubtitleTracks()
+
+  const tracks = await resolveSubtitleTracks(videoPath, materialDetail.value)
+  if (token !== subtitleLoadToken) {
+    revokeSubtitleTracks(tracks)
+    return
+  }
+
+  subtitleTracks.value = tracks
+  await nextTick()
+  syncSubtitleTracks()
+}
+
+const syncSubtitleTracks = () => {
+  if (activeSubtitleIndex.value >= 0) {
+    applySubtitleTrack(videoPlayerRef.value, activeSubtitleIndex.value)
+  } else {
+    hideAllSubtitleTracks(videoPlayerRef.value)
+  }
+}
+
+const toggleSubtitle = () => {
+  if (!subtitleTracks.value.length || !videoPlayerRef.value) return
+
+  if (activeSubtitleIndex.value < 0) {
+    activeSubtitleIndex.value = 0
+  } else {
+    const next = activeSubtitleIndex.value + 1
+    activeSubtitleIndex.value = next >= subtitleTracks.value.length ? -1 : next
+  }
+
+  if (activeSubtitleIndex.value >= 0) {
+    applySubtitleTrack(videoPlayerRef.value, activeSubtitleIndex.value)
+  } else {
+    hideAllSubtitleTracks(videoPlayerRef.value)
+  }
+}
+
 // 停止视频播放
 const stopVideo = () => {
   if (videoPlayerRef.value) {
@@ -468,6 +549,7 @@ const stopVideo = () => {
     videoPlayerRef.value.src = ''
   }
   videoUrl.value = ''
+  clearSubtitleTracks()
 }
 
 // 关闭对话框
@@ -487,6 +569,7 @@ const handleClose = () => {
 
 // 加载视频
 const loadVideo = (videoPath: string) => {
+  clearSubtitleTracks()
   videoUrl.value = getMediaFileUrl(videoPath) || ''
   if (!videoUrl.value) {
     ElMessage.error('无法加载视频：路径无效')
@@ -543,8 +626,8 @@ const loadMaterial = async () => {
     if (material.type === 0 && material.path) {
       await loadPdfPages(material.path, detail)
     } else if (material.type === 1 && material.path) {
-      // 如果是视频，加载视频URL
       loadVideo(material.path)
+      void loadVideoSubtitles(material.path)
     }
 
     loading.value = false
@@ -632,10 +715,6 @@ watch(visible, (val) => {
   }
 })
 </script>
-
-<style scoped>
-/* 使用 Tailwind CSS，无需额外样式 */
-</style>
 
 <style>
 /* 全局样式，用于覆盖 el-dialog 默认样式 */

@@ -48,6 +48,8 @@ MIMETYPE_MAP = {
     '.mp4': 'video/mp4',
     '.avi': 'video/x-msvideo',
     '.mkv': 'video/x-matroska',
+    '.vtt': 'text/vtt',
+    '.srt': 'application/x-subrip',
 }
 
 

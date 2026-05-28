@@ -62,9 +62,16 @@ export interface Page {
 /**
  * 素材详情
  */
+export interface SubtitleFile {
+  path: string;
+  label?: string;
+  lang?: string;
+}
+
 export interface MaterialDetail {
   pdfLength?: number;
   audioList?: AudioFile[];
+  subtitleList?: SubtitleFile[];
   remark?: string;
   pages: Page[];
 }
