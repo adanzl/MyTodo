@@ -74,6 +74,7 @@
           class="max-w-full max-h-full w-full h-full object-contain [&::cue]:bg-black/65 [&::cue]:text-white [&::cue]:text-base [&::cue]:leading-snug"
           @ended="handleVideoEnded"
           @loadedmetadata="syncSubtitleTracks"
+          @error="handleVideoError"
         >
           <track
             v-for="(track, index) in subtitleTracks"
@@ -174,7 +175,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
 import {
   ArrowLeft,
   VideoPlay,
@@ -356,6 +357,8 @@ watch(
     visible.value = val
     if (val && props.materialId) {
       loadMaterial()
+    } else if (!val) {
+      stopVideo()
     }
   }
 )
@@ -497,22 +500,38 @@ const handleKeyDown = (e: KeyboardEvent) => {
 
 const clearSubtitleTracks = () => {
   hideAllSubtitleTracks(videoPlayerRef.value)
-  revokeSubtitleTracks(subtitleTracks.value)
+  const previous = subtitleTracks.value
   subtitleTracks.value = []
   activeSubtitleIndex.value = -1
+  if (previous.length) {
+    void nextTick(() => revokeSubtitleTracks(previous))
+  }
+}
+
+const parseMaterialDetail = (): MaterialDetail | null => {
+  if (materialDetail.value) return materialDetail.value
+  if (!materialData.value?.data) return null
+  try {
+    return typeof materialData.value.data === 'string'
+      ? JSON.parse(materialData.value.data)
+      : materialData.value.data
+  } catch {
+    return null
+  }
 }
 
 const loadVideoSubtitles = async (videoPath: string) => {
   const token = ++subtitleLoadToken
   clearSubtitleTracks()
 
-  const tracks = await resolveSubtitleTracks(videoPath, materialDetail.value)
+  const tracks = await resolveSubtitleTracks(videoPath, parseMaterialDetail())
   if (token !== subtitleLoadToken) {
     revokeSubtitleTracks(tracks)
     return
   }
 
   subtitleTracks.value = tracks
+  activeSubtitleIndex.value = tracks.length > 0 ? 0 : -1
   await nextTick()
   syncSubtitleTracks()
 }
@@ -542,14 +561,25 @@ const toggleSubtitle = () => {
   }
 }
 
-// 停止视频播放
+// 停止视频：仅清空 URL 由 v-if 卸载 <video>，避免手动 src='' 触发未捕获的 abort
 const stopVideo = () => {
   if (videoPlayerRef.value) {
-    videoPlayerRef.value.pause()
-    videoPlayerRef.value.src = ''
+    try {
+      videoPlayerRef.value.pause()
+    } catch {
+      /* ignore */
+    }
   }
   videoUrl.value = ''
   clearSubtitleTracks()
+}
+
+/** 切换/关闭时浏览器会中止进行中的加载，MEDIA_ERR_ABORTED 可忽略 */
+const handleVideoError = () => {
+  const el = videoPlayerRef.value
+  if (!el?.error) return
+  if (el.error.code === MediaError.MEDIA_ERR_ABORTED) return
+  console.warn('视频加载失败:', el.error.code, videoUrl.value)
 }
 
 // 关闭对话框
@@ -567,13 +597,20 @@ const handleClose = () => {
   totalPages.value = 0
 }
 
-// 加载视频
-const loadVideo = (videoPath: string) => {
+// 加载视频：先卸载再设新地址，避免在同一元素上改 src 中止上一次请求
+const loadVideo = async (videoPath: string) => {
   clearSubtitleTracks()
-  videoUrl.value = getMediaFileUrl(videoPath) || ''
-  if (!videoUrl.value) {
+  const nextUrl = getMediaFileUrl(videoPath) || ''
+  if (!nextUrl) {
+    videoUrl.value = ''
     ElMessage.error('无法加载视频：路径无效')
+    return
   }
+  if (videoUrl.value && videoUrl.value !== nextUrl) {
+    videoUrl.value = ''
+    await nextTick()
+  }
+  videoUrl.value = nextUrl
 }
 
 // 加载素材
@@ -626,7 +663,8 @@ const loadMaterial = async () => {
     if (material.type === 0 && material.path) {
       await loadPdfPages(material.path, detail)
     } else if (material.type === 1 && material.path) {
-      loadVideo(material.path)
+      await loadVideo(material.path)
+      await nextTick()
       void loadVideoSubtitles(material.path)
     }
 
@@ -712,7 +750,13 @@ watch(visible, (val) => {
     window.addEventListener('keydown', handleKeyDown)
   } else {
     window.removeEventListener('keydown', handleKeyDown)
+    clearSubtitleTracks()
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown)
+  stopVideo()
 })
 </script>
 

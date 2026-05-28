@@ -21,8 +21,9 @@
           </ion-button>
           <span
             v-if="!isLandscape"
-            class="text-gray-500 text-lg font-bold truncate drop-shadow-sm"
-          >{{ material?.name }}</span>
+            class="text-gray-500 text-lg font-bold truncate drop-shadow-sm min-w-0 flex-1 max-w-[calc(100vw-5rem)]"
+            :title="material?.name"
+          >{{ displayMaterialName }}</span>
         </div>
       </div>
 
@@ -76,7 +77,11 @@
           </div>
           
           <div class="flex-1 flex justify-end items-center gap-2 min-w-0">
-            <span v-if="isLandscape" class="text-gray-500 text-sm font-bold truncate">{{ material?.name }}</span>
+            <span
+              v-if="isLandscape"
+              class="text-gray-500 text-sm font-bold truncate min-w-0 max-w-40"
+              :title="material?.name"
+            >{{ displayMaterialName }}</span>
             <ion-button v-if="isAdmin || currentPage >= getLastPagePosition" color="success" :disabled="isMaterialCompleted || submitting" @click="completeReading">
               完成
             </ion-button>
@@ -126,10 +131,17 @@
               @click="handleDismiss"
               fill="clear"
               color="medium"
-              size="small"
               class="shrink-0 m-0 w-8 h-8 min-h-8 [--padding-start:0] [--padding-end:0]"
             >
               <ion-icon :icon="closeOutline" />
+            </ion-button>
+            <ion-button
+              :disabled="!subtitleTracks.length"
+              fill="outline"
+              :color="activeSubtitleIndex >= 0 ? 'primary' : 'medium'"
+              @click="toggleSubtitle"
+            >
+              字幕
             </ion-button>
           </div>
           
@@ -137,22 +149,14 @@
             <ion-button fill="outline" @click="toggleVideoPlay">
               <ion-icon slot="icon-only" :icon="isVideoPlaying ? pauseOutline : playOutline" />
             </ion-button>
-            <ion-button
-              v-if="subtitleTracks.length"
-              fill="outline"
-              :color="activeSubtitleIndex >= 0 ? 'primary' : 'medium'"
-              @click="toggleSubtitle"
-            >
-              <ion-icon slot="icon-only" :icon="textOutline" />
-            </ion-button>
-            <span
-              v-if="subtitleTracks.length && activeSubtitleIndex >= 0"
-              class="text-xs text-gray-500 max-w-24 truncate"
-            >{{ subtitleTracks[activeSubtitleIndex]?.label }}</span>
           </div>
           
           <div class="flex-1 flex justify-end items-center gap-2 min-w-0">
-            <span v-if="isLandscape" class="text-gray-500 text-sm font-bold truncate">{{ material?.name }}</span>
+            <span
+              v-if="isLandscape"
+              class="text-gray-500 text-sm font-bold truncate min-w-0 max-w-40"
+              :title="material?.name"
+            >{{ displayMaterialName }}</span>
             <ion-button color="success" :disabled="isMaterialCompleted || submitting" @click="completeReading">
               完成
             </ion-button>
@@ -252,6 +256,14 @@ const audioIdx = computed(() => {
     return audioPreviewRef.value?.playIdx || 0;
 });
 
+const MATERIAL_NAME_MAX_LEN = 24;
+
+const displayMaterialName = computed(() => {
+    const name = props.material?.name?.trim() || '';
+    if (name.length <= MATERIAL_NAME_MAX_LEN) return name;
+    return `${name.slice(0, MATERIAL_NAME_MAX_LEN)}…`;
+});
+
 // Canvas 样式（由 flex 容器约束尺寸，避免 vh 在 UC 等浏览器下计算不准）
 const canvasStyle = computed(() => {
     if (isLandscape.value) {
@@ -332,6 +344,7 @@ const loadVideoSubtitles = async (videoPath: string) => {
     }
 
     subtitleTracks.value = tracks;
+    activeSubtitleIndex.value = tracks.length > 0 ? 0 : -1;
     await nextTick();
     syncSubtitleTracks();
 };

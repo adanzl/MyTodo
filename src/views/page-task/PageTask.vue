@@ -176,6 +176,7 @@ import {
   IonSpinner,
   IonToolbar,
   IonPopover,
+  onIonViewDidEnter,
 } from "@ionic/vue";
 import {
   alertCircleOutline,
@@ -186,7 +187,7 @@ import {
   refreshOutline,
   videocamOutline,
 } from "ionicons/icons";
-import { computed, inject, onMounted, ref, watch } from "vue";
+import { computed, inject, ref, watch } from "vue";
 
 // 状态管理
 const loading = ref(false);
@@ -392,9 +393,11 @@ const openMaterialPlayer = async (task: Task, material: MaterialItem) => {
   showPlayerDialog.value = true;
 };
 
-// 获取任务列表
-const fetchTaskList = async () => {
-  loading.value = true;
+// 获取任务列表（下拉刷新时由 ion-refresher 展示进度，不再显示页面 loading）
+const fetchTaskList = async (showLoading = true) => {
+  if (showLoading) {
+    loading.value = true;
+  }
   try {
     const userId = getCurrentUserId();
 
@@ -436,7 +439,9 @@ const fetchTaskList = async () => {
   } catch (error: any) {
     console.error("获取任务列表失败:", error);
   } finally {
-    loading.value = false;
+    if (showLoading) {
+      loading.value = false;
+    }
   }
 };
 
@@ -468,13 +473,13 @@ const btnCalendarClk = () => {
 };
 
 // 下拉刷新
-const handleRefresh = async (event: any) => {
-  await fetchTaskList();
-  event.target.complete();
+const handleRefresh = async (event: CustomEvent) => {
+  await fetchTaskList(false);
+  (event.target as HTMLIonRefresherElement).complete();
 };
 
-// 初始化
-onMounted(() => {
+// 页签激活时自动刷新（与 PageSchedule 一致）
+onIonViewDidEnter(() => {
   fetchTaskList();
 });
 </script>
