@@ -398,7 +398,7 @@ class TaskMgr:
                     task['lock'] = False
                     task['msg'] = ''
 
-                pre_todo = json.loads(task.get('pre_todo', '{}'))
+                pre_todo = json.loads(task.get('pre_todo') or '{}')
                 if pre_todo:
                     todo_ids = pre_todo.get(str(user_id), [])
                     if todo_ids:
