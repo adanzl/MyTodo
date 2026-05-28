@@ -4,15 +4,23 @@
     @did-dismiss="handleDismiss"
     class="[--width:100%] [--height:100%] [--border-radius:0] [--box-shadow:none]"
   >
-    <ion-content class="p-0" fullscreen>
-      <!-- 浮动关闭按钮 -->
-      <div class="absolute top-4 left-4 z-50 flex items-start gap-5 max-w-[calc(100%-2rem)]">
-        <ion-button @click="handleDismiss" fill="clear" color="light" class="bg-gray-500 rounded-full shrink-0">
-          <ion-icon :icon="closeOutline" />
+    <ion-content class="p-0 [--overflow:hidden] overflow-hidden" fullscreen :scroll-y="false">
+      <!-- 浮动关闭按钮 + 标题（避开状态栏 / UC 浏览器顶栏） -->
+      <div
+        class="absolute left-4 z-50 flex items-start gap-5 max-w-[calc(100%-2rem)] top-[calc(1rem+env(safe-area-inset-top,var(--ion-safe-area-top,0)))] max-md:top-[calc(1rem+max(env(safe-area-inset-top,0),var(--ion-safe-area-top,0),28px))]"
+      >
+        <ion-button
+          @click="handleDismiss"
+          fill="clear"
+          color="light"
+          size="small"
+          class="bg-gray-500 rounded-full shrink-0 m-0 w-12 h-8 min-h-8 [--padding-start:0] [--padding-end:0]"
+        >
+          <ion-icon :icon="closeOutline" class="text-lg" />
         </ion-button>
         <span v-if="!isLandscape" class="text-gray-500 text-lg font-bold truncate">{{ material?.name }}</span>
       </div>
-      
+
       <!-- 全屏加载遮罩 -->
       <div v-if="submitting" class="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
         <ion-spinner name="crescent" class="text-white text-6xl"></ion-spinner>
@@ -114,25 +122,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, onMounted, onUnmounted, inject } from 'vue';
+import { addUsage, type AddUsageBody, USAGE_TYPE_PDF, USAGE_TYPE_VIDEO } from '@/api';
+import { finishMaterial } from '@/api/api-task';
+import AudioPreview from '@/components/AudioPreview.vue';
+import EventBus, { C_EVENT } from '@/types/event-bus';
+import { getMediaFileUrl } from '@/utils/file';
+import { getPDFPage, loadPDF, renderPDFPageToCanvas } from '@/utils/pdf-lib';
 import {
-    IonModal,
-    IonHeader,
-    IonToolbar,
-    IonTitle,
-    IonButtons,
     IonButton,
     IonContent,
     IonIcon,
+    IonModal,
     IonSpinner,
 } from '@ionic/vue';
-import { closeOutline, chevronBackOutline, chevronForwardOutline, playOutline, pauseOutline } from 'ionicons/icons';
-import { loadPDF, getPDFPage, renderPDFPageToCanvas } from '@/utils/pdf-lib';
-import { getMediaFileUrl } from '@/utils/file';
-import AudioPreview from '@/components/AudioPreview.vue';
-import { finishMaterial } from '@/api/api-task';
-import { addUsage, type AddUsageBody, USAGE_TYPE_VIDEO, USAGE_TYPE_PDF } from '@/api';
-import EventBus, { C_EVENT } from '@/types/event-bus';
+import { chevronBackOutline, chevronForwardOutline, closeOutline, pauseOutline, playOutline } from 'ionicons/icons';
+import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue';
 
 const globalVar: any = inject('globalVar');
 
@@ -195,21 +199,21 @@ const audioIdx = computed(() => {
     return audioPreviewRef.value?.playIdx || 0;
 });
 
-// Canvas 样式（竖屏时限制最大宽高）
+// Canvas 样式（由 flex 容器约束尺寸，避免 vh 在 UC 等浏览器下计算不准）
 const canvasStyle = computed(() => {
     if (isLandscape.value) {
         return {
             maxWidth: '46vw',
-            maxHeight: 'calc(100vh - 120px)', // 减去 header 和操作区的高度
+            maxHeight: '100%',
             width: 'auto',
-            height: 'auto'
+            height: 'auto',
         };
     }
     return {
         maxWidth: '100%',
-        maxHeight: 'calc(100vh - 150px)', // 减去 header 和操作区的高度
+        maxHeight: '100%',
         width: 'auto',
-        height: 'auto'
+        height: 'auto',
     };
 });
 
