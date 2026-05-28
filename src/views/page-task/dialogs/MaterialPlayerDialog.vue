@@ -111,7 +111,17 @@
         
         <!-- 操作区 -->
         <div class="flex justify-between items-center p-4 border-t bg-white">
-          <div class="flex-1"></div>
+          <div class="flex-1 flex items-center gap-2 min-w-0">
+            <ion-button
+              @click="handleDismiss"
+              fill="clear"
+              color="medium"
+              size="small"
+              class="shrink-0 m-0 w-8 h-8 min-h-8 [--padding-start:0] [--padding-end:0]"
+            >
+              <ion-icon :icon="closeOutline" />
+            </ion-button>
+          </div>
           
           <div class="flex gap-2">
             <ion-button fill="outline" @click="toggleVideoPlay">
