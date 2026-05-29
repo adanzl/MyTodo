@@ -104,32 +104,35 @@
               <div
                 v-for="material in getSortedMaterialsForTask(task)"
                 :key="material.id"
-                class="relative flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow-md aspect-square cursor-pointer"
+                class="relative w-full pb-[100%] cursor-pointer"
                 :class="{ 'opacity-90': task.lock }"
                 @click="handleMaterialClick(task, material)">
-                <div class="absolute top-2 left-3 flex items-center justify-between w-full pr-8">
-                  <ion-icon
-                    :icon="checkmarkCircle"
-                    class="text-xl"
-                    :class="
-                      isMaterialCompleted(task, material, currentDate)
-                        ? 'text-green-400'
-                        : 'text-gray-300'
-                    "></ion-icon>
-                  <span class="text-xs text-gray-500">{{ material.id }}</span>
-                </div>
-                <ion-icon
-                  :icon="material.type === 1 ? videocamOutline : documentTextOutline"
-                  color="primary"
-                  class="text-4xl mb-1 mt-6"></ion-icon>
                 <div
-                  class="text-sm font-medium text-center mb-1 overflow-hidden wrap-anywhere [-webkit-box-orient:vertical] [-webkit-line-clamp:2] [display:-webkit-box]">
-                  {{ material.name }}
+                  class="absolute inset-0 flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow-md overflow-hidden">
+                  <div class="absolute top-2 left-3 flex items-center justify-between w-full pr-8">
+                    <ion-icon
+                      :icon="checkmarkCircle"
+                      class="text-xl"
+                      :class="
+                        isMaterialCompleted(task, material, currentDate)
+                          ? 'text-green-400'
+                          : 'text-gray-300'
+                      "></ion-icon>
+                    <span class="text-xs text-gray-500">{{ material.id }}</span>
+                  </div>
+                  <ion-icon
+                    :icon="material.type === 1 ? videocamOutline : documentTextOutline"
+                    color="primary"
+                    class="text-4xl mb-1 mt-6"></ion-icon>
+                  <div
+                    class="text-sm font-medium text-center mb-1 overflow-hidden wrap-anywhere [-webkit-box-orient:vertical] [-webkit-line-clamp:2] [display:-webkit-box]">
+                    {{ material.name }}
+                  </div>
+                  <div v-if="task.lock">
+                    <ion-icon :icon="lockClosed" class="text-2xl text-gray-500"></ion-icon>
+                  </div>
+                  <div v-else class="text-[10px] flex items-center">点击阅读</div>
                 </div>
-                <div v-if="task.lock">
-                  <ion-icon :icon="lockClosed" class="text-2xl text-gray-500"></ion-icon>
-                </div>
-                <div v-else class="text-[10px] flex items-center">点击阅读</div>
               </div>
             </div>
           </ion-accordion>
