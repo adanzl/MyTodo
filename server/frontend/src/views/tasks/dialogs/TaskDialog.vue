@@ -321,7 +321,7 @@ import { Plus, WarningFilled, ArrowUp, ArrowDown, Close } from "@element-plus/ic
 import { addTask, updateTask, getMaterialList, getMaterialCategoryList, getCommonBlockTimeSlots, type Task, type Material, type MaterialCategory, type TaskBlockTimeSlot } from "@/api/api-task";
 import { getTodoListByTime } from "@/api/api-todo";
 import { sortByName, buildCategoryTree } from "@/utils/file";
-import { getDateByWorkdayIndex, getTaskEndDate, type RestDaysRule } from "@/utils/date";
+import { getDateByWorkdayIndex, getTaskEndDate, parseRestDays, type RestDaysRule } from "@/utils/date";
 import dayjs from "dayjs";
 import QuickAdd from "./QuickAdd.vue";
 import TimeRange from "../components/TimeRange.vue";
@@ -478,7 +478,7 @@ watch(
         start_date: newData.start_date || "",
         duration: newData.duration || 1,
         user_id: newData.user_id || "",
-        rest_days: newData.rest_days,
+        rest_days: parseRestDays(newData.rest_days),
         status: newData.status ?? 1,
         type: Number(newData.type) ?? 0,
         priority: newData.priority ?? 0,
@@ -936,8 +936,12 @@ const handleSubmit = async () => {
       end_date: endDateStr,
       duration: formData.value.duration || 1,
       user_id: userIdStr,
-      // sqlite 不支持直接绑定 dict，对齐 data 字段：统一存 JSON 字符串
-      rest_days: formData.value.rest_days ? JSON.stringify(formData.value.rest_days) : undefined,
+      // sqlite 不支持直接绑定 dict；编辑态 rest_days 可能已是 JSON 字符串，先 normalize 再 stringify
+      rest_days: (() => {
+        const r = parseRestDays(formData.value.rest_days);
+        if (!r.weekdays.length && !r.dates.length && !r.work_dates.length) return undefined;
+        return JSON.stringify(r);
+      })(),
       type: formData.value.type ?? 0,
       status: formData.value.status ?? 1,
       priority: formData.value.priority ?? 1,

@@ -12,7 +12,10 @@ def parse_rest_days(rest_days_raw: Any) -> Dict[str, Any]:
     """
     if not rest_days_raw:
         return {"weekdays": [], "dates": [], "work_dates": []}
-    return json.loads(rest_days_raw) if isinstance(rest_days_raw, str) else rest_days_raw
+    rule = json.loads(rest_days_raw) if isinstance(rest_days_raw, str) else rest_days_raw
+    if isinstance(rule, str):
+        rule = json.loads(rule)
+    return rule
 
 
 def is_rest_day(rule: Dict[str, Any], d: date) -> bool:
