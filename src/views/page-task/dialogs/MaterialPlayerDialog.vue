@@ -189,7 +189,7 @@ import {
     IonModal,
     IonSpinner,
 } from '@ionic/vue';
-import { chevronBackOutline, chevronForwardOutline, closeOutline, pauseOutline, playOutline, textOutline } from 'ionicons/icons';
+import { chevronBackOutline, chevronForwardOutline, closeOutline, pauseOutline, playOutline } from 'ionicons/icons';
 import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
 const globalVar: any = inject('globalVar');
@@ -344,7 +344,7 @@ const loadVideoSubtitles = async (videoPath: string) => {
     }
 
     subtitleTracks.value = tracks;
-    activeSubtitleIndex.value = tracks.length > 0 ? 0 : -1;
+    activeSubtitleIndex.value = -1;
     await nextTick();
     syncSubtitleTracks();
 };

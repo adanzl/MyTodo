@@ -531,7 +531,7 @@ const loadVideoSubtitles = async (videoPath: string) => {
   }
 
   subtitleTracks.value = tracks
-  activeSubtitleIndex.value = tracks.length > 0 ? 0 : -1
+  activeSubtitleIndex.value = -1
   await nextTick()
   syncSubtitleTracks()
 }
