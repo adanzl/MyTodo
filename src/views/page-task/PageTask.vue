@@ -125,9 +125,11 @@
                       :icon="material.type === 1 ? videocamOutline : documentTextOutline"
                       color="primary"
                       class="text-3xl mb-1 shrink-0"></ion-icon>
-                    <div
-                      class="w-full px-1 text-sm font-medium text-center leading-5 h-10 overflow-hidden wrap-anywhere [-webkit-box-orient:vertical] [-webkit-line-clamp:2] [display:-webkit-box]">
-                      {{ material.name }}
+                    <div class="w-full px-1 h-10 flex items-center justify-center">
+                      <div
+                        class="w-full text-sm font-medium text-center leading-5 line-clamp-2 wrap-anywhere">
+                        {{ material.name }}
+                      </div>
                     </div>
                   </div>
                   <div class="shrink-0 h-5 flex items-center justify-center">
