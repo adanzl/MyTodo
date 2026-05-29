@@ -274,16 +274,20 @@ class TaskMgr:
 
     def get_task_list(self,
                       user_id: Optional[int] = None,
-                      date: Optional[str] = None,
+                      start_date: Optional[str] = None,
+                      end_date: Optional[str] = None,
                       page_num: int = 1,
                       page_size: int = 20) -> Dict[str, Any]:
         try:
+            if start_date and not end_date:
+                end_date = start_date
+
             conditions: Dict[str, Any] = {}
             if user_id and user_id > 0:
                 conditions['user_id'] = {'like': f'%{user_id}%'}
-            if date:
-                conditions['start_date'] = {'<=': date}
-                conditions['end_date'] = {'>=': date}
+            if start_date and end_date:
+                conditions['start_date'] = {'<=': end_date}
+                conditions['end_date'] = {'>=': start_date}
 
             result = db_mgr.get_list(TABLE_TASK, page_num=page_num, page_size=page_size, conditions=conditions)
             if result.get('code') != 0:
@@ -291,13 +295,7 @@ class TaskMgr:
 
             tasks = result.get('data', {}).get('data', [])
             if tasks:
-                if date:
-                    target_d = datetime.strptime(date, "%Y-%m-%d").date()
-                    tasks = [
-                        t for t in tasks
-                        if not is_rest_day(parse_rest_days(t.get("rest_days")), target_d)
-                    ]
-                tasks = self.check_task_lock(tasks, user_id, date)
+                tasks = self.check_task_lock(tasks, user_id, start_date)
                 result['data']['data'] = tasks
             return result
         except Exception as e:
