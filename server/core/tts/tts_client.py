@@ -19,7 +19,8 @@ except ImportError:
     log = logging.getLogger()
     rds_mgr = None
     ALI_KEY = os.getenv('ALI_KEY', '')
-    FASTAPI_URL = os.getenv("ZERO_TTS_FASTAPI_URL", "http://192.168.50.171:9099/inference_zero_shot")
+    FASTAPI_URL = os.getenv("ZERO_TTS_FASTAPI_URL",
+                            "http://192.168.50.172:9099/inference_zero_shot")
 
 ROLE_MAP = {
     # cSpell: disable-next-line
@@ -155,7 +156,8 @@ class TTSClient(ResultCallback):
         pass
 
     def on_data(self, data: bytes) -> None:
-        log.debug(f">>[TTS] on_data 回调，数据长度: {len(data) if isinstance(data, bytes) else 'N/A'}")
+        log.debug(
+            f">>[TTS] on_data 回调，数据长度: {len(data) if isinstance(data, bytes) else 'N/A'}")
         # Redis 缓存写入失败不应影响 TTS 正常输出。
         if rds_mgr is not None:
             try:

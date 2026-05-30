@@ -13,7 +13,7 @@ const REMOTE = {
 };
 
 // 本地 IP 地址
-const LOCAL_IP = "192.168.50.171";
+const LOCAL_IP = "192.168.50.172";
 const LOCAL_HTTP_PORT = 8848; // HTTP 端口
 const LOCAL_HTTPS_PORT = 8843; // HTTPS 端口
 

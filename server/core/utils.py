@@ -74,7 +74,8 @@ def read_json_from_request() -> Dict[str, Any]:
             return json.loads(raw_data.decode('utf-8'))
         return {}
     except Exception as e:
-        log.warning(f"[read_json_from_request] 读取 JSON 失败，降级到 request.get_json(): {e}")
+        log.warning(
+            f"[read_json_from_request] 读取 JSON 失败，降级到 request.get_json(): {e}")
         try:
             return request.get_json(silent=True) or {}
         except Exception:
@@ -199,7 +200,8 @@ def get_media_duration(file_path: str) -> Optional[int]:
                     try:
                         # 尝试解析整个输出（通常是单行浮点数）
                         duration = float(stdout)
-                        result_container['duration'] = int(duration) if duration else None
+                        result_container['duration'] = int(
+                            duration) if duration else None
                         # 如果成功解析，即使返回码非0也认为成功
                         return
                     except (ValueError, TypeError):
@@ -211,7 +213,8 @@ def get_media_duration(file_path: str) -> Optional[int]:
                                 continue
                             try:
                                 duration = float(line)
-                                result_container['duration'] = int(duration) if duration else None
+                                result_container['duration'] = int(
+                                    duration) if duration else None
                                 return
                             except (ValueError, TypeError):
                                 continue
@@ -245,8 +248,10 @@ def get_media_duration(file_path: str) -> Optional[int]:
 
     # 检查结果
     if result_container['error']:
-        cmd_info = f", command: {result_container['command']}" if result_container.get('command') else ""
-        log.warning(f"[Utils] Error getting media duration for {file_path}: {result_container['error']}{cmd_info}")
+        cmd_info = f", command: {result_container['command']}" if result_container.get(
+            'command') else ""
+        log.warning(
+            f"[Utils] Error getting media duration for {file_path}: {result_container['error']}{cmd_info}")
         return None
 
     return result_container['duration']
@@ -255,7 +260,7 @@ def get_media_duration(file_path: str) -> Optional[int]:
 def _get_media_server_url() -> str:
     """获取媒体文件服务器的完整 URL。"""
     # 返回固定的服务器地址和端口
-    return "http://192.168.50.171:8848"
+    return "http://192.168.50.172:8848"
 
 
 def decode_url_path(path: str) -> str:
@@ -335,7 +340,8 @@ def get_media_url(local_path: str) -> str:
             filepath = local_path
 
         # URL 编码路径
-        encoded_path = '/'.join(quote(part, safe='') for part in filepath.split('/'))
+        encoded_path = '/'.join(quote(part, safe='')
+                                for part in filepath.split('/'))
 
         # 获取服务器URL（使用固定地址）
         base_url = _get_media_server_url()
@@ -423,7 +429,8 @@ def check_cron_will_trigger_today(cron_expression: str) -> bool:
         parts = cron_expression.strip().split()
         if len(parts) == 6:
             second, minute, hour, day, month, day_of_week = parts
-            converted_day_of_week = convert_standard_cron_weekday_to_apscheduler(day_of_week)
+            converted_day_of_week = convert_standard_cron_weekday_to_apscheduler(
+                day_of_week)
             trigger = CronTrigger(second=second,
                                   minute=minute,
                                   hour=hour,
@@ -432,8 +439,10 @@ def check_cron_will_trigger_today(cron_expression: str) -> bool:
                                   day_of_week=converted_day_of_week)
         elif len(parts) == 5:
             minute, hour, day, month, day_of_week = parts
-            converted_day_of_week = convert_standard_cron_weekday_to_apscheduler(day_of_week)
-            trigger = CronTrigger(minute=minute, hour=hour, day=day, month=month, day_of_week=converted_day_of_week)
+            converted_day_of_week = convert_standard_cron_weekday_to_apscheduler(
+                day_of_week)
+            trigger = CronTrigger(
+                minute=minute, hour=hour, day=day, month=month, day_of_week=converted_day_of_week)
         else:
             return False
 
@@ -549,9 +558,9 @@ def get_file_type_by_magic_number(file) -> Optional[str]:
         b'fLaC': 'flac',
         b'RIFF': 'wav',  # WAV and AVI
         b'OggS': 'ogg',
-        b'\x00\x00\x00\x18ftypM4A': 'm4a', # cspell:disable-line 
-        b'\x00\x00\x00\x14ftypmp42': 'mp4',  # cspell:disable-line 
-        b'\x00\x00\x00 ftyp': 'mp4',  # common for mp4 and mov # cspell:disable-line 
+        b'\x00\x00\x00\x18ftypM4A': 'm4a',  # cspell:disable-line
+        b'\x00\x00\x00\x14ftypmp42': 'mp4',  # cspell:disable-line
+        b'\x00\x00\x00 ftyp': 'mp4',  # common for mp4 and mov # cspell:disable-line
         b'\x30\x26\xb2\x75\x8e\x66\xcf\x11': 'wma',  # WMA/WMV
     }
 
@@ -599,7 +608,7 @@ def get_unique_filepath(directory: str, base_name: str, extension: str) -> str:
 
 def _cleanup_directory(directory: Optional[str], file_paths: Optional[List[str]] = None, is_temp: bool = False) -> None:
     """内部辅助函数：清理目录和文件。
-    
+
     Args:
         directory: 目录路径
         file_paths: 文件路径列表（可选）
@@ -616,7 +625,7 @@ def _cleanup_directory(directory: Optional[str], file_paths: Optional[List[str]]
                         os.remove(path)
                 except Exception:
                     pass
-        
+
         # 如果是临时目录，尝试删除空目录
         if is_temp and directory and os.path.exists(directory):
             try:
@@ -633,31 +642,31 @@ def save_uploaded_files(
     temp_prefix: str = 'upload_'
 ) -> Tuple[Optional[List[str]], Optional[str]]:
     """保存上传的文件到指定目录或临时目录。
-    
+
     通用文件上传保存函数，支持两种模式：
     1. 保存到临时目录：target_dir=None，自动创建临时目录
     2. 保存到指定目录：target_dir 指定目标目录路径
-    
+
     Args:
         files: Flask 文件对象列表（从 request.files.getlist() 获取）
         target_dir: 目标目录路径，None 表示使用临时目录
         temp_prefix: 临时目录前缀（仅在 target_dir=None 时使用）
-    
+
     Returns:
         (file_paths, directory) 成功时返回文件路径列表和目录路径
         (None, None) 失败时返回 None
-    
+
     Examples:
         # 保存到临时目录
         paths, temp_dir = save_uploaded_files(files, temp_prefix='ocr_')
-        
+
         # 保存到指定目录
         paths, _ = save_uploaded_files(files, target_dir='/path/to/dir')
     """
     directory = None
     file_paths = []
     is_temp = target_dir is None
-    
+
     try:
         # 确定目标目录
         if is_temp:
@@ -666,24 +675,24 @@ def save_uploaded_files(
             directory = target_dir
             if not os.path.exists(directory):
                 os.makedirs(directory, exist_ok=True)
-        
+
         # 保存文件
         for file in files:
             if not file.filename:
                 continue
-            
+
             safe_filename = secure_filename(file.filename)
             file_path = os.path.join(directory, safe_filename)
             file.save(file_path)
             file_paths.append(file_path)
-        
+
         # 检查是否有有效文件
         if not file_paths:
             _cleanup_directory(directory, is_temp=is_temp)
             return None, None
-        
+
         return file_paths, directory
-        
+
     except Exception as e:
         log.error(f"[Utils] 保存上传文件失败: {e}")
         _cleanup_directory(directory, file_paths, is_temp=is_temp)
@@ -692,7 +701,7 @@ def save_uploaded_files(
 
 def cleanup_temp_files(temp_dir: str, file_paths: Optional[List[str]] = None) -> None:
     """清理临时文件和目录。
-    
+
     Args:
         temp_dir: 临时目录路径
         file_paths: 文件路径列表（可选，如果提供则只删除这些文件）
@@ -733,7 +742,8 @@ def run_subprocess_safe(cmd: List[str],
     def _run():
         """在线程中使用 os.system + 临时文件运行命令，完全避免 gevent 的 subprocess patch"""
         try:
-            _run_with_os_system(cmd, timeout, env, cwd, result_queue, error_queue)
+            _run_with_os_system(cmd, timeout, env, cwd,
+                                result_queue, error_queue)
         except Exception as e:
             error_queue.put(e)
 
@@ -776,8 +786,10 @@ def _run_with_os_system(cmd_list: List[str], timeout_val: float, env_dict: Optio
             returncode_path = tmp_rc.name
 
         # 构建并执行命令
-        shell_cmd = _build_shell_command(cmd_list, env_dict, cwd_path, stdout_path, stderr_path, returncode_path)
-        returncode = _execute_with_timeout(shell_cmd, timeout_val, cmd_list, error_q)
+        shell_cmd = _build_shell_command(
+            cmd_list, env_dict, cwd_path, stdout_path, stderr_path, returncode_path)
+        returncode = _execute_with_timeout(
+            shell_cmd, timeout_val, cmd_list, error_q)
 
         if returncode is None:  # 超时或出错
             return
@@ -822,7 +834,8 @@ def _build_windows_command(quoted_cmd: str, env_dict: Optional[Dict[str, str]], 
             full_cmd_parts.append(f'set {k}={shlex.quote(v)}')
 
     # 执行命令并重定向输出
-    full_cmd_parts.append(f'{quoted_cmd} > {shlex.quote(stdout_path)} 2> {shlex.quote(stderr_path)}')
+    full_cmd_parts.append(
+        f'{quoted_cmd} > {shlex.quote(stdout_path)} 2> {shlex.quote(stderr_path)}')
 
     # 捕获返回码
     full_cmd_parts.append(

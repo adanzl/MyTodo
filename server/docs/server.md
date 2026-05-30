@@ -263,7 +263,7 @@ docker run -d -it -p 8003:3000 --name DBGate --restart=always \
     -e PASSWORD=\!Zhao575936 \
     -e CONNECTIONS=con1,con2 \
     -e LABEL_con1=MYSQL \
-    -e SERVER_con1=192.168.50.171 \
+    -e SERVER_con1=192.168.50.172 \
     -e USER_con1=leo \
     -e PORT_con1=8002 \
     -e PASSWORD_con1=H^12345678 \
@@ -338,7 +338,7 @@ docker run \
 ```bash
 sudo mkcert -cert-file /etc/ssl/self-signed/selfsigned.crt \
      -key-file /etc/ssl/self-signed/selfsigned.key \
-     192.168.50.171 192.168.50.172 localhost 127.0.0.1
+     192.168.50.172 192.168.50.172 localhost 127.0.0.1
 ```
 
 ## 服务器端口

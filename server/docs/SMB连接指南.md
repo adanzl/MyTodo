@@ -5,7 +5,7 @@
 ### 方法 1: 使用资源管理器（最简单）
 
 1. 打开 **文件资源管理器**
-2. 在地址栏输入：`\\192.168.50.171`
+2. 在地址栏输入：`\\192.168.50.172`
 3. 双击 **MINI_EXT** 共享
 4. 输入用户名：`leo` 和密码
 5. 勾选"记住我的凭据"
@@ -22,7 +22,7 @@ Set-SmbClientConfiguration -EnableInsecureGuestLogons $true -Confirm:$false
 Restart-Service -Name "LanmanWorkstation" -Force
 
 # 2. 挂载共享（开机自动挂载）
-net use Z: \\192.168.50.171\MINI_EXT /user:leo /persistent:yes
+net use Z: \\192.168.50.172\MINI_EXT /user:leo /persistent:yes
 # 输入密码
 # 注意：/persistent:yes 表示开机自动挂载
 
@@ -32,7 +32,7 @@ explorer Z:\
 
 ## 服务器信息
 
-- **服务器 IP**: 192.168.50.171
+- **服务器 IP**: 192.168.50.172
 - **共享名**: MINI_EXT
 - **路径**: /mnt/ext
 - **用户名**: leo
@@ -48,7 +48,7 @@ explorer Z:\
 使用 `/persistent:yes` 参数挂载后，下次开机会自动挂载：
 
 ```cmd
-net use Z: \\192.168.50.171\MINI_EXT /user:leo /persistent:yes
+net use Z: \\192.168.50.172\MINI_EXT /user:leo /persistent:yes
 ```
 
 **注意**：首次挂载需要输入密码，Windows 会保存凭据，之后开机自动挂载时无需再次输入密码。
