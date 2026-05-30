@@ -28,7 +28,6 @@ type ServerMode = "local" | "remote";
 type ServerStatusListener = (isLocal: boolean, changed: boolean) => void;
 
 // 本地连通性探测结果，null 表示尚未探测
-let localIpAvailable: boolean | null = null;
 // 当前实际使用的服务器
 let activeServerMode: ServerMode = "remote";
 // 复用进行中的探测，避免并发重复探测
@@ -65,12 +64,10 @@ function ensureApiSuffix(url: string): string {
 }
 
 function markLocalProbeSuccess(): void {
-  localIpAvailable = true;
   consecutiveLocalProbeFailures = 0;
 }
 
 function markLocalProbeFailure(): void {
-  localIpAvailable = false;
   consecutiveLocalProbeFailures += 1;
 }
 
@@ -144,7 +141,6 @@ function applyServerMode(mode: ServerMode): void {
   api.defaults.baseURL = nextBaseUrl;
 
   if (mode === "local") {
-    localIpAvailable = true;
   }
 
   if (changed) {
