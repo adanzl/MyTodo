@@ -536,6 +536,7 @@ const applyTaskData = (newData?: Partial<Task>) => {
     preTodoCancan.value = [];
     blockTimes.value = [];
     selectedDay.value = 0;
+    restDaysSummary.value = "";
   }
 };
 
@@ -604,6 +605,7 @@ const resetForm = () => {
   preTodoCancan.value = [];
   blockTimes.value = [];
   showRestDaysDialog.value = false;
+  restDaysSummary.value = "";
 };
 
 // 获取某天的素材列表
@@ -946,7 +948,7 @@ const handleSubmit = async () => {
       // sqlite 不支持直接绑定 dict；编辑态 rest_days 可能已是 JSON 字符串，先 normalize 再 stringify
       rest_days: (() => {
         const r = parseRestDays(formData.value.rest_days);
-        if (!r.weekdays.length && !r.dates.length && !r.work_dates.length) return undefined;
+        if (!r.weekdays.length && !r.dates.length && !r.work_dates.length) return null;
         return JSON.stringify(r);
       })(),
       type: formData.value.type ?? 0,

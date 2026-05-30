@@ -189,8 +189,8 @@ export interface Task {
   end_date: string;
   duration: number;
   user_id: string;
-  /** 休息日规则(JSON 或 JSON字符串)。0=周日..6=周六；dates/work_dates 为 YYYY-MM-DD */
-  rest_days?: string | { weekdays?: number[]; dates?: string[]; work_dates?: string[] };
+  /** 休息日规则(JSON 或 JSON字符串)。0=周日..6=周六；dates/work_dates 为 YYYY-MM-DD；null 表示清空 */
+  rest_days?: string | { weekdays?: number[]; dates?: string[]; work_dates?: string[] } | null;
   status?: number; // 1: 进行中, 2: 已结束, 0: 未开始， -1：未开启
   priority?: number; // 任务优先级 数字越小优先级越高，高优先级任务没有完成低优先级任务会锁定
   type: number; // 0:每日任务；1：持续性任务
@@ -267,7 +267,7 @@ export async function getTask(id: number, fields?: string): Promise<Task> {
  * @param task - 任务数据
  */
 export async function addTask(task: Omit<Task, "id">): Promise<Task> {
-  const response = await api.post("/task/update", { id: -1, ...task });
+  const response = await api.post("/task/update", task as unknown as Record<string, unknown>);
   const result = response.data as { code: number; msg?: string; data?: Task };
   if (result.code !== 0 || !result.data) {
     throw new Error(result.msg || "添加任务失败");

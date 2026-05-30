@@ -199,6 +199,9 @@ class DbMgr:
                     processed_data[key] = value
 
             id = processed_data.get('id')
+            if id is not None and id <= 0:
+                processed_data.pop('id', None)
+                id = None
             if id:
                 # 查找是否存在
                 stmt_sel = select(table_obj).where(table_obj.c.id == id)

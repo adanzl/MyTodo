@@ -5,17 +5,26 @@ from datetime import date, timedelta
 from typing import Any, Dict
 
 
+_EMPTY_REST_DAYS: Dict[str, Any] = {"weekdays": [], "dates": [], "work_dates": []}
+
+
 def parse_rest_days(rest_days_raw: Any) -> Dict[str, Any]:
     """
     rest_days 存库为 JSON string（或在写路径/内存中为 dict）。
     这里做一次 parse，让后续计算都基于 dict，避免循环里反复 json.loads。
     """
     if not rest_days_raw:
-        return {"weekdays": [], "dates": [], "work_dates": []}
+        return dict(_EMPTY_REST_DAYS)
     rule = json.loads(rest_days_raw) if isinstance(rest_days_raw, str) else rest_days_raw
     if isinstance(rule, str):
         rule = json.loads(rule)
-    return rule
+    if not isinstance(rule, dict):
+        return dict(_EMPTY_REST_DAYS)
+    return {
+        "weekdays": list(rule.get("weekdays") or []),
+        "dates": list(rule.get("dates") or []),
+        "work_dates": list(rule.get("work_dates") or []),
+    }
 
 
 def is_rest_day(rule: Dict[str, Any], d: date) -> bool:
@@ -23,15 +32,16 @@ def is_rest_day(rule: Dict[str, Any], d: date) -> bool:
         return False
 
     day_key = d.strftime("%Y-%m-%d")
-    if day_key in rule["work_dates"]:
+    if day_key in (rule.get("work_dates") or []):
         return False
-    if day_key in rule["dates"]:
+    if day_key in (rule.get("dates") or []):
         return True
-    if not rule["weekdays"]:
+    weekdays = rule.get("weekdays") or []
+    if not weekdays:
         return False
     # python weekday(): Mon=0..Sun=6 -> rule weekday: Sun=0..Sat=6
     wd = (d.weekday() + 1) % 7
-    return wd in rule["weekdays"]
+    return wd in weekdays
 
 
 def get_workday_index(start_date: date, target_date: date, rule: Dict[str, Any]) -> int:
