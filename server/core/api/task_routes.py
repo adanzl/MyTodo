@@ -81,11 +81,12 @@ def delete_material_category() -> ResponseReturnValue:
 def get_task_list() -> ResponseReturnValue:
     """获取任务列表（带锁定状态检查）"""
     user_id = request.args.get('userId', type=int)
-    date = request.args.get('date')
+    start_date = request.args.get('startDate')
+    end_date = request.args.get('endDate')
     page_num = request.args.get('pageNum', 1, type=int)
     page_size = request.args.get('pageSize', 20, type=int)
-    
-    return task_mgr.get_task_list(user_id, date, page_num, page_size)
+
+    return task_mgr.get_task_list(user_id, start_date, end_date, page_num, page_size)
 
 
 @task_bp.route('/task/update', methods=['POST'])

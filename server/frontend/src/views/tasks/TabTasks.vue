@@ -13,9 +13,9 @@
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="name" label="任务名称" min-width="200" />
       <el-table-column prop="priority" label="优先级" width="80" align="center" />
-      <el-table-column prop="type" label="任务类型" width="100" align="center">
+      <el-table-column prop="type" label="类型" width="70" align="center">
         <template #default="{ row }">
-          <el-tag :type="row.type === 1 ? 'success' : 'primary'">{{ row.type === 1 ? '持续任务' : '每日任务' }}</el-tag>
+          <el-tag :type="row.type === 1 ? 'success' : 'primary'">{{ row.type === 1 ? '持续' : '每日' }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="start_date" label="开始日期" width="110" />
@@ -25,8 +25,13 @@
           {{ getUserName(row.user_id) }}
         </template>
       </el-table-column>
+      <el-table-column label="前置" width="70" align="center">
+        <template #default="{ row }">
+          {{ getPreTodoCounts(row) }}
+        </template>
+      </el-table-column>
       <!-- 休息日 -->
-      <el-table-column label="休息日" width="120">
+      <el-table-column label="休息日" width="110">
         <template #default="{ row }">
           <el-tooltip
             v-if="restDaysText(row)"
@@ -174,6 +179,31 @@ const getUserName = (userId?: number) => {
   if (userIds.includes(3)) names.push("灿灿");
   if (userIds.includes(4)) names.push("昭昭");
   return names.join(", ") || "-";
+};
+
+// 获取布置对象对应的前置任务个数，顺序与布置对象一致
+const getPreTodoCounts = (task: Task): string => {
+  const userIds = String(task.user_id || "").split(",").map(Number);
+  const assignedUsers: number[] = [];
+  if (userIds.includes(3)) assignedUsers.push(3);
+  if (userIds.includes(4)) assignedUsers.push(4);
+  if (assignedUsers.length === 0) return "-";
+
+  let preTodoData: Record<string, number[]> = {};
+  if (task.pre_todo) {
+    try {
+      preTodoData = typeof task.pre_todo === "string" ? JSON.parse(task.pre_todo) : task.pre_todo;
+    } catch {
+      preTodoData = {};
+    }
+  }
+
+  return assignedUsers
+    .map((id) => {
+      const ids = preTodoData[String(id)];
+      return Array.isArray(ids) ? ids.length : 0;
+    })
+    .join(", ");
 };
 
 // 新建任务

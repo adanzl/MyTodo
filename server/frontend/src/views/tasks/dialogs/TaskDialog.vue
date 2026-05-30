@@ -321,7 +321,7 @@ import { Plus, WarningFilled, ArrowUp, ArrowDown, Close } from "@element-plus/ic
 import { addTask, updateTask, getMaterialList, getMaterialCategoryList, getCommonBlockTimeSlots, type Task, type Material, type MaterialCategory, type TaskBlockTimeSlot } from "@/api/api-task";
 import { getTodoListByTime } from "@/api/api-todo";
 import { sortByName, buildCategoryTree } from "@/utils/file";
-import { getDateByWorkdayIndex, getTaskEndDate, type RestDaysRule } from "@/utils/date";
+import { getDateByWorkdayIndex, getTaskEndDate, parseRestDays, type RestDaysRule } from "@/utils/date";
 import dayjs from "dayjs";
 import QuickAdd from "./QuickAdd.vue";
 import TimeRange from "../components/TimeRange.vue";
@@ -468,78 +468,81 @@ const endDateStr = computed(() => {
   return end ? dayjs(end).format("MM月DD日") : "";
 });
 
-// 监听外部传入的 taskData
-watch(
-  () => props.taskData,
-  (newData) => {
-    if (newData && Object.keys(newData).length > 0) {
-      formData.value = {
-        name: newData.name || "",
-        start_date: newData.start_date || "",
-        duration: newData.duration || 1,
-        user_id: newData.user_id || "",
-        rest_days: newData.rest_days,
-        status: newData.status ?? 1,
-        type: Number(newData.type) ?? 0,
-        priority: newData.priority ?? 0,
-      };
+// 根据外部 taskData 填充/重置表单
+const applyTaskData = (newData?: Partial<Task>) => {
+  if (newData && Object.keys(newData).length > 0) {
+    formData.value = {
+      name: newData.name || "",
+      start_date: newData.start_date || "",
+      duration: newData.duration || 1,
+      user_id: newData.user_id || "",
+      rest_days: parseRestDays(newData.rest_days),
+      status: newData.status ?? 1,
+      type: Number(newData.type) ?? 0,
+      priority: newData.priority ?? 0,
+    };
 
-      // 解析 user_id，如果是多个用户用逗号分隔
-      if (newData.user_id) {
-        const userIds = String(newData.user_id).split(",").map(Number);
-        selectedUsers.value = userIds.filter((id) => [3, 4].includes(id));
-      } else {
-        selectedUsers.value = [];
-      }
+    // 解析 user_id，如果是多个用户用逗号分隔
+    if (newData.user_id) {
+      const userIds = String(newData.user_id).split(",").map(Number);
+      selectedUsers.value = userIds.filter((id) => [3, 4].includes(id));
+    } else {
+      selectedUsers.value = [];
+    }
 
-      // 初始化前置日程ID
-      if (newData.pre_todo) {
-        try {
-          const preTodoData = typeof newData.pre_todo === 'string' ? JSON.parse(newData.pre_todo) : newData.pre_todo;
-          preTodoZhaozhao.value = Array.isArray(preTodoData['4']) ? preTodoData['4'] : [];
-          preTodoCancan.value = Array.isArray(preTodoData['3']) ? preTodoData['3'] : [];
-        } catch (e) {
-          console.error('解析前置日程数据失败:', e);
-          preTodoZhaozhao.value = [];
-          preTodoCancan.value = [];
-        }
-      } else {
+    // 初始化前置日程ID
+    if (newData.pre_todo) {
+      try {
+        const preTodoData = typeof newData.pre_todo === 'string' ? JSON.parse(newData.pre_todo) : newData.pre_todo;
+        preTodoZhaozhao.value = Array.isArray(preTodoData['4']) ? preTodoData['4'] : [];
+        preTodoCancan.value = Array.isArray(preTodoData['3']) ? preTodoData['3'] : [];
+      } catch (e) {
+        console.error('解析前置日程数据失败:', e);
         preTodoZhaozhao.value = [];
         preTodoCancan.value = [];
       }
+    } else {
+      preTodoZhaozhao.value = [];
+      preTodoCancan.value = [];
+    }
 
-      blockTimes.value = getCommonBlockTimeSlots(newData.block_time);
+    blockTimes.value = getCommonBlockTimeSlots(newData.block_time);
 
-      // 初始化每日素材数据和每日分数
-      if (newData.data) {
-        try {
-          const parsedData = typeof newData.data === 'string' ? JSON.parse(newData.data) : newData.data;
-          dailyMaterials.value = parsedData.dailyMaterials || {};
-          dailyScore.value = parsedData.dailyScore || {};
-        } catch (e) {
-          console.error('解析任务数据失败:', e);
-          dailyMaterials.value = {};
-          dailyScore.value = {};
-        }
-      } else {
+    // 初始化每日素材数据和每日分数
+    if (newData.data) {
+      try {
+        const parsedData = typeof newData.data === 'string' ? JSON.parse(newData.data) : newData.data;
+        dailyMaterials.value = parsedData.dailyMaterials || {};
+        dailyScore.value = parsedData.dailyScore || {};
+      } catch (e) {
+        console.error('解析任务数据失败:', e);
         dailyMaterials.value = {};
         dailyScore.value = {};
       }
-
-      // 默认选中第一天
-      selectedDay.value = 0;
     } else {
-      // 新建模式，重置为默认值（每日任务）
-      formData.value = createDefaultFormData();
-      selectedUsers.value = [];
       dailyMaterials.value = {};
       dailyScore.value = {};
-      preTodoZhaozhao.value = [];
-      preTodoCancan.value = [];
-      blockTimes.value = [];
-      selectedDay.value = 0;
     }
-  },
+
+    // 默认选中第一天
+    selectedDay.value = 0;
+  } else {
+    // 新建模式，重置为默认值（每日任务）
+    formData.value = createDefaultFormData();
+    selectedUsers.value = [];
+    dailyMaterials.value = {};
+    dailyScore.value = {};
+    preTodoZhaozhao.value = [];
+    preTodoCancan.value = [];
+    blockTimes.value = [];
+    selectedDay.value = 0;
+  }
+};
+
+// 监听外部传入的 taskData
+watch(
+  () => props.taskData,
+  (newData) => applyTaskData(newData),
   { immediate: true, deep: true }
 );
 
@@ -578,6 +581,10 @@ watch(
 // 监听 visible 变化
 watch(visible, (newVal) => {
   emit("update:modelValue", newVal);
+  // 关闭时会 resetForm，再次打开时 taskData 可能未变，需重新填充
+  if (newVal) {
+    applyTaskData(props.taskData);
+  }
 });
 
 // 关闭对话框
@@ -936,12 +943,17 @@ const handleSubmit = async () => {
       end_date: endDateStr,
       duration: formData.value.duration || 1,
       user_id: userIdStr,
-      // sqlite 不支持直接绑定 dict，对齐 data 字段：统一存 JSON 字符串
-      rest_days: formData.value.rest_days ? JSON.stringify(formData.value.rest_days) : undefined,
+      // sqlite 不支持直接绑定 dict；编辑态 rest_days 可能已是 JSON 字符串，先 normalize 再 stringify
+      rest_days: (() => {
+        const r = parseRestDays(formData.value.rest_days);
+        if (!r.weekdays.length && !r.dates.length && !r.work_dates.length) return undefined;
+        return JSON.stringify(r);
+      })(),
       type: formData.value.type ?? 0,
       status: formData.value.status ?? 1,
       priority: formData.value.priority ?? 1,
-      pre_todo: Object.keys(preTodoData).length > 0 ? JSON.stringify(preTodoData) : undefined,
+      // 清空时也要传 "{}"，否则后端不会更新 pre_todo 字段
+      pre_todo: JSON.stringify(preTodoData),
       block_time: (() => {
         const time = blockTimes.value.filter((s) => s.start && s.end && s.start < s.end);
         return time.length ? [{ role: "common", time }] : [];

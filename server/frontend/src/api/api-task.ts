@@ -225,8 +225,8 @@ export function getCommonBlockTimeSlots(rules?: unknown): TaskBlockTimeSlot[] {
  * @param userId - 用户ID（可选）
  * @param pageNum - 页码，默认1
  * @param pageSize - 每页数量，默认20
- * @param startDate - 开始日期（可选，格式 YYYY-MM-DD）
- * @param endDate - 结束日期（可选，格式 YYYY-MM-DD）
+ * @param startDate - 查询范围开始日期（格式 YYYY-MM-DD）
+ * @param endDate - 查询范围结束日期（可选，缺省时等于 startDate）
  */
 export async function getTaskList(
   userId?: number,
@@ -244,10 +244,9 @@ export async function getTaskList(
     params.userId = userId;
   }
 
-  // 使用 date 参数查询指定日期的任务
-  const date = startDate || endDate;
-  if (date) {
-    params.date = date;
+  if (startDate) {
+    params.startDate = startDate;
+    params.endDate = endDate ?? startDate;
   }
 
   const response = await api.get("/task/list", { params });

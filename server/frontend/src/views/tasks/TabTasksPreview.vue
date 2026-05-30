@@ -68,8 +68,9 @@
               <div
                 v-for="item in g.items"
                 :key="`${item.task.id}_${item.material.id}`"
-                class="relative flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow-md cursor-pointer hover:shadow-2xl transition-shadow"
-                @click="openMaterialPlayer(item.task, item.material)"
+                class="relative flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow-md transition-shadow"
+                :class="item.missing ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:shadow-2xl'"
+                @click="openMaterialPlayer(item.task, item.material, item.missing)"
               >
                 <!-- 素材状态角标 -->
                 <div
@@ -83,7 +84,7 @@
                   >
                     {{ item.completed ? "已完成" : "未完成" }}
                   </el-tag>
-                  <span class="truncate flex-1 min-w-0">{{ item.material.id }}</span>
+                  <span class="truncate flex-1 min-w-0 text-right">{{ item.material.id }}</span>
                 </div>
 
                 <el-icon :size="40" color="#409EFF" class="mb-1 mt-6">
@@ -102,7 +103,8 @@
                     {{ item.material.name }}
                   </div>
                 </el-tooltip>
-                <div v-if="g.task.lock" class="mt-2">
+                <div v-if="item.missing" class="text-[10px] text-red-500 mt-2">无法预览</div>
+                <div v-else-if="g.task.lock" class="mt-2">
                   <el-icon :size="24" class="text-gray-500">
                     <Lock />
                   </el-icon>
@@ -193,7 +195,19 @@ const getTaskMaterialSaveList = (task: Task): any[] => {
 const getTaskMaterialList = (task: Task): MaterialItem[] => {
   const saves = getTaskMaterialSaveList(task);
   return saves
-    .map((save: any) => materialMap.value.get(save.id))
+    .map((save: any) => {
+      if (!save?.id) return undefined;
+      const cached = materialMap.value.get(save.id);
+      if (cached) return cached;
+      // 素材可能已从 t_material 删除，但任务 data 里仍保留快照
+      return {
+        id: save.id,
+        name: save.name ?? `素材${save.id}`,
+        path: "",
+        cate_id: -1,
+        type: save.type ?? 0,
+      } as MaterialItem;
+    })
     .filter((m): m is MaterialItem => m !== undefined);
 };
 
@@ -240,6 +254,7 @@ type MaterialDisplayItem = {
   task: Task;
   material: MaterialItem;
   completed: boolean;
+  missing: boolean;
   priority: number;
 };
 
@@ -271,6 +286,7 @@ const groupedTasks = computed<TaskMaterialGroup[]>(() => {
       task,
       material,
       completed: isMaterialCompleted(task, material, currentDate.value),
+      missing: !materialMap.value.has(material.id),
       priority: task.priority ?? 999,
     }));
     const items = sortMaterialItems(rawItems);
@@ -320,7 +336,11 @@ watch(
 );
 
 // 打开素材播放器
-const openMaterialPlayer = async (task: Task, material: MaterialItem) => {
+const openMaterialPlayer = async (task: Task, material: MaterialItem, missing = false) => {
+  if (missing) {
+    ElMessage.warning("素材缺失，无法预览");
+    return;
+  }
   selectedMaterial.value = material;
   selectedTask.value = task;
 
@@ -368,9 +388,11 @@ const fetchTaskList = async () => {
       // 批量获取素材详情
       if (materialIds.size > 0) {
         const materials = await getMaterialListByIds(Array.from(materialIds));
+        const nextMap = new Map(materialMap.value);
         materials.forEach(material => {
-          materialMap.value.set(material.id!, material);
+          nextMap.set(material.id!, material);
         });
+        materialMap.value = nextMap;
       }
     }
   } catch (error: any) {
