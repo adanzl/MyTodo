@@ -3,7 +3,7 @@ import { clearLoginCache, getAccessToken, getTokenExpiresAt, refreshToken } from
 import axios, { type AxiosRequestConfig, type InternalAxiosRequestConfig } from "axios";
 
 const REMOTE_URL = "https://leo-zhao.natapp4.cc/api";
-const LOCAL_IP = "192.168.50.171";
+const LOCAL_IP = "192.168.50.172";
 const LOCAL_PORTS = { http: 8848, https: 8843 };
 let API_URL = "";
 let localIpAvailable: boolean | null = null;

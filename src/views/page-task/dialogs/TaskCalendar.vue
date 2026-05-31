@@ -60,13 +60,15 @@
           <div 
             v-for="date in calendarDates" 
             :key="date.dateStr"
-            class="aspect-square flex flex-col items-center justify-center p-0.5 rounded cursor-pointer relative"
+            class="aspect-square flex flex-col items-center justify-center p-0.5 rounded relative"
             :class="{
+                'cursor-pointer': isDateClickable(date.dateStr),
+                'cursor-not-allowed': !isDateClickable(date.dateStr),
                 'bg-blue-200 text-black': isToday(date.dateStr),
                 'bg-blue-600 text-white': isSelectedDate(date.dateStr) && !isToday(date.dateStr),
                 'bg-white text-black': !isToday(date.dateStr) && !isSelectedDate(date.dateStr),
-                'hover:bg-gray-100': !isToday(date.dateStr) && !isSelectedDate(date.dateStr),
-                'opacity-50': !date.isCurrentMonth
+                'hover:bg-gray-100': isDateClickable(date.dateStr) && !isToday(date.dateStr) && !isSelectedDate(date.dateStr),
+                'opacity-50': !date.isCurrentMonth || !isDateClickable(date.dateStr)
             }"
             @click="selectDate(date.dateStr)"
           >
@@ -102,7 +104,7 @@ import {
     IonDatetimeButton
 } from '@ionic/vue';
 import { closeOutline, chevronBackOutline, chevronForwardOutline } from 'ionicons/icons';
-import { ref, watch } from 'vue';
+import { computed, inject, ref, watch } from 'vue';
 import { getTaskCalendar, type TaskCalendarResponse } from '@/api/api-task';
 import { getTodayStr } from '@/utils/date-util';
 import dayjs from 'dayjs';
@@ -119,6 +121,9 @@ const emit = defineEmits<{
     (e: 'dismiss'): void;
     (e: 'date-selected', date: string): void;
 }>();
+
+const globalVar: any = inject('globalVar');
+const isAdmin = computed(() => globalVar?.user?.admin === 1);
 
 const loading = ref(false);
 const calendarData = ref<TaskCalendarResponse | null>(null);
@@ -182,6 +187,16 @@ const isSelectedDate = (dateStr: string) => {
     return props.selectedDate === dateStr;
 };
 
+// 判断是否是未来日期
+const isFutureDate = (dateStr: string) => {
+    return dayjs(dateStr).isAfter(dayjs(), 'day');
+};
+
+// 非管理员不可点击未来日期
+const isDateClickable = (dateStr: string) => {
+    return isAdmin.value || !isFutureDate(dateStr);
+};
+
 // 获取该日期的任务统计
 const getTaskStats = (dateStr: string) => {
     const tasks = calendarData.value?.calendar[dateStr]?.tasks || [];
@@ -199,6 +214,7 @@ const hasIncompleteTasks = (dateStr: string) => {
 
 // 选择日期
 const selectDate = (dateStr: string) => {
+    if (!isDateClickable(dateStr)) return;
     emit('date-selected', dateStr);
     emit('update:isOpen', false);
 };
