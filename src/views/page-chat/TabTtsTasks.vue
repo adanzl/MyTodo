@@ -116,7 +116,6 @@ import {
   IonRefresher,
   IonRefresherContent,
   IonSegmentContent,
-  alertController,
   loadingController,
 } from "@ionic/vue";
 import { add, checkmarkCircleOutline } from "ionicons/icons";
