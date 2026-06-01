@@ -1,12 +1,14 @@
 /**
- * 视频字幕工具：支持 VTT / SRT，以及 material.data 配置与同名 sidecar 文件自动发现
+ * 视频字幕工具：支持 VTT / SRT，通过 /media/subtitle 发现同目录 sidecar 字幕
  */
+import { apiClient } from '@/api/api-client';
 import { getMediaFileUrl } from '@/utils/file';
 
 export interface SubtitleSource {
   path: string;
   label?: string;
   lang?: string;
+  ext?: string;
 }
 
 export interface ResolvedSubtitleTrack {
@@ -14,27 +16,6 @@ export interface ResolvedSubtitleTrack {
   label: string;
   lang: string;
   isBlob: boolean;
-}
-
-export interface MaterialSubtitleData {
-  subtitleList?: SubtitleSource[];
-}
-
-const SIDECAR_SUFFIXES = ['', '.zh', '.chs', '.cht', '.en', '.eng'];
-const SUBTITLE_EXTENSIONS = ['.vtt', '.srt'];
-
-export function guessSidecarSubtitlePaths(videoPath: string): string[] {
-  const lastDot = videoPath.lastIndexOf('.');
-  if (lastDot <= 0) return [];
-
-  const base = videoPath.slice(0, lastDot);
-  const paths: string[] = [];
-  for (const suffix of SIDECAR_SUFFIXES) {
-    for (const ext of SUBTITLE_EXTENSIONS) {
-      paths.push(`${base}${suffix}${ext}`);
-    }
-  }
-  return paths;
 }
 
 function fileNameFromPath(filePath: string): string {
@@ -83,15 +64,6 @@ export function srtToVtt(srt: string): string {
   return `WEBVTT\n\n${cues.join('\n\n')}\n`;
 }
 
-async function probeMediaExists(url: string): Promise<boolean> {
-  try {
-    const res = await fetch(url, { method: 'HEAD' });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
 async function fetchSubtitleText(url: string): Promise<string> {
   const res = await fetch(url);
   if (!res.ok) {
@@ -100,50 +72,48 @@ async function fetchSubtitleText(url: string): Promise<string> {
   return res.text();
 }
 
-function collectSubtitleSources(
-  videoPath: string,
-  materialData?: MaterialSubtitleData | null
-): SubtitleSource[] {
-  const seen = new Set<string>();
-  const sources: SubtitleSource[] = [];
-
-  const add = (source: SubtitleSource) => {
-    const key = source.path;
-    if (!key || seen.has(key)) return;
-    seen.add(key);
-    sources.push(source);
-  };
-
-  for (const item of materialData?.subtitleList || []) {
-    if (item?.path) add(item);
+async function fetchAvailableSubtitleSources(videoPath: string): Promise<SubtitleSource[]> {
+  const rsp = await apiClient.get('/media/subtitle', {
+    params: { video_path: videoPath },
+  });
+  const body = rsp.data;
+  if (!body || body.code !== 0) {
+    throw new Error(body?.msg || '获取字幕列表失败');
   }
-
-  for (const path of guessSidecarSubtitlePaths(videoPath)) {
-    add({ path, label: labelFromPath(path), lang: langFromPath(path) });
-  }
-
-  return sources;
+  const tracks = body?.data?.tracks;
+  if (!Array.isArray(tracks)) return [];
+  return tracks
+    .map((t: any) => ({
+      path: String(t.path || ''),
+      label: t.label ? String(t.label) : undefined,
+      lang: t.lang ? String(t.lang) : undefined,
+      ext: t.ext ? String(t.ext) : undefined,
+    }))
+    .filter((t) => !!t.path);
 }
 
 export async function resolveSubtitleTracks(
   videoPath: string,
-  materialData?: MaterialSubtitleData | null,
   getUrl: (path: string) => string = getMediaFileUrl
 ): Promise<ResolvedSubtitleTrack[]> {
   if (!videoPath) return [];
 
-  const sources = collectSubtitleSources(videoPath, materialData);
+  let sources: SubtitleSource[] = [];
+  try {
+    sources = await fetchAvailableSubtitleSources(videoPath);
+  } catch (e) {
+    console.warn('获取字幕列表失败:', e);
+    return [];
+  }
+
   const resolved: ResolvedSubtitleTrack[] = [];
 
   for (const source of sources) {
     const url = getUrl(source.path);
     if (!url) continue;
 
-    const ext = source.path.split('.').pop()?.toLowerCase();
+    const ext = (source.ext || source.path.split('.').pop() || '').toLowerCase();
     if (ext !== 'vtt' && ext !== 'srt') continue;
-
-    const exists = await probeMediaExists(url);
-    if (!exists) continue;
 
     const label = source.label || labelFromPath(source.path);
     const lang = source.lang || langFromPath(source.path);

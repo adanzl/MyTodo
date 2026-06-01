@@ -5,73 +5,88 @@
     fullscreen
     :show-close="false"
     destroy-on-close
+    class="m-0! p-0! [&_.el-dialog__header]:hidden [&_.el-dialog__body]:p-0! [&_.el-dialog__body]:h-screen [&_.el-dialog__body]:overflow-hidden"
     @close="handleClose"
-    class="preview-fullscreen-dialog"
   >
-    <div v-loading="loading" element-loading-text="加载中..." element-loading-background="rgba(0, 0, 0, 0.8)" class="relative w-full h-full flex flex-col bg-black overflow-hidden">
-      <!-- PDF双页展示区 -->
-      <div v-if="materialData?.type === 0" class="flex-1 flex justify-center items-center p-0 bg-black overflow-hidden relative min-h-0">
-        <div class="flex gap-0 w-full h-full max-w-full relative [&_.page-spread:last-child]:after:hidden">
+    <div
+      v-loading="loading"
+      element-loading-text="加载中..."
+      element-loading-background="rgba(0, 0, 0, 0.8)"
+      class="relative flex h-full w-full flex-col overflow-hidden bg-black"
+    >
+      <!-- PDF 双页 -->
+      <div
+        v-if="materialData?.type === 0"
+        class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black"
+      >
+        <div class="flex h-full w-full max-w-full">
           <!-- 左页 -->
-          <div class="flex-1 bg-[#e8e0f0] relative flex items-center justify-center overflow-hidden page-spread after:content-[''] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-0.5 after:bg-black left-page">
-            <div class="w-full h-full relative flex items-center justify-center" v-if="leftPage">
+          <div class="relative flex flex-1 items-center justify-center overflow-hidden border-r border-black bg-[#e8e0f0]">
+            <div v-if="leftPage" class="relative flex h-full w-full items-center justify-center">
               <el-image
                 :src="leftPage.thumbnail"
                 fit="contain"
-                class="max-w-full max-h-full w-full h-full object-contain"
+                class="h-full w-full max-h-full max-w-full object-contain"
               >
                 <template #error>
-                  <div class="flex flex-col items-center justify-center h-100 text-gray-500 gap-2.5">
+                  <div class="flex h-24 flex-col items-center justify-center gap-2.5 text-gray-500">
                     <el-icon :size="60"><Picture /></el-icon>
                     <p>图片加载失败</p>
                   </div>
                 </template>
               </el-image>
-              <div class="absolute bottom-5 text-sm text-gray-800 font-medium left-7.5">{{ currentPage * 2 - 1 }}</div>
+              <div class="absolute bottom-5 left-7.5 text-sm font-medium text-gray-800">
+                {{ currentPage * 2 - 1 }}
+              </div>
             </div>
-            <div v-else class="flex items-center justify-center h-full text-gray-400">
+            <div v-else class="flex h-full items-center justify-center text-gray-400">
               <el-icon :size="80"><Picture /></el-icon>
             </div>
           </div>
 
           <!-- 右页 -->
-          <div class="flex-1 bg-[#e8e0f0] relative flex items-center justify-center overflow-hidden page-spread after:content-[''] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-0.5 after:bg-black right-page">
-            <div class="w-full h-full relative flex items-center justify-center" v-if="rightPage">
+          <div class="relative flex flex-1 items-center justify-center overflow-hidden bg-[#e8e0f0]">
+            <div v-if="rightPage" class="relative flex h-full w-full items-center justify-center">
               <el-image
                 :src="rightPage.thumbnail"
                 fit="contain"
-                class="max-w-full max-h-full w-full h-full object-contain"
+                class="h-full w-full max-h-full max-w-full object-contain"
               >
                 <template #error>
-                  <div class="flex flex-col items-center justify-center h-100 text-gray-500 gap-2.5">
+                  <div class="flex h-24 flex-col items-center justify-center gap-2.5 text-gray-500">
                     <el-icon :size="60"><Picture /></el-icon>
                     <p>图片加载失败</p>
                   </div>
                 </template>
               </el-image>
-              <div class="absolute bottom-5 text-sm text-gray-800 font-medium right-7.5">{{ currentPage * 2 }}</div>
-            </div>
-            <div v-else class="flex items-center justify-center h-full text-gray-400">
-              <!-- 单数页面时,最后一页不显示右侧页面 -->
+              <div class="absolute bottom-5 right-7.5 text-sm font-medium text-gray-800">
+                {{ currentPage * 2 }}
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- 返回按钮（悬浮） -->
-        <el-button circle class="absolute top-5 left-5 z-100 bg-black/60 border-none text-white w-10 h-10 backdrop-blur-md hover:bg-black/80" @click="goBack">
+        <el-button
+          circle
+          class="absolute left-5 top-5 z-100 h-10 w-10 border-none! bg-black/60! text-white! backdrop-blur-md hover:bg-black/80!"
+          @click="goBack"
+        >
           <el-icon><ArrowLeft /></el-icon>
         </el-button>
       </div>
 
-      <!-- 视频播放区 -->
-      <div v-else-if="materialData?.type === 1" class="flex-1 flex justify-center items-center p-0 bg-black overflow-hidden relative min-h-0">
+      <!-- 视频 -->
+      <div
+        v-else-if="materialData?.type === 1"
+        class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black"
+      >
         <video
           v-if="videoUrl"
           ref="videoPlayerRef"
           :src="videoUrl"
           controls
           preload="metadata"
-          class="max-w-full max-h-full w-full h-full object-contain [&::cue]:bg-black/65 [&::cue]:text-white [&::cue]:text-base [&::cue]:leading-snug"
+          class="h-full w-full max-h-full max-w-full object-contain [&::cue]:bg-black/65 [&::cue]:text-base [&::cue]:leading-snug [&::cue]:text-white"
           @ended="handleVideoEnded"
           @loadedmetadata="syncSubtitleTracks"
           @error="handleVideoError"
@@ -85,21 +100,26 @@
             :label="track.label"
           />
         </video>
-        <div v-else class="flex items-center justify-center h-full text-gray-400">
+        <div v-else class="flex h-full flex-col items-center justify-center gap-2 text-gray-400">
           <el-icon :size="80"><Picture /></el-icon>
           <p>视频加载失败</p>
         </div>
 
-        <!-- 返回按钮（悬浮） -->
-        <el-button circle class="absolute top-5 left-5 z-100 bg-black/60 border-none text-white w-10 h-10 backdrop-blur-md hover:bg-black/80" @click="goBack">
+        <el-button
+          circle
+          class="absolute left-5 top-5 z-100 h-10 w-10 border-none! bg-black/60! text-white! backdrop-blur-md hover:bg-black/80!"
+          @click="goBack"
+        >
           <el-icon><ArrowLeft /></el-icon>
         </el-button>
       </div>
 
-      <!-- 底部控制栏（仅PDF显示） -->
-      <div v-if="materialData?.type === 0" class="flex items-center justify-between px-7 py-3 bg-white border-t border-[#3a3a3a] h-20 min-h-20">
-        <!-- 左侧：音频播放器 -->
-        <div class="flex items-center gap-4 min-w-37.5 flex-1">
+      <!-- PDF 底部栏 -->
+      <div
+        v-if="materialData?.type === 0"
+        class="flex h-20 min-h-20 shrink-0 items-center justify-between border-t border-gray-200 bg-white px-7 py-3"
+      >
+        <div class="flex min-w-37.5 flex-1 items-center gap-4">
           <MediaComponent
             v-if="currentAudio"
             :file="currentAudio"
@@ -108,53 +128,56 @@
             :show-play-button="false"
           />
           <div v-else class="text-sm text-gray-400">暂无音频</div>
-          <div v-if="linkedAudios.length > 0" class="text-sm text-gray-400">
+          <div v-if="linkedAudios.length > 0" class="text-sm text-gray-500">
             {{ currentPlayingIndex + 1 }} / {{ linkedAudios.length }}
           </div>
         </div>
 
-        <!-- 中间：上一页 | 播放/暂停 | 下一页 -->
         <div class="flex items-center gap-4">
           <el-button
             link
-            @click="prevPage"
             :disabled="currentPage === 1"
-            class="text-white p-0 w-12 h-12 flex items-center justify-center hover:text-blue-500 disabled:text-gray-600 disabled:cursor-not-allowed"
+            class="flex h-12 w-12 items-center justify-center p-0! text-gray-700 hover:text-blue-500! disabled:cursor-not-allowed! disabled:text-gray-300!"
+            @click="prevPage"
           >
             <el-icon :size="32"><DArrowLeft /></el-icon>
           </el-button>
 
           <el-button
             circle
-            @click="togglePlayAll"
             :disabled="linkedAudios.length === 0"
-            class="w-14 h-14 bg-blue-500 border-none hover:bg-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="h-14 w-14 border-none! bg-blue-500! hover:bg-blue-400! disabled:cursor-not-allowed! disabled:opacity-50"
+            @click="togglePlayAll"
           >
-            <el-icon :size="40">
+            <el-icon :size="40" class="text-white!">
               <VideoPause v-if="isPlaying" />
-              <VideoPlay v-else :size="40" />
+              <VideoPlay v-else />
             </el-icon>
           </el-button>
 
           <el-button
             link
-            @click="nextPage"
             :disabled="isLastPage"
-            class="text-white p-0 w-12 h-12 flex items-center justify-center hover:text-blue-500 disabled:text-gray-600 disabled:cursor-not-allowed"
+            class="flex h-12 w-12 items-center justify-center p-0! text-gray-700 hover:text-blue-500! disabled:cursor-not-allowed! disabled:text-gray-300!"
+            @click="nextPage"
           >
             <el-icon :size="32"><DArrowRight /></el-icon>
           </el-button>
         </div>
 
-        <!-- 右侧：素材名称 -->
-        <div class="flex items-center justify-end min-w-37.5 flex-1">
-          <span class="text-sm text-gray-800 max-w-50 overflow-hidden text-ellipsis whitespace-nowrap">{{ materialData?.name || '素材预览' }}</span>
+        <div class="flex min-w-37.5 flex-1 items-center justify-end">
+          <span class="max-w-50 truncate text-sm font-medium text-gray-800">
+            {{ materialData?.name || '素材预览' }}
+          </span>
         </div>
       </div>
 
-      <!-- 底部控制栏（视频） -->
-      <div v-else-if="materialData?.type === 1" class="flex items-center justify-between px-7 py-3 bg-white border-t border-[#3a3a3a] h-20 min-h-20">
-        <div class="flex items-center gap-2 min-w-0">
+      <!-- 视频底部栏 -->
+      <div
+        v-else-if="materialData?.type === 1"
+        class="flex h-20 min-h-20 shrink-0 items-center justify-between border-t border-gray-200 bg-white px-7 py-3"
+      >
+        <div class="flex min-w-0 flex-1 items-center gap-2">
           <el-button
             v-if="subtitleTracks.length"
             :type="activeSubtitleIndex >= 0 ? 'primary' : 'default'"
@@ -165,10 +188,14 @@
           </el-button>
           <span
             v-if="subtitleTracks.length && activeSubtitleIndex >= 0"
-            class="text-xs text-gray-500 truncate max-w-40"
-          >{{ subtitleTracks[activeSubtitleIndex]?.label }}</span>
+            class="max-w-40 truncate text-xs text-gray-500"
+          >
+            {{ subtitleTracks[activeSubtitleIndex]?.label }}
+          </span>
         </div>
-        <span class="text-sm text-gray-800 truncate">{{ materialData?.name || '素材预览' }}</span>
+        <span class="max-w-[50%] truncate text-sm font-medium text-gray-800">
+          {{ materialData?.name || '素材预览' }}
+        </span>
       </div>
     </div>
   </el-dialog>
@@ -508,23 +535,11 @@ const clearSubtitleTracks = () => {
   }
 }
 
-const parseMaterialDetail = (): MaterialDetail | null => {
-  if (materialDetail.value) return materialDetail.value
-  if (!materialData.value?.data) return null
-  try {
-    return typeof materialData.value.data === 'string'
-      ? JSON.parse(materialData.value.data)
-      : materialData.value.data
-  } catch {
-    return null
-  }
-}
-
 const loadVideoSubtitles = async (videoPath: string) => {
   const token = ++subtitleLoadToken
   clearSubtitleTracks()
 
-  const tracks = await resolveSubtitleTracks(videoPath, parseMaterialDetail())
+  const tracks = await resolveSubtitleTracks(videoPath)
   if (token !== subtitleLoadToken) {
     revokeSubtitleTracks(tracks)
     return
@@ -759,20 +774,3 @@ onUnmounted(() => {
   stopVideo()
 })
 </script>
-
-<style>
-/* 全局样式，用于覆盖 el-dialog 默认样式 */
-.preview-fullscreen-dialog {
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-.preview-fullscreen-dialog .el-dialog__header {
-  display: none;
-}
-
-.preview-fullscreen-dialog .el-dialog__body {
-  padding: 0 !important;
-  height: 100vh;
-}
-</style>

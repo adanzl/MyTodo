@@ -11,18 +11,19 @@ import os
 import shutil
 from datetime import datetime
 
-from flask import Blueprint, request, send_file, abort
-from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
+from flask import Blueprint, abort, request, send_file
+from werkzeug.exceptions import RequestEntityTooLarge
 from flask.typing import ResponseReturnValue
 from werkzeug.utils import secure_filename
 
 from core.config import app_logger
 from core.services.audio_merge_mgr import audio_merge_mgr
 from core.services.audio_convert_mgr import audio_convert_mgr
-from core.config import get_media_task_dir, ALLOWED_AUDIO_EXTENSIONS, MIMETYPE_MAP
+from core.services.media_mgr import media_mgr
+from core.config import get_media_task_dir, ALLOWED_AUDIO_EXTENSIONS
 from core.config import config
 from core import limiter
-from core.utils import get_media_duration, validate_and_normalize_path, _ok, _err, ensure_directory, is_allowed_audio_file, get_file_info, read_json_from_request, get_unique_filepath, get_file_type_by_magic_number
+from core.utils import validate_and_normalize_path, _ok, _err, ensure_directory, is_allowed_audio_file, get_file_info, read_json_from_request, get_unique_filepath, get_file_type_by_magic_number
 from core.tools.validation import parse_with_model
 from pydantic import BaseModel, Field
 
@@ -43,12 +44,12 @@ class _CreateConvertTaskBody(BaseModel):
     source_type: str | None = None
 
 
+class _VideoPathQuery(BaseModel):
+    video_path: str
+
+
 log = app_logger
 media_bp = Blueprint('media', __name__)
-
-# 常量定义
-DEFAULT_BASE_DIR = config.DEFAULT_BASE_DIR
-ALLOWED_DIR = config.ALLOWED_DIR
 
 # ========== 媒体文件服务接口（用于 DLNA 播放）==========
 
@@ -64,28 +65,11 @@ def get_duration() -> ResponseReturnValue:
         ResponseReturnValue: 成功时返回 `{"code": 0, "data": {"duration": float, "path": str}}`；
             失败时返回 `{"code": -1, "msg": str}`。
     """
-    try:
-        file_path = request.args.get('path', '')
-
-        # 验证和规范化路径
-        normalized_path, error_msg = validate_and_normalize_path(file_path, DEFAULT_BASE_DIR, must_be_file=True)
-        if not normalized_path:
-            return _err(error_msg or "Invalid file path")
-
-        # 获取媒体文件时长
-        duration = get_media_duration(normalized_path)
-        if duration is not None:
-            return _ok({"duration": duration, "path": normalized_path})
-        else:
-            return _err("无法获取媒体文件时长")
-
-    except PermissionError as e:
-        file_path_str = file_path if 'file_path' in locals() else 'unknown'
-        log.error(f"Permission denied for {file_path_str}: {e}")
-        return _err(f"Permission denied: {str(e)}")
-    except Exception as e:
-        log.error(f"Error getting media duration: {e}")
-        return _err(f"Error: {str(e)}")
+    file_path = request.args.get('path', '')
+    result = media_mgr.get_duration(file_path)
+    if result.get('code') != 0:
+        return _err(result.get('msg') or 'Error')
+    return _ok(result.get('data'))
 
 
 @media_bp.route("/media/files/<path:filepath>", methods=['GET'])
@@ -103,31 +87,29 @@ def serve_media_file(filepath: str) -> ResponseReturnValue:
         - 自动设置 MIME 类型
         - 支持 HTTP Range 请求（通过 Flask 的 `send_file` 自动处理）
     """
-    try:
-        # 安全处理：移除路径中的危险字符
-        filepath = filepath.replace('../', '').replace('..\\', '')
+    result = media_mgr.prepare_serve_file(filepath)
+    if result.get('code') != 0:
+        abort(result.get('http_status', 404))
+    data = result['data']
+    return send_file(data['path'], mimetype=data['mimetype'], conditional=True)
 
-        # 如果路径不是以 / 开头，添加 /
-        if not filepath.startswith('/'):
-            filepath = '/' + filepath
 
-        # 检查文件是否存在
-        if not os.path.exists(filepath) or not os.path.isfile(filepath):
-            log.warning(f"[MEDIA] File not found: {filepath}")
-            abort(404)
+@media_bp.route("/media/subtitle", methods=['GET'])
+def resolve_subtitles() -> ResponseReturnValue:
+    """获取某视频当前可用的字幕列表（由服务端判断文件是否存在）。
 
-        # 获取文件扩展名以确定 Content-Type
-        ext = os.path.splitext(filepath)[1].lower()
-        mimetype = MIMETYPE_MAP.get(ext, 'application/octet-stream')
+    Query Args:
+        video_path (str): 视频文件路径
+    """
+    video_path = request.args.get('video_path', '') or ''
+    body, err = parse_with_model(_VideoPathQuery, {'video_path': video_path}, err_factory=_err)
+    if err or not body:
+        return err or _err('Invalid request arguments')
 
-        log.info(f"[MEDIA] Serving file: {filepath} (MIME: {mimetype})")
-        return send_file(filepath, mimetype=mimetype, conditional=True)
-    except HTTPException as e:
-        # Re-raise HTTP exceptions (like aborts) directly
-        raise e
-    except Exception as e:
-        log.error(f"[MEDIA] Error serving file {filepath}: {e}")
-        abort(500)
+    result = media_mgr.resolve_subtitles(body.video_path)
+    if result.get('code') != 0:
+        return _err(result.get('msg') or 'Error')
+    return _ok(result.get('data'))
 
 
 # ========== 音频合成接口 ==========

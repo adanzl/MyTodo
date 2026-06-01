@@ -109,7 +109,7 @@
                 @click="handleMaterialClick(task, material)">
                 <div
                   class="absolute inset-0 flex flex-col p-3 bg-white rounded-lg shadow-md">
-                  <div class="absolute top-2 left-3 flex items-center justify-between w-[calc(100%-1.5rem)] pr-6">
+                  <div class="absolute top-2 inset-x-3 flex items-center justify-between">
                     <ion-icon
                       :icon="checkmarkCircle"
                       class="text-xl"
@@ -137,7 +137,7 @@
                       v-if="task.lock"
                       :icon="lockClosed"
                       class="text-xl text-gray-500"></ion-icon>
-                    <span v-else class="text-[11px]">点击阅读</span>
+                    <span v-else class="text-xs">点击阅读</span>
                   </div>
                 </div>
               </div>

@@ -172,7 +172,6 @@ import { addUsage, type AddUsageBody, USAGE_TYPE_PDF, USAGE_TYPE_VIDEO } from '@
 import { finishMaterial } from '@/api/api-task';
 import AudioPreview from '@/components/AudioPreview.vue';
 import EventBus, { C_EVENT } from '@/types/event-bus';
-import type { MaterialDetail } from '@/api/api-task';
 import { getMediaFileUrl } from '@/utils/file';
 import { getPDFPage, loadPDF, renderPDFPageToCanvas } from '@/utils/pdf-lib';
 import {
@@ -322,22 +321,11 @@ const clearSubtitleTracks = () => {
     activeSubtitleIndex.value = -1;
 };
 
-const parseMaterialDetail = (): MaterialDetail | null => {
-    if (!props.material?.data) return null;
-    try {
-        return typeof props.material.data === 'string'
-            ? JSON.parse(props.material.data)
-            : props.material.data;
-    } catch {
-        return null;
-    }
-};
-
 const loadVideoSubtitles = async (videoPath: string) => {
     const token = ++subtitleLoadToken;
     clearSubtitleTracks();
 
-    const tracks = await resolveSubtitleTracks(videoPath, parseMaterialDetail());
+    const tracks = await resolveSubtitleTracks(videoPath);
     if (token !== subtitleLoadToken) {
         revokeSubtitleTracks(tracks);
         return;

@@ -257,6 +257,73 @@ def get_media_duration(file_path: str) -> Optional[int]:
     return result_container['duration']
 
 
+_SUBTITLE_SUFFIXES = ("", ".zh", ".chs", ".cht", ".en", ".eng")
+_SUBTITLE_EXTS = (".vtt", ".srt")
+
+
+def guess_sidecar_subtitle_paths(video_path: str) -> list[str]:
+    """根据视频路径生成同目录 sidecar 字幕候选路径。
+
+    Args:
+        video_path: 视频文件路径。
+
+    Returns:
+        候选字幕路径列表（含多种后缀与扩展名组合，由调用方再校验是否存在）。
+
+    Example:
+        >>> guess_sidecar_subtitle_paths("/data/lesson01.mp4")[:4]
+        ['/data/lesson01.vtt', '/data/lesson01.srt', '/data/lesson01.zh.vtt', '/data/lesson01.zh.srt']
+    """
+    last_dot = video_path.rfind(".")
+    if last_dot <= 0:
+        return []
+    base = video_path[:last_dot]
+    return [f"{base}{suffix}{ext}" for suffix in _SUBTITLE_SUFFIXES for ext in _SUBTITLE_EXTS]
+
+
+def subtitle_label_from_path(file_path: str) -> str:
+    """从字幕文件名提取显示标签（去掉扩展名）。
+
+    Args:
+        file_path: 字幕文件路径。
+
+    Returns:
+        用于播放器展示的标签文本。
+
+    Example:
+        >>> subtitle_label_from_path("/data/lesson01.zh.vtt")
+        'lesson01.zh'
+    """
+    name = os.path.basename(file_path) or file_path
+    dot = name.rfind(".")
+    return name[:dot] if dot > 0 else name
+
+
+def subtitle_lang_from_path(file_path: str) -> str:
+    """从字幕文件名推断语言码（zh / en / und）。
+
+    Args:
+        file_path: 字幕文件路径。
+
+    Returns:
+        语言码：zh、en，或无法识别时为 und。
+
+    Example:
+        >>> subtitle_lang_from_path("/data/lesson01.zh.vtt")
+        'zh'
+        >>> subtitle_lang_from_path("/data/lesson01.en.srt")
+        'en'
+        >>> subtitle_lang_from_path("/data/lesson01.vtt")
+        'und'
+    """
+    name = (os.path.basename(file_path) or file_path).lower()
+    if any(tag in name for tag in (".zh.", ".chs.", ".cht.")):
+        return "zh"
+    if any(tag in name for tag in (".en.", ".eng.")):
+        return "en"
+    return "und"
+
+
 def _get_media_server_url() -> str:
     """获取媒体文件服务器的完整 URL。"""
     # 返回固定的服务器地址和端口
