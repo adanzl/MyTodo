@@ -2,8 +2,13 @@
 node_modules
 /coverage
 /dist
+/public/pdfjs
 /ios
 /android
+
+# 独立子项目（自有 eslint / 依赖，不在根目录 CI 安装）
+server/
+device_agent/
 
 
 # local env files
