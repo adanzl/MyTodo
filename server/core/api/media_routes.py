@@ -20,6 +20,7 @@ from core.config import app_logger
 from core.services.audio_merge_mgr import audio_merge_mgr
 from core.services.audio_convert_mgr import audio_convert_mgr
 from core.services.media_mgr import media_mgr
+from core.services.subtitle_mgr import subtitle_mgr
 from core.config import get_media_task_dir, ALLOWED_AUDIO_EXTENSIONS
 from core.config import config
 from core import limiter
@@ -112,7 +113,68 @@ def resolve_subtitles() -> ResponseReturnValue:
     if err or not body:
         return err or _err('Invalid request arguments')
 
-    result = media_mgr.resolve_subtitles(body.video_path)
+    result = subtitle_mgr.resolve_subtitles(body.video_path)
+    if result.get('code') != 0:
+        return _err(result.get('msg') or 'Error')
+    return _ok(result.get('data'))
+
+
+@media_bp.route("/media/subtitle/search", methods=['GET'])
+@limiter.limit("30 per minute")
+def search_subtitles_online() -> ResponseReturnValue:
+    """在线搜索字幕（OpenSubtitles ``GET /api/v1/subtitles``）。
+
+    文档: https://opensubtitles.stoplight.io/docs/opensubtitles-api/a172317bd5ccc-search-for-subtitles
+
+    Query Args:
+        mode (str): ``text`` | ``hash``
+        languages, page, order_by, order_direction（可选，同官方 API）
+
+        mode=text:
+            query (str)
+            title_match (str, optional): 如 ``only`` 精确标题
+
+        mode=hash:
+            video_path (str): 本地视频文件路径（服务端计算 moviehash）
+            filename (optional): 传给 OpenSubtitles 的文件名，默认取路径 basename
+            moviehash_match (str, optional): 如 ``only``
+
+    Returns:
+        与官方一致: total_count, total_pages, page, per_page, data（JSON:API 字幕列表）。
+    """
+    mode = (request.args.get('mode') or '').strip().lower()
+    languages = request.args.get('languages', '') or None
+    order_by = request.args.get('order_by', '') or None
+    order_direction = request.args.get('order_direction', '') or None
+    page = 1
+    if request.args.get('page', '').strip():
+        try:
+            page = max(1, int(request.args.get('page', '1')))
+        except (TypeError, ValueError):
+            return _err('page 必须为正整数')
+
+    if mode == 'text':
+        result = subtitle_mgr.search_by_text(
+            request.args.get('query', ''),
+            languages=languages,
+            page=page,
+            order_by=order_by,
+            order_direction=order_direction,
+            title_match=request.args.get('title_match', '') or None,
+        )
+    elif mode == 'hash':
+        result = subtitle_mgr.search_by_video_path(
+            request.args.get('video_path', ''),
+            languages=languages,
+            filename=request.args.get('filename', '') or None,
+            page=page,
+            moviehash_match=request.args.get('moviehash_match', '') or None,
+            order_by=order_by,
+            order_direction=order_direction,
+        )
+    else:
+        return _err('mode 必须为 text 或 hash')
+
     if result.get('code') != 0:
         return _err(result.get('msg') or 'Error')
     return _ok(result.get('data'))

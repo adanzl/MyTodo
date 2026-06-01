@@ -1,4 +1,4 @@
-"""媒体文件服务：时长查询、文件下发、字幕发现。"""
+"""媒体文件服务：时长查询、文件下发。"""
 
 from __future__ import annotations
 
@@ -10,15 +10,10 @@ from core.utils import (
     _err,
     _ok,
     get_media_duration,
-    subtitle_label_from_path,
-    subtitle_lang_from_path,
     validate_and_normalize_path,
 )
 
 log = app_logger
-
-_SUBTITLE_SUFFIXES = ("", ".zh", ".chs", ".cht", ".en", ".eng")
-_SUBTITLE_EXTS = (".vtt", ".srt")
 
 
 class MediaMgr:
@@ -82,56 +77,6 @@ class MediaMgr:
         except Exception as e:
             log.error(f"[MEDIA] Error preparing file {filepath}: {e}")
             return {**_err(str(e)), "http_status": 500}
-
-    def resolve_subtitles(self, video_path: str) -> dict[str, Any]:
-        """查找视频同目录下实际存在的 sidecar 字幕。
-
-        Args:
-            video_path: 视频文件路径
-
-        Returns:
-            成功: {"code": 0, "data": {"tracks": [{path, label, lang, ext}, ...]}}
-            失败: {"code": -1, "msg": str}
-        """
-        try:
-            normalized_video, error_msg = validate_and_normalize_path(
-                video_path, self.default_base_dir, must_be_file=True
-            )
-            if not normalized_video:
-                return _err(error_msg or "Invalid video_path")
-
-            tracks: list[dict[str, Any]] = []
-            last_dot = normalized_video.rfind(".")
-            candidates: list[str] = []
-            if last_dot > 0:
-                base = normalized_video[:last_dot]
-                candidates = [
-                    f"{base}{suffix}{ext}"
-                    for suffix in _SUBTITLE_SUFFIXES
-                    for ext in _SUBTITLE_EXTS
-                ]
-            for candidate in candidates:
-                ext = os.path.splitext(candidate)[1].lower()
-                if ext not in _SUBTITLE_EXTS:
-                    continue
-
-                normalized, _ = validate_and_normalize_path(
-                    candidate, self.default_base_dir, must_be_file=True
-                )
-                if not normalized or not os.path.isfile(normalized):
-                    continue
-
-                tracks.append({
-                    "path": normalized,
-                    "label": subtitle_label_from_path(normalized),
-                    "lang": subtitle_lang_from_path(normalized),
-                    "ext": ext.lstrip("."),
-                })
-
-            return _ok({"tracks": tracks})
-        except Exception as e:
-            log.error(f"[SUBTITLE] resolve failed: {e}")
-            return _err(f"resolve subtitle failed: {e}")
 
 
 media_mgr = MediaMgr()

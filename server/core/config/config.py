@@ -22,22 +22,17 @@ class Config:
     PORT: int = int(os.environ.get('PORT', 8000))
 
     # ========== Flask 配置 ==========
-    MAX_CONTENT_LENGTH: int = int(os.environ.get(
-        'MAX_CONTENT_LENGTH', 2000 * 1024 * 1024))  # 默认 2000MB
-    MAX_UPLOAD_FILE_SIZE: int = int(os.environ.get(
-        'MAX_UPLOAD_FILE_SIZE', 500 * 1024 * 1024))  # 单文件上传限制，默认 500MB
+    MAX_CONTENT_LENGTH: int = int(os.environ.get('MAX_CONTENT_LENGTH', 2000 * 1024 * 1024))  # 默认 2000MB
+    MAX_UPLOAD_FILE_SIZE: int = int(os.environ.get('MAX_UPLOAD_FILE_SIZE', 500 * 1024 * 1024))  # 单文件上传限制，默认 500MB
 
     # ========== 数据库配置 ==========
     DB_NAME: str = os.environ.get('DB_NAME', 'data.db')
 
     # 数据库连接池配置
     DB_POOL_SIZE: int = int(os.environ.get('DB_POOL_SIZE', 10))  # 连接池大小
-    DB_MAX_OVERFLOW: int = int(os.environ.get(
-        'DB_MAX_OVERFLOW', 20))  # 连接池最大溢出连接数
-    DB_POOL_RECYCLE: int = int(os.environ.get(
-        'DB_POOL_RECYCLE', 3600))  # 连接回收时间（秒）
-    DB_POOL_PRE_PING: bool = os.environ.get(
-        'DB_POOL_PRE_PING', 'true').lower() == 'true'  # 连接前检查连接是否有效
+    DB_MAX_OVERFLOW: int = int(os.environ.get('DB_MAX_OVERFLOW', 20))  # 连接池最大溢出连接数
+    DB_POOL_RECYCLE: int = int(os.environ.get('DB_POOL_RECYCLE', 3600))  # 连接回收时间（秒）
+    DB_POOL_PRE_PING: bool = os.environ.get('DB_POOL_PRE_PING', 'true').lower() == 'true'  # 连接前检查连接是否有效
 
     # ========== Redis 配置 ==========
     REDIS_HOST: str = os.environ.get('REDIS_HOST', 'localhost')
@@ -46,30 +41,25 @@ class Config:
 
     # ========== AI 服务配置 ==========
     # Dify AI 服务
-    AI_DIFY_API_URL: str = os.environ.get(
-        'AI_DIFY_API_URL', 'http://192.168.50.172:9098/v1')
+    AI_DIFY_API_URL: str = os.environ.get('AI_DIFY_API_URL', 'http://192.168.50.172:9098/v1')
     AI_DIFY_API_KEY: str = os.environ.get('AI_DIFY_API_KEY', '')
 
     # 火山引擎豆包
-    DOUBAO_API_URL: str = os.environ.get(
-        'DOUBAO_API_URL', 'https://ark.cn-beijing.volces.com')
+    DOUBAO_API_URL: str = os.environ.get('DOUBAO_API_URL', 'https://ark.cn-beijing.volces.com')
     DOUBAO_AK: str = os.environ.get('DOUBAO_AK', '')
-    DOUBAO_MODEL: str = os.environ.get(
-        'DOUBAO_MODEL', 'ep-20250205111100-zhcpq')
+    DOUBAO_MODEL: str = os.environ.get('DOUBAO_MODEL', 'ep-20250205111100-zhcpq')
 
     # ========== TTS 服务配置 ==========
     # 阿里云 DashScope
     ALI_KEY: str = os.environ.get('ALI_KEY', '')
 
     # 豆包 TTS
-    DOUBAO_TTS_API_URL: str = os.environ.get(
-        'DOUBAO_TTS_API_URL', 'https://openspeech.bytedance.com/api/v1/tts')
+    DOUBAO_TTS_API_URL: str = os.environ.get('DOUBAO_TTS_API_URL', 'https://openspeech.bytedance.com/api/v1/tts')
     DOUBAO_TTS_API_ID: str = os.environ.get('DOUBAO_TTS_API_ID', '')
     DOUBAO_TTS_API_TOKEN: str = os.environ.get('DOUBAO_TTS_API_TOKEN', '')
 
     # Zero TTS FastAPI 服务
-    ZERO_TTS_FASTAPI_URL: str = os.environ.get(
-        'ZERO_TTS_FASTAPI_URL', 'http://192.168.50.172:9099/inference_zero_shot')
+    ZERO_TTS_FASTAPI_URL: str = os.environ.get('ZERO_TTS_FASTAPI_URL', 'http://192.168.50.172:9099/inference_zero_shot')
 
     # ========== ASR 服务配置 ==========
     ASR_SERVER: str = os.environ.get('ASR_SERVER', 'ws://192.168.50.172:9096')
@@ -81,18 +71,26 @@ class Config:
     MI_PASS: str = os.environ.get('MI_PASS', '')
 
     # Agent 设备
-    DEVICE_AGENT_BASE_URL: str = os.environ.get(
-        'DEVICE_AGENT_BASE_URL', 'http://192.168.50.184:8000')
+    DEVICE_AGENT_BASE_URL: str = os.environ.get('DEVICE_AGENT_BASE_URL', 'http://192.168.50.184:8000')
     DEVICE_AGENT_TIMEOUT: int = int(os.environ.get('DEVICE_AGENT_TIMEOUT', 30))
 
     # ========== 文件路径配置 ==========
     # BASE_TMP_DIR: 临时文件目录，用于保存 TTS、PDF、媒体处理等任务产生的临时文件
     BASE_TMP_DIR: str = os.environ.get('BASE_TMP_DIR', '/opt/my_todo/data')
     # DEFAULT_BASE_DIR: 项目文件目录，用于保存用户访问的项目文件
-    DEFAULT_BASE_DIR: str = os.environ.get(
-        'DEFAULT_BASE_DIR', '/opt/my_todo/data')
+    DEFAULT_BASE_DIR: str = os.environ.get('DEFAULT_BASE_DIR', '/opt/my_todo/data')
     ALLOWED_DIR: str = os.environ.get('ALLOWED_DIR', '/mnt')
     LOG_DIR: str = os.environ.get('LOG_DIR', 'logs')
+
+    # ========== OpenSubtitles 字幕搜索 ==========
+    OPEN_SUBTITLES_API: str = os.environ.get('OPEN_SUBTITLES_API', '')
+    OPEN_SUBTITLES_USER: str = os.environ.get('OPEN_SUBTITLES_USER', '')
+    OPEN_SUBTITLES_PASS: str = os.environ.get('OPEN_SUBTITLES_PASS', '')
+    OPEN_SUBTITLES_BASE_URL: str = os.environ.get('OPEN_SUBTITLES_BASE_URL',
+                                                  'https://api.opensubtitles.com').rstrip('/')
+    OPEN_SUBTITLES_TIMEOUT: int = int(os.environ.get('OPEN_SUBTITLES_TIMEOUT', '30'))
+    OPEN_SUBTITLES_USER_AGENT: str = os.environ.get('OPEN_SUBTITLES_USER_AGENT', 'MyTodo/1.0')
+    SUBTITLE_DEFAULT_LANGS: str = os.environ.get('SUBTITLE_DEFAULT_LANGS', 'zh,en')
 
     # ========== 工具配置 ==========
     FFMPEG_PATH: str = os.environ.get('FFMPEG_PATH', '/usr/bin/ffmpeg')
@@ -108,20 +106,16 @@ class Config:
     JWT_REFRESH_DAYS: int = int(os.environ.get('JWT_REFRESH_DAYS', 30))
 
     # Whitelist behavior: start with all /api allowed, then turn off and tighten.
-    AUTH_WHITELIST_ALL_API: bool = os.environ.get(
-        'AUTH_WHITELIST_ALL_API', '1') == '1'
+    AUTH_WHITELIST_ALL_API: bool = os.environ.get('AUTH_WHITELIST_ALL_API', '1') == '1'
     AUTH_API_WHITELIST: str = os.environ.get('AUTH_API_WHITELIST', '')
-    AUTH_API_WHITELIST_PREFIX: str = os.environ.get(
-        'AUTH_API_WHITELIST_PREFIX', '')
+    AUTH_API_WHITELIST_PREFIX: str = os.environ.get('AUTH_API_WHITELIST_PREFIX', '')
 
     # ========== 限流配置 ==========
     # Flask-Limiter 默认限流规则（可用 "200 per day; 50 per hour" 这种复合写法）
-    RATE_LIMIT_DEFAULT: str = os.environ.get(
-        'RATE_LIMIT_DEFAULT', '20000 per day; 5000 per hour')
+    RATE_LIMIT_DEFAULT: str = os.environ.get('RATE_LIMIT_DEFAULT', '20000 per day; 5000 per hour')
     # 限流状态存储：默认使用内存（单进程/单 worker 生效）。生产建议使用 Redis。
     # 示例：redis://localhost:6379/1
-    RATE_LIMIT_STORAGE_URI: str = os.environ.get(
-        'RATE_LIMIT_STORAGE_URI', 'memory://')
+    RATE_LIMIT_STORAGE_URI: str = os.environ.get('RATE_LIMIT_STORAGE_URI', 'memory://')
 
     @classmethod
     def get_cors_origins(cls) -> list:
