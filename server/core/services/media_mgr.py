@@ -10,7 +10,6 @@ from core.utils import (
     _err,
     _ok,
     get_media_duration,
-    guess_sidecar_subtitle_paths,
     subtitle_label_from_path,
     subtitle_lang_from_path,
     validate_and_normalize_path,
@@ -18,6 +17,7 @@ from core.utils import (
 
 log = app_logger
 
+_SUBTITLE_SUFFIXES = ("", ".zh", ".chs", ".cht", ".en", ".eng")
 _SUBTITLE_EXTS = (".vtt", ".srt")
 
 
@@ -101,7 +101,16 @@ class MediaMgr:
                 return _err(error_msg or "Invalid video_path")
 
             tracks: list[dict[str, Any]] = []
-            for candidate in guess_sidecar_subtitle_paths(normalized_video):
+            last_dot = normalized_video.rfind(".")
+            candidates: list[str] = []
+            if last_dot > 0:
+                base = normalized_video[:last_dot]
+                candidates = [
+                    f"{base}{suffix}{ext}"
+                    for suffix in _SUBTITLE_SUFFIXES
+                    for ext in _SUBTITLE_EXTS
+                ]
+            for candidate in candidates:
                 ext = os.path.splitext(candidate)[1].lower()
                 if ext not in _SUBTITLE_EXTS:
                     continue

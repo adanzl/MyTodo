@@ -257,30 +257,6 @@ def get_media_duration(file_path: str) -> Optional[int]:
     return result_container['duration']
 
 
-_SUBTITLE_SUFFIXES = ("", ".zh", ".chs", ".cht", ".en", ".eng")
-_SUBTITLE_EXTS = (".vtt", ".srt")
-
-
-def guess_sidecar_subtitle_paths(video_path: str) -> list[str]:
-    """根据视频路径生成同目录 sidecar 字幕候选路径。
-
-    Args:
-        video_path: 视频文件路径。
-
-    Returns:
-        候选字幕路径列表（含多种后缀与扩展名组合，由调用方再校验是否存在）。
-
-    Example:
-        >>> guess_sidecar_subtitle_paths("/data/lesson01.mp4")[:4]
-        ['/data/lesson01.vtt', '/data/lesson01.srt', '/data/lesson01.zh.vtt', '/data/lesson01.zh.srt']
-    """
-    last_dot = video_path.rfind(".")
-    if last_dot <= 0:
-        return []
-    base = video_path[:last_dot]
-    return [f"{base}{suffix}{ext}" for suffix in _SUBTITLE_SUFFIXES for ext in _SUBTITLE_EXTS]
-
-
 def subtitle_label_from_path(file_path: str) -> str:
     """从字幕文件名提取显示标签（去掉扩展名）。
 

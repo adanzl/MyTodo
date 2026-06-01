@@ -100,6 +100,12 @@ def resolve_subtitles() -> ResponseReturnValue:
 
     Query Args:
         video_path (str): 视频文件路径
+
+    Returns:
+        ResponseReturnValue: 成功时返回
+            `{"code": 0, "msg": "ok", "data": {"tracks": [{"path": str, "label": str, "lang": str, "ext": str}, ...]}}`；
+            失败时返回 `{"code": -1, "msg": str}`。
+            `tracks` 为同目录下实际存在的 sidecar 字幕；无字幕时为空数组。
     """
     video_path = request.args.get('video_path', '') or ''
     body, err = parse_with_model(_VideoPathQuery, {'video_path': video_path}, err_factory=_err)
