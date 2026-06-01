@@ -1,5 +1,5 @@
 /**
- * 视频字幕：通过 /media/subtitle 获取 sidecar 列表，加载 VTT / SRT（SRT 转 VTT blob）
+ * 视频字幕：通过 /media/subtitle/get 获取 sidecar 列表，加载 VTT / SRT（SRT 转 VTT blob）
  */
 import { apiClient } from '@/api/api-client';
 import { getMediaFileUrl } from '@/utils/file';
@@ -56,7 +56,7 @@ function parseSubtitleTrack(raw: unknown): SubtitleTrack | null {
 }
 
 async function fetchSubtitleTracks(videoPath: string): Promise<SubtitleTrack[]> {
-  const { data: body } = await apiClient.get('/media/subtitle', {
+  const { data: body } = await apiClient.get('/media/subtitle/get', {
     params: { video_path: videoPath },
   });
   if (!body || body.code !== 0) {

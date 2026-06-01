@@ -94,7 +94,7 @@ def serve_media_file(filepath: str) -> ResponseReturnValue:
     return send_file(data['path'], mimetype=data['mimetype'], conditional=True)
 
 
-@media_bp.route("/media/subtitle", methods=['GET'])
+@media_bp.route("/media/subtitle/get", methods=['GET'])
 def resolve_subtitles() -> ResponseReturnValue:
     """获取某视频当前可用的字幕列表（由服务端判断文件是否存在）。
 

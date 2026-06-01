@@ -1,5 +1,5 @@
 /**
- * 视频字幕工具：支持 VTT / SRT，通过 /media/subtitle 发现同目录 sidecar 字幕
+ * 视频字幕工具：支持 VTT / SRT，通过 /media/subtitle/get 发现同目录 sidecar 字幕
  */
 import { apiClient } from '@/api/api-client';
 import { getMediaFileUrl } from '@/utils/file';
@@ -73,7 +73,7 @@ async function fetchSubtitleText(url: string): Promise<string> {
 }
 
 async function fetchAvailableSubtitleSources(videoPath: string): Promise<SubtitleSource[]> {
-  const rsp = await apiClient.get('/media/subtitle', {
+  const rsp = await apiClient.get('/media/subtitle/get', {
     params: { video_path: videoPath },
   });
   const body = rsp.data;
