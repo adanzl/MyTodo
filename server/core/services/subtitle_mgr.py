@@ -1,4 +1,4 @@
-"""字幕服务：sidecar 字幕发现、OpenSubtitles 在线搜索。"""
+"""字幕服务：sidecar 字幕发现、ASSRT 在线搜索与下载。"""
 
 from __future__ import annotations
 
@@ -6,11 +6,7 @@ import os
 from typing import Any
 
 from core.config import app_logger, config
-from core.tools.open_subtitles import (
-    OpenSubtitlesError,
-    client as open_subtitles_client,
-    compute_movie_hash,
-)
+from core.tools.assrt_client import AssrtError, client as assrt_client
 from core.utils import (
     _err,
     _ok,
@@ -33,15 +29,7 @@ class SubtitleMgr:
         self.default_base_dir = config.DEFAULT_BASE_DIR
 
     def resolve_subtitles(self, video_path: str) -> dict[str, Any]:
-        """查找视频同目录下实际存在的 sidecar 字幕。
-
-        Args:
-            video_path: 视频文件路径
-
-        Returns:
-            成功: {"code": 0, "data": {"tracks": [{path, label, lang, ext}, ...]}}
-            失败: {"code": -1, "msg": str}
-        """
+        """查找视频同目录下实际存在的 sidecar 字幕。"""
         try:
             normalized_video, error_msg = validate_and_normalize_path(
                 video_path, self.default_base_dir, must_be_file=True
@@ -92,17 +80,20 @@ class SubtitleMgr:
         order_direction: str | None = None,
         title_match: str | None = None,
     ) -> dict[str, Any]:
-        """文字搜索（透传 OpenSubtitles ``GET /api/v1/subtitles`` 响应）。"""
+        """文字搜索（ASSRT ``/v1/sub/search``，响应格式兼容前端 JSON:API 解析）。"""
+        q = (query or "").strip()
+        if not q:
+            return _err("query 不能为空")
         try:
-            return _ok(open_subtitles_client.search_by_query(
-                query,
+            return _ok(assrt_client.search_by_query(
+                q,
                 languages=languages,
                 page=page,
                 order_by=order_by,
                 order_direction=order_direction,
                 title_match=title_match,
             ))
-        except OpenSubtitlesError as e:
+        except AssrtError as e:
             log.warning(f"[SUBTITLE] text search failed: {e}")
             return _err(str(e))
         except Exception as e:
@@ -120,7 +111,8 @@ class SubtitleMgr:
         order_by: str | None = None,
         order_direction: str | None = None,
     ) -> dict[str, Any]:
-        """按本地视频路径搜索字幕：服务端计算 moviehash 后请求 OpenSubtitles。"""
+        """按本地视频路径搜索：用文件名匹配 ASSRT（``is_file`` + ``no_muxer``）。"""
+        del moviehash_match, order_by, order_direction
         path = (video_path or "").strip()
         if not path:
             return _err("video_path 不能为空")
@@ -136,37 +128,66 @@ class SubtitleMgr:
         if not normalized:
             return _err(error_msg or "Invalid video_path")
 
-        try:
-            m_hash = compute_movie_hash(normalized)
-        except RecursionError:
-            log.exception("[SUBTITLE] compute_movie_hash recursion: %s", normalized)
-            return _err("无法读取视频文件: 路径或文件系统异常")
-        except OSError as e:
-            return _err(f"无法读取视频文件: {e}")
-
         fname = (filename or "").strip() or os.path.basename(normalized)
 
         try:
-            payload = open_subtitles_client.search_by_hash(
-                m_hash,
+            payload = assrt_client.search_by_filename(
+                fname,
                 languages=languages,
-                filename=fname,
                 page=page,
-                moviehash_match=moviehash_match,
-                order_by=order_by,
-                order_direction=order_direction,
             )
-        except RecursionError:
-            log.exception("[SUBTITLE] OpenSubtitles recursion, path=%s", normalized)
-            return _err("search subtitle failed: 在线搜索请求异常")
-        except OpenSubtitlesError as e:
-            log.warning(f"[SUBTITLE] hash search failed: {e}")
+        except AssrtError as e:
+            log.warning(f"[SUBTITLE] file search failed: {e}")
             return _err(str(e))
         except Exception as e:
-            log.error(f"[SUBTITLE] hash search failed: {e}")
+            log.error(f"[SUBTITLE] file search failed: {e}")
             return _err(f"search subtitle failed: {e}")
 
         return _ok({"video_path": normalized, **payload})
+
+    def download_subtitle(
+        self,
+        video_path: str,
+        subtitle_id: str,
+        *,
+        file_index: int = 0,
+    ) -> dict[str, Any]:
+        """下载 ASSRT 字幕到视频同目录 sidecar。"""
+        path = (video_path or "").strip()
+        sid = (subtitle_id or "").strip()
+        if not path:
+            return _err("video_path 不能为空")
+        if not sid:
+            return _err("subtitle_id 不能为空")
+
+        normalized, error_msg = validate_and_normalize_path(
+            path, self.default_base_dir, must_be_file=True
+        )
+        if not normalized:
+            return _err(error_msg or "Invalid video_path")
+
+        try:
+            result = assrt_client.download_to_sidecar(
+                sid,
+                normalized,
+                file_index=file_index,
+            )
+        except AssrtError as e:
+            log.warning(f"[SUBTITLE] download failed: {e}")
+            return _err(str(e))
+        except OSError as e:
+            return _err(f"写入字幕文件失败: {e}")
+        except Exception as e:
+            log.error(f"[SUBTITLE] download failed: {e}")
+            return _err(f"download subtitle failed: {e}")
+
+        return _ok({
+            "video_path": normalized,
+            **result,
+            "label": subtitle_label_from_path(result["path"]),
+            "lang": subtitle_lang_from_path(result["path"]),
+            "ext": os.path.splitext(result["path"])[1].lstrip(".").lower(),
+        })
 
 
 subtitle_mgr = SubtitleMgr()

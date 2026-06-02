@@ -2,6 +2,7 @@
     "python-envs.defaultPackageManager": "ms-python.python:conda",
     "python-envs.pythonProjects": [],
     "cSpell.words": [
+        "ASSRT",
         "bluetoothctl",
         "cascader",
         "cmaps",
@@ -29,6 +30,7 @@
         "monkeypatch",
         "moviehash",
         "msvideo",
+        "muxer",
         "natapp",
         "nokey",
         "noprint",
@@ -50,6 +52,7 @@
         "upnp",
         "upnpclient",
         "useragent",
+        "videoname",
         "WEBVTT",
         "zhaozhao"
     ],

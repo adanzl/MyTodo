@@ -7,7 +7,7 @@
 
 选用指南：
 - run_in_background：点火即走，不关心返回值（如任务状态异步写库）。
-- run_blocking：短阻塞 IO（如 requests 调 OpenSubtitles）；在 gevent worker 里 thread.join 可接受。
+- run_blocking：短阻塞 IO（如 requests 调 ASSRT）；在 gevent worker 里 thread.join 可接受。
 - run_async：在子线程跑 asyncio 协程；主线程用 gevent 轮询等待，避免 join 卡死整个 hub（蓝牙/Mi 等）。
 """
 from __future__ import annotations

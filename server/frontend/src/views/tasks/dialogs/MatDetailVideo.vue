@@ -104,6 +104,7 @@ import { VideoPlay, Edit } from "@element-plus/icons-vue";
 import { type Material } from "@/api/api-task";
 import type { MaterialDetail, SubtitleFile } from "@/types/tasks/materialDetail";
 import {
+  downloadSubtitleToSidecar,
   listSidecarSubtitles,
   searchSubtitles,
   type SubtitleSearchRow,
@@ -325,8 +326,44 @@ const addSubtitle = async () => {
   await runSubtitleHashSearch();
 };
 
-const downloadSubtitle = (_row: SubtitleSearchRow) => {
-  ElMessage.info('字幕下载功能即将上线');
+const downloadSubtitle = async (row: SubtitleSearchRow) => {
+  const videoPath = props.matData?.path;
+  if (!videoPath) {
+    ElMessage.warning('请先配置视频路径');
+    return;
+  }
+  if (!row.id) {
+    ElMessage.warning('无效的字幕条目');
+    return;
+  }
+  subtitleSearchLoading.value = true;
+  try {
+    const track = await downloadSubtitleToSidecar({
+      video_path: videoPath,
+      subtitle_id: row.id,
+    });
+    ElMessage.success('字幕已保存到视频同目录');
+    const tracks = await listSidecarSubtitles(videoPath);
+    sidecarSubtitles.value = tracks.map((t) => ({
+      path: t.path,
+      label: t.label,
+      lang: t.lang,
+      ext: t.ext,
+    }));
+    if (!sidecarSubtitles.value.some((s) => s.path === track.path) && track.path) {
+      sidecarSubtitles.value.push({
+        path: track.path,
+        label: track.label,
+        lang: track.lang,
+        ext: track.ext,
+      });
+    }
+  } catch (e: any) {
+    console.error('字幕下载失败:', e);
+    ElMessage.error(e.message || '字幕下载失败');
+  } finally {
+    subtitleSearchLoading.value = false;
+  }
 };
 </script>
 

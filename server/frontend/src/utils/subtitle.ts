@@ -112,6 +112,23 @@ export function parseSubtitleSearchRows(items: unknown[]): SubtitleSearchRow[] {
   return rows;
 }
 
+export async function downloadSubtitleToSidecar(params: {
+  video_path: string;
+  subtitle_id: string;
+  file_index?: number;
+}): Promise<{ path: string; label?: string; lang?: string; ext?: string }> {
+  const rsp = await api.post('/media/subtitle/download', {
+    video_path: params.video_path,
+    subtitle_id: params.subtitle_id,
+    file_index: params.file_index ?? 0,
+  });
+  const body = rsp.data;
+  if (!body || body.code !== 0) {
+    throw new Error(body?.msg || '字幕下载失败');
+  }
+  return body.data ?? {};
+}
+
 export async function searchSubtitles(params: {
   mode: 'text' | 'hash';
   video_path?: string;

@@ -49,6 +49,12 @@ class _VideoPathQuery(BaseModel):
     video_path: str
 
 
+class _SubtitleDownloadBody(BaseModel):
+    video_path: str
+    subtitle_id: str
+    file_index: int = 0
+
+
 log = app_logger
 media_bp = Blueprint('media', __name__)
 
@@ -175,6 +181,25 @@ def search_subtitles_online() -> ResponseReturnValue:
     else:
         return _err('mode 必须为 text 或 hash')
 
+    if result.get('code') != 0:
+        return _err(result.get('msg') or 'Error')
+    return _ok(result.get('data'))
+
+
+@media_bp.route("/media/subtitle/download", methods=['POST'])
+@limiter.limit("20 per minute")
+def download_subtitle_sidecar() -> ResponseReturnValue:
+    """下载字幕到视频同目录 sidecar（JSON: video_path, subtitle_id, file_index?）。"""
+    data = read_json_from_request() or {}
+    body, err = parse_with_model(_SubtitleDownloadBody, data, err_factory=_err)
+    if err or not body:
+        return err or _err('Invalid request arguments')
+
+    result = subtitle_mgr.download_subtitle(
+        body.video_path,
+        body.subtitle_id,
+        file_index=body.file_index,
+    )
     if result.get('code') != 0:
         return _err(result.get('msg') or 'Error')
     return _ok(result.get('data'))

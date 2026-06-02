@@ -13,6 +13,7 @@ export interface SubtitleFile {
   path: string;
   label?: string;
   lang?: string;
+  ext?: string;
 }
 
 export interface MaterialDetail {

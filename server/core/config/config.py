@@ -47,7 +47,7 @@ class Config:
     # 火山引擎豆包
     DOUBAO_API_URL: str = os.environ.get('DOUBAO_API_URL', 'https://ark.cn-beijing.volces.com')
     DOUBAO_AK: str = os.environ.get('DOUBAO_AK', '')
-    DOUBAO_MODEL: str = os.environ.get('DOUBAO_MODEL', 'ep-20250205111100-zhcpq')
+    DOUBAO_MODEL: str = os.environ.get('DOUBAO_MODEL', '')
 
     # ========== TTS 服务配置 ==========
     # 阿里云 DashScope
@@ -82,15 +82,11 @@ class Config:
     ALLOWED_DIR: str = os.environ.get('ALLOWED_DIR', '/mnt')
     LOG_DIR: str = os.environ.get('LOG_DIR', 'logs')
 
-    # ========== OpenSubtitles 字幕搜索 ==========
-    OPEN_SUBTITLES_API: str = os.environ.get('OPEN_SUBTITLES_API', '')
-    OPEN_SUBTITLES_USER: str = os.environ.get('OPEN_SUBTITLES_USER', '')
-    OPEN_SUBTITLES_PASS: str = os.environ.get('OPEN_SUBTITLES_PASS', '')
-    OPEN_SUBTITLES_BASE_URL: str = os.environ.get('OPEN_SUBTITLES_BASE_URL',
-                                                  'https://api.opensubtitles.com').rstrip('/')
-    OPEN_SUBTITLES_TIMEOUT: int = int(os.environ.get('OPEN_SUBTITLES_TIMEOUT', '30'))
-    OPEN_SUBTITLES_USER_AGENT: str = os.environ.get('OPEN_SUBTITLES_USER_AGENT', 'MyTodo/1.0')
-    SUBTITLE_DEFAULT_LANGS: str = os.environ.get('SUBTITLE_DEFAULT_LANGS', 'zh,en')
+    # ========== ASSRT 射手网字幕 ==========
+    ASSRT_API_KEY: str = os.environ.get('ASSRT_API_KEY', '')
+    ASSRT_BASE_URL: str = os.environ.get('ASSRT_BASE_URL', 'https://api.assrt.net').rstrip('/')
+    ASSRT_TIMEOUT: int = int(os.environ.get('ASSRT_TIMEOUT', '30'))
+    SUBTITLE_DEFAULT_LANGS: str = os.environ.get('SUBTITLE_DEFAULT_LANGS', 'en')
 
     # ========== 工具配置 ==========
     FFMPEG_PATH: str = os.environ.get('FFMPEG_PATH', '/usr/bin/ffmpeg')
