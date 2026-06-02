@@ -66,7 +66,7 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column prop="path" label="路径" min-width="200" show-overflow-tooltip>
+      <el-table-column prop="path" label="路径" min-width="200" :show-overflow-tooltip="{ showAfter: 300 }">
         <template #default="{ row }">
           <div style="display: flex; align-items: center; overflow: hidden;">
             {{ row.path }}
@@ -86,7 +86,7 @@
                   <Reading />
                 </el-icon>
               </el-button>
-              <el-button size="small" @click="handleViewDetail(row)" :disabled="row.type != 0">详情</el-button>
+              <el-button size="small" @click="openMatDetail(row)" :disabled="!canOpenMatDetail(row)">详情</el-button>
               <el-button size="small" @click="handleEditMaterial(row)">编辑</el-button>
               <el-button size="small" type="danger" @click="handleDeleteMaterial(row)">删除</el-button>
             </template>
@@ -96,16 +96,18 @@
     </el-table>
 
     <!-- 素材编辑/新增对话框 -->
-    <MaterialDialog v-model="materialDialogVisible" :is-edit="isMaterialEdit" :material-data="currentMaterial"
+    <MaterialDialog v-model="matFormVisible" :is-edit="isMatEdit" :material-data="activeMat"
       :category-list="batchAddCategoryList" :default-cate-id="currentParentId" @success="handleMaterialSuccess"
-      @view-detail="handleViewDetailFromEdit" />
+      @view-detail="openMatDetailFromForm" />
 
-    <!-- 素材详情对话框 -->
-    <MaterialDetailDialog v-model="detailDialogVisible" :material-data="currentMaterial"
-      @update:modelValue="handleDetailDialogClose" @edit="handleEditFromDetail" />
+    <!-- PDF / 视频详情对话框 -->
+    <MatDetailPdf v-model="matDetailPdfVisible" :mat-data="activeMat"
+      @update:modelValue="onMatDetailPdfClose" @edit="openMatEditFromDetail" />
+    <MatDetailVideo v-model="matDetailVideoVisible" :mat-data="activeMat"
+      @update:modelValue="onMatDetailVideoClose" @edit="openMatEditFromDetail" @play="playMaterial" />
 
     <!-- 素材预览弹窗 -->
-    <MaterialPreviewDialog v-model="previewDialogVisible" :material-id="previewMaterialId" />
+    <MaterialPreviewDialog v-model="matPreviewVisible" :material-id="matPreviewId" />
 
     <!-- 批量添加素材对话框 -->
     <BatchAddMaterialDialog v-model="batchAddDialogVisible" :category-list="batchAddCategoryList"
@@ -148,7 +150,8 @@ import {
 } from "@/api/api-task";
 import { sortMaterials, buildCategoryTree, type SortOrder } from "@/utils/file";
 import MaterialDialog from "./dialogs/MaterialDialog.vue";
-import MaterialDetailDialog from "./dialogs/MaterialDetailDialog.vue";
+import MatDetailPdf from "./dialogs/MatDetailPdf.vue";
+import MatDetailVideo from "./dialogs/MatDetailVideo.vue";
 import MaterialPreviewDialog from "./dialogs/MaterialPreviewDialog.vue";
 import BatchAddMaterialDialog from "./dialogs/MaterialBatchAdd.vue";
 
@@ -218,14 +221,26 @@ const breadcrumbList = ref<BreadcrumbItem[]>([
 const currentParentId = ref<number>(-1); // 当前所在父级ID
 
 // 对话框
-const materialDialogVisible = ref(false);
-const detailDialogVisible = ref(false);
-const previewDialogVisible = ref(false);
+const matFormVisible = ref(false);
+const matDetailPdfVisible = ref(false);
+const matDetailVideoVisible = ref(false);
+const matPreviewVisible = ref(false);
 const batchAddDialogVisible = ref(false);
 const folderDialogVisible = ref(false);
-const previewMaterialId = ref<number | null>(null);
-const isMaterialEdit = ref(false);
-const currentMaterial = ref<Partial<Material>>({});
+const matPreviewId = ref<number | null>(null);
+const isMatEdit = ref(false);
+const activeMat = ref<Partial<Material>>({});
+
+const MAT_TYPE_PDF = 0;
+const MAT_TYPE_VIDEO = 1;
+
+const getMatType = (row: { type: unknown }) => Number(row.type);
+
+const canOpenMatDetail = (row: MixedItem) => {
+  if (row.type === 'folder') return false;
+  const t = getMatType(row);
+  return t === MAT_TYPE_PDF || t === MAT_TYPE_VIDEO;
+};
 const currentFolder = ref<Partial<FolderItem>>({});
 const isFolderEdit = ref(false);
 const batchAddCategoryList = ref<{ id: number; name: string }[]>([]); // 批量添加用的目录列表
@@ -494,11 +509,11 @@ const handleDeleteFolder = async (row: MixedItem) => {
 
 // 新增素材
 const handleAddMaterial = () => {
-  isMaterialEdit.value = false;
-  currentMaterial.value = {
+  isMatEdit.value = false;
+  activeMat.value = {
     cate_id: currentParentId.value
   };
-  materialDialogVisible.value = true;
+  matFormVisible.value = true;
 };
 
 // 批量添加素材
@@ -511,38 +526,48 @@ const handleBatchAddSuccess = () => {
   fetchCurrentList();
 };
 
-// 查看详情
-const handleViewDetail = (row: Material) => {
-  currentMaterial.value = row;
-  detailDialogVisible.value = true;
+// 打开 PDF / 视频详情
+const openMatDetail = (row: MixedItem | Material) => {
+  activeMat.value = { ...row } as Material;
+  const matType = getMatType(row);
+  if (matType === MAT_TYPE_VIDEO) {
+    matDetailVideoVisible.value = true;
+  } else if (matType === MAT_TYPE_PDF) {
+    matDetailPdfVisible.value = true;
+  }
 };
 
-// 详情对话框关闭
-const handleDetailDialogClose = (val: boolean) => {
-  detailDialogVisible.value = val;
+const onMatDetailPdfClose = (val: boolean) => {
+  matDetailPdfVisible.value = val;
   if (!val) {
     fetchCurrentList();
   }
 };
 
-// 从编辑页打开详情
-const handleViewDetailFromEdit = (material: Material) => {
-  currentMaterial.value = material;
-  detailDialogVisible.value = true;
+const onMatDetailVideoClose = (val: boolean) => {
+  matDetailVideoVisible.value = val;
+  if (!val) {
+    fetchCurrentList();
+  }
+};
+
+// 从编辑表单打开详情
+const openMatDetailFromForm = (material: Material) => {
+  openMatDetail(material);
 };
 
 // 从详情页打开编辑
-const handleEditFromDetail = (material: Material) => {
-  isMaterialEdit.value = true;
-  currentMaterial.value = material;
-  materialDialogVisible.value = true;
+const openMatEditFromDetail = (material: Material) => {
+  isMatEdit.value = true;
+  activeMat.value = material;
+  matFormVisible.value = true;
 };
 
 // 编辑素材
 const handleEditMaterial = (row: Material) => {
-  isMaterialEdit.value = true;
-  currentMaterial.value = row;
-  materialDialogVisible.value = true;
+  isMatEdit.value = true;
+  activeMat.value = row;
+  matFormVisible.value = true;
 };
 
 // 删除素材
@@ -577,8 +602,8 @@ const playMaterial = (row: Material) => {
   sessionStorage.setItem('previewMaterial', JSON.stringify(row));
 
   // 打开预览弹窗
-  previewMaterialId.value = row.id;
-  previewDialogVisible.value = true;
+  matPreviewId.value = row.id;
+  matPreviewVisible.value = true;
 };
 
 // 初始化

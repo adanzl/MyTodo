@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     v-model="visible"
-    title="素材详情"
+    title="PDF 详情"
     align-center
     width="1200px"
     destroy-on-close
@@ -11,13 +11,11 @@
       <!-- 基本信息 -->
       <div class="">
         <el-descriptions :column="4" border>
-          <el-descriptions-item label="名称" min-width="60">{{ materialData?.name }}</el-descriptions-item>
+          <el-descriptions-item label="名称" min-width="60">{{ matData?.name }}</el-descriptions-item>
           <el-descriptions-item label="类型" min-width="60">
-            <el-tag :type="materialData?.type === 0 ? 'success' : 'warning'" size="small">
-              {{ materialData?.type === 0 ? 'PDF' : 'Video' }}
-            </el-tag>
+            <el-tag type="success" size="small">PDF</el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="路径" min-width="60">{{ materialData?.path }}</el-descriptions-item>
+          <el-descriptions-item label="路径" min-width="60">{{ matData?.path }}</el-descriptions-item>
           <el-descriptions-item label="操作" min-width="60">
             <div class="flex">
               <el-button type="primary" size="small" plain @click="playMaterial">
@@ -71,7 +69,7 @@
           <div class="border-t border-gray-200 p-3">
             <h4 class="text-xs font-semibold mb-2 text-gray-700">备注</h4>
             <el-input
-              v-model="materialForm.remark"
+              v-model="pdfDetailForm.remark"
               type="textarea"
               :rows="4"
               placeholder="请输入备注"
@@ -242,7 +240,7 @@ import FileDialog from "@/views/dialogs/FileDialog.vue";
 
 interface Props {
   modelValue: boolean;
-  materialData?: Partial<Material> | null;
+  matData?: Partial<Material> | null;
 }
 
 interface Emits {
@@ -251,7 +249,7 @@ interface Emits {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  materialData: null,
+  matData: null,
 });
 
 const emit = defineEmits<Emits>();
@@ -260,7 +258,7 @@ const router = useRouter();
 const visible = ref(false);
 
 // 素材表单
-const materialForm = ref({
+const pdfDetailForm = ref({
   name: "",
   remark: "",
 });
@@ -297,10 +295,10 @@ const audioPlayer = useAudioPlayer({
 
 // 当前页面绑定的音频ID列表
 const currentPageAudioIds = computed(() => {
-  if (selectedPageIndex.value === null || !materialDetailData.value?.pages) {
+  if (selectedPageIndex.value === null || !pdfDetailData.value?.pages) {
     return [];
   }
-  const page = materialDetailData.value.pages[selectedPageIndex.value];
+  const page = pdfDetailData.value.pages[selectedPageIndex.value];
   return page?.audioIds || [];
 });
 
@@ -317,15 +315,15 @@ const unboundAudios = computed(() => {
 });
 
 // MaterialDetail 数据
-const materialDetailData = ref<MaterialDetail | null>(null);
+const pdfDetailData = ref<MaterialDetail | null>(null);
 
 // 监听 modelValue 变化
 watch(
   () => props.modelValue,
   (val) => {
     visible.value = val;
-    if (val && props.materialData) {
-      initDetail();
+    if (val && props.matData) {
+      initPdfDetail();
     }
   }
 );
@@ -337,12 +335,12 @@ watch(
   selectedAudioIds,
   (newIds) => {
     // 如果删除模式开启或正在初始化，不处理绑定逻辑
-    if (isDeleteMode.value || isInitializing || selectedPageIndex.value === null || !materialDetailData.value) {
+    if (isDeleteMode.value || isInitializing || selectedPageIndex.value === null || !pdfDetailData.value) {
       previousSelectedIds = new Set(newIds);
       return;
     }
 
-    const page = materialDetailData.value.pages[selectedPageIndex.value];
+    const page = pdfDetailData.value.pages[selectedPageIndex.value];
     if (!page) {
       previousSelectedIds = new Set(newIds);
       return;
@@ -381,7 +379,7 @@ watch(
 
     // 如果有变化，保存到后端
     if (hasChanges) {
-      saveMaterial();
+      savePdfDetail();
     }
 
     // 更新之前的选中状态
@@ -432,8 +430,8 @@ const loadPdfPages = async (pdfPath: string) => {
     pdfPages.value = pages;
 
     // 更新 taskDetail 的 pdfLength
-    if (materialDetailData.value) {
-      materialDetailData.value.pdfLength = pages.length;
+    if (pdfDetailData.value) {
+      pdfDetailData.value.pdfLength = pages.length;
     }
 
     // 默认选中第一页
@@ -449,51 +447,41 @@ const loadPdfPages = async (pdfPath: string) => {
 };
 
 // 初始化详情
-const initDetail = async () => {
-  if (!props.materialData) return;
+const initPdfDetail = async () => {
+  if (!props.matData) return;
 
-  materialForm.value.name = props.materialData.name || "";
+  pdfDetailForm.value.name = props.matData.name || "";
 
   // 解析 data 字段
   let materialDetail: MaterialDetail | null = null;
-  if (typeof props.materialData.data === 'string') {
+  if (typeof props.matData.data === 'string') {
     try {
-      materialDetail = JSON.parse(props.materialData.data);
+      materialDetail = JSON.parse(props.matData.data);
     } catch (e) {
       console.error('解析 data 失败:', e);
     }
   } else {
-    materialDetail = props.materialData.data || null;
+    materialDetail = props.matData.data || null;
   }
 
-  materialForm.value.remark = materialDetail?.remark || "";
+  pdfDetailForm.value.remark = materialDetail?.remark || "";
 
   // 保存 taskDetail 数据
-  materialDetailData.value = materialDetail;
+  pdfDetailData.value = materialDetail;
 
-  // 根据素材类型加载不同的数据
-  if (props.materialData.type === 0 && props.materialData.path) {
-    // PDF 类型 - 使用 pdf.js 加载
-    await loadPdfPages(props.materialData.path);
-    // 从 data 中加载音频列表
-    allAudios.value = materialDetail?.audioList || [];
-  
-    // 确保 pages 数组存在且长度足够
-    if (materialDetail) {
-      if (!materialDetail.pages) {
-        materialDetail.pages = [];
-      }
-      // 扩展 pages 数组以匹配 PDF 页数
-      while (materialDetail.pages.length < pdfPages.value.length) {
-        materialDetail.pages.push({ audioIds: [] });
-      }
-      // 更新 pdfLength
-      materialDetail.pdfLength = pdfPages.value.length;
+  if (!props.matData.path) return;
+
+  await loadPdfPages(props.matData.path);
+  allAudios.value = materialDetail?.audioList || [];
+
+  if (materialDetail) {
+    if (!materialDetail.pages) {
+      materialDetail.pages = [];
     }
-  } else {
-    // 其他类型或未指定路径
-    pdfPages.value = [];
-    allAudios.value = [];
+    while (materialDetail.pages.length < pdfPages.value.length) {
+      materialDetail.pages.push({ audioIds: [] });
+    }
+    materialDetail.pdfLength = pdfPages.value.length;
   }
 
   // 重置选中状态和删除模式
@@ -531,8 +519,8 @@ const selectPage = async (index: number) => {
   selectedPageIndex.value = index;
 
   // 更新选中的音频ID列表为当前页面绑定的音频
-  if (materialDetailData.value && materialDetailData.value.pages[index]) {
-    const newIds = [...materialDetailData.value.pages[index].audioIds];
+  if (pdfDetailData.value && pdfDetailData.value.pages[index]) {
+    const newIds = [...pdfDetailData.value.pages[index].audioIds];
     // 先清空再赋值，确保响应式更新
     selectedAudioIds.value = [];
     await nextTick();
@@ -563,8 +551,8 @@ const toggleDeleteMode = async () => {
   } else {
     // 退出删除模式时，恢复当前页面绑定的音频选中状态
     isInitializing = true;
-    if (selectedPageIndex.value !== null && materialDetailData.value && materialDetailData.value.pages[selectedPageIndex.value]) {
-      const newIds = [...materialDetailData.value.pages[selectedPageIndex.value].audioIds];
+    if (selectedPageIndex.value !== null && pdfDetailData.value && pdfDetailData.value.pages[selectedPageIndex.value]) {
+      const newIds = [...pdfDetailData.value.pages[selectedPageIndex.value].audioIds];
       // 先清空再赋值，确保响应式更新
       selectedAudioIds.value = [];
       await nextTick();
@@ -582,39 +570,39 @@ const toggleDeleteMode = async () => {
 
 // 向上移动音频
 const moveAudioUp = (index: number) => {
-  if (!materialDetailData.value || selectedPageIndex.value === null) return;
+  if (!pdfDetailData.value || selectedPageIndex.value === null) return;
 
-  const page = materialDetailData.value.pages[selectedPageIndex.value];
+  const page = pdfDetailData.value.pages[selectedPageIndex.value];
   if (!page) return;
 
   // 交换位置
   [page.audioIds[index], page.audioIds[index - 1]] = [page.audioIds[index - 1], page.audioIds[index]];
 
   // 保存
-  saveMaterial();
+  savePdfDetail();
 };
 
 // 向下移动音频
 const moveAudioDown = (index: number) => {
-  if (!materialDetailData.value || selectedPageIndex.value === null) return;
+  if (!pdfDetailData.value || selectedPageIndex.value === null) return;
 
-  const page = materialDetailData.value.pages[selectedPageIndex.value];
+  const page = pdfDetailData.value.pages[selectedPageIndex.value];
   if (!page) return;
 
   // 交换位置
   [page.audioIds[index], page.audioIds[index + 1]] = [page.audioIds[index + 1], page.audioIds[index]];
 
   // 保存
-  saveMaterial();
+  savePdfDetail();
 };
 
 // 更新页面绑定
 const handleUpdatePageBinding = async () => {
-  if (selectedPageIndex.value === null || !materialDetailData.value) return;
+  if (selectedPageIndex.value === null || !pdfDetailData.value) return;
 
   try {
     // 保存当前的绑定关系到后端
-    await saveMaterial();
+    await savePdfDetail();
     ElMessage.success('页面绑定已更新');
   } catch (error: any) {
     console.error('更新页面绑定失败:', error);
@@ -660,13 +648,13 @@ const handleClose = () => {
   // 重置状态
   pdfPages.value = [];
   allAudios.value = [];
-  materialForm.value = { name: "", remark: "" };
+  pdfDetailForm.value = { name: "", remark: "" };
   pdfLoading.value = false;
   selectedAudioIds.value = [];
   selectedPageIndex.value = null;
   isDeleteMode.value = false;
   previousSelectedIds = new Set<string>();
-  materialDetailData.value = null;
+  pdfDetailData.value = null;
   // 停止音频播放
   audioPlayer.clear();
 };
@@ -706,38 +694,38 @@ const handleAudioFileConfirm = async (filePaths: string[]) => {
     audioFileDialogVisible.value = false;
 
     // 确保 pages 数组存在且长度足够
-    if (materialDetailData.value && pdfPages.value.length > 0) {
-      if (!materialDetailData.value.pages) {
-        materialDetailData.value.pages = [];
+    if (pdfDetailData.value && pdfPages.value.length > 0) {
+      if (!pdfDetailData.value.pages) {
+        pdfDetailData.value.pages = [];
       }
       // 扩展 pages 数组以匹配 PDF 页数
-      while (materialDetailData.value.pages.length < pdfPages.value.length) {
-        materialDetailData.value.pages.push({ audioIds: [] });
+      while (pdfDetailData.value.pages.length < pdfPages.value.length) {
+        pdfDetailData.value.pages.push({ audioIds: [] });
       }
     }
 
     // 保存到后端
-    await saveMaterial();
+    await savePdfDetail();
   } finally {
     loading.close();
   }
 };
 
 // 保存音频列表
-const saveMaterial = async () => {
-  if (!props.materialData?.id) return;
+const savePdfDetail = async () => {
+  if (!props.matData?.id) return;
 
   try {
     // 解析现有 data
     let existingData: MaterialDetail = { pages: [] };
-    if (typeof props.materialData.data === 'string') {
+    if (typeof props.matData.data === 'string') {
       try {
-        existingData = JSON.parse(props.materialData.data);
+        existingData = JSON.parse(props.matData.data);
       } catch (e) {
         console.error('解析 data 失败:', e);
       }
-    } else if (props.materialData.data) {
-      existingData = props.materialData.data;
+    } else if (props.matData.data) {
+      existingData = props.matData.data;
     }
 
     // 确保 pages 数组存在
@@ -745,30 +733,30 @@ const saveMaterial = async () => {
       existingData.pages = [];
     }
 
-    // 如果有 materialDetailData，使用最新的数据
-    if (materialDetailData.value) {
-      existingData.pages = materialDetailData.value.pages;
+    // 如果有 pdfDetailData，使用最新的数据
+    if (pdfDetailData.value) {
+      existingData.pages = pdfDetailData.value.pages;
     }
 
     const updatedData: MaterialDetail = {
       ...existingData,
       audioList: allAudios.value,
       pdfLength: pdfPages.value.length,
-      remark: materialForm.value.remark,
+      remark: pdfDetailForm.value.remark,
     };
 
     await updateMaterial({
-      id: props.materialData.id,
-      name: props.materialData.name || '',
-      path: props.materialData.path || '',
-      cate_id: props.materialData.cate_id || 0,
-      type: props.materialData.type ?? 0,
+      id: props.matData.id,
+      name: props.matData.name || '',
+      path: props.matData.path || '',
+      cate_id: props.matData.cate_id || 0,
+      type: props.matData.type ?? 0,
       data: JSON.stringify(updatedData), // 序列化为 JSON 字符串
     });
 
-    // 更新本地的 materialData.data
-    if (props.materialData) {
-      props.materialData.data = JSON.stringify(updatedData);
+    // 更新本地的 matData.data
+    if (props.matData) {
+      props.matData.data = JSON.stringify(updatedData);
     }
   } catch (error: any) {
     console.error('保存音频列表失败:', error);
@@ -786,11 +774,11 @@ const handleDeleteSelectedAudios = async () => {
   selectedAudioIds.value = [];
 
   // 保存到后端
-  await saveMaterial();
+  await savePdfDetail();
 };
 
 const playMaterial = () => {
-  if (!props.materialData?.id) return;
+  if (!props.matData?.id) return;
 
   // 关闭弹窗
   handleClose();
@@ -799,20 +787,20 @@ const playMaterial = () => {
   router.push({
     path: "/pdf-checkin",
     query: {
-      materialId: props.materialData.id,
+      materialId: props.matData.id,
     },
   });
 };
 
 // 跳转到编辑
 const gotoEditMaterial = () => {
-  if (!props.materialData) return;
+  if (!props.matData) return;
 
   // 关闭详情弹窗
   handleClose();
 
   // 触发编辑事件，由父组件打开编辑弹窗
-  emit("edit", props.materialData as Material);
+  emit("edit", props.matData as Material);
 };
 </script>
 

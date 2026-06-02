@@ -134,6 +134,9 @@ class SubtitleMgr:
 
             try:
                 m_hash = compute_movie_hash(normalized)
+            except RecursionError:
+                log.error("[SUBTITLE] compute_movie_hash recursion: %s", normalized)
+                return _err("无法读取视频文件: 路径或文件系统异常")
             except OSError as e:
                 return _err(f"无法读取视频文件: {e}")
 
@@ -153,8 +156,8 @@ class SubtitleMgr:
             log.warning(f"[SUBTITLE] hash search failed: {e}")
             return _err(str(e))
         except RecursionError:
-            log.error("[SUBTITLE] hash search failed: path or file caused recursion")
-            return _err("search subtitle failed: 视频路径或文件异常，无法计算 hash")
+            log.error("[SUBTITLE] hash search recursion, path=%s", video_path)
+            return _err("search subtitle failed: 视频路径或文件系统异常")
         except Exception as e:
             log.error(f"[SUBTITLE] hash search failed: {e}")
             return _err(f"search subtitle failed: {e}")

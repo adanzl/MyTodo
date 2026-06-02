@@ -38,7 +38,7 @@ def test_media_subtitle_search_route_text(mock_search):
     mock_search.assert_called_once()
 
 
-@patch("core.tools.open_subtitles.OpenSubtitlesClient._call")
+@patch("core.tools.open_subtitles.OpenSubtitlesClient._get_json")
 def test_search_by_query_returns_official_shape(mock_call, monkeypatch):
     monkeypatch.setattr("core.tools.open_subtitles.config.OPEN_SUBTITLES_API", "key", raising=False)
     mock_call.return_value = {

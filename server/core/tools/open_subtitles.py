@@ -39,21 +39,28 @@ def _normalize_base_url(url: str) -> str:
 
 def compute_movie_hash(file_path: str) -> str:
     """OpenSubtitles moviehash（文件大小 + 首/尾各 64KB）。"""
-    size = os.path.getsize(file_path)
+    try:
+        size = os.path.getsize(file_path)
+    except RecursionError as e:
+        raise OSError("无法读取视频文件") from e
+
     offsets = [0]
     if size > _READ_CHUNK:
         offsets.append(size - _READ_CHUNK)
 
     acc = size
-    with open(file_path, "rb") as f:
-        for offset in offsets:
-            f.seek(offset)
-            block = f.read(_READ_CHUNK)
-            if len(block) < _READ_CHUNK:
-                block += b"\x00" * (_READ_CHUNK - len(block))
-            for val, in struct.iter_unpack("q", block):
-                acc += val
-                acc &= 0xFFFFFFFFFFFFFFFF
+    try:
+        with open(file_path, "rb") as f:
+            for offset in offsets:
+                f.seek(offset)
+                block = f.read(_READ_CHUNK)
+                if len(block) < _READ_CHUNK:
+                    block += b"\x00" * (_READ_CHUNK - len(block))
+                for val, in struct.iter_unpack("q", block):
+                    acc += val
+                    acc &= 0xFFFFFFFFFFFFFFFF
+    except RecursionError as e:
+        raise OSError("无法读取视频文件") from e
     return f"{acc:016x}"
 
 

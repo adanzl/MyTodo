@@ -328,6 +328,18 @@ def decode_url_path(path: str) -> str:
     return path
 
 
+def _path_under_allowed_roots(path: str, base_dir: str) -> bool:
+    """路径须在 base_dir 或 ALLOWED_DIR（如 /mnt）之下。"""
+    from core.config import config
+
+    norm = os.path.normpath(path)
+    roots = [os.path.normpath(base_dir)]
+    allowed = (config.ALLOWED_DIR or "").strip()
+    if allowed:
+        roots.append(os.path.normpath(allowed))
+    return any(norm == root or norm.startswith(root + os.sep) for root in roots)
+
+
 def validate_and_normalize_path(file_path: str,
                                 base_dir: str = '/opt/my_todo/data',
                                 must_be_file: bool = True) -> Tuple[Optional[str], str]:
@@ -344,31 +356,31 @@ def validate_and_normalize_path(file_path: str,
     if not file_path:
         return None, "文件路径不能为空"
 
-    # URL 解码
     file_path = decode_url_path(file_path)
 
-    # 安全检查：防止路径遍历
     if '..' in file_path.split('/') or file_path.startswith('~'):
         return None, "Invalid path: Path traversal not allowed"
 
-    # 处理相对路径
     try:
         if not os.path.isabs(file_path):
             file_path = os.path.join(base_dir, file_path.lstrip('/'))
-            file_path = os.path.realpath(file_path)
-        else:
-            file_path = os.path.realpath(file_path)
+        # 不用 realpath：/mnt 等挂载上解析符号链接可能触发 RecursionError
+        file_path = os.path.abspath(file_path)
+    except (RecursionError, OSError) as e:
+        return None, f"Invalid path: {e}"
+
+    if not _path_under_allowed_roots(file_path, base_dir):
+        return None, "文件路径不在允许的目录内"
+
+    try:
+        if not os.path.exists(file_path):
+            return None, "文件不存在"
+        if must_be_file and not os.path.isfile(file_path):
+            return None, "路径不是文件"
     except RecursionError:
         return None, "Invalid path: 路径解析失败"
     except OSError as e:
         return None, f"Invalid path: {e}"
-
-    # 检查文件是否存在
-    if not os.path.exists(file_path):
-        return None, "文件不存在"
-
-    if must_be_file and not os.path.isfile(file_path):
-        return None, "路径不是文件"
 
     return file_path, 'ok'
 
