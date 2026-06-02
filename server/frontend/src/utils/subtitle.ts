@@ -161,6 +161,7 @@ export async function searchSubtitles(params: {
 export interface RecognizeSubtitleTask {
   task_id: string;
   video_path?: string;
+  output_path?: string;
   language?: string;
   status?: string;
   error_message?: string | null;

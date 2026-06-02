@@ -154,12 +154,10 @@ class SubtitleRecognizeMgr(BaseTaskMgr[SubtitleRecognizeTask]):
                 if self._should_stop(task_id):
                     outcome_error = "已取消"
                 else:
-                    log.info("[SUBTITLE] 识别开始 %s %s", task_id, video_path)
                     try:
                         out = transcribe_to_sidecar(video_path, language=language)
                         outcome_path = str(out.get("path") or "")
                         outcome_success = True
-                        log.info("[SUBTITLE] 识别完成 %s -> %s", task_id, outcome_path)
                     except Exception as e:
                         outcome_error = str(e)
                         (log.warning if isinstance(e, WhisperError) else log.error)(

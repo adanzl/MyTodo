@@ -11,14 +11,14 @@
         <el-button type="primary" plain size="small">识别任务</el-button>
       </slot>
     </template>
-    <div class="flex flex-col gap-2">
-      <div class="flex items-center justify-between">
+    <div class="flex flex-col gap-2 max-h-[60vh]">
+      <div class="flex shrink-0 items-center justify-between">
         <span class="text-sm font-medium">字幕识别队列</span>
         <el-button type="primary" link size="small" :loading="loading" @click="fetchTasks">
           刷新
         </el-button>
       </div>
-      <div v-loading="loading" class="min-h-12 max-h-72 overflow-y-auto">
+      <div v-loading="loading" class="min-h-0 flex-1 overflow-y-auto">
         <div
           v-if="!loading && tasks.length === 0"
           class="text-sm text-gray-400 py-4 text-center"
@@ -31,8 +31,23 @@
           class="flex items-start gap-2 py-2 border-b border-gray-100 last:border-0"
         >
           <div class="flex-1 min-w-0">
-            <div class="text-sm truncate" :title="task.video_path">
-              {{ taskBasename(task.video_path) }}
+            <div class="text-sm flex items-center gap-1 min-w-0">
+              <span class="truncate">{{ taskBasename(task.video_path) }}</span>
+              <el-tooltip
+                v-if="task.video_path"
+                placement="top"
+                :show-after="200"
+              >
+                <template #content>
+                  <div class="text-xs leading-relaxed max-w-md break-all">
+                    <div>输入：{{ task.video_path }}</div>
+                    <div v-if="task.output_path" class="mt-1">输出：{{ task.output_path }}</div>
+                  </div>
+                </template>
+                <el-icon class="shrink-0 text-gray-400 cursor-default" :size="14">
+                  <Document />
+                </el-icon>
+              </el-tooltip>
             </div>
             <div class="text-xs text-gray-500 mt-0.5 flex items-center gap-2 flex-wrap">
               <el-tag :type="statusTag(task.status)" size="small">
@@ -78,6 +93,7 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
+import { Document } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import {
   cancelRecognizeSubtitleTask,

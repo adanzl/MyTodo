@@ -24,8 +24,11 @@
       </el-descriptions>
 
       <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
-        <div class="flex max-h-36 shrink-0 flex-col overflow-hidden rounded border border-gray-200">
-          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-4 py-3 font-bold">
+        <div
+          class="flex min-h-0 flex-col overflow-hidden rounded border border-gray-200"
+          :class="subtitleSearchActive ? 'min-h-32 flex-1' : 'flex-1'"
+        >
+          <div class="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-4 py-3 font-bold">
             <span>本地字幕 ({{ sidecarSubtitles.length }})</span>
             <div class="flex items-center gap-2">
               <el-select v-model="recognizeLang" size="small" style="width: 88px">
@@ -46,7 +49,7 @@
               </el-button>
             </div>
           </div>
-          <div class="overflow-y-auto p-3">
+          <div class="min-h-0 flex-1 overflow-y-auto p-3">
             <div
               v-for="(sub, index) in sidecarSubtitles"
               :key="`${sub.path}-${index}`"

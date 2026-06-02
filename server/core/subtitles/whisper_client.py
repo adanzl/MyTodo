@@ -108,7 +108,6 @@ def transcribe_to_sidecar(video_path: str, *, language: str = "en") -> dict[str,
         t0 = time.monotonic()
         with tempfile.TemporaryDirectory(prefix="mini_whisper_") as tmp:
             wav = os.path.join(tmp, "audio.wav")
-            log.info("[SUBTITLE] whisper extract audio video=%s", video_path)
             code, _, err = run_subprocess_safe(
                 [
                     config.FFMPEG_PATH, "-loglevel", "error", "-y", "-i", video_path, "-vn", "-ac", "1", "-ar", "16000",
@@ -123,12 +122,7 @@ def transcribe_to_sidecar(video_path: str, *, language: str = "en") -> dict[str,
 
         with open(out_path, "w", encoding="utf-8") as f:
             f.write(vtt)
-        log.info(
-            "[SUBTITLE] whisper recognize done video=%s out=%s elapsed=%.1fs",
-            video_path,
-            out_path,
-            time.monotonic() - t0,
-        )
+        log.info("[SUBTITLE] whisper recognize done out=%s", out_path)
         return {
             "path": out_path,
             "remote_name": os.path.basename(out_path),
