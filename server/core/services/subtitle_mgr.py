@@ -1,4 +1,4 @@
-"""字幕服务：sidecar 字幕发现、ASSRT 在线搜索与下载。"""
+"""字幕服务：sidecar 发现、ASSRT 搜索下载、Whisper 识别。"""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import os
 from typing import Any
 
 from core.config import app_logger, config
-from core.tools.assrt_client import AssrtError, client as assrt_client
+from core.subtitles import AssrtError, WhisperError, assrt_client, transcribe_to_sidecar
 from core.utils import (
     _err,
     _ok,
@@ -25,11 +25,9 @@ class SubtitleMgr:
     """字幕相关业务逻辑。"""
 
     def __init__(self) -> None:
-        """初始化，读取默认媒体根目录。"""
         self.default_base_dir = config.DEFAULT_BASE_DIR
 
     def resolve_subtitles(self, video_path: str) -> dict[str, Any]:
-        """查找视频同目录下实际存在的 sidecar 字幕。"""
         try:
             normalized_video, error_msg = validate_and_normalize_path(
                 video_path, self.default_base_dir, must_be_file=True
@@ -39,7 +37,6 @@ class SubtitleMgr:
 
             tracks: list[dict[str, Any]] = []
             last_dot = normalized_video.rfind(".")
-            candidates: list[str] = []
             if last_dot > 0:
                 base = normalized_video[:last_dot]
                 candidates = [
@@ -47,23 +44,21 @@ class SubtitleMgr:
                     for suffix in _SUBTITLE_SUFFIXES
                     for ext in _SUBTITLE_EXTS
                 ]
-            for candidate in candidates:
-                ext = os.path.splitext(candidate)[1].lower()
-                if ext not in _SUBTITLE_EXTS:
-                    continue
-
-                normalized, _ = validate_and_normalize_path(
-                    candidate, self.default_base_dir, must_be_file=True
-                )
-                if not normalized or not os.path.isfile(normalized):
-                    continue
-
-                tracks.append({
-                    "path": normalized,
-                    "label": subtitle_label_from_path(normalized),
-                    "lang": subtitle_lang_from_path(normalized),
-                    "ext": ext.lstrip("."),
-                })
+                for candidate in candidates:
+                    ext = os.path.splitext(candidate)[1].lower()
+                    if ext not in _SUBTITLE_EXTS:
+                        continue
+                    normalized, _ = validate_and_normalize_path(
+                        candidate, self.default_base_dir, must_be_file=True
+                    )
+                    if not normalized or not os.path.isfile(normalized):
+                        continue
+                    tracks.append({
+                        "path": normalized,
+                        "label": subtitle_label_from_path(normalized),
+                        "lang": subtitle_lang_from_path(normalized),
+                        "ext": ext.lstrip("."),
+                    })
 
             return _ok({"tracks": tracks})
         except Exception as e:
@@ -80,19 +75,22 @@ class SubtitleMgr:
         order_direction: str | None = None,
         title_match: str | None = None,
     ) -> dict[str, Any]:
-        """文字搜索（ASSRT ``/v1/sub/search``，响应格式兼容前端 JSON:API 解析）。"""
         q = (query or "").strip()
         if not q:
             return _err("query 不能为空")
         try:
-            return _ok(assrt_client.search_by_query(
+            payload = assrt_client.search_by_query(
                 q,
                 languages=languages,
                 page=page,
                 order_by=order_by,
                 order_direction=order_direction,
                 title_match=title_match,
-            ))
+            )
+            return _ok(payload)
+        except RecursionError:
+            log.exception("[SUBTITLE] ASSRT recursion, query=%s", q)
+            return _err("search subtitle failed: 在线搜索请求异常")
         except AssrtError as e:
             log.warning(f"[SUBTITLE] text search failed: {e}")
             return _err(str(e))
@@ -100,50 +98,40 @@ class SubtitleMgr:
             log.error(f"[SUBTITLE] text search failed: {e}")
             return _err(f"search subtitle failed: {e}")
 
-    def search_by_video_path(
+    def recognize_subtitle(
         self,
         video_path: str,
         *,
-        languages: str | None = None,
-        filename: str | None = None,
-        page: int = 1,
-        moviehash_match: str | None = None,
-        order_by: str | None = None,
-        order_direction: str | None = None,
+        language: str = "en",
     ) -> dict[str, Any]:
-        """按本地视频路径搜索：用文件名匹配 ASSRT（``is_file`` + ``no_muxer``）。"""
-        del moviehash_match, order_by, order_direction
+        """Whisper 语音识别，写入视频同目录 sidecar 字幕。"""
         path = (video_path or "").strip()
         if not path:
             return _err("video_path 不能为空")
 
-        try:
-            normalized, error_msg = validate_and_normalize_path(
-                path, self.default_base_dir, must_be_file=True
-            )
-        except RecursionError:
-            log.exception("[SUBTITLE] validate path recursion: %s", path)
-            return _err("视频路径解析失败")
-
+        normalized, error_msg = validate_and_normalize_path(
+            path, self.default_base_dir, must_be_file=True
+        )
         if not normalized:
             return _err(error_msg or "Invalid video_path")
 
-        fname = (filename or "").strip() or os.path.basename(normalized)
-
+        lang = (language or "en").strip().lower() or "en"
         try:
-            payload = assrt_client.search_by_filename(
-                fname,
-                languages=languages,
-                page=page,
-            )
-        except AssrtError as e:
-            log.warning(f"[SUBTITLE] file search failed: {e}")
+            result = transcribe_to_sidecar(normalized, language=lang)
+        except WhisperError as e:
+            log.warning(f"[SUBTITLE] recognize failed: {e}")
             return _err(str(e))
         except Exception as e:
-            log.error(f"[SUBTITLE] file search failed: {e}")
-            return _err(f"search subtitle failed: {e}")
+            log.error(f"[SUBTITLE] recognize failed: {e}")
+            return _err(f"语音识别失败: {e}")
 
-        return _ok({"video_path": normalized, **payload})
+        return _ok({
+            "video_path": normalized,
+            **result,
+            "label": subtitle_label_from_path(result["path"]),
+            "lang": subtitle_lang_from_path(result["path"]),
+            "ext": os.path.splitext(result["path"])[1].lstrip(".").lower(),
+        })
 
     def download_subtitle(
         self,
@@ -152,7 +140,6 @@ class SubtitleMgr:
         *,
         file_index: int = 0,
     ) -> dict[str, Any]:
-        """下载 ASSRT 字幕到视频同目录 sidecar。"""
         path = (video_path or "").strip()
         sid = (subtitle_id or "").strip()
         if not path:

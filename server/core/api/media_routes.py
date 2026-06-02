@@ -55,6 +55,11 @@ class _SubtitleDownloadBody(BaseModel):
     file_index: int = 0
 
 
+class _SubtitleRecognizeBody(BaseModel):
+    video_path: str
+    language: str = "en"
+
+
 log = app_logger
 media_bp = Blueprint('media', __name__)
 
@@ -128,27 +133,12 @@ def resolve_subtitles() -> ResponseReturnValue:
 @media_bp.route("/media/subtitle/search", methods=['GET'])
 @limiter.limit("30 per minute")
 def search_subtitles_online() -> ResponseReturnValue:
-    """在线搜索字幕（OpenSubtitles ``GET /api/v1/subtitles``）。
-
-    文档: https://opensubtitles.stoplight.io/docs/opensubtitles-api/a172317bd5ccc-search-for-subtitles
+    """在线搜索字幕（ASSRT ``/v1/sub/search``）。
 
     Query Args:
-        mode (str): ``text`` | ``hash``
-        languages, page, order_by, order_direction（可选，同官方 API）
-
-        mode=text:
-            query (str)
-            title_match (str, optional): 如 ``only`` 精确标题
-
-        mode=hash:
-            video_path (str): 本地视频文件路径（服务端计算 moviehash）
-            filename (optional): 传给 OpenSubtitles 的文件名，默认取路径 basename
-            moviehash_match (str, optional): 如 ``only``
-
-    Returns:
-        与官方一致: total_count, total_pages, page, per_page, data（JSON:API 字幕列表）。
+        query (str): 搜索关键词（必填）
+        languages, page, order_by, order_direction, title_match（可选）
     """
-    mode = (request.args.get('mode') or '').strip().lower()
     languages = request.args.get('languages', '') or None
     order_by = request.args.get('order_by', '') or None
     order_direction = request.args.get('order_direction', '') or None
@@ -159,28 +149,14 @@ def search_subtitles_online() -> ResponseReturnValue:
         except (TypeError, ValueError):
             return _err('page 必须为正整数')
 
-    if mode == 'text':
-        result = subtitle_mgr.search_by_text(
-            request.args.get('query', ''),
-            languages=languages,
-            page=page,
-            order_by=order_by,
-            order_direction=order_direction,
-            title_match=request.args.get('title_match', '') or None,
-        )
-    elif mode == 'hash':
-        result = subtitle_mgr.search_by_video_path(
-            request.args.get('video_path', ''),
-            languages=languages,
-            filename=request.args.get('filename', '') or None,
-            page=page,
-            moviehash_match=request.args.get('moviehash_match', '') or None,
-            order_by=order_by,
-            order_direction=order_direction,
-        )
-    else:
-        return _err('mode 必须为 text 或 hash')
-
+    result = subtitle_mgr.search_by_text(
+        request.args.get('query', ''),
+        languages=languages,
+        page=page,
+        order_by=order_by,
+        order_direction=order_direction,
+        title_match=request.args.get('title_match', '') or None,
+    )
     if result.get('code') != 0:
         return _err(result.get('msg') or 'Error')
     return _ok(result.get('data'))
@@ -200,6 +176,21 @@ def download_subtitle_sidecar() -> ResponseReturnValue:
         body.subtitle_id,
         file_index=body.file_index,
     )
+    if result.get('code') != 0:
+        return _err(result.get('msg') or 'Error')
+    return _ok(result.get('data'))
+
+
+@media_bp.route("/media/subtitle/recognize", methods=['POST'])
+@limiter.limit("5 per minute")
+def recognize_subtitle_sidecar() -> ResponseReturnValue:
+    """Whisper 语音识别并写入 sidecar 字幕（JSON: video_path, language 默认 en）。"""
+    data = read_json_from_request() or {}
+    body, err = parse_with_model(_SubtitleRecognizeBody, data, err_factory=_err)
+    if err or not body:
+        return err or _err('Invalid request arguments')
+
+    result = subtitle_mgr.recognize_subtitle(body.video_path, language=body.language)
     if result.get('code') != 0:
         return _err(result.get('msg') or 'Error')
     return _ok(result.get('data'))

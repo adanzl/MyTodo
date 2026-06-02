@@ -7,12 +7,14 @@
 
 选用指南：
 - run_in_background：点火即走，不关心返回值（如任务状态异步写库）。
-- run_blocking：短阻塞 IO（如 requests 调 ASSRT）；在 gevent worker 里 thread.join 可接受。
+- run_blocking：纯 CPU/本地 IO（无 requests/ssl）。
+- http_get_bytes：对外 HTTPS（ASSRT 等）；gevent patch ssl 后须 spawn 子进程发 requests。
 - run_async：在子线程跑 asyncio 协程；主线程用 gevent 轮询等待，避免 join 卡死整个 hub（蓝牙/Mi 等）。
 """
 from __future__ import annotations
 
 import asyncio
+import multiprocessing as mp
 import threading
 import time
 from queue import Empty, Queue
@@ -26,6 +28,7 @@ from core.config import app_logger
 
 log = app_logger
 _T = TypeVar("_T")
+_SPAWN = mp.get_context("spawn")
 
 
 def run_in_background(func: Callable[[], None], daemon: bool = True) -> None:
@@ -47,7 +50,7 @@ def _clear_event_loop() -> None:
 def run_blocking(func: Callable[[], _T], timeout: Optional[float] = None) -> _T:
     """原生线程执行同步阻塞调用并 join 等待。
 
-    典型场景：gevent 下直接 requests/SSL 可能 RecursionError，放到 OS 线程可规避。
+    注意：对外 HTTPS 请用 http_get_bytes，不要用本函数包 requests。
     异常通过 error_q 传回主线程重新抛出，保持调用栈语义。
     """
     wait = timeout if timeout is not None else 30.0
@@ -75,6 +78,60 @@ def run_blocking(func: Callable[[], _T], timeout: Optional[float] = None) -> _T:
         return result_q.get_nowait()
     except Empty:
         raise RuntimeError("线程结束但无返回值")
+
+
+def _http_request_worker(
+    out_q: Any,
+    method: str,
+    url: str,
+    timeout: float,
+    headers: dict[str, str] | None,
+) -> None:
+    import requests as req
+
+    try:
+        resp = req.request(method.upper(), url, timeout=timeout, headers=headers or {})
+        out_q.put(("ok", resp.status_code, resp.content))
+    except Exception as exc:
+        out_q.put(("err", str(exc)))
+
+
+def http_request_bytes(
+    method: str,
+    url: str,
+    *,
+    timeout: float = 30.0,
+    headers: dict[str, str] | None = None,
+) -> tuple[int, bytes]:
+    """在 spawn 子进程发 HTTP，返回 (status_code, body)。主进程 gevent patch ssl 后须走此路径。"""
+    wait = timeout + 15
+    out_q = _SPAWN.Queue()
+    proc = _SPAWN.Process(
+        target=_http_request_worker,
+        args=(out_q, method, url, timeout, headers),
+    )
+    proc.start()
+    proc.join(wait)
+    if proc.is_alive():
+        proc.kill()
+        proc.join(2)
+        raise TimeoutError(f"HTTP 请求超时 ({wait}s)")
+    try:
+        msg = out_q.get_nowait()
+    except Empty:
+        raise RuntimeError("HTTP 子进程无响应")
+    if msg[0] == "err":
+        raise RuntimeError(f"HTTP 请求失败: {msg[1]}")
+    return int(msg[1]), bytes(msg[2])
+
+
+def http_get_bytes(
+    url: str,
+    *,
+    timeout: float = 30.0,
+    headers: dict[str, str] | None = None,
+) -> tuple[int, bytes]:
+    return http_request_bytes("GET", url, timeout=timeout, headers=headers)
 
 
 def run_async(coroutine: Coroutine, timeout: Optional[float] = None) -> Any:

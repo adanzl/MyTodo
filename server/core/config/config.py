@@ -88,6 +88,12 @@ class Config:
     ASSRT_TIMEOUT: int = int(os.environ.get('ASSRT_TIMEOUT', '30'))
     SUBTITLE_DEFAULT_LANGS: str = os.environ.get('SUBTITLE_DEFAULT_LANGS', 'en')
 
+    # ========== Whisper 语音识别 ==========
+    WHISPER_MODEL: str = os.environ.get('WHISPER_MODEL', 'base')
+    WHISPER_DEVICE: str = os.environ.get('WHISPER_DEVICE', 'cpu')
+    WHISPER_COMPUTE_TYPE: str = os.environ.get('WHISPER_COMPUTE_TYPE', 'int8')
+    WHISPER_TIMEOUT: int = int(os.environ.get('WHISPER_TIMEOUT', '1800'))
+
     # ========== 工具配置 ==========
     FFMPEG_PATH: str = os.environ.get('FFMPEG_PATH', '/usr/bin/ffmpeg')
     FFMPEG_TIMEOUT: int = int(os.environ.get('FFMPEG_TIMEOUT', 300))

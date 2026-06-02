@@ -5,15 +5,14 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from typing import Any
 from urllib.parse import urlencode
 
-import requests
-
 from core.config import config
-from core.tools.async_util import run_blocking
+from core.tools.async_util import http_get_bytes
 
 _PER_PAGE = 15
 _TEXT_EXTS = (".srt", ".vtt", ".ass", ".ssa")
@@ -29,6 +28,16 @@ class AssrtError(Exception):
         self.payload = payload
 
 
+def _assrt_get(url: str, timeout: float, *, json_api: bool) -> tuple[int, bytes]:
+    headers = {"Accept": "application/json"} if json_api else None
+    try:
+        return http_get_bytes(url, timeout=timeout, headers=headers)
+    except TimeoutError as e:
+        raise AssrtError("ASSRT 请求超时") from e
+    except RuntimeError as e:
+        raise AssrtError(str(e)) from e
+
+
 def _http_get(path: str, params: dict[str, Any]) -> dict[str, Any]:
     token = (config.ASSRT_API_KEY or "").strip()
     if not token:
@@ -38,31 +47,28 @@ def _http_get(path: str, params: dict[str, Any]) -> dict[str, Any]:
     url = f"{base}{path}?{urlencode({**params, 'token': token})}"
     timeout = float(config.ASSRT_TIMEOUT)
 
-    def _do() -> dict[str, Any]:
-        resp = requests.get(url, timeout=timeout, headers={"Accept": "application/json"})
-        try:
-            data = resp.json()
-        except ValueError as e:
-            raise AssrtError(f"ASSRT 响应非 JSON: HTTP {resp.status_code}") from e
-        if not isinstance(data, dict):
-            raise AssrtError("ASSRT 响应格式错误")
-        status = data.get("status", 0)
-        if status == 0:
-            return data
-        if status == 20001:
-            raise AssrtError("ASSRT Token 无效，请检查 ASSRT_API_KEY", status_code=status, payload=data)
-        if status == 30900:
-            raise AssrtError("ASSRT 请求过于频繁，请稍后再试", status_code=status, payload=data)
-        if status == 101:
-            raise AssrtError("搜索关键词至少 3 个字符", status_code=status, payload=data)
-        for block in data.values():
-            if isinstance(block, dict) and block.get("result") == "failed":
-                err = block.get("err") or block.get("message")
-                if err:
-                    raise AssrtError(str(err), status_code=status, payload=data)
-        raise AssrtError(f"ASSRT 请求失败 (status={status})", status_code=status, payload=data)
-
-    return run_blocking(_do, timeout=timeout + 10)
+    _http_status, body = _assrt_get(url, timeout, json_api=True)
+    try:
+        data = json.loads(body.decode("utf-8", errors="replace")) if body else {}
+    except ValueError as e:
+        raise AssrtError(f"ASSRT 响应非 JSON: HTTP {_http_status}") from e
+    if not isinstance(data, dict):
+        raise AssrtError("ASSRT 响应格式错误")
+    status = data.get("status", 0)
+    if status == 0:
+        return data
+    if status == 20001:
+        raise AssrtError("ASSRT Token 无效，请检查 ASSRT_API_KEY", status_code=status, payload=data)
+    if status == 30900:
+        raise AssrtError("ASSRT 请求过于频繁，请稍后再试", status_code=status, payload=data)
+    if status == 101:
+        raise AssrtError("搜索关键词至少 3 个字符", status_code=status, payload=data)
+    for block in data.values():
+        if isinstance(block, dict) and block.get("result") == "failed":
+            err = block.get("err") or block.get("message")
+            if err:
+                raise AssrtError(str(err), status_code=status, payload=data)
+    raise AssrtError(f"ASSRT 请求失败 (status={status})", status_code=status, payload=data)
 
 
 def _want_langs(languages: str | None) -> set[str]:
@@ -245,14 +251,9 @@ class AssrtClient:
             raise AssrtError("未找到字幕下载地址")
 
         timeout = float(config.ASSRT_TIMEOUT)
-
-        def _download() -> bytes:
-            resp = requests.get(dl_url, timeout=timeout)
-            if resp.status_code != 200:
-                raise AssrtError(f"下载字幕失败: HTTP {resp.status_code}")
-            return resp.content
-
-        content = run_blocking(_download, timeout=timeout + 60)
+        dl_status, content = _assrt_get(dl_url, timeout, json_api=False)
+        if dl_status != 200:
+            raise AssrtError(f"下载字幕失败: HTTP {dl_status}")
 
         ext = os.path.splitext(remote_name)[1].lower()
         if ext not in _TEXT_EXTS:

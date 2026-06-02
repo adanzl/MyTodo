@@ -28,3 +28,4 @@ readerwriterlock>=1.0.9
 pytest==8.3.4
 pytest-cov
 fakeredis
+faster-whisper

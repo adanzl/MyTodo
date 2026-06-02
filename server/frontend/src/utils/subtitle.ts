@@ -130,16 +130,12 @@ export async function downloadSubtitleToSidecar(params: {
 }
 
 export async function searchSubtitles(params: {
-  mode: 'text' | 'hash';
-  video_path?: string;
-  query?: string;
+  query: string;
   page?: number;
   languages?: string;
 }): Promise<SubtitleSearchResult> {
   const rsp = await api.get('/media/subtitle/search', {
     params: {
-      mode: params.mode,
-      video_path: params.video_path,
       query: params.query,
       page: params.page ?? 1,
       languages: params.languages,
@@ -158,9 +154,23 @@ export async function searchSubtitles(params: {
     page: Number(payload.page ?? 1),
     per_page: payload.per_page,
     query: payload.query,
-    video_path: payload.video_path,
     data: parseSubtitleSearchRows(rawList),
   };
+}
+
+export async function recognizeSubtitle(params: {
+  video_path: string;
+  language?: string;
+}): Promise<{ path: string; label?: string; lang?: string; ext?: string }> {
+  const rsp = await api.post('/media/subtitle/recognize', {
+    video_path: params.video_path,
+    language: params.language ?? 'en',
+  });
+  const body = rsp.data;
+  if (!body || body.code !== 0) {
+    throw new Error(body?.msg || '语音识别失败');
+  }
+  return body.data ?? {};
 }
 
 export async function listSidecarSubtitles(videoPath: string): Promise<SubtitleSource[]> {

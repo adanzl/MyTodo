@@ -25,11 +25,26 @@
 
       <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
         <div class="flex max-h-36 shrink-0 flex-col overflow-hidden rounded border border-gray-200">
-          <div class="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-3 font-bold">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-4 py-3 font-bold">
             <span>本地字幕 ({{ sidecarSubtitles.length }})</span>
-            <el-button type="primary" size="small" plain :loading="subtitleSearchLoading" @click="addSubtitle">
-              搜索字幕
-            </el-button>
+            <div class="flex items-center gap-2">
+              <el-select v-model="recognizeLang" size="small" style="width: 88px">
+                <el-option label="en" value="en" />
+                <el-option label="zh" value="zh" />
+              </el-select>
+              <el-button
+                type="warning"
+                size="small"
+                plain
+                :loading="recognizeLoading"
+                @click="runRecognize"
+              >
+                语音识别
+              </el-button>
+              <el-button type="primary" size="small" plain @click="openSubtitleSearch">
+                搜索字幕
+              </el-button>
+            </div>
           </div>
           <div class="overflow-y-auto p-3">
             <div
@@ -51,9 +66,7 @@
           class="flex min-h-0 flex-1 flex-col overflow-hidden rounded border border-gray-200"
         >
           <div class="flex flex-wrap items-center gap-2 border-b border-gray-200 bg-gray-50 px-4 py-3 font-bold">
-            <span>在线搜索字幕</span>
-            <el-tag v-if="subtitleSearchMode === 'hash'" type="info" size="small">Hash 匹配</el-tag>
-            <el-tag v-else type="warning" size="small">文字搜索</el-tag>
+            <span>在线搜索（ASSRT）</span>
             <span v-if="subtitleSearchTotal > 0" class="text-xs font-normal text-gray-500">
               共 {{ subtitleSearchTotal }} 条
             </span>
@@ -61,13 +74,12 @@
           <div class="flex shrink-0 gap-2 border-b border-gray-200 p-3">
             <el-input
               v-model="subtitleSearchQuery"
-              placeholder="按标题关键词搜索（可选）"
+              placeholder="输入关键词搜索"
               clearable
               class="flex-1"
               @keyup.enter="() => runSubtitleTextSearch()"
             />
-            <el-button @click="() => runSubtitleTextSearch()">文字搜索</el-button>
-            <el-button type="primary" @click="() => runSubtitleHashSearch()">Hash 搜索</el-button>
+            <el-button type="primary" @click="() => runSubtitleTextSearch()">搜索</el-button>
           </div>
           <el-table :data="subtitleSearchRows" max-height="320" empty-text="未找到字幕">
             <el-table-column prop="language" label="语言" width="72" />
@@ -75,7 +87,7 @@
             <el-table-column prop="fileName" label="文件名" min-width="180" show-overflow-tooltip />
             <el-table-column label="操作" width="88" fixed="right">
               <template #default="{ row }">
-                <el-button type="primary" size="small" link disabled @click="downloadSubtitle(row)">
+                <el-button type="primary" size="small" link @click="downloadSubtitle(row)">
                   下载
                 </el-button>
               </template>
@@ -106,6 +118,7 @@ import type { MaterialDetail, SubtitleFile } from "@/types/tasks/materialDetail"
 import {
   downloadSubtitleToSidecar,
   listSidecarSubtitles,
+  recognizeSubtitle,
   searchSubtitles,
   type SubtitleSearchRow,
 } from "@/utils/subtitle";
@@ -133,15 +146,16 @@ const videoDetailForm = ref({ remark: "" });
 const videoDetailData = ref<MaterialDetail | null>(null);
 const sidecarSubtitles = ref<SubtitleFile[]>([]);
 
+const recognizeLang = ref("en");
+const recognizeLoading = ref(false);
+
 const subtitleSearchActive = ref(false);
 const subtitleSearchLoading = ref(false);
-const subtitleSearchMode = ref<'hash' | 'text'>('hash');
-const subtitleSearchQuery = ref('');
+const subtitleSearchQuery = ref("");
 const subtitleSearchRows = ref<SubtitleSearchRow[]>([]);
 const subtitleSearchTotal = ref(0);
 const subtitleSearchPage = ref(1);
 const subtitleSearchPerPage = ref(20);
-const subtitleSearchTotalPages = ref(0);
 
 function parseVideoDetailData(raw: Material["data"]): MaterialDetail | null {
   if (!raw) return null;
@@ -156,6 +170,16 @@ function parseVideoDetailData(raw: Material["data"]): MaterialDetail | null {
   return raw;
 }
 
+async function refreshSidecarList(videoPath: string) {
+  const tracks = await listSidecarSubtitles(videoPath);
+  sidecarSubtitles.value = tracks.map((t) => ({
+    path: t.path,
+    label: t.label,
+    lang: t.lang,
+    ext: t.ext,
+  }));
+}
+
 const initVideoDetail = async () => {
   if (!props.matData) return;
 
@@ -166,12 +190,7 @@ const initVideoDetail = async () => {
     videoDetailForm.value.remark = detail?.remark || "";
 
     if (props.matData.path) {
-      const tracks = await listSidecarSubtitles(props.matData.path);
-      sidecarSubtitles.value = tracks.map((t) => ({
-        path: t.path,
-        label: t.label,
-        lang: t.lang,
-      }));
+      await refreshSidecarList(props.matData.path);
     } else {
       sidecarSubtitles.value = [];
     }
@@ -238,9 +257,7 @@ const resetSubtitleSearch = () => {
   subtitleSearchRows.value = [];
   subtitleSearchTotal.value = 0;
   subtitleSearchPage.value = 1;
-  subtitleSearchTotalPages.value = 0;
-  subtitleSearchQuery.value = '';
-  subtitleSearchMode.value = 'hash';
+  subtitleSearchQuery.value = "";
 };
 
 const applySubtitleSearchResult = (result: Awaited<ReturnType<typeof searchSubtitles>>) => {
@@ -248,59 +265,29 @@ const applySubtitleSearchResult = (result: Awaited<ReturnType<typeof searchSubti
   subtitleSearchTotal.value = result.total_count;
   subtitleSearchPage.value = result.page;
   subtitleSearchPerPage.value = result.per_page ?? 20;
-  subtitleSearchTotalPages.value = result.total_pages;
-  if (result.mode === 'text' || result.mode === 'hash') {
-    subtitleSearchMode.value = result.mode;
-  }
 };
 
 function normalizeSearchPage(page: unknown): number {
-  return typeof page === 'number' && page >= 1 ? Math.floor(page) : 1;
+  return typeof page === "number" && page >= 1 ? Math.floor(page) : 1;
 }
-
-const runSubtitleHashSearch = async (page?: number) => {
-  const p = normalizeSearchPage(page);
-  const videoPath = props.matData?.path;
-  if (!videoPath) {
-    ElMessage.warning('请先配置视频路径');
-    return;
-  }
-  subtitleSearchLoading.value = true;
-  subtitleSearchMode.value = 'hash';
-  try {
-    const result = await searchSubtitles({ mode: 'hash', video_path: videoPath, page: p });
-    applySubtitleSearchResult(result);
-    if (result.data.length === 0) {
-      ElMessage.info('未找到匹配字幕，可尝试文字搜索');
-    }
-  } catch (e: any) {
-    console.error('字幕 Hash 搜索失败:', e);
-    ElMessage.error(e.message || '字幕搜索失败');
-    subtitleSearchRows.value = [];
-    subtitleSearchTotal.value = 0;
-  } finally {
-    subtitleSearchLoading.value = false;
-  }
-};
 
 const runSubtitleTextSearch = async (page?: number) => {
   const p = normalizeSearchPage(page);
-  const query = subtitleSearchQuery.value.trim() || props.matData?.name?.trim() || '';
+  const query = subtitleSearchQuery.value.trim() || props.matData?.name?.trim() || "";
   if (!query) {
-    ElMessage.warning('请输入搜索关键词');
+    ElMessage.warning("请输入搜索关键词");
     return;
   }
   subtitleSearchLoading.value = true;
-  subtitleSearchMode.value = 'text';
   try {
-    const result = await searchSubtitles({ mode: 'text', query, page: p });
+    const result = await searchSubtitles({ query, page: p });
     applySubtitleSearchResult(result);
     if (result.data.length === 0) {
-      ElMessage.info('未找到匹配字幕');
+      ElMessage.info("未找到匹配字幕");
     }
   } catch (e: any) {
-    console.error('字幕文字搜索失败:', e);
-    ElMessage.error(e.message || '字幕搜索失败');
+    console.error("字幕搜索失败:", e);
+    ElMessage.error(e.message || "字幕搜索失败");
     subtitleSearchRows.value = [];
     subtitleSearchTotal.value = 0;
   } finally {
@@ -309,31 +296,48 @@ const runSubtitleTextSearch = async (page?: number) => {
 };
 
 const onSubtitleSearchPageChange = (page: number) => {
-  if (subtitleSearchMode.value === 'hash') {
-    runSubtitleHashSearch(page);
-  } else {
-    runSubtitleTextSearch(page);
-  }
+  runSubtitleTextSearch(page);
 };
 
-const addSubtitle = async () => {
+const openSubtitleSearch = () => {
   if (!props.matData?.path) {
-    ElMessage.warning('请先配置视频路径');
+    ElMessage.warning("请先配置视频路径");
     return;
   }
-  subtitleSearchQuery.value = props.matData.name || '';
+  subtitleSearchQuery.value = props.matData.name || "";
   subtitleSearchActive.value = true;
-  await runSubtitleHashSearch();
+};
+
+const runRecognize = async () => {
+  const videoPath = props.matData?.path;
+  if (!videoPath) {
+    ElMessage.warning("请先配置视频路径");
+    return;
+  }
+  recognizeLoading.value = true;
+  try {
+    await recognizeSubtitle({
+      video_path: videoPath,
+      language: recognizeLang.value || "en",
+    });
+    ElMessage.success("语音识别完成，字幕已保存");
+    await refreshSidecarList(videoPath);
+  } catch (e: any) {
+    console.error("语音识别失败:", e);
+    ElMessage.error(e.message || "语音识别失败");
+  } finally {
+    recognizeLoading.value = false;
+  }
 };
 
 const downloadSubtitle = async (row: SubtitleSearchRow) => {
   const videoPath = props.matData?.path;
   if (!videoPath) {
-    ElMessage.warning('请先配置视频路径');
+    ElMessage.warning("请先配置视频路径");
     return;
   }
   if (!row.id) {
-    ElMessage.warning('无效的字幕条目');
+    ElMessage.warning("无效的字幕条目");
     return;
   }
   subtitleSearchLoading.value = true;
@@ -342,14 +346,8 @@ const downloadSubtitle = async (row: SubtitleSearchRow) => {
       video_path: videoPath,
       subtitle_id: row.id,
     });
-    ElMessage.success('字幕已保存到视频同目录');
-    const tracks = await listSidecarSubtitles(videoPath);
-    sidecarSubtitles.value = tracks.map((t) => ({
-      path: t.path,
-      label: t.label,
-      lang: t.lang,
-      ext: t.ext,
-    }));
+    ElMessage.success("字幕已保存到视频同目录");
+    await refreshSidecarList(videoPath);
     if (!sidecarSubtitles.value.some((s) => s.path === track.path) && track.path) {
       sidecarSubtitles.value.push({
         path: track.path,
@@ -359,8 +357,8 @@ const downloadSubtitle = async (row: SubtitleSearchRow) => {
       });
     }
   } catch (e: any) {
-    console.error('字幕下载失败:', e);
-    ElMessage.error(e.message || '字幕下载失败');
+    console.error("字幕下载失败:", e);
+    ElMessage.error(e.message || "字幕下载失败");
   } finally {
     subtitleSearchLoading.value = false;
   }
