@@ -3,6 +3,7 @@
 包含异步工具函数和其他通用工具函数
 """
 import os
+import stat
 import subprocess
 import json
 import sys
@@ -17,7 +18,7 @@ from flask import request
 from queue import Queue, Empty
 from werkzeug.utils import secure_filename
 
-from core.config import app_logger
+from core.config import app_logger, config
 
 log = app_logger
 
@@ -330,8 +331,6 @@ def decode_url_path(path: str) -> str:
 
 def _path_under_allowed_roots(path: str, base_dir: str) -> bool:
     """路径须在 base_dir 或 ALLOWED_DIR（如 /mnt）之下。"""
-    from core.config import config
-
     norm = os.path.normpath(path)
     roots = [os.path.normpath(base_dir)]
     allowed = (config.ALLOWED_DIR or "").strip()
@@ -361,26 +360,26 @@ def validate_and_normalize_path(file_path: str,
     if '..' in file_path.split('/') or file_path.startswith('~'):
         return None, "Invalid path: Path traversal not allowed"
 
-    try:
-        if not os.path.isabs(file_path):
-            file_path = os.path.join(base_dir, file_path.lstrip('/'))
-        # 不用 realpath：/mnt 等挂载上解析符号链接可能触发 RecursionError
-        file_path = os.path.abspath(file_path)
-    except (RecursionError, OSError) as e:
-        return None, f"Invalid path: {e}"
+    if not os.path.isabs(file_path):
+        file_path = os.path.normpath(os.path.join(base_dir, file_path.lstrip('/')))
+    else:
+        file_path = os.path.normpath(file_path)
 
     if not _path_under_allowed_roots(file_path, base_dir):
         return None, "文件路径不在允许的目录内"
 
+    # lstat 不跟随符号链接，避免 /mnt 等挂载上 exists/isfile/realpath 触发 RecursionError
     try:
-        if not os.path.exists(file_path):
-            return None, "文件不存在"
-        if must_be_file and not os.path.isfile(file_path):
-            return None, "路径不是文件"
+        st = os.lstat(file_path)
+    except FileNotFoundError:
+        return None, "文件不存在"
     except RecursionError:
         return None, "Invalid path: 路径解析失败"
     except OSError as e:
         return None, f"Invalid path: {e}"
+
+    if must_be_file and not stat.S_ISREG(st.st_mode):
+        return None, "路径不是文件"
 
     return file_path, 'ok'
 

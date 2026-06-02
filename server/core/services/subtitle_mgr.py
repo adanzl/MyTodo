@@ -121,27 +121,32 @@ class SubtitleMgr:
         order_direction: str | None = None,
     ) -> dict[str, Any]:
         """按本地视频路径搜索字幕：服务端计算 moviehash 后请求 OpenSubtitles。"""
-        try:
-            path = (video_path or "").strip()
-            if not path:
-                return _err("video_path 不能为空")
+        path = (video_path or "").strip()
+        if not path:
+            return _err("video_path 不能为空")
 
+        try:
             normalized, error_msg = validate_and_normalize_path(
                 path, self.default_base_dir, must_be_file=True
             )
-            if not normalized:
-                return _err(error_msg or "Invalid video_path")
+        except RecursionError:
+            log.exception("[SUBTITLE] validate path recursion: %s", path)
+            return _err("视频路径解析失败")
 
-            try:
-                m_hash = compute_movie_hash(normalized)
-            except RecursionError:
-                log.error("[SUBTITLE] compute_movie_hash recursion: %s", normalized)
-                return _err("无法读取视频文件: 路径或文件系统异常")
-            except OSError as e:
-                return _err(f"无法读取视频文件: {e}")
+        if not normalized:
+            return _err(error_msg or "Invalid video_path")
 
-            fname = (filename or "").strip() or os.path.basename(normalized)
+        try:
+            m_hash = compute_movie_hash(normalized)
+        except RecursionError:
+            log.exception("[SUBTITLE] compute_movie_hash recursion: %s", normalized)
+            return _err("无法读取视频文件: 路径或文件系统异常")
+        except OSError as e:
+            return _err(f"无法读取视频文件: {e}")
 
+        fname = (filename or "").strip() or os.path.basename(normalized)
+
+        try:
             payload = open_subtitles_client.search_by_hash(
                 m_hash,
                 languages=languages,
@@ -151,16 +156,17 @@ class SubtitleMgr:
                 order_by=order_by,
                 order_direction=order_direction,
             )
-            return _ok({"video_path": normalized, **payload})
+        except RecursionError:
+            log.exception("[SUBTITLE] OpenSubtitles recursion, path=%s", normalized)
+            return _err("search subtitle failed: 在线搜索请求异常")
         except OpenSubtitlesError as e:
             log.warning(f"[SUBTITLE] hash search failed: {e}")
             return _err(str(e))
-        except RecursionError:
-            log.error("[SUBTITLE] hash search recursion, path=%s", video_path)
-            return _err("search subtitle failed: 视频路径或文件系统异常")
         except Exception as e:
             log.error(f"[SUBTITLE] hash search failed: {e}")
             return _err(f"search subtitle failed: {e}")
+
+        return _ok({"video_path": normalized, **payload})
 
 
 subtitle_mgr = SubtitleMgr()

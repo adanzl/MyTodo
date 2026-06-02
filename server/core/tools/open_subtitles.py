@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import os
+import stat
 import struct
 import threading
 import time
@@ -40,10 +41,13 @@ def _normalize_base_url(url: str) -> str:
 def compute_movie_hash(file_path: str) -> str:
     """OpenSubtitles moviehash（文件大小 + 首/尾各 64KB）。"""
     try:
-        size = os.path.getsize(file_path)
-    except RecursionError as e:
+        st = os.lstat(file_path)
+    except (RecursionError, OSError) as e:
         raise OSError("无法读取视频文件") from e
+    if not stat.S_ISREG(st.st_mode):
+        raise OSError("不是普通文件")
 
+    size = st.st_size
     offsets = [0]
     if size > _READ_CHUNK:
         offsets.append(size - _READ_CHUNK)
@@ -56,8 +60,8 @@ def compute_movie_hash(file_path: str) -> str:
                 block = f.read(_READ_CHUNK)
                 if len(block) < _READ_CHUNK:
                     block += b"\x00" * (_READ_CHUNK - len(block))
-                for val, in struct.iter_unpack("q", block):
-                    acc += val
+                for i in range(0, _READ_CHUNK, 8):
+                    acc += struct.unpack_from("q", block, i)[0]
                     acc &= 0xFFFFFFFFFFFFFFFF
     except RecursionError as e:
         raise OSError("无法读取视频文件") from e
@@ -204,6 +208,8 @@ class OpenSubtitlesClient:
                 headers=headers,
                 timeout=config.OPEN_SUBTITLES_TIMEOUT,
             )
+        except RecursionError as e:
+            raise OpenSubtitlesError(f"请求 OpenSubtitles 失败: {e}") from e
         except requests.RequestException as e:
             raise OpenSubtitlesError(f"请求 OpenSubtitles 失败: {e}") from e
 
