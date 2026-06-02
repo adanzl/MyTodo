@@ -140,10 +140,7 @@ def test_recognize_cancel_pending(mock_bg, tmp_path, monkeypatch):
     q = _make_recognize_mgr(tmp_path, monkeypatch)
     task_id = q.enqueue(str(video), language="en")["data"]["task_id"]
     assert q.cancel(task_id)["code"] == 0
-    task = q.get_task(task_id)
-    assert task is not None
-    assert task["status"] == TASK_STATUS_FAILED
-    assert task["error_message"] == "已取消"
+    assert q.get_task(task_id) is None
 
 
 @patch("core.services.subtitle_mgr.transcribe_to_sidecar")
@@ -193,6 +190,35 @@ def test_recognize_purge_expired_on_load(mock_bg, tmp_path, monkeypatch):
     )
     q = _make_recognize_mgr(tmp_path, monkeypatch)
     assert q.get_task("old0001") is None
+
+
+@patch("core.services.subtitle_mgr.run_in_background")
+def test_recognize_retry_and_remove(mock_bg, tmp_path, monkeypatch):
+    video = tmp_path / "clip.mp4"
+    video.write_bytes(b"x")
+    base = tmp_path / "subtitle_recognize"
+    base.mkdir(parents=True, exist_ok=True)
+    (base / "tasks.json").write_text(
+        json.dumps({
+            "fail001": {
+                "task_id": "fail001",
+                "name": "clip",
+                "video_path": str(video),
+                "language": "en",
+                "status": TASK_STATUS_FAILED,
+                "error_message": "err",
+                "create_time": 9e9,
+                "update_time": 9e9,
+            },
+        }),
+        encoding="utf-8",
+    )
+    q = _make_recognize_mgr(tmp_path, monkeypatch)
+    assert q.get_task("fail001") is not None
+    assert q.retry("fail001")["code"] == 0
+    assert q.get_task("fail001")["status"] == TASK_STATUS_PENDING
+    assert q.cancel("fail001")["code"] == 0
+    assert q.get_task("fail001") is None
 
 
 @patch("core.services.subtitle_mgr.run_in_background")

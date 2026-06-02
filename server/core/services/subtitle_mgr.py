@@ -114,6 +114,11 @@ class SubtitleRecognizeMgr(BaseTaskMgr[SubtitleRecognizeTask]):
             self._save_task_and_update_time(task)
         self._purge_expired_tasks()
 
+    def _drop_task(self, task_id: str) -> None:
+        with self._task_lock.gen_wlock():
+            if self._tasks.pop(task_id, None) is not None:
+                self._save_all_tasks()
+
     def _pick_pending_id(self) -> str | None:
         with self._task_lock.gen_rlock():
             if any(t.status == TASK_STATUS_PROCESSING for t in self._tasks.values()):
@@ -166,12 +171,15 @@ class SubtitleRecognizeMgr(BaseTaskMgr[SubtitleRecognizeTask]):
             finally:
                 self._clear_stop_flag(task_id)
                 if entered_processing:
-                    self._finish_task(
-                        task_id,
-                        success=outcome_success,
-                        error_message=outcome_error,
-                        output_path=outcome_path,
-                    )
+                    if outcome_error == "已取消":
+                        self._drop_task(task_id)
+                    else:
+                        self._finish_task(
+                            task_id,
+                            success=outcome_success,
+                            error_message=outcome_error,
+                            output_path=outcome_path,
+                        )
                 self._drain_queue()
 
         run_in_background(job)
@@ -220,6 +228,7 @@ class SubtitleRecognizeMgr(BaseTaskMgr[SubtitleRecognizeTask]):
         })
 
     def cancel(self, task_id: str) -> dict[str, Any]:
+        """取消/删除任务：进行中则请求停止，其余状态直接从列表移除。"""
         tid = (task_id or "").strip()
         if not tid:
             return _err("task_id 不能为空")
@@ -228,17 +237,31 @@ class SubtitleRecognizeMgr(BaseTaskMgr[SubtitleRecognizeTask]):
             return _err(err)
         if task.status == TASK_STATUS_PROCESSING:
             code, msg = self.stop_task(tid)
-        elif task.status == TASK_STATUS_PENDING:
-            self._finish_task(
-                tid, success=False, error_message="已取消", from_status=TASK_STATUS_PENDING,
-            )
-            code, msg = 0, "已取消"
-            self._drain_queue()
-        else:
-            return _err("任务已结束")
+            if code != 0:
+                return _err(msg)
+            return _ok({"task_id": tid})
+        code, msg = self.delete_task(tid)
         if code != 0:
             return _err(msg)
-        return _ok({"task_id": tid, "cancelled": True})
+        self._drain_queue()
+        return _ok({"task_id": tid})
+
+    def retry(self, task_id: str) -> dict[str, Any]:
+        tid = (task_id or "").strip()
+        if not tid:
+            return _err("task_id 不能为空")
+        task, err = self._get_task_or_err(tid)
+        if not task:
+            return _err(err)
+        if task.status not in (TASK_STATUS_SUCCESS, TASK_STATUS_FAILED):
+            return _err("仅已完成或失败的任务可重试")
+        with self._task_lock.gen_wlock():
+            task.status = TASK_STATUS_PENDING
+            task.error_message = None
+            task.output_path = ""
+            self._save_task_and_update_time(task)
+        self._drain_queue()
+        return _ok({"task_id": tid, "status": TASK_STATUS_PENDING})
 
 
 class SubtitleMgr:
@@ -313,6 +336,9 @@ class SubtitleMgr:
 
     def cancel_recognize_task(self, task_id: str) -> dict[str, Any]:
         return self.recognize.cancel(task_id)
+
+    def retry_recognize_task(self, task_id: str) -> dict[str, Any]:
+        return self.recognize.retry(task_id)
 
     def download_subtitle(self, video_path: str, subtitle_id: str, *, file_index: int = 0) -> dict[str, Any]:
         path = (video_path or "").strip()

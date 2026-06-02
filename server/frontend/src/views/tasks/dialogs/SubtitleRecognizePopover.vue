@@ -2,7 +2,7 @@
   <el-popover
     v-model:visible="visible"
     placement="bottom-end"
-    :width="440"
+    :width="800"
     trigger="click"
     @show="fetchTasks"
   >
@@ -48,16 +48,28 @@
               {{ task.error_message }}
             </div>
           </div>
-          <el-button
-            v-if="canCancel(task)"
-            type="danger"
-            plain
-            size="small"
-            :loading="cancelingId === task.task_id"
-            @click="handleCancel(task)"
-          >
-            取消
-          </el-button>
+          <div class="flex shrink-0 items-center gap-1">
+            <el-button
+              v-if="canRetry(task)"
+              type="primary"
+              plain
+              size="small"
+              :loading="actingId === task.task_id && acting === 'retry'"
+              @click="handleRetry(task)"
+            >
+              重试
+            </el-button>
+            <el-button
+              v-if="canRemove(task)"
+              type="danger"
+              plain
+              size="small"
+              :loading="actingId === task.task_id && acting === 'remove'"
+              @click="handleRemove(task)"
+            >
+              删除
+            </el-button>
+          </div>
         </div>
       </div>
     </div>
@@ -70,13 +82,15 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import {
   cancelRecognizeSubtitleTask,
   listRecognizeSubtitleTasks,
+  retryRecognizeSubtitleTask,
   type RecognizeSubtitleTask,
 } from "@/utils/subtitle";
 
 const visible = ref(false);
 const loading = ref(false);
 const tasks = ref<RecognizeSubtitleTask[]>([]);
-const cancelingId = ref<string | null>(null);
+const actingId = ref<string | null>(null);
+const acting = ref<"retry" | "remove" | null>(null);
 
 const taskBasename = (path?: string) => {
   if (!path) return "—";
@@ -101,8 +115,10 @@ const statusTag = (status?: string): "info" | "warning" | "success" | "danger" =
   return "info";
 };
 
-const canCancel = (task: RecognizeSubtitleTask) =>
-  task.status === "pending" || task.status === "processing";
+const canRetry = (task: RecognizeSubtitleTask) =>
+  task.status === "success" || task.status === "failed";
+
+const canRemove = (_task: RecognizeSubtitleTask) => true;
 
 const fetchTasks = async () => {
   loading.value = true;
@@ -117,32 +133,61 @@ const fetchTasks = async () => {
   }
 };
 
-const handleCancel = async (task: RecognizeSubtitleTask) => {
+const confirmAction = async (message: string) => {
+  try {
+    await ElMessageBox.confirm(message, "删除任务", {
+      confirmButtonText: "确定",
+      cancelButtonText: "返回",
+      type: "warning",
+    });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const runAction = async (
+  task: RecognizeSubtitleTask,
+  kind: "retry" | "remove",
+  fn: () => Promise<void>,
+  successMsg: string,
+) => {
+  actingId.value = task.task_id;
+  acting.value = kind;
+  try {
+    await fn();
+    ElMessage.success(successMsg);
+    await fetchTasks();
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "操作失败";
+    ElMessage.error(msg);
+  } finally {
+    actingId.value = null;
+    acting.value = null;
+  }
+};
+
+const handleRetry = async (task: RecognizeSubtitleTask) => {
   const name = taskBasename(task.video_path);
   try {
-    await ElMessageBox.confirm(
-      `确定取消识别任务「${name}」吗？`,
-      "取消识别",
-      {
-        confirmButtonText: "确定取消",
-        cancelButtonText: "返回",
-        type: "warning",
-      },
-    );
+    await ElMessageBox.confirm(`确定重新识别「${name}」吗？`, "重试识别", {
+      confirmButtonText: "确定",
+      cancelButtonText: "返回",
+      type: "warning",
+    });
   } catch {
     return;
   }
+  await runAction(task, "retry", () => retryRecognizeSubtitleTask(task.task_id), "已重新入队");
+};
 
-  cancelingId.value = task.task_id;
-  try {
-    await cancelRecognizeSubtitleTask(task.task_id);
-    ElMessage.success("已取消");
-    await fetchTasks();
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "取消失败";
-    ElMessage.error(msg);
-  } finally {
-    cancelingId.value = null;
-  }
+const handleRemove = async (task: RecognizeSubtitleTask) => {
+  const name = taskBasename(task.video_path);
+  const hint =
+    task.status === "processing"
+      ? `识别进行中，确定停止并删除「${name}」吗？`
+      : `确定删除任务「${name}」吗？`;
+  if (!(await confirmAction(hint))) return;
+  await runAction(task, "remove", () => cancelRecognizeSubtitleTask(task.task_id), "已删除");
 };
 </script>

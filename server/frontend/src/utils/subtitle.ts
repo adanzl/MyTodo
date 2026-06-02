@@ -197,7 +197,15 @@ export async function cancelRecognizeSubtitleTask(taskId: string): Promise<void>
   const rsp = await api.post('/media/subtitle/recognize/cancel', { task_id: taskId });
   const body = rsp.data;
   if (!body || body.code !== 0) {
-    throw new Error(body?.msg || '取消识别任务失败');
+    throw new Error(body?.msg || '删除识别任务失败');
+  }
+}
+
+export async function retryRecognizeSubtitleTask(taskId: string): Promise<void> {
+  const rsp = await api.post('/media/subtitle/recognize/retry', { task_id: taskId });
+  const body = rsp.data;
+  if (!body || body.code !== 0) {
+    throw new Error(body?.msg || '重试识别任务失败');
   }
 }
 

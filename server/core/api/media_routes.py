@@ -195,13 +195,28 @@ def list_recognize_subtitle_tasks() -> ResponseReturnValue:
 @media_bp.route("/media/subtitle/recognize/cancel", methods=['POST'])
 @limiter.limit("30 per minute")
 def cancel_recognize_subtitle_task() -> ResponseReturnValue:
-    """取消识别任务（JSON: task_id）。"""
+    """取消或删除识别任务（JSON: task_id）。"""
     data = read_json_from_request() or {}
     body, err = parse_with_model(_TaskIdBody, data, err_factory=_err)
     if err or not body:
         return err or _err('Invalid request arguments')
 
     result = subtitle_mgr.cancel_recognize_task(body.task_id)
+    if result.get('code') != 0:
+        return _err(result.get('msg') or 'Error')
+    return _ok(result.get('data'))
+
+
+@media_bp.route("/media/subtitle/recognize/retry", methods=['POST'])
+@limiter.limit("30 per minute")
+def retry_recognize_subtitle_task() -> ResponseReturnValue:
+    """重试识别任务（JSON: task_id），将 success/failed 任务重新入队。"""
+    data = read_json_from_request() or {}
+    body, err = parse_with_model(_TaskIdBody, data, err_factory=_err)
+    if err or not body:
+        return err or _err('Invalid request arguments')
+
+    result = subtitle_mgr.retry_recognize_task(body.task_id)
     if result.get('code') != 0:
         return _err(result.get('msg') or 'Error')
     return _ok(result.get('data'))
