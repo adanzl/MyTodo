@@ -1,18 +1,13 @@
 """OpenSubtitles.com REST API 客户端。
 
 文档: https://opensubtitles.stoplight.io/docs/opensubtitles-api/a172317bd5ccc-search-for-subtitles
-
-``GET /api/v1/subtitles`` 常用查询参数（官方）:
-  query, languages, page, order_by, order_direction, title_match,
-  moviehash, filename, moviehash_match, imdb_id, tmdb_id, ...
-
-登录后 ``base_url`` 可能无 scheme（如 ``api.opensubtitles.com``），需补全为 ``https://``。
 """
 
 from __future__ import annotations
 
 import os
 import struct
+import threading
 import time
 from typing import Any
 
@@ -23,6 +18,7 @@ from core.config import config
 _READ_CHUNK = 64 * 1024
 _TOKEN_TTL = 23 * 3600
 _auth: dict[str, Any] = {"token": None, "expires": 0.0}
+_auth_lock = threading.Lock()
 
 
 class OpenSubtitlesError(Exception):
@@ -35,48 +31,30 @@ class OpenSubtitlesError(Exception):
 def _normalize_base_url(url: str) -> str:
     u = (url or "").strip().rstrip("/")
     if not u:
-        u = "https://api.opensubtitles.com"
-    elif not u.startswith(("http://", "https://")):
-        u = "https://" + u.lstrip("/")
+        return "https://api.opensubtitles.com"
+    if not u.startswith(("http://", "https://")):
+        return "https://" + u.lstrip("/")
     return u
 
 
 def compute_movie_hash(file_path: str) -> str:
     """OpenSubtitles moviehash（文件大小 + 首/尾各 64KB）。"""
-    fmt, unit = "q", struct.calcsize("q")
     size = os.path.getsize(file_path)
+    offsets = [0]
+    if size > _READ_CHUNK:
+        offsets.append(size - _READ_CHUNK)
+
+    acc = size
     with open(file_path, "rb") as f:
-        acc = size
-        for offset in (0, max(0, size - _READ_CHUNK)):
+        for offset in offsets:
             f.seek(offset)
             block = f.read(_READ_CHUNK)
             if len(block) < _READ_CHUNK:
                 block += b"\x00" * (_READ_CHUNK - len(block))
-            for i in range(0, _READ_CHUNK, unit):
-                chunk = block[i:i + unit]
-                if len(chunk) < unit:
-                    chunk += b"\x00" * (unit - len(chunk))
-                acc += struct.unpack(fmt, chunk)[0]
+            for val, in struct.iter_unpack("q", block):
+                acc += val
                 acc &= 0xFFFFFFFFFFFFFFFF
     return f"{acc:016x}"
-
-
-def _append_common_params(
-    params: dict[str, str],
-    *,
-    languages: str | None,
-    page: int,
-    order_by: str | None,
-    order_direction: str | None,
-) -> None:
-    if languages:
-        params["languages"] = languages
-    if page > 1:
-        params["page"] = str(page)
-    if order_by:
-        params["order_by"] = order_by
-    if order_direction:
-        params["order_direction"] = order_direction
 
 
 class OpenSubtitlesClient:
@@ -95,21 +73,24 @@ class OpenSubtitlesClient:
         order_direction: str | None = None,
         title_match: str | None = None,
     ) -> dict[str, Any]:
-        """文字搜索：``query``（及官方可选参数）。"""
         q = (query or "").strip()
         if not q:
             raise OpenSubtitlesError("query 不能为空")
 
         langs = languages or config.SUBTITLE_DEFAULT_LANGS or None
         params: dict[str, str] = {"query": q}
-        _append_common_params(
-            params, languages=langs, page=page, order_by=order_by, order_direction=order_direction
-        )
+        if langs:
+            params["languages"] = langs
+        if page > 1:
+            params["page"] = str(page)
+        if order_by:
+            params["order_by"] = order_by
+        if order_direction:
+            params["order_direction"] = order_direction
         if title_match:
             params["title_match"] = title_match
 
-        body = self._get_subtitles(params)
-        return {"mode": "text", "query": q, **body}
+        return {"mode": "text", "query": q, **self._get_json("/api/v1/subtitles", params=params)}
 
     def search_by_hash(
         self,
@@ -122,40 +103,80 @@ class OpenSubtitlesClient:
         order_by: str | None = None,
         order_direction: str | None = None,
     ) -> dict[str, Any]:
-        """Hash 搜索：``moviehash``（及官方可选 ``filename`` 等）。"""
         h = (moviehash or "").strip().lower()
         if not h:
             raise OpenSubtitlesError("moviehash 不能为空")
 
         langs = languages or config.SUBTITLE_DEFAULT_LANGS or None
         params: dict[str, str] = {"moviehash": h}
-        _append_common_params(
-            params, languages=langs, page=page, order_by=order_by, order_direction=order_direction
-        )
-        if filename:
-            params["filename"] = filename.strip()
+        if langs:
+            params["languages"] = langs
+        if page > 1:
+            params["page"] = str(page)
+        if order_by:
+            params["order_by"] = order_by
+        if order_direction:
+            params["order_direction"] = order_direction
+        fname = (filename or "").strip()
+        if fname:
+            params["filename"] = fname
         if moviehash_match:
             params["moviehash_match"] = moviehash_match
 
-        body = self._get_subtitles(params)
-        out: dict[str, Any] = {"mode": "hash", "moviehash": h, **body}
-        if filename:
-            out["filename"] = filename.strip()
+        out: dict[str, Any] = {"mode": "hash", "moviehash": h, **self._get_json("/api/v1/subtitles", params=params)}
+        if fname:
+            out["filename"] = fname
         return out
 
-    def _get_subtitles(self, params: dict[str, str]) -> dict[str, Any]:
+    def _get_json(self, path: str, *, params: dict[str, str] | None = None) -> dict[str, Any]:
         if not config.OPEN_SUBTITLES_API:
             raise OpenSubtitlesError("未配置 OPEN_SUBTITLES_API")
-        return self._call("GET", "/api/v1/subtitles", params=params)
 
-    def _call(
+        token = self._token()
+        for retry in (False, True):
+            try:
+                return self._http("GET", path, params=params, token=token)
+            except OpenSubtitlesError as e:
+                if retry or not token or e.status_code not in (401, 403):
+                    raise
+                with _auth_lock:
+                    _auth["token"] = None
+                    _auth["expires"] = 0.0
+                token = self._token()
+        raise OpenSubtitlesError("请求失败")
+
+    def _token(self) -> str | None:
+        if not config.OPEN_SUBTITLES_USER or not config.OPEN_SUBTITLES_PASS:
+            return None
+        with _auth_lock:
+            token = _auth.get("token")
+            if token and time.time() < _auth.get("expires", 0):
+                return token
+
+            data = self._http(
+                "POST",
+                "/api/v1/login",
+                json_body={
+                    "username": config.OPEN_SUBTITLES_USER,
+                    "password": config.OPEN_SUBTITLES_PASS,
+                },
+            )
+            token = data.get("token")
+            if not token:
+                raise OpenSubtitlesError("登录响应缺少 token")
+            self.base_url = _normalize_base_url(data.get("base_url") or self.base_url)
+            _auth["token"] = token
+            _auth["expires"] = time.time() + _TOKEN_TTL
+            return token
+
+    def _http(
         self,
         method: str,
         path: str,
         *,
         json_body: dict[str, Any] | None = None,
         params: dict[str, str] | None = None,
-        auth: bool = True,
+        token: str | None = None,
     ) -> dict[str, Any]:
         headers = {
             "Api-Key": config.OPEN_SUBTITLES_API,
@@ -164,13 +185,8 @@ class OpenSubtitlesClient:
         }
         if json_body is not None:
             headers["Content-Type"] = "application/json"
-
-        if auth:
-            token = _auth.get("token")
-            if not token or time.time() >= _auth.get("expires", 0):
-                token = self._login()
-            if token:
-                headers["Authorization"] = f"Bearer {token}"
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
 
         try:
             resp = requests.request(
@@ -198,26 +214,6 @@ class OpenSubtitlesClient:
             raise OpenSubtitlesError(msg, status_code=resp.status_code, payload=data)
 
         return data if isinstance(data, dict) else {}
-
-    def _login(self) -> str | None:
-        if not config.OPEN_SUBTITLES_USER or not config.OPEN_SUBTITLES_PASS:
-            return None
-        data = self._call(
-            "POST",
-            "/api/v1/login",
-            json_body={
-                "username": config.OPEN_SUBTITLES_USER,
-                "password": config.OPEN_SUBTITLES_PASS,
-            },
-            auth=False,
-        )
-        token = data.get("token")
-        if not token:
-            raise OpenSubtitlesError("登录响应缺少 token")
-        self.base_url = _normalize_base_url(data.get("base_url") or self.base_url)
-        _auth["token"] = token
-        _auth["expires"] = time.time() + _TOKEN_TTL
-        return token
 
 
 client = OpenSubtitlesClient()

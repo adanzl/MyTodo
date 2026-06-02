@@ -50,6 +50,7 @@
         "upnp",
         "upnpclient",
         "useragent",
+        "WEBVTT",
         "zhaozhao"
     ],
     "cSpell.ignoreRegExpList": [

@@ -152,6 +152,9 @@ class SubtitleMgr:
         except OpenSubtitlesError as e:
             log.warning(f"[SUBTITLE] hash search failed: {e}")
             return _err(str(e))
+        except RecursionError:
+            log.error("[SUBTITLE] hash search failed: path or file caused recursion")
+            return _err("search subtitle failed: 视频路径或文件异常，无法计算 hash")
         except Exception as e:
             log.error(f"[SUBTITLE] hash search failed: {e}")
             return _err(f"search subtitle failed: {e}")

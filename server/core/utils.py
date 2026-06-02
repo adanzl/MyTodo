@@ -315,7 +315,9 @@ def decode_url_path(path: str) -> str:
     Returns:
         解码后的路径。
     """
-    while '%' in path:
+    for _ in range(32):
+        if '%' not in path:
+            break
         try:
             decoded = unquote(path)
             if decoded == path:
@@ -350,11 +352,16 @@ def validate_and_normalize_path(file_path: str,
         return None, "Invalid path: Path traversal not allowed"
 
     # 处理相对路径
-    if not os.path.isabs(file_path):
-        file_path = os.path.join(base_dir, file_path.lstrip('/'))
-        file_path = os.path.abspath(file_path)
-    else:
-        file_path = os.path.abspath(file_path)
+    try:
+        if not os.path.isabs(file_path):
+            file_path = os.path.join(base_dir, file_path.lstrip('/'))
+            file_path = os.path.realpath(file_path)
+        else:
+            file_path = os.path.realpath(file_path)
+    except RecursionError:
+        return None, "Invalid path: 路径解析失败"
+    except OSError as e:
+        return None, f"Invalid path: {e}"
 
     # 检查文件是否存在
     if not os.path.exists(file_path):
