@@ -317,7 +317,7 @@ const runRecognize = async () => {
   }
   recognizeLoading.value = true;
   try {
-    const job = await recognizeSubtitle({
+    await recognizeSubtitle({
       video_path: videoPath,
       language: recognizeLang.value || "en",
     });

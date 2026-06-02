@@ -88,8 +88,8 @@ class Config:
     ASSRT_TIMEOUT: int = int(os.environ.get('ASSRT_TIMEOUT', '30'))
     SUBTITLE_DEFAULT_LANGS: str = os.environ.get('SUBTITLE_DEFAULT_LANGS', 'en')
 
-    # ========== Whisper 语音识别 ==========
-    WHISPER_MODEL: str = os.environ.get('WHISPER_MODEL', 'base')
+    # ========== Whisper 语音识别（本地 CTranslate2 模型目录，见 faster_whisper.download_model）==========
+    WHISPER_MODEL_DIR: str = os.environ.get('WHISPER_MODEL_DIR', '/mnt/data/whisper/medium')
     WHISPER_DEVICE: str = os.environ.get('WHISPER_DEVICE', 'cpu')
     WHISPER_COMPUTE_TYPE: str = os.environ.get('WHISPER_COMPUTE_TYPE', 'int8')
     WHISPER_TIMEOUT: int = int(os.environ.get('WHISPER_TIMEOUT', '1800'))

@@ -10,6 +10,7 @@
       <el-button type="primary" size="small" @click="handleAddMaterial">添加素材</el-button>
       <el-button type="warning" size="small" @click="handleAddFolder">新建目录</el-button>
       <div class="ml-auto flex items-center gap-2">
+        <SubtitleRecognizePopover />
         <span class="text-sm text-gray-600">排序：</span>
         <el-radio-group v-model="sortType" size="small" @change="handleSortChange">
           <el-radio-button value="name">名称</el-radio-button>
@@ -154,6 +155,7 @@ import MatDetailPdf from "./dialogs/MatDetailPdf.vue";
 import MatDetailVideo from "./dialogs/MatDetailVideo.vue";
 import MaterialPreviewDialog from "./dialogs/MaterialPreviewDialog.vue";
 import BatchAddMaterialDialog from "./dialogs/MaterialBatchAdd.vue";
+import SubtitleRecognizePopover from "./dialogs/SubtitleRecognizePopover.vue";
 
 interface FolderItem extends MaterialCategory {
   type: 'folder';

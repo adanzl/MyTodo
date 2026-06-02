@@ -19,6 +19,7 @@ except ImportError:
 log = app_logger
 
 _ZH_LANGS = frozenset({"zh", "chs", "cht", "chi", "zho"})
+_whisper_model: Any = None
 
 
 class WhisperError(Exception):
@@ -59,24 +60,24 @@ def _sidecar_path(video_path: str, language: str) -> str:
 
 def _whisper_transcribe_sync(wav_path: str, language: str) -> str:
     """在后台线程内同步执行 Whisper（勿在 gevent worker 主线程直接调用）。"""
+    global _whisper_model
     if WhisperModel is None:
         raise WhisperError("未安装 faster-whisper，请执行: pip install faster-whisper")
-
-    model_name = (config.WHISPER_MODEL or "base").strip()
-    device = (config.WHISPER_DEVICE or "cpu").strip()
+    model_dir = (config.WHISPER_MODEL_DIR or "").strip()
+    if not model_dir or not os.path.isdir(model_dir):
+        raise WhisperError("请配置有效的 WHISPER_MODEL_DIR（faster_whisper.download_model 输出目录）")
     log.info(
-        "[SUBTITLE] whisper transcribe start model=%s device=%s language=%s wav=%s",
-        model_name,
-        device,
-        language,
-        wav_path,
+        "[SUBTITLE] whisper transcribe start model=%s language=%s wav=%s",
+        model_dir, language, wav_path,
     )
     t0 = time.monotonic()
-    model = WhisperModel(
-        model_name,
-        device=device,
-        compute_type=(config.WHISPER_COMPUTE_TYPE or "int8").strip(),
-    )
+    if _whisper_model is None:
+        _whisper_model = WhisperModel(
+            model_dir,
+            device=(config.WHISPER_DEVICE or "cpu").strip(),
+            compute_type=(config.WHISPER_COMPUTE_TYPE or "int8").strip(),
+        )
+    model = _whisper_model
     lang = (language or "en").strip() or None
     seg_list, info = model.transcribe(wav_path, language=lang, vad_filter=True)
     vtt = _segments_to_vtt(seg_list)
@@ -110,8 +111,8 @@ def transcribe_to_sidecar(video_path: str, *, language: str = "en") -> dict[str,
             log.info("[SUBTITLE] whisper extract audio video=%s", video_path)
             code, _, err = run_subprocess_safe(
                 [
-                    config.FFMPEG_PATH, "-loglevel", "error", "-y",
-                    "-i", video_path, "-vn", "-ac", "1", "-ar", "16000", wav,
+                    config.FFMPEG_PATH, "-loglevel", "error", "-y", "-i", video_path, "-vn", "-ac", "1", "-ar", "16000",
+                    wav
                 ],
                 timeout=float(config.FFMPEG_TIMEOUT),
             )
