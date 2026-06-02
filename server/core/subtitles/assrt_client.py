@@ -149,11 +149,7 @@ class AssrtClient:
         *,
         languages: str | None = None,
         page: int = 1,
-        order_by: str | None = None,
-        order_direction: str | None = None,
-        title_match: str | None = None,
     ) -> dict[str, Any]:
-        del order_by, order_direction, title_match
         q = (query or "").strip()
         if len(q) < 3:
             raise AssrtError("搜索关键词至少 3 个字符")

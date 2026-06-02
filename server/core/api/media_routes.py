@@ -45,21 +45,6 @@ class _CreateConvertTaskBody(BaseModel):
     source_type: str | None = None
 
 
-class _VideoPathQuery(BaseModel):
-    video_path: str
-
-
-class _SubtitleDownloadBody(BaseModel):
-    video_path: str
-    subtitle_id: str
-    file_index: int = 0
-
-
-class _SubtitleRecognizeBody(BaseModel):
-    video_path: str
-    language: str = "en"
-
-
 log = app_logger
 media_bp = Blueprint('media', __name__)
 
@@ -119,12 +104,11 @@ def resolve_subtitles() -> ResponseReturnValue:
             失败时返回 `{"code": -1, "msg": str}`。
             `tracks` 为同目录下实际存在的 sidecar 字幕；无字幕时为空数组。
     """
-    video_path = request.args.get('video_path', '') or ''
-    body, err = parse_with_model(_VideoPathQuery, {'video_path': video_path}, err_factory=_err)
-    if err or not body:
-        return err or _err('Invalid request arguments')
+    video_path = (request.args.get('video_path') or '').strip()
+    if not video_path:
+        return _err('video_path 不能为空')
 
-    result = subtitle_mgr.resolve_subtitles(body.video_path)
+    result = subtitle_mgr.resolve_subtitles(video_path)
     if result.get('code') != 0:
         return _err(result.get('msg') or 'Error')
     return _ok(result.get('data'))
@@ -137,11 +121,9 @@ def search_subtitles_online() -> ResponseReturnValue:
 
     Query Args:
         query (str): 搜索关键词（必填）
-        languages, page, order_by, order_direction, title_match（可选）
+        languages, page（可选；languages 为服务端按 lang.desc 过滤）
     """
     languages = request.args.get('languages', '') or None
-    order_by = request.args.get('order_by', '') or None
-    order_direction = request.args.get('order_direction', '') or None
     page = 1
     if request.args.get('page', '').strip():
         try:
@@ -153,9 +135,6 @@ def search_subtitles_online() -> ResponseReturnValue:
         request.args.get('query', ''),
         languages=languages,
         page=page,
-        order_by=order_by,
-        order_direction=order_direction,
-        title_match=request.args.get('title_match', '') or None,
     )
     if result.get('code') != 0:
         return _err(result.get('msg') or 'Error')
@@ -167,14 +146,21 @@ def search_subtitles_online() -> ResponseReturnValue:
 def download_subtitle_sidecar() -> ResponseReturnValue:
     """下载字幕到视频同目录 sidecar（JSON: video_path, subtitle_id, file_index?）。"""
     data = read_json_from_request() or {}
-    body, err = parse_with_model(_SubtitleDownloadBody, data, err_factory=_err)
-    if err or not body:
-        return err or _err('Invalid request arguments')
+    video_path = (data.get('video_path') or '').strip()
+    subtitle_id = (data.get('subtitle_id') or '').strip()
+    if not video_path:
+        return _err('video_path 不能为空')
+    if not subtitle_id:
+        return _err('subtitle_id 不能为空')
+    try:
+        file_index = int(data.get('file_index', 0))
+    except (TypeError, ValueError):
+        return _err('file_index 必须为整数')
 
     result = subtitle_mgr.download_subtitle(
-        body.video_path,
-        body.subtitle_id,
-        file_index=body.file_index,
+        video_path,
+        subtitle_id,
+        file_index=file_index,
     )
     if result.get('code') != 0:
         return _err(result.get('msg') or 'Error')
@@ -184,13 +170,38 @@ def download_subtitle_sidecar() -> ResponseReturnValue:
 @media_bp.route("/media/subtitle/recognize", methods=['POST'])
 @limiter.limit("5 per minute")
 def recognize_subtitle_sidecar() -> ResponseReturnValue:
-    """Whisper 语音识别并写入 sidecar 字幕（JSON: video_path, language 默认 en）。"""
+    """提交 Whisper 识别任务（JSON: video_path, language 默认 en），返回 task_id。"""
     data = read_json_from_request() or {}
-    body, err = parse_with_model(_SubtitleRecognizeBody, data, err_factory=_err)
+    video_path = (data.get('video_path') or '').strip()
+    language = (data.get('language') or 'en').strip() or 'en'
+    if not video_path:
+        return _err('video_path 不能为空')
+
+    result = subtitle_mgr.recognize_subtitle(video_path, language=language)
+    if result.get('code') != 0:
+        return _err(result.get('msg') or 'Error')
+    return _ok(result.get('data'))
+
+
+@media_bp.route("/media/subtitle/recognize/tasks", methods=['GET'])
+def list_recognize_subtitle_tasks() -> ResponseReturnValue:
+    """获取进行中的 Whisper 识别任务列表。"""
+    result = subtitle_mgr.list_recognize_tasks()
+    if result.get('code') != 0:
+        return _err(result.get('msg') or 'Error')
+    return _ok(result.get('data'))
+
+
+@media_bp.route("/media/subtitle/recognize/cancel", methods=['POST'])
+@limiter.limit("30 per minute")
+def cancel_recognize_subtitle_task() -> ResponseReturnValue:
+    """取消识别任务（JSON: task_id）。"""
+    data = read_json_from_request() or {}
+    body, err = parse_with_model(_TaskIdBody, data, err_factory=_err)
     if err or not body:
         return err or _err('Invalid request arguments')
 
-    result = subtitle_mgr.recognize_subtitle(body.video_path, language=body.language)
+    result = subtitle_mgr.cancel_recognize_task(body.task_id)
     if result.get('code') != 0:
         return _err(result.get('msg') or 'Error')
     return _ok(result.get('data'))

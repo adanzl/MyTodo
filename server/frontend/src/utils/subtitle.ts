@@ -158,19 +158,70 @@ export async function searchSubtitles(params: {
   };
 }
 
+export interface RecognizeSubtitleTask {
+  task_id: string;
+  video_path?: string;
+  language?: string;
+  status?: string;
+  error_message?: string | null;
+  create_time?: number;
+  update_time?: number;
+}
+
 export async function recognizeSubtitle(params: {
   video_path: string;
   language?: string;
-}): Promise<{ path: string; label?: string; lang?: string; ext?: string }> {
+}): Promise<{ task_id: string; video_path?: string; language?: string; status?: string }> {
   const rsp = await api.post('/media/subtitle/recognize', {
     video_path: params.video_path,
     language: params.language ?? 'en',
   });
   const body = rsp.data;
   if (!body || body.code !== 0) {
-    throw new Error(body?.msg || '语音识别失败');
+    throw new Error(body?.msg || '提交语音识别失败');
   }
   return body.data ?? {};
+}
+
+export async function listRecognizeSubtitleTasks(): Promise<RecognizeSubtitleTask[]> {
+  const rsp = await api.get('/media/subtitle/recognize/tasks');
+  const body = rsp.data;
+  if (!body || body.code !== 0) {
+    throw new Error(body?.msg || '获取识别任务失败');
+  }
+  const tasks = body.data?.tasks;
+  return Array.isArray(tasks) ? tasks : [];
+}
+
+export async function cancelRecognizeSubtitleTask(taskId: string): Promise<void> {
+  const rsp = await api.post('/media/subtitle/recognize/cancel', { task_id: taskId });
+  const body = rsp.data;
+  if (!body || body.code !== 0) {
+    throw new Error(body?.msg || '取消识别任务失败');
+  }
+}
+
+/** 轮询直到该视频无进行中的识别任务，或超时。 */
+export async function waitRecognizeSubtitleDone(
+  videoPath: string,
+  options?: { intervalMs?: number; timeoutMs?: number },
+): Promise<void> {
+  const intervalMs = options?.intervalMs ?? 2000;
+  const timeoutMs = options?.timeoutMs ?? 3_600_000;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const tasks = await listRecognizeSubtitleTasks();
+    const active = tasks.filter(
+      (t) =>
+        t.video_path === videoPath &&
+        (t.status === 'pending' || t.status === 'processing'),
+    );
+    if (active.length === 0) {
+      return;
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  throw new Error('语音识别超时');
 }
 
 export async function listSidecarSubtitles(videoPath: string): Promise<SubtitleSource[]> {

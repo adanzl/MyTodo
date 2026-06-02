@@ -119,6 +119,7 @@ import {
   downloadSubtitleToSidecar,
   listSidecarSubtitles,
   recognizeSubtitle,
+  waitRecognizeSubtitleDone,
   searchSubtitles,
   type SubtitleSearchRow,
 } from "@/utils/subtitle";
@@ -316,10 +317,12 @@ const runRecognize = async () => {
   }
   recognizeLoading.value = true;
   try {
-    await recognizeSubtitle({
+    const job = await recognizeSubtitle({
       video_path: videoPath,
       language: recognizeLang.value || "en",
     });
+    ElMessage.info("已加入识别队列，请稍候…");
+    await waitRecognizeSubtitleDone(videoPath);
     ElMessage.success("语音识别完成，字幕已保存");
     await refreshSidecarList(videoPath);
   } catch (e: any) {

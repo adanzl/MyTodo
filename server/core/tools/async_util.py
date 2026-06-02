@@ -47,11 +47,49 @@ def _clear_event_loop() -> None:
             pass
 
 
+def _poll_worker_thread(
+    thread: threading.Thread,
+    result_q: Queue,
+    error_q: Queue,
+    wait: float,
+) -> Any:
+    """与 run_async 相同：轮询队列 + gevent_sleep，避免 thread.join 卡死 hub。"""
+
+    def poll() -> Any:
+        deadline = time.time() + wait + 1.0
+        while thread.is_alive():
+            if time.time() > deadline:
+                raise TimeoutError(f"操作超时 ({wait}s)")
+            try:
+                raise error_q.get_nowait()
+            except Empty:
+                pass
+            try:
+                return result_q.get_nowait()
+            except Empty:
+                pass
+            gevent_sleep(0.01)
+
+        try:
+            raise error_q.get_nowait()
+        except Empty:
+            pass
+        try:
+            return result_q.get_nowait()
+        except Empty:
+            raise RuntimeError("线程结束但无返回值")
+
+    try:
+        with GeventTimeout(wait + 2.0):
+            return spawn(poll).get()
+    except GeventTimeout:
+        raise TimeoutError(f"操作超时 ({wait}s)")
+
+
 def run_blocking(func: Callable[[], _T], timeout: Optional[float] = None) -> _T:
-    """原生线程执行同步阻塞调用并 join 等待。
+    """原生线程执行同步阻塞调用并等待结果（hub 轮询，同 run_async）。
 
     注意：对外 HTTPS 请用 http_get_bytes，不要用本函数包 requests。
-    异常通过 error_q 传回主线程重新抛出，保持调用栈语义。
     """
     wait = timeout if timeout is not None else 30.0
     result_q: Queue = Queue(maxsize=1)
@@ -65,19 +103,7 @@ def run_blocking(func: Callable[[], _T], timeout: Optional[float] = None) -> _T:
 
     thread = threading.Thread(target=worker, daemon=True)
     thread.start()
-    thread.join(wait)
-    if thread.is_alive():
-        raise TimeoutError(f"操作超时 ({wait}s)")
-
-    # 优先抛子线程异常，否则取返回值
-    try:
-        raise error_q.get_nowait()
-    except Empty:
-        pass
-    try:
-        return result_q.get_nowait()
-    except Empty:
-        raise RuntimeError("线程结束但无返回值")
+    return _poll_worker_thread(thread, result_q, error_q, wait)
 
 
 def _http_request_worker(
@@ -160,36 +186,8 @@ def run_async(coroutine: Coroutine, timeout: Optional[float] = None) -> Any:
     thread = threading.Thread(target=worker, daemon=True)
     thread.start()
 
-    def poll() -> Any:
-        deadline = time.time() + wait + 1.0
-        while thread.is_alive():
-            if time.time() > deadline:
-                log.warning("[async_util] 协程任务超时 (%ss)，线程仍在运行", wait)
-                raise asyncio.TimeoutError(f"Operation timed out after {wait} seconds")
-            # 子线程一旦完成会先写入队列，此处即可返回或抛错
-            try:
-                raise error_q.get_nowait()
-            except Empty:
-                pass
-            try:
-                return result_q.get_nowait()
-            except Empty:
-                pass
-            gevent_sleep(0.01)
-
-        try:
-            raise error_q.get_nowait()
-        except Empty:
-            pass
-        try:
-            return result_q.get_nowait()
-        except Empty:
-            raise RuntimeError("线程结束但无返回值")
-
-    # spawn 把 poll 放进 greenlet；GeventTimeout 防止 poll 本身无限挂起
     try:
-        with GeventTimeout(wait + 2.0):
-            return spawn(poll).get()
-    except GeventTimeout:
-        log.error("[async_util] GeventTimeout after %ss", wait + 2.0)
-        raise asyncio.TimeoutError(f"Operation timed out after {wait} seconds")
+        return _poll_worker_thread(thread, result_q, error_q, wait)
+    except TimeoutError as e:
+        log.warning("[async_util] 协程任务超时 (%ss)，线程仍在运行", wait)
+        raise asyncio.TimeoutError(f"Operation timed out after {wait} seconds") from e

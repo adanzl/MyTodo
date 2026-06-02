@@ -12,4 +12,3 @@
 - 入口: `server/main.py`
 - 启动方式: `python main.py`
 - 默认端口: 8000
-- **gevent + HTTPS**：`main.py` 会 patch ssl；对外 `requests` 用 `async_util.http_get_bytes`，不要用 `run_blocking` 包 requests（会 RecursionError）。
