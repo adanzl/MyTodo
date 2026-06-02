@@ -1,6 +1,8 @@
 """OpenSubtitles.com REST API 客户端。
 
 文档: https://opensubtitles.stoplight.io/docs/opensubtitles-api/a172317bd5ccc-search-for-subtitles
+
+HTTP 经 async_util.run_blocking 在原生线程执行，避免 gevent 下 requests/SSL 递归错误。
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ from typing import Any
 import requests
 
 from core.config import config
+from core.tools.async_util import run_blocking
 
 _READ_CHUNK = 64 * 1024
 _TOKEN_TTL = 23 * 3600
@@ -200,16 +203,19 @@ class OpenSubtitlesClient:
             headers["Authorization"] = f"Bearer {token}"
 
         try:
-            resp = requests.request(
-                method,
-                f"{self.base_url}{path}",
-                json=json_body,
-                params=params,
-                headers=headers,
-                timeout=config.OPEN_SUBTITLES_TIMEOUT,
+            resp = run_blocking(
+                lambda: requests.request(
+                    method,
+                    f"{self.base_url}{path}",
+                    json=json_body,
+                    params=params,
+                    headers=headers,
+                    timeout=config.OPEN_SUBTITLES_TIMEOUT,
+                ),
+                timeout=config.OPEN_SUBTITLES_TIMEOUT + 15,
             )
-        except RecursionError as e:
-            raise OpenSubtitlesError(f"请求 OpenSubtitles 失败: {e}") from e
+        except TimeoutError as e:
+            raise OpenSubtitlesError("请求 OpenSubtitles 超时") from e
         except requests.RequestException as e:
             raise OpenSubtitlesError(f"请求 OpenSubtitles 失败: {e}") from e
 
