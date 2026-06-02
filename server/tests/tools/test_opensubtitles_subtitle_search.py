@@ -61,8 +61,8 @@ def test_search_by_query_returns_official_shape(mock_call, monkeypatch):
     assert out["data"][0]["attributes"]["files"][0]["file_id"] == 99
 
 
-@patch("core.tools.open_subtitles.requests.request")
-def test_login_base_url_without_scheme(mock_request, monkeypatch):
+@patch("core.tools.open_subtitles._request_in_spawn")
+def test_login_base_url_without_scheme(mock_http, monkeypatch):
     monkeypatch.setattr("core.tools.open_subtitles.config.OPEN_SUBTITLES_API", "test-key", raising=False)
     monkeypatch.setattr("core.tools.open_subtitles.config.OPEN_SUBTITLES_USER", "user", raising=False)
     monkeypatch.setattr("core.tools.open_subtitles.config.OPEN_SUBTITLES_PASS", "pass", raising=False)
@@ -71,14 +71,15 @@ def test_login_base_url_without_scheme(mock_request, monkeypatch):
     mod._auth.clear()
     mod._auth.update({"token": None, "expires": 0.0})
 
-    login_resp = MagicMock(status_code=200)
-    login_resp.json.return_value = {"token": "tok", "base_url": "api.opensubtitles.com"}
-    search_resp = MagicMock(status_code=200)
-    search_resp.json.return_value = {"total_count": 0, "total_pages": 0, "page": 1, "data": []}
-    mock_request.side_effect = [login_resp, search_resp]
+    import json
+
+    mock_http.side_effect = [
+        (200, json.dumps({"token": "tok", "base_url": "api.opensubtitles.com"})),
+        (200, json.dumps({"total_count": 0, "total_pages": 0, "page": 1, "data": []})),
+    ]
 
     client = OpenSubtitlesClient()
     client.search_by_query("matrix", languages="en")
     assert client.base_url == "https://api.opensubtitles.com"
-    search_url = mock_request.call_args_list[1].args[1]
+    search_url = mock_http.call_args_list[1].args[1]
     assert search_url.startswith("https://")

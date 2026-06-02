@@ -2,11 +2,14 @@
 
 文档: https://opensubtitles.stoplight.io/docs/opensubtitles-api/a172317bd5ccc-search-for-subtitles
 
-HTTP 经 async_util.run_blocking 在原生线程执行，避免 gevent 下 requests/SSL 递归错误。
+HTTP 在 spawn 子进程执行：gevent 会全局 patch ssl，原生线程里 requests 仍会 SSL 递归；
+spawn 启动干净解释器，未 patch。
 """
 
 from __future__ import annotations
 
+import json
+import multiprocessing as mp
 import os
 import stat
 import struct
@@ -14,10 +17,9 @@ import threading
 import time
 from typing import Any
 
-import requests
-
 from core.config import config
-from core.tools.async_util import run_blocking
+
+_SPAWN_CTX = mp.get_context("spawn")
 
 _READ_CHUNK = 64 * 1024
 _TOKEN_TTL = 23 * 3600
@@ -69,6 +71,62 @@ def compute_movie_hash(file_path: str) -> str:
     except RecursionError as e:
         raise OSError("无法读取视频文件") from e
     return f"{acc:016x}"
+
+
+def _spawn_do_request(
+    out_q: Any,
+    method: str,
+    url: str,
+    headers: dict[str, str],
+    json_body: dict[str, Any] | None,
+    params: dict[str, str] | None,
+    timeout: float,
+) -> None:
+    """子进程入口（须为模块级函数以便 spawn 序列化）。"""
+    import requests as req
+
+    try:
+        resp = req.request(
+            method,
+            url,
+            json=json_body,
+            params=params,
+            headers=headers,
+            timeout=timeout,
+        )
+        out_q.put(("ok", resp.status_code, resp.text))
+    except Exception as exc:
+        out_q.put(("err", type(exc).__name__, str(exc)))
+
+
+def _request_in_spawn(
+    method: str,
+    url: str,
+    *,
+    headers: dict[str, str],
+    json_body: dict[str, Any] | None = None,
+    params: dict[str, str] | None = None,
+    timeout: float | None = None,
+) -> tuple[int, str]:
+    """在 spawn 子进程发 HTTP，返回 (status_code, response_text)。"""
+    req_timeout = timeout if timeout is not None else float(config.OPEN_SUBTITLES_TIMEOUT)
+    wait = req_timeout + 15
+    out_q = _SPAWN_CTX.Queue()
+    proc = _SPAWN_CTX.Process(
+        target=_spawn_do_request,
+        args=(out_q, method, url, headers, json_body, params, req_timeout),
+    )
+    proc.start()
+    proc.join(wait)
+    if proc.is_alive():
+        proc.kill()
+        proc.join(2)
+        raise TimeoutError(f"操作超时 ({wait}s)")
+
+    msg = out_q.get()
+    if msg[0] == "err":
+        raise OpenSubtitlesError(f"请求 OpenSubtitles 失败: {msg[2]}")
+    return int(msg[1]), str(msg[2])
 
 
 class OpenSubtitlesClient:
@@ -202,35 +260,31 @@ class OpenSubtitlesClient:
         if token:
             headers["Authorization"] = f"Bearer {token}"
 
+        url = f"{self.base_url}{path}"
         try:
-            resp = run_blocking(
-                lambda: requests.request(
-                    method,
-                    f"{self.base_url}{path}",
-                    json=json_body,
-                    params=params,
-                    headers=headers,
-                    timeout=config.OPEN_SUBTITLES_TIMEOUT,
-                ),
-                timeout=config.OPEN_SUBTITLES_TIMEOUT + 15,
+            status, text = _request_in_spawn(
+                method,
+                url,
+                headers=headers,
+                json_body=json_body,
+                params=params,
+                timeout=float(config.OPEN_SUBTITLES_TIMEOUT),
             )
         except TimeoutError as e:
             raise OpenSubtitlesError("请求 OpenSubtitles 超时") from e
-        except requests.RequestException as e:
-            raise OpenSubtitlesError(f"请求 OpenSubtitles 失败: {e}") from e
 
         try:
-            data = resp.json()
+            data = json.loads(text) if text else None
         except ValueError:
             data = None
 
-        if resp.status_code != 200:
+        if status != 200:
             msg = "OpenSubtitles 请求失败"
             if isinstance(data, dict):
                 msg = str(data.get("message") or data.get("msg") or msg)
-            elif (resp.text or "").strip() and len(resp.text) < 500:
-                msg = resp.text.strip()
-            raise OpenSubtitlesError(msg, status_code=resp.status_code, payload=data)
+            elif text.strip() and len(text) < 500:
+                msg = text.strip()
+            raise OpenSubtitlesError(msg, status_code=status, payload=data)
 
         return data if isinstance(data, dict) else {}
 
