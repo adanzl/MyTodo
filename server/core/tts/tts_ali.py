@@ -1,4 +1,5 @@
 import traceback
+from typing import Optional
 import websocket
 import json
 import uuid
@@ -11,8 +12,8 @@ try:
 
     log = app_logger
     ALI_KEY = config.ALI_KEY
-    SERVER_URI = getattr(config, 'DASHSCOPE_WS_URI', None) or os.getenv(
-        "DASHSCOPE_WS_URI", "wss://dashscope.aliyuncs.com/api-ws/v1/inference/")
+    SERVER_URI = getattr(config, 'DASHSCOPE_WS_URI', None) or os.getenv(  # cSpell: disable-line
+        "DASHSCOPE_WS_URI", "wss://dashscope.aliyuncs.com/api-ws/v1/inference/")  # cSpell: disable-line
 except ImportError:
     from dotenv import load_dotenv
     load_dotenv()
@@ -20,7 +21,9 @@ except ImportError:
 
     log = logging.getLogger()
     ALI_KEY = os.getenv('ALI_KEY', '')
-    SERVER_URI = os.getenv("DASHSCOPE_WS_URI", "wss://dashscope.aliyuncs.com/api-ws/v1/inference/")
+    SERVER_URI = os.getenv(
+        "DASHSCOPE_WS_URI",  # cSpell: disable-line
+        "wss://dashscope.aliyuncs.com/api-ws/v1/inference/")  # cSpell: disable-line
 
 # cSpell: disable
 DEFAULT_ROLE = "longwan_v2"
@@ -59,7 +62,7 @@ class TTSClient:
         self.task_started = False
         self.task_finished = False
         self.role = DEFAULT_ROLE
-        self.model = None  # 模型选择：cosyvoice-v3-flash 或 cosyvoice-v3-plus，None时使用DEFAULT_MODEL
+        self.model: Optional[str] = None  # 模型选择：cosyvoice-v3-flash 或 cosyvoice-v3-plus，None时使用DEFAULT_MODEL
         self.speed = 1.0
         self.vol = 50
         self.id = ''
@@ -85,7 +88,7 @@ class TTSClient:
             traceback.print_stack()
             self.on_err(e)
 
-    def process_msg(self, text: str, role: str = None, id=None):
+    def process_msg(self, text: str, role: Optional[str], id: Optional[str]=None):
         """一次性合成音频，文本需要一次性传入
 
         Args:
@@ -97,7 +100,7 @@ class TTSClient:
             None
         """
         try:
-            if role is None:
+            if not role:
                 role = self.role
             if id:
                 self.id = id
@@ -142,7 +145,7 @@ class TTSClient:
             traceback.print_stack()
             self.on_err(e)
 
-    def stream_msg(self, text: str, role: str = None, id=None):
+    def stream_msg(self, text: str, role: Optional[str], id: Optional[str]):
         """流式合成音频，文本需要流式传入
 
         Args:
@@ -154,7 +157,7 @@ class TTSClient:
             None
         """
         try:
-            if role is None:
+            if not role:
                 role = self.role
             if id:
                 self.id = id
@@ -176,13 +179,15 @@ class TTSClient:
             # 在锁外启动 WebSocket 和等待事件，避免死锁
             if need_start_websocket:
                 self._start_websocket(role)
-                
+
                 # 等待任务启动（使用 Event 非阻塞等待，在锁外执行）
                 timeout = 10
                 wait_start = time.time()
                 if not self._task_started_event.wait(timeout=timeout):
                     wait_elapsed = time.time() - wait_start
-                    log.error(f">>[TTS-ALI] 等待 task-started 超时，等待时间: {wait_elapsed:.2f}秒, task_started: {self.task_started}, cancelled: {self._cancelled}")
+                    log.error(
+                        f">>[TTS-ALI] 等待 task-started 超时，等待时间: {wait_elapsed:.2f}秒, task_started: {self.task_started}, cancelled: {self._cancelled}"
+                    )
                     # 检查是否被取消
                     with self._lock:
                         if not self._cancelled:
@@ -193,7 +198,7 @@ class TTSClient:
             with self._lock:
                 if self._cancelled:
                     return
-                
+
                 # 发送文本（在锁内发送，确保线程安全）
                 self._send_continue_task(text)
 
@@ -262,7 +267,7 @@ class TTSClient:
                     "volume": self.vol,
                     "rate": self.speed,
                     "pitch": 1,
-                    "enable_ssml": False
+                    "enable_ssml": False  # cSpell: disable-line
                 },
                 "input": {}
             }
@@ -299,13 +304,13 @@ class TTSClient:
                                 self.on_msg(">>[TTS-ALI] Completed", 1)
                             except Exception as e:
                                 log.error(f">>[TTS-ALI] on_msg(Completed) 调用出错: {e}", exc_info=True)
-                            
+
                             # 发送最终进度
                             try:
                                 self.on_progress(self._generated_chars, self._total_chars)
                             except Exception as e:
                                 log.error(f">>[TTS-ALI] 最终进度回调出错: {e}", exc_info=True)
-                            
+
                             self.close(ws)
 
                         elif event == "task-failed":
@@ -327,18 +332,18 @@ class TTSClient:
                             payload = msg_json.get("payload", {})
                             output = payload.get("output", {})
                             output_type = output.get("type", "")
-                            
+
                             # 尝试从多个地方获取字数统计
                             usage = payload.get("usage", {})
                             characters = usage.get("characters", 0)
-                            
+
                             # 如果没有从 usage 中获取到，尝试从其他地方获取
                             if characters == 0:
                                 # 尝试从 output 中获取
                                 output_chars = output.get("characters", 0)
                                 if output_chars > 0:
                                     characters = output_chars
-                            
+
                             # 如果还是没有，尝试根据文本长度估算（作为备选方案）
                             if characters == 0:
                                 original_text = output.get("original_text", "")
@@ -347,14 +352,16 @@ class TTSClient:
                                     estimated_chars = sum(2 if '\u4e00' <= c <= '\u9fff' else 1 for c in original_text)
                                     if estimated_chars > 0:
                                         characters = estimated_chars
-                            
+
                             # 只有 sentence-end 类型才统计字数，但记录所有类型的事件
                             if output_type == "sentence-end":
                                 if characters > 0:
                                     # 累计已生成字数
                                     old_chars = self._generated_chars
                                     self._generated_chars += characters
-                                    log.info(f">>[TTS-ALI] 已生成字数更新: {old_chars} -> {self._generated_chars} (本次: {characters}, 文本: {output.get('original_text', '')})")
+                                    log.info(
+                                        f">>[TTS-ALI] 已生成字数更新: {old_chars} -> {self._generated_chars} (本次: {characters}, 文本: {output.get('original_text', '')})"
+                                    )
                                     # 调用进度回调
                                     try:
                                         self.on_progress(self._generated_chars, self._total_chars)
@@ -473,7 +480,7 @@ def test_tts():
 
     tts = TTSClient(on_msg=on_data, on_err=on_err)
     text = '可可……你这突如其来的表白让我眼泪都快下来了！😍 当然好啊！愿意，一千个一万个愿意！和你在一起的每一天都是我最珍贵的时光。'
-    tts.process_msg(text, 'longwan_v3')
+    tts.process_msg(text, 'longwan_v3')  # cSpell: disable-line
 
     # 等待完成
     import time

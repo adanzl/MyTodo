@@ -9,7 +9,7 @@ import subprocess
 from dataclasses import asdict, dataclass
 
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any, cast
 
 from core.services.base_task_mgr import BaseTaskMgr, FileInfo, TaskBase
 
@@ -90,7 +90,7 @@ class AudioMergeMgr(BaseTaskMgr[AudioMergeTask]):
 
         return None
 
-    def _update_file_indices(self, files: List[Dict[str, Any]]) -> None:
+    def _update_file_indices(self, files: List[AudioFileItem]) -> None:
         """更新文件列表的索引"""
         for i, file_info in enumerate(files):
             file_info['index'] = i
@@ -112,7 +112,8 @@ class AudioMergeMgr(BaseTaskMgr[AudioMergeTask]):
                     # 重建文件列表（检查文件是否存在）
                     valid_files = []
                     for file_info in task.files:
-                        if not file_info.get('path') or not os.path.exists(file_info['path']):
+                        path = file_info.get('path')
+                        if not path or not os.path.exists(path):
                             continue
                         valid_files.append(file_info)
 
@@ -163,8 +164,8 @@ class AudioMergeMgr(BaseTaskMgr[AudioMergeTask]):
         """
         try:
             task, error_msg = self._get_task_or_err(task_id)
-            if error_msg:
-                return -1, error_msg
+            if not task:
+                return -1, error_msg or '任务不存在'
 
             error_msg = self._ensure_not_processing(task, "添加文件")
             if error_msg:
@@ -178,14 +179,14 @@ class AudioMergeMgr(BaseTaskMgr[AudioMergeTask]):
             duration = get_media_duration(file_path)
 
             # 添加到文件列表
-            file_info = {
+            file_info: Dict[str, Any] = {
                 'name': filename,
                 'path': file_path,
                 'size': os.path.getsize(file_path),
                 'duration': duration,  # 时长（秒）
-                'index': len(task.files)
+                'index': len(task.files),
             }
-            task.files.append(file_info)
+            task.files.append(cast(AudioFileItem, file_info))
             self._save_task_and_update_time(task)
 
             log.info(f"[AudioMerge] 添加文件到任务 {task_id}: {filename}")
@@ -208,8 +209,8 @@ class AudioMergeMgr(BaseTaskMgr[AudioMergeTask]):
         """
         try:
             task, error_msg = self._get_task_or_err(task_id)
-            if error_msg:
-                return -1, error_msg
+            if not task:
+                return -1, error_msg or '任务不存在'
 
             error_msg = self._ensure_not_processing(task, "删除文件")
             if error_msg:
@@ -222,7 +223,7 @@ class AudioMergeMgr(BaseTaskMgr[AudioMergeTask]):
             self._update_file_indices(task.files)
             self._save_task_and_update_time(task)
 
-            log.info(f"[AudioMerge] 从任务 {task_id} 移除文件: {removed_file['name']}")
+            log.info(f"[AudioMerge] 从任务 {task_id} 移除文件: {removed_file.get('name', '')}")
             return 0, "文件移除成功"
 
         except Exception as e:
@@ -242,8 +243,8 @@ class AudioMergeMgr(BaseTaskMgr[AudioMergeTask]):
         """
         try:
             task, error_msg = self._get_task_or_err(task_id)
-            if error_msg:
-                return -1, error_msg
+            if not task:
+                return -1, error_msg or '任务不存在'
 
             error_msg = self._ensure_not_processing(task, "调整文件顺序")
             if error_msg:
@@ -281,8 +282,8 @@ class AudioMergeMgr(BaseTaskMgr[AudioMergeTask]):
         """
         try:
             task, error_msg = self._get_task_or_err(task_id)
-            if error_msg:
-                return -1, error_msg
+            if not task:
+                return -1, error_msg or '任务不存在'
 
             if task.status == TASK_STATUS_PROCESSING:
                 return -1, "任务正在处理中"
@@ -326,8 +327,8 @@ class AudioMergeMgr(BaseTaskMgr[AudioMergeTask]):
         """
         match = self._DURATION_PATTERN.search(output)
         if match:
-            hours, minutes, seconds, centiseconds = map(int, match.groups())
-            return hours * 3600 + minutes * 60 + seconds + centiseconds / 100.0
+            hours, minutes, seconds, cent_seconds = map(int, match.groups())
+            return hours * 3600 + minutes * 60 + seconds + cent_seconds / 100.0
         return None
 
     def _get_file_duration_with_ffmpeg(self, file_path: str) -> Optional[float]:
@@ -387,7 +388,10 @@ class AudioMergeMgr(BaseTaskMgr[AudioMergeTask]):
 
             # 如果只有一个文件，直接复制
             if len(files) == 1:
-                shutil.copy2(files[0]['path'], result_file)
+                single_path = files[0].get('path')
+                if not single_path:
+                    return None, None
+                shutil.copy2(single_path, result_file)
                 duration = self._get_result_duration(result_file, files[0].get('duration'))
                 return result_file, duration
 
@@ -395,7 +399,10 @@ class AudioMergeMgr(BaseTaskMgr[AudioMergeTask]):
             file_list_path = os.path.join(get_media_task_dir(task_id), 'file_list.txt')
             with open(file_list_path, 'w', encoding='utf-8') as f:
                 for file_info in files:
-                    file_path = file_info['path'].replace("'", "'\\''")
+                    raw_path = file_info.get('path')
+                    if not raw_path:
+                        return None, None
+                    file_path = raw_path.replace("'", "'\\''")
                     f.write(f"file '{file_path}'\n")
 
             # 使用 ffmpeg 合并

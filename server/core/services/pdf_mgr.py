@@ -141,7 +141,7 @@ class PdfMgr(BaseTaskMgr[PdfTask]):
     def start_task(self, task_id: str, password: Optional[str] = None) -> Tuple[int, str]:
         """提交一个 PDF 文件解密任务（异步处理）。"""
         task, err = self._get_task_or_err(task_id)
-        if err:
+        if not task:
             return -1, err
 
         if not os.path.exists(task.uploaded_path):
@@ -175,8 +175,11 @@ class PdfMgr(BaseTaskMgr[PdfTask]):
                               output_path: str,
                               password: Optional[str] = None) -> Tuple[int, str]:
         try:
-            pdf_args = {'password': password} if password else {}
-            with pikepdf.open(input_path, **pdf_args) as pdf:
+            if password:
+                pdf = pikepdf.open(input_path, password=password)
+            else:
+                pdf = pikepdf.open(input_path)
+            with pdf:
                 pdf.save(output_path)
             return 0, "PDF 解密成功"
         except pikepdf.PasswordError:

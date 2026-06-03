@@ -11,7 +11,7 @@ from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, TypeVar,
 from core.config import (TASK_STATUS_FAILED, TASK_STATUS_PENDING, TASK_STATUS_PROCESSING, TASK_STATUS_SUCCESS,
                          app_logger)
 from core.tools.async_util import run_in_background
-from core.utils import ensure_directory
+from core.utils import ensure_directory, FileInfo
 
 log = app_logger
 
@@ -20,18 +20,6 @@ class TaskProgress(TypedDict):
     total: int
     processed: int
     current_file: str
-
-
-class FileInfo(TypedDict, total=False):
-    name: str
-    path: str
-    size: int
-    duration: float
-    modified: float
-    index: int
-    status: str
-    error: str
-    output_path: str
 
 
 @dataclass(kw_only=True)

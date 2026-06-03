@@ -12,7 +12,19 @@ import queue
 import tempfile
 import shlex
 from datetime import datetime, timedelta
-from typing import Optional, Tuple, List, Dict, Any, Union
+from typing import Optional, Tuple, List, Dict, Any, Union, TypedDict
+
+
+class FileInfo(TypedDict, total=False):
+    name: str
+    path: str
+    size: int
+    duration: float
+    modified: float
+    index: int
+    status: str
+    error: str
+    output_path: str
 from urllib.parse import quote, unquote
 from flask import request
 from queue import Queue, Empty
@@ -581,7 +593,7 @@ def is_allowed_image_file(filename: str) -> bool:
     return os.path.splitext(filename)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
 
 
-def get_file_info(file_path: str) -> Optional[dict]:
+def get_file_info(file_path: str) -> Optional[FileInfo]:
     """获取文件信息。
 
     Args:
