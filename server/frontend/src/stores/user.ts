@@ -13,6 +13,7 @@ import { getPicDisplayUrl } from "@/api/api-pic";
 export interface UserWithExtras extends User {
   wish_progress?: number;
   wish_list?: string;
+  inventory?: string;
 }
 
 export interface CurUser {

@@ -91,6 +91,21 @@ def undo_lottery() -> ResponseReturnValue:
         return {"code": -1, "msg": "error: " + str(e)}
 
 
+@lottery_bp.route("/redeem", methods=["POST"])
+def redeem() -> ResponseReturnValue:
+    """核销礼物记录：切换 status，并扣减/恢复用户背包对应分类数量。"""
+    try:
+        args: Dict[str, Any] = read_json_from_request()
+        history_id_raw = args.get("history_id")
+        history_id, err = _parse_int(history_id_raw, "history_id")
+        if err:
+            return err
+        return lottery_mgr.redeem(history_id)
+    except Exception as e:
+        log.error(e)
+        return {"code": -1, "msg": "error: " + str(e)}
+
+
 @lottery_bp.route("/giftAvgCost", methods=["GET"])
 def gift_avg_cost() -> ResponseReturnValue:
     """按 enable、exchange 筛选礼物并计算平均 cost。Query: enable, exchange（可选，整数）。"""

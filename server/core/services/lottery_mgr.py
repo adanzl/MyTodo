@@ -12,40 +12,38 @@ from core.db.db_mgr import db_mgr
 log = app_logger
 
 
+def _err(msg: str) -> Dict[str, Any]:
+    return {"code": -1, "msg": msg}
+
+
+def _row(table: str, row_id: int, fields: str = '*') -> Optional[Dict[str, Any]]:
+    res = db_mgr.get_data(table, row_id, fields)
+    if res.get('code') != 0:
+        return None
+    return res.get('data') or None
+
+
+def _as_int(val: Any, default: int = 0) -> int:
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return default
+
+
 class LotteryMgr:
     """抽奖逻辑管理类，封装与用户积分、礼物池相关的业务规则。"""
 
-    def __init__(self):
-        self._db = db_mgr
-        self._rds = rds_mgr
+    def _fetch_gifts(self, extra: Optional[Dict[str, Any]] = None, limit: int = 500) -> list:
+        """根据分类 ID 列表或心愿单 ID 等条件，获取 enable=1 且 stock>0 的可用奖池。"""
+        cond: Dict[str, Any] = {'enable': 1, 'stock': {'>': 0}}
+        if extra:
+            cond.update(extra)
+        res = db_mgr.get_list('t_gift', 1, limit, '*', cond)
+        if res.get('code') != 0:
+            return []
+        return (res.get('data') or {}).get('data') or []
 
-    def _weighted_random_choice(self, pool: list) -> Optional[Dict[str, Any]]:
-        """
-        根据物品库存数量作为权重，进行加权随机选择。
-        库存越多的物品，被选中的概率越大。
-        
-        Args:
-            pool: 礼物列表，每个礼物必须包含 'stock' 字段
-            
-        Returns:
-            选中的礼物，如果池子为空则返回 None
-        """
-        if not pool:
-            return None
-
-        # 提取所有礼物的库存作为权重
-        weights = []
-        for gift in pool:
-            stock = gift.get('stock', 0)
-            # 确保权重为正数
-            weight = max(1, int(stock)) if isinstance(stock, (int, float)) else 1
-            weights.append(weight)
-
-        # 使用 random.choices 进行加权随机选择（返回单个元素）
-        selected = random.choices(pool, weights=weights, k=1)[0]
-        return selected
-
-    def _add_gift_history_records(
+    def _write_gift_history(
         self,
         user_id: int,
         gifts: List[Dict[str, Any]],
@@ -58,18 +56,16 @@ class LotteryMgr:
             gift_id = gift.get('id')
             if gift_id is None:
                 continue
-            gift_name = gift.get('name') or ''
-            history_data = {
+            ret = db_mgr.set_data('t_gift_history', {
                 'gift_id': int(gift_id),
-                'gift_name': gift_name,
+                'gift_name': gift.get('name') or '',
                 'user_id': user_id,
                 'gift_cate_id': gift.get('cate_id'),
                 'gift_pool_id': pool_id,
                 'status': 1,
                 'wish': 1 if gift.get('_from_wish') else 0,
                 'msg': msg,
-            }
-            ret = self._db.set_data('t_gift_history', history_data)
+            })
             if ret.get('code') != 0:
                 log.error(f"写入礼物历史失败 [user_id={user_id}, gift_id={gift_id}]: {ret.get('msg')}")
 
@@ -80,30 +76,25 @@ class LotteryMgr:
         读取 pool 的 cate_list 字段获取分类 ID 列表，从这些分类中抽取礼物，抽取 count 次，统一记录日志并返回。
         """
         # ========== 阶段 1：查询和校验 ==========
-        user_data = self._db.get_data('t_user', user_id, "id,score,wish_progress,wish_list")
-        if user_data['code'] != 0:
-            return {"code": -1, "msg": "User not found"}
+        ud = _row('t_user', user_id, "id,score,wish_progress,wish_list,inventory")
+        if not ud:
+            return _err("User not found")
 
-        ud = user_data['data']
         user_score = ud.get('score') or 0
-        wish_progress = int(ud.get('wish_progress')) or 0
+        wish_progress = _as_int(ud.get('wish_progress'))
         wish_list_str = ud.get('wish_list') or '[]'
 
         # 获取奖池配置（从 t_gift_pool 获取）
         pool_cost, wish_threshold, draw_count, cate_ids = self._get_pool_config(pool_id)
         if pool_cost is None:
-            return {
-                "code": -1,
-                "msg": "No lottery data" if pool_id == 0 else "Pool not found",
-            }
-
+            return _err("No lottery data" if pool_id == 0 else "Pool not found")
         # 校验积分（只扣一次费用）
         if user_score < pool_cost:
-            return {"code": -1, "msg": "Not enough score"}
+            return _err("Not enough score")
 
         # ========== 阶段 2：执行抽奖 ==========
         log.info(f"Do lottery, user: {user_id}, pool: {pool_id}, categories: {cate_ids}")
-        won_gifts = []
+        won_gifts: List[Dict[str, Any]] = []
         cur_progress = wish_progress
 
         # 标记是否进行了心愿单抽奖（成功从心愿单抽中）
@@ -112,15 +103,21 @@ class LotteryMgr:
         # 步骤 1：判断是否心愿单抽奖
         if wish_progress >= wish_threshold:
             # 步骤 1.1：拉取心愿单内可抽奖数据
-            wish_pool = self._get_wish_pool(user_id, wish_list_str)
-
+            # 将 t_user.wish_list（JSON 数组字符串，如 '[1,2,3]'）解析为礼物 id 列表
+            wish_ids: List[int] = []
+            if wish_list_str.strip():
+                try:
+                    arr = json.loads(wish_list_str)
+                    if isinstance(arr, list):
+                        wish_ids = [int(x) for x in arr if isinstance(x, (int, float)) and int(x) == x]
+                except Exception:
+                    pass
+            wish_pool = self._fetch_gifts({'id': {'in': wish_ids}}, limit=len(wish_ids)) if wish_ids else []
             if wish_pool:
                 # 从心愿单中随机选择一个（心愿单内不使用加权）
                 selected = random.choice(wish_pool)
-
                 # 尝试扣减库存
-                stock_success, need_remove = self._try_deduct_stock(selected['id'])
-
+                stock_success, _ = self._try_deduct_stock(selected['id'])
                 if stock_success:
                     # 步骤 1.1.1：成功扣减
                     selected_copy = selected.copy()
@@ -134,35 +131,30 @@ class LotteryMgr:
 
         # 步骤 2：普通抽奖（处理剩余次数）
         remaining_draws = draw_count - len(won_gifts)
-
         if remaining_draws > 0:
-            full_pool = self._get_full_pool_by_categories(cate_ids)
+            extra = {'cate_id': {'in': cate_ids}} if cate_ids else None
+            full_pool = self._fetch_gifts(extra)
             if not full_pool:
-                return {"code": -1, "msg": "No available gifts"}
+                return _err("No available gifts")
 
             # 用于记录需要排除的礼物 ID（库存为 0 或扣减失败的）
-            excluded_ids = set()
-
+            excluded_ids: set = set()
             for _ in range(remaining_draws):
                 # 过滤掉已排除的礼物
                 available_pool = [g for g in full_pool if g['id'] not in excluded_ids]
-
                 if not available_pool:
                     break  # 没有可用礼物了
 
-                # 使用加权随机选择，库存越多的物品被选中的概率越大
-                selected = self._weighted_random_choice(available_pool)
-                if selected is None:
-                    break  # 没有可用礼物了
+                # 使用 weighted_random_choice：根据物品库存数量作为权重进行加权随机选择
+                weights = [max(1, _as_int(g.get('stock'), 1)) for g in available_pool]
+                selected = random.choices(available_pool, weights=weights, k=1)[0]
 
                 # 尝试扣减库存
                 stock_success, need_remove = self._try_deduct_stock(selected['id'])
-
                 if stock_success:
                     selected_copy = selected.copy()
                     selected_copy['_from_wish'] = False  # 标记为普通礼物
                     won_gifts.append(selected_copy)
-
                     # 如果库存扣成 0，加入排除列表
                     if need_remove:
                         excluded_ids.add(selected['id'])
@@ -177,52 +169,58 @@ class LotteryMgr:
 
         # 检查是否有中奖礼物
         if not won_gifts:
-            return {"code": -1, "msg": "未能完成抽奖，奖品库存不足"}
+            return _err("未能完成抽奖，奖品库存不足")
 
         # ========== 阶段 3：写入日志 ==========
         out_key_str = ','.join(str(g['id']) for g in won_gifts)
-        
-        # 在心愿单礼物名字前加 * 标记
-        gift_info_parts = []
-        for g in won_gifts:
-            gift_id = g['id']
-            gift_name = g['name']
-            # 如果是心愿单抽中的，在名字前加 *
-            marker = "*" if g.get('_from_wish', False) else ""
-            gift_info_parts.append(f"[{gift_id}]{marker}{gift_name}")
-        gift_info = ', '.join(gift_info_parts)
 
-        add_ret = self._db.add_score(
+        # 在心愿单礼物名字前加 * 标记
+        gift_info = ', '.join(
+            f"[{g['id']}]{'*' if g.get('_from_wish') else ''}{g['name']}" for g in won_gifts
+        )
+
+        add_ret = db_mgr.add_score(
             user_id,
             -pool_cost,  # 只扣一次费用
             'lottery',
             f"获得 {gift_info}",
             out_key=out_key_str,
         )
-
         if add_ret.get('code') != 0:
             log.error(f"写入积分历史失败：{add_ret.get('msg')}")
-            return {"code": -1, "msg": f"写入积分历史失败：{add_ret.get('msg')}"}
+            return _err(f"写入积分历史失败：{add_ret.get('msg')}")
 
-        self._add_gift_history_records(
-            user_id,
-            won_gifts,
-            pool_id=pool_id,
-            msg=f"费用{pool_cost}，获得 {gift_info}",
-        )
+        grant_msg = f"费用{pool_cost}，获得 {gift_info}"
+        self._write_gift_history(user_id, won_gifts, pool_id=pool_id, msg=grant_msg)
 
         # ========== 阶段 4：更新用户状态 ==========
-        log.info(f"Update wish_progress: user_id={user_id}, old={wish_progress}, new={cur_progress}, wish_list={wish_list_str}")
-        self._db.set_data('t_user', {'id': user_id, 'wish_progress': cur_progress})
+        log.info(
+            f"Update wish_progress: user_id={user_id}, old={wish_progress}, "
+            f"new={cur_progress}, wish_list={wish_list_str}"
+        )
+        inv = json.loads(ud.get('inventory') or '{}')
+        for g in won_gifts:
+            if g.get('cate_id') is not None:
+                k = str(int(g['cate_id']))
+                inv[k] = inv.get(k, 0) + 1
+        if db_mgr.set_data('t_user', {
+            'id': user_id,
+            'inventory': json.dumps(inv),
+            'wish_progress': cur_progress,
+        }).get('code') != 0:
+            return _err("更新用户数据失败")
 
         # ========== 阶段 5：记录日志并返回 ==========
-        log.info(f"Lottery success: user_id={user_id}, out_keys=[{out_key_str}], fee={pool_cost}, wish_draw={has_wish_draw}")
+        log.info(
+            f"Lottery success: user_id={user_id}, out_keys=[{out_key_str}], "
+            f"fee={pool_cost}, wish_draw={has_wish_draw}"
+        )
 
         return {
             "code": 0,
             "msg": "抽奖成功",
             "data": {
-                "gift": won_gifts[0] if won_gifts else None,  # 兼容旧客户端
+                "gift": won_gifts[0],  # 兼容旧客户端
                 "gifts": won_gifts,
                 "fee": pool_cost,  # 单次费用
                 "single_fee": pool_cost,
@@ -238,150 +236,94 @@ class LotteryMgr:
         从 t_gift_pool 读 cost、count、cate_list。
         Args:
             pool_id: int - 奖池 ID
-        
+
         Returns:
             tuple: (费用，心愿单满额阈值，抽取次数，分类 ID 列表)
         """
         default_threshold = 5
         default_count = 1
+        fail = (None, default_threshold, default_count, [])
 
         # 从 Redis 读取全局配置（fee 和 wish_count_threshold）
-        raw = self._rds.get_str("lottery:2")
+        raw = rds_mgr.get_str("lottery:2")
         if not raw:
-            return None, default_threshold, default_count, []
+            return fail
         try:
             cfg = json.loads(raw)
         except Exception:
-            return None, default_threshold, default_count, []
+            return fail
 
         # 获取心愿单阈值（所有奖池共用）
-        wish_threshold = cfg.get('wish_count_threshold', default_threshold)
-        wish_threshold = max(1, int(wish_threshold)) if isinstance(wish_threshold, (int, float)) else default_threshold
+        wish_threshold = max(1, _as_int(cfg.get('wish_count_threshold'), default_threshold))
 
         if pool_id == 0:
             # pool_id==0 时使用 Redis 中的 fee
-            fee = cfg.get('fee')
-            if fee is None:
-                return None, default_threshold, default_count, []
-            fee = int(fee)
-            count = cfg.get('count', default_count)
-            count = max(1, int(count)) if isinstance(count, (int, float)) else default_count
-            return fee, wish_threshold, count, []
+            if cfg.get('fee') is None:
+                return fail
+            return _as_int(cfg['fee']), wish_threshold, max(1, _as_int(cfg.get('count'), default_count)), []
 
         # 从数据库读取奖池配置
-        pool = self._db.get_data('t_gift_pool', pool_id, "id,name,cost,count,count_mx,cate_list")
-        if pool.get('code') != 0 or not pool.get('data'):
+        pool_data = _row('t_gift_pool', pool_id, "id,name,cost,count,count_mx,cate_list")
+        if not pool_data:
             # 奖池不存在
-            return None, default_threshold, default_count, []
-
-        pool_data = pool['data']
+            return fail
 
         # 获取 count 和 count_mx，生成随机抽取次数
-        count_min = pool_data.get('count', default_count)
-        count_min = max(1, int(count_min)) if isinstance(count_min, (int, float)) else default_count
-
-        count_mx = pool_data.get('count_mx', count_min)
-        count_mx = max(count_min, int(count_mx)) if isinstance(count_mx, (int, float)) else count_min
+        count_min = max(1, _as_int(pool_data.get('count'), default_count))
+        count_mx = max(count_min, _as_int(pool_data.get('count_mx'), count_min))
 
         # 在 count 到 count_mx 之间随机选择一个抽取次数
         draw_count = random.randint(count_min, count_mx)
 
         # 解析 cate_list 字段（逗号分隔的字符串）为分类 ID 列表
-        cate_list_str = pool_data.get('cate_list') or ''
-        cate_ids = []
-        if cate_list_str and cate_list_str.strip():
-            cate_ids = [
-                int(x.strip()) for x in cate_list_str.split(',') if x.strip() and x.strip().lstrip('-').isdigit()
-            ]
+        cate_list_str = (pool_data.get('cate_list') or '').strip()
+        cate_ids = [
+            int(x.strip()) for x in cate_list_str.split(',')
+            if x.strip().lstrip('-').isdigit()
+        ] if cate_list_str else []
 
         return pool_data['cost'], wish_threshold, draw_count, cate_ids
-
-    def _parse_wish_list_ids(self, wish_list_str: str) -> list:
-        """将 t_user.wish_list（JSON 数组字符串，如 '[1,2,3]'）解析为礼物 id 列表。"""
-        if not wish_list_str or not wish_list_str.strip():
-            return []
-        try:
-            arr = json.loads(wish_list_str)
-        except Exception:
-            return []
-        if not isinstance(arr, list):
-            return []
-        return [int(x) for x in arr if isinstance(x, (int, float)) and int(x) == x]
-
-    def _get_full_pool_by_categories(self, cate_ids: list) -> list:
-        """根据分类 ID 列表获取全量可用奖池（enable=1, stock>0）。"""
-        cond = {'enable': 1, 'stock': {'>': 0}}
-        if cate_ids:
-            # 直接在数据库查询时筛选分类
-            cond['cate_id'] = {'in': cate_ids}
-
-        res = self._db.get_list('t_gift', 1, 500, '*', cond)
-        if res.get('code') != 0:
-            return []
-        return (res.get('data') or {}).get('data') or []
-
-    def _get_wish_pool(self, user_id: int, wish_list_str: str) -> list:
-        """根据 t_user.wish_list 筛出用户心愿单内的可用礼物（enable=1, stock>0）。"""
-        ids = self._parse_wish_list_ids(wish_list_str)
-        if not ids:
-            return []
-
-        # 直接从数据库查询心愿单中的礼物，不需要限制分类
-        cond = {'enable': 1, 'stock': {'>': 0}, 'id': {'in': ids}}
-        res = self._db.get_list('t_gift', 1, len(ids), '*', cond)
-        if res.get('code') != 0:
-            return []
-        return (res.get('data') or {}).get('data') or []
 
     def _try_deduct_stock(self, gift_id: int) -> tuple[bool, bool]:
         """
         尝试扣减礼物库存，使用乐观锁 + 自旋重试机制。
-            
+
         Args:
             gift_id: 礼物 ID
-                
+
         Returns:
-            (扣减是否成功，是否需要移除): 
+            (扣减是否成功，是否需要移除):
             - 第一个 bool 表示扣减是否成功
             - 第二个 bool 表示扣减后库存是否为 0（需要移除）
         """
         max_retries = 30  # 最大重试次数
-        retry_count = 0
-
-        while retry_count < max_retries:
+        for retry_count in range(max_retries):
             try:
                 # 获取最新的库存数据
-                latest_data = self._db.get_data('t_gift', gift_id, 'id,stock')
-                if latest_data.get('code') != 0 or not latest_data.get('data'):
+                latest = _row('t_gift', gift_id, 'id,stock')
+                if not latest:
                     log.error(f"获取礼物最新数据失败 [gift_id={gift_id}]")
                     return False, False
 
-                latest_stock = latest_data['data'].get('stock')
+                latest_stock = latest.get('stock')
                 if not isinstance(latest_stock, (int, float)) or int(latest_stock) <= 0:
                     return False, True  # 库存不足，需要移除
 
                 new_stock = int(latest_stock) - 1
 
                 # 使用条件更新（乐观锁）：只有当 stock 未变时才更新成功
-                update_data = {'id': gift_id, 'stock': new_stock}
-                conditions = {'stock': latest_stock}  # CAS 条件
-
-                update_ret = self._db.set_data('t_gift', update_data, conditions=conditions)
-
+                update_ret = db_mgr.set_data(
+                    't_gift',
+                    {'id': gift_id, 'stock': new_stock},
+                    conditions={'stock': latest_stock},
+                )
                 if update_ret.get('code') == 0 and update_ret.get('cnt', 0) > 0:
                     # 更新成功
-                    return True, (new_stock == 0)
-                else:
-                    # 更新失败（可能是并发冲突），重试
-                    retry_count += 1
-                    # 继续下一次重试
-                    continue
-
+                    return True, new_stock == 0
             except Exception as e:
                 log.error(f"扣减库存异常 [gift_id={gift_id}, retry={retry_count}]: {e}")
-                retry_count += 1
-        log.warning(f"扣减库存超过最大重试次数 [gift_id={gift_id}, retries={retry_count}]")
 
+        log.warning(f"扣减库存超过最大重试次数 [gift_id={gift_id}, retries={max_retries}]")
         return False, False
 
     def do_exchange(self, user_id: int, gift_id: int) -> Dict[str, Any]:
@@ -389,122 +331,130 @@ class LotteryMgr:
         执行兑换：校验礼物可兑换且库存、用户积分足够，扣库存、扣积分并记录历史。
         """
         # 1. 查询礼物：需可兑换、有库存
-        gift_res = self._db.get_data('t_gift', gift_id, '*')
-        if gift_res.get('code') != 0:
-            return {"code": -1, "msg": "礼物不存在"}
-        gift = gift_res.get('data') or {}
+        gift = _row('t_gift', gift_id)
         if not gift:
-            return {"code": -1, "msg": "礼物不存在"}
-        if (gift.get('exchange') or 0) != 1:
-            return {"code": -1, "msg": "该奖品不可兑换"}
+            return _err("礼物不存在")
         stock = gift.get('stock')
+        if gift.get('exchange') != 1:
+            return _err("该奖品不可兑换")
         if not isinstance(stock, (int, float)) or int(stock) <= 0:
-            return {"code": -1, "msg": "库存不足"}
-        cost = gift.get('cost')
-        if cost is None:
-            cost = 0
-        try:
-            cost = int(cost)
-        except (TypeError, ValueError):
-            cost = 0
-        if cost < 0:
-            return {"code": -1, "msg": "无效的兑换积分"}
+            return _err("库存不足")
+
+        cost = max(0, _as_int(gift.get('cost')))
 
         # 2. 查询用户积分
-        user_res = self._db.get_data('t_user', user_id, "id,score")
-        if user_res.get('code') != 0:
-            return {"code": -1, "msg": "用户不存在"}
-        ud = user_res.get('data') or {}
-        user_score = ud.get('score') or 0
-        if user_score < cost:
-            return {"code": -1, "msg": "积分不足"}
+        user = _row('t_user', user_id, "id,score,inventory")
+        if not user or (user.get('score') or 0) < cost:
+            return _err("用户不存在" if not user else "积分不足")
 
         # 3. 扣库存
-        self._db.set_data('t_gift', {
-            'id': gift_id,
-            'stock': max(0,
-                         int(stock) - 1),
-        })
+        db_mgr.set_data('t_gift', {'id': gift_id, 'stock': int(stock) - 1})
 
         # 4. 扣积分并记录历史
-        add_ret = self._db.add_score(
-            user_id,
-            -cost,
-            'exchange',
-            f"兑换[{gift.get('id')}]{gift.get('name', '')}",
-            out_key=str(gift_id),
-        )
+        exchange_msg = f"兑换[{gift.get('id')}]{gift.get('name', '')}"
+        add_ret = db_mgr.add_score(user_id, -cost, 'exchange', exchange_msg, out_key=str(gift_id))
         if add_ret.get('code') != 0:
             return add_ret
 
-        exchange_msg = f"兑换[{gift.get('id')}]{gift.get('name', '')}"
-        self._add_gift_history_records(
-            user_id,
-            [gift],
-            pool_id=-1,
-            msg=exchange_msg,
-        )
+        self._write_gift_history(user_id, [gift], pool_id=-1, msg=exchange_msg)
+
+        inv = json.loads(user.get('inventory') or '{}')
+        if gift.get('cate_id') is not None:
+            k = str(int(gift['cate_id']))
+            inv[k] = inv.get(k, 0) + 1
+        if db_mgr.set_data('t_user', {'id': user_id, 'inventory': json.dumps(inv)}).get('code') != 0:
+            return _err("更新背包失败")
 
         log.info(f"Exchange: user_id={user_id}, gift_id={gift_id}, cost={cost}")
-        return {
-            "code": 0,
-            "msg": "兑换成功",
-            "data": {
-                "gift": gift,
-                "cost": cost
-            },
-        }
+        return {"code": 0, "msg": "兑换成功", "data": {"gift": gift, "cost": cost}}
 
     def undo_lottery(self, history_id: int) -> Dict[str, Any]:
         """
         撤销一次抽奖/兑换：删除该条积分历史、将用户积分恢复为操作前、对应礼物库存 +1。
         仅支持 action 为 lottery 或 exchange 且 out_key 有值的记录。
         """
-        res = self._db.get_data('t_score_history', history_id, '*')
-        if res.get('code') != 0:
-            return {"code": -1, "msg": "查询历史记录失败"}
-        rec = res.get('data') or {}
+        rec = _row('t_score_history', history_id)
         if not rec:
-            return {"code": -1, "msg": "历史记录不存在"}
-        action = (rec.get('action') or '').strip()
-        if action not in ('lottery', 'exchange'):
-            return {"code": -1, "msg": "仅支持撤销抽奖/兑换记录"}
-        out_key = rec.get('out_key')
-        if out_key is None or (isinstance(out_key, str) and not out_key.strip()):
-            return {"code": -1, "msg": "该记录无关联奖品，无法撤销"}
-        user_id = rec.get('user_id')
-        pre_value = rec.get('pre_value')
-        if user_id is None or pre_value is None:
-            return {"code": -1, "msg": "历史数据不完整"}
+            return _err("历史记录不存在")
 
-        # 恢复用户积分为抽奖前
-        set_user = self._db.set_data('t_user', {'id': int(user_id), 'score': int(pre_value)})
-        if set_user.get('code') != 0:
-            return {"code": -1, "msg": "恢复积分失败"}
+        action = (rec.get('action') or '').strip()
+        out_key = rec.get('out_key')
+        user_id, pre_value = rec.get('user_id'), rec.get('pre_value')
+        if action not in ('lottery', 'exchange'):
+            return _err("仅支持撤销抽奖/兑换记录")
+        if not out_key or (isinstance(out_key, str) and not str(out_key).strip()):
+            return _err("该记录无关联奖品，无法撤销")
+        if user_id is None or pre_value is None:
+            return _err("历史数据不完整")
+        uid, score_before = int(user_id), int(pre_value)
+
+        gift_id_counts = Counter(
+            int(part.strip())
+            for part in str(out_key).split(',')
+            if part.strip().lstrip('-').isdigit()
+        )
+        if not gift_id_counts:
+            return _err("该记录无关联奖品，无法撤销")
+
+        # 查找未核销的礼物记录，并扣减背包
+        gh_res = db_mgr.get_list(
+            't_gift_history', 1, 500, '*',
+            {'user_id': uid, 'gift_id': {'in': list(gift_id_counts.keys())}, 'status': 1},
+        )
+        gh_rows = (gh_res.get('data') or {}).get('data') or [] if gh_res.get('code') == 0 else []
+        by_gift: Dict[int, List[Dict[str, Any]]] = {}
+        for row in gh_rows:
+            gid = row.get('gift_id')
+            if gid is not None:
+                by_gift.setdefault(int(gid), []).append(row)
+
+        to_delete: List[int] = []
+        cate_counts: Counter = Counter()
+        for gid, need in gift_id_counts.items():
+            rows = sorted(by_gift.get(gid, []), key=lambda r: r.get('id') or 0, reverse=True)
+            if len(rows) < need:
+                return _err("礼物记录不足或已核销，无法撤销")
+            for row in rows[:need]:
+                to_delete.append(int(row['id']))
+                cate_id = row.get('gift_cate_id')
+                if cate_id is None:
+                    g = _row('t_gift', gid, 'cate_id')
+                    cate_id = g.get('cate_id') if g else None
+                if cate_id is not None:
+                    cate_counts[str(int(cate_id))] += 1
+
+        inv_user = _row('t_user', uid, 'id,inventory,score')
+        if not inv_user:
+            return _err("用户不存在")
+        inv = json.loads(inv_user.get('inventory') or '{}')
+        for key, need in cate_counts.items():
+            if inv.get(key, 0) < need:
+                return _err("背包库存不足，无法撤销")
+            inv[key] -= need
+            if inv[key] <= 0:
+                del inv[key]
+        if db_mgr.set_data('t_user', {
+            'id': uid,
+            'inventory': json.dumps(inv),
+            'score': score_before,
+        }).get('code') != 0:
+            return _err("恢复用户数据失败")
+
+        for gh_id in to_delete:
+            db_mgr.del_data('t_gift_history', gh_id)
 
         # 礼物库存 +1（支持 out_key 为逗号分隔的多个礼物 id，包含重复 ID）
-        out_key_str = str(out_key)
-        gift_id_counts = Counter(
-            int(part.strip()) for part in out_key_str.split(',') if part.strip() and part.strip().lstrip('-').isdigit())
-
         for gid, count in gift_id_counts.items():
-            gift_res = self._db.get_data('t_gift', gid, 'id,stock')
-            if gift_res.get('code') == 0 and gift_res.get('data'):
-                g = gift_res['data']
-                cur_stock = g.get('stock')
-                if isinstance(cur_stock, (int, float)):
-                    self._db.set_data('t_gift', {
-                        'id': gid,
-                        'stock': int(cur_stock) + count,
-                    })
+            g = _row('t_gift', gid, 'id,stock')
+            if g and isinstance(g.get('stock'), (int, float)):
+                db_mgr.set_data('t_gift', {'id': gid, 'stock': int(g['stock']) + count})
 
         # 删除积分历史
-        del_res = self._db.del_data('t_score_history', history_id)
-        if del_res.get('code') != 0:
-            return {"code": -1, "msg": "删除历史记录失败"}
+        if db_mgr.del_data('t_score_history', history_id).get('code') != 0:
+            return _err("删除历史记录失败")
 
-        log.info(f"Undo {action}: history_id={history_id}, user_id={user_id}, gift_id_counts={dict(gift_id_counts)}")
-        return {"code": 0, "msg": "撤销成功", "data": {"user_id": user_id, "score": pre_value}}
+        log.info(f"Undo {action}: history_id={history_id}, user_id={uid}")
+        return {"code": 0, "msg": "撤销成功", "data": {"user_id": uid, "score": score_before}}
 
     def get_gift_avg_cost(
         self,
@@ -517,61 +467,47 @@ class LotteryMgr:
             conditions['enable'] = enable
         if exchange is not None:
             conditions['exchange'] = exchange
-        resp = self._db.get_list('t_gift', 1, 1000, ['cost', 'cate_id', 'stock'], conditions or None)
 
-        if resp.get('code') != 0:
-            return {"code": -1, "msg": "Failed to query gift list"}
-
-        data = resp.get('data') or {}
-        gifts = data.get('data') or []
+        resp = db_mgr.get_list('t_gift', 1, 1000, ['cost', 'cate_id', 'stock'], conditions or None)
+        gifts = (resp.get('data') or {}).get('data') or [] if resp.get('code') == 0 else []
+        if not gifts:
+            return _err("Failed to query gift list")
 
         weighted_sum = 0.0
         total_stock = 0
         by_cate: Dict[Any, tuple] = {}
         for g in gifts:
-            c = g.get('cost')
-            s = g.get('stock')
+            c, s = g.get('cost'), g.get('stock')
             if not isinstance(c, (int, float)) or not isinstance(s, (int, float)):
                 continue
-            cost_val = float(c) if isinstance(c, int) else c
-            stock_val = int(s) if isinstance(s, float) else s
+            cost_val, stock_val = float(c), int(s)
             if stock_val < 0:
                 continue
             weighted_sum += cost_val * stock_val
             total_stock += stock_val
             cate_id = g.get('cate_id')
-            if cate_id not in by_cate:
-                by_cate[cate_id] = (0.0, 0)
-            prev_w, prev_s = by_cate[cate_id]
+            prev_w, prev_s = by_cate.get(cate_id, (0.0, 0))
             by_cate[cate_id] = (prev_w + cost_val * stock_val, prev_s + stock_val)
 
         cate_name_map: Dict[Any, str] = {}
-        try:
-            cate_resp = self._db.get_list('t_gift_category', 1, 1000, ['id', 'name'], None)
-            if cate_resp.get('code') == 0:
-                for c_row in (cate_resp.get('data') or {}).get('data') or []:
-                    cid = c_row.get('id')
-                    if cid is not None:
-                        cate_name_map[cid] = c_row.get('name') or ''
-        except Exception:
-            pass
+        cate_resp = db_mgr.get_list('t_gift_category', 1, 1000, ['id', 'name'], None)
+        if cate_resp.get('code') == 0:
+            for c_row in (cate_resp.get('data') or {}).get('data') or []:
+                if c_row.get('id') is not None:
+                    cate_name_map[c_row['id']] = c_row.get('name') or ''
 
         if total_stock <= 0:
-            return {"code": -1, "msg": "No matching gifts or zero total stock"}
-
-        avg_cost = weighted_sum / total_stock
-
-        def _sort_key(item: tuple) -> tuple:
-            cid = item[0]
-            return (cid is None, cid if cid is not None else 0)
+            return _err("No matching gifts or zero total stock")
 
         by_category = []
-        for cate_id, (cate_weighted, cate_stock) in sorted(by_cate.items(), key=_sort_key):
-            cate_avg = cate_weighted / cate_stock if cate_stock > 0 else 0.0
+        for cate_id, (cate_weighted, cate_stock) in sorted(
+            by_cate.items(),
+            key=lambda item: (item[0] is None, item[0] if item[0] is not None else 0),
+        ):
             by_category.append({
                 "cate_id": cate_id,
                 "cate_name": cate_name_map.get(cate_id),
-                "avg_cost": cate_avg,
+                "avg_cost": cate_weighted / cate_stock if cate_stock > 0 else 0.0,
                 "count": cate_stock,
             })
 
@@ -579,9 +515,66 @@ class LotteryMgr:
             "code": 0,
             "msg": "ok",
             "data": {
-                "avg_cost": avg_cost,
+                "avg_cost": weighted_sum / total_stock,
                 "total_count": total_stock,
                 "by_category": by_category,
+            },
+        }
+
+    def redeem(self, history_id: int) -> Dict[str, Any]:
+        """
+        核销/取消核销礼物记录：切换 t_gift_history.status（1↔2），并同步扣减/恢复用户背包。
+        背包格式：t_user.inventory = {"3":1,"4":1}，键为 gift_cate_id。
+        """
+        rec = _row('t_gift_history', history_id)
+        if not rec:
+            return _err("礼物记录不存在")
+
+        cur_status = _as_int(rec.get('status'), 1) or 1
+        new_status = 2 if cur_status == 1 else 1
+        user_id, cate_id = rec.get('user_id'), rec.get('gift_cate_id')
+        if user_id is None or cate_id is None:
+            return _err("记录缺少用户信息" if user_id is None else "记录缺少分类信息，无法核销")
+        uid, cid = int(user_id), int(cate_id)
+
+        user_data = _row('t_user', uid, 'id,inventory')
+        if not user_data:
+            return _err("用户不存在")
+
+        original_inventory = user_data.get('inventory') or '{}'
+        inv = json.loads(original_inventory)
+        cate_key = str(cid)
+        if new_status == 2:
+            if inv.get(cate_key, 0) < 1:
+                return _err("背包库存不足，无法核销")
+            inv[cate_key] -= 1
+            if inv[cate_key] <= 0:
+                del inv[cate_key]
+        else:
+            inv[cate_key] = inv.get(cate_key, 0) + 1
+
+        inventory_str = json.dumps(inv)
+        if db_mgr.set_data('t_user', {'id': uid, 'inventory': inventory_str}).get('code') != 0:
+            return _err("更新背包失败")
+
+        if db_mgr.set_data('t_gift_history', {'id': history_id, 'status': new_status}).get('code') != 0:
+            # 回滚背包
+            db_mgr.set_data('t_user', {'id': uid, 'inventory': original_inventory})
+            return _err("更新核销状态失败")
+
+        msg = "核销成功" if new_status == 2 else "已取消核销"
+        log.info(
+            f"Redeem: history_id={history_id}, user_id={uid}, cate_id={cid}, "
+            f"status {cur_status}->{new_status}, inventory={inventory_str}"
+        )
+        return {
+            "code": 0,
+            "msg": msg,
+            "data": {
+                "history_id": history_id,
+                "user_id": uid,
+                "status": new_status,
+                "inventory": inventory_str,
             },
         }
 

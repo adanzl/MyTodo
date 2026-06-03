@@ -38,6 +38,11 @@
       <el-tab-pane label="礼物记录" name="history">
         <TabGiftHistory />
       </el-tab-pane>
+
+      <!-- 库存页签 -->
+      <el-tab-pane label="背包" name="inventory">
+        <TabInventory />
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -50,10 +55,11 @@ import { getLotterySetting, setLotterySetting } from "@/api/api-lottery";
 import TabLottery from "./TabLottery.vue";
 import TabPool from "./TabPool.vue";
 import TabGiftHistory from "./TabGiftHistory.vue";
+import TabInventory from "./TabInventory.vue";
 
 // 主页签控制
 const STORAGE_KEY = "lottery-active-tab";
-const VALID_TABS = ["lottery", "pool", "history"] as const;
+const VALID_TABS = ["lottery", "pool", "history", "inventory"] as const;
 const activeMainTab = ref("lottery");
 
 // 监听页签切换
@@ -64,6 +70,7 @@ const handleTabChange = (tabName: string) => {
     'lottery': 'refresh-lottery-tab',
     'pool': 'refresh-pool-tab',
     'history': 'refresh-lottery-history-tab',
+    'inventory': 'refresh-lottery-inventory-tab',
   };
 
   const eventName = eventMap[tabName];

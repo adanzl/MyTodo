@@ -1,8 +1,14 @@
 <template>
   <div class="p-2">
     <div class="flex items-center gap-2 h-10">
-      <el-input placeholder="请输入ID" v-model="searchId" size="small" class="w-30!" clearable
-        @clear="onCateChange"></el-input>
+      <el-input
+        placeholder="请输入ID"
+        v-model="searchId"
+        size="small"
+        class="w-30!"
+        clearable
+        @clear="onCateChange"
+      ></el-input>
       <el-button type="primary" plain size="small" @click="onFilterClk">筛选</el-button>
       <el-button type="primary" size="small" @click="onAddGiftClk">添加奖品</el-button>
       <el-button type="success" size="small" class="ml-1" @click="modifyCateModel = true">
@@ -10,14 +16,18 @@
       </el-button>
     </div>
     <div class="flex py-2">
-      <el-radio-group size="default" v-model="selectedCateId" @change="onCateChange" >
+      <el-radio-group size="default" v-model="selectedCateId" @change="onCateChange">
         <el-radio-button v-for="item in lotteryCatList" :key="item.id" :value="item.id">
           {{ item.name }}
         </el-radio-button>
       </el-radio-group>
-
     </div>
-    <el-table :data="giftList.data" v-loading="loading" :max-height="tableMaxHeight" style="min-height: 200px">
+    <el-table
+      :data="giftList.data"
+      v-loading="loading"
+      :max-height="tableMaxHeight"
+      style="min-height: 200px"
+    >
       <!-- 图片 -->
       <el-table-column width="130" label="Image">
         <template #default="{ row }">
@@ -26,9 +36,15 @@
               <!-- 图片 -->
               <div class="flex items-center w-24">
                 <template v-if="!row.img">
-                  <el-upload class="flex items-center justify-center bg-gray-100 w-full h-24" action="#"
-                    list-type="picture-card" :limit="1" :auto-upload="false" :show-file-list="false"
-                    :on-change="(file: UploadFile) => handleImageChange(file, row)">
+                  <el-upload
+                    class="flex items-center justify-center bg-gray-100 w-full h-24"
+                    action="#"
+                    list-type="picture-card"
+                    :limit="1"
+                    :auto-upload="false"
+                    :show-file-list="false"
+                    :on-change="(file: UploadFile) => handleImageChange(file, row)"
+                  >
                     <el-icon :size="40" color="#999">
                       <Present />
                     </el-icon>
@@ -36,8 +52,13 @@
                 </template>
                 <template v-else>
                   <div class="relative z-50 w-full h-24">
-                    <el-image class="w-full h-full cursor-pointer z-99!" :src="getPicDisplayUrl(row.img)"
-                      :preview-src-list="[getPicDisplayUrl(row.img)]" :preview-teleported="true" fit="contain">
+                    <el-image
+                      class="w-full h-full cursor-pointer z-99!"
+                      :src="getPicDisplayUrl(row.img)"
+                      :preview-src-list="[getPicDisplayUrl(row.img)]"
+                      :preview-teleported="true"
+                      fit="contain"
+                    >
                       <template #error>
                         <div class="w-full h-full flex items-center justify-center bg-gray-100">
                           <el-icon :size="40" color="#999">
@@ -46,8 +67,13 @@
                         </div>
                       </template>
                     </el-image>
-                    <el-upload class="absolute bottom-0 right-0 z-100!" action="#" :show-file-list="false"
-                      :auto-upload="false" :on-change="(file: UploadFile) => handleImageChange(file, row)">
+                    <el-upload
+                      class="absolute bottom-0 right-0 z-100!"
+                      action="#"
+                      :show-file-list="false"
+                      :auto-upload="false"
+                      :on-change="(file: UploadFile) => handleImageChange(file, row)"
+                    >
                       <el-button size="small" type="primary" circle>
                         <el-icon>
                           <Edit />
@@ -60,8 +86,13 @@
             </template>
             <template v-else>
               <div class="relative w-24 h-24">
-                <el-image class="w-full h-full cursor-pointer z-9999!" :src="getPicDisplayUrl(row.img)"
-                  :preview-src-list="[getPicDisplayUrl(row.img)]" :preview-teleported="true" fit="contain">
+                <el-image
+                  class="w-full h-full cursor-pointer z-9999!"
+                  :src="getPicDisplayUrl(row.img)"
+                  :preview-src-list="[getPicDisplayUrl(row.img)]"
+                  :preview-teleported="true"
+                  fit="contain"
+                >
                   <template #error>
                     <div class="w-full h-full flex items-center justify-center bg-gray-100">
                       <el-icon :size="40" color="#999">
@@ -94,7 +125,12 @@
       </el-table-column>
       <el-table-column label="兑换" width="100" align="center">
         <template #default="{ row }">
-          <el-checkbox v-model.number="row.exchange" :true-value="1" :false-value="0" :disabled="!row.edited" />
+          <el-checkbox
+            v-model.number="row.exchange"
+            :true-value="1"
+            :false-value="0"
+            :disabled="!row.edited"
+          />
         </template>
       </el-table-column>
       <el-table-column label="Stock" width="100" align="center">
@@ -105,8 +141,17 @@
       <el-table-column label="Category" width="180">
         <template #default="{ row }">
           <div class="flex items-center">
-            <el-select :disabled="!row.edited" v-model="row.cate_id" @change="handleGiftCatChange($event, row)">
-              <el-option v-for="item in lotteryCatList" :key="item.id" :label="item.name" :value="item.id" />
+            <el-select
+              :disabled="!row.edited"
+              v-model="row.cate_id"
+              @change="handleGiftCatChange($event, row)"
+            >
+              <el-option
+                v-for="item in lotteryCatList"
+                :key="item.id"
+                :label="item.name"
+                :value="item.id"
+              />
             </el-select>
           </div>
         </template>
@@ -131,26 +176,50 @@
       <el-table-column label="操作">
         <template #default="{ row }">
           <div class="flex flex-col gap-2 [&_.el-button+_.el-button]:ml-0!">
-            <el-button v-if="row.id !== -1" class="w-16" size="small" type="danger" @click="handleGiftDel(row)">
+            <el-button
+              v-if="row.id !== -1"
+              class="w-16"
+              size="small"
+              type="danger"
+              @click="handleGiftDel(row)"
+            >
               Delete
             </el-button>
-            <el-button v-if="row.edited" class="w-16" size="small"
-              @click="handleGiftCancel(row, giftList.data.indexOf(row))">
+            <el-button
+              v-if="row.edited"
+              class="w-16"
+              size="small"
+              @click="handleGiftCancel(row, giftList.data.indexOf(row))"
+            >
               Cancel
             </el-button>
             <el-button v-else size="small" class="w-16" @click="handleGiftEdit(row)">
               Edit
             </el-button>
-            <el-button v-if="row.edited" class="w-16" size="small" type="primary" @click="handleGiftSave(row)">
+            <el-button
+              v-if="row.edited"
+              class="w-16"
+              size="small"
+              type="primary"
+              @click="handleGiftSave(row)"
+            >
               Save
             </el-button>
           </div>
         </template>
       </el-table-column>
     </el-table>
-    <el-pagination layout="sizes, prev, pager, next" :total="giftList.totalCount" v-model:page-size="PAGE_SIZE"
-      :page-sizes="[5, 10, 20]" :current-page="giftList.pageNum" class="mt-2" background @size-change="handleSizeChange"
-      @current-change="(page: number) => handlePageChange(page, PAGE_SIZE)" />
+    <el-pagination
+      layout="sizes, prev, pager, next"
+      :total="giftList.totalCount"
+      v-model:page-size="PAGE_SIZE"
+      :page-sizes="[5, 10, 20]"
+      :current-page="giftList.pageNum"
+      class="mt-2"
+      background
+      @size-change="handleSizeChange"
+      @current-change="(page: number) => handlePageChange(page, PAGE_SIZE)"
+    />
   </div>
   <LotteryCategoryDialog v-model="modifyCateModel" @refresh="handleCategoryRefresh" />
 </template>
@@ -160,9 +229,8 @@ import { ref, onMounted, computed, nextTick } from "vue";
 import { ElMessage } from "element-plus";
 import type { UploadFile } from "element-plus";
 import { Edit, Present } from "@element-plus/icons-vue";
-import { getList, getData, setData, delData } from "@/api/api-common";
+import { getGiftCategoryList, getGiftList, getGift, setGift, deleteGift } from "@/api/api-lottery";
 import { uploadPic, getPicDisplayUrl } from "@/api/api-pic";
-import * as _ from "lodash-es";
 import type { Gift, GiftApiData, GiftCategory } from "@/types/lottery";
 import LotteryCategoryDialog from "./dialogs/LotteryCategory.vue";
 
@@ -202,9 +270,27 @@ const lotteryCatList = ref<GiftCategory[]>([]);
 const loading = ref(false);
 const modifyCateModel = ref(false);
 
+const mapGiftFromApi = (item: GiftApiData): Gift => ({
+  id: item.id,
+  name: item.name,
+  img: item.image,
+  cate_id: item.cate_id,
+  cost: item.cost,
+  enable: item.enable === 1,
+  exchange: item.exchange ?? 0,
+  stock: item.stock ?? 0,
+  wish: (item.wish ?? 0) === 1,
+  show: (item.show ?? 0) === 1,
+  edited: false,
+});
+
+const reloadGiftList = (pageNum = giftList.value.pageNum, pageSize = PAGE_SIZE.value) => {
+  refreshGiftList(selectedCate.value?.id ?? 0, pageNum, pageSize, searchId.value);
+};
+
 const refreshCateList = async () => {
   try {
-    const response = await getList<GiftCategory>("t_gift_category");
+    const response = await getGiftCategoryList<GiftCategory>();
     if (response && response.data) {
       const d = response.data.data || [];
       lotteryCatList.value = [...d];
@@ -215,74 +301,51 @@ const refreshCateList = async () => {
     }
   } catch (err) {
     console.error(err);
-    ElMessage.error(JSON.stringify(err));
+    ElMessage.error("获取类别失败");
   }
 };
 
-const refreshGiftList = async (cateId: number, pageNum: number, pageSize: number, searchId?: string) => {
+const refreshGiftList = async (
+  cateId: number,
+  pageNum: number,
+  pageSize: number,
+  searchId?: string
+) => {
   loading.value = true;
   try {
-    let filter: Record<string, string | number> | undefined = undefined;
-    // 如果有searchId，优先使用ID筛选
-    if (searchId && searchId.trim() !== "") {
+    let filter: Record<string, string | number> | undefined;
+    if (searchId?.trim()) {
       filter = { id: searchId.trim() };
-    } else if (cateId && cateId !== 0) {
-      // 否则使用分类筛选
+    } else if (cateId) {
       filter = { cate_id: cateId };
     }
-    const response = await getList<GiftApiData>("t_gift", filter, pageNum, pageSize);
-    if (response && response.data) {
-      const d = response.data.data || [];
-      giftList.value.data = [];
+    const response = await getGiftList<GiftApiData>(filter, pageNum, pageSize);
+    if (response?.data) {
+      giftList.value.data = (response.data.data || []).map(mapGiftFromApi);
       giftList.value.pageNum = response.data.pageNum ?? pageNum;
       giftList.value.pageSize = response.data.pageSize ?? pageSize;
       giftList.value.totalCount = response.data.totalCount ?? 0;
       giftList.value.totalPage =
         response.data.totalPage ??
         Math.ceil((response.data.totalCount ?? 0) / (response.data.pageSize ?? pageSize));
-
-      _.forEach(d, item => {
-        giftList.value.data.push({
-          id: item.id,
-          name: item.name,
-          img: item.image,
-          cate_id: item.cate_id,
-          cost: item.cost,
-          enable: item.enable === 1,
-          exchange: item.exchange ?? 0,
-          stock: item.stock ?? 0,
-          wish: (item.wish ?? 0) === 1,
-          show: (item.show ?? 0) === 1,
-          edited: false,
-        });
-      });
     }
   } catch (err) {
     console.error(err);
-    ElMessage.error(JSON.stringify(err));
+    ElMessage.error("获取奖品列表失败");
   } finally {
     loading.value = false;
   }
 };
 
 const onCateChange = () => {
-  // 切换分类时清除ID筛选
   searchId.value = "";
-  const cate = selectedCate.value;
-  if (cate) {
-    refreshGiftList(cate.id, 1, PAGE_SIZE.value);
-  }
+  reloadGiftList(1);
 };
 
-const onFilterClk = () => {
-  refreshGiftList(selectedCate.value.id, 1, PAGE_SIZE.value, searchId.value);
-};
+const onFilterClk = () => reloadGiftList(1);
 
 const onAddGiftClk = () => {
-  // 添加新奖品时，如果在ID筛选模式下，先清除筛选
-  if (searchId.value && searchId.value.trim() !== "") {
-    searchId.value = "";
-  }
+  if (searchId.value.trim()) searchId.value = "";
 
   giftList.value.data.unshift({
     id: -1,
@@ -306,8 +369,8 @@ const handleGiftCatChange = (event: number, item: Gift) => {
 const handleGiftDel = async (item: Gift) => {
   try {
     item.edited = false;
-    await delData("t_gift", item.id);
-    await refreshGiftList(selectedCate.value.id, giftList.value.pageNum, giftList.value.pageSize, searchId.value);
+    await deleteGift(item.id);
+    reloadGiftList();
   } catch (error) {
     console.error("删除奖品失败:", error);
     ElMessage.error("删除奖品失败");
@@ -319,20 +382,7 @@ const handleGiftCancel = async (item: Gift, idx: number) => {
     giftList.value.data.splice(idx, 1);
   } else {
     try {
-      // 获取所有字段的数据
-      const data = await getData<GiftApiData>("t_gift", item.id, "*");
-      console.log("取消编辑 - 获取到的数据:", data);
-      // 使用直接赋值的方式确保 Vue 响应式更新
-      item.id = data.id;
-      item.name = data.name;
-      item.img = data.image;
-      item.cate_id = data.cate_id;
-      item.cost = data.cost;
-      item.enable = data.enable === 1;
-      item.exchange = data.exchange ?? 0;
-      item.stock = data.stock ?? 0;
-      item.wish = (data.wish ?? 0) === 1;
-      item.show = (data.show ?? 0) === 1;
+      Object.assign(item, mapGiftFromApi(await getGift<GiftApiData>(item.id, "*")));
     } catch (error) {
       console.error("获取奖品数据失败:", error);
       ElMessage.error("获取奖品数据失败");
@@ -344,7 +394,7 @@ const handleGiftCancel = async (item: Gift, idx: number) => {
 
 const handleGiftSave = async (item: Gift) => {
   try {
-    const data = {
+    await setGift({
       id: item.id,
       name: item.name,
       image: item.img,
@@ -355,9 +405,8 @@ const handleGiftSave = async (item: Gift) => {
       stock: item.stock ?? 0,
       wish: item.wish ? 1 : 0,
       show: item.show ? 1 : 0,
-    };
-    await setData("t_gift", data);
-    await refreshGiftList(selectedCate.value.id, giftList.value.pageNum, giftList.value.pageSize, searchId.value);
+    });
+    reloadGiftList();
   } catch (error) {
     console.error("保存奖品失败:", error);
     ElMessage.error("保存奖品失败");
@@ -380,35 +429,26 @@ const handleImageChange = async (file: UploadFile, row: Gift) => {
   }
 };
 
-const handlePageChange = (pageNum: number, pageSize: number) => {
-  refreshGiftList(selectedCate.value.id, pageNum, pageSize, searchId.value);
-};
-
-const handleSizeChange = (pageSize: number) => {
-  refreshGiftList(selectedCate.value.id, 1, pageSize, searchId.value);
-};
+const handlePageChange = (pageNum: number, pageSize: number) => reloadGiftList(pageNum, pageSize);
+const handleSizeChange = (pageSize: number) => reloadGiftList(1, pageSize);
 
 const handleGiftEdit = (item: Gift) => {
   item.edited = true;
 };
 
-// 类别管理对话框刷新回调
 const handleCategoryRefresh = async () => {
   await refreshCateList();
-  // 如果当前选中的分类被删除，重置为第一个分类
   if (!lotteryCatList.value.some(cat => cat.id === selectedCateId.value)) {
-    selectedCateId.value = lotteryCatList.value.length > 0 ? lotteryCatList.value[0].id : 0;
+    selectedCateId.value = lotteryCatList.value[0]?.id ?? 0;
   }
-  // 重新加载奖品列表
-  await refreshGiftList(selectedCate.value.id, 1, PAGE_SIZE.value, searchId.value);
+  reloadGiftList(1);
 };
 
 onMounted(async () => {
   await refreshCateList();
   await refreshGiftList(0, 1, PAGE_SIZE.value);
   calculateTableHeight();
-  window.addEventListener('resize', calculateTableHeight);
+  window.addEventListener("resize", calculateTableHeight);
 });
 </script>
-
 <style scoped></style>

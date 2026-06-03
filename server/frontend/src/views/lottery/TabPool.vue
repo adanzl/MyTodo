@@ -1,8 +1,12 @@
 <template>
   <div class="p-2">
     <div class="flex items-center h-10">
-      <el-button @click="refreshPoolList(poolList.pageNum, poolList.pageSize)"
-          size="small" type="primary" plain>
+      <el-button
+        @click="refreshPoolList(poolList.pageNum, poolList.pageSize)"
+        size="small"
+        type="primary"
+        plain
+      >
         <el-icon>
           <Refresh />
         </el-icon>
@@ -34,7 +38,7 @@
             <el-input v-model="row.cost" size="small" type="number" placeholder="0" clearable />
           </template>
           <template v-else>
-            <span>{{ row.cost ?? '-' }}</span>
+            <span>{{ row.cost ?? "-" }}</span>
           </template>
         </template>
       </el-table-column>
@@ -45,7 +49,7 @@
               <el-input v-model="row.count" size="small" type="number" placeholder="0" clearable />
             </template>
             <template v-else>
-              <span>{{ row.count ?? '-' }}</span>
+              <span>{{ row.count ?? "-" }}</span>
             </template>
           </div>
         </template>
@@ -54,10 +58,16 @@
         <template #default="{ row }">
           <div class="flex items-center justify-center">
             <template v-if="row.edited">
-              <el-input v-model="row.count_mx" size="small" type="number" placeholder="0" clearable />
+              <el-input
+                v-model="row.count_mx"
+                size="small"
+                type="number"
+                placeholder="0"
+                clearable
+              />
             </template>
             <template v-else>
-              <span>{{ row.count_mx ?? '-' }}</span>
+              <span>{{ row.count_mx ?? "-" }}</span>
             </template>
           </div>
         </template>
@@ -66,13 +76,26 @@
         <template #default="{ row }">
           <div class="flex items-center">
             <template v-if="row.edited">
-              <el-select v-model="row.cate_ids" multiple collapse-tags collapse-tags-tooltip size="small"
-                placeholder="选择分类" style="width: 100%" :max-collapse-tags="5">
-                <el-option v-for="cate in categoryList" :key="cate.id" :label="cate.name" :value="cate.id" />
+              <el-select
+                v-model="row.cate_ids"
+                multiple
+                collapse-tags
+                collapse-tags-tooltip
+                size="small"
+                placeholder="选择分类"
+                style="width: 100%"
+                :max-collapse-tags="5"
+              >
+                <el-option
+                  v-for="cate in categoryList"
+                  :key="cate.id"
+                  :label="cate.name"
+                  :value="cate.id"
+                />
               </el-select>
             </template>
             <template v-else>
-              <span>{{ row.cate_names && row.cate_names.length > 0 ? row.cate_names : '-' }}</span>
+              <span>{{ row.cate_names && row.cate_names.length > 0 ? row.cate_names : "-" }}</span>
             </template>
           </div>
         </template>
@@ -83,22 +106,35 @@
             <el-button v-if="row.edited" size="small" type="primary" @click="handlePoolSave(row)">
               保存
             </el-button>
-            <el-button v-if="row.edited" size="small" @click="handlePoolCancel(row, poolList.data.indexOf(row))">
+            <el-button
+              v-if="row.edited"
+              size="small"
+              @click="handlePoolCancel(row, poolList.data.indexOf(row))"
+            >
               取消
             </el-button>
-            <el-button v-else size="small" @click="handlePoolEdit(row)">
-              编辑
-            </el-button>
-            <el-button v-if="row.id !== -1" size="small" type="danger" @click="handlePoolDelete(row)">
+            <el-button v-else size="small" @click="handlePoolEdit(row)"> 编辑 </el-button>
+            <el-button
+              v-if="row.id !== -1"
+              size="small"
+              type="danger"
+              @click="handlePoolDelete(row)"
+            >
               删除
             </el-button>
           </div>
         </template>
       </el-table-column>
     </el-table>
-    <el-pagination layout="prev, pager, next" :total="poolList.totalCount" :page-size="PAGE_SIZE"
-      :current-page="poolList.pageNum" class="mt-2" background
-      @current-change="(page: number) => handlePageChange(page, PAGE_SIZE)" />
+    <el-pagination
+      layout="prev, pager, next"
+      :total="poolList.totalCount"
+      :page-size="PAGE_SIZE"
+      :current-page="poolList.pageNum"
+      class="mt-2"
+      background
+      @current-change="(page: number) => handlePageChange(page, PAGE_SIZE)"
+    />
   </div>
 </template>
 
@@ -106,20 +142,49 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Plus, Refresh } from "@element-plus/icons-vue";
-import { getList, getData, setData, delData } from "@/api/api-common";
-import * as _ from "lodash-es";
+import {
+  getGiftPoolList,
+  getGiftPool,
+  setGiftPool,
+  deleteGiftPool,
+  getGiftCategoryList,
+  type GiftPoolData,
+} from "@/api/api-lottery";
 
-interface PoolItem {
-  id: number;
-  name: string;
-  cost?: number;
-  count?: number;
-  count_mx?: number;
-  cate_list?: string;
+interface PoolItem extends GiftPoolData {
   cate_ids?: number[];
   cate_names?: string;
   edited?: boolean;
 }
+
+const parseCateIds = (cateList?: string) =>
+  cateList
+    ? cateList
+        .split(",")
+        .map(id => parseInt(id, 10))
+        .filter(id => !Number.isNaN(id))
+    : [];
+
+const getCategoryNames = (cateIds: number[], categories: Array<{ id: number; name: string }>) => {
+  if (!cateIds.length) return "";
+  return cateIds
+    .map(id => categories.find(c => c.id === id)?.name)
+    .filter(Boolean)
+    .join("、");
+};
+
+const toPoolItem = (item: GiftPoolData, categories: Array<{ id: number; name: string }>): PoolItem => {
+  const cateIds = parseCateIds(item.cate_list);
+  return {
+    ...item,
+    count: item.count ?? 0,
+    count_mx: item.count_mx ?? 0,
+    cate_list: item.cate_list || "",
+    cate_ids: cateIds,
+    cate_names: getCategoryNames(cateIds, categories),
+    edited: false,
+  };
+};
 
 const PAGE_SIZE = 10;
 const poolList = ref<{
@@ -141,39 +206,21 @@ const categoryList = ref<Array<{ id: number; name: string }>>([]);
 const refreshPoolList = async (pageNum: number, pageSize: number) => {
   loading.value = true;
   try {
-    const response = await getList<PoolItem>("t_gift_pool", undefined, pageNum, pageSize);
-    if (response && response.data) {
-      const d = response.data.data || [];
-      poolList.value.data = [];
+    const response = await getGiftPoolList<GiftPoolData>(undefined, pageNum, pageSize);
+    if (response?.data) {
       poolList.value.pageNum = response.data.pageNum ?? pageNum;
       poolList.value.pageSize = response.data.pageSize ?? pageSize;
       poolList.value.totalCount = response.data.totalCount ?? 0;
       poolList.value.totalPage =
         response.data.totalPage ??
         Math.ceil((response.data.totalCount ?? 0) / (response.data.pageSize ?? pageSize));
-
-      _.forEach(d, item => {
-        // 解析分类 ID 列表
-        const cateIds = item.cate_list ? item.cate_list.split(',').map(id => parseInt(id)).filter(id => !isNaN(id)) : [];
-        // 获取对应的分类名称
-        const cateNames = getCategoryNames(cateIds, categoryList.value);
-
-        poolList.value.data.push({
-          id: item.id,
-          name: item.name,
-          cost: item.cost,
-          count: item.count ?? 0,
-          count_mx: item.count_mx ?? 0,
-          cate_list: item.cate_list || "",
-          cate_ids: cateIds,
-          cate_names: cateNames,
-          edited: false,
-        });
-      });
+      poolList.value.data = (response.data.data || []).map(item =>
+        toPoolItem(item, categoryList.value)
+      );
     }
   } catch (err) {
     console.error(err);
-    ElMessage.error(JSON.stringify(err));
+    ElMessage.error("获取奖池列表失败");
   } finally {
     loading.value = false;
   }
@@ -202,18 +249,8 @@ const handlePoolCancel = async (item: PoolItem, idx: number) => {
     poolList.value.data.splice(idx, 1);
   } else {
     try {
-      const data = await getData<PoolItem>("t_gift_pool", item.id);
-      console.log("取消编辑 - 获取到的数据:", data);
-      // 恢复原始数据
-      item.name = data.name || item.name;
-      item.cost = data.cost || item.cost;
-      item.count = data.count ?? item.count;
-      item.count_mx = data.count_mx ?? item.count_mx;
-      item.cate_list = data.cate_list ?? item.cate_list;
-      // 重新解析分类
-      const cateIds = item.cate_list ? item.cate_list.split(',').map(id => parseInt(id)).filter(id => !isNaN(id)) : [];
-      item.cate_ids = cateIds;
-      item.cate_names = getCategoryNames(cateIds, categoryList.value);
+      const data = await getGiftPool<GiftPoolData>(item.id);
+      Object.assign(item, toPoolItem(data, categoryList.value));
       item.edited = false;
     } catch (error) {
       console.error("获取奖池数据失败:", error);
@@ -229,10 +266,7 @@ const handlePoolSave = async (item: PoolItem) => {
       return;
     }
 
-    // 将分类 ID 数组转换为逗号分隔的字符串
-    const cateListStr = item.cate_ids && item.cate_ids.length > 0
-      ? item.cate_ids.join(',')
-      : '';
+    const cateListStr = item.cate_ids?.length ? item.cate_ids.join(",") : "";
 
     const data = {
       id: item.id,
@@ -242,7 +276,7 @@ const handlePoolSave = async (item: PoolItem) => {
       count_mx: item.count_mx,
       cate_list: cateListStr,
     };
-    await setData("t_gift_pool", data);
+    await setGiftPool(data);
     await refreshPoolList(poolList.value.pageNum, poolList.value.pageSize);
     ElMessage.success("保存成功");
   } catch (error) {
@@ -253,19 +287,15 @@ const handlePoolSave = async (item: PoolItem) => {
 
 const handlePoolDelete = async (item: PoolItem) => {
   try {
-    await ElMessageBox.confirm(
-      `确定要删除奖池"${item.name}"吗？删除后无法恢复。`,
-      "确认删除",
-      {
-        confirmButtonText: "确定",
-        cancelButtonText: "取消",
-        type: "warning",
-      }
-    );
-    await delData("t_gift_pool", item.id);
+    await ElMessageBox.confirm(`确定要删除奖池"${item.name}"吗？删除后无法恢复。`, "确认删除", {
+      confirmButtonText: "确定",
+      cancelButtonText: "取消",
+      type: "warning",
+    });
+    await deleteGiftPool(item.id);
     await refreshPoolList(poolList.value.pageNum, poolList.value.pageSize);
     ElMessage.success("删除成功");
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error !== "cancel") {
       console.error("删除奖池失败:", error);
       ElMessage.error("删除奖池失败");
@@ -277,41 +307,25 @@ const handlePageChange = (pageNum: number, pageSize: number) => {
   refreshPoolList(pageNum, pageSize);
 };
 
-// 辅助函数：根据分类 ID 列表获取分类名称
-const getCategoryNames = (cateIds: number[], categories: Array<{ id: number; name: string }>): string => {
-  if (!cateIds || cateIds.length === 0) return '';
-  const names = cateIds
-    .map(id => categories.find(c => c.id === id)?.name)
-    .filter(name => name) as string[];
-  return names.length > 0 ? names.join('、') : '';
-};
-
-// 加载所有分类
 const refreshCategoryList = async () => {
   try {
-    const response = await getList<{ id: number; name: string }>("t_gift_category");
-    if (response && response.data) {
-      categoryList.value = response.data.data || [];
-    }
+    const response = await getGiftCategoryList<{ id: number; name: string }>();
+    categoryList.value = response.data?.data ?? [];
   } catch (error) {
     console.error("获取分类列表失败:", error);
   }
 };
 
+const handleRefresh = () => refreshPoolList(poolList.value.pageNum, poolList.value.pageSize);
+
 onMounted(() => {
   refreshCategoryList();
   refreshPoolList(1, PAGE_SIZE);
+  window.addEventListener("refresh-pool-tab", handleRefresh);
+});
 
-  // 监听刷新事件
-  const handleRefresh = () => {
-    refreshPoolList(poolList.value.pageNum, poolList.value.pageSize);
-  };
-  window.addEventListener('refresh-pool-tab', handleRefresh);
-
-  onUnmounted(() => {
-    window.removeEventListener('refresh-pool-tab', handleRefresh);
-  });
+onUnmounted(() => {
+  window.removeEventListener("refresh-pool-tab", handleRefresh);
 });
 </script>
-
 <style scoped></style>

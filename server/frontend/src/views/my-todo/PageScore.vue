@@ -98,7 +98,7 @@ import { ref, onMounted, computed } from "vue";
 import { CaretTop, CaretBottom, Present, SuccessFilled } from "@element-plus/icons-vue";
 import { getList, setData } from "@/api/api-common";
 import { getPicDisplayUrl } from "@/api/api-pic";
-import { undoLottery } from "@/api/api-lottery";
+import { undoLottery, getGiftsByIds } from "@/api/api-lottery";
 import type { ScoreHistory } from "@/api/api-score";
 import { ElMessage, ElMessageBox } from "element-plus";
 import * as _ from "lodash-es";
@@ -237,17 +237,12 @@ async function onGiftClick(row: ScoreHistory) {
     // 获取所有唯一的 ID
     const uniqueIds = [...new Set(ids)];
 
-    // 使用 getList 接口获取所有唯一 ID 的奖品数据
-    const response = await getList<{ name: string; image: string }>(
-      "t_gift",
-      { id: { in: uniqueIds } }
-    );
+    const response = await getGiftsByIds<{ id: number; name: string; image: string }>(uniqueIds);
 
     // 创建 ID 到奖品的映射
     const giftMap = new Map<number, { name: string; image: string }>();
-    (response.data.data || []).forEach(gift => {
-      // 需要从返回数据中获取 id，或者重新查询
-      giftMap.set((gift as any).id, gift);
+    (response.data?.data ?? []).forEach(gift => {
+      giftMap.set(gift.id, gift);
     });
 
     // 按照原始 IDs 的顺序重组数据（包括重复项）

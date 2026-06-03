@@ -9,13 +9,13 @@
     </div>
     <el-table :data="userList" stripe class="w-full" v-loading="loading">
       <el-table-column prop="id" label="ID" width="80" />
-      <el-table-column label="Icon" width="100">
+      <el-table-column label="Icon" width="80">
         <template #default="scope">
           <el-avatar :src="scope.row.icon" />
         </template>
       </el-table-column>
-      <el-table-column prop="name" label="Name" width="100" />
-      <el-table-column prop="admin" label="Admin" width="100" class="items-center text-center" />
+      <el-table-column prop="name" label="Name" width="70" />
+      <el-table-column prop="admin" label="Admin" width="100" align="center" />
       <el-table-column label="WProgress" width="120" class="items-center text-center">
         <template #default="{ row }">
           <div class="flex justify-end px-2">
@@ -38,9 +38,10 @@
       </el-table-column>
       <el-table-column prop="score" label="Score" width="100">
         <template #default="{ row }">
-          <el-input v-model="row.score" size="small" />
+          <el-input v-model="row.score" size="small" class="w-14!" />
         </template>
       </el-table-column>
+      <el-table-column prop="inventory" label="Inventory" width="100" show-overflow-tooltip />
       <el-table-column label="Operations">
         <template #default="{ row }">
           <el-button class="w-16" @click="handleUpdateUser(row)" type="primary"> Update </el-button>
