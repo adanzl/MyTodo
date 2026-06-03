@@ -22,6 +22,7 @@ _DESC_KO = re.compile(r"韩")
 
 
 class AssrtError(Exception):
+
     def __init__(self, message: str, *, status_code: int | None = None, payload: Any = None):
         super().__init__(message)
         self.status_code = status_code
@@ -33,8 +34,11 @@ def _assrt_get(url: str, timeout: float, *, json_api: bool) -> tuple[int, bytes]
     try:
         return http_get_bytes(url, timeout=timeout, headers=headers)
     except TimeoutError as e:
-        raise AssrtError("ASSRT 请求超时") from e
+        raise AssrtError(str(e) or "ASSRT 请求超时") from e
     except RuntimeError as e:
+        msg = str(e).lower()
+        if "timeout" in msg or "timed out" in msg:
+            raise AssrtError(f"ASSRT 请求超时（{int(timeout)}s）") from e
         raise AssrtError(str(e)) from e
 
 
@@ -115,7 +119,10 @@ def _row(sub: dict[str, Any]) -> dict[str, Any]:
             "subtitle_id": sub_id,
             "language": _lang_desc(sub),
             "release": release,
-            "files": [{"file_id": sid, "file_name": fname}],
+            "files": [{
+                "file_id": sid,
+                "file_name": fname
+            }],
         },
     }
 
@@ -143,6 +150,7 @@ def _page_payload(subs: list[Any], page: int, want: set[str]) -> dict[str, Any]:
 
 
 class AssrtClient:
+
     def search_by_query(
         self,
         query: str,
@@ -223,16 +231,11 @@ class AssrtClient:
         remote_name = "subtitle.srt"
         filelist = detail.get("filelist")
         if isinstance(filelist, list) and filelist:
-            candidates = [
-                f for f in filelist
-                if isinstance(f, dict) and f.get("url")
-            ]
-            candidates.sort(
-                key=lambda f: (
-                    0 if str(f.get("f", "")).lower().endswith(_TEXT_EXTS) else 1,
-                    str(f.get("f", "")),
-                ),
-            )
+            candidates = [f for f in filelist if isinstance(f, dict) and f.get("url")]
+            candidates.sort(key=lambda f: (
+                0 if str(f.get("f", "")).lower().endswith(_TEXT_EXTS) else 1,
+                str(f.get("f", "")),
+            ), )
             if not candidates:
                 raise AssrtError("字幕包内无可用文件")
             item = candidates[min(max(0, file_index), len(candidates) - 1)]

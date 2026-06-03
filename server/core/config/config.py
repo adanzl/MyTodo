@@ -85,7 +85,7 @@ class Config:
     # ========== ASSRT 射手网字幕 ==========
     ASSRT_API_KEY: str = os.environ.get('ASSRT_API_KEY', '')
     ASSRT_BASE_URL: str = os.environ.get('ASSRT_BASE_URL', 'https://api.assrt.net').rstrip('/')
-    ASSRT_TIMEOUT: int = int(os.environ.get('ASSRT_TIMEOUT', '30'))
+    ASSRT_TIMEOUT: int = int(os.environ.get('ASSRT_TIMEOUT', '60'))
     SUBTITLE_DEFAULT_LANGS: str = os.environ.get('SUBTITLE_DEFAULT_LANGS', 'en')
 
     # ========== Whisper 语音识别（本地 CTranslate2 模型目录，见 faster_whisper.download_model）==========
