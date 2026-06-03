@@ -36,10 +36,13 @@ def _assrt_get(url: str, timeout: float, *, json_api: bool) -> tuple[int, bytes]
     except TimeoutError as e:
         raise AssrtError(str(e) or "ASSRT 请求超时") from e
     except RuntimeError as e:
-        msg = str(e).lower()
-        if "timeout" in msg or "timed out" in msg:
+        msg = str(e)
+        low = msg.lower()
+        if "recursion" in low:
+            raise AssrtError("ASSRT 请求异常（进程初始化冲突，请重启服务后再试）") from e
+        if "timeout" in low or "timed out" in low:
             raise AssrtError(f"ASSRT 请求超时（{int(timeout)}s）") from e
-        raise AssrtError(str(e)) from e
+        raise AssrtError(msg) from e
 
 
 def _http_get(path: str, params: dict[str, Any]) -> dict[str, Any]:

@@ -8,28 +8,27 @@
 选用指南：
 - run_in_background：点火即走，不关心返回值（如任务状态异步写库）。
 - run_blocking：纯 CPU/本地 IO（无 requests/ssl）。
-- http_get_bytes：对外 HTTPS（ASSRT 等）；gevent patch ssl 后须 spawn 子进程发 requests。
+- http_get_bytes：对外 HTTPS（ASSRT 等）；使用 urllib（gevent patch ssl 后可用，勿 subprocess/requests）。
 - run_async：在子线程跑 asyncio 协程；主线程用 gevent 轮询等待，避免 join 卡死整个 hub（蓝牙/Mi 等）。
 """
 from __future__ import annotations
 
 import asyncio
-import multiprocessing as mp
 import threading
 import time
 from queue import Empty, Queue
 from typing import Any, Callable, Coroutine, Optional, TypeVar
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 from gevent import Timeout as GeventTimeout
 from gevent import sleep as gevent_sleep
 from gevent import spawn
 
 from core.config import app_logger
-from core.tools.http_worker import http_request_worker
 
 log = app_logger
 _T = TypeVar("_T")
-_SPAWN = mp.get_context("spawn")
 
 
 def run_in_background(func: Callable[[], None], daemon: bool = True) -> None:
@@ -114,51 +113,19 @@ def http_request_bytes(
     timeout: float = 30.0,
     headers: dict[str, str] | None = None,
 ) -> tuple[int, bytes]:
-    """在 spawn 子进程发 HTTP，返回 (status_code, body)。主进程 gevent patch ssl 后须走此路径。
-
-    使用 gevent_sleep 轮询子进程，避免 proc.join 阻塞整个 hub（否则一次 ASSRT 搜索会卡住全站）。
-    """
-    wait = timeout + 15
-    out_q = _SPAWN.Queue()
-    proc = _SPAWN.Process(
-        target=http_request_worker,
-        args=(out_q, method, url, timeout, headers),
-    )
-    proc.start()
-    deadline = time.monotonic() + wait
-    msg: tuple[str, ...] | None = None
+    """对外 HTTPS GET/HEAD 等（urllib，兼容 gevent patch ssl）。"""
+    req = Request(url, method=method.upper(), headers=headers or {})
     try:
-        while time.monotonic() < deadline:
-            try:
-                msg = out_q.get_nowait()
-                break
-            except Empty:
-                if not proc.is_alive():
-                    try:
-                        msg = out_q.get_nowait()
-                    except Empty:
-                        raise RuntimeError("HTTP 子进程无响应")
-                    break
-                gevent_sleep(0.05)
-        else:
-            if proc.is_alive():
-                proc.kill()
-                proc.join(2)
-            raise TimeoutError(f"HTTP 请求超时 ({wait}s)")
-    finally:
-        if proc.is_alive():
-            proc.kill()
-            proc.join(2)
-
-    assert msg is not None
-    if msg[0] == "err":
-        raise RuntimeError(f"HTTP 请求失败: {msg[1]}")
-    if msg[0] != "ok":
-        raise RuntimeError("HTTP 子进程响应异常")
-    body = msg[2]
-    if not isinstance(body, bytes):
-        raise RuntimeError("HTTP 子进程返回 body 类型异常")
-    return int(msg[1]), body
+        with urlopen(req, timeout=timeout) as resp:
+            return int(resp.status), resp.read()
+    except HTTPError as e:
+        return int(e.code), e.read()
+    except URLError as e:
+        reason = str(e.reason) if getattr(e, "reason", None) else str(e)
+        low = reason.lower()
+        if "timed out" in low or "timeout" in low:
+            raise TimeoutError(f"HTTP 请求超时 ({int(timeout)}s): {reason}") from e
+        raise RuntimeError(f"HTTP 请求失败: {reason}") from e
 
 
 def http_get_bytes(
