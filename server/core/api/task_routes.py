@@ -99,6 +99,16 @@ def update_task() -> ResponseReturnValue:
     return result
 
 
+@task_bp.route('/material/status', methods=['GET'])
+def get_material_status() -> ResponseReturnValue:
+    """查询素材锁定状态（视频观看时长是否超限）"""
+    user_id = request.args.get('userId', type=int)
+    material_id = request.args.get('materialId', type=int)
+    if not user_id or not material_id:
+        return _err('Invalid userId or materialId')
+    return task_mgr.get_material_status(user_id, material_id)
+
+
 @task_bp.route('/task/parent', methods=['GET'])
 def get_material_parent_chain() -> ResponseReturnValue:
     """获取素材的父目录链"""

@@ -40,6 +40,7 @@
         "Pinia",
         "pytest",
         "pywsgi",
+        "Qwen",
         "rescan",
         "rpush",
         "rssi",

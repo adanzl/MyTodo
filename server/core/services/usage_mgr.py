@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any, Dict, Optional
 
 from sqlalchemy import text
@@ -34,7 +35,7 @@ class UsageMgr:
             start_time: 开始时间（字符串格式）
             duration: 持续时间（秒）
             user_id: 用户ID
-            out_key: 外部关联键（可选）
+            out_key: 素材 ID（可选）
 
         Returns:
             操作结果字典
@@ -56,12 +57,50 @@ class UsageMgr:
 
             if result.get('code') != 0:
                 log.error(f"[UsageMgr] 添加使用记录失败: {result.get('msg')}")
+                return result
+
+            if out_key:
+                self._update_material_statistics(out_key, user_id, duration)
 
             return result
 
         except Exception as e:
             log.error(f"[UsageMgr] 添加使用记录异常: {e}", exc_info=True)
             return {"code": -1, "msg": f'error: {str(e)}'}
+
+    def _update_material_statistics(
+        self,
+        material_id: int,
+        user_id: int,
+        duration: int,
+    ) -> None:
+        """累加素材观看时长到 t_material.statistics，key 为 user_id，value 为观看时长（秒）。"""
+        try:
+            material_result = db_mgr.get_data('t_material', material_id, 'statistics')
+            if material_result.get('code') != 0 or not material_result.get('data'):
+                log.warning(f"[UsageMgr] 素材不存在，跳过统计更新: material_id={material_id}")
+                return
+
+            raw_statistics = material_result['data'].get('statistics') or '{}'
+            statistics = json.loads(raw_statistics)
+
+            user_key = str(user_id)
+            statistics[user_key] = int(statistics.get(user_key, 0) or 0) + duration
+
+            update_result = db_mgr.set_data('t_material', {
+                'id': material_id,
+                'statistics': json.dumps(statistics, ensure_ascii=False),
+            })
+            if update_result.get('code') != 0:
+                log.error(
+                    f"[UsageMgr] 更新素材统计失败: material_id={material_id}, "
+                    f"msg={update_result.get('msg')}"
+                )
+        except Exception as e:
+            log.error(
+                f"[UsageMgr] 更新素材统计异常: material_id={material_id}, error={e}",
+                exc_info=True,
+            )
 
     def get_usage_list(
         self,
