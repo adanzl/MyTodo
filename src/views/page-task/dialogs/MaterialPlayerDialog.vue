@@ -170,6 +170,7 @@
 <script setup lang="ts">
 import { addUsage, type AddUsageBody, USAGE_TYPE_PDF, USAGE_TYPE_VIDEO } from '@/api';
 import { finishMaterial } from '@/api/api-task';
+import { apiClient } from '@/api/api-client';
 import AudioPreview from '@/components/AudioPreview.vue';
 import EventBus, { C_EVENT } from '@/types/event-bus';
 import { getMediaFileUrl } from '@/utils/file';
@@ -369,6 +370,28 @@ const handleDismiss = () => {
     void stopUsageTracking();
     pauseVideo();
     clearSubtitleTracks();
+};
+
+const checkVideoLock = async (): Promise<boolean> => {
+    const userId = props.userId;
+    const materialId = props.material?.id;
+    if (!userId || !materialId) return false;
+
+    try {
+        const rsp = await apiClient.get<{ code: number; data?: { lock?: boolean } }>(
+            '/material/status',
+            { params: { userId, materialId } }
+        );
+        return rsp.data.code === 0 && rsp.data.data?.lock === true;
+    } catch (error: unknown) {
+        console.error('获取素材状态失败:', error);
+        return false;
+    }
+};
+
+const closeDueToVideoLock = () => {
+    EventBus.$emit(C_EVENT.TOAST, '视频观看超时');
+    handleDismiss();
 };
 
 const pauseVideo = () => {
@@ -682,8 +705,13 @@ const completeReading = async () => {
 // 监听弹窗打开和素材变化
 watch(
     () => [props.isOpen, props.material] as const,
-    ([isOpen, material]) => {
+    async ([isOpen, material]) => {
         if (isOpen && material) {
+            if (await checkVideoLock()) {
+                closeDueToVideoLock();
+                return;
+            }
+
             loading.value = true;
             
             setTimeout(() => {
