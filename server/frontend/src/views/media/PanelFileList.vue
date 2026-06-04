@@ -94,6 +94,9 @@
           </el-icon>
           <span v-else>⏹</span>
         </el-button>
+        <!-- verify 按钮 -->
+        <el-button v-show="showMoreActions" type="default" size="small" plain circle @click="$emit('verify')"
+          :disabled="!playlistStatus || playlistLoading" title="清理不存在文件" :icon="Brush" />
         <el-button v-show="showMoreActions" type="default" size="small" plain circle @click="$emit('clear')" :disabled="!playlistStatus ||
           ((!getCurrentPreFiles() || getCurrentPreFiles().length === 0) &&
             (!playlistStatus.playlist || playlistStatus.playlist.length === 0)) ||
@@ -168,7 +171,7 @@
 </template>
 
 <script setup lang="ts">
-import { Edit, Collection, Loading, Delete, Menu, ScaleToOriginal, FolderRemove } from "@element-plus/icons-vue";
+import { Edit, Collection, Loading, Delete, Menu, ScaleToOriginal, FolderRemove, Brush } from "@element-plus/icons-vue";
 import { formatDuration } from "@/utils/format";
 import { getWeekdayIndex } from "@/utils/date";
 import { calculateFilesTotalDuration } from "@/utils/file";
@@ -251,6 +254,7 @@ defineEmits<{
   "delete-file": [index: number];
   "remove-duplicate": [];
   "convert-mp3": [];
+  verify: [];
 }>();
 
 const getSelectedWeekdayIndex = () => {

@@ -225,3 +225,30 @@ def test_playlist_reload_exception(client, monkeypatch):
     resp = client.post("/playlist/reload", data=json.dumps({}), content_type="application/json")
     assert resp.status_code == 200
     assert resp.get_json()["code"] != 0
+
+
+def test_playlist_verify_requires_id(client):
+    resp = client.post("/playlist/verify", data=json.dumps({}), content_type="application/json")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["code"] != 0
+    assert "id is required" in body["msg"]
+
+
+def test_playlist_verify_ok(client, monkeypatch):
+    monkeypatch.setattr(playlist_routes.playlist_mgr, "playlist_verify", lambda pid: (0, "已移除 2 个不存在文件"))
+
+    resp = client.post("/playlist/verify", data=json.dumps({"id": "p1"}), content_type="application/json")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["code"] == 0
+    assert "不存在文件" in body["data"]
+
+
+def test_playlist_verify_err_when_mgr_fails(client, monkeypatch):
+    monkeypatch.setattr(playlist_routes.playlist_mgr, "playlist_verify", lambda pid: (-1, "播放列表不存在"))
+
+    resp = client.post("/playlist/verify", data=json.dumps({"id": "p1"}), content_type="application/json")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["code"] != 0

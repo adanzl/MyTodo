@@ -121,6 +121,15 @@ export async function removeDuplicateFiles(id: string): Promise<ApiResponse<unkn
 }
 
 /**
+ * 校验播放列表文件是否存在，移除不存在的项
+ * @param id 播放列表ID
+ */
+export async function verifyPlaylistFiles(id: string): Promise<ApiResponse<unknown>> {
+  const rsp = await api.post("/playlist/verify", { id });
+  return rsp.data;
+}
+
+/**
  * 设置播放列表的当前播放位置（游标）
  * @param id 播放列表ID
  * @param index 索引位置

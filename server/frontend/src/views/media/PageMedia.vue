@@ -45,7 +45,7 @@
         @replace-file="handleReplacePlaylistItem" @open-playlist-selector-for-file="handleOpenPlaylistSelectorForFile"
         @set-current-index-for-file="handleSetCurrentIndexForFile"
         @play-on-device-for-file="handlePlayOnDeviceForFile" @delete-file="handleDeletePlaylistItem"
-        @remove-duplicate="handleRemoveDuplicate" @convert-mp3="handleConvertToMp3">
+        @remove-duplicate="handleRemoveDuplicate" @convert-mp3="handleConvertToMp3" @verify="handleVerifyPlaylist">
       </PanelFileList>
 
       <!-- 第三列：配置详情（Cron + 设备） -->
@@ -147,7 +147,7 @@ import { useFileOperations } from "./composables/useFileOperations";
 import { useDragAndDrop } from "./composables/useDragAndDrop";
 import { usePlaylistNameEdit } from "./composables/usePlaylistNameEdit";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { playFileOnDevice, convertPlaylistToMp3, removeDuplicateFiles, setCurrentIndex } from "@/api/api-playlist";
+import { playFileOnDevice, convertPlaylistToMp3, removeDuplicateFiles, verifyPlaylistFiles, setCurrentIndex } from "@/api/api-playlist";
 import type { MediaFile } from "@/types/tools";
 import { STORAGE_KEY_ACTIVE_PLAYLIST_ID } from "@/constants/playlist";
 
@@ -602,6 +602,40 @@ const handleRemoveDuplicate = async () => {
     if (error !== "cancel") {
       console.error("去重失败:", error);
       ElMessage.error("去重失败，请重试");
+    }
+  }
+};
+
+// 清理不存在的文件
+const handleVerifyPlaylist = async () => {
+  if (!activePlaylistId.value) {
+    ElMessage.warning("请先选择播放列表");
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      "此操作将检查播放列表中的文件是否存在于磁盘，并移除不存在的文件，是否继续？",
+      "确认清理",
+      {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning"
+      }
+    );
+
+    const result = await verifyPlaylistFiles(activePlaylistId.value);
+    if (result.code === 0) {
+      const msg = typeof result.data === "string" ? result.data : result.msg;
+      ElMessage.success(msg || "清理成功");
+      await refreshPlaylistStatus();
+    } else {
+      ElMessage.error(result.msg || "清理失败");
+    }
+  } catch (error) {
+    if (error !== "cancel") {
+      console.error("清理失败:", error);
+      ElMessage.error("清理失败，请重试");
     }
   }
 };

@@ -740,3 +740,42 @@ def test_trigger_button_stop_some_fail(playlist_mgr, mock_device):
     assert code == -1
     assert "p1" in msg or "device error" in msg
 
+
+def test_playlist_verify_removes_missing_files(playlist_mgr, tmp_path):
+    """playlist_verify 移除磁盘上不存在的文件，保留存在的文件"""
+    existing = tmp_path / "keep.mp3"
+    existing.write_text("x")
+    missing = str(tmp_path / "gone.mp3")
+    pre_lists = [[] for _ in range(7)]
+    pre_lists[0] = [{"uri": missing}, {"uri": str(existing)}]
+    p1 = create_playlist_data(
+        "p1",
+        "P1",
+        [{"uri": str(existing)}, {"uri": missing}, {"uri": ""}],
+        pre_lists=pre_lists,
+        current_index=5,
+    )
+    playlist_mgr._playlist_raw = {"p1": p1}
+    playlist_mgr._play_state["p1"] = {"in_pre_files": False, "pre_index": 1, "file_index": 5}
+
+    code, msg = playlist_mgr.playlist_verify("p1")
+    assert code == 0
+    assert "移除" in msg
+    assert len(p1["playlist"]) == 1
+    assert p1["playlist"][0]["uri"] == str(existing)
+    assert p1["current_index"] == 0
+    assert playlist_mgr._play_state["p1"]["file_index"] == 0
+    assert len(pre_lists[0]) == 1
+    assert pre_lists[0][0]["uri"] == str(existing)
+
+
+def test_playlist_verify_all_exist(playlist_mgr, tmp_path):
+    f = tmp_path / "a.mp3"
+    f.write_text("x")
+    p1 = create_playlist_data("p1", "P1", [{"uri": str(f)}])
+    playlist_mgr._playlist_raw = {"p1": p1}
+    code, msg = playlist_mgr.playlist_verify("p1")
+    assert code == 0
+    assert "均存在" in msg
+    assert len(p1["playlist"]) == 1
+

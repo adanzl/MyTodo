@@ -1,4 +1,5 @@
 import datetime
+import os
 import sys
 import time
 from queue import Queue
@@ -809,6 +810,50 @@ class PlaylistMgr:
             (code, msg)。code=0 表示成功开始转换任务。
         """
         return self._format_convert.convert_playlist_to_mp3(playlist_id)
+
+    def playlist_verify(self, playlist_id: str) -> tuple[int, str]:
+        """校验列表文件是否存在，移除不存在的项。"""
+        try:
+            if not self._playlist_raw or playlist_id not in self._playlist_raw:
+                return -1, "播放列表不存在"
+
+            data = self._playlist_raw[playlist_id]
+            p_name = data.get("name", "未知播放列表")
+            removed = 0
+            file_lists: List[List] = []
+            pre_lists = data.get("pre_lists", [])
+            if isinstance(pre_lists, list) and len(pre_lists) == 7:
+                file_lists.extend(pl for pl in pre_lists if isinstance(pl, list))
+            playlist = data.get("playlist", [])
+            if isinstance(playlist, list):
+                file_lists.append(playlist)
+
+            for lst in file_lists:
+                kept = [
+                    x for x in lst
+                    if isinstance(x, dict) and (u := x.get("uri")) and os.path.exists(str(u).strip())
+                ]
+                removed += len(lst) - len(kept)
+                lst[:] = kept
+
+            n = len(playlist) if isinstance(playlist, list) else 0
+            data["current_index"] = min(data.get("current_index", 0), max(0, n - 1)) if n else 0
+            if playlist_id in self._play_state:
+                ps = self._play_state[playlist_id]
+                pre_n = len(self._get_pre_files_for_today(data))
+                ps["pre_index"] = min(ps.get("pre_index", 0), max(0, pre_n - 1)) if pre_n else 0
+                ps["file_index"] = min(ps.get("file_index", 0), max(0, n - 1)) if n else 0
+
+            if removed == 0:
+                return 0, f"播放列表 {p_name} 中所有文件均存在"
+
+            data["updated_time"] = _TS()
+            spawn(self._repo.save, swallow_errors=True)
+            log.info(f"[PlaylistMgr] 播放列表 {playlist_id} 已移除 {removed} 个不存在文件")
+            return 0, f"已从播放列表 {p_name} 中移除 {removed} 个不存在文件"
+        except Exception as e:
+            log.error(f"[PlaylistMgr] playlist_verify 异常: {playlist_id}, {e}", exc_info=True)
+            return -1, f"校验失败: {str(e)}"
 
     def playlist_remove_duplicate(self, playlist_id: str) -> tuple[int, str]:
         """移除播放列表中的重复文件路径。
