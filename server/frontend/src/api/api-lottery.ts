@@ -131,7 +131,7 @@ export async function getGiftList<T = GiftApiData>(
 
 export async function getGift<T = GiftApiData>(
   id: number | string,
-  fields?: string | string[]
+  fields: string | string[] = "*"
 ): Promise<T> {
   return getData<T>("t_gift", id, fields);
 }
@@ -161,8 +161,11 @@ export async function getGiftPoolList<T = GiftPoolData>(
   return getList<T>("t_gift_pool", conditions, pageNum, pageSize);
 }
 
-export async function getGiftPool<T = GiftPoolData>(id: number | string): Promise<T> {
-  return getData<T>("t_gift_pool", id);
+export async function getGiftPool<T = GiftPoolData>(
+  id: number | string,
+  fields: string | string[] = "*"
+): Promise<T> {
+  return getData<T>("t_gift_pool", id, fields);
 }
 
 export async function setGiftPool(data: Record<string, unknown>): Promise<unknown> {
