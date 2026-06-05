@@ -7,7 +7,10 @@ from datetime import datetime, timedelta, date
 import calendar as calendar_module
 import json
 
-from core.config import app_logger, config
+from flask import current_app
+
+from core.config import app_logger
+from core.config.const import DEFAULT_BASE_DIR
 from core.db.db_mgr import db_mgr
 from core.tools.async_util import run_in_background
 from core.utils import get_media_duration, validate_and_normalize_path
@@ -368,11 +371,16 @@ class TaskMgr:
             if not material_duration:
                 path = mat.get('path')
                 if path:
-                    def _fetch(mid=material_id, fp=path):
-                        p, _ = validate_and_normalize_path(fp, config.DEFAULT_BASE_DIR, must_be_file=True)
-                        d = get_media_duration(p) if p else None
-                        if d:
-                            db_mgr.set_data(TABLE_MATERIAL, {'id': mid, 'duration': d})
+                    app = current_app._get_current_object()  # type: ignore[attr-defined]
+                    mid = material_id
+
+                    def _fetch(fp=path, m_id=mid):
+                        with app.app_context():
+                            p, _ = validate_and_normalize_path(fp, DEFAULT_BASE_DIR, must_be_file=True)
+                            d = get_media_duration(p) if p else None
+                            if d:
+                                db_mgr.set_data(TABLE_MATERIAL, {'id': m_id, 'duration': d})
+
                     run_in_background(_fetch)
                 return {"code": 0, "msg": "ok", "data": {"lock": False}}
 
@@ -380,7 +388,7 @@ class TaskMgr:
             if isinstance(stats, str):
                 stats = json.loads(stats)
             locked = int(stats.get(str(user_id), 0) or 0) >= float(material_duration)
-            return {"code": 0, "msg": "ok", "data": {"lock": locked}}
+            return {"code": 0, "msg": "ok", "data": {"lock": locked, "duration": material_duration}}
         except Exception as e:
             log.error(f"获取素材状态失败: material_id={material_id}, {e}")
             return {"code": -1, "msg": f"获取失败: {str(e)}", "data": {"lock": False}}
