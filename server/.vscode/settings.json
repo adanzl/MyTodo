@@ -50,6 +50,7 @@
         "ssdpy",
         "syscall",
         "TMDB",
+        "UNDEPLOYED",
         "unplugin",
         "upnp",
         "upnpclient",
