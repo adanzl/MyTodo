@@ -197,7 +197,10 @@ class TaskMgr:
             if history_result.get('code') != 0:
                 log.error(f"插入任务历史记录失败: {history_result.get('msg')}")
 
-            all_completed = all(m.get('status', {}).get(str(user_id)) == 1 for m in materials_for_day)
+            all_completed = all(
+                self._is_material_completed_for_user(m, user_id)
+                for m in materials_for_day if isinstance(m, dict)
+            )
             score_added = 0
             if all_completed:
                 score = task_data.get('dailyScore', {}).get(str(materials_index), 0)
@@ -446,8 +449,9 @@ class TaskMgr:
                     task['lock'] = False
                     task['msg'] = ''
 
-                pre_todo = json.loads(task.get('pre_todo') or '{}')
-                if pre_todo:
+                pre_todo_raw = task.get('pre_todo') or '{}'
+                pre_todo = pre_todo_raw if isinstance(pre_todo_raw, dict) else json.loads(pre_todo_raw)
+                if isinstance(pre_todo, dict) and pre_todo:
                     todo_ids = pre_todo.get(str(user_id), [])
                     if todo_ids:
                         all_completed, incomplete_names = self._check_schedules_completed(todo_ids, user_id, date_str)
@@ -497,7 +501,10 @@ class TaskMgr:
             materials_for_day = daily_materials.get(str(materials_index), [])
             if not materials_for_day:
                 return False
-            return any((m.get('status') or {}).get(str(user_id)) != 1 for m in materials_for_day)
+            return any(
+                isinstance(m, dict) and not self._is_material_completed_for_user(m, user_id)
+                for m in materials_for_day
+            )
         except Exception as e:
             log.error(f"检查任务素材完成状态失败: {e}")
             return True
