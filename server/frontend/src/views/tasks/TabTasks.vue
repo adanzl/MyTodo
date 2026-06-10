@@ -46,16 +46,18 @@
           <span v-else class="text-gray-400">-</span>
         </template>
       </el-table-column>
-      <el-table-column label="禁用时段" width="150">
+      <el-table-column label="禁用时段" width="180">
         <template #default="{ row }">
           <template v-if="blockSlots(row).length">
             <el-tooltip placement="top" :disabled="blockSlots(row).length <= 1">
               <template #content>
+                <div>{{ blockTypeLabel(row) }}</div>
                 <div v-for="(slot, index) in blockSlots(row)" :key="index">
                   {{ slot.start.slice(0, 5) }} - {{ slot.end.slice(0, 5) }}
                 </div>
               </template>
               <div class="flex items-center gap-1 py-1">
+                <el-tag size="small" :type="blockTypeTag(row)">{{ blockTypeShortLabel(row) }}</el-tag>
                 <TimeRange :model-value="blockSlots(row)[0]" readonly />
                 <el-tag v-if="blockSlots(row).length > 1" class="text-xs text-gray-500 shrink-0" size="small" type="info">
                   +{{ blockSlots(row).length - 1 }}
@@ -102,6 +104,7 @@ import {
   deleteTask,
   getTaskList,
   getCommonBlockTimeSlots,
+  parseBlockTimeConfig,
   type Task,
 } from "@/api/api-task";
 import { Refresh } from "@element-plus/icons-vue";
@@ -113,6 +116,9 @@ import { formatRestDaysFullText } from "@/utils/date";
 
 
 const blockSlots = (row: Task) => getCommonBlockTimeSlots(row.block_time);
+const blockTypeLabel = (row: Task) => (parseBlockTimeConfig(row.block_time).type === "whitelist" ? "白名单" : "黑名单");
+const blockTypeShortLabel = (row: Task) => blockTypeLabel(row).charAt(0);
+const blockTypeTag = (row: Task) => (parseBlockTimeConfig(row.block_time).type === "whitelist" ? "success" : "warning");
 
 const restDaysText = (task: Task) => formatRestDaysFullText(task.rest_days);
 
