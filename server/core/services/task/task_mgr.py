@@ -394,23 +394,32 @@ class TaskMgr:
             return {"code": -1, "msg": f"获取失败: {str(e)}", "data": {"lock": False}}
 
     @staticmethod
-    def _is_in_block_time_now(block_time_raw: Any, date_str: str) -> bool:
+    def _is_in_block_time_now(block_time_raw: str, date_str: str) -> bool:
         now = datetime.now()
         if date_str != now.strftime('%Y-%m-%d'):
             return False
-        rules = block_time_raw
-        if isinstance(rules, str):
-            rules = json.loads(rules)
+        if not block_time_raw or block_time_raw == '{}':
+            return False
+        data = json.loads(block_time_raw)
+        if not isinstance(data, dict):
+            return False
+        block_type = data.get('type') or 'blacklist'
+        rules = (data.get('whitelist') or []) if block_type == 'whitelist' else (data.get('blacklist') or [])
         common = next((r for r in rules if r.get('role') in (None, '', 'common')), None)
         if not common:
             return False
+        slots = common.get('time') or []
+        if block_type == 'whitelist' and not slots:
+            return False
         t = now.time()
-        for slot in common.get('time') or []:
+        in_slot = False
+        for slot in slots:
             start = datetime.strptime(slot['start'], '%H:%M:%S').time()
             end = datetime.strptime(slot['end'], '%H:%M:%S').time()
             if start <= t < end:
-                return True
-        return False
+                in_slot = True
+                break
+        return (not in_slot) if block_type == 'whitelist' else in_slot
 
     def check_task_lock(self,
                         tasks: List[Dict[str, Any]],
@@ -446,7 +455,7 @@ class TaskMgr:
                             task['lock'] = True
                             task['msg'] = f'请先完成前置日程：{"、".join(incomplete_names)}'
 
-                if not task.get('lock') and self._is_in_block_time_now(task.get('block_time'), date_str):
+                if not task.get('lock') and self._is_in_block_time_now(task.get('block_time') or '{}', date_str):
                     task['lock'] = True
                     task['msg'] = '当前处于禁用时段'
 
