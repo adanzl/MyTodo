@@ -89,12 +89,13 @@
         </div>
       </div>
 
-      <!-- 视频播放器（禁用原生 controls，避免 UC 注入下载按钮；用底部栏控制播放） -->
+      <!-- 视频播放器 -->
       <div v-else-if="material?.type === 1" class="flex flex-col h-full">
         <div class="flex-1 relative overflow-hidden bg-black">
           <video
             ref="videoRef"
             :src="getMediaFileUrl(material.path || '')"
+            controls
             autoplay
             preload="metadata"
             playsinline
@@ -107,7 +108,6 @@
             @ended="handleVideoEnded"
             @play="isVideoPlaying = true"
             @pause="isVideoPlaying = false"
-            @click="toggleVideoPlay"
             @loadedmetadata="syncSubtitleTracks"
           >
             <track
@@ -142,12 +142,6 @@
               @click="toggleSubtitle"
             >
               字幕
-            </ion-button>
-          </div>
-          
-          <div class="flex gap-2 items-center">
-            <ion-button fill="outline" @click="toggleVideoPlay">
-              <ion-icon slot="icon-only" :icon="isVideoPlaying ? pauseOutline : playOutline" />
             </ion-button>
           </div>
           
@@ -404,7 +398,7 @@ const pauseVideo = () => {
     }
 };
 
-/** UC / 微信 X5 内核：同层播放，避免原生控件与下载按钮盖住页面 */
+/** UC / 微信 X5 内核：同层播放，避免全屏原生控件盖住页面关闭按钮 */
 const applyVideoCompat = () => {
     const el = videoRef.value;
     if (!el) return;
@@ -412,7 +406,6 @@ const applyVideoCompat = () => {
     el.setAttribute('webkit-playsinline', 'true');
     el.setAttribute('x5-playsinline', 'true');
     el.setAttribute('x5-video-player-type', 'h5-page');
-    el.removeAttribute('controls');
 };
 
 
@@ -789,16 +782,6 @@ const handleBeforeUnload = () => {
                 }
             }
         }
-    }
-};
-
-// 切换视频播放/暂停
-const toggleVideoPlay = () => {
-    if (!videoRef.value) return;
-    if (isVideoPlaying.value) {
-        videoRef.value.pause();
-    } else {
-        videoRef.value.play();
     }
 };
 
