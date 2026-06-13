@@ -208,6 +208,18 @@ def test_set_data_with_list_serialization(db_mgr):
         assert retrieved['data']['data'] == json.dumps([1, 2, 3])
 
 
+def test_set_data_with_dict_serialization(db_mgr):
+    with db_mgr.app.app_context():
+        payload = {'type': 'blacklist', 'blacklist': [], 'whitelist': []}
+        data_to_insert = {'user_name': 'dict_user', 'data': payload}
+        result = db_mgr.set_data(TABLE_SAVE, data_to_insert)
+        assert result['code'] == 0
+        record_id = result['data']
+
+        retrieved = db_mgr.get_data(TABLE_SAVE, record_id, '*')
+        assert retrieved['data']['data'] == json.dumps(payload, ensure_ascii=False)
+
+
 def test_db_operation_exception_handling(db_mgr, monkeypatch):
     with db_mgr.app.app_context():
         # Patch the session to raise an exception

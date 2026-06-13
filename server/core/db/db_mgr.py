@@ -190,10 +190,10 @@ class DbMgr:
             metadata = MetaData()
             table_obj = Table(table, metadata, autoload_with=db_obj.engine)
 
-            # 处理数据，将 list 类型转换为 JSON 字符串
+            # 处理数据，将 list/dict 类型转换为 JSON 字符串（SQLite 不支持直接绑定 dict）
             processed_data = {}
             for key, value in data.items():
-                if isinstance(value, list):
+                if isinstance(value, (list, dict)):
                     processed_data[key] = json.dumps(value, ensure_ascii=False)
                 else:
                     processed_data[key] = value

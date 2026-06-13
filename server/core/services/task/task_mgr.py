@@ -315,6 +315,12 @@ class TaskMgr:
             if isinstance(rest_days_raw, dict):
                 rest_days_raw = json.dumps(rest_days_raw, ensure_ascii=False)
                 task_data["rest_days"] = rest_days_raw
+            block_time_raw = task_data.get("block_time")
+            if isinstance(block_time_raw, (list, dict)):
+                task_data["block_time"] = json.dumps(block_time_raw, ensure_ascii=False)
+            data_raw = task_data.get("data")
+            if isinstance(data_raw, dict):
+                task_data["data"] = json.dumps(data_raw, ensure_ascii=False)
             rule = parse_rest_days(rest_days_raw)
             task_data["end_date"] = end_date_by_work_duration(start_d, dur, rule).strftime("%Y-%m-%d")
 
