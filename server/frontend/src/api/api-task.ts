@@ -204,6 +204,8 @@ export interface Task {
 export interface TaskBlockTimeSlot {
   start: string;
   end: string;
+  /** 0=周日..6=周六；缺省或空数组表示每天都生效 */
+  weekdays?: number[];
 }
 
 export interface TaskBlockTimeRule {

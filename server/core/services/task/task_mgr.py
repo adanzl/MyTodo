@@ -421,8 +421,13 @@ class TaskMgr:
         if block_type == 'whitelist' and not slots:
             return False
         t = now.time()
+        # python weekday(): Mon=0..Sun=6 -> rule weekday: Sun=0..Sat=6
+        wd = (now.weekday() + 1) % 7
         in_slot = False
         for slot in slots:
+            weekdays = slot.get('weekdays') or []
+            if weekdays and wd not in weekdays:
+                continue
             start = datetime.strptime(slot['start'], '%H:%M:%S').time()
             end = datetime.strptime(slot['end'], '%H:%M:%S').time()
             if start <= t < end:

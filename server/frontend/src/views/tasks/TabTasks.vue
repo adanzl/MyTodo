@@ -53,7 +53,7 @@
               <template #content>
                 <div>{{ blockTypeLabel(row) }}</div>
                 <div v-for="(slot, index) in blockSlots(row)" :key="index">
-                  {{ slot.start.slice(0, 5) }} - {{ slot.end.slice(0, 5) }}
+                  {{ blockSlotText(slot) }}
                 </div>
               </template>
               <div class="flex items-center gap-1 py-1">
@@ -106,16 +106,22 @@ import {
   getCommonBlockTimeSlots,
   parseBlockTimeConfig,
   type Task,
+  type TaskBlockTimeSlot,
 } from "@/api/api-task";
 import { Refresh } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { onMounted, ref, onUnmounted, nextTick } from "vue";
 import TimeRange from "./components/TimeRange.vue";
 import TaskDialog from "./dialogs/TaskDialog.vue";
-import { formatRestDaysFullText } from "@/utils/date";
+import { formatRestDaysFullText, formatWeekdaysShort } from "@/utils/date";
 
 
 const blockSlots = (row: Task) => getCommonBlockTimeSlots(row.block_time);
+const blockSlotText = (slot: TaskBlockTimeSlot) => {
+  const weekday = formatWeekdaysShort(slot.weekdays);
+  const time = `${slot.start.slice(0, 5)} - ${slot.end.slice(0, 5)}`;
+  return weekday ? `${weekday} ${time}` : time;
+};
 const blockTypeLabel = (row: Task) => (parseBlockTimeConfig(row.block_time).type === "whitelist" ? "白名单" : "黑名单");
 const blockTypeShortLabel = (row: Task) => blockTypeLabel(row).charAt(0);
 const blockTypeTag = (row: Task) => (parseBlockTimeConfig(row.block_time).type === "whitelist" ? "success" : "warning");

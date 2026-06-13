@@ -121,7 +121,7 @@ export function getTaskEndDate(startDate: string, duration: number, restDays?: u
   return end.format(DAY_FMT);
 }
 
-const WEEKDAY_LABELS_ZH: Record<number, string> = {
+export const WEEKDAY_LABELS_ZH: Record<number, string> = {
   0: "周日",
   1: "周一",
   2: "周二",
@@ -130,6 +130,16 @@ const WEEKDAY_LABELS_ZH: Record<number, string> = {
   5: "周五",
   6: "周六",
 };
+
+/** 格式化周几列表；空或全选返回空字符串 */
+export function formatWeekdaysShort(weekdays?: number[]): string {
+  if (!weekdays?.length || weekdays.length >= 7) return "";
+  const short: Record<number, string> = { 0: "日", 1: "一", 2: "二", 3: "三", 4: "四", 5: "五", 6: "六" };
+  return [...weekdays]
+    .sort((a, b) => a - b)
+    .map((d) => short[d] ?? String(d))
+    .join("、");
+}
 
 export function formatRestDaysFullText(restDays: unknown): string {
   const rule = parseRestDays(restDays);
