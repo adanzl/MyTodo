@@ -196,7 +196,7 @@ export interface Task {
   type: number; // 0:每日任务；1：持续性任务
   data: string | TaskDetail;
   pre_todo?: string; // 前置日程JSON字符串，格式：{"user_id": [todo_ids]}
-  block_time?: TaskBlockTimeRule[];
+  block_time?: TaskBlockTimeConfig;
   lock?: boolean; // 任务是否锁定
   msg?: string; // 锁定提示信息
 }
@@ -211,12 +211,29 @@ export interface TaskBlockTimeRule {
   time: TaskBlockTimeSlot[];
 }
 
-/** 取 common 规则的禁用时段（列表展示、编辑表单用） */
-export function getCommonBlockTimeSlots(rules?: unknown): TaskBlockTimeSlot[] {
-  if (!rules) return [];
-  // 约定：后端存/返 JSON string；这里不做过多兜底校验
-  const arr = (typeof rules === "string" ? (JSON.parse(rules) as TaskBlockTimeRule[]) : (rules as TaskBlockTimeRule[])) ?? [];
-  const rule = arr.find((r) => r.role === "common" || !r.role);
+export interface TaskBlockTimeConfig {
+  type: "blacklist" | "whitelist";
+  blacklist: TaskBlockTimeRule[];
+  whitelist: TaskBlockTimeRule[];
+}
+
+export function parseBlockTimeConfig(rules?: TaskBlockTimeConfig | string): TaskBlockTimeConfig {
+  if (!rules) {
+    return { type: "blacklist", blacklist: [], whitelist: [] };
+  }
+  const config = (typeof rules === "string" ? JSON.parse(rules) : rules) as TaskBlockTimeConfig;
+  return {
+    type: config.type === "whitelist" ? "whitelist" : "blacklist",
+    blacklist: config.blacklist ?? [],
+    whitelist: config.whitelist ?? [],
+  };
+}
+
+/** 取当前生效的 common 禁用时段（列表展示、编辑表单用） */
+export function getCommonBlockTimeSlots(rules?: TaskBlockTimeConfig | string): TaskBlockTimeSlot[] {
+  const config = parseBlockTimeConfig(rules);
+  const list = config.type === "whitelist" ? config.whitelist : config.blacklist;
+  const rule = list.find((r) => r.role === "common" || !r.role);
   return rule?.time?.filter((s) => s.start && s.end) ?? [];
 }
 

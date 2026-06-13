@@ -11,9 +11,10 @@
 
 import json
 import time
+from typing import Any, cast
 
 import dashscope
-from dashscope.audio.tts_v2 import *
+from dashscope.audio.tts_v2 import VoiceEnrollmentService, ResultCallback, SpeechSynthesizer
 
 try:
     from core.config import app_logger, config
@@ -27,8 +28,7 @@ except ImportError:
     load_dotenv()
     import logging
 
-    logging.basicConfig(level=logging.INFO,
-                        format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     log = logging.getLogger()
     ALI_KEY = os.getenv('ALI_KEY', '')
     print("use default log")
@@ -42,26 +42,22 @@ service = VoiceEnrollmentService()
 class VoiceClone(ResultCallback):
     """Voice enrollment 封装。"""
 
-    def __init__(self, on_msg=None, on_err=None):
+    def __init__(self, on_msg=(lambda x, y: None), on_err=(lambda x: None)):
         """创建 VoiceClone。
 
         Args:
             on_data: 预留回调。
             on_err: 错误回调。
         """
-        self.on_data = on_msg or (lambda x, y: None)
+        self.on_data = on_msg
         self.on_err = on_err or (lambda x: None)
-        dashscope.api_key = ALI_KEY
-        self.voice_id = None
+        dashscope.api_key = ALI_KEY  # cSpell: disable-line
+        self.voice_id: str = ''
 
     def clone_voice(self, audio_url: str):
         try:
-            self.voice_id = service.create_voice(target_model=TARGET_MODEL,
-                                                 prefix=VOICE_PREFIX,
-                                                 url=audio_url)
-            log.info(
-                f"Voice enrollment submitted successfully. Request ID: {service.get_last_request_id()}"
-            )
+            self.voice_id = service.create_voice(target_model=TARGET_MODEL, prefix=VOICE_PREFIX, url=audio_url)
+            log.info(f"Voice enrollment submitted successfully. Request ID: {service.get_last_request_id()}")
             log.info(f"Generated Voice ID: {self.voice_id}")
         except Exception as e:
             log.error(f"Error during voice creation: {e}")
@@ -70,14 +66,13 @@ class VoiceClone(ResultCallback):
     def wait_for_voice_id(self, max_attempts=30, poll_interval=10):
         for _ in range(max_attempts):
             try:
-                voice_info = service.query_voice(voice_id=self.voice_id)
+                voice_info = cast(dict[str, Any], service.query_voice(voice_id=self.voice_id))
                 status = voice_info.get("status")
 
                 if status == "OK":
                     return True
                 elif status == "UNDEPLOYED":
-                    raise RuntimeError(
-                        f"Voice processing failed with status: {status}")
+                    raise RuntimeError(f"Voice processing failed with status: {status}")
                 # 对于 "DEPLOYING" 等中间状态，继续等待
                 time.sleep(poll_interval)
             except Exception as e:
@@ -132,9 +127,7 @@ if __name__ == "__main__":
                 # log.info(f">>[VOICE_CLONE] Data: {len(data)} bytes")
                 if f is None:
                     f = open("output.mp3", "wb")
-                    log.info(
-                        f">>[VOICE_CLONE] Start File: {os.path.abspath(f.name)}"
-                    )
+                    log.info(f">>[VOICE_CLONE] Start File: {os.path.abspath(f.name)}")
                 f.write(data)
             else:
                 log.info(f">>[VOICE_CLONE] Data: {data}")
@@ -142,8 +135,7 @@ if __name__ == "__main__":
             # type=1 表示完成消息
             log.info(f">>[VOICE_CLONE] Message END: {data}")
             if f is not None:
-                log.info(
-                    f">>[VOICE_CLONE] End File: {os.path.abspath(f.name)}")
+                log.info(f">>[VOICE_CLONE] End File: {os.path.abspath(f.name)}")
                 f.close()
                 f = None
 

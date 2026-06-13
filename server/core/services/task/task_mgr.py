@@ -197,7 +197,10 @@ class TaskMgr:
             if history_result.get('code') != 0:
                 log.error(f"插入任务历史记录失败: {history_result.get('msg')}")
 
-            all_completed = all(m.get('status', {}).get(str(user_id)) == 1 for m in materials_for_day)
+            all_completed = all(
+                self._is_material_completed_for_user(m, user_id)
+                for m in materials_for_day if isinstance(m, dict)
+            )
             score_added = 0
             if all_completed:
                 score = task_data.get('dailyScore', {}).get(str(materials_index), 0)
@@ -400,23 +403,32 @@ class TaskMgr:
             return {"code": -1, "msg": f"获取失败: {str(e)}", "data": {"lock": False}}
 
     @staticmethod
-    def _is_in_block_time_now(block_time_raw: Any, date_str: str) -> bool:
+    def _is_in_block_time_now(block_time_raw: str, date_str: str) -> bool:
         now = datetime.now()
         if date_str != now.strftime('%Y-%m-%d'):
             return False
-        rules = block_time_raw
-        if isinstance(rules, str):
-            rules = json.loads(rules)
+        if not block_time_raw or block_time_raw == '{}':
+            return False
+        data = json.loads(block_time_raw)
+        if not isinstance(data, dict):
+            return False
+        block_type = data.get('type') or 'blacklist'
+        rules = (data.get('whitelist') or []) if block_type == 'whitelist' else (data.get('blacklist') or [])
         common = next((r for r in rules if r.get('role') in (None, '', 'common')), None)
         if not common:
             return False
+        slots = common.get('time') or []
+        if block_type == 'whitelist' and not slots:
+            return False
         t = now.time()
-        for slot in common.get('time') or []:
+        in_slot = False
+        for slot in slots:
             start = datetime.strptime(slot['start'], '%H:%M:%S').time()
             end = datetime.strptime(slot['end'], '%H:%M:%S').time()
             if start <= t < end:
-                return True
-        return False
+                in_slot = True
+                break
+        return (not in_slot) if block_type == 'whitelist' else in_slot
 
     def check_task_lock(self,
                         tasks: List[Dict[str, Any]],
@@ -443,8 +455,9 @@ class TaskMgr:
                     task['lock'] = False
                     task['msg'] = ''
 
-                pre_todo = json.loads(task.get('pre_todo') or '{}')
-                if pre_todo:
+                pre_todo_raw = task.get('pre_todo') or '{}'
+                pre_todo = pre_todo_raw if isinstance(pre_todo_raw, dict) else json.loads(pre_todo_raw)
+                if isinstance(pre_todo, dict) and pre_todo:
                     todo_ids = pre_todo.get(str(user_id), [])
                     if todo_ids:
                         all_completed, incomplete_names = self._check_schedules_completed(todo_ids, user_id, date_str)
@@ -452,7 +465,7 @@ class TaskMgr:
                             task['lock'] = True
                             task['msg'] = f'请先完成前置日程：{"、".join(incomplete_names)}'
 
-                if not task.get('lock') and self._is_in_block_time_now(task.get('block_time'), date_str):
+                if not task.get('lock') and self._is_in_block_time_now(task.get('block_time') or '{}', date_str):
                     task['lock'] = True
                     task['msg'] = '当前处于禁用时段'
 
@@ -494,7 +507,10 @@ class TaskMgr:
             materials_for_day = daily_materials.get(str(materials_index), [])
             if not materials_for_day:
                 return False
-            return any((m.get('status') or {}).get(str(user_id)) != 1 for m in materials_for_day)
+            return any(
+                isinstance(m, dict) and not self._is_material_completed_for_user(m, user_id)
+                for m in materials_for_day
+            )
         except Exception as e:
             log.error(f"检查任务素材完成状态失败: {e}")
             return True

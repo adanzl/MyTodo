@@ -95,22 +95,28 @@
           <el-row :gutter="20">
             <el-col :span="12">
               <el-form-item label="禁用时段">
-                <div class="flex gap-2 w-full items-center">
-                  <TimeRange
-                    v-for="(_, index) in blockTimes"
-                    :key="index"
-                    v-model="blockTimes[index]"
-                    @remove="blockTimes.splice(index, 1)"
-                  />
-                  <el-button type="primary" link @click="addBlockTime" :icon="Plus"></el-button>
+                <div class="flex flex-col gap-2 w-full">
+                  <el-radio-group :model-value="blockTimeType" @change="handleBlockTimeTypeChange">
+                    <el-radio value="blacklist">黑名单</el-radio>
+                    <el-radio value="whitelist">白名单</el-radio>
+                  </el-radio-group>
+                  <div class="flex gap-2 w-full items-center">
+                    <TimeRange
+                      v-for="(_, index) in blockTimes"
+                      :key="index"
+                      v-model="blockTimes[index]"
+                      @remove="blockTimes.splice(index, 1)"
+                    />
+                    <el-button type="primary" link @click="addBlockTime" :icon="Plus"></el-button>
+                  </div>
                 </div>
               </el-form-item>
             </el-col>
             <el-col :span="12">
               <el-form-item label="休息日">
-                <div class="flex items-center gap-1 min-w-0 h-7">
+                <div class="flex items-start gap-1 min-w-0 text-xs leading-normal ">
                   <div
-                    class="min-w-0 cursor-pointer text-xs wrap-break-word leading-4 flex items-center hover:text-[#409EFF]"
+                    class="min-w-0 flex-1 cursor-pointer wrap-break-word py-1 hover:text-[#409EFF]"
                     @click="showRestDaysDialog = true"
                   >
                     <span v-if="restDaysSummary" class="text-gray-600">{{ restDaysSummary }}</span>
@@ -118,7 +124,7 @@
                   </div>
                   <el-icon
                     v-if="restDaysSummary"
-                    class="shrink-0 cursor-pointer text-gray-400 hover:text-gray-600"
+                    class="shrink-0 cursor-pointer text-gray-400 hover:text-gray-600 my-auto mr-2"
                     :size="16"
                     @click.stop="clearRestDays"
                   >
@@ -318,7 +324,19 @@
 import { ref, watch, nextTick, computed, onMounted } from "vue";
 import { ElMessage } from "element-plus";
 import { Plus, WarningFilled, ArrowUp, ArrowDown, Close } from "@element-plus/icons-vue";
-import { addTask, updateTask, getMaterialList, getMaterialCategoryList, getCommonBlockTimeSlots, type Task, type Material, type MaterialCategory, type TaskBlockTimeSlot } from "@/api/api-task";
+import {
+  addTask,
+  updateTask,
+  getMaterialList,
+  getMaterialCategoryList,
+  getCommonBlockTimeSlots,
+  parseBlockTimeConfig,
+  type Task,
+  type Material,
+  type MaterialCategory,
+  type TaskBlockTimeConfig,
+  type TaskBlockTimeSlot,
+} from "@/api/api-task";
 import { getTodoListByTime } from "@/api/api-todo";
 import { sortByName, buildCategoryTree } from "@/utils/file";
 import { getDateByWorkdayIndex, getTaskEndDate, parseRestDays, type RestDaysRule } from "@/utils/date";
@@ -410,9 +428,39 @@ const dailyMaterials = ref<Record<number, Array<{ id: number; name: string; type
 // 每日分数数据：{ dayNumber: score }
 const dailyScore = ref<Record<number, number>>({});
 const blockTimes = ref<TaskBlockTimeSlot[]>([]);
+const blockTimeType = ref<"blacklist" | "whitelist">("blacklist");
+const blockTimeConfig = ref<TaskBlockTimeConfig>({
+  type: "blacklist",
+  blacklist: [],
+  whitelist: [],
+});
 
 const addBlockTime = () => {
   blockTimes.value.push({ start: "00:00:00", end: "08:00:00" });
+};
+
+const applyBlockTimesToConfig = (type: "blacklist" | "whitelist") => {
+  const time = blockTimes.value.filter((s) => s.start && s.end && s.start < s.end);
+  const rule = time.length ? [{ role: "common", time }] : [];
+  if (type === "whitelist") {
+    blockTimeConfig.value.whitelist = rule;
+  } else {
+    blockTimeConfig.value.blacklist = rule;
+  }
+};
+
+const handleBlockTimeTypeChange = (newType: "blacklist" | "whitelist") => {
+  if (blockTimeType.value === newType) return;
+  applyBlockTimesToConfig(blockTimeType.value);
+  blockTimeType.value = newType;
+  blockTimeConfig.value.type = newType;
+  blockTimes.value = getCommonBlockTimeSlots(blockTimeConfig.value);
+};
+
+const resetBlockTime = () => {
+  blockTimeType.value = "blacklist";
+  blockTimeConfig.value = { type: "blacklist", blacklist: [], whitelist: [] };
+  blockTimes.value = [];
 };
 
 const createDefaultFormData = (): Partial<Task> => ({
@@ -506,7 +554,9 @@ const applyTaskData = (newData?: Partial<Task>) => {
       preTodoCancan.value = [];
     }
 
-    blockTimes.value = getCommonBlockTimeSlots(newData.block_time);
+    blockTimeConfig.value = parseBlockTimeConfig(newData.block_time);
+    blockTimeType.value = blockTimeConfig.value.type;
+    blockTimes.value = getCommonBlockTimeSlots(blockTimeConfig.value);
 
     // 初始化每日素材数据和每日分数
     if (newData.data) {
@@ -534,7 +584,7 @@ const applyTaskData = (newData?: Partial<Task>) => {
     dailyScore.value = {};
     preTodoZhaozhao.value = [];
     preTodoCancan.value = [];
-    blockTimes.value = [];
+    resetBlockTime();
     selectedDay.value = 0;
     restDaysSummary.value = "";
   }
@@ -603,7 +653,7 @@ const resetForm = () => {
   dailyScore.value = {};
   preTodoZhaozhao.value = [];
   preTodoCancan.value = [];
-  blockTimes.value = [];
+  resetBlockTime();
   showRestDaysDialog.value = false;
   restDaysSummary.value = "";
 };
@@ -957,8 +1007,8 @@ const handleSubmit = async () => {
       // 清空时也要传 "{}"，否则后端不会更新 pre_todo 字段
       pre_todo: JSON.stringify(preTodoData),
       block_time: (() => {
-        const time = blockTimes.value.filter((s) => s.start && s.end && s.start < s.end);
-        return time.length ? [{ role: "common", time }] : [];
+        applyBlockTimesToConfig(blockTimeType.value);
+        return { ...blockTimeConfig.value, type: blockTimeType.value };
       })(),
       data: JSON.stringify({
         dailyMaterials: dailyMaterials.value,
