@@ -15,7 +15,7 @@ from flask import Blueprint, request
 from flask.typing import ResponseReturnValue
 
 from core.config import app_logger
-from core.services.agent_mgr import agent_mgr
+from core.services.agent_mgr import HEARTBEAT_TIMEOUT, agent_mgr
 from core.tools.validation import parse_with_model
 from core.utils import _err, _ok, read_json_from_request
 
@@ -143,7 +143,7 @@ def agent_list() -> ResponseReturnValue:
                 'config': device_info.get('config', {}),
                 'heartbeat_time': heartbeat_time,
                 'last_heartbeat_ago': int(current_time - heartbeat_time) if heartbeat_time > 0 else -1,
-                'is_online': (current_time - heartbeat_time) < 30 if heartbeat_time > 0 else False,
+                'is_online': (current_time - heartbeat_time) < HEARTBEAT_TIMEOUT if heartbeat_time > 0 else False,
                 'keyboard': device_info.get('keyboard', {}),
             }
             device_list.append(device_data)

@@ -12,7 +12,7 @@ from core.services.playlist_mgr import playlist_mgr
 log = app_logger
 
 # 心跳超时时间（秒）
-HEARTBEAT_TIMEOUT = 30
+HEARTBEAT_TIMEOUT = 60
 
 BUTTON_MAP = {
     "F13": ("B1", "play"),
