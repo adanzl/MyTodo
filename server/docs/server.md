@@ -354,4 +354,4 @@ sudo mkcert -cert-file /etc/ssl/self-signed/selfsigned.crt \
 | cockpit       | 9090     | openclaw       |  9101 |
 | portainer     | 9000     | openclaw       |  9102 |
 | redis_insight | 9001     | chrome         |  9103 |
-|               |          |                |       |
+| video_factory | 9002     |                |       |

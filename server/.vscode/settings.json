@@ -1,98 +1,93 @@
 {
-    "python-envs.defaultPackageManager": "ms-python.python:conda",
-    "python-envs.pythonProjects": [],
-    "cSpell.words": [
-        "ASSRT",
-        "bluetoothctl",
-        "cascader",
-        "cmaps",
-        "cosyvoice",
-        "daterange",
-        "demuxer",
-        "DGRAM",
-        "Dify",
-        "DLNA",
-        "dotenv",
-        "EROFS",
-        "ffprobe",
-        "flac",
-        "gevent",
-        "geventwebsocket",
-        "hcitool",
-        "HSET",
-        "imdb",
-        "jsonify",
-        "libmp",
-        "llen",
-        "lpush",
-        "lrange",
-        "matroska",
-        "miservice",
-        "monkeypatch",
-        "moviehash",
-        "msvideo",
-        "muxer",
-        "natapp",
-        "nokey",
-        "noprint",
-        "opensubtitles",
-        "pdfjs",
-        "Pinia",
-        "pytest",
-        "pywsgi",
-        "Qwen",
-        "rescan",
-        "rpush",
-        "rssi",
-        "setitem",
-        "smorest",
-        "SSDP",
-        "ssdpy",
-        "syscall",
-        "TMDB",
-        "UNDEPLOYED",
-        "unplugin",
-        "upnp",
-        "upnpclient",
-        "useragent",
-        "videoname",
-        "WEBVTT",
-        "zhaozhao"
-    ],
-    "cSpell.ignoreRegExpList": [
-        "\\b[a-zA-Z_][a-zA-Z0-9_]*\\s*\\(", // 忽略函数调用
-        "\\b[a-zA-Z_][a-zA-Z0-9_]*\\.[a-zA-Z_][a-zA-Z0-9_]*\\s*\\(", // 忽略方法调用
-        "^\\s*from\\s+\\S+\\s+import\\s+.+$", // 忽略 from xxx import xxx
-        "^\\s*import\\s+.+$" // 忽略 import xxx
-    ],
-    "python-envs.defaultEnvManager": "ms-python.python:conda",
-    "[html]": {
-        "editor.defaultFormatter": "esbenp.prettier-vscode"
-    },
-    "[javascript]": {
-        "editor.defaultFormatter": "vscode.typescript-language-features"
-    },
-    "editor.formatOnSave": true,
-    "terminal.integrated.shellIntegration.enabled": true,
-    "terminal.integrated.profiles.osx": {
-        "zsh": {
-            "path": "/bin/zsh",
-            "args": [
-                "-l"
-            ],
-            "env": {
-                "NVM_DIR": "${env:HOME}/.nvm"
-            }
-        }
-    },
-    "terminal.integrated.defaultProfile.osx": "zsh",
-    "terminal.integrated.shellArgs.osx": [
-        "-l"
-    ],
-    "python.testing.pytestArgs": [
-        "."
-    ],
-    "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": true,
-    "python.languageServer": "None"
+  "python-envs.defaultPackageManager": "ms-python.python:conda",
+  "python-envs.pythonProjects": [],
+  "cSpell.words": [
+    "ASSRT",
+    "bluetoothctl",
+    "cascader",
+    "cmaps",
+    "cosyvoice",
+    "daterange",
+    "demuxer",
+    "DGRAM",
+    "Dify",
+    "DLNA",
+    "dotenv",
+    "EROFS",
+    "ffprobe",
+    "flac",
+    "gevent",
+    "geventwebsocket",
+    "hcitool",
+    "HSET",
+    "imdb",
+    "jsonify",
+    "libmp",
+    "llen",
+    "lpush",
+    "lrange",
+    "matroska",
+    "miservice",
+    "monkeypatch",
+    "moviehash",
+    "msvideo",
+    "muxer",
+    "natapp",
+    "nokey",
+    "noprint",
+    "opensubtitles",
+    "pdfjs",
+    "Pinia",
+    "pytest",
+    "pywsgi",
+    "Qwen",
+    "rescan",
+    "rpush",
+    "rssi",
+    "setitem",
+    "smorest",
+    "SSDP",
+    "ssdpy",
+    "syscall",
+    "TMDB",
+    "UNDEPLOYED",
+    "unplugin",
+    "upnp",
+    "upnpclient",
+    "useragent",
+    "videoname",
+    "Vite",
+    "WEBVTT",
+    "zhaozhao"
+  ],
+  "cSpell.ignoreRegExpList": [
+    "\\b[a-zA-Z_][a-zA-Z0-9_]*\\s*\\(", // 忽略函数调用
+    "\\b[a-zA-Z_][a-zA-Z0-9_]*\\.[a-zA-Z_][a-zA-Z0-9_]*\\s*\\(", // 忽略方法调用
+    "^\\s*from\\s+\\S+\\s+import\\s+.+$", // 忽略 from xxx import xxx
+    "^\\s*import\\s+.+$" // 忽略 import xxx
+  ],
+  "python-envs.defaultEnvManager": "ms-python.python:conda",
+  "[html]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "vscode.typescript-language-features"
+  },
+  "editor.formatOnSave": true,
+  "terminal.integrated.shellIntegration.enabled": true,
+  "terminal.integrated.profiles.osx": {
+    "zsh": {
+      "path": "/bin/zsh",
+      "args": ["-l"],
+      "env": {
+        "NVM_DIR": "${env:HOME}/.nvm"
+      }
+    }
+  },
+  "terminal.integrated.defaultProfile.osx": "zsh",
+  "terminal.integrated.shellArgs.osx": ["-l"],
+  "python.testing.pytestArgs": ["."],
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestEnabled": true,
+  "python.languageServer": "None"
 }

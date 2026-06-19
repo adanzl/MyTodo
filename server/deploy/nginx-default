@@ -352,6 +352,44 @@ server {
         proxy_buffering off;
     }
 
+    # video_factory 前端（static/，base /video_factory/web/）
+    location /video_factory/web {
+        alias /mnt/data/project/video_factory/static;
+        index index.html;
+        try_files $uri $uri/ /video_factory/web/index.html;
+        autoindex on;
+
+        # 入口 HTML：刷新即拉最新（不长期缓存）
+        location = /video_factory/web/index.html {
+            add_header Cache-Control "no-cache, no-store, must-revalidate";
+            add_header Pragma "no-cache";
+            expires -1;
+        }
+
+        # Vite 带 hash 的构建产物：长期缓存
+        location ~* ^/video_factory/web/assets/.+\.(js|css|mjs|png|jpg|jpeg|gif|ico|svg|woff2?|ttf|eot|wasm)$ {
+            expires 365d;
+            add_header Cache-Control "public, max-age=31536000, immutable";
+        }
+    }
+
+    location ^~ /video_factory/api/ {
+        proxy_pass            http://127.0.0.1:9002/api/;
+        proxy_set_header      Host $host;
+        proxy_set_header      X-Real-IP $remote_addr;
+        proxy_set_header      X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header      X-Forwarded-Proto $scheme;
+
+        # 大文件上传需要更长的超时时间（30分钟）
+        proxy_connect_timeout 1800s;
+        proxy_send_timeout    1800s;
+        proxy_read_timeout    1800s;
+
+        # 增加缓冲区大小以支持大文件上传
+        proxy_buffer_size     16k;
+        proxy_buffers 32      16k;
+        proxy_busy_buffers_size 32k;
+    }
 
     # Ionic 客户端（root: /mnt/data/project/MyTodo/dist）
     location / {
