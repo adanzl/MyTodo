@@ -3,6 +3,7 @@
  * 提供素材的增删改查功能
  */
 import { getList, getData, setData, delData } from "./api-common";
+import { getRdsData, setRdsData } from "./api-rds";
 import { api } from "./config";
 import type { PaginatedResponse } from "@/types/api";
 import type { TaskDetail } from "@/types/tasks/taskDetail";
@@ -237,6 +238,34 @@ export function getCommonBlockTimeSlots(rules?: TaskBlockTimeConfig | string): T
   const list = config.type === "whitelist" ? config.whitelist : config.blacklist;
   const rule = list.find((r) => r.role === "common" || !r.role);
   return rule?.time?.filter((s) => s.start && s.end) ?? [];
+}
+
+export const GLOBAL_BLOCK_TIME_RDS_TABLE = "task:block_time";
+export const GLOBAL_BLOCK_TIME_RDS_ID = "global";
+
+export function buildBlockTimeConfig(
+  type: "blacklist" | "whitelist",
+  slots: TaskBlockTimeSlot[],
+): TaskBlockTimeConfig {
+  const time = slots.filter((s) => s.start && s.end && s.start < s.end);
+  const rule = time.length ? [{ role: "common", time }] : [];
+  return {
+    type,
+    blacklist: type === "blacklist" ? rule : [],
+    whitelist: type === "whitelist" ? rule : [],
+  };
+}
+
+export async function getGlobalBlockTime(): Promise<TaskBlockTimeConfig> {
+  const raw = await getRdsData<string>(GLOBAL_BLOCK_TIME_RDS_TABLE, GLOBAL_BLOCK_TIME_RDS_ID);
+  if (!raw) {
+    return { type: "blacklist", blacklist: [], whitelist: [] };
+  }
+  return parseBlockTimeConfig(raw);
+}
+
+export async function setGlobalBlockTime(config: TaskBlockTimeConfig): Promise<void> {
+  await setRdsData(GLOBAL_BLOCK_TIME_RDS_TABLE, GLOBAL_BLOCK_TIME_RDS_ID, JSON.stringify(config));
 }
 
 /**

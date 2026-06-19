@@ -14,6 +14,7 @@ from core.config.const import DEFAULT_BASE_DIR
 from core.db.db_mgr import db_mgr
 from core.tools.async_util import run_in_background
 from core.utils import get_media_duration, validate_and_normalize_path
+from .block_time import is_global_block_time_now, is_in_block_time_now
 from .rest_days import parse_rest_days, is_rest_day, get_workday_index, end_date_by_work_duration
 
 log = app_logger
@@ -31,6 +32,7 @@ class TaskMgr:
 
     @staticmethod
     def _is_material_completed_for_user(material: Dict[str, Any], user_id: Optional[int]) -> bool:
+        """判断素材对指定用户是否已完成打卡。"""
         status = material.get('status')
         if not isinstance(status, dict):
             return False
@@ -39,6 +41,7 @@ class TaskMgr:
         return any(v == 1 for v in status.values())
 
     def get_task_calendar(self, date_str: str, user_id: Optional[int] = None) -> Dict[str, Any]:
+        """获取指定月份的任务日历，包含每日素材列表与锁定状态。"""
         try:
             target_date = datetime.strptime(date_str, '%Y-%m-%d')
             year = target_date.year
@@ -140,6 +143,7 @@ class TaskMgr:
             return {"code": -1, "msg": f"获取任务日历失败: {str(e)}", "data": None}
 
     def finish_material(self, task_id: int, material_id: int, date_str: str, user_id: int) -> Dict[str, Any]:
+        """完成指定日期的素材打卡，并在当天全部完成时发放积分。"""
         try:
             task_result = db_mgr.get_data(TABLE_TASK, task_id, '*')
             if task_result.get('code') != 0 or not task_result.get('data'):
@@ -282,6 +286,7 @@ class TaskMgr:
                       end_date: Optional[str] = None,
                       page_num: int = 1,
                       page_size: int = 20) -> Dict[str, Any]:
+        """分页获取任务列表，并按日期计算各任务的锁定状态。"""
         try:
             if start_date and not end_date:
                 end_date = start_date
@@ -307,6 +312,7 @@ class TaskMgr:
             return {"code": -1, "msg": f"获取任务列表失败: {str(e)}", "data": None}
 
     def update_task(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+        """创建或更新任务，自动序列化 JSON 字段并计算结束日期。"""
         try:
             task_id = task_data.get('id')
             if task_id is None or task_id <= 0:
@@ -367,6 +373,7 @@ class TaskMgr:
             return {"code": -1, "msg": f"获取失败: {str(e)}", "data": None}
 
     def get_material_status(self, user_id: int, material_id: int) -> Dict[str, Any]:
+        """获取视频素材的锁定状态（需观看达到时长后才解锁）。"""
         try:
             res = db_mgr.get_data(TABLE_MATERIAL, material_id, 'type,duration,statistics,path')
             if res.get('code') != 0:
@@ -402,43 +409,17 @@ class TaskMgr:
             log.error(f"获取素材状态失败: material_id={material_id}, {e}")
             return {"code": -1, "msg": f"获取失败: {str(e)}", "data": {"lock": False}}
 
-    @staticmethod
-    def _is_in_block_time_now(block_time_raw: str, date_str: str) -> bool:
-        now = datetime.now()
-        if date_str != now.strftime('%Y-%m-%d'):
-            return False
-        if not block_time_raw or block_time_raw == '{}':
-            return False
-        data = json.loads(block_time_raw)
-        if not isinstance(data, dict):
-            return False
-        block_type = data.get('type') or 'blacklist'
-        rules = (data.get('whitelist') or []) if block_type == 'whitelist' else (data.get('blacklist') or [])
-        common = next((r for r in rules if r.get('role') in (None, '', 'common')), None)
-        if not common:
-            return False
-        slots = common.get('time') or []
-        if block_type == 'whitelist' and not slots:
-            return False
-        t = now.time()
-        # python weekday(): Mon=0..Sun=6 -> rule weekday: Sun=0..Sat=6
-        wd = (now.weekday() + 1) % 7
-        in_slot = False
-        for slot in slots:
-            weekdays = slot.get('weekdays') or []
-            if weekdays and wd not in weekdays:
-                continue
-            start = datetime.strptime(slot['start'], '%H:%M:%S').time()
-            end = datetime.strptime(slot['end'], '%H:%M:%S').time()
-            if start <= t < end:
-                in_slot = True
-                break
-        return (not in_slot) if block_type == 'whitelist' else in_slot
-
     def check_task_lock(self,
                         tasks: List[Dict[str, Any]],
                         user_id: Optional[int] = None,
                         date_str: Optional[str] = None) -> List[Dict[str, Any]]:
+        """为任务列表计算锁定状态，写入 lock 与 msg 字段。
+
+        锁定规则（按优先级依次判断）：
+        1. 存在更高优先级（数值更小）的未完成任务
+        2. 前置日程未完成
+        3. 当前处于全局或任务级禁用时段（并集）
+        """
         if not user_id or not date_str:
             for task in tasks:
                 task['lock'] = False
@@ -450,6 +431,7 @@ class TaskMgr:
             sorted_tasks = sorted(tasks, key=lambda x: x.get('priority', 999))
             highest_uncompleted_priority = None
             highest_uncompleted_task_name = None
+            global_locked = is_global_block_time_now(date_str)
 
             for task in sorted_tasks:
                 priority = task.get('priority')
@@ -470,9 +452,13 @@ class TaskMgr:
                             task['lock'] = True
                             task['msg'] = f'请先完成前置日程：{"、".join(incomplete_names)}'
 
-                if not task.get('lock') and self._is_in_block_time_now(task.get('block_time') or '{}', date_str):
-                    task['lock'] = True
-                    task['msg'] = '当前处于禁用时段'
+                if not task.get('lock'):
+                    if global_locked:
+                        task['lock'] = True
+                        task['msg'] = '当前处于全局禁用时段'
+                    elif is_in_block_time_now(task.get('block_time') or '{}', date_str):
+                        task['lock'] = True
+                        task['msg'] = '当前处于禁用时段'
 
                 if not task['lock'] and self._has_uncompleted_materials(task, user_id, target_date):
                     if highest_uncompleted_priority is None or (priority is not None
@@ -489,6 +475,7 @@ class TaskMgr:
             return tasks
 
     def _has_uncompleted_materials(self, task: Dict[str, Any], user_id: int, target_date: datetime) -> bool:
+        """判断任务在指定日期是否仍有未完成的素材。"""
         try:
             start_date_str = task.get('start_date', '')
             if not start_date_str:
@@ -521,6 +508,11 @@ class TaskMgr:
             return True
 
     def _check_schedules_completed(self, todo_ids: List[int], user_id: int, date_str: str) -> tuple:
+        """检查前置日程在指定日期是否全部完成。
+
+        Returns:
+            (是否全部完成, 未完成日程名称列表)
+        """
         try:
             if not todo_ids:
                 return True, []

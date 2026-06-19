@@ -5,6 +5,13 @@
       <div class="flex flex-1 items-center gap-1">
         <el-button type="primary" plain size="small" @click="refreshTasks" :icon="Refresh"/>
         <el-button type="primary" size="small" @click="handleAddTask">新建任务</el-button>
+        <div
+          class="flex items-center gap-1 ml-1 px-2 h-7 rounded border border-dashed border-gray-300 cursor-pointer"
+          @click="blockTimeDialogVisible = true"
+        >
+          <span class="text-xs text-gray-500 shrink-0">全局禁用</span>
+          <BlockTimeDisplay :block-time="globalBlockTime" />
+        </div>
       </div>
     </div>
 
@@ -48,24 +55,7 @@
       </el-table-column>
       <el-table-column label="禁用时段" width="180">
         <template #default="{ row }">
-          <template v-if="blockSlots(row).length">
-            <el-tooltip placement="top" :disabled="blockSlots(row).length <= 1">
-              <template #content>
-                <div>{{ blockTypeLabel(row) }}</div>
-                <div v-for="(slot, index) in blockSlots(row)" :key="index">
-                  {{ blockSlotText(slot) }}
-                </div>
-              </template>
-              <div class="flex items-center gap-1 py-1">
-                <el-tag size="small" :type="blockTypeTag(row)">{{ blockTypeShortLabel(row) }}</el-tag>
-                <TimeRange :model-value="blockSlots(row)[0]" readonly />
-                <el-tag v-if="blockSlots(row).length > 1" class="text-xs text-gray-500 shrink-0" size="small" type="info">
-                  +{{ blockSlots(row).length - 1 }}
-                </el-tag>
-              </div>
-            </el-tooltip>
-          </template>
-          <span v-else class="text-gray-400">-</span>
+          <BlockTimeDisplay :block-time="row.block_time" />
         </template>
       </el-table-column>
       <el-table-column label="操作" width="140" fixed="right">
@@ -96,35 +86,27 @@
       :task-data="currentTaskData"
       @success="fetchTaskList"
     />
+
+    <BlockTimeDialog v-model="blockTimeDialogVisible" @success="fetchGlobalBlockTime" />
   </div>
 </template>
 
 <script setup lang="ts">
 import {
   deleteTask,
+  getGlobalBlockTime,
   getTaskList,
-  getCommonBlockTimeSlots,
-  parseBlockTimeConfig,
   type Task,
-  type TaskBlockTimeSlot,
+  type TaskBlockTimeConfig,
 } from "@/api/api-task";
 import { Refresh } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { onMounted, ref, onUnmounted, nextTick } from "vue";
-import TimeRange from "./components/TimeRange.vue";
+import BlockTimeDisplay from "./components/BlockTimeDisplay.vue";
 import TaskDialog from "./dialogs/TaskDialog.vue";
-import { formatRestDaysFullText, formatWeekdaysShort } from "@/utils/date";
+import BlockTimeDialog from "./dialogs/BlockTimeDialog.vue";
+import { formatRestDaysFullText } from "@/utils/date";
 
-
-const blockSlots = (row: Task) => getCommonBlockTimeSlots(row.block_time);
-const blockSlotText = (slot: TaskBlockTimeSlot) => {
-  const weekday = formatWeekdaysShort(slot.weekdays);
-  const time = `${slot.start.slice(0, 5)} - ${slot.end.slice(0, 5)}`;
-  return weekday ? `${weekday} ${time}` : time;
-};
-const blockTypeLabel = (row: Task) => (parseBlockTimeConfig(row.block_time).type === "whitelist" ? "白名单" : "黑名单");
-const blockTypeShortLabel = (row: Task) => blockTypeLabel(row).charAt(0);
-const blockTypeTag = (row: Task) => (parseBlockTimeConfig(row.block_time).type === "whitelist" ? "success" : "warning");
 
 const restDaysText = (task: Task) => formatRestDaysFullText(task.rest_days);
 
@@ -147,8 +129,19 @@ const pageSize = ref(20);
 
 // 对话框
 const dialogVisible = ref(false);
+const blockTimeDialogVisible = ref(false);
+const globalBlockTime = ref<TaskBlockTimeConfig>();
 const isEdit = ref(false);
 const currentTaskData = ref<Partial<Task>>({});
+
+// 获取全局禁用时段
+const fetchGlobalBlockTime = async () => {
+  try {
+    globalBlockTime.value = await getGlobalBlockTime();
+  } catch (error: any) {
+    ElMessage.error(error.message || "获取全局禁用时段失败");
+  }
+};
 
 // 获取任务列表
 const fetchTaskList = async () => {
@@ -254,6 +247,7 @@ const handleDeleteTask = async (row: Task) => {
 // 初始化
 onMounted(() => {
   fetchTaskList();
+  fetchGlobalBlockTime();
   calculateTableHeight();
   window.addEventListener('resize', calculateTableHeight);
 

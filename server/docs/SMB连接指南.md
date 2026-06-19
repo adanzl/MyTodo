@@ -62,5 +62,3 @@ net use Z: /delete
 # 永久删除（取消自动挂载）
 net use Z: /delete /persistent:no
 ```
-
-

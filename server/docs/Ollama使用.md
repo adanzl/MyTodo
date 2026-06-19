@@ -1,4 +1,6 @@
-# 安装
+# Ollama 处理
+
+## 安装
 
 ```bash
 docker run -d \
@@ -13,35 +15,43 @@ docker run -d \
   ollama/ollama:rocm
 ```
 
+## 常用命令
 
-# 常用命令
-## 查看已下载的所有模型
+### 查看已下载的所有模型
+
 ```bash
 docker exec -it ollama ollama list
 ```
 
-## 查看可下载模型
-访问网页  https://ollama.com/library
+### 查看可下载模型
 
-## 查看正在运行的模型
+访问网页  <https://ollama.com/library>
+
+### 查看正在运行的模型
+
 ```bash
 docker exec -it ollama ollama ps
 ```
-## 拉取新模型
+
+### 拉取新模型
+
 ```bash
 docker exec -it ollama ollama pull qwen3.5:2b
 ```
 
-## 运行模型对话
+### 运行模型对话
+
 ```bash
 docker exec -it ollama ollama run qwen3.5:2b
 ```
 
-## 删除不需要的模型
+### 删除不需要的模型
+
 ```bash
 docker exec -it ollama ollama rm llama3.2
 ```
-## 验证对话
+
+### 验证对话
 
 ```bash
 curl http://localhost:9097/api/generate \

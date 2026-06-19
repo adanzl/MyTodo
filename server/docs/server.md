@@ -47,10 +47,12 @@ source ~/.bashrc
 
 ### 安装
 
+``` text
 sudo apt install -y python3-certbot-nginx
 -- acme.sh 续期（兼容网页申请的证书，更灵活
 curl https://get.acme.sh | sh -s email=adanzl@163.com
 source ~/.bashrc
+```
 
 ### 查看证书状态
 
@@ -176,12 +178,6 @@ docker run -d --name frpc_web \
     -u 9266c2d09e67a0b3a243ce228e77146f \
     -p 1098893
 ```
-
-### FreeDns 域名
-
-域名 leo-dify.mooo.com
-
-https://freedns.afraid.org/subdomain/edit.php?data_id=25288404
 
 ## portainer
 
