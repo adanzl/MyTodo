@@ -254,19 +254,25 @@ docker run -d -p 8002:3306 --name mysql --restart=always \
 
 ```bash
 docker run -d -it -p 8003:3000 --name DBGate --restart=always \
-    -v /mnt/data/project/MyTodo/server/data.db:/home/data.db \
+    -v /mnt/data/project/MyTodo/server/data.db:/home/my_todo.db \
+    -v /mnt/data/project/video_factory/data/data.db:/home/video_factory.db \
+    -v /mnt/data/project/video_factory/data/data.db-wal:/home/video_factory.db-wal \
+    -v /mnt/data/project/video_factory/data/data.db-shm:/home/video_factory.db-shm \
     -e LOGIN=leo \
     -e PASSWORD=\!Zhao575936 \
-    -e CONNECTIONS=con1,con2 \
+    -e CONNECTIONS=con1,con2,con3 \
     -e LABEL_con1=MYSQL \
     -e SERVER_con1=192.168.50.172 \
     -e USER_con1=leo \
     -e PORT_con1=8002 \
     -e PASSWORD_con1=H^12345678 \
     -e ENGINE_con1=mysql@dbgate-plugin-mysql \
-    -e LABEL_con2=SQLite \
-    -e FILE_con2=/home/data.db \
+    -e LABEL_con2=my_todo \
+    -e FILE_con2=/home/my_todo.db \
     -e ENGINE_con2=sqlite@dbgate-plugin-sqlite \
+    -e LABEL_con3=video_factory \
+    -e FILE_con3=/home/video_factory.db \
+    -e ENGINE_con3=sqlite@dbgate-plugin-sqlite \
     dbgate/dbgate:latest
 ```
 
