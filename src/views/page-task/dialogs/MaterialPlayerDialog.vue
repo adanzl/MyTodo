@@ -177,6 +177,7 @@ import {
     type ResolvedSubtitleTrack,
 } from '@/utils/subtitle';
 import {
+    alertController,
     IonButton,
     IonContent,
     IonIcon,
@@ -239,6 +240,11 @@ const audioPreviewRef = ref<any>(null);
 let usageTimer: number | null = null;
 let usageStartTime: number = 0;
 let isTrackingActive: boolean = false; // 追踪是否活跃（页面可见且视频播放中）
+
+// 视频锁定轮询（播放过程中每分钟检查一次）
+const VIDEO_LOCK_POLL_MS = 60_000;
+let videoLockPollTimer: number | null = null;
+let videoLockAlertShown = false;
 
 // 监听 AudioPreview 的播放状态
 const isAudioPlaying = computed(() => {
@@ -359,6 +365,7 @@ const toggleSubtitle = () => {
 
 const handleDismiss = () => {
     if (!props.isOpen) return;
+    stopVideoLockPolling();
     emit('update:isOpen', false);
     stopAudio();
     void stopUsageTracking();
@@ -383,9 +390,48 @@ const checkVideoLock = async (): Promise<boolean> => {
     }
 };
 
-const closeDueToVideoLock = () => {
-    EventBus.$emit(C_EVENT.TOAST, '视频观看超时');
-    handleDismiss();
+const stopVideoLockPolling = () => {
+    if (videoLockPollTimer !== null) {
+        clearInterval(videoLockPollTimer);
+        videoLockPollTimer = null;
+    }
+};
+
+const showVideoLockAlert = async () => {
+    if (videoLockAlertShown) return;
+    videoLockAlertShown = true;
+    stopVideoLockPolling();
+    pauseVideo();
+
+    const alert = await alertController.create({
+        header: '提示',
+        message: '视频观看超时',
+        backdropDismiss: false,
+        buttons: [
+            {
+                text: '确定',
+                handler: () => {
+                    handleDismiss();
+                },
+            },
+        ],
+    });
+    await alert.present();
+};
+
+const pollVideoLockStatus = async () => {
+    if (!props.isOpen || props.material?.type !== 1 || videoLockAlertShown) return;
+    if (await checkVideoLock()) {
+        await showVideoLockAlert();
+    }
+};
+
+const startVideoLockPolling = () => {
+    if (props.material?.type !== 1) return;
+    stopVideoLockPolling();
+    videoLockPollTimer = window.setInterval(() => {
+        void pollVideoLockStatus();
+    }, VIDEO_LOCK_POLL_MS);
 };
 
 const pauseVideo = () => {
@@ -700,8 +746,8 @@ watch(
     () => [props.isOpen, props.material] as const,
     async ([isOpen, material]) => {
         if (isOpen && material) {
-            if (await checkVideoLock()) {
-                closeDueToVideoLock();
+            if (material.type === 1 && (await checkVideoLock())) {
+                await showVideoLockAlert();
                 return;
             }
 
@@ -720,12 +766,15 @@ watch(
                     applyVideoCompat();
                     void loadVideoSubtitles(material.path);
                     startUsageTracking();
+                    startVideoLockPolling();
                 } else {
                     loading.value = false;
                 }
             }, 300);
         } else {
             loading.value = false;
+            stopVideoLockPolling();
+            videoLockAlertShown = false;
             clearSubtitleTracks();
         }
     }
@@ -798,6 +847,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+    stopVideoLockPolling();
     window.removeEventListener('resize', checkOrientation);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
     window.removeEventListener('beforeunload', handleBeforeUnload);

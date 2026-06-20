@@ -73,6 +73,22 @@ export async function uploadPic(file: File): Promise<PicUploadResult> {
   return rsp.data.data!;
 }
 
+const DEFAULT_PIC_PLACEHOLDER = (() => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" role="img" aria-label="暂无图片">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="96" y2="96" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#f9fafb"/>
+      <stop offset="100%" stop-color="#e5e7eb"/>
+    </linearGradient>
+  </defs>
+  <rect width="96" height="96" fill="url(#bg)"/>
+  <rect x="22" y="26" width="52" height="44" rx="6" fill="#fff" fill-opacity="0.65" stroke="#d1d5db" stroke-width="1.5"/>
+  <circle cx="36" cy="42" r="4" fill="#cbd5e1"/>
+  <path d="M28 60l14-12 10 8 16-18" fill="none" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+})();
+
 /**
  * 将文件名或 base64 转成可展示的图片 URL
  * @param img 图片数据（文件名或 base64）
@@ -81,8 +97,7 @@ export async function uploadPic(file: File): Promise<PicUploadResult> {
  */
 export function getPicDisplayUrl(img: string, w?: number, h?: number): string {
   if (!img) {
-    // 返回默认占位图（96x96）
-    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Crect fill='%23e5e7eb' width='96' height='96'/%3E%3C/svg%3E";
+    return DEFAULT_PIC_PLACEHOLDER;
   }
   if (img.startsWith("data:")) return img;
   if (img.startsWith("http://") || img.startsWith("https://")) return img;
