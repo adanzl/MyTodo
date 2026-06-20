@@ -191,7 +191,7 @@ export async function getGiftCategoryList(params?: {
   pageNum?: number;
   pageSize?: number;
 }): Promise<ApiPagedResponse<GiftCategoryItem>> {
-  const { conditions, pageNum = 1, pageSize = 10 } = params ?? {};
+  const { conditions, pageNum = 1, pageSize = 100 } = params ?? {};
   const rsp = await apiClient.get<ApiResponse<ApiPagedResponse<GiftCategoryItem>>>("/getAll", {
     params: {
       table: "t_gift_category",
