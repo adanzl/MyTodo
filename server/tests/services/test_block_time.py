@@ -123,3 +123,26 @@ def test_check_task_lock_task_level_when_global_clear(monkeypatch):
     result = TaskMgr().check_task_lock(tasks, user_id=1, date_str=TODAY)
     assert result[0]["lock"] is True
     assert result[0]["msg"] == "当前处于禁用时段"
+
+
+def test_check_task_lock_pre_task_same_day_only(monkeypatch):
+    """前置任务只检查 date_str 当天，不检查历史或其它天。"""
+    invalidate_global_block_time_cache()
+    monkeypatch.setattr(task_mgr_module, "is_global_block_time_now", lambda *args, **_: False)
+
+    calls = []
+
+    def track_has_uncompleted(self, task, user_id, target_date):
+        calls.append((task.get("name"), target_date.strftime("%Y-%m-%d")))
+        return task.get("name") == "前置A"
+
+    monkeypatch.setattr(TaskMgr, "_has_uncompleted_materials", track_has_uncompleted)
+
+    tasks = [
+        {"id": 10, "priority": 0, "name": "前置A", "block_time": "{}"},
+        {"id": 2, "priority": 1, "name": "当前任务", "pre_task": "[10]", "block_time": "{}"},
+    ]
+    result = TaskMgr().check_task_lock(tasks, user_id=3, date_str=TODAY)
+    locked = next(t for t in result if t["id"] == 2)
+    assert locked["lock"] is True
+    assert calls == [("前置A", TODAY)]

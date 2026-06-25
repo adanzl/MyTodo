@@ -1,12 +1,12 @@
 <template>
   <div class="p-2">
     <!-- 工具栏 -->
-    <div class="flex items-center h-10 mb-2">
-      <div class="flex flex-1 items-center gap-1">
+    <div class="flex items-center min-h-10 mb-2">
+      <div class="flex flex-1 flex-wrap items-center gap-1">
         <el-button type="primary" plain size="small" @click="refreshTasks" :icon="Refresh"/>
         <el-button type="primary" size="small" @click="handleAddTask">新建任务</el-button>
         <div
-          class="flex items-center gap-1 ml-1 px-2 h-7 rounded border border-dashed border-gray-300 cursor-pointer"
+          class="flex flex-wrap items-center gap-1 ml-1 px-2 min-h-7 py-1 rounded border border-dashed border-gray-300 cursor-pointer"
           @click="blockTimeDialogVisible = true"
         >
           <span class="text-xs text-gray-500 shrink-0">全局禁用</span>
@@ -32,9 +32,14 @@
           {{ getUserName(row.user_id) }}
         </template>
       </el-table-column>
-      <el-table-column label="前置" width="70" align="center">
+      <el-table-column label="前置日程" width="90" align="center">
         <template #default="{ row }">
           {{ getPreTodoCounts(row) }}
+        </template>
+      </el-table-column>
+      <el-table-column label="前置任务" width="90" align="center">
+        <template #default="{ row }">
+          {{ getPreTaskCount(row) }}
         </template>
       </el-table-column>
       <!-- 休息日 -->
@@ -96,6 +101,7 @@ import {
   deleteTask,
   getGlobalBlockTime,
   getTaskList,
+  parsePreTask,
   type Task,
   type TaskBlockTimeConfig,
 } from "@/api/api-task";
@@ -209,6 +215,11 @@ const getPreTodoCounts = (task: Task): string => {
       return Array.isArray(ids) ? ids.length : 0;
     })
     .join(", ");
+};
+
+const getPreTaskCount = (task: Task): string => {
+  const count = parsePreTask(task.pre_task).length;
+  return count > 0 ? String(count) : "-";
 };
 
 // 新建任务

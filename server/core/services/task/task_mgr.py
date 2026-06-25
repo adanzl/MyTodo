@@ -418,7 +418,8 @@ class TaskMgr:
         锁定规则（按优先级依次判断）：
         1. 存在更高优先级（数值更小）的未完成任务
         2. 前置日程未完成
-        3. 当前处于全局或任务级禁用时段（并集）
+        3. 前置任务在当天仍有未完成打卡
+        4. 当前处于全局或任务级禁用时段（并集）
         """
         if not user_id or not date_str:
             for task in tasks:
@@ -428,6 +429,7 @@ class TaskMgr:
 
         try:
             target_date = datetime.strptime(date_str, '%Y-%m-%d')
+            task_by_id = {t['id']: t for t in tasks if t.get('id')}
             sorted_tasks = sorted(tasks, key=lambda x: x.get('priority', 999))
             highest_uncompleted_priority = None
             highest_uncompleted_task_name = None
@@ -451,6 +453,20 @@ class TaskMgr:
                         if not all_completed:
                             task['lock'] = True
                             task['msg'] = f'请先完成前置日程：{"、".join(incomplete_names)}'
+
+                if not task.get('lock'):
+                    pre_task_raw = task.get('pre_task')
+                    if pre_task_raw:
+                        pre_task_ids = pre_task_raw if isinstance(pre_task_raw, list) else json.loads(pre_task_raw)
+                        for tid in pre_task_ids:
+                            if tid == task.get('id'):
+                                continue
+                            pre = task_by_id.get(tid)
+                            # 仅检查前置任务在 date_str 当天的打卡是否完成
+                            if pre and self._has_uncompleted_materials(pre, user_id, target_date):
+                                task['lock'] = True
+                                task['msg'] = f'请先完成前置任务：{pre.get("name", f"任务{tid}")}'
+                                break
 
                 if not task.get('lock'):
                     if global_locked:

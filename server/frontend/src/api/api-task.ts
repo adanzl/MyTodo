@@ -197,6 +197,8 @@ export interface Task {
   type: number; // 0:每日任务；1：持续性任务
   data: string | TaskDetail;
   pre_todo?: string; // 前置日程JSON字符串，格式：{"user_id": [todo_ids]}
+  /** 前置任务 id 数组；锁定仅检查当天打卡是否完成 */
+  pre_task?: number[] | string;
   block_time?: TaskBlockTimeConfig;
   lock?: boolean; // 任务是否锁定
   msg?: string; // 锁定提示信息
@@ -218,6 +220,17 @@ export interface TaskBlockTimeConfig {
   type: "blacklist" | "whitelist";
   blacklist: TaskBlockTimeRule[];
   whitelist: TaskBlockTimeRule[];
+}
+
+export function parsePreTask(raw?: Task["pre_task"]): number[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.map(Number).filter((id) => id > 0);
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.map(Number).filter((id) => id > 0) : [];
+  } catch {
+    return [];
+  }
 }
 
 export function parseBlockTimeConfig(rules?: TaskBlockTimeConfig | string): TaskBlockTimeConfig {

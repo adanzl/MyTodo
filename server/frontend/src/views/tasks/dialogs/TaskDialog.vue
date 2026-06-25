@@ -1,5 +1,11 @@
 <template>
-  <el-dialog v-model="visible" :title="isEdit ? '编辑任务' : '新建任务'" width="1200px" align-center @close="handleClose">
+  <el-dialog
+    v-model="visible"
+    :title="isEdit ? '编辑任务' : '新建任务'"
+    width="1200px"
+    align-center
+    @close="handleClose"
+  >
     <div class="max-h-[90vh] overflow-y-auto overflow-x-hidden flex flex-col gap-4">
       <!-- 上区域：任务信息 -->
       <div class="task-info-section p-2 border rounded">
@@ -13,9 +19,19 @@
             </el-col>
             <el-col :span="8">
               <el-form-item label="优先级">
-                <el-input-number v-model="formData.priority" :min="0" :max="10" :step="1" class="w-30!" size="small"
-                  placeholder="数字越小优先级越高" />
-                <el-tooltip content="数字越小优先级越高，高优先级任务没有完成低优先级任务会锁定" placement="bottom">
+                <el-input-number
+                  v-model="formData.priority"
+                  :min="0"
+                  :max="10"
+                  :step="1"
+                  class="w-30!"
+                  size="small"
+                  placeholder="数字越小优先级越高"
+                />
+                <el-tooltip
+                  content="数字越小优先级越高，高优先级任务没有完成低优先级任务会锁定"
+                  placement="bottom"
+                >
                   <el-icon class="ml-2">
                     <WarningFilled />
                   </el-icon>
@@ -36,13 +52,25 @@
           <el-row :gutter="20">
             <el-col :span="8">
               <el-form-item label="开始日期" required>
-                <el-date-picker v-model="formData.start_date" type="date" placeholder="选择开始日期" format="YYYY-MM-DD"
-                  value-format="YYYY-MM-DD" class="w-68!" />
+                <el-date-picker
+                  v-model="formData.start_date"
+                  type="date"
+                  placeholder="选择开始日期"
+                  format="YYYY-MM-DD"
+                  value-format="YYYY-MM-DD"
+                  class="w-68!"
+                />
               </el-form-item>
             </el-col>
             <el-col :span="8">
               <el-form-item label="总天数" required>
-                <el-input-number v-model="formData.duration" :min="1" :max="365" class="w-10" size="small" />
+                <el-input-number
+                  v-model="formData.duration"
+                  :min="1"
+                  :max="365"
+                  class="w-10"
+                  size="small"
+                />
                 <span class="ml-2 text-xs text-gray-600">到 {{ endDateStr }} 结束</span>
               </el-form-item>
             </el-col>
@@ -69,38 +97,91 @@
                   <!-- 灿灿日程 -->
                   <div class="flex items-center gap-1 w-[40%]">
                     <span class="w-10 text-sm text-gray-600">灿灿:</span>
-                    <el-select :disabled="!selectedUsers.includes(3)" v-model="preTodoCancan" multiple filterable
-                      clearable placeholder="请选择灿灿的前置日程" class="flex-1" collapse-tags collapse-tags-tooltip
-                      :max-collapse-tags="2">
-                      <el-option v-for="todo in cancanTodos" :key="'cancan_' + todo.id" :label="todo.title"
-                        :value="todo.id" />
+                    <el-select
+                      :disabled="!selectedUsers.includes(3)"
+                      v-model="preTodoCancan"
+                      multiple
+                      filterable
+                      clearable
+                      placeholder="请选择灿灿的前置日程"
+                      class="flex-1"
+                      collapse-tags
+                      collapse-tags-tooltip
+                      :max-collapse-tags="2"
+                    >
+                      <el-option
+                        v-for="todo in cancanTodos"
+                        :key="'cancan_' + todo.id"
+                        :label="todo.title"
+                        :value="todo.id"
+                      />
                     </el-select>
                   </div>
                   <!-- 昭昭日程 -->
                   <div class="flex items-center gap-1 w-[40%]">
                     <span class="w-10 text-sm text-gray-600">昭昭:</span>
-                    <el-select :disabled="!selectedUsers.includes(4)" v-model="preTodoZhaozhao" multiple filterable
-                      clearable placeholder="请选择昭昭的前置日程" class="flex-1" collapse-tags collapse-tags-tooltip
-                      :max-collapse-tags="3">
-                      <el-option v-for="todo in zhaozhaoTodos" :key="'zhaozhao_' + todo.id" :label="todo.title"
-                        :value="todo.id" />
+                    <el-select
+                      :disabled="!selectedUsers.includes(4)"
+                      v-model="preTodoZhaozhao"
+                      multiple
+                      filterable
+                      clearable
+                      placeholder="请选择昭昭的前置日程"
+                      class="flex-1"
+                      collapse-tags
+                      collapse-tags-tooltip
+                      :max-collapse-tags="3"
+                    >
+                      <el-option
+                        v-for="todo in zhaozhaoTodos"
+                        :key="'zhaozhao_' + todo.id"
+                        :label="todo.title"
+                        :value="todo.id"
+                      />
                     </el-select>
                   </div>
-
                 </div>
               </el-form-item>
             </el-col>
           </el-row>
 
           <el-row :gutter="20">
-            <el-col :span="12">
+            <el-col :span="8">
+              <!-- 前置任务 -->
+              <el-form-item label="前置任务">
+                <div class="flex gap-2 items-center w-full">
+                  <el-tooltip content="完成前置任务当天的规定打卡后才能开始当前任务" placement="bottom">
+                    <el-icon><WarningFilled /></el-icon>
+                  </el-tooltip>
+                  <el-select
+                    v-model="preTaskIds"
+                    multiple
+                    filterable
+                    clearable
+                    placeholder="请选择前置任务"
+                    class="flex-1"
+                    collapse-tags
+                    collapse-tags-tooltip
+                    :max-collapse-tags="3"
+                  >
+                    <el-option
+                      v-for="task in preTaskOptions"
+                      :key="task.id"
+                      :label="`${task.id} - ${task.name}`"
+                      :value="task.id!"
+                    />
+                  </el-select>
+                </div>
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
               <el-form-item label="禁用时段">
                 <div class="flex flex-col gap-2 w-full">
                   <el-radio-group :model-value="blockTimeType" @change="handleBlockTimeTypeChange">
                     <el-radio value="blacklist">黑名单</el-radio>
                     <el-radio value="whitelist">白名单</el-radio>
                   </el-radio-group>
-                  <div class="flex gap-2 w-full items-center">
+                  <div class="flex flex-wrap gap-2 w-full items-center">
                     <TimeRange
                       v-for="(_, index) in blockTimes"
                       :key="index"
@@ -112,9 +193,9 @@
                 </div>
               </el-form-item>
             </el-col>
-            <el-col :span="12">
+            <el-col :span="8">
               <el-form-item label="休息日">
-                <div class="flex items-start gap-1 min-w-0 text-xs leading-normal ">
+                <div class="flex items-start gap-1 min-w-0 text-xs leading-normal">
                   <div
                     class="min-w-0 flex-1 cursor-pointer wrap-break-word py-1 hover:text-[#409EFF]"
                     @click="showRestDaysDialog = true"
@@ -143,12 +224,29 @@
           <h3 class="text-lg font-semibold">打卡活动配置</h3>
           <div class="flex items-center gap-4">
             <!-- 每日分数配置 -->
-            <span>{{ formData.type === 1 ? '完成奖励' : `第${selectedDay + 1}天星星` }}</span>
-            <el-input-number v-if="formData.type === 1" v-model="dailyScore[0]" :min="0" :max="1000" :step="1"
-              placeholder="'奖励'" class="w-36" size="small" :disabled="getAllMaterials().length === 0" />
-            <el-input-number v-else-if="selectedDay !== -1" v-model="dailyScore[selectedDay]" :min="0" :max="1000"
-              :step="1" :placeholder="'奖励'" class="w-36" size="small"
-              :disabled="getDayMaterials(selectedDay).length === 0" />
+            <span>{{ formData.type === 1 ? "完成奖励" : `第${selectedDay + 1}天星星` }}</span>
+            <el-input-number
+              v-if="formData.type === 1"
+              v-model="dailyScore[0]"
+              :min="0"
+              :max="1000"
+              :step="1"
+              placeholder="'奖励'"
+              class="w-36"
+              size="small"
+              :disabled="getAllMaterials().length === 0"
+            />
+            <el-input-number
+              v-else-if="selectedDay !== -1"
+              v-model="dailyScore[selectedDay]"
+              :min="0"
+              :max="1000"
+              :step="1"
+              :placeholder="'奖励'"
+              class="w-36"
+              size="small"
+              :disabled="getDayMaterials(selectedDay).length === 0"
+            />
             <el-button type="primary" size="small" @click="showMaterialSelector = true">
               <el-icon class="mr-1">
                 <Plus />
@@ -164,7 +262,7 @@
           </div>
         </div>
 
-        <div class="checkin-content flex" style="height: 400px;">
+        <div class="checkin-content flex" style="height: 400px">
           <!-- 左侧：天数列表（仅每日任务显示） -->
           <div v-if="formData.type === 0" class="day-list w-48 border-r overflow-y-auto">
             <div
@@ -193,8 +291,11 @@
                 暂无素材，点击“添加素材”按钮添加
               </div>
               <div v-else class="space-y-2">
-                <div v-for="(material, index) in getAllMaterials()" :key="material.id"
-                  class="material-item p-3 border rounded flex items-center justify-between hover:bg-gray-50 transition-all duration-200">
+                <div
+                  v-for="(material, index) in getAllMaterials()"
+                  :key="material.id"
+                  class="material-item p-3 border rounded flex items-center justify-between hover:bg-gray-50 transition-all duration-200"
+                >
                   <div class="flex-1">
                     <div class="font-medium">{{ material.name }}</div>
                     <div class="text-xs text-gray-500 mt-1 flex gap-3">
@@ -203,15 +304,30 @@
                     </div>
                   </div>
                   <div class="flex items-center gap-1">
-                    <el-button size="small" type="primary" link @click="moveMaterialUp(0, index)"
-                      :disabled="index === 0">
+                    <el-button
+                      size="small"
+                      type="primary"
+                      link
+                      @click="moveMaterialUp(0, index)"
+                      :disabled="index === 0"
+                    >
                       <el-icon :size="16"><ArrowUp /></el-icon>
                     </el-button>
-                    <el-button size="small" type="primary" link @click="moveMaterialDown(0, index)"
-                      :disabled="index === getAllMaterials().length - 1">
+                    <el-button
+                      size="small"
+                      type="primary"
+                      link
+                      @click="moveMaterialDown(0, index)"
+                      :disabled="index === getAllMaterials().length - 1"
+                    >
                       <el-icon :size="16"><ArrowDown /></el-icon>
                     </el-button>
-                    <el-button size="small" type="danger" link @click="removeMaterialFromAll(index)">
+                    <el-button
+                      size="small"
+                      type="danger"
+                      link
+                      @click="removeMaterialFromAll(index)"
+                    >
                       删除
                     </el-button>
                   </div>
@@ -224,12 +340,18 @@
                 请选择左侧的天数
               </div>
               <div v-else>
-                <div v-if="getDayMaterials(selectedDay).length === 0" class="text-center text-gray-400 py-20">
+                <div
+                  v-if="getDayMaterials(selectedDay).length === 0"
+                  class="text-center text-gray-400 py-20"
+                >
                   暂无素材，点击“添加素材”按钮添加
                 </div>
                 <div v-else class="space-y-2">
-                  <div v-for="(material, index) in getDayMaterials(selectedDay)" :key="material.id"
-                    class="material-item p-3 border rounded flex items-center justify-between hover:bg-gray-50 transition-all duration-200">
+                  <div
+                    v-for="(material, index) in getDayMaterials(selectedDay)"
+                    :key="material.id"
+                    class="material-item p-3 border rounded flex items-center justify-between hover:bg-gray-50 transition-all duration-200"
+                  >
                     <div class="flex-1">
                       <div class="font-medium">{{ material.name }}</div>
                       <div class="text-xs text-gray-500 mt-1 flex gap-3">
@@ -238,15 +360,30 @@
                       </div>
                     </div>
                     <div class="flex items-center gap-1">
-                      <el-button size="small" type="primary" link @click="moveMaterialUp(selectedDay, index)"
-                        :disabled="index === 0">
+                      <el-button
+                        size="small"
+                        type="primary"
+                        link
+                        @click="moveMaterialUp(selectedDay, index)"
+                        :disabled="index === 0"
+                      >
                         <el-icon :size="16"><ArrowUp /></el-icon>
                       </el-button>
-                      <el-button size="small" type="primary" link @click="moveMaterialDown(selectedDay, index)"
-                        :disabled="index === getDayMaterials(selectedDay).length - 1">
+                      <el-button
+                        size="small"
+                        type="primary"
+                        link
+                        @click="moveMaterialDown(selectedDay, index)"
+                        :disabled="index === getDayMaterials(selectedDay).length - 1"
+                      >
                         <el-icon :size="16"><ArrowDown /></el-icon>
                       </el-button>
-                      <el-button size="small" type="danger" link @click="removeMaterial(selectedDay, index)">
+                      <el-button
+                        size="small"
+                        type="danger"
+                        link
+                        @click="removeMaterial(selectedDay, index)"
+                      >
                         删除
                       </el-button>
                     </div>
@@ -265,19 +402,41 @@
     </template>
 
     <!-- 素材选择器弹窗 -->
-    <el-dialog v-model="showMaterialSelector" title="选择素材" width="1100px" append-to-body align-center>
-      <div v-loading="materialLoading" element-loading-text="加载中..." style="min-height: 500px;">
-        <div class="flex gap-4" style="height: 500px;">
+    <el-dialog
+      v-model="showMaterialSelector"
+      title="选择素材"
+      width="1100px"
+      append-to-body
+      align-center
+    >
+      <div v-loading="materialLoading" element-loading-text="加载中..." style="min-height: 500px">
+        <div class="flex gap-4" style="height: 500px">
           <!-- 左侧：类别选择 -->
           <div class="w-58 border rounded p-3 overflow-y-auto">
-            <el-tree ref="categoryTreeRef" :data="cascaderOptions" :props="treeProps" node-key="id" :indent="10"
-              @node-click="handleTreeSelect" highlight-current accordion>
+            <el-tree
+              ref="categoryTreeRef"
+              :data="cascaderOptions"
+              :props="treeProps"
+              node-key="id"
+              :indent="10"
+              @node-click="handleTreeSelect"
+              highlight-current
+              accordion
+            >
               <template #default="{ node, data }">
                 <div class="flex items-center justify-between w-full pr-2">
-                  <el-tooltip :content="node.label" placement="top" :disabled="node.label.length <= 10">
+                  <el-tooltip
+                    :content="node.label"
+                    placement="top"
+                    :disabled="node.label.length <= 10"
+                  >
                     <span class="truncate max-w-32">{{ node.label }}</span>
                   </el-tooltip>
-                  <el-tag size="small" type="primary" v-if="getMaterialCategorySelectedCount(data.id) > 0">
+                  <el-tag
+                    size="small"
+                    type="primary"
+                    v-if="getMaterialCategorySelectedCount(data.id) > 0"
+                  >
                     {{ getMaterialCategorySelectedCount(data.id) }}
                   </el-tag>
                 </div>
@@ -287,8 +446,14 @@
 
           <!-- 右侧：素材列表 -->
           <div class="flex-1 border rounded overflow-hidden">
-            <el-table v-if="!materialLoading" ref="materialTableRef" :data="materialList"
-              @selection-change="handleMaterialSelectionChange" @row-click="handleRowClick" height="100%">
+            <el-table
+              v-if="!materialLoading"
+              ref="materialTableRef"
+              :data="materialList"
+              @selection-change="handleMaterialSelectionChange"
+              @row-click="handleRowClick"
+              height="100%"
+            >
               <el-table-column type="selection" width="40" />
               <el-table-column prop="id" label="ID" width="60" />
               <el-table-column prop="name" label="素材名称" min-width="200" />
@@ -327,10 +492,12 @@ import { Plus, WarningFilled, ArrowUp, ArrowDown, Close } from "@element-plus/ic
 import {
   addTask,
   updateTask,
+  getTaskList,
   getMaterialList,
   getMaterialCategoryList,
   getCommonBlockTimeSlots,
   parseBlockTimeConfig,
+  parsePreTask,
   type Task,
   type Material,
   type MaterialCategory,
@@ -339,7 +506,12 @@ import {
 } from "@/api/api-task";
 import { getTodoListByTime } from "@/api/api-todo";
 import { sortByName, buildCategoryTree } from "@/utils/file";
-import { getDateByWorkdayIndex, getTaskEndDate, parseRestDays, type RestDaysRule } from "@/utils/date";
+import {
+  getDateByWorkdayIndex,
+  getTaskEndDate,
+  parseRestDays,
+  type RestDaysRule,
+} from "@/utils/date";
 import dayjs from "dayjs";
 import QuickAdd from "./QuickAdd.vue";
 import TimeRange from "../components/TimeRange.vue";
@@ -381,6 +553,8 @@ const categoryTreeRef = ref();
 // 前置日程相关
 const preTodoZhaozhao = ref<number[]>([]); // 昭昭的前置日程ID列表
 const preTodoCancan = ref<number[]>([]); // 灿灿的前置日程ID列表
+const preTaskIds = ref<number[]>([]);
+const preTaskOptions = ref<Array<{ id: number; name: string }>>([]);
 const zhaozhaoTodos = ref<Array<{ id: number; title: string }>>([]);
 const cancanTodos = ref<Array<{ id: number; title: string }>>([]);
 
@@ -392,8 +566,8 @@ const isRestoringMaterialSelection = ref(false);
 
 // Tree 配置
 const treeProps = {
-  label: 'name',
-  children: 'children',
+  label: "name",
+  children: "children",
 };
 
 // 计算级联选项
@@ -440,7 +614,7 @@ const addBlockTime = () => {
 };
 
 const applyBlockTimesToConfig = (type: "blacklist" | "whitelist") => {
-  const time = blockTimes.value.filter((s) => s.start && s.end && s.start < s.end);
+  const time = blockTimes.value.filter(s => s.start && s.end && s.start < s.end);
   const rule = time.length ? [{ role: "common", time }] : [];
   if (type === "whitelist") {
     blockTimeConfig.value.whitelist = rule;
@@ -465,7 +639,7 @@ const resetBlockTime = () => {
 
 const createDefaultFormData = (): Partial<Task> => ({
   name: "",
-  start_date: dayjs().format('YYYY-MM-DD'),
+  start_date: dayjs().format("YYYY-MM-DD"),
   duration: 1,
   user_id: "",
   status: 1,
@@ -511,8 +685,12 @@ const clearRestDays = () => {
 
 // 计算结束日期
 const endDateStr = computed(() => {
-  if (!formData.value.start_date || !formData.value.duration) return '';
-  const end = getTaskEndDate(formData.value.start_date, formData.value.duration || 1, formData.value.rest_days);
+  if (!formData.value.start_date || !formData.value.duration) return "";
+  const end = getTaskEndDate(
+    formData.value.start_date,
+    formData.value.duration || 1,
+    formData.value.rest_days
+  );
   return end ? dayjs(end).format("MM月DD日") : "";
 });
 
@@ -533,7 +711,7 @@ const applyTaskData = (newData?: Partial<Task>) => {
     // 解析 user_id，如果是多个用户用逗号分隔
     if (newData.user_id) {
       const userIds = String(newData.user_id).split(",").map(Number);
-      selectedUsers.value = userIds.filter((id) => [3, 4].includes(id));
+      selectedUsers.value = userIds.filter(id => [3, 4].includes(id));
     } else {
       selectedUsers.value = [];
     }
@@ -541,11 +719,12 @@ const applyTaskData = (newData?: Partial<Task>) => {
     // 初始化前置日程ID
     if (newData.pre_todo) {
       try {
-        const preTodoData = typeof newData.pre_todo === 'string' ? JSON.parse(newData.pre_todo) : newData.pre_todo;
-        preTodoZhaozhao.value = Array.isArray(preTodoData['4']) ? preTodoData['4'] : [];
-        preTodoCancan.value = Array.isArray(preTodoData['3']) ? preTodoData['3'] : [];
+        const preTodoData =
+          typeof newData.pre_todo === "string" ? JSON.parse(newData.pre_todo) : newData.pre_todo;
+        preTodoZhaozhao.value = Array.isArray(preTodoData["4"]) ? preTodoData["4"] : [];
+        preTodoCancan.value = Array.isArray(preTodoData["3"]) ? preTodoData["3"] : [];
       } catch (e) {
-        console.error('解析前置日程数据失败:', e);
+        console.error("解析前置日程数据失败:", e);
         preTodoZhaozhao.value = [];
         preTodoCancan.value = [];
       }
@@ -554,6 +733,8 @@ const applyTaskData = (newData?: Partial<Task>) => {
       preTodoCancan.value = [];
     }
 
+    preTaskIds.value = parsePreTask(newData.pre_task);
+
     blockTimeConfig.value = parseBlockTimeConfig(newData.block_time);
     blockTimeType.value = blockTimeConfig.value.type;
     blockTimes.value = getCommonBlockTimeSlots(blockTimeConfig.value);
@@ -561,11 +742,12 @@ const applyTaskData = (newData?: Partial<Task>) => {
     // 初始化每日素材数据和每日分数
     if (newData.data) {
       try {
-        const parsedData = typeof newData.data === 'string' ? JSON.parse(newData.data) : newData.data;
+        const parsedData =
+          typeof newData.data === "string" ? JSON.parse(newData.data) : newData.data;
         dailyMaterials.value = parsedData.dailyMaterials || {};
         dailyScore.value = parsedData.dailyScore || {};
       } catch (e) {
-        console.error('解析任务数据失败:', e);
+        console.error("解析任务数据失败:", e);
         dailyMaterials.value = {};
         dailyScore.value = {};
       }
@@ -584,6 +766,7 @@ const applyTaskData = (newData?: Partial<Task>) => {
     dailyScore.value = {};
     preTodoZhaozhao.value = [];
     preTodoCancan.value = [];
+    preTaskIds.value = [];
     resetBlockTime();
     selectedDay.value = 0;
     restDaysSummary.value = "";
@@ -593,14 +776,14 @@ const applyTaskData = (newData?: Partial<Task>) => {
 // 监听外部传入的 taskData
 watch(
   () => props.taskData,
-  (newData) => applyTaskData(newData),
+  newData => applyTaskData(newData),
   { immediate: true, deep: true }
 );
 
 // 监听 modelValue 变化
 watch(
   () => props.modelValue,
-  (newVal) => {
+  newVal => {
     visible.value = newVal;
   }
 );
@@ -608,7 +791,7 @@ watch(
 // 监听 duration 变化，确保选中第一天
 watch(
   () => formData.value.duration,
-  (newDuration) => {
+  newDuration => {
     if (newDuration && newDuration > 0) {
       selectedDay.value = 0;
     }
@@ -618,7 +801,7 @@ watch(
 // 监听 type 变化，持续任务时默认选中第0天
 watch(
   () => formData.value.type,
-  (newType) => {
+  newType => {
     if (newType === 1) {
       // 持续任务：选中第0天
       selectedDay.value = 0;
@@ -630,11 +813,13 @@ watch(
 );
 
 // 监听 visible 变化
-watch(visible, (newVal) => {
+watch(visible, newVal => {
   emit("update:modelValue", newVal);
   // 关闭时会 resetForm，再次打开时 taskData 可能未变，需重新填充
   if (newVal) {
     applyTaskData(props.taskData);
+    loadPreTaskOptions();
+    loadTodoList();
   }
 });
 
@@ -653,6 +838,7 @@ const resetForm = () => {
   dailyScore.value = {};
   preTodoZhaozhao.value = [];
   preTodoCancan.value = [];
+  preTaskIds.value = [];
   resetBlockTime();
   showRestDaysDialog.value = false;
   restDaysSummary.value = "";
@@ -710,7 +896,7 @@ const removeMaterialFromAll = (index: number) => {
     for (const day in dailyMaterials.value) {
       const materials = dailyMaterials.value[Number(day)];
       const matIndex = materials.findIndex(
-        (m) => m.id === materialToRemove.id && m.name === materialToRemove.name
+        m => m.id === materialToRemove.id && m.name === materialToRemove.name
       );
       if (matIndex !== -1) {
         materials.splice(matIndex, 1);
@@ -737,6 +923,19 @@ const loadCategoryList = async () => {
   }
 };
 
+// 加载可选的前置任务列表
+const loadPreTaskOptions = async () => {
+  try {
+    const res = await getTaskList(undefined, 1, 1000);
+    const currentId = props.isEdit ? props.taskData?.id : undefined;
+    preTaskOptions.value = (res.data?.data || [])
+      .filter(t => t.id && t.id !== currentId)
+      .map(t => ({ id: t.id!, name: t.name }));
+  } catch (error: any) {
+    console.error("获取任务列表失败:", error);
+  }
+};
+
 // 加载日程列表
 const loadTodoList = async () => {
   try {
@@ -758,7 +957,7 @@ const loadTodoList = async () => {
       const result = await getTodoListByTime(startDate, endDate, 4);
       zhaozhaoTodos.value = (result.data || []).map((todo: any) => ({
         id: todo.id,
-        title: todo.title
+        title: todo.title,
       }));
     }
 
@@ -767,7 +966,7 @@ const loadTodoList = async () => {
       const result = await getTodoListByTime(startDate, endDate, 3);
       cancanTodos.value = (result.data || []).map((todo: any) => ({
         id: todo.id,
-        title: todo.title
+        title: todo.title,
       }));
     }
   } catch (error: any) {
@@ -793,7 +992,9 @@ const loadMaterialList = async () => {
         const categoryMaterialIds = materialList.value
           .filter(m => m.cate_id === selectedCategoryId.value)
           .map(m => m.id);
-        const count = selectedMaterials.value.filter(m => categoryMaterialIds.includes(m.id)).length;
+        const count = selectedMaterials.value.filter(m =>
+          categoryMaterialIds.includes(m.id)
+        ).length;
         materialCategorySelectedCountCache.value.set(selectedCategoryId.value, count);
       }
     }
@@ -841,17 +1042,18 @@ watch(selectedUsers, () => {
   }
 });
 
-watch(showMaterialSelector, async (newVal) => {
+watch(showMaterialSelector, async newVal => {
   if (newVal) {
     await loadCategoryList();
     await loadMaterialList();
     // 自动选中当前天数已添加的素材
     await nextTick();
-    const currentMaterials = formData.value.type === 1 ? getAllMaterials() : getDayMaterials(selectedDay.value);
-    const materialIds = new Set(currentMaterials.map((m) => m.id));
+    const currentMaterials =
+      formData.value.type === 1 ? getAllMaterials() : getDayMaterials(selectedDay.value);
+    const materialIds = new Set(currentMaterials.map(m => m.id));
 
     // 使用表格的 toggleRowSelection 方法设置勾选状态
-    materialList.value.forEach((row) => {
+    materialList.value.forEach(row => {
       if (row.id && materialIds.has(row.id)) {
         materialTableRef.value?.toggleRowSelection(row, true);
       }
@@ -867,6 +1069,7 @@ watch(showMaterialSelector, async (newVal) => {
 
 // 组件挂载时加载日程列表
 onMounted(() => {
+  loadPreTaskOptions();
   loadTodoList();
 });
 
@@ -876,14 +1079,14 @@ const handleMaterialSelectionChange = (selection: Material[]) => {
   const currentIds = new Set(materialList.value.map(m => m.id));
   selectedMaterials.value = [
     ...selectedMaterials.value.filter(m => !currentIds.has(m.id)),
-    ...selection
+    ...selection,
   ];
 
   Array.from(materialCategorySelectedCountCache.value.keys()).forEach(catId => {
     if (materialList.value.some(m => m.cate_id === catId)) {
-      const count = materialList.value
-        .filter(m => m.cate_id === catId && selectedMaterials.value.some(sm => sm.id === m.id))
-        .length;
+      const count = materialList.value.filter(
+        m => m.cate_id === catId && selectedMaterials.value.some(sm => sm.id === m.id)
+      ).length;
       materialCategorySelectedCountCache.value.set(catId, count);
     }
   });
@@ -910,11 +1113,9 @@ const confirmAddMaterials = () => {
   }
 
   let addedCount = 0;
-  selectedMaterials.value.forEach((material) => {
+  selectedMaterials.value.forEach(material => {
     // 检查是否已存在
-    const exists = dailyMaterials.value[targetDay].some(
-      (m) => m.id === material.id
-    );
+    const exists = dailyMaterials.value[targetDay].some(m => m.id === material.id);
 
     if (!exists) {
       dailyMaterials.value[targetDay].push({
@@ -953,7 +1154,7 @@ const handleQuickAddAllocated = (
     }
 
     for (const material of materials) {
-      const exists = dailyMaterials.value[internalDay].some((m) => m.id === material.id);
+      const exists = dailyMaterials.value[internalDay].some(m => m.id === material.id);
       if (!exists) {
         dailyMaterials.value[internalDay].push(material);
       }
@@ -978,15 +1179,19 @@ const handleSubmit = async () => {
     const userIdStr = selectedUsers.value.join(",");
 
     // 计算结束日期
-    const endDateStr = getTaskEndDate(formData.value.start_date, formData.value.duration || 1, formData.value.rest_days);
+    const endDateStr = getTaskEndDate(
+      formData.value.start_date,
+      formData.value.duration || 1,
+      formData.value.rest_days
+    );
 
     // 构建任务数据,确保所有必需字段都有值
     const preTodoData: Record<string, number[]> = {};
     if (preTodoZhaozhao.value.length > 0) {
-      preTodoData['4'] = preTodoZhaozhao.value;
+      preTodoData["4"] = preTodoZhaozhao.value;
     }
     if (preTodoCancan.value.length > 0) {
-      preTodoData['3'] = preTodoCancan.value;
+      preTodoData["3"] = preTodoCancan.value;
     }
 
     const taskData: Omit<Task, "id"> = {
@@ -1006,6 +1211,7 @@ const handleSubmit = async () => {
       priority: formData.value.priority ?? 1,
       // 清空时也要传 "{}"，否则后端不会更新 pre_todo 字段
       pre_todo: JSON.stringify(preTodoData),
+      pre_task: preTaskIds.value,
       block_time: (() => {
         applyBlockTimesToConfig(blockTimeType.value);
         return { ...blockTimeConfig.value, type: blockTimeType.value };
@@ -1015,7 +1221,6 @@ const handleSubmit = async () => {
         dailyScore: dailyScore.value,
       }),
     };
-
 
     if (props.isEdit && props.taskData?.id) {
       await updateTask({
