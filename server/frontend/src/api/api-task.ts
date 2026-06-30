@@ -319,7 +319,7 @@ export async function getTaskList(
  * 获取单个任务详情
  * @param id - 任务ID
  */
-export async function getTask(id: number, fields?: string): Promise<Task> {
+export async function getTask(id: number, fields: string = "*"): Promise<Task> {
   return await getData<Task>("t_task", id, fields);
 }
 

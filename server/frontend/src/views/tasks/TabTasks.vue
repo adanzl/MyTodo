@@ -63,9 +63,10 @@
           <BlockTimeDisplay :block-time="row.block_time" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="140" fixed="right">
+      <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" @click="handleEditTask(row)">编辑</el-button>
+          <el-button size="small" type="primary" @click="handleEditTask(row)">编辑</el-button>
+          <el-button size="small"  @click="handleCopyTask(row)">复制</el-button>
           <el-button size="small" type="danger" @click="handleDeleteTask(row)">删除</el-button>
         </template>
       </el-table-column>
@@ -98,6 +99,7 @@
 
 <script setup lang="ts">
 import {
+  addTask,
   deleteTask,
   getGlobalBlockTime,
   getTaskList,
@@ -234,6 +236,30 @@ const handleEditTask = (row: Task) => {
   isEdit.value = true;
   currentTaskData.value = row;
   dialogVisible.value = true;
+};
+
+// 复制任务
+const handleCopyTask = async (row: Task) => {
+  try {
+    await ElMessageBox.confirm(`确定要复制任务「${row.name}」吗？`, "提示", {
+      confirmButtonText: "确定",
+      cancelButtonText: "取消",
+      type: "info",
+    });
+
+    const { id: _id, lock: _lock, msg: _msg, ...rest } = row;
+    await addTask({
+      ...rest,
+      name: `${row.name}(复制)`,
+      data: typeof row.data === "string" ? row.data : JSON.stringify(row.data ?? {}),
+    });
+    ElMessage.success("复制成功");
+    fetchTaskList();
+  } catch (error: any) {
+    if (error !== "cancel") {
+      ElMessage.error(error.message || "复制失败");
+    }
+  }
 };
 
 // 删除任务
