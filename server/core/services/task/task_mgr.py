@@ -416,7 +416,7 @@ class TaskMgr:
         """为任务列表计算锁定状态，写入 lock 与 msg 字段。
 
         锁定规则（按优先级依次判断）：
-        1. 存在更高优先级（数值更小）的未完成任务
+        1. 存在更高优先级（数值更小）的未完成任务（priority=-1 的任务不参与此项）
         2. 前置日程未完成
         3. 前置任务在当天仍有未完成打卡
         4. 当前处于全局或任务级禁用时段（并集）
@@ -437,7 +437,9 @@ class TaskMgr:
 
             for task in sorted_tasks:
                 priority = task.get('priority')
-                if highest_uncompleted_priority is not None and priority is not None and priority > highest_uncompleted_priority:
+                priority_excluded = priority == -1
+                if (not priority_excluded and highest_uncompleted_priority is not None
+                        and priority is not None and priority > highest_uncompleted_priority):
                     task['lock'] = True
                     task['msg'] = f'请先完成 "{highest_uncompleted_task_name}"'
                 else:
@@ -476,7 +478,8 @@ class TaskMgr:
                         task['lock'] = True
                         task['msg'] = '当前处于禁用时段'
 
-                if not task['lock'] and self._has_uncompleted_materials(task, user_id, target_date):
+                if (not priority_excluded and not task['lock']
+                        and self._has_uncompleted_materials(task, user_id, target_date)):
                     if highest_uncompleted_priority is None or (priority is not None
                                                                 and priority < highest_uncompleted_priority):
                         highest_uncompleted_priority = priority

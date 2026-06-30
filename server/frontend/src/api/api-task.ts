@@ -193,7 +193,7 @@ export interface Task {
   /** 休息日规则(JSON 或 JSON字符串)。0=周日..6=周六；dates/work_dates 为 YYYY-MM-DD；null 表示清空 */
   rest_days?: string | { weekdays?: number[]; dates?: string[]; work_dates?: string[] } | null;
   status?: number; // 1: 进行中, 2: 已结束, 0: 未开始， -1：未开启
-  priority?: number; // 任务优先级 数字越小优先级越高，高优先级任务没有完成低优先级任务会锁定
+  priority?: number; // 任务优先级，数字越小越高；-1 不参与优先级锁定
   type: number; // 0:每日任务；1：持续性任务
   data: string | TaskDetail;
   pre_todo?: string; // 前置日程JSON字符串，格式：{"user_id": [todo_ids]}

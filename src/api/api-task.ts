@@ -16,7 +16,7 @@ export interface Task {
   duration: number;
   user_id: string;
   status?: number; // 1: 进行中, 2: 已结束, 0: 未开始， -1：未开启
-  priority?: number; // 任务优先级 数字越小优先级越高，高优先级任务没有完成低优先级任务会锁定
+  priority?: number; // 任务优先级，数字越小越高；-1 不参与优先级锁定
   type: number; // 0:每日任务；1：持续性任务
   data: string | TaskDetail;
   lock?: boolean; // 任务是否被锁定
