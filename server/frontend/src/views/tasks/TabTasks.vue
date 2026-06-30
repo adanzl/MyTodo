@@ -10,7 +10,7 @@
           @click="blockTimeDialogVisible = true"
         >
           <span class="text-xs text-gray-500 shrink-0">全局禁用</span>
-          <BlockTimeDisplay :block-time="globalBlockTime" />
+          <BlockTimeDisplay :block-time="globalBlockTime" :wrap="false" />
         </div>
       </div>
     </div>
@@ -58,7 +58,7 @@
           <span v-else class="text-gray-400">-</span>
         </template>
       </el-table-column>
-      <el-table-column label="禁用时段" width="180">
+      <el-table-column label="禁用时段" width="220">
         <template #default="{ row }">
           <BlockTimeDisplay :block-time="row.block_time" />
         </template>
