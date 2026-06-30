@@ -15,26 +15,32 @@ from core.services.task.block_time import (
 
 TaskMgr = task_mgr_module.TaskMgr
 
+USER_CANCAN = 3
 
-def _blacklist_raw(start: str, end: str, weekdays=None) -> str:
+
+def _blacklist_raw(start: str, end: str, weekdays=None, user_id: int = USER_CANCAN) -> str:
     slot = {"start": start, "end": end}
     if weekdays is not None:
         slot["weekdays"] = weekdays
     return json.dumps(
         {
-            "type": "blacklist",
-            "blacklist": [{"role": "common", "time": [slot]}],
-            "whitelist": [],
+            str(user_id): {
+                "type": "blacklist",
+                "blacklist": [slot],
+                "whitelist": [],
+            }
         }
     )
 
 
-def _whitelist_raw(start: str, end: str) -> str:
+def _whitelist_raw(start: str, end: str, user_id: int = USER_CANCAN) -> str:
     return json.dumps(
         {
-            "type": "whitelist",
-            "blacklist": [],
-            "whitelist": [{"role": "common", "time": [{"start": start, "end": end}]}],
+            str(user_id): {
+                "type": "whitelist",
+                "blacklist": [],
+                "whitelist": [{"start": start, "end": end}],
+            }
         }
     )
 
@@ -50,43 +56,47 @@ def test_global_block_time_redis_key():
 
 def test_blacklist_in_slot():
     raw = _blacklist_raw("09:00:00", "12:00:00")
-    assert is_in_block_time_now(raw, TODAY, now=NOW_IN_SLOT) is True
-    assert is_in_block_time_now(raw, TODAY, now=NOW_OUT_SLOT) is False
+    assert is_in_block_time_now(raw, TODAY, USER_CANCAN, now=NOW_IN_SLOT) is True
+    assert is_in_block_time_now(raw, TODAY, USER_CANCAN, now=NOW_OUT_SLOT) is False
+
+
+def test_blacklist_no_config_for_user():
+    raw = _blacklist_raw("09:00:00", "12:00:00", user_id=USER_CANCAN)
+    assert is_in_block_time_now(raw, TODAY, 4, now=NOW_IN_SLOT) is False
 
 
 def test_blacklist_not_today():
     raw = _blacklist_raw("09:00:00", "12:00:00")
-    assert is_in_block_time_now(raw, "2026-06-16", now=NOW_IN_SLOT) is False
+    assert is_in_block_time_now(raw, "2026-06-16", USER_CANCAN, now=NOW_IN_SLOT) is False
 
 
 def test_whitelist_outside_allowed():
     raw = _whitelist_raw("09:00:00", "12:00:00")
-    assert is_in_block_time_now(raw, TODAY, now=NOW_OUT_SLOT) is True
-    assert is_in_block_time_now(raw, TODAY, now=NOW_IN_SLOT) is False
+    assert is_in_block_time_now(raw, TODAY, USER_CANCAN, now=NOW_OUT_SLOT) is True
+    assert is_in_block_time_now(raw, TODAY, USER_CANCAN, now=NOW_IN_SLOT) is False
 
 
 def test_whitelist_empty_slots_not_locked():
-    raw = json.dumps({"type": "whitelist", "blacklist": [], "whitelist": [{"role": "common", "time": []}]})
-    assert is_in_block_time_now(raw, TODAY, now=NOW_IN_SLOT) is False
+    raw = json.dumps({"3": {"type": "whitelist", "blacklist": [], "whitelist": []}})
+    assert is_in_block_time_now(raw, TODAY, USER_CANCAN, now=NOW_IN_SLOT) is False
 
 
 def test_cross_midnight_blacklist():
     raw = _blacklist_raw("22:00:00", "07:00:00")
-    assert is_in_block_time_now(raw, TODAY, now=datetime(2026, 6, 17, 23, 0, 0)) is True
-    assert is_in_block_time_now(raw, TODAY, now=datetime(2026, 6, 17, 6, 30, 0)) is True
-    assert is_in_block_time_now(raw, TODAY, now=datetime(2026, 6, 17, 12, 0, 0)) is False
+    assert is_in_block_time_now(raw, TODAY, USER_CANCAN, now=datetime(2026, 6, 17, 23, 0, 0)) is True
+    assert is_in_block_time_now(raw, TODAY, USER_CANCAN, now=datetime(2026, 6, 17, 6, 30, 0)) is True
+    assert is_in_block_time_now(raw, TODAY, USER_CANCAN, now=datetime(2026, 6, 17, 12, 0, 0)) is False
 
 
 def test_weekday_filter():
-    # 2026-06-17 is Wednesday -> wd=3
     raw = _blacklist_raw("09:00:00", "12:00:00", weekdays=[0])
-    assert is_in_block_time_now(raw, TODAY, now=NOW_IN_SLOT) is False
+    assert is_in_block_time_now(raw, TODAY, USER_CANCAN, now=NOW_IN_SLOT) is False
 
 
 def test_get_global_block_time_config_cached(monkeypatch):
     invalidate_global_block_time_cache()
     calls = {"n": 0}
-    raw = '{"type":"blacklist","blacklist":[],"whitelist":[]}'
+    raw = '{"3":{"type":"blacklist","blacklist":[],"whitelist":[]}}'
 
     def fake_get_str(key):
         calls["n"] += 1
@@ -107,7 +117,7 @@ def test_check_task_lock_global_union(monkeypatch):
         lambda *args, **_: True,
     )
     tasks = [{"priority": 1, "name": "t1", "block_time": "{}"}]
-    result = TaskMgr().check_task_lock(tasks, user_id=1, date_str=TODAY)
+    result = TaskMgr().check_task_lock(tasks, user_id=USER_CANCAN, date_str=TODAY)
     assert result[0]["lock"] is True
     assert result[0]["msg"] == "当前处于全局禁用时段"
 
@@ -119,8 +129,9 @@ def test_check_task_lock_task_level_when_global_clear(monkeypatch):
         "is_global_block_time_now",
         lambda *args, **_: False,
     )
+    today = datetime.now().strftime("%Y-%m-%d")
     tasks = [{"priority": 1, "name": "t1", "block_time": _blacklist_raw("00:00:00", "23:59:59")}]
-    result = TaskMgr().check_task_lock(tasks, user_id=1, date_str=TODAY)
+    result = TaskMgr().check_task_lock(tasks, user_id=USER_CANCAN, date_str=today)
     assert result[0]["lock"] is True
     assert result[0]["msg"] == "当前处于禁用时段"
 

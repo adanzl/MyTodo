@@ -1,11 +1,13 @@
 """任务禁用时段（block_time）解析与判断。
 
-支持任务级与全局级配置，数据结构一致：
-- blacklist：当前时间在时段内则禁用
-- whitelist：当前时间不在允许时段内则禁用
+数据结构（按 user_id 分人，无 common）：
+{
+  "3": { "type": "blacklist"|"whitelist", "blacklist": [slots], "whitelist": [slots] },
+  "4": { ... }
+}
+某 user_id 无配置 = 该层不限制。
 
-全局配置存 Redis，key 与 setRdsData/getRdsData 约定一致：
-  table=task:block_time, id=global -> task:block_time:global
+全局配置存 Redis：task:block_time:global
 """
 from __future__ import annotations
 
@@ -22,7 +24,6 @@ log = app_logger
 GLOBAL_BLOCK_TIME_RDS_TABLE = "task:block_time"
 GLOBAL_BLOCK_TIME_RDS_ID = "global"
 _GLOBAL_CACHE_TTL_SEC = 30
-_COMMON_ROLES = (None, "", "common")
 
 _UNCACHED = object()
 _global_cache_config: Any = _UNCACHED
@@ -55,80 +56,89 @@ def get_global_block_time_config(*, force_refresh: bool = False) -> Optional[Dic
     return _global_cache_config
 
 
-def parse_block_time_config(block_time_raw: str) -> Optional[Dict[str, Any]]:
-    """解析 block_time JSON 字符串；无效或空配置返回 None。"""
+def parse_block_time_config(block_time_raw: Any) -> Optional[Dict[str, Any]]:
+    """解析 block_time JSON；无效或空配置返回 None。"""
     if not block_time_raw or block_time_raw == "{}":
         return None
+    if isinstance(block_time_raw, dict):
+        return block_time_raw or None
+    if not isinstance(block_time_raw, str):
+        return None
     try:
-        return json.loads(block_time_raw)
+        data = json.loads(block_time_raw)
     except json.JSONDecodeError:
         return None
+    if not isinstance(data, dict) or not data:
+        return None
+    return data
 
 
-def _is_blocked_by_config(data: Optional[Dict[str, Any]], now: datetime) -> bool:
-    if not data:
+def _get_user_entry(config: Optional[Dict[str, Any]], user_id: int) -> Optional[Dict[str, Any]]:
+    if not config or user_id <= 0:
+        return None
+    entry = config.get(str(user_id))
+    return entry if isinstance(entry, dict) else None
+
+
+def _slot_matches(slot: Dict[str, Any], wd: int, t) -> bool:
+    weekdays = slot.get("weekdays") or []
+    if weekdays and wd not in weekdays:
         return False
-    block_type = data.get("type") or "blacklist"
-    rules = data.get("whitelist" if block_type == "whitelist" else "blacklist") or []
-    common = next((r for r in rules if r.get("role") in _COMMON_ROLES), None)
-    if not common:
+    start_s, end_s = slot.get("start"), slot.get("end")
+    if not start_s or not end_s:
         return False
-    slots = common.get("time") or []
+    start = end = None
+    for fmt in ("%H:%M:%S", "%H:%M"):
+        try:
+            start = datetime.strptime(start_s, fmt).time()
+            end = datetime.strptime(end_s, fmt).time()
+            break
+        except ValueError:
+            continue
+    if start is None or end is None:
+        return False
+    return (start <= t < end) if start <= end else (t >= start or t < end)
+
+
+def _is_blocked_by_entry(entry: Dict[str, Any], now: datetime) -> bool:
+    block_type = entry.get("type") or "blacklist"
+    slots = entry.get("whitelist" if block_type == "whitelist" else "blacklist") or []
     if block_type == "whitelist" and not slots:
         return False
 
-    # python weekday(): Mon=0..Sun=6 -> rule weekday: Sun=0..Sat=6
     wd, t = (now.weekday() + 1) % 7, now.time()
-    in_slot = False
-    for slot in slots:
-        weekdays = slot.get("weekdays") or []
-        if weekdays and wd not in weekdays:
-            continue
-        start_s, end_s = slot.get("start"), slot.get("end")
-        if not start_s or not end_s:
-            continue
-        start = end = None
-        for fmt in ("%H:%M:%S", "%H:%M"):
-            try:
-                start = datetime.strptime(start_s, fmt).time()
-                end = datetime.strptime(end_s, fmt).time()
-                break
-            except ValueError:
-                continue
-        if start is None or end is None:
-            continue
-        # 判断时刻是否落在 [start, end) 内，支持跨午夜（如 22:00-07:00）
-        if (start <= t < end) if start <= end else (t >= start or t < end):
-            in_slot = True
-            break
+    in_slot = any(_slot_matches(slot, wd, t) for slot in slots if isinstance(slot, dict))
     return not in_slot if block_type == "whitelist" else in_slot
 
 
-def is_global_block_time_now(date_str: str, *, now: Optional[datetime] = None) -> bool:
-    """当前时刻是否处于全局禁用时段。"""
-    now = now or datetime.now()
-    if date_str != now.strftime("%Y-%m-%d"):
-        return False
-    return _is_blocked_by_config(get_global_block_time_config(), now)
-
-
-def is_in_block_time_now(
-    block_time_raw: str,
+def is_global_block_time_now(
     date_str: str,
+    user_id: int,
     *,
     now: Optional[datetime] = None,
 ) -> bool:
-    """判断指定日期当前时刻是否应因 block_time 配置而锁定。
-
-    Args:
-        block_time_raw: block_time JSON 字符串
-        date_str: 查询日期（YYYY-MM-DD），仅当为今天时才生效
-        now: 可选，用于测试注入当前时刻
-
-    Returns:
-        是否应锁定
-    """
+    """当前时刻是否处于该用户的全局禁用时段。"""
     now = now or datetime.now()
     if date_str != now.strftime("%Y-%m-%d"):
         return False
-    return _is_blocked_by_config(parse_block_time_config(block_time_raw), now)
+    entry = _get_user_entry(get_global_block_time_config(), user_id)
+    if not entry:
+        return False
+    return _is_blocked_by_entry(entry, now)
+
+
+def is_in_block_time_now(
+    block_time_raw: Any,
+    date_str: str,
+    user_id: int,
+    *,
+    now: Optional[datetime] = None,
+) -> bool:
+    """判断指定日期当前时刻是否应因任务级 block_time 而锁定。"""
+    now = now or datetime.now()
+    if date_str != now.strftime("%Y-%m-%d"):
+        return False
+    entry = _get_user_entry(parse_block_time_config(block_time_raw), user_id)
+    if not entry:
+        return False
+    return _is_blocked_by_entry(entry, now)

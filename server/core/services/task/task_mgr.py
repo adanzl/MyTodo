@@ -433,7 +433,7 @@ class TaskMgr:
             sorted_tasks = sorted(tasks, key=lambda x: x.get('priority', 999))
             highest_uncompleted_priority = None
             highest_uncompleted_task_name = None
-            global_locked = is_global_block_time_now(date_str)
+            global_locked = is_global_block_time_now(date_str, user_id)
 
             for task in sorted_tasks:
                 priority = task.get('priority')
@@ -474,7 +474,7 @@ class TaskMgr:
                     if global_locked:
                         task['lock'] = True
                         task['msg'] = '当前处于全局禁用时段'
-                    elif is_in_block_time_now(task.get('block_time') or '{}', date_str):
+                    elif is_in_block_time_now(task.get('block_time') or '{}', date_str, user_id):
                         task['lock'] = True
                         task['msg'] = '当前处于禁用时段'
 
