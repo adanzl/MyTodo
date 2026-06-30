@@ -47,7 +47,7 @@ source ~/.bashrc
 
 ### 安装
 
-``` text
+```text
 sudo apt install -y python3-certbot-nginx
 -- acme.sh 续期（兼容网页申请的证书，更灵活
 curl https://get.acme.sh | sh -s email=adanzl@163.com
@@ -256,8 +256,6 @@ docker run -d -p 8002:3306 --name mysql --restart=always \
 docker run -d -it -p 8003:3000 --name DBGate --restart=always \
     -v /mnt/data/project/MyTodo/server/data.db:/home/my_todo.db \
     -v /mnt/data/project/video_factory/data/data.db:/home/video_factory.db \
-    -v /mnt/data/project/video_factory/data/data.db-wal:/home/video_factory.db-wal \
-    -v /mnt/data/project/video_factory/data/data.db-shm:/home/video_factory.db-shm \
     -e LOGIN=leo \
     -e PASSWORD=\!Zhao575936 \
     -e CONNECTIONS=con1,con2,con3 \
@@ -345,15 +343,15 @@ sudo mkcert -cert-file /etc/ssl/self-signed/selfsigned.crt \
 
 ## 服务器端口
 
-| Server        | Port     | Server         |  Port |
-| ------------- | -------- | -------------- | ----: |
-| my-todo       | 8000     | funASR-online  |  9095 |
-| code-server   | 8001     | funASR-offline |  9096 |
-| mysql         | 8002     | ollama         |  9097 |
-| DBGate        | 8003     | dify           |  9098 |
-| nginx         | 8848/443 | cosy-voice     | x9099 |
-| redis         | 6379     | openclaw       |  9100 |
-| cockpit       | 9090     | openclaw       |  9101 |
-| portainer     | 9000     | openclaw       |  9102 |
-| redis_insight | 9001     | chrome         |  9103 |
-| video_factory | 9002     |                |       |
+| Server        | Port     | Server          |  Port |
+| ------------- | -------- | --------------- | ----: |
+| my-todo       | 8000     | funASR-online   |  9095 |
+| code-server   | 8001     | funASR-offline  |  9096 |
+| mysql         | 8002     | ollama          |  9097 |
+| DBGate        | 8003     | dify            |  9098 |
+| nginx         | 8848/443 | cosy-voice      | x9099 |
+| redis         | 6379     | FogSight        |  9100 |
+| cockpit       | 9090     | StableDiffusion |  9101 |
+| portainer     | 9000     | openclaw        |  9102 |
+| redis_insight | 9001     | chrome          |  9103 |
+| video_factory | 9002     |                 |       |
