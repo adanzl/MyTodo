@@ -13,7 +13,7 @@
         :key="task.taskId"
         class="bg-white rounded-lg p-4 shadow"
       >
-        <div class="flex justify-between items-endy">
+        <div class="flex justify-between items-end">
           <p class="font-semibold text-gray-800 text-xl">{{ task.taskName }}</p>
           <span class="text-sm text-gray-600">
             {{ task.completedMaterials }}/{{ task.totalMaterials }}
