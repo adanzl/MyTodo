@@ -21,7 +21,7 @@
               <el-form-item label="优先级">
                 <el-input-number
                   v-model="formData.priority"
-                  :min="0"
+                  :min="-1"
                   :max="10"
                   :step="1"
                   class="w-30!"
@@ -29,7 +29,7 @@
                   placeholder="数字越小优先级越高"
                 />
                 <el-tooltip
-                  content="数字越小优先级越高，高优先级任务没有完成低优先级任务会锁定"
+                  content="数字越小优先级越高，未完成的高优先级任务会锁定低优先级任务；设为 -1 则不参与优先级锁定"
                   placement="bottom"
                 >
                   <el-icon class="ml-2">

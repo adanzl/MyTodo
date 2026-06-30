@@ -146,3 +146,28 @@ def test_check_task_lock_pre_task_same_day_only(monkeypatch):
     locked = next(t for t in result if t["id"] == 2)
     assert locked["lock"] is True
     assert calls == [("前置A", TODAY)]
+
+
+def test_check_task_lock_priority_minus_one_excluded(monkeypatch):
+    """priority=-1 的任务不参与优先级锁定：不锁别人，也不被别人锁。"""
+    invalidate_global_block_time_cache()
+    monkeypatch.setattr(task_mgr_module, "is_global_block_time_now", lambda *args, **_: False)
+
+    def mock_has_uncompleted(self, task, user_id, target_date):
+        return task.get("name") in ("高优先级未完成", "无优先级任务")
+
+    monkeypatch.setattr(TaskMgr, "_has_uncompleted_materials", mock_has_uncompleted)
+
+    tasks = [
+        {"id": 1, "priority": 0, "name": "高优先级未完成", "block_time": "{}"},
+        {"id": 2, "priority": 1, "name": "低优先级任务", "block_time": "{}"},
+        {"id": 3, "priority": -1, "name": "无优先级任务", "block_time": "{}"},
+    ]
+    result = TaskMgr().check_task_lock(tasks, user_id=1, date_str=TODAY)
+    by_id = {t["id"]: t for t in result}
+
+    assert by_id[1]["lock"] is False
+    assert by_id[2]["lock"] is True
+    assert by_id[2]["msg"] == '请先完成 "高优先级未完成"'
+    assert by_id[3]["lock"] is False
+    assert by_id[3]["msg"] == ""
