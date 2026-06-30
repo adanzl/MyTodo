@@ -176,21 +176,7 @@
             </el-col>
             <el-col :span="8">
               <el-form-item label="禁用时段">
-                <div class="flex flex-col gap-2 w-full">
-                  <el-radio-group :model-value="blockTimeType" @change="handleBlockTimeTypeChange">
-                    <el-radio value="blacklist">黑名单</el-radio>
-                    <el-radio value="whitelist">白名单</el-radio>
-                  </el-radio-group>
-                  <div class="flex flex-wrap gap-2 w-full items-center">
-                    <TimeRange
-                      v-for="(_, index) in blockTimes"
-                      :key="index"
-                      v-model="blockTimes[index]"
-                      @remove="blockTimes.splice(index, 1)"
-                    />
-                    <el-button type="primary" link @click="addBlockTime" :icon="Plus"></el-button>
-                  </div>
-                </div>
+                <BlockTimeEditor v-model="blockTimeConfig" :user-ids="selectedUsers" />
               </el-form-item>
             </el-col>
             <el-col :span="8">
@@ -495,14 +481,13 @@ import {
   getTaskList,
   getMaterialList,
   getMaterialCategoryList,
-  getCommonBlockTimeSlots,
   parseBlockTimeConfig,
   parsePreTask,
+  pruneBlockTimeConfig,
   type Task,
   type Material,
   type MaterialCategory,
-  type TaskBlockTimeConfig,
-  type TaskBlockTimeSlot,
+  type BlockTimeConfig,
 } from "@/api/api-task";
 import { getTodoListByTime } from "@/api/api-todo";
 import { sortByName, buildCategoryTree } from "@/utils/file";
@@ -514,7 +499,7 @@ import {
 } from "@/utils/date";
 import dayjs from "dayjs";
 import QuickAdd from "./QuickAdd.vue";
-import TimeRange from "../components/TimeRange.vue";
+import BlockTimeEditor from "../components/BlockTimeEditor.vue";
 import RestDaysDialog from "./RestDaysDialog.vue";
 
 interface Props {
@@ -601,40 +586,10 @@ const handleTreeSelect = (data: any) => {
 const dailyMaterials = ref<Record<number, Array<{ id: number; name: string; type: number }>>>({});
 // 每日分数数据：{ dayNumber: score }
 const dailyScore = ref<Record<number, number>>({});
-const blockTimes = ref<TaskBlockTimeSlot[]>([]);
-const blockTimeType = ref<"blacklist" | "whitelist">("blacklist");
-const blockTimeConfig = ref<TaskBlockTimeConfig>({
-  type: "blacklist",
-  blacklist: [],
-  whitelist: [],
-});
-
-const addBlockTime = () => {
-  blockTimes.value.push({ start: "00:00:00", end: "08:00:00" });
-};
-
-const applyBlockTimesToConfig = (type: "blacklist" | "whitelist") => {
-  const time = blockTimes.value.filter(s => s.start && s.end && s.start < s.end);
-  const rule = time.length ? [{ role: "common", time }] : [];
-  if (type === "whitelist") {
-    blockTimeConfig.value.whitelist = rule;
-  } else {
-    blockTimeConfig.value.blacklist = rule;
-  }
-};
-
-const handleBlockTimeTypeChange = (newType: "blacklist" | "whitelist") => {
-  if (blockTimeType.value === newType) return;
-  applyBlockTimesToConfig(blockTimeType.value);
-  blockTimeType.value = newType;
-  blockTimeConfig.value.type = newType;
-  blockTimes.value = getCommonBlockTimeSlots(blockTimeConfig.value);
-};
+const blockTimeConfig = ref<BlockTimeConfig>({});
 
 const resetBlockTime = () => {
-  blockTimeType.value = "blacklist";
-  blockTimeConfig.value = { type: "blacklist", blacklist: [], whitelist: [] };
-  blockTimes.value = [];
+  blockTimeConfig.value = {};
 };
 
 const createDefaultFormData = (): Partial<Task> => ({
@@ -736,8 +691,6 @@ const applyTaskData = (newData?: Partial<Task>) => {
     preTaskIds.value = parsePreTask(newData.pre_task);
 
     blockTimeConfig.value = parseBlockTimeConfig(newData.block_time);
-    blockTimeType.value = blockTimeConfig.value.type;
-    blockTimes.value = getCommonBlockTimeSlots(blockTimeConfig.value);
 
     // 初始化每日素材数据和每日分数
     if (newData.data) {
@@ -1212,10 +1165,7 @@ const handleSubmit = async () => {
       // 清空时也要传 "{}"，否则后端不会更新 pre_todo 字段
       pre_todo: JSON.stringify(preTodoData),
       pre_task: preTaskIds.value,
-      block_time: (() => {
-        applyBlockTimesToConfig(blockTimeType.value);
-        return { ...blockTimeConfig.value, type: blockTimeType.value };
-      })(),
+      block_time: pruneBlockTimeConfig(blockTimeConfig.value),
       data: JSON.stringify({
         dailyMaterials: dailyMaterials.value,
         dailyScore: dailyScore.value,

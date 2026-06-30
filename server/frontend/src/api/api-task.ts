@@ -199,27 +199,9 @@ export interface Task {
   pre_todo?: string; // 前置日程JSON字符串，格式：{"user_id": [todo_ids]}
   /** 前置任务 id 数组；锁定仅检查当天打卡是否完成 */
   pre_task?: number[] | string;
-  block_time?: TaskBlockTimeConfig;
+  block_time?: BlockTimeConfig;
   lock?: boolean; // 任务是否锁定
   msg?: string; // 锁定提示信息
-}
-
-export interface TaskBlockTimeSlot {
-  start: string;
-  end: string;
-  /** 0=周日..6=周六；缺省或空数组表示每天都生效 */
-  weekdays?: number[];
-}
-
-export interface TaskBlockTimeRule {
-  role: string;
-  time: TaskBlockTimeSlot[];
-}
-
-export interface TaskBlockTimeConfig {
-  type: "blacklist" | "whitelist";
-  blacklist: TaskBlockTimeRule[];
-  whitelist: TaskBlockTimeRule[];
 }
 
 export function parsePreTask(raw?: Task["pre_task"]): number[] {
@@ -233,52 +215,143 @@ export function parsePreTask(raw?: Task["pre_task"]): number[] {
   }
 }
 
-export function parseBlockTimeConfig(rules?: TaskBlockTimeConfig | string): TaskBlockTimeConfig {
+export interface TaskBlockTimeSlot {
+  start: string;
+  end: string;
+  /** 0=周日..6=周六；缺省或空数组表示每天都生效 */
+  weekdays?: number[];
+}
+
+/** 单个用户的禁用时段配置 */
+export interface BlockTimeEntry {
+  type: "blacklist" | "whitelist";
+  blacklist: TaskBlockTimeSlot[];
+  whitelist: TaskBlockTimeSlot[];
+}
+
+/** 顶层按 user_id 分人："3"=灿灿，"4"=昭昭；无 key = 不限制 */
+export type BlockTimeConfig = Record<string, BlockTimeEntry>;
+
+/** @deprecated 兼容类型别名，请使用 BlockTimeConfig */
+export type TaskBlockTimeConfig = BlockTimeConfig;
+
+export const BLOCK_TIME_USER_CANCAN = 3;
+export const BLOCK_TIME_USER_ZHAOZHAO = 4;
+
+const EMPTY_BLOCK_TIME_CONFIG: BlockTimeConfig = {};
+
+export function parseBlockTimeConfig(rules?: BlockTimeConfig | string): BlockTimeConfig {
   if (!rules) {
-    return { type: "blacklist", blacklist: [], whitelist: [] };
+    return { ...EMPTY_BLOCK_TIME_CONFIG };
   }
-  const config = (typeof rules === "string" ? JSON.parse(rules) : rules) as TaskBlockTimeConfig;
+  const config = (typeof rules === "string" ? JSON.parse(rules) : rules) as BlockTimeConfig;
+  if (!config || typeof config !== "object" || Array.isArray(config)) {
+    return { ...EMPTY_BLOCK_TIME_CONFIG };
+  }
+  return config;
+}
+
+export function getBlockTimeEntry(
+  config?: BlockTimeConfig | string,
+  userId?: number,
+): BlockTimeEntry | undefined {
+  if (!userId) return undefined;
+  const parsed = parseBlockTimeConfig(config);
+  const entry = parsed[String(userId)];
+  if (!entry || typeof entry !== "object") return undefined;
   return {
-    type: config.type === "whitelist" ? "whitelist" : "blacklist",
-    blacklist: config.blacklist ?? [],
-    whitelist: config.whitelist ?? [],
+    type: entry.type === "whitelist" ? "whitelist" : "blacklist",
+    blacklist: entry.blacklist ?? [],
+    whitelist: entry.whitelist ?? [],
   };
 }
 
-/** 取当前生效的 common 禁用时段（列表展示、编辑表单用） */
-export function getCommonBlockTimeSlots(rules?: TaskBlockTimeConfig | string): TaskBlockTimeSlot[] {
-  const config = parseBlockTimeConfig(rules);
-  const list = config.type === "whitelist" ? config.whitelist : config.blacklist;
-  const rule = list.find((r) => r.role === "common" || !r.role);
-  return rule?.time?.filter((s) => s.start && s.end) ?? [];
+export function getBlockTimeSlots(entry?: BlockTimeEntry): TaskBlockTimeSlot[] {
+  if (!entry) return [];
+  const list = entry.type === "whitelist" ? entry.whitelist : entry.blacklist;
+  return list.filter((s) => s.start && s.end);
+}
+
+export function buildBlockTimeEntry(
+  type: "blacklist" | "whitelist",
+  slots: TaskBlockTimeSlot[],
+): BlockTimeEntry | undefined {
+  const time = slots.filter((s) => s.start && s.end && s.start < s.end);
+  if (!time.length) {
+    return undefined;
+  }
+  return {
+    type,
+    blacklist: type === "blacklist" ? time : [],
+    whitelist: type === "whitelist" ? time : [],
+  };
+}
+
+export function setBlockTimeEntry(
+  config: BlockTimeConfig,
+  userId: number,
+  type: "blacklist" | "whitelist",
+  slots: TaskBlockTimeSlot[],
+): BlockTimeConfig {
+  const next = { ...config };
+  const entry = buildBlockTimeEntry(type, slots);
+  const key = String(userId);
+  if (entry) {
+    next[key] = entry;
+  } else {
+    delete next[key];
+  }
+  return next;
+}
+
+export function pruneBlockTimeConfig(config: BlockTimeConfig): BlockTimeConfig {
+  const next: BlockTimeConfig = {};
+  for (const [key, entry] of Object.entries(config)) {
+    if (!entry) continue;
+    const slots = getBlockTimeSlots(entry);
+    if (slots.length) {
+      next[key] = {
+        type: entry.type === "whitelist" ? "whitelist" : "blacklist",
+        blacklist: entry.type === "blacklist" ? slots : [],
+        whitelist: entry.type === "whitelist" ? slots : [],
+      };
+    }
+  }
+  return next;
+}
+
+export function formatBlockTimeSummary(config?: BlockTimeConfig | string): string {
+  const parsed = parseBlockTimeConfig(config);
+  const parts: string[] = [];
+  const labels: Record<string, string> = { "3": "灿", "4": "昭" };
+  for (const uid of [BLOCK_TIME_USER_CANCAN, BLOCK_TIME_USER_ZHAOZHAO]) {
+    const entry = getBlockTimeEntry(parsed, uid);
+    const slots = getBlockTimeSlots(entry);
+    if (!slots.length) continue;
+    const mode = entry!.type === "whitelist" ? "白" : "黑";
+    parts.push(`${labels[String(uid)]}:${mode}${slots.length}`);
+  }
+  return parts.length ? parts.join(" ") : "";
 }
 
 export const GLOBAL_BLOCK_TIME_RDS_TABLE = "task:block_time";
 export const GLOBAL_BLOCK_TIME_RDS_ID = "global";
 
-export function buildBlockTimeConfig(
-  type: "blacklist" | "whitelist",
-  slots: TaskBlockTimeSlot[],
-): TaskBlockTimeConfig {
-  const time = slots.filter((s) => s.start && s.end && s.start < s.end);
-  const rule = time.length ? [{ role: "common", time }] : [];
-  return {
-    type,
-    blacklist: type === "blacklist" ? rule : [],
-    whitelist: type === "whitelist" ? rule : [],
-  };
-}
-
-export async function getGlobalBlockTime(): Promise<TaskBlockTimeConfig> {
+export async function getGlobalBlockTime(): Promise<BlockTimeConfig> {
   const raw = await getRdsData<string>(GLOBAL_BLOCK_TIME_RDS_TABLE, GLOBAL_BLOCK_TIME_RDS_ID);
   if (!raw) {
-    return { type: "blacklist", blacklist: [], whitelist: [] };
+    return { ...EMPTY_BLOCK_TIME_CONFIG };
   }
   return parseBlockTimeConfig(raw);
 }
 
-export async function setGlobalBlockTime(config: TaskBlockTimeConfig): Promise<void> {
-  await setRdsData(GLOBAL_BLOCK_TIME_RDS_TABLE, GLOBAL_BLOCK_TIME_RDS_ID, JSON.stringify(config));
+export async function setGlobalBlockTime(config: BlockTimeConfig): Promise<void> {
+  const payload = pruneBlockTimeConfig(config);
+  await setRdsData(
+    GLOBAL_BLOCK_TIME_RDS_TABLE,
+    GLOBAL_BLOCK_TIME_RDS_ID,
+    JSON.stringify(payload),
+  );
 }
 
 /**

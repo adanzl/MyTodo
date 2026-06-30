@@ -12,3 +12,11 @@
 - 入口: `server/main.py`
 - 启动方式: `python main.py`
 - 默认端口: 8000
+
+
+## SSH
+
+主机名：局域网 mini 或者 (57c42474b0ea.ofalias.net 端口 58186)
+用户名 leo
+密码 见.env 里的 SSH_PASSWORD
+工作目录 /mnt/data/project/MyTodo/server

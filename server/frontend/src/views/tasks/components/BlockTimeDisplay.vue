@@ -1,13 +1,20 @@
 <template>
-  <template v-if="slots.length">
-    <div class="flex flex-wrap items-center gap-1 py-1 min-w-0">
-      <el-tag size="small" :type="typeTag" class="shrink-0">{{ typeShortLabel }}</el-tag>
-      <TimeRange
-        v-for="(slot, index) in slots"
-        :key="index"
-        :model-value="slot"
-        readonly
-      />
+  <template v-if="segments.length">
+    <div class="flex flex-col gap-1 py-1 min-w-0">
+      <div
+        v-for="seg in segments"
+        :key="seg.userId"
+        class="flex flex-wrap items-center gap-1 min-w-0"
+      >
+        <el-tag size="small" type="info" class="shrink-0">{{ seg.label }}</el-tag>
+        <el-tag size="small" :type="seg.typeTag" class="shrink-0">{{ seg.typeShort }}</el-tag>
+        <TimeRange
+          v-for="(slot, index) in seg.slots"
+          :key="index"
+          :model-value="slot"
+          readonly
+        />
+      </div>
     </div>
   </template>
   <span v-else class="text-gray-400">-</span>
@@ -16,21 +23,44 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import {
-  getCommonBlockTimeSlots,
+  BLOCK_TIME_USER_CANCAN,
+  BLOCK_TIME_USER_ZHAOZHAO,
+  getBlockTimeEntry,
+  getBlockTimeSlots,
   parseBlockTimeConfig,
-  type TaskBlockTimeConfig,
+  type BlockTimeConfig,
 } from "@/api/api-task";
 import TimeRange from "./TimeRange.vue";
 
 const props = defineProps<{
-  blockTime?: TaskBlockTimeConfig | string;
+  blockTime?: BlockTimeConfig | string;
 }>();
 
-const slots = computed(() => getCommonBlockTimeSlots(props.blockTime));
-const typeShortLabel = computed(() =>
-  (parseBlockTimeConfig(props.blockTime).type === "whitelist" ? "白名单" : "黑名单").charAt(0),
-);
-const typeTag = computed(() =>
-  parseBlockTimeConfig(props.blockTime).type === "whitelist" ? "success" : "warning",
-);
+const USER_META = [
+  { id: BLOCK_TIME_USER_CANCAN, label: "灿灿" },
+  { id: BLOCK_TIME_USER_ZHAOZHAO, label: "昭昭" },
+] as const;
+
+const segments = computed(() => {
+  const config = parseBlockTimeConfig(props.blockTime);
+  return USER_META.map(({ id, label }) => {
+    const entry = getBlockTimeEntry(config, id);
+    const slots = getBlockTimeSlots(entry);
+    if (!slots.length) return null;
+    const isWhitelist = entry!.type === "whitelist";
+    return {
+      userId: id,
+      label,
+      slots,
+      typeShort: isWhitelist ? "白" : "黑",
+      typeTag: isWhitelist ? ("success" as const) : ("warning" as const),
+    };
+  }).filter(Boolean) as Array<{
+    userId: number;
+    label: string;
+    slots: ReturnType<typeof getBlockTimeSlots>;
+    typeShort: string;
+    typeTag: "success" | "warning";
+  }>;
+});
 </script>

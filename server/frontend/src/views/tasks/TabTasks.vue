@@ -105,7 +105,7 @@ import {
   getTaskList,
   parsePreTask,
   type Task,
-  type TaskBlockTimeConfig,
+  type BlockTimeConfig,
 } from "@/api/api-task";
 import { Refresh } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -138,7 +138,7 @@ const pageSize = ref(20);
 // 对话框
 const dialogVisible = ref(false);
 const blockTimeDialogVisible = ref(false);
-const globalBlockTime = ref<TaskBlockTimeConfig>();
+const globalBlockTime = ref<BlockTimeConfig>();
 const isEdit = ref(false);
 const currentTaskData = ref<Partial<Task>>({});
 
