@@ -146,7 +146,7 @@
           </el-row>
 
           <el-row :gutter="20">
-            <el-col :span="8">
+            <el-col :span="12">
               <!-- 前置任务 -->
               <el-form-item label="前置任务">
                 <div class="flex gap-2 items-center w-full">
@@ -174,12 +174,7 @@
                 </div>
               </el-form-item>
             </el-col>
-            <el-col :span="8">
-              <el-form-item label="禁用时段">
-                <BlockTimeEditor v-model="blockTimeConfig" :user-ids="selectedUsers" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
+            <el-col :span="12">
               <el-form-item label="休息日">
                 <div class="flex items-start gap-1 min-w-0 text-xs leading-normal">
                   <div
@@ -198,6 +193,14 @@
                     <Close />
                   </el-icon>
                 </div>
+              </el-form-item>
+            </el-col>
+          </el-row>
+
+          <el-row :gutter="20">
+            <el-col :span="24">
+              <el-form-item label="禁用时段">
+                <BlockTimeEditor v-model="blockTimeConfig" :user-ids="selectedUsers" />
               </el-form-item>
             </el-col>
           </el-row>
