@@ -17,6 +17,25 @@ from aiohttp import ClientSession
 from miservice import MiAccount, MiNAService
 from miservice.miiocommand import miio_command, MiIOService
 
+# Monkey-patch: 修复 aiohttp follow 302 后 cookie 丢失导致登录失败的问题
+async def _patched_securityTokenService(self, location, nonce, ssecurity):
+    import base64, hashlib
+    from urllib import parse
+    from yarl import URL
+    nsec = "nonce=" + str(nonce) + "&" + ssecurity
+    clientSign = base64.b64encode(hashlib.sha1(nsec.encode()).digest()).decode()
+    url = location + "&clientSign=" + parse.quote(clientSign)
+    async with self.session.get(url) as r:
+        serviceToken = r.cookies.get("serviceToken")
+        if not serviceToken:
+            jar = self.session.cookie_jar.filter_cookies(URL(url))
+            serviceToken = jar.get("serviceToken")
+        if not serviceToken:
+            raise Exception(await r.text())
+        return serviceToken.value
+
+MiAccount._securityTokenService = _patched_securityTokenService
+
 from core.config import app_logger, config
 from core.tools.async_util import run_async
 from core.utils import convert_to_http_url, format_time_str
