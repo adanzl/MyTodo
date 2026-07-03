@@ -1,4 +1,5 @@
 """
+当小米
 在服务器直接运行: /home/leo/.conda/envs/flask_env/bin/python deploy/mi_login_final.py
 会自动填写账号密码，遇到短信验证码时让你输入，最后保存 token 到 ~/.mi.token
 """
@@ -82,7 +83,7 @@ async def main():
 
         print(f"[{ts()}] [6/6] 最终 URL: {page.url}")
         cookies = await context.cookies()
-        cookie_dict = {c["name"]: c["value"] for c in cookies}
+        cookie_dict = {c.get("name", ""): c.get("value", "") for c in cookies}
         uid = cookie_dict.get("userId") or login_data.get("userId")
         pt = cookie_dict.get("passToken") or login_data.get("passToken")
 
