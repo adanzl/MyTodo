@@ -13,6 +13,7 @@ User=leo
 Group=leo
 Type=simple
 ExecStart=/opt/chml_frp/frpc
+WorkDirectory=/opt/chml_frp
 StandardError=null
 Restart=on-failure
 # 重启间隔时间（避免频繁重启，单位：秒）
