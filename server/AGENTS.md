@@ -20,3 +20,7 @@
 用户名 leo
 密码 见.env 里的 SSH_PASSWORD
 工作目录 /mnt/data/project/MyTodo/server
+
+## 快捷命令
+
+- push 表示执行提交git 并执行push
