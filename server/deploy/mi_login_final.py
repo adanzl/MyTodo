@@ -14,7 +14,7 @@ async def main():
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             headless=True,
-            executable_path="/home/leo/.conda/envs/flask_env/lib/python3.13/site-packages/playwright/browsers/chromium-1228/chrome-linux/chrome",
+            executable_path="/opt/chrome-linux/chrome",
             args=["--no-sandbox", "--disable-setuid-sandbox", "--headless=new"]
         )
         context = await browser.new_context(
