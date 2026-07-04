@@ -376,12 +376,17 @@ const handleDismiss = () => {
 const checkVideoLock = async (): Promise<boolean> => {
     const userId = props.userId;
     const materialId = props.material?.id;
+    const taskId = props.task?.id;
     if (!userId || !materialId) return false;
 
     try {
+        const params: any = { userId, materialId };
+        if (taskId) {
+            params.taskId = taskId;
+        }
         const rsp = await apiClient.get<{ code: number; data?: { lock?: boolean } }>(
             '/material/status',
-            { params: { userId, materialId } }
+            { params }
         );
         return rsp.data.code === 0 && rsp.data.data?.lock === true;
     } catch (error: unknown) {
