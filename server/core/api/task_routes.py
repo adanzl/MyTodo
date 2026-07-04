@@ -101,12 +101,13 @@ def update_task() -> ResponseReturnValue:
 
 @task_bp.route('/material/status', methods=['GET'])
 def get_material_status() -> ResponseReturnValue:
-    """查询素材锁定状态（视频观看时长是否超限）"""
+    """查询素材锁定状态（视频观看时长是否超限 + 白名单实时检查）"""
     user_id = request.args.get('userId', type=int)
     material_id = request.args.get('materialId', type=int)
+    task_id = request.args.get('taskId', type=int)  # 可选，用于任务级白名单检查
     if not user_id or not material_id:
         return _err('Invalid userId or materialId')
-    return task_mgr.get_material_status(user_id, material_id)
+    return task_mgr.get_material_status(user_id, material_id, task_id)
 
 
 @task_bp.route('/task/parent', methods=['GET'])
