@@ -47,9 +47,6 @@
   </ion-modal>
   <WeekSelector
     ref="weekSelector"
-    trigger="btnCustom"
-    side="top"
-    alignment="center"
     @update:value="onRepeatDataChange"
     :value="repeatData" />
 </template>
