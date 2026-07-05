@@ -1,9 +1,25 @@
 import { apiClient } from "./api-client";
 import type { ApiResponse } from "./types";
 import type { ScheduleData, ScheduleSave } from "@/types/user-data";
+import dayjs from "dayjs";
 
 export interface GetTodoCalendarResponse {
   [date: string]: ScheduleData[];
+}
+
+/** dayjs 默认 toJSON 输出 UTC(Z)，后端无法识别时区；转为带偏移的 ISO 字符串 */
+function serializeDate(v: any): any {
+  if (dayjs.isDayjs(v)) return v.format("YYYY-MM-DDTHH:mm:ssZ");
+  return v;
+}
+
+function serializeScheduleData(data: any): any {
+  return {
+    ...data,
+    startTs: serializeDate(data.startTs),
+    endTs: serializeDate(data.endTs),
+    repeatEndTs: serializeDate(data.repeatEndTs),
+  };
 }
 
 /**
@@ -33,7 +49,7 @@ export async function getTodoCalendar(
  * @returns 新建待办的ID
  */
 export async function createTodo(scheduleData: Partial<ScheduleData>): Promise<number> {
-  const rsp = await apiClient.post<ApiResponse<{ id: number }>>("/todo/create", scheduleData);
+  const rsp = await apiClient.post<ApiResponse<{ id: number }>>("/todo/create", serializeScheduleData(scheduleData));
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
   }
@@ -49,10 +65,10 @@ export async function updateTodo(
   todoId: number,
   scheduleData: Partial<ScheduleData>
 ): Promise<void> {
-  const rsp = await apiClient.post<ApiResponse<unknown>>("/todo/update", {
+  const rsp = await apiClient.post<ApiResponse<unknown>>("/todo/update", serializeScheduleData({
     id: todoId,
     ...scheduleData,
-  });
+  }));
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
   }
