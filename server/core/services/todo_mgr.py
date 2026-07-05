@@ -230,6 +230,18 @@ class TodoMgr:
             log.error(f"[TodoMgr] 判断日程显示异常: {e}", exc_info=True)
             return False
 
+    def _get_plan_name(self, user_id: int) -> str:
+        """根据 user_id 查用户名，返回计划名称如'灿灿计划'"""
+        try:
+            r = db_mgr.query(f"SELECT name FROM t_user WHERE id = {user_id}")
+            if r.get('code') == 0 and r.get('data'):
+                user_name = r['data'][0].get('name', '')
+                if user_name:
+                    return f"{user_name}计划"
+        except Exception:
+            pass
+        return ''
+
     def create_todo(self, schedule_data: ScheduleData) -> Dict[str, Any]:
         """
         创建日程。
@@ -243,7 +255,8 @@ class TodoMgr:
         try:
             # 将 ScheduleData 转换为数据库字段
             db_data = {
-                'name': schedule_data.title,
+                'name': self._get_plan_name(schedule_data.userId),
+                'title': schedule_data.title,
                 'start_ts': schedule_data.startTs,
                 'end_ts': schedule_data.endTs,
                 'all_day': schedule_data.allDay,
@@ -323,7 +336,8 @@ class TodoMgr:
         try:
             db_data = {
                 'id': todo_id,
-                'name': schedule_data.title,
+                'name': self._get_plan_name(schedule_data.userId),
+                'title': schedule_data.title,
                 'start_ts': schedule_data.startTs,
                 'end_ts': schedule_data.endTs,
                 'all_day': schedule_data.allDay,

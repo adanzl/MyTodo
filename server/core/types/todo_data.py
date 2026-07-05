@@ -72,7 +72,7 @@ class ScheduleData:
         instance = cls()
         # 从 t_schedule 获取基础数据
         instance.id = schedule_row.get('id', -1)
-        instance.title = schedule_row.get('name', '') or ''
+        instance.title = schedule_row.get('title', '') or ''
         instance.startTs = schedule_row.get('start_ts')
         instance.endTs = schedule_row.get('end_ts')
         instance.allDay = schedule_row.get('all_day', 1) if schedule_row.get('all_day') is not None else 1
