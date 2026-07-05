@@ -116,10 +116,10 @@ class TodoMgr:
             schedules_sql = f"""
                 SELECT * FROM t_schedule 
                 WHERE user_id = {user_id}
-                  AND start_ts <= '{end_time}'
+                  AND date(start_ts) <= '{end_time}'
                   AND (
-                    (repeat != 0 AND (repeat_end_ts IS NULL OR repeat_end_ts >= '{start_time}'))
-                    OR (repeat = 0 AND (end_ts IS NULL OR end_ts >= '{start_time}'))
+                    (repeat != 0 AND (repeat_end_ts IS NULL OR date(repeat_end_ts) >= '{start_time}'))
+                    OR (repeat = 0 AND (end_ts IS NULL OR date(end_ts) >= '{start_time}'))
                   )
             """
             schedules_result = db_mgr.query(schedules_sql)
