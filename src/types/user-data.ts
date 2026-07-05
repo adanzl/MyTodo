@@ -67,6 +67,7 @@ export class ScheduleData {
   subtasks: Subtask[] = []; // 子任务列表
   state?: number = 0; // 完成状态：0-未完成，1-已完成
   saveScore?: number; // 通过这个任务获得的积分
+  userId: number = -1; // 所属用户id
   static Copy(o: ScheduleData): ScheduleData {
     const ret = JSON.parse(JSON.stringify(o));
     ret.startTs = ret.startTs && dayjs(ret.startTs);
