@@ -300,8 +300,8 @@ function btnTodayClk() {
 
 // 添加日程按钮
 const btnAddScheduleClk = () => {
-  // 清空数据
-  scheduleModalData.value = undefined;
+  // 清空数据：传新对象确保 watcher 能检测到引用变化
+  scheduleModalData.value = new ScheduleData();
   scheduleSave.value = undefined;
   isScheduleModalOpen.value = true;
 };

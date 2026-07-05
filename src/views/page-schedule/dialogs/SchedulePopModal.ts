@@ -59,7 +59,7 @@ export default defineComponent({
     modal: Object,
     schedule: {
       type: Object,
-      default: new ScheduleData(),
+      default: () => new ScheduleData(),
     },
     selectedDate: {
       type: Object,
