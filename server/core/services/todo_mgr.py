@@ -113,13 +113,16 @@ class TodoMgr:
         """
         try:
             # 获取用户的可能在时间范围内显示的日程模板
+            # end_time 补上时间后缀，确保 start_ts <= end_time 的字符串比较不会因为
+            # start_ts 带时间而漏掉当天数据（如 '2026-07-05T00:00:00+08:00' <= '2026-07-05T23:59:59'）
+            end_ts_bound = end_time + 'T23:59:59'
             schedules_sql = f"""
                 SELECT * FROM t_schedule 
                 WHERE user_id = {user_id}
-                  AND substr(start_ts, 1, 10) <= '{end_time}'
+                  AND start_ts <= '{end_ts_bound}'
                   AND (
-                    (repeat != 0 AND (repeat_end_ts IS NULL OR substr(repeat_end_ts, 1, 10) >= '{start_time}'))
-                    OR (repeat = 0 AND (end_ts IS NULL OR substr(end_ts, 1, 10) >= '{start_time}'))
+                    (repeat != 0 AND (repeat_end_ts IS NULL OR repeat_end_ts >= '{start_time}'))
+                    OR (repeat = 0 AND (end_ts IS NULL OR end_ts >= '{start_time}'))
                   )
             """
             schedules_result = db_mgr.query(schedules_sql)
