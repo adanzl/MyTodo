@@ -708,7 +708,7 @@ export default defineComponent({
         
         // 确保 userId 已赋值
         if (_scheduleData && _scheduleData.userId === -1) {
-          _scheduleData.userId = globalVar.user?.id ?? globalVar.scheduleListId;
+          _scheduleData.userId = globalVar.scheduleListId;
         }
         
         try {
