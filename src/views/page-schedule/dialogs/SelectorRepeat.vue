@@ -38,13 +38,6 @@
             </div>
           </ion-radio>
         </ion-radio-group>
-        <WeekSelector
-          ref="weekSelector"
-          trigger="btnCustom"
-          side="top"
-          alignment="center"
-          @update:value="onRepeatDataChange"
-          :value="repeatData" />
       </ion-item>
     </div>
     <ion-footer>
@@ -52,6 +45,13 @@
       <ion-button class="flex-1 text-orange-400" fill="clear" @click="confirm()">确定</ion-button>
     </ion-footer>
   </ion-modal>
+  <WeekSelector
+    ref="weekSelector"
+    trigger="btnCustom"
+    side="top"
+    alignment="center"
+    @update:value="onRepeatDataChange"
+    :value="repeatData" />
 </template>
 
 <script lang="ts" setup>
