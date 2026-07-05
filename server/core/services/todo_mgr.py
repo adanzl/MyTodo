@@ -325,34 +325,33 @@ class TodoMgr:
 
     def update_todo(self, todo_id: int, schedule_data: ScheduleData) -> Dict[str, Any]:
         """
-        更新日程模板，不处理存档
-        Args:
-            todo_id: 日程ID
-            schedule_data: 日程数据对象
-
-        Returns:
-            操作结果
+        更新日程模板，不处理存档。只更新传入的非空字段。
         """
         try:
-            db_data = {
-                'id': todo_id,
-                'name': self._get_plan_name(schedule_data.userId),
-                'title': schedule_data.title,
-                'start_ts': schedule_data.startTs,
-                'end_ts': schedule_data.endTs,
-                'all_day': schedule_data.allDay,
-                'reminder': schedule_data.reminder,
-                'repeat': schedule_data.repeat,
-                'repeat_data': serialize_data(schedule_data.repeatData),
-                'repeat_end_ts': schedule_data.repeatEndTs,
-                'color': schedule_data.color,
-                'priority': schedule_data.priority,
-                'group_id': schedule_data.groupId,
-                'order_idx': schedule_data.order,
-                'score': schedule_data.score,
-                'subtasks': serialize_object_list(schedule_data.subtasks),
-                'user_id': schedule_data.userId
-            }
+            db_data: Dict[str, Any] = {'id': todo_id}
+
+            def _set(key: str, value: Any, *, default=None) -> None:
+                if value is not None and value != default:
+                    db_data[key] = value
+
+            _set('name', self._get_plan_name(schedule_data.userId) if schedule_data.userId else None)
+            _set('title', schedule_data.title, default='')
+            _set('start_ts', schedule_data.startTs, default='')
+            _set('end_ts', schedule_data.endTs, default='')
+            _set('all_day', schedule_data.allDay)
+            _set('reminder', schedule_data.reminder, default=0)
+            _set('repeat', schedule_data.repeat, default=0)
+            if schedule_data.repeatData is not None:
+                db_data['repeat_data'] = serialize_data(schedule_data.repeatData)
+            _set('repeat_end_ts', schedule_data.repeatEndTs, default='')
+            _set('color', schedule_data.color, default=0)
+            _set('priority', schedule_data.priority, default=-1)
+            _set('group_id', schedule_data.groupId, default=-1)
+            _set('order_idx', schedule_data.order)
+            _set('score', schedule_data.score)
+            if schedule_data.subtasks is not None:
+                db_data['subtasks'] = serialize_object_list(schedule_data.subtasks)
+            _set('user_id', schedule_data.userId)
 
             result = db_mgr.set_data('t_schedule', db_data)
             if result.get('code') == 0:
