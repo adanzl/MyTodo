@@ -187,8 +187,10 @@ class TodoMgr:
             if not start_ts:
                 return False
 
-            start_dt = datetime.fromisoformat(start_ts.replace('Z', '+00:00')).replace(tzinfo=None)
-            start_day = start_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+            # 前端 dayjs 序列化为 UTC，后端需转 UTC+8 取日期
+            start_dt = datetime.fromisoformat(start_ts.replace('Z', '+00:00'))
+            start_local = start_dt + timedelta(hours=8)
+            start_day = start_local.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
 
             target_day = target_dt.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
 
@@ -200,8 +202,9 @@ class TodoMgr:
 
             repeat_end_ts = schedule.get('repeat_end_ts')
             if repeat_end_ts:
-                repeat_end_dt = datetime.fromisoformat(repeat_end_ts.replace('Z', '+00:00')).replace(tzinfo=None)
-                if repeat_end_dt < target_day:
+                repeat_end_dt = datetime.fromisoformat(repeat_end_ts.replace('Z', '+00:00')) + timedelta(hours=8)
+                repeat_end_day = repeat_end_dt.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+                if repeat_end_day < target_day:
                     return False
 
             repeat = schedule.get('repeat', 0)
