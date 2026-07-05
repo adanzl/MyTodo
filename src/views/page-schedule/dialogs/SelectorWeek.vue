@@ -33,9 +33,9 @@ ion-footer {
 }
 </style>
 <script setup lang="ts">
-import { IonCheckbox } from "@ionic/vue";
+import { IonCheckbox, modalController } from "@ionic/vue";
 import { WEEK } from "@/types/schedule-type";
-import { ref } from "vue";
+import { nextTick, ref } from "vue";
 const modal = ref();
 const props = defineProps({
   value: {
@@ -56,11 +56,15 @@ function onCheckboxChange(e: CustomEvent, idx: number) {
   }
 }
 function onModalDismiss() {}
+async function doDismiss() {
+  await nextTick();
+  await modalController.dismiss();
+}
 function cancel() {
-  setTimeout(() => modal.value.$el?.dismiss());
+  doDismiss();
 }
 function confirm() {
   emits("update:value", [...valueRef.value]);
-  setTimeout(() => modal.value.$el?.dismiss());
+  doDismiss();
 }
 </script>

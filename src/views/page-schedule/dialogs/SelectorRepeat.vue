@@ -64,8 +64,8 @@ import {
   RepeatType,
 } from "@/types/schedule-type";
 import { createTriggerController } from "@/utils/t-overlay";
-import { IonRadio, IonRadioGroup } from "@ionic/vue";
-import { onMounted, ref, watch } from "vue";
+import { IonRadio, IonRadioGroup, modalController } from "@ionic/vue";
+import { nextTick, onMounted, ref, watch } from "vue";
 import dayjs from "dayjs";
 import WeekSelector from "./SelectorWeek.vue";
 const props = defineProps({
@@ -88,12 +88,16 @@ const weekSelector = ref();
 const valueRef = ref(props.value.repeat ?? 0);
 const repeatData = ref(props.value.repeatData ?? new RepeatData());
 
+const doDismiss = async () => {
+  await nextTick();
+  await modalController.dismiss();
+};
 const cancel = () => {
-  setTimeout(() => modal.value.$el?.dismiss());
+  doDismiss();
 };
 const confirm = () => {
   emits("update:value", valueRef.value, repeatData.value);
-  setTimeout(() => modal.value.$el?.dismiss());
+  doDismiss();
 };
 const onSelectChange = (e: any) => {
   valueRef.value = e.detail.value;
