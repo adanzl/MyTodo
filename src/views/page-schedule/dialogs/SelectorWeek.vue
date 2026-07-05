@@ -1,7 +1,6 @@
 <template>
   <ion-modal
     ref="modal"
-    :is-open="isOpen"
     aria-hidden="false"
     id="repeatSelector"
     class="backdrop"
@@ -38,7 +37,6 @@ import { IonCheckbox } from "@ionic/vue";
 import { WEEK } from "@/types/schedule-type";
 import { ref } from "vue";
 const modal = ref();
-const isOpen = ref(false);
 const props = defineProps({
   value: {
     type: Object,
@@ -57,18 +55,12 @@ function onCheckboxChange(e: CustomEvent, idx: number) {
     valueRef.value.delete(idx);
   }
 }
-function onModalDismiss() {
-  isOpen.value = false;
-}
-function open() {
-  isOpen.value = true;
-}
+function onModalDismiss() {}
 function cancel() {
-  isOpen.value = false;
+  setTimeout(() => modal.value.$el?.dismiss());
 }
 function confirm() {
   emits("update:value", [...valueRef.value]);
-  isOpen.value = false;
+  setTimeout(() => modal.value.$el?.dismiss());
 }
-defineExpose({ open });
 </script>
