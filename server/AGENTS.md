@@ -1,4 +1,4 @@
-na # Project Notes for AI Agents
+# Project Notes for AI Agents
 
 ## Python Environment
 
