@@ -243,6 +243,7 @@ class TodoMgr:
         try:
             # 将 ScheduleData 转换为数据库字段
             db_data = {
+                'name': schedule_data.title,
                 'title': schedule_data.title,
                 'start_ts': schedule_data.startTs,
                 'end_ts': schedule_data.endTs,
@@ -323,6 +324,7 @@ class TodoMgr:
         try:
             db_data = {
                 'id': todo_id,
+                'name': schedule_data.title,
                 'title': schedule_data.title,
                 'start_ts': schedule_data.startTs,
                 'end_ts': schedule_data.endTs,
