@@ -79,18 +79,18 @@ export function getNextRepeatDate(
   } else if (repeat.id === 999) {
     if (repeatData?.week?.length) {
       const ln = repeatData.week.length ?? 0;
-      repeatData.week.sort();
+      const sortedWeek = [...repeatData.week].sort();
       const day = date.day();
-      const idx = _.sortedIndex(repeatData.week, day);
+      const idx = _.sortedIndex(sortedWeek, day);
       if (idx === ln) {
-        const d = 7 - day + repeatData.week[0];
+        const d = 7 - day + sortedWeek[0];
         ret = date.add(d, "day");
       } else {
-        if (repeatData.week[idx] == day) {
-          const d = (repeatData.week[(idx + 1) % ln] + 7 - day) % 7;
+        if (sortedWeek[idx] == day) {
+          const d = (sortedWeek[(idx + 1) % ln] + 7 - day) % 7;
           ret = date.add(d, "day");
         } else {
-          const d = repeatData.week[idx] - day;
+          const d = sortedWeek[idx] - day;
           ret = date.add(d, "day");
         }
       }
