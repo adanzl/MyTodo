@@ -1,4 +1,4 @@
-import sqlite3, os
+naimport sqlite3, os
 base = os.path.dirname(os.path.abspath(__file__))
 db_path = os.path.join(base, "data", "mytodo.db")
 c = sqlite3.connect(db_path)
