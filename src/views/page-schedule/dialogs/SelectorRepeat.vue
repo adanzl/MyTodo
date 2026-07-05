@@ -1,6 +1,7 @@
 <template>
   <ion-modal
     ref="modal"
+    :is-open="isOpen"
     aria-hidden="false"
     id="repeatSelector"
     class="bottom-modal"
@@ -85,23 +86,23 @@ const props = defineProps({
 const triggerController = createTriggerController();
 const modal = ref();
 const weekSelector = ref();
+const isOpen = ref(false);
 const valueRef = ref(props.value.repeat ?? 0);
 const repeatData = ref(props.value.repeatData ?? new RepeatData());
 
 const cancel = () => {
-  modal.value.$el!.dismiss();
+  isOpen.value = false;
 };
 const confirm = () => {
   emits("update:value", valueRef.value, repeatData.value);
-  modal.value.$el!.dismiss();
+  isOpen.value = false;
 };
 const onSelectChange = (e: any) => {
-  console.log("onSelectChange", e.detail.value);
   valueRef.value = e.detail.value;
 };
 function onItemClk(_e: any, o: RepeatType) {
   if (o.id === CUSTOM_REPEAT_ID) {
-    weekSelector.value?.$el.present();
+    weekSelector.value?.open();
   }
 }
 
@@ -111,15 +112,20 @@ onMounted(() => {
     () => props.trigger,
     (newValue) => {
       if (newValue) {
-        // 当 trigger 属性变化时，添加点击监听器
         triggerController.addClickListener(modal.value!.$el!, newValue);
       }
     },
-    { immediate: true } // 立即执行一次 watcher
+    { immediate: true }
   );
+  // 劫持 trigger 的 present 调用，改用 isOpen 控制
+  if (modal.value?.$el) {
+    modal.value.$el.present = () => {
+      isOpen.value = true;
+    };
+  }
 });
 const onModalDismiss = () => {
-  // valueRef.value = props.value;
+  isOpen.value = false;
 };
 
 function onRepeatDataChange(v: number[]) {
