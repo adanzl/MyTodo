@@ -694,8 +694,8 @@ export default defineComponent({
     const scheduleModalMethods = {
       // 添加日程按钮
       btnAddScheduleClk: async () => {
-        // 清空数据
-        refData.scheduleModalData.value = undefined;
+        // 清空数据：传新对象确保 watcher 能检测到引用变化
+        refData.scheduleModalData.value = new ScheduleData();
         refData.isScheduleModalOpen.value = true;
       },
       // 添加日程页面关闭回调
