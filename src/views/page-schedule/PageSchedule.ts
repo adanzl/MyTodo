@@ -706,6 +706,11 @@ export default defineComponent({
         const _scheduleData = event.detail.data;
         const role = event.detail.role; // "all" 或 "cur"
         
+        // 确保 userId 已赋值
+        if (_scheduleData && _scheduleData.userId === -1) {
+          _scheduleData.userId = globalVar.user?.id ?? globalVar.scheduleListId;
+        }
+        
         try {
           if (role === "all") {
             // 应用到所有：新增或编辑日程模板
