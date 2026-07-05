@@ -89,11 +89,9 @@ const valueRef = ref(props.value.repeat ?? 0);
 const repeatData = ref(props.value.repeatData ?? new RepeatData());
 
 const cancel = () => {
-  console.log("[SelectorRepeat] cancel dismiss");
   modal.value.$el!.dismiss();
 };
 const confirm = () => {
-  console.log("[SelectorRepeat] confirm dismiss");
   emits("update:value", valueRef.value, repeatData.value);
   modal.value.$el!.dismiss();
 };
