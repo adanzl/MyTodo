@@ -2,7 +2,15 @@
 import sqlite3
 import os
 
-db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "mytodo.db")
+base = os.path.dirname(os.path.abspath(__file__))
+for name in ("data/mytodo.db", "data/data.db"):
+    db_path = os.path.join(base, name)
+    if os.path.exists(db_path):
+        break
+else:
+    raise FileNotFoundError("找不到数据库文件")
+
+print(f"使用数据库: {db_path}")
 conn = sqlite3.connect(db_path)
 cur = conn.cursor()
 
