@@ -3,7 +3,7 @@ import sqlite3
 import os
 
 base = os.path.dirname(os.path.abspath(__file__))
-for name in ("data/mytodo.db", "data/data.db"):
+for name in ("data.db", "data/mytodo.db"):
     db_path = os.path.join(base, name)
     if os.path.exists(db_path):
         break
