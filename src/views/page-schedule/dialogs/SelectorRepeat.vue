@@ -1,7 +1,6 @@
 <template>
   <ion-modal
     ref="modal"
-    :is-open="isOpen"
     aria-hidden="false"
     id="repeatSelector"
     class="bottom-modal"
@@ -86,23 +85,22 @@ const props = defineProps({
 const triggerController = createTriggerController();
 const modal = ref();
 const weekSelector = ref();
-const isOpen = ref(false);
 const valueRef = ref(props.value.repeat ?? 0);
 const repeatData = ref(props.value.repeatData ?? new RepeatData());
 
 const cancel = () => {
-  isOpen.value = false;
+  setTimeout(() => modal.value.$el?.dismiss());
 };
 const confirm = () => {
   emits("update:value", valueRef.value, repeatData.value);
-  isOpen.value = false;
+  setTimeout(() => modal.value.$el?.dismiss());
 };
 const onSelectChange = (e: any) => {
   valueRef.value = e.detail.value;
 };
 function onItemClk(_e: any, o: RepeatType) {
   if (o.id === CUSTOM_REPEAT_ID) {
-    weekSelector.value?.open();
+    weekSelector.value?.$el.present();
   }
 }
 
@@ -117,19 +115,12 @@ onMounted(() => {
     },
     { immediate: true }
   );
-  // 劫持 trigger 的 present 调用，改用 isOpen 控制
-  if (modal.value?.$el) {
-    modal.value.$el.present = () => {
-      isOpen.value = true;
-    };
-  }
 });
 const onModalDismiss = () => {
-  isOpen.value = false;
+  // valueRef.value = props.value;
 };
 
 function onRepeatDataChange(v: number[]) {
-  console.log("onRepeatDataChange", v);
   repeatData.value.week = v;
 }
 </script>
