@@ -133,7 +133,7 @@ def test_check_task_lock_task_level_when_global_clear(monkeypatch):
     tasks = [{"priority": 1, "name": "t1", "block_time": _blacklist_raw("00:00:00", "23:59:59")}]
     result = TaskMgr().check_task_lock(tasks, user_id=USER_CANCAN, date_str=today)
     assert result[0]["lock"] is True
-    assert result[0]["msg"] == "当前处于禁用时段"
+    assert result[0]["msg"] == "当前处于任务禁用时段"
 
 
 def test_check_task_lock_pre_task_same_day_only(monkeypatch):
