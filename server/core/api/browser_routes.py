@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from typing import Any, Dict
 
 from flask import Blueprint
@@ -19,6 +20,8 @@ log = app_logger
 browser_bp = Blueprint('browser', __name__)
 
 _REDIS_KEY = 'browser:config'
+
+_TS_FMT = '%Y-%m-%d %H:%M:%S'
 
 
 def _load_config() -> Dict[str, Any]:
@@ -81,12 +84,14 @@ def set_config() -> ResponseReturnValue:
 
         current = _load_config()
 
-        # 如果包含 admin.pin，自动 MD5 加密
+        # 如果包含 admin.pin，自动 MD5 加密（空字符串表示清空，不加密）
         admin = json_data.get("admin")
-        if isinstance(admin, dict) and "pin" in admin:
+        if isinstance(admin, dict) and "pin" in admin and admin["pin"]:
             admin = dict(admin)
             admin["pin"] = hashlib.md5(admin["pin"].encode("utf-8")).hexdigest()
             json_data["admin"] = admin
+
+        json_data["timestamp"] = time.strftime(_TS_FMT)
 
         current.update(json_data)
 
@@ -114,6 +119,7 @@ def publish_version() -> ResponseReturnValue:
         except (ValueError, IndexError):
             major, minor, patch = 0, 0, 1
         config_data["version"] = f"{major}.{minor}.{patch}"
+        config_data["publishTime"] = time.strftime(_TS_FMT)
 
         if _save_config(config_data):
             log.info(f"[BrowserRoutes] 版本已发布: {config_data['version']}")
