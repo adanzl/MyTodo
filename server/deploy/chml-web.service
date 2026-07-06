@@ -1,0 +1,23 @@
+# sudo cp deploy/chml-web.service /etc/systemd/system/
+# 开启 systemctl start chml-web
+# 开机启动 systemctl enable chml-web
+
+[Unit]
+Description=Chml Web Service
+After=network.target
+
+[Service]
+User=leo
+Group=leo
+Type=simple
+ExecStart=/opt/chml_frp/frpc -c frpc-web.ini
+WorkingDirectory=/opt/chml_frp
+StandardError=null
+Restart=on-failure
+# 重启间隔时间（避免频繁重启，单位：秒）
+RestartSec=3
+# 进程最大文件打开数（解决高并发下文件句柄不足）
+LimitNOFILE=6553
+
+[Install]
+WantedBy=multi-user.target

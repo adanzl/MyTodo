@@ -14,7 +14,7 @@ Group=leo
 Type=simple
 ExecStart=/opt/natapp/natapp -config=/opt/natapp/config_web.ini
 # Suppress stderr to eliminate duplicated messages in syslog. NM calls openlog()
-# with LOG_PERROR when run in foreground. But systemd redirects stderr to
+# with LOG_ERROR when run in foreground. But systemd redirects stderr to
 # syslog by default, which results in logging each message twice.
 StandardError=null
 Restart=on-failure
