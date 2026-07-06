@@ -18,6 +18,12 @@ export interface BrowserAdminConfig {
   pin: string;
 }
 
+export interface BrowserMark {
+  title: string;
+  url: string;
+  position: number;
+}
+
 export interface BrowserConfig {
   version: string;
   timestamp: string;
@@ -26,6 +32,7 @@ export interface BrowserConfig {
   app: BrowserAppConfig;
   admin: BrowserAdminConfig;
   whitelist: BrowserWhitelistConfig;
+  marks: BrowserMark[];
 }
 
 /** 获取浏览器配置 */

@@ -113,10 +113,17 @@ const loadFromConfig = (config?: BlockTimeConfig | string) => {
   const next: Record<number, UserBlockState> = {};
   for (const uid of ALL_USER_IDS) {
     const entry = getBlockTimeEntry(parsed, uid);
-    next[uid] = {
-      type: entry?.type ?? "blacklist",
-      slots: entry ? [...getBlockTimeSlots(entry)] : [],
-    };
+    if (entry) {
+      // 有配置 → 按配置填充
+      next[uid] = {
+        type: entry.type ?? "blacklist",
+        slots: [...getBlockTimeSlots(entry)],
+      };
+    } else {
+      // 无配置 → 保留当前状态（不重置），避免切换类型后空 config 被回退
+      const current = userStates.value[uid];
+      next[uid] = current || { type: "blacklist", slots: [] };
+    }
   }
   userStates.value = next;
   nextTick(() => {
