@@ -445,7 +445,7 @@ class TaskMgr:
             if isinstance(stats, str):
                 stats = json.loads(stats)
             locked = int(stats.get(str(user_id), 0)
-                         or 0) >= float(material_duration)
+                         or 0) >= float(material_duration) * 1.2
             return {"code": 0, "msg": "ok", "data": {"lock": locked, "duration": material_duration}}
         except Exception as e:
             log.error(f"获取素材状态失败: material_id={material_id}, {e}")

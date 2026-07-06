@@ -122,6 +122,10 @@
           <div v-if="loading" class="absolute inset-0 flex justify-center items-center bg-black bg-opacity-80">
             <ion-spinner name="crescent" class="text-white text-4xl"></ion-spinner>
           </div>
+          <div v-if="videoLocked" class="absolute inset-0 z-10 flex flex-col justify-center items-center bg-black/80">
+            <div class="text-white/90 text-lg mb-2">视频观看超时</div>
+            <div class="text-gray-400 text-sm">已达到观看时长限制</div>
+          </div>
         </div>
         
         <!-- 操作区 -->
@@ -177,7 +181,6 @@ import {
     type ResolvedSubtitleTrack,
 } from '@/utils/subtitle';
 import {
-    alertController,
     IonButton,
     IonContent,
     IonIcon,
@@ -244,7 +247,7 @@ let isTrackingActive: boolean = false; // 追踪是否活跃（页面可见且�
 // 视频锁定轮询（播放过程中每分钟检查一次）
 const VIDEO_LOCK_POLL_MS = 60_000;
 let videoLockPollTimer: number | null = null;
-let videoLockAlertShown = false;
+const videoLocked = ref(false);
 
 // 监听 AudioPreview 的播放状态
 const isAudioPlaying = computed(() => {
@@ -402,32 +405,17 @@ const stopVideoLockPolling = () => {
     }
 };
 
-const showVideoLockAlert = async () => {
-    if (videoLockAlertShown) return;
-    videoLockAlertShown = true;
+const setVideoLocked = () => {
+    if (videoLocked.value) return;
+    videoLocked.value = true;
     stopVideoLockPolling();
     pauseVideo();
-
-    const alert = await alertController.create({
-        header: '提示',
-        message: '视频观看超时',
-        backdropDismiss: false,
-        buttons: [
-            {
-                text: '确定',
-                handler: () => {
-                    handleDismiss();
-                },
-            },
-        ],
-    });
-    await alert.present();
 };
 
 const pollVideoLockStatus = async () => {
-    if (!props.isOpen || props.material?.type !== 1 || videoLockAlertShown) return;
+    if (!props.isOpen || props.material?.type !== 1 || videoLocked.value) return;
     if (await checkVideoLock()) {
-        await showVideoLockAlert();
+        setVideoLocked();
     }
 };
 
@@ -752,7 +740,7 @@ watch(
     async ([isOpen, material]) => {
         if (isOpen && material) {
             if (material.type === 1 && (await checkVideoLock())) {
-                await showVideoLockAlert();
+                setVideoLocked();
                 return;
             }
 
@@ -779,7 +767,7 @@ watch(
         } else {
             loading.value = false;
             stopVideoLockPolling();
-            videoLockAlertShown = false;
+            videoLocked.value = false;
             clearSubtitleTracks();
         }
     }
