@@ -21,6 +21,7 @@ export interface BrowserAdminConfig {
 export interface BrowserConfig {
   version: string;
   timestamp: string;
+  publishTime: string;
   env: string;
   app: BrowserAppConfig;
   admin: BrowserAdminConfig;
