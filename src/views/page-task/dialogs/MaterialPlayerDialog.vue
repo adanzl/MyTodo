@@ -123,7 +123,7 @@
             <ion-spinner name="crescent" class="text-white text-4xl"></ion-spinner>
           </div>
           <div v-if="videoLocked" class="absolute inset-0 z-10 flex flex-col justify-center items-center bg-black/80">
-            <div class="text-white/90 text-lg mb-2">视频观看超时</div>
+            <div class="text-white/90 text-lg mb-2">{{ lockReason || '视频观看超时' }}</div>
             <div class="text-gray-400 text-sm">已达到观看时长限制</div>
           </div>
         </div>
@@ -248,6 +248,7 @@ let isTrackingActive: boolean = false; // 追踪是否活跃（页面可见且�
 const VIDEO_LOCK_POLL_MS = 60_000;
 let videoLockPollTimer: number | null = null;
 const videoLocked = ref(false);
+const lockReason = ref('');
 
 // 监听 AudioPreview 的播放状态
 const isAudioPlaying = computed(() => {
@@ -376,25 +377,29 @@ const handleDismiss = () => {
     clearSubtitleTracks();
 };
 
-const checkVideoLock = async (): Promise<boolean> => {
+const checkVideoLock = async (): Promise<{ locked: boolean; reason: string }> => {
     const userId = props.userId;
     const materialId = props.material?.id;
     const taskId = props.task?.id;
-    if (!userId || !materialId) return false;
+    if (!userId || !materialId) return { locked: false, reason: '' };
 
     try {
         const params: any = { userId, materialId };
         if (taskId) {
             params.taskId = taskId;
         }
-        const rsp = await apiClient.get<{ code: number; data?: { lock?: boolean } }>(
+        const rsp = await apiClient.get<{ code: number; data?: { lock?: boolean; reason?: string; duration?: number } }>(
             '/material/status',
             { params }
         );
-        return rsp.data.code === 0 && rsp.data.data?.lock === true;
+        const data = rsp.data.data;
+        if (rsp.data.code === 0 && data?.lock === true) {
+            return { locked: true, reason: data?.reason || '视频观看超时' };
+        }
+        return { locked: false, reason: '' };
     } catch (error: unknown) {
         console.error('获取素材状态失败:', error);
-        return false;
+        return { locked: false, reason: '' };
     }
 };
 
@@ -405,17 +410,19 @@ const stopVideoLockPolling = () => {
     }
 };
 
-const setVideoLocked = () => {
+const setVideoLocked = (reason: string) => {
     if (videoLocked.value) return;
     videoLocked.value = true;
+    lockReason.value = reason || '视频观看超时';
     stopVideoLockPolling();
     pauseVideo();
 };
 
 const pollVideoLockStatus = async () => {
     if (!props.isOpen || props.material?.type !== 1 || videoLocked.value) return;
-    if (await checkVideoLock()) {
-        setVideoLocked();
+    const result = await checkVideoLock();
+    if (result.locked) {
+        setVideoLocked(result.reason);
     }
 };
 
@@ -739,9 +746,12 @@ watch(
     () => [props.isOpen, props.material] as const,
     async ([isOpen, material]) => {
         if (isOpen && material) {
-            if (material.type === 1 && (await checkVideoLock())) {
-                setVideoLocked();
-                return;
+            if (material.type === 1) {
+                const lockResult = await checkVideoLock();
+                if (lockResult.locked) {
+                    setVideoLocked(lockResult.reason);
+                    return;
+                }
             }
 
             loading.value = true;
@@ -768,6 +778,7 @@ watch(
             loading.value = false;
             stopVideoLockPolling();
             videoLocked.value = false;
+            lockReason.value = '';
             clearSubtitleTracks();
         }
     }

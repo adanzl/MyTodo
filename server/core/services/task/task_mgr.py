@@ -14,7 +14,7 @@ from core.config.const import DEFAULT_BASE_DIR
 from core.db.db_mgr import db_mgr
 from core.tools.async_util import run_in_background
 from core.utils import get_media_duration, validate_and_normalize_path
-from .block_time import is_global_block_time_now, is_in_block_time_now
+from .block_time import is_global_block_time_now, parse_block_time_config, _get_user_entry, _is_blocked_by_entry
 from .rest_days import parse_rest_days, is_rest_day, get_workday_index, end_date_by_work_duration
 
 log = app_logger
@@ -394,23 +394,38 @@ class TaskMgr:
             user_id: 用户ID
             material_id: 素材ID
             task_id: 任务ID（可选，用于检查任务级白名单）
+
+        优先级：任务级 block_time 配置优先于全局配置。
         """
         try:
-            # 实时检查白名单（全局 + 任务级）
+            # 实时检查白名单（任务级优先于全局）
             now = datetime.now()
             date_str = now.strftime('%Y-%m-%d')
 
-            # 1. 检查全局白名单
-            if is_global_block_time_now(date_str, user_id, now=now):
-                return {"code": 0, "msg": "ok", "data": {"lock": True, "reason": "当前处于全局禁用时段"}}
-
-            # 2. 如果提供了任务ID，检查任务级白名单
+            # 1. 先检查任务级 block_time（任务配置优先于全局）
             if task_id and task_id > 0:
                 task_res = db_mgr.get_data(TABLE_TASK, task_id, 'block_time')
                 if task_res.get('code') == 0 and task_res.get('data'):
                     block_time_raw = task_res['data'].get('block_time', '{}')
-                    if is_in_block_time_now(block_time_raw, date_str, user_id, now=now):
-                        return {"code": 0, "msg": "ok", "data": {"lock": True, "reason": "当前处于任务禁用时段"}}
+                    config = parse_block_time_config(block_time_raw)
+                    task_entry = _get_user_entry(config, user_id)
+                    if task_entry is not None:
+                        # 任务有此用户的 block_time 配置 → 以任务配置为准
+                        if _is_blocked_by_entry(task_entry, now):
+                            return {"code": 0, "msg": "ok", "data": {"lock": True, "reason": "当前处于任务禁用时段"}}
+                        # 任务配置允许 → 不锁，跳过全局检查
+                    else:
+                        # 任务无此用户的配置 → 回退到全局检查
+                        if is_global_block_time_now(date_str, user_id, now=now):
+                            return {"code": 0, "msg": "ok", "data": {"lock": True, "reason": "当前处于全局禁用时段"}}
+                else:
+                    # 任务无 block_time 配置 → 回退到全局检查
+                    if is_global_block_time_now(date_str, user_id, now=now):
+                        return {"code": 0, "msg": "ok", "data": {"lock": True, "reason": "当前处于全局禁用时段"}}
+            else:
+                # 无 task_id → 只检查全局
+                if is_global_block_time_now(date_str, user_id, now=now):
+                    return {"code": 0, "msg": "ok", "data": {"lock": True, "reason": "当前处于全局禁用时段"}}
 
             res = db_mgr.get_data(
                 TABLE_MATERIAL, material_id, 'type,duration,statistics,path')
@@ -461,7 +476,8 @@ class TaskMgr:
         1. 存在更高优先级（数值更小）的未完成任务（priority=-1 的任务不参与此项）
         2. 前置日程未完成
         3. 前置任务在当天仍有未完成打卡
-        4. 当前处于全局或任务级禁用时段（并集）
+        4. 当前处于任务级禁用时段（任务配置优先于全局）
+        5. 当前处于全局禁用时段（仅在任务无 block_time 配置时生效）
         """
         if not user_id or not date_str:
             for task in tasks:
@@ -516,12 +532,20 @@ class TaskMgr:
                                 break
 
                 if not task.get('lock'):
-                    if global_locked:
+                    # 任务级 block_time 优先于全局
+                    block_time_raw = task.get('block_time') or '{}'
+                    config = parse_block_time_config(block_time_raw)
+                    task_entry = _get_user_entry(config, user_id)
+                    if task_entry is not None:
+                        # 任务有此用户的 block_time 配置 → 以任务配置为准
+                        if _is_blocked_by_entry(task_entry, datetime.now()):
+                            task['lock'] = True
+                            task['msg'] = '当前处于任务禁用时段'
+                        # 任务配置允许 → 不锁，跳过全局
+                    elif global_locked:
+                        # 任务无此用户的配置 → 回退到全局检查
                         task['lock'] = True
                         task['msg'] = '当前处于全局禁用时段'
-                    elif is_in_block_time_now(task.get('block_time') or '{}', date_str, user_id):
-                        task['lock'] = True
-                        task['msg'] = '当前处于禁用时段'
 
                 if (not priority_excluded and not task['lock']
                         and self._has_uncompleted_materials(task, user_id, target_date)):
