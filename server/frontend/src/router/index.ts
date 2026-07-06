@@ -57,6 +57,11 @@ const routes: RouteRecordRaw[] = [
     name: "Tasks",
     component: () => import("@/views/tasks/PageTasks.vue"),
   },
+  {
+    path: "/browser",
+    name: "Browser",
+    component: () => import("@/views/browser/PageBrowser.vue"),
+  },
 ];
 
 const router = createRouter({

@@ -12,7 +12,7 @@ from flask import Blueprint
 from flask.typing import ResponseReturnValue
 
 import core.db.rds_mgr as rds_mgr
-from core.config import app_logger
+from core.config import app_logger, Config
 from core.utils import _err, _ok, read_json_from_request
 
 log = app_logger
@@ -52,7 +52,7 @@ def get_version() -> ResponseReturnValue:
         return _ok({
             "version": config_data.get("version", ""),
             "timestamp": config_data.get("timestamp", ""),
-            "env": config_data.get("env", ""),
+            "env": Config.ENV,
         })
     except Exception as e:
         log.error(f"[BrowserRoutes] 获取版本异常: {e}", exc_info=True)
@@ -64,6 +64,7 @@ def get_config() -> ResponseReturnValue:
     """查询浏览器配置（查）"""
     try:
         config_data = _load_config()
+        config_data["env"] = Config.ENV
         return _ok(config_data)
     except Exception as e:
         log.error(f"[BrowserRoutes] 查询配置异常: {e}", exc_info=True)

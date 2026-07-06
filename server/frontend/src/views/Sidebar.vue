@@ -50,6 +50,10 @@
           <el-icon><List /></el-icon>
           <template #title>阅读打卡</template>
         </el-menu-item>
+        <el-menu-item index="/browser">
+          <el-icon><Monitor /></el-icon>
+          <template #title>浏览器</template>
+        </el-menu-item>
         <el-menu-item index="#" @click="toggleCollapse">
           <el-icon><Expand v-if="isCollapse" /><Fold v-else /></el-icon>
           <template #title>折叠</template>
@@ -73,6 +77,7 @@ import {
   PieChart,
   List,
   Timer,
+  Monitor,
   Expand,
   Fold,
 } from "@element-plus/icons-vue";
