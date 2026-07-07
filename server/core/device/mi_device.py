@@ -36,6 +36,42 @@ async def _patched_securityTokenService(self, location, nonce, ssecurity):
 
 MiAccount._securityTokenService = _patched_securityTokenService
 
+# Monkey-patch: 修复 serviceToken 过期后清空整个 token 导致 passToken 丢失的问题
+import logging as _logging
+_mi_logger = _logging.getLogger("miservice")
+
+async def _patched_mi_request(self, sid, url, data, headers, relogin=True):
+    headers["User-Agent"] = self.now_ua
+    if (self.token and sid in self.token) or await self.login(sid):
+        cookies = {
+            "userId": self.token["userId"],
+            "serviceToken": self.token[sid][1],
+        }
+        content = data(self.token, cookies) if callable(data) else data
+        method = "GET" if data is None else "POST"
+        async with self.session.request(
+            method, url, data=content, cookies=cookies, headers=headers
+        ) as r:
+            status = r.status
+            if status == 200:
+                resp = await r.json(content_type=None)
+                code = resp["code"]
+                if code == 0:
+                    return resp
+                if "auth" in resp.get("message", "").lower():
+                    status = 401
+            else:
+                resp = await r.text()
+        if status == 401 and relogin:
+            _mi_logger.warn("Auth error on request %s %s, relogin...", url, resp)
+            self.token.pop(sid, None)  # only remove expired sid, keep passToken for lightweight refresh
+            return await self.mi_request(sid, url, data, headers, False)
+    else:
+        resp = "Login failed"
+    raise Exception(f"Error {url}: {resp}")
+
+MiAccount.mi_request = _patched_mi_request
+
 from core.config import app_logger, config
 from core.tools.async_util import run_async
 from core.utils import convert_to_http_url, format_time_str
