@@ -3,7 +3,7 @@
 在服务器直接运行: /home/leo/.conda/envs/flask_env/bin/python deploy/mi_login_final.py
 会自动填写账号密码，遇到短信验证码时让你输入，最后保存 token 到 ~/.mi.token
 """
-import asyncio, json, os, time, datetime
+import asyncio, json, os, subprocess, time, datetime
 from playwright.async_api import async_playwright
 
 from dotenv import load_dotenv
@@ -20,7 +20,8 @@ async def main():
         browser = await p.chromium.launch(
             headless=True,
             executable_path="/opt/chrome-linux/chrome",
-            args=["--no-sandbox", "--disable-setuid-sandbox", "--headless=new"]
+            args=["--no-sandbox", "--disable-setuid-sandbox", "--headless=new",
+                  "--disable-breakpad", "--disable-crash-reporter"]
         )
         context = await browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -98,5 +99,12 @@ async def main():
 
         print(f"[{ts()}] 总耗时: {elapsed:.1f}s")
         await browser.close()
+
+    # 清理可能残留的 chromium 子进程（crashpad_handler 等）
+    try:
+        subprocess.run(["pkill", "-f", "chrome_crashpad_handler"],
+                       capture_output=True, timeout=5)
+    except Exception:
+        pass
 
 asyncio.run(main())

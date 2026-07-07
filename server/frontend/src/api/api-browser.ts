@@ -9,10 +9,13 @@ export interface BrowserAppConfig {
   url: string;
 }
 
-export interface BrowserWhitelistConfig {
+export interface BrowserWhitelistItem {
   open: string;
   urls: string[];
 }
+
+/** 白名单配置：按用户 ID 分组，common 为通用 */
+export type BrowserWhitelistConfig = Record<string, BrowserWhitelistItem>;
 
 export interface BrowserAdminConfig {
   pin: string;
@@ -24,6 +27,10 @@ export interface BrowserMark {
   position: number;
 }
 
+/** 书签配置：按用户 ID 分组，common 为通用 */
+export type BrowserMarksConfig = Record<string, BrowserMark[]>;
+
+/** 浏览器配置 */
 export interface BrowserConfig {
   version: string;
   timestamp: string;
@@ -32,7 +39,7 @@ export interface BrowserConfig {
   app: BrowserAppConfig;
   admin: BrowserAdminConfig;
   whitelist: BrowserWhitelistConfig;
-  marks: BrowserMark[];
+  marks: BrowserMarksConfig;
 }
 
 /** 获取浏览器配置 */
