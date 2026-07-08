@@ -458,11 +458,13 @@ const doRequestUnlock = async (durationHours: number) => {
 
     unlocking.value = true;
     try {
-        await requestUnlockMaterial(materialId, userId, props.task?.id, durationHours);
-        // 申请已提交，提示等待审批
+        const res = await requestUnlockMaterial(materialId, userId, props.task?.id, durationHours);
+        // 申请已提交/更新，提示等待审批
         const successAlert = await alertController.create({
-            header: '申请已提交',
-            message: '不限时申请已提交，等待管理员审批后生效',
+            header: res.replaced ? '申请已更新' : '申请已提交',
+            message: res.replaced
+                ? '已有待审批申请，已更新为最新提交，等待管理员审批后生效'
+                : '不限时申请已提交，等待管理员审批后生效',
             buttons: ['确定'],
         });
         await successAlert.present();

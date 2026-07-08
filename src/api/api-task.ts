@@ -446,7 +446,7 @@ export async function requestUnlockMaterial(
   userId: number,
   taskId?: number,
   durationHours: number = 1
-): Promise<{ success: boolean; id: number }> {
+): Promise<{ success: boolean; id: number; replaced: boolean }> {
   const body: any = {
     material_id: materialId,
     user_id: userId,
@@ -455,7 +455,7 @@ export async function requestUnlockMaterial(
   if (taskId) {
     body.task_id = taskId;
   }
-  const rsp = await apiClient.post<ApiResponse<{ success: boolean; id: number }>>("/material/unlimit/apply", body);
+  const rsp = await apiClient.post<ApiResponse<{ success: boolean; id: number; replaced: boolean }>>("/material/unlimit/apply", body);
 
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg || "申请解锁失败");

@@ -510,6 +510,9 @@ class TaskMgr:
             duration_hours: 申请不限时时长（小时）
         """
         try:
+            # 移除该用户已有的待审批申请（多次提交只保留最后一次）
+            replaced_id = self._remove_pending_by_user(user_id)
+
             apply_id = int(time.time() * 1000)
             record = {
                 'id': apply_id,
@@ -530,8 +533,10 @@ class TaskMgr:
             log.info(
                 f"不限时申请已提交: id={apply_id} user={user_id} "
                 f"material={material_id} duration={duration_hours}h"
+                + (f" (替换旧申请 id={replaced_id})" if replaced_id else "")
             )
-            return {"code": 0, "msg": "申请已提交，等待管理员审批", "data": {"success": True, "id": apply_id}}
+            msg = "申请已更新，等待管理员审批" if replaced_id else "申请已提交，等待管理员审批"
+            return {"code": 0, "msg": msg, "data": {"success": True, "id": apply_id, "replaced": bool(replaced_id)}}
         except Exception as e:
             log.error(f"不限时申请提交失败: user={user_id} material={material_id}, {e}")
             return {"code": -1, "msg": f"申请失败: {str(e)}"}
@@ -553,6 +558,33 @@ class TaskMgr:
             'created_at': record.get('created_at'),
         })
         rds_mgr.set(TaskMgr.PENDING_INDEX_KEY, json.dumps(pending, ensure_ascii=False))
+
+    @staticmethod
+    def _remove_pending_by_user(user_id: int) -> Optional[int]:
+        """移除该用户已有的待审批申请，返回被移除的申请ID（无则返回None）。
+
+        多次提交只保留最后一次。
+        """
+        raw = rds_mgr.get_str(TaskMgr.PENDING_INDEX_KEY)
+        pending: List[Dict[str, Any]] = json.loads(raw) if raw else []
+        replaced_id = None
+        new_pending: List[Dict[str, Any]] = []
+        for item in pending:
+            if item.get('user_id') == user_id and item.get('status') == 'pending':
+                replaced_id = item.get('id')
+                # 标记旧记录为已替换
+                old_key = f"task:unlimit:apply:{replaced_id}"
+                old_raw = rds_mgr.get_str(old_key)
+                if old_raw:
+                    old_record = json.loads(old_raw)
+                    old_record['status'] = 'replaced'
+                    old_record['replaced_at'] = datetime.now().isoformat()
+                    rds_mgr.set(old_key, json.dumps(old_record, ensure_ascii=False))
+            else:
+                new_pending.append(item)
+        if replaced_id is not None:
+            rds_mgr.set(TaskMgr.PENDING_INDEX_KEY, json.dumps(new_pending, ensure_ascii=False))
+        return replaced_id
 
     def list_unlimit_applications(self, status: Optional[str] = None) -> Dict[str, Any]:
         """列出不限时申请（默认只返回待审批的）。
