@@ -180,8 +180,8 @@ import { REMOTE, LOCAL_IP, LOCAL_HTTP_PORT } from "@/api/config";
 
 // 用户列定义
 const USER_COLUMNS = [
-  { key: "3", label: "昭昭" },
-  { key: "4", label: "灿灿" },
+  { key: "3", label: "灿灿" },
+  { key: "4", label: "昭昭" },
 ];
 
 const loading = ref(false);

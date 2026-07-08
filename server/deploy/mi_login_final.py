@@ -3,7 +3,12 @@
 在服务器直接运行: /home/leo/.conda/envs/flask_env/bin/python deploy/mi_login_final.py
 会自动填写账号密码，遇到短信验证码时让你输入，最后保存 token 到 ~/.mi.token
 """
-import asyncio, json, os, subprocess, time, datetime
+import asyncio
+import json
+import os
+import subprocess
+import time
+import datetime
 from playwright.async_api import async_playwright
 
 from dotenv import load_dotenv
@@ -11,8 +16,10 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 MI_USER = os.getenv("MI_USER", "")
 MI_PASS = os.getenv("MI_PASS", "")
 
+
 def ts():
     return datetime.datetime.now().strftime("%H:%M:%S")
+
 
 async def main():
     t0 = time.time()
@@ -21,7 +28,8 @@ async def main():
             headless=True,
             executable_path="/opt/chrome-linux/chrome",
             args=["--no-sandbox", "--disable-setuid-sandbox", "--headless=new",
-                  "--disable-breakpad", "--disable-crash-reporter"]
+                  "--disable-crashpad", "--disable-breakpad",
+                  "--disable-gpu", "--disable-software-rasterizer"]
         )
         context = await browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -90,7 +98,8 @@ async def main():
 
         elapsed = time.time() - t0
         if uid:
-            token = {"userId": uid, "deviceId": "ABCDEF1234567890", "passToken": pt or ""}
+            token = {"userId": uid, "deviceId": "ABCDEF1234567890",
+                     "passToken": pt or ""}
             with open(os.path.expanduser("~/.mi.token"), "w") as f:
                 json.dump(token, f, indent=2)
             print(f"\n[{ts()}] 登录成功！userId: {uid}, token 已保存到 ~/.mi.token")
@@ -100,11 +109,12 @@ async def main():
         print(f"[{ts()}] 总耗时: {elapsed:.1f}s")
         await browser.close()
 
-    # 清理可能残留的 chromium 子进程（crashpad_handler 等）
-    try:
-        subprocess.run(["pkill", "-f", "chrome_crashpad_handler"],
-                       capture_output=True, timeout=5)
-    except Exception:
-        pass
+    # 清理可能残留的 chromium crashpad 子进程（可能以 root 运行，需 sudo）
+    for cmd in [["sudo", "pkill", "-9", "-f", "chrome_crashpad_handler"],
+                ["pkill", "-9", "-f", "chrome_crashpad_handler"]]:
+        try:
+            subprocess.run(cmd, capture_output=True, timeout=5)
+        except Exception:
+            pass
 
 asyncio.run(main())
