@@ -34,19 +34,22 @@
         <ion-button size="small" fill="outline" @click="setToday">今</ion-button>
       </div>
 
+      <!-- 审批入口（仅 admin 可见） -->
+      <ion-button v-if="isAdmin" size="small" fill="clear" @click="showApprovalModal = true" class="relative m-0!">
+        <ion-icon :icon="checkmarkCircle" class="w-5 h-5" />
+        <ion-badge v-if="unlimitCount > 0" color="danger" class="absolute top-0.5 right-0.5 text-xs px-1 min-w-4">{{
+          unlimitCount }}</ion-badge>
+      </ion-button>
+
       <ion-button size="" class="w-10! m-0! [&::part(native)]:p-0" fill="clear" id="more-trigger">
         <ion-icon slot="start" class="w-6 h-6" :icon="alertCircleOutline"></ion-icon>
       </ion-button>
 
+
+
       <!-- 更多选项 Popover -->
-      <ion-popover
-        trigger="more-trigger"
-        trigger-action="click"
-        class="[--width:90vw] [--max-width:320px]">
-        <TaskProgressPopover
-          :tasks="taskList"
-          :user-id="getCurrentUserId() || 0"
-          :date="currentDateStr" />
+      <ion-popover trigger="more-trigger" trigger-action="click" class="[--width:90vw] [--max-width:320px]">
+        <TaskProgressPopover :tasks="taskList" :user-id="getCurrentUserId() || 0" :date="currentDateStr" />
       </ion-popover>
     </div>
     <ion-content class="[&::part(scroll)]:px-4 [&::part(scroll)]:pb-2">
@@ -64,33 +67,16 @@
           <p>暂无任务</p>
         </div>
 
-        <ion-accordion-group
-          v-else
-          class="[--ion-item-background:transparent]"
-          :multiple="false"
-          :value="expandedAccordionValue"
-          @ionChange="onAccordionChange">
-          <ion-accordion
-            v-for="task in sortedDisplayTasks"
-            :key="task.id"
-            :value="String(task.id)"
+        <ion-accordion-group v-else class="[--ion-item-background:transparent]" :multiple="false"
+          :value="expandedAccordionValue" @ionChange="onAccordionChange">
+          <ion-accordion v-for="task in sortedDisplayTasks" :key="task.id" :value="String(task.id)"
             class="mb-2 overflow-hidden rounded-lg">
             <ion-item slot="header" color="light" lines="full">
-              <ion-icon
-                v-if="isTaskAllCompleted(task)"
-                :icon="checkmarkCircle"
-                slot="start"
+              <ion-icon v-if="isTaskAllCompleted(task)" :icon="checkmarkCircle" slot="start"
                 class="text-xl text-green-400 w-6"></ion-icon>
-              <ion-icon
-                v-else-if="task.lock"
-                :icon="lockClosed"
-                slot="start"
+              <ion-icon v-else-if="task.lock" :icon="lockClosed" slot="start"
                 class="text-xl text-gray-500 w-6"></ion-icon>
-              <ion-icon
-                v-else
-                :icon="checkmarkCircle"
-                slot="start"
-                class="text-xl text-gray-300 w-6"></ion-icon>
+              <ion-icon v-else :icon="checkmarkCircle" slot="start" class="text-xl text-gray-300 w-6"></ion-icon>
               <div class="flex items-baseline w-full mx-2">
                 <span class="text-base font-medium flex-1">{{ task.name }}</span>
                 <p class="text-xs text-gray-500">
@@ -98,45 +84,29 @@
                 </p>
               </div>
             </ion-item>
-            <div
-              slot="content"
-              class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 p-2">
-              <div
-                v-for="material in getSortedMaterialsForTask(task)"
-                :key="material.id"
-                class="relative w-full pb-[100%] cursor-pointer"
-                :class="{ 'opacity-90': task.lock }"
+            <div slot="content" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 p-2">
+              <div v-for="material in getSortedMaterialsForTask(task)" :key="material.id"
+                class="relative w-full pb-[100%] cursor-pointer" :class="{ 'opacity-90': task.lock }"
                 @click="handleMaterialClick(task, material)">
-                <div
-                  class="absolute inset-0 flex flex-col p-3 bg-white rounded-lg shadow-md">
+                <div class="absolute inset-0 flex flex-col p-3 bg-white rounded-lg shadow-md">
                   <div class="absolute top-2 inset-x-3 flex items-center justify-between">
-                    <ion-icon
-                      :icon="checkmarkCircle"
-                      class="text-xl"
-                      :class="
-                        isMaterialCompleted(task, material, currentDate)
-                          ? 'text-green-400'
-                          : 'text-gray-300'
+                    <ion-icon :icon="checkmarkCircle" class="text-xl" :class="isMaterialCompleted(task, material, currentDate)
+                        ? 'text-green-400'
+                        : 'text-gray-300'
                       "></ion-icon>
                     <span class="text-xs text-gray-500">{{ material.id }}</span>
                   </div>
                   <div class="flex-1 flex flex-col items-center justify-center min-h-0 w-full pt-5">
-                    <ion-icon
-                      :icon="material.type === 1 ? videocamOutline : documentTextOutline"
-                      color="primary"
+                    <ion-icon :icon="material.type === 1 ? videocamOutline : documentTextOutline" color="primary"
                       class="text-3xl mb-1 shrink-0"></ion-icon>
                     <div class="w-full px-1 h-10 flex items-center justify-center">
-                      <div
-                        class="w-full text-sm font-medium text-center leading-5 line-clamp-2 wrap-anywhere">
+                      <div class="w-full text-sm font-medium text-center leading-5 line-clamp-2 wrap-anywhere">
                         {{ material.name }}
                       </div>
                     </div>
                   </div>
                   <div class="shrink-0 h-5 flex items-center justify-center">
-                    <ion-icon
-                      v-if="task.lock"
-                      :icon="lockClosed"
-                      class="text-xl text-gray-500"></ion-icon>
+                    <ion-icon v-if="task.lock" :icon="lockClosed" class="text-xl text-gray-500"></ion-icon>
                     <span v-else class="text-xs">点击阅读</span>
                   </div>
                 </div>
@@ -147,35 +117,33 @@
       </div>
 
       <!-- 素材播放弹窗 -->
-      <MaterialPlayerDialog
-        v-model:is-open="showPlayerDialog"
-        :material="selectedMaterial"
-        :task="selectedTask"
-        :user-id="getCurrentUserId()"
-        :date="selectedDate"
-        @completed="handleMaterialCompleted" />
+      <MaterialPlayerDialog v-model:is-open="showPlayerDialog" :material="selectedMaterial" :task="selectedTask"
+        :user-id="getCurrentUserId()" :date="selectedDate" @completed="handleMaterialCompleted" />
 
       <!-- 任务日历弹窗 -->
-      <TaskCalendar
-        v-model:is-open="showCalendarDialog"
-        :selected-date="currentDateStr"
+      <TaskCalendar v-model:is-open="showCalendarDialog" :selected-date="currentDateStr"
         @date-selected="handleDateSelected" />
+
+      <!-- 不限时审批弹窗 -->
+      <UnlimitApprovalModal v-model:is-open="showApprovalModal" @approved="onApprovalDone" />
     </ion-content>
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { getTaskList, getMaterialListByIds, type Task, type MaterialItem } from "@/api/api-task";
+import { getTaskList, getMaterialListByIds, type Task, type MaterialItem, listUnlimitApplications } from "@/api/api-task";
 import { diffDays } from "@/utils/date-util";
 import dayjs from "dayjs";
 import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import MaterialPlayerDialog from "./dialogs/MaterialPlayerDialog.vue";
 import TaskProgressPopover from "./dialogs/TaskProgressPopover.vue";
 import TaskCalendar from "./dialogs/TaskCalendar.vue";
+import UnlimitApprovalModal from "./dialogs/UnlimitApprovalModal.vue";
 import EventBus, { C_EVENT } from "@/types/event-bus";
 import {
   IonAccordion,
   IonAccordionGroup,
+  IonBadge,
   IonButtons,
   IonHeader,
   IonLabel,
@@ -217,6 +185,10 @@ const selectedDate = ref<string>(""); // 素材对应的日期
 
 // 日历弹窗状态
 const showCalendarDialog = ref(false);
+
+// 审批弹窗状态（仅 admin）
+const showApprovalModal = ref(false);
+const unlimitCount = ref(0);
 
 // 当前日期字符串（使用 dayjs 避免 UTC 时区偏移）
 const currentDateStr = computed(() => {
@@ -389,6 +361,22 @@ const handleMaterialCompleted = () => {
   fetchTaskList();
 };
 
+// 拉取不限时审批列表（仅 admin）
+const fetchUnlimitList = async () => {
+  if (!isAdmin.value) return;
+  try {
+    const res = await listUnlimitApplications('pending');
+    unlimitCount.value = res.total;
+  } catch (e) {
+    console.error('获取审批列表失败:', e);
+  }
+};
+
+// 审批完成回调
+const onApprovalDone = () => {
+  fetchUnlimitList();
+};
+
 // 打开素材播放器
 const openMaterialPlayer = async (task: Task, material: MaterialItem) => {
   selectedMaterial.value = {
@@ -454,6 +442,9 @@ const fetchTaskList = async (showLoading = true) => {
       loading.value = false;
     }
   }
+
+  // Admin 同时拉取审批列表
+  fetchUnlimitList();
 };
 
 // 刷新任务
