@@ -68,3 +68,12 @@ export async function publishBrowserVersion(): Promise<{ version: string }> {
   }
   return rsp.data.data;
 }
+
+/** 构建浏览器（在指定目录执行 git 重置 + 构建脚本） */
+export async function buildBrowser(path: string): Promise<{ output: string; error: string; rc: number }> {
+  const rsp = await api.post<ApiResponse<{ output: string; error: string; rc: number }>>("/browser/build", { path });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
