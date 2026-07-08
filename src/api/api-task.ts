@@ -109,7 +109,7 @@ export async function getTaskList(
     const rsp = await apiClient.get<ApiResponse<ApiPagedResponse<Task>>>("/task/list", {
       params: {
         userId,
-        date: startDate,
+        startDate,
         pageNum,
         pageSize,
       },

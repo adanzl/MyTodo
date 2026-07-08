@@ -483,20 +483,28 @@ const toggleEditUrl = (userKey: string, index: number) => {
     // 退出编辑时处理 URL：去掉协议和端口
     const raw = whitelistForm[userKey].urls[index];
     whitelistForm[userKey].urls[index] = raw.replace(/^https?:\/\//, "").replace(/:\d+$/, "");
+    editingUrls[userKey][index] = false;
+    // 主动触发保存
+    if (whitelistLoaded && !savingWhitelist.value) {
+      handleSaveWhitelist(userKey);
+    }
+  } else {
+    editingUrls[userKey][index] = true;
   }
-  editingUrls[userKey][index] = !editingUrls[userKey][index];
 };
 
 // 自动保存
 let whitelistLoaded = false;
 let marksLoaded = false;
 
-// 监听每个用户的白名单变化
+// 监听每个用户的白名单变化（编辑中不保存，退出编辑时才触发）
 for (const col of USER_COLUMNS) {
   watch(
     () => ({ open: whitelistForm[col.key].open, urls: [...whitelistForm[col.key].urls] }),
     () => {
       if (!whitelistLoaded || savingWhitelist.value) return;
+      // 有 URL 正在编辑时跳过，等退出编辑再保存
+      if (Object.values(editingUrls[col.key]).some(Boolean)) return;
       handleSaveWhitelist(col.key);
     },
     { deep: true }
