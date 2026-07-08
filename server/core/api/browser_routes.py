@@ -14,7 +14,7 @@ from flask.typing import ResponseReturnValue
 
 import core.db.rds_mgr as rds_mgr
 from core.config import app_logger, Config
-from core.utils import _err, _ok, read_json_from_request
+from core.utils import _err, _ok, read_json_from_request, run_subprocess_safe
 
 log = app_logger
 browser_bp = Blueprint('browser', __name__)
@@ -101,6 +101,42 @@ def set_config() -> ResponseReturnValue:
         return _err('保存配置失败')
     except Exception as e:
         log.error(f"[BrowserRoutes] 更新配置异常: {e}", exc_info=True)
+        return _err(f'error: {str(e)}')
+
+
+@browser_bp.route('/browser/build', methods=['POST'])
+def build_browser() -> ResponseReturnValue:
+    """在指定目录执行 git 放弃本地修改 + 构建脚本"""
+    try:
+        json_data = read_json_from_request() or {}
+        build_path = json_data.get('path', '/mnt/data/project/linxi-browser').strip()
+        if not build_path:
+            return _err('构建路径不能为空')
+
+        # 1. git 放弃本地修改
+        rc1, out1, err1 = run_subprocess_safe(
+            ['git', 'checkout', '.'], cwd=build_path, timeout=30)
+        if rc1 != 0:
+            return _err(f'git checkout 失败: {err1 or out1}')
+
+        rc2, out2, err2 = run_subprocess_safe(
+            ['git', 'clean', '-fd'], cwd=build_path, timeout=30)
+        if rc2 != 0:
+            return _err(f'git clean 失败: {err2 or out2}')
+
+        # 2. 执行构建脚本
+        rc3, out3, err3 = run_subprocess_safe(
+            ['sh', 'deploy/package.sh'], cwd=build_path, timeout=300)
+
+        output = '\n'.join(filter(None, [out1, out2, out3]))
+        errors = '\n'.join(filter(None, [err1, err2, err3]))
+
+        if rc3 != 0:
+            return _err(f'构建失败 (code={rc3}): {errors or err3}')
+
+        return _ok({'output': output, 'error': errors, 'rc': rc3})
+    except Exception as e:
+        log.error(f"[BrowserRoutes] 构建异常: {e}", exc_info=True)
         return _err(f'error: {str(e)}')
 
 

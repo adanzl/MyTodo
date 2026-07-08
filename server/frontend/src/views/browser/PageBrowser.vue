@@ -58,6 +58,12 @@
                       :type="urlMode === 'local' ? 'primary' : ''">本地</el-button>
                   </div>
                 </el-form-item>
+                <el-form-item label="构建地址">
+                  <div class="flex gap-2 items-center w-full">
+                    <el-input v-model="buildPath" placeholder="/mnt/data/project/linxi-browser" class="flex-1" />
+                    <el-button type="warning" @click="handleBuild" :loading="building">构建</el-button>
+                  </div>
+                </el-form-item>
               </el-form>
             </div>
             <div class="flex-1 min-w-0">
@@ -139,7 +145,7 @@
                     </div>
                     <span class="text-xs text-blue-500 truncate">{{ mark.url || '-' }}</span>
                   </div>
-                  <el-button type="primary" plain @click="currentMarkUser = col.key; markForm.title = ''; markForm.url = ''; editingMarkIndex = -1; showMarkDialog = true"
+                  <el-button type="primary" plain @click="currentMarkUser = col.key; markForm.title = ''; markForm.url = 'https://'; editingMarkIndex = -1; showMarkDialog = true"
                     size="small">添加书签</el-button>
                 </div>
               </div>
@@ -174,7 +180,7 @@
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { ArrowDown, ArrowUp, Delete, Edit, Reading, Refresh, View } from "@element-plus/icons-vue";
-import { getBrowserConfig, setBrowserConfig, publishBrowserVersion } from "@/api/api-browser";
+import { getBrowserConfig, setBrowserConfig, publishBrowserVersion, buildBrowser } from "@/api/api-browser";
 import type { BrowserConfig, BrowserMark } from "@/api/api-browser";
 import { REMOTE, LOCAL_IP, LOCAL_HTTP_PORT } from "@/api/config";
 
@@ -190,6 +196,8 @@ const savingWhitelist = ref(false);
 const savingAdmin = ref(false);
 const savingMarks = ref(false);
 const publishing = ref(false);
+const building = ref(false);
+const buildPath = ref('/mnt/data/project/linxi-browser');
 
 // 下载地址域名切换
 const REMOTE_DOWNLOAD_DOMAIN = REMOTE.url.replace(/\/+$/, "");
@@ -327,6 +335,38 @@ const handlePublish = async () => {
     }
   } finally {
     publishing.value = false;
+  }
+};
+
+const handleBuild = async () => {
+  if (!buildPath.value.trim()) {
+    ElMessage.warning("请填写构建地址");
+    return;
+  }
+  try {
+    await ElMessageBox.confirm(
+      `将在 ${buildPath.value} 目录执行：\n1. git checkout .（放弃本地修改）\n2. git clean -fd（删除未跟踪文件）\n3. sh deploy/package.sh（执行构建脚本）\n\n确认继续？`,
+      "构建确认",
+      { type: "warning" }
+    );
+  } catch {
+    return;
+  }
+  building.value = true;
+  try {
+    const result = await buildBrowser(buildPath.value);
+    if (result.error) {
+      ElMessage.warning(`构建完成，但有警告：${result.error}`);
+    } else {
+      ElMessage.success("构建成功");
+    }
+    if (result.output) {
+      console.log("[Browser Build Output]", result.output);
+    }
+  } catch (e: unknown) {
+    ElMessage.error((e as Error).message || "构建失败");
+  } finally {
+    building.value = false;
   }
 };
 
