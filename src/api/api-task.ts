@@ -434,6 +434,107 @@ export async function finishMaterial(
   return rsp.data.data!;
 }
 
+/**
+ * 申请解锁视频素材（提交审批）
+ * @param materialId - 素材ID
+ * @param userId - 用户ID
+ * @param taskId - 任务ID(可选)
+ * @param durationHours - 申请解锁时长(小时)
+ */
+export async function requestUnlockMaterial(
+  materialId: number,
+  userId: number,
+  taskId?: number,
+  durationHours: number = 1
+): Promise<{ success: boolean; id: number }> {
+  const body: any = {
+    material_id: materialId,
+    user_id: userId,
+    duration_hours: durationHours,
+  };
+  if (taskId) {
+    body.task_id = taskId;
+  }
+  const rsp = await apiClient.post<ApiResponse<{ success: boolean; id: number }>>("/material/unlimit/apply", body);
 
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg || "申请解锁失败");
+  }
 
+  return rsp.data.data!;
+}
+
+/** 不限时申请列表项 */
+export interface UnlimitApplication {
+  id: number;
+  user_id: number;
+  material_id: number;
+  task_id?: number;
+  duration_hours: number;
+  status: 'pending' | 'approved' | 'denied';
+  created_at: string;
+  approved_at?: string;
+  denied_at?: string;
+}
+
+/**
+ * 列出不限时申请
+ * @param status - 过滤状态，默认 pending
+ */
+export async function listUnlimitApplications(
+  status?: string
+): Promise<{ applications: UnlimitApplication[]; total: number }> {
+  const params: any = {};
+  if (status) {
+    params.status = status;
+  }
+  const rsp = await apiClient.get<ApiResponse<{ applications: UnlimitApplication[]; total: number }>>(
+    "/material/unlimit/list",
+    { params }
+  );
+
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg || "获取申请列表失败");
+  }
+
+  return rsp.data.data!;
+}
+
+/**
+ * 批量审批通过不限时申请
+ * @param ids - 申请ID列表
+ */
+export async function approveUnlimitApplications(
+  ids: number[]
+): Promise<{ approved: number; not_found: number[] }> {
+  const rsp = await apiClient.post<ApiResponse<{ approved: number; not_found: number[] }>>(
+    "/material/unlimit/approve",
+    { ids }
+  );
+
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg || "审批失败");
+  }
+
+  return rsp.data.data!;
+}
+
+/**
+ * 批量拒绝不限时申请
+ * @param ids - 申请ID列表
+ */
+export async function denyUnlimitApplications(
+  ids: number[]
+): Promise<{ denied: number; not_found: number[] }> {
+  const rsp = await apiClient.post<ApiResponse<{ denied: number; not_found: number[] }>>(
+    "/material/unlimit/deny",
+    { ids }
+  );
+
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg || "拒绝失败");
+  }
+
+  return rsp.data.data!;
+}
 

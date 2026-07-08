@@ -124,7 +124,16 @@
           </div>
           <div v-if="videoLocked" class="absolute inset-0 z-10 flex flex-col justify-center items-center bg-black/80">
             <div class="text-white/90 text-lg mb-2">{{ lockReason || '视频观看超时' }}</div>
-            <div class="text-gray-400 text-sm">已达到观看时长限制</div>
+            <div class="text-gray-400 text-sm mb-4">已达到观看时长限制</div>
+            <ion-button
+              fill="outline"
+              color="warning"
+              size="small"
+              :disabled="unlocking"
+              @click="showUnlockAlert"
+            >
+              {{ unlocking ? '申请中...' : '申请解锁' }}
+            </ion-button>
           </div>
         </div>
         
@@ -167,7 +176,7 @@
 
 <script setup lang="ts">
 import { addUsage, type AddUsageBody, USAGE_TYPE_PDF, USAGE_TYPE_VIDEO } from '@/api';
-import { finishMaterial } from '@/api/api-task';
+import { finishMaterial, requestUnlockMaterial } from '@/api/api-task';
 import { apiClient } from '@/api/api-client';
 import AudioPreview from '@/components/AudioPreview.vue';
 import EventBus, { C_EVENT } from '@/types/event-bus';
@@ -186,6 +195,7 @@ import {
     IonIcon,
     IonModal,
     IonSpinner,
+    alertController,
 } from '@ionic/vue';
 import { chevronBackOutline, chevronForwardOutline, closeOutline, pauseOutline, playOutline } from 'ionicons/icons';
 import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -249,6 +259,7 @@ const VIDEO_LOCK_POLL_MS = 60_000;
 let videoLockPollTimer: number | null = null;
 const videoLocked = ref(false);
 const lockReason = ref('');
+const unlocking = ref(false);
 
 // 监听 AudioPreview 的播放状态
 const isAudioPlaying = computed(() => {
@@ -416,6 +427,56 @@ const setVideoLocked = (reason: string) => {
     lockReason.value = reason || '视频观看超时';
     stopVideoLockPolling();
     pauseVideo();
+};
+
+/** 弹出申请解锁时长选择 */
+const showUnlockAlert = async () => {
+    const alert = await alertController.create({
+        header: '申请解锁',
+        message: '选择申请解锁时长：',
+        buttons: [
+            {
+                text: '取消',
+                role: 'cancel',
+            },
+            {
+                text: '1小时',
+                handler: async () => {
+                    await doRequestUnlock(1);
+                },
+            },
+        ],
+    });
+    await alert.present();
+};
+
+/** 执行申请解锁请求 */
+const doRequestUnlock = async (durationHours: number) => {
+    const userId = props.userId;
+    const materialId = props.material?.id;
+    if (!userId || !materialId) return;
+
+    unlocking.value = true;
+    try {
+        await requestUnlockMaterial(materialId, userId, props.task?.id, durationHours);
+        // 申请已提交，提示等待审批
+        const successAlert = await alertController.create({
+            header: '申请已提交',
+            message: '不限时申请已提交，等待管理员审批后生效',
+            buttons: ['确定'],
+        });
+        await successAlert.present();
+    } catch (e: any) {
+        console.error('申请解锁失败:', e);
+        const errAlert = await alertController.create({
+            header: '申请失败',
+            message: e?.message || '请稍后重试',
+            buttons: ['确定'],
+        });
+        await errAlert.present();
+    } finally {
+        unlocking.value = false;
+    }
 };
 
 const pollVideoLockStatus = async () => {

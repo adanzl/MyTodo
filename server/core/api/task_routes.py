@@ -12,6 +12,7 @@ from core.config import app_logger
 from core.services.task.task_mgr import task_mgr
 from core.tools.validation import parse_with_model
 from core.utils import _err, read_json_from_request
+from typing import List
 
 log = app_logger
 task_bp = Blueprint('task', __name__)
@@ -29,6 +30,19 @@ class FinishMaterialQuery(BaseModel):
     material_id: int
     date: str
     user_id: int
+
+
+class ApplyUnlimitQuery(BaseModel):
+    """申请不限时参数"""
+    user_id: int
+    material_id: int
+    task_id: int | None = None
+    duration_hours: float = 1.0
+
+
+class ApproveDenyQuery(BaseModel):
+    """批量审批/拒绝参数"""
+    ids: List[int]
 
 
 @task_bp.route('/task/calendar', methods=['POST'])
@@ -108,6 +122,57 @@ def get_material_status() -> ResponseReturnValue:
     if not user_id or not material_id:
         return _err('Invalid userId or materialId')
     return task_mgr.get_material_status(user_id, material_id, task_id)
+
+
+@task_bp.route('/material/unlimit/apply', methods=['POST'])
+def apply_material_unlimit() -> ResponseReturnValue:
+    """申请视频不限时（暂时解除观看时长限制）"""
+    json_data = read_json_from_request()
+    body, err = parse_with_model(ApplyUnlimitQuery, json_data, err_factory=_err)
+    if err or not body:
+        return err or _err('Invalid request body')
+
+    log.info(f"=> [Unlimit Apply] user={body.user_id} material={body.material_id} duration={body.duration_hours}h")
+    result = task_mgr.apply_unlimit(
+        user_id=body.user_id,
+        material_id=body.material_id,
+        task_id=body.task_id,
+        duration_hours=body.duration_hours,
+    )
+    return result
+
+
+@task_bp.route('/material/unlimit/list', methods=['GET'])
+def list_unlimit_applications() -> ResponseReturnValue:
+    """列出所有未处理的不限时申请"""
+    status = request.args.get('status', 'pending')
+    return task_mgr.list_unlimit_applications(status if status else None)
+
+
+@task_bp.route('/material/unlimit/approve', methods=['POST'])
+def approve_unlimit_applications() -> ResponseReturnValue:
+    """批量审批通过不限时申请"""
+    json_data = read_json_from_request()
+    body, err = parse_with_model(ApproveDenyQuery, json_data, err_factory=_err)
+    if err or not body:
+        return err or _err('Invalid request body')
+
+    log.info(f"=> [Unlimit Approve] ids={body.ids}")
+    result = task_mgr.approve_unlimit(body.ids)
+    return result
+
+
+@task_bp.route('/material/unlimit/deny', methods=['POST'])
+def deny_unlimit_applications() -> ResponseReturnValue:
+    """批量拒绝不限时申请"""
+    json_data = read_json_from_request()
+    body, err = parse_with_model(ApproveDenyQuery, json_data, err_factory=_err)
+    if err or not body:
+        return err or _err('Invalid request body')
+
+    log.info(f"=> [Unlimit Deny] ids={body.ids}")
+    result = task_mgr.deny_unlimit(body.ids)
+    return result
 
 
 @task_bp.route('/task/parent', methods=['GET'])
