@@ -486,7 +486,7 @@ const toggleEditUrl = (userKey: string, index: number) => {
   if (editingUrls[userKey][index]) {
     // 退出编辑时处理 URL：去掉协议和端口
     const raw = whitelistForm[userKey].urls[index];
-    whitelistForm[userKey].urls[index] = raw.replace(/^https?:\/\//, "").replace(/:\d+/, "");
+    whitelistForm[userKey].urls[index] = raw.replace(/^https?:\/\//, "").replace(/:\d+$/, "");
   }
   editingUrls[userKey][index] = !editingUrls[userKey][index];
 };
