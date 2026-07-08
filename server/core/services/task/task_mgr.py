@@ -476,8 +476,8 @@ class TaskMgr:
         1. 存在更高优先级（数值更小）的未完成任务（priority=-1 的任务不参与此项）
         2. 前置日程未完成
         3. 前置任务在当天仍有未完成打卡
-        4. 当前处于任务级禁用时段（任务配置优先于全局）
-        5. 当前处于全局禁用时段（仅在任务无 block_time 配置时生效）
+
+        注意：block_time 校验不在此处处理，由 /material/status 接口单独负责。
         """
         if not user_id or not date_str:
             for task in tasks:
@@ -491,7 +491,6 @@ class TaskMgr:
             sorted_tasks = sorted(tasks, key=lambda x: x.get('priority', 999))
             highest_uncompleted_priority = None
             highest_uncompleted_task_name = None
-            global_locked = is_global_block_time_now(date_str, user_id)
 
             for task in sorted_tasks:
                 priority = task.get('priority')
@@ -530,22 +529,6 @@ class TaskMgr:
                                 task['lock'] = True
                                 task['msg'] = f'请先完成前置任务：{pre.get("name", f"任务{tid}")}'
                                 break
-
-                if not task.get('lock'):
-                    # 任务级 block_time 优先于全局
-                    block_time_raw = task.get('block_time') or '{}'
-                    config = parse_block_time_config(block_time_raw)
-                    task_entry = _get_user_entry(config, user_id)
-                    if task_entry is not None:
-                        # 任务有此用户的 block_time 配置 → 以任务配置为准
-                        if _is_blocked_by_entry(task_entry, datetime.now()):
-                            task['lock'] = True
-                            task['msg'] = '当前处于任务禁用时段'
-                        # 任务配置允许 → 不锁，跳过全局
-                    elif global_locked:
-                        # 任务无此用户的配置 → 回退到全局检查
-                        task['lock'] = True
-                        task['msg'] = '当前处于全局禁用时段'
 
                 if (not priority_excluded and not task['lock']
                         and self._has_uncompleted_materials(task, user_id, target_date)):
