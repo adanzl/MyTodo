@@ -103,7 +103,8 @@ class BrowserMgr:
         if existing_pid and self._is_pid_alive(existing_pid):
             return -1, f'已有构建任务在运行中 (pid={existing_pid})', {}
 
-        log_file = os.path.join(build_path, 'build.log')
+        # 日志放到 /tmp，避免被 git clean -fd 删除
+        log_file = f'/tmp/browser-build-{int(time.time())}.log'
 
         # 将整个流程包装为一个后台脚本，输出全部写入日志文件
         shell_cmd = (
