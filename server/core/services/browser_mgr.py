@@ -107,6 +107,7 @@ class BrowserMgr:
         log_file = f'/tmp/browser-build-{int(time.time())}.log'
 
         # 将整个流程包装为一个后台脚本，输出全部写入日志文件
+        # 使用 bash -l 加载 .bashrc/.profile 环境变量
         shell_cmd = (
             'set -e; '
             'echo "=== git checkout . ==="; '
@@ -119,9 +120,9 @@ class BrowserMgr:
 
         try:
             log_f = open(log_file, 'w')
-            # 继承当前环境变量，确保 JAVA_HOME 等正确传递
+            # 使用 bash -l 加载登录环境（.bashrc/.profile）
             proc = subprocess.Popen(
-                ['sh', '-c', shell_cmd],
+                ['bash', '-l', '-c', shell_cmd],
                 cwd=build_path,
                 stdout=log_f,
                 stderr=subprocess.STDOUT,
