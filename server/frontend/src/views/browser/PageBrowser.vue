@@ -64,8 +64,12 @@
                     <el-button type="warning" @click="handleBuild" :loading="building">构建</el-button>
                   </div>
                   <div v-if="buildStatus" class="flex gap-2 items-center mt-1 text-xs">
-                    <el-tag :type="buildStatus.status === 'success' ? 'success' : buildStatus.status === 'failed' ? 'danger' : 'warning'" size="small">
-                      {{ buildStatus.status === 'building' && buildStatus.alive ? '构建中' : buildStatus.status === 'success' ? '构建成功' : buildStatus.status === 'failed' ? '构建失败' : buildStatus.status || '未构建' }}
+                    <el-tag
+                      :type="buildStatus.status === 'success' ? 'success' : buildStatus.status === 'failed' ? 'danger' : 'warning'"
+                      size="small">
+                      {{ buildStatus.status === 'building' && buildStatus.alive ? '构建中' : buildStatus.status ===
+                        'success' ?
+                        '构建成功' : buildStatus.status === 'failed' ? '构建失败' : buildStatus.status || '未构建' }}
                     </el-tag>
                     <span class="text-gray-400">{{ buildStatus.time }}</span>
                     <span v-if="buildStatus.pid" class="text-gray-400">pid={{ buildStatus.pid }}</span>
@@ -153,7 +157,8 @@
                     </div>
                     <span class="text-xs text-blue-500 truncate">{{ mark.url || '-' }}</span>
                   </div>
-                  <el-button type="primary" plain @click="currentMarkUser = col.key; markForm.title = ''; markForm.url = 'https://'; editingMarkIndex = -1; showMarkDialog = true"
+                  <el-button type="primary" plain
+                    @click="currentMarkUser = col.key; markForm.title = ''; markForm.url = 'https://'; editingMarkIndex = -1; showMarkDialog = true"
                     size="small">添加书签</el-button>
                 </div>
               </div>
@@ -354,7 +359,7 @@ const handleBuild = async () => {
   }
   try {
     await ElMessageBox.confirm(
-      `将在 ${buildPath.value} 目录执行：\n1. git checkout .（放弃本地修改）\n2. git clean -fd（删除未跟踪文件）\n3. sh deploy/package.sh（后台执行构建脚本）\n\n确认继续？`,
+      `将在 ${buildPath.value} 目录执行：sh deploy/package.sh（后台执行构建脚本）\n\n确认继续？`,
       "构建确认",
       { type: "warning" }
     );

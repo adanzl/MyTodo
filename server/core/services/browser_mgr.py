@@ -119,12 +119,14 @@ class BrowserMgr:
 
         try:
             log_f = open(log_file, 'w')
+            # 继承当前环境变量，确保 JAVA_HOME 等正确传递
             proc = subprocess.Popen(
                 ['sh', '-c', shell_cmd],
                 cwd=build_path,
                 stdout=log_f,
                 stderr=subprocess.STDOUT,
                 start_new_session=True,
+                env=os.environ.copy(),
             )
             pid = proc.pid
         except Exception as e:
