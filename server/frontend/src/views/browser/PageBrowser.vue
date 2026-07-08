@@ -237,7 +237,6 @@ const whitelistForm = reactive<Record<string, { open: string; urls: string[] }>>
   "3": { open: "false", urls: [] },
   "4": { open: "false", urls: [] },
 });
-const originalUrls = ref<Record<string, string[]>>({ "3": [], "4": [] });
 const editingUrls = reactive<Record<string, Record<number, boolean>>>({ "3": {}, "4": {} });
 const adminForm = reactive({ pin: "" });
 // 书签：按用户分组
@@ -258,7 +257,6 @@ const loadConfig = async () => {
     for (const col of USER_COLUMNS) {
       const w = data.whitelist?.[col.key];
       whitelistForm[col.key] = { open: w?.open || "false", urls: [...(w?.urls || [])] };
-      originalUrls.value[col.key] = [...(w?.urls || [])];
       editingUrls[col.key] = {};
     }
     // 书签：按用户分组加载
@@ -290,9 +288,7 @@ const handleSaveWhitelist = async (userKey: string) => {
   savingWhitelist.value = true;
   try {
     const form = whitelistForm[userKey];
-    const urls = form.urls.map((url, i) =>
-      editingUrls[userKey][i] ? originalUrls.value[userKey][i] ?? url : url
-    ).filter((u: string) => u.trim() !== "");
+    const urls = form.urls.filter((u: string) => u.trim() !== "");
     const whitelist = { ...config.value.whitelist, [userKey]: { open: form.open, urls } };
     const result = await setBrowserConfig({ whitelist });
     config.value = result;
