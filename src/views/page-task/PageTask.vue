@@ -167,6 +167,7 @@
 <script setup lang="ts">
 import { getTaskList, getMaterialListByIds, type Task, type MaterialItem } from "@/api/api-task";
 import { diffDays } from "@/utils/date-util";
+import dayjs from "dayjs";
 import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import MaterialPlayerDialog from "./dialogs/MaterialPlayerDialog.vue";
 import TaskProgressPopover from "./dialogs/TaskProgressPopover.vue";
@@ -217,9 +218,9 @@ const selectedDate = ref<string>(""); // 素材对应的日期
 // 日历弹窗状态
 const showCalendarDialog = ref(false);
 
-// 当前日期字符串
+// 当前日期字符串（使用 dayjs 避免 UTC 时区偏移）
 const currentDateStr = computed(() => {
-  return currentDate.value.toISOString().split("T")[0];
+  return dayjs(currentDate.value).format("YYYY-MM-DD");
 });
 
 // 获取全局变量
@@ -398,8 +399,8 @@ const openMaterialPlayer = async (task: Task, material: MaterialItem) => {
     path: material.path,
   };
   selectedTask.value = task;
-  // 计算素材对应的日期
-  selectedDate.value = currentDate.value.toISOString().split("T")[0];
+  // 计算素材对应的日期（使用 dayjs 避免 UTC 时区偏移）
+  selectedDate.value = dayjs(currentDate.value).format("YYYY-MM-DD");
   showPlayerDialog.value = true;
 };
 
@@ -411,8 +412,8 @@ const fetchTaskList = async (showLoading = true) => {
   try {
     const userId = getCurrentUserId();
 
-    // 使用当前选中的日期，而不是今天
-    const selectedDateStr = currentDate.value.toISOString().split("T")[0];
+    // 使用当前选中的日期，而不是今天（使用 dayjs 避免 UTC 时区偏移）
+    const selectedDateStr = dayjs(currentDate.value).format("YYYY-MM-DD");
 
     if (!userId) {
       taskList.value = [];
