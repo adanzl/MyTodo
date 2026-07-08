@@ -69,9 +69,18 @@ export async function publishBrowserVersion(): Promise<{ version: string }> {
   return rsp.data.data;
 }
 
-/** 构建浏览器（在指定目录执行 git 重置 + 构建脚本） */
-export async function buildBrowser(path: string): Promise<{ output: string; error: string; rc: number }> {
-  const rsp = await api.post<ApiResponse<{ output: string; error: string; rc: number }>>("/browser/build", { path });
+/** 构建浏览器（后台异步执行） */
+export async function buildBrowser(path: string): Promise<{ pid: number; log: string }> {
+  const rsp = await api.post<ApiResponse<{ pid: number; log: string }>>("/browser/build", { path });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
+
+/** 获取构建状态 */
+export async function getBuildStatus(): Promise<{ status: string; time: string; path: string; pid: number; log: string; alive: boolean }> {
+  const rsp = await api.get<ApiResponse<{ status: string; time: string; path: string; pid: number; log: string; alive: boolean }>>("/browser/build/status");
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
   }

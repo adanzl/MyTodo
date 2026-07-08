@@ -1,64 +1,30 @@
 """Browser 浏览器配置下发路由。
-提供浏览器客户端的版本查询、配置查询和配置更新功能。
+提供浏览器客户端的版本查询、配置更新和构建功能。
 """
 
 from __future__ import annotations
 
-import hashlib
-import json
-import time
-from typing import Any, Dict
-
 from flask import Blueprint
 from flask.typing import ResponseReturnValue
 
-import core.db.rds_mgr as rds_mgr
-from core.config import app_logger, Config
-from core.utils import _err, _ok, read_json_from_request, run_subprocess_safe
+from core.config import Config
+from core.services.browser_mgr import browser_mgr
+from core.utils import _err, _ok, read_json_from_request
 
-log = app_logger
 browser_bp = Blueprint('browser', __name__)
-
-_REDIS_KEY = 'browser:config'
-
-_TS_FMT = '%Y-%m-%d %H:%M:%S'
-
-
-def _load_config() -> Dict[str, Any]:
-    """从 Redis 加载浏览器配置"""
-    try:
-        raw = rds_mgr.get_str(_REDIS_KEY)
-        if raw:
-            parsed = json.loads(raw)
-            if isinstance(parsed, dict):
-                return parsed
-    except Exception as e:
-        log.warning(f"[BrowserRoutes] 从 Redis 加载配置失败: {e}")
-    return {}
-
-
-def _save_config(config_data: Dict[str, Any]) -> bool:
-    """保存浏览器配置到 Redis"""
-    try:
-        rds_mgr.set(_REDIS_KEY, json.dumps(config_data, ensure_ascii=False))
-        return True
-    except Exception as e:
-        log.error(f"[BrowserRoutes] 保存配置到 Redis 失败: {e}")
-        return False
 
 
 @browser_bp.route('/browser/version', methods=['GET'])
 def get_version() -> ResponseReturnValue:
     """获取版本信息（从配置中读取）"""
     try:
-        config_data = _load_config()
+        config_data = browser_mgr.load_config()
         return _ok({
             "version": config_data.get("version", ""),
             "timestamp": config_data.get("timestamp", ""),
             "env": Config.ENV,
         })
     except Exception as e:
-        log.error(f"[BrowserRoutes] 获取版本异常: {e}", exc_info=True)
         return _err(f'error: {str(e)}')
 
 
@@ -66,11 +32,10 @@ def get_version() -> ResponseReturnValue:
 def get_config() -> ResponseReturnValue:
     """查询浏览器配置（查）"""
     try:
-        config_data = _load_config()
+        config_data = browser_mgr.load_config()
         config_data["env"] = Config.ENV
         return _ok(config_data)
     except Exception as e:
-        log.error(f"[BrowserRoutes] 查询配置异常: {e}", exc_info=True)
         return _err(f'error: {str(e)}')
 
 
@@ -79,28 +44,11 @@ def set_config() -> ResponseReturnValue:
     """更新浏览器配置（改），合并写入"""
     try:
         json_data = read_json_from_request()
-        if not json_data:
-            return _err('请求数据不能为空')
-
-        current = _load_config()
-
-        # 如果包含 admin.pin，自动 MD5 加密（空字符串表示清空，不加密）
-        admin = json_data.get("admin")
-        if isinstance(admin, dict) and "pin" in admin and admin["pin"]:
-            admin = dict(admin)
-            admin["pin"] = hashlib.md5(admin["pin"].encode("utf-8")).hexdigest()
-            json_data["admin"] = admin
-
-        json_data["timestamp"] = time.strftime(_TS_FMT)
-
-        current.update(json_data)
-
-        if _save_config(current):
-            log.info(f"[BrowserRoutes] 配置已更新: {json_data}")
-            return _ok(current)
-        return _err('保存配置失败')
+        code, msg, data = browser_mgr.update_config(json_data)
+        if code != 0:
+            return _err(msg)
+        return _ok(data)
     except Exception as e:
-        log.error(f"[BrowserRoutes] 更新配置异常: {e}", exc_info=True)
         return _err(f'error: {str(e)}')
 
 
@@ -109,60 +57,33 @@ def build_browser() -> ResponseReturnValue:
     """在指定目录执行 git 放弃本地修改 + 构建脚本"""
     try:
         json_data = read_json_from_request() or {}
-        build_path = json_data.get('path', '/mnt/data/project/linxi-browser').strip()
-        if not build_path:
-            return _err('构建路径不能为空')
-
-        # 1. git 放弃本地修改
-        rc1, out1, err1 = run_subprocess_safe(
-            ['git', 'checkout', '.'], cwd=build_path, timeout=30)
-        if rc1 != 0:
-            return _err(f'git checkout 失败: {err1 or out1}')
-
-        rc2, out2, err2 = run_subprocess_safe(
-            ['git', 'clean', '-fd'], cwd=build_path, timeout=30)
-        if rc2 != 0:
-            return _err(f'git clean 失败: {err2 or out2}')
-
-        # 2. 执行构建脚本
-        rc3, out3, err3 = run_subprocess_safe(
-            ['sh', 'deploy/package.sh'], cwd=build_path, timeout=300)
-
-        output = '\n'.join(filter(None, [out1, out2, out3]))
-        errors = '\n'.join(filter(None, [err1, err2, err3]))
-
-        if rc3 != 0:
-            return _err(f'构建失败 (code={rc3}): {errors or err3}')
-
-        return _ok({'output': output, 'error': errors, 'rc': rc3})
+        build_path = json_data.get(
+            'path', '/mnt/data/project/linxi-browser').strip()
+        code, msg, data = browser_mgr.build(build_path)
+        if code != 0:
+            return _err(msg)
+        return _ok(data)
     except Exception as e:
-        log.error(f"[BrowserRoutes] 构建异常: {e}", exc_info=True)
+        return _err(f'error: {str(e)}')
+
+
+@browser_bp.route('/browser/build/status', methods=['GET'])
+def get_build_status() -> ResponseReturnValue:
+    """获取构建状态和时间"""
+    try:
+        status = browser_mgr.get_build_status()
+        return _ok(status)
+    except Exception as e:
         return _err(f'error: {str(e)}')
 
 
 @browser_bp.route('/browser/publish', methods=['POST'])
 def publish_version() -> ResponseReturnValue:
-    """发布版本：自动递增 version 并更新 buildTime"""
+    """发布版本：自动递增 version 并更新 publishTime"""
     try:
-        config_data = _load_config()
-
-        # 语义化版本递增 patch
-        raw = config_data.get("version", "0.0.0")
-        parts = raw.split(".")
-        try:
-            major, minor, patch = (int(parts[i]) if i < len(parts) and parts[i].isdigit() else 0 for i in range(3))
-            patch += 1
-        except (ValueError, IndexError):
-            major, minor, patch = 0, 0, 1
-        config_data["version"] = f"{major}.{minor}.{patch}"
-        config_data["publishTime"] = time.strftime(_TS_FMT)
-
-        if _save_config(config_data):
-            log.info(f"[BrowserRoutes] 版本已发布: {config_data['version']}")
-            return _ok({
-                "version": config_data["version"],
-            })
-        return _err('发布版本失败')
+        code, msg, data = browser_mgr.publish_version()
+        if code != 0:
+            return _err(msg)
+        return _ok(data)
     except Exception as e:
-        log.error(f"[BrowserRoutes] 发布版本异常: {e}", exc_info=True)
         return _err(f'error: {str(e)}')
