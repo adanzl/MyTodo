@@ -63,6 +63,14 @@
                     <el-input v-model="buildPath" placeholder="/mnt/data/project/linxi-browser" class="flex-1" />
                     <el-button type="warning" @click="handleBuild" :loading="building">构建</el-button>
                   </div>
+                  <div v-if="buildStatus" class="flex gap-2 items-center mt-1 text-xs">
+                    <el-tag :type="buildStatus.status === 'success' ? 'success' : buildStatus.status === 'failed' ? 'danger' : 'warning'" size="small">
+                      {{ buildStatus.status === 'building' && buildStatus.alive ? '构建中' : buildStatus.status === 'success' ? '构建成功' : buildStatus.status === 'failed' ? '构建失败' : buildStatus.status || '未构建' }}
+                    </el-tag>
+                    <span class="text-gray-400">{{ buildStatus.time }}</span>
+                    <span v-if="buildStatus.pid" class="text-gray-400">pid={{ buildStatus.pid }}</span>
+                    <el-button link type="primary" size="small" @click="loadBuildStatus">刷新</el-button>
+                  </div>
                 </el-form-item>
               </el-form>
             </div>
@@ -180,7 +188,7 @@
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { ArrowDown, ArrowUp, Delete, Edit, Reading, Refresh, View } from "@element-plus/icons-vue";
-import { getBrowserConfig, setBrowserConfig, publishBrowserVersion, buildBrowser } from "@/api/api-browser";
+import { getBrowserConfig, setBrowserConfig, publishBrowserVersion, buildBrowser, getBuildStatus } from "@/api/api-browser";
 import type { BrowserConfig, BrowserMark } from "@/api/api-browser";
 import { REMOTE, LOCAL_IP, LOCAL_HTTP_PORT } from "@/api/config";
 
@@ -198,6 +206,7 @@ const savingMarks = ref(false);
 const publishing = ref(false);
 const building = ref(false);
 const buildPath = ref('/mnt/data/project/linxi-browser');
+const buildStatus = ref<{ status: string; time: string; path: string; pid: number; log: string; alive: boolean } | null>(null);
 
 // 下载地址域名切换
 const REMOTE_DOWNLOAD_DOMAIN = REMOTE.url.replace(/\/+$/, "");
@@ -345,7 +354,7 @@ const handleBuild = async () => {
   }
   try {
     await ElMessageBox.confirm(
-      `将在 ${buildPath.value} 目录执行：\n1. git checkout .（放弃本地修改）\n2. git clean -fd（删除未跟踪文件）\n3. sh deploy/package.sh（执行构建脚本）\n\n确认继续？`,
+      `将在 ${buildPath.value} 目录执行：\n1. git checkout .（放弃本地修改）\n2. git clean -fd（删除未跟踪文件）\n3. sh deploy/package.sh（后台执行构建脚本）\n\n确认继续？`,
       "构建确认",
       { type: "warning" }
     );
@@ -355,18 +364,20 @@ const handleBuild = async () => {
   building.value = true;
   try {
     const result = await buildBrowser(buildPath.value);
-    if (result.error) {
-      ElMessage.warning(`构建完成，但有警告：${result.error}`);
-    } else {
-      ElMessage.success("构建成功");
-    }
-    if (result.output) {
-      console.log("[Browser Build Output]", result.output);
-    }
+    ElMessage.success(`构建已启动 (pid=${result.pid})，日志: ${result.log}`);
+    await loadBuildStatus();
   } catch (e: unknown) {
     ElMessage.error((e as Error).message || "构建失败");
   } finally {
     building.value = false;
+  }
+};
+
+const loadBuildStatus = async () => {
+  try {
+    buildStatus.value = await getBuildStatus();
+  } catch {
+    // 忽略，可能还没有构建过
   }
 };
 
@@ -505,6 +516,7 @@ for (const col of USER_COLUMNS) {
 
 onMounted(async () => {
   await loadConfig();
+  await loadBuildStatus();
   whitelistLoaded = true;
   marksLoaded = true;
 });
