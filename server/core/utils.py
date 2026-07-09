@@ -15,6 +15,16 @@ from datetime import datetime, timedelta
 from typing import Optional, Tuple, List, Dict, Any, Union, TypedDict
 
 
+def fmt_ts(minutes: int = 0) -> str:
+    """返回带时区偏移的时间字符串，如 '2026-07-09 12:34:56 +08:00'。
+    minutes>0 表示当前时间之后的分钟。
+    """
+    dt = datetime.now() + timedelta(minutes=minutes)
+    offset = dt.astimezone().utcoffset()
+    hours = int(offset.total_seconds() / 3600) if offset else 0
+    return dt.strftime(f'%Y-%m-%d %H:%M:%S {hours:+03d}:00')
+
+
 class FileInfo(TypedDict, total=False):
     name: str
     path: str
@@ -25,6 +35,8 @@ class FileInfo(TypedDict, total=False):
     status: str
     error: str
     output_path: str
+
+
 from urllib.parse import quote, unquote
 from flask import request
 from queue import Queue, Empty
@@ -87,8 +99,7 @@ def read_json_from_request() -> Dict[str, Any]:
             return json.loads(raw_data.decode('utf-8'))
         return {}
     except Exception as e:
-        log.warning(
-            f"[read_json_from_request] 读取 JSON 失败，降级到 request.get_json(): {e}")
+        log.warning(f"[read_json_from_request] 读取 JSON 失败，降级到 request.get_json(): {e}")
         try:
             return request.get_json(silent=True) or {}
         except Exception:
@@ -213,8 +224,7 @@ def get_media_duration(file_path: str) -> Optional[int]:
                     try:
                         # 尝试解析整个输出（通常是单行浮点数）
                         duration = float(stdout)
-                        result_container['duration'] = int(
-                            duration) if duration else None
+                        result_container['duration'] = int(duration) if duration else None
                         # 如果成功解析，即使返回码非0也认为成功
                         return
                     except (ValueError, TypeError):
@@ -226,8 +236,7 @@ def get_media_duration(file_path: str) -> Optional[int]:
                                 continue
                             try:
                                 duration = float(line)
-                                result_container['duration'] = int(
-                                    duration) if duration else None
+                                result_container['duration'] = int(duration) if duration else None
                                 return
                             except (ValueError, TypeError):
                                 continue
@@ -261,10 +270,8 @@ def get_media_duration(file_path: str) -> Optional[int]:
 
     # 检查结果
     if result_container['error']:
-        cmd_info = f", command: {result_container['command']}" if result_container.get(
-            'command') else ""
-        log.warning(
-            f"[Utils] Error getting media duration for {file_path}: {result_container['error']}{cmd_info}")
+        cmd_info = f", command: {result_container['command']}" if result_container.get('command') else ""
+        log.warning(f"[Utils] Error getting media duration for {file_path}: {result_container['error']}{cmd_info}")
         return None
 
     return result_container['duration']
@@ -413,8 +420,7 @@ def get_media_url(local_path: str) -> str:
             filepath = local_path
 
         # URL 编码路径
-        encoded_path = '/'.join(quote(part, safe='')
-                                for part in filepath.split('/'))
+        encoded_path = '/'.join(quote(part, safe='') for part in filepath.split('/'))
 
         # 获取服务器URL（使用固定地址）
         base_url = _get_media_server_url()
@@ -502,8 +508,7 @@ def check_cron_will_trigger_today(cron_expression: str) -> bool:
         parts = cron_expression.strip().split()
         if len(parts) == 6:
             second, minute, hour, day, month, day_of_week = parts
-            converted_day_of_week = convert_standard_cron_weekday_to_apscheduler(
-                day_of_week)
+            converted_day_of_week = convert_standard_cron_weekday_to_apscheduler(day_of_week)
             trigger = CronTrigger(second=second,
                                   minute=minute,
                                   hour=hour,
@@ -512,10 +517,8 @@ def check_cron_will_trigger_today(cron_expression: str) -> bool:
                                   day_of_week=converted_day_of_week)
         elif len(parts) == 5:
             minute, hour, day, month, day_of_week = parts
-            converted_day_of_week = convert_standard_cron_weekday_to_apscheduler(
-                day_of_week)
-            trigger = CronTrigger(
-                minute=minute, hour=hour, day=day, month=month, day_of_week=converted_day_of_week)
+            converted_day_of_week = convert_standard_cron_weekday_to_apscheduler(day_of_week)
+            trigger = CronTrigger(minute=minute, hour=hour, day=day, month=month, day_of_week=converted_day_of_week)
         else:
             return False
 
@@ -709,11 +712,9 @@ def _cleanup_directory(directory: Optional[str], file_paths: Optional[List[str]]
         pass
 
 
-def save_uploaded_files(
-    files: List[Any],
-    target_dir: Optional[str] = None,
-    temp_prefix: str = 'upload_'
-) -> Tuple[Optional[List[str]], Optional[str]]:
+def save_uploaded_files(files: List[Any],
+                        target_dir: Optional[str] = None,
+                        temp_prefix: str = 'upload_') -> Tuple[Optional[List[str]], Optional[str]]:
     """保存上传的文件到指定目录或临时目录。
 
     通用文件上传保存函数，支持两种模式：
@@ -815,8 +816,7 @@ def run_subprocess_safe(cmd: List[str],
     def _run():
         """在线程中使用 os.system + 临时文件运行命令，完全避免 gevent 的 subprocess patch"""
         try:
-            _run_with_os_system(cmd, timeout, env, cwd,
-                                result_queue, error_queue)
+            _run_with_os_system(cmd, timeout, env, cwd, result_queue, error_queue)
         except Exception as e:
             error_queue.put(e)
 
@@ -859,10 +859,8 @@ def _run_with_os_system(cmd_list: List[str], timeout_val: float, env_dict: Optio
             returncode_path = tmp_rc.name
 
         # 构建并执行命令
-        shell_cmd = _build_shell_command(
-            cmd_list, env_dict, cwd_path, stdout_path, stderr_path, returncode_path)
-        returncode = _execute_with_timeout(
-            shell_cmd, timeout_val, cmd_list, error_q)
+        shell_cmd = _build_shell_command(cmd_list, env_dict, cwd_path, stdout_path, stderr_path, returncode_path)
+        returncode = _execute_with_timeout(shell_cmd, timeout_val, cmd_list, error_q)
 
         if returncode is None:  # 超时或出错
             return
@@ -907,8 +905,7 @@ def _build_windows_command(quoted_cmd: str, env_dict: Optional[Dict[str, str]], 
             full_cmd_parts.append(f'set {k}={shlex.quote(v)}')
 
     # 执行命令并重定向输出
-    full_cmd_parts.append(
-        f'{quoted_cmd} > {shlex.quote(stdout_path)} 2> {shlex.quote(stderr_path)}')
+    full_cmd_parts.append(f'{quoted_cmd} > {shlex.quote(stdout_path)} 2> {shlex.quote(stderr_path)}')
 
     # 捕获返回码
     full_cmd_parts.append(
