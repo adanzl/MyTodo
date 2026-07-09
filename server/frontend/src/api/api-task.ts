@@ -169,7 +169,7 @@ export async function deleteMaterialCategory(
 export async function getMaterialParentChain(
   materialId: number
 ): Promise<Array<{ id: number; name: string; parent?: number | null }>> {
-  const response = await api.get("/task/parent", {
+  const response = await api.get("/material/parent", {
     params: { materialId },
   });
   if (response.data.code !== 0) {

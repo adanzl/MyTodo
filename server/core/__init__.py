@@ -105,6 +105,7 @@ def create_app():
     from core.api.usage_routes import usage_bp
     from core.api.todo_routes import todo_bp
     from core.api.browser_routes import browser_bp
+    from core.api.material_routes import material_bp
 
     app.register_blueprint(api_bp, url_prefix='/')
     app.register_blueprint(lottery_bp, url_prefix='/')
@@ -123,6 +124,7 @@ def create_app():
     app.register_blueprint(usage_bp, url_prefix='/')
     app.register_blueprint(todo_bp, url_prefix='/')
     app.register_blueprint(browser_bp, url_prefix='/')
+    app.register_blueprint(material_bp, url_prefix='/')
 
     # ========== JWT Auth ==========
     app.config['JWT_SECRET_KEY'] = config.JWT_SECRET_KEY
