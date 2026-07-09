@@ -17,6 +17,7 @@
         "gunicorn",
         "journalctl",
         "Lanman",
+        "linxi",
         "micli",
         "msie",
         "mypy",

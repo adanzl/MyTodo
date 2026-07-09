@@ -64,8 +64,7 @@ class TaskMgr:
             if user_id and user_id > 0:
                 conditions['user_id'] = {'like': f'%{user_id}%'}
 
-            result = db_mgr.get_list(
-                TABLE_TASK, page_num=1, page_size=1000, conditions=conditions)
+            result = db_mgr.get_list(TABLE_TASK, page_num=1, page_size=1000, conditions=conditions)
             if result.get('code') != 0:
                 log.error(f"获取任务列表失败: {result.get('msg')}")
                 return {"code": -1, "msg": "获取任务列表失败", "data": None}
@@ -83,14 +82,12 @@ class TaskMgr:
                     if not start_date_str or duration <= 0:
                         continue
 
-                    start_date_d = datetime.strptime(
-                        start_date_str, '%Y-%m-%d').date()
+                    start_date_d = datetime.strptime(start_date_str, '%Y-%m-%d').date()
                     task_data = json.loads(task.get('data') or '{}')
                     daily_materials = task_data.get('dailyMaterials', {})
                     pre_todo = json.loads(task.get('pre_todo') or '{}')
                     rule = parse_rest_days(task.get("rest_days"))
-                    end_d = end_date_by_work_duration(
-                        start_date_d, int(duration), rule)
+                    end_d = end_date_by_work_duration(start_date_d, int(duration), rule)
 
                     cur = start_date_d
                     while cur <= end_d:
@@ -99,14 +96,12 @@ class TaskMgr:
                             continue
                         date_key = cur.strftime('%Y-%m-%d')
                         if date_key not in calendar_data:
-                            calendar_data[date_key] = {
-                                'date': date_key, 'tasks': []}
+                            calendar_data[date_key] = {'date': date_key, 'tasks': []}
 
                         if is_rest_day(rule, cur):
                             materials_for_day = []
                         else:
-                            workday_idx = get_workday_index(
-                                start_date_d, cur, rule)
+                            workday_idx = get_workday_index(start_date_d, cur, rule)
                             materials_index = 0 if task_type == 1 else workday_idx
                             materials_for_day = daily_materials.get(str(materials_index), []) if isinstance(
                                 daily_materials, dict) else []
@@ -192,8 +187,7 @@ class TaskMgr:
 
             task_data['dailyMaterials'] = daily_materials
             updated_data = json.dumps(task_data, ensure_ascii=False)
-            update_result = db_mgr.set_data(
-                TABLE_TASK, {'id': task_id, 'data': updated_data})
+            update_result = db_mgr.set_data(TABLE_TASK, {'id': task_id, 'data': updated_data})
             if update_result.get('code') != 0:
                 return {"code": -1, "msg": "更新失败", "data": None}
 
@@ -210,13 +204,10 @@ class TaskMgr:
                 log.error(f"插入任务历史记录失败: {history_result.get('msg')}")
 
             all_completed = all(
-                self._is_material_completed_for_user(m, user_id)
-                for m in materials_for_day if isinstance(m, dict)
-            )
+                self._is_material_completed_for_user(m, user_id) for m in materials_for_day if isinstance(m, dict))
             score_added = 0
             if all_completed:
-                score = task_data.get('dailyScore', {}).get(
-                    str(materials_index), 0)
+                score = task_data.get('dailyScore', {}).get(str(materials_index), 0)
                 if score > 0:
                     add_score_result = db_mgr.add_score(user_id=user_id,
                                                         value=score,
@@ -272,8 +263,7 @@ class TaskMgr:
                                                        page_size=1000,
                                                        conditions={'cate_id': cat_id})
                     if materials_result.get('code') == 0:
-                        materials = materials_result.get(
-                            'data', {}).get('data', [])
+                        materials = materials_result.get('data', {}).get('data', [])
                         for material in materials:
                             material_id = material.get('id')
                             if material_id is not None:
@@ -309,8 +299,7 @@ class TaskMgr:
                 conditions['start_date'] = {'<=': end_date}
                 conditions['end_date'] = {'>=': start_date}
 
-            result = db_mgr.get_list(
-                TABLE_TASK, page_num=page_num, page_size=page_size, conditions=conditions)
+            result = db_mgr.get_list(TABLE_TASK, page_num=page_num, page_size=page_size, conditions=conditions)
             if result.get('code') != 0:
                 return result
 
@@ -330,8 +319,7 @@ class TaskMgr:
             if task_id is None or task_id <= 0:
                 task_data = {k: v for k, v in task_data.items() if k != 'id'}
 
-            start_d = datetime.strptime(
-                task_data["start_date"], "%Y-%m-%d").date()
+            start_d = datetime.strptime(task_data["start_date"], "%Y-%m-%d").date()
             dur = int(task_data["duration"])
             rest_days_raw = task_data.get("rest_days")
             if isinstance(rest_days_raw, dict):
@@ -339,14 +327,12 @@ class TaskMgr:
                 task_data["rest_days"] = rest_days_raw
             block_time_raw = task_data.get("block_time")
             if isinstance(block_time_raw, (list, dict)):
-                task_data["block_time"] = json.dumps(
-                    block_time_raw, ensure_ascii=False)
+                task_data["block_time"] = json.dumps(block_time_raw, ensure_ascii=False)
             data_raw = task_data.get("data")
             if isinstance(data_raw, dict):
                 task_data["data"] = json.dumps(data_raw, ensure_ascii=False)
             rule = parse_rest_days(rest_days_raw)
-            task_data["end_date"] = end_date_by_work_duration(
-                start_d, dur, rule).strftime("%Y-%m-%d")
+            task_data["end_date"] = end_date_by_work_duration(start_d, dur, rule).strftime("%Y-%m-%d")
 
             res = db_mgr.set_data(TABLE_TASK, task_data)
             if res.get("code") != 0:
@@ -373,13 +359,11 @@ class TaskMgr:
             visited = set()
             while current_id != -1 and current_id not in visited:
                 visited.add(current_id)
-                category = db_mgr.get_data(
-                    TABLE_MATERIAL_CATEGORY, current_id, '*')
+                category = db_mgr.get_data(TABLE_MATERIAL_CATEGORY, current_id, '*')
                 if category.get('code') != 0 or not category.get('data'):
                     break
                 cat_data = category['data']
-                chain.append(
-                    {"id": cat_data['id'], "name": cat_data['name'], "parent": cat_data.get('parent', -1)})
+                chain.append({"id": cat_data['id'], "name": cat_data['name'], "parent": cat_data.get('parent', -1)})
                 current_id = cat_data.get('parent', -1)
 
             chain.append({"id": -1, "name": "根目录", "parent": None})
@@ -429,8 +413,7 @@ class TaskMgr:
                 if is_global_block_time_now(date_str, user_id, now=now):
                     return {"code": 0, "msg": "ok", "data": {"lock": True, "reason": "当前处于全局禁用时段"}}
 
-            res = db_mgr.get_data(
-                TABLE_MATERIAL, material_id, 'type,duration,statistics,path')
+            res = db_mgr.get_data(TABLE_MATERIAL, material_id, 'type,duration,statistics,path')
             if res.get('code') != 0:
                 return {"code": -1, "msg": "素材不存在", "data": {"lock": False}}
 
@@ -442,18 +425,15 @@ class TaskMgr:
             if not material_duration:
                 path = mat.get('path')
                 if path:
-                    # type: ignore[attr-defined]
-                    app = current_app._get_current_object()
+                    app = current_app._get_current_object()  # type: ignore[attr-defined]
                     mid = material_id
 
                     def _fetch(fp=path, m_id=mid):
                         with app.app_context():
-                            p, _ = validate_and_normalize_path(
-                                fp, DEFAULT_BASE_DIR, must_be_file=True)
+                            p, _ = validate_and_normalize_path(fp, DEFAULT_BASE_DIR, must_be_file=True)
                             d = get_media_duration(p) if p else None
                             if d:
-                                db_mgr.set_data(TABLE_MATERIAL, {
-                                                'id': m_id, 'duration': d})
+                                db_mgr.set_data(TABLE_MATERIAL, {'id': m_id, 'duration': d})
 
                     run_in_background(_fetch)
                 return {"code": 0, "msg": "ok", "data": {"lock": False}}
@@ -466,8 +446,7 @@ class TaskMgr:
             stats = mat.get('statistics') or {}
             if isinstance(stats, str):
                 stats = json.loads(stats)
-            locked = int(stats.get(str(user_id), 0)
-                         or 0) >= float(material_duration) * 1.2
+            locked = int(stats.get(str(user_id), 0) or 0) >= float(material_duration) * 1.2
             return {"code": 0, "msg": "ok", "data": {"lock": locked, "duration": material_duration}}
         except Exception as e:
             log.error(f"获取素材状态失败: material_id={material_id}, {e}")
@@ -510,10 +489,8 @@ class TaskMgr:
             duration_hours: 申请不限时时长（小时）
         """
         try:
-            # 移除该用户已有的待审批申请（多次提交只保留最后一次）
-            replaced_id = self._remove_pending_by_user(user_id)
-
             apply_id = int(time.time() * 1000)
+            now_iso = datetime.now().isoformat()
             record = {
                 'id': apply_id,
                 'user_id': user_id,
@@ -521,20 +498,43 @@ class TaskMgr:
                 'task_id': task_id,
                 'duration_hours': duration_hours,
                 'status': 'pending',
-                'created_at': datetime.now().isoformat(),
+                'created_at': now_iso,
             }
             # 存储申请记录
             apply_key = f"task:unlimit:apply:{apply_id}"
             rds_mgr.set(apply_key, json.dumps(record, ensure_ascii=False))
 
-            # 加入待审批索引
-            self._add_to_pending_index(apply_id, record)
+            # 原子操作：移除旧申请 + 添加新申请（单次读写 Redis 避免竞态）
+            replaced_id = None
+            raw = rds_mgr.get_str(TaskMgr.PENDING_INDEX_KEY)
+            pending: List[Dict[str, Any]] = json.loads(raw) if raw else []
+            new_pending: List[Dict[str, Any]] = []
+            for item in pending:
+                if item.get('user_id') == user_id and item.get('status') == 'pending':
+                    replaced_id = item.get('id')
+                    old_key = f"task:unlimit:apply:{replaced_id}"
+                    old_raw = rds_mgr.get_str(old_key)
+                    if old_raw:
+                        old_record = json.loads(old_raw)
+                        old_record['status'] = 'replaced'
+                        old_record['replaced_at'] = now_iso
+                        rds_mgr.set(old_key, json.dumps(old_record, ensure_ascii=False))
+                else:
+                    new_pending.append(item)
+            new_pending.append({
+                'id': apply_id,
+                'user_id': user_id,
+                'material_id': material_id,
+                'task_id': task_id,
+                'duration_hours': duration_hours,
+                'status': 'pending',
+                'created_at': now_iso,
+            })
+            rds_mgr.set(TaskMgr.PENDING_INDEX_KEY, json.dumps(new_pending, ensure_ascii=False))
 
-            log.info(
-                f"不限时申请已提交: id={apply_id} user={user_id} "
-                f"material={material_id} duration={duration_hours}h"
-                + (f" (替换旧申请 id={replaced_id})" if replaced_id else "")
-            )
+            log.info(f"不限时申请已提交: id={apply_id} user={user_id} "
+                     f"material={material_id} duration={duration_hours}h" +
+                     (f" (替换旧申请 id={replaced_id})" if replaced_id else ""))
             msg = "申请已更新，等待管理员审批" if replaced_id else "申请已提交，等待管理员审批"
             return {"code": 0, "msg": msg, "data": {"success": True, "id": apply_id, "replaced": bool(replaced_id)}}
         except Exception as e:
@@ -542,6 +542,34 @@ class TaskMgr:
             return {"code": -1, "msg": f"申请失败: {str(e)}"}
 
     PENDING_INDEX_KEY = "task:unlimit:apply:pending"
+
+    def list_unlimit_applications(self, status: Optional[str] = None) -> Dict[str, Any]:
+        """列出不限时申请（默认只返回待审批的，每用户仅返回最新一条）。
+
+        Args:
+            status: 过滤状态，None 或 'pending' 返回待审批
+        """
+        try:
+            raw = rds_mgr.get_str(TaskMgr.PENDING_INDEX_KEY)
+            all_apps: List[Dict[str, Any]] = json.loads(raw) if raw else []
+            if status:
+                all_apps = [a for a in all_apps if a.get('status') == status]
+            else:
+                all_apps = [a for a in all_apps if a.get('status') == 'pending']
+            # 每用户仅返回最新一条（防历史脏数据）
+            seen: Dict[int, Dict[str, Any]] = {}
+            for app in all_apps:
+                uid = app.get('user_id')
+                if uid is None:
+                    continue
+                existing = seen.get(uid)
+                if not existing or app.get('id', 0) > existing.get('id', 0):
+                    seen[uid] = app
+            deduped = list(seen.values())
+            return {"code": 0, "msg": "ok", "data": {"applications": deduped, "total": len(deduped)}}
+        except Exception as e:
+            log.error(f"列出不限时申请失败: {e}")
+            return {"code": -1, "msg": f"查询失败: {str(e)}"}
 
     @staticmethod
     def _add_to_pending_index(apply_id: int, record: Dict[str, Any]) -> None:
@@ -558,51 +586,6 @@ class TaskMgr:
             'created_at': record.get('created_at'),
         })
         rds_mgr.set(TaskMgr.PENDING_INDEX_KEY, json.dumps(pending, ensure_ascii=False))
-
-    @staticmethod
-    def _remove_pending_by_user(user_id: int) -> Optional[int]:
-        """移除该用户已有的待审批申请，返回被移除的申请ID（无则返回None）。
-
-        多次提交只保留最后一次。
-        """
-        raw = rds_mgr.get_str(TaskMgr.PENDING_INDEX_KEY)
-        pending: List[Dict[str, Any]] = json.loads(raw) if raw else []
-        replaced_id = None
-        new_pending: List[Dict[str, Any]] = []
-        for item in pending:
-            if item.get('user_id') == user_id and item.get('status') == 'pending':
-                replaced_id = item.get('id')
-                # 标记旧记录为已替换
-                old_key = f"task:unlimit:apply:{replaced_id}"
-                old_raw = rds_mgr.get_str(old_key)
-                if old_raw:
-                    old_record = json.loads(old_raw)
-                    old_record['status'] = 'replaced'
-                    old_record['replaced_at'] = datetime.now().isoformat()
-                    rds_mgr.set(old_key, json.dumps(old_record, ensure_ascii=False))
-            else:
-                new_pending.append(item)
-        if replaced_id is not None:
-            rds_mgr.set(TaskMgr.PENDING_INDEX_KEY, json.dumps(new_pending, ensure_ascii=False))
-        return replaced_id
-
-    def list_unlimit_applications(self, status: Optional[str] = None) -> Dict[str, Any]:
-        """列出不限时申请（默认只返回待审批的）。
-
-        Args:
-            status: 过滤状态，None 或 'pending' 返回待审批
-        """
-        try:
-            raw = rds_mgr.get_str(TaskMgr.PENDING_INDEX_KEY)
-            all_apps: List[Dict[str, Any]] = json.loads(raw) if raw else []
-            if status:
-                all_apps = [a for a in all_apps if a.get('status') == status]
-            else:
-                all_apps = [a for a in all_apps if a.get('status') == 'pending']
-            return {"code": 0, "msg": "ok", "data": {"applications": all_apps, "total": len(all_apps)}}
-        except Exception as e:
-            log.error(f"列出不限时申请失败: {e}")
-            return {"code": -1, "msg": f"查询失败: {str(e)}"}
 
     def approve_unlimit(self, ids: List[int]) -> Dict[str, Any]:
         """批量审批通过不限时申请。"""
@@ -655,10 +638,7 @@ class TaskMgr:
             rds_mgr.set(TaskMgr.PENDING_INDEX_KEY, json.dumps(pending, ensure_ascii=False))
 
             log.info(f"不限时审批通过: ids={ids} approved={approved_count} not_found={not_found_ids}")
-            return {
-                "code": 0, "msg": "ok",
-                "data": {"approved": approved_count, "not_found": not_found_ids}
-            }
+            return {"code": 0, "msg": "ok", "data": {"approved": approved_count, "not_found": not_found_ids}}
         except Exception as e:
             log.error(f"不限时审批失败: {e}")
             return {"code": -1, "msg": f"审批失败: {str(e)}"}
@@ -698,10 +678,7 @@ class TaskMgr:
             rds_mgr.set(TaskMgr.PENDING_INDEX_KEY, json.dumps(pending, ensure_ascii=False))
 
             log.info(f"不限时申请已拒绝: ids={ids} denied={denied_count} not_found={not_found_ids}")
-            return {
-                "code": 0, "msg": "ok",
-                "data": {"denied": denied_count, "not_found": not_found_ids}
-            }
+            return {"code": 0, "msg": "ok", "data": {"denied": denied_count, "not_found": not_found_ids}}
         except Exception as e:
             log.error(f"不限时拒绝失败: {e}")
             return {"code": -1, "msg": f"拒绝失败: {str(e)}"}
@@ -735,8 +712,8 @@ class TaskMgr:
             for task in sorted_tasks:
                 priority = task.get('priority')
                 priority_excluded = priority == -1
-                if (not priority_excluded and highest_uncompleted_priority is not None
-                        and priority is not None and priority > highest_uncompleted_priority):
+                if (not priority_excluded and highest_uncompleted_priority is not None and priority is not None
+                        and priority > highest_uncompleted_priority):
                     task['lock'] = True
                     task['msg'] = f'请先完成 "{highest_uncompleted_task_name}"'
                 else:
@@ -744,13 +721,11 @@ class TaskMgr:
                     task['msg'] = ''
 
                 pre_todo_raw = task.get('pre_todo') or '{}'
-                pre_todo = pre_todo_raw if isinstance(
-                    pre_todo_raw, dict) else json.loads(pre_todo_raw)
+                pre_todo = pre_todo_raw if isinstance(pre_todo_raw, dict) else json.loads(pre_todo_raw)
                 if isinstance(pre_todo, dict) and pre_todo:
                     todo_ids = pre_todo.get(str(user_id), [])
                     if todo_ids:
-                        all_completed, incomplete_names = self._check_schedules_completed(
-                            todo_ids, user_id, date_str)
+                        all_completed, incomplete_names = self._check_schedules_completed(todo_ids, user_id, date_str)
                         if not all_completed:
                             task['lock'] = True
                             task['msg'] = f'请先完成前置日程：{"、".join(incomplete_names)}'
@@ -758,8 +733,7 @@ class TaskMgr:
                 if not task.get('lock'):
                     pre_task_raw = task.get('pre_task')
                     if pre_task_raw:
-                        pre_task_ids = pre_task_raw if isinstance(
-                            pre_task_raw, list) else json.loads(pre_task_raw)
+                        pre_task_ids = pre_task_raw if isinstance(pre_task_raw, list) else json.loads(pre_task_raw)
                         for tid in pre_task_ids:
                             if tid == task.get('id'):
                                 continue
@@ -811,10 +785,7 @@ class TaskMgr:
             if not materials_for_day:
                 return False
             return any(
-                isinstance(m, dict) and not self._is_material_completed_for_user(
-                    m, user_id)
-                for m in materials_for_day
-            )
+                isinstance(m, dict) and not self._is_material_completed_for_user(m, user_id) for m in materials_for_day)
         except Exception as e:
             log.error(f"检查任务素材完成状态失败: {e}")
             return True
@@ -836,8 +807,7 @@ class TaskMgr:
                     return False, [f'日程{todo_id}']
                 saves = result.get('data', [])
                 if not saves or saves[0].get('state', 0) != 1:
-                    name_result = db_mgr.get_data(
-                        't_schedule', todo_id, 'title')
+                    name_result = db_mgr.get_data('t_schedule', todo_id, 'title')
                     name = name_result.get('data', {}).get(
                         'title', f'日程{todo_id}') if name_result.get('code') == 0 else f'日程{todo_id}'
                     incomplete_names.append(name)

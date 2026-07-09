@@ -164,7 +164,7 @@
               class="text-gray-500 text-sm font-bold truncate min-w-0 max-w-40"
               :title="material?.name"
             >{{ displayMaterialName }}</span>
-            <ion-button color="success" :disabled="isMaterialCompleted || submitting" @click="completeReading">
+            <ion-button color="success" :disabled="videoLocked || isMaterialCompleted || submitting" @click="completeReading">
               完成
             </ion-button>
           </div>
@@ -799,6 +799,7 @@ const completeReading = async () => {
         handleDismiss();
     } catch (error) {
         console.error('保存失败:', error);
+        EventBus.$emit(C_EVENT.TOAST, error?.message || '完成失败，请稍后重试');
     } finally {
         submitting.value = false;
     }

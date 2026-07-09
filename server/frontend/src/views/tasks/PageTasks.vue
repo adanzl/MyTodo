@@ -32,6 +32,11 @@
       <el-tab-pane label="任务记录" name="history">
         <TabTaskHistory />
       </el-tab-pane>
+
+      <!-- 视频解锁审批页签 -->
+      <el-tab-pane label="解锁审批" name="video-unlock">
+        <TabVideoUnlock />
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -44,6 +49,7 @@ import TabTaskCalendar from "./TabTaskCalendar.vue";
 import TabTasksPreview from "./TabTasksPreview.vue";
 import TabUsage from "./TabUsage.vue";
 import TabTaskHistory from "./TabTaskHistory.vue";
+import TabVideoUnlock from "./TabVideoUnlock.vue";
 
 // 主页签控制
 const STORAGE_KEY = 'tasks-active-tab';
@@ -72,7 +78,8 @@ watch(activeMainTab, (newTab) => {
     'calendar': 'refresh-calendar-tab',
     'preview': 'refresh-preview-tab',
     'usage': 'refresh-usage-tab',
-    'history': 'refresh-history-tab'
+    'history': 'refresh-history-tab',
+    'video-unlock': 'refresh-video-unlock-tab'
   };
 
   const eventName = eventMap[newTab];
