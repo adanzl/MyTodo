@@ -206,10 +206,10 @@ export interface Task {
 
 export function parsePreTask(raw?: Task["pre_task"]): number[] {
   if (!raw) return [];
-  if (Array.isArray(raw)) return raw.map(Number).filter((id) => id > 0);
+  if (Array.isArray(raw)) return raw.map(Number).filter(id => id > 0);
   try {
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.map(Number).filter((id) => id > 0) : [];
+    return Array.isArray(parsed) ? parsed.map(Number).filter(id => id > 0) : [];
   } catch {
     return [];
   }
@@ -253,7 +253,7 @@ export function parseBlockTimeConfig(rules?: BlockTimeConfig | string): BlockTim
 
 export function getBlockTimeEntry(
   config?: BlockTimeConfig | string,
-  userId?: number,
+  userId?: number
 ): BlockTimeEntry | undefined {
   if (!userId) return undefined;
   const parsed = parseBlockTimeConfig(config);
@@ -269,14 +269,14 @@ export function getBlockTimeEntry(
 export function getBlockTimeSlots(entry?: BlockTimeEntry): TaskBlockTimeSlot[] {
   if (!entry) return [];
   const list = entry.type === "whitelist" ? entry.whitelist : entry.blacklist;
-  return list.filter((s) => s.start && s.end);
+  return list.filter(s => s.start && s.end);
 }
 
 export function buildBlockTimeEntry(
   type: "blacklist" | "whitelist",
-  slots: TaskBlockTimeSlot[],
+  slots: TaskBlockTimeSlot[]
 ): BlockTimeEntry | undefined {
-  const time = slots.filter((s) => s.start && s.end && s.start < s.end);
+  const time = slots.filter(s => s.start && s.end && s.start < s.end);
   if (!time.length) {
     return undefined;
   }
@@ -291,7 +291,7 @@ export function setBlockTimeEntry(
   config: BlockTimeConfig,
   userId: number,
   type: "blacklist" | "whitelist",
-  slots: TaskBlockTimeSlot[],
+  slots: TaskBlockTimeSlot[]
 ): BlockTimeConfig {
   const next = { ...config };
   const entry = buildBlockTimeEntry(type, slots);
@@ -347,11 +347,7 @@ export async function getGlobalBlockTime(): Promise<BlockTimeConfig> {
 
 export async function setGlobalBlockTime(config: BlockTimeConfig): Promise<void> {
   const payload = pruneBlockTimeConfig(config);
-  await setRdsData(
-    GLOBAL_BLOCK_TIME_RDS_TABLE,
-    GLOBAL_BLOCK_TIME_RDS_ID,
-    JSON.stringify(payload),
-  );
+  await setRdsData(GLOBAL_BLOCK_TIME_RDS_TABLE, GLOBAL_BLOCK_TIME_RDS_ID, JSON.stringify(payload));
 }
 
 /**
@@ -533,6 +529,60 @@ export interface TaskHistory {
  * @param pageNum - 页码，默认1
  * @param pageSize - 每页数量，默认20
  */
+// ==================== 视频不限时审批 API ====================
+
+/**
+ * 不限时申请数据结构
+ */
+export interface UnlimitApplication {
+  id: number;
+  user_id: number;
+  material_id: number;
+  task_id?: number | null;
+  duration_hours: number;
+  status: string;
+  created_at: string;
+  approved_at?: string;
+  denied_at?: string;
+  reason?: string;
+}
+
+/**
+ * 获取不限时申请列表
+ * @param status - 状态过滤，默认 'pending'
+ */
+export async function getUnlimitList(status: string = "pending"): Promise<UnlimitApplication[]> {
+  const response = await api.get("/material/unlimit/list", {
+    params: { status },
+  });
+  if (response.data.code !== 0) {
+    throw new Error(response.data.msg || "获取不限时申请列表失败");
+  }
+  return response.data.data?.applications || [];
+}
+
+/**
+ * 批量审批通过不限时申请
+ * @param ids - 申请ID数组
+ */
+export async function approveUnlimit(ids: number[]): Promise<void> {
+  const response = await api.post("/material/unlimit/approve", { ids });
+  if (response.data.code !== 0) {
+    throw new Error(response.data.msg || "审批失败");
+  }
+}
+
+/**
+ * 批量拒绝不限时申请
+ * @param ids - 申请ID数组
+ */
+export async function denyUnlimit(ids: number[]): Promise<void> {
+  const response = await api.post("/material/unlimit/deny", { ids });
+  if (response.data.code !== 0) {
+    throw new Error(response.data.msg || "拒绝失败");
+  }
+}
+
 export async function getTaskHistoryList(
   userId?: number,
   taskId?: number,

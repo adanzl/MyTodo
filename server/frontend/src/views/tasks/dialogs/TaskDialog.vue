@@ -107,12 +107,12 @@
                       class="flex-1"
                       collapse-tags
                       collapse-tags-tooltip
-                      :max-collapse-tags="2"
+                      :max-collapse-tags="1"
                     >
                       <el-option
                         v-for="todo in cancanTodos"
                         :key="'cancan_' + todo.id"
-                        :label="todo.title"
+                        :label="getPreTodoLabel(todo)"
                         :value="todo.id"
                       />
                     </el-select>
@@ -135,7 +135,7 @@
                       <el-option
                         v-for="todo in zhaozhaoTodos"
                         :key="'zhaozhao_' + todo.id"
-                        :label="todo.title"
+                        :label="getPreTodoLabel(todo)"
                         :value="todo.id"
                       />
                     </el-select>
@@ -543,8 +543,19 @@ const preTodoZhaozhao = ref<number[]>([]); // 昭昭的前置日程ID列表
 const preTodoCancan = ref<number[]>([]); // 灿灿的前置日程ID列表
 const preTaskIds = ref<number[]>([]);
 const preTaskOptions = ref<Array<{ id: number; name: string }>>([]);
-const zhaozhaoTodos = ref<Array<{ id: number; title: string }>>([]);
-const cancanTodos = ref<Array<{ id: number; title: string }>>([]);
+const zhaozhaoTodos = ref<Array<{ id: number; title: string; startTs?: string; repeatEndTs?: string }>>([]);
+const cancanTodos = ref<Array<{ id: number; title: string; startTs?: string; repeatEndTs?: string }>>([]);
+
+// 格式化前置日程标签（名称 + 起止日期）
+const getPreTodoLabel = (todo: { title: string; startTs?: string; repeatEndTs?: string }) => {
+  const formatTime = (t?: string) => t ? t.substring(0, 10) : '';
+  const start = formatTime(todo.startTs);
+  const end = formatTime(todo.repeatEndTs);
+  if (start && end) {
+    return `${todo.title} (${start} ~ ${end})`;
+  }
+  return todo.title;
+};
 
 // 缓存每个类别的选中数量（key: categoryId, value: count）
 const materialCategorySelectedCountCache = ref<Map<number, number>>(new Map());
@@ -914,6 +925,8 @@ const loadTodoList = async () => {
       zhaozhaoTodos.value = (result.data || []).map((todo: any) => ({
         id: todo.id,
         title: todo.title,
+        startTs: todo.startTs,
+        repeatEndTs: todo.repeatEndTs,
       }));
     }
 
@@ -923,6 +936,8 @@ const loadTodoList = async () => {
       cancanTodos.value = (result.data || []).map((todo: any) => ({
         id: todo.id,
         title: todo.title,
+        startTs: todo.startTs,
+        repeatEndTs: todo.repeatEndTs,
       }));
     }
   } catch (error: any) {

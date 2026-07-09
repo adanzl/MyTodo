@@ -19,15 +19,15 @@
     <el-table :data="taskList" v-loading="loading" stripe border style="width: 100%" :max-height="tableMaxHeight">
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="name" label="任务名称" min-width="200" />
-      <el-table-column prop="priority" label="优先级" width="80" align="center" />
-      <el-table-column prop="type" label="类型" width="70" align="center">
+      <el-table-column prop="priority" label="优先级" width="70" align="center" />
+      <el-table-column prop="type" label="类型" width="60" align="center">
         <template #default="{ row }">
-          <el-tag :type="row.type === 1 ? 'success' : 'primary'">{{ row.type === 1 ? '持续' : '每日' }}</el-tag>
+          <el-tag :type="row.type === 1 ? 'success' : 'primary'" size="small">{{ row.type === 1 ? '持续' : '每日' }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="start_date" label="开始日期" width="110" />
       <el-table-column prop="duration" label="天数" width="70" align="center" />
-      <el-table-column prop="user_id" label="布置对象" width="120">
+      <el-table-column prop="user_id" label="布置对象" width="100">
         <template #default="{ row }">
           {{ getUserName(row.user_id) }}
         </template>
@@ -51,23 +51,23 @@
             placement="top"
             :show-after="300"
           >
-            <span class="text-xs text-gray-700 cursor-default block truncate max-w-[100px]">
+            <span class="text-xs text-gray-700 cursor-default block truncate max-w-25">
               {{ restDaysText(row) }}
             </span>
           </el-tooltip>
           <span v-else class="text-gray-400">-</span>
         </template>
       </el-table-column>
-      <el-table-column label="禁用时段" width="220">
+      <el-table-column label="禁用时段" width="230">
         <template #default="{ row }">
           <BlockTimeDisplay :block-time="row.block_time" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="160" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" type="primary" @click="handleEditTask(row)">编辑</el-button>
-          <el-button size="small"  @click="handleCopyTask(row)">复制</el-button>
-          <el-button size="small" type="danger" @click="handleDeleteTask(row)">删除</el-button>
+          <el-button size="small" type="primary" :icon="Edit" @click="handleEditTask(row)" />
+          <el-button size="small" :icon="CopyDocument" @click="handleCopyTask(row)" />
+          <el-button size="small" type="danger" :icon="Delete" @click="handleDeleteTask(row)" />
         </template>
       </el-table-column>
     </el-table>
@@ -107,7 +107,7 @@ import {
   type Task,
   type BlockTimeConfig,
 } from "@/api/api-task";
-import { Refresh } from "@element-plus/icons-vue";
+import { Refresh, Edit, CopyDocument, Delete } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { onMounted, ref, onUnmounted, nextTick } from "vue";
 import BlockTimeDisplay from "./components/BlockTimeDisplay.vue";
