@@ -801,7 +801,7 @@ const completeReading = async () => {
         
         console.log('完成阅读，已保存');
         handleDismiss();
-    } catch (error) {
+    } catch (error: any) {
         console.error('保存失败:', error);
         EventBus.$emit(C_EVENT.TOAST, error?.message || '完成失败，请稍后重试');
     } finally {
