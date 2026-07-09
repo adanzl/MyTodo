@@ -446,7 +446,7 @@ const showUnlockAlert = async () => {
             {
                 text: '1小时',
                 handler: async () => {
-                    await doRequestUnlock(1);
+                    await doRequestUnlock(60);
                 },
             },
         ],
@@ -455,14 +455,14 @@ const showUnlockAlert = async () => {
 };
 
 /** 执行申请解锁请求 */
-const doRequestUnlock = async (durationHours: number) => {
+const doRequestUnlock = async (duration: number) => {
     const userId = props.userId;
     const materialId = props.material?.id;
-    if (!userId || !materialId) return;
+    if (!userId || !materialId || !props.task?.id) return;
 
     unlocking.value = true;
     try {
-        const res = await requestUnlockMaterial(materialId, userId, props.task?.id, durationHours, lockCode.value);
+        const res = await requestUnlockMaterial(materialId, userId, props.task?.id, duration, lockCode.value);
         // 申请已提交/更新，提示等待审批
         const successAlert = await alertController.create({
             header: res.replaced ? '申请已更新' : '申请已提交',

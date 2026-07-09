@@ -23,8 +23,8 @@ class ApplyUnlimitQuery(BaseModel):
     """申请不限时参数"""
     user_id: int
     material_id: int
-    task_id: int | None = None
-    duration_hours: float = 1.0
+    task_id: int
+    duration: int = 60
     lock_code: int = 0
 
 
@@ -73,12 +73,12 @@ def apply_material_unlimit() -> ResponseReturnValue:
     if err or not body:
         return err or _err('Invalid request body')
 
-    log.info(f"=> [Unlimit Apply] user={body.user_id} material={body.material_id} duration={body.duration_hours}h")
+    log.info(f"=> [Unlimit Apply] user={body.user_id} material={body.material_id} duration={body.duration}min")
     result = material_mgr.apply_unlimit(
         user_id=body.user_id,
         material_id=body.material_id,
         task_id=body.task_id,
-        duration_hours=body.duration_hours,
+        duration=body.duration,
         lock_code=body.lock_code,
     )
     return result
@@ -86,9 +86,13 @@ def apply_material_unlimit() -> ResponseReturnValue:
 
 @material_bp.route('/material/unlimit/list', methods=['GET'])
 def list_unlimit_applications() -> ResponseReturnValue:
-    """列出所有未处理的不限时申请"""
-    status = request.args.get('status', 'pending')
-    return material_mgr.list_unlimit_applications(status if status else None)
+    """列出不限时申请"""
+    status = request.args.get('status')
+    expires_at = request.args.get('expiresAt')
+    return material_mgr.list_unlimit_applications(
+        status=status if status else None,
+        expires_at=expires_at if expires_at else None,
+    )
 
 
 @material_bp.route('/material/unlimit/approve', methods=['POST'])

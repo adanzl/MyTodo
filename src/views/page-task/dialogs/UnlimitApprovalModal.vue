@@ -52,7 +52,7 @@
               <span class="text-xs text-gray-500">#{{ app.id }}</span>
             </div>
             <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
-              <span>时长: {{ app.duration_hours }}h</span>
+              <span>时长: {{ app.duration }}分钟</span>
               <span>{{ formatTime(app.created_at) }}</span>
             </div>
           </ion-label>

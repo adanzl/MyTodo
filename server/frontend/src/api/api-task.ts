@@ -539,7 +539,7 @@ export interface UnlimitApplication {
   user_id: number;
   material_id: number;
   task_id?: number | null;
-  duration_hours: number;
+  duration: number;
   status: string;
   created_at: string;
   approved_at?: string;

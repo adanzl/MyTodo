@@ -438,26 +438,24 @@ export async function finishMaterial(
  * 申请解锁视频素材（提交审批）
  * @param materialId - 素材ID
  * @param userId - 用户ID
- * @param taskId - 任务ID(可选)
- * @param durationHours - 申请解锁时长(小时)
+ * @param taskId - 任务ID
+ * @param duration - 申请解锁时长(分钟)
  * @param lockCode - 锁定类型码
  */
 export async function requestUnlockMaterial(
   materialId: number,
   userId: number,
-  taskId?: number,
-  durationHours: number = 1,
+  taskId: number,
+  duration: number = 60,
   lockCode: number = 0
 ): Promise<{ success: boolean; id: number; replaced: boolean }> {
   const body: any = {
     material_id: materialId,
     user_id: userId,
-    duration_hours: durationHours,
+    task_id: taskId,
+    duration: duration,
     lock_code: lockCode,
   };
-  if (taskId) {
-    body.task_id = taskId;
-  }
   const rsp = await apiClient.post<ApiResponse<{ success: boolean; id: number; replaced: boolean }>>("/material/unlimit/apply", body);
 
   if (rsp.data.code !== 0) {
@@ -472,12 +470,15 @@ export interface UnlimitApplication {
   id: number;
   user_id: number;
   material_id: number;
-  task_id?: number;
-  duration_hours: number;
+  task_id: number;
+  duration: number;
+  type?: number;
+  lock_code: number;
   status: 'pending' | 'approved' | 'denied';
   created_at: string;
   approved_at?: string;
   denied_at?: string;
+  expires_at?: string;
 }
 
 /**

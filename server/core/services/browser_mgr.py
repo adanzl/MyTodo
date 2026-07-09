@@ -156,7 +156,7 @@ class BrowserMgr:
             if pid and self._is_pid_alive(pid):
                 status['alive'] = True
             else:
-                # 进程已结束，通过 waitpid 获取退出码
+                # 进程已结束，通过 wait pid 获取退出码
                 status['alive'] = False
                 rc = self._wait_pid(pid) if pid else -1
                 log_tail = self._read_log_tail(status.get('log', ''))
@@ -184,11 +184,11 @@ class BrowserMgr:
 
     @staticmethod
     def _wait_pid(pid: int) -> int:
-        """通过 waitpid 获取进程退出码，回收僵尸进程"""
+        """通过 wait pid 获取进程退出码，回收僵尸进程"""
         try:
-            _, wstatus = os.waitpid(pid, os.WNOHANG)
-            if os.WIFEXITED(wstatus):
-                return os.WEXITSTATUS(wstatus)
+            _, w_status = os.waitpid(pid, os.WNOHANG)
+            if os.WIFEXITED(w_status):
+                return os.WEXITSTATUS(w_status)
             return -1
         except ChildProcessError:
             # 进程已被回收或不是子进程
