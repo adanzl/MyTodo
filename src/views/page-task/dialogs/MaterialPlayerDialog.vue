@@ -93,6 +93,7 @@
       <div v-else-if="material?.type === 1" class="flex flex-col h-full">
         <div class="flex-1 relative overflow-hidden bg-black">
           <video
+            v-if="videoReady"
             ref="videoRef"
             :src="getMediaFileUrl(material.path || '')"
             controls
@@ -164,7 +165,7 @@
               class="text-gray-500 text-sm font-bold truncate min-w-0 max-w-40"
               :title="material?.name"
             >{{ displayMaterialName }}</span>
-            <ion-button color="success" :disabled="videoLocked || isMaterialCompleted || submitting" @click="completeReading">
+            <ion-button color="success" :disabled="isMaterialCompleted || submitting" @click="completeReading">
               完成
             </ion-button>
           </div>
@@ -259,7 +260,9 @@ const VIDEO_LOCK_POLL_MS = 60_000;
 let videoLockPollTimer: number | null = null;
 const videoLocked = ref(false);
 const lockReason = ref('');
+const lockCode = ref(0);
 const unlocking = ref(false);
+const videoReady = ref(false);
 
 // 监听 AudioPreview 的播放状态
 const isAudioPlaying = computed(() => {
@@ -388,29 +391,29 @@ const handleDismiss = () => {
     clearSubtitleTracks();
 };
 
-const checkVideoLock = async (): Promise<{ locked: boolean; reason: string }> => {
+const checkVideoLock = async (): Promise<{ locked: boolean; reason: string; lockCode: number }> => {
     const userId = props.userId;
     const materialId = props.material?.id;
     const taskId = props.task?.id;
-    if (!userId || !materialId) return { locked: false, reason: '' };
+    if (!userId || !materialId) return { locked: false, reason: '', lockCode: 0 };
 
     try {
         const params: any = { userId, materialId };
         if (taskId) {
             params.taskId = taskId;
         }
-        const rsp = await apiClient.get<{ code: number; data?: { lock?: boolean; reason?: string; duration?: number } }>(
+        const rsp = await apiClient.get<{ code: number; data?: { lock?: number; reason?: string; duration?: number } }>(
             '/material/status',
             { params }
         );
         const data = rsp.data.data;
-        if (rsp.data.code === 0 && data?.lock === true) {
-            return { locked: true, reason: data?.reason || '视频观看超时' };
+        if (rsp.data.code === 0 && data?.lock && data.lock > 0) {
+            return { locked: true, reason: data?.reason || '已禁用', lockCode: data.lock };
         }
-        return { locked: false, reason: '' };
+        return { locked: false, reason: '', lockCode: 0 };
     } catch (error: unknown) {
         console.error('获取素材状态失败:', error);
-        return { locked: false, reason: '' };
+        return { locked: false, reason: '', lockCode: 0 };
     }
 };
 
@@ -421,10 +424,11 @@ const stopVideoLockPolling = () => {
     }
 };
 
-const setVideoLocked = (reason: string) => {
+const setVideoLocked = (reason: string, code: number = 0) => {
     if (videoLocked.value) return;
     videoLocked.value = true;
     lockReason.value = reason || '视频观看超时';
+    lockCode.value = code;
     stopVideoLockPolling();
     pauseVideo();
 };
@@ -458,7 +462,7 @@ const doRequestUnlock = async (durationHours: number) => {
 
     unlocking.value = true;
     try {
-        const res = await requestUnlockMaterial(materialId, userId, props.task?.id, durationHours);
+        const res = await requestUnlockMaterial(materialId, userId, props.task?.id, durationHours, lockCode.value);
         // 申请已提交/更新，提示等待审批
         const successAlert = await alertController.create({
             header: res.replaced ? '申请已更新' : '申请已提交',
@@ -485,7 +489,7 @@ const pollVideoLockStatus = async () => {
     if (!props.isOpen || props.material?.type !== 1 || videoLocked.value) return;
     const result = await checkVideoLock();
     if (result.locked) {
-        setVideoLocked(result.reason);
+        setVideoLocked(result.reason, result.lockCode);
     }
 };
 
@@ -813,14 +817,14 @@ watch(
             if (material.type === 1) {
                 const lockResult = await checkVideoLock();
                 if (lockResult.locked) {
-                    setVideoLocked(lockResult.reason);
+                    setVideoLocked(lockResult.reason, lockResult.lockCode);
                     return;
                 }
             }
 
             loading.value = true;
             
-            setTimeout(() => {
+            setTimeout(async () => {
                 if (material.type === 0 && material.path) {
                     if (!pdfCanvasLeft.value) {
                         loading.value = false;
@@ -829,6 +833,8 @@ watch(
                     renderPDF(getMediaFileUrl(material.path));
                     startUsageTracking();
                 } else if (material.type === 1 && material.path) {
+                    videoReady.value = true;
+                    await nextTick();
                     loading.value = false;
                     applyVideoCompat();
                     void loadVideoSubtitles(material.path);
@@ -843,6 +849,8 @@ watch(
             stopVideoLockPolling();
             videoLocked.value = false;
             lockReason.value = '';
+            lockCode.value = 0;
+            videoReady.value = false;
             clearSubtitleTracks();
         }
     }

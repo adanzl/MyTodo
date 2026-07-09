@@ -440,17 +440,20 @@ export async function finishMaterial(
  * @param userId - 用户ID
  * @param taskId - 任务ID(可选)
  * @param durationHours - 申请解锁时长(小时)
+ * @param lockCode - 锁定类型码
  */
 export async function requestUnlockMaterial(
   materialId: number,
   userId: number,
   taskId?: number,
-  durationHours: number = 1
+  durationHours: number = 1,
+  lockCode: number = 0
 ): Promise<{ success: boolean; id: number; replaced: boolean }> {
   const body: any = {
     material_id: materialId,
     user_id: userId,
     duration_hours: durationHours,
+    lock_code: lockCode,
   };
   if (taskId) {
     body.task_id = taskId;
