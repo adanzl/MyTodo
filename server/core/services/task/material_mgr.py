@@ -6,8 +6,7 @@
 from __future__ import annotations
 
 import json
-import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from flask import current_app
@@ -15,7 +14,6 @@ from flask import current_app
 from core.config import app_logger
 from core.config.const import DEFAULT_BASE_DIR
 from core.db.db_mgr import db_mgr
-from core.db import rds_mgr
 from core.tools.async_util import run_in_background
 from core.utils import get_media_duration, validate_and_normalize_path
 from .block_time import is_global_block_time_now, parse_block_time_config, _get_user_entry, _is_blocked_by_entry
@@ -25,29 +23,18 @@ log = app_logger
 TABLE_MATERIAL = 't_material'
 TABLE_TASK = 't_task'
 TABLE_MATERIAL_CATEGORY = 't_material_category'
+TABLE_UNLIMIT = 't_material_unlimit'
 
 _ok = lambda data: {"code": 0, "msg": "ok", "data": data}
 _err = lambda msg, data: {"code": -1, "msg": msg, "data": data}
 
-PENDING_INDEX_KEY = "task:unlimit:apply:pending"
 
-_unlimit_rds_key = lambda user_id: f"task:unlimit:{user_id}"
-
-
-def _get_active_unlimit(user_id: int) -> Optional[Dict[str, Any]]:
-    """检查用户是否存在有效的不限时记录。"""
-    key = _unlimit_rds_key(user_id)
-    raw = rds_mgr.get_str(key)
-    if not raw:
-        return None
-    try:
-        record = json.loads(raw)
-        expiry_ts = record.get('expiry_ts', 0)
-        if time.time() >= expiry_ts:
-            return None
-        return record
-    except (json.JSONDecodeError, KeyError):
-        return None
+def _ts(minutes: int = 0) -> str:
+    """返回带时区偏移的时间字符串，如 '2026-07-09 12:34:56 +08:00'。minutes>0 表示当前时间之后的分钟。"""
+    dt = datetime.now() + timedelta(minutes=minutes)
+    offset = dt.astimezone().utcoffset()
+    hours = int(offset.total_seconds() / 3600) if offset else 0
+    return dt.strftime(f'%Y-%m-%d %H:%M:%S {hours:+03d}:00')
 
 
 class MaterialMgr:
@@ -57,6 +44,38 @@ class MaterialMgr:
     LOCK_CODE_TASK_BLOCK = 1  # 任务级禁用时段
     LOCK_CODE_GLOBAL_BLOCK = 2  # 全局禁用时段
     LOCK_CODE_DURATION = 3  # 视频观看时长超限
+
+    @staticmethod
+    def _get_active_unlimit(user_id: int,
+                            material_id: int = 0,
+                            task_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
+        """检查用户是否存在有效的不限时记录。"""
+        try:
+            now_iso = _ts()
+            base = {
+                'user_id': user_id,
+                'status': 'approved',
+                'expires_at': {
+                    '>': now_iso
+                },
+            }
+            # 1/2=用户级不限时
+            r = db_mgr.get_list(TABLE_UNLIMIT, page_size=1, conditions={**base, 'lock_code': {'in': [1, 2]}})
+            if r.get('code') == 0 and r.get('data', {}).get('data'):
+                return r['data']['data'][0]
+            # 3=素材级不限时，需匹配素材和任务
+            r = db_mgr.get_list(TABLE_UNLIMIT,
+                                page_size=1,
+                                conditions={
+                                    **base, 'lock_code': 3,
+                                    'material_id': material_id,
+                                    'task_id': task_id
+                                })
+            if r.get('code') == 0 and r.get('data', {}).get('data'):
+                return r['data']['data'][0]
+            return None
+        except Exception:
+            return None
 
     def delete_material_category(self, category_id: int, delete_materials: bool = False) -> Dict[str, Any]:
         """删除素材分类（文件夹）"""
@@ -215,7 +234,7 @@ class MaterialMgr:
                 return _ok({"lock": MaterialMgr.LOCK_CODE_NONE})
 
             # 检查是否存在有效的不限时记录
-            active_unlimit = _get_active_unlimit(user_id)
+            active_unlimit = MaterialMgr._get_active_unlimit(user_id, material_id, task_id)
             if active_unlimit:
                 return _ok({"lock": MaterialMgr.LOCK_CODE_NONE, "duration": material_duration, "unlimit": True})
 
@@ -238,8 +257,8 @@ class MaterialMgr:
         self,
         user_id: int,
         material_id: int,
-        task_id: Optional[int] = None,
-        duration_hours: float = 1.0,
+        task_id: int,
+        duration: int = 60,
         lock_code: int = 0,
     ) -> Dict[str, Any]:
         """提交不限时申请（需管理员审批后生效）。
@@ -248,87 +267,103 @@ class MaterialMgr:
             user_id: 用户ID
             material_id: 素材ID（记录用途）
             task_id: 任务ID（可选，记录用途）
-            duration_hours: 申请不限时时长（小时）
+            duration: 申请不限时时长（分钟）
             lock_code: 锁定类型码（0=未锁定, 1=任务禁用, 2=全局禁用, 3=时长超限）
         """
         try:
-            apply_id = int(time.time() * 1000)
-            now_iso = datetime.now().isoformat()
-            record = {
-                'id': apply_id,
-                'user_id': user_id,
-                'material_id': material_id,
-                'task_id': task_id,
-                'duration_hours': duration_hours,
-                'lock_code': lock_code,
-                'status': 'pending',
-                'created_at': now_iso,
-            }
-            apply_key = f"task:unlimit:apply:{apply_id}"
-            rds_mgr.set(apply_key, json.dumps(record, ensure_ascii=False))
+            now_iso = _ts()
 
-            # 原子操作：移除旧申请 + 添加新申请
-            replaced_id = None
-            raw = rds_mgr.get_str(PENDING_INDEX_KEY)
-            pending: List[Dict[str, Any]] = json.loads(raw) if raw else []
-            new_pending: List[Dict[str, Any]] = []
-            for item in pending:
-                if item.get('user_id') == user_id and item.get('status') == 'pending':
-                    replaced_id = item.get('id')
-                    old_key = f"task:unlimit:apply:{replaced_id}"
-                    old_raw = rds_mgr.get_str(old_key)
-                    if old_raw:
-                        old_record = json.loads(old_raw)
-                        old_record['status'] = 'replaced'
-                        old_record['replaced_at'] = now_iso
-                        rds_mgr.set(old_key, json.dumps(old_record, ensure_ascii=False))
-                else:
-                    new_pending.append(item)
-            new_pending.append({
-                'id': apply_id,
-                'user_id': user_id,
-                'material_id': material_id,
-                'task_id': task_id,
-                'duration_hours': duration_hours,
-                'lock_code': lock_code,
-                'status': 'pending',
-                'created_at': now_iso,
-            })
-            rds_mgr.set(PENDING_INDEX_KEY, json.dumps(new_pending, ensure_ascii=False))
+            # 去重逻辑：按 lock_code 类型区分替换范围
+            if lock_code == 3:
+                # 3=时长超限：按 (user_id, material_id, task_id) 去重
+                cond: Dict[str, Any] = {
+                    'user_id': user_id,
+                    'status': 'pending',
+                    'lock_code': 3,
+                    'material_id': material_id,
+                    'task_id': task_id,
+                }
+                pending_res = db_mgr.get_list(TABLE_UNLIMIT, page_size=10, conditions=cond)
+            else:
+                # 1/2=禁用时段：按 user_id 去重（不限素材/任务）
+                pending_res = db_mgr.get_list(TABLE_UNLIMIT,
+                                              page_size=10,
+                                              conditions={
+                                                  'user_id': user_id,
+                                                  'status': 'pending',
+                                                  'lock_code': {
+                                                      'in': [1, 2]
+                                                  },
+                                              })
+            if pending_res.get('code') == 0:
+                records = pending_res.get('data', {}).get('data', [])
+                if records:
+                    old = records[0]
+                    old_id = old.get('id')
+                    if old_id:
+                        db_mgr.set_data(
+                            TABLE_UNLIMIT, {
+                                'id': old_id,
+                                'duration': duration,
+                                'material_id': material_id,
+                                'task_id': task_id,
+                                'created_at': now_iso,
+                            })
+                        apply_id = old_id
+                        log.info(f"不限时申请已更新: id={apply_id} user={user_id} "
+                                 f"material={material_id} duration={duration}min")
+                        return {
+                            "code": 0,
+                            "msg": "申请已更新，等待管理员审批",
+                            "data": {
+                                "success": True,
+                                "id": apply_id,
+                                "replaced": True
+                            }
+                        }
+
+            # 插入新申请
+            result = db_mgr.set_data(
+                TABLE_UNLIMIT, {
+                    'user_id': user_id,
+                    'material_id': material_id,
+                    'task_id': task_id,
+                    'duration': duration,
+                    'type': 0,
+                    'lock_code': lock_code,
+                    'status': 'pending',
+                    'created_at': now_iso,
+                })
+            apply_id = result.get('data')
 
             log.info(f"不限时申请已提交: id={apply_id} user={user_id} "
-                     f"material={material_id} duration={duration_hours}h" +
-                     (f" (替换旧申请 id={replaced_id})" if replaced_id else ""))
-            msg = "申请已更新，等待管理员审批" if replaced_id else "申请已提交，等待管理员审批"
-            return {"code": 0, "msg": msg, "data": {"success": True, "id": apply_id, "replaced": bool(replaced_id)}}
+                     f"material={material_id} duration={duration}min")
+            return {"code": 0, "msg": "申请已提交，等待管理员审批", "data": {"success": True, "id": apply_id, "replaced": False}}
         except Exception as e:
             log.error(f"不限时申请提交失败: user={user_id} material={material_id}, {e}")
             return {"code": -1, "msg": f"申请失败: {str(e)}"}
 
-    def list_unlimit_applications(self, status: Optional[str] = None) -> Dict[str, Any]:
-        """列出不限时申请（默认只返回待审批的，每用户仅返回最新一条）。
+    def list_unlimit_applications(self,
+                                  status: Optional[str] = None,
+                                  expires_at: Optional[str] = None) -> Dict[str, Any]:
+        """列出不限时申请。
 
         Args:
-            status: 过滤状态，None 或 'pending' 返回待审批
+            status: 过滤状态，逗号分隔（如 'pending,approved'），None 返回所有
+            expires_at: 过期时间过滤，只返回 expires_at 大于此时间的记录（含 null），不传则不筛选
         """
         try:
-            raw = rds_mgr.get_str(PENDING_INDEX_KEY)
-            all_apps: List[Dict[str, Any]] = json.loads(raw) if raw else []
+            conditions: Dict[str, Any] = {}
             if status:
-                all_apps = [a for a in all_apps if a.get('status') == status]
-            else:
-                all_apps = [a for a in all_apps if a.get('status') == 'pending']
-            # 每用户仅返回最新一条
-            seen: Dict[int, Dict[str, Any]] = {}
-            for app in all_apps:
-                uid = app.get('user_id')
-                if uid is None:
-                    continue
-                existing = seen.get(uid)
-                if not existing or app.get('id', 0) > existing.get('id', 0):
-                    seen[uid] = app
-            deduped = list(seen.values())
-            return {"code": 0, "msg": "ok", "data": {"applications": deduped, "total": len(deduped)}}
+                conditions['status'] = {'in': status.split(',')}
+            if expires_at:
+                conditions['expires_at'] = {'>': expires_at}
+
+            result = db_mgr.get_list(TABLE_UNLIMIT, page_size=1000, conditions=conditions)
+            if result.get('code') != 0:
+                return _err(f"查询失败: {result.get('msg')}", {})
+            apps = result.get('data', {}).get('data', [])
+            return {"code": 0, "msg": "ok", "data": {"applications": apps, "total": len(apps)}}
         except Exception as e:
             log.error(f"列出不限时申请失败: {e}")
             return {"code": -1, "msg": f"查询失败: {str(e)}"}
@@ -336,48 +371,32 @@ class MaterialMgr:
     def approve_unlimit(self, ids: List[int]) -> Dict[str, Any]:
         """批量审批通过不限时申请。"""
         try:
-            raw = rds_mgr.get_str(PENDING_INDEX_KEY)
-            pending: List[Dict[str, Any]] = json.loads(raw) if raw else []
             approved_count = 0
             not_found_ids: List[int] = []
 
             for apply_id in ids:
-                found = False
-                for item in pending:
-                    if item.get('id') == apply_id and item.get('status') == 'pending':
-                        found = True
-                        apply_key = f"task:unlimit:apply:{apply_id}"
-                        apply_raw = rds_mgr.get_str(apply_key)
-                        if apply_raw:
-                            record = json.loads(apply_raw)
-                            record['status'] = 'approved'
-                            record['approved_at'] = datetime.now().isoformat()
-                            rds_mgr.set(apply_key, json.dumps(record, ensure_ascii=False))
-
-                            # 设置活跃不限时状态
-                            now_ts = time.time()
-                            expiry_ts = now_ts + record.get('duration_hours', 1) * 3600
-                            expires_at = datetime.fromtimestamp(expiry_ts).isoformat()
-                            unlimit_record = {
-                                'user_id': record['user_id'],
-                                'apply_id': apply_id,
-                                'duration_hours': record.get('duration_hours'),
-                                'expiry_ts': expiry_ts,
-                                'expires_at': expires_at,
-                                'approved_at': datetime.now().isoformat(),
-                            }
-                            unlimit_key = _unlimit_rds_key(record['user_id'])
-                            rds_mgr.set(unlimit_key, json.dumps(unlimit_record, ensure_ascii=False))
-
-                        item['status'] = 'approved'
-                        item['approved_at'] = datetime.now().isoformat()
-                        approved_count += 1
-                        break
-
-                if not found:
+                record = db_mgr.get_data(TABLE_UNLIMIT, apply_id, '*')
+                if record.get('code') != 0 or not record.get('data'):
                     not_found_ids.append(apply_id)
+                    continue
+                data = record['data']
+                if data.get('status') != 'pending':
+                    not_found_ids.append(apply_id)
+                    continue
 
-            rds_mgr.set(PENDING_INDEX_KEY, json.dumps(pending, ensure_ascii=False))
+                now_iso = _ts()
+                duration_min = data.get('duration', 60)
+                expires_at = _ts(duration_min)
+
+                db_mgr.set_data(TABLE_UNLIMIT, {
+                    'id': apply_id,
+                    'status': 'approved',
+                    'approved_at': now_iso,
+                    'expires_at': expires_at,
+                })
+
+                approved_count += 1
+
             log.info(f"不限时审批通过: ids={ids} approved={approved_count} not_found={not_found_ids}")
             return {"code": 0, "msg": "ok", "data": {"approved": approved_count, "not_found": not_found_ids}}
         except Exception as e:
@@ -387,33 +406,26 @@ class MaterialMgr:
     def deny_unlimit(self, ids: List[int]) -> Dict[str, Any]:
         """批量拒绝不限时申请。"""
         try:
-            raw = rds_mgr.get_str(PENDING_INDEX_KEY)
-            pending: List[Dict[str, Any]] = json.loads(raw) if raw else []
             denied_count = 0
             not_found_ids: List[int] = []
 
             for apply_id in ids:
-                found = False
-                for item in pending:
-                    if item.get('id') == apply_id and item.get('status') == 'pending':
-                        found = True
-                        apply_key = f"task:unlimit:apply:{apply_id}"
-                        apply_raw = rds_mgr.get_str(apply_key)
-                        if apply_raw:
-                            record = json.loads(apply_raw)
-                            record['status'] = 'denied'
-                            record['denied_at'] = datetime.now().isoformat()
-                            rds_mgr.set(apply_key, json.dumps(record, ensure_ascii=False))
-
-                        item['status'] = 'denied'
-                        item['denied_at'] = datetime.now().isoformat()
-                        denied_count += 1
-                        break
-
-                if not found:
+                record = db_mgr.get_data(TABLE_UNLIMIT, apply_id, '*')
+                if record.get('code') != 0 or not record.get('data'):
                     not_found_ids.append(apply_id)
+                    continue
+                data = record['data']
+                if data.get('status') != 'pending':
+                    not_found_ids.append(apply_id)
+                    continue
 
-            rds_mgr.set(PENDING_INDEX_KEY, json.dumps(pending, ensure_ascii=False))
+                db_mgr.set_data(TABLE_UNLIMIT, {
+                    'id': apply_id,
+                    'status': 'denied',
+                    'denied_at': _ts(),
+                })
+                denied_count += 1
+
             log.info(f"不限时申请已拒绝: ids={ids} denied={denied_count} not_found={not_found_ids}")
             return {"code": 0, "msg": "ok", "data": {"denied": denied_count, "not_found": not_found_ids}}
         except Exception as e:

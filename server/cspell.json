@@ -36,5 +36,8 @@
         "werkzeug",
         "wifispeaker",
         "wsgi"
+    ],
+    "ignoreRegExpList": [
+        "\\w+\\.\\w+"
     ]
 }
