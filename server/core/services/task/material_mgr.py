@@ -15,7 +15,7 @@ from core.config import app_logger
 from core.config.const import DEFAULT_BASE_DIR
 from core.db.db_mgr import db_mgr
 from core.tools.async_util import run_in_background
-from core.utils import get_media_duration, validate_and_normalize_path
+from core.utils import fmt_ts, get_media_duration, validate_and_normalize_path
 from .block_time import is_global_block_time_now, parse_block_time_config, _get_user_entry, _is_blocked_by_entry
 
 log = app_logger
@@ -27,14 +27,6 @@ TABLE_UNLIMIT = 't_material_unlimit'
 
 _ok = lambda data: {"code": 0, "msg": "ok", "data": data}
 _err = lambda msg, data: {"code": -1, "msg": msg, "data": data}
-
-
-def _ts(minutes: int = 0) -> str:
-    """返回带时区偏移的时间字符串，如 '2026-07-09 12:34:56 +08:00'。minutes>0 表示当前时间之后的分钟。"""
-    dt = datetime.now() + timedelta(minutes=minutes)
-    offset = dt.astimezone().utcoffset()
-    hours = int(offset.total_seconds() / 3600) if offset else 0
-    return dt.strftime(f'%Y-%m-%d %H:%M:%S {hours:+03d}:00')
 
 
 class MaterialMgr:
@@ -51,7 +43,7 @@ class MaterialMgr:
                             task_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
         """检查用户是否存在有效的不限时记录。"""
         try:
-            now_iso = _ts()
+            now_iso = fmt_ts()
             base = {
                 'user_id': user_id,
                 'status': 'approved',
@@ -271,7 +263,7 @@ class MaterialMgr:
             lock_code: 锁定类型码（0=未锁定, 1=任务禁用, 2=全局禁用, 3=时长超限）
         """
         try:
-            now_iso = _ts()
+            now_iso = fmt_ts()
 
             # 去重逻辑：按 lock_code 类型区分替换范围
             if lock_code == 3:
@@ -384,9 +376,9 @@ class MaterialMgr:
                     not_found_ids.append(apply_id)
                     continue
 
-                now_iso = _ts()
+                now_iso = fmt_ts()
                 duration_min = data.get('duration', 60)
-                expires_at = _ts(duration_min)
+                expires_at = fmt_ts(duration_min)
 
                 db_mgr.set_data(TABLE_UNLIMIT, {
                     'id': apply_id,
@@ -422,7 +414,7 @@ class MaterialMgr:
                 db_mgr.set_data(TABLE_UNLIMIT, {
                     'id': apply_id,
                     'status': 'denied',
-                    'denied_at': _ts(),
+                    'denied_at': fmt_ts(),
                 })
                 denied_count += 1
 

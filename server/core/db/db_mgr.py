@@ -1,4 +1,3 @@
-import datetime
 import json
 import traceback
 from typing import Any, Dict, List, Optional, Union, cast
@@ -11,6 +10,7 @@ from core.config.const import (DB_CODE_ERROR, DB_CODE_ERROR_RUNTIME, DB_CODE_SUC
 from core.db import db_obj
 from core.models.score_history import ScoreHistory
 from core.models.user import User
+from core.utils import fmt_ts
 
 log = app_logger
 
@@ -276,13 +276,6 @@ class DbMgr:
             cur_score = pre_score + int(value)
 
             # 创建积分历史记录
-            # 手动计算时区偏移，确保正确输出时区信息
-            now = datetime.datetime.now()
-            offset = now.astimezone().utcoffset()
-            offset_hours = int(offset.total_seconds() / 3600) if offset else 0
-            offset_str = f"{offset_hours:+03d}:00"
-
-            # 使用属性赋值方式创建 ScoreHistory 对象
             score_history = ScoreHistory()
             score_history.user_id = user_id
             score_history.value = value
@@ -290,7 +283,7 @@ class DbMgr:
             score_history.pre_value = pre_score
             score_history.current = cur_score
             score_history.msg = msg if msg else ''
-            score_history.dt = now.strftime(f"%Y-%m-%d %H:%M:%S {offset_str}")
+            score_history.dt = fmt_ts()
             score_history.out_key = out_key
 
             # 更新用户积分
