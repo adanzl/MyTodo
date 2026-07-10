@@ -90,7 +90,7 @@
                 @click="handleMaterialClick(task, material)">
                 <div class="absolute inset-0 flex flex-col p-3 bg-white rounded-lg shadow-md">
                   <div class="absolute top-2 inset-x-3 flex items-center justify-between">
-                    <ion-icon :icon="checkmarkCircle" class="text-xl" :class="isMaterialCompleted(task, material, currentDate)
+                    <ion-icon :icon="checkmarkCircle" class="text-xl" :class="isMaterialCompleted(task, material)
                         ? 'text-green-400'
                         : 'text-gray-300'
                       "></ion-icon>
@@ -131,7 +131,7 @@
 </template>
 
 <script setup lang="ts">
-import { getTaskList, getMaterialListByIds, type Task, type MaterialItem, listUnlimitApplications } from "@/api/api-task";
+import { getTaskList, type TaskWithMaterials, type MaterialItem, listUnlimitApplications } from "@/api/api-task";
 import dayjs from "dayjs";
 import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import MaterialPlayerDialog from "./dialogs/MaterialPlayerDialog.vue";
@@ -169,8 +169,7 @@ import { computed, inject, ref, watch } from "vue";
 
 // 状态管理
 const loading = ref(false);
-const taskList = ref<Task[]>([]); // 当前选中日期的任务
-const materialMap = ref<Map<number, MaterialItem>>(new Map());
+const taskList = ref<TaskWithMaterials[]>([]); // 当前选中日期的任务（含当天素材详情）
 const startDate = ref(new Date());
 const currentDate = ref(new Date());
 const totalCount = ref(0);
@@ -179,7 +178,7 @@ const selectedUserId = ref("3");
 // 播放弹窗状态
 const showPlayerDialog = ref(false);
 const selectedMaterial = ref<any>(null);
-const selectedTask = ref<Task | null>(null);
+const selectedTask = ref<TaskWithMaterials | null>(null);
 const selectedDate = ref<string>(""); // 素材对应的日期
 
 // 日历弹窗状态
@@ -208,7 +207,7 @@ const expandedAccordionValue = ref<string | undefined>(undefined);
 // 1) 每日任务 > 持续任务（type=1 视为持续任务）
 // 2) 有未完成素材 > 全部已完成
 // 3) 优先级数字小 > 数字大
-const sortedDisplayTasks = computed((): Task[] => {
+const sortedDisplayTasks = computed((): TaskWithMaterials[] => {
   return taskList.value
     .filter((task) => getTaskMaterialList(task).length > 0)
     .sort((a, b) => {
@@ -230,10 +229,10 @@ const sortedDisplayTasks = computed((): Task[] => {
     });
 });
 
-const getSortedMaterialsForTask = (task: Task): MaterialItem[] => {
+const getSortedMaterialsForTask = (task: TaskWithMaterials): MaterialItem[] => {
   return [...getTaskMaterialList(task)].sort((a, b) => {
-    const completedA = isMaterialCompleted(task, a, currentDate.value);
-    const completedB = isMaterialCompleted(task, b, currentDate.value);
+    const completedA = isMaterialCompleted(task, a);
+    const completedB = isMaterialCompleted(task, b);
     if (completedA !== completedB) {
       return completedA ? 1 : -1;
     }
@@ -241,17 +240,17 @@ const getSortedMaterialsForTask = (task: Task): MaterialItem[] => {
   });
 };
 
-const isTaskAllCompleted = (task: Task): boolean => {
+const isTaskAllCompleted = (task: TaskWithMaterials): boolean => {
   const materials = getTaskMaterialList(task);
   if (materials.length === 0) {
     return false;
   }
-  return materials.every((material) => isMaterialCompleted(task, material, currentDate.value));
+  return materials.every((material) => isMaterialCompleted(task, material));
 };
 
-const getTaskProgressText = (task: Task): string => {
+const getTaskProgressText = (task: TaskWithMaterials): string => {
   const materials = getTaskMaterialList(task);
-  const done = materials.filter((m) => isMaterialCompleted(task, m, currentDate.value)).length;
+  const done = materials.filter((m) => isMaterialCompleted(task, m)).length;
   return `${done}/${materials.length}`;
 };
 
@@ -266,21 +265,13 @@ const onAccordionChange = (event: CustomEvent) => {
 
 watch(sortedDisplayTasks, syncExpandedAccordionValue);
 
-// 获取任务当天的素材存档列表（直接使用后端计算的 today_materials）
-const getTaskMaterialSaveList = (task: Task): any[] => {
+// 获取任务当天的素材列表（直接使用后端返回的 today_materials）
+const getTaskMaterialList = (task: TaskWithMaterials): MaterialItem[] => {
   return task.today_materials || [];
 };
 
-// 获取任务当天的素材基础信息列表
-const getTaskMaterialList = (task: Task): MaterialItem[] => {
-  const saves = getTaskMaterialSaveList(task);
-  return saves
-    .map((save: any) => materialMap.value.get(save.id))
-    .filter((m): m is MaterialItem => m !== undefined);
-};
-
-// 检查素材是否完成（直接从 today_materials 中查找 status）
-const isMaterialCompleted = (task: Task, material: any, _date: Date) => {
+// 检查素材是否完成（从 today_materials 中查找 status）
+const isMaterialCompleted = (task: TaskWithMaterials, material: MaterialItem) => {
   const materials = task.today_materials || [];
   const found = materials.find((m) => m.id === material.id);
   const userId = getCurrentUserId();
@@ -291,7 +282,7 @@ const isMaterialCompleted = (task: Task, material: any, _date: Date) => {
 };
 
 // 处理素材点击
-const handleMaterialClick = (task: Task, material: MaterialItem) => {
+const handleMaterialClick = (task: TaskWithMaterials, material: MaterialItem) => {
   // 直接使用后端返回的锁定状态
   if (task.lock) {
     EventBus.$emit(C_EVENT.TOAST, task.msg || "任务已锁定");
@@ -334,7 +325,7 @@ const onApprovalDone = () => {
 };
 
 // 打开素材播放器
-const openMaterialPlayer = async (task: Task, material: MaterialItem) => {
+const openMaterialPlayer = async (task: TaskWithMaterials, material: MaterialItem) => {
   selectedMaterial.value = {
     id: material.id,
     name: material.name,
@@ -365,31 +356,12 @@ const fetchTaskList = async (showLoading = true) => {
       return;
     }
 
-    // 使用新的 API，带锁定状态检查
+    // 单次调用获取任务列表 + 当天素材详情
     const res = await getTaskList(userId, 1, 100, selectedDateStr, selectedDateStr);
 
     if (res.code === 0 && res.data) {
       taskList.value = res.data.data || [];
       totalCount.value = res.data.totalCount || 0;
-
-      // 收集所有素材 ID
-      const materialIds = new Set<number>();
-      taskList.value.forEach((task) => {
-        const saves = getTaskMaterialSaveList(task);
-        saves.forEach((save: any) => {
-          if (save && save.id) {
-            materialIds.add(save.id);
-          }
-        });
-      });
-
-      // 批量获取素材详情
-      if (materialIds.size > 0) {
-        const materials = await getMaterialListByIds(Array.from(materialIds));
-        materials.forEach((material) => {
-          materialMap.value.set(material.id, material);
-        });
-      }
     }
   } catch (error: any) {
     console.error("获取任务列表失败:", error);
