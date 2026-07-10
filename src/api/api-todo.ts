@@ -7,9 +7,9 @@ export interface GetTodoCalendarResponse {
   [date: string]: ScheduleData[];
 }
 
-/** dayjs 默认 toJSON 输出 UTC(Z)，后端无法识别时区；转为带偏移的 ISO 字符串 */
+/** 转为纯日期字符串 YYYY-MM-DD */
 function serializeDate(v: any): any {
-  if (dayjs.isDayjs(v)) return v.format("YYYY-MM-DDTHH:mm:ssZ");
+  if (dayjs.isDayjs(v)) return v.format("YYYY-MM-DD");
   return v;
 }
 

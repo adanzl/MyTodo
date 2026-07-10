@@ -79,7 +79,7 @@
                           {{ getGroupOptions(schedule.groupId).label }}
                         </span>
                         <span class="mr-3 flex items-center text-xs">
-                          {{ schedule.allDay ? "全天" : schedule.startTs?.format("HH:mm") }}
+                          {{ schedule.allDay ? "全天" : "" }}
                         </span>
                         <span class="mr-1 flex items-center">
                           <Icon icon="mdi:star" class="text-red-500 mr-1 text-sm" />

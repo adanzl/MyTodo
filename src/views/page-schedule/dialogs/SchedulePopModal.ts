@@ -230,14 +230,15 @@ export default defineComponent({
       },
       // 日程开始结束日期点击清除
       btnScheduleDateClearClk: () => {
-        refData.curScheduleData.value.startTs = dayjs();
-        refData.curScheduleData.value.endTs = dayjs();
+        refData.curScheduleData.value.startTs = dayjs().startOf('day');
+        refData.curScheduleData.value.endTs = dayjs().startOf('day');
         tab2Method.btnScheduleDTClk();
       },
-      // 日程开始时间选择器确认
+      // 日程开始时间选择器确认（日期模式）
       btnScheduleDatetimeOkClk: () => {
         refData.datetimeShowFlag.value = false;
-        refData.curScheduleData.value.startTs = refData.scheduleStartTsComponent.value;
+        const d = dayjs(refData.scheduleStartTsComponent.value);
+        refData.curScheduleData.value.startTs = d.isValid() ? d.startOf('day') : dayjs().startOf('day');
       },
       // 日程开始时间选择器AllDay切换
       onScheduleDatetimeAllDayChange: (event: any) => {
@@ -256,7 +257,8 @@ export default defineComponent({
       },
       // 重复结束日期改变
       onRepeatEndDtChange: (event: any) => {
-        refData.curScheduleData.value!.repeatEndTs = dayjs(event.detail.value);
+        const d = dayjs(event.detail.value);
+        refData.curScheduleData.value!.repeatEndTs = d.isValid() ? d.startOf('day') : undefined;
       },
       // 重复结束日期选择确认点击
       btnRepeatEndOkClk: () => {
