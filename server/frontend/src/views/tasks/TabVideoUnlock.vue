@@ -47,12 +47,75 @@
           {{ row.duration }} 分钟
         </template>
       </el-table-column>
+      <el-table-column label="审批类型" width="100" align="center">
+        <template #default="{ row }">
+          <el-tag v-if="row.lock_code === 1" type="warning" size="small">任务禁用</el-tag>
+          <el-tag v-else-if="row.lock_code === 2" type="danger" size="small">全局禁用</el-tag>
+          <el-tag v-else-if="row.lock_code === 3" type="info" size="small">时长超限</el-tag>
+          <span v-else>未知({{ row.lock_code }})</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="created_at" label="申请时间" width="170">
         <template #default="{ row }">
           {{ row.created_at ? dayjs(row.created_at).format('YYYY-MM-DD HH:mm:ss') : '-' }}
         </template>
       </el-table-column>
     </el-table>
+
+    <!-- 生效中列表 -->
+    <div class="mt-6">
+      <div class="flex items-center h-8 mb-2">
+        <span class="text-sm font-medium text-gray-600">生效中的申请</span>
+        <el-button type="primary" plain size="small" class="ml-2" @click="fetchActiveList" :icon="Refresh" />
+        <span class="text-sm text-gray-400 ml-2">共 {{ activeList.length }} 条</span>
+      </div>
+      <el-table
+        :data="activeList"
+        v-loading="activeLoading"
+        stripe border
+        style="width: 100%"
+        :max-height="tableMaxHeight"
+      >
+        <el-table-column width="45" />
+        <el-table-column prop="id" label="ID" width="150" />
+        <el-table-column label="用户" width="70" align="center">
+          <template #default="{ row }">
+            {{ getUserName(row.user_id) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="素材" min-width="200">
+          <template #default="{ row }">
+            {{ getMaterialName(row.material_id) || `素材#${row.material_id}` }}
+          </template>
+        </el-table-column>
+        <el-table-column label="申请时长" width="100" align="center">
+          <template #default="{ row }">
+            {{ row.duration }} 分钟
+          </template>
+        </el-table-column>
+        <el-table-column label="审批类型" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.lock_code === 1" type="warning" size="small">任务禁用</el-tag>
+            <el-tag v-else-if="row.lock_code === 2" type="danger" size="small">全局禁用</el-tag>
+            <el-tag v-else-if="row.lock_code === 3" type="info" size="small">时长超限</el-tag>
+            <span v-else>未知({{ row.lock_code }})</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="申请时间" width="170">
+          <template #default="{ row }">
+            {{ row.created_at ? dayjs(row.created_at).format('YYYY-MM-DD HH:mm:ss') : '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="过期时间" width="170">
+          <template #default="{ row }">
+            <span v-if="row.expires_at" :class="{ 'text-red-500': dayjs(row.expires_at).isBefore(dayjs()) }">
+              {{ dayjs(row.expires_at).format('YYYY-MM-DD HH:mm:ss') }}
+            </span>
+            <span v-else class="text-gray-400">永久</span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
   </div>
 </template>
 
@@ -76,6 +139,8 @@ const calculateTableHeight = () => {
 const loading = ref(false);
 const applicationList = ref<UnlimitApplication[]>([]);
 const selectedIds = ref<number[]>([]);
+const activeLoading = ref(false);
+const activeList = ref<UnlimitApplication[]>([]);
 const materialNameMap = ref<Map<number, string>>(new Map());
 
 const getUserName = (userId: number) => {
@@ -105,13 +170,32 @@ const fetchList = async () => {
   loading.value = true;
   try {
     applicationList.value = await getUnlimitList('pending');
-    const materialIds = applicationList.value.map((a) => a.material_id);
-    await fetchMaterialNames(materialIds);
+    await refreshMaterialNames();
   } catch (error: any) {
     ElMessage.error(error.message || "获取申请列表失败");
   } finally {
     loading.value = false;
   }
+};
+
+const fetchActiveList = async () => {
+  activeLoading.value = true;
+  try {
+    activeList.value = await getUnlimitList('approved', dayjs().format('YYYY-MM-DD HH:mm:ss'));
+    await refreshMaterialNames();
+  } catch (error: any) {
+    ElMessage.error(error.message || "获取生效中列表失败");
+  } finally {
+    activeLoading.value = false;
+  }
+};
+
+const refreshMaterialNames = async () => {
+  const allMaterialIds = [
+    ...applicationList.value.map((a) => a.material_id),
+    ...activeList.value.map((a) => a.material_id),
+  ];
+  await fetchMaterialNames(allMaterialIds);
 };
 
 const handleSelectionChange = (rows: UnlimitApplication[]) => {
@@ -159,11 +243,13 @@ const handleDeny = async () => {
 // 初始化
 onMounted(() => {
   fetchList();
+  fetchActiveList();
   calculateTableHeight();
   window.addEventListener("resize", calculateTableHeight);
 
   const handleRefresh = () => {
     fetchList();
+    fetchActiveList();
   };
   window.addEventListener("refresh-video-unlock-tab", handleRefresh);
 
