@@ -12,6 +12,7 @@ from sqlalchemy import text
 from core.config import app_logger
 from core.db import db_obj
 from core.db.db_mgr import db_mgr
+from core.utils import fmt_ts
 
 log = app_logger
 
@@ -52,6 +53,7 @@ class UsageMgr:
             if out_key is not None:
                 data['out_key'] = out_key
 
+            data['dt'] = fmt_ts()
             # 插入数据
             result = db_mgr.set_data('t_usage', data)
 

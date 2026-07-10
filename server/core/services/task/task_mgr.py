@@ -9,7 +9,7 @@ import json
 
 from core.config import app_logger
 from core.db.db_mgr import db_mgr
-from core.utils import _ok, _err
+from core.utils import _ok, _err, fmt_ts
 from .rest_days import parse_rest_days, is_rest_day, get_workday_index, end_date_by_work_duration
 
 log = app_logger
@@ -195,7 +195,8 @@ class TaskMgr:
                 'material_id': material_id,
                 'date_str': date_str,
                 'state': 1,
-                'reward': 0
+                'reward': 0,
+                'dt': fmt_ts(),
             }
             history_result = db_mgr.set_data('t_task_history', history_data)
             if history_result.get('code') != 0:
