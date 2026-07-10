@@ -4,34 +4,20 @@
     <div class="flex items-center h-10 mb-2">
       <div class="flex flex-1 items-center gap-4">
         <el-button type="primary" plain size="small" @click="fetchList" :icon="Refresh" />
-        <span class="text-sm text-gray-500">共 {{ applicationList.length }} 条待审批</span>
+        <span class="text-sm text-gray-500">共 {{ applicationList.length }} 条 待审批</span>
         <div class="flex-1" />
-        <el-button
-          size="small"
-          type="success"
-          :disabled="!selectedIds.length"
-          @click="handleApprove"
-        >通过 ({{ selectedIds.length }})</el-button>
-        <el-button
-          size="small"
-          type="danger"
-          :disabled="!selectedIds.length"
-          @click="handleDeny"
-        >拒绝 ({{ selectedIds.length }})</el-button>
+        <el-button size="small" type="success" :disabled="!selectedIds.length" @click="handleApprove">通过 ({{
+          selectedIds.length }})</el-button>
+        <el-button size="small" type="danger" :disabled="!selectedIds.length" @click="handleDeny">拒绝 ({{
+          selectedIds.length }})</el-button>
       </div>
     </div>
 
     <!-- 表格 -->
-    <el-table
-      :data="applicationList"
-      v-loading="loading"
-      stripe border
-      style="width: 100%"
-      :max-height="tableMaxHeight"
-      @selection-change="handleSelectionChange"
-    >
+    <el-table :data="applicationList" v-loading="loading" stripe border style="width: 100%" :max-height="tableMaxHeight"
+      @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="45" />
-      <el-table-column prop="id" label="ID" width="150" />
+      <el-table-column prop="id" label="ID" width="60" />
       <el-table-column label="用户" width="70" align="center">
         <template #default="{ row }">
           {{ getUserName(row.user_id) }}
@@ -50,7 +36,7 @@
       <el-table-column label="审批类型" width="100" align="center">
         <template #default="{ row }">
           <el-tag v-if="row.lock_code === 1" type="warning" size="small">任务禁用</el-tag>
-          <el-tag v-else-if="row.lock_code === 2" type="danger" size="small">全局禁用</el-tag>
+          <el-tag v-else-if="row.lock_code === 2" type="warning" size="small">全局禁用</el-tag>
           <el-tag v-else-if="row.lock_code === 3" type="info" size="small">时长超限</el-tag>
           <span v-else>未知({{ row.lock_code }})</span>
         </template>
@@ -60,24 +46,30 @@
           {{ row.created_at ? dayjs(row.created_at).format('YYYY-MM-DD HH:mm:ss') : '-' }}
         </template>
       </el-table-column>
+      <el-table-column label="操作" width="170" align="center">
+        <template #default="{ row }">
+          <div class="flex gap-1 justify-center">
+            <el-button size="small" type="primary" @click="handleApproveSingle(row)">通过</el-button>
+            <el-button size="small" type="danger" @click="handleDenySingle(row)">拒绝</el-button>
+          </div>
+        </template>
+      </el-table-column>
     </el-table>
 
     <!-- 生效中列表 -->
     <div class="mt-6">
       <div class="flex items-center h-8 mb-2">
-        <span class="text-sm font-medium text-gray-600">生效中的申请</span>
         <el-button type="primary" plain size="small" class="ml-2" @click="fetchActiveList" :icon="Refresh" />
-        <span class="text-sm text-gray-400 ml-2">共 {{ activeList.length }} 条</span>
+        <span class="text-sm text-gray-400 ml-2">共 {{ activeList.length }} 条 生效中</span>
       </div>
-      <el-table
-        :data="activeList"
-        v-loading="activeLoading"
-        stripe border
-        style="width: 100%"
-        :max-height="tableMaxHeight"
-      >
-        <el-table-column width="45" />
-        <el-table-column prop="id" label="ID" width="150" />
+      <el-table :data="activeList" v-loading="activeLoading" stripe border style="width: 100%"
+        :max-height="tableMaxHeight">
+        <el-table-column width="45">
+          <template #default="{ row }">
+            <el-button size="small" circle type="danger" plain @click="handleRevoke(row)">x</el-button>
+          </template>
+        </el-table-column>
+        <el-table-column prop="id" label="ID" width="60" />
         <el-table-column label="用户" width="70" align="center">
           <template #default="{ row }">
             {{ getUserName(row.user_id) }}
@@ -120,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import { getUnlimitList, approveUnlimit, denyUnlimit, getMaterialListByIds, type UnlimitApplication } from "@/api/api-task";
+import { getUnlimitList, approveUnlimit, denyUnlimit, revokeUnlimit, getMaterialListByIds, type UnlimitApplication } from "@/api/api-task";
 import { Refresh } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { onMounted, ref, onUnmounted, nextTick } from "vue";
@@ -214,9 +206,75 @@ const handleApprove = async () => {
     ElMessage.success(`已通过 ${selectedIds.value.length} 条申请`);
     selectedIds.value = [];
     fetchList();
+    fetchActiveList();
   } catch (error: any) {
     if (error !== "cancel") {
       ElMessage.error(error.message || "审批失败");
+    }
+  }
+};
+
+const handleApproveSingle = async (row: UnlimitApplication) => {
+  try {
+    const { value: durationStr } = await ElMessageBox.prompt(
+      `确定要通过该不限时申请吗？请输入认证分钟数：`,
+      "提示",
+      {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "info",
+        inputValue: String(row.duration),
+        inputPlaceholder: "认证分钟数",
+        inputValidator: (val: string) => {
+          const num = Number(val);
+          if (!Number.isInteger(num) || num <= 0) return '请输入大于 0 的整数';
+          return true;
+        },
+        inputErrorMessage: '无效的分钟数',
+      }
+    );
+    await approveUnlimit([row.id], parseInt(durationStr, 10));
+    ElMessage.success(`已通过申请 #${row.id}`);
+    fetchList();
+    fetchActiveList();
+  } catch (error: any) {
+    if (error !== "cancel") {
+      ElMessage.error(error.message || "审批失败");
+    }
+  }
+};
+
+const handleDenySingle = async (row: UnlimitApplication) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要拒绝该不限时申请吗？`,
+      "提示",
+      { confirmButtonText: "确定", cancelButtonText: "取消", type: "warning" }
+    );
+    await denyUnlimit([row.id]);
+    ElMessage.success(`已拒绝申请 #${row.id}`);
+    fetchList();
+    fetchActiveList();
+  } catch (error: any) {
+    if (error !== "cancel") {
+      ElMessage.error(error.message || "拒绝失败");
+    }
+  }
+};
+
+const handleRevoke = async (row: UnlimitApplication) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要撤销申请 #${row.id}（${getMaterialName(row.material_id) || `素材#${row.material_id}`}）使其立即失效吗？`,
+      "提示",
+      { confirmButtonText: "确定", cancelButtonText: "取消", type: "warning" }
+    );
+    await revokeUnlimit(row.id);
+    ElMessage.success(`已撤销申请 #${row.id}`);
+    fetchActiveList();
+  } catch (error: any) {
+    if (error !== "cancel") {
+      ElMessage.error(error.message || "操作失败");
     }
   }
 };
@@ -233,6 +291,7 @@ const handleDeny = async () => {
     ElMessage.success(`已拒绝 ${selectedIds.value.length} 条申请`);
     selectedIds.value = [];
     fetchList();
+    fetchActiveList();
   } catch (error: any) {
     if (error !== "cancel") {
       ElMessage.error(error.message || "拒绝失败");

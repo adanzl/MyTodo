@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from flask import current_app
 
@@ -224,7 +224,7 @@ class MaterialMgr:
             if not material_duration:
                 path = mat.get('path')
                 if path:
-                    app = current_app._get_current_object()  # pyright: ignore[reportAttributeAccessIssue]
+                    app = cast(Any, current_app)._get_current_object()
                     mid = material_id
 
                     def _fetch(fp=path, m_id=mid):
@@ -371,8 +371,13 @@ class MaterialMgr:
             log.error(f"列出不限时申请失败: {e}")
             return _err(f"查询失败: {str(e)}")
 
-    def approve_unlimit(self, ids: List[int]) -> Dict[str, Any]:
-        """批量审批通过不限时申请。"""
+    def approve_unlimit(self, ids: List[int], duration: Optional[int] = None) -> Dict[str, Any]:
+        """批量审批通过不限时申请。
+
+        Args:
+            ids: 申请ID列表
+            duration: 自定义不限时时长（分钟），不传则使用申请时的值
+        """
         try:
             approved_count = 0
             not_found_ids: List[int] = []
@@ -388,7 +393,7 @@ class MaterialMgr:
                     continue
 
                 now_iso = fmt_ts()
-                duration_min = data.get('duration', 60)
+                duration_min = duration or data.get('duration', 60)
                 expires_at = fmt_ts(duration_min)
 
                 db_mgr.set_data(TABLE_UNLIMIT, {
@@ -436,6 +441,26 @@ class MaterialMgr:
         except Exception as e:
             log.error(f"不限时拒绝失败: {e}")
             return _err(f"拒绝失败: {str(e)}")
+
+    def revoke_unlimit(self, apply_id: int) -> Dict[str, Any]:
+        """使生效中的不限时申请立即失效（将过期时间设为当前）。"""
+        try:
+            record = db_mgr.get_data(TABLE_UNLIMIT, apply_id, '*')
+            if record.get('code') != 0 or not record.get('data'):
+                return _err('记录不存在')
+            data = record['data']
+            if data.get('status') != 'approved':
+                return _err('仅生效中的申请可以失效')
+
+            db_mgr.set_data(TABLE_UNLIMIT, {
+                'id': apply_id,
+                'expires_at': fmt_ts(),  # 设为当前时间，立即过期
+            })
+            log.info(f"不限时申请已失效: id={apply_id}")
+            return _ok({"success": True})
+        except Exception as e:
+            log.error(f"不限时申请失效失败: {e}")
+            return _err(f"操作失败: {str(e)}")
 
 
 material_mgr = MaterialMgr()

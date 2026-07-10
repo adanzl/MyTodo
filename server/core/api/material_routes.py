@@ -8,7 +8,7 @@ from __future__ import annotations
 from flask import Blueprint, request
 from flask.typing import ResponseReturnValue
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 from core.config import app_logger
 from core.services.task.material_mgr import material_mgr
@@ -31,6 +31,7 @@ class ApplyUnlimitQuery(BaseModel):
 class ApproveDenyQuery(BaseModel):
     """批量审批/拒绝参数"""
     ids: List[int]
+    duration: Optional[int] = None
 
 
 @material_bp.route('/material/category/delete', methods=['POST'])
@@ -104,7 +105,7 @@ def approve_unlimit_applications() -> ResponseReturnValue:
         return err or _err('Invalid request body')
 
     log.info(f"=> [Unlimit Approve] ids={body.ids}")
-    result = material_mgr.approve_unlimit(body.ids)
+    result = material_mgr.approve_unlimit(body.ids, duration=body.duration)
     return result
 
 
@@ -118,6 +119,24 @@ def deny_unlimit_applications() -> ResponseReturnValue:
 
     log.info(f"=> [Unlimit Deny] ids={body.ids}")
     result = material_mgr.deny_unlimit(body.ids)
+    return result
+
+
+class RevokeQuery(BaseModel):
+    """使生效申请失效参数"""
+    id: int
+
+
+@material_bp.route('/material/unlimit/revoke', methods=['POST'])
+def revoke_unlimit_application() -> ResponseReturnValue:
+    """使生效中的不限时申请立即失效"""
+    json_data = read_json_from_request()
+    body, err = parse_with_model(RevokeQuery, json_data, err_factory=_err)
+    if err or not body:
+        return err or _err('Invalid request body')
+
+    log.info(f'=> [Unlimit Revoke] id={body.id}')
+    result = material_mgr.revoke_unlimit(body.id)
     return result
 
 
