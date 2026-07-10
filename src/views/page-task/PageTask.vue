@@ -15,11 +15,12 @@
 
     <!-- 用户筛选（仅 admin 可见） -->
     <div v-if="isAdmin" class="flex items-center gap-2 mx-2">
-      <ion-segment v-model="selectedUserId" @ionChange="handleUserChange">
-        <ion-segment-button value="3">
+      <ion-segment v-model="selectedUserId" @ionChange="handleUserChange"
+        class="[--background:transparent] [--indicator-color:var(--ion-color-primary)]">
+        <ion-segment-button value="3" class="[--color:var(--ion-color-dark)] [--color-checked:var(--ion-color-primary)]">
           <ion-label>灿灿</ion-label>
         </ion-segment-button>
-        <ion-segment-button value="4">
+        <ion-segment-button value="4" class="[--color:var(--ion-color-dark)] [--color-checked:var(--ion-color-primary)]">
           <ion-label>昭昭</ion-label>
         </ion-segment-button>
       </ion-segment>

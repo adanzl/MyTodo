@@ -570,9 +570,14 @@ export async function getUnlimitList(status: string = "pending", expiresAt?: str
 /**
  * 批量审批通过不限时申请
  * @param ids - 申请ID数组
+ * @param duration - 自定义不限时时长（分钟），不传则使用申请时的值
  */
-export async function approveUnlimit(ids: number[]): Promise<void> {
-  const response = await api.post("/material/unlimit/approve", { ids });
+export async function approveUnlimit(ids: number[], duration?: number): Promise<void> {
+  const payload: Record<string, any> = { ids };
+  if (duration !== undefined) {
+    payload.duration = duration;
+  }
+  const response = await api.post("/material/unlimit/approve", payload);
   if (response.data.code !== 0) {
     throw new Error(response.data.msg || "审批失败");
   }
@@ -586,6 +591,17 @@ export async function denyUnlimit(ids: number[]): Promise<void> {
   const response = await api.post("/material/unlimit/deny", { ids });
   if (response.data.code !== 0) {
     throw new Error(response.data.msg || "拒绝失败");
+  }
+}
+
+/**
+ * 使生效中的不限时申请立即失效
+ * @param id - 申请ID
+ */
+export async function revokeUnlimit(id: number): Promise<void> {
+  const response = await api.post("/material/unlimit/revoke", { id });
+  if (response.data.code !== 0) {
+    throw new Error(response.data.msg || "操作失败");
   }
 }
 

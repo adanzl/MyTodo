@@ -72,6 +72,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
+import dayjs from 'dayjs';
 import {
   IonModal,
   IonHeader,
@@ -122,16 +123,9 @@ const getUserName = (userId: number): string => {
 
 const formatTime = (isoStr: string): string => {
   if (!isoStr) return '';
-  try {
-    const d = new Date(isoStr);
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    const h = String(d.getHours()).padStart(2, '0');
-    const min = String(d.getMinutes()).padStart(2, '0');
-    return `${m}-${day} ${h}:${min}`;
-  } catch {
-    return isoStr;
-  }
+  const d = dayjs(isoStr);
+  if (!d.isValid()) return isoStr;
+  return d.format('MM-DD HH:mm');
 };
 
 const toggleSelect = (id: number) => {
