@@ -168,10 +168,12 @@ class TaskMgr:
             materials_for_day = daily_materials.get(str(materials_index), [])
 
             day_material_ids = [m.get('id') for m in materials_for_day if isinstance(m, dict)]
+            all_days_summary = {k: [m.get('id') for m in v if isinstance(m, dict)] for k, v in daily_materials.items() if isinstance(v, list)}
             log.info(
                 f"[finish_material] task_id={task_id}, material_id={material_id}, date={date_str}, "
                 f"user_id={user_id}, type={task.get('type', 0)}, workday_idx={workday_idx}, "
-                f"materials_index={materials_index}, day_material_ids={day_material_ids}"
+                f"materials_index={materials_index}, day_material_ids={day_material_ids}, "
+                f"all_days_summary={all_days_summary}"
             )
 
             for material in materials_for_day:
