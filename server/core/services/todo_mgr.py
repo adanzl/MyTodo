@@ -113,9 +113,8 @@ class TodoMgr:
         """
         try:
             # 获取用户的可能在时间范围内显示的日程模板
-            # end_time 补上时间后缀，确保 start_ts <= end_time 的字符串比较不会因为
-            # start_ts 带时间而漏掉当天数据（如 '2026-07-05T00:00:00+08:00' <= '2026-07-05T23:59:59'）
-            end_ts_bound = end_time + 'T23:59:59'
+            # start_ts/end_ts/repeat_end_ts 均为纯日期 YYYY-MM-DD，字符串比较即可
+            end_ts_bound = end_time
             schedules_sql = f"""
                 SELECT * FROM t_schedule 
                 WHERE user_id = {user_id}
