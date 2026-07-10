@@ -20,7 +20,7 @@ from flask.typing import ResponseReturnValue
 from pydantic import BaseModel
 
 from core.config import app_logger
-from core.services.tts_mgr import tts_mgr
+from core.services.tools.tts_mgr import tts_mgr
 from core.tools.validation import parse_with_model
 from core.utils import (
     _err,
@@ -66,7 +66,8 @@ class _TTSAnalyzeBody(BaseModel):
 @tts_bp.route('/tts/create', methods=['POST'])
 def create_tts_task() -> ResponseReturnValue:
     json_data = read_json_from_request()
-    body, err = parse_with_model(_CreateTTSTaskBody, json_data, err_factory=_err)
+    body, err = parse_with_model(
+        _CreateTTSTaskBody, json_data, err_factory=_err)
     if err or not body:
         return err or _err("Invalid request body")
     create_kwargs = {
@@ -88,7 +89,8 @@ def create_tts_task() -> ResponseReturnValue:
 @tts_bp.route('/tts/update', methods=['POST'])
 def update_tts_task() -> ResponseReturnValue:
     json_data = read_json_from_request()
-    body, err = parse_with_model(_UpdateTTSTaskBody, json_data, err_factory=_err)
+    body, err = parse_with_model(
+        _UpdateTTSTaskBody, json_data, err_factory=_err)
     if err or not body:
         return err or _err("Invalid request body")
     code, msg = tts_mgr.update_task(
@@ -199,7 +201,8 @@ def download_tts_file() -> ResponseReturnValue:
 
         # 使用任务名称作为下载文件名，非法字符替换为下划线，无名称时用 task_id
         raw_name = (task_info.get('name') or '').strip()
-        safe_name = ''.join(c if c.isalnum() or c in ' _-' else '_' for c in raw_name).strip() or f"tts_{task_id}"
+        safe_name = ''.join(c if c.isalnum(
+        ) or c in ' _-' else '_' for c in raw_name).strip() or f"tts_{task_id}"
         download_name = f"{safe_name}.mp3"
 
         # 返回文件下载。UC 等对 HTML a.download 的中文支持差，依赖服务端 Content-Disposition。
@@ -210,7 +213,8 @@ def download_tts_file() -> ResponseReturnValue:
             download_name=download_name,
             mimetype='audio/mpeg',
         )
-        ascii_fallback = ''.join(c if ord(c) < 128 else '_' for c in download_name).strip() or 'audio.mp3'
+        ascii_fallback = ''.join(
+            c if ord(c) < 128 else '_' for c in download_name).strip() or 'audio.mp3'
         encoded_filename = quote(download_name, safe='')
         resp.headers['Content-Disposition'] = (
             f"attachment; filename=\"{ascii_fallback}\"; filename*=UTF-8''{encoded_filename}"
@@ -227,15 +231,15 @@ def download_tts_file() -> ResponseReturnValue:
 @tts_bp.route('/tts/ocr', methods=['POST'])
 def tts_ocr() -> ResponseReturnValue:
     """TTS 任务 OCR 图片文字识别接口。
-    
+
     将 OCR 识别结果自动追加到指定 TTS 任务的文本末尾。
     开始 OCR 后，TTS 任务进入处理中状态；OCR 完成后，结果追加到文本末尾，任务状态恢复为待处理。
     该接口采用异步执行方式，立即返回成功响应，OCR 处理在后台线程中执行。
-    
+
     Request (multipart/form-data):
         - task_id: 任务 ID（必填，可通过 form-data 或 query 参数传递）
         - file: 图片文件（支持多个，字段名可以是 'file' 或 'files[]'）
-    
+
     Returns:
         ResponseReturnValue: 
             - 成功: {"code": 0, "msg": "ok"} - OCR 任务已启动，正在后台处理
@@ -253,12 +257,14 @@ def tts_ocr() -> ResponseReturnValue:
         if not request.files:
             return _err("请上传图片文件")
 
-        files = request.files.getlist('file') or request.files.getlist('files[]')
+        files = request.files.getlist(
+            'file') or request.files.getlist('files[]')
         if not files or all(not f.filename for f in files):
             return _err("未找到上传的图片文件")
 
         # 保存上传的文件到临时目录
-        image_paths, temp_dir = save_uploaded_files(files, temp_prefix='tts_ocr_')
+        image_paths, temp_dir = save_uploaded_files(
+            files, temp_prefix='tts_ocr_')
         if image_paths is None or temp_dir is None:
             return _err("保存上传文件失败或没有有效的图片文件")
 
@@ -296,7 +302,8 @@ def tts_analyze() -> ResponseReturnValue:
     """
     try:
         json_data = read_json_from_request()
-        body, err = parse_with_model(_TTSAnalyzeBody, json_data, err_factory=_err)
+        body, err = parse_with_model(
+            _TTSAnalyzeBody, json_data, err_factory=_err)
         if err or not body:
             return err or _err("Invalid request body")
 

@@ -5,7 +5,7 @@ import types
 
 import pytest
 from unittest.mock import patch
-import core.services.pdf_mgr as pm
+import core.services.tools.pdf_mgr as pm
 from core.config import TASK_STATUS_SUCCESS, TASK_STATUS_FAILED, TASK_STATUS_UPLOADED, TASK_STATUS_PROCESSING
 
 

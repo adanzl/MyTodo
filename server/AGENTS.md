@@ -17,11 +17,13 @@
 ## SSH
 
 主机
-- 局域网 mini
-- 广域网 57c42474b0ea.ofalias.net:58186
-- 广域网 
+- 局域网 主机： mini
+- 广域网 主机：vip.bj.frp.one:19367
+- 广域网 主机：57c42474b0ea.ofalias.net:58186
 用户名 leo
 密码 见.env 里的 SSH_PASSWORD
+优先级从上到下
+
 工作目录 /mnt/data/project/MyTodo/server
 
 ## 快捷命令

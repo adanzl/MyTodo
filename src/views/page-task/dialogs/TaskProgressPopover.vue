@@ -45,7 +45,6 @@ import type { Task } from '@/api/api-task';
 const props = defineProps<{
   tasks: Task[];
   userId: number;
-  date?: string; // 选中的日期，默认为今天
 }>();
 
 interface TaskProgress {
@@ -57,40 +56,21 @@ interface TaskProgress {
   todayScore: number;
 }
 
-// 计算任务进度
-const calculateTaskProgress = (task: Task, userId: number, targetDate: Date): TaskProgress => {
+// 计算任务进度（直接使用后端计算的 today_materials）
+const calculateTaskProgress = (task: Task, userId: number): TaskProgress => {
   try {
-    const taskData = typeof task.data === 'string' ? JSON.parse(task.data) : task.data;
-    const dailyMaterials = taskData.dailyMaterials || {};
-    const dailyScore = taskData.dailyScore || {};
-    
-    // 计算目标日期是任务的第几天
-    const start = new Date(task.start_date);
-    const diffDaysCount = Math.floor((targetDate.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    
-    if (diffDaysCount < 0 || diffDaysCount >= task.duration) {
-      return {
-        taskId: task.id!,
-        taskName: task.name,
-        completedMaterials: 0,
-        totalMaterials: 0,
-        progressPercent: 0,
-        todayScore: 0,
-      };
-    }
-    
-    // type=1（持续任务）：始终检查第0天
-    const materialsIndex = task.type === 1 ? 0 : diffDaysCount;
-    const materials = dailyMaterials[String(materialsIndex)] || [];
+    const materials = task.today_materials || [];
     
     // 统计已完成的素材数
-    const completedMaterials = materials.filter((m: any) => {
+    const completedMaterials = materials.filter((m) => {
       return m.status && m.status[String(userId)] === 1;
     }).length;
     
     const totalMaterials = materials.length;
     const progressPercent = totalMaterials > 0 ? (completedMaterials / totalMaterials) * 100 : 0;
-    const todayScore = dailyScore[String(materialsIndex)] || 0;
+    
+    // todayScore 待后端扩展 today_score 字段后支持
+    const todayScore = 0;
     
     return {
       taskId: task.id!,
@@ -115,8 +95,6 @@ const calculateTaskProgress = (task: Task, userId: number, targetDate: Date): Ta
 
 // 计算任务进度列表
 const taskProgressList = computed(() => {
-  // 使用传入的日期，如果没有则使用今天
-  const targetDate = props.date ? new Date(props.date) : new Date();
-  return props.tasks.map(task => calculateTaskProgress(task, props.userId, targetDate));
+  return props.tasks.map(task => calculateTaskProgress(task, props.userId));
 });
 </script>

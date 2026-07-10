@@ -14,7 +14,7 @@ from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 
 from core.config import PDF_UNLOCK_DIR, PDF_UPLOAD_DIR, app_logger
-from core.services.pdf_mgr import pdf_mgr
+from core.services.tools.pdf_mgr import pdf_mgr
 from core.tools.validation import parse_with_model
 from core.utils import _err, _ok, read_json_from_request
 

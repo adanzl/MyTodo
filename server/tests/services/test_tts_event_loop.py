@@ -10,7 +10,7 @@ import os
 import pytest
 from unittest.mock import patch
 
-from core.services.tts_mgr import TTSMgr
+from core.services.tools.tts_mgr import TTSMgr
 from core.tools.async_util import _clear_event_loop
 from core.config import (
     TASK_STATUS_PENDING,
@@ -23,13 +23,13 @@ from core.config import (
 @pytest.fixture(autouse=True)
 def mock_get_media_duration(monkeypatch):
     """Mock get_media_duration 避免测试中调用 ffprobe（环境可能未安装）。"""
-    monkeypatch.setattr('core.services.tts_mgr.get_media_duration', lambda _: 1.0)
+    monkeypatch.setattr('core.services.tools.tts_mgr.get_media_duration', lambda _: 1.0)
 
 
 @pytest.fixture
 def tts_mgr(tmp_path, monkeypatch):
     """Provides a clean TTSMgr instance using a temporary directory."""
-    monkeypatch.setattr('core.services.tts_mgr.TTS_BASE_DIR', str(tmp_path))
+    monkeypatch.setattr('core.services.tools.tts_mgr.TTS_BASE_DIR', str(tmp_path))
     mgr = TTSMgr()
     mgr._tasks = {}
     return mgr
@@ -112,7 +112,7 @@ def test_tts_task_start_with_event_loop(tts_mgr: TTSMgr, tmp_path):
             if self.on_msg:
                 self.on_msg("done", 1)
 
-    with patch('core.services.tts_mgr.TTSClient', FakeTTSClient):
+    with patch('core.services.tools.tts_mgr.TTSClient', FakeTTSClient):
         # 确保目录存在
         output_file = tmp_path / task_id / 'output.mp3'
         os.makedirs(os.path.dirname(output_file), exist_ok=True)
@@ -240,7 +240,7 @@ def test_tts_task_execution_without_event_loop_error(tts_mgr: TTSMgr, tmp_path):
         if "child watchers" in str(err) or "default loop" in str(err):
             event_loop_errors.append(str(err))
 
-    with patch('core.services.tts_mgr.TTSClient', FakeTTSClient):
+    with patch('core.services.tools.tts_mgr.TTSClient', FakeTTSClient):
         # 启动任务
         code, msg = tts_mgr.start_task(task_id)
         assert code == 0

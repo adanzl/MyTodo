@@ -49,7 +49,7 @@
 
       <!-- 更多选项 Popover -->
       <ion-popover trigger="more-trigger" trigger-action="click" class="[--width:90vw] [--max-width:320px]">
-        <TaskProgressPopover :tasks="taskList" :user-id="getCurrentUserId() || 0" :date="currentDateStr" />
+        <TaskProgressPopover :tasks="taskList" :user-id="getCurrentUserId() || 0" />
       </ion-popover>
     </div>
     <ion-content class="[&::part(scroll)]:px-4 [&::part(scroll)]:pb-2">
@@ -132,7 +132,6 @@
 
 <script setup lang="ts">
 import { getTaskList, getMaterialListByIds, type Task, type MaterialItem, listUnlimitApplications } from "@/api/api-task";
-import { diffDays } from "@/utils/date-util";
 import dayjs from "dayjs";
 import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import MaterialPlayerDialog from "./dialogs/MaterialPlayerDialog.vue";
@@ -267,28 +266,9 @@ const onAccordionChange = (event: CustomEvent) => {
 
 watch(sortedDisplayTasks, syncExpandedAccordionValue);
 
-// 获取任务当天的素材存档列表（从 task.data 中直接获取）
+// 获取任务当天的素材存档列表（直接使用后端计算的 today_materials）
 const getTaskMaterialSaveList = (task: Task): any[] => {
-  try {
-    const taskData = typeof task.data === "string" ? JSON.parse(task.data) : task.data;
-    const dailyMaterials = taskData.dailyMaterials || {};
-
-    // 计算当前日期是任务的第几天（从0开始）
-    const diffDaysCount = diffDays(currentDate.value, task.start_date);
-
-    if (diffDaysCount < 0 || diffDaysCount >= task.duration) {
-      return [];
-    }
-
-    // type=1（持续任务）：始终显示第0天的素材
-    const materialsIndex = task.type === 1 ? 0 : diffDaysCount;
-
-    // 直接返回对应天数的素材存档数组（索引从0开始）
-    return dailyMaterials[String(materialsIndex)] || [];
-  } catch (error) {
-    console.error("解析任务数据失败:", error);
-    return [];
-  }
+  return task.today_materials || [];
 };
 
 // 获取任务当天的素材基础信息列表
@@ -299,39 +279,15 @@ const getTaskMaterialList = (task: Task): MaterialItem[] => {
     .filter((m): m is MaterialItem => m !== undefined);
 };
 
-// 检查素材是否完成
-const isMaterialCompleted = (task: Task, material: any, date: Date) => {
-  try {
-    const taskData = typeof task.data === "string" ? JSON.parse(task.data) : task.data;
-
-    // 检查 dailyMaterials 中的 status
-    if (taskData.dailyMaterials) {
-      const diffDaysCount = diffDays(date, task.start_date);
-      if (diffDaysCount < 0 || diffDaysCount >= task.duration) {
-        return false;
-      }
-
-      // type=1（持续任务）：始终检查第0天的素材
-      const materialsIndex = task.type === 1 ? 0 : diffDaysCount;
-
-      // 使用从0开始的索引
-      const materials = taskData.dailyMaterials[String(materialsIndex)];
-      if (materials) {
-        const found = materials.find((m: any) => m.id === material.id);
-        // status 现在是 Record<string, number>，key 为 user_id
-        const userId = getCurrentUserId();
-
-        if (userId && found?.status) {
-          return found.status[String(userId)] === 1;
-        }
-        return false;
-      }
-    }
-
-    return false;
-  } catch (error) {
-    return false;
+// 检查素材是否完成（直接从 today_materials 中查找 status）
+const isMaterialCompleted = (task: Task, material: any, _date: Date) => {
+  const materials = task.today_materials || [];
+  const found = materials.find((m) => m.id === material.id);
+  const userId = getCurrentUserId();
+  if (userId && found?.status) {
+    return found.status[String(userId)] === 1;
   }
+  return false;
 };
 
 // 处理素材点击

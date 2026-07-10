@@ -54,7 +54,8 @@ class TaskMgr:
             if user_id and user_id > 0:
                 conditions['user_id'] = {'like': f'%{user_id}%'}
 
-            result = db_mgr.get_list(TABLE_TASK, page_num=1, page_size=1000, conditions=conditions)
+            result = db_mgr.get_list(
+                TABLE_TASK, page_num=1, page_size=1000, conditions=conditions)
             if result.get('code') != 0:
                 log.error(f"获取任务列表失败: {result.get('msg')}")
                 return {"code": -1, "msg": "获取任务列表失败", "data": None}
@@ -72,12 +73,14 @@ class TaskMgr:
                     if not start_date_str or duration <= 0:
                         continue
 
-                    start_date_d = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                    start_date_d = datetime.strptime(
+                        start_date_str, '%Y-%m-%d').date()
                     task_data = json.loads(task.get('data') or '{}')
                     daily_materials = task_data.get('dailyMaterials', {})
                     pre_todo = json.loads(task.get('pre_todo') or '{}')
                     rule = parse_rest_days(task.get("rest_days"))
-                    end_d = end_date_by_work_duration(start_date_d, int(duration), rule)
+                    end_d = end_date_by_work_duration(
+                        start_date_d, int(duration), rule)
 
                     cur = start_date_d
                     while cur <= end_d:
@@ -86,12 +89,14 @@ class TaskMgr:
                             continue
                         date_key = cur.strftime('%Y-%m-%d')
                         if date_key not in calendar_data:
-                            calendar_data[date_key] = {'date': date_key, 'tasks': []}
+                            calendar_data[date_key] = {
+                                'date': date_key, 'tasks': []}
 
                         if is_rest_day(rule, cur):
                             materials_for_day = []
                         else:
-                            workday_idx = get_workday_index(start_date_d, cur, rule)
+                            workday_idx = get_workday_index(
+                                start_date_d, cur, rule)
                             materials_index = 0 if task_type == 1 else workday_idx
                             materials_for_day = daily_materials.get(str(materials_index), []) if isinstance(
                                 daily_materials, dict) else []
@@ -167,16 +172,6 @@ class TaskMgr:
             materials_index = 0 if task.get('type', 0) == 1 else workday_idx
             materials_for_day = daily_materials.get(str(materials_index), [])
 
-            day_material_ids = [m.get('id') for m in materials_for_day if isinstance(m, dict)]
-            all_days_summary = {k: [m.get('id') for m in v if isinstance(m, dict)] for k, v in daily_materials.items() if isinstance(v, list)}
-            log.info(
-                f"[finish_material] task_id={task_id}, material_id={material_id}, date={date_str}, "
-                f"user_id={user_id}, type={task.get('type', 0)}, start_date={start_date_str}, "
-                f"rest_days={task.get('rest_days')}, duration={duration}, workday_idx={workday_idx}, "
-                f"materials_index={materials_index}, day_material_ids={day_material_ids}, "
-                f"all_days_summary={all_days_summary}"
-            )
-
             for material in materials_for_day:
                 if material.get('id') == material_id:
                     material.setdefault('status', {})
@@ -187,7 +182,8 @@ class TaskMgr:
 
             task_data['dailyMaterials'] = daily_materials
             updated_data = json.dumps(task_data, ensure_ascii=False)
-            update_result = db_mgr.set_data(TABLE_TASK, {'id': task_id, 'data': updated_data})
+            update_result = db_mgr.set_data(
+                TABLE_TASK, {'id': task_id, 'data': updated_data})
             if update_result.get('code') != 0:
                 return {"code": -1, "msg": "更新失败", "data": None}
 
@@ -207,7 +203,8 @@ class TaskMgr:
                 self._is_material_completed_for_user(m, user_id) for m in materials_for_day if isinstance(m, dict))
             score_added = 0
             if all_completed:
-                score = task_data.get('dailyScore', {}).get(str(materials_index), 0)
+                score = task_data.get('dailyScore', {}).get(
+                    str(materials_index), 0)
                 if score > 0:
                     add_score_result = db_mgr.add_score(user_id=user_id,
                                                         value=score,
@@ -222,6 +219,31 @@ class TaskMgr:
         except Exception as e:
             log.error(f"完成素材打卡失败: {e}")
             return {"code": -1, "msg": f"完成素材打卡失败: {str(e)}", "data": None}
+
+    @staticmethod
+    def _get_today_materials(task: Dict[str, Any], date_str: str) -> List[Dict[str, Any]]:
+        """根据日期计算任务当天应显示的素材列表。"""
+        try:
+            start_date_str = task.get('start_date', '')
+            if not start_date_str:
+                return []
+            start_date_d = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            target_d = datetime.strptime(date_str, '%Y-%m-%d').date()
+            duration = int(task.get('duration', 0) or 0)
+            if duration <= 0:
+                return []
+
+            rule = parse_rest_days(task.get('rest_days'))
+            workday_idx = get_workday_index(start_date_d, target_d, rule)
+            if workday_idx < 0 or workday_idx >= duration:
+                return []
+
+            task_data = json.loads(task.get('data') or '{}')
+            daily_materials = task_data.get('dailyMaterials', {})
+            materials_index = 0 if task.get('type', 0) == 1 else workday_idx
+            return daily_materials.get(str(materials_index), [])
+        except Exception:
+            return []
 
     def get_task_list(self,
                       user_id: Optional[int] = None,
@@ -241,13 +263,19 @@ class TaskMgr:
                 conditions['start_date'] = {'<=': end_date}
                 conditions['end_date'] = {'>=': start_date}
 
-            result = db_mgr.get_list(TABLE_TASK, page_num=page_num, page_size=page_size, conditions=conditions)
+            result = db_mgr.get_list(
+                TABLE_TASK, page_num=page_num, page_size=page_size, conditions=conditions)
             if result.get('code') != 0:
                 return result
 
             tasks = result.get('data', {}).get('data', [])
             if tasks:
                 tasks = self.check_task_lock(tasks, user_id, start_date)
+                # 为每个任务附加当天素材列表
+                if start_date:
+                    for task in tasks:
+                        task['today_materials'] = self._get_today_materials(
+                            task, start_date)
                 result['data']['data'] = tasks
             return result
         except Exception as e:
@@ -261,7 +289,8 @@ class TaskMgr:
             if task_id is None or task_id <= 0:
                 task_data = {k: v for k, v in task_data.items() if k != 'id'}
 
-            start_d = datetime.strptime(task_data["start_date"], "%Y-%m-%d").date()
+            start_d = datetime.strptime(
+                task_data["start_date"], "%Y-%m-%d").date()
             dur = int(task_data["duration"])
             rest_days_raw = task_data.get("rest_days")
             if isinstance(rest_days_raw, dict):
@@ -269,12 +298,14 @@ class TaskMgr:
                 task_data["rest_days"] = rest_days_raw
             block_time_raw = task_data.get("block_time")
             if isinstance(block_time_raw, (list, dict)):
-                task_data["block_time"] = json.dumps(block_time_raw, ensure_ascii=False)
+                task_data["block_time"] = json.dumps(
+                    block_time_raw, ensure_ascii=False)
             data_raw = task_data.get("data")
             if isinstance(data_raw, dict):
                 task_data["data"] = json.dumps(data_raw, ensure_ascii=False)
             rule = parse_rest_days(rest_days_raw)
-            task_data["end_date"] = end_date_by_work_duration(start_d, dur, rule).strftime("%Y-%m-%d")
+            task_data["end_date"] = end_date_by_work_duration(
+                start_d, dur, rule).strftime("%Y-%m-%d")
 
             res = db_mgr.set_data(TABLE_TASK, task_data)
             if res.get("code") != 0:
@@ -323,11 +354,13 @@ class TaskMgr:
                     task['msg'] = ''
 
                 pre_todo_raw = task.get('pre_todo') or '{}'
-                pre_todo = pre_todo_raw if isinstance(pre_todo_raw, dict) else json.loads(pre_todo_raw)
+                pre_todo = pre_todo_raw if isinstance(
+                    pre_todo_raw, dict) else json.loads(pre_todo_raw)
                 if isinstance(pre_todo, dict) and pre_todo:
                     todo_ids = pre_todo.get(str(user_id), [])
                     if todo_ids:
-                        all_completed, incomplete_names = self._check_schedules_completed(todo_ids, user_id, date_str)
+                        all_completed, incomplete_names = self._check_schedules_completed(
+                            todo_ids, user_id, date_str)
                         if not all_completed:
                             task['lock'] = True
                             task['msg'] = f'请先完成前置日程：{"、".join(incomplete_names)}'
@@ -335,7 +368,8 @@ class TaskMgr:
                 if not task.get('lock'):
                     pre_task_raw = task.get('pre_task')
                     if pre_task_raw:
-                        pre_task_ids = pre_task_raw if isinstance(pre_task_raw, list) else json.loads(pre_task_raw)
+                        pre_task_ids = pre_task_raw if isinstance(
+                            pre_task_raw, list) else json.loads(pre_task_raw)
                         for tid in pre_task_ids:
                             if tid == task.get('id'):
                                 continue
@@ -409,7 +443,8 @@ class TaskMgr:
                     return False, [f'日程{todo_id}']
                 saves = result.get('data', [])
                 if not saves or saves[0].get('state', 0) != 1:
-                    name_result = db_mgr.get_data('t_schedule', todo_id, 'title')
+                    name_result = db_mgr.get_data(
+                        't_schedule', todo_id, 'title')
                     name = name_result.get('data', {}).get(
                         'title', f'日程{todo_id}') if name_result.get('code') == 0 else f'日程{todo_id}'
                     incomplete_names.append(name)
