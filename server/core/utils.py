@@ -21,13 +21,13 @@ from typing import Optional, Tuple, List, Dict, Any, Union, TypedDict
 
 
 def fmt_ts(minutes: int = 0) -> str:
-    """返回带时区偏移的时间字符串，如 '2026-07-09 12:34:56 +08:00'。
+    """返回 ISO 8601 格式时间字符串，如 '2026-07-09T12:34:56+08:00'。
     minutes>0 表示当前时间之后的分钟。
     """
     dt = datetime.now() + timedelta(minutes=minutes)
     offset = dt.astimezone().utcoffset()
     hours = int(offset.total_seconds() / 3600) if offset else 0
-    return dt.strftime(f'%Y-%m-%d %H:%M:%S {hours:+03d}:00')
+    return dt.strftime(f'%Y-%m-%dT%H:%M:%S{hours:+03d}:00')
 
 
 class FileInfo(TypedDict, total=False):
