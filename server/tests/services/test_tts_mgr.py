@@ -11,20 +11,23 @@ from core.config import TASK_STATUS_PENDING, TASK_STATUS_PROCESSING, TASK_STATUS
 @pytest.fixture(autouse=True)
 def mock_get_media_duration(monkeypatch):
     """Mock get_media_duration 避免测试中调用 ffprobe（环境可能未安装）。"""
-    monkeypatch.setattr('core.services.tools.tts_mgr.get_media_duration', lambda _: 1.0)
+    monkeypatch.setattr(
+        'core.services.tools.tts_mgr.get_media_duration', lambda _: 1.0)
 
 
 @pytest.fixture
 def tts_mgr(tmp_path, monkeypatch):
     """Provides a clean TTSMgr instance using a temporary directory."""
-    monkeypatch.setattr('core.services.tools.tts_mgr.TTS_BASE_DIR', str(tmp_path))
+    monkeypatch.setattr(
+        'core.services.tools.tts_mgr.TTS_BASE_DIR', str(tmp_path))
     mgr = TTSMgr()
     mgr._tasks = {}
     return mgr
 
 
 def test_create_task_success(tts_mgr: TTSMgr):
-    code, msg, task_id = tts_mgr.create_task(text="Hello world", name="Test Task")
+    code, msg, task_id = tts_mgr.create_task(
+        text="Hello world", name="Test Task")
 
     assert code == 0
     assert msg == "任务创建成功"
@@ -50,12 +53,15 @@ def test_create_task_empty_text_succeeds(tts_mgr: TTSMgr):
 
 def test_update_task_success(tts_mgr: TTSMgr):
     _, _, task_id = tts_mgr.create_task(text="Initial text")
-    code, msg = tts_mgr.update_task(task_id, name="New Name", text="Updated text", speed=1.5, vol=75)
+    assert task_id is not None
+    code, msg = tts_mgr.update_task(
+        task_id, name="New Name", text="Updated text", speed=1.5, vol=75)
 
     assert code == 0
     assert msg == "任务更新成功"
 
     task = tts_mgr.get_task(task_id)
+    assert task is not None
     assert task['name'] == "New Name"
     assert task['text'] == "Updated text"
     assert task['speed'] == 1.5
@@ -64,7 +70,9 @@ def test_update_task_success(tts_mgr: TTSMgr):
 
 def test_update_task_processing_fails(tts_mgr: TTSMgr):
     _, _, task_id = tts_mgr.create_task(text="test")
+    assert task_id is not None
     task = tts_mgr._get_task(task_id)
+    assert task is not None
     task.status = TASK_STATUS_PROCESSING
 
     code, msg = tts_mgr.update_task(task_id, name="New Name")
@@ -75,6 +83,7 @@ def test_update_task_processing_fails(tts_mgr: TTSMgr):
 
 def test_delete_task_success(tts_mgr: TTSMgr, tmp_path):
     _, _, task_id = tts_mgr.create_task(text="test")
+    assert task_id is not None
     task_dir = tmp_path / task_id
     assert os.path.exists(task_dir)
 
@@ -87,6 +96,7 @@ def test_delete_task_success(tts_mgr: TTSMgr, tmp_path):
 
 def test_start_task_success(tts_mgr: TTSMgr):
     _, _, task_id = tts_mgr.create_task(text="Hello")
+    assert task_id is not None
 
     code, msg = tts_mgr.start_task(task_id)
 
@@ -102,7 +112,9 @@ def test_start_task_task_not_found(tts_mgr: TTSMgr):
 
 def test_start_task_already_processing(tts_mgr: TTSMgr):
     _, _, task_id = tts_mgr.create_task(text="hello")
+    assert task_id is not None
     task = tts_mgr._get_task(task_id)
+    assert task is not None
     task.status = TASK_STATUS_PROCESSING
 
     code, msg = tts_mgr.start_task(task_id)
@@ -190,6 +202,7 @@ def test_start_task_async_runs_and_writes_file(tts_mgr: TTSMgr, tmp_path):
 
 def test_start_task_no_text_fails(tts_mgr: TTSMgr):
     _, _, task_id = tts_mgr.create_task(text="not empty")
+    assert task_id is not None
     task = tts_mgr._get_task(task_id)
     if task:
         task.text = ""
@@ -214,18 +227,22 @@ def test_run_tts_task_stop_midway_sets_failed(tts_mgr: TTSMgr, monkeypatch):
             self._total_chars = 0
 
         def stream_msg(self, text: str, role=None, id=None):
-            self.on_msg(b"abc", 0)
+            if self.on_msg:
+                self.on_msg(b"abc", 0)
 
         def stream_complete(self):
-            self.on_msg("done", 1)
+            if self.on_msg:
+                self.on_msg("done", 1)
 
     with patch('core.services.tools.tts_mgr.TTSClient', FakeTTSClient):
         _, _, task_id = tts_mgr.create_task(text="x", name="stop")
+        assert task_id is not None
 
         # request stop before running
         tts_mgr._stop_flags[task_id] = True
 
         task = tts_mgr._get_task(task_id)
+        assert task is not None
         # 直接调用 _run_tts_task 会抛出 RuntimeError，但不会更新状态
         # 需要通过 start_task 来触发异步执行
         tts_mgr.start_task(task_id)
@@ -248,6 +265,7 @@ def test_run_tts_task_stop_midway_sets_failed(tts_mgr: TTSMgr, monkeypatch):
 
 def test_after_delete_task_handles_nested_dirs(tts_mgr: TTSMgr, tmp_path):
     _, _, task_id = tts_mgr.create_task(text="x")
+    assert task_id is not None
 
     # create nested dirs/files
     base = tmp_path / task_id
@@ -264,6 +282,7 @@ def test_after_delete_task_handles_nested_dirs(tts_mgr: TTSMgr, tmp_path):
 def test_get_output_file_path_exists(tts_mgr: TTSMgr, tmp_path):
     """测试获取输出文件路径（文件存在）"""
     _, _, task_id = tts_mgr.create_task(text="test")
+    assert task_id is not None
     output_file = tts_mgr._get_output_file_path(task_id)
 
     # 创建输出文件
@@ -272,6 +291,7 @@ def test_get_output_file_path_exists(tts_mgr: TTSMgr, tmp_path):
         f.write(b"fake audio")
 
     path = tts_mgr.get_output_file_path(task_id)
+    assert path is not None
     assert path == output_file
     assert os.path.exists(path)
 
@@ -279,6 +299,7 @@ def test_get_output_file_path_exists(tts_mgr: TTSMgr, tmp_path):
 def test_get_output_file_path_not_exists(tts_mgr: TTSMgr):
     """测试获取输出文件路径（文件不存在）"""
     _, _, task_id = tts_mgr.create_task(text="test")
+    assert task_id is not None
     path = tts_mgr.get_output_file_path(task_id)
     assert path is None
 
@@ -292,7 +313,9 @@ def test_get_output_file_path_task_not_found(tts_mgr: TTSMgr):
 def test_stop_task_success(tts_mgr: TTSMgr):
     """测试停止任务成功"""
     _, _, task_id = tts_mgr.create_task(text="test")
+    assert task_id is not None
     task = tts_mgr._get_task(task_id)
+    assert task is not None
     task.status = TASK_STATUS_PROCESSING
 
     # Mock 客户端
@@ -307,6 +330,7 @@ def test_stop_task_success(tts_mgr: TTSMgr):
 def test_stop_task_not_processing(tts_mgr: TTSMgr):
     """测试停止非处理中的任务"""
     _, _, task_id = tts_mgr.create_task(text="test")
+    assert task_id is not None
     code, msg = tts_mgr.stop_task(task_id)
     assert code == -1
     assert "任务未在处理中" in msg
@@ -322,7 +346,9 @@ def test_stop_task_not_found(tts_mgr: TTSMgr):
 def test_stop_task_no_client(tts_mgr: TTSMgr):
     """测试停止任务时没有客户端"""
     _, _, task_id = tts_mgr.create_task(text="test")
+    assert task_id is not None
     task = tts_mgr._get_task(task_id)
+    assert task is not None
     task.status = TASK_STATUS_PROCESSING
 
     code, msg = tts_mgr.stop_task(task_id)
@@ -333,7 +359,9 @@ def test_stop_task_no_client(tts_mgr: TTSMgr):
 def test_stop_task_client_exception(tts_mgr: TTSMgr):
     """测试停止任务时客户端抛出异常"""
     _, _, task_id = tts_mgr.create_task(text="test")
+    assert task_id is not None
     task = tts_mgr._get_task(task_id)
+    assert task is not None
     task.status = TASK_STATUS_PROCESSING
 
     # Mock 客户端抛出异常
@@ -349,6 +377,7 @@ def test_stop_task_client_exception(tts_mgr: TTSMgr):
 def test_after_delete_task_dir_not_exists(tts_mgr: TTSMgr):
     """测试删除任务时目录不存在"""
     _, _, task_id = tts_mgr.create_task(text="test")
+    assert task_id is not None
     # 直接删除任务，不创建目录
     tts_mgr._after_delete_task(task_id)
     # 应该不会抛出异常
@@ -357,6 +386,7 @@ def test_after_delete_task_dir_not_exists(tts_mgr: TTSMgr):
 def test_after_delete_task_rmtree_exception(tts_mgr: TTSMgr, tmp_path, monkeypatch):
     """测试删除任务目录时抛出异常"""
     _, _, task_id = tts_mgr.create_task(text="test")
+    assert task_id is not None
     task_dir = tmp_path / task_id
     os.makedirs(task_dir, exist_ok=True)
 
@@ -369,7 +399,9 @@ def test_after_delete_task_rmtree_exception(tts_mgr: TTSMgr, tmp_path, monkeypat
 def test_get_output_file_path_uses_task_output_file(tts_mgr: TTSMgr, tmp_path):
     """测试 get_output_file_path 使用任务中保存的 output_file"""
     _, _, task_id = tts_mgr.create_task(text="test")
+    assert task_id is not None
     task = tts_mgr._get_task(task_id)
+    assert task is not None
 
     # 设置自定义输出文件路径
     custom_path = str(tmp_path / "custom_output.mp3")
@@ -387,6 +419,7 @@ def test_get_output_file_path_uses_task_output_file(tts_mgr: TTSMgr, tmp_path):
 def test_get_output_file_path_fallback_to_default(tts_mgr: TTSMgr, tmp_path):
     """测试 get_output_file_path 回退到默认路径"""
     _, _, task_id = tts_mgr.create_task(text="test")
+    assert task_id is not None
 
     # 创建默认输出文件
     default_path = tts_mgr._get_output_file_path(task_id)
@@ -425,18 +458,23 @@ def test_count_text_chars_mixed(tts_mgr: TTSMgr):
 def test_create_task_calculates_total_chars(tts_mgr: TTSMgr):
     """测试创建任务时计算总字数"""
     _, _, task_id = tts_mgr.create_task(text="你好世界")
+    assert task_id is not None
     task = tts_mgr.get_task(task_id)
+    assert task is not None
     assert task['total_chars'] == 8  # 4个汉字 * 2 = 8
 
 
 def test_update_task_recalculates_total_chars(tts_mgr: TTSMgr):
     """测试更新任务时重新计算总字数"""
     _, _, task_id = tts_mgr.create_task(text="Hello")
+    assert task_id is not None
     task = tts_mgr.get_task(task_id)
+    assert task is not None
     initial_chars = task['total_chars']
 
     tts_mgr.update_task(task_id, text="你好世界")
     task = tts_mgr.get_task(task_id)
+    assert task is not None
     assert task['total_chars'] == 8  # 4个汉字 * 2 = 8
     assert task['total_chars'] != initial_chars
 
@@ -444,7 +482,9 @@ def test_update_task_recalculates_total_chars(tts_mgr: TTSMgr):
 def test_task_generated_chars_field(tts_mgr: TTSMgr):
     """测试任务包含 generated_chars 字段"""
     _, _, task_id = tts_mgr.create_task(text="test")
+    assert task_id is not None
     task = tts_mgr.get_task(task_id)
+    assert task is not None
     assert 'generated_chars' in task
     assert task['generated_chars'] == 0
 
@@ -452,7 +492,9 @@ def test_task_generated_chars_field(tts_mgr: TTSMgr):
 def test_task_total_chars_field(tts_mgr: TTSMgr):
     """测试任务包含 total_chars 字段"""
     _, _, task_id = tts_mgr.create_task(text="test")
+    assert task_id is not None
     task = tts_mgr.get_task(task_id)
+    assert task is not None
     assert 'total_chars' in task
     assert task['total_chars'] >= 0
 
@@ -476,6 +518,7 @@ def test_start_ocr_task_success(tts_mgr: TTSMgr, tmp_path):
     """测试启动 OCR 任务成功"""
     import tempfile
     _, _, task_id = tts_mgr.create_task(text="初始文本")
+    assert task_id is not None
 
     # 创建临时图片文件
     temp_dir = tempfile.mkdtemp(prefix='test_ocr_')
@@ -510,7 +553,8 @@ def test_start_ocr_task_success(tts_mgr: TTSMgr, tmp_path):
 
 def test_start_ocr_task_task_not_found(tts_mgr: TTSMgr):
     """测试启动 OCR 任务时任务不存在"""
-    code, msg = tts_mgr.start_ocr_task("nonexistent", ["/path/to/image.jpg"], "/tmp")
+    code, msg = tts_mgr.start_ocr_task(
+        "nonexistent", ["/path/to/image.jpg"], "/tmp")
     assert code == -1
     assert "任务不存在" in msg
 
@@ -518,7 +562,9 @@ def test_start_ocr_task_task_not_found(tts_mgr: TTSMgr):
 def test_start_ocr_task_processing_fails(tts_mgr: TTSMgr):
     """测试启动 OCR 任务时任务正在处理中"""
     _, _, task_id = tts_mgr.create_task(text="test")
+    assert task_id is not None
     task = tts_mgr._get_task(task_id)
+    assert task is not None
     task.status = TASK_STATUS_PROCESSING
 
     code, msg = tts_mgr.start_ocr_task(task_id, ["/path/to/image.jpg"], "/tmp")
@@ -529,6 +575,7 @@ def test_start_ocr_task_processing_fails(tts_mgr: TTSMgr):
 def test_start_ocr_task_empty_image_paths(tts_mgr: TTSMgr):
     """测试启动 OCR 任务时图片路径列表为空"""
     _, _, task_id = tts_mgr.create_task(text="test")
+    assert task_id is not None
     code, msg = tts_mgr.start_ocr_task(task_id, [], "/tmp")
     assert code == -1
     assert "图片路径列表为空" in msg
@@ -537,11 +584,13 @@ def test_start_ocr_task_empty_image_paths(tts_mgr: TTSMgr):
 def test_append_text_to_task(tts_mgr: TTSMgr):
     """测试追加文本到任务"""
     _, _, task_id = tts_mgr.create_task(text="初始文本")
+    assert task_id is not None
 
     code, msg = tts_mgr._append_text_to_task(task_id, "追加的文本")
     assert code == 0
 
     task = tts_mgr.get_task(task_id)
+    assert task is not None
     assert "初始文本" in task['text']
     assert "追加的文本" in task['text']
     assert task['status'] == TASK_STATUS_PENDING
@@ -550,11 +599,13 @@ def test_append_text_to_task(tts_mgr: TTSMgr):
 def test_append_text_to_task_empty_current_text(tts_mgr: TTSMgr):
     """测试追加文本到空文本任务"""
     _, _, task_id = tts_mgr.create_task(text="")
+    assert task_id is not None
 
     code, msg = tts_mgr._append_text_to_task(task_id, "新文本")
     assert code == 0
 
     task = tts_mgr.get_task(task_id)
+    assert task is not None
     assert task['text'] == "新文本"
 
 
@@ -568,13 +619,16 @@ def test_append_text_to_task_not_found(tts_mgr: TTSMgr):
 def test_update_task_status_to_pending(tts_mgr: TTSMgr):
     """测试通过 _update_task_status 将任务状态设为待处理"""
     _, _, task_id = tts_mgr.create_task(text="test")
+    assert task_id is not None
     task = tts_mgr._get_task(task_id)
+    assert task is not None
     task.status = TASK_STATUS_PROCESSING
     tts_mgr._save_task_and_update_time(task)
 
     tts_mgr._update_task_status(task_id, TASK_STATUS_PENDING, None)
 
     task = tts_mgr.get_task(task_id)
+    assert task is not None
     assert task["status"] == TASK_STATUS_PENDING
 
 
@@ -584,8 +638,10 @@ def test_update_task_status_to_pending(tts_mgr: TTSMgr):
 def test_start_analyze_article_task_success(tts_mgr: TTSMgr):
     """测试启动分析文章任务成功"""
     _, _, task_id = tts_mgr.create_task(text="杯弓蛇影是一篇好文章。")
+    assert task_id is not None
     with patch("core.services.tools.tts_mgr._txt_client") as mock_txt:
-        mock_txt.query.return_value = ("ok", '{"title": "杯弓蛇影", "words": ["好文章"]}')
+        mock_txt.query.return_value = (
+            "ok", '{"title": "杯弓蛇影", "words": ["好文章"]}')
 
         code, msg = tts_mgr.start_analyze_article_task(task_id)
         assert code == 0
@@ -618,7 +674,9 @@ def test_start_analyze_article_task_task_not_found(tts_mgr: TTSMgr):
 def test_start_analyze_article_task_processing(tts_mgr: TTSMgr):
     """测试启动分析文章任务时 TTS 正在处理中"""
     _, _, task_id = tts_mgr.create_task(text="test")
+    assert task_id is not None
     task = tts_mgr._get_task(task_id)
+    assert task is not None
     task.status = TASK_STATUS_PROCESSING
     tts_mgr._save_task_and_update_time(task)
 
@@ -630,6 +688,7 @@ def test_start_analyze_article_task_processing(tts_mgr: TTSMgr):
 def test_start_analyze_article_task_no_text(tts_mgr: TTSMgr):
     """测试启动分析文章任务时任务文本为空"""
     _, _, task_id = tts_mgr.create_task(text="")
+    assert task_id is not None
 
     code, msg = tts_mgr.start_analyze_article_task(task_id)
     assert code == -1
@@ -639,6 +698,7 @@ def test_start_analyze_article_task_no_text(tts_mgr: TTSMgr):
 def test_start_analyze_article_task_subtask_running(tts_mgr: TTSMgr):
     """测试启动分析文章任务时任务已被 OCR/分析锁定"""
     _, _, task_id = tts_mgr.create_task(text="有内容的文本")
+    assert task_id is not None
     tts_mgr._analysis_running_tasks.add(task_id)
 
     try:
@@ -652,6 +712,7 @@ def test_start_analyze_article_task_subtask_running(tts_mgr: TTSMgr):
 def test_delete_task_when_subtask_running(tts_mgr: TTSMgr):
     """测试删除任务时任务正在执行 OCR/分析则不允许删除"""
     _, _, task_id = tts_mgr.create_task(text="test")
+    assert task_id is not None
     tts_mgr._ocr_running_tasks.add(task_id)
 
     try:
@@ -665,6 +726,7 @@ def test_delete_task_when_subtask_running(tts_mgr: TTSMgr):
 def test_ensure_no_subtask_running(tts_mgr: TTSMgr):
     """测试 _ensure_no_subtask_running：有子任务运行时返回错误信息"""
     _, _, task_id = tts_mgr.create_task(text="test")
+    assert task_id is not None
 
     err = tts_mgr._ensure_no_subtask_running(task_id, "更新任务")
     assert err is None
@@ -689,10 +751,13 @@ def test_ensure_no_subtask_running(tts_mgr: TTSMgr):
 def test_save_analysis_to_task_success(tts_mgr: TTSMgr):
     """测试 _save_analysis_to_task 成功保存 JSON 分析结果"""
     _, _, task_id = tts_mgr.create_task(text="test")
-    code, msg = tts_mgr._save_analysis_to_task(task_id, '{"title": "标题", "words": ["a", "b"]}')
+    assert task_id is not None
+    code, msg = tts_mgr._save_analysis_to_task(
+        task_id, '{"title": "标题", "words": ["a", "b"]}')
     assert code == 0
 
     task = tts_mgr.get_task(task_id)
+    assert task is not None
     assert task["analysis"]["title"] == "标题"
     assert task["analysis"]["words"] == ["a", "b"]
 
@@ -700,10 +765,12 @@ def test_save_analysis_to_task_success(tts_mgr: TTSMgr):
 def test_save_analysis_to_task_invalid_json(tts_mgr: TTSMgr):
     """测试 _save_analysis_to_task 当 analysis_raw 非 JSON 时按 raw 保存"""
     _, _, task_id = tts_mgr.create_task(text="test")
+    assert task_id is not None
     code, msg = tts_mgr._save_analysis_to_task(task_id, "not valid json {")
     assert code == 0
 
     task = tts_mgr.get_task(task_id)
+    assert task is not None
     assert task["analysis"]["raw"] == "not valid json {"
 
 
@@ -717,7 +784,9 @@ def test_save_analysis_to_task_task_not_found(tts_mgr: TTSMgr):
 def test_append_text_to_task_keep_status(tts_mgr: TTSMgr):
     """测试 _append_text_to_task(keep_status=True) 只追加文本、不改变任务状态"""
     _, _, task_id = tts_mgr.create_task(text="原文")
+    assert task_id is not None
     task = tts_mgr._get_task(task_id)
+    assert task is not None
     task.status = TASK_STATUS_SUCCESS
     tts_mgr._save_task_and_update_time(task)
 
@@ -725,6 +794,7 @@ def test_append_text_to_task_keep_status(tts_mgr: TTSMgr):
     assert code == 0
 
     task = tts_mgr.get_task(task_id)
+    assert task is not None
     assert "原文" in task["text"]
     assert "追加内容" in task["text"]
     assert task["status"] == TASK_STATUS_SUCCESS
@@ -745,6 +815,7 @@ def test_get_output_file_path_not_found(tts_mgr: TTSMgr):
 def test_get_output_file_path_no_output_file(tts_mgr: TTSMgr):
     """测试 get_output_file_path 任务存在但未设置 output_file 时返回默认路径或 None"""
     _, _, task_id = tts_mgr.create_task(text="test")
+    assert task_id is not None
     # 任务刚创建，无 output_file，会走 _get_output_file_path 分支，文件不存在则返回 None
     result = tts_mgr.get_output_file_path(task_id)
     # tmp_path 下目录存在但 output.mp3 不存在，应返回 None
@@ -754,6 +825,7 @@ def test_get_output_file_path_no_output_file(tts_mgr: TTSMgr):
 def test_update_task_empty_name_fails(tts_mgr: TTSMgr):
     """测试 update_task 传入空名称时返回 -1"""
     _, _, task_id = tts_mgr.create_task(text="test")
+    assert task_id is not None
     code, msg = tts_mgr.update_task(task_id, name="")
     assert code == -1
     assert "任务名称不能为空" in msg
@@ -777,7 +849,8 @@ def test_create_task_returns_failure_when_save_fails(tts_mgr: TTSMgr, monkeypatc
 
 def test_update_task_status_task_not_found(tts_mgr: TTSMgr):
     """测试 _update_task_status 在任务不存在时只打日志不抛错"""
-    tts_mgr._update_task_status("nonexistent_id", TASK_STATUS_FAILED, "test error")
+    tts_mgr._update_task_status(
+        "nonexistent_id", TASK_STATUS_FAILED, "test error")
     # 不应抛错，仅内部 log.warning
 
 
@@ -785,6 +858,7 @@ def test_tts_run_fails_when_client_calls_on_err(tts_mgr: TTSMgr, tmp_path):
     """测试 TTS 任务在客户端 on_err 回调时标记为失败"""
     import time
     _, _, task_id = tts_mgr.create_task(text="fail me")
+    assert task_id is not None
 
     class FakeTTSClientErr:
 
@@ -822,27 +896,33 @@ def test_tts_run_fails_when_client_calls_on_err(tts_mgr: TTSMgr, tmp_path):
 def test_save_analysis_to_task_non_dict_parsed(tts_mgr: TTSMgr):
     """_save_analysis_to_task 当 JSON 解析结果为非 dict 时包装为 {"data": parsed}"""
     _, _, task_id = tts_mgr.create_task(text="test")
+    assert task_id is not None
     code, msg = tts_mgr._save_analysis_to_task(task_id, "[1,2,3]")
     assert code == 0
     task = tts_mgr.get_task(task_id)
+    assert task is not None
     assert task.get("analysis") == {"data": [1, 2, 3]}
 
 
 def test_append_text_to_task_task_id_mismatch(tts_mgr: TTSMgr):
     """_append_text_to_task 当 task_id 与任务不匹配时返回错误（内部校验）"""
     _, _, task_id = tts_mgr.create_task(text="x")
+    assert task_id is not None
     task = tts_mgr._get_task(task_id)
+    assert task is not None
     # 人为改 task_id 制造不匹配（仅测试分支）
     original_id = task.task_id
     task.task_id = "other_id"
-    code, msg = tts_mgr._append_text_to_task(original_id, "y", keep_status=True)
+    code, msg = tts_mgr._append_text_to_task(
+        original_id, "y", keep_status=True)
     assert code == -1
     task.task_id = original_id
 
 
-def test_start_analyze_article_task_no_text(tts_mgr: TTSMgr):
+def test_start_analyze_article_task_no_text_v2(tts_mgr: TTSMgr):
     """start_analyze_article_task 当任务文本为空时返回 -1"""
     _, _, task_id = tts_mgr.create_task(text="")
+    assert task_id is not None
     code, msg = tts_mgr.start_analyze_article_task(task_id)
     assert code == -1
     assert "内容为空" in msg or "空" in msg
@@ -852,6 +932,7 @@ def test_run_ocr_task_logic_error_status(tts_mgr: TTSMgr, tmp_path):
     """_run_ocr_task_logic 当 OCR 返回 error 时只记录日志不抛错"""
     import tempfile
     _, _, task_id = tts_mgr.create_task(text="x")
+    assert task_id is not None
     temp_dir = tempfile.mkdtemp()
     image_path = os.path.join(temp_dir, "a.jpg")
     with open(image_path, "wb") as f:
@@ -860,34 +941,41 @@ def test_run_ocr_task_logic_error_status(tts_mgr: TTSMgr, tmp_path):
         mock_ocr.query.return_value = ("error", "OCR failed")
         tts_mgr._run_ocr_task_logic(task_id, [image_path], temp_dir)
     task = tts_mgr.get_task(task_id)
+    assert task is not None
     assert "OCR failed" not in (task.get("text") or "")
 
 
 def test_run_analyze_article_task_logic_error_status(tts_mgr: TTSMgr):
     """_run_analyze_article_task_logic 当 txt_ali 返回 error 时只记录日志不抛错"""
     _, _, task_id = tts_mgr.create_task(text="some text")
+    assert task_id is not None
     with patch('core.services.tools.tts_mgr._txt_client') as mock_txt:
         mock_txt.query.return_value = ("error", "分析失败")
         tts_mgr._run_analyze_article_task_logic(task_id, "some text")
     task = tts_mgr.get_task(task_id)
+    assert task is not None
     assert task.get("analysis") is None
 
 
 def test_run_analyze_article_task_logic_save_fails(tts_mgr: TTSMgr):
     """_run_analyze_article_task_logic 当 _save_analysis_to_task 返回非 0 时只记录日志"""
     _, _, task_id = tts_mgr.create_task(text="some text")
+    assert task_id is not None
     with patch('core.services.tools.tts_mgr._txt_client') as mock_txt:
         mock_txt.query.return_value = ("ok", '{"title":"x"}')
         with patch.object(tts_mgr, '_save_analysis_to_task', return_value=(-1, "save failed")):
             tts_mgr._run_analyze_article_task_logic(task_id, "some text")
     task = tts_mgr.get_task(task_id)
-    assert task.get("analysis") is None or task.get("analysis") != {"title": "x"}
+    assert task is not None
+    assert task.get("analysis") is None or task.get(
+        "analysis") != {"title": "x"}
 
 
 def test_run_ocr_task_logic_append_fails(tts_mgr: TTSMgr, tmp_path):
     """_run_ocr_task_logic 当 _append_text_to_task 返回非 0 时只记录日志"""
     import tempfile
     _, _, task_id = tts_mgr.create_task(text="x")
+    assert task_id is not None
     temp_dir = tempfile.mkdtemp()
     image_path = os.path.join(temp_dir, "a.jpg")
     with open(image_path, "wb") as f:
@@ -897,15 +985,16 @@ def test_run_ocr_task_logic_append_fails(tts_mgr: TTSMgr, tmp_path):
         with patch.object(tts_mgr, '_append_text_to_task', return_value=(-1, "append failed")):
             tts_mgr._run_ocr_task_logic(task_id, [image_path], temp_dir)
     task = tts_mgr.get_task(task_id)
+    assert task is not None
     assert "OCR结果" not in (task.get("text") or "")
 
 
 def test_count_text_chars_none():
     """count_text_chars(None) 返回 0"""
-    assert count_text_chars(None) == 0
+    assert count_text_chars(None) == 0  # type: ignore[arg-type]
 
 
-def test_update_task_status_task_not_found(tts_mgr: TTSMgr):
+def test_update_task_status_task_not_found_v2(tts_mgr: TTSMgr):
     """_update_task_status 任务不存在时只记录 warning 不抛错"""
     tts_mgr._update_task_status("nonexistent_id", TASK_STATUS_FAILED, "test")
     # 不抛错即通过
@@ -915,6 +1004,7 @@ def test_update_task_status_task_not_found(tts_mgr: TTSMgr):
 def test_update_task_status_save_raises(tts_mgr: TTSMgr):
     """_update_task_status 内 _save_task_and_update_time 抛错时向外抛出"""
     _, _, task_id = tts_mgr.create_task(text="x")
+    assert task_id is not None
     with patch.object(tts_mgr, '_save_task_and_update_time', side_effect=RuntimeError("save error")):
         with pytest.raises(RuntimeError, match="save error"):
             tts_mgr._update_task_status(task_id, TASK_STATUS_FAILED, "err")
@@ -943,7 +1033,10 @@ def test_run_tts_task_on_data_non_bytes_logs(tts_mgr: TTSMgr, tmp_path):
 
     with patch('core.services.tools.tts_mgr.TTSClient', FakeTTSClientNonBytes):
         _, _, task_id = tts_mgr.create_task(text="ab")
-        tts_mgr._run_tts_task(tts_mgr._get_task(task_id))
+        assert task_id is not None
+        t = tts_mgr._get_task(task_id)
+        assert t is not None
+        tts_mgr._run_tts_task(t)
     task = tts_mgr.get_task(task_id)
     assert task is not None
     assert task.get("status") in (TASK_STATUS_SUCCESS, TASK_STATUS_FAILED)
@@ -977,8 +1070,12 @@ def test_run_tts_task_duration_none(tts_mgr: TTSMgr, tmp_path):
     with patch('core.services.tools.tts_mgr.TTSClient', FakeTTSClientQuick):
         with patch('core.services.tools.tts_mgr.get_media_duration', return_value=None):
             _, _, task_id = tts_mgr.create_task(text="ab")
-            tts_mgr._run_tts_task(tts_mgr._get_task(task_id))
+            assert task_id is not None
+            t = tts_mgr._get_task(task_id)
+            assert t is not None
+            tts_mgr._run_tts_task(t)
     task = tts_mgr.get_task(task_id)
+    assert task is not None
     assert task.get("status") == TASK_STATUS_SUCCESS
     assert task.get("duration") is None
 
@@ -986,7 +1083,9 @@ def test_run_tts_task_duration_none(tts_mgr: TTSMgr, tmp_path):
 def test_get_task_success_without_duration_triggers_update(tts_mgr: TTSMgr, tmp_path):
     """get_task 当任务成功且 duration 为 None 且文件存在时触发 _update_duration_async"""
     _, _, task_id = tts_mgr.create_task(text="x")
+    assert task_id is not None
     task = tts_mgr._get_task(task_id)
+    assert task is not None
     task.status = TASK_STATUS_SUCCESS
     task.duration = None
     task.output_file = os.path.join(str(tmp_path), task_id, 'output.mp3')
@@ -1014,8 +1113,11 @@ def test_get_task_success_without_duration_triggers_update(tts_mgr: TTSMgr, tmp_
 def test_get_output_file_path_absolute_exists(tts_mgr: TTSMgr, tmp_path):
     """get_output_file_path 当 output_file 为绝对路径且文件存在时返回该路径"""
     _, _, task_id = tts_mgr.create_task(text="x")
+    assert task_id is not None
     task = tts_mgr._get_task(task_id)
-    abs_path = os.path.abspath(os.path.join(str(tmp_path), task_id, 'output.mp3'))
+    assert task is not None
+    abs_path = os.path.abspath(os.path.join(
+        str(tmp_path), task_id, 'output.mp3'))
     os.makedirs(os.path.dirname(abs_path), exist_ok=True)
     with open(abs_path, 'wb') as f:
         f.write(b'x')

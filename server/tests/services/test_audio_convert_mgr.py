@@ -8,68 +8,80 @@ from core.config import TASK_STATUS_PENDING, TASK_STATUS_PROCESSING, TASK_STATUS
 @pytest.fixture
 def convert_mgr(tmp_path, monkeypatch):
     """Provides a clean AudioConvertMgr instance using a temporary directory."""
-    monkeypatch.setattr('core.services.tools.audio_convert_mgr.AUDIO_CONVERT_BASE_DIR', str(tmp_path))
+    monkeypatch.setattr(
+        'core.services.tools.audio_convert_mgr.AUDIO_CONVERT_BASE_DIR', str(tmp_path))
     mgr = AudioConvertMgr()
     mgr._tasks = {}  # Ensure no tasks from previous tests
     return mgr
 
 
 def test_create_task_success(convert_mgr: AudioConvertMgr, monkeypatch):
-    monkeypatch.setattr('core.services.tools.audio_convert_mgr._spawn', lambda fn: None)
+    monkeypatch.setattr(
+        'core.services.tools.audio_convert_mgr._spawn', lambda fn: None)
     """Test successful creation of a conversion task with specified parameters."""
     name = "My Test Task"
     output_dir = "test_output"
     overwrite = False
 
-    code, msg, task_id = convert_mgr.create_task(name=name, output_dir=output_dir, overwrite=overwrite)
+    code, msg, task_id = convert_mgr.create_task(
+        name=name, output_dir=output_dir, overwrite=overwrite)
 
     assert code == 0
     assert msg == "任务创建成功"
     assert task_id is not None
 
-    task = convert_mgr.get_task(task_id)
+    task = convert_mgr._get_task(task_id)
     assert task is not None
-    assert task['name'] == name
-    assert task['output_dir'] == output_dir
-    assert task['overwrite'] == overwrite
-    assert task['status'] == TASK_STATUS_PENDING
-    assert task['directory'] is None
-    assert task['progress'] is None
+    assert task.name == name
+    assert task.output_dir == output_dir
+    assert task.overwrite == overwrite
+    assert task.status == TASK_STATUS_PENDING
+    assert task.directory is None
+    assert task.progress is None
 
 
 def test_create_task_with_defaults(convert_mgr: AudioConvertMgr, monkeypatch):
-    monkeypatch.setattr('core.services.tools.audio_convert_mgr._spawn', lambda fn: None)
+    monkeypatch.setattr(
+        'core.services.tools.audio_convert_mgr._spawn', lambda fn: None)
     """Test task creation using default values for name, output_dir, and overwrite."""
     code, msg, task_id = convert_mgr.create_task()
 
     assert code == 0
     assert task_id is not None
 
-    task = convert_mgr.get_task(task_id)
+    task = convert_mgr._get_task(task_id)
     assert task is not None
-    assert task['name'] is not None
-    assert task['output_dir'] == 'mp3'
-    assert task['overwrite'] is True
-    assert task['status'] == TASK_STATUS_PENDING
+    assert task.name is not None
+    assert task.output_dir == 'mp3'
+    assert task.overwrite is True
+    assert task.status == TASK_STATUS_PENDING
 
 
 def test_create_task_empty_output_dir_uses_default(convert_mgr: AudioConvertMgr):
     """output_dir 为空或空格时回退为 mp3"""
     code, _, task_id = convert_mgr.create_task(output_dir="   ")
     assert code == 0
-    assert convert_mgr.get_task(task_id)['output_dir'] == 'mp3'
+    assert task_id is not None
+    task = convert_mgr._get_task(task_id)
+    assert task is not None
+    assert task.output_dir == 'mp3'
 
 
 def test_update_task_empty_output_dir_keeps_previous(convert_mgr: AudioConvertMgr, monkeypatch):
-    monkeypatch.setattr('core.services.tools.audio_convert_mgr._spawn', lambda fn: None)
+    monkeypatch.setattr(
+        'core.services.tools.audio_convert_mgr._spawn', lambda fn: None)
     _, _, task_id = convert_mgr.create_task()
+    assert task_id is not None
     code, msg = convert_mgr.update_task(task_id, output_dir="   ")
     assert code == 0
-    assert convert_mgr.get_task(task_id)['output_dir'] == 'mp3'
+    task = convert_mgr._get_task(task_id)
+    assert task is not None
+    assert task.output_dir == 'mp3'
 
 
 def test_update_task_no_fields_fails(convert_mgr: AudioConvertMgr):
     _, _, task_id = convert_mgr.create_task()
+    assert task_id is not None
     code, msg = convert_mgr.update_task(task_id)
     assert code == -1
     assert "没有提供" in msg
@@ -77,12 +89,14 @@ def test_update_task_no_fields_fails(convert_mgr: AudioConvertMgr):
 
 def test_scan_skips_getsize_error(convert_mgr: AudioConvertMgr, tmp_path, monkeypatch):
     """扫描文件时 getsize 失败不影响入库"""
-    monkeypatch.setattr("os.path.getsize", lambda p: (_ for _ in ()).throw(OSError("perm")))
+    monkeypatch.setattr("os.path.getsize", lambda p: (
+        _ for _ in ()).throw(OSError("perm")))
     (tmp_path / "a.mp3").write_bytes(b"x")
     task = AudioConvertTask(task_id="t1", name="n", directory=str(tmp_path))
     convert_mgr._tasks["t1"] = task
     convert_mgr._scan_and_bind_files(task)
-    assert "size" not in (task.file_status or {}).get(str(tmp_path / "a.mp3"), {})
+    assert "size" not in (task.file_status or {}).get(
+        str(tmp_path / "a.mp3"), {})
 
 
 def test_convert_file_to_mp3_generic_exception(convert_mgr: AudioConvertMgr, tmp_path):
@@ -100,44 +114,55 @@ def test_convert_file_to_mp3_generic_exception(convert_mgr: AudioConvertMgr, tmp
 
 def test_update_file_duration_async_duration_none(convert_mgr: AudioConvertMgr, monkeypatch):
     """_update_file_duration_async 当 get_media_duration 返回 None 时不更新"""
-    monkeypatch.setattr("core.services.tools.audio_convert_mgr.get_media_duration", lambda p: None)
+    monkeypatch.setattr(
+        "core.services.tools.audio_convert_mgr.get_media_duration", lambda p: None)
     _, _, task_id = convert_mgr.create_task()
+    assert task_id is not None
     task = convert_mgr._get_task(task_id)
+    assert task is not None
     task.file_status = {"/f.mp3": {"status": "pending"}}
     convert_mgr._update_file_duration_async(task_id, "/f.mp3")
+    assert task.file_status is not None
     assert task.file_status["/f.mp3"].get("duration") is None
 
 
 def test_ensure_output_directory_os_error(convert_mgr: AudioConvertMgr, tmp_path, monkeypatch):
     """_ensure_output_directory 当 makedirs 抛 OSError 时返回 False"""
     monkeypatch.setattr("os.path.exists", lambda p: False)
-    monkeypatch.setattr("os.makedirs", lambda p, **kw: (_ for _ in ()).throw(OSError("disk full")))
+    monkeypatch.setattr("os.makedirs", lambda p, **
+                        kw: (_ for _ in ()).throw(OSError("disk full")))
     ok, err = convert_mgr._ensure_output_directory(str(tmp_path / "newdir"))
     assert ok is False
     assert err is not None
 
 
 def test_update_task_success(convert_mgr: AudioConvertMgr, tmp_path, monkeypatch):
-    monkeypatch.setattr('core.services.tools.audio_convert_mgr._spawn', lambda fn: None)
+    monkeypatch.setattr(
+        'core.services.tools.audio_convert_mgr._spawn', lambda fn: None)
     """Test successful update of a task's properties."""
     _, _, task_id = convert_mgr.create_task()
+    assert task_id is not None
     new_name = "Updated Task Name"
     new_dir = tmp_path
 
-    code, msg = convert_mgr.update_task(task_id, name=new_name, directory=str(new_dir))
+    code, msg = convert_mgr.update_task(
+        task_id, name=new_name, directory=str(new_dir))
 
     assert code == 0
     assert msg == "任务更新成功"
 
-    task = convert_mgr.get_task(task_id)
-    assert task['name'] == new_name
-    assert task['directory'] == str(new_dir)
+    task = convert_mgr._get_task(task_id)
+    assert task is not None
+    assert task.name == new_name
+    assert task.directory == str(new_dir)
 
 
 def test_update_task_not_processing(convert_mgr: AudioConvertMgr):
     """Test that a task cannot be updated while it is processing."""
     _, _, task_id = convert_mgr.create_task()
+    assert task_id is not None
     task = convert_mgr._get_task(task_id)
+    assert task is not None
     task.status = TASK_STATUS_PROCESSING
 
     code, msg = convert_mgr.update_task(task_id, name="New Name")
@@ -149,17 +174,20 @@ def test_update_task_not_processing(convert_mgr: AudioConvertMgr):
 def test_delete_task_success(convert_mgr: AudioConvertMgr):
     """Test successful deletion of a task."""
     _, _, task_id = convert_mgr.create_task()
+    assert task_id is not None
     code, msg = convert_mgr.delete_task(task_id)
 
     assert code == 0
     assert msg == "任务删除成功"
-    assert convert_mgr.get_task(task_id) is None
+    assert convert_mgr._get_task(task_id) is None
 
 
 def test_delete_task_processing(convert_mgr: AudioConvertMgr):
     """Test that a task cannot be deleted while it is processing."""
     _, _, task_id = convert_mgr.create_task()
+    assert task_id is not None
     task = convert_mgr._get_task(task_id)
+    assert task is not None
     task.status = TASK_STATUS_PROCESSING
 
     code, msg = convert_mgr.delete_task(task_id)
@@ -172,19 +200,23 @@ def test_delete_task_processing(convert_mgr: AudioConvertMgr):
 def test_start_task_success(mock_run_task_async, convert_mgr: AudioConvertMgr, tmp_path):
     """Test that a task can be started successfully."""
     _, _, task_id = convert_mgr.create_task()
+    assert task_id is not None
     convert_mgr.update_task(task_id, directory=str(tmp_path))
 
     code, msg = convert_mgr.start_task(task_id)
 
     assert code == 0
     assert msg == "转码任务已启动"
-    mock_run_task_async.assert_called_once_with(task_id, convert_mgr._run_convert)
+    mock_run_task_async.assert_called_once_with(
+        task_id, convert_mgr._run_convert)
 
 
 def test_start_task_already_processing(convert_mgr: AudioConvertMgr):
     """Test that a task cannot be started if it is already processing."""
     _, _, task_id = convert_mgr.create_task()
+    assert task_id is not None
     task = convert_mgr._get_task(task_id)
+    assert task is not None
     task.status = TASK_STATUS_PROCESSING
 
     code, msg = convert_mgr.start_task(task_id)
@@ -196,6 +228,7 @@ def test_start_task_already_processing(convert_mgr: AudioConvertMgr):
 def test_start_task_no_directory(convert_mgr: AudioConvertMgr):
     """Test that a task cannot be started without a directory."""
     _, _, task_id = convert_mgr.create_task()
+    assert task_id is not None
 
     code, msg = convert_mgr.start_task(task_id)
 
@@ -225,15 +258,18 @@ def test_scan_media_files(tmp_path):
 @patch('core.services.tools.audio_convert_mgr.run_subprocess_safe')
 def test_convert_directory_success(mock_run_subprocess, convert_mgr: AudioConvertMgr, tmp_path, monkeypatch):
     """Test a successful directory conversion."""
-    monkeypatch.setattr('core.services.tools.audio_convert_mgr._spawn', lambda fn: None)
+    monkeypatch.setattr(
+        'core.services.tools.audio_convert_mgr._spawn', lambda fn: None)
     mock_run_subprocess.return_value = (0, "", "")
     # Create dummy media files
     (tmp_path / "song1.wav").touch()
     (tmp_path / "song2.flac").touch()
 
     _, _, task_id = convert_mgr.create_task()
+    assert task_id is not None
     convert_mgr.update_task(task_id, directory=str(tmp_path))
     task = convert_mgr._get_task(task_id)
+    assert task is not None
 
     # Mock os.path.exists to simulate output file creation
     original_exists = os.path.exists
@@ -247,6 +283,7 @@ def test_convert_directory_success(mock_run_subprocess, convert_mgr: AudioConver
         convert_mgr._run_convert(task)
 
     assert task.status == TASK_STATUS_SUCCESS
+    assert task.progress is not None
     assert task.progress['processed'] == 2
     assert task.progress['total'] == 2
 
@@ -254,7 +291,8 @@ def test_convert_directory_success(mock_run_subprocess, convert_mgr: AudioConver
 @patch('core.services.tools.audio_convert_mgr.run_subprocess_safe')
 def test_convert_directory_with_failure(mock_run_subprocess, convert_mgr: AudioConvertMgr, tmp_path, monkeypatch):
     """Test a directory conversion where one file fails."""
-    monkeypatch.setattr('core.services.tools.audio_convert_mgr._spawn', lambda fn: None)
+    monkeypatch.setattr(
+        'core.services.tools.audio_convert_mgr._spawn', lambda fn: None)
     mock_run_subprocess.side_effect = [
         (0, "", ""),  # Success for song1
         (1, "", "error"),  # Failure for song2
@@ -263,8 +301,10 @@ def test_convert_directory_with_failure(mock_run_subprocess, convert_mgr: AudioC
     (tmp_path / "song2.flac").touch()
 
     _, _, task_id = convert_mgr.create_task()
+    assert task_id is not None
     convert_mgr.update_task(task_id, directory=str(tmp_path))
     task = convert_mgr._get_task(task_id)
+    assert task is not None
 
     original_exists = os.path.exists
 
@@ -277,32 +317,41 @@ def test_convert_directory_with_failure(mock_run_subprocess, convert_mgr: AudioC
         convert_mgr._run_convert(task)
 
     assert task.status == TASK_STATUS_FAILED
+    assert task.progress is not None
     assert task.progress['processed'] == 2
+    assert task.error_message is not None
     assert "部分文件转换失败" in task.error_message
 
 
 def test_update_task_output_and_overwrite(convert_mgr: AudioConvertMgr):
     """Test updating output_dir and overwrite properties."""
     _, _, task_id = convert_mgr.create_task()
+    assert task_id is not None
 
-    code, msg = convert_mgr.update_task(task_id, output_dir="new_mp3", overwrite=False)
+    code, msg = convert_mgr.update_task(
+        task_id, output_dir="new_mp3", overwrite=False)
 
     assert code == 0
-    task = convert_mgr.get_task(task_id)
-    assert task['output_dir'] == "new_mp3"
-    assert task['overwrite'] is False
+    task = convert_mgr._get_task(task_id)
+    assert task is not None
+    assert task.output_dir == "new_mp3"
+    assert task.overwrite is False
 
 
 def test_convert_directory_no_files(convert_mgr: AudioConvertMgr, tmp_path, monkeypatch):
     """Test directory conversion with no media files."""
-    monkeypatch.setattr('core.services.tools.audio_convert_mgr._spawn', lambda fn: None)
+    monkeypatch.setattr(
+        'core.services.tools.audio_convert_mgr._spawn', lambda fn: None)
     _, _, task_id = convert_mgr.create_task()
+    assert task_id is not None
     convert_mgr.update_task(task_id, directory=str(tmp_path))
     task = convert_mgr._get_task(task_id)
+    assert task is not None
 
     convert_mgr._run_convert(task)
 
     assert task.status == TASK_STATUS_SUCCESS
+    assert task.progress is not None
     assert task.progress['total'] == 0
 
 
@@ -311,16 +360,20 @@ def test_convert_directory_stopped(convert_mgr: AudioConvertMgr, tmp_path, monke
     (tmp_path / "song1.wav").touch()
 
     # avoid spawning gevent greenlet during unit tests
-    monkeypatch.setattr('core.services.tools.audio_convert_mgr._spawn', lambda fn: None)
+    monkeypatch.setattr(
+        'core.services.tools.audio_convert_mgr._spawn', lambda fn: None)
 
     _, _, task_id = convert_mgr.create_task()
+    assert task_id is not None
     convert_mgr.update_task(task_id, directory=str(tmp_path))
     task = convert_mgr._get_task(task_id)
+    assert task is not None
 
     convert_mgr._stop_flags[task_id] = True
     convert_mgr._run_convert(task)
 
     assert task.status == TASK_STATUS_FAILED
+    assert task.error_message is not None
     assert "任务已被停止" in task.error_message
 
 
@@ -354,6 +407,7 @@ def test_convert_file_to_mp3_ffmpeg_not_found(convert_mgr: AudioConvertMgr, tmp_
             ok, err = convert_mgr._convert_file_to_mp3(str(in_f), str(out_f))
 
     assert ok is False
+    assert err is not None
     assert 'ffmpeg 未找到' in err
 
 
@@ -365,7 +419,8 @@ def test_convert_file_to_mp3_returncode_0_but_output_missing(convert_mgr: AudioC
     with patch.object(convert_mgr, '_ensure_output_directory', return_value=(True, None)):
         with patch('core.services.tools.audio_convert_mgr.run_subprocess_safe', return_value=(0, '', '')):
             with patch('os.path.exists', return_value=False):
-                ok, err = convert_mgr._convert_file_to_mp3(str(in_f), str(out_f))
+                ok, err = convert_mgr._convert_file_to_mp3(
+                    str(in_f), str(out_f))
 
     assert ok is False
     assert err is not None
@@ -393,7 +448,8 @@ def test_update_file_duration_async_sets_duration(convert_mgr: AudioConvertMgr):
     with patch('core.services.tools.audio_convert_mgr.get_media_duration', return_value=12.5):
         convert_mgr._update_file_duration_async('t1', '/tmp/a.mp3')
 
-    assert task.file_status['/tmp/a.mp3']['duration'] == 12.5
+    assert task.file_status is not None
+    assert task.file_status['/tmp/a.mp3'].get('duration') == 12.5
 
 
 def test_get_convert_output_file_success(convert_mgr: AudioConvertMgr, tmp_path):
@@ -422,7 +478,8 @@ def test_get_convert_output_file_success(convert_mgr: AudioConvertMgr, tmp_path)
     )
     convert_mgr._tasks[task.task_id] = task
 
-    path, err = convert_mgr.get_convert_output_file(task.task_id, str(output_file))
+    path, err = convert_mgr.get_convert_output_file(
+        task.task_id, str(output_file))
     assert err is None
     assert path == str(output_file)
 
@@ -451,7 +508,8 @@ def test_get_convert_output_file_rejects_source_file(convert_mgr: AudioConvertMg
     )
     convert_mgr._tasks[task.task_id] = task
 
-    path, err = convert_mgr.get_convert_output_file(task.task_id, str(output_dir / "missing.mp3"))
+    path, err = convert_mgr.get_convert_output_file(
+        task.task_id, str(output_dir / "missing.mp3"))
     assert path is None
     assert err == "文件不存在"
 
@@ -467,6 +525,7 @@ def test_get_convert_output_file_not_ready(convert_mgr: AudioConvertMgr, tmp_pat
     convert_mgr._tasks[task.task_id] = task
 
     pending_output = convert_mgr._expected_output_path(task, str(input_file))
-    path, err = convert_mgr.get_convert_output_file(task.task_id, pending_output or str(tmp_path / "x.mp3"))
+    path, err = convert_mgr.get_convert_output_file(
+        task.task_id, pending_output or str(tmp_path / "x.mp3"))
     assert path is None
     assert err == "文件不存在"

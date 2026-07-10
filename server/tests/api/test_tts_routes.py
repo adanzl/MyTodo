@@ -13,12 +13,17 @@ def app(monkeypatch, tmp_path):
     app.register_blueprint(tr.tts_bp)
 
     # Mock tts_mgr methods to avoid filesystem/threads
-    monkeypatch.setattr(tr.tts_mgr, "create_task", lambda **kw: (0, "任务创建成功", "t1"))
+    monkeypatch.setattr(tr.tts_mgr, "create_task",
+                        lambda **kw: (0, "任务创建成功", "t1"))
     monkeypatch.setattr(tr.tts_mgr, "update_task", lambda **kw: (0, "任务更新成功"))
-    monkeypatch.setattr(tr.tts_mgr, "start_task", lambda task_id: (0, "TTS 任务已启动"))
-    monkeypatch.setattr(tr.tts_mgr, "stop_task", lambda task_id: (0, "已请求停止任务"))
-    monkeypatch.setattr(tr.tts_mgr, "delete_task", lambda task_id: (0, "任务删除成功"))
-    monkeypatch.setattr(tr.tts_mgr, "get_task", lambda task_id: {"task_id": task_id, "name": "n", "status": "pending"})
+    monkeypatch.setattr(tr.tts_mgr, "start_task",
+                        lambda task_id: (0, "TTS 任务已启动"))
+    monkeypatch.setattr(tr.tts_mgr, "stop_task",
+                        lambda task_id: (0, "已请求停止任务"))
+    monkeypatch.setattr(tr.tts_mgr, "delete_task",
+                        lambda task_id: (0, "任务删除成功"))
+    monkeypatch.setattr(tr.tts_mgr, "get_task", lambda task_id: {
+                        "task_id": task_id, "name": "n", "status": "pending"})
     monkeypatch.setattr(tr.tts_mgr, "list_tasks", lambda: [{"task_id": "t1"}])
 
     return app
@@ -54,7 +59,8 @@ def test_create_tts_task_with_all_params(client):
 
 def test_create_tts_task_failure(client, monkeypatch):
     """测试创建任务失败的情况"""
-    monkeypatch.setattr(tr.tts_mgr, "create_task", lambda **kw: (-1, "创建失败", None))
+    monkeypatch.setattr(tr.tts_mgr, "create_task",
+                        lambda **kw: (-1, "创建失败", None))
     resp = client.post('/tts/create', json={"text": "hello"})
     assert resp.status_code == 200
     data = resp.get_json()
@@ -64,7 +70,8 @@ def test_create_tts_task_failure(client, monkeypatch):
 
 def test_create_tts_task_invalid_json(client):
     """测试无效的 JSON 请求"""
-    resp = client.post('/tts/create', data="invalid json", content_type='application/json')
+    resp = client.post('/tts/create', data="invalid json",
+                       content_type='application/json')
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["code"] == -1
@@ -161,7 +168,8 @@ def test_stop_task_invalid_body(client):
 
 def test_delete_task_failure(client, monkeypatch):
     """测试删除任务失败的情况"""
-    monkeypatch.setattr(tr.tts_mgr, "delete_task", lambda task_id: (-1, "删除失败"))
+    monkeypatch.setattr(tr.tts_mgr, "delete_task",
+                        lambda task_id: (-1, "删除失败"))
     resp = client.post('/tts/delete', json={"task_id": "t1"})
     assert resp.status_code == 200
     data = resp.get_json()
@@ -217,8 +225,10 @@ def test_download_tts_file_success(client, monkeypatch, tmp_path):
     test_file = tmp_path / "output.mp3"
     test_file.write_bytes(b"fake audio data")
 
-    monkeypatch.setattr(tr.tts_mgr, "get_task", lambda task_id: {"task_id": task_id, "status": "success"})
-    monkeypatch.setattr(tr.tts_mgr, "get_output_file_path", lambda task_id: str(test_file))
+    monkeypatch.setattr(tr.tts_mgr, "get_task", lambda task_id: {
+                        "task_id": task_id, "status": "success"})
+    monkeypatch.setattr(tr.tts_mgr, "get_output_file_path",
+                        lambda task_id: str(test_file))
 
     resp = client.get('/tts/download?task_id=t1')
     assert resp.status_code == 200
@@ -257,7 +267,8 @@ def test_download_tts_file_task_not_found(client, monkeypatch):
 
 def test_download_tts_file_task_not_success(client, monkeypatch):
     """测试下载时任务未完成"""
-    monkeypatch.setattr(tr.tts_mgr, "get_task", lambda task_id: {"task_id": task_id, "status": "processing"})
+    monkeypatch.setattr(tr.tts_mgr, "get_task", lambda task_id: {
+                        "task_id": task_id, "status": "processing"})
     resp = client.get('/tts/download?task_id=t1')
     assert resp.status_code == 200
     data = resp.get_json()
@@ -267,8 +278,10 @@ def test_download_tts_file_task_not_success(client, monkeypatch):
 
 def test_download_tts_file_not_exists(client, monkeypatch):
     """测试下载时文件不存在"""
-    monkeypatch.setattr(tr.tts_mgr, "get_task", lambda task_id: {"task_id": task_id, "status": "success"})
-    monkeypatch.setattr(tr.tts_mgr, "get_output_file_path", lambda task_id: None)
+    monkeypatch.setattr(tr.tts_mgr, "get_task", lambda task_id: {
+                        "task_id": task_id, "status": "success"})
+    monkeypatch.setattr(tr.tts_mgr, "get_output_file_path",
+                        lambda task_id: None)
     resp = client.get('/tts/download?task_id=t1')
     assert resp.status_code == 200
     data = resp.get_json()
@@ -294,8 +307,10 @@ def test_tts_ocr_success(client, monkeypatch, tmp_path):
     import os
 
     # Mock tts_mgr 方法
-    monkeypatch.setattr(tr.tts_mgr, "get_task", lambda task_id: {"task_id": task_id, "status": "pending"})
-    monkeypatch.setattr(tr.tts_mgr, "start_ocr_task", lambda task_id, image_paths, temp_dir: (0, "OCR 任务已启动"))
+    monkeypatch.setattr(tr.tts_mgr, "get_task", lambda task_id: {
+                        "task_id": task_id, "status": "pending"})
+    monkeypatch.setattr(tr.tts_mgr, "start_ocr_task",
+                        lambda task_id, image_paths, temp_dir: (0, "OCR 任务已启动"))
 
     # 创建临时图片文件
     with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp_file:
@@ -321,7 +336,8 @@ def test_tts_ocr_success(client, monkeypatch, tmp_path):
 
 def test_tts_ocr_no_files(client):
     """测试 TTS OCR 没有上传文件"""
-    resp = client.post('/tts/ocr', data={'task_id': 't1'}, content_type='multipart/form-data')
+    resp = client.post(
+        '/tts/ocr', data={'task_id': 't1'}, content_type='multipart/form-data')
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["code"] == -1
@@ -334,7 +350,8 @@ def test_tts_ocr_empty_filenames(client, monkeypatch):
     from core.services.tools.tts_mgr import TTSTask
 
     def mock_get_task_or_err(task_id):
-        task = TTSTask(task_id=task_id, name="test", status=TASK_STATUS_PENDING, text="test")
+        task = TTSTask(task_id=task_id, name="test",
+                       status=TASK_STATUS_PENDING, text="test")
         return task, None
 
     monkeypatch.setattr(tr.tts_mgr, "_get_task_or_err", mock_get_task_or_err)
@@ -343,7 +360,8 @@ def test_tts_ocr_empty_filenames(client, monkeypatch):
     from werkzeug.datastructures import FileStorage
     empty_file = FileStorage(filename='', stream=None)
 
-    resp = client.post('/tts/ocr', data={'task_id': 't1', 'file': empty_file}, content_type='multipart/form-data')
+    resp = client.post(
+        '/tts/ocr', data={'task_id': 't1', 'file': empty_file}, content_type='multipart/form-data')
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["code"] == -1
@@ -356,13 +374,15 @@ def test_tts_ocr_save_files_failure(client, monkeypatch):
     from core.services.tools.tts_mgr import TTSTask
 
     def mock_get_task_or_err(task_id):
-        task = TTSTask(task_id=task_id, name="test", status=TASK_STATUS_PENDING, text="test")
+        task = TTSTask(task_id=task_id, name="test",
+                       status=TASK_STATUS_PENDING, text="test")
         return task, None
 
     monkeypatch.setattr(tr.tts_mgr, "_get_task_or_err", mock_get_task_or_err)
 
     # Mock save_uploaded_files 返回 None（保存失败）
-    monkeypatch.setattr('core.api.tts_routes.save_uploaded_files', lambda *args, **kwargs: (None, None))
+    monkeypatch.setattr('core.api.tts_routes.save_uploaded_files',
+                        lambda *args, **kwargs: (None, None))
 
     import tempfile
     with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp_file:
@@ -394,7 +414,8 @@ def test_tts_ocr_exception(client, monkeypatch):
     def mock_parse_with_model(*args, **kwargs):
         raise Exception("测试异常")
 
-    monkeypatch.setattr('core.api.tts_routes.parse_with_model', mock_parse_with_model)
+    monkeypatch.setattr(
+        'core.api.tts_routes.parse_with_model', mock_parse_with_model)
 
     import tempfile
     with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp_file:
@@ -466,7 +487,8 @@ def test_tts_ocr_task_processing(client, monkeypatch):
 
     # Mock _get_task_or_err 返回一个 processing 状态的任务
     def mock_get_task_or_err(task_id):
-        task = TTSTask(task_id=task_id, name="test", status=TASK_STATUS_PROCESSING, text="test")
+        task = TTSTask(task_id=task_id, name="test",
+                       status=TASK_STATUS_PROCESSING, text="test")
         return task, None
 
     monkeypatch.setattr(tr.tts_mgr, "_get_task_or_err", mock_get_task_or_err)
@@ -498,8 +520,10 @@ def test_tts_ocr_start_failure(client, monkeypatch, tmp_path):
     """测试 TTS OCR 启动失败"""
     import tempfile
 
-    monkeypatch.setattr(tr.tts_mgr, "get_task", lambda task_id: {"task_id": task_id, "status": "pending"})
-    monkeypatch.setattr(tr.tts_mgr, "start_ocr_task", lambda task_id, image_paths, temp_dir: (-1, "启动失败"))
+    monkeypatch.setattr(tr.tts_mgr, "get_task", lambda task_id: {
+                        "task_id": task_id, "status": "pending"})
+    monkeypatch.setattr(tr.tts_mgr, "start_ocr_task",
+                        lambda task_id, image_paths, temp_dir: (-1, "启动失败"))
 
     with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp_file:
         tmp_file.write(b'fake image data')
@@ -528,7 +552,8 @@ def test_tts_ocr_start_failure(client, monkeypatch, tmp_path):
 
 def test_tts_analysis_success(client, monkeypatch):
     """测试 POST /tts/analysis 成功"""
-    monkeypatch.setattr(tr.tts_mgr, "start_analyze_article_task", lambda task_id: (0, "分析文章任务已启动"))
+    monkeypatch.setattr(tr.tts_mgr, "start_analyze_article_task",
+                        lambda task_id: (0, "分析文章任务已启动"))
     resp = client.post("/tts/analysis", json={"task_id": "t1"})
     assert resp.status_code == 200
     data = resp.get_json()
@@ -537,7 +562,8 @@ def test_tts_analysis_success(client, monkeypatch):
 
 def test_tts_analysis_failure(client, monkeypatch):
     """测试 POST /tts/analysis 启动失败"""
-    monkeypatch.setattr(tr.tts_mgr, "start_analyze_article_task", lambda task_id: (-1, "待分析的文章内容为空"))
+    monkeypatch.setattr(tr.tts_mgr, "start_analyze_article_task",
+                        lambda task_id: (-1, "待分析的文章内容为空"))
     resp = client.post("/tts/analysis", json={"task_id": "t1"})
     assert resp.status_code == 200
     data = resp.get_json()
@@ -547,7 +573,8 @@ def test_tts_analysis_failure(client, monkeypatch):
 
 def test_tts_analysis_invalid_json(client):
     """测试 POST /tts/analysis 无效 JSON"""
-    resp = client.post("/tts/analysis", data="not json", content_type="application/json")
+    resp = client.post("/tts/analysis", data="not json",
+                       content_type="application/json")
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["code"] == -1
@@ -555,7 +582,8 @@ def test_tts_analysis_invalid_json(client):
 
 def test_tts_analysis_exception(client, monkeypatch):
     """测试 POST /tts/analysis 接口异常"""
-    monkeypatch.setattr(tr.tts_mgr, "start_analyze_article_task", MagicMock(side_effect=Exception("服务异常")))
+    monkeypatch.setattr(tr.tts_mgr, "start_analyze_article_task",
+                        MagicMock(side_effect=Exception("服务异常")))
     resp = client.post("/tts/analysis", json={"task_id": "t1"})
     assert resp.status_code == 200
     data = resp.get_json()

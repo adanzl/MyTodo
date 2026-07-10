@@ -3,6 +3,7 @@
 """
 
 from __future__ import annotations
+from core import limiter
 
 import os
 from typing import Any, Dict
@@ -20,8 +21,6 @@ from core.utils import _err, _ok, read_json_from_request
 
 log = app_logger
 pdf_bp = Blueprint('pdf', __name__)
-
-from core import limiter
 
 
 class _PdfDecryptBody(BaseModel):

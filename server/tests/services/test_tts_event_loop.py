@@ -23,13 +23,15 @@ from core.config import (
 @pytest.fixture(autouse=True)
 def mock_get_media_duration(monkeypatch):
     """Mock get_media_duration 避免测试中调用 ffprobe（环境可能未安装）。"""
-    monkeypatch.setattr('core.services.tools.tts_mgr.get_media_duration', lambda _: 1.0)
+    monkeypatch.setattr(
+        'core.services.tools.tts_mgr.get_media_duration', lambda _: 1.0)
 
 
 @pytest.fixture
 def tts_mgr(tmp_path, monkeypatch):
     """Provides a clean TTSMgr instance using a temporary directory."""
-    monkeypatch.setattr('core.services.tools.tts_mgr.TTS_BASE_DIR', str(tmp_path))
+    monkeypatch.setattr(
+        'core.services.tools.tts_mgr.TTS_BASE_DIR', str(tmp_path))
     mgr = TTSMgr()
     mgr._tasks = {}
     return mgr
@@ -66,7 +68,8 @@ def test_event_loop_in_thread():
 
 def test_tts_task_creation(tts_mgr: TTSMgr):
     """测试 TTS 任务创建"""
-    code, msg, task_id = tts_mgr.create_task(text="这是一个测试文本，用于验证事件循环设置是否正确。", name="事件循环测试任务")
+    code, msg, task_id = tts_mgr.create_task(
+        text="这是一个测试文本，用于验证事件循环设置是否正确。", name="事件循环测试任务")
 
     assert code == 0, f"创建任务失败: {msg}"
     assert task_id is not None, "task_id 不应该为空"
@@ -86,6 +89,7 @@ def test_tts_task_start_with_event_loop(tts_mgr: TTSMgr, tmp_path):
     # 创建测试任务
     code, msg, task_id = tts_mgr.create_task(text="测试文本", name="事件循环测试")
     assert code == 0
+    assert task_id is not None
 
     # Mock TTSClient 以避免实际调用 TTS 服务
     class FakeTTSClient:
@@ -183,7 +187,7 @@ def test_run_task_async_with_loop_creates_event_loop(tts_mgr: TTSMgr):
 
 def test_clear_event_loop_in_thread():
     """测试 _clear_event_loop 函数在新线程中的行为"""
-    clear_result = {'ok': False}
+    clear_result: dict = {'ok': False}
 
     def thread_test():
         loop = None
@@ -211,8 +215,10 @@ def test_tts_task_execution_without_event_loop_error(tts_mgr: TTSMgr, tmp_path):
     import time
 
     # 创建测试任务
-    code, msg, task_id = tts_mgr.create_task(text="测试文本，用于验证事件循环", name="事件循环错误测试")
+    code, msg, task_id = tts_mgr.create_task(
+        text="测试文本，用于验证事件循环", name="事件循环错误测试")
     assert code == 0
+    assert task_id is not None
 
     # Mock TTSClient
     class FakeTTSClient:
@@ -256,11 +262,14 @@ def test_tts_task_execution_without_event_loop_error(tts_mgr: TTSMgr, tmp_path):
             time.sleep(0.1)
 
         # 检查是否有事件循环错误
-        assert len(event_loop_errors) == 0, f"不应该有事件循环错误，但发现了: {event_loop_errors}"
+        assert len(
+            event_loop_errors) == 0, f"不应该有事件循环错误，但发现了: {event_loop_errors}"
 
         # 检查任务状态
         assert task is not None
         if task['status'] == TASK_STATUS_FAILED:
             error_msg = task.get('error_message', '')
-            assert "child watchers" not in error_msg.lower(), f"任务失败，但错误信息中不应该包含事件循环错误: {error_msg}"
-            assert "default loop" not in error_msg.lower(), f"任务失败，但错误信息中不应该包含事件循环错误: {error_msg}"
+            assert "child watchers" not in error_msg.lower(
+            ), f"任务失败，但错误信息中不应该包含事件循环错误: {error_msg}"
+            assert "default loop" not in error_msg.lower(
+            ), f"任务失败，但错误信息中不应该包含事件循环错误: {error_msg}"

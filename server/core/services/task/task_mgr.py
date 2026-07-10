@@ -9,6 +9,7 @@ import json
 
 from core.config import app_logger
 from core.db.db_mgr import db_mgr
+from core.utils import _ok, _err
 from .rest_days import parse_rest_days, is_rest_day, get_workday_index, end_date_by_work_duration
 
 log = app_logger
@@ -58,7 +59,7 @@ class TaskMgr:
                 TABLE_TASK, page_num=1, page_size=1000, conditions=conditions)
             if result.get('code') != 0:
                 log.error(f"获取任务列表失败: {result.get('msg')}")
-                return {"code": -1, "msg": "获取任务列表失败", "data": None}
+                return _err("获取任务列表失败")
 
             tasks = result.get('data', {}).get('data', [])
             if user_id and user_id > 0:
@@ -137,14 +138,14 @@ class TaskMgr:
             }
         except Exception as e:
             log.error(f"获取任务日历失败: {e}")
-            return {"code": -1, "msg": f"获取任务日历失败: {str(e)}", "data": None}
+            return _err(f"获取任务日历失败: {str(e)}")
 
     def finish_material(self, task_id: int, material_id: int, date_str: str, user_id: int) -> Dict[str, Any]:
         """完成指定日期的素材打卡，并在当天全部完成时发放积分。"""
         try:
             task_result = db_mgr.get_data(TABLE_TASK, task_id, '*')
             if task_result.get('code') != 0 or not task_result.get('data'):
-                return {"code": -1, "msg": "任务不存在", "data": None}
+                return _err("任务不存在")
 
             task = task_result['data']
             task_data = json.loads(task.get('data') or '{}')
@@ -152,22 +153,22 @@ class TaskMgr:
 
             start_date_str = task.get('start_date', '')
             if not start_date_str:
-                return {"code": -1, "msg": "任务开始日期不存在", "data": None}
+                return _err("任务开始日期不存在")
 
             start_date_d = datetime.strptime(start_date_str, '%Y-%m-%d').date()
             target_d = datetime.strptime(date_str, '%Y-%m-%d').date()
             duration = int(task.get("duration", 0) or 0)
             if duration <= 0:
-                return {"code": -1, "msg": "任务天数不存在", "data": None}
+                return _err("任务天数不存在")
 
             rule = parse_rest_days(task.get("rest_days"))
             workday_idx = get_workday_index(start_date_d, target_d, rule)
             if workday_idx == -1:
-                return {"code": -1, "msg": "日期不在任务范围内", "data": None}
+                return _err("日期不在任务范围内")
             if workday_idx == -2:
-                return {"code": -1, "msg": "休息日不能打卡", "data": None}
+                return _err("休息日不能打卡")
             if workday_idx >= duration:
-                return {"code": -1, "msg": "日期不在任务范围内", "data": None}
+                return _err("日期不在任务范围内")
 
             materials_index = 0 if task.get('type', 0) == 1 else workday_idx
             materials_for_day = daily_materials.get(str(materials_index), [])
@@ -178,14 +179,14 @@ class TaskMgr:
                     material['status'][str(user_id)] = 1
                     break
             else:
-                return {"code": -1, "msg": "素材不存在于该天", "data": None}
+                return _err("素材不存在于该天")
 
             task_data['dailyMaterials'] = daily_materials
             updated_data = json.dumps(task_data, ensure_ascii=False)
             update_result = db_mgr.set_data(
                 TABLE_TASK, {'id': task_id, 'data': updated_data})
             if update_result.get('code') != 0:
-                return {"code": -1, "msg": "更新失败", "data": None}
+                return _err("更新失败")
 
             history_data = {
                 'user_id': user_id,
@@ -215,10 +216,10 @@ class TaskMgr:
                     else:
                         score_added = score
 
-            return {"code": 0, "msg": "ok", "data": {"success": True, "score": score_added}}
+            return _ok({"success": True, "score": score_added})
         except Exception as e:
             log.error(f"完成素材打卡失败: {e}")
-            return {"code": -1, "msg": f"完成素材打卡失败: {str(e)}", "data": None}
+            return _err(f"完成素材打卡失败: {str(e)}")
 
     @staticmethod
     def _get_today_materials(task: Dict[str, Any], date_str: str) -> List[Dict[str, Any]]:
@@ -280,7 +281,7 @@ class TaskMgr:
             return result
         except Exception as e:
             log.error(f"获取任务列表失败: {e}")
-            return {"code": -1, "msg": f"获取任务列表失败: {str(e)}", "data": None}
+            return _err(f"获取任务列表失败: {str(e)}")
 
     def update_task(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
         """创建或更新任务，自动序列化 JSON 字段并计算结束日期。"""
@@ -311,10 +312,10 @@ class TaskMgr:
             if res.get("code") != 0:
                 return res
             tid = res.get("data")
-            return db_mgr.get_data(TABLE_TASK, int(tid), "*") if tid else {"code": 0, "msg": "ok", "data": None}
+            return db_mgr.get_data(TABLE_TASK, int(tid), "*") if tid else _ok()
         except Exception as e:
             log.error(f"update_task failed: {e}")
-            return {"code": -1, "msg": f"update_task failed: {str(e)}", "data": None}
+            return _err(f"update_task failed: {str(e)}")
 
     def check_task_lock(self,
                         tasks: List[Dict[str, Any]],

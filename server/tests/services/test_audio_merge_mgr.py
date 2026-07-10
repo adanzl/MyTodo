@@ -4,13 +4,15 @@ import pytest
 from unittest.mock import patch, mock_open
 
 from core.config import TASK_STATUS_FAILED, TASK_STATUS_PENDING, TASK_STATUS_PROCESSING, TASK_STATUS_SUCCESS
-from core.services.tools.audio_merge_mgr import AudioMergeMgr
+from core.services.tools.audio_merge_mgr import AudioMergeMgr, AudioFileItem
+from typing import List
 
 
 @pytest.fixture
 def merge_mgr(tmp_path, monkeypatch):
     """Provides a clean AudioMergeMgr instance using a temporary directory."""
-    monkeypatch.setattr('core.services.tools.audio_merge_mgr.AUDIO_MERGE_BASE_DIR', str(tmp_path))
+    monkeypatch.setattr(
+        'core.services.tools.audio_merge_mgr.AUDIO_MERGE_BASE_DIR', str(tmp_path))
     mgr = AudioMergeMgr()
     mgr._tasks = {}  # Ensure no tasks from previous tests
     return mgr
@@ -48,6 +50,7 @@ def test_create_task_with_defaults(merge_mgr: AudioMergeMgr):
 @patch('core.services.tools.audio_merge_mgr.get_media_duration', return_value=10.0)
 def test_add_file_success(mock_get_duration, mock_getsize, mock_exists, merge_mgr: AudioMergeMgr, tmp_path):
     _, _, task_id = merge_mgr.create_task()
+    assert task_id is not None
     file_path = str(tmp_path / "test.mp3")
 
     code, msg = merge_mgr.add_file(task_id, file_path, "test.mp3")
@@ -55,13 +58,16 @@ def test_add_file_success(mock_get_duration, mock_getsize, mock_exists, merge_mg
     assert code == 0
     assert msg == "文件添加成功"
     task = merge_mgr.get_task(task_id)
+    assert task is not None
     assert len(task['files']) == 1
     assert task['files'][0]['name'] == "test.mp3"
 
 
 def test_add_file_failures(merge_mgr: AudioMergeMgr, tmp_path):
     _, _, task_id = merge_mgr.create_task()
+    assert task_id is not None
     task = merge_mgr._get_task(task_id)
+    assert task is not None
     task.status = TASK_STATUS_PROCESSING
 
     code, msg = merge_mgr.add_file(task_id, "/path/to/file.mp3", "file.mp3")
@@ -69,7 +75,8 @@ def test_add_file_failures(merge_mgr: AudioMergeMgr, tmp_path):
     assert "任务正在处理中" in msg
 
     task.status = TASK_STATUS_PENDING
-    code, msg = merge_mgr.add_file(task_id, "/path/to/nonexistent.mp3", "nonexistent.mp3")
+    code, msg = merge_mgr.add_file(
+        task_id, "/path/to/nonexistent.mp3", "nonexistent.mp3")
     assert code == -1
     assert "文件不存在" in msg
 
@@ -83,7 +90,8 @@ def test_add_file_failures(merge_mgr: AudioMergeMgr, tmp_path):
 
 def test_read_tasks_from_file_not_exists(merge_mgr: AudioMergeMgr):
     """_read_tasks_from_file 当文件不存在时返回 None"""
-    assert merge_mgr._read_tasks_from_file("/nonexistent/path/tasks.json") is None
+    assert merge_mgr._read_tasks_from_file(
+        "/nonexistent/path/tasks.json") is None
 
 
 def test_read_tasks_from_file_invalid_json(merge_mgr: AudioMergeMgr, tmp_path):
@@ -114,6 +122,7 @@ def test_validate_file_unsupported_extension(merge_mgr: AudioMergeMgr, tmp_path)
 @patch('core.services.tools.audio_merge_mgr.get_media_duration', return_value=10.0)
 def test_remove_file_success(mock_get_duration, mock_getsize, mock_exists, merge_mgr: AudioMergeMgr, tmp_path):
     _, _, task_id = merge_mgr.create_task()
+    assert task_id is not None
     file_path = str(tmp_path / "test.mp3")
     merge_mgr.add_file(task_id, file_path, "test.mp3")
 
@@ -122,12 +131,15 @@ def test_remove_file_success(mock_get_duration, mock_getsize, mock_exists, merge
     assert code == 0
     assert msg == "文件移除成功"
     task = merge_mgr.get_task(task_id)
+    assert task is not None
     assert len(task['files']) == 0
 
 
 def test_remove_file_failures(merge_mgr: AudioMergeMgr, tmp_path):
     _, _, task_id = merge_mgr.create_task()
+    assert task_id is not None
     task = merge_mgr._get_task(task_id)
+    assert task is not None
     task.status = TASK_STATUS_PROCESSING
 
     code, msg = merge_mgr.remove_file(task_id, 0)
@@ -145,6 +157,7 @@ def test_remove_file_failures(merge_mgr: AudioMergeMgr, tmp_path):
 @patch('core.services.tools.audio_merge_mgr.get_media_duration', return_value=10.0)
 def test_reorder_files_success(mock_get_duration, mock_getsize, mock_exists, merge_mgr: AudioMergeMgr, tmp_path):
     _, _, task_id = merge_mgr.create_task()
+    assert task_id is not None
     merge_mgr.add_file(task_id, str(tmp_path / "a.mp3"), "a.mp3")
     merge_mgr.add_file(task_id, str(tmp_path / "b.mp3"), "b.mp3")
 
@@ -153,13 +166,16 @@ def test_reorder_files_success(mock_get_duration, mock_getsize, mock_exists, mer
     assert code == 0
     assert msg == "文件顺序调整成功"
     task = merge_mgr.get_task(task_id)
+    assert task is not None
     assert task['files'][0]['name'] == "b.mp3"
     assert task['files'][1]['name'] == "a.mp3"
 
 
 def test_reorder_files_failures(merge_mgr: AudioMergeMgr, tmp_path):
     _, _, task_id = merge_mgr.create_task()
+    assert task_id is not None
     task = merge_mgr._get_task(task_id)
+    assert task is not None
     task.status = TASK_STATUS_PROCESSING
 
     code, msg = merge_mgr.reorder_files(task_id, [1, 0])
@@ -184,10 +200,14 @@ def test_reorder_files_failures(merge_mgr: AudioMergeMgr, tmp_path):
 
 def test_reorder_files_exception_returns_error(monkeypatch, merge_mgr: AudioMergeMgr, tmp_path):
     _, _, task_id = merge_mgr.create_task()
+    assert task_id is not None
     t = merge_mgr._get_task(task_id)
-    t.files.append({'name': 'a.mp3', 'path': str(tmp_path / 'a.mp3'), 'size': 1, 'duration': 1.0, 'index': 0})
+    assert t is not None
+    t.files.append({'name': 'a.mp3', 'path': str(
+        tmp_path / 'a.mp3'), 'size': 1, 'duration': 1.0, 'index': 0})
 
-    monkeypatch.setattr(merge_mgr, '_save_task_and_update_time', lambda *_: (_ for _ in ()).throw(RuntimeError('boom')))
+    monkeypatch.setattr(merge_mgr, '_save_task_and_update_time',
+                        lambda *_: (_ for _ in ()).throw(RuntimeError('boom')))
 
     code, msg = merge_mgr.reorder_files(task_id, [0])
     assert code == -1
@@ -201,6 +221,7 @@ def test_reorder_files_exception_returns_error(monkeypatch, merge_mgr: AudioMerg
 def test_start_task_success(mock_run_async, mock_get_duration, mock_getsize, mock_exists, merge_mgr: AudioMergeMgr,
                             tmp_path):
     _, _, task_id = merge_mgr.create_task()
+    assert task_id is not None
     merge_mgr.add_file(task_id, str(tmp_path / "a.mp3"), "a.mp3")
 
     code, msg = merge_mgr.start_task(task_id)
@@ -218,7 +239,9 @@ def test_start_task_task_not_found(merge_mgr: AudioMergeMgr):
 
 def test_start_task_already_processing(merge_mgr: AudioMergeMgr):
     _, _, task_id = merge_mgr.create_task()
+    assert task_id is not None
     task = merge_mgr._get_task(task_id)
+    assert task is not None
     task.status = TASK_STATUS_PROCESSING
 
     code, msg = merge_mgr.start_task(task_id)
@@ -229,6 +252,7 @@ def test_start_task_already_processing(merge_mgr: AudioMergeMgr):
 
 def test_start_task_no_files(merge_mgr: AudioMergeMgr):
     _, _, task_id = merge_mgr.create_task()
+    assert task_id is not None
 
     code, msg = merge_mgr.start_task(task_id)
 
@@ -243,7 +267,8 @@ def test_parse_duration_from_ffmpeg_output(merge_mgr: AudioMergeMgr):
 
 
 def test_get_result_duration_uses_fallback(merge_mgr: AudioMergeMgr):
-    assert merge_mgr._get_result_duration('/tmp/x.mp3', fallback_duration=3.3) == 3.3
+    assert merge_mgr._get_result_duration(
+        '/tmp/x.mp3', fallback_duration=3.3) == 3.3
 
 
 def test_get_file_duration_with_ffmpeg_success(merge_mgr: AudioMergeMgr):
@@ -266,7 +291,7 @@ def test_get_file_duration_with_ffmpeg_outer_exception(merge_mgr: AudioMergeMgr)
 @patch('core.services.tools.audio_merge_mgr.get_media_task_result_dir')
 def test_merge_audio_files_single_file(mock_get_result_dir, mock_copy, merge_mgr: AudioMergeMgr, tmp_path):
     mock_get_result_dir.return_value = str(tmp_path)
-    files = [{'path': 'a.mp3', 'duration': 10.0}]
+    files: List[AudioFileItem] = [{'path': 'a.mp3', 'duration': 10.0}]
     result_file, _ = merge_mgr._merge_audio_files('task1', files)
     mock_copy.assert_called_once_with('a.mp3', str(tmp_path / 'merged.mp3'))
     assert result_file is not None
@@ -286,7 +311,7 @@ def test_merge_audio_files_multiple_files(mock_get_result_dir, mock_exists, mock
                                           merge_mgr: AudioMergeMgr, tmp_path):
     mock_get_result_dir.return_value = str(tmp_path)
     mock_run_subprocess.return_value = (0, '', '')
-    files = [{'path': 'a.mp3'}, {'path': 'b.mp3'}]
+    files: List[AudioFileItem] = [{'path': 'a.mp3'}, {'path': 'b.mp3'}]
 
     result_file, _ = merge_mgr._merge_audio_files('task1', files)
 
@@ -302,7 +327,7 @@ def test_merge_audio_files_returncode_0_but_missing_result(mock_get_result_dir, 
                                                            mock_file_open, merge_mgr: AudioMergeMgr, tmp_path):
     mock_get_result_dir.return_value = str(tmp_path)
     mock_run_subprocess.return_value = (0, '', '')
-    files = [{'path': 'a.mp3'}, {'path': 'b.mp3'}]
+    files: List[AudioFileItem] = [{'path': 'a.mp3'}, {'path': 'b.mp3'}]
 
     result_file, dur = merge_mgr._merge_audio_files('task1', files)
 
@@ -317,7 +342,7 @@ def test_merge_audio_files_returncode_0_but_missing_result(mock_get_result_dir, 
 def test_merge_audio_files_returncode_nonzero(mock_get_result_dir, mock_exists, mock_run_subprocess, mock_file_open,
                                               merge_mgr: AudioMergeMgr, tmp_path):
     mock_get_result_dir.return_value = str(tmp_path)
-    files = [{'path': 'a.mp3'}, {'path': 'b.mp3'}]
+    files: List[AudioFileItem] = [{'path': 'a.mp3'}, {'path': 'b.mp3'}]
 
     result_file, dur = merge_mgr._merge_audio_files('task1', files)
 
@@ -331,7 +356,7 @@ def test_merge_audio_files_returncode_nonzero(mock_get_result_dir, mock_exists, 
 def test_merge_audio_files_timeout(mock_get_result_dir, mock_run_subprocess, mock_file_open, merge_mgr: AudioMergeMgr,
                                    tmp_path):
     mock_get_result_dir.return_value = str(tmp_path)
-    files = [{'path': 'a.mp3'}, {'path': 'b.mp3'}]
+    files: List[AudioFileItem] = [{'path': 'a.mp3'}, {'path': 'b.mp3'}]
 
     result_file, dur = merge_mgr._merge_audio_files('task1', files)
 
@@ -345,7 +370,7 @@ def test_merge_audio_files_timeout(mock_get_result_dir, mock_run_subprocess, moc
 def test_merge_audio_files_run_subprocess_exception(mock_get_result_dir, mock_run_subprocess, mock_file_open,
                                                     merge_mgr: AudioMergeMgr, tmp_path):
     mock_get_result_dir.return_value = str(tmp_path)
-    files = [{'path': 'a.mp3'}, {'path': 'b.mp3'}]
+    files: List[AudioFileItem] = [{'path': 'a.mp3'}, {'path': 'b.mp3'}]
 
     result_file, dur = merge_mgr._merge_audio_files('task1', files)
 
@@ -356,19 +381,23 @@ def test_merge_audio_files_run_subprocess_exception(mock_get_result_dir, mock_ru
 def test_merge_audio_files_outer_exception_returns_none(monkeypatch, merge_mgr: AudioMergeMgr):
     monkeypatch.setattr('core.services.tools.audio_merge_mgr.get_media_task_result_dir', lambda *_:
                         (_ for _ in ()).throw(RuntimeError('boom')))
-    rf, dur = merge_mgr._merge_audio_files('t1', [{'path': 'a.mp3'}])
+    rf, dur = merge_mgr._merge_audio_files(
+        't1', [{'path': 'a.mp3'}])  # type: ignore[arg-type]
     assert rf is None
     assert dur is None
 
 
 def test_load_history_tasks_removes_missing_task_dir(monkeypatch, tmp_path):
-    monkeypatch.setattr('core.services.tools.audio_merge_mgr.AUDIO_MERGE_BASE_DIR', str(tmp_path / 'merge'))
+    monkeypatch.setattr(
+        'core.services.tools.audio_merge_mgr.AUDIO_MERGE_BASE_DIR', str(tmp_path / 'merge'))
 
-    monkeypatch.setattr('core.services.tools.audio_merge_mgr.get_media_task_dir', lambda tid: str(tmp_path / 'missing' / tid))
+    monkeypatch.setattr('core.services.tools.audio_merge_mgr.get_media_task_dir',
+                        lambda tid: str(tmp_path / 'missing' / tid))
     monkeypatch.setattr('core.services.tools.audio_merge_mgr.get_media_task_result_dir',
                         lambda tid: str(tmp_path / 'missing' / tid / 'result'))
 
-    monkeypatch.setattr('core.services.tools.audio_merge_mgr.shutil.rmtree', lambda p: None)
+    monkeypatch.setattr(
+        'core.services.tools.audio_merge_mgr.shutil.rmtree', lambda p: None)
 
     os.makedirs(tmp_path / 'merge', exist_ok=True)
     meta = {
@@ -390,21 +419,24 @@ def test_load_history_tasks_removes_missing_task_dir(monkeypatch, tmp_path):
             'update_time': 1,
         }
     }
-    (tmp_path / 'merge' / 'tasks.json').write_text(json.dumps(meta, ensure_ascii=False), encoding='utf-8')
+    (tmp_path / 'merge' / 'tasks.json').write_text(json.dumps(meta,
+                                                              ensure_ascii=False), encoding='utf-8')
 
     mgr = AudioMergeMgr()
     assert mgr.get_task('t1') is None
 
 
 def test_load_history_tasks_filters_files_and_clears_missing_result(monkeypatch, tmp_path):
-    monkeypatch.setattr('core.services.tools.audio_merge_mgr.AUDIO_MERGE_BASE_DIR', str(tmp_path / 'merge'))
+    monkeypatch.setattr(
+        'core.services.tools.audio_merge_mgr.AUDIO_MERGE_BASE_DIR', str(tmp_path / 'merge'))
     os.makedirs(tmp_path / 'merge', exist_ok=True)
 
     task_dir = tmp_path / 'taskdir'
     os.makedirs(task_dir, exist_ok=True)
 
     # make task dir exist
-    monkeypatch.setattr('core.services.tools.audio_merge_mgr.get_media_task_dir', lambda tid: str(task_dir))
+    monkeypatch.setattr(
+        'core.services.tools.audio_merge_mgr.get_media_task_dir', lambda tid: str(task_dir))
 
     file_ok = tmp_path / 'ok.mp3'
     file_ok.write_bytes(b'x')
@@ -415,7 +447,8 @@ def test_load_history_tasks_filters_files_and_clears_missing_result(monkeypatch,
     def fake_exists(p):
         return p in (str(task_dir), str(file_ok), tasks_json)
 
-    monkeypatch.setattr('core.services.tools.audio_merge_mgr.os.path.exists', fake_exists)
+    monkeypatch.setattr(
+        'core.services.tools.audio_merge_mgr.os.path.exists', fake_exists)
 
     meta = {
         't1': {
@@ -461,7 +494,8 @@ def test_load_history_tasks_filters_files_and_clears_missing_result(monkeypatch,
         }
     }
 
-    (tmp_path / 'merge' / 'tasks.json').write_text(json.dumps(meta, ensure_ascii=False), encoding='utf-8')
+    (tmp_path / 'merge' / 'tasks.json').write_text(json.dumps(meta,
+                                                              ensure_ascii=False), encoding='utf-8')
 
     mgr = AudioMergeMgr()
     t = mgr.get_task('t1')
@@ -474,7 +508,8 @@ def test_load_history_tasks_filters_files_and_clears_missing_result(monkeypatch,
 
 
 def test_load_history_tasks_exception_removes_task(monkeypatch, tmp_path):
-    monkeypatch.setattr('core.services.tools.audio_merge_mgr.AUDIO_MERGE_BASE_DIR', str(tmp_path / 'merge'))
+    monkeypatch.setattr(
+        'core.services.tools.audio_merge_mgr.AUDIO_MERGE_BASE_DIR', str(tmp_path / 'merge'))
     os.makedirs(tmp_path / 'merge', exist_ok=True)
 
     meta = {
@@ -490,7 +525,8 @@ def test_load_history_tasks_exception_removes_task(monkeypatch, tmp_path):
             'update_time': 1,
         }
     }
-    (tmp_path / 'merge' / 'tasks.json').write_text(json.dumps(meta, ensure_ascii=False), encoding='utf-8')
+    (tmp_path / 'merge' / 'tasks.json').write_text(json.dumps(meta,
+                                                              ensure_ascii=False), encoding='utf-8')
 
     monkeypatch.setattr('core.services.tools.audio_merge_mgr.get_media_task_dir', lambda tid:
                         (_ for _ in ()).throw(RuntimeError('boom')))
@@ -515,14 +551,15 @@ def test_validate_file_wrong_ext_and_missing(tmp_path):
 
 def test_update_file_indices_sets_index():
     mgr = AudioMergeMgr()
-    files = [{'name': 'a'}, {'name': 'b'}]
+    files: List[AudioFileItem] = [{'name': 'a'}, {'name': 'b'}]
     mgr._update_file_indices(files)
-    assert files[0]['index'] == 0
-    assert files[1]['index'] == 1
+    assert files[0].get('index') == 0
+    assert files[1].get('index') == 1
 
 
 def test_before_delete_task_rmtree_called(monkeypatch, tmp_path):
-    monkeypatch.setattr('core.services.tools.audio_merge_mgr.get_media_task_dir', lambda tid: str(tmp_path / tid))
+    monkeypatch.setattr(
+        'core.services.tools.audio_merge_mgr.get_media_task_dir', lambda tid: str(tmp_path / tid))
     os.makedirs(tmp_path / 't1', exist_ok=True)
 
     called = {'p': None}
@@ -530,7 +567,8 @@ def test_before_delete_task_rmtree_called(monkeypatch, tmp_path):
     def fake_rmtree(p):
         called['p'] = p
 
-    monkeypatch.setattr('core.services.tools.audio_merge_mgr.shutil.rmtree', fake_rmtree)
+    monkeypatch.setattr(
+        'core.services.tools.audio_merge_mgr.shutil.rmtree', fake_rmtree)
 
     mgr = AudioMergeMgr()
     t = mgr._task_from_dict({
@@ -550,11 +588,14 @@ def test_before_delete_task_rmtree_called(monkeypatch, tmp_path):
 
 
 def test_start_task_runner_result_duration_fallback(monkeypatch, merge_mgr: AudioMergeMgr):
-    monkeypatch.setattr(merge_mgr, '_merge_audio_files', lambda task_id, files: ('/tmp/r.mp3', None))
-    monkeypatch.setattr('core.services.tools.audio_merge_mgr.get_media_duration', lambda p: 9.9)
+    monkeypatch.setattr(merge_mgr, '_merge_audio_files',
+                        lambda task_id, files: ('/tmp/r.mp3', None))
+    monkeypatch.setattr(
+        'core.services.tools.audio_merge_mgr.get_media_duration', lambda p: 9.9)
 
     def fake_run_task_async(task_id, runner):
         t = merge_mgr._get_task(task_id)
+        assert t is not None
         t.status = TASK_STATUS_PROCESSING
         runner(t)
         if t.status == TASK_STATUS_PROCESSING:
@@ -563,33 +604,43 @@ def test_start_task_runner_result_duration_fallback(monkeypatch, merge_mgr: Audi
     monkeypatch.setattr(merge_mgr, '_run_task_async', fake_run_task_async)
 
     _, _, tid = merge_mgr.create_task('n')
+    assert tid is not None
     t = merge_mgr._get_task(tid)
-    t.files.append({'name': 'a.mp3', 'path': '/tmp/a.mp3', 'size': 1, 'duration': 1.0, 'index': 0})
+    assert t is not None
+    t.files.append({'name': 'a.mp3', 'path': '/tmp/a.mp3',
+                   'size': 1, 'duration': 1.0, 'index': 0})
 
     code, msg = merge_mgr.start_task(tid)
     assert code == 0
 
     task = merge_mgr.get_task(tid)
+    assert task is not None
     assert task['result_duration'] == 9.9
 
 
 def test_start_task_runner_merge_failed(monkeypatch, merge_mgr: AudioMergeMgr):
-    monkeypatch.setattr(merge_mgr, '_merge_audio_files', lambda task_id, files: (None, None))
+    monkeypatch.setattr(merge_mgr, '_merge_audio_files',
+                        lambda task_id, files: (None, None))
 
     def fake_run_task_async(task_id, runner):
         t = merge_mgr._get_task(task_id)
+        assert t is not None
         t.status = TASK_STATUS_PROCESSING
         runner(t)
 
     monkeypatch.setattr(merge_mgr, '_run_task_async', fake_run_task_async)
 
     _, _, tid = merge_mgr.create_task('n')
+    assert tid is not None
     t = merge_mgr._get_task(tid)
-    t.files.append({'name': 'a.mp3', 'path': '/tmp/a.mp3', 'size': 1, 'duration': 1.0, 'index': 0})
+    assert t is not None
+    t.files.append({'name': 'a.mp3', 'path': '/tmp/a.mp3',
+                   'size': 1, 'duration': 1.0, 'index': 0})
 
     code, msg = merge_mgr.start_task(tid)
     assert code == 0
 
     task = merge_mgr.get_task(tid)
+    assert task is not None
     assert task['status'] == TASK_STATUS_FAILED
     assert task['error_message'] == '合成失败'
