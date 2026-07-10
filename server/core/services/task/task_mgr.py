@@ -167,6 +167,13 @@ class TaskMgr:
             materials_index = 0 if task.get('type', 0) == 1 else workday_idx
             materials_for_day = daily_materials.get(str(materials_index), [])
 
+            day_material_ids = [m.get('id') for m in materials_for_day if isinstance(m, dict)]
+            log.info(
+                f"[finish_material] task_id={task_id}, material_id={material_id}, date={date_str}, "
+                f"user_id={user_id}, type={task.get('type', 0)}, workday_idx={workday_idx}, "
+                f"materials_index={materials_index}, day_material_ids={day_material_ids}"
+            )
+
             for material in materials_for_day:
                 if material.get('id') == material_id:
                     material.setdefault('status', {})
