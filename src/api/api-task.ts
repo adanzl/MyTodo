@@ -442,13 +442,18 @@ export interface UnlimitApplication {
 /**
  * 列出不限时申请
  * @param status - 过滤状态，默认 pending
+ * @param expiresAt - 过期时间过滤，只返回 expires_at 大于此时间的记录
  */
 export async function listUnlimitApplications(
-  status?: string
+  status?: string,
+  expiresAt?: string
 ): Promise<{ applications: UnlimitApplication[]; total: number }> {
   const params: any = {};
   if (status) {
     params.status = status;
+  }
+  if (expiresAt) {
+    params.expiresAt = expiresAt;
   }
   const rsp = await apiClient.get<ApiResponse<{ applications: UnlimitApplication[]; total: number }>>(
     "/material/unlimit/list",

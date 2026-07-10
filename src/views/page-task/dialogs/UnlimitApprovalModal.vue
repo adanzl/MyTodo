@@ -72,16 +72,16 @@
         </ion-list>
       </template>
 
-      <!-- 已处理 -->
+      <!-- 生效中 -->
       <div class="border-t border-gray-200/60 mx-4 my-2"></div>
-      <div class="px-4 pt-1 pb-1 text-xs font-medium text-gray-400">已处理 ({{ historyList.length }})</div>
+      <div class="px-4 pt-1 pb-1 text-xs font-medium text-gray-400">生效中 ({{ historyList.length }})</div>
       <div v-if="historyLoading" class="flex justify-center items-center py-6">
         <ion-spinner name="crescent"></ion-spinner>
       </div>
 
       <template v-else>
         <div v-if="historyList.length === 0" class="text-center py-6 text-gray-400 text-sm">
-          暂无已处理申请
+          暂无生效中申请
         </div>
 
         <ion-list v-else class="[--ion-item-background:transparent]">
@@ -223,7 +223,7 @@ const fetchList = async () => {
 const fetchHistoryList = async () => {
   historyLoading.value = true;
   try {
-    const res = await listUnlimitApplications('approved,denied');
+    const res = await listUnlimitApplications('approved,denied', dayjs().format());
     historyList.value = res.applications;
   } catch (e: any) {
     console.error('获取已处理列表失败:', e);
