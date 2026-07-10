@@ -4,20 +4,20 @@ import time
 import pytest
 from unittest.mock import patch, MagicMock
 
-from core.services.tts_mgr import TTSMgr, count_text_chars
+from core.services.tools.tts_mgr import TTSMgr, count_text_chars
 from core.config import TASK_STATUS_PENDING, TASK_STATUS_PROCESSING, TASK_STATUS_SUCCESS, TASK_STATUS_FAILED
 
 
 @pytest.fixture(autouse=True)
 def mock_get_media_duration(monkeypatch):
     """Mock get_media_duration 避免测试中调用 ffprobe（环境可能未安装）。"""
-    monkeypatch.setattr('core.services.tts_mgr.get_media_duration', lambda _: 1.0)
+    monkeypatch.setattr('core.services.tools.tts_mgr.get_media_duration', lambda _: 1.0)
 
 
 @pytest.fixture
 def tts_mgr(tmp_path, monkeypatch):
     """Provides a clean TTSMgr instance using a temporary directory."""
-    monkeypatch.setattr('core.services.tts_mgr.TTS_BASE_DIR', str(tmp_path))
+    monkeypatch.setattr('core.services.tools.tts_mgr.TTS_BASE_DIR', str(tmp_path))
     mgr = TTSMgr()
     mgr._tasks = {}
     return mgr
@@ -138,7 +138,7 @@ def test_start_task_async_runs_and_writes_file(tts_mgr: TTSMgr, tmp_path):
             if self.on_msg:
                 self.on_msg("done", 1)
 
-    with patch('core.services.tts_mgr.TTSClient', FakeTTSClient):
+    with patch('core.services.tools.tts_mgr.TTSClient', FakeTTSClient):
         code, msg, task_id = tts_mgr.create_task(text="这是测试文本", name="async")
         assert code == 0
         assert task_id is not None
@@ -219,7 +219,7 @@ def test_run_tts_task_stop_midway_sets_failed(tts_mgr: TTSMgr, monkeypatch):
         def stream_complete(self):
             self.on_msg("done", 1)
 
-    with patch('core.services.tts_mgr.TTSClient', FakeTTSClient):
+    with patch('core.services.tools.tts_mgr.TTSClient', FakeTTSClient):
         _, _, task_id = tts_mgr.create_task(text="x", name="stop")
 
         # request stop before running
@@ -361,7 +361,7 @@ def test_after_delete_task_rmtree_exception(tts_mgr: TTSMgr, tmp_path, monkeypat
     os.makedirs(task_dir, exist_ok=True)
 
     # Mock shutil.rmtree 抛出异常
-    with patch('core.services.tts_mgr.shutil.rmtree', side_effect=Exception("删除失败")):
+    with patch('core.services.tools.tts_mgr.shutil.rmtree', side_effect=Exception("删除失败")):
         tts_mgr._after_delete_task(task_id)
         # 应该不会抛出异常，只是记录警告
 
@@ -400,13 +400,13 @@ def test_get_output_file_path_fallback_to_default(tts_mgr: TTSMgr, tmp_path):
 
 def test_count_text_chars_empty(tts_mgr: TTSMgr):
     """测试统计空文本字数"""
-    from core.services.tts_mgr import count_text_chars
+    from core.services.tools.tts_mgr import count_text_chars
     assert count_text_chars("") == 0
 
 
 def test_count_text_chars_chinese(tts_mgr: TTSMgr):
     """测试统计中文字数（汉字按2个字符计算）"""
-    from core.services.tts_mgr import count_text_chars
+    from core.services.tools.tts_mgr import count_text_chars
     # "你好" 是2个汉字，应该算4个字符
     assert count_text_chars("你好") == 4
     # "你好世界" 是4个汉字，应该算8个字符
@@ -415,7 +415,7 @@ def test_count_text_chars_chinese(tts_mgr: TTSMgr):
 
 def test_count_text_chars_mixed(tts_mgr: TTSMgr):
     """测试统计混合文本字数"""
-    from core.services.tts_mgr import count_text_chars
+    from core.services.tools.tts_mgr import count_text_chars
     # "Hello 世界" = 5个字母 + 1个空格 + 2个汉字 = 5 + 1 + 4 = 10
     assert count_text_chars("Hello 世界") == 10
     # "123你好" = 3个数字 + 2个汉字 = 3 + 4 = 7
@@ -459,7 +459,7 @@ def test_task_total_chars_field(tts_mgr: TTSMgr):
 
 def test_count_text_chars_punctuation(tts_mgr: TTSMgr):
     """测试统计标点符号字数（按1个字符计算）"""
-    from core.services.tts_mgr import count_text_chars
+    from core.services.tools.tts_mgr import count_text_chars
     # 标点符号按1个字符计算
     assert count_text_chars("，。！？") == 4
     assert count_text_chars("Hello, World!") == 13  # 12个字母+1个逗号+1个空格+1个感叹号
@@ -467,7 +467,7 @@ def test_count_text_chars_punctuation(tts_mgr: TTSMgr):
 
 def test_count_text_chars_numbers(tts_mgr: TTSMgr):
     """测试统计数字字数（按1个字符计算）"""
-    from core.services.tts_mgr import count_text_chars
+    from core.services.tools.tts_mgr import count_text_chars
     assert count_text_chars("123456") == 6
     assert count_text_chars("你好123") == 7  # 2个汉字*2 + 3个数字 = 4 + 3 = 7
 
@@ -484,7 +484,7 @@ def test_start_ocr_task_success(tts_mgr: TTSMgr, tmp_path):
         f.write(b'fake image data')
 
     # Mock OCR 客户端（代码直接使用 _ocr_client）
-    with patch('core.services.tts_mgr._ocr_client') as mock_ocr:
+    with patch('core.services.tools.tts_mgr._ocr_client') as mock_ocr:
         mock_ocr.query.return_value = ("ok", "OCR识别结果")
 
         code, msg = tts_mgr.start_ocr_task(task_id, [image_path], temp_dir)
@@ -584,7 +584,7 @@ def test_update_task_status_to_pending(tts_mgr: TTSMgr):
 def test_start_analyze_article_task_success(tts_mgr: TTSMgr):
     """测试启动分析文章任务成功"""
     _, _, task_id = tts_mgr.create_task(text="杯弓蛇影是一篇好文章。")
-    with patch("core.services.tts_mgr._txt_client") as mock_txt:
+    with patch("core.services.tools.tts_mgr._txt_client") as mock_txt:
         mock_txt.query.return_value = ("ok", '{"title": "杯弓蛇影", "words": ["好文章"]}')
 
         code, msg = tts_mgr.start_analyze_article_task(task_id)
@@ -805,7 +805,7 @@ def test_tts_run_fails_when_client_calls_on_err(tts_mgr: TTSMgr, tmp_path):
         def stream_complete(self):
             pass
 
-    with patch('core.services.tts_mgr.TTSClient', FakeTTSClientErr):
+    with patch('core.services.tools.tts_mgr.TTSClient', FakeTTSClientErr):
         tts_mgr.start_task(task_id)
         deadline = 5.0
         start = time.time()
@@ -856,7 +856,7 @@ def test_run_ocr_task_logic_error_status(tts_mgr: TTSMgr, tmp_path):
     image_path = os.path.join(temp_dir, "a.jpg")
     with open(image_path, "wb") as f:
         f.write(b"fake")
-    with patch('core.services.tts_mgr._ocr_client') as mock_ocr:
+    with patch('core.services.tools.tts_mgr._ocr_client') as mock_ocr:
         mock_ocr.query.return_value = ("error", "OCR failed")
         tts_mgr._run_ocr_task_logic(task_id, [image_path], temp_dir)
     task = tts_mgr.get_task(task_id)
@@ -866,7 +866,7 @@ def test_run_ocr_task_logic_error_status(tts_mgr: TTSMgr, tmp_path):
 def test_run_analyze_article_task_logic_error_status(tts_mgr: TTSMgr):
     """_run_analyze_article_task_logic 当 txt_ali 返回 error 时只记录日志不抛错"""
     _, _, task_id = tts_mgr.create_task(text="some text")
-    with patch('core.services.tts_mgr._txt_client') as mock_txt:
+    with patch('core.services.tools.tts_mgr._txt_client') as mock_txt:
         mock_txt.query.return_value = ("error", "分析失败")
         tts_mgr._run_analyze_article_task_logic(task_id, "some text")
     task = tts_mgr.get_task(task_id)
@@ -876,7 +876,7 @@ def test_run_analyze_article_task_logic_error_status(tts_mgr: TTSMgr):
 def test_run_analyze_article_task_logic_save_fails(tts_mgr: TTSMgr):
     """_run_analyze_article_task_logic 当 _save_analysis_to_task 返回非 0 时只记录日志"""
     _, _, task_id = tts_mgr.create_task(text="some text")
-    with patch('core.services.tts_mgr._txt_client') as mock_txt:
+    with patch('core.services.tools.tts_mgr._txt_client') as mock_txt:
         mock_txt.query.return_value = ("ok", '{"title":"x"}')
         with patch.object(tts_mgr, '_save_analysis_to_task', return_value=(-1, "save failed")):
             tts_mgr._run_analyze_article_task_logic(task_id, "some text")
@@ -892,7 +892,7 @@ def test_run_ocr_task_logic_append_fails(tts_mgr: TTSMgr, tmp_path):
     image_path = os.path.join(temp_dir, "a.jpg")
     with open(image_path, "wb") as f:
         f.write(b"fake")
-    with patch('core.services.tts_mgr._ocr_client') as mock_ocr:
+    with patch('core.services.tools.tts_mgr._ocr_client') as mock_ocr:
         mock_ocr.query.return_value = ("ok", "OCR结果")
         with patch.object(tts_mgr, '_append_text_to_task', return_value=(-1, "append failed")):
             tts_mgr._run_ocr_task_logic(task_id, [image_path], temp_dir)
@@ -941,7 +941,7 @@ def test_run_tts_task_on_data_non_bytes_logs(tts_mgr: TTSMgr, tmp_path):
         def stream_complete(self):
             pass
 
-    with patch('core.services.tts_mgr.TTSClient', FakeTTSClientNonBytes):
+    with patch('core.services.tools.tts_mgr.TTSClient', FakeTTSClientNonBytes):
         _, _, task_id = tts_mgr.create_task(text="ab")
         tts_mgr._run_tts_task(tts_mgr._get_task(task_id))
     task = tts_mgr.get_task(task_id)
@@ -974,8 +974,8 @@ def test_run_tts_task_duration_none(tts_mgr: TTSMgr, tmp_path):
         def stream_complete(self):
             pass
 
-    with patch('core.services.tts_mgr.TTSClient', FakeTTSClientQuick):
-        with patch('core.services.tts_mgr.get_media_duration', return_value=None):
+    with patch('core.services.tools.tts_mgr.TTSClient', FakeTTSClientQuick):
+        with patch('core.services.tools.tts_mgr.get_media_duration', return_value=None):
             _, _, task_id = tts_mgr.create_task(text="ab")
             tts_mgr._run_tts_task(tts_mgr._get_task(task_id))
     task = tts_mgr.get_task(task_id)
@@ -995,8 +995,8 @@ def test_get_task_success_without_duration_triggers_update(tts_mgr: TTSMgr, tmp_
         f.write(b'fake')
     tts_mgr._save_task_and_update_time(task)
     # 整段测试内 patch get_media_duration，确保后台线程执行时仍返回 2.5（避免与 fixture 的 1.0 冲突）
-    with patch('core.services.tts_mgr.get_media_duration', return_value=2.5):
-        with patch('core.services.tts_mgr.run_in_background', lambda fn: threading.Thread(target=fn, daemon=True).start()):
+    with patch('core.services.tools.tts_mgr.get_media_duration', return_value=2.5):
+        with patch('core.services.tools.tts_mgr.run_in_background', lambda fn: threading.Thread(target=fn, daemon=True).start()):
             d = tts_mgr.get_task(task_id)
         assert d is not None
         assert d.get("duration") is None  # 首次调用时异步尚未完成

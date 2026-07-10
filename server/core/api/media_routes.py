@@ -17,8 +17,8 @@ from flask.typing import ResponseReturnValue
 from werkzeug.utils import secure_filename
 
 from core.config import app_logger
-from core.services.audio_merge_mgr import audio_merge_mgr
-from core.services.audio_convert_mgr import audio_convert_mgr
+from core.services.tools.audio_merge_mgr import audio_merge_mgr
+from core.services.tools.audio_convert_mgr import audio_convert_mgr
 from core.services.media_mgr import media_mgr
 from core.services.subtitle_mgr import subtitle_mgr
 from core.config import get_media_task_dir, ALLOWED_AUDIO_EXTENSIONS

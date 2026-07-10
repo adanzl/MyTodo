@@ -331,7 +331,7 @@ def test_tts_ocr_no_files(client):
 def test_tts_ocr_empty_filenames(client, monkeypatch):
     """测试 TTS OCR 上传的文件名为空"""
     from core.config import TASK_STATUS_PENDING
-    from core.services.tts_mgr import TTSTask
+    from core.services.tools.tts_mgr import TTSTask
 
     def mock_get_task_or_err(task_id):
         task = TTSTask(task_id=task_id, name="test", status=TASK_STATUS_PENDING, text="test")
@@ -353,7 +353,7 @@ def test_tts_ocr_empty_filenames(client, monkeypatch):
 def test_tts_ocr_save_files_failure(client, monkeypatch):
     """测试 TTS OCR 保存文件失败"""
     from core.config import TASK_STATUS_PENDING
-    from core.services.tts_mgr import TTSTask
+    from core.services.tools.tts_mgr import TTSTask
 
     def mock_get_task_or_err(task_id):
         task = TTSTask(task_id=task_id, name="test", status=TASK_STATUS_PENDING, text="test")
@@ -462,7 +462,7 @@ def test_tts_ocr_task_not_found(client, monkeypatch):
 def test_tts_ocr_task_processing(client, monkeypatch):
     """测试 TTS OCR 任务正在处理中"""
     from core.config import TASK_STATUS_PROCESSING
-    from core.services.tts_mgr import TTSTask
+    from core.services.tools.tts_mgr import TTSTask
 
     # Mock _get_task_or_err 返回一个 processing 状态的任务
     def mock_get_task_or_err(task_id):

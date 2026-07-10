@@ -21,6 +21,7 @@ export interface Task {
   data: string | TaskDetail;
   lock?: boolean; // 任务是否被锁定
   msg?: string; // 锁定提示信息
+  today_materials?: Array<{ id: number; name: string; type: number; status?: Record<string, number> }>; // 后端计算的当天素材列表
 }
 
 /**
