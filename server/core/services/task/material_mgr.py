@@ -15,7 +15,7 @@ from core.config import app_logger
 from core.config.const import DEFAULT_BASE_DIR
 from core.db.db_mgr import db_mgr
 from core.tools.async_util import run_in_background
-from core.utils import fmt_ts, get_media_duration, validate_and_normalize_path
+from core.utils import fmt_ts, get_media_duration, validate_and_normalize_path, _ok, _err
 from .block_time import is_global_block_time_now, parse_block_time_config, _get_user_entry, _is_blocked_by_entry
 
 log = app_logger
@@ -25,8 +25,6 @@ TABLE_TASK = 't_task'
 TABLE_MATERIAL_CATEGORY = 't_material_category'
 TABLE_UNLIMIT = 't_material_unlimit'
 
-_ok = lambda data: {"code": 0, "msg": "ok", "data": data}
-_err = lambda msg, data: {"code": -1, "msg": msg, "data": data}
 
 
 class MaterialMgr:
@@ -98,7 +96,7 @@ class MaterialMgr:
                                                        page_size=1,
                                                        conditions={'cate_id': cat_id})
                     if materials_result.get('code') == 0 and materials_result.get('data', {}).get('total', 0) > 0:
-                        return {"code": -1, "msg": "该目录或其子目录下还有素材，无法删除（可勾选'同时删除素材'）", "data": None}
+                        return _err("该目录或其子目录下还有素材，无法删除（可勾选'同时删除素材'）")
 
             # 删除素材：先删除所有类别下的素材
             if delete_materials:
@@ -119,23 +117,23 @@ class MaterialMgr:
             for cat_id in all_category_ids:
                 result = db_mgr.del_data(TABLE_MATERIAL_CATEGORY, cat_id)
                 if result.get('code') != 0:
-                    return {"code": -1, "msg": f"删除分类 {cat_id} 失败: {result.get('msg')}", "data": None}
+                    return _err(f"删除分类 {cat_id} 失败: {result.get('msg')}")
 
-            return {"code": 0, "msg": "删除成功", "data": None}
+            return _ok("删除成功")
         except Exception as e:
             log.error(f'删除素材分类失败: {e}')
-            return {"code": -1, "msg": f"删除失败: {str(e)}", "data": None}
+            return _err(f"删除失败: {str(e)}")
 
     def get_material_parent_chain(self, material_id: int) -> Dict[str, Any]:
         """获取素材的父目录链（从当前目录到根目录）"""
         try:
             material = db_mgr.get_data(TABLE_MATERIAL, material_id, '*')
             if material.get('code') != 0 or not material.get('data'):
-                return {"code": -1, "msg": "素材不存在", "data": None}
+                return _err("素材不存在")
 
             cate_id = material['data'].get('cate_id', -1)
             if cate_id == -1 or cate_id is None:
-                return {"code": 0, "msg": "success", "data": [{"id": -1, "name": "根目录", "parent": None}]}
+                return _ok([{"id": -1, "name": "根目录", "parent": None}])
 
             chain = []
             current_id = cate_id
@@ -151,10 +149,10 @@ class MaterialMgr:
 
             chain.append({"id": -1, "name": "根目录", "parent": None})
             chain.reverse()
-            return {"code": 0, "msg": "success", "data": chain}
+            return _ok(chain)
         except Exception as e:
             log.error(f'获取素材父目录链失败: {e}')
-            return {"code": -1, "msg": f"获取失败: {str(e)}", "data": None}
+            return _err(f"获取失败: {str(e)}")
 
     def get_material_status(self, user_id: int, material_id: int, task_id: Optional[int] = None) -> Dict[str, Any]:
         """获取素材的锁定状态。
@@ -330,10 +328,10 @@ class MaterialMgr:
 
             log.info(f"不限时申请已提交: id={apply_id} user={user_id} "
                      f"material={material_id} duration={duration}min")
-            return {"code": 0, "msg": "申请已提交，等待管理员审批", "data": {"success": True, "id": apply_id, "replaced": False}}
+            return _ok({"success": True, "id": apply_id, "replaced": False})
         except Exception as e:
             log.error(f"不限时申请提交失败: user={user_id} material={material_id}, {e}")
-            return {"code": -1, "msg": f"申请失败: {str(e)}"}
+            return _err(f"申请失败: {str(e)}")
 
     def list_unlimit_applications(self,
                                   status: Optional[str] = None,
@@ -355,10 +353,10 @@ class MaterialMgr:
             if result.get('code') != 0:
                 return _err(f"查询失败: {result.get('msg')}", {})
             apps = result.get('data', {}).get('data', [])
-            return {"code": 0, "msg": "ok", "data": {"applications": apps, "total": len(apps)}}
+            return _ok({"applications": apps, "total": len(apps)})
         except Exception as e:
             log.error(f"列出不限时申请失败: {e}")
-            return {"code": -1, "msg": f"查询失败: {str(e)}"}
+            return _err(f"查询失败: {str(e)}")
 
     def approve_unlimit(self, ids: List[int]) -> Dict[str, Any]:
         """批量审批通过不限时申请。"""
@@ -390,10 +388,10 @@ class MaterialMgr:
                 approved_count += 1
 
             log.info(f"不限时审批通过: ids={ids} approved={approved_count} not_found={not_found_ids}")
-            return {"code": 0, "msg": "ok", "data": {"approved": approved_count, "not_found": not_found_ids}}
+            return _ok({"approved": approved_count, "not_found": not_found_ids})
         except Exception as e:
             log.error(f"不限时审批失败: {e}")
-            return {"code": -1, "msg": f"审批失败: {str(e)}"}
+            return _err(f"审批失败: {str(e)}")
 
     def deny_unlimit(self, ids: List[int]) -> Dict[str, Any]:
         """批量拒绝不限时申请。"""
@@ -419,10 +417,10 @@ class MaterialMgr:
                 denied_count += 1
 
             log.info(f"不限时申请已拒绝: ids={ids} denied={denied_count} not_found={not_found_ids}")
-            return {"code": 0, "msg": "ok", "data": {"denied": denied_count, "not_found": not_found_ids}}
+            return _ok({"denied": denied_count, "not_found": not_found_ids})
         except Exception as e:
             log.error(f"不限时拒绝失败: {e}")
-            return {"code": -1, "msg": f"拒绝失败: {str(e)}"}
+            return _err(f"拒绝失败: {str(e)}")
 
 
 material_mgr = MaterialMgr()

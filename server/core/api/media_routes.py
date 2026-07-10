@@ -39,7 +39,8 @@ class _SaveResultBody(BaseModel):
 
 
 class _CreateConvertTaskBody(BaseModel):
-    name: str = Field(default_factory=lambda: datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    name: str = Field(
+        default_factory=lambda: datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     output_dir: str | None = None
     overwrite: bool | None = None
     source_type: str | None = None
@@ -226,7 +227,8 @@ def retry_recognize_subtitle_task() -> ResponseReturnValue:
 
 
 class _CreateMediaTaskBody(BaseModel):
-    name: str = Field(default_factory=lambda: datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    name: str = Field(
+        default_factory=lambda: datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
 
 @media_bp.route("/media/merge/create", methods=['POST'])
@@ -241,7 +243,8 @@ def create_media_task() -> ResponseReturnValue:
     """
     try:
         data = read_json_from_request()
-        body, err = parse_with_model(_CreateMediaTaskBody, data, err_factory=_err)
+        body, err = parse_with_model(
+            _CreateMediaTaskBody, data, err_factory=_err)
         if err or not body:
             return err or _err("Invalid request body")
         name = body.name
@@ -287,7 +290,8 @@ def upload_file() -> ResponseReturnValue:
     """
     try:
         args_data = {**request.form.to_dict(), **request.args.to_dict()}
-        validated_args, err = parse_with_model(_UploadFileArgs, args_data, err_factory=_err)
+        validated_args, err = parse_with_model(
+            _UploadFileArgs, args_data, err_factory=_err)
         if err or not validated_args:
             return err or _err("Invalid request arguments")
         task_id = validated_args.task_id
@@ -367,7 +371,8 @@ def add_file_by_path() -> ResponseReturnValue:
     """
     try:
         data = read_json_from_request() or request.form.to_dict()
-        body, err = parse_with_model(_AddFileByPathBody, data, err_factory=_err)
+        body, err = parse_with_model(
+            _AddFileByPathBody, data, err_factory=_err)
         if err or not body:
             return err or _err("Invalid request body")
         task_id = body.task_id
@@ -586,7 +591,8 @@ def download_result() -> ResponseReturnValue:
         Exception: I/O 异常或服务内部异常会被捕获并转换为错误响应。
     """
     try:
-        args, err = parse_with_model(_TaskIdBody, request.args.to_dict(), err_factory=_err)
+        args, err = parse_with_model(
+            _TaskIdBody, request.args.to_dict(), err_factory=_err)
         if err or not args:
             return err or _err("Invalid request arguments")
         task_id = args.task_id
@@ -634,7 +640,8 @@ def save_result() -> ResponseReturnValue:
         target_path = body.target_path
 
         # 验证目标路径
-        normalized_path, error_msg = validate_and_normalize_path(target_path, must_be_file=False)
+        normalized_path, error_msg = validate_and_normalize_path(
+            target_path, must_be_file=False)
         if not normalized_path:
             return _err(error_msg or "目标路径无效")
         target_path = normalized_path
@@ -707,7 +714,8 @@ def create_convert_task() -> ResponseReturnValue:
     """
     try:
         data = read_json_from_request()
-        body, err = parse_with_model(_CreateConvertTaskBody, data, err_factory=_err)
+        body, err = parse_with_model(
+            _CreateConvertTaskBody, data, err_factory=_err)
         if err or not body:
             return err or _err("Invalid request body")
         name = body.name
@@ -742,7 +750,8 @@ def upload_convert_files() -> ResponseReturnValue:
             return err or _err("Invalid request body")
 
         task_id = body.task_id
-        files = request.files.getlist('file') or request.files.getlist('files[]')
+        files = request.files.getlist(
+            'file') or request.files.getlist('files[]')
         code, msg = audio_convert_mgr.upload_files(task_id, files)
         if code != 0:
             return _err(msg)
@@ -829,11 +838,13 @@ def update_convert_task() -> ResponseReturnValue:
         # 至少需要提供一个要更新的字段
         output_dir_raw = data.get('output_dir')
         # 确保 output_dir 是字符串类型或 None
-        output_dir = str(output_dir_raw) if output_dir_raw is not None else None
+        output_dir = str(
+            output_dir_raw) if output_dir_raw is not None else None
 
         overwrite_raw = data.get('overwrite')
         source_type_raw = data.get('source_type')
-        source_type = str(source_type_raw) if source_type_raw is not None else None
+        source_type = str(
+            source_type_raw) if source_type_raw is not None else None
         # 将字符串形式的布尔值转换为真正的布尔类型
         if overwrite_raw is not None:
             if isinstance(overwrite_raw, bool):
@@ -849,7 +860,8 @@ def update_convert_task() -> ResponseReturnValue:
 
         # 验证目录路径（如果提供了）
         if directory is not None:
-            normalized_path, error_msg = validate_and_normalize_path(directory, must_be_file=False)
+            normalized_path, error_msg = validate_and_normalize_path(
+                directory, must_be_file=False)
             if not normalized_path:
                 return _err(error_msg or "目录路径无效")
             directory = normalized_path
@@ -908,7 +920,8 @@ def download_convert_file() -> ResponseReturnValue:
         if not task_id or not output_path:
             return _err("task_id 和 output_path 参数不能为空")
 
-        output_file, err = audio_convert_mgr.get_convert_output_file(task_id, output_path)
+        output_file, err = audio_convert_mgr.get_convert_output_file(
+            task_id, output_path)
         if err or not output_file:
             return _err(err or "文件不存在")
 

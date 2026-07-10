@@ -2,6 +2,11 @@
 通用工具函数
 包含异步工具函数和其他通用工具函数
 """
+from core.config import app_logger, config
+from werkzeug.utils import secure_filename
+from queue import Queue, Empty
+from flask import request
+from urllib.parse import quote, unquote
 import os
 import stat
 import subprocess
@@ -37,43 +42,11 @@ class FileInfo(TypedDict, total=False):
     output_path: str
 
 
-from urllib.parse import quote, unquote
-from flask import request
-from queue import Queue, Empty
-from werkzeug.utils import secure_filename
-
-from core.config import app_logger, config
-
 log = app_logger
 
 
-def ok_response(data: Any = None) -> Dict[str, Any]:
-    """返回成功响应。
-
-    Args:
-        data: 响应数据，可选。
-
-    Returns:
-        成功响应字典。
-    """
-    return {"code": 0, "msg": "ok", "data": data}
-
-
-def err_response(message: str) -> Dict[str, Any]:
-    """返回错误响应。
-
-    Args:
-        message: 错误消息。
-
-    Returns:
-        错误响应字典。
-    """
-    return {"code": -1, "msg": message}
-
-
-# 为了保持向后兼容，提供别名
-_ok = ok_response
-_err = err_response
+def _ok(data=None): return {"code": 0, "msg": "ok", "data": data}
+def _err(message, data=None): return {"code": -1, "msg": message, "data": data}
 
 
 def get_json_body() -> Dict[str, Any]:
@@ -99,7 +72,8 @@ def read_json_from_request() -> Dict[str, Any]:
             return json.loads(raw_data.decode('utf-8'))
         return {}
     except Exception as e:
-        log.warning(f"[read_json_from_request] 读取 JSON 失败，降级到 request.get_json(): {e}")
+        log.warning(
+            f"[read_json_from_request] 读取 JSON 失败，降级到 request.get_json(): {e}")
         try:
             return request.get_json(silent=True) or {}
         except Exception:
@@ -224,7 +198,8 @@ def get_media_duration(file_path: str) -> Optional[int]:
                     try:
                         # 尝试解析整个输出（通常是单行浮点数）
                         duration = float(stdout)
-                        result_container['duration'] = int(duration) if duration else None
+                        result_container['duration'] = int(
+                            duration) if duration else None
                         # 如果成功解析，即使返回码非0也认为成功
                         return
                     except (ValueError, TypeError):
@@ -236,7 +211,8 @@ def get_media_duration(file_path: str) -> Optional[int]:
                                 continue
                             try:
                                 duration = float(line)
-                                result_container['duration'] = int(duration) if duration else None
+                                result_container['duration'] = int(
+                                    duration) if duration else None
                                 return
                             except (ValueError, TypeError):
                                 continue
@@ -270,8 +246,10 @@ def get_media_duration(file_path: str) -> Optional[int]:
 
     # 检查结果
     if result_container['error']:
-        cmd_info = f", command: {result_container['command']}" if result_container.get('command') else ""
-        log.warning(f"[Utils] Error getting media duration for {file_path}: {result_container['error']}{cmd_info}")
+        cmd_info = f", command: {result_container['command']}" if result_container.get(
+            'command') else ""
+        log.warning(
+            f"[Utils] Error getting media duration for {file_path}: {result_container['error']}{cmd_info}")
         return None
 
     return result_container['duration']
@@ -380,7 +358,8 @@ def validate_and_normalize_path(file_path: str,
         return None, "Invalid path: Path traversal not allowed"
 
     if not os.path.isabs(file_path):
-        file_path = os.path.normpath(os.path.join(base_dir, file_path.lstrip('/')))
+        file_path = os.path.normpath(
+            os.path.join(base_dir, file_path.lstrip('/')))
     else:
         file_path = os.path.normpath(file_path)
 
@@ -420,7 +399,8 @@ def get_media_url(local_path: str) -> str:
             filepath = local_path
 
         # URL 编码路径
-        encoded_path = '/'.join(quote(part, safe='') for part in filepath.split('/'))
+        encoded_path = '/'.join(quote(part, safe='')
+                                for part in filepath.split('/'))
 
         # 获取服务器URL（使用固定地址）
         base_url = _get_media_server_url()
@@ -508,7 +488,8 @@ def check_cron_will_trigger_today(cron_expression: str) -> bool:
         parts = cron_expression.strip().split()
         if len(parts) == 6:
             second, minute, hour, day, month, day_of_week = parts
-            converted_day_of_week = convert_standard_cron_weekday_to_apscheduler(day_of_week)
+            converted_day_of_week = convert_standard_cron_weekday_to_apscheduler(
+                day_of_week)
             trigger = CronTrigger(second=second,
                                   minute=minute,
                                   hour=hour,
@@ -517,8 +498,10 @@ def check_cron_will_trigger_today(cron_expression: str) -> bool:
                                   day_of_week=converted_day_of_week)
         elif len(parts) == 5:
             minute, hour, day, month, day_of_week = parts
-            converted_day_of_week = convert_standard_cron_weekday_to_apscheduler(day_of_week)
-            trigger = CronTrigger(minute=minute, hour=hour, day=day, month=month, day_of_week=converted_day_of_week)
+            converted_day_of_week = convert_standard_cron_weekday_to_apscheduler(
+                day_of_week)
+            trigger = CronTrigger(
+                minute=minute, hour=hour, day=day, month=month, day_of_week=converted_day_of_week)
         else:
             return False
 
@@ -816,7 +799,8 @@ def run_subprocess_safe(cmd: List[str],
     def _run():
         """在线程中使用 os.system + 临时文件运行命令，完全避免 gevent 的 subprocess patch"""
         try:
-            _run_with_os_system(cmd, timeout, env, cwd, result_queue, error_queue)
+            _run_with_os_system(cmd, timeout, env, cwd,
+                                result_queue, error_queue)
         except Exception as e:
             error_queue.put(e)
 
@@ -859,8 +843,10 @@ def _run_with_os_system(cmd_list: List[str], timeout_val: float, env_dict: Optio
             returncode_path = tmp_rc.name
 
         # 构建并执行命令
-        shell_cmd = _build_shell_command(cmd_list, env_dict, cwd_path, stdout_path, stderr_path, returncode_path)
-        returncode = _execute_with_timeout(shell_cmd, timeout_val, cmd_list, error_q)
+        shell_cmd = _build_shell_command(
+            cmd_list, env_dict, cwd_path, stdout_path, stderr_path, returncode_path)
+        returncode = _execute_with_timeout(
+            shell_cmd, timeout_val, cmd_list, error_q)
 
         if returncode is None:  # 超时或出错
             return
@@ -905,7 +891,8 @@ def _build_windows_command(quoted_cmd: str, env_dict: Optional[Dict[str, str]], 
             full_cmd_parts.append(f'set {k}={shlex.quote(v)}')
 
     # 执行命令并重定向输出
-    full_cmd_parts.append(f'{quoted_cmd} > {shlex.quote(stdout_path)} 2> {shlex.quote(stderr_path)}')
+    full_cmd_parts.append(
+        f'{quoted_cmd} > {shlex.quote(stdout_path)} 2> {shlex.quote(stderr_path)}')
 
     # 捕获返回码
     full_cmd_parts.append(
