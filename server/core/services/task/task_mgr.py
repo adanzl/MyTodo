@@ -171,7 +171,8 @@ class TaskMgr:
             all_days_summary = {k: [m.get('id') for m in v if isinstance(m, dict)] for k, v in daily_materials.items() if isinstance(v, list)}
             log.info(
                 f"[finish_material] task_id={task_id}, material_id={material_id}, date={date_str}, "
-                f"user_id={user_id}, type={task.get('type', 0)}, workday_idx={workday_idx}, "
+                f"user_id={user_id}, type={task.get('type', 0)}, start_date={start_date_str}, "
+                f"rest_days={task.get('rest_days')}, duration={duration}, workday_idx={workday_idx}, "
                 f"materials_index={materials_index}, day_material_ids={day_material_ids}, "
                 f"all_days_summary={all_days_summary}"
             )
