@@ -444,7 +444,7 @@ const showUnlockAlert = async () => {
                 role: 'cancel',
             },
             {
-                text: '1小时',
+                text: '申请',
                 handler: async () => {
                     await doRequestUnlock(60);
                 },
