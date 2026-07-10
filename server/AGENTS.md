@@ -16,7 +16,10 @@
 
 ## SSH
 
-主机名：局域网 mini 或者 (57c42474b0ea.ofalias.net 端口 58186)
+主机
+- 局域网 mini
+- 广域网 57c42474b0ea.ofalias.net:58186
+- 广域网 
 用户名 leo
 密码 见.env 里的 SSH_PASSWORD
 工作目录 /mnt/data/project/MyTodo/server
