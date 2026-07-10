@@ -173,7 +173,7 @@ const fetchList = async () => {
 const fetchActiveList = async () => {
   activeLoading.value = true;
   try {
-    activeList.value = await getUnlimitList('approved', dayjs().format('YYYY-MM-DD HH:mm:ss'));
+    activeList.value = await getUnlimitList('approved', dayjs().format('YYYY-MM-DDTHH:mm:ss+08:00'));
     await refreshMaterialNames();
   } catch (error: any) {
     ElMessage.error(error.message || "获取生效中列表失败");
