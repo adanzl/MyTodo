@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 import core.db.rds_mgr as rds_mgr
 from core.config import app_logger
 from core.db.db_mgr import db_mgr
+from core.utils import fmt_ts
 
 log = app_logger
 
@@ -65,6 +66,7 @@ class LotteryMgr:
                 'status': 1,
                 'wish': 1 if gift.get('_from_wish') else 0,
                 'msg': msg,
+                'dt': fmt_ts(),
             })
             if ret.get('code') != 0:
                 log.error(f"写入礼物历史失败 [user_id={user_id}, gift_id={gift_id}]: {ret.get('msg')}")
