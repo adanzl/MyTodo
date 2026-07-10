@@ -15,6 +15,7 @@ from .rest_days import parse_rest_days, is_rest_day, get_workday_index, end_date
 log = app_logger
 
 TABLE_TASK = 't_task'
+TABLE_MATERIAL = 't_material'
 
 
 class TaskMgr:
@@ -223,7 +224,7 @@ class TaskMgr:
 
     @staticmethod
     def _get_today_materials(task: Dict[str, Any], date_str: str) -> List[Dict[str, Any]]:
-        """根据日期计算任务当天应显示的素材列表。"""
+        """根据日期计算任务当天应显示的素材列表，返回完整素材详情。"""
         try:
             start_date_str = task.get('start_date', '')
             if not start_date_str:
@@ -236,13 +237,49 @@ class TaskMgr:
 
             rule = parse_rest_days(task.get('rest_days'))
             workday_idx = get_workday_index(start_date_d, target_d, rule)
-            if workday_idx < 0 or workday_idx >= duration:
+            if workday_idx < 0:
                 return []
 
             task_data = json.loads(task.get('data') or '{}')
             daily_materials = task_data.get('dailyMaterials', {})
             materials_index = 0 if task.get('type', 0) == 1 else workday_idx
-            return daily_materials.get(str(materials_index), [])
+
+            # 越界时取最后一天的素材
+            if materials_index >= duration:
+                materials_index = duration - 1
+
+            save_list = daily_materials.get(str(materials_index), [])
+            if not save_list:
+                return []
+
+            # 批量查询完整素材详情
+            ids = [int(s['id']) for s in save_list if s.get('id')]
+            if not ids:
+                return []
+            mat_res = db_mgr.get_list(TABLE_MATERIAL, page_num=1, page_size=len(ids),
+                                      conditions={'id': {'in': ids}})
+            materials = mat_res.get('data', {}).get('data', []) if mat_res.get('code') == 0 else []
+
+            # 按 id 构建映射
+            mat_map = {}
+            for m in materials:
+                mat_map[m['id']] = m
+                # 解析 data 字段
+                if isinstance(m.get('data'), str):
+                    try:
+                        m['data'] = json.loads(m['data'])
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+
+            # 按 save_list 顺序组装并合并 status
+            result = []
+            for save in save_list:
+                material = mat_map.get(int(save['id']))
+                if material:
+                    material = dict(material)
+                    material['status'] = save.get('status', {})
+                    result.append(material)
+            return result
         except Exception:
             return []
 

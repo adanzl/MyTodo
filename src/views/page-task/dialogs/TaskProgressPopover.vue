@@ -40,10 +40,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { IonContent } from '@ionic/vue';
-import type { Task } from '@/api/api-task';
+import type { TaskWithMaterials } from '@/api/api-task';
 
 const props = defineProps<{
-  tasks: Task[];
+  tasks: TaskWithMaterials[];
   userId: number;
 }>();
 
@@ -56,8 +56,8 @@ interface TaskProgress {
   todayScore: number;
 }
 
-// 计算任务进度（直接使用后端计算的 today_materials）
-const calculateTaskProgress = (task: Task, userId: number): TaskProgress => {
+// 计算任务进度（直接使用 today_materials）
+const calculateTaskProgress = (task: TaskWithMaterials, userId: number): TaskProgress => {
   try {
     const materials = task.today_materials || [];
     
@@ -69,7 +69,7 @@ const calculateTaskProgress = (task: Task, userId: number): TaskProgress => {
     const totalMaterials = materials.length;
     const progressPercent = totalMaterials > 0 ? (completedMaterials / totalMaterials) * 100 : 0;
     
-    // todayScore 待后端扩展 today_score 字段后支持
+    // todayScore 待后端扩展后支持
     const todayScore = 0;
     
     return {

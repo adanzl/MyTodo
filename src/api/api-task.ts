@@ -21,7 +21,14 @@ export interface Task {
   data: string | TaskDetail;
   lock?: boolean; // 任务是否被锁定
   msg?: string; // 锁定提示信息
-  today_materials?: Array<{ id: number; name: string; type: number; status?: Record<string, number> }>; // 后端计算的当天素材列表
+  todayIdx?: number; // 后端计算的工作日索引（扣除休息日），越界时取最后一天
+}
+
+/**
+ * 任务（含当天完整素材详情）
+ */
+export interface TaskWithMaterials extends Task {
+  today_materials: MaterialItem[]; // 当天素材完整信息（含 path、data 等）
 }
 
 /**
@@ -94,82 +101,32 @@ export interface MaterialItem {
  * 获取任务列表
  * @param userId - 用户ID
  * @param pageNum - 页码，默认1
- * @param pageSize - 每页数量，默认20
- * @param startDate - 开始日期（可选，格式 YYYY-MM-DD）
- * @param endDate - 结束日期（可选，格式 YYYY-MM-DD）
+ * @param pageSize - 每页数量，默认100
+ * @param startDate - 日期（格式 YYYY-MM-DD）
  */
 export async function getTaskList(
-  userId?: number,
+  userId: number,
   pageNum: number = 1,
-  pageSize: number = 20,
-  startDate?: string,
-  endDate?: string
-): Promise<ApiResponse<ApiPagedResponse<Task>>> {
-  // 如果有 userId 和 startDate，使用新的带锁定状态的 API
-  if (userId && userId > 0 && startDate) {
-    const rsp = await apiClient.get<ApiResponse<ApiPagedResponse<Task>>>("/task/list", {
-      params: {
-        userId,
-        startDate,
-        pageNum,
-        pageSize,
-      },
-    });
-
-    if (rsp.data.code !== 0) {
-      throw new Error(rsp.data.msg || "获取任务列表失败");
-    }
-
-    // 解析 data 字段
-    const tasks = rsp.data.data?.data || [];
-    rsp.data.data!.data = tasks.map(task => ({
-      ...task,
-      data: typeof task.data === 'string' ? JSON.parse(task.data) : task.data,
-    }));
-
-    return rsp.data;
-  }
-  
-  // 否则使用原有的通用 API
-  const params: any = {
-    table: "t_task",
-    pageNum,
-    pageSize,
-  };
-
-  // 构建条件
-  const conditions: any = {};
-  
-  if (userId && userId > 0) {
-    // 使用 LIKE 条件匹配 user_id 字段（如 "3,4" 中包含 "3"）
-    conditions.user_id = { like: `%${userId}%` };
-  }
-  
-  if (startDate) {
-    conditions.start_date = { '<=': startDate };
-  }
-  
-  if (endDate) {
-    conditions.end_date = { '>=': endDate };
-  }
-  
-  if (Object.keys(conditions).length > 0) {
-    params.conditions = JSON.stringify(conditions);
-  }
-
-  const rsp = await apiClient.get<ApiResponse<ApiPagedResponse<Task>>>("/getAll", {
-    params,
+  pageSize: number = 100,
+  startDate: string
+): Promise<ApiResponse<ApiPagedResponse<TaskWithMaterials>>> {
+  const rsp = await apiClient.get<ApiResponse<ApiPagedResponse<TaskWithMaterials>>>("/task/list", {
+    params: { userId, startDate, pageNum, pageSize },
   });
 
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg || "获取任务列表失败");
   }
 
-  // 解析 data 字段
+  // 解析 data 和 today_materials 字段
   const tasks = rsp.data.data?.data || [];
   rsp.data.data!.data = tasks.map(task => ({
     ...task,
     data: typeof task.data === 'string' ? JSON.parse(task.data) : task.data,
+    today_materials: (task.today_materials || []).map(m => ({
+      ...m,
+      data: typeof m.data === 'string' ? JSON.parse(m.data) : m.data,
+    })),
   }));
 
   return rsp.data;
