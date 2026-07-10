@@ -468,7 +468,7 @@ const doRequestUnlock = async (duration: number) => {
             header: res.replaced ? '申请已更新' : '申请已提交',
             message: res.replaced
                 ? '已有待审批申请，已更新为最新提交，等待管理员审批后生效'
-                : '不限时申请已提交，等待管理员审批后生效',
+                : '申请已提交，等待管理员审批后生效',
             buttons: ['确定'],
         });
         await successAlert.present();

@@ -544,16 +544,22 @@ export interface UnlimitApplication {
   created_at: string;
   approved_at?: string;
   denied_at?: string;
+  expires_at?: string;
   reason?: string;
+  lock_code?: number;
 }
 
 /**
  * 获取不限时申请列表
  * @param status - 状态过滤，默认 'pending'
  */
-export async function getUnlimitList(status: string = "pending"): Promise<UnlimitApplication[]> {
+export async function getUnlimitList(status: string = "pending", expiresAt?: string): Promise<UnlimitApplication[]> {
+  const params: Record<string, any> = { status };
+  if (expiresAt) {
+    params.expiresAt = expiresAt;
+  }
   const response = await api.get("/material/unlimit/list", {
-    params: { status },
+    params,
   });
   if (response.data.code !== 0) {
     throw new Error(response.data.msg || "获取不限时申请列表失败");

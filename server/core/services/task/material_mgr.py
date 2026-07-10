@@ -26,7 +26,6 @@ TABLE_MATERIAL_CATEGORY = 't_material_category'
 TABLE_UNLIMIT = 't_material_unlimit'
 
 
-
 class MaterialMgr:
     """素材管理器"""
 
@@ -50,7 +49,8 @@ class MaterialMgr:
                 },
             }
             # 1/2=用户级不限时
-            r = db_mgr.get_list(TABLE_UNLIMIT, page_size=1, conditions={**base, 'lock_code': {'in': [1, 2]}})
+            r = db_mgr.get_list(TABLE_UNLIMIT, page_size=1, conditions={
+                                **base, 'lock_code': {'in': [1, 2]}})
             if r.get('code') == 0 and r.get('data', {}).get('data'):
                 return r['data']['data'][0]
             # 3=素材级不限时，需匹配素材和任务
@@ -86,7 +86,8 @@ class MaterialMgr:
                             children_ids.extend(get_all_children_ids(child_id))
                 return children_ids
 
-            all_category_ids = [category_id] + get_all_children_ids(category_id)
+            all_category_ids = [category_id] + \
+                get_all_children_ids(category_id)
 
             # 不删除素材：检查是否有素材
             if not delete_materials:
@@ -106,7 +107,8 @@ class MaterialMgr:
                                                        page_size=1000,
                                                        conditions={'cate_id': cat_id})
                     if materials_result.get('code') == 0:
-                        materials = materials_result.get('data', {}).get('data', [])
+                        materials = materials_result.get(
+                            'data', {}).get('data', [])
                         for material in materials:
                             material_id = material.get('id')
                             if material_id is not None:
@@ -140,11 +142,13 @@ class MaterialMgr:
             visited = set()
             while current_id != -1 and current_id not in visited:
                 visited.add(current_id)
-                category = db_mgr.get_data(TABLE_MATERIAL_CATEGORY, current_id, '*')
+                category = db_mgr.get_data(
+                    TABLE_MATERIAL_CATEGORY, current_id, '*')
                 if category.get('code') != 0 or not category.get('data'):
                     break
                 cat_data = category['data']
-                chain.append({"id": cat_data['id'], "name": cat_data['name'], "parent": cat_data.get('parent', -1)})
+                chain.append(
+                    {"id": cat_data['id'], "name": cat_data['name'], "parent": cat_data.get('parent', -1)})
                 current_id = cat_data.get('parent', -1)
 
             chain.append({"id": -1, "name": "根目录", "parent": None})
@@ -174,7 +178,22 @@ class MaterialMgr:
             now = datetime.now()
             date_str = now.strftime('%Y-%m-%d')
 
-            # 1. 先检查任务级 block_time（任务配置优先于全局）
+            # 先查询素材基本信息（type, duration, path），后续多种检查都可能用到
+            res = db_mgr.get_data(
+                TABLE_MATERIAL, material_id, 'type,duration,statistics,path')
+            if res.get('code') != 0:
+                return _err("素材不存在", {"lock": MaterialMgr.LOCK_CODE_NONE})
+
+            mat = res['data']
+            material_duration = mat.get('duration')
+
+            # 0. 优先检查是否存在有效的不限时记录——通过审批后应无视所有锁定
+            active_unlimit = MaterialMgr._get_active_unlimit(
+                user_id, material_id, task_id)
+            if active_unlimit:
+                return _ok({"lock": MaterialMgr.LOCK_CODE_NONE, "duration": material_duration, "unlimit": True})
+
+            # 1. 检查任务级 block_time（任务配置优先于全局）
             if task_id and task_id > 0:
                 task_res = db_mgr.get_data(TABLE_TASK, task_id, 'block_time')
                 if task_res.get('code') == 0 and task_res.get('data'):
@@ -198,35 +217,27 @@ class MaterialMgr:
                 if is_global_block_time_now(date_str, user_id, now=now):
                     return _ok({"lock": MaterialMgr.LOCK_CODE_GLOBAL_BLOCK, "reason": "当前处于全局禁用时段"})
 
-            res = db_mgr.get_data(TABLE_MATERIAL, material_id, 'type,duration,statistics,path')
-            if res.get('code') != 0:
-                return _err("素材不存在", {"lock": MaterialMgr.LOCK_CODE_NONE})
-
-            mat = res['data']
+            # 非视频类型不检查时长锁定
             if mat.get('type') != 1:
                 return _ok({"lock": MaterialMgr.LOCK_CODE_NONE})
 
-            material_duration = mat.get('duration')
             if not material_duration:
                 path = mat.get('path')
                 if path:
-                    app = current_app._get_current_object()  # type: ignore[attr-defined]
+                    app = current_app._get_current_object()  # pyright: ignore[reportAttributeAccessIssue]
                     mid = material_id
 
                     def _fetch(fp=path, m_id=mid):
                         with app.app_context():
-                            p, _ = validate_and_normalize_path(fp, DEFAULT_BASE_DIR, must_be_file=True)
+                            p, _ = validate_and_normalize_path(
+                                fp, DEFAULT_BASE_DIR, must_be_file=True)
                             d = get_media_duration(p) if p else None
                             if d:
-                                db_mgr.set_data(TABLE_MATERIAL, {'id': m_id, 'duration': d})
+                                db_mgr.set_data(TABLE_MATERIAL, {
+                                                'id': m_id, 'duration': d})
 
                     run_in_background(_fetch)
                 return _ok({"lock": MaterialMgr.LOCK_CODE_NONE})
-
-            # 检查是否存在有效的不限时记录
-            active_unlimit = MaterialMgr._get_active_unlimit(user_id, material_id, task_id)
-            if active_unlimit:
-                return _ok({"lock": MaterialMgr.LOCK_CODE_NONE, "duration": material_duration, "unlimit": True})
 
             stats = mat.get('statistics') or {}
             if isinstance(stats, str):
@@ -273,7 +284,8 @@ class MaterialMgr:
                     'material_id': material_id,
                     'task_id': task_id,
                 }
-                pending_res = db_mgr.get_list(TABLE_UNLIMIT, page_size=10, conditions=cond)
+                pending_res = db_mgr.get_list(
+                    TABLE_UNLIMIT, page_size=10, conditions=cond)
             else:
                 # 1/2=禁用时段：按 user_id 去重（不限素材/任务）
                 pending_res = db_mgr.get_list(TABLE_UNLIMIT,
@@ -349,7 +361,8 @@ class MaterialMgr:
             if expires_at:
                 conditions['expires_at'] = {'>': expires_at}
 
-            result = db_mgr.get_list(TABLE_UNLIMIT, page_size=1000, conditions=conditions)
+            result = db_mgr.get_list(
+                TABLE_UNLIMIT, page_size=1000, conditions=conditions)
             if result.get('code') != 0:
                 return _err(f"查询失败: {result.get('msg')}", {})
             apps = result.get('data', {}).get('data', [])
@@ -387,7 +400,8 @@ class MaterialMgr:
 
                 approved_count += 1
 
-            log.info(f"不限时审批通过: ids={ids} approved={approved_count} not_found={not_found_ids}")
+            log.info(
+                f"不限时审批通过: ids={ids} approved={approved_count} not_found={not_found_ids}")
             return _ok({"approved": approved_count, "not_found": not_found_ids})
         except Exception as e:
             log.error(f"不限时审批失败: {e}")
@@ -416,7 +430,8 @@ class MaterialMgr:
                 })
                 denied_count += 1
 
-            log.info(f"不限时申请已拒绝: ids={ids} denied={denied_count} not_found={not_found_ids}")
+            log.info(
+                f"不限时申请已拒绝: ids={ids} denied={denied_count} not_found={not_found_ids}")
             return _ok({"denied": denied_count, "not_found": not_found_ids})
         except Exception as e:
             log.error(f"不限时拒绝失败: {e}")
