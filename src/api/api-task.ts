@@ -465,13 +465,19 @@ export async function listUnlimitApplications(
 /**
  * 批量审批通过不限时申请
  * @param ids - 申请ID列表
+ * @param duration - 自定义不限时时长（分钟），不传则使用申请时的值
  */
 export async function approveUnlimitApplications(
-  ids: number[]
+  ids: number[],
+  duration?: number
 ): Promise<{ approved: number; not_found: number[] }> {
+  const body: Record<string, any> = { ids };
+  if (duration !== undefined) {
+    body.duration = duration;
+  }
   const rsp = await apiClient.post<ApiResponse<{ approved: number; not_found: number[] }>>(
     "/material/unlimit/approve",
-    { ids }
+    body
   );
 
   if (rsp.data.code !== 0) {
@@ -495,6 +501,25 @@ export async function denyUnlimitApplications(
 
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg || "拒绝失败");
+  }
+
+  return rsp.data.data!;
+}
+
+/**
+ * 使生效中的不限时申请立即失效
+ * @param id - 申请ID
+ */
+export async function revokeUnlimitApplication(
+  id: number
+): Promise<{ success: boolean }> {
+  const rsp = await apiClient.post<ApiResponse<{ success: boolean }>>(
+    "/material/unlimit/revoke",
+    { id }
+  );
+
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg || "操作失败");
   }
 
   return rsp.data.data!;
