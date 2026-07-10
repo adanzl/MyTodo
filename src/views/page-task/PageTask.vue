@@ -357,7 +357,7 @@ const fetchTaskList = async (showLoading = true) => {
     }
 
     // 单次调用获取任务列表 + 当天素材详情
-    const res = await getTaskList(userId, 1, 100, selectedDateStr, selectedDateStr);
+    const res = await getTaskList(userId, 1, 100, selectedDateStr);
 
     if (res.code === 0 && res.data) {
       taskList.value = res.data.data || [];
