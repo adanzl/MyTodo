@@ -86,3 +86,12 @@ export async function getBuildStatus(): Promise<{ status: string; time: string; 
   }
   return rsp.data.data;
 }
+
+/** 获取最新 APK 版本号 */
+export async function getLatestApkVersion(path: string): Promise<{ version: string }> {
+  const rsp = await api.post<ApiResponse<{ version: string }>>("/browser/build/version", { path });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}

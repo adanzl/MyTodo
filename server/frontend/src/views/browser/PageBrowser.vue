@@ -44,6 +44,9 @@
                 <el-form-item label="App 版本">
                   <div class="flex gap-2 items-center w-full">
                     <el-input v-model="appForm.version" placeholder="如 2.3.1" class="flex-1" />
+                    <el-button type="warning" size="small" @click="handleLoadApkVersion" :loading="loadingApkVersion">
+                      加载
+                    </el-button>
                     <el-button type="primary" size="small" @click="handleSaveApp" :loading="savingApp">
                       保存
                     </el-button>
@@ -193,7 +196,7 @@
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { ArrowDown, ArrowUp, Delete, Edit, Reading, Refresh, View } from "@element-plus/icons-vue";
-import { getBrowserConfig, setBrowserConfig, publishBrowserVersion, buildBrowser, getBuildStatus } from "@/api/api-browser";
+import { getBrowserConfig, setBrowserConfig, publishBrowserVersion, buildBrowser, getBuildStatus, getLatestApkVersion } from "@/api/api-browser";
 import type { BrowserConfig, BrowserMark } from "@/api/api-browser";
 import { REMOTE, LOCAL_IP, LOCAL_HTTP_PORT } from "@/api/config";
 
@@ -210,6 +213,7 @@ const savingAdmin = ref(false);
 const savingMarks = ref(false);
 const publishing = ref(false);
 const building = ref(false);
+const loadingApkVersion = ref(false);
 const buildPath = ref('/mnt/data/project/linxi-browser');
 const buildStatus = ref<{ status: string; time: string; path: string; pid: number; log: string; alive: boolean } | null>(null);
 
@@ -345,6 +349,23 @@ const handlePublish = async () => {
     }
   } finally {
     publishing.value = false;
+  }
+};
+
+const handleLoadApkVersion = async () => {
+  if (!buildPath.value.trim()) {
+    ElMessage.warning("请先填写构建地址");
+    return;
+  }
+  loadingApkVersion.value = true;
+  try {
+    const result = await getLatestApkVersion(buildPath.value);
+    appForm.version = result.version;
+    ElMessage.success(`已加载版本: ${result.version}`);
+  } catch (e: unknown) {
+    ElMessage.error((e as Error).message || "加载版本失败");
+  } finally {
+    loadingApkVersion.value = false;
   }
 };
 

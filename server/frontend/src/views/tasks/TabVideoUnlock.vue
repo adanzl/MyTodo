@@ -18,6 +18,11 @@
       @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="45" />
       <el-table-column prop="id" label="ID" width="60" />
+      <el-table-column label="任务ID" width="80" align="center">
+        <template #default="{ row }">
+          {{ row.task_id ?? '-' }}
+        </template>
+      </el-table-column>
       <el-table-column label="用户" width="70" align="center">
         <template #default="{ row }">
           {{ getUserName(row.user_id) }}
@@ -70,6 +75,11 @@
           </template>
         </el-table-column>
         <el-table-column prop="id" label="ID" width="60" />
+        <el-table-column label="任务ID" width="80" align="center">
+          <template #default="{ row }">
+            {{ row.task_id ?? '-' }}
+          </template>
+        </el-table-column>
         <el-table-column label="用户" width="70" align="center">
           <template #default="{ row }">
             {{ getUserName(row.user_id) }}
