@@ -87,3 +87,18 @@ def publish_version() -> ResponseReturnValue:
         return _ok(data)
     except Exception as e:
         return _err(f'error: {str(e)}')
+
+
+@browser_bp.route('/browser/build/version', methods=['POST'])
+def get_latest_apk_version() -> ResponseReturnValue:
+    """获取最新 APK 版本号（从构建目录的 app/build.gradle.kts 读取）"""
+    try:
+        json_data = read_json_from_request() or {}
+        build_path = json_data.get(
+            'path', '/mnt/data/project/linxi-browser').strip()
+        code, msg, data = browser_mgr.get_latest_apk_version(build_path)
+        if code != 0:
+            return _err(msg)
+        return _ok(data)
+    except Exception as e:
+        return _err(f'error: {str(e)}')

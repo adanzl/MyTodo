@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import subprocess
 import time
 from typing import Any, Dict, Optional, Tuple
@@ -90,6 +91,26 @@ class BrowserMgr:
             log.info(f"[BrowserMgr] 版本已发布: {config_data['version']}")
             return 0, 'ok', {"version": config_data["version"]}
         return -1, '发布版本失败', {}
+
+    # ---------- APK 版本 ----------
+
+    def get_latest_apk_version(self, build_path: str = _DEFAULT_BUILD_PATH) -> Tuple[int, str, Dict[str, Any]]:
+        """从构建目录的 app/build.gradle.kts 读取最新 APK 版本号"""
+        gradle_path = os.path.join(build_path, 'app', 'build.gradle.kts')
+        try:
+            if not os.path.isfile(gradle_path):
+                return -1, f'未找到 build.gradle.kts: {gradle_path}', {}
+            with open(gradle_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            # 提取 defaultConfig 块中的 versionName
+            match = re.search(
+                r'defaultConfig\s*\{[^}]*?versionName\s*=\s*"([^"]+)"', content, re.DOTALL)
+            if not match:
+                return -1, 'build.gradle.kts 中未找到 versionName', {}
+            version = match.group(1)
+            return 0, 'ok', {'version': version}
+        except Exception as e:
+            return -1, f'读取版本失败: {str(e)}', {}
 
     # ---------- 构建管理 ----------
 
