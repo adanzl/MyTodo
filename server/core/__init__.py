@@ -21,6 +21,7 @@ patch_fake_useragent()
 
 import core.ai.ai_mgr as ai_mgr
 from core.chat.chat_mgr import chat_mgr
+from core.db import rds_mgr
 from core.db.db_mgr import db_mgr
 from core.services.scheduler_mgr import scheduler_mgr
 from core.config import config, app_logger, access_logger
@@ -244,6 +245,10 @@ def create_app():
 
     # 初始化定时任务调度器
     scheduler_mgr.start()
+
+    # 如果 Redis 不可用（本地回退模式），启动定时恢复检查
+    rds_mgr.start_restore_timer()
+
     return app
 
 
