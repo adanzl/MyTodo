@@ -79,8 +79,8 @@ class PicMgr:
                 fpath = os.path.join(self._base_dir, f)
                 if not os.path.isfile(fpath):
                     continue
-                fbase = self._get_base_name_from_filename(f)
-                if fbase == base_name:
+                file_base = self._get_base_name_from_filename(f)
+                if file_base == base_name:
                     result.append(fpath)
         except OSError as e:
             log.warning(f"[Pic] 列出目录失败: {e}")
