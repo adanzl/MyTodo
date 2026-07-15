@@ -19,6 +19,7 @@ _REDIS_KEY = 'browser:config'
 _BUILD_STATUS_KEY = 'browser:build:status'
 _TS_FMT = '%Y-%m-%d %H:%M:%S'
 _DEFAULT_BUILD_PATH = '/mnt/data/project/linxi-browser'
+_LOG_FILE = '/tmp/browser-build.log'
 
 
 class BrowserMgr:
@@ -124,8 +125,8 @@ class BrowserMgr:
         if existing_pid and self._is_pid_alive(existing_pid):
             return -1, f'已有构建任务在运行中 (pid={existing_pid})', {}
 
-        # 日志放到 /tmp，避免被 git clean -fd 删除
-        log_file = f'/tmp/browser-build-{int(time.time())}.log'
+        # 固定日志路径，覆盖写入（每次构建从头开始）
+        log_file = _LOG_FILE
 
         # 将整个流程包装为一个后台脚本，输出全部写入日志文件
         # 使用 bash -l 加载 .bashrc/.profile 环境变量
@@ -188,6 +189,17 @@ class BrowserMgr:
                 status['error'] = f'退出码: {rc}\n{log_tail}' if log_tail else f'退出码: {rc}'
                 self._save_build_status(status)
         return status
+
+    def get_build_log(self) -> Dict[str, Any]:
+        """读取构建日志内容"""
+        if not os.path.isfile(_LOG_FILE):
+            return {'log': ''}
+        try:
+            with open(_LOG_FILE, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+            return {'log': content}
+        except Exception as e:
+            return {'log': f'读取日志失败: {e}'}
 
     def _get_build_pid(self) -> Optional[int]:
         """获取当前构建 PID"""
