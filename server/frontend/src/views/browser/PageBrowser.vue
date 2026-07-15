@@ -162,7 +162,7 @@
                     <span class="text-xs text-blue-500 truncate">{{ mark.url || '-' }}</span>
                   </div>
                   <el-button type="primary" plain
-                    @click="currentMarkUser = col.key; markForm.title = ''; markForm.url = 'https://'; editingMarkIndex = -1; showMarkDialog = true"
+                    @click="currentMarkUser = col.key; editingMarkIndex = -1; showMarkDialog = true"
                     size="small">添加书签</el-button>
                 </div>
               </div>
@@ -170,30 +170,13 @@
           </el-card>
         </div>
 
-        <!-- 添加/编辑书签弹窗 -->
-        <el-dialog v-model="showMarkDialog" :title="editingMarkIndex >= 0 ? '编辑书签' : '添加书签'" width="420px">
-          <el-form :model="markForm" label-width="60px">
-            <el-form-item label="标题">
-              <el-input v-model="markForm.title" placeholder="书签名称" />
-            </el-form-item>
-            <el-form-item label="URL">
-              <el-input v-model="markForm.url" placeholder="https://..." />
-            </el-form-item>
-          </el-form>
-          <template #footer>
-            <el-button @click="showMarkDialog = false">取消</el-button>
-            <el-button type="primary" @click="confirmAddMark" :disabled="!markForm.title.trim()">
-              确定
-            </el-button>
-          </template>
-        </el-dialog>
+        <BookmarkDialog
+          v-model="showMarkDialog"
+          :editing-mark="editingMarkIndex >= 0 ? marksForm[currentMarkUser][editingMarkIndex] : null"
+          @confirm="onBookmarkConfirm"
+        />
 
-        <!-- 构建日志弹窗 -->
-        <el-dialog v-model="showLogDialog" title="构建日志" width="90%" top="20px">
-          <div class="max-h-[70vh] overflow-auto" v-loading="loadingLog">
-            <pre class="text-xs bg-gray-50 p-4 rounded whitespace-pre-wrap">{{ logContent || '暂无日志' }}</pre>
-          </div>
-        </el-dialog>
+        <BuildLogDialog v-model="showLogDialog" />
 
       </template>
     </el-skeleton>
@@ -204,7 +187,9 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { ArrowDown, ArrowUp, Delete, Edit, Reading, Refresh, View } from "@element-plus/icons-vue";
-import { getBrowserConfig, setBrowserConfig, publishBrowserVersion, buildBrowser, getBuildStatus, getBuildLog, getLatestApkVersion } from "@/api/api-browser";
+import { getBrowserConfig, setBrowserConfig, publishBrowserVersion, buildBrowser, getBuildStatus, getLatestApkVersion } from "@/api/api-browser";
+import BookmarkDialog from "./dialogs/BookmarkDialog.vue";
+import BuildLogDialog from "./dialogs/BuildLogDialog.vue";
 import type { BrowserConfig, BrowserMark } from "@/api/api-browser";
 import { REMOTE, LOCAL_IP, LOCAL_HTTP_PORT } from "@/api/config";
 
@@ -226,8 +211,6 @@ const buildPath = ref('/mnt/data/project/linxi-browser');
 const buildStatus = ref<{ status: string; time: string; path: string; pid: number; log: string; alive: boolean } | null>(null);
 
 const showLogDialog = ref(false);
-const logContent = ref('');
-const loadingLog = ref(false);
 
 // 下载地址域名切换
 const REMOTE_DOWNLOAD_DOMAIN = REMOTE.url.replace(/\/+$/, "");
@@ -260,7 +243,6 @@ const marksForm = reactive<Record<string, BrowserMark[]>>({ "3": [], "4": [] });
 const showMarkDialog = ref(false);
 const editingMarkIndex = ref(-1);
 const currentMarkUser = ref("3");
-const markForm = reactive({ title: "", url: "", position: 1 });
 
 const loadConfig = async () => {
   loading.value = true;
@@ -415,17 +397,8 @@ const loadBuildStatus = async () => {
   }
 };
 
-const handleShowLog = async () => {
+const handleShowLog = () => {
   showLogDialog.value = true;
-  loadingLog.value = true;
-  try {
-    const result = await getBuildLog();
-    logContent.value = result.log;
-  } catch {
-    logContent.value = '加载日志失败';
-  } finally {
-    loadingLog.value = false;
-  }
 };
 
 /** 替换 URL 的域名部分，保留路径和查询参数 */
@@ -480,24 +453,19 @@ const handleSaveMarks = async (userKey: string) => {
 const editMark = (userKey: string, index: number) => {
   editingMarkIndex.value = index;
   currentMarkUser.value = userKey;
-  const mark = marksForm[userKey][index];
-  markForm.title = mark.title;
-  markForm.url = mark.url;
   showMarkDialog.value = true;
 };
 
-const confirmAddMark = () => {
-  if (!markForm.title.trim()) return;
+const onBookmarkConfirm = (data: { title: string; url: string }) => {
   const userKey = currentMarkUser.value;
   const userMarks = marksForm[userKey];
   if (editingMarkIndex.value >= 0) {
-    userMarks[editingMarkIndex.value].title = markForm.title.trim();
-    userMarks[editingMarkIndex.value].url = markForm.url.trim();
+    userMarks[editingMarkIndex.value].title = data.title;
+    userMarks[editingMarkIndex.value].url = data.url;
   } else {
     const nextPos = userMarks.length > 0 ? userMarks.length + 1 : 1;
-    userMarks.push({ title: markForm.title.trim(), url: markForm.url.trim(), position: nextPos });
+    userMarks.push({ title: data.title, url: data.url, position: nextPos });
   }
-  showMarkDialog.value = false;
   handleSaveMarks(userKey);
 };
 
