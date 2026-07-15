@@ -66,17 +66,18 @@
                     <el-input v-model="buildPath" placeholder="/mnt/data/project/linxi-browser" class="flex-1" />
                     <el-button type="warning" @click="handleBuild" :loading="building">构建</el-button>
                   </div>
-                  <div v-if="buildStatus" class="flex gap-2 items-center mt-1 text-xs">
+                  <div class="flex gap-2 items-center mt-1 text-xs">
                     <el-tag
-                      :type="buildStatus.status === 'success' ? 'success' : buildStatus.status === 'failed' ? 'danger' : 'warning'"
+                      :type="buildStatus?.status === 'success' ? 'success' : buildStatus?.status === 'failed' ? 'danger' : 'warning'"
                       size="small">
-                      {{ buildStatus.status === 'building' && buildStatus.alive ? '构建中' : buildStatus.status ===
+                      {{ buildStatus?.status === 'building' && buildStatus?.alive ? '构建中' : buildStatus?.status ===
                         'success' ?
-                        '构建成功' : buildStatus.status === 'failed' ? '构建失败' : buildStatus.status || '未构建' }}
+                        '构建成功' : buildStatus?.status === 'failed' ? '构建失败' : buildStatus?.status || '未构建' }}
                     </el-tag>
-                    <span class="text-gray-400">{{ buildStatus.time }}</span>
-                    <span v-if="buildStatus.pid" class="text-gray-400">pid={{ buildStatus.pid }}</span>
+                    <span class="text-gray-400">{{ buildStatus?.time }}</span>
+                    <span v-if="buildStatus?.pid" class="text-gray-400">pid={{ buildStatus?.pid }}</span>
                     <el-button link type="primary" size="small" @click="loadBuildStatus">刷新</el-button>
+                    <el-button link type="primary" size="small" @click="handleShowLog">log</el-button>
                   </div>
                 </el-form-item>
               </el-form>
@@ -187,6 +188,13 @@
           </template>
         </el-dialog>
 
+        <!-- 构建日志弹窗 -->
+        <el-dialog v-model="showLogDialog" title="构建日志" width="90%" top="20px">
+          <div class="max-h-[70vh] overflow-auto" v-loading="loadingLog">
+            <pre class="text-xs bg-gray-50 p-4 rounded whitespace-pre-wrap">{{ logContent || '暂无日志' }}</pre>
+          </div>
+        </el-dialog>
+
       </template>
     </el-skeleton>
   </div>
@@ -196,7 +204,7 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { ArrowDown, ArrowUp, Delete, Edit, Reading, Refresh, View } from "@element-plus/icons-vue";
-import { getBrowserConfig, setBrowserConfig, publishBrowserVersion, buildBrowser, getBuildStatus, getLatestApkVersion } from "@/api/api-browser";
+import { getBrowserConfig, setBrowserConfig, publishBrowserVersion, buildBrowser, getBuildStatus, getBuildLog, getLatestApkVersion } from "@/api/api-browser";
 import type { BrowserConfig, BrowserMark } from "@/api/api-browser";
 import { REMOTE, LOCAL_IP, LOCAL_HTTP_PORT } from "@/api/config";
 
@@ -216,6 +224,10 @@ const building = ref(false);
 const loadingApkVersion = ref(false);
 const buildPath = ref('/mnt/data/project/linxi-browser');
 const buildStatus = ref<{ status: string; time: string; path: string; pid: number; log: string; alive: boolean } | null>(null);
+
+const showLogDialog = ref(false);
+const logContent = ref('');
+const loadingLog = ref(false);
 
 // 下载地址域名切换
 const REMOTE_DOWNLOAD_DOMAIN = REMOTE.url.replace(/\/+$/, "");
@@ -400,6 +412,19 @@ const loadBuildStatus = async () => {
     buildStatus.value = await getBuildStatus();
   } catch {
     // 忽略，可能还没有构建过
+  }
+};
+
+const handleShowLog = async () => {
+  showLogDialog.value = true;
+  loadingLog.value = true;
+  try {
+    const result = await getBuildLog();
+    logContent.value = result.log;
+  } catch {
+    logContent.value = '加载日志失败';
+  } finally {
+    loadingLog.value = false;
   }
 };
 

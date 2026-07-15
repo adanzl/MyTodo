@@ -77,6 +77,16 @@ def get_build_status() -> ResponseReturnValue:
         return _err(f'error: {str(e)}')
 
 
+@browser_bp.route('/browser/build/log', methods=['GET'])
+def get_build_log() -> ResponseReturnValue:
+    """获取构建日志内容"""
+    try:
+        data = browser_mgr.get_build_log()
+        return _ok(data)
+    except Exception as e:
+        return _err(f'error: {str(e)}')
+
+
 @browser_bp.route('/browser/publish', methods=['POST'])
 def publish_version() -> ResponseReturnValue:
     """发布版本：自动递增 version 并更新 publishTime"""

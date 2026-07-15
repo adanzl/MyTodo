@@ -87,6 +87,15 @@ export async function getBuildStatus(): Promise<{ status: string; time: string; 
   return rsp.data.data;
 }
 
+/** 获取构建日志内容 */
+export async function getBuildLog(): Promise<{ log: string }> {
+  const rsp = await api.get<ApiResponse<{ log: string }>>("/browser/build/log");
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data;
+}
+
 /** 获取最新 APK 版本号 */
 export async function getLatestApkVersion(path: string): Promise<{ version: string }> {
   const rsp = await api.post<ApiResponse<{ version: string }>>("/browser/build/version", { path });
