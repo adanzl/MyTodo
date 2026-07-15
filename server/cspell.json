@@ -18,6 +18,7 @@
         "journalctl",
         "Lanman",
         "linxi",
+        "localtime",
         "micli",
         "msie",
         "mypy",
