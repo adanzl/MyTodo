@@ -112,7 +112,7 @@
                 <div class="text-left font-medium mb-2 pl-2">{{ col.label }}</div>
                 <el-form label-width="80px" size="small">
                   <el-form-item label="开启">
-                    <el-switch v-model="whitelistForm[col.key].open" active-value="true" inactive-value="false" />
+                    <el-switch v-model="whitelistForm[col.key].open" active-value="true" inactive-value="false" @change="handleSaveWhitelist(col.key)" />
                   </el-form-item>
                   <el-form-item label="URL 列表">
                     <div class="w-full">
@@ -193,7 +193,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { ArrowDown, ArrowUp, Delete, Edit, Reading, Refresh, View } from "@element-plus/icons-vue";
 import { getBrowserConfig, setBrowserConfig, publishBrowserVersion, buildBrowser, getBuildStatus, getLatestApkVersion } from "@/api/api-browser";
@@ -431,10 +431,12 @@ function setLocalUrl() {
 const addUrl = (userKey: string) => {
   whitelistForm[userKey].urls.push("");
   editingUrls[userKey][whitelistForm[userKey].urls.length - 1] = true;
+  handleSaveWhitelist(userKey);
 };
 
 const removeUrl = (userKey: string, index: number) => {
   whitelistForm[userKey].urls.splice(index, 1);
+  handleSaveWhitelist(userKey);
 };
 
 const handleSaveMarks = async (userKey: string) => {
@@ -471,16 +473,19 @@ const confirmAddMark = () => {
     userMarks.push({ title: markForm.title.trim(), url: markForm.url.trim(), position: nextPos });
   }
   showMarkDialog.value = false;
+  handleSaveMarks(userKey);
 };
 
 const removeMark = (userKey: string, index: number) => {
   marksForm[userKey].splice(index, 1);
+  handleSaveMarks(userKey);
 };
 
 const reorderMarks = (userKey: string, fn: (arr: BrowserMark[]) => BrowserMark[]) => {
   const arr = fn([...marksForm[userKey]]);
   arr.forEach((m, i) => (m.position = i + 1));
   marksForm[userKey] = arr;
+  handleSaveMarks(userKey);
 };
 
 const moveMarkUp = (userKey: string, index: number) => {
@@ -505,8 +510,7 @@ const toggleEditUrl = (userKey: string, index: number) => {
     const raw = whitelistForm[userKey].urls[index];
     whitelistForm[userKey].urls[index] = raw.replace(/^https?:\/\//, "").replace(/:\d+$/, "");
     editingUrls[userKey][index] = false;
-    // 主动触发保存
-    if (whitelistLoaded && !savingWhitelist.value) {
+    if (!savingWhitelist.value) {
       handleSaveWhitelist(userKey);
     }
   } else {
@@ -514,40 +518,8 @@ const toggleEditUrl = (userKey: string, index: number) => {
   }
 };
 
-// 自动保存
-let whitelistLoaded = false;
-let marksLoaded = false;
-
-// 监听每个用户的白名单变化（编辑中不保存，退出编辑时才触发）
-for (const col of USER_COLUMNS) {
-  watch(
-    () => ({ open: whitelistForm[col.key].open, urls: [...whitelistForm[col.key].urls] }),
-    () => {
-      if (!whitelistLoaded || savingWhitelist.value) return;
-      // 有 URL 正在编辑时跳过，等退出编辑再保存
-      if (Object.values(editingUrls[col.key]).some(Boolean)) return;
-      handleSaveWhitelist(col.key);
-    },
-    { deep: true }
-  );
-}
-
-// 监听每个用户的书签变化
-for (const col of USER_COLUMNS) {
-  watch(
-    () => marksForm[col.key],
-    () => {
-      if (!marksLoaded || savingMarks.value) return;
-      handleSaveMarks(col.key);
-    },
-    { deep: true }
-  );
-}
-
 onMounted(async () => {
   await loadConfig();
   await loadBuildStatus();
-  whitelistLoaded = true;
-  marksLoaded = true;
 });
 </script>
