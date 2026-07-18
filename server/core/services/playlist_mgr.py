@@ -795,10 +795,8 @@ class PlaylistMgr:
             code, msg = self.play_next(pid)
             if code != 0:
                 log.warning(f"[PlaylistMgr] 定时器触发播放下一首失败: {pid}, {msg}")
-                self._cleanup_play_state(pid)
         except Exception as e:
             log.error(f"[PlaylistMgr] 定时器触发播放下一首异常: {pid}, {e}", exc_info=True)
-            self._cleanup_play_state(pid)
 
     def convert_playlist_to_mp3(self, playlist_id: str) -> tuple[int, str]:
         """将播放列表中的所有文件转换为MP3格式，删除原始文件并替换为新文件。
