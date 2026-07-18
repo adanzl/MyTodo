@@ -556,6 +556,8 @@ export function usePlaylistData(
    */
   const shouldSkipAutoRefresh = (isAutoRefresh: boolean): boolean => {
     if (!isAutoRefresh) return false;
+    // 正在保存播放列表时跳过，防止竞态条件
+    if (playlistLoading.value) return true;
     // 正在编辑设备配置时跳过
     if (pendingDeviceType.value !== null) return true;
     // 处于拖拽排序模式时跳过
