@@ -43,9 +43,9 @@
         @play-on-device-for-pre-file="handlePlayOnDeviceForPreFile" @delete-pre-file="handleDeletePreFile"
         @move-file-up="handleMovePlaylistItemUp" @move-file-down="handleMovePlaylistItemDown"
         @replace-file="handleReplacePlaylistItem" @open-playlist-selector-for-file="handleOpenPlaylistSelectorForFile"
-        @set-current-index-for-file="handleSetCurrentIndexForFile"
-        @play-on-device-for-file="handlePlayOnDeviceForFile" @delete-file="handleDeletePlaylistItem"
-        @remove-duplicate="handleRemoveDuplicate" @convert-mp3="handleConvertToMp3" @verify="handleVerifyPlaylist">
+        @set-current-index-for-file="handleSetCurrentIndexForFile" @play-on-device-for-file="handlePlayOnDeviceForFile"
+        @delete-file="handleDeletePlaylistItem" @remove-duplicate="handleRemoveDuplicate"
+        @convert-mp3="handleConvertToMp3" @verify="handleVerifyPlaylist">
       </PanelFileList>
 
       <!-- 第三列：配置详情（Cron + 设备） -->
@@ -744,9 +744,6 @@ const handleBatchAddFiles = async (data: {
       return playlistInfo;
     });
 
-    // 同步到 collection
-    syncActivePlaylist(playlistCollection.value);
-    await savePlaylist(playlistCollection.value);
   } catch (error) {
     logAndNoticeError(error as Error, "批量添加文件失败");
   } finally {
@@ -812,10 +809,6 @@ const handleBatchRemoveFiles = async (data: {
 
       return playlistInfo;
     });
-
-    // 同步到 collection
-    syncActivePlaylist(playlistCollection.value);
-    await savePlaylist(playlistCollection.value);
   } catch (error) {
     logAndNoticeError(error as Error, "批量删除文件失败");
   } finally {
