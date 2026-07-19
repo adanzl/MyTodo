@@ -220,109 +220,116 @@
                         @click="handlePrevPage"></div>
                     <div v-if="hasPreviewContent" class="absolute right-0 top-0 w-[20%] h-full z-10 cursor-pointer"
                         @click="handleNextPage"></div>
-                    <!-- 翻页动画容器 -->
-                    <Transition :name="transitionName" mode="out-in">
-                        <div :key="currentContentKey" class="flex items-center justify-center w-full h-full"
-                            :style="previewMode === 'bound' && boundPages[spreadCurrentPage - 1] ? 'filter: drop-shadow(0 2px 8px rgba(0,0,0,0.12))' : ''">
-                            <!-- 普通预览（双页）-->
-                            <template v-if="previewMode === 'single' && previewPages[previewCurrentPage - 1]">
+                    <!-- 普通预览（双页）-->
+                    <Swiper v-if="previewMode === 'single' && previewPages.length > 0"
+                        :modules="swiperModules" effect="flip" :speed="400"
+                        class="w-full h-full" @swiper="onSwiperReady" @slide-change="onSwiperSlideChange">
+                        <SwiperSlide v-for="(spread, i) in previewPages" :key="'sp-'+i"
+                            class="flex items-center justify-center w-full h-full !bg-gray-100">
+                            <div class="flex items-center justify-center w-full h-full gap-0">
                                 <div class="h-full flex flex-col items-center justify-center shrink-0 max-w-[50%]">
-                                    <img :src="previewPages[previewCurrentPage - 1].leftImage"
-                                        class="max-w-full max-h-full object-contain" />
+                                    <img :src="spread.leftImage" class="max-w-full max-h-full object-contain" />
                                     <span class="text-xs text-gray-400 mt-1">
-                                        第 {{ previewPages[previewCurrentPage - 1].leftPageNum || originalTotalPages }} 页
+                                        第 {{ spread.leftPageNum || originalTotalPages }} 页
                                     </span>
                                 </div>
                                 <div class="h-full flex flex-col items-center justify-center shrink-0 max-w-[50%] relative">
-                                    <img v-if="previewPages[previewCurrentPage - 1].rightPageNum === 0" :src="blankPageDataUrl"
+                                    <img v-if="spread.rightPageNum === 0" :src="blankPageDataUrl"
                                         class="max-w-full max-h-full object-contain rounded border-2 border-dashed border-gray-300" />
-                                    <img v-else :src="previewPages[previewCurrentPage - 1].rightImage"
-                                        class="max-w-full max-h-full object-contain" />
-                                    <span v-if="previewPages[previewCurrentPage - 1].rightPageNum === 0"
+                                    <img v-else :src="spread.rightImage" class="max-w-full max-h-full object-contain" />
+                                    <span v-if="spread.rightPageNum === 0"
                                         class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
                                     <span class="text-xs text-gray-400 mt-1">
-                                        第 {{ previewPages[previewCurrentPage - 1].rightPageNum || originalTotalPages }} 页
+                                        第 {{ spread.rightPageNum || originalTotalPages }} 页
                                     </span>
                                 </div>
-                            </template>
-                            <!-- 骑缝模式 -->
-                            <template v-else-if="previewMode === 'saddle-stitch' && spreadPages[spreadCurrentPage - 1]">
+                            </div>
+                        </SwiperSlide>
+                    </Swiper>
+                    <!-- 骑缝排版 -->
+                    <Swiper v-else-if="previewMode === 'saddle-stitch' && spreadPages.length > 0"
+                        :modules="swiperModules" effect="flip" :speed="400"
+                        class="w-full h-full" @swiper="onSwiperReady" @slide-change="onSwiperSlideChange">
+                        <SwiperSlide v-for="(spread, i) in spreadPages" :key="'ss-'+i"
+                            class="flex items-center justify-center w-full h-full !bg-gray-100">
+                            <div class="flex items-center justify-center w-full h-full gap-0">
                                 <div class="h-full flex flex-col items-center justify-center shrink-0 max-w-[50%] relative">
-                                    <img v-if="spreadPages[spreadCurrentPage - 1].leftPageNum === 0" :src="blankPageDataUrl"
+                                    <img v-if="spread.leftPageNum === 0" :src="blankPageDataUrl"
                                         class="max-w-full max-h-full object-contain rounded border-2 border-dashed border-gray-300" />
-                                    <img v-else :src="spreadPages[spreadCurrentPage - 1].leftImage"
-                                        class="max-w-full max-h-full object-contain" />
-                                    <span v-if="spreadPages[spreadCurrentPage - 1].leftPageNum === 0"
+                                    <img v-else :src="spread.leftImage" class="max-w-full max-h-full object-contain" />
+                                    <span v-if="spread.leftPageNum === 0"
                                         class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
                                     <span class="text-xs text-gray-400 mt-1">
-                                        第 {{ spreadPages[spreadCurrentPage - 1].leftPageNum || originalTotalPages }} 页
+                                        第 {{ spread.leftPageNum || originalTotalPages }} 页
                                     </span>
                                 </div>
                                 <div class="h-full flex flex-col items-center justify-center shrink-0 max-w-[50%] relative">
-                                    <img v-if="spreadPages[spreadCurrentPage - 1].rightPageNum === 0" :src="blankPageDataUrl"
+                                    <img v-if="spread.rightPageNum === 0" :src="blankPageDataUrl"
                                         class="max-w-full max-h-full object-contain rounded border-2 border-dashed border-gray-300" />
-                                    <img v-else :src="spreadPages[spreadCurrentPage - 1].rightImage"
-                                        class="max-w-full max-h-full object-contain" />
-                                    <span v-if="spreadPages[spreadCurrentPage - 1].rightPageNum === 0"
+                                    <img v-else :src="spread.rightImage" class="max-w-full max-h-full object-contain" />
+                                    <span v-if="spread.rightPageNum === 0"
                                         class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
                                     <span class="text-xs text-gray-400 mt-1">
-                                        第 {{ spreadPages[spreadCurrentPage - 1].rightPageNum || originalTotalPages }} 页
+                                        第 {{ spread.rightPageNum || originalTotalPages }} 页
                                     </span>
                                 </div>
-                            </template>
-                            <!-- 装订预览 -->
-                            <template v-else-if="previewMode === 'bound' && boundPages[spreadCurrentPage - 1]">
-                                <div class="flex items-center justify-center w-full h-full gap-0">
-                                    <div class="h-full flex flex-col items-center justify-center shrink-0 max-w-[50%] relative">
-                                        <!-- 首页左侧透明 -->
-                                        <template v-if="spreadCurrentPage === 1 && boundPages[0].leftPageNum === 0">
-                                        </template>
-                                        <template v-else-if="boundPages[spreadCurrentPage - 1].leftPageNum === 0">
-                                            <img :src="blankPageDataUrl" class="max-w-full max-h-full object-contain rounded" />
-                                            <span
-                                                class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
-                                            <span class="text-xs text-gray-400 mt-1">
-                                                第 {{ boundPages[spreadCurrentPage - 1].leftPageNum || originalTotalPages }} 页
-                                            </span>
-                                        </template>
-                                        <template v-else>
-                                            <img :src="boundPages[spreadCurrentPage - 1].leftImage"
-                                                class="max-w-full max-h-full object-contain" />
-                                            <span class="text-xs text-gray-400 mt-1">
-                                                第 {{ boundPages[spreadCurrentPage - 1].leftPageNum }} 页
-                                            </span>
-                                        </template>
-                                    </div>
-                                    <!-- 书脊效果 -->
-                                    <div
-                                        class="w-[3px] self-stretch bg-gradient-to-r from-transparent via-gray-400/30 to-transparent shrink-0 rounded-full">
-                                    </div>
-                                    <div class="h-full flex flex-col items-center justify-center shrink-0 max-w-[50%] relative">
-                                        <!-- 末页右侧透明 -->
-                                        <template
-                                            v-if="spreadCurrentPage === boundPages.length && boundPages[spreadCurrentPage - 1].rightPageNum === 0">
-                                        </template>
-                                        <template v-else-if="boundPages[spreadCurrentPage - 1].rightPageNum === 0">
-                                            <img :src="blankPageDataUrl" class="max-w-full max-h-full object-contain rounded" />
-                                            <span
-                                                class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
-                                            <span class="text-xs text-gray-400 mt-1">
-                                                第 {{ boundPages[spreadCurrentPage - 1].rightPageNum || originalTotalPages }} 页
-                                            </span>
-                                        </template>
-                                        <template v-else>
-                                            <img :src="boundPages[spreadCurrentPage - 1].rightImage"
-                                                class="max-w-full max-h-full object-contain" />
-                                            <span class="text-xs text-gray-400 mt-1">
-                                                第 {{ boundPages[spreadCurrentPage - 1].rightPageNum }} 页
-                                            </span>
-                                        </template>
-                                    </div>
+                            </div>
+                        </SwiperSlide>
+                    </Swiper>
+                    <!-- 装订预览 -->
+                    <Swiper v-else-if="previewMode === 'bound' && boundPages.length > 0"
+                        :modules="swiperModules" effect="flip" :speed="400"
+                        class="w-full h-full" @swiper="onSwiperReady" @slide-change="onSwiperSlideChange"
+                        :style="{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.12))' }">
+                        <SwiperSlide v-for="(spread, i) in boundPages" :key="'bd-'+i"
+                            class="flex items-center justify-center w-full h-full !bg-gray-100">
+                            <div class="flex items-center justify-center w-full h-full gap-0">
+                                <div class="h-full flex flex-col items-center justify-center shrink-0 max-w-[50%] relative">
+                                    <!-- 首页左侧透明 -->
+                                    <template v-if="i === 0 && spread.leftPageNum === 0">
+                                    </template>
+                                    <template v-else-if="spread.leftPageNum === 0">
+                                        <img :src="blankPageDataUrl" class="max-w-full max-h-full object-contain rounded" />
+                                        <span
+                                            class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
+                                        <span class="text-xs text-gray-400 mt-1">
+                                            第 {{ spread.leftPageNum || originalTotalPages }} 页
+                                        </span>
+                                    </template>
+                                    <template v-else>
+                                        <img :src="spread.leftImage" class="max-w-full max-h-full object-contain" />
+                                        <span class="text-xs text-gray-400 mt-1">
+                                            第 {{ spread.leftPageNum }} 页
+                                        </span>
+                                    </template>
                                 </div>
-                            </template>
-                            <span v-else class="text-gray-400 text-sm">点击上方"预览"按钮查看 PDF 内容</span>
-                        </div>
-                    </Transition>
+                                <!-- 书脊效果 -->
+                                <div
+                                    class="w-[3px] self-stretch bg-gradient-to-r from-transparent via-gray-400/30 to-transparent shrink-0 rounded-full">
+                                </div>
+                                <div class="h-full flex flex-col items-center justify-center shrink-0 max-w-[50%] relative">
+                                    <!-- 末页右侧透明 -->
+                                    <template v-if="i === boundPages.length - 1 && spread.rightPageNum === 0">
+                                    </template>
+                                    <template v-else-if="spread.rightPageNum === 0">
+                                        <img :src="blankPageDataUrl" class="max-w-full max-h-full object-contain rounded" />
+                                        <span
+                                            class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
+                                        <span class="text-xs text-gray-400 mt-1">
+                                            第 {{ spread.rightPageNum || originalTotalPages }} 页
+                                        </span>
+                                    </template>
+                                    <template v-else>
+                                        <img :src="spread.rightImage" class="max-w-full max-h-full object-contain" />
+                                        <span class="text-xs text-gray-400 mt-1">
+                                            第 {{ spread.rightPageNum }} 页
+                                        </span>
+                                    </template>
+                                </div>
+                            </div>
+                        </SwiperSlide>
+                    </Swiper>
+                    <span v-if="!hasPreviewContent" class="text-gray-400 text-sm">点击上方"预览"按钮查看 PDF 内容</span>
                 </div>
             </div>
         </div>
@@ -367,10 +374,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, computed, onMounted, onBeforeUnmount } from "vue";
+import { ref, shallowRef, computed, onMounted, onBeforeUnmount, nextTick } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import type { UploadFile } from "element-plus";
 import { Refresh, Plus, Delete, ArrowLeft, ArrowRight } from "@element-plus/icons-vue";
+import { Swiper, SwiperSlide } from 'swiper/vue';
+import { EffectFlip } from 'swiper/modules';
+import 'swiper/css';
+import 'swiper/css/effect-flip';
 import { formatSize } from "@/utils/format";
 import { logAndNoticeError } from "@/utils/error";
 import { loadPdfDocument, renderPdfPageToDataUrl } from "@/utils/pdf-lib";
@@ -459,7 +470,23 @@ const pdfDocCache = shallowRef<any>(null);
 const fillConfigs = ref<number[]>([]);
 const originalTotalPages = ref(0);
 const spreadDataCachedTaskId = ref(''); // 标记当前骑缝数据属于哪个任务
-const pageDirection = ref(1); // 翻页方向：1=向前，-1=向后
+
+// Swiper 翻页
+const swiperModules = [EffectFlip];
+let swiperInstance: any = null;
+
+function onSwiperReady(swiper: any) {
+    swiperInstance = swiper;
+}
+
+function onSwiperSlideChange(swiper: any) {
+    const idx = swiper.activeIndex + 1;
+    if (previewMode.value === 'single') {
+        previewCurrentPage.value = idx;
+    } else {
+        spreadCurrentPage.value = idx;
+    }
+}
 
 // 辅助函数
 const getStatusTagType = (status: string) => STATUS_MAP[status]?.tag ?? "info";
@@ -494,37 +521,13 @@ const hasPreviewContent = computed(() => {
     return false;
 });
 
-// 翻页动画过渡名称
-const transitionName = computed(() => {
-    return pageDirection.value > 0 ? 'flip-forward' : 'flip-backward';
-});
-
-// 当前内容唯一 key，用于触发 Transition 动画
-const currentContentKey = computed(() => {
-    if (previewMode.value === 'single') return `single-${previewCurrentPage.value}`;
-    if (previewMode.value === 'saddle-stitch') return `saddle-${spreadCurrentPage.value}`;
-    if (previewMode.value === 'bound') return `bound-${spreadCurrentPage.value}`;
-    return 'empty';
-});
-
-// 翻页操作
+// 翻页操作（由 Swiper 驱动动画）
 function handlePrevPage() {
-    pageDirection.value = -1;
-    if (previewMode.value === 'single') {
-        if (previewCurrentPage.value > 1) previewCurrentPage.value--;
-    } else {
-        if (spreadCurrentPage.value > 1) spreadCurrentPage.value--;
-    }
+    swiperInstance?.slidePrev();
 }
 
 function handleNextPage() {
-    pageDirection.value = 1;
-    if (previewMode.value === 'single') {
-        if (previewCurrentPage.value < previewPages.value.length) previewCurrentPage.value++;
-    } else {
-        const max = previewMode.value === 'bound' ? boundPages.value.length : spreadPages.value.length;
-        if (spreadCurrentPage.value < max) spreadCurrentPage.value++;
-    }
+    swiperInstance?.slideNext();
 }
 
 // 应用任务数据到当前视图
@@ -1012,33 +1015,14 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* 水平翻书动画 */
-.flip-forward-enter-active,
-.flip-forward-leave-active,
-.flip-backward-enter-active,
-.flip-backward-leave-active {
-    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+/* 确保 Swiper 容器撑满父容器 */
+.swiper {
+    width: 100%;
+    height: 100%;
 }
 
-/* 向前翻：旧页向左翻出，新页从右侧翻入 */
-.flip-forward-enter-from {
-    transform: translateX(80%) scale(0.95);
-    opacity: 0;
-}
-
-.flip-forward-leave-to {
-    transform: translateX(-80%) scale(0.95);
-    opacity: 0;
-}
-
-/* 向后翻：旧页向右翻出，新页从左侧翻入 */
-.flip-backward-enter-from {
-    transform: translateX(-80%) scale(0.95);
-    opacity: 0;
-}
-
-.flip-backward-leave-to {
-    transform: translateX(80%) scale(0.95);
-    opacity: 0;
+/* 翻页过程中禁止文字选中 */
+.swiper-slide {
+    user-select: none;
 }
 </style>
