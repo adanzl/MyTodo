@@ -219,9 +219,9 @@ class PdfLayoutMgr(BaseTaskMgr[PdfLayoutTask]):
 
                 out = Pdf.new()
                 # 获取原始页尺寸
-                ref_page = pdf.pages[0]
-                pw = float(ref_page.mediabox.width)
-                ph = float(ref_page.mediabox.height)
+                ref_rect = pikepdf.Rectangle(pdf.pages[0].mediabox)
+                pw = float(ref_rect.width)
+                ph = float(ref_rect.height)
 
                 for left_idx, right_idx in spreads:
                     # 每个 spread 合并为一页（两页左右拼接）
