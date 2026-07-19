@@ -12,7 +12,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # 服务根目录（main.py 所在目录，用于解析相对路径）
-_SERVER_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_SERVER_ROOT = os.path.dirname(os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__))))
 
 # 临时文件基础目录（用于真正的临时文件，处理过程中的中间文件）
 BASE_TMP_DIR = os.environ.get('BASE_TMP_DIR', '/tmp/my_todo')
@@ -23,12 +24,18 @@ DEFAULT_BASE_DIR_RAW = os.environ.get('DEFAULT_BASE_DIR', 'data')
 if os.path.isabs(DEFAULT_BASE_DIR_RAW):
     DEFAULT_BASE_DIR = DEFAULT_BASE_DIR_RAW
 else:
-    DEFAULT_BASE_DIR = os.path.normpath(os.path.join(_SERVER_ROOT, DEFAULT_BASE_DIR_RAW))
+    DEFAULT_BASE_DIR = os.path.normpath(
+        os.path.join(_SERVER_ROOT, DEFAULT_BASE_DIR_RAW))
 
 # PDF 工具相关目录（任务存档和最终文件保存在 base 目录）
 PDF_BASE_DIR = os.path.join(DEFAULT_BASE_DIR, 'tasks', 'pdf')
 PDF_UPLOAD_DIR = os.path.join(PDF_BASE_DIR, 'upload')
 PDF_UNLOCK_DIR = os.path.join(PDF_BASE_DIR, 'unlock')
+
+# PDF 排版工具相关目录（任务存档和最终文件保存在 base 目录）
+PDF_LAYOUT_BASE_DIR = os.path.join(DEFAULT_BASE_DIR, 'tasks', 'pdf_layout')
+PDF_LAYOUT_UPLOAD_DIR = os.path.join(PDF_LAYOUT_BASE_DIR, 'upload')
+PDF_LAYOUT_OUTPUT_DIR = os.path.join(PDF_LAYOUT_BASE_DIR, 'output')
 
 # 媒体工具相关目录（任务存档和最终文件保存在 base 目录）
 MEDIA_BASE_DIR = os.path.join(DEFAULT_BASE_DIR, 'tasks', 'media')
@@ -64,10 +71,12 @@ def get_media_task_result_dir(task_id: str) -> str:
 
 
 # 允许的音频文件扩展名
-ALLOWED_AUDIO_EXTENSIONS = {'.mp3', '.wav', '.flac', '.aac', '.m4a', '.ogg', '.wma'}
+ALLOWED_AUDIO_EXTENSIONS = {'.mp3', '.wav',
+                            '.flac', '.aac', '.m4a', '.ogg', '.wma'}
 
 # 允许的视频文件扩展名
-ALLOWED_VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'}
+ALLOWED_VIDEO_EXTENSIONS = {'.mp4', '.avi',
+                            '.mkv', '.mov', '.wmv', '.flv', '.webm'}
 
 # 允许的 PDF 文件扩展名
 ALLOWED_PDF_EXTENSIONS = {'.pdf'}
