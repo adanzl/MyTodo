@@ -156,10 +156,6 @@
                                 @click="updateSaddleStitchPreview">
                                 更新
                             </el-button>
-                            <el-button type="success" size="small" plain class="!h-5 !text-xs !px-2"
-                                @click="handleSaveLayout" :loading="previewLoading">
-                                保存
-                            </el-button>
                         </div>
                     </div>
                     <!-- 单页导航 -->
@@ -913,21 +909,14 @@ const handleBoundPreview = async (item: PdfLayoutTask) => {
     await renderBoundPreview();
 };
 
-// 按当前填充配置重新渲染骑缝预览
+// 按当前填充配置重新渲染并自动保存骑缝 PDF
 const updateSaddleStitchPreview = async () => {
-    renderSaddleStitchPreview();
-};
-
-// 生成并下载骑缝排版 PDF
-const handleSaveLayout = async () => {
     const task = currentTask.value;
     if (!task) return;
-    if (previewLoading.value) {
-        ElMessage.warning("正在渲染中，请稍候");
-        return;
-    }
 
-    previewLoading.value = true;
+    await renderSaddleStitchPreview();
+
+    // 渲染完成后自动生成并下载骑缝 PDF
     try {
         const response = await savePdfLayout(task.task_id, fillConfigs.value);
         if (response.code !== 0 || !response.data) {
@@ -939,7 +928,6 @@ const handleSaveLayout = async () => {
         const filename = result.output_info?.name || result.task_id;
         if (filename) {
             const url = getPdfLayoutDownloadUrl(filename, 'output');
-            // 创建临时 a 标签触发下载
             const a = document.createElement('a');
             a.href = url;
             a.download = filename;
@@ -950,8 +938,6 @@ const handleSaveLayout = async () => {
         }
     } catch (error) {
         logAndNoticeError(error as Error, "保存骑缝排版 PDF 失败");
-    } finally {
-        previewLoading.value = false;
     }
 };
 
