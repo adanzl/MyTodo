@@ -11,6 +11,8 @@ from werkzeug.utils import secure_filename
 
 from core.services.base_task_mgr import BaseTaskMgr, FileInfo, TaskBase
 
+from pikepdf import Matrix, Pdf
+
 import pikepdf
 
 from core.config import app_logger
@@ -215,22 +217,28 @@ class PdfLayoutMgr(BaseTaskMgr[PdfLayoutTask]):
                 effective = _build_effective_pages(total_pages, fill_configs)
                 spreads = _generate_saddle_stitch_spreads(len(effective))
 
-                out = pikepdf.Pdf.new()
-                a4_size = (595, 842)
+                out = Pdf.new()
+                # 获取原始页尺寸
+                ref_page = pdf.pages[0]
+                pw = float(ref_page.mediabox.width)
+                ph = float(ref_page.mediabox.height)
 
                 for left_idx, right_idx in spreads:
+                    # 每个 spread 合并为一页（两页左右拼接）
+                    merge_page = out.add_blank_page(page_size=(2 * pw, ph))
+
                     left_pn = effective[left_idx - 1]
                     right_pn = effective[right_idx - 1]
 
                     if left_pn > 0:
-                        out.pages.append(pdf.pages[left_pn - 1])
-                    else:
-                        out.add_blank_page(page_size=a4_size)
+                        src = pdf.pages[left_pn - 1]
+                        xobj = out.copy_foreign(src.as_form_xobject())
+                        merge_page.add_overlay(xobj, Matrix(1, 0, 0, 1, 0, 0))  # pyright: ignore
 
                     if right_pn > 0:
-                        out.pages.append(pdf.pages[right_pn - 1])
-                    else:
-                        out.add_blank_page(page_size=a4_size)
+                        src = pdf.pages[right_pn - 1]
+                        xobj = out.copy_foreign(src.as_form_xobject())
+                        merge_page.add_overlay(xobj, Matrix(1, 0, 0, 1, pw, 0))  # pyright: ignore
 
                 out.save(output_path)
 

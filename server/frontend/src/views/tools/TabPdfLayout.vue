@@ -146,7 +146,7 @@
                             :class="previewMode === 'bound' ? '' : '!text-gray-400 !border-gray-300'">
                             骑缝预览
                         </el-button>
-                        <div v-if="previewMode === 'saddle-stitch' && fillConfigs.length > 0"
+                        <div v-if="(previewMode === 'saddle-stitch' || previewMode === 'bound') && fillConfigs.length > 0"
                             class="flex items-center gap-1">
                             <span class="text-xs text-gray-500 ml-1">填充:</span>
                             <el-input-number v-for="(_, i) in fillConfigs" :key="i" v-model="fillConfigs[i]"
