@@ -316,7 +316,8 @@
         </div>
 
         <!-- 上传/创建任务对话框 -->
-        <el-dialog v-model="createDialogVisible" title="上传 PDF 文件" width="400px" :close-on-click-modal="false" @close="handleDialogClose">
+        <el-dialog v-model="createDialogVisible" title="上传 PDF 文件" width="400px" :close-on-click-modal="false"
+            @close="handleDialogClose">
             <el-form>
                 <el-form-item label="选择文件">
                     <el-upload :auto-upload="false" :on-change="handleFileChange" :show-file-list="false" accept=".pdf">
@@ -851,6 +852,11 @@ const renderSaddleStitchPreview = async () => {
         });
 
         spreadPages.value = await Promise.all(spreadPromises);
+        // 骑缝第一个视图左边强制空白
+        if (spreadPages.value.length > 0) {
+            spreadPages.value[0].leftPageNum = 0;
+            spreadPages.value[0].leftImage = '';
+        }
     } catch (error) {
         logAndNoticeError(error as Error, "渲染骑缝预览失败");
         spreadPages.value = [];
