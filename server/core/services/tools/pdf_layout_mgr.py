@@ -199,7 +199,7 @@ class PdfLayoutMgr(BaseTaskMgr[PdfLayoutTask]):
                 except Exception as e:
                     log.error(f"[PDF 排版] 删除文件失败 {path}: {e}")
 
-    def update_fill_configs(self, task_id: str, fill_configs: list[int]) -> Tuple[int, str]:
+    def save_fill_configs(self, task_id: str, fill_configs: list[int]) -> Tuple[int, str]:
         """更新任务的填充配置。"""
         with self._task_lock.gen_wlock():
             task, err = self._get_task_or_err(task_id)
