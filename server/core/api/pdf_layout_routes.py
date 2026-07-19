@@ -160,29 +160,9 @@ def pdf_layout_delete() -> ResponseReturnValue:
         return _err(f"删除任务失败: {str(e)}")
 
 
-@pdf_layout_bp.route("/pdf_layout/<task_id>/config", methods=['PUT'])
-def pdf_layout_update_config(task_id: str) -> ResponseReturnValue:
-    """更新任务填充配置。"""
-    try:
-        data: Dict[str, Any] = read_json_from_request()
-        fill_configs = data.get('fill_configs', [])
-        if not isinstance(fill_configs, list):
-            return _err("fill_configs 必须为数组")
-
-        code, msg = pdf_layout_mgr.update_fill_configs(task_id, fill_configs)
-        if code != 0:
-            return _err(msg)
-
-        return _ok({"message": msg})
-
-    except Exception as e:
-        log.error(f"[PDF 排版] 更新填充配置失败: {e}")
-        return _err(f"更新填充配置失败: {str(e)}")
-
-
 @pdf_layout_bp.route("/pdf_layout/save", methods=['POST'])
 def pdf_layout_save() -> ResponseReturnValue:
-    """生成骑缝排版 PDF。"""
+    """保存任务的填充配置（不生成 PDF）。"""
     try:
         data: Dict[str, Any] = read_json_from_request()
         body, err = parse_with_model(
@@ -190,7 +170,28 @@ def pdf_layout_save() -> ResponseReturnValue:
         if err or not body:
             return err or _err("Invalid request body")
 
-        code, msg = pdf_layout_mgr.save_layout(body.task_id, body.fill_configs)
+        code, msg = pdf_layout_mgr.update_fill_configs(body.task_id, body.fill_configs)
+        if code != 0:
+            return _err(msg)
+
+        return _ok({"message": msg})
+
+    except Exception as e:
+        log.error(f"[PDF 排版] 保存填充配置失败: {e}")
+        return _err(f"保存填充配置失败: {str(e)}")
+
+
+@pdf_layout_bp.route("/pdf_layout/generate", methods=['POST'])
+def pdf_layout_generate() -> ResponseReturnValue:
+    """生成骑缝排版 PDF（使用已保存的填充配置）。"""
+    try:
+        data: Dict[str, Any] = read_json_from_request()
+        body, err = parse_with_model(
+            _PdfLayoutProcessBody, data, err_factory=_err)
+        if err or not body:
+            return err or _err("Invalid request body")
+
+        code, msg = pdf_layout_mgr.generate_layout(body.task_id)
         if code != 0:
             return _err(msg)
 
@@ -198,5 +199,5 @@ def pdf_layout_save() -> ResponseReturnValue:
         return _ok(task_info)
 
     except Exception as e:
-        log.error(f"[PDF 排版] 保存骑缝 PDF 失败: {e}")
-        return _err(f"保存骑缝 PDF 失败: {str(e)}")
+        log.error(f"[PDF 排版] 生成骑缝 PDF 失败: {e}")
+        return _err(f"生成骑缝 PDF 失败: {str(e)}")

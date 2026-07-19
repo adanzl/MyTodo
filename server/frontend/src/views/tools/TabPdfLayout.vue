@@ -360,7 +360,7 @@ import {
     getPdfLayoutDownloadUrl,
     deletePdfLayout,
     savePdfLayout,
-    savePdfLayoutFillConfigs,
+    generatePdfLayout,
 } from "@/api/api-pdf-layout";
 import type { PdfLayoutTask } from "@/types/tools/pdf-layout";
 
@@ -945,7 +945,7 @@ const handleBoundPreview = async (item: PdfLayoutTask) => {
 const updateSaddleStitchPreview = async () => {
     const task = currentTask.value;
     if (!task) return;
-    await savePdfLayoutFillConfigs(task.task_id, fillConfigs.value);
+    await savePdfLayout(task.task_id, fillConfigs.value);
     await renderSaddleStitchPreview();
 };
 
@@ -960,7 +960,14 @@ const handleDownloadLayout = async () => {
 
     previewLoading.value = true;
     try {
-        const response = await savePdfLayout(task.task_id, fillConfigs.value);
+        // 先保存填充配置
+        const saveResult = await savePdfLayout(task.task_id, fillConfigs.value);
+        if (saveResult.code !== 0) {
+            ElMessage.error(saveResult.msg || "保存填充配置失败");
+            return;
+        }
+        // 再生成 PDF
+        const response = await generatePdfLayout(task.task_id);
         if (response.code !== 0 || !response.data) {
             ElMessage.error(response.msg || "生成骑缝 PDF 失败");
             return;

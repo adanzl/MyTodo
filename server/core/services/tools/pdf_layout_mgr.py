@@ -211,8 +211,8 @@ class PdfLayoutMgr(BaseTaskMgr[PdfLayoutTask]):
             log.info(f"[PDF 排版] 更新填充配置: {task_id} {fill_configs}")
             return 0, "填充配置已保存"
 
-    def save_layout(self, task_id: str, fill_configs: list[int]) -> Tuple[int, str]:
-        """生成骑缝排版 PDF 并保存。"""
+    def generate_layout(self, task_id: str) -> Tuple[int, str]:
+        """生成骑缝排版 PDF（使用已保存的 fill_configs）。"""
         with self._task_lock.gen_wlock():
             task, err = self._get_task_or_err(task_id)
             if not task:
@@ -221,6 +221,7 @@ class PdfLayoutMgr(BaseTaskMgr[PdfLayoutTask]):
             if not task.uploaded_path or not os.path.exists(task.uploaded_path):
                 return -1, "上传文件不存在"
 
+            fill_configs = task.fill_configs or []
             output_path = self._get_output_path(task.task_id)
 
         try:
@@ -262,7 +263,7 @@ class PdfLayoutMgr(BaseTaskMgr[PdfLayoutTask]):
                     task2.status = TASK_STATUS_SUCCESS
                     self._save_task_and_update_time(task2)
 
-            log.info(f"[PDF 排版] 骑缝 PDF 保存成功: {output_path}")
+            log.info(f"[PDF 排版] 骑缝 PDF 生成成功: {output_path}")
             return 0, "骑缝 PDF 已生成"
 
         except Exception as e:
