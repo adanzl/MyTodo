@@ -316,7 +316,7 @@
         </div>
 
         <!-- 上传/创建任务对话框 -->
-        <el-dialog v-model="createDialogVisible" title="上传 PDF 文件" width="400px" @close="handleDialogClose">
+        <el-dialog v-model="createDialogVisible" title="上传 PDF 文件" width="400px" :close-on-click-modal="false" @close="handleDialogClose">
             <el-form>
                 <el-form-item label="选择文件">
                     <el-upload :auto-upload="false" :on-change="handleFileChange" :show-file-list="false" accept=".pdf">
@@ -329,9 +329,12 @@
                     已选择: {{ selectedFile.name }}
                 </div>
                 <el-progress v-if="uploadProgress > 0 && uploadProgress < 100" :percentage="uploadProgress" />
+                <div v-if="uploadSizeText" class="text-xs text-gray-500 text-right mt-1">
+                    已上传: {{ uploadSizeText }}
+                </div>
             </el-form>
             <template #footer>
-                <el-button @click="createDialogVisible = false">取消</el-button>
+                <el-button @click="handleDialogClose">取消</el-button>
                 <el-button type="primary" @click="handleUploadConfirm" :loading="loading" :disabled="!selectedFile">
                     上传
                 </el-button>
@@ -357,6 +360,7 @@ import {
     getPdfLayoutDownloadUrl,
     deletePdfLayout,
     savePdfLayout,
+    savePdfLayoutFillConfigs,
 } from "@/api/api-pdf-layout";
 import type { PdfLayoutTask } from "@/types/tools/pdf-layout";
 
@@ -413,6 +417,14 @@ const currentTask = ref<PdfLayoutTask | null>(null);
 const createDialogVisible = ref(false);
 const selectedFile = ref<File | null>(null);
 const uploadProgress = ref(0);
+const uploadAbortController = ref<AbortController | null>(null);
+
+const uploadSizeText = computed(() => {
+    if (!selectedFile.value || uploadProgress.value <= 0) return '';
+    const totalKB = Math.round(selectedFile.value.size / 1024);
+    const uploadedKB = Math.round(totalKB * uploadProgress.value / 100);
+    return `${uploadedKB} KB / ${totalKB} KB`;
+});
 
 // 预览相关
 const previewMode = ref<'single' | 'saddle-stitch' | 'bound'>('single');
@@ -530,12 +542,16 @@ const handleViewTask = async (taskId: string) => {
 const handleCreateTask = () => {
     selectedFile.value = null;
     uploadProgress.value = 0;
+    uploadAbortController.value = new AbortController();
     createDialogVisible.value = true;
 };
 
 const handleDialogClose = () => {
+    uploadAbortController.value?.abort();
+    uploadAbortController.value = null;
     selectedFile.value = null;
     uploadProgress.value = 0;
+    createDialogVisible.value = false;
 };
 
 const handleFileChange = (file: UploadFile) => {
@@ -553,19 +569,28 @@ const handleUploadConfirm = async () => {
     }
     await withLoading(async () => {
         uploadProgress.value = 0;
-        const response = await uploadPdfLayout(selectedFile.value!, p => {
-            uploadProgress.value = p;
-        });
-        if (response.code === 0) {
-            uploadProgress.value = 100;
-            ElMessage.success("文件上传成功");
-            createDialogVisible.value = false;
-            selectedFile.value = null;
-            await loadTaskList();
-            const task = response.data as PdfLayoutTask;
-            if (task?.task_id) await syncTask(task.task_id);
-        } else {
-            ElMessage.error(response.msg || "文件上传失败");
+        const signal = uploadAbortController.value?.signal;
+        try {
+            const response = await uploadPdfLayout(selectedFile.value!, p => {
+                uploadProgress.value = p;
+            }, signal);
+            if (response.code === 0) {
+                uploadProgress.value = 100;
+                ElMessage.success("文件上传成功");
+                createDialogVisible.value = false;
+                selectedFile.value = null;
+                await loadTaskList();
+                const task = response.data as PdfLayoutTask;
+                if (task?.task_id) await syncTask(task.task_id);
+            } else {
+                ElMessage.error(response.msg || "文件上传失败");
+            }
+        } catch (err: any) {
+            if (err?.name === 'AbortError' || err?.code === 'ERR_CANCELED') {
+                // 用户取消上传，静默处理
+                return;
+            }
+            throw err;
         }
     }, "文件上传失败");
 };
@@ -918,6 +943,9 @@ const handleBoundPreview = async (item: PdfLayoutTask) => {
 
 // 按当前填充配置重新渲染骑缝预览
 const updateSaddleStitchPreview = async () => {
+    const task = currentTask.value;
+    if (!task) return;
+    await savePdfLayoutFillConfigs(task.task_id, fillConfigs.value);
     await renderSaddleStitchPreview();
 };
 
