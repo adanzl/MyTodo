@@ -26,7 +26,7 @@
         </template>
       </el-table-column>
       <el-table-column prop="start_date" label="开始日期" width="110" />
-      <el-table-column prop="duration" label="天数" width="70" align="center" />
+      <el-table-column prop="end_date" label="结束日期" width="110" />
       <el-table-column prop="user_id" label="布置对象" width="100">
         <template #default="{ row }">
           {{ getUserName(row.user_id) }}
