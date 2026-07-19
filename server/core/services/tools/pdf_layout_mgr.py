@@ -11,7 +11,7 @@ from werkzeug.utils import secure_filename
 
 from core.services.base_task_mgr import BaseTaskMgr, FileInfo, TaskBase
 
-from pikepdf import Matrix, Pdf
+from pikepdf import Pdf
 
 import pikepdf
 
@@ -232,13 +232,13 @@ class PdfLayoutMgr(BaseTaskMgr[PdfLayoutTask]):
 
                     if left_pn > 0:
                         src = pdf.pages[left_pn - 1]
-                        xobj = out.copy_foreign(src.as_form_xobject())
-                        merge_page.add_overlay(xobj, Matrix(1, 0, 0, 1, 0, 0))  # pyright: ignore
+                        merge_page.add_overlay(
+                            src, pikepdf.Rectangle(0, 0, pw, ph))
 
                     if right_pn > 0:
                         src = pdf.pages[right_pn - 1]
-                        xobj = out.copy_foreign(src.as_form_xobject())
-                        merge_page.add_overlay(xobj, Matrix(1, 0, 0, 1, pw, 0))  # pyright: ignore
+                        merge_page.add_overlay(
+                            src, pikepdf.Rectangle(pw, 0, 2 * pw, ph))
 
                 out.save(output_path)
 
