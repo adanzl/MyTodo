@@ -90,13 +90,13 @@ export async function deletePdfLayout(task_id: string): Promise<ApiResponse<{ me
 }
 
 /**
- * 生成并保存骑缝排版 PDF
+ * 保存任务的填充配置（不生成 PDF）
  */
 export async function savePdfLayout(
   task_id: string,
   fill_configs: number[]
-): Promise<ApiResponse<PdfLayoutTask>> {
-  const response = await api.post<ApiResponse<PdfLayoutTask>>("/pdf_layout/save", {
+): Promise<ApiResponse<{ message: string }>> {
+  const response = await api.post<ApiResponse<{ message: string }>>("/pdf_layout/save", {
     task_id,
     fill_configs,
   });
@@ -104,15 +104,13 @@ export async function savePdfLayout(
 }
 
 /**
- * 保存任务的填充配置
+ * 生成骑缝排版 PDF（使用已保存的填充配置）
  */
-export async function savePdfLayoutFillConfigs(
-  task_id: string,
-  fill_configs: number[]
-): Promise<ApiResponse<{ message: string }>> {
-  const response = await api.put<ApiResponse<{ message: string }>>(
-    `/pdf_layout/${encodeURIComponent(task_id)}/config`,
-    { fill_configs }
-  );
+export async function generatePdfLayout(
+  task_id: string
+): Promise<ApiResponse<PdfLayoutTask>> {
+  const response = await api.post<ApiResponse<PdfLayoutTask>>("/pdf_layout/generate", {
+    task_id,
+  });
   return response.data;
 }
