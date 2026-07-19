@@ -72,4 +72,8 @@ export interface PdfLayoutTask {
    * 更新时间戳
    */
   update_time: number;
+  /**
+   * 填充配置
+   */
+  fill_configs?: number[];
 }

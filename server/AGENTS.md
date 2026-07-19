@@ -17,7 +17,7 @@
 ## SSH
 
 主机
-- 局域网 主机： mini
+- 局域网 主机: mini  
 - 广域网 主机：vip.bj.frp.one:19367
 - 广域网 主机：57c42474b0ea.ofalias.net:58186
 用户名 leo
@@ -26,6 +26,12 @@
 
 工作目录 /mnt/data/project/MyTodo/server
 
+## 注意
+
+- 不要处理后端的重启和代码拉取
+
+
 ## 快捷命令
 
 - push 表示执行提交git 并执行push
+  

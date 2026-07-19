@@ -37,6 +37,7 @@ class PdfLayoutTask(TaskBase):
     uploaded_info: PdfLayoutFileInfo
     output_path: Optional[str] = None
     output_info: Optional[PdfLayoutFileInfo] = None
+    fill_configs: Optional[list[int]] = None
 
 
 class PdfLayoutMgr(BaseTaskMgr[PdfLayoutTask]):
@@ -116,7 +117,8 @@ class PdfLayoutMgr(BaseTaskMgr[PdfLayoutTask]):
             base_name, ext = os.path.splitext(safe_filename)
 
             # 使用统一的函数生成唯一文件路径
-            file_path = get_unique_filepath(PDF_LAYOUT_UPLOAD_DIR, base_name, ext)
+            file_path = get_unique_filepath(
+                PDF_LAYOUT_UPLOAD_DIR, base_name, ext)
             safe_filename = os.path.basename(file_path)
 
             file_obj.save(file_path)
@@ -194,6 +196,94 @@ class PdfLayoutMgr(BaseTaskMgr[PdfLayoutTask]):
                     log.info(f"[PDF 排版] 删除文件: {path}")
                 except Exception as e:
                     log.error(f"[PDF 排版] 删除文件失败 {path}: {e}")
+
+    def update_config(self, task_id: str, fill_configs: list[int]) -> Tuple[int, str]:
+        """更新任务的填充配置。"""
+        with self._task_lock.gen_wlock():
+            task, err = self._get_task_or_err(task_id)
+            if not task:
+                return -1, err
+            task.fill_configs = fill_configs
+            self._save_task_and_update_time(task)
+            log.info(f"[PDF 排版] 更新配置: {task_id}, fill_configs={fill_configs}")
+            return 0, "配置已保存"
+
+    def save_layout(self, task_id: str, fill_configs: list[int]) -> Tuple[int, str]:
+        """生成骑缝排版 PDF 并保存。"""
+        with self._task_lock.gen_wlock():
+            task, err = self._get_task_or_err(task_id)
+            if not task:
+                return -1, err
+
+            if not task.uploaded_path or not os.path.exists(task.uploaded_path):
+                return -1, "上传文件不存在"
+
+            output_path = self._get_output_path(task.task_id)
+
+        try:
+            with pikepdf.open(task.uploaded_path) as pdf:
+                total_pages = len(pdf.pages)
+                effective = _build_effective_pages(total_pages, fill_configs)
+                spreads = _generate_saddle_stitch_spreads(len(effective))
+
+                out = pikepdf.Pdf.new()
+                a4_size = (595, 842)
+
+                for left_idx, right_idx in spreads:
+                    left_pn = effective[left_idx - 1]
+                    right_pn = effective[right_idx - 1]
+
+                    if left_pn > 0:
+                        out.pages.append(pdf.pages[left_pn - 1])
+                    else:
+                        out.add_blank_page(page_size=a4_size)
+
+                    if right_pn > 0:
+                        out.pages.append(pdf.pages[right_pn - 1])
+                    else:
+                        out.add_blank_page(page_size=a4_size)
+
+                out.save(output_path)
+
+            with self._task_lock.gen_wlock():
+                task2, _ = self._get_task_or_err(task_id)
+                if task2:
+                    task2.output_path = output_path
+                    task2.output_info = get_file_info(output_path)
+                    task2.status = TASK_STATUS_SUCCESS
+                    self._save_task_and_update_time(task2)
+
+            log.info(f"[PDF 排版] 骑缝 PDF 保存成功: {output_path}")
+            return 0, "骑缝 PDF 已生成"
+
+        except Exception as e:
+            log.error(f"[PDF 排版] 生成骑缝 PDF 失败: {e}")
+            return -1, f"生成骑缝 PDF 失败: {str(e)}"
+
+
+# ---- 算法辅助函数（与前端对齐） ----
+
+def _build_effective_pages(total_pages: int, insert_at: list[int]) -> list[int]:
+    """构建有效页码列表，0=空白，按 insert_at 在指定页前插入空白。"""
+    pages: list[int] = []
+    for i in range(1, total_pages + 1):
+        count = sum(1 for p in insert_at if p == i)
+        for _ in range(count):
+            pages.append(0)
+        pages.append(i)
+    padded = ((len(pages) + 3) // 4) * 4
+    while len(pages) < padded:
+        pages.append(0)
+    return pages
+
+
+def _generate_saddle_stitch_spreads(effective_count: int) -> list[tuple[int, int]]:
+    """生成骑缝对开页索引序列（1-based）。"""
+    spreads: list[tuple[int, int]] = []
+    for s in range(effective_count // 4):
+        spreads.append((effective_count - 2 * s, 2 * s + 1))
+        spreads.append((2 * s + 2, effective_count - 2 * s - 1))
+    return spreads
 
 
 pdf_layout_mgr = PdfLayoutMgr()

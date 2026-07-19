@@ -30,6 +30,11 @@ class _PdfLayoutDeleteBody(BaseModel):
     task_id: str
 
 
+class _PdfLayoutUpdateBody(BaseModel):
+    task_id: str
+    fill_configs: list[int]
+
+
 @limiter.limit("10 per minute; 50 per hour")
 @pdf_layout_bp.route("/pdf_layout/upload", methods=['POST'])
 def pdf_layout_upload() -> ResponseReturnValue:
@@ -153,3 +158,46 @@ def pdf_layout_delete() -> ResponseReturnValue:
     except Exception as e:
         log.error(f"[PDF 排版] 删除任务失败: {e}")
         return _err(f"删除任务失败: {str(e)}")
+
+
+@pdf_layout_bp.route("/pdf_layout/update", methods=['POST'])
+def pdf_layout_update_config() -> ResponseReturnValue:
+    """更新任务配置（填充配置等）。"""
+    try:
+        data: Dict[str, Any] = read_json_from_request()
+        body, err = parse_with_model(
+            _PdfLayoutUpdateBody, data, err_factory=_err)
+        if err or not body:
+            return err or _err("Invalid request body")
+
+        code, msg = pdf_layout_mgr.update_config(body.task_id, body.fill_configs)
+        if code != 0:
+            return _err(msg)
+
+        return _ok({"message": msg})
+
+    except Exception as e:
+        log.error(f"[PDF 排版] 更新配置失败: {e}")
+        return _err(f"更新配置失败: {str(e)}")
+
+
+@pdf_layout_bp.route("/pdf_layout/save", methods=['POST'])
+def pdf_layout_save() -> ResponseReturnValue:
+    """生成骑缝排版 PDF。"""
+    try:
+        data: Dict[str, Any] = read_json_from_request()
+        body, err = parse_with_model(
+            _PdfLayoutUpdateBody, data, err_factory=_err)
+        if err or not body:
+            return err or _err("Invalid request body")
+
+        code, msg = pdf_layout_mgr.save_layout(body.task_id, body.fill_configs)
+        if code != 0:
+            return _err(msg)
+
+        task_info = pdf_layout_mgr.get_task(body.task_id)
+        return _ok(task_info)
+
+    except Exception as e:
+        log.error(f"[PDF 排版] 保存骑缝 PDF 失败: {e}")
+        return _err(f"保存骑缝 PDF 失败: {str(e)}")
