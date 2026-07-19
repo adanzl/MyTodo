@@ -268,6 +268,10 @@ def _build_effective_pages(total_pages: int, insert_at: list[int]) -> list[int]:
         for _ in range(count):
             pages.append(0)
         pages.append(i)
+    # 处理末尾插入（填值 > total_pages 表示在最后插入）
+    trailing = sum(1 for p in insert_at if p > total_pages)
+    for _ in range(trailing):
+        pages.append(0)
     padded = ((len(pages) + 3) // 4) * 4
     while len(pages) < padded:
         pages.append(0)
