@@ -56,11 +56,11 @@
         <!-- 右侧：文件信息 + 预览 -->
         <div class="flex-1 min-w-0 border rounded p-3 flex flex-col min-h-0" v-if="currentTask">
             <!-- 上半：文件信息与操作 -->
-            <div class="shrink-0 space-y-2 pr-1 overflow-auto">
-                <h3 class="text-base font-semibold">文件信息: {{ currentTask.name || currentTask.task_id }}</h3>
+            <div class="shrink-0 pr-1">
+                <h3 class="text-base font-semibold mb-2">文件信息: {{ currentTask.name || currentTask.task_id }}</h3>
 
                 <!-- 任务信息 -->
-                <div class="flex items-center gap-4">
+                <div class="flex items-center gap-4 mb-2">
                     <el-tag :type="getStatusTagType(currentTask.status)" size="small" class="w-16 text-center shrink-0">
                         {{ getStatusText(currentTask.status) }}
                     </el-tag>
@@ -72,52 +72,57 @@
                     </el-tooltip>
                 </div>
 
-                <!-- 上传文件 -->
-                <div class="border rounded p-2 flex flex-col gap-1 w-full min-w-0">
-                    <div class="flex items-start justify-between gap-2 min-w-0">
-                        <div class="flex items-center gap-2 min-w-0 flex-1">
-                            <h4 class="text-xs font-semibold">文件信息</h4>
+                <!-- 文件信息和排版结果水平排列 -->
+                <div class="flex gap-2 mb-2">
+                    <!-- 上传文件 -->
+                    <div class="border rounded p-2 flex-1 min-w-0">
+                        <div class="flex items-start justify-between gap-2 min-w-0">
+                            <div class="flex items-center gap-2 min-w-0 flex-1">
+                                <h4 class="text-xs font-semibold">文件信息</h4>
+                            </div>
+                            <div class="flex items-center gap-1 shrink-0">
+                                <el-button type="success" v-bind="mediumTextButtonProps" @click="handleProcess"
+                                    :disabled="isProcessDisabled" :loading="isTaskProcessing">
+                                    开始排版
+                                </el-button>
+                            </div>
                         </div>
-                        <div class="flex items-center gap-1 shrink-0">
-                            <el-button type="success" v-bind="mediumTextButtonProps" @click="handleProcess"
-                                :disabled="isProcessDisabled" :loading="isTaskProcessing">
-                                开始排版
-                            </el-button>
+                        <div v-if="currentTask.uploaded_info" class="text-xs text-gray-600">
+                            <div class="truncate" :title="currentTask.uploaded_info.name">
+                                {{ currentTask.uploaded_info.name }}
+                            </div>
+                            <div class="flex items-center gap-2 text-xs text-gray-500">
+                                <span>大小: {{ formatSize(currentTask.uploaded_info.size ?? 0) }}</span>
+                                <span>修改: {{ formatTime(currentTask.uploaded_info.modified) }}</span>
+                            </div>
                         </div>
+                        <div v-else class="text-sm text-gray-400">文件信息不可用</div>
                     </div>
-                    <div v-if="currentTask.uploaded_info" class="text-xs text-gray-600">
-                        <div class="truncate" :title="currentTask.uploaded_info.name">
-                            {{ currentTask.uploaded_info.name }}
-                        </div>
-                        <div class="flex items-center gap-2 text-xs text-gray-500">
-                            <span>大小: {{ formatSize(currentTask.uploaded_info.size ?? 0) }}</span>
-                            <span>修改: {{ formatTime(currentTask.uploaded_info.modified) }}</span>
-                        </div>
-                    </div>
-                    <div v-else class="text-sm text-gray-400">文件信息不可用</div>
-                </div>
 
-                <!-- 输出文件 -->
-                <div v-if="currentTask.output_info" class="border rounded p-2 flex flex-col gap-1 w-full min-w-0">
-                    <h4 class="text-xs font-semibold">排版结果</h4>
-                    <div class="text-xs text-gray-600">
-                        <div class="truncate" :title="currentTask.output_info.name">
-                            {{ currentTask.output_info.name }}
-                        </div>
-                        <div class="flex items-center gap-2 text-xs text-gray-500">
-                            <span>大小: {{ formatSize(currentTask.output_info.size ?? 0) }}</span>
-                        </div>
+                    <!-- 输出文件 -->
+                    <div class="border rounded p-2 flex-1 min-w-0">
+                        <h4 class="text-xs font-semibold">排版结果</h4>
+                        <template v-if="currentTask.output_info">
+                            <div class="text-xs text-gray-600">
+                                <div class="truncate" :title="currentTask.output_info.name">
+                                    {{ currentTask.output_info.name }}
+                                </div>
+                                <div class="flex items-center gap-2 text-xs text-gray-500">
+                                    <span>大小: {{ formatSize(currentTask.output_info.size ?? 0) }}</span>
+                                </div>
+                            </div>
+                            <a class="text-xs text-blue-600 hover:text-blue-800"
+                                :href="getDownloadUrl(currentTask.uploaded_info?.name || currentTask.task_id, 'output')"
+                                target="_blank" rel="noopener noreferrer">
+                                下载排版结果
+                            </a>
+                        </template>
+                        <div v-else class="text-xs text-gray-400">暂无排版结果</div>
                     </div>
-                    <a class="text-xs text-blue-600 hover:text-blue-800"
-                        :href="getDownloadUrl(currentTask.uploaded_info?.name || currentTask.task_id, 'output')"
-                        target="_blank" rel="noopener noreferrer">
-                        下载排版结果
-                    </a>
                 </div>
-
 
                 <!-- 排版进度 -->
-                <div v-if="currentTask.status === 'processing'" class="border rounded p-2">
+                <div v-if="currentTask.status === 'processing'" class="border rounded p-2 mb-2">
                     <h4 class="text-xs font-semibold">排版进度</h4>
                     <el-progress :percentage="50" indeterminate />
                     <div class="text-xs text-gray-400">正在处理中，请稍候...</div>
@@ -953,6 +958,10 @@ const updateSaddleStitchPreview = async () => {
     if (!task) return;
     await savePdfLayout(task.task_id, fillConfigs.value);
     await renderSaddleStitchPreview();
+    // 如果在骑缝预览模式，同步刷新 boundPages
+    if (previewMode.value === 'bound') {
+        await renderBoundPreview();
+    }
 };
 
 // 生成并下载骑缝排版 PDF
