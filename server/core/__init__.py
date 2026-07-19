@@ -1,3 +1,19 @@
+from core.models import *
+import time
+import os
+import json
+from core.config import config, app_logger, access_logger
+from core.services.scheduler_mgr import scheduler_mgr
+from core.db.db_mgr import db_mgr
+from core.db import rds_mgr
+from core.chat.chat_mgr import chat_mgr
+import core.ai.ai_mgr as ai_mgr
+from core.tools.useragent_fix import patch_fake_useragent
+from flask_jwt_extended import (JWTManager, create_access_token, create_refresh_token, set_refresh_cookies,
+                                unset_jwt_cookies, verify_jwt_in_request)
+from datetime import timedelta
+from flask_smorest import Api
+from flask_sqlalchemy import SQLAlchemy
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_socketio import SocketIO
@@ -6,35 +22,21 @@ from flask_limiter.util import get_remote_address
 
 # 全局限流实例，供各路由模块装饰器使用
 limiter = Limiter(key_func=get_remote_address)
-from flask_sqlalchemy import SQLAlchemy
-from flask_smorest import Api
-from datetime import timedelta
 
-from flask_jwt_extended import (JWTManager, create_access_token, create_refresh_token, set_refresh_cookies,
-                                unset_jwt_cookies, verify_jwt_in_request)
 
 # 必须在导入任何使用 miservice 的模块之前 patch fake_useragent
 # 避免 fake_useragent 的 ThreadPoolExecutor 在 gevent 环境中导致 LoopExit
-from core.tools.useragent_fix import patch_fake_useragent
 
 patch_fake_useragent()
 
-import core.ai.ai_mgr as ai_mgr
-from core.chat.chat_mgr import chat_mgr
-from core.db import rds_mgr
-from core.db.db_mgr import db_mgr
-from core.services.scheduler_mgr import scheduler_mgr
-from core.config import config, app_logger, access_logger
-import json
-import os
-import time
 
 log = app_logger
 
 
 def create_app():
     instance_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    app = Flask(__name__, instance_path=instance_path, instance_relative_config=True)
+    app = Flask(__name__, instance_path=instance_path,
+                instance_relative_config=True)
 
     # OpenAPI / Swagger UI
     app.config.setdefault("API_TITLE", "MyTodo Server API")
@@ -42,14 +44,16 @@ def create_app():
     app.config.setdefault("OPENAPI_VERSION", "3.0.3")
     app.config.setdefault("OPENAPI_URL_PREFIX", "/")
     app.config.setdefault("OPENAPI_SWAGGER_UI_PATH", "/docs")
-    app.config.setdefault("OPENAPI_SWAGGER_UI_URL", "https://cdn.jsdelivr.net/npm/swagger-ui-dist/")
+    app.config.setdefault("OPENAPI_SWAGGER_UI_URL",
+                          "https://cdn.jsdelivr.net/npm/swagger-ui-dist/")
     Api(app)
 
     # OPTIONS 预检请求记录开始时间（不再短路，让 Flask-CORS 处理）
     @app.before_request
     def _record_options_start_time():
         if request.method == 'OPTIONS':
-            request._start_time = time.time()  # pyright: ignore[reportAttributeAccessIssue]
+            # pyright: ignore[reportAttributeAccessIssue]
+            request._start_time = time.time()
 
     # 配置限流（全局默认）
     limiter = Limiter(
@@ -72,12 +76,14 @@ def create_app():
         # 如果配置为 '*'，禁用 credentials 支持（因为 '*' 与 credentials 不兼容）
         log.warning("[CORS] CORS_ORIGINS 设置为 '*'，但应用需要 credentials 支持（JWT cookies）。"
                     "建议配置具体的 origins（如：CORS_ORIGINS=https://leo-zhao.natapp4.cc,http://localhost:5173）")
-        CORS(app, supports_credentials=False, resources={r"/*": {"origins": "*"}})
+        CORS(app, supports_credentials=False,
+             resources={r"/*": {"origins": "*"}})
         socketio_cors_origins = "*"
     else:
         # 使用具体的 origins 列表，支持 credentials
         log.info(f"[CORS] 配置允许的 origins: {cors_origins}, 启用 credentials 支持")
-        CORS(app, supports_credentials=True, resources={r"/*": {"origins": cors_origins}})
+        CORS(app, supports_credentials=True, resources={
+             r"/*": {"origins": cors_origins}})
         socketio_cors_origins = cors_origins
 
     # 创建 SocketIO 实例并与 Flask 应用关联
@@ -99,6 +105,7 @@ def create_app():
     from core.api.playlist_routes import playlist_bp
     from core.api.mi_routes import mi_bp
     from core.api.pdf_routes import pdf_bp
+    from core.api.pdf_layout_routes import pdf_layout_bp
     from core.api.auth_routes import auth_bp
     from core.api.tts_routes import tts_bp
     from core.api.ai_routes import ai_bp
@@ -118,6 +125,7 @@ def create_app():
     app.register_blueprint(dlna_bp, url_prefix='/')
     app.register_blueprint(mi_bp, url_prefix='/')
     app.register_blueprint(pdf_bp, url_prefix='/')
+    app.register_blueprint(pdf_layout_bp, url_prefix='/')
     app.register_blueprint(auth_bp, url_prefix='/')
     app.register_blueprint(tts_bp, url_prefix='/')
     app.register_blueprint(ai_bp, url_prefix='/')
@@ -132,8 +140,10 @@ def create_app():
     app.config['JWT_TOKEN_LOCATION'] = ['headers', 'cookies']
     app.config['JWT_HEADER_NAME'] = 'Authorization'
     app.config['JWT_HEADER_TYPE'] = 'Bearer'
-    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=int(config.JWT_ACCESS_DAYS))
-    app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=int(config.JWT_REFRESH_DAYS))
+    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(
+        days=int(config.JWT_ACCESS_DAYS))
+    app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(
+        days=int(config.JWT_REFRESH_DAYS))
 
     # refresh token via HttpOnly cookie
     app.config['JWT_COOKIE_SECURE'] = bool(config.IS_PRODUCTION)
@@ -207,14 +217,17 @@ def create_app():
     @app.before_request
     def _record_start_time():
         """记录请求开始时间，用于计算响应时间"""
-        request._start_time = time.time()  # pyright: ignore[reportAttributeAccessIssue]
+        request._start_time = time.time(
+        )  # pyright: ignore[reportAttributeAccessIssue]
 
         # CORS 调试日志：记录 OPTIONS 预检请求
         if request.method == 'OPTIONS':
             origin = request.headers.get('Origin', 'None')
             path = request.path
-            log.debug(f"[CORS Debug] OPTIONS request: origin={origin}, path={path}")
-            log.debug(f"[CORS Debug] Allowed origins: {config.get_cors_origins()}")
+            log.debug(
+                f"[CORS Debug] OPTIONS request: origin={origin}, path={path}")
+            log.debug(
+                f"[CORS Debug] Allowed origins: {config.get_cors_origins()}")
 
     @app.after_request
     def _log_access(response):
@@ -224,18 +237,21 @@ def create_app():
             method = request.method
             path = request.path
             status_code = response.status_code
-            client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', 'unknown'))
+            client_ip = request.environ.get(
+                'HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', 'unknown'))
             user_agent = request.headers.get('User-Agent', '-')
 
             # 计算响应时间
             if hasattr(request, '_start_time'):
                 response_time = (time.time() -
-                                 request._start_time) * 1000  # 转换为毫秒  # pyright: ignore[reportAttributeAccessIssue]
+                                 # 转换为毫秒  # pyright: ignore[reportAttributeAccessIssue]
+                                 request._start_time) * 1000
             else:
                 response_time = 0
 
             # 记录访问日志（格式：方法 路径 状态码 响应时间(ms) 客户端IP User-Agent）
-            access_logger.info(f'{method} {path} {status_code} {response_time:.2f}ms {client_ip} {user_agent}')
+            access_logger.info(
+                f'{method} {path} {status_code} {response_time:.2f}ms {client_ip} {user_agent}')
 
         return response
 
@@ -250,6 +266,3 @@ def create_app():
     rds_mgr.start_restore_timer()
 
     return app
-
-
-from core.models import *
