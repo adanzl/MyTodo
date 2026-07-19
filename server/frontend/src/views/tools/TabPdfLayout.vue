@@ -153,26 +153,8 @@
             下载排版结果
           </a>
         </div>
-      </div>
-    </div>
 
-    <!-- 中间：空状态 -->
-    <div class="flex-1 min-w-0 border rounded p-3 flex flex-col" v-else>
-      <div class="flex items-center justify-between mb-3 shrink-0">
-        <h3 class="text-base font-semibold">文件信息</h3>
-      </div>
-      <div class="flex-1 flex items-center justify-center text-sm text-gray-400">
-        请从左侧选择一个任务查看文件信息
-      </div>
-    </div>
-
-    <!-- 右侧：排版操作 -->
-    <div class="w-80 shrink-0 border rounded p-3 flex flex-col" v-if="currentTask">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="text-base font-semibold">排版操作</h3>
-      </div>
-      <div class="flex-1 overflow-auto flex flex-col gap-3">
-        <!-- 操作按钮 -->
+        <!-- 排版操作 -->
         <div class="border rounded p-3 flex flex-col gap-2">
           <el-button
             type="success"
@@ -195,27 +177,19 @@
           <el-progress :percentage="50" indeterminate />
           <div class="text-sm text-gray-400">正在处理中，请稍候...</div>
         </div>
-
-        <!-- 排版结果 -->
-        <div
-          v-if="currentTask.status === 'success'"
-          class="border rounded p-3 flex flex-col gap-2"
-        >
-          <h4 class="text-sm font-semibold">排版结果</h4>
-          <div class="text-sm text-gray-600">
-            <div>排版完成！</div>
-          </div>
-        </div>
       </div>
     </div>
 
-    <!-- 右侧：空状态 -->
-    <div class="w-80 shrink-0 border rounded p-3 flex flex-col" v-else>
-      <h3 class="text-base font-semibold mb-3">排版操作</h3>
+    <!-- 中间：空状态 -->
+    <div class="flex-1 min-w-0 border rounded p-3 flex flex-col" v-else>
+      <div class="flex items-center justify-between mb-3 shrink-0">
+        <h3 class="text-base font-semibold">文件信息</h3>
+      </div>
       <div class="flex-1 flex items-center justify-center text-sm text-gray-400">
-        请从左侧选择一个任务进行操作
+        请从左侧选择一个任务查看文件信息
       </div>
     </div>
+
 
     <!-- 上传/创建任务对话框 -->
     <el-dialog
