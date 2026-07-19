@@ -80,12 +80,6 @@
                             <div class="flex items-center gap-2 min-w-0 flex-1">
                                 <h4 class="text-xs font-semibold">文件信息</h4>
                             </div>
-                            <div class="flex items-center gap-1 shrink-0">
-                                <el-button type="success" v-bind="mediumTextButtonProps" @click="handleProcess"
-                                    :disabled="isProcessDisabled" :loading="isTaskProcessing">
-                                    开始排版
-                                </el-button>
-                            </div>
                         </div>
                         <div v-if="currentTask.uploaded_info" class="text-xs text-gray-600">
                             <div class="truncate" :title="currentTask.uploaded_info.name">
@@ -101,7 +95,14 @@
 
                     <!-- 输出文件 -->
                     <div class="border rounded p-2 flex-1 min-w-0">
-                        <h4 class="text-xs font-semibold">排版结果</h4>
+                        <div class="flex items-center justify-between gap-2">
+                            <h4 class="text-xs font-semibold">排版结果</h4>
+                            <a v-if="currentTask.output_info" class="text-xs text-blue-600 hover:text-blue-800"
+                                :href="getDownloadUrl(currentTask.uploaded_info?.name || currentTask.task_id, 'output')"
+                                target="_blank" rel="noopener noreferrer">
+                                下载排版结果
+                            </a>
+                        </div>
                         <template v-if="currentTask.output_info">
                             <div class="text-xs text-gray-600">
                                 <div class="truncate" :title="currentTask.output_info.name">
@@ -111,13 +112,8 @@
                                     <span>大小: {{ formatSize(currentTask.output_info.size ?? 0) }}</span>
                                 </div>
                             </div>
-                            <a class="text-xs text-blue-600 hover:text-blue-800"
-                                :href="getDownloadUrl(currentTask.uploaded_info?.name || currentTask.task_id, 'output')"
-                                target="_blank" rel="noopener noreferrer">
-                                下载排版结果
-                            </a>
                         </template>
-                        <div v-else class="text-xs text-gray-400">暂无排版结果</div>
+                        <div v-else class="text-xs text-gray-400">暂版结果</div>
                     </div>
                 </div>
 
@@ -163,7 +159,7 @@
                             </el-button>
                             <el-button type="success" size="small" plain class="!h-5 !text-xs !px-2"
                                 @click="handleDownloadLayout">
-                                下载
+                                生成
                             </el-button>
                         </div>
                     </div>
@@ -220,9 +216,9 @@
                 <div v-loading="previewLoading"
                     class="flex-1 flex items-center justify-center bg-gray-100 rounded min-h-0 overflow-hidden p-2 relative">
                     <!-- 左右翻页点击区域 -->
-                    <div v-if="hasPreviewContent" class="absolute left-0 top-0 w-[20%] h-full z-10 cursor-w-resize"
+                    <div v-if="hasPreviewContent" class="absolute left-0 top-0 w-[20%] h-full z-10 cursor-pointer"
                         @click="handlePrevPage"></div>
-                    <div v-if="hasPreviewContent" class="absolute right-0 top-0 w-[20%] h-full z-10 cursor-e-resize"
+                    <div v-if="hasPreviewContent" class="absolute right-0 top-0 w-[20%] h-full z-10 cursor-pointer"
                         @click="handleNextPage"></div>
                     <!-- 普通预览（双页）-->
                     <div v-if="previewMode === 'single' && previewPages[previewCurrentPage - 1]"
@@ -361,7 +357,6 @@ import { useControllableInterval } from "@/composables/useInterval";
 import {
     getPdfLayoutList,
     uploadPdfLayout,
-    processPdfLayout,
     getPdfLayoutTaskStatus,
     getPdfLayoutDownloadUrl,
     deletePdfLayout,
@@ -470,13 +465,6 @@ const withLoading = async (action: () => Promise<void>, errorMessage: string) =>
 };
 
 // 计算属性
-const isTaskProcessing = computed(() => currentTask.value?.status === "processing");
-const isProcessDisabled = computed(() => {
-    const task = currentTask.value;
-    if (!task || isTaskProcessing.value) return true;
-    return !task.uploaded_info || task.status === "pending";
-});
-
 // 是否有可翻页的预览内容
 const hasPreviewContent = computed(() => {
     if (previewMode.value === 'single') return previewPages.value.length > 0;
@@ -616,26 +604,6 @@ const handleDeleteTask = async (taskId: string) => {
             ElMessage.error(response.msg || "删除任务失败");
         }
     }, "删除任务失败");
-};
-
-// 开始排版
-const handleProcess = async () => {
-    const task = currentTask.value;
-    if (!task) return;
-    if (!task.uploaded_info) return ElMessage.warning("没有可处理的文件");
-    if (!(await confirmAction(`确定要排版 "${task.name || task.task_id}" 吗?`, "确认排版"))) return;
-
-    await withLoading(async () => {
-        const response = await processPdfLayout(task!.task_id);
-        if (response.code === 0) {
-            ElMessage.success("排版任务已启动");
-            taskList.value = (await getPdfLayoutList()).data as PdfLayoutTask[] || [];
-            await syncTask();
-            startPolling();
-        } else {
-            ElMessage.error(response.msg || "启动排版失败");
-        }
-    }, "启动排版失败");
 };
 
 // 轮询
