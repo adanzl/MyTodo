@@ -170,7 +170,8 @@ def pdf_layout_save() -> ResponseReturnValue:
         if err or not body:
             return err or _err("Invalid request body")
 
-        code, msg = pdf_layout_mgr.update_fill_configs(body.task_id, body.fill_configs)
+        code, msg = pdf_layout_mgr.save_fill_configs(
+            body.task_id, body.fill_configs)
         if code != 0:
             return _err(msg)
 
