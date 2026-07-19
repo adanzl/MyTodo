@@ -102,3 +102,17 @@ export async function savePdfLayout(
   });
   return response.data;
 }
+
+/**
+ * 保存任务的填充配置
+ */
+export async function savePdfLayoutFillConfigs(
+  task_id: string,
+  fill_configs: number[]
+): Promise<ApiResponse<{ message: string }>> {
+  const response = await api.put<ApiResponse<{ message: string }>>(
+    `/pdf_layout/${encodeURIComponent(task_id)}/config`,
+    { fill_configs }
+  );
+  return response.data;
+}
