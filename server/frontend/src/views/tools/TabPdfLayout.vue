@@ -150,7 +150,7 @@
                             class="flex items-center gap-1">
                             <span class="text-xs text-gray-500 ml-1">填充:</span>
                             <el-input-number v-for="(_, i) in fillConfigs" :key="i" v-model="fillConfigs[i]"
-                                size="small" class="!w-16" :min="1" :max="originalTotalPages"
+                                size="small" class="!w-16" :min="1" :max="originalTotalPages + 1"
                                 controls-position="right" />
                             <el-button size="small" type="primary" plain class="!h-5 !text-xs !px-2"
                                 @click="updateSaddleStitchPreview">
@@ -717,7 +717,7 @@ function generateSaddleStitchSpreads(effectiveCount: number): [number, number][]
 }
 
 // 构建有效页面数据：0=空白页，>0=原始页码，自动补齐到4的倍数
-// insertAt: 在指定页码之前插入空白页
+// insertAt: 在指定页码之前插入空白页（>totalPages 表示在末尾插入）
 function buildEffectivePages(totalPages: number, insertAt: number[]): number[] {
     const pages: number[] = [];
     for (let i = 1; i <= totalPages; i++) {
@@ -725,6 +725,9 @@ function buildEffectivePages(totalPages: number, insertAt: number[]): number[] {
         for (let b = 0; b < count; b++) pages.push(0);
         pages.push(i);
     }
+    // 处理末尾插入（填值 > totalPages 表示在最后插入）
+    const trailing = insertAt.filter(p => p > totalPages).length;
+    for (let b = 0; b < trailing; b++) pages.push(0);
     const padded = Math.ceil(pages.length / 4) * 4;
     while (pages.length < padded) pages.push(0);
     return pages;
@@ -733,7 +736,7 @@ function buildEffectivePages(totalPages: number, insertAt: number[]): number[] {
 // 初始化填充配置：需要几页就生成几个默认值（全部在末页后）
 function initFillConfigs(totalPages: number): number[] {
     const needed = Math.ceil(totalPages / 4) * 4 - totalPages;
-    return needed > 0 ? Array(needed).fill(totalPages) : [];
+    return needed > 0 ? Array(needed).fill(totalPages + 1) : [];
 }
 
 // 骑缝排版（加载并初始化填充配置）
