@@ -88,3 +88,31 @@ export async function deletePdfLayout(task_id: string): Promise<ApiResponse<{ me
   });
   return response.data;
 }
+
+/**
+ * 更新任务配置（填充配置等）
+ */
+export async function updatePdfLayoutConfig(
+  task_id: string,
+  fill_configs: number[]
+): Promise<ApiResponse<{ message: string }>> {
+  const response = await api.post<ApiResponse<{ message: string }>>("/pdf_layout/update", {
+    task_id,
+    fill_configs,
+  });
+  return response.data;
+}
+
+/**
+ * 生成并保存骑缝排版 PDF
+ */
+export async function savePdfLayout(
+  task_id: string,
+  fill_configs: number[]
+): Promise<ApiResponse<PdfLayoutTask>> {
+  const response = await api.post<ApiResponse<PdfLayoutTask>>("/pdf_layout/save", {
+    task_id,
+    fill_configs,
+  });
+  return response.data;
+}

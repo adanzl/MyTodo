@@ -15,6 +15,7 @@ from datetime import timedelta
 from flask_smorest import Api
 from flask_sqlalchemy import SQLAlchemy
 from flask import Flask, jsonify, request
+from typing import Any, cast
 from flask_cors import CORS
 from flask_socketio import SocketIO
 from flask_limiter import Limiter
@@ -52,8 +53,7 @@ def create_app():
     @app.before_request
     def _record_options_start_time():
         if request.method == 'OPTIONS':
-            # pyright: ignore[reportAttributeAccessIssue]
-            request._start_time = time.time()
+            cast(Any, request)._start_time = time.time()
 
     # 配置限流（全局默认）
     limiter = Limiter(
@@ -217,8 +217,7 @@ def create_app():
     @app.before_request
     def _record_start_time():
         """记录请求开始时间，用于计算响应时间"""
-        request._start_time = time.time(
-        )  # pyright: ignore[reportAttributeAccessIssue]
+        cast(Any, request)._start_time = time.time()
 
         # CORS 调试日志：记录 OPTIONS 预检请求
         if request.method == 'OPTIONS':
@@ -244,8 +243,7 @@ def create_app():
             # 计算响应时间
             if hasattr(request, '_start_time'):
                 response_time = (time.time() -
-                                 # 转换为毫秒  # pyright: ignore[reportAttributeAccessIssue]
-                                 request._start_time) * 1000
+                                 cast(Any, request)._start_time) * 1000
             else:
                 response_time = 0
 
