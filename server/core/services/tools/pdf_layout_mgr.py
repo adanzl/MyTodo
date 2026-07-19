@@ -273,18 +273,16 @@ class PdfLayoutMgr(BaseTaskMgr[PdfLayoutTask]):
 
 # ---- 算法辅助函数（与前端对齐） ----
 
-def _build_effective_pages(total_pages: int, replace_at: list[int]) -> list[int]:
-    """构建有效页码列表，0=空白，按 replace_at 替换指定页为空白。"""
+def _build_effective_pages(total_pages: int, insert_at: list[int]) -> list[int]:
+    """构建有效页码列表，0=空白，按 insert_at 在指定页前插入空白。"""
     pages: list[int] = []
     for i in range(1, total_pages + 1):
-        count = sum(1 for p in replace_at if p == i)
-        if count > 0:
-            for _ in range(count):
-                pages.append(0)
-        else:
-            pages.append(i)
+        count = sum(1 for p in insert_at if p == i)
+        for _ in range(count):
+            pages.append(0)
+        pages.append(i)
     # 末尾追加空白（填值 > total_pages 表示在末尾追加）
-    trailing = sum(1 for p in replace_at if p > total_pages)
+    trailing = sum(1 for p in insert_at if p > total_pages)
     for _ in range(trailing):
         pages.append(0)
     padded = ((len(pages) + 3) // 4) * 4
