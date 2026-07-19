@@ -231,7 +231,7 @@
                             <img :src="previewPages[previewCurrentPage - 1].leftImage"
                                 class="max-w-full max-h-full object-contain" />
                             <span class="text-xs text-gray-400 mt-1">
-                                第 {{ previewPages[previewCurrentPage - 1].leftPageNum || originalTotalPages }} 页
+                                第 {{ previewPages[previewCurrentPage - 1].leftPageNum }} 页
                             </span>
                         </div>
                         <div class="h-full flex flex-col items-center justify-center shrink-0 max-w-[50%] relative">
@@ -242,7 +242,7 @@
                             <span v-if="previewPages[previewCurrentPage - 1].rightPageNum === 0"
                                 class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
                             <span class="text-xs text-gray-400 mt-1">
-                                第 {{ previewPages[previewCurrentPage - 1].rightPageNum || originalTotalPages }} 页
+                                第 {{ previewPages[previewCurrentPage - 1].rightPageNum }} 页
                             </span>
                         </div>
                     </div>
@@ -257,7 +257,7 @@
                             <span v-if="spreadPages[spreadCurrentPage - 1].leftPageNum === 0"
                                 class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
                             <span class="text-xs text-gray-400 mt-1">
-                                第 {{ spreadPages[spreadCurrentPage - 1].leftPageNum || originalTotalPages }} 页
+                                第 {{ spreadPages[spreadCurrentPage - 1].leftPageNum }} 页
                             </span>
                         </div>
                         <div class="h-full flex flex-col items-center justify-center shrink-0 max-w-[50%] relative">
@@ -268,7 +268,7 @@
                             <span v-if="spreadPages[spreadCurrentPage - 1].rightPageNum === 0"
                                 class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
                             <span class="text-xs text-gray-400 mt-1">
-                                第 {{ spreadPages[spreadCurrentPage - 1].rightPageNum || originalTotalPages }} 页
+                                第 {{ spreadPages[spreadCurrentPage - 1].rightPageNum }} 页
                             </span>
                         </div>
                     </div>
@@ -285,7 +285,7 @@
                                 <span v-if="boundPages[spreadCurrentPage - 1].leftPageNum === 0"
                                     class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
                                 <span class="text-xs text-gray-400 mt-1">
-                                    第 {{ boundPages[spreadCurrentPage - 1].leftPageNum || originalTotalPages }} 页
+                                    第 {{ boundPages[spreadCurrentPage - 1].leftPageNum }} 页
                                 </span>
                             </div>
                             <!-- 书脊效果 -->
@@ -300,7 +300,7 @@
                                 <span v-if="boundPages[spreadCurrentPage - 1].rightPageNum === 0"
                                     class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
                                 <span class="text-xs text-gray-400 mt-1">
-                                    第 {{ boundPages[spreadCurrentPage - 1].rightPageNum || originalTotalPages }} 页
+                                    第 {{ boundPages[spreadCurrentPage - 1].rightPageNum }} 页
                                 </span>
                             </div>
                         </div>
@@ -748,20 +748,16 @@ function generateSaddleStitchSpreads(effectiveCount: number): [number, number][]
 }
 
 // 构建有效页面数据：0=空白页，>0=原始页码，自动补齐到4的倍数
-// replaceAt: 用空白替换指定页码的页面（>totalPages 表示在末尾追加空白）
-function buildEffectivePages(totalPages: number, replaceAt: number[]): number[] {
+// insertAt: 在指定页码前插入空白页（>totalPages 表示在末尾追加）
+function buildEffectivePages(totalPages: number, insertAt: number[]): number[] {
     const pages: number[] = [];
     for (let i = 1; i <= totalPages; i++) {
-        const count = replaceAt.filter(p => p === i).length;
-        if (count > 0) {
-            // 替换：用空白代替原页码
-            for (let b = 0; b < count; b++) pages.push(0);
-        } else {
-            pages.push(i);
-        }
+        const count = insertAt.filter(p => p === i).length;
+        for (let b = 0; b < count; b++) pages.push(0);
+        pages.push(i);
     }
     // 末尾追加空白（填值 > totalPages）
-    const trailing = replaceAt.filter(p => p > totalPages).length;
+    const trailing = insertAt.filter(p => p > totalPages).length;
     for (let b = 0; b < trailing; b++) pages.push(0);
     const padded = Math.ceil(pages.length / 4) * 4;
     while (pages.length < padded) pages.push(0);
