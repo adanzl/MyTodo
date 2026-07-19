@@ -748,16 +748,20 @@ function generateSaddleStitchSpreads(effectiveCount: number): [number, number][]
 }
 
 // 构建有效页面数据：0=空白页，>0=原始页码，自动补齐到4的倍数
-// insertAt: 在指定页码之前插入空白页（>totalPages 表示在末尾插入）
-function buildEffectivePages(totalPages: number, insertAt: number[]): number[] {
+// replaceAt: 用空白替换指定页码的页面（>totalPages 表示在末尾追加空白）
+function buildEffectivePages(totalPages: number, replaceAt: number[]): number[] {
     const pages: number[] = [];
     for (let i = 1; i <= totalPages; i++) {
-        const count = insertAt.filter(p => p === i).length;
-        for (let b = 0; b < count; b++) pages.push(0);
-        pages.push(i);
+        const count = replaceAt.filter(p => p === i).length;
+        if (count > 0) {
+            // 替换：用空白代替原页码
+            for (let b = 0; b < count; b++) pages.push(0);
+        } else {
+            pages.push(i);
+        }
     }
-    // 处理末尾插入（填值 > totalPages 表示在最后插入）
-    const trailing = insertAt.filter(p => p > totalPages).length;
+    // 末尾追加空白（填值 > totalPages）
+    const trailing = replaceAt.filter(p => p > totalPages).length;
     for (let b = 0; b < trailing; b++) pages.push(0);
     const padded = Math.ceil(pages.length / 4) * 4;
     while (pages.length < padded) pages.push(0);
