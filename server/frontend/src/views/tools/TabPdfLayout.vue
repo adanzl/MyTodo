@@ -883,19 +883,19 @@ function generateBoundSpreads(effectiveData: number[]): [number, number][] {
     }
     if (lastContentIdx < 0) return spreads;
 
-    // 第一个对开：[末页, 第1页]
+    // 第一个对开：[末页, 第1页]（骑缝装订的封面）
     spreads.push([effectiveData[lastContentIdx], effectiveData[0]]);
 
-    // 中间页：顺序配对（2-3, 4-5...）
+    // 中间页顺序配对（2-3, 4-5...），不越过 lastContentIdx
     for (let i = 1; i < lastContentIdx; i += 2) {
-        spreads.push([effectiveData[i], effectiveData[i + 1]]);
+        const right = i + 1 < lastContentIdx ? effectiveData[i + 1] : 0;
+        spreads.push([effectiveData[i], right]);
     }
 
-    // 末尾填充页（空白页）
+    // 末尾填充空白页
     for (let i = lastContentIdx + 1; i < n; i += 2) {
-        if (i + 1 < n) {
-            spreads.push([effectiveData[i], effectiveData[i + 1]]);
-        }
+        const right = i + 1 < n ? effectiveData[i + 1] : 0;
+        spreads.push([effectiveData[i], right]);
     }
 
     return spreads;
