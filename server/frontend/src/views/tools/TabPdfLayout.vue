@@ -356,7 +356,6 @@ import {
     getPdfLayoutTaskStatus,
     getPdfLayoutDownloadUrl,
     deletePdfLayout,
-    updatePdfLayoutConfig,
     savePdfLayout,
 } from "@/api/api-pdf-layout";
 import type { PdfLayoutTask } from "@/types/tools/pdf-layout";
@@ -916,14 +915,6 @@ const handleBoundPreview = async (item: PdfLayoutTask) => {
 
 // 按当前填充配置重新渲染骑缝预览
 const updateSaddleStitchPreview = async () => {
-    const task = currentTask.value;
-    if (task) {
-        try {
-            await updatePdfLayoutConfig(task.task_id, fillConfigs.value);
-        } catch {
-            // 静默失败，不影响预览
-        }
-    }
     renderSaddleStitchPreview();
 };
 
