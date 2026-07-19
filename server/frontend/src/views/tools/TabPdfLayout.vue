@@ -126,8 +126,8 @@
             </div>
 
             <!-- 下半：PDF 预览 -->
-            <div class="flex-1 min-h-0 border-t pt-3 mt-3 flex flex-col">
-                <div class="flex items-center justify-between shrink-0 mb-2">
+            <div class="flex-1 min-h-0 border-t pt-3 mt-1 flex flex-col">
+                <div class="flex items-center justify-between shrink-0 mb-2 h-4">
                     <div class="flex items-center gap-0">
                         <span class="text-sm font-semibold mr-4">PDF 预览</span>
                         <el-button type="success" size="small" plain class="!h-5 !text-xs !px-2 shrink-0"
@@ -214,178 +214,278 @@
                     </div>
                 </div>
                 <div v-loading="previewLoading"
-                    class="flex-1 flex items-center justify-center bg-gray-100 rounded min-h-0 overflow-hidden p-2 relative">
-                    <!-- 左右翻页点击区域 -->
-                    <div v-if="hasPreviewContent" class="absolute left-0 top-0 w-[20%] h-full z-10 cursor-pointer"
-                        @click="handlePrevPage"></div>
-                    <div v-if="hasPreviewContent" class="absolute right-0 top-0 w-[20%] h-full z-10 cursor-pointer"
-                        @click="handleNextPage"></div>
-                    <!-- 翻书动画容器 -->
-                    <div class="flip-perspective flex items-stretch justify-center w-full h-full"
-                        :style="previewMode === 'bound' && boundPages[spreadCurrentPage - 1] ? 'filter: drop-shadow(0 2px 8px rgba(0,0,0,0.12))' : ''">
+                    class="flex-1 flex items-center justify-center bg-gray-100 rounded min-h-0 overflow-hidden p-2 relative [overflow-anchor:none]">
+                    <!-- 左右翻页点击区域（边界禁用，避免无效点击引起滚动/跳动） -->
+                    <div v-if="hasPreviewContent"
+                        class="absolute left-0 top-0 w-[20%] h-full z-10"
+                        :class="canFlipPrev ? 'cursor-pointer' : 'pointer-events-none'"
+                        @click.prevent="handlePrevPage"></div>
+                    <div v-if="hasPreviewContent"
+                        class="absolute right-0 top-0 w-[20%] h-full z-10"
+                        :class="canFlipNext ? 'cursor-pointer' : 'pointer-events-none'"
+                        @click.prevent="handleNextPage"></div>
+                    <!-- 翻书动画容器（勿在此加 filter，会压扁 3D 翻页） -->
+                    <div class="flip-perspective flex items-stretch justify-center w-full h-full">
                         <!-- 普通预览（双页）-->
                         <template v-if="previewMode === 'single' && previewPages[previewCurrentPage - 1]">
-                            <div class="flip-page flip-page-left h-full flex-1 min-w-0" :class="leftPageAnimeClass">
-                                <div class="flip-page-inner relative">
-                                    <div class="flip-face flip-face-front flex flex-col items-center justify-center">
-                                        <img :src="previewPages[previewCurrentPage - 1].leftImage"
+                            <div class="flip-slot flip-slot-left relative h-full flex-1 min-w-0">
+                                <div class="flip-page-stack">
+                                    <div class="flip-stage">
+                                    <div v-if="flipUnderlayLeft"
+                                        class="flip-underlay flip-underlay-left absolute inset-0 z-0 pointer-events-none">
+                                        <img v-if="flipUnderlayLeft.leftPageNum === 0" :src="blankPageDataUrl"
+                                            class="max-w-full max-h-full object-contain rounded border-2 border-dashed border-gray-300" />
+                                        <img v-else-if="flipUnderlayLeft.leftImage" :src="flipUnderlayLeft.leftImage"
                                             class="max-w-full max-h-full object-contain" />
-                                        <span class="text-xs text-gray-400 mt-1">
-                                            第 {{ previewPages[previewCurrentPage - 1].leftPageNum || originalTotalPages }} 页
-                                        </span>
                                     </div>
-                                    <div class="flip-face flip-face-back flex flex-col items-center justify-center">
-                                        <img v-if="flipBackSpread?.rightImage" :src="flipBackSpread.rightImage"
-                                            class="max-w-full max-h-full object-contain" />
-                                        <span v-if="flipBackSpread?.rightPageNum" class="text-xs text-gray-400 mt-1">
-                                            第 {{ flipBackSpread.rightPageNum }} 页
-                                        </span>
+                                    <div class="flip-page flip-page-left relative z-[1] max-h-full max-w-full"
+                                        :class="leftPageAnimeClass">
+                                        <div class="flip-page-inner relative">
+                                            <div class="flip-face flip-face-front">
+                                                <img :src="previewPages[previewCurrentPage - 1].leftImage"
+                                                    class="max-w-full max-h-full object-contain" />
+                                            </div>
+                                            <div class="flip-face flip-face-back">
+                                                <template v-if="flipBackSpread">
+                                                    <img v-if="flipBackSpread.rightPageNum === 0" :src="blankPageDataUrl"
+                                                        class="max-w-full max-h-full object-contain rounded border-2 border-dashed border-gray-300" />
+                                                    <img v-else-if="flipBackSpread.rightImage"
+                                                        :src="flipBackSpread.rightImage"
+                                                        class="max-w-full max-h-full object-contain" />
+                                                    <span v-if="flipBackSpread.rightPageNum === 0"
+                                                        class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
+                                                </template>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
+                                <span class="flip-page-label">{{ leftPageLabel }}</span>
+                                </div>
                             </div>
-                            <div class="flip-page flip-page-right h-full flex-1 min-w-0" :class="rightPageAnimeClass">
-                                <div class="flip-page-inner relative">
-                                    <div class="flip-face flip-face-front flex flex-col items-center justify-center">
-                                        <img v-if="previewPages[previewCurrentPage - 1].rightPageNum === 0"
-                                            :src="blankPageDataUrl"
+                            <div class="flip-slot flip-slot-right relative h-full flex-1 min-w-0">
+                                <div class="flip-page-stack">
+                                    <div class="flip-stage">
+                                    <div v-if="flipUnderlayRight"
+                                        class="flip-underlay flip-underlay-right absolute inset-0 z-0 pointer-events-none">
+                                        <img v-if="flipUnderlayRight.rightPageNum === 0" :src="blankPageDataUrl"
                                             class="max-w-full max-h-full object-contain rounded border-2 border-dashed border-gray-300" />
-                                        <img v-else :src="previewPages[previewCurrentPage - 1].rightImage"
+                                        <img v-else-if="flipUnderlayRight.rightImage" :src="flipUnderlayRight.rightImage"
                                             class="max-w-full max-h-full object-contain" />
-                                        <span v-if="previewPages[previewCurrentPage - 1].rightPageNum === 0"
-                                            class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
-                                        <span class="text-xs text-gray-400 mt-1">
-                                            第 {{ previewPages[previewCurrentPage - 1].rightPageNum || originalTotalPages }}
-                                            页
-                                        </span>
                                     </div>
-                                    <div class="flip-face flip-face-back flex flex-col items-center justify-center">
-                                        <img v-if="flipBackSpread?.leftImage" :src="flipBackSpread.leftImage"
-                                            class="max-w-full max-h-full object-contain" />
-                                        <span v-if="flipBackSpread?.leftPageNum" class="text-xs text-gray-400 mt-1">
-                                            第 {{ flipBackSpread.leftPageNum }} 页
-                                        </span>
+                                    <div class="flip-page flip-page-right relative z-[1] max-h-full max-w-full"
+                                        :class="rightPageAnimeClass">
+                                        <div class="flip-page-inner relative">
+                                            <div class="flip-face flip-face-front">
+                                                <img v-if="previewPages[previewCurrentPage - 1].rightPageNum === 0"
+                                                    :src="blankPageDataUrl"
+                                                    class="max-w-full max-h-full object-contain rounded border-2 border-dashed border-gray-300" />
+                                                <img v-else :src="previewPages[previewCurrentPage - 1].rightImage"
+                                                    class="max-w-full max-h-full object-contain" />
+                                                <span v-if="previewPages[previewCurrentPage - 1].rightPageNum === 0"
+                                                    class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
+                                            </div>
+                                            <div class="flip-face flip-face-back">
+                                                <template v-if="flipBackSpread">
+                                                    <img v-if="flipBackSpread.leftPageNum === 0" :src="blankPageDataUrl"
+                                                        class="max-w-full max-h-full object-contain rounded border-2 border-dashed border-gray-300" />
+                                                    <img v-else-if="flipBackSpread.leftImage"
+                                                        :src="flipBackSpread.leftImage"
+                                                        class="max-w-full max-h-full object-contain" />
+                                                    <span v-if="flipBackSpread.leftPageNum === 0"
+                                                        class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
+                                                </template>
+                                            </div>
+                                        </div>
                                     </div>
+                                </div>
+                                <span class="flip-page-label">{{ rightPageLabel }}</span>
                                 </div>
                             </div>
                         </template>
-                        <!-- 骑缝模式 -->
+                        <!-- 骑缝模式（半页翻） -->
                         <template v-else-if="previewMode === 'saddle-stitch' && spreadPages[spreadCurrentPage - 1]">
-                            <div class="flip-page flip-page-left h-full flex-1 min-w-0" :class="leftPageAnimeClass">
-                                <div class="flip-page-inner relative">
-                                    <div class="flip-face flip-face-front flex flex-col items-center justify-center">
-                                        <img v-if="spreadPages[spreadCurrentPage - 1].leftPageNum === 0"
-                                            :src="blankPageDataUrl"
+                            <div class="flip-slot flip-slot-left relative h-full flex-1 min-w-0">
+                                <div class="flip-page-stack">
+                                    <div class="flip-stage">
+                                    <div v-if="flipUnderlayLeft"
+                                        class="flip-underlay flip-underlay-left absolute inset-0 z-0 pointer-events-none">
+                                        <img v-if="flipUnderlayLeft.leftPageNum === 0" :src="blankPageDataUrl"
                                             class="max-w-full max-h-full object-contain rounded border-2 border-dashed border-gray-300" />
-                                        <img v-else :src="spreadPages[spreadCurrentPage - 1].leftImage"
+                                        <img v-else-if="flipUnderlayLeft.leftImage" :src="flipUnderlayLeft.leftImage"
                                             class="max-w-full max-h-full object-contain" />
-                                        <span v-if="spreadPages[spreadCurrentPage - 1].leftPageNum === 0"
+                                        <span v-if="flipUnderlayLeft.leftPageNum === 0"
                                             class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
-                                        <span class="text-xs text-gray-400 mt-1">
-                                            第 {{ spreadPages[spreadCurrentPage - 1].leftPageNum || originalTotalPages }} 页
-                                        </span>
                                     </div>
-                                    <div class="flip-face flip-face-back flex flex-col items-center justify-center">
-                                        <img v-if="flipBackSpread?.rightImage" :src="flipBackSpread.rightImage"
-                                            class="max-w-full max-h-full object-contain" />
-                                        <span v-if="flipBackSpread?.rightPageNum" class="text-xs text-gray-400 mt-1">
-                                            第 {{ flipBackSpread.rightPageNum }} 页
-                                        </span>
+                                    <div class="flip-page flip-page-left relative z-[1] max-h-full max-w-full"
+                                        :class="leftPageAnimeClass">
+                                        <div class="flip-page-inner relative">
+                                            <div class="flip-face flip-face-front">
+                                                <img v-if="spreadPages[spreadCurrentPage - 1].leftPageNum === 0"
+                                                    :src="blankPageDataUrl"
+                                                    class="max-w-full max-h-full object-contain rounded border-2 border-dashed border-gray-300" />
+                                                <img v-else :src="spreadPages[spreadCurrentPage - 1].leftImage"
+                                                    class="max-w-full max-h-full object-contain" />
+                                                <span v-if="spreadPages[spreadCurrentPage - 1].leftPageNum === 0"
+                                                    class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
+                                            </div>
+                                            <div class="flip-face flip-face-back">
+                                                <template v-if="flipBackSpread">
+                                                    <img v-if="flipBackSpread.rightPageNum === 0" :src="blankPageDataUrl"
+                                                        class="max-w-full max-h-full object-contain rounded border-2 border-dashed border-gray-300" />
+                                                    <img v-else-if="flipBackSpread.rightImage"
+                                                        :src="flipBackSpread.rightImage"
+                                                        class="max-w-full max-h-full object-contain" />
+                                                    <span v-if="flipBackSpread.rightPageNum === 0"
+                                                        class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
+                                                </template>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
+                                <span class="flip-page-label">{{ leftPageLabel }}</span>
+                                </div>
                             </div>
-                            <div class="flip-page flip-page-right h-full flex-1 min-w-0" :class="rightPageAnimeClass">
-                                <div class="flip-page-inner relative">
-                                    <div class="flip-face flip-face-front flex flex-col items-center justify-center">
-                                        <img v-if="spreadPages[spreadCurrentPage - 1].rightPageNum === 0"
-                                            :src="blankPageDataUrl"
+                            <div class="flip-slot flip-slot-right relative h-full flex-1 min-w-0">
+                                <div class="flip-page-stack">
+                                    <div class="flip-stage">
+                                    <div v-if="flipUnderlayRight"
+                                        class="flip-underlay flip-underlay-right absolute inset-0 z-0 pointer-events-none">
+                                        <img v-if="flipUnderlayRight.rightPageNum === 0" :src="blankPageDataUrl"
                                             class="max-w-full max-h-full object-contain rounded border-2 border-dashed border-gray-300" />
-                                        <img v-else :src="spreadPages[spreadCurrentPage - 1].rightImage"
+                                        <img v-else-if="flipUnderlayRight.rightImage" :src="flipUnderlayRight.rightImage"
                                             class="max-w-full max-h-full object-contain" />
-                                        <span v-if="spreadPages[spreadCurrentPage - 1].rightPageNum === 0"
+                                        <span v-if="flipUnderlayRight.rightPageNum === 0"
                                             class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
-                                        <span class="text-xs text-gray-400 mt-1">
-                                            第 {{ spreadPages[spreadCurrentPage - 1].rightPageNum || originalTotalPages }} 页
-                                        </span>
                                     </div>
-                                    <div class="flip-face flip-face-back flex flex-col items-center justify-center">
-                                        <img v-if="flipBackSpread?.leftImage" :src="flipBackSpread.leftImage"
-                                            class="max-w-full max-h-full object-contain" />
-                                        <span v-if="flipBackSpread?.leftPageNum" class="text-xs text-gray-400 mt-1">
-                                            第 {{ flipBackSpread.leftPageNum }} 页
-                                        </span>
+                                    <div class="flip-page flip-page-right relative z-[1] max-h-full max-w-full"
+                                        :class="rightPageAnimeClass">
+                                        <div class="flip-page-inner relative">
+                                            <div class="flip-face flip-face-front">
+                                                <img v-if="spreadPages[spreadCurrentPage - 1].rightPageNum === 0"
+                                                    :src="blankPageDataUrl"
+                                                    class="max-w-full max-h-full object-contain rounded border-2 border-dashed border-gray-300" />
+                                                <img v-else :src="spreadPages[spreadCurrentPage - 1].rightImage"
+                                                    class="max-w-full max-h-full object-contain" />
+                                                <span v-if="spreadPages[spreadCurrentPage - 1].rightPageNum === 0"
+                                                    class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
+                                            </div>
+                                            <div class="flip-face flip-face-back">
+                                                <template v-if="flipBackSpread">
+                                                    <img v-if="flipBackSpread.leftPageNum === 0" :src="blankPageDataUrl"
+                                                        class="max-w-full max-h-full object-contain rounded border-2 border-dashed border-gray-300" />
+                                                    <img v-else-if="flipBackSpread.leftImage"
+                                                        :src="flipBackSpread.leftImage"
+                                                        class="max-w-full max-h-full object-contain" />
+                                                    <span v-if="flipBackSpread.leftPageNum === 0"
+                                                        class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
+                                                </template>
+                                            </div>
+                                        </div>
                                     </div>
+                                </div>
+                                <span class="flip-page-label">{{ rightPageLabel }}</span>
                                 </div>
                             </div>
                         </template>
-                        <!-- 装订预览 -->
+                        <!-- 装订预览（骑缝预览） -->
                         <template v-else-if="previewMode === 'bound' && boundPages[spreadCurrentPage - 1]">
-                            <div class="flip-page flip-page-left h-full flex-1 min-w-0" :class="leftPageAnimeClass">
-                                <div class="flip-page-inner relative">
-                                    <div class="flip-face flip-face-front flex flex-col items-center justify-center">
-                                        <template v-if="spreadCurrentPage === 1 && boundPages[0].leftPageNum === 0">
-                                        </template>
-                                        <template v-else-if="boundPages[spreadCurrentPage - 1].leftPageNum === 0">
+                            <div class="flip-slot flip-slot-left relative h-full flex-1 min-w-0">
+                                <div class="flip-page-stack">
+                                    <div class="flip-stage">
+                                    <div v-if="flipUnderlayLeft"
+                                        class="flip-underlay flip-underlay-left absolute inset-0 z-0 pointer-events-none">
+                                        <template v-if="isFlipTargetCoverLeft"></template>
+                                        <template v-else-if="flipUnderlayLeft.leftPageNum === 0">
                                             <img :src="blankPageDataUrl"
                                                 class="max-w-full max-h-full object-contain rounded" />
                                             <span
                                                 class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
-                                            <span class="text-xs text-gray-400 mt-1">
-                                                第 {{ boundPages[spreadCurrentPage - 1].leftPageNum || originalTotalPages
-                                                }} 页
-                                            </span>
                                         </template>
-                                        <template v-else>
-                                            <img :src="boundPages[spreadCurrentPage - 1].leftImage"
-                                                class="max-w-full max-h-full object-contain" />
-                                            <span class="text-xs text-gray-400 mt-1">
-                                                第 {{ boundPages[spreadCurrentPage - 1].leftPageNum }} 页
-                                            </span>
-                                        </template>
-                                    </div>
-                                    <div class="flip-face flip-face-back flex flex-col items-center justify-center">
-                                        <img v-if="flipBackSpread?.rightImage" :src="flipBackSpread.rightImage"
+                                        <img v-else :src="flipUnderlayLeft.leftImage"
                                             class="max-w-full max-h-full object-contain" />
-                                        <span v-if="flipBackSpread?.rightPageNum" class="text-xs text-gray-400 mt-1">
-                                            第 {{ flipBackSpread.rightPageNum }} 页
-                                        </span>
+                                    </div>
+                                    <div class="flip-page flip-page-left relative z-[1] max-h-full max-w-full"
+                                        :class="leftPageAnimeClass">
+                                        <div class="flip-page-inner relative">
+                                            <div class="flip-face flip-face-front">
+                                                <template v-if="spreadCurrentPage === 1 && boundPages[0].leftPageNum === 0">
+                                                </template>
+                                                <template v-else-if="boundPages[spreadCurrentPage - 1].leftPageNum === 0">
+                                                    <img :src="blankPageDataUrl"
+                                                        class="max-w-full max-h-full object-contain rounded" />
+                                                    <span
+                                                        class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
+                                                </template>
+                                                <img v-else :src="boundPages[spreadCurrentPage - 1].leftImage"
+                                                    class="max-w-full max-h-full object-contain" />
+                                            </div>
+                                            <div class="flip-face flip-face-back">
+                                                <template v-if="flipBackSpread">
+                                                    <template v-if="isFlipTargetCoverRight"></template>
+                                                    <template v-else-if="flipBackSpread.rightPageNum === 0">
+                                                        <img :src="blankPageDataUrl"
+                                                            class="max-w-full max-h-full object-contain rounded" />
+                                                        <span
+                                                            class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
+                                                    </template>
+                                                    <img v-else :src="flipBackSpread.rightImage"
+                                                        class="max-w-full max-h-full object-contain" />
+                                                </template>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
+                                <span class="flip-page-label">{{ leftPageLabel }}</span>
+                                </div>
                             </div>
-                            <!-- 书脊效果（不参与翻页动画） -->
-                            <div
-                                class="w-[3px] self-stretch bg-gradient-to-r from-transparent via-gray-400/30 to-transparent shrink-0 rounded-full">
-                            </div>
-                            <div class="flip-page flip-page-right h-full flex-1 min-w-0" :class="rightPageAnimeClass">
-                                <div class="flip-page-inner relative">
-                                    <div class="flip-face flip-face-front flex flex-col items-center justify-center">
-                                        <template
-                                            v-if="spreadCurrentPage === boundPages.length && boundPages[spreadCurrentPage - 1].rightPageNum === 0">
-                                        </template>
-                                        <template v-else-if="boundPages[spreadCurrentPage - 1].rightPageNum === 0">
+                            <div class="flip-slot flip-slot-right relative h-full flex-1 min-w-0">
+                                <div class="flip-page-stack">
+                                    <div class="flip-stage">
+                                    <div v-if="flipUnderlayRight"
+                                        class="flip-underlay flip-underlay-right absolute inset-0 z-0 pointer-events-none">
+                                        <template v-if="isFlipTargetCoverRight"></template>
+                                        <template v-else-if="flipUnderlayRight.rightPageNum === 0">
                                             <img :src="blankPageDataUrl"
                                                 class="max-w-full max-h-full object-contain rounded" />
                                             <span
                                                 class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
-                                            <span class="text-xs text-gray-400 mt-1">
-                                                第 {{ boundPages[spreadCurrentPage - 1].rightPageNum ||
-                                                originalTotalPages }} 页
-                                            </span>
                                         </template>
-                                        <template v-else>
-                                            <img :src="boundPages[spreadCurrentPage - 1].rightImage"
-                                                class="max-w-full max-h-full object-contain" />
-                                            <span class="text-xs text-gray-400 mt-1">
-                                                第 {{ boundPages[spreadCurrentPage - 1].rightPageNum }} 页
-                                            </span>
-                                        </template>
-                                    </div>
-                                    <div class="flip-face flip-face-back flex flex-col items-center justify-center">
-                                        <img v-if="flipBackSpread?.leftImage" :src="flipBackSpread.leftImage"
+                                        <img v-else :src="flipUnderlayRight.rightImage"
                                             class="max-w-full max-h-full object-contain" />
-                                        <span v-if="flipBackSpread?.leftPageNum" class="text-xs text-gray-400 mt-1">
-                                            第 {{ flipBackSpread.leftPageNum }} 页
-                                        </span>
                                     </div>
+                                    <div class="flip-page flip-page-right relative z-[1] max-h-full max-w-full"
+                                        :class="rightPageAnimeClass">
+                                        <div class="flip-page-inner relative">
+                                            <div class="flip-face flip-face-front">
+                                                <template
+                                                    v-if="spreadCurrentPage === boundPages.length && boundPages[spreadCurrentPage - 1].rightPageNum === 0">
+                                                </template>
+                                                <template v-else-if="boundPages[spreadCurrentPage - 1].rightPageNum === 0">
+                                                    <img :src="blankPageDataUrl"
+                                                        class="max-w-full max-h-full object-contain rounded" />
+                                                    <span
+                                                        class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
+                                                </template>
+                                                <img v-else :src="boundPages[spreadCurrentPage - 1].rightImage"
+                                                    class="max-w-full max-h-full object-contain" />
+                                            </div>
+                                            <div class="flip-face flip-face-back">
+                                                <template v-if="flipBackSpread">
+                                                    <template v-if="isFlipTargetCoverLeft"></template>
+                                                    <template v-else-if="flipBackSpread.leftPageNum === 0">
+                                                        <img :src="blankPageDataUrl"
+                                                            class="max-w-full max-h-full object-contain rounded" />
+                                                        <span
+                                                            class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
+                                                    </template>
+                                                    <img v-else :src="flipBackSpread.leftImage"
+                                                        class="max-w-full max-h-full object-contain" />
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <span class="flip-page-label">{{ rightPageLabel }}</span>
                                 </div>
                             </div>
                         </template>
@@ -565,10 +665,13 @@ const hasPreviewContent = computed(() => {
 // ===== 翻书 3D 动画（双面卡牌翻转，完整 180°）=====
 const isFlipping = ref(false);
 const flipBackSpread = ref<SpreadPage | null>(null);
-let flipTimer: ReturnType<typeof setTimeout> | null = null;
+const flipTargetIndex = ref(-1);
+let flipEndTimer: ReturnType<typeof setTimeout> | null = null;
+
+const FLIP_DURATION_MS = 900;
 
 function clearFlipTimers() {
-    if (flipTimer) { clearTimeout(flipTimer); flipTimer = null; }
+    if (flipEndTimer) { clearTimeout(flipEndTimer); flipEndTimer = null; }
 }
 
 // 获取当前模式的页面数组
@@ -578,7 +681,7 @@ function getPagesArray(): SpreadPage[] {
     return spreadPages.value;
 }
 
-// 动画 CSS 类名：向前翻只翻右页，向后翻只翻左页
+// 向前翻只翻右页，向后翻只翻左页（三种预览模式共用半页翻）
 const leftPageAnimeClass = computed(() => {
     if (isFlipping.value && pageDirection.value < 0) return 'page-flip-left';
     return '';
@@ -587,6 +690,69 @@ const leftPageAnimeClass = computed(() => {
 const rightPageAnimeClass = computed(() => {
     if (isFlipping.value && pageDirection.value > 0) return 'page-flip-right';
     return '';
+});
+
+/** 向前翻时，新右页从动画一开始就铺在翻页层下方 */
+const flipUnderlayRight = computed(() =>
+    isFlipping.value && pageDirection.value > 0 ? flipBackSpread.value : null
+);
+
+/** 向后翻时，新左页从动画一开始就铺在翻页层下方 */
+const flipUnderlayLeft = computed(() =>
+    isFlipping.value && pageDirection.value < 0 ? flipBackSpread.value : null
+);
+
+/** 骑缝预览首页左侧 / 末页右侧为透明封面，不是填充空白页 */
+const isFlipTargetCoverLeft = computed(() =>
+    previewMode.value === 'bound'
+    && flipTargetIndex.value === 0
+    && flipBackSpread.value?.leftPageNum === 0
+);
+
+const isFlipTargetCoverRight = computed(() =>
+    previewMode.value === 'bound'
+    && flipTargetIndex.value === boundPages.value.length - 1
+    && flipBackSpread.value?.rightPageNum === 0
+);
+
+/** 当前对开页（页码标签用，与 3D 翻页层解耦） */
+const activeSpread = computed(() => {
+    if (previewMode.value === 'single') return previewPages.value[previewCurrentPage.value - 1] ?? null;
+    if (previewMode.value === 'bound') return boundPages.value[spreadCurrentPage.value - 1] ?? null;
+    return spreadPages.value[spreadCurrentPage.value - 1] ?? null;
+});
+
+function formatFlipPageLabel(pageNum: number) {
+    const n = pageNum === 0 ? originalTotalPages.value : pageNum;
+    return n > 0 ? `第 ${n} 页` : '';
+}
+
+/** 左侧页码：在翻页层外固定显示，向前翻保持当前页，向后翻显示目标页 */
+const leftPageLabel = computed(() => {
+    if (flipUnderlayLeft.value) {
+        if (isFlipTargetCoverLeft.value) return '';
+        return formatFlipPageLabel(flipUnderlayLeft.value.leftPageNum);
+    }
+    const cur = activeSpread.value;
+    if (!cur) return '';
+    if (previewMode.value === 'bound' && spreadCurrentPage.value === 1 && cur.leftPageNum === 0) return '';
+    return formatFlipPageLabel(cur.leftPageNum);
+});
+
+/** 右侧页码：向前翻一开始就显示目标右页 */
+const rightPageLabel = computed(() => {
+    if (flipUnderlayRight.value) {
+        if (isFlipTargetCoverRight.value) return '';
+        return formatFlipPageLabel(flipUnderlayRight.value.rightPageNum);
+    }
+    const cur = activeSpread.value;
+    if (!cur) return '';
+    if (
+        previewMode.value === 'bound'
+        && spreadCurrentPage.value === boundPages.value.length
+        && cur.rightPageNum === 0
+    ) return '';
+    return formatFlipPageLabel(cur.rightPageNum);
 });
 
 function getCurrentPageIndex(): number {
@@ -599,6 +765,9 @@ function getMaxPageIndex(): number {
     if (previewMode.value === 'bound') return boundPages.value.length;
     return spreadPages.value.length;
 }
+
+const canFlipPrev = computed(() => hasPreviewContent.value && getCurrentPageIndex() > 1);
+const canFlipNext = computed(() => hasPreviewContent.value && getCurrentPageIndex() < getMaxPageIndex());
 
 function advancePageIndex(direction: number) {
     if (previewMode.value === 'single') {
@@ -616,24 +785,28 @@ function triggerFlip(direction: number) {
 
     clearFlipTimers();
 
-    // 准备背面内容：目标页的数据
+    // 准备背面 + 底层内容：目标对开页
     const pages = getPagesArray();
     const targetIdx = current - 1 + direction; // 0-based
     if (targetIdx >= 0 && targetIdx < pages.length) {
         flipBackSpread.value = { ...pages[targetIdx] };
+        flipTargetIndex.value = targetIdx;
     } else {
         flipBackSpread.value = null;
+        flipTargetIndex.value = -1;
     }
 
     isFlipping.value = true;
     pageDirection.value = direction;
 
-    // 动画持续 0.9s，完成后更新页码
-    flipTimer = setTimeout(() => {
+    // 动画结束后再切页码并清理（底层已提前显示新页，无需中途切换）
+    flipEndTimer = setTimeout(() => {
         advancePageIndex(direction);
         isFlipping.value = false;
         flipBackSpread.value = null;
-    }, 900);
+        flipTargetIndex.value = -1;
+        flipEndTimer = null;
+    }, FLIP_DURATION_MS);
 }
 
 // 翻页操作
@@ -650,6 +823,7 @@ watch(previewMode, () => {
     clearFlipTimers();
     isFlipping.value = false;
     flipBackSpread.value = null;
+    flipTargetIndex.value = -1;
 });
 
 // 应用任务数据到当前视图
@@ -1144,8 +1318,89 @@ onBeforeUnmount(() => {
     transform-style: preserve-3d;
 }
 
-/* 页面外层（定义旋转轴心） */
+/* 左右半页槽位：上方翻页舞台 + 下方固定页码 */
+.flip-slot {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    container-type: size;
+}
+
+.flip-slot-left {
+    justify-content: flex-end;
+}
+
+.flip-slot-right {
+    justify-content: flex-start;
+}
+
+/* 正在翻的那一侧整槽抬高，避免翻过中缝后沉到对页下面 */
+.flip-slot:has(.page-flip-right),
+.flip-slot:has(.page-flip-left) {
+    z-index: 20;
+}
+
+/* 图片+页码同宽一列，页码相对 PDF 居中 */
+.flip-page-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    max-width: 100%;
+    max-height: 100%;
+    min-height: 0;
+    gap: 0.25rem;
+}
+
+/* 仅图片参与 3D；underlay 与 flip-page 叠同一格 */
+.flip-stage {
+    position: relative;
+    display: grid;
+    align-items: center;
+    flex: 0 1 auto;
+    min-height: 0;
+    min-width: 0;
+    max-width: 100%;
+    max-height: calc(100cqh - 1.5rem);
+    transform-style: preserve-3d;
+}
+
+.flip-slot-left .flip-stage {
+    justify-items: end;
+}
+
+.flip-slot-right .flip-stage {
+    justify-items: start;
+}
+
+.flip-stage > .flip-underlay,
+.flip-stage > .flip-page {
+    grid-area: 1 / 1;
+}
+
+.flip-page-label {
+    flex-shrink: 0;
+    position: relative;
+    z-index: 3;
+    font-size: 0.75rem;
+    line-height: 1;
+    color: #9ca3af;
+    text-align: center;
+    white-space: nowrap;
+    height: 1rem; /* 固定占位，避免末页无页码时高度塌缩导致整体下移 */
+}
+
+/* 页面外层：尺寸由 PDF 图决定，不超过槽位 */
 .flip-page {
+    position: relative;
+    z-index: 2;
+    max-width: 100%;
+    max-height: 100%;
+    width: fit-content;
+    height: fit-content;
     transform-style: preserve-3d;
 }
 
@@ -1162,37 +1417,75 @@ onBeforeUnmount(() => {
 /* 页面内层（承载正反两面） */
 .flip-page-inner {
     position: relative;
-    width: 100%;
-    height: 100%;
+    width: fit-content;
+    height: fit-content;
+    max-width: 100%;
+    max-height: 100%;
     transform-style: preserve-3d;
 }
 
-/* 正反面共用 */
-.flip-face {
+/* 正面：参与文档流，决定翻页卡片真实大小（= PDF 页） */
+.flip-face-front {
+    position: relative;
+    display: block;
+    width: fit-content;
+    max-width: 100%;
+    max-height: 100%;
+    backface-visibility: hidden;
+    background: transparent;
+}
+
+/* 背面：叠在正面同尺寸上 */
+.flip-face-back {
     position: absolute;
     inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     backface-visibility: hidden;
+    transform: rotateY(180deg);
+    background: #fff;
 }
 
-/* 所有图片：覆盖 flex 居中，贴书脊 + 从书脊裁剪 */
-.flip-page-right .flip-face img {
-    align-self: flex-start;
-    object-position: left center;
-}
-.flip-page-left .flip-face img {
-    align-self: flex-end;
-    object-position: right center;
+/* 预留页码高度，避免 PDF 盖住底边页码 */
+.flip-face img,
+.flip-underlay img {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 100cqw;
+    max-height: calc(100cqh - 1.5rem);
+    object-fit: contain;
 }
 
-/* 翻页动画中提升叠层 */
+/* 预加载页始终在翻页卡下方 */
+.flip-underlay {
+    position: relative !important;
+    inset: auto !important;
+    z-index: 0 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+    height: fit-content;
+    max-width: 100%;
+    max-height: 100%;
+    pointer-events: none;
+    transform: translateZ(-1px);
+}
+
+.flip-underlay-left {
+    justify-content: flex-end;
+}
+
+.flip-underlay-right {
+    justify-content: flex-start;
+}
+
+/* 翻页中再抬一层，并带一点 translateZ，保证盖过对页 */
 .page-flip-left,
 .page-flip-right {
-    z-index: 1;
-}
-
-/* 背面预翻转 180° */
-.flip-face-back {
-    transform: rotateY(180deg);
+    z-index: 10 !important;
 }
 
 /* ===== 向前翻页（下一页）：右页绕左边缘旋转 -180° ===== */
@@ -1201,8 +1494,13 @@ onBeforeUnmount(() => {
 }
 
 @keyframes flipRight {
-    from { transform: rotateY(0deg); }
-    to { transform: rotateY(-180deg); }
+    from {
+        transform: translateZ(2px) rotateY(0deg);
+    }
+
+    to {
+        transform: translateZ(2px) rotateY(-180deg);
+    }
 }
 
 /* ===== 向后翻页（上一页）：左页绕右边缘旋转 180° ===== */
@@ -1211,7 +1509,12 @@ onBeforeUnmount(() => {
 }
 
 @keyframes flipLeft {
-    from { transform: rotateY(0deg); }
-    to { transform: rotateY(180deg); }
+    from {
+        transform: translateZ(2px) rotateY(0deg);
+    }
+
+    to {
+        transform: translateZ(2px) rotateY(180deg);
+    }
 }
 </style>
