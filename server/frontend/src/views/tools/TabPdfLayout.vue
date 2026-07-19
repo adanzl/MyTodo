@@ -231,7 +231,7 @@
                             <img :src="previewPages[previewCurrentPage - 1].leftImage"
                                 class="max-w-full max-h-full object-contain" />
                             <span class="text-xs text-gray-400 mt-1">
-                                第 {{ previewPages[previewCurrentPage - 1].leftPageNum }} 页
+                                第 {{ previewPages[previewCurrentPage - 1].leftPageNum || originalTotalPages }} 页
                             </span>
                         </div>
                         <div class="h-full flex flex-col items-center justify-center shrink-0 max-w-[50%] relative">
@@ -242,7 +242,7 @@
                             <span v-if="previewPages[previewCurrentPage - 1].rightPageNum === 0"
                                 class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
                             <span class="text-xs text-gray-400 mt-1">
-                                第 {{ previewPages[previewCurrentPage - 1].rightPageNum }} 页
+                                第 {{ previewPages[previewCurrentPage - 1].rightPageNum || originalTotalPages }} 页
                             </span>
                         </div>
                     </div>
@@ -257,7 +257,7 @@
                             <span v-if="spreadPages[spreadCurrentPage - 1].leftPageNum === 0"
                                 class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
                             <span class="text-xs text-gray-400 mt-1">
-                                第 {{ spreadPages[spreadCurrentPage - 1].leftPageNum }} 页
+                                第 {{ spreadPages[spreadCurrentPage - 1].leftPageNum || originalTotalPages }} 页
                             </span>
                         </div>
                         <div class="h-full flex flex-col items-center justify-center shrink-0 max-w-[50%] relative">
@@ -268,7 +268,7 @@
                             <span v-if="spreadPages[spreadCurrentPage - 1].rightPageNum === 0"
                                 class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
                             <span class="text-xs text-gray-400 mt-1">
-                                第 {{ spreadPages[spreadCurrentPage - 1].rightPageNum }} 页
+                                第 {{ spreadPages[spreadCurrentPage - 1].rightPageNum || originalTotalPages }} 页
                             </span>
                         </div>
                     </div>
@@ -285,7 +285,7 @@
                                 <span v-if="boundPages[spreadCurrentPage - 1].leftPageNum === 0"
                                     class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
                                 <span class="text-xs text-gray-400 mt-1">
-                                    第 {{ boundPages[spreadCurrentPage - 1].leftPageNum }} 页
+                                    第 {{ boundPages[spreadCurrentPage - 1].leftPageNum || originalTotalPages }} 页
                                 </span>
                             </div>
                             <!-- 书脊效果 -->
@@ -300,7 +300,7 @@
                                 <span v-if="boundPages[spreadCurrentPage - 1].rightPageNum === 0"
                                     class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
                                 <span class="text-xs text-gray-400 mt-1">
-                                    第 {{ boundPages[spreadCurrentPage - 1].rightPageNum }} 页
+                                    第 {{ boundPages[spreadCurrentPage - 1].rightPageNum || originalTotalPages }} 页
                                 </span>
                             </div>
                         </div>
