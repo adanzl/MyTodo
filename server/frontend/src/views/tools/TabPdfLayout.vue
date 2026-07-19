@@ -816,11 +816,11 @@ const handleSaddleStitchPreview = async (item: PdfLayoutTask) => {
 };
 
 // 渲染骑缝预览（使用当前 fillConfigs）
-const renderSaddleStitchPreview = async () => {
+const renderSaddleStitchPreview = async (skipLoading = false) => {
     const pdf = pdfDocCache.value;
     if (!pdf) return;
 
-    previewLoading.value = true;
+    if (!skipLoading) previewLoading.value = true;
     spreadPages.value = [];
     spreadCurrentPage.value = 1;
 
@@ -857,43 +857,25 @@ const renderSaddleStitchPreview = async () => {
         });
 
         spreadPages.value = await Promise.all(spreadPromises);
-        // 骑缝第一个视图左边强制空白
-        if (spreadPages.value.length > 0) {
-            spreadPages.value[0].leftPageNum = 0;
-            spreadPages.value[0].leftImage = '';
-        }
     } catch (error) {
         logAndNoticeError(error as Error, "渲染骑缝预览失败");
         spreadPages.value = [];
     } finally {
-        previewLoading.value = false;
+        if (!skipLoading) previewLoading.value = false;
     }
 };
 
-// 生成阅读顺序对开页（底-1, 2-3, 4-5...）
+// 生成阅读顺序对开页（空白-1, 2-3, 4-5...）
 function generateBoundSpreads(effectiveData: number[]): [number, number][] {
     const spreads: [number, number][] = [];
     const n = effectiveData.length;
     if (n === 0) return spreads;
 
-    // 找到最后一个非空白页（最后一页原始内容）
-    let lastContentIdx = n - 1;
-    while (lastContentIdx >= 0 && effectiveData[lastContentIdx] === 0) {
-        lastContentIdx--;
-    }
-    if (lastContentIdx < 0) return spreads;
+    // 第一个对开：[空白, 第1页]（骑缝装订封面）
+    spreads.push([0, effectiveData[0]]);
 
-    // 第一个对开：[末页, 第1页]（骑缝装订的封面）
-    spreads.push([effectiveData[lastContentIdx], effectiveData[0]]);
-
-    // 中间页顺序配对（2-3, 4-5...），不越过 lastContentIdx
-    for (let i = 1; i < lastContentIdx; i += 2) {
-        const right = i + 1 < lastContentIdx ? effectiveData[i + 1] : 0;
-        spreads.push([effectiveData[i], right]);
-    }
-
-    // 末尾填充空白页
-    for (let i = lastContentIdx + 1; i < n; i += 2) {
+    // 剩余页顺序配对（2-3, 4-5...）
+    for (let i = 1; i < n; i += 2) {
         const right = i + 1 < n ? effectiveData[i + 1] : 0;
         spreads.push([effectiveData[i], right]);
     }
@@ -902,11 +884,11 @@ function generateBoundSpreads(effectiveData: number[]): [number, number][] {
 }
 
 // 渲染装订预览（从骑缝排版数据提取，按阅读顺序重排）
-const renderBoundPreview = async () => {
+const renderBoundPreview = async (skipLoading = false) => {
     const pdf = pdfDocCache.value;
     if (!pdf) return;
 
-    previewLoading.value = true;
+    if (!skipLoading) previewLoading.value = true;
     boundPages.value = [];
     spreadCurrentPage.value = 1;
 
@@ -930,11 +912,16 @@ const renderBoundPreview = async () => {
                 rightPageNum: rightNum,
             });
         }
+        // 骑缝预览第一个视图左边强制空白
+        if (boundPages.value.length > 0) {
+            boundPages.value[0].leftPageNum = 0;
+            boundPages.value[0].leftImage = '';
+        }
     } catch (error) {
         logAndNoticeError(error as Error, "渲染装订预览失败");
         boundPages.value = [];
     } finally {
-        previewLoading.value = false;
+        if (!skipLoading) previewLoading.value = false;
     }
 };
 
@@ -956,11 +943,16 @@ const handleBoundPreview = async (item: PdfLayoutTask) => {
 const updateSaddleStitchPreview = async () => {
     const task = currentTask.value;
     if (!task) return;
-    await savePdfLayout(task.task_id, fillConfigs.value);
-    await renderSaddleStitchPreview();
-    // 如果在骑缝预览模式，同步刷新 boundPages
-    if (previewMode.value === 'bound') {
-        await renderBoundPreview();
+    previewLoading.value = true;
+    try {
+        await savePdfLayout(task.task_id, fillConfigs.value);
+        await renderSaddleStitchPreview(true);
+        // 如果在骑缝预览模式，同步刷新 boundPages
+        if (previewMode.value === 'bound') {
+            await renderBoundPreview(true);
+        }
+    } finally {
+        previewLoading.value = false;
     }
 };
 
