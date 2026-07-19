@@ -274,30 +274,50 @@
                         style="filter: drop-shadow(0 2px 8px rgba(0,0,0,0.12))">
                         <div class="flex items-center justify-center w-full h-full gap-0">
                             <div class="h-full flex flex-col items-center justify-center shrink-0 max-w-[50%] relative">
-                                <img v-if="boundPages[spreadCurrentPage - 1].leftPageNum === 0" :src="blankPageDataUrl"
-                                    class="max-w-full max-h-full object-contain rounded" />
-                                <img v-else :src="boundPages[spreadCurrentPage - 1].leftImage"
-                                    class="max-w-full max-h-full object-contain" />
-                                <span v-if="boundPages[spreadCurrentPage - 1].leftPageNum === 0"
-                                    class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
-                                <span class="text-xs text-gray-400 mt-1">
-                                    第 {{ boundPages[spreadCurrentPage - 1].leftPageNum || originalTotalPages }} 页
-                                </span>
+                                <!-- 首页左侧透明 -->
+                                <template v-if="spreadCurrentPage === 1 && boundPages[0].leftPageNum === 0">
+                                </template>
+                                <template v-else-if="boundPages[spreadCurrentPage - 1].leftPageNum === 0">
+                                    <img :src="blankPageDataUrl"
+                                        class="max-w-full max-h-full object-contain rounded" />
+                                    <span
+                                        class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
+                                    <span class="text-xs text-gray-400 mt-1">
+                                        第 {{ boundPages[spreadCurrentPage - 1].leftPageNum || originalTotalPages }} 页
+                                    </span>
+                                </template>
+                                <template v-else>
+                                    <img :src="boundPages[spreadCurrentPage - 1].leftImage"
+                                        class="max-w-full max-h-full object-contain" />
+                                    <span class="text-xs text-gray-400 mt-1">
+                                        第 {{ boundPages[spreadCurrentPage - 1].leftPageNum }} 页
+                                    </span>
+                                </template>
                             </div>
                             <!-- 书脊效果 -->
                             <div
                                 class="w-[3px] self-stretch bg-gradient-to-r from-transparent via-gray-400/30 to-transparent shrink-0 rounded-full">
                             </div>
                             <div class="h-full flex flex-col items-center justify-center shrink-0 max-w-[50%] relative">
-                                <img v-if="boundPages[spreadCurrentPage - 1].rightPageNum === 0" :src="blankPageDataUrl"
-                                    class="max-w-full max-h-full object-contain rounded" />
-                                <img v-else :src="boundPages[spreadCurrentPage - 1].rightImage"
-                                    class="max-w-full max-h-full object-contain" />
-                                <span v-if="boundPages[spreadCurrentPage - 1].rightPageNum === 0"
-                                    class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
-                                <span class="text-xs text-gray-400 mt-1">
-                                    第 {{ boundPages[spreadCurrentPage - 1].rightPageNum || originalTotalPages }} 页
-                                </span>
+                                <!-- 末页右侧透明 -->
+                                <template v-if="spreadCurrentPage === boundPages.length && boundPages[spreadCurrentPage - 1].rightPageNum === 0">
+                                </template>
+                                <template v-else-if="boundPages[spreadCurrentPage - 1].rightPageNum === 0">
+                                    <img :src="blankPageDataUrl"
+                                        class="max-w-full max-h-full object-contain rounded" />
+                                    <span
+                                        class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
+                                    <span class="text-xs text-gray-400 mt-1">
+                                        第 {{ boundPages[spreadCurrentPage - 1].rightPageNum || originalTotalPages }} 页
+                                    </span>
+                                </template>
+                                <template v-else>
+                                    <img :src="boundPages[spreadCurrentPage - 1].rightImage"
+                                        class="max-w-full max-h-full object-contain" />
+                                    <span class="text-xs text-gray-400 mt-1">
+                                        第 {{ boundPages[spreadCurrentPage - 1].rightPageNum }} 页
+                                    </span>
+                                </template>
                             </div>
                         </div>
                     </div>
@@ -839,7 +859,7 @@ function generateBoundSpreads(effectiveData: number[]): [number, number][] {
     const n = effectiveData.length;
     if (n === 0) return spreads;
 
-    // 第一个对开：[空白, 第1页]（骑缝装订封面）
+    // 第一个对开：[空白, 第1页]
     spreads.push([0, effectiveData[0]]);
 
     // 剩余页顺序配对（2-3, 4-5...）
@@ -880,11 +900,7 @@ const renderBoundPreview = async (skipLoading = false) => {
                 rightPageNum: rightNum,
             });
         }
-        // 骑缝预览第一个视图左边强制空白
-        if (boundPages.value.length > 0) {
-            boundPages.value[0].leftPageNum = 0;
-            boundPages.value[0].leftImage = '';
-        }
+
     } catch (error) {
         logAndNoticeError(error as Error, "渲染装订预览失败");
         boundPages.value = [];
