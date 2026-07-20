@@ -1,6 +1,6 @@
 # sudo cp deploy/chml-http.service /etc/systemd/system/
-# 开启 systemctl start chml-http
-# 开机启动 systemctl enable chml-http
+# 开启 sudo systemctl start chml-http
+# 开机启动 sudo systemctl enable chml-http
 
 [Unit]
 Description=Chml http Service
