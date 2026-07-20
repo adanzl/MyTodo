@@ -5,7 +5,7 @@ from __future__ import annotations
 from core import limiter
 
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from flask import Blueprint, request, send_file
 from flask.typing import ResponseReturnValue
@@ -33,6 +33,7 @@ class _PdfLayoutDeleteBody(BaseModel):
 class _PdfLayoutUpdateBody(BaseModel):
     task_id: str
     fill_configs: list[int]
+    is_saddle_stitch: Optional[bool] = None
 
 
 @limiter.limit("10 per minute; 50 per hour")
@@ -171,7 +172,7 @@ def pdf_layout_save() -> ResponseReturnValue:
             return err or _err("Invalid request body")
 
         code, msg = pdf_layout_mgr.save_fill_configs(
-            body.task_id, body.fill_configs)
+            body.task_id, body.fill_configs, body.is_saddle_stitch)
         if code != 0:
             return _err(msg)
 

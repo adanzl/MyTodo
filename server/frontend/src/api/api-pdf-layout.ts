@@ -90,15 +90,17 @@ export async function deletePdfLayout(task_id: string): Promise<ApiResponse<{ me
 }
 
 /**
- * 保存任务的填充配置（不生成 PDF）
+ * 保存任务的填充配置 / 骑缝版标记（不生成 PDF）
  */
 export async function savePdfLayout(
   task_id: string,
-  fill_configs: number[]
+  fill_configs: number[],
+  is_saddle_stitch?: boolean
 ): Promise<ApiResponse<{ message: string }>> {
   const response = await api.post<ApiResponse<{ message: string }>>("/pdf_layout/save", {
     task_id,
     fill_configs,
+    ...(is_saddle_stitch !== undefined ? { is_saddle_stitch } : {}),
   });
   return response.data;
 }

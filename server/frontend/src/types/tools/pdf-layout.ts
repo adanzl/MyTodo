@@ -76,4 +76,8 @@ export interface PdfLayoutTask {
    * 填充配置
    */
   fill_configs?: number[];
+  /**
+   * 是否为骑缝版
+   */
+  is_saddle_stitch?: boolean;
 }

@@ -80,6 +80,14 @@
                             <div class="flex items-center gap-2 min-w-0 flex-1">
                                 <h4 class="text-xs font-semibold">文件信息</h4>
                             </div>
+                            <el-checkbox
+                                :model-value="!!currentTask.is_saddle_stitch"
+                                size="large"
+                                class="saddle-flag-checkbox shrink-0"
+                                @change="handleSaddleStitchFlagChange"
+                            >
+                                骑缝版
+                            </el-checkbox>
                         </div>
                         <div v-if="currentTask.uploaded_info" class="text-xs text-gray-600">
                             <div class="truncate" :title="currentTask.uploaded_info.name">
@@ -135,7 +143,8 @@
                             :class="previewMode === 'single' ? '' : '!text-gray-400 !border-gray-300'">
                             {{ previewPages.length > 0 ? "刷新" : "预览" }}
                         </el-button>
-                        <el-button type="warning" size="small" plain class="!h-5 !text-xs !px-2 shrink-0"
+                        <el-button v-if="!currentTask.is_saddle_stitch" type="warning" size="small" plain
+                            class="!h-5 !text-xs !px-2 shrink-0"
                             @click="handleSaddleStitchPreview(currentTask)"
                             :disabled="!currentTask.uploaded_info || previewLoading"
                             :class="previewMode === 'saddle-stitch' ? '' : '!text-gray-400 !border-gray-300'">
@@ -147,7 +156,7 @@
                             :class="previewMode === 'bound' ? '' : '!text-gray-400 !border-gray-300'">
                             骑缝预览
                         </el-button>
-                        <div v-if="(previewMode === 'saddle-stitch' || previewMode === 'bound') && fillConfigs.length > 0"
+                        <div v-if="!currentTask.is_saddle_stitch && (previewMode === 'saddle-stitch' || previewMode === 'bound') && fillConfigs.length > 0"
                             class="flex items-center gap-1">
                             <span class="text-xs text-gray-500 ml-1">填充:</span>
                             <el-input-number v-for="(_, i) in fillConfigs" :key="i" v-model="fillConfigs[i]"
@@ -213,8 +222,9 @@
                         </el-button>
                     </div>
                 </div>
-                <div v-loading="previewLoading"
-                    class="flex-1 flex items-center justify-center bg-gray-100 rounded min-h-0 overflow-hidden p-2 relative [overflow-anchor:none]">
+                <div v-loading="previewLoading" ref="previewAreaRef"
+                    class="flex-1 flex items-center justify-center bg-gray-100 rounded min-h-0 overflow-hidden p-2 relative [overflow-anchor:none]"
+                    :style="{ '--pdf-ar': pdfPageAspect }">
                     <!-- 左右翻页点击区域（边界禁用，避免无效点击引起滚动/跳动） -->
                     <div v-if="hasPreviewContent"
                         class="absolute left-0 top-0 w-[20%] h-full z-10"
@@ -564,11 +574,30 @@ interface SpreadPage {
 
 // 空白页占位图片（初始为空，PDF 加载后按实际页尺寸创建）
 const blankPageDataUrl = ref('');
+// 预览区尺寸与 PDF 页宽高比（用于小尺寸 PDF 放大铺满）
+const previewAreaRef = ref<HTMLElement | null>(null);
+const pdfPageAspect = ref(0.707); // width/height，默认约 A4
+const previewRenderScale = ref(0.5);
 
-// 根据 PDF 第一页创建同等尺寸的空白 canvas
-async function initBlankPageImage(pdf: any, scale = 0.5) {
+/** 按预览槽位计算渲染缩放：小页放大、大页缩小，兼顾清晰度与内存 */
+function computePreviewRenderScale(pageWidthPt: number, pageHeightPt: number): number {
+    const el = previewAreaRef.value;
+    const slotW = Math.max((el?.clientWidth ?? 800) / 2, 100);
+    const slotH = Math.max((el?.clientHeight ?? 600) - 24, 100);
+    const fitScale = Math.min(slotW / pageWidthPt, slotH / pageHeightPt);
+    const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
+    return Math.min(Math.max(fitScale * dpr, 0.5), 2.5);
+}
+
+// 根据 PDF 第一页创建同等尺寸的空白 canvas，并记录宽高比 / 渲染缩放
+async function initBlankPageImage(pdf: any) {
     try {
         const page = await pdf.getPage(1);
+        const base = page.getViewport({ scale: 1 });
+        pdfPageAspect.value = base.width / base.height;
+        const scale = computePreviewRenderScale(base.width, base.height);
+        previewRenderScale.value = scale;
+
         const viewport = page.getViewport({ scale });
         const canvas = document.createElement('canvas');
         canvas.width = viewport.width;
@@ -582,6 +611,67 @@ async function initBlankPageImage(pdf: any, scale = 0.5) {
     } catch {
         // 静默失败，空白页将降级为空字符串
     }
+}
+
+/** 骑缝成品页为左右拼接宽页：按半页尺寸初始化空白页与宽高比 */
+async function initBlankPageImageFromSaddleSheet(pdf: any) {
+    try {
+        const page = await pdf.getPage(1);
+        const base = page.getViewport({ scale: 1 });
+        const halfW = base.width / 2;
+        pdfPageAspect.value = halfW / base.height;
+        const scale = computePreviewRenderScale(halfW, base.height);
+        previewRenderScale.value = scale;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.floor(halfW * scale));
+        canvas.height = Math.max(1, Math.floor(base.height * scale));
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        blankPageDataUrl.value = canvas.toDataURL('image/png');
+    } catch {
+        // 静默失败
+    }
+}
+
+/** 将骑缝成品的一页（左右拼接）拆成左右半页图片 */
+async function renderSaddleSheetHalves(
+    page: any,
+    scale: number,
+): Promise<{ left: string; right: string }> {
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('无法获取 canvas 2d 上下文');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({
+        canvasContext: ctx,
+        viewport,
+        canvas: canvas as unknown as HTMLCanvasElement,
+    }).promise;
+
+    const halfW = Math.floor(viewport.width / 2);
+    const rightW = viewport.width - halfW;
+    const h = viewport.height;
+
+    const leftCanvas = document.createElement('canvas');
+    leftCanvas.width = halfW;
+    leftCanvas.height = h;
+    leftCanvas.getContext('2d')!.drawImage(canvas, 0, 0, halfW, h, 0, 0, halfW, h);
+
+    const rightCanvas = document.createElement('canvas');
+    rightCanvas.width = rightW;
+    rightCanvas.height = h;
+    rightCanvas.getContext('2d')!.drawImage(canvas, halfW, 0, rightW, h, 0, 0, rightW, h);
+
+    return {
+        left: leftCanvas.toDataURL('image/jpeg', 0.8),
+        right: rightCanvas.toDataURL('image/jpeg', 0.8),
+    };
 }
 
 // 状态映射
@@ -987,10 +1077,11 @@ const handlePreview = async (item: PdfLayoutTask) => {
         console.time('loadPdf');
         const pdf = await loadPdfDocument(url);
         console.timeEnd('loadPdf');
-        await initBlankPageImage(pdf, 0.5);
+        await initBlankPageImage(pdf);
+        const scale = previewRenderScale.value;
 
         const totalPages = pdf.numPages;
-        console.log(`PDF 页数: ${totalPages}, 文件: ${item.uploaded_info.name}`);
+        console.log(`PDF 页数: ${totalPages}, 文件: ${item.uploaded_info.name}, scale: ${scale}`);
         originalTotalPages.value = totalPages;
 
         // 并行渲染所有 spread
@@ -1001,7 +1092,7 @@ const handlePreview = async (item: PdfLayoutTask) => {
             spreadPromises.push(
                 (async () => {
                     const leftImg = await renderPdfPageToDataUrl(await pdf.getPage(pageIdx), {
-                        scale: 0.5,
+                        scale,
                         mimeType: "image/jpeg",
                         quality: 0.7,
                     });
@@ -1010,7 +1101,7 @@ const handlePreview = async (item: PdfLayoutTask) => {
                     let rightNum = 0;
                     if (pageIdx + 1 <= totalPages) {
                         rightImg = await renderPdfPageToDataUrl(await pdf.getPage(pageIdx + 1), {
-                            scale: 0.5,
+                            scale,
                             mimeType: "image/jpeg",
                             quality: 0.7,
                         });
@@ -1101,7 +1192,7 @@ const handleSaddleStitchPreview = async (item: PdfLayoutTask) => {
         }
 
         const pdf = await loadPdfDocument(url);
-        await initBlankPageImage(pdf, 0.5);
+        await initBlankPageImage(pdf);
         const totalPages = pdf.numPages;
         originalTotalPages.value = totalPages;
         fillConfigs.value = (item.fill_configs && item.fill_configs.length > 0)
@@ -1136,17 +1227,18 @@ const renderSaddleStitchPreview = async (skipLoading = false) => {
             const leftPageNum = effectiveData[leftIdx - 1];
             const rightPageNum = effectiveData[rightIdx - 1];
 
+            const scale = previewRenderScale.value;
             let leftImg = '';
             if (leftPageNum > 0) {
                 leftImg = await renderPdfPageToDataUrl(await pdf.getPage(leftPageNum), {
-                    scale: 0.5, mimeType: "image/jpeg", quality: 0.8,
+                    scale, mimeType: "image/jpeg", quality: 0.8,
                 });
             }
 
             let rightImg = '';
             if (rightPageNum > 0) {
                 rightImg = await renderPdfPageToDataUrl(await pdf.getPage(rightPageNum), {
-                    scale: 0.5, mimeType: "image/jpeg", quality: 0.8,
+                    scale, mimeType: "image/jpeg", quality: 0.8,
                 });
             }
 
@@ -1230,12 +1322,76 @@ const handleBoundPreview = async (item: PdfLayoutTask) => {
         ElMessage.warning("文件不存在");
         return;
     }
-    if (!pdfDocCache.value) {
+    // 已是骑缝成品：原始 PDF 即拼版页，拆半后按阅读顺序预览
+    if (item.is_saddle_stitch) {
+        await loadBoundPreviewFromSaddlePdf(item);
+        return;
+    }
+    if (!pdfDocCache.value || spreadDataCachedTaskId.value !== item.task_id || spreadPages.value.length === 0) {
         await handleSaddleStitchPreview(item);
     }
     previewMode.value = 'bound';
     spreadCurrentPage.value = 1;
     await renderBoundPreview();
+};
+
+/** 把已是骑缝成品的原始 PDF 拆页后，按阅读顺序做装订预览 */
+const loadBoundPreviewFromSaddlePdf = async (item: PdfLayoutTask) => {
+    previewLoading.value = true;
+    previewMode.value = 'bound';
+    boundPages.value = [];
+    spreadPages.value = [];
+    fillConfigs.value = [];
+    spreadCurrentPage.value = 1;
+
+    try {
+        const url = getPdfLayoutDownloadUrl(item.uploaded_info!.name, "uploaded");
+        if (!url) {
+            ElMessage.error("无法获取文件地址");
+            return;
+        }
+
+        const pdf = await loadPdfDocument(url);
+        await initBlankPageImageFromSaddleSheet(pdf);
+        pdfDocCache.value = pdf;
+        spreadDataCachedTaskId.value = item.task_id;
+
+        const numSheets = pdf.numPages;
+        const effectiveCount = numSheets * 2;
+        originalTotalPages.value = effectiveCount;
+
+        const spreads = generateSaddleStitchSpreads(effectiveCount);
+        const pageImageMap = new Map<number, string>();
+        const scale = previewRenderScale.value;
+
+        const halfResults = await Promise.all(
+            spreads.map(async ([leftIdx, rightIdx], sheetIndex) => {
+                const page = await pdf.getPage(sheetIndex + 1);
+                const halves = await renderSaddleSheetHalves(page, scale);
+                return { leftIdx, rightIdx, halves };
+            }),
+        );
+
+        for (const { leftIdx, rightIdx, halves } of halfResults) {
+            pageImageMap.set(leftIdx, halves.left);
+            pageImageMap.set(rightIdx, halves.right);
+        }
+
+        const effectiveData = Array.from({ length: effectiveCount }, (_, i) => i + 1);
+        const boundSpreads = generateBoundSpreads(effectiveData);
+        boundPages.value = boundSpreads.map(([leftNum, rightNum]) => ({
+            id: `${leftNum}-${rightNum}`,
+            leftImage: leftNum > 0 ? (pageImageMap.get(leftNum) || '') : '',
+            rightImage: rightNum > 0 ? (pageImageMap.get(rightNum) || '') : '',
+            leftPageNum: leftNum,
+            rightPageNum: rightNum,
+        }));
+    } catch (error) {
+        logAndNoticeError(error as Error, "加载骑缝成品预览失败");
+        boundPages.value = [];
+    } finally {
+        previewLoading.value = false;
+    }
 };
 
 // 按当前填充配置重新渲染骑缝预览
@@ -1244,7 +1400,7 @@ const updateSaddleStitchPreview = async () => {
     if (!task) return;
     previewLoading.value = true;
     try {
-        await savePdfLayout(task.task_id, fillConfigs.value);
+        await savePdfLayout(task.task_id, fillConfigs.value, !!task.is_saddle_stitch);
         await renderSaddleStitchPreview(true);
         // 如果在骑缝预览模式，同步刷新 boundPages
         if (previewMode.value === 'bound') {
@@ -1252,6 +1408,31 @@ const updateSaddleStitchPreview = async () => {
         }
     } finally {
         previewLoading.value = false;
+    }
+};
+
+// 切换骑缝版标记并保存到存档（表示 PDF 已是骑缝成品）
+const handleSaddleStitchFlagChange = async (val: string | number | boolean) => {
+    const task = currentTask.value;
+    if (!task) return;
+    const checked = !!val;
+    try {
+        const result = await savePdfLayout(
+            task.task_id,
+            task.fill_configs || fillConfigs.value || [],
+            checked,
+        );
+        if (result.code !== 0) {
+            ElMessage.error(result.msg || "保存骑缝版标记失败");
+            return;
+        }
+        applyTask({ ...task, is_saddle_stitch: checked });
+        // 已是骑缝成品时退出骑缝排版模式
+        if (checked && previewMode.value === 'saddle-stitch') {
+            previewMode.value = 'single';
+        }
+    } catch (error) {
+        logAndNoticeError(error as Error, "保存骑缝版标记失败");
     }
 };
 
@@ -1267,7 +1448,7 @@ const handleDownloadLayout = async () => {
     previewLoading.value = true;
     try {
         // 先保存填充配置
-        const saveResult = await savePdfLayout(task.task_id, fillConfigs.value);
+        const saveResult = await savePdfLayout(task.task_id, fillConfigs.value, !!task.is_saddle_stitch);
         if (saveResult.code !== 0) {
             ElMessage.error(saveResult.msg || "保存填充配置失败");
             return;
@@ -1447,14 +1628,12 @@ onBeforeUnmount(() => {
     background: #fff;
 }
 
-/* 预留页码高度，避免 PDF 盖住底边页码 */
+/* 按槽位与 PDF 宽高比缩放（小页放大、大页缩小），贴合书脊 */
 .flip-face img,
 .flip-underlay img {
     display: block;
-    width: auto;
-    height: auto;
-    max-width: 100cqw;
-    max-height: calc(100cqh - 1.5rem);
+    width: min(100cqw, calc((100cqh - 1.5rem) * var(--pdf-ar, 0.707)));
+    height: min(calc(100cqh - 1.5rem), calc(100cqw / var(--pdf-ar, 0.707)));
     object-fit: contain;
 }
 
@@ -1516,5 +1695,21 @@ onBeforeUnmount(() => {
     to {
         transform: translateZ(2px) rotateY(180deg);
     }
+}
+
+.saddle-flag-checkbox :deep(.el-checkbox__inner) {
+    width: 18px;
+    height: 18px;
+}
+
+.saddle-flag-checkbox :deep(.el-checkbox__inner::after) {
+    left: 6px;
+    height: 9px;
+    width: 4px;
+}
+
+.saddle-flag-checkbox :deep(.el-checkbox__label) {
+    font-size: 14px;
+    font-weight: 600;
 }
 </style>

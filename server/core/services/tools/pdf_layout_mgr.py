@@ -40,6 +40,7 @@ class PdfLayoutTask(TaskBase):
     output_path: Optional[str] = None
     output_info: Optional[PdfLayoutFileInfo] = None
     fill_configs: Optional[list[int]] = None
+    is_saddle_stitch: bool = False
 
 
 class PdfLayoutMgr(BaseTaskMgr[PdfLayoutTask]):
@@ -199,16 +200,26 @@ class PdfLayoutMgr(BaseTaskMgr[PdfLayoutTask]):
                 except Exception as e:
                     log.error(f"[PDF 排版] 删除文件失败 {path}: {e}")
 
-    def save_fill_configs(self, task_id: str, fill_configs: list[int]) -> Tuple[int, str]:
-        """更新任务的填充配置。"""
+    def save_fill_configs(
+        self,
+        task_id: str,
+        fill_configs: list[int],
+        is_saddle_stitch: Optional[bool] = None,
+    ) -> Tuple[int, str]:
+        """更新任务的填充配置与骑缝版标记。"""
         with self._task_lock.gen_wlock():
             task, err = self._get_task_or_err(task_id)
             if not task:
                 return -1, err
 
             task.fill_configs = fill_configs
+            if is_saddle_stitch is not None:
+                task.is_saddle_stitch = is_saddle_stitch
             self._save_task_and_update_time(task)
-            log.info(f"[PDF 排版] 更新填充配置: {task_id} {fill_configs}")
+            log.info(
+                f"[PDF 排版] 更新填充配置: {task_id} {fill_configs}, "
+                f"is_saddle_stitch={task.is_saddle_stitch}"
+            )
             return 0, "填充配置已保存"
 
     def generate_layout(self, task_id: str) -> Tuple[int, str]:
