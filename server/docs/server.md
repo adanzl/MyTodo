@@ -343,15 +343,15 @@ sudo mkcert -cert-file /etc/ssl/self-signed/selfsigned.crt \
 
 ## 服务器端口
 
-| Server        | Port     | Server         |  Port |
-| ------------- | -------- | -------------- | ----: |
-| my-todo       | 8000     | funASR-online  |  9095 |
-| code-server   | 8001     | funASR-offline |  9096 |
-| mysql         | 8002     | ollama         |  9097 |
-| DBGate        | 8003     | dify           |  9098 |
-| nginx         | 8848/443 | cosy-voice     | x9099 |
-| redis         | 6379     | chml_frp       |  9100 |
-| cockpit       | 9090     | openclaw       |  9101 |
-| portainer     | 9000     | openclaw       |  9102 |
-| redis_insight | 9001     | chrome         |  9103 |
-| video_factory | 9002     |                |       |
+| Server        | Port     | Server           |  Port |
+| ------------- | -------- | ---------------- | ----: |
+| my-todo       | 8000     | funASR-online    |  9095 |
+| code-server   | 8001     | funASR-offline   |  9096 |
+| mysql         | 8002     | ollama           |  9097 |
+| DBGate        | 8003     | dify             |  9098 |
+| nginx         | 8848/443 | cosy-voice       | x9099 |
+| redis         | 6379     | chml_frp         |  9100 |
+| cockpit       | 9090     | stable-diffusion |  9101 |
+| portainer     | 9000     | cursor-proxy     |  9102 |
+| redis_insight | 9001     | chrome           |  9103 |
+| video_factory | 9002     |                  |       |
