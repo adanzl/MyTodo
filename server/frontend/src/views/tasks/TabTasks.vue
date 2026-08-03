@@ -3,12 +3,11 @@
     <!-- 工具栏 -->
     <div class="flex items-center min-h-10 mb-2">
       <div class="flex flex-1 flex-wrap items-center gap-1">
-        <el-button type="primary" plain size="small" @click="refreshTasks" :icon="Refresh"/>
+        <el-button type="primary" plain size="small" @click="refreshTasks" :icon="Refresh" />
         <el-button type="primary" size="small" @click="handleAddTask">新建任务</el-button>
         <div
           class="flex flex-wrap items-center gap-1 ml-1 px-2 min-h-7 py-1 rounded border border-dashed border-gray-300 cursor-pointer"
-          @click="blockTimeDialogVisible = true"
-        >
+          @click="blockTimeDialogVisible = true">
           <span class="text-xs text-gray-500 shrink-0">全局禁用</span>
           <BlockTimeDisplay :block-time="globalBlockTime" :wrap="false" />
         </div>
@@ -18,11 +17,18 @@
     <!-- 表格 -->
     <el-table :data="taskList" v-loading="loading" stripe border style="width: 100%" :max-height="tableMaxHeight">
       <el-table-column prop="id" label="ID" width="70" />
-      <el-table-column prop="name" label="任务名称" min-width="200" />
+      <el-table-column prop="name" label="任务名称" min-width="200">
+        <template #default="{ row }">
+          <span :class="isVideoUnlimit(row) ? 'text-[#409EFF]' : ''" :title="isVideoUnlimit(row) ? '视频不限时' : undefined">
+            {{ row.name }}
+          </span>
+        </template>
+      </el-table-column>
       <el-table-column prop="priority" label="优先级" width="70" align="center" />
       <el-table-column prop="type" label="类型" width="60" align="center">
         <template #default="{ row }">
-          <el-tag :type="row.type === 1 ? 'success' : 'primary'" size="small">{{ row.type === 1 ? '持续' : '每日' }}</el-tag>
+          <el-tag :type="row.type === 1 ? 'success' : 'primary'" size="small">{{ row.type === 1 ? '持续' : '每日'
+            }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="start_date" label="开始日期" width="110" />
@@ -45,12 +51,7 @@
       <!-- 休息日 -->
       <el-table-column label="休息日" width="110">
         <template #default="{ row }">
-          <el-tooltip
-            v-if="restDaysText(row)"
-            :content="restDaysText(row)"
-            placement="top"
-            :show-after="300"
-          >
+          <el-tooltip v-if="restDaysText(row)" :content="restDaysText(row)" placement="top" :show-after="300">
             <span class="text-xs text-gray-700 cursor-default block truncate max-w-25">
               {{ restDaysText(row) }}
             </span>
@@ -73,25 +74,12 @@
     </el-table>
 
     <!-- 分页 -->
-    <el-pagination
-      layout="sizes, prev, pager, next"
-      :total="totalCount"
-      v-model:page-size="pageSize"
-      :page-sizes="[10, 20, 50]"
-      :current-page="pageNum"
-      class="mt-2"
-      background
-      @size-change="handleSizeChange"
-      @current-change="handlePageChange"
-    />
+    <el-pagination layout="sizes, prev, pager, next" :total="totalCount" v-model:page-size="pageSize"
+      :page-sizes="[10, 20, 50]" :current-page="pageNum" class="mt-2" background @size-change="handleSizeChange"
+      @current-change="handlePageChange" />
 
     <!-- 任务编辑对话框 -->
-    <TaskDialog
-      v-model="dialogVisible"
-      :is-edit="isEdit"
-      :task-data="currentTaskData"
-      @success="fetchTaskList"
-    />
+    <TaskDialog v-model="dialogVisible" :is-edit="isEdit" :task-data="currentTaskData" @success="fetchTaskList" />
 
     <BlockTimeDialog v-model="blockTimeDialogVisible" @success="fetchGlobalBlockTime" />
   </div>
@@ -117,6 +105,15 @@ import { formatRestDaysFullText } from "@/utils/date";
 
 
 const restDaysText = (task: Task) => formatRestDaysFullText(task.rest_days);
+
+const isVideoUnlimit = (task: Task) => {
+  try {
+    const data = typeof task.data === "string" ? JSON.parse(task.data || "{}") : task.data;
+    return !!data?.video_unlimit;
+  } catch {
+    return false;
+  }
+};
 
 const tableMaxHeight = ref<number>(0);
 // 计算表格最大高度
