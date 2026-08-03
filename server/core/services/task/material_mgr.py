@@ -194,10 +194,13 @@ class MaterialMgr:
                 return _ok({"lock": MaterialMgr.LOCK_CODE_NONE, "duration": material_duration, "unlimit": True})
 
             # 1. 检查任务级 block_time（任务配置优先于全局）
+            # 同时读取 data.video_unlimit，供后续时长检查使用
+            video_unlimit = False
             if task_id and task_id > 0:
-                task_res = db_mgr.get_data(TABLE_TASK, task_id, 'block_time')
+                task_res = db_mgr.get_data(TABLE_TASK, task_id, 'block_time,data')
                 if task_res.get('code') == 0 and task_res.get('data'):
-                    block_time_raw = task_res['data'].get('block_time', '{}')
+                    task_row = task_res['data']
+                    block_time_raw = task_row.get('block_time', '{}')
                     config = parse_block_time_config(block_time_raw)
                     task_entry = _get_user_entry(config, user_id)
                     if task_entry is not None:
@@ -208,6 +211,15 @@ class MaterialMgr:
                         # 任务无此用户的配置 → 回退到全局检查
                         if is_global_block_time_now(date_str, user_id, now=now):
                             return _ok({"lock": MaterialMgr.LOCK_CODE_GLOBAL_BLOCK, "reason": "当前处于全局禁用时段"})
+
+                    task_data = task_row.get('data') or {}
+                    if isinstance(task_data, str):
+                        try:
+                            task_data = json.loads(task_data)
+                        except Exception:
+                            task_data = {}
+                    if isinstance(task_data, dict):
+                        video_unlimit = bool(task_data.get('video_unlimit'))
                 else:
                     # 任务无 block_time 配置 → 回退到全局检查
                     if is_global_block_time_now(date_str, user_id, now=now):
@@ -220,6 +232,14 @@ class MaterialMgr:
             # 非视频类型不检查时长锁定
             if mat.get('type') != 1:
                 return _ok({"lock": MaterialMgr.LOCK_CODE_NONE})
+
+            # 任务开启 video_unlimit 时，跳过观看时长限制
+            if video_unlimit:
+                return _ok({
+                    "lock": MaterialMgr.LOCK_CODE_NONE,
+                    "duration": material_duration,
+                    "video_unlimit": True,
+                })
 
             if not material_duration:
                 path = mat.get('path')
