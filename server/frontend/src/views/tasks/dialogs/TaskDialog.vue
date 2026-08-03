@@ -48,9 +48,9 @@
             </el-col>
           </el-row>
 
-          <!-- 第二行：开始日期、总天数 -->
+          <!-- 第二行：开始日期、总天数、任务类型、视频不限时 -->
           <el-row :gutter="20">
-            <el-col :span="8">
+            <el-col :span="5">
               <el-form-item label="开始日期" required>
                 <el-date-picker
                   v-model="formData.start_date"
@@ -58,11 +58,11 @@
                   placeholder="选择开始日期"
                   format="YYYY-MM-DD"
                   value-format="YYYY-MM-DD"
-                  class="w-68!"
+                  class="w-full!"
                 />
               </el-form-item>
             </el-col>
-            <el-col :span="8">
+            <el-col :span="7">
               <el-form-item label="总天数" required>
                 <el-input-number
                   v-model="formData.duration"
@@ -80,6 +80,16 @@
                   <el-radio :value="0">每日任务</el-radio>
                   <el-radio :value="1">持续任务</el-radio>
                 </el-radio-group>
+              </el-form-item>
+            </el-col>
+            <el-col :span="4">
+              <el-form-item label="视频不限时">
+                <div class="flex items-center gap-2">
+                  <el-switch v-model="videoUnlimit" />
+                  <el-tooltip content="开启后，该任务下的视频素材不限制观看时长" placement="bottom">
+                    <el-icon><WarningFilled /></el-icon>
+                  </el-tooltip>
+                </div>
               </el-form-item>
             </el-col>
           </el-row>
@@ -601,6 +611,8 @@ const dailyMaterials = ref<Record<number, Array<{ id: number; name: string; type
 // 每日分数数据：{ dayNumber: score }
 const dailyScore = ref<Record<number, number>>({});
 const blockTimeConfig = ref<BlockTimeConfig>({});
+/** 任务下视频素材是否不限制观看时长，存于 data.video_unlimit */
+const videoUnlimit = ref(false);
 
 const resetBlockTime = () => {
   blockTimeConfig.value = {};
@@ -706,21 +718,24 @@ const applyTaskData = (newData?: Partial<Task>) => {
 
     blockTimeConfig.value = parseBlockTimeConfig(newData.block_time);
 
-    // 初始化每日素材数据和每日分数
+    // 初始化每日素材数据、每日分数、视频不限时
     if (newData.data) {
       try {
         const parsedData =
           typeof newData.data === "string" ? JSON.parse(newData.data) : newData.data;
         dailyMaterials.value = parsedData.dailyMaterials || {};
         dailyScore.value = parsedData.dailyScore || {};
+        videoUnlimit.value = !!parsedData.video_unlimit;
       } catch (e) {
         console.error("解析任务数据失败:", e);
         dailyMaterials.value = {};
         dailyScore.value = {};
+        videoUnlimit.value = false;
       }
     } else {
       dailyMaterials.value = {};
       dailyScore.value = {};
+      videoUnlimit.value = false;
     }
 
     // 默认选中第一天
@@ -735,6 +750,7 @@ const applyTaskData = (newData?: Partial<Task>) => {
     preTodoCancan.value = [];
     preTaskIds.value = [];
     resetBlockTime();
+    videoUnlimit.value = false;
     selectedDay.value = 0;
     restDaysSummary.value = "";
   }
@@ -807,6 +823,7 @@ const resetForm = () => {
   preTodoCancan.value = [];
   preTaskIds.value = [];
   resetBlockTime();
+  videoUnlimit.value = false;
   showRestDaysDialog.value = false;
   restDaysSummary.value = "";
 };
@@ -1187,6 +1204,7 @@ const handleSubmit = async () => {
       data: JSON.stringify({
         dailyMaterials: dailyMaterials.value,
         dailyScore: dailyScore.value,
+        video_unlimit: videoUnlimit.value,
       }),
     };
 

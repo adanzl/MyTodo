@@ -15,4 +15,6 @@ export interface TaskDetail {
   // key: 天数索引（从0开始）
   // value: 该天的分数，完成当天全部素材可获得
   dailyScore: Record<string, number>;
+  /** 为 true 时，该任务下视频素材不限制观看时长，默认 false */
+  video_unlimit?: boolean;
 }
