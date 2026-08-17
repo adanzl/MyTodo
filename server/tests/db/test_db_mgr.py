@@ -296,3 +296,37 @@ def test_gift_history_fields(db_mgr):
         assert list_result['data']['data'][0]['gift_id'] == 101
         assert list_result['data']['data'][0]['gift_name'] == '测试礼物'
         assert list_result['data']['data'][0]['gift_pool_id'] == 3
+
+
+def test_set_data_coerces_datetime_strings(db_mgr):
+    with db_mgr.app.app_context():
+        db_obj.session.execute(text("""
+            CREATE TABLE IF NOT EXISTS t_usage (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type TEXT,
+                start_time DATETIME,
+                duration INTEGER,
+                user_id INTEGER,
+                out_key INTEGER,
+                dt DATETIME
+            )
+        """))
+        db_obj.session.commit()
+
+        result = db_mgr.set_data('t_usage', {
+            'type': 'matVideo',
+            'start_time': '2026-08-17T10:45:44.815Z',
+            'duration': 30,
+            'user_id': 4,
+            'out_key': 2385,
+            'dt': '2026-08-17T18:45:44+08:00',
+        })
+        assert result['code'] == 0, result.get('msg')
+        record_id = result['data']
+        retrieved = db_mgr.get_data('t_usage', record_id, '*')
+        assert retrieved['code'] == 0
+        assert retrieved['data']['type'] == 'matVideo'
+        assert retrieved['data']['duration'] == 30
+        assert retrieved['data']['start_time'] is not None
+        assert retrieved['data']['dt'] is not None
+
