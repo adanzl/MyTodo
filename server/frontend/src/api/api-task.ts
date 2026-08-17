@@ -350,6 +350,47 @@ export async function setGlobalBlockTime(config: BlockTimeConfig): Promise<void>
   await setRdsData(GLOBAL_BLOCK_TIME_RDS_TABLE, GLOBAL_BLOCK_TIME_RDS_ID, JSON.stringify(payload));
 }
 
+/** 全勤奖励配置，存 Redis key：task:reward */
+export interface TaskRewardConfig {
+  reward: number;
+  start_date: string;
+  end_date: string;
+}
+
+export const TASK_REWARD_RDS_TABLE = "task";
+export const TASK_REWARD_RDS_ID = "reward";
+
+const EMPTY_TASK_REWARD: TaskRewardConfig = { reward: 0, start_date: "", end_date: "" };
+
+export async function getTaskRewardConfig(): Promise<TaskRewardConfig> {
+  const raw = await getRdsData<string>(TASK_REWARD_RDS_TABLE, TASK_REWARD_RDS_ID);
+  if (!raw) {
+    return { ...EMPTY_TASK_REWARD };
+  }
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return {
+      reward: Number(parsed?.reward) || 0,
+      start_date: parsed?.start_date || "",
+      end_date: parsed?.end_date || "",
+    };
+  } catch {
+    return { ...EMPTY_TASK_REWARD };
+  }
+}
+
+export async function setTaskRewardConfig(config: TaskRewardConfig): Promise<void> {
+  await setRdsData(
+    TASK_REWARD_RDS_TABLE,
+    TASK_REWARD_RDS_ID,
+    JSON.stringify({
+      reward: Math.max(0, Number(config.reward) || 0),
+      start_date: config.start_date || "",
+      end_date: config.end_date || "",
+    }),
+  );
+}
+
 /**
  * 获取任务列表
  * @param userId - 用户ID（可选）

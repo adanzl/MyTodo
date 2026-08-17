@@ -238,13 +238,7 @@
         </ion-card-content>
       </ion-card>
     </div>
-    <RewardPop
-      :is-open="bOpenRewardPop.open"
-      :value="bOpenRewardPop.value"
-      :reward-type="bOpenRewardPop.rewardType"
-      :img="bOpenRewardPop.img"
-      :msg="bOpenRewardPop.msg"
-      @willDismiss="bOpenRewardPop.open = false" />
+    <RewardPop />
     <RewardListPop
       :is-open="bOpenRewardListPop.open"
       :reward-list="bOpenRewardListPop.rewardList"
@@ -261,15 +255,15 @@
 
 <script setup lang="ts">
 import RewardSet from "@/components/RewardSet.vue";
+import RewardPop from "@/components/RewardPop.vue";
 import RewardListPop from "@/components/RewardListPop.vue";
 import { ColorOptions, LoadColorData } from "@/types/color-type";
 import { C_EVENT } from "@/types/event-bus";
 import { GroupOptions, PriorityOptions } from "@/types/schedule-type";
 import { User, UserData } from "@/types/user-data";
 import { getApiUrl, scheduleProactiveRefresh } from "@/api/api-client";
-import { getUserList } from "@/api/api-user";
+import { getUserList, getUserInfo } from "@/api/api-user";
 import { clearLoginCache, login } from "@/utils/auth-util";
-import avatar from "@/assets/images/avatar.svg";
 import {
   IonAccordion,
   IonAccordionGroup,
@@ -317,13 +311,6 @@ const curUser = ref(new User());          // 当前选中用户
 curUser.value.name = "点击选择用户";
 const userPopover = ref<any>(null);
 const textPwd = ref("");                  // 密码输入
-const bOpenRewardPop = ref({
-  open: false,
-  value: "0",
-  rewardType: "points",
-  img: avatar,
-  msg:"",
-});
 const bOpenRewardListPop = ref({
   open: false,
   rewardList: [] as Array<{ value: string; rewardType: string; img?: string }>,
@@ -483,12 +470,18 @@ eventBus.$on(C_EVENT.AUTH_EXPIRED, () => {
 eventBus.$on(C_EVENT.UPDATE_SAVE, (params: any) => {
   userData.value = params;
 });
-eventBus.$on(C_EVENT.REWARD, (params: any) => {
-  bOpenRewardPop.value.open = true;
-  bOpenRewardPop.value.value = String(params.value);
-  bOpenRewardPop.value.rewardType = params.rewardType;
-  bOpenRewardPop.value.img = params.img;
-  bOpenRewardPop.value.msg = params.msg;
+eventBus.$on(C_EVENT.UPDATE_USER_INFO, async () => {
+  const userId = curUser.value?.id;
+  if (!userId || userId <= 0) return;
+  try {
+    const userInfo = await getUserInfo(userId);
+    curUser.value.score = userInfo.score;
+    if (globalVar?.user?.id === userId) {
+      globalVar.user.score = userInfo.score;
+    }
+  } catch (error) {
+    console.error("刷新用户积分失败:", error);
+  }
 });
 eventBus.$on(C_EVENT.REWARD_LIST, (params: any) => {
   bOpenRewardListPop.value.open = true;

@@ -11,6 +11,7 @@ from core.config import app_logger
 from core.db.db_mgr import db_mgr
 from core.utils import _ok, _err, fmt_ts
 from .rest_days import parse_rest_days, is_rest_day, get_workday_index, end_date_by_work_duration
+from .reward import TASK_REWARD_ACTION, get_reward_config, is_reward_active
 
 log = app_logger
 
@@ -142,7 +143,7 @@ class TaskMgr:
             return _err(f"获取任务日历失败: {str(e)}")
 
     def finish_material(self, task_id: int, material_id: int, date_str: str, user_id: int) -> Dict[str, Any]:
-        """完成指定日期的素材打卡，并在当天全部完成时发放积分。"""
+        """完成指定日期的素材打卡；当天任务素材全部完成时发放任务星星，全部每日任务完成时再发全勤奖励。"""
         try:
             task_result = db_mgr.get_data(TABLE_TASK, task_id, '*')
             if task_result.get('code') != 0 or not task_result.get('data'):
@@ -218,7 +219,11 @@ class TaskMgr:
                     else:
                         score_added = score
 
-            return _ok({"success": True, "score": score_added})
+            bonus = 0
+            if all_completed and int(task.get('type', 0) or 0) != 1:
+                bonus = self._try_grant_daily_reward(user_id, date_str)
+
+            return _ok({"success": True, "score": score_added, "bonus": bonus})
         except Exception as e:
             log.error(f"完成素材打卡失败: {e}")
             return _err(f"完成素材打卡失败: {str(e)}")
@@ -434,29 +439,31 @@ class TaskMgr:
                 task['msg'] = ''
             return tasks
 
+    def _get_materials_for_date(self, task: Dict[str, Any], target_d: date) -> List[Dict[str, Any]]:
+        """返回任务在指定自然日应打卡的素材列表；休息日、越界或无素材时为空。"""
+        start_date_str = task.get('start_date', '')
+        if not start_date_str:
+            return []
+        start_date_d = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        duration = int(task.get('duration', 0) or 0)
+        if duration <= 0:
+            return []
+
+        rule = parse_rest_days(task.get('rest_days'))
+        workday_idx = get_workday_index(start_date_d, target_d, rule)
+        if workday_idx < 0 or workday_idx >= duration:
+            return []
+
+        task_data = json.loads(task.get('data') or '{}')
+        daily_materials = task_data.get('dailyMaterials', {})
+        materials_index = 0 if task.get('type', 0) == 1 else workday_idx
+        materials_for_day = daily_materials.get(str(materials_index), [])
+        return materials_for_day if isinstance(materials_for_day, list) else []
+
     def _has_uncompleted_materials(self, task: Dict[str, Any], user_id: int, target_date: datetime) -> bool:
         """判断任务在指定日期是否仍有未完成的素材。"""
         try:
-            start_date_str = task.get('start_date', '')
-            if not start_date_str:
-                return False
-            start_date_d = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-            duration = int(task.get('duration', 0) or 0)
-            if duration <= 0:
-                return False
-
-            target_d = target_date.date()
-            rule = parse_rest_days(task.get('rest_days'))
-            workday_idx = get_workday_index(start_date_d, target_d, rule)
-            if workday_idx == -2:
-                return False
-            if workday_idx < 0 or workday_idx >= duration:
-                return False
-
-            task_data = json.loads(task.get('data') or '{}')
-            daily_materials = task_data.get('dailyMaterials', {})
-            materials_index = 0 if task.get('type', 0) == 1 else workday_idx
-            materials_for_day = daily_materials.get(str(materials_index), [])
+            materials_for_day = self._get_materials_for_date(task, target_date.date())
             if not materials_for_day:
                 return False
             return any(
@@ -464,6 +471,72 @@ class TaskMgr:
         except Exception as e:
             log.error(f"检查任务素材完成状态失败: {e}")
             return True
+
+    def _try_grant_daily_reward(self, user_id: int, date_str: str) -> int:
+        """当天所有非持续任务完成后发放全勤奖励星星，已发过则跳过。"""
+        try:
+            config = get_reward_config()
+            if not config or not is_reward_active(config, date_str):
+                return 0
+            reward = int(config['reward'])
+
+            history = db_mgr.get_list(
+                't_score_history', 1, 1, 'id',
+                {'user_id': user_id, 'action': TASK_REWARD_ACTION, 'out_key': date_str})
+            if history.get('code') != 0:
+                log.error(f"查询全勤奖励记录失败: {history.get('msg')}")
+                return 0
+            rows = (history.get('data') or {}).get('data') or []
+            if rows:
+                return 0
+
+            result = db_mgr.get_list(
+                TABLE_TASK, page_num=1, page_size=1000,
+                conditions={
+                    'user_id': {'like': f'%{user_id}%'},
+                    'start_date': {'<=': date_str},
+                    'end_date': {'>=': date_str},
+                })
+            if result.get('code') != 0:
+                log.error(f"查询全勤奖励任务失败: {result.get('msg')}")
+                return 0
+
+            tasks = result.get('data', {}).get('data', []) or []
+            target_d = datetime.strptime(date_str, '%Y-%m-%d').date()
+            target_dt = datetime.strptime(date_str, '%Y-%m-%d')
+            daily_tasks = []
+            for task in tasks:
+                if int(task.get('type', 0) or 0) == 1:
+                    continue
+                try:
+                    materials = self._get_materials_for_date(task, target_d)
+                except Exception as e:
+                    log.error(f"解析任务 {task.get('id')} 当天素材失败: {e}")
+                    return 0
+                if not materials:
+                    continue
+                daily_tasks.append(task)
+
+            if not daily_tasks:
+                return 0
+            if any(self._has_uncompleted_materials(task, user_id, target_dt) for task in daily_tasks):
+                return 0
+
+            add_ret = db_mgr.add_score(
+                user_id=user_id,
+                value=reward,
+                action=TASK_REWARD_ACTION,
+                msg=f'完成{date_str}全部每日任务奖励',
+                out_key=date_str,
+            )
+            if add_ret.get('code') != 0:
+                log.error(f"发放全勤奖励失败: {add_ret.get('msg')}")
+                return 0
+            log.info(f"发放全勤奖励: user_id={user_id}, date={date_str}, reward={reward}")
+            return reward
+        except Exception as e:
+            log.error(f"发放全勤奖励异常: {e}")
+            return 0
 
     def _check_schedules_completed(self, todo_ids: List[int], user_id: int, date_str: str) -> tuple:
         """检查前置日程在指定日期是否全部完成。

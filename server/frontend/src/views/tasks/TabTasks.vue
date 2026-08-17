@@ -11,6 +11,12 @@
           <span class="text-xs text-gray-500 shrink-0">全局禁用</span>
           <BlockTimeDisplay :block-time="globalBlockTime" :wrap="false" />
         </div>
+        <div
+          class="flex flex-wrap items-center gap-1 ml-1 px-2 min-h-7 py-1 rounded border border-dashed border-gray-300 cursor-pointer"
+          @click="rewardDialogVisible = true">
+          <span class="text-xs text-gray-500 shrink-0">全勤奖励</span>
+          <span class="text-xs text-gray-700">{{ rewardSummary }}</span>
+        </div>
       </div>
     </div>
 
@@ -82,6 +88,7 @@
     <TaskDialog v-model="dialogVisible" :is-edit="isEdit" :task-data="currentTaskData" @success="fetchTaskList" />
 
     <BlockTimeDialog v-model="blockTimeDialogVisible" @success="fetchGlobalBlockTime" />
+    <RewardDialog v-model="rewardDialogVisible" @success="fetchTaskReward" />
   </div>
 </template>
 
@@ -91,16 +98,19 @@ import {
   deleteTask,
   getGlobalBlockTime,
   getTaskList,
+  getTaskRewardConfig,
   parsePreTask,
   type Task,
   type BlockTimeConfig,
+  type TaskRewardConfig,
 } from "@/api/api-task";
 import { Refresh, Edit, CopyDocument, Delete } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { onMounted, ref, onUnmounted, nextTick } from "vue";
+import { computed, onMounted, ref, onUnmounted, nextTick } from "vue";
 import BlockTimeDisplay from "./components/BlockTimeDisplay.vue";
 import TaskDialog from "./dialogs/TaskDialog.vue";
 import BlockTimeDialog from "./dialogs/BlockTimeDialog.vue";
+import RewardDialog from "./dialogs/RewardDialog.vue";
 import { formatRestDaysFullText } from "@/utils/date";
 
 
@@ -135,7 +145,16 @@ const pageSize = ref(20);
 // 对话框
 const dialogVisible = ref(false);
 const blockTimeDialogVisible = ref(false);
+const rewardDialogVisible = ref(false);
 const globalBlockTime = ref<BlockTimeConfig>();
+const taskReward = ref<TaskRewardConfig>({ reward: 0, start_date: "", end_date: "" });
+const rewardSummary = computed(() => {
+  const cfg = taskReward.value;
+  if (!cfg.reward || !cfg.start_date || !cfg.end_date) {
+    return "未配置";
+  }
+  return `${cfg.reward}星 ${cfg.start_date}~${cfg.end_date}`;
+});
 const isEdit = ref(false);
 const currentTaskData = ref<Partial<Task>>({});
 
@@ -145,6 +164,14 @@ const fetchGlobalBlockTime = async () => {
     globalBlockTime.value = await getGlobalBlockTime();
   } catch (error: any) {
     ElMessage.error(error.message || "获取全局禁用时段失败");
+  }
+};
+
+const fetchTaskReward = async () => {
+  try {
+    taskReward.value = await getTaskRewardConfig();
+  } catch (error: any) {
+    ElMessage.error(error.message || "获取全勤奖励失败");
   }
 };
 
@@ -282,6 +309,7 @@ const handleDeleteTask = async (row: Task) => {
 onMounted(() => {
   fetchTaskList();
   fetchGlobalBlockTime();
+  fetchTaskReward();
   calculateTableHeight();
   window.addEventListener('resize', calculateTableHeight);
 
