@@ -1,5 +1,5 @@
 <template>
-  <ion-modal id="reward-list-modal" class="backdrop">
+  <ion-modal id="reward-list-modal" class="backdrop" :is-open="isOpen" @didDismiss="onDismiss">
     <div class="p-3 flex border-b border-gray-400 mx-6">
       <span class="text-center w-full">获得</span>
     </div>
@@ -60,8 +60,15 @@ interface RewardItem {
 }
 
 defineProps<{
+    isOpen?: boolean;
     rewardList?: RewardItem[];
 }>();
+
+const emit = defineEmits<{ willDismiss: [] }>();
+
+function onDismiss() {
+  emit("willDismiss");
+}
 
 /** 返回可展示的图片 URL，无图时自动返回占位图 */
 function getRewardImageUrl(img?: string): string {

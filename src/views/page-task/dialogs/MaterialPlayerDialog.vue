@@ -178,6 +178,7 @@
 <script setup lang="ts">
 import { addUsage, type AddUsageBody, USAGE_TYPE_PDF, USAGE_TYPE_VIDEO } from '@/api';
 import { finishMaterial, requestUnlockMaterial } from '@/api/api-task';
+import { getUserInfo } from '@/api/api-user';
 import { apiClient } from '@/api/api-client';
 import AudioPreview from '@/components/AudioPreview.vue';
 import EventBus, { C_EVENT } from '@/types/event-bus';
@@ -772,6 +773,46 @@ const reportUsage = async (duration: number, startTime?: number, isFinalReport =
     }
 };
 
+const REWARD_MODAL_DELAY_MS = 350;
+
+type RewardPayload = {
+    value: string;
+    rewardType: 'points';
+    msg?: string;
+};
+
+const buildRewardPayloads = (result: { score?: number; bonus?: number }): RewardPayload[] => {
+    const rewards: RewardPayload[] = [];
+    if ((result.score || 0) > 0) {
+        rewards.push({ value: String(result.score), rewardType: 'points', msg: '任务奖励' });
+    }
+    if ((result.bonus || 0) > 0) {
+        rewards.push({ value: String(result.bonus), rewardType: 'points', msg: '全勤奖励' });
+    }
+    return rewards;
+};
+
+const showRewardPopups = (rewards: RewardPayload[]) => {
+    if (!rewards.length) return;
+    window.setTimeout(() => {
+        for (const reward of rewards) {
+            EventBus.$emit(C_EVENT.REWARD, reward);
+        }
+    }, REWARD_MODAL_DELAY_MS);
+};
+
+const refreshUserScore = async (userId: number) => {
+    try {
+        const userInfo = await getUserInfo(userId);
+        if (globalVar?.user?.id === userId) {
+            globalVar.user.score = userInfo.score;
+        }
+        EventBus.$emit(C_EVENT.UPDATE_USER_INFO);
+    } catch (error) {
+        console.error('刷新用户积分失败:', error);
+    }
+};
+
 // 完成阅读
 const completeReading = async () => {
     if (!props.material || !props.task || !props.date || !props.userId) return;
@@ -780,27 +821,23 @@ const completeReading = async () => {
     try {
         const userId = props.userId;
         
-        // 使用服务端接口完成素材打卡
         const result = await finishMaterial(
             props.task.id,
             props.material.id,
-            props.date, // 使用传入的日期
+            props.date,
             userId
         );
-        
-        // 如果获得积分，弹出奖励弹窗
-        if (result.score > 0) {
-            EventBus.$emit(C_EVENT.REWARD, {
-                value: result.score,
-                rewardType: 'points',
-            });
-        }
-        
-        // 通知父组件刷新列表
+
+        const rewards = buildRewardPayloads(result);
         emit('completed');
-        
-        console.log('完成阅读，已保存');
+
+        if (rewards.length > 0) {
+            void refreshUserScore(userId);
+        }
+
+        // 先关闭全屏阅读弹窗，避免与奖励弹窗层级冲突
         handleDismiss();
+        showRewardPopups(rewards);
     } catch (error: any) {
         console.error('保存失败:', error);
         EventBus.$emit(C_EVENT.TOAST, error?.message || '完成失败，请稍后重试');

@@ -377,8 +377,8 @@ export async function finishMaterial(
   materialId: number,
   date: string,
   userId: number
-): Promise<{ score: number }> {
-  const rsp = await apiClient.post<ApiResponse<{ success: boolean; score: number }>>("/task/finish", {
+): Promise<{ score: number; bonus?: number }> {
+  const rsp = await apiClient.post<ApiResponse<{ success: boolean; score: number; bonus?: number }>>("/task/finish", {
     task_id: taskId,
     material_id: materialId,
     date,
