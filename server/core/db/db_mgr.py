@@ -1,9 +1,10 @@
 import json
 import traceback
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Union, cast
 
 from flask import Flask
-from sqlalchemy import MetaData, Table, func, inspect, select, text
+from sqlalchemy import Date, DateTime, MetaData, Table, func, inspect, select, text
 
 from core.config import app_logger, config
 from core.config.const import (DB_CODE_ERROR, DB_CODE_ERROR_RUNTIME, DB_CODE_SUCCESS)
@@ -16,6 +17,41 @@ log = app_logger
 
 DB_NAME = "data.db"
 TABLE_SAVE = "t_user_save"
+
+
+def _parse_datetime_string(value: str) -> datetime:
+    """把 ISO/常见时间字符串解析为 naive datetime（本地时区）。"""
+    text = value.strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        parsed = datetime.strptime(text[:19], "%Y-%m-%d %H:%M:%S")
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone().replace(tzinfo=None)
+    return parsed
+
+
+def _coerce_sql_value(col: Any, value: Any) -> Any:
+    """按列类型转换写入值；DateTime/Date 列不接受原始字符串。"""
+    if value is None or not isinstance(value, str):
+        return value
+    col_type = getattr(col, "type", None)
+    if isinstance(col_type, DateTime):
+        try:
+            return _parse_datetime_string(value)
+        except ValueError:
+            return value
+    if isinstance(col_type, Date):
+        try:
+            return _parse_datetime_string(value).date()
+        except ValueError:
+            try:
+                return datetime.strptime(value[:10], "%Y-%m-%d").date()
+            except ValueError:
+                return value
+    return value
 
 
 class DbMgr:
@@ -190,9 +226,11 @@ class DbMgr:
             metadata = MetaData()
             table_obj = Table(table, metadata, autoload_with=db_obj.engine)
 
-            # 处理数据，将 list/dict 类型转换为 JSON 字符串（SQLite 不支持直接绑定 dict）
+            # 处理数据：list/dict 转 JSON；DateTime/Date 列把字符串转成 datetime/date
             processed_data = {}
             for key, value in data.items():
+                if key in table_obj.c:
+                    value = _coerce_sql_value(table_obj.c[key], value)
                 if isinstance(value, (list, dict)):
                     processed_data[key] = json.dumps(value, ensure_ascii=False)
                 else:
