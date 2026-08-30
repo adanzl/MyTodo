@@ -17,13 +17,15 @@ from aiohttp import ClientSession
 from miservice import MiAccount, MiNAService
 from miservice.miiocommand import miio_command, MiIOService
 
+
 # Monkey-patch: 修复 aiohttp follow 302 后 cookie 丢失导致登录失败的问题
 async def _patched_securityTokenService(self, location, nonce, ssecurity):
     import base64, hashlib
     from urllib import parse
     from yarl import URL
     nsec = "nonce=" + str(nonce) + "&" + ssecurity
-    clientSign = base64.b64encode(hashlib.sha1(nsec.encode()).digest()).decode()
+    clientSign = base64.b64encode(hashlib.sha1(
+        nsec.encode()).digest()).decode()
     url = location + "&clientSign=" + parse.quote(clientSign)
     async with self.session.get(url) as r:
         serviceToken = r.cookies.get("serviceToken")
@@ -34,11 +36,14 @@ async def _patched_securityTokenService(self, location, nonce, ssecurity):
             raise Exception(await r.text())
         return serviceToken.value
 
+
 MiAccount._securityTokenService = _patched_securityTokenService
 
 # Monkey-patch: 修复 serviceToken 过期后清空整个 token 导致 passToken 丢失的问题
 import logging as _logging
+
 _mi_logger = _logging.getLogger("miservice")
+
 
 async def _patched_mi_request(self, sid, url, data, headers, relogin=True):
     headers["User-Agent"] = self.now_ua
@@ -49,9 +54,11 @@ async def _patched_mi_request(self, sid, url, data, headers, relogin=True):
         }
         content = data(self.token, cookies) if callable(data) else data
         method = "GET" if data is None else "POST"
-        async with self.session.request(
-            method, url, data=content, cookies=cookies, headers=headers
-        ) as r:
+        async with self.session.request(method,
+                                        url,
+                                        data=content,
+                                        cookies=cookies,
+                                        headers=headers) as r:
             status = r.status
             if status == 200:
                 resp = await r.json(content_type=None)
@@ -63,12 +70,16 @@ async def _patched_mi_request(self, sid, url, data, headers, relogin=True):
             else:
                 resp = await r.text()
         if status == 401 and relogin:
-            _mi_logger.warn("Auth error on request %s %s, relogin...", url, resp)
-            self.token.pop(sid, None)  # only remove expired sid, keep passToken for lightweight refresh
+            _mi_logger.warn("Auth error on request %s %s, relogin...", url,
+                            resp)
+            self.token.pop(
+                sid, None
+            )  # only remove expired sid, keep passToken for lightweight refresh
             return await self.mi_request(sid, url, data, headers, False)
     else:
         resp = "Login failed"
     raise Exception(f"Error {url}: {resp}")
+
 
 MiAccount.mi_request = _patched_mi_request
 
@@ -86,6 +97,8 @@ DEFAULT_MI_PASSWORD = config.MI_PASS
 TOKEN_FILE = os.path.join(str(Path.home()), ".mi.token")
 
 print(f'Token file {TOKEN_FILE}')
+
+
 def _device_to_dict(device: Dict[str, Any]) -> Dict[str, str]:
     """将 Device 对象转换为字典"""
     try:
@@ -102,7 +115,8 @@ def _device_to_dict(device: Dict[str, Any]) -> Dict[str, str]:
         return {}
 
 
-async def _get_device_did_async(username: str, password: str, device_id: str) -> Tuple[int, str]:
+async def _get_device_did_async(username: str, password: str,
+                                device_id: str) -> Tuple[int, str]:
     session = None
     try:
         session = ClientSession()
@@ -145,7 +159,9 @@ class MiDevice(DeviceBase):
         self.password = password or DEFAULT_MI_PASSWORD
 
     @staticmethod
-    async def scan_devices(username: Optional[str] = None, password: Optional[str] = None) -> List[Dict[str, str]]:
+    async def scan_devices(
+            username: Optional[str] = None,
+            password: Optional[str] = None) -> List[Dict[str, str]]:
         """扫描小米设备
 
         Args:
@@ -170,7 +186,8 @@ class MiDevice(DeviceBase):
 
         try:
             MiDevice.scanning = True
-            log.info(f"[MiDevice] Starting scan with username: {username[:3]}***")
+            log.info(
+                f"[MiDevice] Starting scan with username: {username[:3]}***")
             async with ClientSession() as session:
                 account = MiAccount(
                     session,
@@ -230,10 +247,12 @@ class MiDevice(DeviceBase):
                 # 捕获 gevent LoopExit 异常（可能由 fake_useragent 的线程池操作引起）
                 import gevent
                 if isinstance(e, gevent.exceptions.LoopExit):
-                    log.warning(f"[MiDevice] Play: gevent LoopExit (可忽略), 重试播放")
+                    log.warning(
+                        f"[MiDevice] Play: gevent LoopExit (可忽略), 重试播放")
                     # 重试一次
                     try:
-                        await mina_service.play_by_url(self.device_id, media_url)
+                        await mina_service.play_by_url(self.device_id,
+                                                       media_url)
                         return 0, "ok"
                     except Exception as e2:
                         log.error(f"[MiDevice] Play retry error: {e2}")
@@ -309,19 +328,20 @@ class MiDevice(DeviceBase):
                 session = ClientSession()
                 account = self._create_account(session)
                 _service = MiIOService(account)
-                result = await miio_command(_service, self.device_did, '2-1,3-1,3-2')
+                result = await miio_command(_service, self.device_did,
+                                            '2-1,3-1,3-2')
                 volume = result[0]  # 获取音量，确保始终有音量值
                 state = 'PLAYING' if result[1] == 1 else 'STOPPED'
                 state_code = result[1]
                 return 0, {
-                        "state": state,
-                        "state_code": state_code,
-                        "status": 'OK',
-                        "track": 0,
-                        "duration": "00:00:00",
-                        "position": "00:00:00",
-                        "volume": volume  # 确保音量始终返回
-                    }
+                    "state": state,
+                    "state_code": state_code,
+                    "status": 'OK',
+                    "track": 0,
+                    "duration": "00:00:00",
+                    "position": "00:00:00",
+                    "volume": volume  # 确保音量始终返回
+                }
             # try:
             #     # 获取 MiNAService 对象
             #     session = ClientSession()
@@ -467,7 +487,8 @@ class MiDevice(DeviceBase):
         """
         try:
             if self.device_did is None:
-                code, self.device_did = run_async(_get_device_did_async(self.username, self.password, self.device_id),
+                code, self.device_did = run_async(_get_device_did_async(
+                    self.username, self.password, self.device_id),
                                                   timeout=5.0)
                 if code != 0:
                     return code, "设备未找到"
@@ -485,7 +506,8 @@ def scan_devices_sync(timeout: float = 5.0) -> List[Dict[str, str]]:
     try:
         username = os.getenv("MI_USER", DEFAULT_MI_USERNAME)
         password = os.getenv("MI_PASS", DEFAULT_MI_PASSWORD)
-        return run_async(MiDevice.scan_devices(username, password), timeout=timeout + 2.0)
+        return run_async(MiDevice.scan_devices(username, password),
+                         timeout=timeout + 2.0)
     except asyncio.TimeoutError:
         log.error(f"[MiDevice] Scan timeout after {timeout + 2.0}s")
         return []
