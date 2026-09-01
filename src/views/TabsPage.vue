@@ -14,21 +14,23 @@
           </ion-toolbar>
         </ion-header>
         <ion-content>
-          <!-- 用户信息卡片：头像、昵称、积分 -->
-          <ion-item lines="none" @click="rewardLbClk" detail="true">
-            <ion-avatar slot="start" class="ml-0 w-8 h-8">
+          <!-- 用户信息卡片：头像、昵称、Coin/积分 -->
+          <ion-item lines="none" @click="rewardLbClk" detail="true" class="[--inner-padding-end:8px]">
+            <ion-avatar slot="start" class="ml-0 w-8 h-8 shrink-0">
               <ion-img :src="curUser.icon" />
             </ion-avatar>
-            <ion-label class="font-bold ml-3">{{ curUser.name }}</ion-label>
-            <!-- Coin 显示 -->
-            <Icon icon="mdi:coin" class="text-yellow-500 w-5 h-5 mr-2" />
-            <div class="text-left pl-1 font-bold w-12">
-              {{ curUser?.coin ?? 0 }}
-            </div>
-            <!-- 星星积分显示 -->
-            <Icon icon="mdi:star" class="text-red-500 w-5 h-5 ml-2" />
-            <div class="text-left pl-1 font-bold w-12">
-              {{ curUser?.score ?? 0 }}
+            <div class="flex flex-col min-w-0 flex-1 ml-3 py-1">
+              <div class="font-bold truncate">{{ curUser.name }}</div>
+              <div class="flex items-center gap-3 mt-0.5">
+                <span class="inline-flex items-center gap-1 whitespace-nowrap shrink-0 tabular-nums text-sm font-bold">
+                  <Icon icon="mdi:coin" class="text-yellow-500 w-4 h-4 shrink-0" />
+                  {{ formatNum(curUser?.coin ?? 0) }}
+                </span>
+                <span class="inline-flex items-center gap-1 whitespace-nowrap shrink-0 tabular-nums text-sm font-bold">
+                  <Icon icon="mdi:star" class="text-red-500 w-4 h-4 shrink-0" />
+                  {{ formatNum(curUser?.score ?? 0) }}
+                </span>
+              </div>
             </div>
           </ion-item>
           <!-- 筛选条件：项目 / 分组 / 优先级 -->
@@ -306,6 +308,10 @@ import { useRouter } from "vue-router";
 
 // ===== 路由与全局状态 =====
 const router = useRouter();
+
+function formatNum(n: number): string {
+  return n.toLocaleString("en-US");
+}
 
 // ===== 响应式状态 =====
 const bLogin = ref(false);                // 是否已登录
