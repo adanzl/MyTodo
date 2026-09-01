@@ -168,15 +168,8 @@ docker run -d --name frpc_ssh \
     --restart unless-stopped --dns 223.5.5.5 \
     openfrp/frpc:latest \
     -u 9266c2d09e67a0b3a243ce228e77146f \
-    -p 1096970
+    -p 1209445
 
-# web channel
-docker run -d --name frpc_web \
-    -v /var/run/docker.sock:/var/run/docker.sock \
-    --restart unless-stopped --dns 223.5.5.5 \
-    openfrp/frpc:latest \
-    -u 9266c2d09e67a0b3a243ce228e77146f \
-    -p 1098893
 ```
 
 ## portainer

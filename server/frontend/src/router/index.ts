@@ -32,6 +32,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/my-todo/PageScore.vue"),
   },
   {
+    path: "/coin",
+    name: "Coin",
+    component: () => import("@/views/my-todo/PageCoin.vue"),
+  },
+  {
     path: "/statistics",
     name: "Statistics",
     component: () => import("@/views/my-todo/PageStats.vue"),

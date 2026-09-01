@@ -338,6 +338,28 @@ class DbMgr:
             traceback.print_exc()
             return {"code": DB_CODE_ERROR, "msg": f'error: {str(e)}'}
 
+    def add_coin(
+        self,
+        user_id: int,
+        value: int,
+        action: str,
+        msg: Optional[str],
+        out_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """为用户增加或扣除金币。"""
+        try:
+            user = db_obj.session.get(User, user_id)
+            if not user:
+                return {"code": DB_CODE_ERROR_RUNTIME, "msg": f"用户不存在: {user_id}"}
+            user.coin = user.coin + int(value)
+            db_obj.session.commit()
+            return {"code": DB_CODE_SUCCESS, "msg": "ok", "data": user.coin}
+        except Exception as e:
+            db_obj.session.rollback()
+            log.error(e)
+            traceback.print_exc()
+            return {"code": DB_CODE_ERROR, "msg": f'error: {str(e)}'}
+
     def del_data(self, table: str, id: int) -> Dict[str, Any]:
         """从指定表删除一条数据。"""
         try:

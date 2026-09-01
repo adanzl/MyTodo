@@ -38,14 +38,19 @@
       </el-table-column>
       <el-table-column prop="score" label="Score" width="100">
         <template #default="{ row }">
-          <el-input v-model="row.score" size="small" class="w-14!" />
+          {{ row.score }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="coin" label="Coin" width="100">
+        <template #default="{ row }">
+          {{ row.coin }}
         </template>
       </el-table-column>
       <el-table-column prop="inventory" label="Inventory" width="100" show-overflow-tooltip />
       <el-table-column label="Operations">
         <template #default="{ row }">
-          <el-button class="w-16" @click="handleUpdateUser(row)" type="primary"> Update </el-button>
-          <el-button class="w-16" @click="onAddScoreBtnClick(row)"> Score </el-button>
+          <el-button class="w-16" @click="onAddScoreBtnClick(row)" type="primary"> Score </el-button>
+          <el-button class="w-16" @click="onAddCoinBtnClick(row)" type="warning"> Coin </el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -65,6 +70,22 @@
         <el-button @click="handleAddScore()" class="ml-2 w-16" type="primary"> Submit </el-button>
       </div>
     </el-dialog>
+    <el-dialog
+      v-model="coinDialogForm.visible"
+      title="Change Coin"
+      width="600"
+      :before-close="handleCoinDialogClose"
+    >
+      <span>输入的金币会作用在当前金币上，输入负数则会减少金币</span>
+      <div v-if="coinDialogForm.data">
+        {{ coinDialogForm.data.name }} 当前金币: {{ coinDialogForm.data.coin }}
+      </div>
+      <div class="flex mt-4">
+        <el-input v-model="coinDialogForm.value" style="width: 240px" placeholder="Please input" />
+
+        <el-button @click="handleAddCoin()" class="ml-2 w-16" type="warning"> Submit </el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -72,8 +93,8 @@
 import { ref, onMounted, computed } from "vue";
 import { ElMessage } from "element-plus";
 import { Refresh } from "@element-plus/icons-vue";
-import { setUserInfo } from "@/api/api-user";
 import { addScore } from "@/api/api-score";
+import { addCoin } from "@/api/api-coin";
 import { getLotterySetting } from "@/api/api-lottery";
 import { useUserStore, type UserWithExtras } from "@/stores/user";
 
@@ -114,24 +135,19 @@ const dialogForm = ref<{
   value: 0,
 });
 
+const coinDialogForm = ref<{
+  visible: boolean;
+  data: UserWithExtras | null;
+  value: number;
+}>({
+  visible: false,
+  data: null,
+  value: 0,
+});
+
 const refreshUserList = async () => {
   // 使用 store 刷新用户列表（会自动处理缓存）
   await userStore.refreshUserList(true);
-};
-
-const handleUpdateUser = async (item: UserWithExtras) => {
-  try {
-    const data = {
-      id: item.id,
-      score: item.score,
-    };
-    await setUserInfo(data.id, data.score);
-    console.log("update user", data);
-    await refreshUserList();
-  } catch (error) {
-    console.error("更新用户失败:", error);
-    ElMessage.error("更新用户失败");
-  }
 };
 
 const onAddScoreBtnClick = (item: UserWithExtras) => {
@@ -155,9 +171,35 @@ const handleAddScore = async () => {
   }
 };
 
+const onAddCoinBtnClick = (item: UserWithExtras) => {
+  coinDialogForm.value.visible = true;
+  coinDialogForm.value.data = item;
+};
+
+const handleAddCoin = async () => {
+  if (!coinDialogForm.value.data) {
+    ElMessage.warning("请选择用户");
+    return;
+  }
+  try {
+    await addCoin(coinDialogForm.value.data.id, "pcAdmin", coinDialogForm.value.value, "管理后台变更");
+    await refreshUserList();
+    coinDialogForm.value.visible = false;
+    coinDialogForm.value.value = 0;
+  } catch (error) {
+    console.error("添加金币失败:", error);
+    ElMessage.error("添加金币失败");
+  }
+};
+
 const handleDialogClose = () => {
   dialogForm.value.visible = false;
   dialogForm.value.value = 0;
+};
+
+const handleCoinDialogClose = () => {
+  coinDialogForm.value.visible = false;
+  coinDialogForm.value.value = 0;
 };
 
 onMounted(async () => {

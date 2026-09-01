@@ -16,6 +16,7 @@ export class User {
   icon = `${avatar}`;
   admin = 0;
   score = 0;
+  coin = 0;
   dScore = 0;
 }
 

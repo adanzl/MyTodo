@@ -63,7 +63,7 @@ export function clearUserListCache(): void {
 
 export async function getUserInfo(id: number): Promise<UserInfo> {
   const rsp = await apiClient.get<ApiResponse<UserInfo>>("/getData", {
-    params: { table: "t_user", id, fields: "id,score" },
+    params: { table: "t_user", id, fields: "id,score,coin" },
   });
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);

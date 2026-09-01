@@ -8,6 +8,7 @@ export class User {
   icon: string = "";
   admin: number = 0;
   score: number = 0;
+  coin: number = 0;
 
   constructor() {
     this.id = -1;
@@ -16,5 +17,6 @@ export class User {
     this.icon = "";
     this.admin = 0;
     this.score = 0;
+    this.coin = 0;
   }
 }

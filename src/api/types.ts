@@ -36,6 +36,7 @@ export interface ApiListResponse<T> {
 export interface UserInfo {
   id: number;
   score?: number;
+  coin?: number;
   [key: string]: unknown;
 }
 
@@ -44,6 +45,7 @@ export interface UserListItem {
   id: number;
   name?: string;
   score?: number;
+  coin?: number;
   wish_list?: number[];
   [key: string]: unknown;
 }
