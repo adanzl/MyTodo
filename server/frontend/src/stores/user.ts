@@ -14,6 +14,7 @@ export interface UserWithExtras extends User {
   wish_progress?: number;
   wish_list?: string;
   inventory?: string;
+  coin?: number;
 }
 
 export interface CurUser {

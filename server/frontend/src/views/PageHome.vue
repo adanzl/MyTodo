@@ -38,12 +38,12 @@
       </el-table-column>
       <el-table-column prop="score" label="Score" width="100">
         <template #default="{ row }">
-          {{ row.score }}
+          {{ formatNum(row.score) }}
         </template>
       </el-table-column>
       <el-table-column prop="coin" label="Coin" width="100">
         <template #default="{ row }">
-          {{ row.coin }}
+          {{ formatNum(row.coin) }}
         </template>
       </el-table-column>
       <el-table-column prop="inventory" label="Inventory" width="100" show-overflow-tooltip />
@@ -62,7 +62,7 @@
     >
       <span>输入的积分会作用在当前积分上，输入负数则会减少积分</span>
       <div v-if="dialogForm.data">
-        {{ dialogForm.data.name }} 当前积分: {{ dialogForm.data.score }}
+        {{ dialogForm.data.name }} 当前积分: {{ formatNum(dialogForm.data.score) }}
       </div>
       <div class="flex mt-4">
         <el-input v-model="dialogForm.value" style="width: 240px" placeholder="Please input" />
@@ -78,7 +78,7 @@
     >
       <span>输入的金币会作用在当前金币上，输入负数则会减少金币</span>
       <div v-if="coinDialogForm.data">
-        {{ coinDialogForm.data.name }} 当前金币: {{ coinDialogForm.data.coin }}
+        {{ coinDialogForm.data.name }} 当前金币: {{ formatNum(coinDialogForm.data.coin ?? 0) }}
       </div>
       <div class="flex mt-4">
         <el-input v-model="coinDialogForm.value" style="width: 240px" placeholder="Please input" />
@@ -97,6 +97,8 @@ import { addScore } from "@/api/api-score";
 import { addCoin } from "@/api/api-coin";
 import { getLotterySetting } from "@/api/api-lottery";
 import { useUserStore, type UserWithExtras } from "@/stores/user";
+
+const formatNum = (n: number) => new Intl.NumberFormat().format(n);
 
 // 使用 Pinia Store
 const userStore = useUserStore();
