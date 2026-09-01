@@ -60,11 +60,30 @@ export async function setUserInfo(
 }
 
 /**
+ * 设置用户金币
+ */
+export async function setUserInfoCoin(
+  id: number | string,
+  coin: number
+): Promise<{ id: number; coin: number }> {
+  const rsp = await api.post<ApiResponse<{ id: number; coin: number }>>("/setData", {
+    table: "t_user",
+    data: { id, coin },
+  });
+
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+
+  return rsp.data.data;
+}
+
+/**
  * 获取用户信息
  */
-export async function getUserInfo(id: number | string): Promise<{ id: number; score: number }> {
-  const rsp = await api.get<ApiResponse<{ id: number; score: number }>>("/getData", {
-    params: { table: "t_user", id, fields: "id,score" },
+export async function getUserInfo(id: number | string): Promise<{ id: number; score: number; coin: number }> {
+  const rsp = await api.get<ApiResponse<{ id: number; score: number; coin: number }>>("/getData", {
+    params: { table: "t_user", id, fields: "id,score,coin" },
   });
 
   if (rsp.data.code !== 0) {

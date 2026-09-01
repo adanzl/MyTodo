@@ -30,6 +30,10 @@
           <el-icon><Star /></el-icon>
           <template #title>Score</template>
         </el-menu-item>
+        <el-menu-item index="/coin">
+          <el-icon><Coin /></el-icon>
+          <template #title>Coin</template>
+        </el-menu-item>
         <el-menu-item index="/statistics">
           <el-icon><PieChart /></el-icon>
           <template #title>统计</template>
@@ -80,6 +84,7 @@ import {
   Monitor,
   Expand,
   Fold,
+  Coin,
 } from "@element-plus/icons-vue";
 import { useUserStore } from "@/stores/user";
 

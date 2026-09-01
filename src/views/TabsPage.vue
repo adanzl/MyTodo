@@ -20,8 +20,13 @@
               <ion-img :src="curUser.icon" />
             </ion-avatar>
             <ion-label class="font-bold ml-3">{{ curUser.name }}</ion-label>
-            <!-- 积分显示 -->
-            <Icon icon="mdi:star" class="text-red-500 w-5 h-5" />
+            <!-- Coin 显示 -->
+            <Icon icon="mdi:coin" class="text-yellow-500 w-5 h-5 mr-2" />
+            <div class="text-left pl-1 font-bold w-12">
+              {{ curUser?.coin ?? 0 }}
+            </div>
+            <!-- 星星积分显示 -->
+            <Icon icon="mdi:star" class="text-red-500 w-5 h-5 ml-2" />
             <div class="text-left pl-1 font-bold w-12">
               {{ curUser?.score ?? 0 }}
             </div>
@@ -476,8 +481,10 @@ eventBus.$on(C_EVENT.UPDATE_USER_INFO, async () => {
   try {
     const userInfo = await getUserInfo(userId);
     curUser.value.score = userInfo.score;
+    curUser.value.coin = userInfo.coin;
     if (globalVar?.user?.id === userId) {
       globalVar.user.score = userInfo.score;
+      globalVar.user.coin = userInfo.coin;
     }
   } catch (error) {
     console.error("刷新用户积分失败:", error);

@@ -326,6 +326,24 @@ def add_score() -> ResponseReturnValue:
     return db_mgr.add_score(user_id, value, action, msg)
 
 
+@api_bp.route("/addCoin", methods=['POST'])
+def add_coin() -> ResponseReturnValue:
+    args: Dict[str, Any] = read_json_from_request()
+    log.info("=> [Add Coin] " + json.dumps(args, ensure_ascii=False))
+
+    user_id_raw = args.get('user')
+    user_id, err = _parse_int(user_id_raw, 'user')
+    if err:
+        return err
+
+    value = args.get('value')
+    action = args.get('action')
+    msg = args.get('msg')
+    if value is None or action is None or user_id is None:
+        return {"code": -1, "msg": "value or action or user_id is required"}
+    return db_mgr.add_coin(user_id, value, action, msg)
+
+
 @api_bp.route("/addRdsList", methods=['POST'])
 def add_rds_list() -> ResponseReturnValue:
     """向Redis列表中插入数据（列表尾部插入）"""
