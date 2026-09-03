@@ -450,6 +450,77 @@ def test_stop_on_not_playing(playlist_mgr, mock_device):
     mock_device.stop.assert_called_once()
 
 
+def test_stop_schedules_device_status_verify(playlist_mgr, mock_device,
+                                              monkeypatch):
+    """stop 后应安排设备状态复核；仍 PLAYING 时再发 stop 并链式下一次。"""
+    p1 = create_playlist_data("p1", "P1", [{"uri": "f1.mp3"}])
+    playlist_mgr.update_single_playlist(p1)
+    playlist_mgr._devices["p1"] = {"obj": mock_device}
+
+    captured = []
+
+    def capture_add_date_job(func, job_id, run_date):
+        captured.append((func, job_id, run_date))
+        return True
+
+    monkeypatch.setattr(mock_scheduler_mgr, "get_job", lambda job_id: None)
+    monkeypatch.setattr(mock_scheduler_mgr, "remove_job", MagicMock())
+    monkeypatch.setattr(mock_scheduler_mgr, "add_date_job",
+                        capture_add_date_job)
+
+    code, msg = playlist_mgr.stop("p1")
+    assert code == 0
+    assert mock_device.stop.call_count == 1
+    assert len(captured) == 1
+    assert captured[0][1] == "playlist_stop_verify_p1"
+
+    verify_fn = captured[0][0]
+    captured.clear()
+    mock_device.stop.reset_mock()
+    mock_device.get_status.return_value = (0, {
+        "state": "PLAYING",
+        "duration": "00:01:00",
+        "position": "00:00:10",
+    })
+
+    verify_fn()
+    assert mock_device.stop.call_count == 1
+    assert len(captured) == 1  # 链式安排下一次复核
+
+
+def test_stop_verify_passes_when_device_stopped(playlist_mgr, mock_device,
+                                                 monkeypatch):
+    """复核时设备已停止则不再链式安排。"""
+    p1 = create_playlist_data("p1", "P1", [{"uri": "f1.mp3"}])
+    playlist_mgr.update_single_playlist(p1)
+    playlist_mgr._devices["p1"] = {"obj": mock_device}
+
+    captured = []
+
+    def capture_add_date_job(func, job_id, run_date):
+        captured.append((func, job_id, run_date))
+        return True
+
+    monkeypatch.setattr(mock_scheduler_mgr, "get_job", lambda job_id: None)
+    monkeypatch.setattr(mock_scheduler_mgr, "remove_job", MagicMock())
+    monkeypatch.setattr(mock_scheduler_mgr, "add_date_job",
+                        capture_add_date_job)
+
+    playlist_mgr.stop("p1")
+    verify_fn = captured[0][0]
+    captured.clear()
+    mock_device.stop.reset_mock()
+    mock_device.get_status.return_value = (0, {
+        "state": "STOPPED",
+        "duration": "00:00:00",
+        "position": "00:00:00",
+    })
+
+    verify_fn()
+    mock_device.stop.assert_not_called()
+    assert captured == []
+
+
 def test_collect_files_without_duration(playlist_mgr):
     p1 = create_playlist_data("p1", "P1", [{
         "uri": "f1.mp3"

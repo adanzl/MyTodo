@@ -294,8 +294,15 @@ class MiDevice(DeviceBase):
                 session = ClientSession()
                 account = self._create_account(session)
                 mina_service = MiNAService(account)
+                # HTTP 流场景下单次 pause/stop 常假成功，连续发两次提高停下概率
                 await mina_service.player_pause(self.device_id)
                 await mina_service.player_stop(self.device_id)
+                await asyncio.sleep(0.4)
+                try:
+                    await mina_service.player_pause(self.device_id)
+                    await mina_service.player_stop(self.device_id)
+                except Exception as e2:
+                    log.warning(f"[MiDevice] Stop second pass ignored: {e2}")
                 return 0, "ok"
             except Exception as e:
                 error_str = str(e)

@@ -761,6 +761,7 @@ class PlaylistMgr:
             return -1, "设备不存在或未初始化"
 
         self._cleanup_play_state(id)
+        self._last_play_sent_at.pop(id, None)
 
         code, msg = device.stop()
         if code == 0:
@@ -768,29 +769,46 @@ class PlaylistMgr:
         else:
             log.error(f"[PlaylistMgr] 停止播放失败 - 设备停止失败: {id} - {p_name}, {msg}")
 
-        # 若 3s 内向设备发过 play（如刚切歌），设备可能在加载中忽略了 stop，3s 后若列表仍为停止状态则再发一次 stop
-        last_play_sent = self._last_play_sent_at.get(id)
-        if last_play_sent and (datetime.datetime.now() -
-                               last_play_sent).total_seconds() < 3:
-            verify_job_id = f"playlist_stop_verify_{id}"
-
-            def _stop_verify_task(pid=id) -> None:
-                if pid in self._playing_playlists or pid not in self._devices:
-                    return
-                c, m = self._devices.safe_stop(pid)
-                p_name_verify = self._playlist_raw.get(pid, {}).get(
-                    "name", "未知播放列表")
-                log.info(
-                    f"[PlaylistMgr] 停止验证: 列表已停止且 3s 内曾发过 play，再次向设备发 stop: "
-                    f"{pid} - {p_name_verify}, code={c}, msg={m}")
-
-            self._scheduling.schedule_one_shot(verify_job_id, 3,
-                                               _stop_verify_task)
-            log.info(
-                f"[PlaylistMgr] 3s 内曾向设备发过 play，已安排 3s 后验证并必要时再发 stop: {id} - {p_name}"
-            )
-
+        # 小爱等设备对 HTTP 流常出现 stop/pause API 成功但实际继续播；按状态多次复核再停。
+        self._schedule_device_stop_verify(id)
         return code, msg
+
+    # 停止后复核延迟（秒）：小爱 HTTP 流常在 pause/stop 后仍继续拉流
+    _STOP_VERIFY_DELAYS = (3, 10, 30)
+
+    def _schedule_device_stop_verify(self, playlist_id: str,
+                                      attempt: int = 0) -> None:
+        """停止后按设备状态复核；仍在播或状态未知则再发 stop，并链式安排下一次。"""
+        if attempt >= len(self._STOP_VERIFY_DELAYS):
+            return
+        delay = self._STOP_VERIFY_DELAYS[attempt]
+        job_id = f"playlist_stop_verify_{playlist_id}"
+
+        def _stop_verify_task(pid=playlist_id, att=attempt) -> None:
+            if pid in self._playing_playlists or pid not in self._devices:
+                return
+            state, _ = self._devices.read_progress(pid)
+            p_name_verify = self._playlist_raw.get(pid, {}).get(
+                "name", "未知播放列表")
+            # PLAYING：必须再停；空状态：get_status 失败时也再停一次兜底
+            if state == "PLAYING" or not state:
+                c, m = self._devices.safe_stop(pid)
+                log.warning(
+                    f"[PlaylistMgr] 停止验证: 设备可能仍在播放，再次 stop "
+                    f"(attempt={att + 1}/{len(self._STOP_VERIFY_DELAYS)}): "
+                    f"{pid} - {p_name_verify}, state={state or 'unknown'}, "
+                    f"code={c}, msg={m}")
+                self._schedule_device_stop_verify(pid, att + 1)
+            else:
+                log.info(
+                    f"[PlaylistMgr] 停止验证通过: {pid} - {p_name_verify}, "
+                    f"state={state}, attempt={att + 1}")
+
+        self._scheduling.schedule_one_shot(job_id, delay, _stop_verify_task)
+        if attempt == 0:
+            log.info(
+                f"[PlaylistMgr] 已安排停止后设备状态复核: {playlist_id}, "
+                f"delays={list(self._STOP_VERIFY_DELAYS)}s")
 
     def trigger_button(self, button: str, action: str) -> tuple[int, str]:
         """响应外部按钮事件（如 Agent 上报）来播放或停止播放列表。
