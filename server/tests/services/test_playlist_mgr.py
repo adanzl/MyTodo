@@ -452,7 +452,7 @@ def test_stop_on_not_playing(playlist_mgr, mock_device):
 
 def test_stop_schedules_device_status_verify(playlist_mgr, mock_device,
                                               monkeypatch):
-    """stop 后应安排设备状态复核；仍 PLAYING 时再发 stop 并链式下一次。"""
+    """stop 后应安排设备状态复核；每次复核都再发 stop 并链式下一次。"""
     p1 = create_playlist_data("p1", "P1", [{"uri": "f1.mp3"}])
     playlist_mgr.update_single_playlist(p1)
     playlist_mgr._devices["p1"] = {"obj": mock_device}
@@ -488,9 +488,9 @@ def test_stop_schedules_device_status_verify(playlist_mgr, mock_device,
     assert len(captured) == 1  # 链式安排下一次复核
 
 
-def test_stop_verify_passes_when_device_stopped(playlist_mgr, mock_device,
-                                                 monkeypatch):
-    """复核时设备已停止则不再链式安排。"""
+def test_stop_verify_still_stops_when_device_reports_stopped(
+        playlist_mgr, mock_device, monkeypatch):
+    """小爱常假报 STOPPED，复核时仍应再发 stop 并继续链式安排。"""
     p1 = create_playlist_data("p1", "P1", [{"uri": "f1.mp3"}])
     playlist_mgr.update_single_playlist(p1)
     playlist_mgr._devices["p1"] = {"obj": mock_device}
@@ -517,8 +517,8 @@ def test_stop_verify_passes_when_device_stopped(playlist_mgr, mock_device,
     })
 
     verify_fn()
-    mock_device.stop.assert_not_called()
-    assert captured == []
+    mock_device.stop.assert_called_once()
+    assert len(captured) == 1
 
 
 def test_collect_files_without_duration(playlist_mgr):

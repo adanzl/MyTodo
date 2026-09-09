@@ -773,12 +773,13 @@ class PlaylistMgr:
         self._schedule_device_stop_verify(id)
         return code, msg
 
-    # 停止后复核延迟（秒）：小爱 HTTP 流常在 pause/stop 后仍继续拉流
-    _STOP_VERIFY_DELAYS = (3, 10, 30)
+    # 停止后复核延迟（秒）。小爱 get_status 常假报 STOPPED 却继续拉 HTTP 流，
+    # 不可在首次 STOPPED 时提前结束复核。
+    _STOP_VERIFY_DELAYS = (3, 10, 30, 120, 300)
 
     def _schedule_device_stop_verify(self, playlist_id: str,
                                       attempt: int = 0) -> None:
-        """停止后按设备状态复核；仍在播或状态未知则再发 stop，并链式安排下一次。"""
+        """停止后强制多次再发 stop，跑完全部延迟；不信任单次 STOPPED。"""
         if attempt >= len(self._STOP_VERIFY_DELAYS):
             return
         delay = self._STOP_VERIFY_DELAYS[attempt]
@@ -790,19 +791,14 @@ class PlaylistMgr:
             state, _ = self._devices.read_progress(pid)
             p_name_verify = self._playlist_raw.get(pid, {}).get(
                 "name", "未知播放列表")
-            # PLAYING：必须再停；空状态：get_status 失败时也再停一次兜底
-            if state == "PLAYING" or not state:
-                c, m = self._devices.safe_stop(pid)
-                log.warning(
-                    f"[PlaylistMgr] 停止验证: 设备可能仍在播放，再次 stop "
-                    f"(attempt={att + 1}/{len(self._STOP_VERIFY_DELAYS)}): "
-                    f"{pid} - {p_name_verify}, state={state or 'unknown'}, "
-                    f"code={c}, msg={m}")
-                self._schedule_device_stop_verify(pid, att + 1)
-            else:
-                log.info(
-                    f"[PlaylistMgr] 停止验证通过: {pid} - {p_name_verify}, "
-                    f"state={state}, attempt={att + 1}")
+            # 无论状态如何都再 stop：小爱 HTTP 流下 STOPPED 不可靠。
+            c, m = self._devices.safe_stop(pid)
+            total = len(self._STOP_VERIFY_DELAYS)
+            log.info(
+                f"[PlaylistMgr] 停止验证再发 stop "
+                f"(attempt={att + 1}/{total}): {pid} - {p_name_verify}, "
+                f"state={state or 'unknown'}, code={c}, msg={m}")
+            self._schedule_device_stop_verify(pid, att + 1)
 
         self._scheduling.schedule_one_shot(job_id, delay, _stop_verify_task)
         if attempt == 0:
