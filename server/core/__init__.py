@@ -35,9 +35,15 @@ log = app_logger
 
 
 def create_app():
+    # Flask(__name__) 的包根是 core/，但模板与静态资源在 server/ 下
     instance_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    app = Flask(__name__, instance_path=instance_path,
-                instance_relative_config=True)
+    app = Flask(
+        __name__,
+        instance_path=instance_path,
+        instance_relative_config=True,
+        template_folder=os.path.join(instance_path, "templates"),
+        static_folder=os.path.join(instance_path, "static"),
+    )
 
     # OpenAPI / Swagger UI
     app.config.setdefault("API_TITLE", "MyTodo Server API")
