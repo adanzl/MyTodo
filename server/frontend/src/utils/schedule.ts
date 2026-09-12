@@ -8,13 +8,18 @@ import {
   WEEK,
   PriorityOptions,
   GroupOptions,
+  ColorOptions,
   type RepeatOption,
   type PriorityOption,
   type GroupOption,
+  type ColorOption,
 } from "@/constants/schedule";
 
 interface RepeatData {
   week?: number[];
+  weekdays?: number[];
+  monthDays?: number[];
+  interval?: number;
 }
 
 /**
@@ -121,6 +126,58 @@ export function getGroupOptions(id: number): GroupOption {
     }
   }
   return GroupOptions[0];
+}
+
+/**
+ * 获取颜色选项
+ */
+export function getColorOptions(id?: number): ColorOption {
+  for (const v of ColorOptions) {
+    if (v.id === id) {
+      return v;
+    }
+  }
+  return ColorOptions[0];
+}
+
+/**
+ * 获取重复规则展示文本
+ */
+export function getRepeatRuleText(repeat: number | string, repeatData?: RepeatData | string): string {
+  const repeatId = Number(repeat);
+  const repeatMap: Record<number, string> = {
+    0: "无",
+    1: "每天",
+    2: "每星期",
+    3: "每月",
+    4: "每年",
+    5: "工作日",
+    6: "每周末",
+    999: "自定义",
+  };
+  const base = repeatMap[repeatId] ?? String(repeat);
+  if (repeatId !== 999 || !repeatData) {
+    return base;
+  }
+  try {
+    const data =
+      typeof repeatData === "string" ? (JSON.parse(repeatData) as RepeatData) : repeatData;
+    if (data.week?.length) {
+      return buildCustomRepeatLabel(data);
+    }
+    const parts: string[] = [];
+    if (data.interval) parts.push(`每${data.interval}次`);
+    if (data.weekdays?.length) {
+      const dayNames = ["日", "一", "二", "三", "四", "五", "六"];
+      parts.push(data.weekdays.map((d) => `周${dayNames[d]}`).join("、"));
+    }
+    if (data.monthDays?.length) {
+      parts.push(`每月${data.monthDays.join("、")}日`);
+    }
+    return parts.length ? `${base}（${parts.join("，")}）` : base;
+  } catch {
+    return base;
+  }
 }
 
 

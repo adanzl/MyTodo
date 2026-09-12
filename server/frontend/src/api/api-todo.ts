@@ -10,7 +10,8 @@ export interface ScheduleData {
   allDay: boolean;
   order: number;
   reminder: number;
-  repeat: string;
+  repeat: number | string;
+  repeatData?: Record<string, unknown>;
   repeatEndTs: string;
   score?: number;
   color?: number;
@@ -22,6 +23,9 @@ export interface ScheduleData {
     title?: string;
   }>;
 }
+
+/** 日历视图：日期 -> 当天日程列表 */
+export type TodoCalendarData = Record<string, ScheduleData[]>;
 
 /**
  * 获取待办事项列表
@@ -71,6 +75,30 @@ export async function getTodoListByTime(
     throw new Error(rsp.data.msg);
   }
   return rsp.data.data;
+}
+
+/**
+ * 获取指定时间范围内的日历数据（按日展开重复日程）
+ * @param startTime - 开始时间（格式：YYYY-MM-DD）
+ * @param endTime - 结束时间（格式：YYYY-MM-DD）
+ * @param userId - 用户ID
+ */
+export async function getTodoCalendar(
+  startTime: string,
+  endTime: string,
+  userId: number
+): Promise<TodoCalendarData> {
+  const rsp = await api.get<ApiResponse<TodoCalendarData>>("/todo/calendar", {
+    params: {
+      start_time: startTime,
+      end_time: endTime,
+      user_id: userId,
+    },
+  });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  return rsp.data.data || {};
 }
 
 /**
