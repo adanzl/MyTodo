@@ -106,6 +106,7 @@
       v-model:visible="dialogVisible"
       :todo-data="currentTodo"
       :is-edit="isEditMode"
+      :user-id="selectedUserId"
       @success="refreshData"
     />
   </div>

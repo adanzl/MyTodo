@@ -118,6 +118,8 @@ def create_todo() -> ResponseReturnValue:
         schedule_data.order = int(order_val) if order_val is not None else 0
         schedule_data.score = json_data.get('score')
         schedule_data.userId = json_data.get('userId') or json_data.get('user_id')
+        if not schedule_data.userId:
+            return _err('userId is required')
 
         # 解析子任务
         subtasks_raw = json_data.get('subtasks', [])

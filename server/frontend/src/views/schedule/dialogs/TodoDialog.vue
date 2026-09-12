@@ -131,6 +131,7 @@ const props = defineProps<{
   visible: boolean;
   todoData: ScheduleData | null;
   isEdit?: boolean;
+  userId?: number;
 }>();
 
 const emit = defineEmits<{
@@ -202,7 +203,7 @@ watch(() => props.todoData, (newData) => {
       reminder: newData.reminder || 0,
     };
   } else if (!isEdit.value) {
-    // 添加模式，重置表单
+    // 添加模式，重置表单（必须带上当前筛选用户，否则入库 user_id 为 NULL，刷新后列表/日历查不到）
     formData.value = {
       id: 0,
       title: '',
@@ -213,9 +214,22 @@ watch(() => props.todoData, (newData) => {
       allDay: false,
       score: 0,
       subtasks: [],
+      userId: props.userId ?? 0,
+      color: 0,
+      priority: 0,
+      groupId: -1,
+      order: 0,
+      reminder: 0,
     };
   }
 }, { immediate: true });
+
+// 切换筛选用户时，同步到添加中的表单
+watch(() => props.userId, (uid) => {
+  if (!isEdit.value && uid != null) {
+    formData.value.userId = uid;
+  }
+});
 
 const addSubtask = () => {
   if (!formData.value.subtasks) {
@@ -253,6 +267,21 @@ const handleSubmit = async () => {
         submitData[key] = value;
       }
     });
+
+    // 创建时确保绑定当前用户；repeat 统一为数字，与 webapp / 日历逻辑一致
+    if (!isEdit.value) {
+      submitData.userId = props.userId ?? formData.value.userId;
+      if (!submitData.userId) {
+        ElMessage.error('请先选择用户');
+        return;
+      }
+    }
+    if (submitData.repeat !== undefined) {
+      submitData.repeat = Number(submitData.repeat);
+    }
+    if (typeof submitData.allDay === 'boolean') {
+      submitData.allDay = submitData.allDay ? 1 : 0;
+    }
 
     if (isEdit.value && formData.value.id) {
       await updateTodo(formData.value.id, submitData);
