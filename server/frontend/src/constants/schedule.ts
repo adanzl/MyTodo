@@ -27,11 +27,13 @@ export const ReminderOptions: ReminderOption[] = [
 ];
 
 export interface RepeatOption {
-  id: number | string;
+  id: number;
   label: string;
   tag: string;
   icon: string;
 }
+
+export const CUSTOM_REPEAT_ID = 999;
 
 export const RepeatOptions: RepeatOption[] = [
   { id: 0, label: "无", tag: "", icon: "MdiCalendarBlankOutline" },
@@ -42,7 +44,7 @@ export const RepeatOptions: RepeatOption[] = [
   { id: 3, label: "每月", tag: "month", icon: "MdiCalendarTodayOutline" },
   { id: 4, label: "每年", tag: "year", icon: "MdiCalendarMultiselectOutline" },
   {
-    id: "CUSTOM_REPEAT_ID",
+    id: CUSTOM_REPEAT_ID,
     label: "自定义",
     tag: "custom",
     icon: "MdiHammerWrench",
@@ -94,6 +96,20 @@ export const GroupOptions: GroupOption[] = [
   { id: 0, label: "未分类", color: "white", icon: "MdiBorderRoundCorners" },
   { id: 1, label: "工作", color: "red", icon: "MdiWorkOutline" },
   { id: 2, label: "学习", color: "yellow", icon: "MdiLearnOutline" },
+];
+
+export interface ColorOption {
+  id: number;
+  label: string;
+  tag: string;
+}
+
+export const ColorOptions: ColorOption[] = [
+  { id: 0, label: "None", tag: "#f8fafc" },
+  { id: 1, label: "Red", tag: "#fca5a5" },
+  { id: 2, label: "Yellow", tag: "#fde047" },
+  { id: 3, label: "Blue", tag: "#93c5fd" },
+  { id: 4, label: "Green", tag: "#4ade80" },
 ];
 
 
