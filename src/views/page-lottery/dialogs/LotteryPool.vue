@@ -29,19 +29,19 @@
                             <p class="w-15 shrink-0"> 中奖数： </p>
                             <p class="w-8">{{ pool.count }} - {{ pool.count_mx }} </p>
                         </div>
-                        <div class="flex text-xs mt-2">
+                        <div class="flex items-start text-xs mt-2">
                             <p class="w-9 shrink-0 "> 类别： </p>
                             <!-- 有类别时 -->
-                            <div class="flex gap-1">
+                            <div class="flex flex-1 min-w-0 flex-wrap gap-1 pr-1">
                                 <template v-if="pool.cateNames && pool.cateNames.length > 0">
                                     <div v-for="(name, idx) in pool.cateNames" :key="idx"
-                                        class="text-xs px-1 py-1 rounded-sm bg-blue-100 text-blue-800">
+                                        class="text-xs px-1 py-1 rounded-sm bg-blue-100 text-blue-800 whitespace-nowrap">
                                         {{ name }}
                                     </div>
                                 </template>
                                 <!-- 无类别时 -->
                                 <div v-else color="medium"
-                                    class="text-xs px-1 py-1 rounded-sm bg-gray-100 text-gray-800">
+                                    class="text-xs px-1 py-1 rounded-sm bg-gray-100 text-gray-800 whitespace-nowrap">
                                     无
                                 </div>
                             </div>
@@ -101,10 +101,10 @@
                                 <div class="flex flex-wrap gap-2">
                                     <ion-chip v-for="cate in lotteryCatList" :key="cate.id"
                                         :color="isSelectedCate(cate.id) ? 'primary' : 'medium'" :outline="false"
-                                        class="rounded-md px-2" @click="toggleCate(cate.id)">
+                                        class="rounded-md px-2 whitespace-nowrap" @click="toggleCate(cate.id)">
                                         <ion-icon :icon="checkmarkCircle"
                                             :class="isSelectedCate(cate.id) ? 'text-blue-500' : 'text-gray-300'"
-                                            class="w-4 h-4 mr-1">
+                                            class="w-4 h-4 mr-1 shrink-0">
                                         </ion-icon>
                                         {{ cate.name }}
                                     </ion-chip>
