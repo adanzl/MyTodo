@@ -1,10 +1,8 @@
 <template>
-  <div class="">
+  <div class="p-2">
     <!-- 增加刷新数据按钮 -->
-    <div class="mb-4">
-      <el-button @click="refreshUserList" type="primary" :loading="loading">
-        <el-icon><Refresh /></el-icon>
-        刷新数据
+    <div class="mb-2">
+      <el-button @click="refreshUserList" type="primary" :loading="loading" size="small" :icon="Refresh">
       </el-button>
     </div>
     <el-table :data="userList" stripe class="w-full" v-loading="loading">
