@@ -1,0 +1,13 @@
+{
+  "strings": {
+    "schedule_play:playlist_collection": "{\"p1\": {\"id\": \"p1\", \"name\": \"P1\", \"playlist\": [{\"uri\": \"f1.mp3\"}], \"files\": [{\"uri\": \"f1.mp3\"}], \"device\": {\"type\": \"dlna\", \"address\": \"http://p1.local\"}, \"pre_lists\": [[], [], [], [], [], [], []], \"trigger_button\": null, \"schedule\": {\"enabled\": 0, \"cron\": \"\"}}}"
+  },
+  "lists": {},
+  "hashes": {
+    "schedule_play:playlist_collection_history": {
+      "2026-08-26 23:47:03": "{\"p1\": {\"name\": \"P1\", \"duration_timer_at\": \"2026-08-26 23:48:03\"}}",
+      "2026-08-26 23:47:21": "{\"p1\": {\"id\": \"p1\", \"name\": \"P1\", \"playlist\": [{\"uri\": \"f1.mp3\"}], \"files\": [{\"uri\": \"f1.mp3\"}], \"device\": {\"type\": \"dlna\", \"address\": \"http://p1.local\"}, \"pre_lists\": [[], [], [], [], [], [], []], \"trigger_button\": null, \"schedule\": {\"enabled\": 0, \"cron\": \"\"}}}",
+      "2026-09-04 01:10:04": "{\"p1\": {\"id\": \"p1\", \"name\": \"P1\", \"playlist\": [{\"uri\": \"f1.mp3\"}], \"files\": [{\"uri\": \"f1.mp3\"}], \"device\": {\"type\": \"dlna\", \"address\": \"http://p1.local\"}, \"pre_lists\": [[], [], [], [], [], [], []], \"trigger_button\": null, \"schedule\": {\"enabled\": 0, \"cron\": \"\"}}}"
+    }
+  }
+}
