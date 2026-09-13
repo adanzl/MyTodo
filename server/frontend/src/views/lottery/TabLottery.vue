@@ -156,7 +156,7 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column label="启用" width="80">
+      <el-table-column label="启用抽奖" width="100">
         <template #default="{ row }">
           <div class="flex items-center pl-2">
             <el-checkbox v-model="row.enable" :disabled="!row.edited" />
