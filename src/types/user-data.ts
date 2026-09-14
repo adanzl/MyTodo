@@ -18,6 +18,7 @@ export class User {
   score = 0;
   coin = 0;
   dScore = 0;
+  dCoin = 0;
 }
 
 export class LotteryData {

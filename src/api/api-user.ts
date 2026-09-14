@@ -8,6 +8,7 @@ import type {
   GetUserListResponse,
   UserListItem,
   AddScoreBody,
+  AddCoinBody,
 } from "./types";
 
 /** 用户列表缓存时长（毫秒），5 分钟内不重复请求 */
@@ -103,6 +104,20 @@ export async function addScore(
 ): Promise<void> {
   const body: AddScoreBody = { user, action, value, msg };
   const rsp = await apiClient.post<ApiResponse<unknown>>("/addScore", body);
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+  clearUserListCache();
+}
+
+export async function addCoin(
+  user: number,
+  action: string,
+  value: number,
+  msg: string
+): Promise<void> {
+  const body: AddCoinBody = { user, action, value, msg };
+  const rsp = await apiClient.post<ApiResponse<unknown>>("/addCoin", body);
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
   }
