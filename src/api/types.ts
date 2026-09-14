@@ -66,6 +66,14 @@ export interface AddScoreBody {
   msg: string;
 }
 
+/** addCoin 请求体 */
+export interface AddCoinBody {
+  user: number;
+  action: string;
+  value: number;
+  msg: string;
+}
+
 // ----- schedule -----
 
 /** getSave 接口返回的原始 data 结构 */
