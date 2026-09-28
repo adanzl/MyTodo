@@ -81,20 +81,19 @@
         <div class="w-12 h-auto flex items-center" @click="btnChangeMode">
           <Icon icon="weui:keyboard-outlined" class="h-10 w-10" />
         </div>
-        <ion-button
-          class="flex-1 mr-1"
+        <button
+          type="button"
+          class="voice-record-button flex-1 mr-1"
           ref="recBtn"
           @pointerdown="startRecording"
-          :color="isRecording ? 'warning' : 'primary'">
-          <div v-if="isRecording" class="flex items-center">
-            <Icon icon="mdi:stop-circle-outline" class="h-6 w-6" />
-            <label class="ml-1 text-sm">松开发送</label>
-          </div>
-          <div v-else class="flex items-center">
-            <Icon icon="mdi:microphone" class="h-6 w-6" />
-            <label class="ml-1 text-sm">按住说话</label>
-          </div>
-        </ion-button>
+          @contextmenu.prevent
+          :class="{ 'is-recording': isRecording }"
+          :aria-busy="isOpeningRecorder || isStoppingRecorder">
+          <Icon icon="mdi:microphone" class="h-6 w-6" />
+          <span class="ml-1 text-sm" aria-live="polite">{{
+            isOpeningRecorder ? '正在打开麦克风…' : isStoppingRecorder ? '正在处理…' : isRecording ? '松开发送，移出取消' : '按住说话'
+          }}</span>
+        </button>
         <div class="w-12 flex flex-col pl-2">
           <ion-checkbox
             class="ml-1 h-8"
@@ -124,13 +123,13 @@ import { getChatSetting, setChatSetting } from "@/api/api-chat";
 import { getUserList } from "@/api/api-user";
 import { getNetworkErrorMessage } from "@/utils/net-util";
 import {
-  createGesture,
   IonCheckbox,
   IonSegment,
   IonSegmentButton,
   IonSegmentView,
   IonToolbar,
   onIonViewDidEnter,
+  onIonViewWillLeave,
 } from "@ionic/vue";
 import { heartOutline, megaphoneOutline } from "ionicons/icons";
 import Recorder from "recorder-core/recorder.wav.min";
@@ -171,11 +170,15 @@ const chatRoomTabRef = ref<InstanceType<typeof ChatRoomTab> | null>(null);
 const aiChatTabRef = ref<InstanceType<typeof AiChatTab> | null>(null);
 
 const wsUrl = getApiUrl().replace("api", "");
-const recBtn = ref<any>();
+const recBtn = ref<HTMLButtonElement | null>(null);
 const socketRef = ref<Socket>();
 
 const isWaitingServer = ref(false);
 const isRecording = ref(false);
+const isOpeningRecorder = ref(false);
+const isStoppingRecorder = ref(false);
+let recordingPointer: number | null = null;
+let recorderDisposed = false;
 const SAMPLE_RATE = 16000;
 const audioRef = ref<HTMLAudioElement | null>(null);
 const audioPlayMsg = ref<AiChatMsg | null>(null);
@@ -292,6 +295,8 @@ function getUserInfo(userId: string) {
 }
 
 onBeforeUnmount(() => {
+  recorderDisposed = true;
+  cancelRecording();
   window.removeEventListener("resize", updateTabsHeight);
   if (observer) {
     observer.disconnect();
@@ -308,6 +313,8 @@ onBeforeUnmount(() => {
     socketRef.value.disconnect();
   }
 });
+
+onIonViewWillLeave(cancelRecording);
 
 const hasChatTabEnteredBefore = ref(false);
 onIonViewDidEnter(async () => {
@@ -433,6 +440,7 @@ function initSocketIO() {
 }
 
 async function handleSegmentChange(event: any) {
+  cancelRecording();
   chatType.value = event.detail.value;
 }
 
@@ -468,7 +476,7 @@ const sendTextMessage = () => {
 };
 
 function sendAudioData(data: string, finish: boolean = false, cancel = false) {
-  if (!socketRef.value!.connected) {
+  if (!socketRef.value?.connected) {
     console.warn("WebSocket未连接，稍后重试");
     return;
   }
@@ -482,48 +490,95 @@ function sendAudioData(data: string, finish: boolean = false, cancel = false) {
   socketRef.value!.emit("message", message);
 }
 
-async function startRecording() {
-  if (!isWaitingServer.value) {
-    console.log("==> startRecording");
-    try {
-      rec.open(
-        () => {
-          console.info("Recording started");
-          rec.start();
-          const gesture = createGesture({
-            el: recBtn.value.$el,
-            gestureName: "longPress",
-            threshold: 0,
-            onStart: () => {},
-            onMove: (ev) => {
-              const rect = recBtn.value.$el.getBoundingClientRect();
-              const isOutside =
-                ev.currentX < rect.left ||
-                ev.currentX > rect.right ||
-                ev.currentY < rect.top ||
-                ev.currentY > rect.bottom;
+function clearRecordingPointer() {
+  recordingPointer = null;
+  window.removeEventListener('pointerup', onRecordingPointerUp, true);
+  window.removeEventListener('pointercancel', onRecordingPointerCancel, true);
+  window.removeEventListener('pointermove', onRecordingPointerMove, true);
+  window.removeEventListener('blur', cancelRecording);
+  document.removeEventListener('visibilitychange', onRecordingVisibilityChange);
+}
 
-              if (isOutside) {
-                stopRecording(true);
-                gesture.destroy();
-              }
-            },
-            onEnd: () => {
-              stopRecording(false);
-              gesture.destroy();
-            },
-          });
-          gesture.enable();
-          isRecording.value = true;
-        },
-        () => {
-          console.error("Recording failed");
-        }
-      );
-    } catch (error) {
-      console.error("Error starting recording:", error);
-      isRecording.value = false;
-    }
+function cancelRecording() {
+  clearRecordingPointer();
+  stopRecording(true);
+}
+
+function onRecordingVisibilityChange() {
+  if (document.hidden) cancelRecording();
+}
+
+function onRecordingPointerUp(event: PointerEvent) {
+  if (event.pointerId !== recordingPointer) return;
+  clearRecordingPointer();
+  stopRecording();
+}
+
+function onRecordingPointerCancel(event: PointerEvent) {
+  if (event.pointerId === recordingPointer) cancelRecording();
+}
+
+function onRecordingPointerMove(event: PointerEvent) {
+  if (event.pointerId !== recordingPointer) return;
+  const rect = recBtn.value?.getBoundingClientRect();
+  const tolerance = 40;
+  if (rect && (event.clientX < rect.left - tolerance || event.clientX > rect.right + tolerance ||
+    event.clientY < rect.top - tolerance || event.clientY > rect.bottom + tolerance)) {
+    cancelRecording();
+  }
+}
+
+function startRecording(event: PointerEvent) {
+  if (!event.isPrimary || event.button !== 0) return;
+  event.preventDefault();
+  if (isOpeningRecorder.value || isStoppingRecorder.value || isRecording.value) return;
+  if (isWaitingServer.value) {
+    EventBus.$emit(C_EVENT.TOAST, '正在等待回复，请稍后再录音');
+    return;
+  }
+  if (!window.isSecureContext) {
+    EventBus.$emit(C_EVENT.TOAST, '当前页面不是安全连接，请使用 HTTPS 地址打开后录音');
+    return;
+  }
+  if (!socketRef.value?.connected) {
+    EventBus.$emit(C_EVENT.TOAST, '聊天服务未连接，请连接后再录音');
+    return;
+  }
+  recordingPointer = event.pointerId;
+  isOpeningRecorder.value = true;
+  // 在异步权限请求前监听松手，避免授权完成后开始一次已经结束的按压。
+  window.addEventListener('pointerup', onRecordingPointerUp, true);
+  window.addEventListener('pointercancel', onRecordingPointerCancel, true);
+  window.addEventListener('pointermove', onRecordingPointerMove, true);
+  window.addEventListener('blur', cancelRecording);
+  document.addEventListener('visibilitychange', onRecordingVisibilityChange);
+  const fail = (message: unknown, denied = false) => {
+    clearRecordingPointer();
+    isOpeningRecorder.value = false;
+    isRecording.value = false;
+    rec.close();
+    if (!recorderDisposed) EventBus.$emit(C_EVENT.TOAST, denied
+      ? '麦克风权限被拒绝，请在浏览器或系统设置中允许麦克风访问'
+      : `无法开始录音：${String(message)}`);
+  };
+  try {
+    rec.open(() => {
+      isOpeningRecorder.value = false;
+      if (recordingPointer === null || recorderDisposed) {
+        rec.close();
+        if (!recorderDisposed) EventBus.$emit(C_EVENT.TOAST, '麦克风已就绪，请重新按住说话');
+        return;
+      }
+      try {
+        recSampleBuf = new Int16Array();
+        rec.start();
+        isRecording.value = true;
+      } catch (error) {
+        fail(error);
+      }
+    }, fail);
+  } catch (error) {
+    fail(error);
   }
 }
 
@@ -545,6 +600,8 @@ function recProcess(buffer: any, powerLevel: any, bufferDuration: any, bufferSam
 
 function stopRecording(cancel = false) {
   if (isRecording.value === false) return;
+  isRecording.value = false;
+  isStoppingRecorder.value = true;
   console.log("==> stopRecording", cancel);
   rec.stop(
     (blob: Blob) => {
@@ -561,10 +618,16 @@ function stopRecording(cancel = false) {
         streamAudio(() => {});
       }
       rec.close();
+      isStoppingRecorder.value = false;
     },
-    (errMsg: any) => console.log("errMsg: " + errMsg)
+    (errMsg: any) => {
+      sendAudioData('', true, true);
+      recSampleBuf = new Int16Array();
+      rec.close();
+      isStoppingRecorder.value = false;
+      if (!cancel && !recorderDisposed) EventBus.$emit(C_EVENT.TOAST, `录音失败：${errMsg}`);
+    }
   );
-  isRecording.value = false;
 }
 
 async function btnAudioClk(msg: AiChatMsg) {
@@ -653,6 +716,7 @@ function streamAudio(f = () => {}) {
 }
 
 function btnChangeMode() {
+  cancelRecording();
   if (INPUT_TYPE.value == "text") {
     INPUT_TYPE.value = "voice";
   } else {
@@ -685,3 +749,23 @@ function onChatSettingDismiss(e: any) {
   chatSetting.value.open = false;
 }
 </script>
+
+<style scoped>
+.voice-record-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border-radius: 4px;
+  background: var(--ion-color-primary);
+  color: var(--ion-color-primary-contrast);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.voice-record-button.is-recording {
+  background: var(--ion-color-warning);
+  color: var(--ion-color-warning-contrast);
+}
+</style>
