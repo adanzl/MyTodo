@@ -49,9 +49,16 @@ import {
 } from "@ionic/vue";
 import { Icon } from "@iconify/vue";
 import { volumeMediumOutline } from "ionicons/icons";
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import EventBus, { C_EVENT } from "@/types/event-bus";
 import { getAiChatMessages } from "@/api/api-chat";
+import {
+  AI_HISTORY_MAX_PAGES,
+  AI_HISTORY_PAGE_SIZE,
+  oldestHistoryId,
+  prependHistoryTurns,
+  type DifyHistoryItem,
+} from "@/views/page-chat/ai-chat-history";
 import { getNetworkErrorMessage } from "@/utils/net-util";
 import type { RefresherCustomEvent } from "@ionic/vue";
 
@@ -77,6 +84,15 @@ defineEmits<{
 const contentRef = ref<InstanceType<typeof IonContent> | null>(null);
 const messages = ref<ChatMsg[]>([]);
 const networkError = ref(false);
+/** 已拉到的最旧一条 Dify 消息 id。连续下拉时用它翻页；空回答不展示，但不能停在失败记录上。 */
+const historyCursor = ref<string | number | undefined>(undefined);
+
+watch(
+  () => props.aiConversationId,
+  () => {
+    historyCursor.value = undefined;
+  }
+);
 
 function scrollToBottom(duration = 200) {
   contentRef.value?.$el?.scrollToBottom?.(duration);
@@ -98,34 +114,39 @@ function getLastMessage(): ChatMsg | undefined {
   return messages.value[messages.value.length - 1];
 }
 
+function initialCursor(): string | number | undefined {
+  if (historyCursor.value) return historyCursor.value;
+  const first = messages.value.find((msg) => msg.id !== undefined && msg.id !== "");
+  return first?.id;
+}
+
 async function doRefresh(e: RefresherCustomEvent) {
   if (!props.aiConversationId) {
     e.target.complete();
     return;
   }
   networkError.value = false;
-  const firstId = messages.value.length > 0 ? messages.value[0].id : undefined;
+  let cursor = initialCursor();
   try {
-    const data: any = await getAiChatMessages(
-      props.aiConversationId,
-      3,
-      props.userName,
-      firstId
-    );
-    const list = data?.data ?? [];
-    list.reverse().forEach((item: any) => {
-      if (item?.answer === "") return;
-      messages.value.unshift({
-        id: item.id,
-        content: item.answer,
-        role: "server",
-      });
-      messages.value.unshift({
-        id: item.id,
-        content: item.query,
-        role: "me",
-      });
-    });
+    for (let page = 0; page < AI_HISTORY_MAX_PAGES; page++) {
+      const data = (await getAiChatMessages(
+        props.aiConversationId,
+        AI_HISTORY_PAGE_SIZE,
+        props.userName,
+        cursor
+      )) as { data?: DifyHistoryItem[]; has_more?: boolean } | null;
+      const list = Array.isArray(data?.data) ? data.data : [];
+      if (list.length === 0) break;
+
+      const oldest = oldestHistoryId(list);
+      if (oldest !== undefined && oldest === cursor) break;
+      if (oldest !== undefined) historyCursor.value = oldest;
+
+      const { messages: next, added } = prependHistoryTurns(messages.value, list);
+      messages.value = next;
+      cursor = historyCursor.value;
+      if (added > 0 || !data?.has_more) break;
+    }
   } catch (err) {
     networkError.value = true;
     EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
