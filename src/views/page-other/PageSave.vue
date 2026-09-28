@@ -97,7 +97,7 @@ const toastData = ref({
   text: "",
 });
 onMounted(() => {
-  const data = localStorage.getItem("bAuth");
+  const data = localStorage.getItem("lx_bAuth");
   if (data) {
     bAuth.value = data === "true";
   }

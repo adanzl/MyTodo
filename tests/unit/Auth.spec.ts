@@ -35,11 +35,11 @@ describe("Auth", () => {
     });
 
     it("setAccessToken(null) 移除 token 及过期时间", () => {
-      localStorage.setItem("access_token", "old");
-      localStorage.setItem("access_token_expires_at", "123");
+      localStorage.setItem("lx_access_token", "old");
+      localStorage.setItem("lx_access_token_expires_at", "123");
       setAccessToken(null);
-      expect(localStorage.getItem("access_token")).toBeNull();
-      expect(localStorage.getItem("access_token_expires_at")).toBeNull();
+      expect(localStorage.getItem("lx_access_token")).toBeNull();
+      expect(localStorage.getItem("lx_access_token_expires_at")).toBeNull();
     });
 
     it("setAccessToken(token) 写入 token，getAccessToken 可读回", () => {
@@ -59,18 +59,18 @@ describe("Auth", () => {
   });
 
   describe("clearLoginCache", () => {
-    it("移除 access_token、access_token_expires_at、refresh_token、saveUser、bAuth", () => {
-      localStorage.setItem("access_token", "x");
-      localStorage.setItem("access_token_expires_at", "123");
-      localStorage.setItem("refresh_token", "rt");
-      localStorage.setItem("saveUser", "1");
-      localStorage.setItem("bAuth", "1");
+    it("移除 lx_access_token、lx_access_token_expires_at、lx_refresh_token、lx_saveUser、lx_bAuth", () => {
+      localStorage.setItem("lx_access_token", "x");
+      localStorage.setItem("lx_access_token_expires_at", "123");
+      localStorage.setItem("lx_refresh_token", "rt");
+      localStorage.setItem("lx_saveUser", "1");
+      localStorage.setItem("lx_bAuth", "1");
       clearLoginCache();
-      expect(localStorage.getItem("access_token")).toBeNull();
-      expect(localStorage.getItem("access_token_expires_at")).toBeNull();
-      expect(localStorage.getItem("refresh_token")).toBeNull();
-      expect(localStorage.getItem("saveUser")).toBeNull();
-      expect(localStorage.getItem("bAuth")).toBeNull();
+      expect(localStorage.getItem("lx_access_token")).toBeNull();
+      expect(localStorage.getItem("lx_access_token_expires_at")).toBeNull();
+      expect(localStorage.getItem("lx_refresh_token")).toBeNull();
+      expect(localStorage.getItem("lx_saveUser")).toBeNull();
+      expect(localStorage.getItem("lx_bAuth")).toBeNull();
     });
   });
 
@@ -120,7 +120,7 @@ describe("Auth", () => {
   describe("refreshToken", () => {
     it("有 access 与 refresh 时 body 为 refresh_token，且头带 Authorization", async () => {
       setAccessToken("old_token");
-      localStorage.setItem("refresh_token", "the_rtk");
+      localStorage.setItem("lx_refresh_token", "the_rtk");
       mockPost.mockResolvedValueOnce({
         data: { access_token: "new_token", expires_in: 3600 },
       });
@@ -167,14 +167,14 @@ describe("Auth", () => {
 
   describe("logout", () => {
     it("无论请求成功与否都会 clearLoginCache", async () => {
-      localStorage.setItem("access_token", "x");
+      localStorage.setItem("lx_access_token", "x");
       mockPost.mockResolvedValueOnce({});
       await logout(baseUrl);
       expect(getAccessToken()).toBeNull();
     });
 
     it("请求失败时仍清除本地缓存", async () => {
-      localStorage.setItem("access_token", "x");
+      localStorage.setItem("lx_access_token", "x");
       mockPost.mockRejectedValueOnce(new Error("Network error"));
       await expect(logout(baseUrl)).rejects.toThrow("Network error");
       expect(getAccessToken()).toBeNull();
