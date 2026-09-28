@@ -351,7 +351,7 @@ onMounted(async () => {
   try {
     const userListData = await getUserList();
     userList.value = userListData.data;
-    const sUserId = localStorage.getItem("saveUser");
+    const sUserId = localStorage.getItem("lx_saveUser");
     const sUser = _.find(userListData.data, (u) => u.id.toString() === sUserId);
     if (sUser) {
       bLogin.value = true;
@@ -445,7 +445,7 @@ async function btnLoginClick() {
     bLogin.value = true;
     globalVar.user = curUser.value;
     if (res?.expires_in) scheduleProactiveRefresh(res.expires_in);
-    localStorage.setItem("saveUser", curUser.value.id.toString());
+    localStorage.setItem("lx_saveUser", curUser.value.id.toString());
     try {
       await updateScheduleGroup();
       LoadColorData();

@@ -1,10 +1,10 @@
 /** 登录/续期/登出与 localStorage，refresh 存 A 时 XSS 可读（与 B 的 HttpOnly 不同） */
 import EventBus, { C_EVENT } from "@/types/event-bus";
 
-const KEY_ACCESS = "access_token";
-const KEY_EXPIRES_AT = "access_token_expires_at";
-const KEY_REFRESH = "refresh_token";
-const LOGIN_CACHE_KEYS = [KEY_ACCESS, KEY_EXPIRES_AT, KEY_REFRESH, "saveUser", "bAuth"] as const;
+const KEY_ACCESS = "lx_access_token";
+const KEY_EXPIRES_AT = "lx_access_token_expires_at";
+const KEY_REFRESH = "lx_refresh_token";
+const LOGIN_CACHE_KEYS = [KEY_ACCESS, KEY_EXPIRES_AT, KEY_REFRESH, "lx_saveUser", "lx_bAuth"] as const;
 
 export interface LoginResponse {
   code: number;

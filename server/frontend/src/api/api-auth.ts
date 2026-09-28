@@ -21,9 +21,9 @@ export interface LoginResponse {
   user: { id: number; name: string; icon?: string };
 }
 
-const STORAGE_KEY_ACCESS = "access_token";
-const STORAGE_KEY_ACCESS_EXPIRES_AT = "access_token_expires_at";
-const STORAGE_KEY_REFRESH = "refresh_token";
+const STORAGE_KEY_ACCESS = "lx_access_token";
+const STORAGE_KEY_ACCESS_EXPIRES_AT = "lx_access_token_expires_at";
+const STORAGE_KEY_REFRESH = "lx_refresh_token";
 
 export function getAccessToken(): string | null {
   return localStorage.getItem(STORAGE_KEY_ACCESS);
