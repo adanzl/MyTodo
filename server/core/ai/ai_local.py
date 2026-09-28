@@ -16,13 +16,22 @@ from core.config import app_logger, config
 
 log = app_logger
 API_URL = config.AI_DIFY_API_URL
-API_KEY = config.AI_DIFY_API_KEY
+LEO_USER = "leo"
 
-HEADERS = {
-    "Content-Type": "application/json",
-    "Accept": "application/json",
-    "Authorization": f"Bearer {API_KEY}",
-}
+
+def dify_api_key(user: str | None) -> str:
+    """leo 使用 AI_DIFY_API_KEY，其他用户使用 AI_DIFY_DOUDOU_API_KEY。"""
+    if (user or "").strip().lower() == LEO_USER:
+        return config.AI_DIFY_API_KEY
+    return config.AI_DIFY_DOUDOU_API_KEY
+
+
+def dify_headers(user: str | None) -> dict[str, str]:
+    return {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": f"Bearer {dify_api_key(user)}",
+    }
 
 
 class AILocal:
@@ -64,7 +73,7 @@ class AILocal:
         try:
             with requests.post(
                     f"{API_URL}/chat-messages",
-                    headers=HEADERS,
+                    headers=dify_headers(self.user),
                     json=payload,
                     stream=True,
                     timeout=timeout,
@@ -103,7 +112,7 @@ class AILocal:
         try:
             with requests.post(
                     f"{API_URL}/chat-messages/:{self.last_task_id}/stop",
-                    headers=HEADERS,
+                    headers=dify_headers(self.user),
                     json=payload,
             ) as response:
                 response.raise_for_status()
@@ -125,7 +134,7 @@ class AILocal:
                 payload["first_id"] = first_id
             with requests.get(
                     f"{API_URL}/messages",
-                    headers=HEADERS,
+                    headers=dify_headers(user),
                     params=payload,
             ) as r:
                 r.raise_for_status()
