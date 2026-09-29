@@ -2,14 +2,25 @@
 
 from unittest.mock import MagicMock
 
+from core.chat import chat_request_store
 from core.chat.asr_client import AsrClient, _AsrSession
 from core.chat.chat_mgr import ClientContext
 
+USER = "asr-interleave-user"
 
-def test_late_asr_result_keeps_request_id_from_callback_not_overwritten_session():
+
+def test_late_asr_result_keeps_request_id_from_callback_not_overwritten_session(
+    memory_rds,
+):
     socketio = MagicMock()
     ctx = ClientContext("sid-1", socketio)
+    ctx.ai.user = USER
     ctx.ai.stream_msg = MagicMock()
+
+    chat_request_store.try_transition(USER, "req-a", None, "accepted")
+    chat_request_store.set_phase(USER, "req-a", "asr")
+    chat_request_store.try_transition(USER, "req-b", None, "accepted")
+    chat_request_store.set_phase(USER, "req-b", "asr")
 
     ctx.on_asr_result("来自A", "req-a")
     ctx.on_asr_result("来自B", "req-b")

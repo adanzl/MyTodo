@@ -1,4 +1,4 @@
-dashscope==1.23.2
+dashscope==1.27.7
 Flask>=3.0,<4
 Werkzeug>=3.0,<4
 Flask-Cors>=4,<5

@@ -12,6 +12,7 @@ import json
 
 import requests
 
+from core.chat import chat_request_store
 from core.config import app_logger, config
 
 log = app_logger
@@ -44,14 +45,36 @@ class AILocal:
             on_msg: 回调 `on_msg(payload, message_id, type, client_request_id)`。
                 - type=0: 流式 message chunk
                 - type=1: message_end（metadata）
-            on_err: 错误回调 `on_err(err, client_request_id)`。
+            on_err: 错误回调 `on_err(err, client_request_id, attempt=0)`。
         """
         self.aiConversationId = ""
         self.user = "user"
-        self.on_msg = on_msg or (lambda a, b, c, d="": None)
-        self.on_err = on_err or (lambda x, d="": None)
+        self.on_msg = on_msg or (lambda a, b, c, d="", attempt=0: None)
+        self.on_err = on_err or (lambda x, d="", attempt=0: None)
         self.last_task_id = -1
         self._active_stream_request_id = ""
+        self._task_id_by_request: dict[str, object] = {}
+        self._pending_cancel: set[str] = set()
+        self._abort_requests: set[str] = set()
+
+    def _invoke_on_msg(
+        self,
+        text,
+        msg_id,
+        msg_type,
+        req_id: str,
+        attempt: int,
+    ) -> None:
+        try:
+            self.on_msg(text, msg_id, msg_type, req_id, attempt=attempt)
+        except TypeError:
+            self.on_msg(text, msg_id, msg_type, req_id)
+
+    def _invoke_on_err(self, err: Exception, req_id: str, attempt: int) -> None:
+        try:
+            self.on_err(err, req_id, attempt=attempt)
+        except TypeError:
+            self.on_err(err, req_id)
 
     def stream_msg(
         self,
@@ -60,6 +83,7 @@ class AILocal:
         timeout: int = 30,
         try_times: int = 0,
         client_request_id: str = "",
+        bound_attempt: int | None = None,
     ) -> None:
         """发起流式对话请求。
 
@@ -77,9 +101,20 @@ class AILocal:
             "user": self.user,
         }
         req_id = client_request_id or ""
+        stream_attempt = (
+            bound_attempt
+            if bound_attempt is not None
+            else (chat_request_store.get_attempt(self.user, req_id) if req_id else 0)
+        )
         self._active_stream_request_id = req_id
-        log.info(f"==== [AI] Query: {self.user} - {query} [{req_id}]")
+        if req_id:
+            self._abort_requests.discard(req_id)
+        log.info(
+            f"==== [AI] Query: {self.user} - {query} [{req_id}] attempt={stream_attempt}"
+        )
 
+        had_output = False
+        last_line = b""
         try:
             with requests.post(
                     f"{API_URL}/chat-messages",
@@ -91,49 +126,103 @@ class AILocal:
                 response.raise_for_status()
 
                 for line in response.iter_lines():
+                    last_line = line or last_line
+                    if req_id and req_id in self._abort_requests:
+                        break
                     if line and line.startswith(b"data:"):
                         chunk = json.loads(line.decode("utf-8")[6:])
                         self.aiConversationId = chunk["conversation_id"]
                         if "task_id" in chunk:
                             self.last_task_id = chunk["task_id"]
+                            if req_id:
+                                self._task_id_by_request[req_id] = chunk["task_id"]
+                                if req_id in self._pending_cancel:
+                                    self._pending_cancel.discard(req_id)
+                                    self._abort_requests.add(req_id)
+                                    self._post_stop_task(
+                                        req_id, chunk["task_id"], stream_attempt
+                                    )
+                                    break
                         if "message" == chunk["event"]:
-                            self.on_msg(chunk["answer"], chunk["message_id"], 0, req_id)
+                            had_output = True
+                            self._invoke_on_msg(
+                                chunk["answer"],
+                                chunk["message_id"],
+                                0,
+                                req_id,
+                                stream_attempt,
+                            )
                         elif chunk["event"] == "error":
                             raise RuntimeError(f"{chunk['code']} : {chunk['message']}")
                         elif chunk["event"] == "message_end":
                             log.info(chunk["metadata"])
-                            self.on_msg(chunk["metadata"], chunk["message_id"], 1, req_id)
+                            had_output = True
+                            self._invoke_on_msg(
+                                chunk["metadata"],
+                                chunk["message_id"],
+                                1,
+                                req_id,
+                                stream_attempt,
+                            )
 
         except requests.exceptions.RequestException as e:
             log.error(f">>[AI] 请求失败: {str(e)}")
-            if try_times < 1:
-                self.aiConversationId = ""
-                self.stream_msg(
-                    query, inputs, timeout, try_times + 1, client_request_id=req_id
-                )
+            if req_id and req_id in self._abort_requests:
+                return
+            if had_output or try_times >= 1:
+                self._invoke_on_err(e, req_id, stream_attempt)
             else:
-                self.on_err(e, req_id)
+                self.stream_msg(
+                    query,
+                    inputs,
+                    timeout,
+                    try_times + 1,
+                    client_request_id=req_id,
+                    bound_attempt=stream_attempt,
+                )
         except Exception as ee:
-            log.error(">>[AI] 响应数据解析错误 " + line.decode("utf-8"))
-            self.on_err(ee, req_id)
+            if last_line:
+                log.error(">>[AI] 响应数据解析错误 " + last_line.decode("utf-8", errors="replace"))
+            else:
+                log.error(">>[AI] 响应数据解析错误")
+            self._invoke_on_err(ee, req_id, stream_attempt)
 
-    def streaming_cancel(self, client_request_id: str = "") -> None:
-        """取消当前流式任务（如果服务端支持 stop）。"""
-        req_id = client_request_id or self._active_stream_request_id
-        task_id = self.last_task_id
+    def _post_stop_task(
+        self,
+        req_id: str,
+        task_id: object,
+        attempt: int = 0,
+    ) -> None:
+        if task_id is None or task_id == -1:
+            log.info(f">>[AI] skip cancel [{req_id}]: missing task_id")
+            return
         payload = {"user": self.user}
         log.info(f">>[AI] cancel streaming [{req_id}] task={task_id}")
         try:
             with requests.post(
-                    f"{API_URL}/chat-messages/:{task_id}/stop",
+                    f"{API_URL}/chat-messages/{task_id}/stop",
                     headers=dify_headers(self.user),
                     json=payload,
             ) as response:
                 response.raise_for_status()
-
         except Exception as ee:
             log.error(f">>[AI] cancel error {ee}")
-            self.on_err(ee, req_id)
+            self._invoke_on_err(ee, req_id, attempt)
+
+    def streaming_cancel(self, client_request_id: str = "") -> None:
+        """取消流式任务；尚无 task_id 时登记待取消，拿到 ID 后再 stop。"""
+        req_id = (client_request_id or self._active_stream_request_id or "").strip()
+        if not req_id:
+            return
+        task_id = self._task_id_by_request.get(req_id)
+        if task_id is not None:
+            self._pending_cancel.discard(req_id)
+            self._abort_requests.add(req_id)
+            attempt = chat_request_store.get_attempt(self.user, req_id)
+            self._post_stop_task(req_id, task_id, attempt)
+            return
+        self._pending_cancel.add(req_id)
+        log.info(f">>[AI] defer cancel [{req_id}] until task_id arrives")
 
     @staticmethod
     def get_chat_messages(conversation_id, limit, user, first_id=None):

@@ -12,6 +12,7 @@ def test_streaming_cancel_error_uses_captured_request_id(monkeypatch):
     ai = AILocal(lambda *a: None, on_err)
     ai._active_stream_request_id = "req-b"
     ai.last_task_id = 99
+    ai._task_id_by_request["req-a"] = 88
 
     def boom(*args, **kwargs):
         raise RuntimeError("cancel failed")
