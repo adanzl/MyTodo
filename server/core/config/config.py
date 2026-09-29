@@ -63,8 +63,29 @@ class Config:
     ZERO_TTS_FASTAPI_URL: str = os.environ.get('ZERO_TTS_FASTAPI_URL', 'http://192.168.50.172:9099/inference_zero_shot')
 
     # ========== ASR 服务配置 ==========
+    # aliyun: 阿里云百炼实时 ASR；funasr: 原本地 FunASR。
+    ASR_PROVIDER: str = os.environ.get('ASR_PROVIDER', 'aliyun').strip().lower()
+
+    # 本地 FunASR（保留，ASR_PROVIDER=funasr 时使用）
     ASR_SERVER: str = os.environ.get('ASR_SERVER', 'ws://192.168.50.172:9096')
     ASR_MODE: str = os.environ.get('ASR_MODE', 'offline')
+
+    # 阿里云百炼 Qwen-Audio 实时 ASR。默认复用现有 ALI_KEY；可用独立 Key 覆盖。
+    ASR_ALIYUN_SERVER: str = os.environ.get(
+        'ASR_ALIYUN_SERVER',
+        'wss://dashscope.aliyuncs.com/api-ws/v1/inference',
+    )
+    ASR_ALIYUN_MODEL: str = os.environ.get(
+        'ASR_ALIYUN_MODEL',
+        'qwen-audio-3.1-asr-flash-streaming',
+    )
+    ASR_ALIYUN_API_KEY: str = os.environ.get('ASR_ALIYUN_API_KEY', ALI_KEY)
+    ASR_ALIYUN_WORKSPACE_ID: str = os.environ.get('ASR_ALIYUN_WORKSPACE_ID', '')
+    ASR_ALIYUN_VAD_MODEL: str = os.environ.get('ASR_ALIYUN_VAD_MODEL', 'near_meeting_16k')
+    ASR_ALIYUN_LANGUAGE_HINTS: str = os.environ.get('ASR_ALIYUN_LANGUAGE_HINTS', 'zh,en')
+    ASR_ALIYUN_CONTEXT: str = os.environ.get('ASR_ALIYUN_CONTEXT', '')
+    # JSON object，例如 {"霸王龙":5,"Tyrannosaurus rex":5}；留空/{} 表示不用即时热词。
+    ASR_ALIYUN_VOCABULARY: str = os.environ.get('ASR_ALIYUN_VOCABULARY', '{}')
 
     # ========== 设备配置 ==========
     # 小米设备
@@ -157,6 +178,9 @@ class Config:
             'has_ai_dify_doudou_key': bool(cls.AI_DIFY_DOUDOU_API_KEY),
             'has_doubao_ak': bool(cls.DOUBAO_AK),
             'has_ali_key': bool(cls.ALI_KEY),
+            'asr_provider': cls.ASR_PROVIDER,
+            'asr_aliyun_model': cls.ASR_ALIYUN_MODEL,
+            'has_asr_aliyun_key': bool(cls.ASR_ALIYUN_API_KEY),
             'has_mi_credentials': bool(cls.MI_USER and cls.MI_PASS),
         }
 

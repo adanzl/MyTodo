@@ -406,6 +406,33 @@ server/
 - Redis 连接配置（在 `core/db/rds_mgr.py` 中配置）
 - AI API 密钥（在 `core/ai/ai_mgr.py` 中配置）
 
+#### ASR Provider
+
+默认使用阿里云百炼实时 ASR，原本地 FunASR 完整保留，可通过环境变量随时切换。
+
+```bash
+# 阿里云（默认）
+ASR_PROVIDER=aliyun
+# 不设置时复用 ALI_KEY；也可单独配置 ASR_ALIYUN_API_KEY
+ASR_ALIYUN_API_KEY=sk-xxx
+ASR_ALIYUN_MODEL=qwen-audio-3.1-asr-flash-streaming
+ASR_ALIYUN_VAD_MODEL=near_meeting_16k
+ASR_ALIYUN_LANGUAGE_HINTS=zh,en
+# 可选：儿童科普场景上下文与即时热词
+ASR_ALIYUN_CONTEXT=儿童科普问答，可能出现恐龙、天文、物理、数学和英文科学名词
+ASR_ALIYUN_VOCABULARY={"霸王龙":5,"Tyrannosaurus rex":5}
+```
+
+默认兼容公共 WebSocket 地址；生产环境可将 `ASR_ALIYUN_SERVER` 配成百炼业务空间专属 WebSocket 地址。API Key 与接口地域必须一致。
+
+切回原本地 FunASR 不需要改代码：
+
+```bash
+ASR_PROVIDER=funasr
+ASR_SERVER=ws://192.168.50.172:9096
+ASR_MODE=offline
+```
+
 ### 数据库配置
 
 - **SQLite**: 数据库文件位于项目根目录 `data.db`

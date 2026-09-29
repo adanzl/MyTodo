@@ -11,7 +11,7 @@ import time
 
 import core.db.rds_mgr as rds_mgr
 from core.ai.ai_local import AILocal
-from core.chat.asr_client import AsrClient
+from core.chat.asr_factory import create_asr_client
 from core.chat import chat_request_store
 from core.config import app_logger
 from core.chat import tts_cache
@@ -39,7 +39,7 @@ class ClientContext:
         self.sid = sid
         self.pending_audio = False
         self.ai = AILocal(self.on_ai_msg, self.on_err)
-        self.asr = AsrClient(self.on_asr_result, self.on_asr_err)  # 语音识别
+        self.asr = create_asr_client(self.on_asr_result, self.on_asr_err)  # 语音识别
         self.tts = TTSClient(self.on_tts_msg, self.on_tts_err)  # 语音合成
         self.autoTTS = False
         self.socketio = socketio
