@@ -70,9 +70,9 @@ server {
 # 默认服务器配置 - 其他所有域名
 server {
     listen 8848 default_server;
-    listen 8843 ssl default_server;
+    listen 443 ssl default_server;
     listen [::]:8848 default_server;
-    listen [::]:8843 ssl default_server;
+    listen [::]:443 ssl default_server;
 
     root /mnt/data/project/MyTodo/dist;
     index index.html index.htm index.nginx-debian.html;
