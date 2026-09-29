@@ -46,3 +46,4 @@ android/.idea/
 **/__pycache__
 device_agent/config.properties
 server/test.py
+rds_local.json
