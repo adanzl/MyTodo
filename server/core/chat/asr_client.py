@@ -16,13 +16,12 @@ from dataclasses import dataclass
 
 import websocket
 
-from core.config import app_logger
+from core.config import app_logger, config
 
 log = app_logger
 
-# ASR_SERVER = "ws://127.0.0.1:9095"
-ASR_SERVER = "ws://192.168.50.172:9096"
-ASR_MODE = "offline"
+ASR_SERVER = config.ASR_SERVER
+ASR_MODE = config.ASR_MODE
 ASR_CHUNK_SIZE = [5, 10, 5]  # 采样块的大小 [5,10,5]=600ms, [8,8,4]=480ms
 ASR_CHUNK_INTERVAL = 10  # 音频块处理的间隔时间
 ASR_MX_WORDS = 10000

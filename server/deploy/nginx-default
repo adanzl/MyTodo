@@ -255,7 +255,6 @@ server {
         # 修复 iframe 中 cookie 无法使用的问题
         # 设置 cookie 的 SameSite=None 和 Secure 属性，允许跨站（iframe）使用
         proxy_cookie_flags ~ samesite=None secure;
-        proxy_cookie_path / "/; SameSite=None; Secure";
     }
 
     location /redis_insight/ {
