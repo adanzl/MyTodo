@@ -53,7 +53,13 @@
 
 <script lang="ts" setup>
 import EventBus, { C_EVENT } from "@/types/event-bus";
-import { getChatMem, getChatSetting, getConversationId, setChatSetting } from "@/api/api-chat";
+import {
+  getChatMem,
+  getChatSetting,
+  getConversationId,
+  setChatMem,
+  setChatSetting,
+} from "@/api/api-chat";
 import { getNetworkErrorMessage } from "@/utils/net-util";
 import { inject, onMounted, ref } from "vue";
 import { IonTextarea, loadingController } from "@ionic/vue";
@@ -61,6 +67,7 @@ import { IonTextarea, loadingController } from "@ionic/vue";
 const modal = ref();
 const globalVar: any = inject("globalVar");
 const textareaMem = ref("");
+const aiConversationId = ref("");
 const chatSetting = ref({
   ttsSpeed: 1.1,
   ttsRole: "longwan_v2",
@@ -69,14 +76,16 @@ const chatSetting = ref({
 const cancel = () => {
   modal.value.$el!.dismiss({}, "cancel");
 };
-const confirm = () => {
-  setChatSetting(globalVar.user.id, JSON.stringify(chatSetting.value))
-    .then(() => {
-      modal.value.$el!.dismiss(chatSetting.value, "confirm");
-    })
-    .catch((err) => {
-      EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
-    });
+const confirm = async () => {
+  try {
+    await setChatSetting(globalVar.user.id, JSON.stringify(chatSetting.value));
+    if (aiConversationId.value) {
+      await setChatMem(aiConversationId.value, textareaMem.value);
+    }
+    modal.value.$el!.dismiss(chatSetting.value, "confirm");
+  } catch (err) {
+    EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
+  }
 };
 
 onMounted(async () => {});
@@ -92,9 +101,9 @@ async function onModalPresent() {
       chatSetting.value.ttsSpeed = v.ttsSpeed;
       chatSetting.value.ttsRole = v.ttsRole;
     }
-    const aiConversationId = (await getConversationId(globalVar.user.id)) || "";
-    if (aiConversationId) {
-      const mem = await getChatMem(aiConversationId);
+    aiConversationId.value = (await getConversationId(globalVar.user.id)) || "";
+    if (aiConversationId.value) {
+      const mem = await getChatMem(aiConversationId.value);
       textareaMem.value = mem ?? "";
     }
   } catch (err) {

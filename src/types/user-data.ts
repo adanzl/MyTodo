@@ -19,6 +19,8 @@ export class User {
   coin = 0;
   dScore = 0;
   dCoin = 0;
+  /** 本次弹窗内金币变更备注（写入 addCoin msg） */
+  coinMsg = "";
 }
 
 export class LotteryData {

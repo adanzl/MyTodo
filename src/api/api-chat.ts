@@ -79,6 +79,6 @@ export async function getChatMem(id: number | string): Promise<string | null> {
   return getRdsData("mem", id);
 }
 
-export async function setChatMem(id: number, cId: string): Promise<void> {
-  return setRdsData("mem", id, cId);
+export async function setChatMem(id: number | string, value: string): Promise<void> {
+  return setRdsData("mem", id as number, value);
 }

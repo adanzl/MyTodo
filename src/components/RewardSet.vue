@@ -30,8 +30,8 @@
           class="m-1"
           fill="outline"
           mode="md"
-          type="number"
-          @ionChange="onCoinChange($event, u)"></ion-input>
+          readonly
+          @click="openCoinEditAlert(u)"></ion-input>
         <ion-input
           :value="u.score"
           class="m-1"
@@ -51,7 +51,8 @@
 <script lang="ts" setup>
 import { User } from "@/types/user-data";
 import { addCoin, addScore, getUserList } from "@/api/api-user";
-import { IonAvatar, IonImg } from "@ionic/vue";
+import { alertController, IonAvatar, IonImg } from "@ionic/vue";
+import EventBus, { C_EVENT } from "@/types/event-bus";
 import { inject, onMounted, ref } from "vue";
 
 const modal = ref();
@@ -94,6 +95,7 @@ async function onModalPresent() {
     userList.value.forEach((u: User) => {
       u.dScore = 0;
       u.dCoin = 0;
+      u.coinMsg = "";
     });
   });
   // console.log("userList", uList);
@@ -105,7 +107,10 @@ async function onModalDismiss() {
       addScore(u.id, "appAdmin", u.dScore, "app管理变更" + globalVar.user.name);
     }
     if (u.dCoin !== 0) {
-      addCoin(u.id, "appAdmin", u.dCoin, "app管理变更" + globalVar.user.name);
+      const msg =
+        u.coinMsg?.trim() ||
+        `app管理变更${globalVar.user.name}`;
+      addCoin(u.id, "appAdmin", u.dCoin, msg);
     }
   });
   modifyUser.clear();
@@ -115,10 +120,47 @@ function onScoreChange(e: any, u: User) {
   u.score = Number(e.detail.value);
   modifyUser.set(u.id, u);
 }
-function onCoinChange(e: any, u: User) {
-  u.dCoin += Number(e.detail.value) - u.coin;
-  u.coin = Number(e.detail.value);
+function applyCoinValue(u: User, newCoin: number, remark: string) {
+  u.dCoin += newCoin - u.coin;
+  u.coin = newCoin;
+  u.coinMsg = remark.trim();
   modifyUser.set(u.id, u);
+}
+
+async function openCoinEditAlert(u: User) {
+  const alert = await alertController.create({
+    header: `${u.name} · 金币`,
+    subHeader: `当前 ${u.coin}`,
+    inputs: [
+      {
+        name: "coinValue",
+        type: "number",
+        placeholder: "新金币值",
+        value: String(u.coin),
+      },
+      {
+        name: "remark",
+        type: "textarea",
+        placeholder: "备注（选填）",
+      },
+    ],
+    buttons: [
+      { text: "取消", role: "cancel" },
+      {
+        text: "确定",
+        handler: (data) => {
+          const newCoin = Number(data.coinValue);
+          const remark = String(data.remark ?? "").trim();
+          if (Number.isNaN(newCoin)) {
+            EventBus.$emit(C_EVENT.TOAST, "请输入有效的金币数值");
+            return false;
+          }
+          applyCoinValue(u, newCoin, remark);
+        },
+      },
+    ],
+  });
+  await alert.present();
 }
 </script>
 
