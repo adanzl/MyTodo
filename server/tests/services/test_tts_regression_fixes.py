@@ -32,10 +32,88 @@ def test_tts_client_stream_msg_updates_role_for_redis_key():
         tts.stream_msg("你好", role="custom_voice", id="msg-42")
         assert tts.role == "custom_voice"
 
-        with patch("core.tts.tts_client.rds_mgr") as rds:
+        with patch("core.chat.tts_cache.rds_mgr") as rds:
+            rds.set = MagicMock(return_value=True)
+            rds.setex = MagicMock(return_value=True)
             rds.append_value = MagicMock()
+            tts.start_immediate_cache("msg-42", "hello", "custom_voice", 1.0)
             tts.on_data(b"chunk")
-            rds.append_value.assert_called_once_with("audio:msg-42:custom_voice", b"chunk")
+            assert rds.append_value.call_count == 1
+            assert rds.append_value.call_args[0][1] == b"chunk"
+
+
+def test_one_shot_tts_keeps_synthesizer_reference_for_cancel():
+    tts = TTSClient()
+    synth = MagicMock()
+
+    def _call(_text):
+        assert tts.synthesizer is synth
+
+    synth.call.side_effect = _call
+    with patch("core.tts.tts_client.SpeechSynthesizer", return_value=synth):
+        tts.process_msg("需要中止的朗读", role="longwan_v3", id="msg-cancel")
+
+    tts.streaming_cancel()
+    synth.streaming_cancel.assert_called_once()
+
+
+def test_auto_tts_keeps_first_chunk_tail_and_full_text():
+    socketio = MagicMock()
+    ctx = ClientContext("sid-auto-tts", socketio)
+    ctx.autoTTS = True
+    ctx.tts = MagicMock()
+    ctx.tts.role = "longwan_v3"
+    ctx.tts.speed = 1.1
+
+    ctx.on_ai_msg("你好。后面", "msg-auto-1", type=0)
+
+    ctx.tts.start_deferred_cache.assert_called_once_with("msg-auto-1")
+    ctx.tts.stream_msg.assert_called_once_with(text="你好。", id="msg-auto-1")
+    assert ctx._tts_phrase_buffer.full_text == "你好。后面"
+
+    ctx.on_ai_msg("", "msg-auto-1", type=1)
+
+    assert ctx.tts.stream_msg.call_args_list[-1].kwargs == {
+        "text": "后面",
+        "id": "msg-auto-1",
+    }
+    ctx.tts.prepare_deferred_cache.assert_called_once_with(
+        "你好。后面",
+        role="longwan_v3",
+        speed=1.1,
+    )
+    ctx.tts.stream_complete.assert_called_once()
+
+
+def test_tts_client_deferred_cache_commits_only_after_sdk_complete():
+    tts = TTSClient()
+    tts.start_deferred_cache("msg-deferred")
+    tts.on_data(b"audio")
+    tts.prepare_deferred_cache("完整文本", role="longwan_v3", speed=1.0)
+
+    with patch("core.chat.tts_cache.begin_session") as begin, patch(
+        "core.chat.tts_cache.finalize_session"
+    ) as finalize, patch("core.tts.tts_client.rds_mgr.append_value") as append:
+        begin.return_value = {"audio_key": "audio", "meta_key": "meta", "text_hash": "hash"}
+        assert begin.call_count == 0
+
+        tts.on_complete()
+
+        begin.assert_called_once()
+        append.assert_called_once_with("audio", b"audio")
+        finalize.assert_called_once_with(begin.return_value)
+
+
+def test_tts_end_clears_manual_request_id_after_emitting_it():
+    socketio = MagicMock()
+    ctx = ClientContext("sid-tts-id", socketio)
+    ctx._tts_emit_request_id = "tts-123"
+
+    ctx.on_tts_msg("done", 1)
+
+    emit = [c for c in socketio.emit.call_args_list if c[0][0] == "endAudio"][-1]
+    assert emit[0][1]["ttsRequestId"] == "tts-123"
+    assert ctx._tts_emit_request_id is None
 
 
 def test_tts_mgr_sets_total_chars_with_count_text_chars_rule(tts_mgr: TTSMgr, tmp_path):
@@ -202,20 +280,15 @@ def test_chat_mgr_handle_tts_redis_cache_hit():
 
     socketio.reset_mock()
     ctx = ClientContext(sid, socketio)
-    ctx.tts.stream_msg = MagicMock()
-    ctx.tts.stream_complete = MagicMock()
+    ctx.tts.process_msg = MagicMock()
     mgr.clients[sid] = ctx
 
     with patch("core.chat.chat_mgr.request", new=MagicMock(sid=sid)), patch(
-        "core.chat.chat_mgr.rds_mgr"
-    ) as rds:
-        rds.exists.return_value = 1
-        rds.get.return_value = b"abc"
-
+        "core.chat.chat_mgr.tts_cache.get_complete_audio", return_value=b"abc"
+    ):
         handle_tts(payload)
 
-        ctx.tts.stream_msg.assert_not_called()
-        ctx.tts.stream_complete.assert_not_called()
+        ctx.tts.process_msg.assert_not_called()
 
     end_emit = [c for c in socketio.emit.call_args_list if c[0][0] == "endAudio"][-1]
     assert end_emit[0][1]["content"] == ">>[TTS] Completed"

@@ -3,6 +3,7 @@ import json
 from datetime import datetime
 
 task_mgr_module = importlib.import_module("core.services.task.task_mgr")
+material_mgr_module = importlib.import_module("core.services.task.material_mgr")
 from core.services.task.block_time import (
     GLOBAL_BLOCK_TIME_RDS_ID,
     GLOBAL_BLOCK_TIME_RDS_TABLE,
@@ -14,6 +15,7 @@ from core.services.task.block_time import (
 )
 
 TaskMgr = task_mgr_module.TaskMgr
+MaterialMgr = material_mgr_module.MaterialMgr
 
 USER_CANCAN = 3
 
@@ -109,38 +111,52 @@ def test_get_global_block_time_config_cached(monkeypatch):
     assert calls["n"] == 1
 
 
-def test_check_task_lock_global_union(monkeypatch):
+def _mock_material_status_db(monkeypatch, task_block_time: str):
+    monkeypatch.setattr(MaterialMgr, "_get_active_unlimit", lambda *args, **kwargs: None)
+
+    def fake_get_data(table, row_id, fields):
+        if table == material_mgr_module.TABLE_MATERIAL:
+            return {
+                "code": 0,
+                "data": {"type": 0, "duration": 0, "statistics": {}, "path": ""},
+            }
+        if table == material_mgr_module.TABLE_TASK:
+            return {"code": 0, "data": {"block_time": task_block_time, "data": {}}}
+        raise AssertionError(f"unexpected table: {table}")
+
+    monkeypatch.setattr(material_mgr_module.db_mgr, "get_data", fake_get_data)
+
+
+def test_material_status_falls_back_to_global_block_time(monkeypatch):
     invalidate_global_block_time_cache()
+    _mock_material_status_db(monkeypatch, "{}")
     monkeypatch.setattr(
-        task_mgr_module,
+        material_mgr_module,
         "is_global_block_time_now",
         lambda *args, **_: True,
     )
-    tasks = [{"priority": 1, "name": "t1", "block_time": "{}"}]
-    result = TaskMgr().check_task_lock(tasks, user_id=USER_CANCAN, date_str=TODAY)
-    assert result[0]["lock"] is True
-    assert result[0]["msg"] == "当前处于全局禁用时段"
+
+    result = MaterialMgr().get_material_status(USER_CANCAN, material_id=1, task_id=10)
+    assert result["data"]["lock"] == MaterialMgr.LOCK_CODE_GLOBAL_BLOCK
+    assert result["data"]["reason"] == "当前处于全局禁用时段"
 
 
-def test_check_task_lock_task_level_when_global_clear(monkeypatch):
+def test_material_status_task_block_time_overrides_global(monkeypatch):
     invalidate_global_block_time_cache()
+    _mock_material_status_db(monkeypatch, _blacklist_raw("00:00:00", "23:59:59"))
     monkeypatch.setattr(
-        task_mgr_module,
+        material_mgr_module,
         "is_global_block_time_now",
         lambda *args, **_: False,
     )
-    today = datetime.now().strftime("%Y-%m-%d")
-    tasks = [{"priority": 1, "name": "t1", "block_time": _blacklist_raw("00:00:00", "23:59:59")}]
-    result = TaskMgr().check_task_lock(tasks, user_id=USER_CANCAN, date_str=today)
-    assert result[0]["lock"] is True
-    assert result[0]["msg"] == "当前处于任务禁用时段"
+
+    result = MaterialMgr().get_material_status(USER_CANCAN, material_id=1, task_id=10)
+    assert result["data"]["lock"] == MaterialMgr.LOCK_CODE_TASK_BLOCK
+    assert result["data"]["reason"] == "当前处于任务禁用时段"
 
 
 def test_check_task_lock_pre_task_same_day_only(monkeypatch):
     """前置任务只检查 date_str 当天，不检查历史或其它天。"""
-    invalidate_global_block_time_cache()
-    monkeypatch.setattr(task_mgr_module, "is_global_block_time_now", lambda *args, **_: False)
-
     calls = []
 
     def track_has_uncompleted(self, task, user_id, target_date):
@@ -161,9 +177,6 @@ def test_check_task_lock_pre_task_same_day_only(monkeypatch):
 
 def test_check_task_lock_priority_minus_one_excluded(monkeypatch):
     """priority=-1 的任务不参与优先级锁定：不锁别人，也不被别人锁。"""
-    invalidate_global_block_time_cache()
-    monkeypatch.setattr(task_mgr_module, "is_global_block_time_now", lambda *args, **_: False)
-
     def mock_has_uncompleted(self, task, user_id, target_date):
         return task.get("name") in ("高优先级未完成", "无优先级任务")
 

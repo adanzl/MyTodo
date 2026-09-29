@@ -1,4 +1,5 @@
 export type ChatMsgStatus =
+  | "sending"
   | "thinking"
   | "streaming"
   | "done"

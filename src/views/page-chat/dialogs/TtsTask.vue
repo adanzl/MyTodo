@@ -301,8 +301,9 @@
                 interface="popover"
                 class="min-h-8 block w-full mt-1">
                 <ion-select-option value="">无</ion-select-option>
+                <ion-select-option value="longwan_v3">龙婉 (longwan_v3)</ion-select-option>
                 <ion-select-option value="cosyvoice-v3-plus-leo-34ba9eaebae44039a4a9426af6389dcd">
-                  灿灿
+                  灿灿 (克隆)
                 </ion-select-option>
               </ion-select>
             </div>

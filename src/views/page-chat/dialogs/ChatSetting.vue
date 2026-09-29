@@ -77,7 +77,7 @@ const globalVar: any = inject("globalVar");
 const textareaMem = ref("");
 const chatSetting = ref({
   ttsSpeed: 1.1,
-  ttsRole: "longwan_v2",
+  ttsRole: "longwan_v3",
 } as { [key: string]: any });
 
 const effectiveConversationId = computed(
@@ -121,7 +121,7 @@ async function onModalPresent() {
     if (setting) {
       const v = JSON.parse(setting);
       chatSetting.value.ttsSpeed = v.ttsSpeed ?? props.settingSnapshot?.ttsSpeed ?? 1.1;
-      chatSetting.value.ttsRole = v.ttsRole ?? props.settingSnapshot?.ttsRole ?? "longwan_v2";
+      chatSetting.value.ttsRole = v.ttsRole ?? props.settingSnapshot?.ttsRole ?? "longwan_v3";
     } else if (props.settingSnapshot) {
       chatSetting.value.ttsSpeed = props.settingSnapshot.ttsSpeed;
       chatSetting.value.ttsRole = props.settingSnapshot.ttsRole;

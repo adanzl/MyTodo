@@ -325,6 +325,30 @@ def set(key: str, value) -> bool:
     return _safe_redis_operation(lambda: _rds.set(key, value), timeout=3.0)  # pyright: ignore[reportReturnType]
 
 
+def setex(key: str, ttl_seconds: int, value) -> bool:
+    """设置带 TTL 的键值；本地 fallback 在 value 内嵌 exp 由上层解析。"""
+    if _local_store is not None:
+        return _local_store.set(key, value)
+    _rds = cast(redis.Redis, rds)
+    return _safe_redis_operation(
+        lambda: _rds.setex(key, ttl_seconds, value),
+        timeout=3.0,
+    )  # pyright: ignore[reportReturnType]
+
+
+def eval_lua(script: str, keys: list[str], args: list[str]) -> Any | None:
+    """执行 Lua；本地 fallback 时返回 None，由调用方自行加锁处理。"""
+    if _local_store is not None:
+        return None
+    assert rds is not None
+    _rds = cast(redis.Redis, rds)
+    flat = [*keys, *args]
+    return _safe_redis_operation(
+        lambda: _rds.eval(script, len(keys), *flat),
+        timeout=5.0,
+    )
+
+
 def append_value(key: str, value) -> int:
     """向字符串 key 追加内容。"""
     if _local_store is not None:

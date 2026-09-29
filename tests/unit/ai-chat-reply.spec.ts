@@ -1,5 +1,7 @@
 import {
   applyChatChunkToMessages,
+  confirmUserMessageSent,
+  failUserMessageSend,
   failServerReply,
   finishServerReply,
   newBubbleKey,
@@ -42,6 +44,24 @@ describe("ai-chat-reply", () => {
     finishServerReply(messages, "r1", { stopped: true });
     expect(messages[0].status).toBe("stopped");
     expect(messages[0].content).toBe("已停止");
+  });
+
+  it("发送确认与失败会更新用户气泡并保留重试文案", () => {
+    const messages: ChatMsg[] = [
+      {
+        bubbleKey: newBubbleKey("me"),
+        role: "me",
+        content: "你好",
+        status: "sending",
+        clientRequestId: "t1",
+      },
+    ];
+    confirmUserMessageSent(messages, "t1");
+    expect(messages[0].status).toBe("done");
+    const retry = failUserMessageSend(messages, "t1", "未送达");
+    expect(retry).toBe("你好");
+    expect(messages[0].retryText).toBe("你好");
+    expect(messages[0].status).toBe("error");
   });
 
   it("识别阶段停止会结束用户侧识别气泡", () => {

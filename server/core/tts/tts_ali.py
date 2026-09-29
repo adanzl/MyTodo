@@ -26,8 +26,8 @@ except ImportError:
         "wss://dashscope.aliyuncs.com/api-ws/v1/inference/")  # cSpell: disable-line
 
 # cSpell: disable
-DEFAULT_ROLE = "longwan_v2"
-DEFAULT_MODEL = "cosyvoice-v3-plus"
+DEFAULT_ROLE = "longwan_v3"
+DEFAULT_MODEL = "cosyvoice-v3-flash"
 MODEL_MAP = {
     "longwan_v2": "cosyvoice-v2",
     'longcheng_v2': 'cosyvoice-v2',

@@ -37,7 +37,7 @@
               size="small"
               fill="clear"
               class="mt-1 h-8"
-              @click="$emit('retry', msg.retryText!)">
+              @click="$emit('retry', msg.retryText!, msg.clientRequestId)">
               重试
             </ion-button>
             <div
@@ -51,7 +51,10 @@
           <div
             v-else
             class="max-w-[80%] bg-green-500 text-white p-2 rounded-lg shadow-md relative ml-auto inline-block">
-            <span v-if="msg.status === 'recognizing'" class="italic opacity-90">{{
+            <span v-if="msg.status === 'sending'" class="italic opacity-90">{{
+              msg.content || "发送中…"
+            }}</span>
+            <span v-else-if="msg.status === 'recognizing'" class="italic opacity-90">{{
               msg.content || "正在识别…"
             }}</span>
             <span v-else-if="msg.status === 'stopped'" class="opacity-90">{{
@@ -59,6 +62,14 @@
             }}</span>
             <span v-else-if="msg.content">{{ msg.content }}</span>
             <p v-if="msg.errorMessage" class="text-sm mt-1 opacity-95">{{ msg.errorMessage }}</p>
+            <ion-button
+              v-if="msg.status === 'error' && msg.retryText"
+              size="small"
+              fill="clear"
+              class="mt-1 h-8 text-white"
+              @click="$emit('retry', msg.retryText!, msg.clientRequestId)">
+              重试
+            </ion-button>
             <ion-button
               v-if="msg.retryKind === 'voice'"
               size="small"
@@ -110,12 +121,17 @@ import {
 } from "@/views/page-chat/ai-chat-history";
 import {
   applyChatChunkToMessages,
+  restoreServerReplySnapshot,
   completeVoiceRecognizing,
+  confirmUserMessageSent,
+  failUserMessageSend,
   failVoiceRecognizing,
   failServerReply,
   findServerByClientRequestId,
+  findUserByClientRequestId,
   finishServerReply,
   newBubbleKey,
+  prepareMessagesForResend,
 } from "@/views/page-chat/ai-chat-reply";
 import type { ChatMsg } from "@/views/page-chat/ai-chat-types";
 import { getNetworkErrorMessage } from "@/utils/net-util";
@@ -130,7 +146,7 @@ const props = defineProps<{
 
 defineEmits<{
   (e: "audio-click", msg: ChatMsg): void;
-  (e: "retry", text: string): void;
+  (e: "retry", text: string, clientRequestId?: string): void;
   (e: "retry-voice"): void;
 }>();
 
@@ -214,6 +230,22 @@ function startAwaitingReply(clientRequestId: string, retryText: string) {
   });
 }
 
+function ensureAwaitingReply(clientRequestId: string, retryText: string) {
+  const existing = findServerByClientRequestId(messages.value, clientRequestId);
+  if (existing) {
+    existing.status = "thinking";
+    existing.content = "正在思考…";
+    existing.errorMessage = undefined;
+    existing.retryText = retryText;
+    return;
+  }
+  startAwaitingReply(clientRequestId, retryText);
+}
+
+function prepareForResend(clientRequestId: string, text: string) {
+  prepareMessagesForResend(messages.value, clientRequestId, text);
+}
+
 function applyChatChunk(data: {
   clientRequestId?: string;
   id?: string | number;
@@ -234,6 +266,14 @@ function applyChatChunk(data: {
 
 function finishActiveReply(clientRequestId: string, opts?: { stopped?: boolean }) {
   finishServerReply(messages.value, clientRequestId, opts);
+}
+
+function confirmUserSent(clientRequestId: string) {
+  confirmUserMessageSent(messages.value, clientRequestId);
+}
+
+function failUserSend(clientRequestId: string, errorMessage: string): string | undefined {
+  return failUserMessageSend(messages.value, clientRequestId, errorMessage);
 }
 
 function failActiveReply(
@@ -259,6 +299,47 @@ function appendLastMessageContent(text: string) {
 
 function getLastMessage(): ChatMsg | undefined {
   return messages.value[messages.value.length - 1];
+}
+
+function getPendingClientRequestIds(): string[] {
+  const ids = new Set<string>();
+  for (const msg of messages.value) {
+    const rid = msg.clientRequestId;
+    if (!rid) continue;
+    if (
+      msg.role === "me" &&
+      (msg.status === "sending" ||
+        msg.status === "error" ||
+        msg.status === "recognizing")
+    ) {
+      ids.add(rid);
+    }
+    if (
+      msg.role === "server" &&
+      (msg.status === "thinking" ||
+        msg.status === "streaming" ||
+        msg.status === "error")
+    ) {
+      ids.add(rid);
+    }
+  }
+  return [...ids];
+}
+
+function restoreServerReply(
+  clientRequestId: string,
+  replyText: string,
+  finished: boolean
+) {
+  restoreServerReplySnapshot(messages.value, clientRequestId, replyText, finished);
+}
+
+function getRequestRetryText(clientRequestId: string): string {
+  const server = findServerByClientRequestId(messages.value, clientRequestId);
+  if (server?.retryText) return server.retryText;
+  const user = findUserByClientRequestId(messages.value, clientRequestId);
+  if (user?.retryText) return user.retryText;
+  return user?.content ?? "";
 }
 
 function initialCursor(): string | number | undefined {
@@ -318,10 +399,17 @@ defineExpose({
   appendLastMessageContent,
   applyChatChunk,
   startAwaitingReply,
+  ensureAwaitingReply,
+  prepareForResend,
   startVoiceRecognizing,
   onAsrResult,
   finishActiveReply,
   failActiveReply,
+  confirmUserSent,
+  failUserSend,
   getLastMessage,
+  getPendingClientRequestIds,
+  getRequestRetryText,
+  restoreServerReply,
 });
 </script>

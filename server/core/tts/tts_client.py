@@ -30,8 +30,8 @@ ROLE_MAP = {
 }
 
 # cSpell: disable
-DEFAULT_ROLE = "longwan_v2"
-DEFAULT_MODEL = "cosyvoice-v1"
+DEFAULT_ROLE = "longwan_v3"
+DEFAULT_MODEL = "cosyvoice-v3-flash"
 MODEL_MAP = {
     "longwan_v2": "cosyvoice-v2",
     'longcheng_v2': 'cosyvoice-v2',
@@ -57,15 +57,113 @@ class TTSClient(ResultCallback):
         self.vol = 50
         self.id = ''
         self._errored = False
+        self._cache_session = None
+        self._deferred_cache_msg_id = ''
+        self._deferred_cache_audio = bytearray()
+        self._deferred_cache_text = ''
+        self._deferred_cache_role: str | None = None
+        self._deferred_cache_speed: float | None = None
+
+    def _model_for_role(self, role: str) -> str:
+        return MODEL_MAP.get(role, DEFAULT_MODEL)
+
+    def start_immediate_cache(
+        self,
+        msg_id: str,
+        text: str,
+        role: str | None = None,
+        speed: float | None = None,
+    ) -> None:
+        from core.chat import tts_cache
+
+        role = role or self.role
+        speed = self.speed if speed is None else speed
+        self._deferred_cache_msg_id = ''
+        self._deferred_cache_audio = bytearray()
+        self._deferred_cache_text = ''
+        self._deferred_cache_role = None
+        self._deferred_cache_speed = None
+        self._cache_session = tts_cache.begin_session(
+            msg_id,
+            text,
+            role,
+            speed,
+            self._model_for_role(role),
+        )
+
+    def start_deferred_cache(self, msg_id: str) -> None:
+        self._cache_session = None
+        self._deferred_cache_msg_id = msg_id or ''
+        self._deferred_cache_audio = bytearray()
+        self._deferred_cache_text = ''
+        self._deferred_cache_role = None
+        self._deferred_cache_speed = None
+
+    def prepare_deferred_cache(
+        self,
+        text: str,
+        role: str | None = None,
+        speed: float | None = None,
+    ) -> None:
+        """记录流式 TTS 的最终文本；等 SDK on_complete 后再把完整音频落缓存。"""
+        if not self._deferred_cache_msg_id:
+            return
+        self._deferred_cache_text = text or ''
+        self._deferred_cache_role = role or self.role
+        self._deferred_cache_speed = self.speed if speed is None else speed
+
+    def _commit_deferred_cache(self) -> None:
+        from core.chat import tts_cache
+
+        msg_id = self._deferred_cache_msg_id
+        text = self._deferred_cache_text
+        audio = bytes(self._deferred_cache_audio)
+        role = self._deferred_cache_role or self.role
+        speed = self.speed if self._deferred_cache_speed is None else self._deferred_cache_speed
+        if msg_id and text and audio and rds_mgr is not None:
+            session = tts_cache.begin_session(
+                msg_id,
+                text,
+                role,
+                speed,
+                self._model_for_role(role),
+            )
+            rds_mgr.append_value(session["audio_key"], audio)
+            tts_cache.finalize_session(session)
+        self._deferred_cache_msg_id = ''
+        self._deferred_cache_audio = bytearray()
+        self._deferred_cache_text = ''
+        self._deferred_cache_role = None
+        self._deferred_cache_speed = None
+
+    def abort_cache(self) -> None:
+        from core.chat import tts_cache
+
+        if self._cache_session:
+            tts_cache.abort_session(self._cache_session)
+        self._cache_session = None
+        self._deferred_cache_msg_id = ''
+        self._deferred_cache_audio = bytearray()
+        self._deferred_cache_text = ''
+        self._deferred_cache_role = None
+        self._deferred_cache_speed = None
+
+    def finalize_cache(self) -> None:
+        from core.chat import tts_cache
+
+        if self._cache_session:
+            tts_cache.finalize_session(self._cache_session)
+        self._cache_session = None
 
     def streaming_cancel(self):
         log.info(">>[TTS] cancel streaming")
+        self.abort_cache()
         try:
             if self.synthesizer is not None:
                 self.synthesizer.streaming_cancel()
                 self.synthesizer = None
         except Exception as e:
-            log.error(">>[TTS]" + e)
+            log.error(f">>[TTS] {e}")
             traceback.print_stack()
             self.on_err(e)
 
@@ -87,14 +185,15 @@ class TTSClient(ResultCallback):
             if id:
                 self.id = id
             self._errored = False
-            synthesizer = SpeechSynthesizer(
+            # call() 内部也是基于流式会话实现；保留实例才能让 ttsCancel 真正中止生成。
+            self.synthesizer = SpeechSynthesizer(
                 model=MODEL_MAP.get(role, DEFAULT_MODEL),
                 voice=role,
                 volume=self.vol,
                 speech_rate=self.speed,
                 callback=self,
             )
-            synthesizer.call(text)
+            self.synthesizer.call(text)
 
         except Exception as e:
             log.error(f">>[TTS] {e}")
@@ -150,11 +249,14 @@ class TTSClient(ResultCallback):
 
     def on_complete(self):
         log.debug(">>[TTS] on_complete 回调")
+        self.finalize_cache()
+        self._commit_deferred_cache()
         self.on_msg(">>[TTS] Completed", 1)
 
     def on_error(self, message: str):
         log.error(f">>[TTS] failed, {message}")
         self.synthesizer = None
+        self.abort_cache()
         if self._errored:
             return
         self._errored = True
@@ -175,11 +277,13 @@ class TTSClient(ResultCallback):
     def on_data(self, data: bytes) -> None:
         log.debug(
             f">>[TTS] on_data 回调，数据长度: {len(data) if isinstance(data, bytes) else 'N/A'}")
-        # Redis 缓存写入失败不应影响 TTS 正常输出。
-        if rds_mgr is not None:
+        if self._deferred_cache_msg_id:
+            self._deferred_cache_audio.extend(data)
+        elif self._cache_session is not None and rds_mgr is not None:
             try:
-                key = f"audio:{self.id}:{self.role}"
-                rds_mgr.append_value(key, data)
+                from core.chat import tts_cache
+
+                tts_cache.append_audio(self._cache_session, data)
             except Exception as e:
                 log.warning(f">>[TTS] Redis append failed, ignore: {e}")
 

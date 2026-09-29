@@ -35,6 +35,79 @@ export function findUserByClientRequestId(
   );
 }
 
+export function confirmUserMessageSent(
+  messages: ChatMsg[],
+  clientRequestId: string
+): void {
+  const user = findUserByClientRequestId(messages, clientRequestId);
+  if (user?.status === "sending") user.status = "done";
+}
+
+export function prepareMessagesForResend(
+  messages: ChatMsg[],
+  clientRequestId: string,
+  text: string
+): void {
+  const user = findUserByClientRequestId(messages, clientRequestId);
+  if (user) {
+    user.status = "sending";
+    user.errorMessage = undefined;
+    user.content = text;
+    user.retryText = text;
+  }
+  const server = findServerByClientRequestId(messages, clientRequestId);
+  if (server) {
+    server.status = "thinking";
+    server.content = "正在思考…";
+    server.errorMessage = undefined;
+  }
+}
+
+export function failUserMessageSend(
+  messages: ChatMsg[],
+  clientRequestId: string,
+  errorMessage: string
+): string | undefined {
+  const user = findUserByClientRequestId(messages, clientRequestId);
+  if (!user) return undefined;
+  const retryText =
+    user.status === "sending" ? user.content : user.retryText ?? user.content;
+  user.status = "error";
+  user.errorMessage = errorMessage;
+  if (retryText) user.retryText = retryText;
+  return retryText;
+}
+
+/** 重连后从服务端快照恢复助手回复（非增量 chunk）。 */
+export function restoreServerReplySnapshot(
+  messages: ChatMsg[],
+  clientRequestId: string,
+  replyText: string,
+  finished: boolean
+): void {
+  const text = replyText.trim();
+  if (!text) return;
+  let target = findServerByClientRequestId(messages, clientRequestId);
+  if (!target) {
+    messages.push({
+      bubbleKey: newBubbleKey("srv"),
+      role: "server",
+      content: text,
+      status: finished ? "done" : "streaming",
+      clientRequestId,
+    });
+    return;
+  }
+  if (isTerminal(target.status) && target.status !== "streaming") {
+    if (finished) target.status = "done";
+    if (!target.content) target.content = text;
+    return;
+  }
+  target.content = text;
+  target.status = finished ? "done" : "streaming";
+  target.errorMessage = undefined;
+}
+
 export function applyChatChunkToMessages(
   messages: ChatMsg[],
   data: { clientRequestId?: string; id?: string | number; content?: string }

@@ -399,8 +399,9 @@
                 @change="handleTtsRoleChange"
                 class="w-full"
               >
+                <el-option label="龙婉 (longwan_v3)" value="longwan_v3" />
                 <el-option
-                  label="灿灿"
+                  label="灿灿 (克隆)"
                   value="cosyvoice-v3-plus-leo-34ba9eaebae44039a4a9426af6389dcd"
                 />
               </el-select>
@@ -591,7 +592,8 @@ import {
 } from "@/api/api-tts";
 
 // TTS 常量配置
-const DEFAULT_ROLE = "cosyvoice-v3-plus-leo-34ba9eaebae44039a4a9426af6389dcd"; // 默认音色：灿灿
+const DEFAULT_ROLE = "longwan_v3"; // 默认音色：龙婉
+const DEFAULT_MODEL = "cosyvoice-v3-flash";
 const DEFAULT_SPEED = 0.8; // 默认语速
 const DEFAULT_VOL = 50; // 默认音量
 
@@ -609,7 +611,7 @@ const ttsRenameTaskName = ref("");
 // 任务参数
 const ttsText = ref("");
 const ttsRole = ref<string | null>(DEFAULT_ROLE);
-const ttsModel = ref<string | null>(null); // 模型选择：cosyvoice-v3-flash 或 cosyvoice-v3-plus
+const ttsModel = ref<string | null>(DEFAULT_MODEL);
 const ttsSpeed = ref(DEFAULT_SPEED);
 const ttsVol = ref(DEFAULT_VOL);
 const ttsParamsChanged = ref(false);
@@ -712,7 +714,7 @@ const handleTtsCreateTaskConfirm = async () => {
 const updateTaskParamsFromData = (task: TTSTask) => {
   ttsText.value = task.text || "";
   ttsRole.value = task.role || DEFAULT_ROLE;
-  ttsModel.value = task.model || null;
+  ttsModel.value = task.model || DEFAULT_MODEL;
   ttsSpeed.value = task.speed ?? DEFAULT_SPEED;
   ttsVol.value = task.vol ?? DEFAULT_VOL;
   ttsParamsChanged.value = false;

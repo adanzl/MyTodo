@@ -80,7 +80,7 @@ server {
     # 全局设置允许上传大文件（最大 1000MB），所有 location 继承此设置
     client_max_body_size 2000m;
 
-    # Let's Encrypt（certbot）：full chain = 站点证书 + 中间链；privkey = 私钥
+    # Let's Encrypt（certbot）：full chain = 站点证书 + 中间链；priv key = 私钥
     ssl_certificate /etc/letsencrypt/live/local.leo-zhao.top/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/local.leo-zhao.top/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
