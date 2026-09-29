@@ -12,6 +12,7 @@
 import json
 import threading
 import time
+from dataclasses import dataclass
 
 import websocket
 
@@ -28,6 +29,13 @@ ASR_MX_WORDS = 10000
 ASR_WAV = "h5"
 
 
+@dataclass
+class _AsrSession:
+    request_id: str
+    ws_generation: int
+    cancelled: bool = False
+
+
 class AsrClient:
     """ASR WebSocket 客户端。"""
 
@@ -35,7 +43,7 @@ class AsrClient:
         """创建客户端。
 
         Args:
-            on_result: 识别结果回调 `on_result(text)`。
+            on_result: 识别结果回调 `on_result(text, client_request_id)`。
             on_err: 错误回调 `on_err(err)`。
         """
         self.is_running = False
@@ -47,9 +55,55 @@ class AsrClient:
         self.text_print = ""
         self.text_print_2pass_online = ""
         self.text_print_2pass_offline = ""
-        self.on_result = on_result or (lambda text: None)
+        self.on_result = on_result or (lambda text, rid="": None)
         self.on_err = on_err or (lambda text: None)
-        self.cancel = False
+        self._session: _AsrSession | None = None
+        self._sessions_by_generation: dict[int, _AsrSession] = {}
+        self._ws_generation = 0
+        self._next_session_request_id = ""
+        self.sid = ""
+
+    def _find_session(self, request_id: str) -> _AsrSession | None:
+        if not request_id:
+            return None
+        if self._session and self._session.request_id == request_id:
+            return self._session
+        for session in self._sessions_by_generation.values():
+            if session.request_id == request_id:
+                return session
+        return None
+
+    def begin_session(self, request_id: str) -> None:
+        if not request_id:
+            return
+        cur = self._session
+        if cur and cur.request_id == request_id and not cur.cancelled:
+            return
+        if cur and cur.request_id != request_id:
+            log.info(f">>[ASR] retire session {cur.request_id} for new {request_id}")
+            cur.cancelled = True
+            self._teardown_connection()
+        self._next_session_request_id = request_id
+
+    def cancel_session(self, request_id: str) -> None:
+        if not request_id:
+            return
+        target = self._find_session(request_id)
+        if not target:
+            return
+        target.cancelled = True
+        if self._session is target and self.ws is not None:
+            self._teardown_connection()
+
+    def cancel_current_session(self) -> None:
+        if self._session:
+            self.cancel_session(self._session.request_id)
+
+    def _teardown_connection(self) -> None:
+        self.close()
+        self.is_running = False
+        self.ws = None
+        self.buffer = bytearray()
 
     def start_asr(self, ws):
         chunk_size = 60 * ASR_CHUNK_SIZE[1] / ASR_CHUNK_INTERVAL
@@ -85,82 +139,114 @@ class AsrClient:
         if self.ws:
             self.ws.close()
 
-    def on_open(self, ws):
-        log.info(">>[ASR] open")
-        try:
-            self.start_asr(ws)
-            self.is_running = True
-        except Exception as e:
-            log.error(f">>[ASR] Error : {e}")
-            self.on_err(e)
-
-    def on_message(self, ws, msg):
-        log.info(f">>[ASR] handle asr msg {msg}")
-        try:
-            meg = json.loads(msg)
-            text = meg["text"]
-            timestamp = ""
-            offline_msg_done = meg.get("is_final", False)
-            if "timestamp" in meg:
-                timestamp = meg["timestamp"]
-            if "mode" not in meg:
-                log.warning(">>[ASR] mode not in meg")
+    def _make_on_message(self, ws_generation: int):
+        def on_message(ws, msg):
+            if ws_generation != self._ws_generation:
+                log.info(">>[ASR] ignore stale ws message")
                 return
-            if meg["mode"] == "online":
-                self.text_print += "{}".format(text)
-                self.text_print = self.text_print[-ASR_MX_WORDS:]
-            elif meg["mode"] == "offline":
-                self.text_print += "{}".format(text)
-                offline_msg_done = True
-            else:
-                if meg["mode"] == "2pass-online":
-                    self.text_print_2pass_online += "{}".format(text)
-                    self.text_print = self.text_print_2pass_offline + self.text_print_2pass_online
+            session = self._sessions_by_generation.get(ws_generation)
+            if session is None or session.cancelled or session.ws_generation != ws_generation:
+                log.info(">>[ASR] ignore result for cancelled or stale session")
+                return
+            log.info(f">>[ASR] handle asr msg {msg}")
+            try:
+                meg = json.loads(msg)
+                text = meg["text"]
+                timestamp = ""
+                if "timestamp" in meg:
+                    timestamp = meg["timestamp"]
+                if "mode" not in meg:
+                    log.warning(">>[ASR] mode not in meg")
+                    return
+                if meg["mode"] == "online":
+                    self.text_print += "{}".format(text)
+                    self.text_print = self.text_print[-ASR_MX_WORDS:]
+                elif meg["mode"] == "offline":
+                    self.text_print += "{}".format(text)
                 else:
-                    self.text_print_2pass_online = ""
-                    self.text_print = self.text_print_2pass_offline + "{}".format(
-                        text)
-                    self.text_print_2pass_offline += "{}".format(text)
-                self.text_print = self.text_print[-ASR_MX_WORDS:]
-            msg = {
-                "type": "recognition",
-                "content": self.text_print,
-                "timestamp": timestamp
-            }
-            log.info(f">>[ASR] Receive result: {msg} , {self.sid}")
-            self.text_all = self.text_print
-            self.text_print = ""
-            # if offline_msg_done:
-            #     self.close()
-            if not self.cancel:
-                self.on_result(self.text_all)
-            self.cancel = False
-        except Exception as e:
-            self.on_err(e)
-            log.error("Exception:", e)
+                    if meg["mode"] == "2pass-online":
+                        self.text_print_2pass_online += "{}".format(text)
+                        self.text_print = self.text_print_2pass_offline + self.text_print_2pass_online
+                    else:
+                        self.text_print_2pass_online = ""
+                        self.text_print = self.text_print_2pass_offline + "{}".format(text)
+                        self.text_print_2pass_offline += "{}".format(text)
+                    self.text_print = self.text_print[-ASR_MX_WORDS:]
+                msg_out = {
+                    "type": "recognition",
+                    "content": self.text_print,
+                    "timestamp": timestamp,
+                }
+                log.info(f">>[ASR] Receive result: {msg_out} , {self.sid}")
+                self.text_all = self.text_print
+                self.text_print = ""
+                rid = session.request_id
+                self.on_result(self.text_all, rid)
+            except Exception as e:
+                self.on_err(e)
+                log.error("[ASR] Exception: %s", e)
 
-    def on_error(self, ws, error):
-        log.error(f">>[ASR] error {error}")
+        return on_message
 
-    def on_close(self, ws, close_status_code, close_msg):
-        log.info(f">>[ASR] Close {close_status_code} {close_msg}")
-        self.buffer = bytearray()
-        self.ws = None
-        self.is_running = False
+    def _make_on_open(self, ws_generation: int):
+        def on_open(ws):
+            if ws_generation != self._ws_generation:
+                log.info(">>[ASR] ignore stale ws open")
+                return
+            log.info(">>[ASR] open")
+            try:
+                self.start_asr(ws)
+                self.is_running = True
+            except Exception as e:
+                log.error(f">>[ASR] Error : {e}")
+                self.on_err(e)
+
+        return on_open
+
+    def _make_on_error(self, ws_generation: int):
+        def on_error(ws, error):
+            if ws_generation != self._ws_generation:
+                log.info(">>[ASR] ignore stale ws error")
+                return
+            log.error(f">>[ASR] error {error}")
+
+        return on_error
+
+    def _make_on_close(self, ws_generation: int):
+        def on_close(ws, close_status_code, close_msg):
+            if ws_generation != self._ws_generation:
+                log.info(">>[ASR] ignore stale ws close")
+                return
+            log.info(f">>[ASR] Close {close_status_code} {close_msg}")
+            self.buffer = bytearray()
+            self.ws = None
+            self.is_running = False
+
+        return on_close
 
     def connect(self, sid, sample_rate):
         self.sid = sid
         self.sample_rate = sample_rate
+        self._ws_generation += 1
+        ws_generation = self._ws_generation
+        rid = self._next_session_request_id
+        if not rid and self._session and not self._session.cancelled:
+            rid = self._session.request_id
+        if not rid:
+            rid = ""
+        self._next_session_request_id = ""
+        session = _AsrSession(request_id=rid, ws_generation=ws_generation)
+        self._session = session
+        self._sessions_by_generation[ws_generation] = session
 
         self.ws = websocket.WebSocketApp(
             ASR_SERVER,
-            on_open=self.on_open,
-            on_message=self.on_message,
-            on_error=self.on_error,
-            on_close=self.on_close,
+            on_open=self._make_on_open(ws_generation),
+            on_message=self._make_on_message(ws_generation),
+            on_error=self._make_on_error(ws_generation),
+            on_close=self._make_on_close(ws_generation),
         )
 
-        # 启动 WebSocket 连接
         wst = threading.Thread(target=self.ws.run_forever)
         wst.daemon = True
         wst.start()
@@ -169,7 +255,6 @@ class AsrClient:
         self.buffer.extend(audio_data)
         if self.ws is None:
             self.connect(sid, sample_rate)
-            # socketio.emit("message", {"type": "recognition", "content": "OK"}, room=sid)
         if self.is_running:
             while self.ws and len(self.buffer) >= self.package_size:
                 s_data = self.buffer[:self.package_size]

@@ -56,6 +56,7 @@ class TTSClient(ResultCallback):
         self.speed = 1.0
         self.vol = 50
         self.id = ''
+        self._errored = False
 
     def streaming_cancel(self):
         log.info(">>[TTS] cancel streaming")
@@ -81,8 +82,11 @@ class TTSClient(ResultCallback):
         try:
             if role is None:
                 role = self.role
+            else:
+                self.role = role
             if id:
                 self.id = id
+            self._errored = False
             synthesizer = SpeechSynthesizer(
                 model=MODEL_MAP.get(role, DEFAULT_MODEL),
                 voice=role,
@@ -111,9 +115,12 @@ class TTSClient(ResultCallback):
         try:
             if role is None:
                 role = self.role
+            else:
+                self.role = role
             if id:
                 self.id = id
             if self.synthesizer is None:
+                self._errored = False
                 self.synthesizer = SpeechSynthesizer(
                     model=MODEL_MAP.get(role, DEFAULT_MODEL),
                     voice=role,
@@ -147,10 +154,20 @@ class TTSClient(ResultCallback):
 
     def on_error(self, message: str):
         log.error(f">>[TTS] failed, {message}")
+        self.synthesizer = None
+        if self._errored:
+            return
+        self._errored = True
+        try:
+            self.on_err(Exception(message))
+        except Exception as e:
+            log.error(f">>[TTS] on_err callback failed: {e}")
+            traceback.print_stack()
 
     def on_close(self):
         log.debug(f">>[TTS] on_close 回调")
         self.synthesizer = None
+        self._errored = False
 
     def on_event(self, message):
         pass

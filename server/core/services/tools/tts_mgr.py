@@ -49,6 +49,8 @@ OUTPUT_FILENAME = 'output.mp3'
 
 # WebSocket 任务完成等待超时时间（秒）
 TASK_COMPLETION_TIMEOUT = 600
+# 长时间未收到音频/进度数据则判定失败（秒）
+TTS_DATA_IDLE_TIMEOUT = 120.0
 
 
 def count_text_chars(text: str) -> int:
@@ -587,9 +589,8 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             client.vol = task.vol
             client.model = task.model  # 设置模型选择
 
-            # 计算总字数（用于进度显示）
-            total_chars = len(task.text)
-            client._total_chars = total_chars
+            # 计算总字数（用于进度显示，与 task.total_chars 规则一致）
+            client._total_chars = task.total_chars
 
             # 保存客户端引用，以便停止时可以取消
             with self._task_lock.gen_wlock():
@@ -637,22 +638,31 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                 raise
 
             # 等待任务完成（WebSocket 会异步返回 task-finished 事件）
-            log.info(f"[TTSMgr] 任务 {task.name} 开始等待 WebSocket 任务完成（数据接收超时: 10秒）")
-            # 初始化最后一次接收到数据的时间（从发送完成时开始计时）
+            log.info(
+                f"[TTSMgr] 任务 {task.name} 开始等待 WebSocket 任务完成"
+                f"（无数据超时: {TTS_DATA_IDLE_TIMEOUT}s，总超时: {TASK_COMPLETION_TIMEOUT}s）"
+            )
             last_data_time[0] = time.time()
-            DATA_TIMEOUT = 10.0  # 10秒没有收到数据则视为超时
+            wait_started_at = time.time()
 
             while not task_completed.is_set():
-                # 检查是否10秒没有收到数据
-                time_since_last_data = time.time() - last_data_time[0]
-                if time_since_last_data >= DATA_TIMEOUT:
-                    log.warning(
-                        f"[TTSMgr] 任务 {task.task_id} 数据接收超时，距离最后一次接收数据已过去: {time_since_last_data:.2f}秒（超时限制: {DATA_TIMEOUT}秒）"
+                elapsed = time.time() - wait_started_at
+                if elapsed >= TASK_COMPLETION_TIMEOUT:
+                    raise TimeoutError(
+                        f"任务等待超时（已超过 {TASK_COMPLETION_TIMEOUT} 秒未完成）"
                     )
-                    # 超时也视为失败
-                    raise TimeoutError(f"任务数据接收超时（{DATA_TIMEOUT}秒未收到数据）")
 
-                # 使用短超时进行轮询，以便定期检查
+                time_since_last_data = time.time() - last_data_time[0]
+                if time_since_last_data >= TTS_DATA_IDLE_TIMEOUT:
+                    log.warning(
+                        f"[TTSMgr] 任务 {task.task_id} 数据接收超时，"
+                        f"距离最后一次接收数据已过去: {time_since_last_data:.2f}秒"
+                        f"（无数据超时: {TTS_DATA_IDLE_TIMEOUT}秒）"
+                    )
+                    raise TimeoutError(
+                        f"任务数据接收超时（{TTS_DATA_IDLE_TIMEOUT}秒未收到数据）"
+                    )
+
                 task_completed.wait(timeout=1.0)
 
             # 检查是否有错误发生

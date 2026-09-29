@@ -41,18 +41,26 @@ class AILocal:
         """创建客户端实例。
 
         Args:
-            on_msg: 回调 `on_msg(payload, message_id, type)`。
+            on_msg: 回调 `on_msg(payload, message_id, type, client_request_id)`。
                 - type=0: 流式 message chunk
                 - type=1: message_end（metadata）
-            on_err: 错误回调。
+            on_err: 错误回调 `on_err(err, client_request_id)`。
         """
         self.aiConversationId = ""
         self.user = "user"
-        self.on_msg = on_msg or (lambda a, b, c: None)
-        self.on_err = on_err or (lambda x: None)
+        self.on_msg = on_msg or (lambda a, b, c, d="": None)
+        self.on_err = on_err or (lambda x, d="": None)
         self.last_task_id = -1
+        self._active_stream_request_id = ""
 
-    def stream_msg(self, query: str, inputs: dict | None = None, timeout: int = 30, try_times: int = 0) -> None:
+    def stream_msg(
+        self,
+        query: str,
+        inputs: dict | None = None,
+        timeout: int = 30,
+        try_times: int = 0,
+        client_request_id: str = "",
+    ) -> None:
         """发起流式对话请求。
 
         Args:
@@ -68,7 +76,9 @@ class AILocal:
             "response_mode": "streaming",
             "user": self.user,
         }
-        log.info(f"==== [AI] Query: {self.user} - {query}")
+        req_id = client_request_id or ""
+        self._active_stream_request_id = req_id
+        log.info(f"==== [AI] Query: {self.user} - {query} [{req_id}]")
 
         try:
             with requests.post(
@@ -87,31 +97,35 @@ class AILocal:
                         if "task_id" in chunk:
                             self.last_task_id = chunk["task_id"]
                         if "message" == chunk["event"]:
-                            self.on_msg(chunk["answer"], chunk["message_id"], 0)
+                            self.on_msg(chunk["answer"], chunk["message_id"], 0, req_id)
                         elif chunk["event"] == "error":
                             raise RuntimeError(f"{chunk['code']} : {chunk['message']}")
                         elif chunk["event"] == "message_end":
                             log.info(chunk["metadata"])
-                            self.on_msg(chunk["metadata"], chunk["message_id"], 1)
+                            self.on_msg(chunk["metadata"], chunk["message_id"], 1, req_id)
 
         except requests.exceptions.RequestException as e:
             log.error(f">>[AI] 请求失败: {str(e)}")
             if try_times < 1:
                 self.aiConversationId = ""
-                self.stream_msg(query, inputs, timeout, try_times + 1)
+                self.stream_msg(
+                    query, inputs, timeout, try_times + 1, client_request_id=req_id
+                )
             else:
-                self.on_err(e)
+                self.on_err(e, req_id)
         except Exception as ee:
             log.error(">>[AI] 响应数据解析错误 " + line.decode("utf-8"))
-            self.on_err(ee)
+            self.on_err(ee, req_id)
 
-    def streaming_cancel(self) -> None:
+    def streaming_cancel(self, client_request_id: str = "") -> None:
         """取消当前流式任务（如果服务端支持 stop）。"""
+        req_id = client_request_id or self._active_stream_request_id
+        task_id = self.last_task_id
         payload = {"user": self.user}
-        log.info(">>[AI] cancel streaming")
+        log.info(f">>[AI] cancel streaming [{req_id}] task={task_id}")
         try:
             with requests.post(
-                    f"{API_URL}/chat-messages/:{self.last_task_id}/stop",
+                    f"{API_URL}/chat-messages/:{task_id}/stop",
                     headers=dify_headers(self.user),
                     json=payload,
             ) as response:
@@ -119,7 +133,7 @@ class AILocal:
 
         except Exception as ee:
             log.error(f">>[AI] cancel error {ee}")
-            self.on_err(ee)
+            self.on_err(ee, req_id)
 
     @staticmethod
     def get_chat_messages(conversation_id, limit, user, first_id=None):

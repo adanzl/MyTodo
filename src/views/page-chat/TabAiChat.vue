@@ -15,7 +15,7 @@
         <ion-button size="small" fill="clear" @click="retryRefresh">重试</ion-button>
       </div>
       <div class="flex flex-col h-full p-2 border-t border-gray-200 gap-2">
-        <div v-for="(msg, idx) in messages" :key="msg.clientRequestId ?? msg.id ?? idx" class="p-1.5 w-full flex">
+        <div v-for="msg in messages" :key="msg.bubbleKey" class="p-1.5 w-full flex">
           <div
             v-if="msg.role == 'server'"
             class="max-w-[80%] bg-pink-200 rounded-lg p-2 shadow-md relative inline-block">
@@ -24,10 +24,14 @@
               class="text-gray-600 italic animate-pulse">
               {{ msg.content || "正在思考…" }}
             </span>
-            <span v-else-if="msg.status === 'error'" class="text-red-800">
-              {{ msg.content }}
+            <span v-else-if="msg.status === 'stopped'" class="text-gray-700">
+              {{ msg.content || "已停止" }}
             </span>
-            <span v-else>{{ msg.content ?? "..." }}</span>
+            <template v-else>
+              <span v-if="msg.content">{{ msg.content }}</span>
+              <span v-else-if="msg.status !== 'error'">...</span>
+            </template>
+            <p v-if="msg.errorMessage" class="text-red-800 text-sm mt-1">{{ msg.errorMessage }}</p>
             <ion-button
               v-if="msg.status === 'error' && msg.retryText"
               size="small"
@@ -44,10 +48,27 @@
               <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
             </div>
           </div>
-          <div v-else class="max-w-[80%] bg-green-500 text-white p-2 rounded-lg shadow-md relative ml-auto inline-block">
-            {{ msg.content }}
+          <div
+            v-else
+            class="max-w-[80%] bg-green-500 text-white p-2 rounded-lg shadow-md relative ml-auto inline-block">
+            <span v-if="msg.status === 'recognizing'" class="italic opacity-90">{{
+              msg.content || "正在识别…"
+            }}</span>
+            <span v-else-if="msg.status === 'stopped'" class="opacity-90">{{
+              msg.content || "已取消"
+            }}</span>
+            <span v-else-if="msg.content">{{ msg.content }}</span>
+            <p v-if="msg.errorMessage" class="text-sm mt-1 opacity-95">{{ msg.errorMessage }}</p>
+            <ion-button
+              v-if="msg.retryKind === 'voice'"
+              size="small"
+              fill="clear"
+              class="mt-1 h-8 text-white"
+              @click="$emit('retry-voice')">
+              重新录音
+            </ion-button>
             <div
-              v-if="msg.audioSrc"
+              v-if="msg.audioSrc && msg.status !== 'recognizing' && msg.status !== 'error'"
               class="absolute -left-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center text-black"
               @click="$emit('audio-click', msg)">
               <Icon icon="mdi:stop-circle-outline" class="w-6 h-6" v-if="msg.playing" />
@@ -87,23 +108,20 @@ import {
   prependHistoryTurns,
   type DifyHistoryItem,
 } from "@/views/page-chat/ai-chat-history";
+import {
+  applyChatChunkToMessages,
+  completeVoiceRecognizing,
+  failVoiceRecognizing,
+  failServerReply,
+  findServerByClientRequestId,
+  finishServerReply,
+  newBubbleKey,
+} from "@/views/page-chat/ai-chat-reply";
+import type { ChatMsg } from "@/views/page-chat/ai-chat-types";
 import { getNetworkErrorMessage } from "@/utils/net-util";
 import type { RefresherCustomEvent } from "@ionic/vue";
 
-export type ChatMsgStatus = "thinking" | "streaming" | "done" | "error";
-
-export interface ChatMsg {
-  id?: string | number;
-  content: string;
-  role: string;
-  audioSrc?: string;
-  playing?: boolean;
-  ts?: string;
-  type?: string;
-  status?: ChatMsgStatus;
-  clientRequestId?: string;
-  retryText?: string;
-}
+export type { ChatMsg, ChatMsgStatus } from "@/views/page-chat/ai-chat-types";
 
 const props = defineProps<{
   aiConversationId: string;
@@ -113,6 +131,7 @@ const props = defineProps<{
 defineEmits<{
   (e: "audio-click", msg: ChatMsg): void;
   (e: "retry", text: string): void;
+  (e: "retry-voice"): void;
 }>();
 
 const SCROLL_NEAR_BOTTOM_PX = 80;
@@ -122,10 +141,7 @@ const messages = ref<ChatMsg[]>([]);
 const networkError = ref(false);
 const userNearBottom = ref(true);
 const showNewReplyHint = ref(false);
-/** 已拉到的最旧一条 Dify 消息 id。连续下拉时用它翻页；空回答不展示，但不能停在失败记录上。 */
 const historyCursor = ref<string | number | undefined>(undefined);
-/** 当前等待中的 AI 回复（占位气泡） */
-const activeReplyClientId = ref<string | undefined>(undefined);
 
 watch(
   () => props.aiConversationId,
@@ -167,32 +183,29 @@ function scrollToBottomAndClearHint() {
   scrollToBottom(200);
 }
 
-function addMessage(msg: ChatMsg) {
-  messages.value.push(msg);
+function addMessage(msg: Omit<ChatMsg, "bubbleKey"> & { bubbleKey?: string }) {
+  messages.value.push({
+    bubbleKey: msg.bubbleKey ?? newBubbleKey(msg.role === "me" ? "me" : "srv"),
+    ...msg,
+  });
 }
 
-function findActiveServerMessage(): ChatMsg | undefined {
-  if (activeReplyClientId.value) {
-    const byClient = messages.value.find(
-      (m) => m.role === "server" && m.clientRequestId === activeReplyClientId.value
-    );
-    if (byClient) return byClient;
-  }
-  for (let i = messages.value.length - 1; i >= 0; i--) {
-    const m = messages.value[i];
-    if (
-      m.role === "server" &&
-      (m.status === "thinking" || m.status === "streaming")
-    ) {
-      return m;
-    }
-  }
-  return undefined;
+function startVoiceRecognizing(clientRequestId: string, audioSrc: string) {
+  addMessage({
+    role: "me",
+    content: "正在识别…",
+    status: "recognizing",
+    clientRequestId,
+    audioSrc,
+  });
+}
+
+function onAsrResult(clientRequestId: string, text: string, audioSrc: string) {
+  completeVoiceRecognizing(messages.value, clientRequestId, text, audioSrc);
 }
 
 function startAwaitingReply(clientRequestId: string, retryText: string) {
-  activeReplyClientId.value = clientRequestId;
-  messages.value.push({
+  addMessage({
     role: "server",
     content: "正在思考…",
     status: "thinking",
@@ -201,57 +214,47 @@ function startAwaitingReply(clientRequestId: string, retryText: string) {
   });
 }
 
-function applyChatChunk(data: { id?: string | number; content?: string }) {
-  const chunk = data.content ?? "";
-  if (!chunk) return;
-  let target = findActiveServerMessage();
-  if (data.id !== undefined && data.id !== "") {
-    const byId = messages.value.find((m) => m.role === "server" && m.id === data.id);
-    if (byId) target = byId;
-  }
-  if (!target) {
-    const msg: ChatMsg = {
-      id: data.id,
-      content: chunk,
+function applyChatChunk(data: {
+  clientRequestId?: string;
+  id?: string | number;
+  content?: string;
+}) {
+  if (!data.clientRequestId) return;
+  const changed = applyChatChunkToMessages(messages.value, data);
+  if (!changed && (data.content ?? "")) {
+    addMessage({
       role: "server",
+      content: data.content!,
       status: "streaming",
-    };
-    addMessage(msg);
-    return;
-  }
-  if (data.id !== undefined && data.id !== "") target.id = data.id;
-  if (target.status === "thinking") {
-    target.status = "streaming";
-    target.content = chunk;
-  } else {
-    target.content = (target.content ?? "") + chunk;
-  }
-}
-
-function finishActiveReply() {
-  const target = findActiveServerMessage();
-  if (target) target.status = "done";
-  activeReplyClientId.value = undefined;
-}
-
-function failActiveReply(message: string) {
-  const target = findActiveServerMessage();
-  if (target) {
-    target.status = "error";
-    target.content = message;
-  } else {
-    messages.value.push({
-      role: "server",
-      content: message,
-      status: "error",
+      clientRequestId: data.clientRequestId,
+      id: data.id,
     });
   }
-  activeReplyClientId.value = undefined;
 }
 
-/** @deprecated 保留兼容；新逻辑请用 applyChatChunk */
+function finishActiveReply(clientRequestId: string, opts?: { stopped?: boolean }) {
+  finishServerReply(messages.value, clientRequestId, opts);
+}
+
+function failActiveReply(
+  clientRequestId: string,
+  errorMessage: string,
+  retryText?: string
+) {
+  const hasServer = Boolean(findServerByClientRequestId(messages.value, clientRequestId));
+  failVoiceRecognizing(messages.value, clientRequestId, errorMessage, {
+    retryVoice: !hasServer,
+  });
+  if (hasServer) {
+    failServerReply(messages.value, clientRequestId, errorMessage, retryText);
+  }
+}
+
 function appendLastMessageContent(text: string) {
-  applyChatChunk({ content: text });
+  const last = messages.value[messages.value.length - 1];
+  if (last?.role === "server" && last.clientRequestId) {
+    applyChatChunk({ clientRequestId: last.clientRequestId, content: text });
+  }
 }
 
 function getLastMessage(): ChatMsg | undefined {
@@ -287,7 +290,7 @@ async function doRefresh(e: RefresherCustomEvent) {
       if (oldest !== undefined) historyCursor.value = oldest;
 
       const { messages: next, added } = prependHistoryTurns(messages.value, list);
-      messages.value = next;
+      messages.value = next as ChatMsg[];
       cursor = historyCursor.value;
       if (added > 0 || !data?.has_more) break;
     }
@@ -315,6 +318,8 @@ defineExpose({
   appendLastMessageContent,
   applyChatChunk,
   startAwaitingReply,
+  startVoiceRecognizing,
+  onAsrResult,
   finishActiveReply,
   failActiveReply,
   getLastMessage,
