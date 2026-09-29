@@ -87,7 +87,7 @@ export function restoreServerReplySnapshot(
 ): void {
   const text = replyText.trim();
   if (!text) return;
-  let target = findServerByClientRequestId(messages, clientRequestId);
+  const target = findServerByClientRequestId(messages, clientRequestId);
   if (!target) {
     messages.push({
       bubbleKey: newBubbleKey("srv"),
