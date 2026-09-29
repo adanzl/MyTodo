@@ -78,10 +78,17 @@
       <div v-if="coinDialogForm.data">
         {{ coinDialogForm.data.name }} 当前金币: {{ formatNum(coinDialogForm.data.coin ?? 0) }}
       </div>
-      <div class="flex mt-4">
-        <el-input v-model="coinDialogForm.value" style="width: 240px" placeholder="Please input" />
-
-        <el-button @click="handleAddCoin()" class="ml-2 w-16" type="warning"> Submit </el-button>
+      <div class="mt-4 flex flex-col gap-3 max-w-sm">
+        <el-input v-model.number="coinDialogForm.value" class="w-60" placeholder="变更数量（可为负数）" />
+        <el-input
+          v-model="coinDialogForm.msg"
+          type="textarea"
+          :rows="2"
+          maxlength="200"
+          show-word-limit
+          placeholder="注释 / 变更原因（写入记录 msg）"
+        />
+        <el-button @click="handleAddCoin()" class="w-16" type="warning"> Submit </el-button>
       </div>
     </el-dialog>
   </div>
@@ -139,10 +146,12 @@ const coinDialogForm = ref<{
   visible: boolean;
   data: UserWithExtras | null;
   value: number;
+  msg: string;
 }>({
   visible: false,
   data: null,
   value: 0,
+  msg: "",
 });
 
 const refreshUserList = async () => {
@@ -174,6 +183,7 @@ const handleAddScore = async () => {
 const onAddCoinBtnClick = (item: UserWithExtras) => {
   coinDialogForm.value.visible = true;
   coinDialogForm.value.data = item;
+  coinDialogForm.value.msg = "";
 };
 
 const handleAddCoin = async () => {
@@ -181,11 +191,17 @@ const handleAddCoin = async () => {
     ElMessage.warning("请选择用户");
     return;
   }
+  const reason = coinDialogForm.value.msg.trim();
+  if (!reason) {
+    ElMessage.warning("请填写变更原因");
+    return;
+  }
   try {
-    await addCoin(coinDialogForm.value.data.id, "pcAdmin", coinDialogForm.value.value, "管理后台变更");
+    await addCoin(coinDialogForm.value.data.id, "pcAdmin", coinDialogForm.value.value, reason);
     await refreshUserList();
     coinDialogForm.value.visible = false;
     coinDialogForm.value.value = 0;
+    coinDialogForm.value.msg = "";
   } catch (error) {
     console.error("添加金币失败:", error);
     ElMessage.error("添加金币失败");
@@ -200,6 +216,7 @@ const handleDialogClose = () => {
 const handleCoinDialogClose = () => {
   coinDialogForm.value.visible = false;
   coinDialogForm.value.value = 0;
+  coinDialogForm.value.msg = "";
 };
 
 onMounted(async () => {

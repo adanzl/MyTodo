@@ -1,4 +1,5 @@
 import json
+import re
 import traceback
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union, cast
@@ -9,6 +10,7 @@ from sqlalchemy import Date, DateTime, MetaData, Table, func, inspect, select, t
 from core.config import app_logger, config
 from core.config.const import (DB_CODE_ERROR, DB_CODE_ERROR_RUNTIME, DB_CODE_SUCCESS)
 from core.db import db_obj
+from core.models.coin_history import CoinHistory
 from core.models.score_history import ScoreHistory
 from core.models.user import User
 from core.utils import fmt_ts
@@ -17,6 +19,16 @@ log = app_logger
 
 DB_NAME = "data.db"
 TABLE_SAVE = "t_user_save"
+SCORE_HISTORY_TABLE = "t_score_history"
+COIN_HISTORY_TABLE = "t_coin_history"
+
+
+def _clone_sqlite_ddl(sql: str, source_table: str, target_table: str) -> str:
+    """把 sqlite_master 里的 DDL 从 source 表名克隆到 target（含常见索引名）。"""
+    out = re.sub(rf"\b{re.escape(source_table)}\b", target_table, sql)
+    out = out.replace("idx_score", "idx_coin")
+    out = out.replace("sqlite_autoindex_t_score", "sqlite_autoindex_t_coin")
+    return out
 
 
 def _parse_datetime_string(value: str) -> datetime:
@@ -89,6 +101,59 @@ class DbMgr:
 
         db_obj.init_app(app)
         self._initialized = True
+        with app.app_context():
+            self.ensure_t_coin_history_table()
+
+    def ensure_t_coin_history_table(self) -> None:
+        """若缺少 t_coin_history，则按 t_score_history 的 SQLite 结构克隆（含索引）。"""
+        inspector = inspect(db_obj.engine)
+        if inspector.has_table(COIN_HISTORY_TABLE):
+            return
+
+        if "sqlite" not in str(db_obj.engine.url):
+            db_obj.create_all()
+            log.info("created %s via create_all (non-sqlite)", COIN_HISTORY_TABLE)
+            return
+
+        if not inspector.has_table(SCORE_HISTORY_TABLE):
+            db_obj.create_all()
+            log.info("created %s via create_all (no %s)", COIN_HISTORY_TABLE, SCORE_HISTORY_TABLE)
+            return
+
+        source = SCORE_HISTORY_TABLE
+        target = COIN_HISTORY_TABLE
+        try:
+            row = db_obj.session.execute(
+                text("SELECT sql FROM sqlite_master WHERE type='table' AND name=:name"),
+                {"name": source},
+            ).fetchone()
+            if not row or not row[0]:
+                db_obj.create_all()
+                return
+
+            create_sql = _clone_sqlite_ddl(row[0], source, target)
+            db_obj.session.execute(text(create_sql))
+
+            idx_rows = db_obj.session.execute(
+                text(
+                    "SELECT sql FROM sqlite_master WHERE type='index' "
+                    "AND tbl_name=:tbl AND sql IS NOT NULL"
+                ),
+                {"tbl": source},
+            ).fetchall()
+            for (idx_sql,) in idx_rows:
+                new_sql = _clone_sqlite_ddl(idx_sql, source, target)
+                try:
+                    db_obj.session.execute(text(new_sql))
+                except Exception as idx_err:
+                    log.warning("skip index while creating %s: %s", target, idx_err)
+
+            db_obj.session.commit()
+            log.info("created %s cloned from %s", target, source)
+        except Exception as e:
+            db_obj.session.rollback()
+            log.error("ensure %s failed: %s", target, e)
+            traceback.print_exc()
 
     def set_save(self, id: Optional[int], user_name: Optional[str], data: str) -> Dict[str, Any]:
         """
@@ -346,14 +411,30 @@ class DbMgr:
         msg: Optional[str],
         out_key: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """为用户增加或扣除金币。"""
+        """为用户增加或扣除金币，并记录历史。"""
         try:
             user = db_obj.session.get(User, user_id)
             if not user:
                 return {"code": DB_CODE_ERROR_RUNTIME, "msg": f"用户不存在: {user_id}"}
-            user.coin = user.coin + int(value)
+
+            pre_coin = user.coin
+            cur_coin = pre_coin + int(value)
+
+            coin_history = CoinHistory()
+            coin_history.user_id = user_id
+            coin_history.value = value
+            coin_history.action = action
+            coin_history.pre_value = pre_coin
+            coin_history.current = cur_coin
+            coin_history.msg = msg if msg else ''
+            coin_history.dt = fmt_ts()
+            coin_history.out_key = out_key
+
+            user.coin = cur_coin
+
+            db_obj.session.add(coin_history)
             db_obj.session.commit()
-            return {"code": DB_CODE_SUCCESS, "msg": "ok", "data": user.coin}
+            return {"code": DB_CODE_SUCCESS, "msg": "ok", "data": cur_coin}
         except Exception as e:
             db_obj.session.rollback()
             log.error(e)

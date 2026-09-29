@@ -89,20 +89,36 @@ export class ScheduleData {
   }
 }
 
+/** 当天存档覆盖字段（/todo/save 的 schedule_override，非完整 ScheduleData） */
+export type ScheduleOverridePayload = {
+  title?: string;
+  color?: number;
+  priority?: number;
+  groupId?: number;
+  order?: number;
+  score?: number;
+  subtasks?: Subtask[];
+};
+
 // 日程存档【每天】
 export class ScheduleSave {
   date?: string; // 日期 YYYY-MM-DD
   scheduleId?: number; // 日程ID
   state: 0 | 1 = 0;
   subtasks: Record<number, number> = {}; // <number, number>;
-  // 覆盖字段
-  scheduleOverride?: ScheduleData;
+  // 覆盖字段（本地存档可仍为完整 ScheduleData，接口层用 ScheduleOverridePayload）
+  scheduleOverride?: ScheduleOverridePayload | ScheduleData;
   score?: number; // 通过这个任务获得的积分
   static Copy(o: ScheduleSave): ScheduleSave {
     const ret = new ScheduleSave();
     ret.state = o.state;
     ret.score = o.score;
-    if (o.scheduleOverride) ret.scheduleOverride = ScheduleData.Copy(o.scheduleOverride);
+    if (o.scheduleOverride) {
+      ret.scheduleOverride =
+        o.scheduleOverride instanceof ScheduleData
+          ? ScheduleData.Copy(o.scheduleOverride)
+          : JSON.parse(JSON.stringify(o.scheduleOverride));
+    }
     if (o.subtasks) ret.subtasks = JSON.parse(JSON.stringify(o.subtasks));
     return ret;
   }

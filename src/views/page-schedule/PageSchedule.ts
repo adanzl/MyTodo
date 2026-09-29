@@ -10,12 +10,19 @@ import {
   DayData,
   MonthData,
   ScheduleData,
-  ScheduleSave,
+  Subtask,
   UData,
   User,
   UserData,
 } from "@/types/user-data";
-import { getTodoCalendar, createTodo, updateTodo, deleteTodo, saveTodo } from "@/api/api-todo";
+import {
+  buildScheduleOverridePayload,
+  getTodoCalendar,
+  createTodo,
+  updateTodo,
+  deleteTodo,
+  saveTodo,
+} from "@/api/api-todo";
 import { getUserInfo } from "@/api/api-user";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import {
@@ -343,7 +350,7 @@ export default defineComponent({
     });
     eventBus.$on(C_EVENT.UPDATE_USER_INFO, async () => {
       getUserInfo(refData.user.value.id).then((userInfo: any) => {
-        refData.user.value = userInfo;
+        refData.user.value = { ...refData.user.value, ...userInfo };
       });
     });
     onMounted(() => {
@@ -616,7 +623,7 @@ export default defineComponent({
             }
             // 重新加载用户信息以更新积分显示
             getUserInfo(refData.user.value.id).then((userInfo: any) => {
-              refData.user.value = userInfo;
+              refData.user.value = { ...refData.user.value, ...userInfo };
             });
           } catch (err) {
             console.error('[PageSchedule] 更新日程状态失败:', err);
@@ -749,13 +756,21 @@ export default defineComponent({
               }
             }
           } else if (role === "cur") {
-            // 仅当天：保存特定日期的覆盖数据
+            // 仅当天：覆盖字段 + 顶层 state/subtasks（与后端存档约定一致）
             if (refData.selectedDate.value) {
-              const scheduleSave: Partial<ScheduleSave> = {
+              const subtaskStates: Record<number, number> = {};
+              _scheduleData.subtasks?.forEach((st: Subtask) => {
+                if (st.id !== -1) {
+                  subtaskStates[st.id] = st.state ?? 0;
+                }
+              });
+              await saveTodo({
                 date: refData.selectedDate.value.dt.format('YYYY-MM-DD'),
-                scheduleOverride: _scheduleData,
-              };
-              await saveTodo(scheduleSave);
+                scheduleId: _scheduleData.id,
+                state: _scheduleData.state ?? 0,
+                subtasks: subtaskStates,
+                scheduleOverride: buildScheduleOverridePayload(_scheduleData),
+              });
             }
           }
           

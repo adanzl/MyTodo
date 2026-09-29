@@ -61,6 +61,8 @@ class ScheduleData:
         self.score: Optional[int] = None  # 积分
         self.subtasks: list[Subtask] = []  # 子任务列表
         self.userId: Optional[int] = None  # 用户ID
+        # 请求体是否在 schedule_override 中显式携带 subtasks（含空列表）
+        self.override_subtasks_provided: bool = False
 
         # 完成状态字段（来自 t_schedule_save）
         self.state: int = 0  # 完成状态：0-未完成，1-已完成
@@ -139,6 +141,21 @@ class ScheduleData:
         self.state = state
         self.saveScore = score
 
+    def to_override_dict(self, *, include_subtasks: bool = False) -> dict:
+        """写入 t_schedule_save.schedule_override 的字段（不含完成状态）"""
+        data: dict = {
+            'title': self.title,
+            'color': self.color,
+            'priority': self.priority,
+            'groupId': self.groupId,
+            'order': self.order,
+        }
+        if self.score is not None:
+            data['score'] = self.score
+        if include_subtasks:
+            data['subtasks'] = [st.to_dict() for st in self.subtasks]
+        return data
+
     def to_dict(self) -> dict:
         """转换为字典"""
         return {
@@ -174,3 +191,7 @@ class ScheduleSave:
         self.subtasks: dict = {}
         self.score: Optional[int] = None
         self.scheduleOverride: Optional[ScheduleData] = None
+        # 标记请求体中显式提供的字段，用于部分更新存档
+        self.update_state: bool = False
+        self.update_subtasks: bool = False
+        self.update_schedule_override: bool = False

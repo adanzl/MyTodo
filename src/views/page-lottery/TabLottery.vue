@@ -151,13 +151,26 @@ const swiperRef = ref();
 // 本地维护选中的奖池状态，默认选中第一个（"全部"）
 const localSelectedPool = ref<any>(null);
 
-// 监听 poolList 变化，当 localSelectedPool 为空时自动选中第一个
+// 监听 poolList 变化：无选中时默认「全部」；有选中时按 id 同步对象，不存在则回退
 watch(
   () => props.poolList,
   (newList) => {
-    if (!localSelectedPool.value && newList.length > 0) {
+    if (newList.length === 0) {
+      localSelectedPool.value = null;
+      return;
+    }
+    const selectedId = localSelectedPool.value?.id;
+    if (selectedId === undefined || selectedId === null) {
       localSelectedPool.value = newList[0];
-      // 触发选中事件，通知父组件
+      emit("pool-change", newList[0]);
+      return;
+    }
+    const matched = newList.find((item: { id: number }) => item.id === selectedId);
+    if (matched) {
+      localSelectedPool.value = matched;
+      emit("pool-change", matched);
+    } else {
+      localSelectedPool.value = newList[0];
       emit("pool-change", newList[0]);
     }
   },

@@ -22,6 +22,15 @@ log = app_logger
 class TodoMgr:
     """Todo 管理类，封装日程数据的操作"""
 
+    @staticmethod
+    def _json_db_value(data: Any) -> Optional[str]:
+        """写入 JSON 列：已是字符串则原样保留，避免双重编码。"""
+        if data is None:
+            return None
+        if isinstance(data, str):
+            return data
+        return serialize_data(data)
+
     def _convert_schedules_to_list(self, schedules: List[dict]) -> List[dict]:
         """将数据库日程记录转换为 ScheduleData 列表"""
         return [ScheduleData.from_db_rows(schedule).to_dict() for schedule in schedules]
@@ -400,7 +409,7 @@ class TodoMgr:
         try:
             # 1. 查询是否存在该 schedule_id 和 date 组合的记录
             query_sql = f"""
-                SELECT id, state, score FROM t_schedule_save 
+                SELECT id, state, score, subtasks, schedule_override FROM t_schedule_save 
                 WHERE schedule_id = {schedule_save.scheduleId} AND date = '{schedule_save.date}'
             """
             query_result = db_mgr.query(query_sql)
@@ -414,6 +423,36 @@ class TodoMgr:
                 old_state = existing_record.get('state', 0)
                 old_score = existing_record.get('score', 0) or 0
 
+            if schedule_save.update_state:
+                new_state = schedule_save.state
+            elif existing_record is not None:
+                new_state = existing_record.get('state', 0)
+            else:
+                new_state = 0
+
+            if schedule_save.update_subtasks:
+                new_subtasks = schedule_save.subtasks
+            elif existing_record is not None:
+                new_subtasks = existing_record.get('subtasks') or {}
+                if isinstance(new_subtasks, str):
+                    try:
+                        new_subtasks = json.loads(new_subtasks)
+                    except json.JSONDecodeError:
+                        new_subtasks = {}
+            else:
+                new_subtasks = {}
+
+            if schedule_save.update_schedule_override:
+                if schedule_save.scheduleOverride:
+                    override_payload = schedule_save.scheduleOverride.to_override_dict(
+                        include_subtasks=schedule_save.scheduleOverride.override_subtasks_provided)
+                else:
+                    override_payload = None
+            elif existing_record is not None:
+                override_payload = existing_record.get('schedule_override')
+            else:
+                override_payload = None
+
             # 2. 准备保存数据
             db_data = {
                 'schedule_id':
@@ -421,11 +460,11 @@ class TodoMgr:
                 'date':
                 schedule_save.date,
                 'state':
-                schedule_save.state,
+                new_state,
                 'subtasks':
-                serialize_data(schedule_save.subtasks),
+                serialize_data(new_subtasks),
                 'schedule_override':
-                serialize_data(schedule_save.scheduleOverride.to_dict() if schedule_save.scheduleOverride else None),
+                self._json_db_value(override_payload),
             }
 
             # 如果存在记录，添加 id 用于更新
@@ -437,11 +476,11 @@ class TodoMgr:
             save_id = result.get('data') if result.get('code') == 0 else None
 
             # 4. 如果状态改变，更新用户总积分
-            if old_state != schedule_save.state and result.get('code') == 0:
-                self._update_user_score(schedule_save.scheduleId, old_state, schedule_save.state, old_score, save_id)
+            if old_state != new_state and result.get('code') == 0:
+                self._update_user_score(schedule_save.scheduleId, old_state, new_state, old_score, save_id)
 
             log.info(f"[TodoMgr] 保存日程状态{'成功' if result.get('code') == 0 else '失败'}: "
-                     f"schedule_id={schedule_save.scheduleId}, date={schedule_save.date}, state={schedule_save.state}")
+                     f"schedule_id={schedule_save.scheduleId}, date={schedule_save.date}, state={new_state}")
             return result
         except Exception as e:
             log.error(f"[TodoMgr] 保存日程状态异常: {e}", exc_info=True)

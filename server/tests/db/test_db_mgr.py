@@ -62,6 +62,7 @@ def db_mgr(monkeypatch, app):
         db_obj.session.execute(text(f"DELETE FROM {TABLE_SAVE}"))
         db_obj.session.execute(text("DELETE FROM t_user"))
         db_obj.session.execute(text("DELETE FROM t_score_history"))
+        db_obj.session.execute(text("DELETE FROM t_coin_history"))
         db_obj.session.commit()
 
     db_manager.app = app
@@ -127,6 +128,26 @@ def test_add_score(db_mgr):
         assert history_result['code'] == 0
         assert len(history_result['data']) == 1
         assert history_result['data'][0]['value'] == 50
+
+
+def test_add_coin(db_mgr):
+    with db_mgr.app.app_context():
+        user = User(name='coiner', score=0, coin=10, icon='default_icon', pwd='default_pwd')
+        db_obj.session.add(user)
+        db_obj.session.commit()
+        user_id = user.id
+
+        add_coin_result = db_mgr.add_coin(user_id=user_id, value=5, action='test_add', msg='Test coin')
+        assert add_coin_result['code'] == 0
+        assert add_coin_result['data'] == 15
+
+        updated_user = db_obj.session.get(User, user_id)
+        assert updated_user.coin == 15
+
+        history_result = db_mgr.query(f"SELECT * FROM t_coin_history WHERE user_id = {user_id}")
+        assert history_result['code'] == 0
+        assert len(history_result['data']) == 1
+        assert history_result['data'][0]['value'] == 5
 
 
 def test_set_data(db_mgr):

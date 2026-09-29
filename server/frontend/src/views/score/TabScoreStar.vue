@@ -1,7 +1,7 @@
 <template>
   <div class="">
     <div class="flex items-center gap-3 h-10 ">
-      <el-select v-model="selectedAction" placeholder="全部动作" clearable @change="onActionChange" style="width: 150px">
+      <el-select v-model="selectedAction" placeholder="全部动作" clearable @change="onActionChange" style="width: 150px" size="small">
         <el-option label="全部" value="" />
         <el-option label="抽奖" value="lottery" />
         <el-option label="兑换" value="exchange" />
@@ -9,7 +9,7 @@
         <el-option label="任务" value="task" />
         <el-option label="管理" value="appAdmin" />
       </el-select>
-      <el-radio-group size="default" v-model="selectedUserId" @change="onUserChange">
+      <el-radio-group size="small" v-model="selectedUserId" @change="onUserChange">
         <el-radio-button v-for="item in userList" :key="item.id" :value="item.id">
           {{ item.name }}
         </el-radio-button>
@@ -94,7 +94,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, onUnmounted, computed } from "vue";
 import { CaretTop, CaretBottom, Present, SuccessFilled } from "@element-plus/icons-vue";
 import { getList, setData } from "@/api/api-common";
 import { getPicDisplayUrl } from "@/api/api-pic";
@@ -292,9 +292,18 @@ async function onConfirmGift(row: ScoreHistory) {
   }
 }
 
+const onRefreshTab = () => {
+  refreshRecordList(selectedUserId.value, recordList.value.pageNum, recordList.value.pageSize);
+};
+
 onMounted(async () => {
+  window.addEventListener("refresh-score-star-tab", onRefreshTab);
   await refreshUserList();
   await refreshRecordList(0, 1, PAGE_SIZE);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("refresh-score-star-tab", onRefreshTab);
 });
 </script>
 

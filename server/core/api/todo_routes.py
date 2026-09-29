@@ -9,7 +9,7 @@ from typing import Any, Dict
 from flask import Blueprint, request
 from flask.typing import ResponseReturnValue
 from pydantic import BaseModel
-from core.types.todo_data import ScheduleSave, ScheduleData
+from core.types.todo_data import ScheduleSave, ScheduleData, Subtask
 
 from core.config import app_logger
 from core.services.todo_mgr import todo_mgr
@@ -231,22 +231,38 @@ def save_todo() -> ResponseReturnValue:
         schedule_save = ScheduleSave()
         schedule_save.scheduleId = schedule_id
         schedule_save.date = date
-        schedule_save.state = json_data.get('state', 0)
-        schedule_save.subtasks = json_data.get('subtasks', {})
-        schedule_save.score = json_data.get('score')
+        if 'state' in json_data:
+            schedule_save.state = json_data.get('state', 0)
+            schedule_save.update_state = True
+        if 'subtasks' in json_data:
+            schedule_save.subtasks = json_data.get('subtasks') or {}
+            schedule_save.update_subtasks = True
+        if 'score' in json_data:
+            schedule_save.score = json_data.get('score')
 
         # 解析 schedule_override
-        override_data = json_data.get('schedule_override')
-        if override_data:
-            schedule_save.scheduleOverride = ScheduleData()
-            schedule_save.scheduleOverride.title = override_data.get('title', '')
-            schedule_save.scheduleOverride.color = override_data.get('color', 0)
-            schedule_save.scheduleOverride.priority = override_data.get('priority', -1)
-            schedule_save.scheduleOverride.groupId = int(
-                override_data.get('groupId')) if override_data.get('groupId') is not None else -1
-            schedule_save.scheduleOverride.order = int(
-                override_data.get('order')) if override_data.get('order') is not None else 0
-            schedule_save.scheduleOverride.score = override_data.get('score')
+        if 'schedule_override' in json_data:
+            override_data = json_data.get('schedule_override')
+            schedule_save.update_schedule_override = True
+            if override_data:
+                schedule_save.scheduleOverride = ScheduleData()
+                schedule_save.scheduleOverride.title = override_data.get('title', '')
+                schedule_save.scheduleOverride.color = override_data.get('color', 0)
+                schedule_save.scheduleOverride.priority = override_data.get('priority', -1)
+                schedule_save.scheduleOverride.groupId = int(
+                    override_data.get('groupId')) if override_data.get('groupId') is not None else -1
+                schedule_save.scheduleOverride.order = int(
+                    override_data.get('order')) if override_data.get('order') is not None else 0
+                schedule_save.scheduleOverride.score = override_data.get('score')
+                if 'subtasks' in override_data:
+                    schedule_save.scheduleOverride.override_subtasks_provided = True
+                    override_subtasks = override_data.get('subtasks')
+                    if isinstance(override_subtasks, list):
+                        schedule_save.scheduleOverride.subtasks = [
+                            Subtask.from_dict(st_data) for st_data in override_subtasks
+                        ]
+            else:
+                schedule_save.scheduleOverride = None
 
         if schedule_save.scheduleId is None or not schedule_save.date:
             return _err('schedule_id and date are required')

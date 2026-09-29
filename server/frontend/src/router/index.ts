@@ -29,7 +29,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/score",
     name: "Score",
-    component: () => import("@/views/my-todo/PageScore.vue"),
+    component: () => import("@/views/score/PageScore.vue"),
   },
   {
     path: "/statistics",
