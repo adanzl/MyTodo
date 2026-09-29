@@ -10,8 +10,13 @@ const mocks = vi.hoisted(() => ({
 vi.mock('recorder-core/recorder.wav.min', () => ({ default: () => mocks.recorder }));
 vi.mock('socket.io-client', () => ({ default: () => mocks.socket }));
 vi.mock('@/api/api-client', () => ({ getApiUrl: () => 'https://example.com/api' }));
-vi.mock('@/api/api-chat', () => ({ getChatSetting: async () => null, setChatSetting: vi.fn() }));
-vi.mock('@/api/api-user', () => ({ getUserList: async () => ({ data: [] }) }));
+vi.mock('@/api/api-chat', () => ({
+  getChatSetting: async (): Promise<null> => null,
+  setChatSetting: vi.fn(),
+}));
+vi.mock('@/api/api-user', () => ({
+  getUserList: async (): Promise<{ data: never[] }> => ({ data: [] }),
+}));
 vi.mock('@/types/event-bus', () => ({ default: { $emit: mocks.toast }, C_EVENT: { TOAST: 'toast' } }));
 vi.mock('@/views/page-chat/TabChatRoom.vue', () => ({ default: { template: '<div />' } }));
 vi.mock('@/views/page-chat/TabAiChat.vue', () => ({ default: { template: '<div />' } }));

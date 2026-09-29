@@ -1,6 +1,6 @@
 import { apiClient } from "./api-client";
 import type { ApiResponse } from "./types";
-import type { ScheduleData, ScheduleSave } from "@/types/user-data";
+import type { ScheduleData, ScheduleOverridePayload, ScheduleSave } from "@/types/user-data";
 import dayjs from "dayjs";
 
 export interface GetTodoCalendarResponse {
@@ -95,12 +95,62 @@ export async function getTodo(
   return rsp.data.data!;
 }
 
+/** 从弹窗数据构建当天覆盖 payload（含子任务定义，不含完成状态） */
+export function buildScheduleOverridePayload(data: ScheduleData): ScheduleOverridePayload {
+  return {
+    title: data.title,
+    color: data.color,
+    priority: data.priority,
+    groupId: data.groupId,
+    order: data.order,
+    score: data.score,
+    subtasks: data.subtasks?.map((st) => ({
+      id: st.id,
+      name: st.name,
+      order: st.order,
+      score: st.score,
+      imgIds: st.imgIds?.length ? [...st.imgIds] : [],
+    })),
+  };
+}
+
+export type TodoSavePayload = Partial<Omit<ScheduleSave, "scheduleOverride">> & {
+  scheduleOverride?: ScheduleOverridePayload;
+  schedule_override?: ScheduleOverridePayload;
+  scheduleId?: number;
+  schedule_id?: number;
+};
+
+/** 转为后端 /todo/save 约定的 snake_case 字段 */
+function serializeScheduleSave(scheduleSave: TodoSavePayload): Record<string, unknown> {
+  const {
+    scheduleId,
+    scheduleOverride,
+    schedule_id: scheduleIdSnake,
+    schedule_override: scheduleOverrideSnake,
+    ...rest
+  } = scheduleSave;
+  const body: Record<string, unknown> = { ...rest };
+  const sid = scheduleId ?? scheduleIdSnake;
+  if (sid !== undefined) {
+    body.schedule_id = sid;
+  }
+  const override = scheduleOverride ?? scheduleOverrideSnake;
+  if (override !== undefined) {
+    body.schedule_override = override;
+  }
+  return body;
+}
+
 /**
  * 保存待办事项（创建或更新）
  * @param scheduleSave - 待保存的待办数据（包含ID则为更新，否则为创建）
  */
-export async function saveTodo(scheduleSave: Partial<ScheduleSave>): Promise<void> {
-  const rsp = await apiClient.post<ApiResponse<unknown>>("/todo/save", scheduleSave);
+export async function saveTodo(scheduleSave: TodoSavePayload): Promise<void> {
+  const rsp = await apiClient.post<ApiResponse<unknown>>(
+    "/todo/save",
+    serializeScheduleSave(scheduleSave)
+  );
   if (rsp.data.code !== 0) {
     throw new Error(rsp.data.msg);
   }

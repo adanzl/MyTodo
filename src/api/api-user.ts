@@ -15,6 +15,9 @@ import type {
 const USER_LIST_CACHE_MS = 5 * 60 * 1000;
 let userListCache: { data: GetUserListResponse; ts: number } | null = null;
 let userListPending: Promise<GetUserListResponse> | null = null;
+/** 递增后，进行中的列表请求不再写入缓存 */
+let userListFetchGeneration = 0;
+let userListPendingGeneration = 0;
 
 async function fetchUserList(): Promise<GetUserListResponse> {
   const rsp = await apiClient.get<ApiResponse<GetUserListResponse>>("/getAllUser");
@@ -44,22 +47,33 @@ export async function getUserList(force = false): Promise<GetUserListResponse> {
   if (!force && userListCache && now - userListCache.ts < USER_LIST_CACHE_MS) {
     return userListCache.data;
   }
-  if (userListPending) {
+  if (force) {
+    userListFetchGeneration += 1;
+  }
+  const fetchGeneration = userListFetchGeneration;
+  if (!force && userListPending && userListPendingGeneration === fetchGeneration) {
     return userListPending;
   }
-  userListPending = fetchUserList();
-  try {
-    const data = await userListPending;
-    userListCache = { data, ts: Date.now() };
-    return data;
-  } finally {
-    userListPending = null;
-  }
+  userListPendingGeneration = fetchGeneration;
+  userListPending = fetchUserList()
+    .then((data) => {
+      if (fetchGeneration === userListFetchGeneration) {
+        userListCache = { data, ts: Date.now() };
+      }
+      return data;
+    })
+    .finally(() => {
+      if (userListPendingGeneration === fetchGeneration) {
+        userListPending = null;
+      }
+    });
+  return userListPending;
 }
 
 /** 清除用户列表缓存（修改用户数据后调用，如 addScore、setUserData） */
 export function clearUserListCache(): void {
   userListCache = null;
+  userListFetchGeneration += 1;
 }
 
 export async function getUserInfo(id: number): Promise<UserInfo> {

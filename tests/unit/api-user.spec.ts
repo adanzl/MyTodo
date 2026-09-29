@@ -33,7 +33,7 @@ describe("api/user", () => {
       const result = await getUserInfo(1);
       expect(result).toEqual({ id: 1, score: 100 });
       expect(mockGet).toHaveBeenCalledWith("/getData", {
-        params: { table: "t_user", id: 1, fields: "id,score" },
+        params: { table: "t_user", id: 1, fields: "id,score,coin" },
       });
     });
 
@@ -102,6 +102,33 @@ describe("api/user", () => {
       });
       await getUserList();
       await getUserList(true);
+      expect(mockGet).toHaveBeenCalledTimes(2);
+    });
+
+    it("清缓存后，进行中的旧请求不会重新写入缓存", async () => {
+      mockGet.mockReset();
+      let resolveFetch: (v: unknown) => void;
+      const slowFetch = new Promise((resolve) => {
+        resolveFetch = resolve;
+      });
+      mockGet.mockReturnValueOnce(slowFetch);
+      const pending = getUserList();
+      clearUserListCache();
+      mockGet.mockResolvedValueOnce({
+        data: {
+          code: 0,
+          data: { data: [{ id: 2, name: "fresh" }] },
+        },
+      });
+      resolveFetch!({
+        data: {
+          code: 0,
+          data: { data: [{ id: 1, name: "stale" }] },
+        },
+      });
+      await pending;
+      const afterClear = await getUserList();
+      expect(afterClear.data[0].name).toBe("fresh");
       expect(mockGet).toHaveBeenCalledTimes(2);
     });
   });
