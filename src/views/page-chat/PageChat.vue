@@ -199,6 +199,9 @@ const isOpeningRecorder = ref(false);
 const isStoppingRecorder = ref(false);
 let recordingPointer: number | null = null;
 let recorderDisposed = false;
+let recorderOpenAttempt = 0;
+let recorderOpenTimeout: ReturnType<typeof setTimeout> | null = null;
+const RECORDER_OPEN_TIMEOUT_MS = 15000;
 const SAMPLE_RATE = 16000;
 const audioRef = ref<HTMLAudioElement | null>(null);
 type AudioPlayTarget = Pick<AiChatMsg, "content" | "audioSrc" | "playing" | "id">;
@@ -213,7 +216,7 @@ function setLstAudioBlobUrl(blob: Blob) {
   lstAudioObjectUrl = URL.createObjectURL(blob);
   lstAudioSrc.value = lstAudioObjectUrl;
 }
-const chatType = ref(CHAT_TTS_TASKS);
+const chatType = ref(CHAT_AI);
 const ttsData = ref<any>({ audioBuffer: null, msg: null, audioEnd: false, mediaSource: null });
 const rec = Recorder({
   type: "wav",
@@ -1056,6 +1059,26 @@ function clearRecordingPointer() {
   document.removeEventListener('visibilitychange', onRecordingVisibilityChange);
 }
 
+function clearRecorderOpenTimeout() {
+  if (recorderOpenTimeout !== null) {
+    clearTimeout(recorderOpenTimeout);
+    recorderOpenTimeout = null;
+  }
+}
+
+function cancelOpeningRecorder() {
+  if (!isOpeningRecorder.value) return false;
+  recorderOpenAttempt += 1;
+  clearRecorderOpenTimeout();
+  isOpeningRecorder.value = false;
+  try {
+    rec.close();
+  } catch (error) {
+    console.warn('==> close opening recorder failed', error);
+  }
+  return true;
+}
+
 function abortActiveVoiceRequest(requestId?: string | null) {
   const id = requestId ?? currentRecordingRequestId;
   if (!id) return;
@@ -1067,6 +1090,7 @@ function abortActiveVoiceRequest(requestId?: string | null) {
 
 function cancelRecording() {
   clearRecordingPointer();
+  if (cancelOpeningRecorder()) return;
   stopRecording(true);
 }
 
@@ -1077,6 +1101,7 @@ function onRecordingVisibilityChange() {
 function onRecordingPointerUp(event: PointerEvent) {
   if (event.pointerId !== recordingPointer) return;
   clearRecordingPointer();
+  if (cancelOpeningRecorder()) return;
   stopRecording();
 }
 
@@ -1111,6 +1136,7 @@ function startRecording(event: PointerEvent) {
     return;
   }
   recordingPointer = event.pointerId;
+  const openAttempt = ++recorderOpenAttempt;
   isOpeningRecorder.value = true;
   // 在异步权限请求前监听松手，避免授权完成后开始一次已经结束的按压。
   window.addEventListener('pointerup', onRecordingPointerUp, true);
@@ -1118,18 +1144,30 @@ function startRecording(event: PointerEvent) {
   window.addEventListener('pointermove', onRecordingPointerMove, true);
   window.addEventListener('blur', cancelRecording);
   document.addEventListener('visibilitychange', onRecordingVisibilityChange);
-  const fail = (message: unknown, denied = false) => {
-    clearRecordingPointer();
+  const settleOpening = () => {
+    if (openAttempt !== recorderOpenAttempt) return false;
+    clearRecorderOpenTimeout();
     isOpeningRecorder.value = false;
+    return true;
+  };
+  const fail = (message: unknown, denied = false) => {
+    if (!settleOpening()) return;
+    clearRecordingPointer();
     isRecording.value = false;
     rec.close();
     if (!recorderDisposed) EventBus.$emit(C_EVENT.TOAST, denied
       ? '麦克风权限被拒绝，请在浏览器或系统设置中允许麦克风访问'
       : `无法开始录音：${String(message)}`);
   };
+  recorderOpenTimeout = setTimeout(() => {
+    fail('打开麦克风超时，请检查浏览器或系统麦克风权限后重试');
+  }, RECORDER_OPEN_TIMEOUT_MS);
   try {
     rec.open(() => {
-      isOpeningRecorder.value = false;
+      if (!settleOpening()) {
+        rec.close();
+        return;
+      }
       if (recordingPointer === null || recorderDisposed) {
         rec.close();
         if (!recorderDisposed) EventBus.$emit(C_EVENT.TOAST, '麦克风已就绪，请重新按住说话');
