@@ -32,6 +32,7 @@
         "openfrp",
         "opentype",
         "Pydantic",
+        "pytest",
         "redisinsight",
         "rocm",
         "selfsigned",

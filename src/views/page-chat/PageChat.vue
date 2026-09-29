@@ -49,7 +49,8 @@
         ref="aiChatTabRef"
         :ai-conversation-id="chatSetting.aiConversationId"
         :user-name="globalVar.user.name"
-        @audio-click="btnAudioClk" />
+        @audio-click="btnAudioClk"
+        @retry="retryAiMessage" />
       <TtsTasksTab :active="chatType === CHAT_TTS_TASKS" />
     </ion-segment-view>
     <audio ref="audioRef" style="width: auto" class="m-2"></audio>
@@ -71,10 +72,9 @@
           @keyup.enter="sendTextMessage"
           mode="md" />
         <ion-button
-          @click="sendTextMessage"
-          :disabled="!inputText || isWaitingServer"
-          :loading="isWaitingServer">
-          发送
+          @click="isWaitingServer ? stopAiGeneration() : sendTextMessage()"
+          :disabled="isWaitingServer ? false : !inputText || !socketReady">
+          {{ isWaitingServer ? "停止" : "发送" }}
         </ion-button>
       </div>
       <div class="flex py-2 w-full h-18" v-else>
@@ -94,15 +94,6 @@
             isOpeningRecorder ? '正在打开麦克风…' : isStoppingRecorder ? '正在处理…' : isRecording ? '松开发送，移出取消' : '按住说话'
           }}</span>
         </button>
-        <div class="w-12 flex flex-col pl-2">
-          <ion-checkbox
-            class="ml-1 h-8"
-            style="--size: 22px"
-            :checked="AUDIO_TYPE == 'hold'"
-            alignment="center"
-            @ionChange="onAudioTypeChange" />
-          <span>hold</span>
-        </div>
       </div>
     </ion-item>
     <ChatSetting :is-open="chatSetting.open" @willDismiss="onChatSettingDismiss" />
@@ -123,7 +114,6 @@ import { getChatSetting, setChatSetting } from "@/api/api-chat";
 import { getUserList } from "@/api/api-user";
 import { getNetworkErrorMessage } from "@/utils/net-util";
 import {
-  IonCheckbox,
   IonSegment,
   IonSegmentButton,
   IonSegmentView,
@@ -148,6 +138,8 @@ const TTS_AUTO = false;
 const TTS_ROLE = "longwan_v2";
 const MEDIA_SOURCE_CHECK_MS = 2000;
 const SCROLL_TO_BOTTOM_DELAY = 200;
+const AI_REPLY_TIMEOUT_MS = 120_000;
+const AI_ASR_WAIT_MS = 45_000;
 
 const CHAT_ROOM = "chat_room";
 const CHAT_AI = "chat_ai";
@@ -160,7 +152,6 @@ const chatSetting = ref({
   chatRoomId: "",
 });
 const INPUT_TYPE = ref("text");
-const AUDIO_TYPE = ref("hold");
 const inputText = ref("");
 const globalVar: any = inject("globalVar");
 const inputRef = ref<HTMLElement | null>(null);
@@ -174,6 +165,10 @@ const recBtn = ref<HTMLButtonElement | null>(null);
 const socketRef = ref<Socket>();
 
 const isWaitingServer = ref(false);
+const socketHandshakeOk = ref(false);
+const socketReady = ref(false);
+let aiReplyTimeout: ReturnType<typeof setTimeout> | null = null;
+let aiRequestSeq = 0;
 const isRecording = ref(false);
 const isOpeningRecorder = ref(false);
 const isStoppingRecorder = ref(false);
@@ -306,6 +301,7 @@ onBeforeUnmount(() => {
     clearInterval(mediaSourceCheckTimer);
     mediaSourceCheckTimer = null;
   }
+  clearAiReplyTimeout();
   const audioEl = audioRef.value;
   if (audioEl) audioEl.removeEventListener("ended", onAudioEnded);
   if (socketRef.value) {
@@ -327,6 +323,59 @@ onIonViewDidEnter(async () => {
   chatRoomTabRef.value?.loadInitial();
 });
 
+function updateSocketReady() {
+  socketReady.value = Boolean(socketRef.value?.connected && socketHandshakeOk.value);
+}
+
+function clearAiReplyTimeout() {
+  if (aiReplyTimeout != null) {
+    clearTimeout(aiReplyTimeout);
+    aiReplyTimeout = null;
+  }
+}
+
+function beginAiWait() {
+  isWaitingServer.value = true;
+  clearAiReplyTimeout();
+  aiReplyTimeout = setTimeout(() => {
+    if (!isWaitingServer.value) return;
+    endAiWait({ failed: true, message: "回复超时，请重试" });
+    EventBus.$emit(C_EVENT.TOAST, "AI 回复超时");
+  }, AI_REPLY_TIMEOUT_MS);
+}
+
+function endAiWait(opts?: { failed?: boolean; message?: string }) {
+  clearAiReplyTimeout();
+  isWaitingServer.value = false;
+  const aiTab = aiChatTabRef.value;
+  if (opts?.failed) {
+    aiTab?.failActiveReply(opts.message ?? "请求失败，请重试");
+  } else {
+    aiTab?.finishActiveReply();
+  }
+}
+
+function nextAiClientRequestId(): string {
+  aiRequestSeq += 1;
+  return `ai-${Date.now()}-${aiRequestSeq}`;
+}
+
+function emitHandshake() {
+  socketHandshakeOk.value = false;
+  updateSocketReady();
+  const chatConfig = {
+    key: "123456",
+    ttsAuto: TTS_AUTO,
+    ttsRole: chatSetting.value.ttsRole,
+    ttsSpeed: chatSetting.value.ttsSpeed,
+    ttsVol: 50,
+    aiConversationId: chatSetting.value.aiConversationId,
+    chatRoomId: chatSetting.value.chatRoomId,
+    user: globalVar.user.name,
+  };
+  socketRef.value!.emit("handshake", chatConfig);
+}
+
 function initSocketIO() {
   socketRef.value = io(wsUrl, {
     transports: ["websocket"],
@@ -337,17 +386,7 @@ function initSocketIO() {
     rejectUnauthorized: false,
   });
   socketRef.value.on("connect", () => {
-    const chatConfig = {
-      key: "123456",
-      ttsAuto: TTS_AUTO,
-      ttsRole: chatSetting.value.ttsRole,
-      ttsSpeed: chatSetting.value.ttsSpeed,
-      ttsVol: 50,
-      aiConversationId: chatSetting.value.aiConversationId,
-      chatRoomId: chatSetting.value.chatRoomId,
-      user: globalVar.user.name,
-    };
-    socketRef.value!.emit("handshake", chatConfig);
+    emitHandshake();
   });
   socketRef.value.on("message", (data) => {
     console.log("==> message", data);
@@ -365,9 +404,10 @@ function initSocketIO() {
         role: "server",
       });
     }
-    aiChatTabRef.value?.scrollToBottom(SCROLL_TO_BOTTOM_DELAY);
+    aiChatTabRef.value?.scrollToBottomIfNeeded(SCROLL_TO_BOTTOM_DELAY);
   });
   socketRef.value.on("msgAsr", (data) => {
+    if (chatType.value !== CHAT_AI) return;
     if (data.content) {
       aiChatTabRef.value?.addMessage({
         id: "",
@@ -375,8 +415,11 @@ function initSocketIO() {
         role: "me",
         audioSrc: lstAudioSrc.value,
       });
+      const clientRequestId = nextAiClientRequestId();
+      aiChatTabRef.value?.startAwaitingReply(clientRequestId, data.content);
+      beginAiWait();
     }
-    aiChatTabRef.value?.scrollToBottom(SCROLL_TO_BOTTOM_DELAY);
+    aiChatTabRef.value?.scrollToBottomIfNeeded(SCROLL_TO_BOTTOM_DELAY);
   });
   socketRef.value.on("msgChat", async (data) => {
     console.log("==> msgChat", data);
@@ -389,32 +432,24 @@ function initSocketIO() {
         type: data.type,
       });
     } else {
-      const aiTab = aiChatTabRef.value;
-      const last = aiTab?.getLastMessage?.();
-      if (!last || last.role === "me") {
-        const msg: AiChatMsg = {
-          id: data.id,
-          content: data.content,
-          role: "server",
-          playing: TTS_AUTO,
-        };
-        aiChatTabRef.value?.addMessage(msg);
-        if (TTS_AUTO) {
-          audioPlayMsg.value = msg;
-        }
-      } else {
-        aiChatTabRef.value?.appendLastMessageContent(data.content);
+      aiChatTabRef.value?.applyChatChunk({
+        id: data.id,
+        content: data.content,
+      });
+      if (TTS_AUTO) {
+        const last = aiChatTabRef.value?.getLastMessage?.();
+        if (last?.role === "server") audioPlayMsg.value = last;
       }
       if (data.aiConversationId != chatSetting.value.aiConversationId) {
         chatSetting.value.aiConversationId = data.aiConversationId;
         setChatSetting(globalVar.user.id, JSON.stringify(chatSetting.value));
       }
-      aiChatTabRef.value?.scrollToBottom(SCROLL_TO_BOTTOM_DELAY);
+      aiChatTabRef.value?.scrollToBottomIfNeeded(SCROLL_TO_BOTTOM_DELAY);
     }
   });
   socketRef.value.on("endChat", (data: any) => {
     console.log("==> MSG_TYPE_CHAT_END", data.content);
-    isWaitingServer.value = false;
+    endAiWait();
   });
   socketRef.value.on("dataAudio", (data: any) => {
     if (data.type === "tts") {
@@ -433,9 +468,30 @@ function initSocketIO() {
     ttsData.value.audioEnd = true;
     console.log("==> end_audio", data.content);
   });
-  socketRef.value.on("handshakeResponse", () => {});
-  socketRef.value.on("disconnect", () => console.log("Disconnected from the server."));
-  socketRef.value.on("error", (error) => console.error("msg error:", error));
+  socketRef.value.on("handshakeResponse", () => {
+    socketHandshakeOk.value = true;
+    updateSocketReady();
+  });
+  socketRef.value.on("disconnect", () => {
+    console.log("Disconnected from the server.");
+    socketHandshakeOk.value = false;
+    updateSocketReady();
+    if (isWaitingServer.value) {
+      endAiWait({ failed: true, message: "连接已断开，请重试" });
+      EventBus.$emit(C_EVENT.TOAST, "聊天连接已断开");
+    }
+  });
+  socketRef.value.on("error", (error: { type?: string; content?: string } | string) => {
+    console.error("msg error:", error);
+    const message =
+      typeof error === "string"
+        ? error
+        : error?.content || "AI 请求出错，请重试";
+    if (isWaitingServer.value) {
+      endAiWait({ failed: true, message });
+      EventBus.$emit(C_EVENT.TOAST, message);
+    }
+  });
   socketRef.value.on("close", () => console.log("WebSocket connection closed."));
 }
 
@@ -444,35 +500,73 @@ async function handleSegmentChange(event: any) {
   chatType.value = event.detail.value;
 }
 
-const sendTextMessage = () => {
-  if (inputText.value && !isWaitingServer.value) {
-    if (chatType.value === CHAT_AI) {
-      aiChatTabRef.value?.addMessage({
-        id: "",
-        content: inputText.value,
-        role: "me",
-      });
-      aiChatTabRef.value?.scrollToBottom(SCROLL_TO_BOTTOM_DELAY);
-    } else if (chatType.value === CHAT_ROOM) {
-      chatRoomTabRef.value?.addMessage({
-        id: "",
-        content: inputText.value,
-        role: globalVar.user.id,
-      });
-      chatRoomTabRef.value?.scrollToBottom(SCROLL_TO_BOTTOM_DELAY);
-    }
-
-    const message = JSON.stringify({
-      type: "text",
-      content: inputText.value,
-      chatType: chatType.value,
-      roomId: chatSetting.value.chatRoomId,
-      userId: globalVar.user.id,
-    });
-    inputText.value = "";
-    isWaitingServer.value = true;
-    socketRef.value!.emit("message", message);
+function sendAiText(text: string, opts?: { showUserBubble?: boolean }) {
+  const trimmed = text.trim();
+  if (!trimmed || isWaitingServer.value) return false;
+  if (!socketRef.value?.connected || !socketHandshakeOk.value) {
+    EventBus.$emit(C_EVENT.TOAST, "聊天服务未就绪，请稍后再试");
+    return false;
   }
+  if (opts?.showUserBubble !== false) {
+    aiChatTabRef.value?.addMessage({
+      id: "",
+      content: trimmed,
+      role: "me",
+    });
+  }
+  const clientRequestId = nextAiClientRequestId();
+  aiChatTabRef.value?.startAwaitingReply(clientRequestId, trimmed);
+  aiChatTabRef.value?.scrollToBottomIfNeeded(SCROLL_TO_BOTTOM_DELAY);
+  const message = JSON.stringify({
+    type: "text",
+    content: trimmed,
+    chatType: CHAT_AI,
+    roomId: chatSetting.value.chatRoomId,
+    userId: globalVar.user.id,
+  });
+  socketRef.value!.emit("message", message);
+  beginAiWait();
+  return true;
+}
+
+function retryAiMessage(text: string) {
+  if (isWaitingServer.value) return;
+  sendAiText(text);
+}
+
+function stopAiGeneration() {
+  if (!isWaitingServer.value) return;
+  socketRef.value?.emit("chatCancel");
+  endAiWait();
+}
+
+const sendTextMessage = () => {
+  if (!inputText.value || isWaitingServer.value) return;
+  if (chatType.value === CHAT_AI) {
+    const text = inputText.value;
+    if (sendAiText(text)) inputText.value = "";
+    return;
+  }
+  if (!socketRef.value?.connected || !socketHandshakeOk.value) {
+    EventBus.$emit(C_EVENT.TOAST, "聊天服务未就绪，请稍后再试");
+    return;
+  }
+  chatRoomTabRef.value?.addMessage({
+    id: "",
+    content: inputText.value,
+    role: globalVar.user.id,
+  });
+  chatRoomTabRef.value?.scrollToBottom(SCROLL_TO_BOTTOM_DELAY);
+  const message = JSON.stringify({
+    type: "text",
+    content: inputText.value,
+    chatType: chatType.value,
+    roomId: chatSetting.value.chatRoomId,
+    userId: globalVar.user.id,
+  });
+  inputText.value = "";
+  isWaitingServer.value = true;
+  socketRef.value!.emit("message", message);
 };
 
 function sendAudioData(data: string, finish: boolean = false, cancel = false) {
@@ -617,6 +711,15 @@ function stopRecording(cancel = false) {
       if (TTS_AUTO && !cancel) {
         streamAudio(() => {});
       }
+      if (!cancel && chatType.value === CHAT_AI) {
+        isWaitingServer.value = true;
+        clearAiReplyTimeout();
+        aiReplyTimeout = setTimeout(() => {
+          if (!isWaitingServer.value) return;
+          endAiWait({ failed: true, message: "语音识别超时，请重试" });
+          EventBus.$emit(C_EVENT.TOAST, "语音识别超时");
+        }, AI_ASR_WAIT_MS);
+      }
       rec.close();
       isStoppingRecorder.value = false;
     },
@@ -724,27 +827,21 @@ function btnChangeMode() {
   }
 }
 
-function onAudioTypeChange() {
-  if (AUDIO_TYPE.value == "hold") {
-    AUDIO_TYPE.value = "stream";
-  } else {
-    AUDIO_TYPE.value = "hold";
-  }
-}
-
 function btnChatSettingClk() {
   chatSetting.value.open = true;
 }
 
-function onChatSettingDismiss(e: any) {
+async function onChatSettingDismiss(e: any) {
   if (e.detail.role === "confirm") {
-    updateChatSetting();
-    socketRef.value!.emit("config", {
-      ttsSpeed: chatSetting.value.ttsSpeed,
-      ttsRole: chatSetting.value.ttsRole,
-      aiConversationId: chatSetting.value.aiConversationId,
-      chatRoomId: chatSetting.value.chatRoomId,
-    });
+    await updateChatSetting();
+    if (socketRef.value?.connected) {
+      socketRef.value.emit("config", {
+        ttsSpeed: chatSetting.value.ttsSpeed,
+        ttsRole: chatSetting.value.ttsRole,
+        aiConversationId: chatSetting.value.aiConversationId,
+        chatRoomId: chatSetting.value.chatRoomId,
+      });
+    }
   }
   chatSetting.value.open = false;
 }

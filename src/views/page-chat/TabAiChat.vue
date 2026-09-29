@@ -1,6 +1,10 @@
 <template>
   <ion-segment-content id="aiChat">
-    <ion-content class="" ref="contentRef">
+    <ion-content
+      class="relative"
+      ref="contentRef"
+      scroll-events
+      @ionScroll="onContentScroll">
       <ion-refresher slot="fixed" @ionRefresh="onRefresh">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
@@ -11,12 +15,29 @@
         <ion-button size="small" fill="clear" @click="retryRefresh">重试</ion-button>
       </div>
       <div class="flex flex-col h-full p-2 border-t border-gray-200 gap-2">
-        <div v-for="(msg, idx) in messages" :key="idx" class="p-1.5 w-full flex">
+        <div v-for="(msg, idx) in messages" :key="msg.clientRequestId ?? msg.id ?? idx" class="p-1.5 w-full flex">
           <div
             v-if="msg.role == 'server'"
             class="max-w-[80%] bg-pink-200 rounded-lg p-2 shadow-md relative inline-block">
-            {{ msg.content ?? "..." }}
+            <span
+              v-if="msg.status === 'thinking'"
+              class="text-gray-600 italic animate-pulse">
+              {{ msg.content || "正在思考…" }}
+            </span>
+            <span v-else-if="msg.status === 'error'" class="text-red-800">
+              {{ msg.content }}
+            </span>
+            <span v-else>{{ msg.content ?? "..." }}</span>
+            <ion-button
+              v-if="msg.status === 'error' && msg.retryText"
+              size="small"
+              fill="clear"
+              class="mt-1 h-8"
+              @click="$emit('retry', msg.retryText!)">
+              重试
+            </ion-button>
             <div
+              v-if="msg.status !== 'error'"
               class="absolute -right-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center"
               @click="$emit('audio-click', msg)">
               <Icon icon="mdi:stop-circle-outline" class="w-6 h-6" v-if="msg.playing" />
@@ -35,6 +56,13 @@
           </div>
         </div>
       </div>
+      <button
+        v-if="showNewReplyHint"
+        type="button"
+        class="sticky bottom-2 left-1/2 -translate-x-1/2 z-10 px-3 py-1.5 rounded-full bg-blue-600 text-white text-sm shadow-md"
+        @click="scrollToBottomAndClearHint">
+        有新回复 ↓
+      </button>
     </ion-content>
   </ion-segment-content>
 </template>
@@ -62,6 +90,8 @@ import {
 import { getNetworkErrorMessage } from "@/utils/net-util";
 import type { RefresherCustomEvent } from "@ionic/vue";
 
+export type ChatMsgStatus = "thinking" | "streaming" | "done" | "error";
+
 export interface ChatMsg {
   id?: string | number;
   content: string;
@@ -70,6 +100,9 @@ export interface ChatMsg {
   playing?: boolean;
   ts?: string;
   type?: string;
+  status?: ChatMsgStatus;
+  clientRequestId?: string;
+  retryText?: string;
 }
 
 const props = defineProps<{
@@ -79,13 +112,20 @@ const props = defineProps<{
 
 defineEmits<{
   (e: "audio-click", msg: ChatMsg): void;
+  (e: "retry", text: string): void;
 }>();
+
+const SCROLL_NEAR_BOTTOM_PX = 80;
 
 const contentRef = ref<InstanceType<typeof IonContent> | null>(null);
 const messages = ref<ChatMsg[]>([]);
 const networkError = ref(false);
+const userNearBottom = ref(true);
+const showNewReplyHint = ref(false);
 /** 已拉到的最旧一条 Dify 消息 id。连续下拉时用它翻页；空回答不展示，但不能停在失败记录上。 */
 const historyCursor = ref<string | number | undefined>(undefined);
+/** 当前等待中的 AI 回复（占位气泡） */
+const activeReplyClientId = ref<string | undefined>(undefined);
 
 watch(
   () => props.aiConversationId,
@@ -94,20 +134,124 @@ watch(
   }
 );
 
+async function measureNearBottom(): Promise<boolean> {
+  const el = await contentRef.value?.$el?.getScrollElement?.();
+  if (!el) return true;
+  const { scrollTop, scrollHeight, clientHeight } = el;
+  return scrollHeight - scrollTop - clientHeight <= SCROLL_NEAR_BOTTOM_PX;
+}
+
+function onContentScroll() {
+  void measureNearBottom().then((near) => {
+    userNearBottom.value = near;
+    if (near) showNewReplyHint.value = false;
+  });
+}
+
 function scrollToBottom(duration = 200) {
   contentRef.value?.$el?.scrollToBottom?.(duration);
+}
+
+function scrollToBottomIfNeeded(duration = 200) {
+  if (userNearBottom.value) {
+    scrollToBottom(duration);
+    showNewReplyHint.value = false;
+  } else {
+    showNewReplyHint.value = true;
+  }
+}
+
+function scrollToBottomAndClearHint() {
+  showNewReplyHint.value = false;
+  userNearBottom.value = true;
+  scrollToBottom(200);
 }
 
 function addMessage(msg: ChatMsg) {
   messages.value.push(msg);
 }
 
-function appendLastMessageContent(text: string) {
-  if (messages.value.length === 0) return;
-  const last = messages.value[messages.value.length - 1];
-  if (last.role === "server") {
-    last.content = (last.content ?? "") + text;
+function findActiveServerMessage(): ChatMsg | undefined {
+  if (activeReplyClientId.value) {
+    const byClient = messages.value.find(
+      (m) => m.role === "server" && m.clientRequestId === activeReplyClientId.value
+    );
+    if (byClient) return byClient;
   }
+  for (let i = messages.value.length - 1; i >= 0; i--) {
+    const m = messages.value[i];
+    if (
+      m.role === "server" &&
+      (m.status === "thinking" || m.status === "streaming")
+    ) {
+      return m;
+    }
+  }
+  return undefined;
+}
+
+function startAwaitingReply(clientRequestId: string, retryText: string) {
+  activeReplyClientId.value = clientRequestId;
+  messages.value.push({
+    role: "server",
+    content: "正在思考…",
+    status: "thinking",
+    clientRequestId,
+    retryText,
+  });
+}
+
+function applyChatChunk(data: { id?: string | number; content?: string }) {
+  const chunk = data.content ?? "";
+  if (!chunk) return;
+  let target = findActiveServerMessage();
+  if (data.id !== undefined && data.id !== "") {
+    const byId = messages.value.find((m) => m.role === "server" && m.id === data.id);
+    if (byId) target = byId;
+  }
+  if (!target) {
+    const msg: ChatMsg = {
+      id: data.id,
+      content: chunk,
+      role: "server",
+      status: "streaming",
+    };
+    addMessage(msg);
+    return;
+  }
+  if (data.id !== undefined && data.id !== "") target.id = data.id;
+  if (target.status === "thinking") {
+    target.status = "streaming";
+    target.content = chunk;
+  } else {
+    target.content = (target.content ?? "") + chunk;
+  }
+}
+
+function finishActiveReply() {
+  const target = findActiveServerMessage();
+  if (target) target.status = "done";
+  activeReplyClientId.value = undefined;
+}
+
+function failActiveReply(message: string) {
+  const target = findActiveServerMessage();
+  if (target) {
+    target.status = "error";
+    target.content = message;
+  } else {
+    messages.value.push({
+      role: "server",
+      content: message,
+      status: "error",
+    });
+  }
+  activeReplyClientId.value = undefined;
+}
+
+/** @deprecated 保留兼容；新逻辑请用 applyChatChunk */
+function appendLastMessageContent(text: string) {
+  applyChatChunk({ content: text });
 }
 
 function getLastMessage(): ChatMsg | undefined {
@@ -166,8 +310,13 @@ function retryRefresh() {
 
 defineExpose({
   scrollToBottom,
+  scrollToBottomIfNeeded,
   addMessage,
   appendLastMessageContent,
+  applyChatChunk,
+  startAwaitingReply,
+  finishActiveReply,
+  failActiveReply,
   getLastMessage,
 });
 </script>
