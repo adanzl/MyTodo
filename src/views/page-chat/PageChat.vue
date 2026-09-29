@@ -50,7 +50,8 @@
         :ai-conversation-id="chatSetting.aiConversationId"
         :user-name="globalVar.user.name"
         @audio-click="btnAudioClk"
-        @retry="retryAiMessage" />
+        @retry="retryAiMessage"
+        @retry-voice="onRetryVoice" />
       <TtsTasksTab :active="chatType === CHAT_TTS_TASKS" />
     </ion-segment-view>
     <audio ref="audioRef" style="width: auto" class="m-2"></audio>
@@ -96,7 +97,11 @@
         </button>
       </div>
     </ion-item>
-    <ChatSetting :is-open="chatSetting.open" @willDismiss="onChatSettingDismiss" />
+    <ChatSetting
+      :is-open="chatSetting.open"
+      :ai-conversation-id="chatSetting.aiConversationId"
+      :setting-snapshot="chatSettingSnapshot"
+      @willDismiss="onChatSettingDismiss" />
   </ion-page>
 </template>
 
@@ -104,7 +109,7 @@
 import ChatRoomTab from "./TabChatRoom.vue";
 import AiChatTab from "./TabAiChat.vue";
 import TtsTasksTab from "./TabTtsTasks.vue";
-import type { ChatMsg as AiChatMsg } from "./TabAiChat.vue";
+import type { ChatMsg as AiChatMsg } from "./ai-chat-types";
 import ChatSetting from "./dialogs/ChatSetting.vue";
 import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";
 import { Icon } from "@iconify/vue";
@@ -124,7 +129,9 @@ import {
 import { heartOutline, megaphoneOutline } from "ionicons/icons";
 import Recorder from "recorder-core/recorder.wav.min";
 import io, { Socket } from "socket.io-client";
-import { inject, onBeforeUnmount, onMounted, ref } from "vue";
+import { createAiRequestTracker } from "@/views/page-chat/ai-chat-request-tracker";
+import { newBubbleKey } from "@/views/page-chat/ai-chat-reply";
+import { computed, inject, onBeforeUnmount, onMounted, ref } from "vue";
 
 Recorder.CLog = function () {}; // 屏蔽Recorder的日志输出
 
@@ -169,6 +176,18 @@ const socketHandshakeOk = ref(false);
 const socketReady = ref(false);
 let aiReplyTimeout: ReturnType<typeof setTimeout> | null = null;
 let aiRequestSeq = 0;
+const aiRequestTracker = createAiRequestTracker();
+let pendingVoiceClientRequestId: string | null = null;
+let pendingVoiceRetryHint = "";
+/** 一次按住录音从开始到松手共用的 clientRequestId（AI 语音） */
+let currentRecordingRequestId: string | null = null;
+
+const chatSettingSnapshot = computed(() => ({
+  ttsSpeed: chatSetting.value.ttsSpeed,
+  ttsRole: chatSetting.value.ttsRole,
+  aiConversationId: chatSetting.value.aiConversationId,
+  chatRoomId: chatSetting.value.chatRoomId,
+}));
 const isRecording = ref(false);
 const isOpeningRecorder = ref(false);
 const isStoppingRecorder = ref(false);
@@ -176,7 +195,8 @@ let recordingPointer: number | null = null;
 let recorderDisposed = false;
 const SAMPLE_RATE = 16000;
 const audioRef = ref<HTMLAudioElement | null>(null);
-const audioPlayMsg = ref<AiChatMsg | null>(null);
+type AudioPlayTarget = Pick<AiChatMsg, "content" | "audioSrc" | "playing" | "id">;
+const audioPlayMsg = ref<AudioPlayTarget | null>(null);
 const lstAudioSrc = ref<string>("");
 const chatType = ref(CHAT_TTS_TASKS);
 const ttsData = ref<any>({ audioBuffer: null, msg: null, audioEnd: false, mediaSource: null });
@@ -334,24 +354,55 @@ function clearAiReplyTimeout() {
   }
 }
 
-function beginAiWait() {
+function beginAiWait(
+  clientRequestId: string,
+  timeoutMs = AI_REPLY_TIMEOUT_MS,
+  opts?: { asrPhase?: boolean }
+) {
   isWaitingServer.value = true;
   clearAiReplyTimeout();
   aiReplyTimeout = setTimeout(() => {
-    if (!isWaitingServer.value) return;
-    endAiWait({ failed: true, message: "回复超时，请重试" });
-    EventBus.$emit(C_EVENT.TOAST, "AI 回复超时");
-  }, AI_REPLY_TIMEOUT_MS);
+    if (!aiRequestTracker.accepts(clientRequestId)) return;
+    const asrPhase = opts?.asrPhase === true;
+    endAiWait({
+      failed: true,
+      message: asrPhase ? "语音识别超时，请重试" : "回复超时，请重试",
+      clientRequestId,
+      retryText: asrPhase ? undefined : pendingVoiceRetryHint || undefined,
+    });
+    EventBus.$emit(C_EVENT.TOAST, asrPhase ? "语音识别超时" : "AI 回复超时");
+  }, timeoutMs);
 }
 
-function endAiWait(opts?: { failed?: boolean; message?: string }) {
+function endAiWait(opts?: {
+  failed?: boolean;
+  message?: string;
+  stopped?: boolean;
+  clientRequestId?: string;
+  retryText?: string;
+}) {
+  const rid = opts?.clientRequestId ?? aiRequestTracker.getActive();
+  if (!rid) {
+    clearAiReplyTimeout();
+    isWaitingServer.value = false;
+    return;
+  }
   clearAiReplyTimeout();
-  isWaitingServer.value = false;
+  aiRequestTracker.dismiss(rid);
+  isWaitingServer.value = aiRequestTracker.getActive() !== null;
   const aiTab = aiChatTabRef.value;
   if (opts?.failed) {
-    aiTab?.failActiveReply(opts.message ?? "请求失败，请重试");
+    aiTab?.failActiveReply(
+      rid,
+      opts.message ?? "请求失败，请重试",
+      opts.retryText ?? (pendingVoiceRetryHint || undefined)
+    );
   } else {
-    aiTab?.finishActiveReply();
+    aiTab?.finishActiveReply(rid, { stopped: opts?.stopped });
+  }
+  if (pendingVoiceClientRequestId === rid) {
+    pendingVoiceClientRequestId = null;
+    pendingVoiceRetryHint = "";
   }
 }
 
@@ -392,6 +443,7 @@ function initSocketIO() {
     console.log("==> message", data);
     if (data.type === MSG_TYPE_TRANSLATION) {
       aiChatTabRef.value?.addMessage({
+        bubbleKey: newBubbleKey("srv"),
         id: "",
         content: `Translation: ${data.content}`,
         role: "server",
@@ -399,6 +451,7 @@ function initSocketIO() {
       isWaitingServer.value = false;
     } else {
       aiChatTabRef.value?.addMessage({
+        bubbleKey: newBubbleKey("srv"),
         id: "",
         content: `Unknown: ${JSON.stringify(data)}`,
         role: "server",
@@ -406,19 +459,14 @@ function initSocketIO() {
     }
     aiChatTabRef.value?.scrollToBottomIfNeeded(SCROLL_TO_BOTTOM_DELAY);
   });
-  socketRef.value.on("msgAsr", (data) => {
-    if (chatType.value !== CHAT_AI) return;
-    if (data.content) {
-      aiChatTabRef.value?.addMessage({
-        id: "",
-        content: data.content,
-        role: "me",
-        audioSrc: lstAudioSrc.value,
-      });
-      const clientRequestId = nextAiClientRequestId();
-      aiChatTabRef.value?.startAwaitingReply(clientRequestId, data.content);
-      beginAiWait();
-    }
+  socketRef.value.on("msgAsr", (data: { content?: string; clientRequestId?: string }) => {
+    const rid = data.clientRequestId;
+    if (!rid || !aiRequestTracker.accepts(rid)) return;
+    if (!data.content) return;
+    pendingVoiceRetryHint = data.content;
+    aiChatTabRef.value?.onAsrResult(rid, data.content, lstAudioSrc.value);
+    aiChatTabRef.value?.startAwaitingReply(rid, data.content);
+    beginAiWait(rid);
     aiChatTabRef.value?.scrollToBottomIfNeeded(SCROLL_TO_BOTTOM_DELAY);
   });
   socketRef.value.on("msgChat", async (data) => {
@@ -432,7 +480,9 @@ function initSocketIO() {
         type: data.type,
       });
     } else {
+      if (!aiRequestTracker.accepts(data.clientRequestId)) return;
       aiChatTabRef.value?.applyChatChunk({
+        clientRequestId: data.clientRequestId,
         id: data.id,
         content: data.content,
       });
@@ -447,9 +497,17 @@ function initSocketIO() {
       aiChatTabRef.value?.scrollToBottomIfNeeded(SCROLL_TO_BOTTOM_DELAY);
     }
   });
-  socketRef.value.on("endChat", (data: any) => {
-    console.log("==> MSG_TYPE_CHAT_END", data.content);
-    endAiWait();
+  socketRef.value.on("endChat", (data: { clientRequestId?: string; chat_type?: string }) => {
+    console.log("==> MSG_TYPE_CHAT_END", data);
+    if (!data.clientRequestId) {
+      if (chatType.value === CHAT_ROOM) {
+        clearAiReplyTimeout();
+        isWaitingServer.value = false;
+      }
+      return;
+    }
+    if (!aiRequestTracker.accepts(data.clientRequestId)) return;
+    endAiWait({ clientRequestId: data.clientRequestId });
   });
   socketRef.value.on("dataAudio", (data: any) => {
     if (data.type === "tts") {
@@ -476,22 +534,27 @@ function initSocketIO() {
     console.log("Disconnected from the server.");
     socketHandshakeOk.value = false;
     updateSocketReady();
-    if (isWaitingServer.value) {
-      endAiWait({ failed: true, message: "连接已断开，请重试" });
+    const rid = aiRequestTracker.getActive();
+    if (rid) {
+      endAiWait({ failed: true, message: "连接已断开，请重试", clientRequestId: rid });
       EventBus.$emit(C_EVENT.TOAST, "聊天连接已断开");
     }
   });
-  socketRef.value.on("error", (error: { type?: string; content?: string } | string) => {
-    console.error("msg error:", error);
-    const message =
-      typeof error === "string"
-        ? error
-        : error?.content || "AI 请求出错，请重试";
-    if (isWaitingServer.value) {
-      endAiWait({ failed: true, message });
+  socketRef.value.on(
+    "error",
+    (error: { type?: string; content?: string; clientRequestId?: string } | string) => {
+      console.error("msg error:", error);
+      const message =
+        typeof error === "string"
+          ? error
+          : error?.content || "AI 请求出错，请重试";
+      const rid =
+        typeof error === "string" ? aiRequestTracker.getActive() : error?.clientRequestId;
+      if (!rid || !aiRequestTracker.accepts(rid)) return;
+      endAiWait({ failed: true, message, clientRequestId: rid });
       EventBus.$emit(C_EVENT.TOAST, message);
     }
-  });
+  );
   socketRef.value.on("close", () => console.log("WebSocket connection closed."));
 }
 
@@ -507,14 +570,18 @@ function sendAiText(text: string, opts?: { showUserBubble?: boolean }) {
     EventBus.$emit(C_EVENT.TOAST, "聊天服务未就绪，请稍后再试");
     return false;
   }
+  const clientRequestId = nextAiClientRequestId();
+  aiRequestTracker.activate(clientRequestId);
+  pendingVoiceRetryHint = trimmed;
   if (opts?.showUserBubble !== false) {
     aiChatTabRef.value?.addMessage({
-      id: "",
+      bubbleKey: newBubbleKey("me"),
       content: trimmed,
       role: "me",
+      clientRequestId,
+      status: "done",
     });
   }
-  const clientRequestId = nextAiClientRequestId();
   aiChatTabRef.value?.startAwaitingReply(clientRequestId, trimmed);
   aiChatTabRef.value?.scrollToBottomIfNeeded(SCROLL_TO_BOTTOM_DELAY);
   const message = JSON.stringify({
@@ -523,9 +590,10 @@ function sendAiText(text: string, opts?: { showUserBubble?: boolean }) {
     chatType: CHAT_AI,
     roomId: chatSetting.value.chatRoomId,
     userId: globalVar.user.id,
+    clientRequestId,
   });
   socketRef.value!.emit("message", message);
-  beginAiWait();
+  beginAiWait(clientRequestId);
   return true;
 }
 
@@ -534,10 +602,20 @@ function retryAiMessage(text: string) {
   sendAiText(text);
 }
 
+function onRetryVoice() {
+  if (isWaitingServer.value) return;
+  INPUT_TYPE.value = "voice";
+  EventBus.$emit(C_EVENT.TOAST, "请重新按住说话");
+}
+
 function stopAiGeneration() {
-  if (!isWaitingServer.value) return;
-  socketRef.value?.emit("chatCancel");
-  endAiWait();
+  const rid = aiRequestTracker.getActive();
+  if (!rid || !isWaitingServer.value) return;
+  socketRef.value?.emit(
+    "chatCancel",
+    JSON.stringify({ clientRequestId: rid })
+  );
+  endAiWait({ stopped: true, clientRequestId: rid });
 }
 
 const sendTextMessage = () => {
@@ -569,7 +647,12 @@ const sendTextMessage = () => {
   socketRef.value!.emit("message", message);
 };
 
-function sendAudioData(data: string, finish: boolean = false, cancel = false) {
+function sendAudioData(
+  data: string,
+  finish: boolean = false,
+  cancel = false,
+  clientRequestId?: string
+) {
   if (!socketRef.value?.connected) {
     console.warn("WebSocket未连接，稍后重试");
     return;
@@ -580,6 +663,7 @@ function sendAudioData(data: string, finish: boolean = false, cancel = false) {
     content: data,
     finish: finish,
     cancel: cancel,
+    ...(clientRequestId ? { clientRequestId } : {}),
   });
   socketRef.value!.emit("message", message);
 }
@@ -634,8 +718,8 @@ function startRecording(event: PointerEvent) {
     EventBus.$emit(C_EVENT.TOAST, '当前页面不是安全连接，请使用 HTTPS 地址打开后录音');
     return;
   }
-  if (!socketRef.value?.connected) {
-    EventBus.$emit(C_EVENT.TOAST, '聊天服务未连接，请连接后再录音');
+  if (!socketReady.value) {
+    EventBus.$emit(C_EVENT.TOAST, '聊天服务未就绪，请稍后再录音');
     return;
   }
   recordingPointer = event.pointerId;
@@ -667,6 +751,9 @@ function startRecording(event: PointerEvent) {
         recSampleBuf = new Int16Array();
         rec.start();
         isRecording.value = true;
+        if (chatType.value === CHAT_AI) {
+          currentRecordingRequestId = nextAiClientRequestId();
+        }
       } catch (error) {
         fail(error);
       }
@@ -688,7 +775,12 @@ function recProcess(buffer: any, powerLevel: any, bufferDuration: any, bufferSam
     recSampleBuf = recSampleBuf.slice(chunk_size, recSampleBuf.length);
     const uint8 = new Uint8Array(sendBuf.buffer);
     const base64Data = btoa(String.fromCharCode(...uint8));
-    sendAudioData(base64Data);
+    sendAudioData(
+      base64Data,
+      false,
+      false,
+      currentRecordingRequestId ?? undefined
+    );
   }
 }
 
@@ -705,20 +797,26 @@ function stopRecording(cancel = false) {
         recSampleBuf = new Int16Array();
         const uint8 = new Uint8Array(sendBuf.buffer);
         const base64Data = btoa(String.fromCharCode(...uint8));
-        sendAudioData(base64Data);
+        sendAudioData(
+          base64Data,
+          false,
+          false,
+          currentRecordingRequestId ?? undefined
+        );
       }
-      sendAudioData("", true, cancel);
+      const voiceRequestId = currentRecordingRequestId;
+      currentRecordingRequestId = null;
+      if (!cancel && chatType.value === CHAT_AI && voiceRequestId) {
+        pendingVoiceClientRequestId = voiceRequestId;
+        pendingVoiceRetryHint = "";
+        aiRequestTracker.activate(voiceRequestId);
+        aiChatTabRef.value?.startVoiceRecognizing(voiceRequestId, lstAudioSrc.value);
+        aiChatTabRef.value?.scrollToBottomIfNeeded(SCROLL_TO_BOTTOM_DELAY);
+        beginAiWait(voiceRequestId, AI_ASR_WAIT_MS, { asrPhase: true });
+      }
+      sendAudioData("", true, cancel, voiceRequestId ?? undefined);
       if (TTS_AUTO && !cancel) {
         streamAudio(() => {});
-      }
-      if (!cancel && chatType.value === CHAT_AI) {
-        isWaitingServer.value = true;
-        clearAiReplyTimeout();
-        aiReplyTimeout = setTimeout(() => {
-          if (!isWaitingServer.value) return;
-          endAiWait({ failed: true, message: "语音识别超时，请重试" });
-          EventBus.$emit(C_EVENT.TOAST, "语音识别超时");
-        }, AI_ASR_WAIT_MS);
       }
       rec.close();
       isStoppingRecorder.value = false;
@@ -733,7 +831,7 @@ function stopRecording(cancel = false) {
   );
 }
 
-async function btnAudioClk(msg: AiChatMsg) {
+async function btnAudioClk(msg: AudioPlayTarget) {
   if (isWaitingServer.value) return;
   console.log("==> playAudio", msg);
   if (msg.playing) {

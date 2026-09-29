@@ -43,6 +43,8 @@ beforeEach(async () => {
   });
   await flushPromises();
   state = (wrapper.vm as any).$.setupState;
+  state.socketHandshakeOk = true;
+  state.socketReady = true;
 });
 afterEach(() => {
   wrapper.unmount();

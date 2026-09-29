@@ -7,7 +7,10 @@ export interface DifyHistoryItem {
   answer?: string | null;
 }
 
+import { historyBubbleKey } from "@/views/page-chat/ai-chat-reply";
+
 export interface HistoryBubble {
+  bubbleKey?: string;
   id?: string | number;
   content: string;
   role: string;
@@ -44,11 +47,13 @@ export function prependHistoryTurns(
     if (hasId(item.id) && seen.has(String(item.id))) continue;
     if (hasId(item.id)) seen.add(String(item.id));
     messages.unshift({
+      bubbleKey: historyBubbleKey(item.id!, "server"),
       id: item.id,
       content: item.answer,
       role: "server",
     });
     messages.unshift({
+      bubbleKey: historyBubbleKey(item.id!, "me"),
       id: item.id,
       content: item.query ?? "",
       role: "me",
