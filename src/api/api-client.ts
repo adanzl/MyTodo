@@ -8,7 +8,7 @@ import {
   sessionScopeMatches,
   type SessionScope,
 } from "@/utils/auth-util";
-import axios, { type AxiosRequestConfig, type InternalAxiosRequestConfig } from "axios";
+import axios, { type InternalAxiosRequestConfig } from "axios";
 
 declare module "axios" {
   export interface InternalAxiosRequestConfig {

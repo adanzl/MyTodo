@@ -8,7 +8,7 @@ import {
   sessionScopeMatches,
   type LoginResponse,
 } from "@/utils/auth-util";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 describe("SessionChangedError / sessionScopeMatches", () => {
   beforeEach(() => {
