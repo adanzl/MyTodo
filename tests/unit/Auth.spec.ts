@@ -59,18 +59,22 @@ describe("Auth", () => {
   });
 
   describe("clearLoginCache", () => {
-    it("移除 lx_access_token、lx_access_token_expires_at、lx_refresh_token、lx_saveUser、lx_bAuth", () => {
+    it("移除 lx_access_token、lx_access_token_expires_at、lx_refresh_token、lx_saveUser、lx_bAuth、lx_session_revision", () => {
       localStorage.setItem("lx_access_token", "x");
       localStorage.setItem("lx_access_token_expires_at", "123");
       localStorage.setItem("lx_refresh_token", "rt");
       localStorage.setItem("lx_saveUser", "1");
       localStorage.setItem("lx_bAuth", "1");
+      localStorage.setItem("lx_session_revision", "rev-1");
+      localStorage.removeItem("lx_web_logout_signal");
       clearLoginCache();
       expect(localStorage.getItem("lx_access_token")).toBeNull();
       expect(localStorage.getItem("lx_access_token_expires_at")).toBeNull();
       expect(localStorage.getItem("lx_refresh_token")).toBeNull();
       expect(localStorage.getItem("lx_saveUser")).toBeNull();
       expect(localStorage.getItem("lx_bAuth")).toBeNull();
+      expect(localStorage.getItem("lx_session_revision")).toBeNull();
+      expect(localStorage.getItem("lx_web_logout_signal")).toBe("1");
     });
   });
 
@@ -82,12 +86,14 @@ describe("Auth", () => {
           access_token: "new_token",
           refresh_token: "ref_rtk",
           expires_in: 3600,
+          user: { id: 42, name: "user" },
         },
       });
       const result = await login(baseUrl, "user", "pass");
       expect(result.access_token).toBe("new_token");
       expect(getAccessToken()).toBe("new_token");
       expect(getRefreshToken()).toBe("ref_rtk");
+      expect(localStorage.getItem("lx_saveUser")).toBe("42");
       expect(mockPost).toHaveBeenCalledWith(
         "https://example.com/api/auth/login",
         { username: "user", password: "pass" },
@@ -98,6 +104,14 @@ describe("Auth", () => {
     it("成功但无 access_token 时不写入", async () => {
       mockPost.mockResolvedValueOnce({ data: { code: 0, msg: "ok" } });
       await login(baseUrl, "u", "p");
+      expect(getAccessToken()).toBeNull();
+    });
+
+    it("有 access_token 但缺少 user.id 时抛错且不写入", async () => {
+      mockPost.mockResolvedValueOnce({
+        data: { code: 0, access_token: "orphan_token", expires_in: 3600 },
+      });
+      await expect(login(baseUrl, "u", "p")).rejects.toThrow("user.id");
       expect(getAccessToken()).toBeNull();
     });
 

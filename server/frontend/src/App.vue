@@ -19,7 +19,7 @@
           </el-tag>
         </div>
       </el-header>
-      <el-main >
+      <el-main v-loading="!!pendingRoute" element-loading-text="正在切换页面...">
         <router-view></router-view>
       </el-main>
     </el-container>
@@ -38,6 +38,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { StarFilled } from "@element-plus/icons-vue";
+import { pendingRoute } from "@/router";
 import Sidebar from "@/views/Sidebar.vue";
 import Login from "@/views/PageLogin.vue";
 import { useUserStore } from "@/stores/user";

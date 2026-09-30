@@ -1,5 +1,11 @@
+import { shallowRef } from "vue";
 import { setupChunkReloadGuard } from "@/utils/chunk-reload";
-import { createRouter, createWebHashHistory, type RouteRecordRaw } from "vue-router";
+import {
+  createRouter,
+  createWebHashHistory,
+  type RouteRecordRaw,
+  type RouteLocationNormalized,
+} from "vue-router";
 
 const routes: RouteRecordRaw[] = [
   {
@@ -67,6 +73,18 @@ const routes: RouteRecordRaw[] = [
 const router = createRouter({
   history: createWebHashHistory(),
   routes,
+});
+
+// 在异步路由组件加载前反馈导航状态；旧导航结束不能清除新导航的提示。
+export const pendingRoute = shallowRef<RouteLocationNormalized | null>(null);
+router.beforeEach(to => {
+  pendingRoute.value = to;
+});
+router.afterEach(to => {
+  if (pendingRoute.value === to) pendingRoute.value = null;
+});
+router.onError((_error, to) => {
+  if (pendingRoute.value === to) pendingRoute.value = null;
 });
 
 setupChunkReloadGuard(router);

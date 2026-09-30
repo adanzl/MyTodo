@@ -43,38 +43,17 @@ function getPdfjsBinaryAssetUrls() {
  * @returns PDF 文档对象
  */
 export async function loadPDF(url: string) {
-  try {
-    const assets = getPdfjsBinaryAssetUrls();
-    let loadingTask = pdfjsLib.getDocument({
-      url,
-      // 安卓 WebView 经常出现 worker 初始化失败，默认走主线程可避免白屏
-      disableWorker: isAndroid,
-      // 提升兼容性，避免部分设备字体/解码异常
-      useSystemFonts: true,
-      isEvalSupported: false,
-      ...assets,
-    } as any);
+  const assets = getPdfjsBinaryAssetUrls();
+  const loadingTask = pdfjsLib.getDocument({
+    url,
+    useSystemFonts: true,
+    ...assets,
+  });
 
-    try {
-      return await loadingTask.promise;
-    } catch (workerError) {
-      if (!isAndroid) {
-        console.warn('PDF worker 模式失败，降级为 disableWorker:', workerError);
-        loadingTask.destroy();
-        loadingTask = pdfjsLib.getDocument({
-          url,
-          disableWorker: true,
-          useSystemFonts: true,
-          isEvalSupported: false,
-          ...assets,
-        } as any);
-      } else {
-        throw workerError;
-      }
-    }
-    const pdf = await loadingTask.promise;
-    return pdf;
+  try {
+    return await loadingTask.promise;
   } catch (error) {
+    loadingTask.destroy();
     console.error('加载 PDF 失败:', error);
     throw error;
   }

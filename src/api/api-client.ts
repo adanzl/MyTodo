@@ -1,6 +1,22 @@
 import EventBus, { C_EVENT } from "@/types/event-bus";
-import { clearLoginCache, getAccessToken, getTokenExpiresAt, refreshToken } from "@/utils/auth-util";
+import {
+  captureSessionScope,
+  clearLoginCache,
+  getAccessToken,
+  getTokenExpiresAt,
+  refreshToken,
+  sessionScopeMatches,
+  type SessionScope,
+} from "@/utils/auth-util";
 import axios, { type AxiosRequestConfig, type InternalAxiosRequestConfig } from "axios";
+
+declare module "axios" {
+  export interface InternalAxiosRequestConfig {
+    /** 请求发出时会话快照，401 重试前必须仍匹配。 */
+    lxSessionScope?: SessionScope;
+    _retry?: boolean;
+  }
+}
 
 const REMOTE_URL = "https://leo-zhao.natapp4.cc/api";
 const LOCAL_IP = "192.168.50.172";
@@ -15,6 +31,31 @@ export const apiClient = axios.create({
 
 const TOKEN_REFRESH_BUFFER_SEC = 6 * 3600;
 
+/** 请求绑定的会话已切换（含等待续期期间换账号），应取消发送。 */
+export class SessionChangedError extends Error {
+  constructor(message = "会话已切换，已取消该请求") {
+    super(message);
+    this.name = "SessionChangedError";
+  }
+}
+
+function assertSessionUnchanged(scope: SessionScope): void {
+  if (!sessionScopeMatches(scope)) {
+    throw new SessionChangedError();
+  }
+}
+
+/**
+ * 进入拦截器即绑定会话快照；重试不得覆盖。
+ * 等待续期后再次核对，避免 A 的操作在换到 B 后仍携带 B 的凭证发出。
+ */
+function bindRequestSession(cfg: InternalAxiosRequestConfig): SessionScope {
+  if (!cfg.lxSessionScope) {
+    cfg.lxSessionScope = captureSessionScope();
+  }
+  return cfg.lxSessionScope;
+}
+
 apiClient.interceptors.request.use(
   async (cfg: InternalAxiosRequestConfig) => {
     const url = String(cfg.url || "");
@@ -26,6 +67,9 @@ apiClient.interceptors.request.use(
       return cfg;
     }
 
+    const requestScope = bindRequestSession(cfg);
+    assertSessionUnchanged(requestScope);
+
     const token = getAccessToken();
     const expiresAt = getTokenExpiresAt();
     const now = Date.now();
@@ -35,11 +79,13 @@ apiClient.interceptors.request.use(
       expiresAt - now < TOKEN_REFRESH_BUFFER_SEC * 1000;
     if (needRefresh) {
       try {
-        await ensureRefreshed();
+        await ensureRefreshed(requestScope);
       } catch {
         /* 续期失败仍带旧 access，由 401 重试 */
       }
     }
+
+    assertSessionUnchanged(requestScope);
 
     const finalToken = getAccessToken();
     if (finalToken) {
@@ -51,7 +97,8 @@ apiClient.interceptors.request.use(
 );
 
 let isRefreshing = false;
-let refreshWaiters: Array<(token: string | null) => void> = [];
+/** 续期进行中的等待队列，按发起时的会话 scope 隔离。 */
+let refreshWaiters: Array<{ scope: SessionScope; resolve: (token: string | null) => void }> = [];
 let proactiveRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 
 const REFRESH_BUFFER_SEC = 300;
@@ -63,6 +110,15 @@ function clearProactiveRefreshTimer(): void {
   }
 }
 
+function resolveRefreshWaiters(token: string | null, refreshScope: SessionScope): void {
+  const waiters = refreshWaiters;
+  refreshWaiters = [];
+  for (const w of waiters) {
+    const ok = Boolean(token) && sessionScopeMatches(w.scope) && sessionScopeMatches(refreshScope);
+    w.resolve(ok ? token : null);
+  }
+}
+
 export function scheduleProactiveRefresh(expiresInSeconds: number): void {
   clearProactiveRefreshTimer();
   if (expiresInSeconds <= 0) return;
@@ -70,9 +126,10 @@ export function scheduleProactiveRefresh(expiresInSeconds: number): void {
     Math.min(expiresInSeconds * 0.8, Math.max(0, expiresInSeconds - REFRESH_BUFFER_SEC)) * 1000;
   proactiveRefreshTimer = setTimeout(async () => {
     proactiveRefreshTimer = null;
+    const scope = captureSessionScope();
     try {
-      const data = await refreshToken(API_URL);
-      if (data?.access_token) {
+      const data = await refreshToken(API_URL, scope);
+      if (data?.access_token && sessionScopeMatches(scope)) {
         scheduleProactiveRefresh(data.expires_in);
       }
     } catch {
@@ -83,28 +140,33 @@ export function scheduleProactiveRefresh(expiresInSeconds: number): void {
 
 EventBus.$on(C_EVENT.LOGIN_CACHE_CLEARED, clearProactiveRefreshTimer);
 
-async function ensureRefreshed(): Promise<string | null> {
+async function ensureRefreshed(callerScope?: SessionScope): Promise<string | null> {
+  const myScope = callerScope ?? captureSessionScope();
   if (isRefreshing) {
     return new Promise((resolve) => {
-      refreshWaiters.push(resolve);
+      refreshWaiters.push({ scope: myScope, resolve });
     });
   }
   isRefreshing = true;
+  const refreshScope = captureSessionScope();
   try {
-    const data = await refreshToken(API_URL);
-    const token = data?.access_token || getAccessToken();
-    refreshWaiters.forEach((cb) => cb(token));
-    refreshWaiters = [];
-    if (data?.expires_in) scheduleProactiveRefresh(data.expires_in);
-    return token;
+    const data = await refreshToken(API_URL, refreshScope);
+    const token =
+      sessionScopeMatches(refreshScope) && data?.access_token
+        ? data.access_token
+        : getAccessToken();
+    resolveRefreshWaiters(token, refreshScope);
+    if (data?.expires_in && sessionScopeMatches(refreshScope)) {
+      scheduleProactiveRefresh(data.expires_in);
+    }
+    return sessionScopeMatches(myScope) ? token : null;
   } catch (e: any) {
-    if (e?.response?.status === 401) {
+    if (e?.response?.status === 401 && sessionScopeMatches(refreshScope)) {
       clearProactiveRefreshTimer();
       clearLoginCache();
       EventBus.$emit(C_EVENT.AUTH_EXPIRED);
     }
-    refreshWaiters.forEach((cb) => cb(null));
-    refreshWaiters = [];
+    resolveRefreshWaiters(null, refreshScope);
     throw e;
   } finally {
     isRefreshing = false;
@@ -114,17 +176,29 @@ async function ensureRefreshed(): Promise<string | null> {
 apiClient.interceptors.response.use(
   (res) => res,
   async (error) => {
-    const cfg = error.config as (AxiosRequestConfig & { _retry?: boolean }) | undefined;
+    const cfg = error.config as InternalAxiosRequestConfig | undefined;
     if (error.response?.status === 401 && cfg && !cfg._retry) {
+      const requestScope = cfg.lxSessionScope;
+      if (requestScope && !sessionScopeMatches(requestScope)) {
+        return Promise.reject(error);
+      }
       cfg._retry = true;
+      if (requestScope) {
+        bindRequestSession(cfg);
+      }
       try {
-        const newToken = await ensureRefreshed();
+        const newToken = await ensureRefreshed(requestScope ?? captureSessionScope());
+        if (requestScope && !sessionScopeMatches(requestScope)) {
+          return Promise.reject(new SessionChangedError());
+        }
         if (newToken) {
           (cfg.headers = cfg.headers ?? ({} as typeof cfg.headers))["Authorization"] = `Bearer ${newToken}`;
+        } else if (requestScope) {
+          return Promise.reject(error);
         }
         return apiClient.request(cfg);
       } catch {
-        // 401 时已在 ensureRefreshed 中 clear + AUTH_EXPIRED
+        // 401 时已在 ensureRefreshed 中 clear + AUTH_EXPIRED（且 scope 仍匹配）
       }
     }
     return Promise.reject(error);

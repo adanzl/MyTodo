@@ -38,6 +38,14 @@ function generateWsUrl(apiKey: string, apiSecret: string): string {
 
 // 开始录音
 const startRecording = async () => {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    result.value = "当前环境不支持录音，请使用 HTTPS 打开页面并在浏览器中开启 WebRTC/麦克风权限。";
+    return;
+  }
+  if (!window.isSecureContext) {
+    result.value = "当前页面不是安全连接，请使用 HTTPS 地址打开后再录音。";
+    return;
+  }
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     mediaRecorder = new MediaRecorder(stream);
@@ -108,8 +116,14 @@ const startRecording = async () => {
       console.error("WebSocket 连接出错:", error);
       isRecording.value = false;
     };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("开始录音失败:", error);
+    const name = error instanceof DOMException ? error.name : "";
+    if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+      result.value = "麦克风权限被拒绝，请在浏览器或系统设置中允许麦克风访问。";
+    } else {
+      result.value = `无法开始录音：${error instanceof Error ? error.message : String(error)}`;
+    }
   }
 };
 
