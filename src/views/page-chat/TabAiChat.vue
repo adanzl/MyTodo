@@ -44,8 +44,15 @@
               v-if="msg.status !== 'error'"
               class="absolute -right-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center"
               @click="$emit('audio-click', msg)">
-              <Icon icon="mdi:stop-circle-outline" class="w-6 h-6" v-if="msg.playing" />
-              <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
+              <ion-spinner
+                v-if="msg.audioLoading"
+                name="crescent"
+                class="w-5 h-5" />
+              <Icon
+                v-else-if="msg.playing"
+                icon="mdi:stop-circle-outline"
+                class="w-6 h-6" />
+              <ion-icon v-else :icon="volumeMediumOutline" class="w-6 h-6" />
             </div>
           </div>
           <div
@@ -82,8 +89,15 @@
               v-if="msg.audioSrc && msg.status !== 'recognizing' && msg.status !== 'error'"
               class="absolute -left-10 top-1 rounded-[50%] border border-cyan-950 w-8 h-8 flex items-center justify-center text-black"
               @click="$emit('audio-click', msg)">
-              <Icon icon="mdi:stop-circle-outline" class="w-6 h-6" v-if="msg.playing" />
-              <ion-icon :icon="volumeMediumOutline" class="w-6 h-6" v-else />
+              <ion-spinner
+                v-if="msg.audioLoading"
+                name="crescent"
+                class="w-5 h-5" />
+              <Icon
+                v-else-if="msg.playing"
+                icon="mdi:stop-circle-outline"
+                class="w-6 h-6" />
+              <ion-icon v-else :icon="volumeMediumOutline" class="w-6 h-6" />
             </div>
           </div>
         </div>
@@ -106,6 +120,7 @@ import {
   IonRefresher,
   IonRefresherContent,
   IonSegmentContent,
+  IonSpinner,
 } from "@ionic/vue";
 import { Icon } from "@iconify/vue";
 import { volumeMediumOutline } from "ionicons/icons";

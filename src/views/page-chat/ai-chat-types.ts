@@ -13,6 +13,8 @@ export interface ChatMsg {
   content: string;
   role: string;
   audioSrc?: string;
+  /** TTS 已请求、尚未收到首包音频 */
+  audioLoading?: boolean;
   playing?: boolean;
   ts?: string;
   type?: string;
