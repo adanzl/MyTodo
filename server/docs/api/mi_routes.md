@@ -35,6 +35,17 @@
   - 成功：`_ok(status)`
   - 失败：`_err("获取状态失败")` 或 `_err(status.error)`
 
+## POST `/api/mi/speak`
+
+- **用途**：让小爱音箱播报文字（`MiNAService.text_to_speech`）。
+- **Body（JSON）**
+  - `device_id`：string，必填（NAS deviceId）
+  - `device_did`：string，必填（米家 DID，与其它 mi 接口一致）
+  - `text`：string，必填，去首尾空白后非空，最长 500 字
+- **返回**
+  - 成功：`_ok({"message": "..."})`
+  - 失败：`_err(msg)`
+
 ## POST `/api/mi/stop`
 
 - **用途**：停止小米设备播放。

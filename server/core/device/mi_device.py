@@ -280,6 +280,60 @@ class MiDevice(DeviceBase):
             log.error(f"[MiDevice] Play error: {e}")
             return -1, f"播放失败: {str(e)}"
 
+    def speak(self, text: str) -> Tuple[int, str]:
+        """让小爱音箱播报指定文字。
+
+        Args:
+            text (str): 要播报的文本。
+
+        Returns:
+            Tuple[int, str]: (code, msg)。code=0 表示成功。
+        """
+        text = (text or "").strip()
+        if not text:
+            return -1, "text is required"
+
+        async def _speak_async():
+            session = None
+            try:
+                session = ClientSession()
+                account = self._create_account(session)
+                mina_service = MiNAService(account)
+                await mina_service.text_to_speech(self.device_id, text)
+                return 0, "ok"
+            except Exception as e:
+                import gevent
+                if isinstance(e, gevent.exceptions.LoopExit):
+                    log.warning(
+                        f"[MiDevice] Speak: gevent LoopExit (可忽略), 重试播报")
+                    try:
+                        await mina_service.text_to_speech(self.device_id, text)
+                        return 0, "ok"
+                    except Exception as e2:
+                        log.error(f"[MiDevice] Speak retry error: {e2}")
+                        return -1, f"播报失败: {str(e2)}"
+
+                error_str = str(e)
+                if "Login failed" in error_str or "登录验证失败" in error_str or "70016" in error_str:
+                    log.error(f"[MiDevice] 登录验证失败，请检查账号密码是否正确: {e}")
+                    return -1, "登录验证失败，请检查账号密码是否正确"
+
+                log.error(f"[MiDevice] Speak error: {e}")
+                return -1, f"播报失败: {str(e)}"
+            finally:
+                if session:
+                    await session.close()
+
+        try:
+            return run_async(_speak_async(), timeout=20.0)
+        except Exception as e:
+            import gevent
+            if isinstance(e, gevent.exceptions.LoopExit):
+                log.warning(f"[MiDevice] Speak: gevent LoopExit (可忽略)")
+                return -1, "播报失败: gevent LoopExit"
+            log.error(f"[MiDevice] Speak error: {e}")
+            return -1, f"播报失败: {str(e)}"
+
     def stop(self) -> Tuple[int, str]:
         """停止小米设备上的播放。
 

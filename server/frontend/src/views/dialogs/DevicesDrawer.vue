@@ -376,6 +376,19 @@
                     </el-button>
                     <el-button
                       size="small"
+                      type="primary"
+                      plain
+                      circle
+                      @click="handleSpeakMiDevice(row)"
+                      :loading="row._speaking"
+                      :disabled="row._speaking || row._statusRefreshing || row._volumeChanging"
+                      title="文字播报"
+                      class="p-0.5 w-4! h-4!"
+                    >
+                      <el-icon v-if="!row._speaking"><Microphone /></el-icon>
+                    </el-button>
+                    <el-button
+                      size="small"
                       class="w-8! h-6!"
                       type="danger"
                       plain
@@ -422,7 +435,7 @@
 <script setup lang="ts">
 import { ref, watch, onUnmounted, onMounted, computed } from "vue";
 // ElMessage 已通过自动导入插件自动导入，无需手动导入
-import { Refresh, Cpu, Loading } from "@element-plus/icons-vue";
+import { Refresh, Cpu, Loading, Microphone } from "@element-plus/icons-vue";
 import { api } from "@/api/config";
 import { logAndNoticeError } from "@/utils";
 import { DEVICE_SCAN_TIMEOUT, AGENT_LIST_REFRESH_INTERVAL } from "@/constants/device";
@@ -432,6 +445,7 @@ import {
   getMiDeviceStatus as apiGetMiDeviceStatus,
   setMiDeviceVolume as apiSetMiDeviceVolume,
   stopMiDevice as apiStopMiDevice,
+  speakMiDevice as apiSpeakMiDevice,
   scanDlnaDevices as apiScanDlnaDevices,
   getDlnaDeviceVolume as apiGetDlnaDeviceVolume,
   setDlnaDeviceVolume as apiSetDlnaDeviceVolume,
@@ -865,6 +879,55 @@ const setMiDeviceVolume = async (device: MiDevice, volume: number) => {
     logAndNoticeError(error as Error, "设置小米设备音量失败");
   } finally {
     device._volumeChanging = false;
+  }
+};
+
+// 让小爱音箱播报文字
+const handleSpeakMiDevice = async (device: MiDevice) => {
+  const deviceId = getMiDeviceId(device);
+  const deviceDid = device.miotDID;
+  if (!deviceId || !deviceDid) {
+    ElMessage.warning("设备ID 或 设备Did 无效");
+    return;
+  }
+
+  const deviceName = device.name || deviceId;
+
+  try {
+    const { value } = await ElMessageBox.prompt(
+      `向「${deviceName}」发送要播报的文字`,
+      "文字播报",
+      {
+        confirmButtonText: "发送",
+        cancelButtonText: "取消",
+        inputType: "textarea",
+        inputPlaceholder: "请输入要播报的内容",
+        inputValidator: val => {
+          const t = (val || "").trim();
+          if (!t) return "内容不能为空";
+          if (t.length > 500) return "内容不能超过 500 字";
+          return true;
+        },
+      }
+    );
+
+    const text = (value || "").trim();
+    if (!text) return;
+
+    device._speaking = true;
+    const result = await apiSpeakMiDevice(deviceId, deviceDid, text);
+
+    if (result?.code === 0) {
+      ElMessage.success("已发送播报");
+    } else {
+      ElMessage.error(result?.msg || "播报失败");
+    }
+  } catch (error) {
+    if (error !== "cancel") {
+      logAndNoticeError(error as Error, "小米设备文字播报失败");
+    }
+  } finally {
+    device._speaking = false;
   }
 };
 

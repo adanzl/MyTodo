@@ -99,6 +99,22 @@ export async function stopMiDevice(
   return response.data;
 }
 
+/**
+ * 让小爱音箱播报文字
+ */
+export async function speakMiDevice(
+  deviceId: string,
+  deviceDid: string,
+  text: string
+): Promise<ApiResponse<{ message: string }>> {
+  const response = await api.post("/mi/speak", {
+    device_id: deviceId,
+    device_did: deviceDid,
+    text,
+  });
+  return response.data;
+}
+
 // ========== DLNA 设备 API ==========
 
 /**
