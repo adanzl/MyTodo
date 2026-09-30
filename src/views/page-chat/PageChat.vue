@@ -54,31 +54,34 @@
         @retry-voice="onRetryVoice" />
       <TtsTasksTab :active="chatType === CHAT_TTS_TASKS" />
     </ion-segment-view>
-    <audio ref="audioRef" style="width: auto" class="m-2"></audio>
-    <ion-item v-if="chatType !== CHAT_TTS_TASKS">
-      <div class="flex py-2 w-full h-18" v-if="INPUT_TYPE == 'text'">
+    <audio ref="audioRef" class="sr-only" aria-hidden="true" tabindex="-1" />
+    <ion-item
+      v-if="chatType !== CHAT_TTS_TASKS"
+      lines="none"
+      class="h-14 max-h-14 shrink-0 [--background:var(--color-gray-200)] [--min-height:0]! [--padding-top:0] [--padding-bottom:0] [--inner-padding-top:0] [--inner-padding-bottom:0] [&::part(native)]:h-full! [&::part(native)]:min-h-0! [&::part(native)]:py-0">
+      <div class="flex h-full w-full items-center" v-if="INPUT_TYPE == 'text'">
         <div
-          class="w-12 h-auto flex items-center cursor-pointer"
+          class="w-12 flex items-center cursor-pointer"
           :class="chatType === CHAT_ROOM ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''"
           @click="btnChangeMode">
           <Icon icon="weui:voice-outlined" class="h-10 w-10" />
         </div>
         <ion-input
-          class="flex-1 mr-1"
+          class="min-h-10! min-w-0 flex-1 mr-1 text-sm [--color:#000] [--padding-top:6px] [--padding-bottom:6px] [--padding-start:10px] [--padding-end:10px]"
           v-model="inputText"
           ref="inputRef"
           placeholder="Type a message"
           fill="solid"
-          style="--color: #000"
           @keyup.enter="sendTextMessage"
           mode="md" />
         <ion-button
+          class="m-0 h-10 min-h-10! shrink-0"
           @click="isWaitingServer ? stopAiGeneration() : sendTextMessage()"
           :disabled="isWaitingServer ? false : !inputText || !socketReady">
           {{ isWaitingServer ? "停止" : "发送" }}
         </ion-button>
       </div>
-      <div class="flex py-2 w-full h-18" v-else>
+      <div class="flex h-full w-full items-center" v-else>
         <div class="w-12 h-auto flex items-center" @click="btnChangeMode">
           <Icon icon="weui:keyboard-outlined" class="h-10 w-10" />
         </div>
@@ -204,7 +207,10 @@ let recorderOpenTimeout: ReturnType<typeof setTimeout> | null = null;
 const RECORDER_OPEN_TIMEOUT_MS = 15000;
 const SAMPLE_RATE = 16000;
 const audioRef = ref<HTMLAudioElement | null>(null);
-type AudioPlayTarget = Pick<AiChatMsg, "content" | "audioSrc" | "playing" | "id">;
+type AudioPlayTarget = Pick<
+  AiChatMsg,
+  "content" | "audioSrc" | "audioLoading" | "playing" | "id"
+>;
 const audioPlayMsg = ref<AudioPlayTarget | null>(null);
 const lstAudioSrc = ref<string>("");
 let lstAudioObjectUrl: string | null = null;
@@ -261,10 +267,19 @@ function tryFinalizeTtsPlayback() {
 }
 
 const onAudioEnded = () => {
-  if (audioPlayMsg.value) audioPlayMsg.value.playing = false;
+  if (audioPlayMsg.value) {
+    audioPlayMsg.value.playing = false;
+    audioPlayMsg.value.audioLoading = false;
+  }
   ttsData.value.audioEnd = true;
   ttsData.value.audioBuffer = null;
 };
+
+function markTtsPlaybackStarted() {
+  if (!audioPlayMsg.value?.audioLoading) return;
+  audioPlayMsg.value.audioLoading = false;
+  audioPlayMsg.value.playing = true;
+}
 
 function appendPlayAudioToBuffer() {
   if (
@@ -866,6 +881,7 @@ function initSocketIO() {
       if (data.ttsRequestId && data.ttsRequestId !== activeTtsRequestId) return;
       const chunk = data.data;
       if (chunk instanceof ArrayBuffer) {
+        markTtsPlaybackStarted();
         playAudioData.push(chunk);
         appendPlayAudioToBuffer();
       } else {
@@ -879,6 +895,10 @@ function initSocketIO() {
     if (data.ttsRequestId && data.ttsRequestId !== activeTtsRequestId) return;
     ttsData.value.audioEnd = true;
     console.log("==> end_audio", data.content);
+    if (audioPlayMsg.value?.audioLoading) {
+      audioPlayMsg.value.audioLoading = false;
+      audioPlayMsg.value.playing = false;
+    }
     tryFinalizeTtsPlayback();
   });
   socketRef.value.on("chatRequestStatus", onChatRequestStatus);
@@ -1271,17 +1291,20 @@ function stopRecording(cancel = false) {
 async function btnAudioClk(msg: AudioPlayTarget) {
   if (isWaitingServer.value) return;
   console.log("==> playAudio", msg);
-  if (msg.playing) {
+  if (msg.playing || msg.audioLoading) {
     msg.playing = false;
+    msg.audioLoading = false;
     stopAndClearAudio();
   } else {
     stopAndClearAudio();
-    msg.playing = true;
     audioPlayMsg.value = msg;
     if (msg.audioSrc) {
+      msg.playing = true;
       audioRef.value!.src = msg.audioSrc;
       audioRef.value!.play();
     } else {
+      msg.audioLoading = true;
+      msg.playing = false;
       ttsData.value.msg = msg;
       activeTtsRequestId = nextTtsRequestId();
       const payload = JSON.stringify({
@@ -1324,6 +1347,7 @@ async function stopAndClearAudio() {
   }
   if (audioPlayMsg.value) {
     audioPlayMsg.value.playing = false;
+    audioPlayMsg.value.audioLoading = false;
   }
   audioPlayMsg.value = null;
   if (ttsData.value.mediaSource) {
@@ -1397,14 +1421,13 @@ async function onChatSettingDismiss(e: any) {
   chatSetting.value.open = false;
 }
 </script>
-
 <style scoped>
 .voice-record-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
-  border-radius: 4px;
+  min-height: 2.5rem;
+  border-radius: 0.5rem;
   background: var(--ion-color-primary);
   color: var(--ion-color-primary-contrast);
   touch-action: none;
@@ -1417,3 +1440,4 @@ async function onChatSettingDismiss(e: any) {
   color: var(--ion-color-warning-contrast);
 }
 </style>
+
