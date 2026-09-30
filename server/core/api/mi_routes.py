@@ -89,6 +89,41 @@ def mi_status() -> ResponseReturnValue:
         return _err(f'error: {str(e)}')
 
 
+MI_SPEAK_TEXT_MAX_LEN = 500
+
+
+@mi_bp.route("/mi/speak", methods=['POST'])
+def mi_speak() -> ResponseReturnValue:
+    """让小爱音箱播报文字。"""
+    try:
+        data: Dict[str, Any] = read_json_from_request()
+        device_id = data.get('device_id')
+        device_did = data.get('device_did')
+        if not device_id or not device_did:
+            return _err('device_id or device_did is required')
+
+        text = data.get('text')
+        if text is None:
+            return _err('text is required')
+        if not isinstance(text, str):
+            return _err('text must be string')
+        text = text.strip()
+        if not text:
+            return _err('text is required')
+        if len(text) > MI_SPEAK_TEXT_MAX_LEN:
+            return _err(f'text must be at most {MI_SPEAK_TEXT_MAX_LEN} characters')
+
+        device = MiDevice(address=device_id, did=device_did)
+        code, msg = device.speak(text)
+        if code == 0:
+            return _ok({'message': msg or '播报成功'})
+        else:
+            return _err(msg or '播报失败')
+    except Exception as e:
+        log.error(f"[MI] Speak error: {e}")
+        return _err(f'error: {str(e)}')
+
+
 @mi_bp.route("/mi/stop", methods=['POST'])
 def mi_stop() -> ResponseReturnValue:
     """停止小米设备播放。"""

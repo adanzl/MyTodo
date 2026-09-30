@@ -252,6 +252,57 @@ def test_mi_status_err_non_dict_fallback_msg(client, monkeypatch):
     assert body["msg"] == "获取状态失败"
 
 
+def test_mi_speak_requires_device_id(client):
+    resp = client.post("/mi/speak", data=json.dumps({}), content_type="application/json")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["code"] != 0
+    assert "device_id" in body["msg"]
+
+
+def test_mi_speak_requires_text(client, monkeypatch):
+    monkeypatch.setattr(mi_routes, "MiDevice", lambda address, did: object())
+
+    resp = client.post(
+        "/mi/speak",
+        data=json.dumps({"device_id": "d1", "device_did": "did1"}),
+        content_type="application/json",
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["code"] != 0
+    assert body["msg"] == "text is required"
+
+
+def test_mi_speak_ok(client, monkeypatch):
+
+    class FakeDev:
+
+        def __init__(self, address, did):
+            assert address == "d1"
+            assert did == "did1"
+
+        def speak(self, text):
+            assert text == "你好"
+            return 0, "ok"
+
+    monkeypatch.setattr(mi_routes, "MiDevice", FakeDev)
+
+    resp = client.post(
+        "/mi/speak",
+        data=json.dumps({
+            "device_id": "d1",
+            "device_did": "did1",
+            "text": "你好",
+        }),
+        content_type="application/json",
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["code"] == 0
+    assert body["data"]["message"] == "ok"
+
+
 def test_mi_stop_requires_device_id(client):
     resp = client.post("/mi/stop", data=json.dumps({}), content_type="application/json")
     assert resp.status_code == 200

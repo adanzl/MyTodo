@@ -156,6 +156,10 @@ export interface MiDevice extends BaseDevice {
    */
   _stopping?: boolean;
   /**
+   * 是否正在播报（内部状态）
+   */
+  _speaking?: boolean;
+  /**
    * 设备类型
    */
   type?: "mi";
