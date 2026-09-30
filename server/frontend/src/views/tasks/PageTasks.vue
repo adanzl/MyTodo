@@ -4,37 +4,37 @@
     <el-tabs v-model="activeMainTab" @tab-change="handleTabChange"
       class="flex-1 flex flex-col overflow-hidden h-[calc(100vh-120px)] mt-2">
       <!-- 素材管理页签 -->
-      <el-tab-pane label="素材管理" name="material">
+      <el-tab-pane lazy label="素材管理" name="material">
         <TabMaterial />
       </el-tab-pane>
 
       <!-- 任务管理页签 -->
-      <el-tab-pane label="任务管理" name="tasks">
+      <el-tab-pane lazy label="任务管理" name="tasks">
         <TabTasks />
       </el-tab-pane>
 
       <!-- 任务日历页签 -->
-      <el-tab-pane label="任务日历" name="calendar">
+      <el-tab-pane lazy label="任务日历" name="calendar">
         <TabTaskCalendar />
       </el-tab-pane>
 
       <!-- 任务预览页签 -->
-      <el-tab-pane label="任务预览" name="preview">
+      <el-tab-pane lazy label="任务预览" name="preview">
         <TabTasksPreview />
       </el-tab-pane>
 
       <!-- 使用统计页签 -->
-      <el-tab-pane label="使用统计" name="usage">
+      <el-tab-pane lazy label="使用统计" name="usage">
         <TabUsage />
       </el-tab-pane>
 
       <!-- 任务记录页签 -->
-      <el-tab-pane label="任务记录" name="history">
+      <el-tab-pane lazy label="任务记录" name="history">
         <TabTaskHistory />
       </el-tab-pane>
 
       <!-- 视频解锁审批页签 -->
-      <el-tab-pane label="解锁审批" name="video-unlock">
+      <el-tab-pane lazy label="解锁审批" name="video-unlock">
         <TabVideoUnlock />
       </el-tab-pane>
     </el-tabs>
@@ -42,26 +42,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from "vue";
-import TabMaterial from "./TabMaterial.vue";
-import TabTasks from "./TabTasks.vue";
-import TabTaskCalendar from "./TabTaskCalendar.vue";
-import TabTasksPreview from "./TabTasksPreview.vue";
-import TabUsage from "./TabUsage.vue";
-import TabTaskHistory from "./TabTaskHistory.vue";
-import TabVideoUnlock from "./TabVideoUnlock.vue";
+import { ref, watch, defineAsyncComponent } from "vue";
+const TabMaterial = defineAsyncComponent(() => import("./TabMaterial.vue"));
+const TabTasks = defineAsyncComponent(() => import("./TabTasks.vue"));
+const TabTaskCalendar = defineAsyncComponent(() => import("./TabTaskCalendar.vue"));
+const TabTasksPreview = defineAsyncComponent(() => import("./TabTasksPreview.vue"));
+const TabUsage = defineAsyncComponent(() => import("./TabUsage.vue"));
+const TabTaskHistory = defineAsyncComponent(() => import("./TabTaskHistory.vue"));
+const TabVideoUnlock = defineAsyncComponent(() => import("./TabVideoUnlock.vue"));
 
 // 主页签控制
 const STORAGE_KEY = 'tasks-active-tab';
-const activeMainTab = ref("calendar");
-
-// 从 localStorage 加载上次选中的页签
-onMounted(() => {
-  const savedTab = localStorage.getItem(STORAGE_KEY);
-  if (savedTab) {
-    activeMainTab.value = savedTab;
-  }
-});
+const VALID_TABS = ["material", "tasks", "calendar", "preview", "usage", "history", "video-unlock"];
+const savedTab = localStorage.getItem(STORAGE_KEY);
+const activeMainTab = ref(savedTab && VALID_TABS.includes(savedTab) ? savedTab : "calendar");
 
 // 监听页签切换
 const handleTabChange = (tabName: string) => {

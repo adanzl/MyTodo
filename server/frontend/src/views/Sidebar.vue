@@ -1,7 +1,7 @@
 <template>
   <el-aside :width="isCollapse ? '64px' : '200px'" class="transition-all duration-300">
     <el-scrollbar>
-      <el-menu :default-active="route.path" :collapse="isCollapse" unique-opened router>
+      <el-menu :default-active="pendingRoute?.path ?? route.path" :collapse="isCollapse" unique-opened router>
         <el-menu-item index="#">
           <el-avatar :src="userStore.curUser.ico" :size="isCollapse ? 20 : 40"></el-avatar>
           <template #title >
@@ -10,11 +10,11 @@
             </el-button>
           </template>
         </el-menu-item>
-        <el-menu-item index="/home" @click="handleMenuSelect">
+        <el-menu-item index="/home">
           <el-icon><HomeFilled /></el-icon>
           <template #title>Home</template>
         </el-menu-item>
-        <el-menu-item index="/lottery" @click="handleMenuSelect">
+        <el-menu-item index="/lottery">
           <el-icon><Present /></el-icon>
           <template #title>抽奖</template>
         </el-menu-item>
@@ -46,7 +46,7 @@
           <el-icon><Setting /></el-icon>
           <template #title>工具</template>
         </el-menu-item>
-        <el-menu-item index="/tasks" @click="handleMenuSelect">
+        <el-menu-item index="/tasks">
           <el-icon><List /></el-icon>
           <template #title>阅读打卡</template>
         </el-menu-item>
@@ -65,6 +65,7 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
+import { pendingRoute } from "@/router";
 import { useRouter, useRoute } from "vue-router";
 import {
   HomeFilled,
@@ -93,10 +94,6 @@ const emit = defineEmits(['collapse-change']);
 const toggleCollapse = () => {
   isCollapse.value = !isCollapse.value;
   emit('collapse-change', isCollapse.value);
-};
-
-const handleMenuSelect = () => {
-  // 菜单选择处理
 };
 
 const handleLogout = () => {
