@@ -5,3 +5,4 @@ export * from "./playlist";
 export * from "./device";
 export * from "./media";
 export * from "./schedule";
+export * from "./fileBrowser";

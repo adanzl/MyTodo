@@ -2,40 +2,48 @@
   <el-card class="w-120" shadow="always">
     <template #header>用户登录</template>
     <div class="flex flex-col gap-2 items-center">
-      <el-select
-        v-if="!loading"
-        v-model="user.id"
-        placeholder="请选择用户"
-        class="w-60!"
-        :loading="loading"
-        loading-text="加载用户列表中..."
-        :disabled="loading"
-      >
-        <el-option
-          class="h-13!"
-          v-for="item in userList"
-          :key="item.id"
-          :label="item.name"
-          :value="item.id"
+      <div class="relative w-60">
+        <el-avatar
+          :size="40"
+          :src="selectedUserIcon"
+          class="absolute top-1/2 -left-13 -translate-y-1/2"
+        />
+        <el-select
+          v-if="!loading"
+          v-model="user.id"
+          placeholder="请选择用户"
+          class="w-60!"
+          :loading="loading"
+          loading-text="加载用户列表中..."
+          :disabled="loading"
         >
-          <div class="flex items-center border-b border-gray-200">
-            <el-avatar class="h-10! w-10!" :src="item.icon"></el-avatar>
-            <div class="pl-4 text-base text-gray-500">{{ item.name }}</div>
-          </div>
-        </el-option>
-      </el-select>
+          <el-option
+            class="h-13!"
+            v-for="item in userList"
+            :key="item.id"
+            :label="item.name"
+            :value="item.id"
+          >
+            <div class="flex items-center border-b border-gray-200">
+              <el-avatar class="h-10! w-10!" :src="item.icon"></el-avatar>
+              <div class="pl-4 text-base text-gray-500">{{ item.name }}</div>
+            </div>
+          </el-option>
+        </el-select>
+      </div>
       <el-input
         v-model="user.password"
-        style="width: 240px"
+        class="w-60!"
         type="password"
         placeholder="Password"
         show-password
+        @keydown.enter="handleLogin"
       ></el-input>
       <el-button
         type="primary"
         size="large"
         class="w-24 h-24 mt-4"
-        :disabled="!user.id"
+        :disabled="!user.id || loggingIn"
         @click="handleLogin"
       >
         Login
@@ -66,6 +74,12 @@ const user = ref<{
   id: null,
   password: "",
 });
+const loggingIn = ref(false);
+
+const selectedUserIcon = computed(() => {
+  const selected = userList.value.find(u => u.id === user.value.id);
+  return selected?.icon || undefined;
+});
 
 const refreshUserList = async () => {
   // 使用 Pinia Store（会自动处理缓存）
@@ -77,11 +91,12 @@ const refreshUserList = async () => {
 };
 
 const handleLogin = async () => {
-  if (!user.value.id) return;
+  if (!user.value.id || loggingIn.value) return;
 
   const uu = userList.value.find(u => u.id === user.value.id);
   if (!uu) return;
 
+  loggingIn.value = true;
   try {
     const resp = await apiLogin(uu.name, user.value.password);
     if (resp.code !== 0) {
@@ -101,6 +116,8 @@ const handleLogin = async () => {
     });
   } catch (e: any) {
     ElMessage.error(e?.message || "登录失败");
+  } finally {
+    loggingIn.value = false;
   }
 };
 

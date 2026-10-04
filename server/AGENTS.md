@@ -32,4 +32,4 @@
 
 ## 快捷命令
 
-- push 表示执行提交git 并执行push
+- push 表示执行提交git 并执行push；提交信息里不要注明 AI

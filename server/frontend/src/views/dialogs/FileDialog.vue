@@ -12,7 +12,10 @@
         <el-button size="small" @click="handleNavigateUp" :disabled="!fileBrowserCanNavigateUp">
           上一级
         </el-button>
-        <el-button size="small" @click="handleGoToHome"> 首页 </el-button>
+        <el-button v-for="root in FILE_BROWSER_ROOTS" :key="root" size="small"
+          :type="isPathInRoot(fileBrowserPath, root) ? 'primary' : 'default'" @click="handleGoToRoot(root)">
+          {{ rootLabel(root) }}
+        </el-button>
         <el-button size="small" @click="handleSelectAll"> 全选 </el-button>
         <el-button size="small" @click="handleDeselectAll"> 取消全选 </el-button>
         <span v-if="selectedFiles.length > 0" class="text-sm text-blue-600 ml-2">
@@ -69,8 +72,8 @@
       <slot name="footer">
         <div class="flex items-center justify-between">
           <span class="text-sm text-gray-500">
-            <span v-if="mode === 'file'">提示：点击文件可切换选择状态，双击目录可进入</span>
-            <span v-else>提示：双击目录可进入，点击确定选择当前目录</span>
+            <span v-if="mode === 'file'">提示：单击目录进入，点击文件切换选择</span>
+            <span v-else>提示：双击目录进入；未勾选时确定会选择当前目录</span>
           </span>
           <div class="flex gap-2 items-center">
             <slot name="footer-prepend"></slot>
@@ -92,6 +95,17 @@ import { ElMessage } from "element-plus";
 import { listDirectory } from "@/api/api-file";
 import { formatSize } from "@/utils/format";
 import { logAndNoticeError } from "@/utils";
+import {
+  FILE_BROWSER_DEFAULT_PATH,
+  FILE_BROWSER_HUB_PATH,
+  FILE_BROWSER_ROOTS,
+  canNavigateBrowserUp,
+  clampBrowserPath,
+  filterBrowserList,
+  isPathInRoot,
+  joinBrowserPath,
+  parentBrowserPath,
+} from "@/constants/fileBrowser";
 
 interface FileBrowserItem {
   name: string;
@@ -113,7 +127,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   visible: false,
   title: "选择文件",
-  defaultPath: "/mnt/ext_base",
+  defaultPath: FILE_BROWSER_DEFAULT_PATH,
   extensions: "audio",
   confirmButtonText: "确定",
   confirmLoading: false,
@@ -131,7 +145,7 @@ const emit = defineEmits<{
 const STORAGE_KEY_LAST_PATH = "file_dialog_last_path";
 const getLastPath = () => {
   try {
-    return localStorage.getItem(STORAGE_KEY_LAST_PATH) || props.defaultPath;
+    return clampBrowserPath(localStorage.getItem(STORAGE_KEY_LAST_PATH) || props.defaultPath, props.defaultPath);
   } catch {
     return props.defaultPath;
   }
@@ -141,6 +155,7 @@ const fileBrowserList = ref<FileBrowserItem[]>([]);
 const fileBrowserLoading = ref(false);
 const selectedFiles = ref<string[]>([]);
 const fileBrowserCanNavigateUp = ref(false);
+let refreshToken = 0;
 
 // 保存路径到 localStorage
 const saveLastPath = (path: string) => {
@@ -153,54 +168,57 @@ const saveLastPath = (path: string) => {
 
 // 更新是否可以向上导航
 const updateFileBrowserCanNavigateUp = () => {
-  const path = fileBrowserPath.value;
-  fileBrowserCanNavigateUp.value = !!(path && path !== "/mnt/ext_base" && path !== "/");
+  fileBrowserCanNavigateUp.value = canNavigateBrowserUp(fileBrowserPath.value);
 };
 
-// 刷新文件浏览器
+const navigateTo = (path: string) => {
+  const next = clampBrowserPath(path, props.defaultPath);
+  if (fileBrowserPath.value === next) {
+    void refreshFileBrowser();
+    return;
+  }
+  fileBrowserPath.value = next;
+};
+
 const refreshFileBrowser = async () => {
+  const path = clampBrowserPath(fileBrowserPath.value || props.defaultPath, props.defaultPath);
+  if (fileBrowserPath.value !== path) {
+    fileBrowserPath.value = path;
+    return;
+  }
+
+  const token = ++refreshToken;
   try {
     fileBrowserLoading.value = true;
-    const path = fileBrowserPath.value || props.defaultPath;
-    // 目录模式下，传递 extensions="all" 显示所有文件
-    const params: Record<string, string> = { path: path };
-    if (props.mode === "directory") {
-      params.extensions = "all";
-    } else {
-      params.extensions = props.extensions;
+    const extensions = props.mode === "directory" ? "all" : props.extensions;
+    const items = await listDirectory(path, extensions);
+    if (token !== refreshToken) {
+      return;
     }
-    const items = await listDirectory(path, params.extensions);
-
-    // 直接使用完整数据
-    fileBrowserList.value = items as any;
-
+    fileBrowserList.value = filterBrowserList(path, items) as any;
     updateFileBrowserCanNavigateUp();
   } catch (error) {
-    logAndNoticeError(error as Error, "获取文件列表失败");
+    if (token === refreshToken) {
+      logAndNoticeError(error as Error, "获取文件列表失败");
+    }
   } finally {
-    fileBrowserLoading.value = false;
+    if (token === refreshToken) {
+      fileBrowserLoading.value = false;
+    }
   }
 };
 
-// 向上导航
 const handleNavigateUp = () => {
-  const path = fileBrowserPath.value;
-  if (path && path !== "/mnt/ext_base" && path !== "/") {
-    const parts = String(path)
-      .split("/")
-      .filter(p => p);
-    parts.pop();
-    fileBrowserPath.value = parts.length > 0 ? "/" + parts.join("/") : "/mnt/ext_base";
-    updateFileBrowserCanNavigateUp();
-    refreshFileBrowser();
+  if (!canNavigateBrowserUp(fileBrowserPath.value)) {
+    return;
   }
+  navigateTo(parentBrowserPath(fileBrowserPath.value));
 };
 
-// 回到首页
-const handleGoToHome = () => {
-  fileBrowserPath.value = props.defaultPath;
-  updateFileBrowserCanNavigateUp();
-  refreshFileBrowser();
+const rootLabel = (root: string) => root.split("/").filter(Boolean).pop() || root;
+
+const handleGoToRoot = (root: string) => {
+  navigateTo(root);
 };
 
 // 行点击处理
@@ -213,12 +231,7 @@ const handleRowClick = (row: FileBrowserItem) => {
       }
       return;
     }
-    // 文件模式：单击目录进入
-    const newPath =
-      fileBrowserPath.value === "/" ? `/${row.name}` : `${fileBrowserPath.value}/${row.name}`;
-    fileBrowserPath.value = newPath;
-    updateFileBrowserCanNavigateUp();
-    refreshFileBrowser();
+    navigateTo(joinBrowserPath(fileBrowserPath.value, row.name));
   } else {
     // 目录模式下不处理文件点击
     if (props.mode !== "directory") {
@@ -230,18 +243,18 @@ const handleRowClick = (row: FileBrowserItem) => {
 // 行双击处理：双击目录进入
 const handleRowDblClick = (row: FileBrowserItem) => {
   if (row.isDirectory) {
-    const newPath =
-      fileBrowserPath.value === "/" ? `/${row.name}` : `${fileBrowserPath.value}/${row.name}`;
-    fileBrowserPath.value = newPath;
-    updateFileBrowserCanNavigateUp();
-    refreshFileBrowser();
+    navigateTo(joinBrowserPath(fileBrowserPath.value, row.name));
   }
 };
 
 // 切换选择状态（支持文件和目录）
+const itemFullPath = (row: FileBrowserItem) => joinBrowserPath(fileBrowserPath.value, row.name);
+
+const isSelectableRow = (row: FileBrowserItem) =>
+  props.mode === "directory" ? !!row.isDirectory : !row.isDirectory;
+
 const handleToggleSelection = (row: FileBrowserItem) => {
-  const itemPath =
-    fileBrowserPath.value === "/" ? `/${row.name}` : `${fileBrowserPath.value}/${row.name}`;
+  const itemPath = itemFullPath(row);
 
   // 单选模式：清除其他选中，只保留当前
   if (!props.multiple) {
@@ -260,46 +273,27 @@ const handleToggleSelection = (row: FileBrowserItem) => {
 
 // 检查文件是否被选中
 const isFileSelected = (row: FileBrowserItem): boolean => {
-  if (row.isDirectory) {
-    // 目录模式下，检查目录是否被选中
-    if (props.mode === "directory") {
-      const dirPath =
-        fileBrowserPath.value === "/" ? `/${row.name}` : `${fileBrowserPath.value}/${row.name}`;
-      return selectedFiles.value.includes(dirPath);
-    }
+  if (!isSelectableRow(row)) {
     return false;
   }
-  const filePath =
-    fileBrowserPath.value === "/" ? `/${row.name}` : `${fileBrowserPath.value}/${row.name}`;
-  return selectedFiles.value.includes(filePath);
+  return selectedFiles.value.includes(itemFullPath(row));
 };
 
-// 全选当前目录下的所有文件
 const handleSelectAll = () => {
-  const currentPath = fileBrowserPath.value;
   fileBrowserList.value.forEach(row => {
-    if (!row.isDirectory) {
-      const filePath = currentPath === "/" ? `/${row.name}` : `${currentPath}/${row.name}`;
-      if (!selectedFiles.value.includes(filePath)) {
-        selectedFiles.value.push(filePath);
-      }
+    if (!isSelectableRow(row)) {
+      return;
+    }
+    const filePath = itemFullPath(row);
+    if (!selectedFiles.value.includes(filePath)) {
+      selectedFiles.value.push(filePath);
     }
   });
 };
 
-// 取消全选当前目录下的所有文件
 const handleDeselectAll = () => {
-  const currentPath = fileBrowserPath.value;
-  const currentFiles = fileBrowserList.value
-    .filter(row => !row.isDirectory)
-    .map(row => {
-      return currentPath === "/" ? `/${row.name}` : `${currentPath}/${row.name}`;
-    });
-
-  // 只移除当前目录下的文件，保留其他目录的文件
-  selectedFiles.value = selectedFiles.value.filter(filePath => {
-    return !currentFiles.includes(filePath);
-  });
+  const currentItems = fileBrowserList.value.filter(isSelectableRow).map(itemFullPath);
+  selectedFiles.value = selectedFiles.value.filter(filePath => !currentItems.includes(filePath));
 };
 
 // 确认选择文件
@@ -315,8 +309,8 @@ const handleConfirm = () => {
       emit("confirm", [...selectedFiles.value]);
     } else {
       // 没有选中，返回当前路径
-      const currentPath = fileBrowserPath.value || props.defaultPath || "/mnt/ext_base";
-      if (!currentPath || String(currentPath).trim() === "") {
+      const currentPath = fileBrowserPath.value || props.defaultPath || FILE_BROWSER_DEFAULT_PATH;
+      if (!currentPath || String(currentPath).trim() === "" || currentPath === FILE_BROWSER_HUB_PATH) {
         ElMessage.warning("请先选择一个目录");
         return;
       }
@@ -352,7 +346,7 @@ const isConfirmDisabled = computed(() => {
     .trim();
   // 目录模式下，按钮始终可用
   if (modeValue === "directory") {
-    return false;
+    return fileBrowserPath.value === FILE_BROWSER_HUB_PATH && selectedFiles.value.length === 0;
   }
   // 文件模式下，没有选中文件时禁用
   return selectedFiles.value.length === 0;
@@ -383,19 +377,18 @@ watch(
   () => props.visible,
   newVal => {
     if (newVal) {
-      // 优先使用 localStorage 保存的路径，如果没有则使用 defaultPath
-      const savedPath = localStorage.getItem(STORAGE_KEY_LAST_PATH);
-      fileBrowserPath.value = savedPath || props.defaultPath;
       selectedFiles.value = [];
-      setTimeout(() => refreshFileBrowser(), 0);
+      const savedPath = localStorage.getItem(STORAGE_KEY_LAST_PATH);
+      navigateTo(savedPath || props.defaultPath);
     } else {
       selectedFiles.value = [];
     }
   }
 );
 
-// 监听路径变化
 watch(fileBrowserPath, () => {
-  refreshFileBrowser();
+  if (props.visible) {
+    void refreshFileBrowser();
+  }
 });
 </script>
