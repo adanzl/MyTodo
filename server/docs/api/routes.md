@@ -133,7 +133,7 @@
 
 - **Query**
   - `conversation_id`：string，必填
-  - `user`：string，必填。同时决定使用哪个 Dify 应用：`leo` 走 leo 的 app，其他用户名走豆豆 app
+  - `user`：string，必填。同时决定使用哪个 Dify 应用：`leo` 走 leo 的 app，`灿灿` 走灿灿的 app，其他（含 `昭昭`）走昭昭的 app
   - `limit`：string/int，可选
   - `first_id`：string/int，可选。本页最旧一条的 id，用于往更早翻页
 - **返回**：`{"code":0,"msg":"ok","data": AILocal.get_chat_messages(...)}`

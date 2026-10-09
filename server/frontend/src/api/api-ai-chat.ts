@@ -3,7 +3,7 @@
  *
  * 后端代理见 server/core/api/chat_routes.py，对外路径 `/api/chat/*`。
  * 注意 `user` 参数同时决定使用哪个 Dify 应用：
- * 用户名为 `leo` 走 leo 的 app，其他用户名走豆豆的 app。
+ * `leo` / `灿灿` 各自独立，其他用户名（含 `昭昭`）走昭昭的应用，见后端 `dify_api_key`。
  */
 import { api } from "./config";
 import type { ApiResponse } from "@/types/api";

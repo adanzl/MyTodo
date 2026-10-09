@@ -43,7 +43,8 @@ class Config:
     # Dify AI 服务
     AI_DIFY_API_URL: str = os.environ.get('AI_DIFY_API_URL', 'http://192.168.50.172:9098/v1')
     AI_DIFY_API_KEY: str = os.environ.get('AI_DIFY_API_KEY', '')
-    AI_DIFY_DOUDOU_API_KEY: str = os.environ.get('AI_DIFY_DOUDOU_API_KEY', '')
+    AI_DIFY_ZHAOZHAO_API_KEY: str = os.environ.get('AI_DIFY_ZHAOZHAO_API_KEY', '')
+    AI_DIFY_CANCAN_API_KEY: str = os.environ.get('AI_DIFY_CANCAN_API_KEY', '')
 
     # 火山引擎豆包
     DOUBAO_API_URL: str = os.environ.get('DOUBAO_API_URL', 'https://ark.cn-beijing.volces.com')
@@ -175,7 +176,8 @@ class Config:
             'port': cls.PORT,
             'max_content_length_mb': cls.MAX_CONTENT_LENGTH // (1024 * 1024),
             'has_ai_dify_key': bool(cls.AI_DIFY_API_KEY),
-            'has_ai_dify_doudou_key': bool(cls.AI_DIFY_DOUDOU_API_KEY),
+            'has_ai_dify_zhaozhao_key': bool(cls.AI_DIFY_ZHAOZHAO_API_KEY),
+            'has_ai_dify_cancan_key': bool(cls.AI_DIFY_CANCAN_API_KEY),
             'has_doubao_ak': bool(cls.DOUBAO_AK),
             'has_ali_key': bool(cls.ALI_KEY),
             'asr_provider': cls.ASR_PROVIDER,

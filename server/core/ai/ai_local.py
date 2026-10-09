@@ -18,13 +18,25 @@ from core.config import app_logger, config
 log = app_logger
 API_URL = config.AI_DIFY_API_URL
 LEO_USER = "leo"
+CANCAN_USER = "灿灿"
 
 
 def dify_api_key(user: str | None) -> str:
-    """leo 使用 AI_DIFY_API_KEY，其他用户使用 AI_DIFY_DOUDOU_API_KEY。"""
-    if (user or "").strip().lower() == LEO_USER:
+    """按用户名选择 Dify 应用的 API Key。
+
+    - `leo`  -> `AI_DIFY_API_KEY`
+    - `灿灿` -> `AI_DIFY_CANCAN_API_KEY`
+    - 其他（含 `昭昭`）-> `AI_DIFY_ZHAOZHAO_API_KEY`
+
+    注意：该分流同时作用于移动端对话（`stream_msg`），不只是查询接口，
+    换 key 等于换机器人。
+    """
+    name = (user or "").strip()
+    if name.lower() == LEO_USER:
         return config.AI_DIFY_API_KEY
-    return config.AI_DIFY_DOUDOU_API_KEY
+    if name == CANCAN_USER:
+        return config.AI_DIFY_CANCAN_API_KEY
+    return config.AI_DIFY_ZHAOZHAO_API_KEY
 
 
 def dify_headers(user: str | None) -> dict[str, str]:
