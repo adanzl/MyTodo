@@ -1,74 +1,74 @@
 <template>
-  <div class="p-2 flex flex-col">
+  <div class="p-2">
     <!-- 工具栏 -->
-    <div class="flex flex-wrap items-center gap-2 mb-2 shrink-0">
-      <el-radio-group v-model="userName" @change="loadActive" size="small">
-        <el-radio-button v-for="name in USER_OPTIONS" :key="name" :value="name">
-          {{ name }}
-        </el-radio-button>
-      </el-radio-group>
-      <el-select v-model="pageSize" style="width: 140px" size="small">
-        <el-option :value="10" label="消息 10 条/页" />
-        <el-option :value="20" label="消息 20 条/页" />
-        <el-option :value="50" label="消息 50 条/页" />
-      </el-select>
-      <el-button type="primary" plain size="small" :icon="Refresh" @click="loadActive" />
-      <el-tag v-if="conversationId" type="success" effect="plain" size="small">
-        会话 {{ shortId(conversationId) }}
-      </el-tag>
-      <el-tag v-else type="info" effect="plain" size="small">未绑定会话</el-tag>
-    </div>
-
-    <!-- 会话内容：直接展示 -->
-    <div
-      ref="scroller"
-      v-loading="loading || msgLoading"
-      class="overflow-y-auto rounded border border-gray-200 bg-white p-3"
-      :style="{ height: `${scrollerHeight}px` }">
-      <!-- 加载更早 -->
-      <el-button
-        v-if="msgHasMore"
-        size="small"
-        class="mb-3 w-full"
-        :loading="msgLoading"
-        @click="loadOlderMessages">
-        加载更早
-      </el-button>
-
-      <div v-for="msg in messages" :key="msg.id" class="mb-4">
-        <div class="text-xs text-gray-400 mb-1 text-center">
-          {{ formatTs(msg.created_at) }}
-        </div>
-        <div class="flex justify-end mb-1">
-          <div
-            class="max-w-[80%] bg-green-500 text-white rounded-lg px-3 py-2 whitespace-pre-wrap break-words">
-            {{ msg.query }}
-          </div>
-        </div>
-        <div class="flex">
-          <div
-            class="max-w-[80%] bg-pink-100 rounded-lg px-3 py-2 whitespace-pre-wrap break-words">
-            <template v-if="msg.answer">{{ msg.answer }}</template>
-            <span v-else class="text-gray-400 italic">（无回复）</span>
-          </div>
-        </div>
-        <div v-if="msg.error" class="mt-1 text-xs text-red-500">失败：{{ msg.error }}</div>
-        <div class="mt-1 text-xs text-gray-400">
-          tokens {{ msg.message_tokens ?? 0 }} + {{ msg.answer_tokens ?? 0 }} =
-          {{ msg.total_tokens ?? 0 }}
-          <span v-if="msg.provider_response_latency !== undefined">
-            · {{ msg.provider_response_latency?.toFixed(1) }}s
-          </span>
-          <span v-if="msg.total_price"> · ${{ msg.total_price }}</span>
-        </div>
-      </div>
-
-      <div
-        v-if="!messages.length && !msgLoading && !loading"
-        class="py-10 text-center text-gray-500">
-        {{ emptyHint }}
+    <div class="flex items-center h-10 mb-2">
+      <div class="flex flex-1 flex-wrap items-center gap-4">
+        <el-button type="primary" plain size="small" :icon="Refresh" @click="loadActive" />
+        <el-radio-group v-model="userName" size="small" @change="loadActive">
+          <el-radio-button v-for="name in USER_OPTIONS" :key="name" :value="name">
+            {{ name }}
+          </el-radio-button>
+        </el-radio-group>
+        <el-tag v-if="conversationId" type="success" effect="plain" size="small">
+          会话 {{ shortId(conversationId) }}
+        </el-tag>
+        <el-tag v-else type="info" effect="plain" size="small">未绑定会话</el-tag>
       </div>
     </div>
+
+    <!-- 消息列表：第 1 页是最新的，倒序 -->
+    <el-table
+      :data="rows"
+      v-loading="loading || pageLoading"
+      stripe
+      border
+      style="width: 100%"
+      :max-height="tableMaxHeight">
+      <el-table-column label="序号" width="70" align="center">
+        <template #default="{ $index }">
+          {{ (pageNum - 1) * pageSize + $index + 1 }}
+        </template>
+      </el-table-column>
+      <el-table-column
+        :label="`${userName}说的话`"
+        min-width="180"
+        :show-overflow-tooltip="OVERFLOW_TOOLTIP">
+        <template #default="{ row }">{{ row.query || "（空）" }}</template>
+      </el-table-column>
+      <el-table-column label="回答" min-width="320" :show-overflow-tooltip="OVERFLOW_TOOLTIP">
+        <template #default="{ row }">
+          <span v-if="row.answer">{{ row.answer }}</span>
+          <!-- 生成失败时 answer 为空，把原因显示出来，否则只会看到一个空单元格 -->
+          <span v-else-if="row.error" class="text-red-500">失败：{{ row.error }}</span>
+          <span v-else class="text-gray-400 italic">（无回复）</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="时间" width="170">
+        <template #default="{ row }">{{ formatTs(row.created_at) }}</template>
+      </el-table-column>
+      <template #empty>
+        <div class="py-6 text-gray-500">{{ emptyHint }}</div>
+      </template>
+    </el-table>
+
+    <!--
+      分页：与后台其它页面同一写法（el-pagination + sizes/prev/pager/next + background）。
+      Dify 不返回消息总数，所以不传 total，改用 page-count 直接给「页数」；
+      页数随往下翻逐页增长，列出的页码都是真实可点的页。
+      layout 里的 `->` 是组件内置的右对齐分隔符，配合默认插槽把「已加载条数」贴到该行最右。
+    -->
+    <el-pagination
+      layout="sizes, prev, pager, next, ->, slot"
+      :page-count="pageCount"
+      v-model:page-size="pageSize"
+      :page-sizes="[10, 20, 50]"
+      :current-page="pageNum"
+      class="mt-2"
+      background
+      @size-change="handleSizeChange"
+      @current-change="handlePageChange">
+      <span class="text-sm text-gray-500">已加载 {{ loadedCount }} 条</span>
+    </el-pagination>
   </div>
 </template>
 
@@ -84,31 +84,72 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 
 const REFRESH_EVENT = "refresh-ai-history-tab";
 
+/**
+ * 单元格保持单行，超出显示省略号，悬停出 tooltip。
+ * popperClass 配合文件末尾的全局样式，让 tooltip 保留回答里的换行，读起来更像原文。
+ */
+const OVERFLOW_TOOLTIP = {
+  popperClass: "ai-history-tooltip",
+  showAfter: 200,
+};
+
 /** 本页只需查看这两位用户的 AI 对话记录，固定枚举，不由用户列表决定 */
 const USER_OPTIONS = ["昭昭", "灿灿"] as const;
+
+interface PageState {
+  /** 该页消息，接口返回为时间正序 */
+  items: DifyMessage[];
+  /** 是否还有更早的一页 */
+  hasMore: boolean;
+  /** 本页最旧一条的 id，作为「更早一页」的游标 */
+  oldestId?: string;
+}
 
 const userStore = useUserStore();
 
 const userName = ref<string>(USER_OPTIONS[0]);
 const pageSize = ref(20);
 const loading = ref(false);
-const scroller = ref<HTMLElement | null>(null);
-/** 消息区高度：el-tab-pane 不提供高度，按窗口高度算（与 TabTaskHistory 同法） */
-const scrollerHeight = ref(400);
+const pageLoading = ref(false);
+const tableMaxHeight = ref<number>(0);
 
 /** 当前活跃会话 id：来自 chatSetting.aiConversationId */
 const conversationId = ref("");
-const messages = ref<DifyMessage[]>([]);
-const msgHasMore = ref(false);
-const msgLoading = ref(false);
-/** 消息翻页游标：已加载消息里最旧一条的 id */
-const msgCursor = ref<string | undefined>(undefined);
+/** 已加载的页，下标 0 即第 1 页（最新的一页）；往前翻直接读缓存，不重复请求 */
+const pages = ref<PageState[]>([]);
+const pageNum = ref(1);
+
+const currentPage = computed(() => pages.value[pageNum.value - 1]);
+/** 倒序：最新的在最前 */
+const rows = computed(() => (currentPage.value?.items ?? []).slice().reverse());
+/** 最后一页是否还有更早的 */
+const lastHasMore = computed(() => Boolean(pages.value[pages.value.length - 1]?.hasMore));
+/**
+ * 页数 = 已加载页数，再算上「已知还有一页」。
+ * Dify 不返回总数，只能随着往下翻逐页递增；0 表示还没有可展示的页。
+ */
+const pageCount = computed(
+  () => pages.value.length + (lastHasMore.value ? 1 : 0)
+);
+/** 已加载条数：Dify 没有总数，只能统计已拉取到的部分 */
+const loadedCount = computed(() =>
+  pages.value.reduce((sum, p) => sum + (p?.items?.length ?? 0), 0)
+);
 
 const emptyHint = computed(() =>
   conversationId.value
     ? `「${userName.value}」这个会话还没有消息`
     : `「${userName.value}」还没有进行中的 AI 对话（chatSetting 未绑定会话）`
 );
+
+// 计算表格最大高度（与阅读任务页保持一致的算法）
+const calculateTableHeight = () => {
+  nextTick(() => {
+    const windowHeight = window.innerHeight;
+    const reservedSpace = 300;
+    tableMaxHeight.value = windowHeight - reservedSpace;
+  });
+};
 
 function formatTs(ts?: number): string {
   if (!ts) return "-";
@@ -130,22 +171,50 @@ async function readActiveConversationId(id: number): Promise<string> {
   return (cid ?? "").trim();
 }
 
-function scrollToBottom(): void {
-  nextTick(() => {
-    const el = scroller.value;
-    if (el) el.scrollTop = el.scrollHeight;
-  });
+/**
+ * 拉取指定页。第 1 页不带游标（Dify 返回最新的 N 条），
+ * 更早的页用上一页最旧一条的 id 作为 first_id。
+ * 只有「下一页」需要请求，回到已加载的页直接读缓存。
+ */
+async function fetchPage(target: number): Promise<void> {
+  if (!conversationId.value) return;
+  if (target < 1 || pages.value[target - 1]) return;
+
+  const prev = pages.value[target - 2];
+  if (target > 1 && !prev) return;
+
+  pageLoading.value = true;
+  try {
+    const page = await getConversationMessages(
+      conversationId.value,
+      pageSize.value,
+      userName.value,
+      target === 1 ? undefined : prev.oldestId
+    );
+    const list = Array.isArray(page?.data) ? page.data : [];
+
+    // 接口按时间正序返回，list[0] 即本页最旧一条
+    pages.value[target - 1] = {
+      items: list,
+      hasMore: Boolean(page?.has_more) && list.length > 0,
+      oldestId: list[0]?.id,
+    };
+    pageNum.value = target;
+  } catch (error) {
+    ElMessage.error((error as Error).message || "获取会话消息失败");
+  } finally {
+    pageLoading.value = false;
+  }
 }
 
 /**
- * 直接加载 chatSetting.aiConversationId 绑定会话的消息。
- * 本页不展示会话列表，该字段即「当前正在继续的对话」的唯一来源。
+ * 重置并加载第 1 页。
+ * 本页不展示会话列表，chatSetting.aiConversationId 即「当前正在继续的对话」的唯一来源。
  */
 async function loadActive(): Promise<void> {
   conversationId.value = "";
-  messages.value = [];
-  msgCursor.value = undefined;
-  msgHasMore.value = false;
+  pages.value = [];
+  pageNum.value = 1;
   loading.value = true;
 
   try {
@@ -161,8 +230,7 @@ async function loadActive(): Promise<void> {
     conversationId.value = await readActiveConversationId(user.id);
     if (!conversationId.value) return;
 
-    await fetchMessages(true);
-    scrollToBottom();
+    await fetchPage(1);
   } catch (error) {
     ElMessage.error((error as Error).message || "获取会话消息失败");
   } finally {
@@ -170,67 +238,46 @@ async function loadActive(): Promise<void> {
   }
 }
 
-async function fetchMessages(reset: boolean): Promise<void> {
-  if (!conversationId.value) return;
-
-  const firstId = reset ? undefined : msgCursor.value;
-  msgLoading.value = true;
-  try {
-    const page = await getConversationMessages(
-      conversationId.value,
-      pageSize.value,
-      userName.value,
-      firstId
-    );
-    const list = Array.isArray(page?.data) ? page.data : [];
-
-    if (reset) {
-      messages.value = list;
-    } else {
-      const seen = new Set(messages.value.map((m) => m.id));
-      messages.value = [...list.filter((m) => !seen.has(m.id)), ...messages.value];
-    }
-
-    // 消息按时间正序返回，list[0] 即本页最旧一条，作为往更早翻的游标
-    const nextCursor = list[0]?.id;
-    const progressed = Boolean(nextCursor) && nextCursor !== firstId;
-    msgHasMore.value = Boolean(page?.has_more) && list.length > 0 && progressed;
-    if (progressed) msgCursor.value = nextCursor;
-  } catch (error) {
-    ElMessage.error((error as Error).message || "获取会话消息失败");
-    if (reset) messages.value = [];
-    msgHasMore.value = false;
-  } finally {
-    msgLoading.value = false;
+function handlePageChange(page: number): void {
+  if (page === pageNum.value) return;
+  // 已加载过就直接展示；只有往后一页才需要请求
+  if (pages.value[page - 1]) {
+    pageNum.value = page;
+    return;
   }
+  void fetchPage(page);
 }
 
-function loadOlderMessages(): void {
-  if (!msgCursor.value) return;
-  const el = scroller.value;
-  const prevHeight = el?.scrollHeight ?? 0;
-  void fetchMessages(false).then(() => {
-    // 往更早翻时保持视口位置，避免跳到顶部
-    nextTick(() => {
-      if (el) el.scrollTop = el.scrollHeight - prevHeight;
-    });
-  });
+/** 改每页条数会改变分页边界，游标随之失效，必须从第 1 页重新拉 */
+function handleSizeChange(): void {
+  pages.value = [];
+  pageNum.value = 1;
+  void fetchPage(1);
 }
-
-const updateScrollerHeight = (): void => {
-  // 视口减去外层 header、页签栏、工具栏与内边距
-  scrollerHeight.value = Math.max(200, window.innerHeight - 300);
-};
 
 onMounted(() => {
-  updateScrollerHeight();
-  window.addEventListener("resize", updateScrollerHeight);
+  calculateTableHeight();
+  window.addEventListener("resize", calculateTableHeight);
   window.addEventListener(REFRESH_EVENT, loadActive);
+
   loadActive();
 });
 
 onUnmounted(() => {
-  window.removeEventListener("resize", updateScrollerHeight);
+  window.removeEventListener("resize", calculateTableHeight);
   window.removeEventListener(REFRESH_EVENT, loadActive);
 });
 </script>
+
+<style>
+/*
+ * el-table 的 show-overflow-tooltip 会把 popper 挂到 body 上，
+ * scoped 样式选不中，因此这里用全局样式。
+ * pre-wrap 保留回答里的换行，避免整段被压成一行。
+ */
+.ai-history-tooltip {
+  max-width: 620px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+</style>
