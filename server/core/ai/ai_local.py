@@ -246,6 +246,24 @@ class AILocal:
             log.error(f"请求失败: {str(e)}")
             return None
 
+    @staticmethod
+    def get_conversations(user, limit=20, last_id=None):
+        """从 Dify 获取会话列表（按 updated_at 倒序，`last_id` 往更早翻页）。
+
+        与 `get_chat_messages` 不同：这里不吞异常，交给路由层返回 `code:-1`，
+        避免「上游报错」被前端当成「没有数据」。
+        """
+        payload = {"user": user, "limit": limit}
+        if last_id:
+            payload["last_id"] = last_id
+        with requests.get(
+                f"{API_URL}/conversations",
+                headers=dify_headers(user),
+                params=payload,
+        ) as r:
+            r.raise_for_status()
+            return r.json()
+
 
 if __name__ == "__main__":
 

@@ -65,7 +65,7 @@ export async function getAiChatMessages(
   user: string,
   first_id?: string | number
 ): Promise<unknown> {
-  const rsp = await apiClient.get<ApiResponse<unknown>>("/chatMessages", {
+  const rsp = await apiClient.get<ApiResponse<unknown>>("/chat/messages", {
     params: { conversation_id, limit, user, first_id },
   });
   if (rsp.data.code !== 0) {

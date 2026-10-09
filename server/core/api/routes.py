@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 import core.db.rds_mgr as rds_mgr
-from core.ai.ai_local import AILocal
 from core.config import app_logger
 from core.db.db_mgr import db_mgr
 from core.services.file_mgr import file_mgr
@@ -284,20 +283,6 @@ def set_rds_data() -> ResponseReturnValue:
         value = data.get('value') if isinstance(data, dict) else None
         rds_mgr.set(f"{table}:{rid}", value)
         return {"code": 0, "msg": "ok", "data": rid}
-    except Exception as e:
-        log.error(e)
-        return {"code": -1, "msg": 'error' + str(e)}
-
-
-@api_bp.route("/chatMessages", methods=['GET'])
-def chat_messages() -> ResponseReturnValue:
-    try:
-        log.info("=> [Chat Messages] " + json.dumps(request.args, ensure_ascii=False))
-        c_id = request.args.get('conversation_id')
-        limit = request.args.get('limit')
-        first_id = request.args.get('first_id')
-        user = request.args.get('user')
-        return {"code": 0, "msg": "ok", "data": AILocal.get_chat_messages(c_id, limit, user, first_id)}
     except Exception as e:
         log.error(e)
         return {"code": -1, "msg": 'error' + str(e)}

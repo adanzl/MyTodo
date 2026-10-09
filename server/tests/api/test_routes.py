@@ -20,7 +20,6 @@ def app(monkeypatch):
     # Mock managers before app creation to prevent real connections
     monkeypatch.setattr(routes, 'db_mgr', MagicMock())
     monkeypatch.setattr(routes, 'rds_mgr', MagicMock())
-    monkeypatch.setattr(routes, 'AILocal', MagicMock())
     monkeypatch.setattr(routes, 'file_mgr', MagicMock())
 
     app = Flask(__name__)
@@ -253,16 +252,10 @@ def test_set_rds_data_ok_and_exception(client):
     assert resp.json["code"] == -1
 
 
-def test_chat_messages_ok_and_exception(client, monkeypatch):
-    routes.AILocal.get_chat_messages.return_value = []  # type: ignore
-    resp = client.get('/chatMessages?conversation_id=c')
-    assert resp.status_code == 200
-    assert resp.json["code"] == 0
-
-    routes.AILocal.get_chat_messages.side_effect = RuntimeError("boom")
-    resp = client.get('/chatMessages?conversation_id=c')
-    assert resp.status_code == 200
-    assert resp.json["code"] == -1
+def test_chat_messages_route_removed(app):
+    """旧路径 /chatMessages 已移除（不留别名），chat 代理统一走 /api/chat/*。"""
+    rules = {rule.rule for rule in app.url_map.iter_rules()}
+    assert '/chatMessages' not in rules
 
 
 def test_route_index_ok(client, monkeypatch):

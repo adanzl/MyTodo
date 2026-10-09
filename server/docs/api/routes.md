@@ -124,16 +124,38 @@
 - **行为**：`rds_mgr.rpush(key, value)`
 - **返回**：`{"code":0,"msg":"ok","data":<value>}`
 
-## 聊天消息查询
+## 聊天（Dify 对话代理）
 
-### GET `/api/chatMessages`
+路由定义在 `core/api/chat_routes.py`（`chat_bp`），以 `url_prefix='/chat'` 注册，
+叠加 `main.py` 的 `/api` 前缀后对外为 `/api/chat/*`。
+
+### GET `/api/chat/messages`
 
 - **Query**
   - `conversation_id`：string，必填
+  - `user`：string，必填。同时决定使用哪个 Dify 应用：`leo` 走 leo 的 app，其他用户名走豆豆 app
   - `limit`：string/int，可选
-  - `first_id`：string/int，可选
-  - `user`：string，可选
+  - `first_id`：string/int，可选。本页最旧一条的 id，用于往更早翻页
 - **返回**：`{"code":0,"msg":"ok","data": AILocal.get_chat_messages(...)}`
+  - `data` 为 Dify 原始响应 `{limit, has_more, data:[...]}`，其中 `data` 按时间从旧到新
+  - ⚠️ 取数失败时 `AILocal.get_chat_messages` 吞掉异常返回 `None`，此时仍是
+    `code:0` + `data:null`，调用方必须自行判空（已知问题，待单独修复）
+
+### GET `/api/chat/conversations`
+
+- **Query**
+  - `user`：string，必填，语义同上
+  - `limit`：int，可选，默认 20，会收敛到 `[1, 100]`
+  - `last_id`：string，可选。上一页最后一条会话 id，用于往更早翻页
+- **返回**
+  - 成功：`{"code":0,"msg":"ok","data":{"limit":20,"has_more":true,"data":[{"id","name","status","inputs","created_at","updated_at"}]}}`
+    - `data` 按 `updated_at` 倒序
+  - 失败：`{"code":-1,"msg":"<上游错误信息>"}`
+    - 与 `/messages` 不同，上游异常（401/404 等）会透出，不会伪装成「没有会话」
+  - 不存在的用户名返回空列表而非报错，前端需自行区分
+
+> **变更记录**：原 `GET /api/chatMessages` 已迁移为 `/api/chat/messages` 并**移除原路径**，
+> 按约定不保留兼容别名，需客户端同步发布。
 
 ## 积分/抽奖
 
