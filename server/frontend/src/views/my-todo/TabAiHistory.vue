@@ -35,12 +35,25 @@
         :show-overflow-tooltip="OVERFLOW_TOOLTIP">
         <template #default="{ row }">{{ row.query || "（空）" }}</template>
       </el-table-column>
-      <el-table-column label="回答" min-width="320" :show-overflow-tooltip="OVERFLOW_TOOLTIP">
+      <el-table-column label="回答" min-width="320">
         <template #default="{ row }">
-          <span v-if="row.answer">{{ row.answer }}</span>
-          <!-- 生成失败时 answer 为空，把原因显示出来，否则只会看到一个空单元格 -->
-          <span v-else-if="row.error" class="text-red-500">失败：{{ row.error }}</span>
-          <span v-else class="text-gray-400 italic">（无回复）</span>
+          <div class="flex w-full min-w-0 items-center gap-1">
+            <span v-if="row.answer" class="min-w-0 flex-1 truncate">{{ row.answer }}</span>
+            <!-- 生成失败时 answer 为空，把原因显示出来，否则只会看到一个空单元格 -->
+            <span v-else-if="row.error" class="min-w-0 flex-1 truncate text-red-500">
+              失败：{{ row.error }}
+            </span>
+            <span v-else class="min-w-0 flex-1 truncate text-gray-400 italic">（无回复）</span>
+            <el-button
+              v-if="row.answer || row.error"
+              link
+              type="primary"
+              size="small"
+              class="shrink-0"
+              @click="openAnswer(row)">
+              全文
+            </el-button>
+          </div>
         </template>
       </el-table-column>
       <el-table-column label="时间" width="170">
@@ -69,6 +82,107 @@
       @current-change="handlePageChange">
       <span class="text-sm text-gray-500">已加载 {{ loadedCount }} 条</span>
     </el-pagination>
+
+    <!--
+      全文弹窗。注意：Tailwind 的 utilities 在 @layer 内，而 Element Plus 未分层，
+      按层叠规则未分层优先，所以 Tailwind 无法覆盖 EP 给 .el-dialog/__header 设的
+      padding 等属性。因此这里关掉 EP 自带头部，整套头部与内容都用 Tailwind 自己排。
+    -->
+    <el-dialog
+      v-model="answerVisible"
+      width="780px"
+      align-center
+      append-to-body
+      destroy-on-close
+      :show-close="false">
+      <div v-if="answerRow" class="flex flex-col">
+        <!-- 自建头部：图标 + 标题 + 元信息 + 操作 -->
+        <div class="mb-4 flex items-start gap-3 border-b border-gray-100 pb-4">
+          <div
+            class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+            :class="answerIsError ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'">
+            <el-icon :size="17">
+              <WarningFilled v-if="answerIsError" />
+              <ChatDotRound v-else />
+            </el-icon>
+          </div>
+
+          <div class="min-w-0 flex-1">
+            <div class="text-base font-semibold text-gray-800">
+              {{ answerIsError ? "生成失败" : "回答全文" }}
+            </div>
+            <div class="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-gray-400">
+              <span>{{ userName }}</span>
+              <span>·</span>
+              <span>{{ formatTs(answerRow.created_at) }}</span>
+              <span>·</span>
+              <span>{{ answerBody.length }} 字</span>
+              <template v-if="answerRow.total_tokens">
+                <span>·</span>
+                <span>{{ answerRow.total_tokens }} tokens</span>
+              </template>
+            </div>
+          </div>
+
+          <div class="flex shrink-0 items-center gap-1">
+            <el-button
+              v-if="answerBody"
+              size="small"
+              :type="copied ? 'success' : 'default'"
+              :icon="copied ? Check : DocumentCopy"
+              @click="copyAnswer">
+              {{ copied ? "已复制" : "复制全文" }}
+            </el-button>
+            <el-button link :icon="Close" @click="answerVisible = false" />
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-3">
+          <!--
+            提问：次要信息。灰条 + 灰底。
+            底色用 gray-200（对白底对比度 1.24）；gray-50/100 仅 1.05/1.10，肉眼等同透明。
+          -->
+          <div
+            v-if="answerRow.query"
+            class="rounded-lg border-l-4 border-gray-400 bg-gray-200 px-4 py-3">
+            <div class="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-gray-500">
+              <el-icon :size="13"><User /></el-icon>
+              <span>{{ userName }} 提问</span>
+            </div>
+            <el-scrollbar max-height="8rem">
+              <div class="pr-2 text-sm leading-6 text-gray-700 whitespace-pre-wrap wrap-break-word">
+                {{ answerRow.query }}
+              </div>
+            </el-scrollbar>
+          </div>
+
+          <!--
+            回答：主要信息。主题色条 + 更实的底色，和提问块形成明确层次。
+            底色用 -200 档。
+          -->
+          <div
+            class="rounded-lg border-l-4 px-4 py-3"
+            :class="answerIsError ? 'border-red-600 bg-red-100' : 'border-blue-600 bg-blue-100'">
+            <div
+              class="mb-2 flex items-center gap-1.5 text-xs font-medium"
+              :class="answerIsError ? 'text-red-700' : 'text-blue-900'">
+              <el-icon :size="13">
+                <WarningFilled v-if="answerIsError" />
+                <ChatDotRound v-else />
+              </el-icon>
+              <span>{{ answerIsError ? "失败原因" : "AI 回答" }}</span>
+            </div>
+            <el-scrollbar max-height="56vh">
+              <div
+                class="pr-2 text-sm leading-7 whitespace-pre-wrap wrap-break-word"
+                :class="answerIsError ? 'text-red-900' : 'text-gray-800'">
+                {{ answerBody }}
+              </div>
+            </el-scrollbar>
+          </div>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -77,7 +191,15 @@ import { getConversationMessages } from "@/api/api-ai-chat";
 import { getRdsData } from "@/api/api-rds";
 import { useUserStore } from "@/stores/user";
 import type { DifyMessage } from "@/types/ai";
-import { Refresh } from "@element-plus/icons-vue";
+import {
+  ChatDotRound,
+  Check,
+  Close,
+  DocumentCopy,
+  Refresh,
+  User,
+  WarningFilled,
+} from "@element-plus/icons-vue";
 import dayjs from "dayjs";
 import { ElMessage } from "element-plus";
 import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
@@ -86,10 +208,13 @@ const REFRESH_EVENT = "refresh-ai-history-tab";
 
 /**
  * 单元格保持单行，超出显示省略号，悬停出 tooltip。
- * popperClass 配合文件末尾的全局样式，让 tooltip 保留回答里的换行，读起来更像原文。
+ * 直接用 Tailwind 类作为 popper 的样式：EP 未对 popper 设置 white-space / max-width，
+ * 这两个属性可以生效；white-space: pre-wrap 保留回答里的换行。
+ * 用 light 主题，避免 EP 的 .el-popper.is-dark（两段选择器）压过工具类。
  */
 const OVERFLOW_TOOLTIP = {
-  popperClass: "ai-history-tooltip",
+  popperClass: "max-w-[620px] whitespace-pre-wrap wrap-break-word",
+  effect: "light",
   showAfter: 200,
 };
 
@@ -112,6 +237,11 @@ const pageSize = ref(20);
 const loading = ref(false);
 const pageLoading = ref(false);
 const tableMaxHeight = ref<number>(0);
+const answerVisible = ref(false);
+const answerRow = ref<DifyMessage | null>(null);
+/** 复制成功后的短暂反馈 */
+const copied = ref(false);
+let copiedTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** 当前活跃会话 id：来自 chatSetting.aiConversationId */
 const conversationId = ref("");
@@ -160,6 +290,38 @@ function formatTs(ts?: number): string {
 function shortId(id?: string): string {
   if (!id) return "-";
   return id.length > 8 ? id.slice(0, 8) : id;
+}
+
+const answerIsError = computed(
+  () => Boolean(answerRow.value && !answerRow.value.answer && answerRow.value.error)
+);
+
+const answerBody = computed(() => {
+  const row = answerRow.value;
+  if (!row) return "";
+  return row.answer || row.error || "";
+});
+
+/** 单元格只显示一行，完整回答（或失败原因）放到对话框里看 */
+function openAnswer(row: DifyMessage): void {
+  answerRow.value = row;
+  copied.value = false;
+  answerVisible.value = true;
+}
+
+async function copyAnswer(): Promise<void> {
+  const text = answerBody.value;
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    copied.value = true;
+    if (copiedTimer) clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(() => {
+      copied.value = false;
+    }, 1500);
+  } catch {
+    ElMessage.error("复制失败");
+  }
 }
 
 /** 读 chatSetting，取出当前绑定的会话 id */
@@ -266,18 +428,6 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener("resize", calculateTableHeight);
   window.removeEventListener(REFRESH_EVENT, loadActive);
+  if (copiedTimer) clearTimeout(copiedTimer);
 });
 </script>
-
-<style>
-/*
- * el-table 的 show-overflow-tooltip 会把 popper 挂到 body 上，
- * scoped 样式选不中，因此这里用全局样式。
- * pre-wrap 保留回答里的换行，避免整段被压成一行。
- */
-.ai-history-tooltip {
-  max-width: 620px;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-</style>
