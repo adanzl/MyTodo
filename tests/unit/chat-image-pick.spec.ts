@@ -755,7 +755,7 @@ describe('重试时保留图片', () => {
       failActiveReply: vi.fn(),
       restoreServerReply: vi.fn(),
       finishActiveReply: vi.fn(),
-      getPendingClientRequestIds: () => [],
+      getPendingClientRequestIds: (): string[] => [],
       applyChatChunk: vi.fn(),
     };
   }
