@@ -52,3 +52,87 @@ export async function getConversationMessages(
   }
   return rsp.data.data;
 }
+
+/** 导出接口的返回：文件本体 + 服务端给出的文件名与条数 */
+export interface ChatExportResult {
+  blob: Blob;
+  filename: string;
+  /** 服务端回传的条数；响应头读不到时为 undefined */
+  count?: number;
+}
+
+/** 从 Content-Disposition 取文件名，优先 RFC 5987 的 filename*（中文名） */
+function parseDispositionFilename(disposition: string): string {
+  if (!disposition) return "";
+  const star = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
+  if (star?.[1]) {
+    try {
+      return decodeURIComponent(star[1].trim());
+    } catch {
+      // 解码失败时退回下面的 filename=
+    }
+  }
+  const plain = /filename=(?:"([^"]*)"|([^;]+))/i.exec(disposition);
+  return (plain?.[1] ?? plain?.[2] ?? "").trim();
+}
+
+/** 响应头缺失时的兜底文件名 */
+function fallbackFilename(user: string): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  const ts =
+    `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}` +
+    `-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  return `AI对话-${user}-${ts}.csv`;
+}
+
+/**
+ * 导出某个会话的消息记录（CSV 文件）。
+ *
+ * 取数与 CSV 生成都在服务端完成：Dify 的 `/messages` 只支持游标分页且不返回总数，
+ * 放前端就得由浏览器反复往返翻页、把整段会话缓存进内存再过滤。
+ *
+ * 失败时后端仍返回 `{code:-1,msg}` 的 JSON（HTTP 200）。因为这里 `responseType` 是
+ * blob，axios 拦截器只看到一个 Blob、无法自动判错，所以靠 Content-Type 自行区分。
+ */
+export async function exportChatMessages(params: {
+  conversationId: string;
+  user: string;
+  start?: string | null;
+  end?: string | null;
+}): Promise<ChatExportResult> {
+  const rsp = await api.get<Blob>("/chat/export", {
+    params: {
+      conversation_id: params.conversationId,
+      user: params.user,
+      start: params.start || undefined,
+      end: params.end || undefined,
+    },
+    responseType: "blob",
+    // 服务端要翻页拉全整个会话，比普通接口慢
+    timeout: 120000,
+  });
+
+  const contentType = String(rsp.headers["content-type"] || "");
+  if (contentType.includes("application/json")) {
+    const text = await rsp.data.text();
+    let message = "导出失败";
+    try {
+      message = (JSON.parse(text) as { msg?: string }).msg || message;
+    } catch {
+      // 不是合法 JSON 时沿用默认文案
+    }
+    throw new Error(message);
+  }
+
+  const countRaw = rsp.headers["x-export-count"];
+  const parsedCount = countRaw ? Number(countRaw) : Number.NaN;
+
+  return {
+    blob: rsp.data,
+    filename:
+      parseDispositionFilename(String(rsp.headers["content-disposition"] || "")) ||
+      fallbackFilename(params.user),
+    count: Number.isNaN(parsedCount) ? undefined : parsedCount,
+  };
+}

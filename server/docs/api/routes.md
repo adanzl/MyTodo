@@ -129,30 +129,73 @@
 路由定义在 `core/api/chat_routes.py`（`chat_bp`），以 `url_prefix='/chat'` 注册，
 叠加 `main.py` 的 `/api` 前缀后对外为 `/api/chat/*`。
 
+路由只负责解析请求参数、调用 `ChatMgr`（`core/chat/chat_mgr.py`）并把返回值交给
+Flask；取数、分页、日期过滤、CSV 生成与导出响应头都在 `ChatMgr` 内。
+Dify 的 HTTP 细节封装在 `AILocal`（`core/ai/ai_local.py`）。
+
+- `ChatMgr.get_messages` / `get_conversations`：单页查询（对应下面两个 GET），返回 `_ok/_err`
+- `ChatMgr.collect_messages`：游标翻页拉全某会话
+- `ChatMgr.export_messages`：按日期范围生成 CSV，**成功返回 `flask.Response`**（文件流），
+  失败返回 `_err`（dict）
+
 ### GET `/api/chat/messages`
 
 - **Query**
   - `conversation_id`：string，必填
   - `user`：string，必填。同时决定使用哪个 Dify 应用：`leo` 走 leo 的 app，`灿灿` 走灿灿的 app，其他（含 `昭昭`）走昭昭的 app
-  - `limit`：string/int，可选
+  - `limit`：int，可选，默认 20，会收敛到 `[1, 100]`（不传/非法值 → 20）
   - `first_id`：string/int，可选。本页最旧一条的 id，用于往更早翻页
 - **返回**：`{"code":0,"msg":"ok","data": AILocal.get_chat_messages(...)}`
   - `data` 为 Dify 原始响应 `{limit, has_more, data:[...]}`，其中 `data` 按时间从旧到新
   - ⚠️ 取数失败时 `AILocal.get_chat_messages` 吞掉异常返回 `None`，此时仍是
     `code:0` + `data:null`，调用方必须自行判空（已知问题，待单独修复）
+  - 注意：`limit` 已在 `ChatMgr` 内收敛，所以**越界不再会**掉进上面这个
+    `data:null`（`limit>100` 会被收敛成 100 正常返回）
 
 ### GET `/api/chat/conversations`
 
 - **Query**
-  - `user`：string，必填，语义同上
+  - `user`：string，必填，语义同上。前后空格会被去掉，为空则报 `user is required`
   - `limit`：int，可选，默认 20，会收敛到 `[1, 100]`
-  - `last_id`：string，可选。上一页最后一条会话 id，用于往更早翻页
+  - `last_id`：string，可选。上一页最后一条会话 id，用于往更早翻页（空串视为不传）
 - **返回**
   - 成功：`{"code":0,"msg":"ok","data":{"limit":20,"has_more":true,"data":[{"id","name","status","inputs","created_at","updated_at"}]}}`
     - `data` 按 `updated_at` 倒序
   - 失败：`{"code":-1,"msg":"<上游错误信息>"}`
     - 与 `/messages` 不同，上游异常（401/404 等）会透出，不会伪装成「没有会话」
   - 不存在的用户名返回空列表而非报错，前端需自行区分
+
+### GET `/api/chat/export`
+
+按日期范围导出某个会话的消息记录，返回 **CSV 文件附件**（不是 JSON 包装）。
+
+- **Query**
+  - `conversation_id`：string，必填
+  - `user`：string，必填，语义同上；同时用作导出文件名与「谁说的话」列名
+  - `start`：string，可选，`YYYY-MM-DD`，含当天 `00:00:00`
+  - `end`：string，可选，`YYYY-MM-DD`，含当天 `23:59:59`
+  - 日期留空表示不限；时区按**服务端本地时区**解释（线上为 Asia/Shanghai）
+- **成功返回**：`Content-Type: text/csv; charset=utf-8`
+  - 带 UTF-8 BOM、CRLF 行尾，Excel 打开中文不乱码
+  - 列：`序号, 时间, <user>说的话, 回答`；时间格式 `YYYY-MM-DD HH:mm:ss`
+  - 生成失败的消息在「回答」列回填 `失败：<原因>`，避免该列为空丢信息
+  - 响应头
+    - `Content-Disposition`：`filename=` ASCII 回退 + `filename*=UTF-8''` 中文名（`AI对话-<user>-<时间戳>.csv`）
+    - `X-Export-Count`：本次导出条数
+- **失败返回**：仍是统一 JSON `{"code":-1,"msg":"..."}`（HTTP 200）
+  - ⚠️ 调用方必须靠 `Content-Type` 区分「文件」与「错误」，不能只看状态码
+  - 常见 msg：`conversation_id is required` / `user is required` /
+    `日期格式应为 YYYY-MM-DD...` / `开始日期不能晚于结束日期` /
+    `所选时间范围内没有数据` / `当前会话没有可导出的数据` /
+    `会话消息超过 N 条，请缩小时间范围后重试`
+- **实现要点**
+  - 参数校验、取数、过滤、CSV 生成与响应头拼装都在 `ChatMgr.export_messages`
+    （`core/chat/chat_mgr.py`）里完成，**成功时直接返回 `flask.Response`**；路由只把
+    query 原样转过去。Dify 的 HTTP 细节仍封装在 `AILocal`。
+  - `ChatMgr.collect_messages` 负责翻页拉全：Dify 的 `/messages` 只支持游标分页
+    且不返回总数，放前端会变成浏览器反复往返取数、把整段会话缓存进内存。
+  - `start` 同时作为翻页的**早停下界**：某页最旧一条早于它即可停止（更早的页只会更旧）。
+  - 翻页上限 `EXPORT_PAGE_SIZE * EXPORT_MAX_PAGES`，超出时报错而不是静默给不完整数据。
 
 > **变更记录**：原 `GET /api/chatMessages` 已迁移为 `/api/chat/messages` 并**移除原路径**，
 > 按约定不保留兼容别名，需客户端同步发布。

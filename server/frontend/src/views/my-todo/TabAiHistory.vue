@@ -4,6 +4,15 @@
     <div class="flex items-center h-10 mb-2">
       <div class="flex flex-1 flex-wrap items-center gap-4">
         <el-button type="primary" plain size="small" :icon="Refresh" @click="loadActive" />
+        <el-button
+          type="primary"
+          plain
+          size="small"
+          :icon="Download"
+          :disabled="!conversationId"
+          @click="openExport">
+          导出
+        </el-button>
         <el-radio-group v-model="userName" size="small" @change="loadActive">
           <el-radio-button v-for="name in USER_OPTIONS" :key="name" :value="name">
             {{ name }}
@@ -183,11 +192,48 @@
         </div>
       </div>
     </el-dialog>
+
+    <!--
+      导出弹窗：时间范围留空表示导出全部。
+      实际取数与 CSV 生成都在后端完成（/api/chat/export），这里只收日期。
+    -->
+    <el-dialog
+      v-model="exportVisible"
+      title="导出 AI 对话记录"
+      width="460px"
+      align-center
+      append-to-body
+      destroy-on-close>
+      <div class="flex flex-col gap-3">
+        <div class="text-sm text-gray-500">
+          选择时间范围，留空表示导出全部。
+        </div>
+        <el-date-picker
+          v-model="exportRange"
+          type="daterange"
+          range-separator="至"
+          start-placeholder="开始日期"
+          end-placeholder="结束日期"
+          value-format="YYYY-MM-DD"
+          unlink-panels
+          clearable
+          class="w-full!" />
+        <div class="text-xs text-gray-400">
+          按日期筛选，日期按服务器时区计算；会话较长时可能需要几秒。
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="exportVisible = false">取消</el-button>
+        <el-button type="primary" :loading="exporting" @click="confirmExport">
+          确认导出
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { getConversationMessages } from "@/api/api-ai-chat";
+import { exportChatMessages, getConversationMessages } from "@/api/api-ai-chat";
 import { getRdsData } from "@/api/api-rds";
 import { useUserStore } from "@/stores/user";
 import type { DifyMessage } from "@/types/ai";
@@ -196,12 +242,13 @@ import {
   Check,
   Close,
   DocumentCopy,
+  Download,
   Refresh,
   User,
   WarningFilled,
 } from "@element-plus/icons-vue";
 import dayjs from "dayjs";
-import { ElMessage } from "element-plus";
+import { ElLoading, ElMessage } from "element-plus";
 import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 
 const REFRESH_EVENT = "refresh-ai-history-tab";
@@ -242,6 +289,11 @@ const answerRow = ref<DifyMessage | null>(null);
 /** 复制成功后的短暂反馈 */
 const copied = ref(false);
 let copiedTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** 导出弹窗与时间范围；范围为空表示全部 */
+const exportVisible = ref(false);
+const exportRange = ref<[string, string] | null>(null);
+const exporting = ref(false);
 
 /** 当前活跃会话 id：来自 chatSetting.aiConversationId */
 const conversationId = ref("");
@@ -415,6 +467,69 @@ function handleSizeChange(): void {
   pages.value = [];
   pageNum.value = 1;
   void fetchPage(1);
+}
+
+/* ==================== 导出 CSV ==================== */
+
+/**
+ * 导出交给后端（`/api/chat/export`）完成，前端只负责取回文件并落盘。
+ *
+ * 不在前端做的原因：Dify 的 `/messages` 只支持游标分页、且没有总数，
+ * 放前端就得由浏览器反复往返翻页、把整段会话缓存在内存里，
+ * 日期过滤口径也会散落到两端。这些放服务端一次做完更省事也更一致。
+ */
+function openExport(): void {
+  if (!conversationId.value) {
+    ElMessage.warning("当前没有可导出的会话");
+    return;
+  }
+  exportRange.value = null;
+  exportVisible.value = true;
+}
+
+async function confirmExport(): Promise<void> {
+  if (!conversationId.value) {
+    ElMessage.warning("当前没有可导出的会话");
+    return;
+  }
+
+  const range = exportRange.value;
+  exporting.value = true;
+  const mask = ElLoading.service({
+    lock: true,
+    text: "正在导出…",
+    background: "rgba(0, 0, 0, 0.7)",
+  });
+
+  try {
+    const { blob, filename, count } = await exportChatMessages({
+      conversationId: conversationId.value,
+      user: userName.value,
+      start: range?.[0],
+      end: range?.[1],
+    });
+
+    saveBlob(filename, blob);
+    exportVisible.value = false;
+    ElMessage.success(count ? `已导出 ${count} 条` : "导出完成");
+  } catch (error) {
+    ElMessage.error((error as Error).message || "导出失败");
+  } finally {
+    mask.close();
+    exporting.value = false;
+  }
+}
+
+/** 触发浏览器下载。objectURL 用完即释放，避免页面常驻持有 */
+function saveBlob(filename: string, blob: Blob): void {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 onMounted(() => {
