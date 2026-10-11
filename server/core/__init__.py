@@ -3,6 +3,7 @@ import time
 import os
 import json
 from core.config import config, app_logger, access_logger
+from core.auth_policy import always_requires_auth
 from core.services.scheduler_mgr import scheduler_mgr
 from core.db.db_mgr import db_mgr
 from core.db import rds_mgr
@@ -184,8 +185,9 @@ def create_app():
         return [x.strip() for x in (raw or '').split(',') if x.strip()]
 
     def _is_whitelisted(path: str) -> bool:
-        # getAll 接口移出白名单，必须走 JWT 验证
-        if path == '/getAll' or path.rstrip('/') == '/getAll':
+        # 这些接口必须始终走 JWT 验证：不受 AUTH_WHITELIST_ALL_API 与
+        # 前缀白名单影响（见 core/auth_policy.py）
+        if always_requires_auth(path):
             return False
         if not path.startswith('/api'):
             return True
@@ -193,7 +195,8 @@ def create_app():
             return True
         if path.startswith('/api/auth/'):
             return True
-        # pic 图片查看接口白名单（img 标签无法携带 JWT）
+        # pic 图片**查看**接口白名单（img 标签无法携带 JWT）
+        # 注意：删除/上传走 axios，能带凭证，故不在白名单内（见 auth_policy）
         if path.startswith('/api/pic/') or path.startswith('/pic/'):
             return True
         exact = set(_parse_csv(config.AUTH_API_WHITELIST))
