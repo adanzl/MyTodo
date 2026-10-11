@@ -104,7 +104,7 @@
         </button>
       </div>
     </div>
-    <ChatImagePreview
+    <ImagePreview
       v-model:is-open="pendingPreview.open"
       v-model:index="pendingPreview.index"
       :images="pendingPreviewImages" />
@@ -176,7 +176,7 @@
 import ChatRoomTab from "./TabChatRoom.vue";
 import AiChatTab from "./TabAiChat.vue";
 import TtsTasksTab from "./TabTtsTasks.vue";
-import ChatImagePreview from "./ChatImagePreview.vue";
+import ImagePreview from "@/components/ImagePreview.vue";
 import type { ChatMsg as AiChatMsg } from "./ai-chat-types";
 import ChatSetting from "./dialogs/ChatSetting.vue";
 import ServerRemoteBadge from "@/components/ServerRemoteBadge.vue";

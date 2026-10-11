@@ -36,23 +36,37 @@ function hasId(id: string | number | undefined | null): id is string | number {
   return id !== undefined && id !== null && id !== "";
 }
 
+/** 没有 type 字段时，用扩展名判断是不是图片 */
+const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp|bmp)$/i;
+
 /**
- * 从 `message_files` 里挑出图片文件名。
+ * 从消息附件里挑出图片文件名。
+ *
+ * 两个来源共用这一份实现（归一化逻辑相同，没必要各写一份）：
+ * - Dify 历史：`message_files`，元素是 `{filename, type, ...}` 对象
+ * - 聊天室消息：`files`，元素可能是对象（`{type, filename}`）也可能是裸文件名
  *
  * 只认 `type === "image"`；缺失 type 时按扩展名兜底，避免上游少个字段就丢图。
- * 历史里的 `url` 是 300 秒签名的临时地址，不能用；必须走我们自己的文件名。
+ * 历史里的 `url` 是 300 秒签名的临时地址，不能用；必须走我们自己的文件名
+ * （`chat-<userId>-<时间戳>.<ext>`，与 pic 目录里的名字一致）。
  */
-export function imageFilenamesFromMessageFiles(
-  files: DifyHistoryItem["message_files"]
-): string[] {
-  if (!files || !Array.isArray(files)) return [];
+export function imageFilenamesFromFiles(files: unknown): string[] {
+  if (!Array.isArray(files)) return [];
   const names: string[] = [];
-  for (const f of files) {
-    const name = (f?.filename || "").trim();
+  for (const item of files) {
+    const raw =
+      typeof item === "string"
+        ? item
+        : (item as DifyMessageFile | null | undefined)?.filename;
+    if (typeof raw !== "string") continue;
+    const name = raw.trim();
     if (!name) continue;
-    const type = (f?.type || "").toLowerCase();
+    const type =
+      typeof item === "string"
+        ? ""
+        : String((item as DifyMessageFile)?.type ?? "").toLowerCase();
     if (type && type !== "image") continue;
-    if (!type && !/\.(jpe?g|png|gif|webp|bmp)$/i.test(name)) continue;
+    if (!type && !IMAGE_EXT_RE.test(name)) continue;
     names.push(name);
   }
   return names;
@@ -90,7 +104,7 @@ export function prependHistoryTurns(
       content: item.answer,
       role: "server",
     });
-    const images = imageFilenamesFromMessageFiles(item.message_files);
+    const images = imageFilenamesFromFiles(item.message_files);
     messages.unshift({
       bubbleKey: historyBubbleKey(item.id!, "me"),
       id: item.id,

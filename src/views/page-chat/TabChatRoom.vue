@@ -52,7 +52,7 @@
         </div>
       </div>
     </ion-content>
-    <ChatImagePreview
+    <ImagePreview
       v-model:is-open="imagePreview.open"
       v-model:index="imagePreview.index"
       :images="imagePreview.images" />
@@ -73,9 +73,10 @@ import { computed, ref, watch } from "vue";
 import EventBus, { C_EVENT } from "@/types/event-bus";
 import { getChatMessages } from "@/api/api-chat";
 import { getPicDisplayUrl } from "@/api/api-pic";
-import { roomImageFilenames } from "@/views/page-chat/chat-room-images";
+import { imageFilenamesFromFiles } from "@/views/page-chat/ai-chat-history";
 import { getNetworkErrorMessage } from "@/utils/net-util";
-import ChatImagePreview from "./ChatImagePreview.vue";
+import ImagePreview from "@/components/ImagePreview.vue";
+import { useImagePreview } from "./use-image-preview";
 import type { RefresherCustomEvent } from "@ionic/vue";
 
 export interface ChatMsg {
@@ -109,20 +110,8 @@ const contentRef = ref<InstanceType<typeof IonContent> | null>(null);
 const messages = ref<ChatMsg[]>([]);
 const networkError = ref(false);
 
-/** 点气泡里的图片看大图 */
-const imagePreview = ref<{
-  open: boolean;
-  index: number;
-  images: { src: string; alt: string }[];
-}>({ open: false, index: 0, images: [] });
-
-function openImagePreview(names: string[], index: number) {
-  imagePreview.value = {
-    open: true,
-    index,
-    images: names.map((name) => ({ src: getPicDisplayUrl(name), alt: name })),
-  };
-}
+/** 点气泡里的图片看大图（与 TabAiChat 共用） */
+const { imagePreview, openImagePreview } = useImagePreview();
 
 function scrollToBottom(duration = 200) {
   contentRef.value?.$el?.scrollToBottom?.(duration);
@@ -141,7 +130,7 @@ async function loadInitial() {
     const list = data?.data ?? [];
     list.reverse().forEach((item: any) => {
       const d = typeof item === "string" ? JSON.parse(item) : item;
-      const images = roomImageFilenames(d.files);
+      const images = imageFilenamesFromFiles(d.files);
       messages.value.unshift({
         id: d.id,
         content: d.content,
@@ -174,7 +163,7 @@ async function onRefresh(e: RefresherCustomEvent) {
     const list = data?.data ?? [];
     list.reverse().forEach((item: any) => {
       const d = typeof item === "string" ? JSON.parse(item) : item;
-      const images = roomImageFilenames(d.files);
+      const images = imageFilenamesFromFiles(d.files);
       messages.value.unshift({
         id: d.id,
         content: d.content,

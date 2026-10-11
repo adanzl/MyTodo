@@ -1,21 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
-import ChatImagePreview from '@/views/page-chat/ChatImagePreview.vue';
+import ImagePreview from '@/components/ImagePreview.vue';
+import { useImagePreview } from '@/views/page-chat/use-image-preview';
 
 /**
  * Ionic 的组件在 jsdom 里是未定义的自定义元素，不会渲染插槽内容。
- * 这里把它们替换成"渲染插槽的 div"，让模板里的普通元素（img / 按钮）可被断言，
- * 同时属性会透传到根 div 上，因此仍能按 aria-label 定位按钮。
+ * 这里把 ion-modal 换成"渲染插槽的 div"，让浮层里的普通元素（img / button）可被断言。
  */
 const slotStub = { template: '<div><slot /></div>' };
 const ionicStubs = {
   IonModal: slotStub,
-  IonHeader: slotStub,
-  IonToolbar: slotStub,
-  IonButtons: slotStub,
-  IonButton: slotStub,
-  IonContent: slotStub,
-  IonTitle: slotStub,
+  IonIcon: { template: '<i />' },
 };
 
 const IMAGES = [
@@ -25,7 +20,7 @@ const IMAGES = [
 ];
 
 function render(props: Record<string, unknown> = {}) {
-  return mount(ChatImagePreview, {
+  return mount(ImagePreview, {
     props: { isOpen: true, images: IMAGES, index: 0, ...props },
     global: {
       stubs: ionicStubs,
@@ -38,13 +33,31 @@ function buttonByLabel(wrapper: ReturnType<typeof render>, label: string) {
   return wrapper.findAll('[aria-label]').find((el) => el.attributes('aria-label') === label);
 }
 
-describe('ChatImagePreview', () => {
+/** 控制按钮是原生 button，直接看 DOM 的 disabled 属性 */
+function isDisabled(wrapper: ReturnType<typeof render>, label: string) {
+  return (buttonByLabel(wrapper, label)!.element as HTMLButtonElement).disabled;
+}
+
+describe('ImagePreview', () => {
   it('renders the image at the given index with its alt text', () => {
     const img = render({ index: 1 }).find('[data-testid="image-preview-img"]');
 
     expect(img.exists()).toBe(true);
     expect(img.attributes('src')).toBe('blob:b.png');
     expect(img.attributes('alt')).toBe('b.png');
+  });
+
+  it('是浮层：不渲染标题栏（ion-header / ion-toolbar / ion-title）', () => {
+    const wrapper = render();
+
+    // 用标签查找而非 html() 字符串匹配：html() 会把模板注释也带上，
+    // 注释里出现这些字样会造成误报。
+    for (const tag of ['ion-header', 'ion-toolbar', 'ion-title']) {
+      expect(wrapper.find(tag).exists(), `${tag} 不该存在`).toBe(false);
+    }
+    // 浮层本体与图片仍在
+    expect(wrapper.find('[data-testid="image-preview-body"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="image-preview-img"]').exists()).toBe(true);
   });
 
   it('shows the position counter only when there are multiple images', () => {
@@ -81,10 +94,6 @@ describe('ChatImagePreview', () => {
   });
 
   it('disables navigation at both ends', () => {
-    // 经 stub 渲染后 disabled 会落到普通 div 上，值以字符串形式出现
-    const isDisabled = (wrapper: ReturnType<typeof render>, label: string) =>
-      buttonByLabel(wrapper, label)!.attributes('disabled') === 'true';
-
     const first = render({ index: 0 });
     expect(isDisabled(first, '上一张')).toBe(true);
     expect(isDisabled(first, '下一张')).toBe(false);
@@ -92,6 +101,13 @@ describe('ChatImagePreview', () => {
     const last = render({ index: 2 });
     expect(isDisabled(last, '上一张')).toBe(false);
     expect(isDisabled(last, '下一张')).toBe(true);
+  });
+
+  it('单张图片时不显示翻页控件与计数', () => {
+    const wrapper = render({ images: [IMAGES[0]] });
+
+    expect(buttonByLabel(wrapper, '上一张')).toBeUndefined();
+    expect(buttonByLabel(wrapper, '下一张')).toBeUndefined();
   });
 
   it('closes itself when the image list becomes empty (revoked preview URLs)', () => {
@@ -106,5 +122,35 @@ describe('ChatImagePreview', () => {
     await wrapper.setProps({ images: [IMAGES[0]] });
 
     expect(wrapper.emitted('update:isOpen')).toEqual([[false]]);
+  });
+});
+
+describe('useImagePreview', () => {
+  // TabAiChat 与 TabChatRoom 共用它构造预览状态；这里回归的是"文件名 → 可渲染的 src"，
+  // 一旦映射写错，两处的预览会同时静默失效（点缩略图没反应或空白）。
+  it('把文件名映射成 pic 查看地址，并带上 alt', () => {
+    const { imagePreview, openImagePreview } = useImagePreview();
+
+    openImagePreview(['chat-1-1.png', 'chat-1-2.jpg'], 1);
+
+    expect(imagePreview.value.open).toBe(true);
+    expect(imagePreview.value.index).toBe(1);
+    expect(imagePreview.value.images).toHaveLength(2);
+    expect(imagePreview.value.images[1].alt).toBe('chat-1-2.jpg');
+    // src 走 pic 查看接口（此处只断言形状，具体 URL 由 getPicDisplayUrl 决定）
+    expect(String(imagePreview.value.images[0].src)).toContain('chat-1-1.png');
+  });
+
+  it('默认从第一张开始，空列表也能安全打开（由组件自行关闭）', () => {
+    const { imagePreview, openImagePreview } = useImagePreview();
+
+    openImagePreview([]);
+
+    expect(imagePreview.value.index).toBe(0);
+    expect(imagePreview.value.images).toEqual([]);
+  });
+
+  it('初始为关闭状态', () => {
+    expect(useImagePreview().imagePreview.value.open).toBe(false);
   });
 });

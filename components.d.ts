@@ -17,6 +17,7 @@ declare module 'vue' {
     FabButton: typeof import('./src/components/FabButton.vue')['default']
     GConfig: typeof import('./src/components/GConfig.vue')['default']
     IconMdiCheckAll: typeof import('~icons/mdi/check-all')['default']
+    ImagePreview: typeof import('./src/components/ImagePreview.vue')['default']
     RewardListPop: typeof import('./src/components/RewardListPop.vue')['default']
     RewardPop: typeof import('./src/components/RewardPop.vue')['default']
     RewardSet: typeof import('./src/components/RewardSet.vue')['default']

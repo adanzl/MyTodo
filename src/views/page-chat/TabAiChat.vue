@@ -119,7 +119,7 @@
         有新回复 ↓
       </button>
     </ion-content>
-    <ChatImagePreview
+    <ImagePreview
       v-model:is-open="imagePreview.open"
       v-model:index="imagePreview.index"
       :images="imagePreview.images" />
@@ -136,7 +136,8 @@ import {
   IonSpinner,
 } from "@ionic/vue";
 import { Icon } from "@iconify/vue";
-import ChatImagePreview from "./ChatImagePreview.vue";
+import ImagePreview from "@/components/ImagePreview.vue";
+import { useImagePreview } from "./use-image-preview";
 import { volumeMediumOutline } from "ionicons/icons";
 import { ref, watch } from "vue";
 import EventBus, { C_EVENT } from "@/types/event-bus";
@@ -189,12 +190,8 @@ const userNearBottom = ref(true);
 const showNewReplyHint = ref(false);
 const historyCursor = ref<string | number | undefined>(undefined);
 
-/** 气泡内图片的大图预览状态 */
-const imagePreview = ref<{ open: boolean; index: number; images: { src: string; alt: string }[] }>({
-  open: false,
-  index: 0,
-  images: [],
-});
+/** 气泡内图片的大图预览状态（与 TabChatRoom 共用） */
+const { imagePreview, openImagePreview } = useImagePreview();
 
 watch(
   () => props.aiConversationId,
@@ -369,15 +366,6 @@ function restoreServerReply(
   finished: boolean
 ) {
   restoreServerReplySnapshot(messages.value, clientRequestId, replyText, finished);
-}
-
-/** 点缩略图看大图：用 pic 查看接口的原始尺寸（不传 w/h） */
-function openImagePreview(names: string[], index: number) {
-  imagePreview.value = {
-    open: true,
-    index,
-    images: names.map((name) => ({ src: getPicDisplayUrl(name), alt: name })),
-  };
 }
 
 function getRequestRetryText(clientRequestId: string): string {

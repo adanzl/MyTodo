@@ -1,5 +1,5 @@
 import {
-  imageFilenamesFromMessageFiles,
+  imageFilenamesFromFiles,
   oldestHistoryId,
   prependHistoryTurns,
   type DifyHistoryItem,
@@ -47,10 +47,11 @@ describe("ai-chat-history", () => {
   });
 });
 
-describe("imageFilenamesFromMessageFiles", () => {
+/** 两个来源共用同一个提取函数：Dify 历史与聊天室消息 */
+describe("imageFilenamesFromFiles", () => {
   it("取多图（message_files 实测是数组）", () => {
     expect(
-      imageFilenamesFromMessageFiles([
+      imageFilenamesFromFiles([
         { filename: "chat-1-1.png", type: "image" },
         { filename: "chat-1-2.jpg", type: "image" },
       ])
@@ -58,12 +59,12 @@ describe("imageFilenamesFromMessageFiles", () => {
   });
 
   it("缺失或非法输入一律返回空数组", () => {
-    expect(imageFilenamesFromMessageFiles(null)).toEqual([]);
-    expect(imageFilenamesFromMessageFiles(undefined)).toEqual([]);
-    expect(imageFilenamesFromMessageFiles([])).toEqual([]);
+    expect(imageFilenamesFromFiles(null)).toEqual([]);
+    expect(imageFilenamesFromFiles(undefined)).toEqual([]);
+    expect(imageFilenamesFromFiles([])).toEqual([]);
     // 上游字段异常（不是数组）也不能崩
     expect(
-      imageFilenamesFromMessageFiles(
+      imageFilenamesFromFiles(
         { filename: "a.png" } as unknown as DifyHistoryItem["message_files"]
       )
     ).toEqual([]);
@@ -71,7 +72,7 @@ describe("imageFilenamesFromMessageFiles", () => {
 
   it("过滤掉非图片类型，也跳过没有文件名的项", () => {
     expect(
-      imageFilenamesFromMessageFiles([
+      imageFilenamesFromFiles([
         { filename: "doc.pdf", type: "document" },
         { filename: "", type: "image" },
         { filename: "chat-1-3.png", type: "image" },
@@ -81,12 +82,45 @@ describe("imageFilenamesFromMessageFiles", () => {
 
   it("缺 type 时按扩展名兜底，避免上游少个字段就丢图", () => {
     expect(
-      imageFilenamesFromMessageFiles([
+      imageFilenamesFromFiles([
         { filename: "chat-1-4.png" },
         { filename: "chat-1-5.JPEG" },
         { filename: "notes.txt" },
       ])
     ).toEqual(["chat-1-4.png", "chat-1-5.JPEG"]);
+  });
+
+  // ---- 聊天室来源：元素可能是裸文件名，也可能是 {type, filename} 对象 ----
+  it("聊天室：对象形态", () => {
+    expect(
+      imageFilenamesFromFiles([
+        { type: "image", filename: "chat-2-1.png" },
+        { type: "image", filename: "chat-2-2.jpg" },
+      ])
+    ).toEqual(["chat-2-1.png", "chat-2-2.jpg"]);
+  });
+
+  it("聊天室：裸文件名数组", () => {
+    expect(imageFilenamesFromFiles(["chat-2-1.png"])).toEqual(["chat-2-1.png"]);
+  });
+
+  it("聊天室：畸形元素逐项跳过，不整体失败", () => {
+    // 一条格式异常的历史消息/广播不该让整个列表加载失败
+    expect(
+      imageFilenamesFromFiles([{}, [], 42, "", "   ", { filename: "" }])
+    ).toEqual([]);
+  });
+
+  it("聊天室：非数组输入返回空数组", () => {
+    expect(imageFilenamesFromFiles("chat-2-1.png")).toEqual([]);
+    expect(imageFilenamesFromFiles({ filename: "a.png" })).toEqual([]);
+  });
+
+  it("去除首尾空白并保持顺序", () => {
+    expect(imageFilenamesFromFiles(["  a.png  ", "b.png"])).toEqual([
+      "a.png",
+      "b.png",
+    ]);
   });
 });
 
