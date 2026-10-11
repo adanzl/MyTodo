@@ -1,4 +1,5 @@
 import {
+  imageFilenamesFromMessageFiles,
   oldestHistoryId,
   prependHistoryTurns,
   type DifyHistoryItem,
@@ -43,5 +44,77 @@ describe("ai-chat-history", () => {
     expect(added).toBe(1);
     expect(messages[0]).toMatchObject({ content: "早", role: "me" });
     expect(messages[2]).toMatchObject({ content: "2", role: "me" });
+  });
+});
+
+describe("imageFilenamesFromMessageFiles", () => {
+  it("取多图（message_files 实测是数组）", () => {
+    expect(
+      imageFilenamesFromMessageFiles([
+        { filename: "chat-1-1.png", type: "image" },
+        { filename: "chat-1-2.jpg", type: "image" },
+      ])
+    ).toEqual(["chat-1-1.png", "chat-1-2.jpg"]);
+  });
+
+  it("缺失或非法输入一律返回空数组", () => {
+    expect(imageFilenamesFromMessageFiles(null)).toEqual([]);
+    expect(imageFilenamesFromMessageFiles(undefined)).toEqual([]);
+    expect(imageFilenamesFromMessageFiles([])).toEqual([]);
+    // 上游字段异常（不是数组）也不能崩
+    expect(
+      imageFilenamesFromMessageFiles(
+        { filename: "a.png" } as unknown as DifyHistoryItem["message_files"]
+      )
+    ).toEqual([]);
+  });
+
+  it("过滤掉非图片类型，也跳过没有文件名的项", () => {
+    expect(
+      imageFilenamesFromMessageFiles([
+        { filename: "doc.pdf", type: "document" },
+        { filename: "", type: "image" },
+        { filename: "chat-1-3.png", type: "image" },
+      ])
+    ).toEqual(["chat-1-3.png"]);
+  });
+
+  it("缺 type 时按扩展名兜底，避免上游少个字段就丢图", () => {
+    expect(
+      imageFilenamesFromMessageFiles([
+        { filename: "chat-1-4.png" },
+        { filename: "chat-1-5.JPEG" },
+        { filename: "notes.txt" },
+      ])
+    ).toEqual(["chat-1-4.png", "chat-1-5.JPEG"]);
+  });
+});
+
+describe("历史气泡带图", () => {
+  it("图片文件名挂到用户气泡上，供模板渲染", () => {
+    const page: DifyHistoryItem[] = [
+      {
+        id: "h1",
+        query: "看看这张图",
+        answer: "看到了",
+        message_files: [{ filename: "chat-1-9.png", type: "image" }],
+      },
+    ];
+
+    const { messages } = prependHistoryTurns([], page);
+    const user = messages.find((m) => m.role === "me");
+
+    expect(user?.images).toEqual(["chat-1-9.png"]);
+  });
+
+  it("没有图片的轮次不带 images 字段（避免渲染空容器）", () => {
+    const page: DifyHistoryItem[] = [
+      { id: "h2", query: "只有文字", answer: "好" },
+    ];
+
+    const { messages } = prependHistoryTurns([], page);
+    const user = messages.find((m) => m.role === "me");
+
+    expect(user?.images).toBeUndefined();
   });
 });

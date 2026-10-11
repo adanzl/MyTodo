@@ -73,6 +73,20 @@ export async function uploadPic(file: File): Promise<PicUploadResult> {
   return rsp.data.data!;
 }
 
+/**
+ * 删除 pic 目录中的图片文件（连同所有缩放缓存变体）。
+ *
+ * 注意与 `delPic` 区分：`delPic` 删的是 `t_user_pic` 表的记录，本函数删的是磁盘文件。
+ */
+export async function deletePicFile(filename: string): Promise<void> {
+  const rsp = await apiClient.post<ApiResponse<{ deleted?: string[] }>>("/pic/delete", {
+    name: filename,
+  });
+  if (rsp.data.code !== 0) {
+    throw new Error(rsp.data.msg);
+  }
+}
+
 const DEFAULT_PIC_PLACEHOLDER = (() => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" role="img" aria-label="暂无图片">
   <defs>

@@ -17,11 +17,13 @@ Dify 的 HTTP 细节仍封装在 `AILocal`（`core/ai/ai_local.py`），本类�
 import base64
 import csv
 import io
+import os
 import time
 from datetime import datetime
 from urllib.parse import quote
 
 import core.db.rds_mgr as rds_mgr
+from core.ai.ai_file import AiImageError, resolve_chat_files
 from core.ai.ai_local import AILocal
 from core.chat.asr_factory import create_asr_client
 from core.chat import chat_request_store
@@ -37,6 +39,40 @@ log = app_logger
 MSG_TYPE_ERROR = "error"
 
 EVENT_MESSAGE = "message"
+
+# 只发图片、不打字时的占位文本。
+# Dify 的 query 不允许为空（实测 400 `invalid_param: query is required`），而且这个
+# 占位文本会作为用户那一轮的文案进入 Dify 历史，所以固定成一个可识别的值。
+EMPTY_QUERY_PLACEHOLDER = '[图片]'
+
+
+# 单条聊天室消息允许携带的图片数上限（防滥用；对齐 AI 侧的默认上限）
+MAX_ROOM_FILES = 3
+
+
+def _parse_room_files(raw) -> list[dict]:
+    """把聊天室消息里的附件归一成 ``[{'type': 'image', 'filename': ...}]``。
+
+    聊天室不做 Dify 转换，所以这里只做形状收敛：去掉路径成分、丢掉空项、限长，
+    避免把任意内容原样广播给房间里所有人。
+    """
+    if not raw:
+        return []
+    if isinstance(raw, (str, dict)):
+        raw = [raw]
+    if not isinstance(raw, (list, tuple)):
+        return []
+    files: list[dict] = []
+    for item in raw:
+        filename = ''
+        if isinstance(item, str):
+            filename = item
+        elif isinstance(item, dict):
+            filename = str(item.get('filename') or '')
+        filename = os.path.basename(filename.strip())
+        if filename and len(filename) <= 255:
+            files.append({'type': 'image', 'filename': filename})
+    return files[:MAX_ROOM_FILES]
 
 # 查询 Dify 时的单页条数上限（Dify 自身限制，超出会 422）与默认值
 MAX_LIMIT = 100
@@ -684,6 +720,10 @@ class ChatMgr:
             if chat_type == 'chat_room':
                 room_id = data.get('roomId', '')
                 user_id = data.get('userId', '')
+                # 聊天室的图片：与 AI 对话不同，这里不需要转成 Dify 的 file id，
+                # 只把文件名透传/落库（图片已由 /api/pic/upload 存在本服务），
+                # 对端用 /pic/view?name=<filename> 渲染。
+                room_files = _parse_room_files(data.get('files'))
                 msg_data = {
                     'user_id': user_id,
                     'content': content,
@@ -691,6 +731,8 @@ class ChatMgr:
                     'ts': time.strftime('%Y-%m-%d %H:%M:%S'),
                     'chat_type': chat_type,
                 }
+                if room_files:
+                    msg_data['files'] = room_files
                 rds_mgr.rpush("chat:" + room_id, json.dumps(msg_data, ensure_ascii=False))
                 for client in self.clients.values():
                     if client.sid != sid:
@@ -706,7 +748,23 @@ class ChatMgr:
                     return
                 if not client.try_begin_ai(rid):
                     return
-                client.ai.stream_msg(content, client_request_id=rid)
+                # 图片在本地存一份（/api/pic/upload），这里换成 Dify 的文件 id。
+                # 能力未开/上传失败时直接结束本轮并回报错误——Dify 在开关关闭时
+                # 会静默丢弃附件，不检查的话用户会以为图片发出去了。
+                try:
+                    files = resolve_chat_files(data.get('files'), client.ai.user)
+                except AiImageError as e:
+                    log.warning(f"[CHAT] 图片处理失败 user={client.ai.user}: {e}")
+                    client.on_err(e, rid)
+                    return
+                query = content
+                if files and not content.strip():
+                    query = EMPTY_QUERY_PLACEHOLDER
+                # 无图时不传 files，保持与既有调用完全一致（Dify 侧缺省即空）
+                if files:
+                    client.ai.stream_msg(query, client_request_id=rid, files=files)
+                else:
+                    client.ai.stream_msg(query, client_request_id=rid)
         except Exception as e:
             log.error(f"[CHAT] Error handling text for client {sid}: {e}")
 

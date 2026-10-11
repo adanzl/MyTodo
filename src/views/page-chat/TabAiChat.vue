@@ -58,6 +58,15 @@
           <div
             v-else
             class="max-w-[80%] bg-green-500 text-white p-2 rounded-lg shadow-md relative ml-auto inline-block">
+            <div v-if="msg.images?.length" class="flex flex-wrap gap-1 mb-1">
+              <img
+                v-for="(name, idx) in msg.images"
+                :key="`${name}-${idx}`"
+                :src="getPicDisplayUrl(name)"
+                :alt="name"
+                class="w-28 h-28 object-cover rounded-md bg-white/20 cursor-zoom-in"
+                @click="openImagePreview(msg.images!, idx)" />
+            </div>
             <span v-if="msg.status === 'sending'" class="italic opacity-90">{{
               msg.content || "发送中…"
             }}</span>
@@ -110,6 +119,10 @@
         有新回复 ↓
       </button>
     </ion-content>
+    <ChatImagePreview
+      v-model:is-open="imagePreview.open"
+      v-model:index="imagePreview.index"
+      :images="imagePreview.images" />
   </ion-segment-content>
 </template>
 
@@ -123,10 +136,12 @@ import {
   IonSpinner,
 } from "@ionic/vue";
 import { Icon } from "@iconify/vue";
+import ChatImagePreview from "./ChatImagePreview.vue";
 import { volumeMediumOutline } from "ionicons/icons";
 import { ref, watch } from "vue";
 import EventBus, { C_EVENT } from "@/types/event-bus";
 import { getAiChatMessages } from "@/api/api-chat";
+import { getPicDisplayUrl } from "@/api/api-pic";
 import {
   AI_HISTORY_MAX_PAGES,
   AI_HISTORY_PAGE_SIZE,
@@ -173,6 +188,13 @@ const networkError = ref(false);
 const userNearBottom = ref(true);
 const showNewReplyHint = ref(false);
 const historyCursor = ref<string | number | undefined>(undefined);
+
+/** 气泡内图片的大图预览状态 */
+const imagePreview = ref<{ open: boolean; index: number; images: { src: string; alt: string }[] }>({
+  open: false,
+  index: 0,
+  images: [],
+});
 
 watch(
   () => props.aiConversationId,
@@ -349,12 +371,31 @@ function restoreServerReply(
   restoreServerReplySnapshot(messages.value, clientRequestId, replyText, finished);
 }
 
+/** 点缩略图看大图：用 pic 查看接口的原始尺寸（不传 w/h） */
+function openImagePreview(names: string[], index: number) {
+  imagePreview.value = {
+    open: true,
+    index,
+    images: names.map((name) => ({ src: getPicDisplayUrl(name), alt: name })),
+  };
+}
+
 function getRequestRetryText(clientRequestId: string): string {
   const server = findServerByClientRequestId(messages.value, clientRequestId);
   if (server?.retryText) return server.retryText;
   const user = findUserByClientRequestId(messages.value, clientRequestId);
   if (user?.retryText) return user.retryText;
   return user?.content ?? "";
+}
+
+/**
+ * 取出某轮用户消息随附的图片文件名。
+ *
+ * 图片在发送后就从输入区清空了，气泡上的 `images` 是唯一留存的凭证，
+ * 重试必须从这里取回来，否则重发会变成"只有文字没有图"。
+ */
+function getRequestImages(clientRequestId: string): string[] {
+  return findUserByClientRequestId(messages.value, clientRequestId)?.images ?? [];
 }
 
 function initialCursor(): string | number | undefined {
@@ -425,6 +466,7 @@ defineExpose({
   getLastMessage,
   getPendingClientRequestIds,
   getRequestRetryText,
+  getRequestImages,
   restoreServerReply,
 });
 </script>

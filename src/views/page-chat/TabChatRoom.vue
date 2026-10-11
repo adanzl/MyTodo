@@ -16,6 +16,15 @@
           <div v-if="String(msg.role) === userIdStr" class="flex">
             <div
               class="max-w-[70%] bg-green-500 text-white p-2 ml-auto mr-15 rounded-lg shadow-md relative inline-block">
+              <div v-if="msg.images?.length" class="flex flex-wrap gap-1 mb-1">
+                <img
+                  v-for="(name, i) in msg.images"
+                  :key="`${name}-${i}`"
+                  :src="getPicDisplayUrl(name)"
+                  :alt="name"
+                  class="w-28 h-28 object-cover rounded-md bg-white/20 cursor-zoom-in"
+                  @click="openImagePreview(msg.images!, i)" />
+              </div>
               {{ msg.content }}
               <ion-avatar slot="start" class="w-12 h-12 ml-1 absolute -right-15 -top-1">
                 <ion-img :src="getUserInfo(msg.role)?.icon ?? DEFAULT_AVATAR" />
@@ -28,12 +37,25 @@
               <ion-avatar slot="start" class="w-12 h-12 mr-1 absolute -left-15 -top-1">
                 <ion-img :src="getUserInfo(msg.role)?.icon ?? DEFAULT_AVATAR" />
               </ion-avatar>
+              <div v-if="msg.images?.length" class="flex flex-wrap gap-1 mb-1">
+                <img
+                  v-for="(name, i) in msg.images"
+                  :key="`${name}-${i}`"
+                  :src="getPicDisplayUrl(name)"
+                  :alt="name"
+                  class="w-28 h-28 object-cover rounded-md cursor-zoom-in"
+                  @click="openImagePreview(msg.images!, i)" />
+              </div>
               {{ msg.content }}
             </div>
           </div>
         </div>
       </div>
     </ion-content>
+    <ChatImagePreview
+      v-model:is-open="imagePreview.open"
+      v-model:index="imagePreview.index"
+      :images="imagePreview.images" />
   </ion-segment-content>
 </template>
 
@@ -50,7 +72,10 @@ import {
 import { computed, ref, watch } from "vue";
 import EventBus, { C_EVENT } from "@/types/event-bus";
 import { getChatMessages } from "@/api/api-chat";
+import { getPicDisplayUrl } from "@/api/api-pic";
+import { roomImageFilenames } from "@/views/page-chat/chat-room-images";
 import { getNetworkErrorMessage } from "@/utils/net-util";
+import ChatImagePreview from "./ChatImagePreview.vue";
 import type { RefresherCustomEvent } from "@ionic/vue";
 
 export interface ChatMsg {
@@ -61,6 +86,8 @@ export interface ChatMsg {
   playing?: boolean;
   ts?: string;
   type?: string;
+  /** 随消息发送的图片文件名（pic 目录里的名字），用 /pic/view?name= 渲染 */
+  images?: string[];
 }
 
 const DEFAULT_AVATAR = new URL("../../assets/images/avatar.svg", import.meta.url).href;
@@ -82,6 +109,21 @@ const contentRef = ref<InstanceType<typeof IonContent> | null>(null);
 const messages = ref<ChatMsg[]>([]);
 const networkError = ref(false);
 
+/** 点气泡里的图片看大图 */
+const imagePreview = ref<{
+  open: boolean;
+  index: number;
+  images: { src: string; alt: string }[];
+}>({ open: false, index: 0, images: [] });
+
+function openImagePreview(names: string[], index: number) {
+  imagePreview.value = {
+    open: true,
+    index,
+    images: names.map((name) => ({ src: getPicDisplayUrl(name), alt: name })),
+  };
+}
+
 function scrollToBottom(duration = 200) {
   contentRef.value?.$el?.scrollToBottom?.(duration);
 }
@@ -99,12 +141,14 @@ async function loadInitial() {
     const list = data?.data ?? [];
     list.reverse().forEach((item: any) => {
       const d = typeof item === "string" ? JSON.parse(item) : item;
+      const images = roomImageFilenames(d.files);
       messages.value.unshift({
         id: d.id,
         content: d.content,
         role: d.user_id,
         ts: d.ts,
         type: d.type,
+        ...(images.length > 0 ? { images } : {}),
       });
     });
   } catch (err) {
@@ -130,12 +174,14 @@ async function onRefresh(e: RefresherCustomEvent) {
     const list = data?.data ?? [];
     list.reverse().forEach((item: any) => {
       const d = typeof item === "string" ? JSON.parse(item) : item;
+      const images = roomImageFilenames(d.files);
       messages.value.unshift({
         id: d.id,
         content: d.content,
         role: d.user_id,
         ts: d.ts,
         type: d.type,
+        ...(images.length > 0 ? { images } : {}),
       });
     });
   } catch (err) {

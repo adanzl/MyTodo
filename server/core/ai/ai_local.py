@@ -96,6 +96,7 @@ class AILocal:
         try_times: int = 0,
         client_request_id: str = "",
         bound_attempt: int | None = None,
+        files: list[dict] | None = None,
     ) -> None:
         """发起流式对话请求。
 
@@ -104,6 +105,8 @@ class AILocal:
             inputs (dict | None): 透传给 Dify 的 inputs。
             timeout (int): HTTP 超时时间（秒）。
             try_times (int): 内部递归重试计数（仅做一次轻量重试）。
+            files (list[dict] | None): Dify `files` 参数（图片等附件），由
+                `core.ai.ai_file.resolve_chat_files` 生成。
         """
         payload = {
             "inputs": inputs or {},
@@ -111,6 +114,7 @@ class AILocal:
             "conversation_id": self.aiConversationId,
             "response_mode": "streaming",
             "user": self.user,
+            "files": files or [],
         }
         req_id = client_request_id or ""
         stream_attempt = (
