@@ -41,8 +41,14 @@ def db_mgr(monkeypatch, app):
 
     monkeypatch.setattr('core.db.db_mgr.DB_NAME', 'test_data.db')
     import os
-    if os.path.exists('test_data.db'):
-        os.remove('test_data.db')
+    # Flask-SQLAlchemy 会把相对 sqlite 路径解析到 app.instance_path（不是 CWD），
+    # 必须删那个位置，否则会残留上一版表结构：create_all() 只补缺失的表、
+    # 不会补缺失的列，旧库会让后续 INSERT 报 "has no column named ..."。
+    db_path = os.path.join(app.instance_path, 'test_data.db')
+    os.makedirs(app.instance_path, exist_ok=True)
+    for stale in (db_path, os.path.join(os.getcwd(), 'test_data.db')):
+        if os.path.exists(stale):
+            os.remove(stale)
     db_manager.init(app)
 
     with app.app_context():

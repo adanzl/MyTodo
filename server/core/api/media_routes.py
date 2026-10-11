@@ -89,7 +89,13 @@ def serve_media_file(filepath: str) -> ResponseReturnValue:
     if result.get('code') != 0:
         abort(result.get('http_status', 404))
     data = result['data']
-    return send_file(data['path'], mimetype=data['mimetype'], conditional=True)
+    try:
+        return send_file(data['path'], mimetype=data['mimetype'], conditional=True)
+    except Exception as e:
+        # 校验通过后文件仍可能被删除或无权限（媒体目录常见），
+        # 兜住异常返回 500，避免抛出裸异常
+        log.error(f"[MEDIA] Error serving file {filepath}: {e}")
+        return _err(f"Error serving file: {e}"), 500
 
 
 @media_bp.route("/media/subtitle/get", methods=['GET'])

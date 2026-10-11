@@ -4,13 +4,14 @@ import pytest
 import queue
 import json
 import os
+import stat
 import sys
 from datetime import datetime
 from flask import Flask, request
 from unittest.mock import patch, MagicMock
 
-from core.utils import (_build_shell_command, _read_file_safe, _read_returncode, ok_response,
-                        err_response, get_json_body, read_json_from_request, format_time_str, time_to_seconds,
+from core.utils import (_build_shell_command, _read_file_safe, _read_returncode, _ok,
+                        _err, get_json_body, read_json_from_request, format_time_str, time_to_seconds,
                         decode_url_path, is_allowed_audio_file, is_allowed_pdf_file, get_unique_filepath,
                         convert_standard_cron_weekday_to_apscheduler, validate_and_normalize_path, get_media_url,
                         ensure_directory, get_file_info, convert_to_http_url, run_subprocess_safe,
@@ -18,17 +19,24 @@ from core.utils import (_build_shell_command, _read_file_safe, _read_returncode,
                         _cleanup_temp_files)
 
 # --- Test Response Helpers ---
+# 响应封装的公开名字是 _ok / _err（沿用 core.utils 现有命名）；
+# 错误响应同样带 data 键（值为 None），与成功响应形状保持一致。
 
 
 def test_ok_response():
-    """Test ok_response for correct structure."""
-    assert ok_response() == {"code": 0, "msg": "ok", "data": None}
-    assert ok_response(data={"foo": "bar"}) == {"code": 0, "msg": "ok", "data": {"foo": "bar"}}
+    """Test _ok for correct structure."""
+    assert _ok() == {"code": 0, "msg": "ok", "data": None}
+    assert _ok(data={"foo": "bar"}) == {"code": 0, "msg": "ok", "data": {"foo": "bar"}}
 
 
 def test_err_response():
-    """Test err_response for correct structure."""
-    assert err_response("An error") == {"code": -1, "msg": "An error"}
+    """Test _err for correct structure."""
+    assert _err("An error") == {"code": -1, "msg": "An error", "data": None}
+    assert _err("An error", data={"foo": "bar"}) == {
+        "code": -1,
+        "msg": "An error",
+        "data": {"foo": "bar"},
+    }
 
 
 # --- Test Time Helpers ---
@@ -138,15 +146,16 @@ def test_get_json_body_not_json_content_type(app):
 def test_get_unique_filepath_does_not_exist(mock_exists):
     mock_exists.return_value = False
     path = get_unique_filepath('/tmp', 'file', '.txt')
-    assert path == '/tmp/file.txt'
-    mock_exists.assert_called_once_with('/tmp/file.txt')
+    # 用 os.path.join 拼期望值，避免硬编码 '/' 在 Windows 上失败
+    assert path == os.path.join('/tmp', 'file.txt')
+    mock_exists.assert_called_once_with(os.path.join('/tmp', 'file.txt'))
 
 
 @patch('core.utils.os.path.exists')
 def test_get_unique_filepath_exists_once(mock_exists):
     mock_exists.side_effect = [True, False]
     path = get_unique_filepath('/tmp', 'file', '.txt')
-    assert path == '/tmp/file_1.txt'
+    assert path == os.path.join('/tmp', 'file_1.txt')
     assert mock_exists.call_count == 2
 
 
@@ -154,32 +163,36 @@ def test_get_unique_filepath_exists_once(mock_exists):
 def test_get_unique_filepath_exists_twice(mock_exists):
     mock_exists.side_effect = [True, True, False]
     path = get_unique_filepath('/tmp', 'file', '.txt')
-    assert path == '/tmp/file_2.txt'
+    assert path == os.path.join('/tmp', 'file_2.txt')
     assert mock_exists.call_count == 3
 
 
-@patch('core.utils.os.path.exists', return_value=True)
-@patch('core.utils.os.path.isfile', return_value=True)
+def _fake_lstat(mode: int) -> os.stat_result:
+    """构造 os.lstat 的返回值；实现只读 st_mode，其余字段填 0。"""
+    return os.stat_result((mode, 0, 0, 1, 0, 0, 0, 0, 0, 0))
+
+
+@patch('core.utils.os.lstat')
 @patch('core.utils.os.path.isabs', return_value=True)
-@patch('core.utils.os.path.abspath', side_effect=lambda p: p)
-def test_validate_and_normalize_path_ok(mock_abspath, mock_isabs, mock_isfile, mock_exists):
+def test_validate_and_normalize_path_ok(mock_isabs, mock_lstat):
+    mock_lstat.return_value = _fake_lstat(stat.S_IFREG)
     path, err = validate_and_normalize_path('/mnt/file.txt', base_dir='/mnt')
     assert err == 'ok'
-    assert path == '/mnt/file.txt'
+    assert path == os.path.normpath('/mnt/file.txt')
 
 
-@patch('core.utils.os.path.exists', return_value=False)
-def test_validate_and_normalize_path_not_exists(mock_exists):
+@patch('core.utils.os.lstat', side_effect=FileNotFoundError)
+def test_validate_and_normalize_path_not_exists(mock_lstat):
     # 使用允许目录内的路径进行测试
     path, err = validate_and_normalize_path('/opt/my_todo/data/nonexistent.txt')
     assert err == "文件不存在"
     assert path is None
 
 
-@patch('core.utils.os.path.exists', return_value=True)
-@patch('core.utils.os.path.isfile', return_value=False)
-def test_validate_and_normalize_path_not_a_file(mock_isfile, mock_exists):
-    # 使用允许目录内的路径进行测试
+@patch('core.utils.os.lstat')
+def test_validate_and_normalize_path_not_a_file(mock_lstat):
+    # 使用允许目录内的路径进行测试；lstat 返回目录模式即"不是文件"
+    mock_lstat.return_value = _fake_lstat(stat.S_IFDIR)
     path, err = validate_and_normalize_path('/opt/my_todo/data/a_directory', must_be_file=True)
     assert err == "路径不是文件"
     assert path is None
@@ -252,15 +265,14 @@ def test_validate_and_normalize_path_rejects_path_traversal():
     assert "Path traversal" in err
 
 
+@patch('core.utils.os.lstat')
 @patch('core.utils.os.path.isabs', return_value=False)
-@patch('core.utils.os.path.abspath', side_effect=lambda p: p)
-@patch('core.utils.os.path.exists', return_value=True)
-@patch('core.utils.os.path.isfile', return_value=True)
-@patch('core.utils.os.path.join', side_effect=lambda a, b: f"{a}/{b}")
-def test_validate_and_normalize_path_relative_path_ok(mock_join, mock_isfile, mock_exists, mock_abspath, mock_isabs):
+def test_validate_and_normalize_path_relative_path_ok(mock_isabs, mock_lstat):
+    # 相对路径应被拼到 base_dir 下
+    mock_lstat.return_value = _fake_lstat(stat.S_IFREG)
     path, err = validate_and_normalize_path("ext_base/a.mp3", base_dir="/mnt")
     assert err == 'ok'
-    assert path.startswith("/mnt/")
+    assert path == os.path.normpath(os.path.join("/mnt", "ext_base/a.mp3"))
 
 
 # --- Test Cron Helpers (check_cron_will_trigger_today) ---

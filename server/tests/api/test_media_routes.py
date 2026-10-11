@@ -30,11 +30,16 @@ def client(app):
 
 
 # region /media/getDuration
+# 路由只负责把 media_mgr.get_duration 的结果转成响应，
+# 路径校验与 ffprobe 都在 media_mgr 内部，所以这里 patch 的是 mgr 方法。
 
 
 def test_media_get_duration_ok(client, monkeypatch):
-    monkeypatch.setattr(media_routes, "validate_and_normalize_path", lambda *args, **kwargs: ("/_/a.mp3", None))
-    monkeypatch.setattr(media_routes, "get_media_duration", lambda path: 12.5)
+    monkeypatch.setattr(
+        media_routes.media_mgr,
+        "get_duration",
+        lambda path: {"code": 0, "data": {"duration": 12.5, "path": "/_/a.mp3"}},
+    )
 
     resp = client.get("/media/getDuration?path=/_/a.mp3")
     assert resp.status_code == 200
@@ -44,7 +49,12 @@ def test_media_get_duration_ok(client, monkeypatch):
 
 
 def test_media_get_duration_err_when_validate_fails(client, monkeypatch):
-    monkeypatch.setattr(media_routes, "validate_and_normalize_path", lambda *args, **kwargs: (None, "bad path"))
+    """路径非法时 mgr 返回失败，路由应转成错误响应。"""
+    monkeypatch.setattr(
+        media_routes.media_mgr,
+        "get_duration",
+        lambda path: {"code": -1, "msg": "Invalid file path"},
+    )
 
     resp = client.get("/media/getDuration?path=../x")
     assert resp.status_code == 200
@@ -53,8 +63,11 @@ def test_media_get_duration_err_when_validate_fails(client, monkeypatch):
 
 
 def test_media_get_duration_err_when_get_duration_fails(client, monkeypatch):
-    monkeypatch.setattr(media_routes, "validate_and_normalize_path", lambda *args, **kwargs: ("/_/a.mp3", None))
-    monkeypatch.setattr(media_routes, "get_media_duration", lambda path: None)
+    monkeypatch.setattr(
+        media_routes.media_mgr,
+        "get_duration",
+        lambda path: {"code": -1, "msg": "无法获取媒体文件时长"},
+    )
 
     resp = client.get("/media/getDuration?path=/_/a.mp3")
     assert resp.status_code == 200
@@ -63,12 +76,11 @@ def test_media_get_duration_err_when_get_duration_fails(client, monkeypatch):
 
 
 def test_media_get_duration_permission_error(client, monkeypatch):
-    monkeypatch.setattr(media_routes, "validate_and_normalize_path", lambda *args, **kwargs: ("/_/a.mp3", None))
-
-    def raise_perm(_):
-        raise PermissionError("no")
-
-    monkeypatch.setattr(media_routes, "get_media_duration", raise_perm)
+    monkeypatch.setattr(
+        media_routes.media_mgr,
+        "get_duration",
+        lambda path: {"code": -1, "msg": "Permission denied: no"},
+    )
 
     resp = client.get("/media/getDuration?path=/_/a.mp3")
     assert resp.status_code == 200
@@ -76,9 +88,11 @@ def test_media_get_duration_permission_error(client, monkeypatch):
 
 
 def test_media_get_duration_generic_exception(client, monkeypatch):
-    monkeypatch.setattr(media_routes, "validate_and_normalize_path", lambda *args, **kwargs: ("/_/a.mp3", None))
-    monkeypatch.setattr(media_routes, "get_media_duration", lambda path:
-                        (_ for _ in ()).throw(RuntimeError("probe err")))
+    monkeypatch.setattr(
+        media_routes.media_mgr,
+        "get_duration",
+        lambda path: {"code": -1, "msg": "Error: probe err"},
+    )
     resp = client.get("/media/getDuration?path=/_/a.mp3")
     assert resp.status_code == 200
     assert resp.get_json()["code"] != 0
@@ -551,7 +565,7 @@ def test_media_convert_create_ok(client, monkeypatch):
     monkeypatch.setattr(
         media_routes.audio_convert_mgr,
         "create_task",
-        lambda name, output_dir=None, overwrite=None: (0, "ok", "cid"),
+        lambda name, output_dir=None, overwrite=None, source_type=None: (0, "ok", "cid"),
     )
     monkeypatch.setattr(media_routes.audio_convert_mgr, "get_task", lambda task_id: {"id": task_id})
 
@@ -566,7 +580,7 @@ def test_media_convert_create_mgr_err(client, monkeypatch):
     monkeypatch.setattr(
         media_routes.audio_convert_mgr,
         "create_task",
-        lambda name, output_dir=None, overwrite=None: (-1, "bad", None),
+        lambda name, output_dir=None, overwrite=None, source_type=None: (-1, "bad", None),
     )
     resp = client.post("/media/convert/create", json={"name": "n"})
     assert resp.get_json()["code"] != 0

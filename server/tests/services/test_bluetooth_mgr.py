@@ -1,4 +1,5 @@
 import asyncio
+import os
 import types
 from unittest.mock import MagicMock, patch
 
@@ -312,11 +313,14 @@ def test_find_command_fallback_searches_common_paths(monkeypatch):
 
     mgr = BluetoothMgr()
 
+    # 期望值用 os.path.join 拼，避免硬编码 '/' 在 Windows 上不匹配
+    expected = os.path.join("/usr/bin", "bluetoothctl")
+
     # shutil.which is patched to None by the autouse fixture; exercise common path fallback
-    monkeypatch.setattr(bm.os.path, "exists", lambda p: p.endswith("/usr/bin/bluetoothctl"))
+    monkeypatch.setattr(bm.os.path, "exists", lambda p: p == expected)
     monkeypatch.setattr(bm.os, "access", lambda p, mode: True)
 
-    assert mgr._find_command("bluetoothctl") == "/usr/bin/bluetoothctl"
+    assert mgr._find_command("bluetoothctl") == expected
 
 
 def test_parse_bluetoothctl_output_handles_name_missing():
