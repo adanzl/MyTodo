@@ -38,15 +38,55 @@
           {{ (pageNum - 1) * pageSize + $index + 1 }}
         </template>
       </el-table-column>
-      <el-table-column
-        :label="`${userName}说的话`"
-        min-width="180"
-        :show-overflow-tooltip="OVERFLOW_TOOLTIP">
-        <template #default="{ row }">{{ row.query || "（空）" }}</template>
+      <!--
+        这一列不用列级的 `show-overflow-tooltip`：单元格现在是 flex（缩略图 + 文本），
+        文本自己 `truncate` 后 EP 检测不到溢出，悬停就不会再弹全文了。
+        所以改成显式 el-tooltip，行为不依赖 EP 的溢出启发式。
+      -->
+      <el-table-column :label="`${userName}说的话`" min-width="200">
+        <template #default="{ row }">
+          <div class="flex w-full min-w-0 items-center gap-1">
+            <!-- 提问随附的图片：缩略图可点开看大图 -->
+            <el-image
+              v-for="(name, idx) in questionImages(row)"
+              :key="`${name}-${idx}`"
+              class="h-6 w-6 shrink-0 cursor-zoom-in rounded"
+              :src="getPicDisplayUrl(name, 64, 64)"
+              :preview-src-list="questionImages(row).map(n => getPicDisplayUrl(n))"
+              :initial-index="idx"
+              :preview-teleported="true"
+              fit="cover">
+              <template #error>
+                <div class="flex h-full w-full items-center justify-center bg-gray-100 text-gray-400">
+                  <el-icon :size="12"><Picture /></el-icon>
+                </div>
+              </template>
+            </el-image>
+            <el-tooltip v-bind="OVERFLOW_TOOLTIP" :content="row.query || '（空）'">
+              <span class="min-w-0 flex-1 truncate">{{ row.query || "（空）" }}</span>
+            </el-tooltip>
+          </div>
+        </template>
       </el-table-column>
       <el-table-column label="回答" min-width="320">
         <template #default="{ row }">
           <div class="flex w-full min-w-0 items-center gap-1">
+            <!-- 回答随附的图片（Dify 生成图片时才会出现，目前实测为空） -->
+            <el-image
+              v-for="(name, idx) in answerImages(row)"
+              :key="`${name}-${idx}`"
+              class="h-6 w-6 shrink-0 cursor-zoom-in rounded"
+              :src="getPicDisplayUrl(name, 64, 64)"
+              :preview-src-list="answerImages(row).map(n => getPicDisplayUrl(n))"
+              :initial-index="idx"
+              :preview-teleported="true"
+              fit="cover">
+              <template #error>
+                <div class="flex h-full w-full items-center justify-center bg-gray-100 text-gray-400">
+                  <el-icon :size="12"><Picture /></el-icon>
+                </div>
+              </template>
+            </el-image>
             <span v-if="row.answer" class="min-w-0 flex-1 truncate">{{ row.answer }}</span>
             <!-- 生成失败时 answer 为空，把原因显示出来，否则只会看到一个空单元格 -->
             <span v-else-if="row.error" class="min-w-0 flex-1 truncate text-red-500">
@@ -150,15 +190,33 @@
           <!--
             提问：次要信息。灰条 + 灰底。
             底色用 gray-200（对白底对比度 1.24）；gray-50/100 仅 1.05/1.10，肉眼等同透明。
+            注意判空要把图片算进去：只发图片不发文字时 query 为空，不能因此整块隐藏。
           -->
           <div
-            v-if="answerRow.query"
+            v-if="answerRow.query || questionImages(answerRow).length"
             class="rounded-lg border-l-4 border-gray-400 bg-gray-200 px-4 py-3">
             <div class="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-gray-500">
               <el-icon :size="13"><User /></el-icon>
               <span>{{ userName }} 提问</span>
             </div>
-            <el-scrollbar max-height="8rem">
+            <div class="flex flex-wrap gap-2">
+              <el-image
+                v-for="(name, idx) in questionImages(answerRow)"
+                :key="`${name}-${idx}`"
+                class="h-24 w-24 cursor-zoom-in rounded bg-white/60"
+                :src="getPicDisplayUrl(name, 240, 240)"
+                :preview-src-list="questionImages(answerRow).map(n => getPicDisplayUrl(n))"
+                :initial-index="idx"
+                :preview-teleported="true"
+                fit="cover">
+                <template #error>
+                  <div class="flex h-full w-full items-center justify-center text-gray-400">
+                    <el-icon :size="20"><Picture /></el-icon>
+                  </div>
+                </template>
+              </el-image>
+            </div>
+            <el-scrollbar v-if="answerRow.query" max-height="8rem">
               <div class="pr-2 text-sm leading-6 text-gray-700 whitespace-pre-wrap wrap-break-word">
                 {{ answerRow.query }}
               </div>
@@ -180,6 +238,23 @@
                 <ChatDotRound v-else />
               </el-icon>
               <span>{{ answerIsError ? "失败原因" : "AI 回答" }}</span>
+            </div>
+            <div v-if="answerImages(answerRow).length" class="flex flex-wrap gap-2">
+              <el-image
+                v-for="(name, idx) in answerImages(answerRow)"
+                :key="`${name}-${idx}`"
+                class="h-24 w-24 cursor-zoom-in rounded bg-white/60"
+                :src="getPicDisplayUrl(name, 240, 240)"
+                :preview-src-list="answerImages(answerRow).map(n => getPicDisplayUrl(n))"
+                :initial-index="idx"
+                :preview-teleported="true"
+                fit="cover">
+                <template #error>
+                  <div class="flex h-full w-full items-center justify-center text-gray-400">
+                    <el-icon :size="20"><Picture /></el-icon>
+                  </div>
+                </template>
+              </el-image>
             </div>
             <el-scrollbar max-height="56vh">
               <div
@@ -234,15 +309,19 @@
 
 <script setup lang="ts">
 import { exportChatMessages, getConversationMessages } from "@/api/api-ai-chat";
+import { getBaseUrl } from "@/api/config";
+import { getPicDisplayUrl } from "@/api/api-pic";
 import { getRdsData } from "@/api/api-rds";
 import { useUserStore } from "@/stores/user";
 import type { DifyMessage } from "@/types/ai";
+import { splitMessageImages } from "./ai-history-images";
 import {
   ChatDotRound,
   Check,
   Close,
   DocumentCopy,
   Download,
+  Picture,
   Refresh,
   User,
   WarningFilled,
@@ -342,6 +421,18 @@ function formatTs(ts?: number): string {
 function shortId(id?: string): string {
   if (!id) return "-";
   return id.length > 8 ? id.slice(0, 8) : id;
+}
+
+/* ==================== 图片 ==================== */
+
+/** 提问随附的图片文件名（点开可看大图）。解析规则见 ai-history-images.ts */
+function questionImages(row: DifyMessage | null): string[] {
+  return row ? splitMessageImages(row.message_files).question : [];
+}
+
+/** 回答随附的图片文件名（Dify 生成图片时才有） */
+function answerImages(row: DifyMessage | null): string[] {
+  return row ? splitMessageImages(row.message_files).answer : [];
 }
 
 const answerIsError = computed(
@@ -507,6 +598,9 @@ async function confirmExport(): Promise<void> {
       user: userName.value,
       start: range?.[0],
       end: range?.[1],
+      // CSV 里的图片要写成绝对 URL；哪个前缀能访问到服务只有浏览器知道，
+      // 所以由前端把 API 的 origin 交给后端拼接（本地/远程都指向各自那台）
+      base: getBaseUrl(),
     });
 
     saveBlob(filename, blob);

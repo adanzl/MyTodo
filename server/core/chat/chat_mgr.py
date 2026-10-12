@@ -18,6 +18,7 @@ import base64
 import csv
 import io
 import os
+import re
 import time
 from datetime import datetime
 from urllib.parse import quote
@@ -86,6 +87,8 @@ MAX_EXPORT_MESSAGES = EXPORT_PAGE_SIZE * EXPORT_MAX_PAGES
 EXPORT_TIME_FMT = '%Y-%m-%d %H:%M:%S'
 # 导出响应类型（带 charset，Excel 才不会把中文读成乱码）
 EXPORT_CONTENT_TYPE = 'text/csv; charset=utf-8'
+# 图片文件名兜底判断（上游没给 type 时用）
+IMAGE_EXT_RE = re.compile(r'\.(?:jpe?g|png|gif|webp|bmp)$', re.IGNORECASE)
 
 
 class ClientContext:
@@ -542,7 +545,8 @@ class ChatMgr:
 
         return messages, truncated
 
-    def export_messages(self, conversation_id, user, start=None, end=None):
+    def export_messages(self, conversation_id, user, start=None, end=None,
+                        image_base=None):
         """按日期范围导出会话消息，成功时直接返回可下发的 CSV 文件响应。
 
         参数校验、取数、过滤、CSV 生成与响应头拼装都在这里完成，
@@ -552,6 +556,9 @@ class ChatMgr:
             conversation_id: 必填，Dify 会话 id
             user: 必填，Dify 侧用户标识（同时决定用哪个 Dify 应用，并用作列名）
             start / end: 可选，`YYYY-MM-DD`；留空表示不限，按服务端本地时区
+            image_base: 可选，API 的 origin（如 `https://example.com`），用来把
+                CSV 里的图片拼成可点击的绝对 URL；不合法或留空时退回相对路径。
+                由调用方传入，因为服务端未必知道自己被访问的公网地址。
 
         Returns:
             成功: `flask.Response` —— `text/csv` 附件，带 BOM 与 CRLF
@@ -590,8 +597,9 @@ class ChatMgr:
 
         filename = f"AI对话-{name}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.csv"
         log.info(f"[CHAT] 导出会话 {target} 共 {len(picked)} 条")
-        return self._csv_response(self._build_csv(picked, name), filename,
-                                 len(picked))
+        return self._csv_response(
+            self._build_csv(picked, name, self._normalize_image_base(image_base)),
+            filename, len(picked))
 
     @staticmethod
     def _content_disposition(filename) -> str:
@@ -687,15 +695,16 @@ class ChatMgr:
         return [msg for _, msg in picked]
 
     @classmethod
-    def _build_csv(cls, messages, user_label) -> str:
-        """生成 CSV 文本：序号 / 时间 /「<谁>说的话」/ 回答。
+    def _build_csv(cls, messages, user_label, image_base=None) -> str:
+        """生成 CSV 文本：序号 / 时间 /「<谁>说的话」/ 回答 / 图片。
 
         - 用标准库 `csv` 负责转义（含逗号、引号、换行的字段自动加引号）；
-        - 行尾 CRLF、开头加 BOM，Excel 打开中文不乱码。
+        - 行尾 CRLF、开头加 BOM，Excel 打开中文不乱码；
+        - 「图片」列写可点击的完整 URL（见 `_image_cell`），多张图各占一行。
         """
         buf = io.StringIO()
         writer = csv.writer(buf, lineterminator='\r\n')
-        writer.writerow(['序号', '时间', f'{user_label}说的话', '回答'])
+        writer.writerow(['序号', '时间', f'{user_label}说的话', '回答', '图片'])
 
         for index, msg in enumerate(messages or [], 1):
             answer = msg.get('answer') or ''
@@ -707,9 +716,75 @@ class ChatMgr:
                 cls._format_ts(msg.get('created_at')),
                 msg.get('query') or '',
                 answer,
+                cls._image_cell(msg.get('message_files'), image_base),
             ])
 
         return '\ufeff' + buf.getvalue()
+
+    @staticmethod
+    def _image_filenames(files) -> list:
+        """从 `message_files` 里挑出图片文件名，保持原有顺序。
+
+        只认 `type == 'image'`；缺 `type` 时按扩展名兜底，避免上游少个字段就丢图。
+        非图片附件（Dify 也支持文档等）直接跳过。
+
+        与 `_parse_room_files` 的区别：那是**入站**数据，要按不可信输入处理
+        （取 basename、限长、限 3 张）；这里是 Dify 返回的**上游**数据，
+        只做类型筛选，不该砍数量，否则导出会少图。
+        """
+        names = []
+        for item in (files or []):
+            if isinstance(item, str):
+                name, kind = item.strip(), ''
+            elif isinstance(item, dict):
+                name = str(item.get('filename') or '').strip()
+                kind = str(item.get('type') or '').lower()
+            else:
+                continue
+            if not name:
+                continue
+            if kind:
+                if kind != 'image':
+                    continue
+            elif not IMAGE_EXT_RE.search(name):
+                continue
+            names.append(name)
+        return names
+
+    @staticmethod
+    def _normalize_image_base(raw) -> str:
+        """校验前端传来的图片 URL 前缀（API 的 origin），不合法就返回空串。
+
+        由前端传是因为服务端未必知道自己被访问的公网地址（常在反代后面）。
+        只接受 `http(s)://` 开头、不含空白与引号的纯 origin：这段字符串会直接写进
+        CSV，不能被当成任意内容塞进去。不合法时退回相对路径（见 `_image_cell`）。
+        """
+        text = str(raw or '').strip().rstrip('/')
+        if not text:
+            return ''
+        if not text.startswith(('http://', 'https://')):
+            return ''
+        # 空白/引号/尖括号/逗号都可能破坏 CSV 单元格或拼出奇怪 URL
+        if any(ch in text for ch in ' \t\r\n"\'<>,;'):
+            return ''
+        return text
+
+    @classmethod
+    def _image_cell(cls, files, image_base=None) -> str:
+        """把图片文件名拼成一个单元格的内容；多张图用换行分隔。
+
+        `filename` 是我们上传时定的名字（与 pic 目录一致），直接拼 `/api/pic/view`
+        即可访问。`image_base` 为空时退回相对路径 —— 至少还能看出有图、图叫什么叫。
+        """
+        names = cls._image_filenames(files)
+        if not names:
+            return ''
+        base = (image_base or '').rstrip('/')
+        return '\n'.join(
+            f"{base}/api/pic/view?name={quote(n, safe='')}" if base
+            else f"/api/pic/view?name={quote(n, safe='')}"
+            for n in names
+        )
 
     # ---------------- Socket 事件 ----------------
 

@@ -100,6 +100,12 @@ export async function exportChatMessages(params: {
   user: string;
   start?: string | null;
   end?: string | null;
+  /**
+   * API 的 origin（如 `https://example.com`），用于把 CSV 里的图片拼成绝对 URL。
+   * 由调用方传入的原因：服务端未必知道自己被访问的公网地址（可能在反代后面），
+   * 而浏览器一定知道。留空时后端退回相对路径。
+   */
+  base?: string;
 }): Promise<ChatExportResult> {
   const rsp = await api.get<Blob>("/chat/export", {
     params: {
@@ -107,6 +113,7 @@ export async function exportChatMessages(params: {
       user: params.user,
       start: params.start || undefined,
       end: params.end || undefined,
+      base: params.base || undefined,
     },
     responseType: "blob",
     // 服务端要翻页拉全整个会话，比普通接口慢

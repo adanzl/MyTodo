@@ -541,7 +541,7 @@ def test_build_csv_starts_with_bom_and_uses_crlf():
 def test_build_csv_header_uses_user_label():
     csv_text = ChatMgr._build_csv([], '灿灿')
 
-    assert csv_text.split('\r\n')[0] == '\ufeff序号,时间,灿灿说的话,回答'
+    assert csv_text.split('\r\n')[0] == '\ufeff序号,时间,灿灿说的话,回答,图片'
 
 
 def test_build_csv_numbers_rows_from_one():
@@ -598,6 +598,188 @@ def test_build_csv_handles_missing_fields():
     assert csv_text.split('\r\n')[1].startswith('1,2026-10-08 10:00:00,,')
 
 
+# ---------- 图片（message_files）----------
+# 图片由前端上传到本服务（pic 目录），文件名保留在 Dify 历史里，
+# 所以导出时能按 /api/pic/view?name=<filename> 还原出可点开的地址。
+
+def _msg_with_files(files):
+    return {
+        'id': 'm1',
+        'created_at': ts('2026-10-08 10:00:00'),
+        'query': '这是啥',
+        'answer': '这是月亮。',
+        'message_files': files,
+    }
+
+
+def _image_file(name, belongs_to='user'):
+    return {'id': 'f1', 'filename': name, 'type': 'image',
+            'mime_type': 'image/png', 'belongs_to': belongs_to,
+            'url': '/files/x/file-preview?sign=y', 'upload_file_id': 'u1'}
+
+
+def test_image_filenames_picks_images_only():
+    files = [
+        _image_file('a.png'),
+        {'filename': 'doc.pdf', 'type': 'document'},
+        _image_file('b.jpg'),
+    ]
+
+    assert ChatMgr._image_filenames(files) == ['a.png', 'b.jpg']
+
+
+@pytest.mark.parametrize('name', ['a.png', 'a.JPG', 'a.jpeg', 'a.gif', 'a.webp', 'a.bmp'])
+def test_image_filenames_extension_fallback_without_type(name):
+    """上游没给 type 时按扩展名兜底，不能少个字段就丢图。"""
+    assert ChatMgr._image_filenames([{'filename': name}]) == [name]
+
+
+@pytest.mark.parametrize('bad', [
+    None, [], 'not-a-list',
+    [{'filename': ''}], [{'filename': '   '}],
+    [{'filename': 'readme.txt', 'type': 'document'}],
+    [{'filename': 'note.md'}],
+    [{}, 'x' * 300],
+])
+def test_image_filenames_ignores_unusable(bad):
+    assert ChatMgr._image_filenames(bad) == []
+
+
+def test_image_filenames_accepts_plain_strings():
+    """`_parse_room_files` 那种形状（裸文件名）也要认得。"""
+    assert ChatMgr._image_filenames(['a.png', 'b.txt']) == ['a.png']
+
+
+def test_image_filenames_does_not_cap_count():
+    """上游数据不做数量裁剪，否则导出会少图。"""
+    files = [_image_file(f'{i}.png') for i in range(10)]
+
+    assert len(ChatMgr._image_filenames(files)) == 10
+
+
+def test_image_cell_builds_absolute_url():
+    cell = ChatMgr._image_cell([_image_file('chat-4-1791808178982.png')],
+                               'https://example.com')
+
+    assert cell == 'https://example.com/api/pic/view?name=chat-4-1791808178982.png'
+
+
+def test_image_cell_falls_back_to_relative_path():
+    """没给 base 时退回相对路径：至少还能看出有图、图叫什么。"""
+    cell = ChatMgr._image_cell([_image_file('a.png')])
+
+    assert cell == '/api/pic/view?name=a.png'
+
+
+def test_image_cell_multiple_images_one_per_line():
+    cell = ChatMgr._image_cell(
+        [_image_file('a.png'), _image_file('b.jpg')], 'https://example.com')
+
+    assert cell == ('https://example.com/api/pic/view?name=a.png\n'
+                    'https://example.com/api/pic/view?name=b.jpg')
+
+
+def test_image_cell_url_encodes_filename():
+    cell = ChatMgr._image_cell([_image_file('有 空格.png')], 'https://example.com')
+
+    assert ' ' not in cell
+    assert 'name=%E6%9C%89%20%E7%A9%BA%E6%A0%BC.png' in cell
+
+
+def test_image_cell_empty_when_no_files():
+    assert ChatMgr._image_cell([], 'https://example.com') == ''
+    assert ChatMgr._image_cell(None) == ''
+
+
+def test_image_cell_strips_trailing_slash_of_base():
+    cell = ChatMgr._image_cell([_image_file('a.png')], 'https://example.com/')
+
+    assert cell.startswith('https://example.com/api/')
+
+
+# ---------- _normalize_image_base ----------
+
+@pytest.mark.parametrize('raw,expected', [
+    ('https://example.com', 'https://example.com'),
+    ('http://192.168.50.172:8848', 'http://192.168.50.172:8848'),
+    ('https://example.com/', 'https://example.com'),      # 去尾斜杠
+    ('  https://example.com  ', 'https://example.com'),   # 去空格
+    ('https://example.com/sub', 'https://example.com/sub'),
+])
+def test_normalize_image_base_accepts_valid(raw, expected):
+    assert ChatMgr._normalize_image_base(raw) == expected
+
+
+@pytest.mark.parametrize('bad', [
+    None, '', '   ',
+    'example.com',                 # 缺协议
+    'ftp://example.com',
+    'javascript:alert(1)',
+    'https://example.com/ has space',
+    'https://example.com"x',       # 引号会破坏 CSV 单元格
+    'https://example.com\nx',      # 换行同理
+    'https://example.com,x',
+    '<script>',
+])
+def test_normalize_image_base_rejects_unusable(bad):
+    assert ChatMgr._normalize_image_base(bad) == ''
+
+
+def test_build_csv_includes_image_url(monkeypatch, mgr):
+    messages = [_msg_with_files([_image_file('chat-4-1.png')])]
+    monkeypatch.setattr(AILocal, 'get_chat_messages',
+                        lambda *a, **kw: {'has_more': False, 'data': messages})
+
+    resp = mgr.export_messages('conv-1', '昭昭', image_base='https://example.com')
+    body = _body(resp)
+
+    assert '图片' in body.split('\r\n')[0]
+    assert 'https://example.com/api/pic/view?name=chat-4-1.png' in body
+    # 多图/多行的单元格会被加引号（CSV 转义由标准库负责）
+    assert resp.headers['X-Export-Count'] == '1'
+
+
+def test_build_csv_image_cell_empty_for_plain_text_message(monkeypatch, mgr):
+    """没图的行最后一列为空，不能写出残留内容。"""
+    messages = [{'id': 'm1', 'created_at': ts('2026-10-08 10:00:00'),
+                 'query': 'q', 'answer': 'a'}]
+    monkeypatch.setattr(AILocal, 'get_chat_messages',
+                        lambda *a, **kw: {'has_more': False, 'data': messages})
+
+    resp = mgr.export_messages('conv-1', 'leo')
+    row = _body(resp).split('\r\n')[1]
+
+    assert row.endswith(',,') or row.endswith(',')
+
+
+def test_export_ignores_invalid_image_base(monkeypatch, mgr):
+    """非法 base 不能让 CSV 里出现奇怪内容，应退回相对路径。"""
+    messages = [_msg_with_files([_image_file('a.png')])]
+    monkeypatch.setattr(AILocal, 'get_chat_messages',
+                        lambda *a, **kw: {'has_more': False, 'data': messages})
+
+    resp = mgr.export_messages('conv-1', 'leo', image_base='javascript:x')
+    body = _body(resp)
+
+    assert 'javascript' not in body
+    assert '/api/pic/view?name=a.png' in body
+
+
+def test_export_image_only_message_keeps_placeholder_query(monkeypatch, mgr):
+    """只发图片时 query 是后端写的占位文本，导出要原样保留并带上图片。"""
+    messages = [{'id': 'm1', 'created_at': ts('2026-10-08 10:00:00'),
+                 'query': '[图片]', 'answer': '这是月亮。',
+                 'message_files': [_image_file('a.png')]}]
+    monkeypatch.setattr(AILocal, 'get_chat_messages',
+                        lambda *a, **kw: {'has_more': False, 'data': messages})
+
+    body = _body(mgr.export_messages('conv-1', 'leo',
+                                     image_base='https://example.com'))
+
+    assert '[图片]' in body
+    assert '/api/pic/view?name=a.png' in body
+
+
 # ---------- export_messages ----------
 # 成功时返回 flask.Response（文件流），失败时返回 _err dict —— 两种形状都要断言
 
@@ -623,7 +805,7 @@ def test_export_ok_returns_csv_response(monkeypatch, mgr):
     assert resp.headers['Content-Type'].startswith('text/csv')
     assert resp.headers['X-Export-Count'] == '2'
     body = _body(resp)
-    assert body.split('\r\n')[0] == '\ufeff序号,时间,昭昭说的话,回答'
+    assert body.split('\r\n')[0] == '\ufeff序号,时间,昭昭说的话,回答,图片'
     assert '想你了' in body
     # 生成失败的行回填失败原因
     assert '失败：Run failed: x' in body

@@ -14,6 +14,27 @@ export interface DifyConversation {
   updated_at: number;
 }
 
+/**
+ * Dify 消息随附的文件（`message_files` 的元素）。
+ *
+ * 实测形如：
+ * `{filename, type: "image", mime_type, belongs_to, url, upload_file_id, size}`
+ * - `filename`：我们上传时定的名字（`chat-<userId>-<时间戳>.<ext>`），与 pic 目录里
+ *   的文件名一致，可直接拼 `/api/pic/view?name=<filename>`；
+ *   `url` 是 Dify 内网的签名地址，前端用不了。
+ * - `belongs_to`：`user` 表示这张图属于提问，`assistant` 表示属于回答。
+ */
+export interface DifyMessageFile {
+  id?: string;
+  filename?: string;
+  type?: string;
+  mime_type?: string;
+  belongs_to?: string;
+  url?: string;
+  upload_file_id?: string;
+  size?: number;
+}
+
 export interface DifyMessage {
   id: string;
   conversation_id: string;
@@ -25,6 +46,8 @@ export interface DifyMessage {
   status?: string;
   /** 生成失败时的原因，例如 "Run failed: Variable #conversation.Memory# not found" */
   error?: string | null;
+  /** 该条消息随附的图片等文件；没有附件时 Dify 返回空数组 */
+  message_files?: DifyMessageFile[] | null;
   message_tokens?: number;
   answer_tokens?: number;
   total_tokens?: number;

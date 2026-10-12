@@ -88,6 +88,8 @@ def chat_export() -> ResponseReturnValue:
         user: 必填，Dify 侧用户标识（同时决定使用哪个 Dify 应用）。
         start: 可选，起始日期 `YYYY-MM-DD`（含当天 00:00:00）。
         end: 可选，结束日期 `YYYY-MM-DD`（含当天 23:59:59）。
+        base: 可选，API 的 origin（如 `https://example.com`），用来把 CSV 里的图片
+            拼成可点击的绝对 URL；由前端传入，不合法时后端退回相对路径。
 
     日期留空表示不限。时区按服务端本地时区解释（线上为 Asia/Shanghai）。
 
@@ -106,6 +108,7 @@ def chat_export() -> ResponseReturnValue:
             request.args.get('user'),
             start=request.args.get('start'),
             end=request.args.get('end'),
+            image_base=request.args.get('base'),
         )
     except Exception as e:
         log.error(e)

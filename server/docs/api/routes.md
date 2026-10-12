@@ -174,11 +174,20 @@ Dify 的 HTTP 细节封装在 `AILocal`（`core/ai/ai_local.py`）。
   - `user`：string，必填，语义同上；同时用作导出文件名与「谁说的话」列名
   - `start`：string，可选，`YYYY-MM-DD`，含当天 `00:00:00`
   - `end`：string，可选，`YYYY-MM-DD`，含当天 `23:59:59`
+  - `base`：string，可选，API 的 origin（如 `https://example.com`），用来把「图片」列
+    拼成可点击的绝对 URL。由前端传入，因为服务端可能在反代后面、未必知道自己被访问的
+    公网地址。只接受 `http(s)://` 开头且不含空白/引号的纯 origin，不合法时退回相对路径。
   - 日期留空表示不限；时区按**服务端本地时区**解释（线上为 Asia/Shanghai）
 - **成功返回**：`Content-Type: text/csv; charset=utf-8`
   - 带 UTF-8 BOM、CRLF 行尾，Excel 打开中文不乱码
-  - 列：`序号, 时间, <user>说的话, 回答`；时间格式 `YYYY-MM-DD HH:mm:ss`
+  - 列：`序号, 时间, <user>说的话, 回答, 图片`；时间格式 `YYYY-MM-DD HH:mm:ss`
   - 生成失败的消息在「回答」列回填 `失败：<原因>`，避免该列为空丢信息
+  - 「图片」列：该条消息随附的图片，**每张一行**，形如
+    `<base>/api/pic/view?name=chat-4-<时间戳>.png`
+    - Dify 的 `message_files[].url` 是内网 + 300 秒签名的地址，用不了；
+      可用的是 `filename`（上传时由我们命名，与 pic 目录一致），所以按它拼本服务的地址
+    - 非图片附件（Dify 也支持文档）会被跳过；没有图片的行该列为空
+    - 不传 `base`（或不合法）时退回相对路径 `/api/pic/view?name=...`
   - 响应头
     - `Content-Disposition`：`filename=` ASCII 回退 + `filename*=UTF-8''` 中文名（`AI对话-<user>-<时间戳>.csv`）
     - `X-Export-Count`：本次导出条数
@@ -196,6 +205,9 @@ Dify 的 HTTP 细节封装在 `AILocal`（`core/ai/ai_local.py`）。
     且不返回总数，放前端会变成浏览器反复往返取数、把整段会话缓存进内存。
   - `start` 同时作为翻页的**早停下界**：某页最旧一条早于它即可停止（更早的页只会更旧）。
   - 翻页上限 `EXPORT_PAGE_SIZE * EXPORT_MAX_PAGES`，超出时报错而不是静默给不完整数据。
+  - 图片解析见 `ChatMgr._image_filenames` / `_image_cell`：只筛 `type == 'image'`，
+    缺 `type` 时按扩展名兜底；**不做数量裁剪**（与 `_parse_room_files` 那个入站净化不同，
+    上游数据不能砍，否则导出会少图）。
 
 > **变更记录**：原 `GET /api/chatMessages` 已迁移为 `/api/chat/messages` 并**移除原路径**，
 > 按约定不保留兼容别名，需客户端同步发布。

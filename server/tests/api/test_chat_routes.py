@@ -176,7 +176,27 @@ def test_export_forwards_raw_params(client, monkeypatch):
                '&start=2026-10-01&end=2026-10-08')
 
     chat_routes.chat_mgr.export_messages.assert_called_once_with(
-        ' c ', ' leo ', start='2026-10-01', end='2026-10-08')
+        ' c ', ' leo ', start='2026-10-01', end='2026-10-08', image_base=None)
+
+
+def test_export_forwards_base_for_image_urls(client, monkeypatch):
+    """`base` 用于把 CSV 里的图片拼成绝对 URL，原样交给 mgr 校验。"""
+    chat_routes.chat_mgr.export_messages.return_value = {"code": -1, "msg": "x"}
+
+    client.get('/chat/export?conversation_id=c&user=leo'
+               '&base=https%3A%2F%2Fexample.com')
+
+    chat_routes.chat_mgr.export_messages.assert_called_once_with(
+        'c', 'leo', start=None, end=None, image_base='https://example.com')
+
+
+def test_export_blank_base_forwarded_empty(client, monkeypatch):
+    chat_routes.chat_mgr.export_messages.return_value = {"code": -1, "msg": "x"}
+
+    client.get('/chat/export?conversation_id=c&user=leo&base=')
+
+    chat_routes.chat_mgr.export_messages.assert_called_once_with(
+        'c', 'leo', start=None, end=None, image_base='')
 
 
 def test_export_missing_dates_forwarded_as_none(client, monkeypatch):
@@ -185,7 +205,7 @@ def test_export_missing_dates_forwarded_as_none(client, monkeypatch):
     client.get('/chat/export?conversation_id=c&user=leo')
 
     chat_routes.chat_mgr.export_messages.assert_called_once_with(
-        'c', 'leo', start=None, end=None)
+        'c', 'leo', start=None, end=None, image_base=None)
 
 
 def test_export_missing_params_forwarded_as_none(client, monkeypatch):
@@ -195,14 +215,14 @@ def test_export_missing_params_forwarded_as_none(client, monkeypatch):
     client.get('/chat/export')
 
     chat_routes.chat_mgr.export_messages.assert_called_once_with(
-        None, None, start=None, end=None)
+        None, None, start=None, end=None, image_base=None)
 
 
 def test_export_response_returned_as_is(client, monkeypatch):
     """mgr 返回的 Response 要原样成为 HTTP 响应（路由不再包装）。"""
     from flask import Response
 
-    def fake(conversation_id, user, start=None, end=None):
+    def fake(conversation_id, user, start=None, end=None, image_base=None):
         resp = Response('\ufeff序号\r\n1\r\n', content_type='text/csv; charset=utf-8')
         resp.headers['Content-Disposition'] = 'attachment; filename="a.csv"'
         resp.headers['X-Export-Count'] = '7'
