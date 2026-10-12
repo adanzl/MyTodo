@@ -36,6 +36,9 @@ log = app_logger
 
 # 能力自检结果缓存时长（秒）：期间内不重复请求 /parameters
 CAPABILITY_TTL = 300
+# 「未开启」的缓存要短：读到未开启通常正说明用户正在 Dify 里配置。
+# 若按常规 TTL 缓存，用户改完开关后还会连着失败几分钟，很难判断到底哪里没生效。
+CAPABILITY_TTL_DISABLED = 30
 # upload_file_id 缓存条数上限（进程内，仅用于省掉重复上传）
 MAX_ID_CACHE = 500
 # 与 Dify 通信的超时（秒）
@@ -51,7 +54,7 @@ class AiImageError(Exception):
 
 # (user, filename) -> upload_file_id
 _id_cache: dict[tuple[str, str], str] = {}
-# user -> (检查时间, 是否开启, 图片数上限)
+# user -> (到期时间, 是否开启, 图片数上限)
 _capability_cache: dict[str, tuple[float, bool, int]] = {}
 _lock = threading.Lock()
 
@@ -70,12 +73,13 @@ def image_capability(user: str, *, force: bool = False) -> tuple[bool, int]:
     if not force:
         with _lock:
             hit = _capability_cache.get(key)
-        if hit and now - hit[0] < CAPABILITY_TTL:
+        if hit and now < hit[0]:
             return hit[1], hit[2]
 
     enabled, limit = _fetch_capability(key)
+    ttl = CAPABILITY_TTL if enabled else CAPABILITY_TTL_DISABLED
     with _lock:
-        _capability_cache[key] = (now, enabled, limit)
+        _capability_cache[key] = (now + ttl, enabled, limit)
     return enabled, limit
 
 

@@ -151,6 +151,62 @@ def test_capability_fail_open_on_network_error(monkeypatch):
     assert ai_file.image_capability("灿灿") == (True, 0)
 
 
+def test_disabled_result_is_cached_only_briefly(monkeypatch):
+    """「未开启」只短暂缓存：用户去 Dify 打开开关后应很快生效。
+
+    否则用户改完配置仍会连着失败，很难判断到底是哪里没生效。
+    """
+    clock = {"t": 1000.0}
+    monkeypatch.setattr(ai_file.time, "time", lambda: clock["t"])
+    _patch_parameters(monkeypatch, {"file_upload": {}})
+
+    assert ai_file.image_capability("灿灿") == (False, 0)
+
+    # 用户在 Dify 里打开了开关
+    _patch_parameters(
+        monkeypatch, {"file_upload": {"enabled": True, "number_limits": 3}}
+    )
+
+    # 短暂窗口内仍走缓存（避免连续重试反复打 Dify）
+    clock["t"] += ai_file.CAPABILITY_TTL_DISABLED - 1
+    assert ai_file.image_capability("灿灿") == (False, 0)
+
+    # 过了这个短窗口就必须重新读取，且要能拿到新值
+    clock["t"] += 2
+    assert ai_file.image_capability("灿灿") == (True, 3)
+
+
+def test_enabled_result_keeps_the_long_ttl(monkeypatch):
+    """开启状态变化少，仍按常规 TTL 缓存，避免每次发图都请求 Dify。"""
+    clock = {"t": 1000.0}
+    monkeypatch.setattr(ai_file.time, "time", lambda: clock["t"])
+    calls = []
+
+    class _Rsp:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"file_upload": {"enabled": True, "number_limits": 3}}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_a):
+            return False
+
+    def _get(*_a, **_k):
+        calls.append(1)
+        return _Rsp()
+
+    monkeypatch.setattr(ai_file.requests, "get", _get)
+
+    assert ai_file.image_capability("灿灿") == (True, 3)
+    clock["t"] += ai_file.CAPABILITY_TTL - 1
+    assert ai_file.image_capability("灿灿") == (True, 3)
+    assert len(calls) == 1, "常规 TTL 内不该再请求"
+
+
 # ---------------- resolve_chat_files ----------------
 
 
