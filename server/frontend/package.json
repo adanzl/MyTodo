@@ -19,7 +19,7 @@
     "axios": "^1.13.2",
     "crypto-js": "^4.2.0",
     "dayjs": "^1.11.19",
-    "element-plus": "2.13.7",
+    "element-plus": "2.14.7",
     "lodash-es": "^4.17.22",
     "pdfjs-dist": "^5.6.205",
     "pinia": "^3.0.4",
