@@ -28,13 +28,14 @@
       :max-height="tableMaxHeight"
       style="min-height: 200px"
     >
+      <el-table-column label="ID" width="70" align="center" prop="id" />
       <!-- 图片 -->
       <el-table-column width="130" label="Image">
         <template #default="{ row }">
-          <div class="h-24 flex">
+          <div class="h-20 flex">
             <template v-if="row.edited">
               <!-- 图片 -->
-              <div class="flex items-center w-24">
+              <div class="flex items-center w-20">
                 <template v-if="!row.img">
                   <el-upload
                     class="flex items-center justify-center bg-gray-100 w-full h-24"
@@ -85,7 +86,7 @@
               </div>
             </template>
             <template v-else>
-              <div class="relative w-24 h-24">
+              <div class="relative w-20">
                 <el-image
                   class="w-full h-full cursor-pointer z-9999!"
                   :src="getPicDisplayUrl(row.img)"
@@ -110,9 +111,6 @@
         <template #default="{ row }">
           <div class="flex flex-col">
             <el-descriptions :column="1" size="small" border label-width="50">
-              <el-descriptions-item label="ID" width="100">
-                <el-input v-model="row.id" size="small" disabled></el-input>
-              </el-descriptions-item>
               <el-descriptions-item label="名称">
                 <el-input v-model="row.name" size="small" :disabled="!row.edited" />
               </el-descriptions-item>

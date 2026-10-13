@@ -2,7 +2,7 @@
   <div class="p-2">
     <div class="flex flex-wrap items-center gap-5 h-10 mb-2">
       <el-button size="small" type="primary" plain @click="handleRefresh" :icon="Refresh" />
-      <el-radio-group v-model="selectedRecordType" size="default" @change="reloadFromFirstPage">
+      <el-radio-group v-model="selectedRecordType" size="small" @change="reloadFromFirstPage">
         <el-radio-button value="all">全部</el-radio-button>
         <el-radio-button value="lottery">抽奖</el-radio-button>
         <el-radio-button value="exchange">兑换</el-radio-button>
@@ -12,14 +12,17 @@
         placeholder="选择奖池"
         :disabled="selectedRecordType !== 'lottery'"
         clearable
+        size="small"
         style="width: 160px"
         @change="reloadFromFirstPage"
       >
         <el-option label="全部奖池" :value="0" />
         <el-option v-for="pool in poolList" :key="pool.id" :label="pool.name" :value="pool.id" />
       </el-select>
-      <el-checkbox v-model="onlyWish" @change="reloadFromFirstPage" size="large">心愿单</el-checkbox>
-      <el-radio-group size="default" v-model="selectedUserId" @change="reloadFromFirstPage">
+      <el-checkbox v-model="onlyWish" @change="reloadFromFirstPage" size="large"
+        >心愿单</el-checkbox
+      >
+      <el-radio-group size="small" v-model="selectedUserId" @change="reloadFromFirstPage">
         <el-radio-button v-for="item in userList" :key="item.id" :value="item.id">
           {{ item.name }}
         </el-radio-button>
