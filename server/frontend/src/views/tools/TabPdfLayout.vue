@@ -54,7 +54,7 @@
             <div class="shrink-0 border-t mt-2 pt-2">
                 <el-button type="danger" plain class="w-full" :disabled="!hasClearableTasks || loading"
                     @click="handleClearAllTasks">
-                    清空
+                    删除所有任务
                 </el-button>
             </div>
         </div>
@@ -522,18 +522,25 @@
         </div>
 
         <!-- 上传/创建任务对话框 -->
-        <el-dialog v-model="createDialogVisible" title="上传 PDF 文件" width="400px" :close-on-click-modal="false"
+        <el-dialog v-model="createDialogVisible" title="上传 PDF 文件" width="480px" :close-on-click-modal="false"
             @close="handleDialogClose">
             <el-form>
                 <el-form-item label="选择文件">
-                    <el-upload :auto-upload="false" :on-change="handleFileChange" :show-file-list="false" accept=".pdf">
+                    <el-upload v-model:file-list="uploadFileList" :auto-upload="false" :multiple="true"
+                        :on-change="handleFileChange" :show-file-list="false" accept=".pdf">
                         <template #trigger>
                             <el-button type="primary" size="small">选择文件</el-button>
                         </template>
                     </el-upload>
                 </el-form-item>
-                <div v-if="selectedFile" class="text-sm text-gray-600 mb-2">
-                    已选择: {{ selectedFile.name }}
+                <div class="text-xs text-gray-500 mb-2">可一次选择多个 PDF，每个文件单独生成一个任务</div>
+                <div v-if="uploadFileList.length" class="mb-2 max-h-40 overflow-y-auto">
+                    <div class="text-sm text-gray-600 mb-1">已选择 {{ uploadFileList.length }} 个文件</div>
+                    <div v-for="file in uploadFileList" :key="file.uid"
+                        class="flex items-center gap-2 text-sm text-gray-600">
+                        <span class="truncate min-w-0 flex-1" :title="file.name">{{ file.name }}</span>
+                        <el-button link type="danger" :disabled="loading" @click="removeSelectedFile(file)">移除</el-button>
+                    </div>
                 </div>
                 <el-progress v-if="uploadProgress > 0 && uploadProgress < 100" :percentage="uploadProgress" />
                 <div v-if="uploadSizeText" class="text-xs text-gray-500 text-right mt-1">
@@ -542,7 +549,7 @@
             </el-form>
             <template #footer>
                 <el-button @click="handleDialogClose">取消</el-button>
-                <el-button type="primary" @click="handleUploadConfirm" :loading="loading" :disabled="!selectedFile">
+                <el-button type="primary" @click="handleUploadConfirm" :loading="loading" :disabled="!selectedFiles.length">
                     上传
                 </el-button>
             </template>
@@ -553,7 +560,7 @@
 <script setup lang="ts">
 import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import type { UploadFile } from "element-plus";
+import type { UploadFile, UploadFiles } from "element-plus";
 import { Refresh, Plus, Delete, ArrowLeft, ArrowRight } from "@element-plus/icons-vue";
 import { formatSize } from "@/utils/format";
 import { logAndNoticeError } from "@/utils/error";
@@ -700,13 +707,22 @@ const currentTask = ref<PdfLayoutTask | null>(null);
 
 // 上传相关
 const createDialogVisible = ref(false);
-const selectedFile = ref<File | null>(null);
+const uploadFileList = ref<UploadFiles>([]);
 const uploadProgress = ref(0);
 const uploadAbortController = ref<AbortController | null>(null);
 
+const isPdfFile = (name: string) => name.toLowerCase().endsWith(".pdf");
+
+const selectedFiles = computed(() =>
+    uploadFileList.value
+        .map((item) => item.raw)
+        .filter((file): file is File => !!file && isPdfFile(file.name))
+);
+
 const uploadSizeText = computed(() => {
-    if (!selectedFile.value || uploadProgress.value <= 0) return '';
-    const totalKB = Math.round(selectedFile.value.size / 1024);
+    if (!selectedFiles.value.length || uploadProgress.value <= 0) return '';
+    const total = selectedFiles.value.reduce((sum, file) => sum + file.size, 0);
+    const totalKB = Math.round(total / 1024);
     const uploadedKB = Math.round(totalKB * uploadProgress.value / 100);
     return `${uploadedKB} KB / ${totalKB} KB`;
 });
@@ -969,7 +985,7 @@ const handleViewTask = async (taskId: string) => {
 
 // 创建任务（打开上传对话框）
 const handleCreateTask = () => {
-    selectedFile.value = null;
+    uploadFileList.value = [];
     uploadProgress.value = 0;
     uploadAbortController.value = new AbortController();
     createDialogVisible.value = true;
@@ -978,42 +994,56 @@ const handleCreateTask = () => {
 const handleDialogClose = () => {
     uploadAbortController.value?.abort();
     uploadAbortController.value = null;
-    selectedFile.value = null;
+    uploadFileList.value = [];
     uploadProgress.value = 0;
     createDialogVisible.value = false;
 };
 
-const handleFileChange = (file: UploadFile) => {
-    if (file.raw) {
-        selectedFile.value = file.raw;
-        uploadProgress.value = 0;
-    }
+const handleFileChange = (_file: UploadFile, files: UploadFiles) => {
+    uploadProgress.value = 0;
+    const invalid = files.filter((item) => !isPdfFile(item.name));
+    if (!invalid.length) return;
+    ElMessage.warning("仅支持 PDF 文件");
+    uploadFileList.value = files.filter((item) => isPdfFile(item.name));
+};
+
+const removeSelectedFile = (file: UploadFile) => {
+    uploadFileList.value = uploadFileList.value.filter((item) => item.uid !== file.uid);
 };
 
 // 上传确认
 const handleUploadConfirm = async () => {
-    if (!selectedFile.value) {
-        ElMessage.warning("请选择文件");
+    const files = selectedFiles.value;
+    if (!files.length) {
+        ElMessage.warning("请选择 PDF 文件");
         return;
     }
     await withLoading(async () => {
         uploadProgress.value = 0;
         const signal = uploadAbortController.value?.signal;
         try {
-            const response = await uploadPdfLayout(selectedFile.value!, p => {
+            const response = await uploadPdfLayout(files, p => {
                 uploadProgress.value = p;
             }, signal);
-            if (response.code === 0) {
-                uploadProgress.value = 100;
-                ElMessage.success("文件上传成功");
-                createDialogVisible.value = false;
-                selectedFile.value = null;
-                await loadTaskList();
-                const task = response.data as PdfLayoutTask;
-                if (task?.task_id) await syncTask(task.task_id);
-            } else {
+            const created = response.data?.tasks ?? [];
+            const failed = response.data?.failed ?? [];
+            if (response.code !== 0 || !created.length) {
                 ElMessage.error(response.msg || "文件上传失败");
+                return;
             }
+            uploadProgress.value = 100;
+            if (failed.length) {
+                ElMessage.warning(`已上传 ${created.length} 个文件，${failed.length} 个失败`);
+            } else if (created.length > 1) {
+                ElMessage.success(`已上传 ${created.length} 个文件，各生成一个任务`);
+            } else {
+                ElMessage.success("文件上传成功");
+            }
+            createDialogVisible.value = false;
+            uploadFileList.value = [];
+            await loadTaskList();
+            const last = created[created.length - 1];
+            if (last?.task_id) await syncTask(last.task_id);
         } catch (err: any) {
             if (err?.name === 'AbortError' || err?.code === 'ERR_CANCELED') {
                 // 用户取消上传，静默处理
@@ -1024,20 +1054,20 @@ const handleUploadConfirm = async () => {
     }, "文件上传失败");
 };
 
-// 清空全部可删除任务（处理中的任务后端不允许删除）
+// 删除全部可删除任务（处理中的任务后端不允许删除）
 const handleClearAllTasks = async () => {
     const deletable = taskList.value.filter((task) => task.status !== "processing");
     if (!deletable.length) return;
     const skipped = taskList.value.length - deletable.length;
     const message = skipped
-        ? `将删除 ${deletable.length} 个任务，${skipped} 个处理中的任务会保留。确定清空吗？`
-        : "确定要清空所有任务吗？";
-    if (!(await confirmAction(message, "清空任务"))) return;
+        ? `将删除 ${deletable.length} 个任务及其上传文件、排版结果，${skipped} 个处理中的任务会保留。确定删除吗？`
+        : "确定要删除所有任务吗？相关的上传文件和排版结果也会一并删除。";
+    if (!(await confirmAction(message, "删除所有任务"))) return;
 
     await withLoading(async () => {
         const response = await deletePdfLayout(undefined, true);
         if (response.code !== 0) {
-            ElMessage.error(response.msg || "清空任务失败");
+            ElMessage.error(response.msg || "删除所有任务失败");
             return;
         }
         const failed = response.data?.failed ?? 0;
@@ -1053,9 +1083,9 @@ const handleClearAllTasks = async () => {
         if (failed) {
             ElMessage.warning(`${failed} 个任务删除失败`);
         } else {
-            ElMessage.success(kept ? `已清空 ${deleted} 个任务` : "已清空全部任务");
+            ElMessage.success(kept ? `已删除 ${deleted} 个任务` : "已删除全部任务");
         }
-    }, "清空任务失败");
+    }, "删除所有任务失败");
 };
 
 // 删除任务

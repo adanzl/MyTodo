@@ -13,19 +13,29 @@ export async function getPdfLayoutList(): Promise<ApiResponse<PdfLayoutTask[]>> 
   return response.data;
 }
 
+export interface PdfLayoutUploadFailure {
+  filename: string;
+  msg: string;
+}
+
+export interface PdfLayoutUploadResult {
+  tasks: PdfLayoutTask[];
+  failed: PdfLayoutUploadFailure[];
+}
+
 /**
- * 上传 PDF 文件
- * @param file 要上传的文件
+ * 上传一个或多个 PDF。每个文件单独生成一个任务。
+ * @param files 要上传的文件
  * @param onProgress 上传进度回调函数，参数为进度百分比 (0-100)
  * @param signal 可选的 AbortSignal，用于取消上传
  */
 export async function uploadPdfLayout(
-  file: File,
+  files: File[],
   onProgress?: (progress: number) => void,
   signal?: AbortSignal
-): Promise<ApiResponse<PdfLayoutTask>> {
+): Promise<ApiResponse<PdfLayoutUploadResult>> {
   const formData = new FormData();
-  formData.append("file", file);
+  files.forEach((file) => formData.append("file", file));
 
   const config = {
     headers: {
@@ -42,7 +52,7 @@ export async function uploadPdfLayout(
     },
   };
 
-  const response = await api.post<ApiResponse<PdfLayoutTask>>("/pdf_layout/upload", formData, config);
+  const response = await api.post<ApiResponse<PdfLayoutUploadResult>>("/pdf_layout/upload", formData, config);
   return response.data;
 }
 
@@ -80,7 +90,7 @@ export function getPdfLayoutDownloadUrl(filename: string, type: "uploaded" | "ou
 }
 
 /**
- * 删除 PDF 排版任务。clear_all 为 true 时一次清空全部可删除任务。
+ * 删除 PDF 排版任务。clear_all 为 true 时一次删除全部可删除任务及其文件。
  */
 export async function deletePdfLayout(
   task_id?: string,

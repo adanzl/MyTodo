@@ -190,15 +190,32 @@ class PdfLayoutMgr(BaseTaskMgr[PdfLayoutTask]):
             return -1, f"PDF 排版处理失败: {str(e)}"
 
     def _before_delete_task(self, task: PdfLayoutTask) -> None:
-        """删除关联的上传文件和输出文件。"""
-        paths_to_delete = [task.uploaded_path, task.output_path]
-        for path in paths_to_delete:
-            if path and os.path.exists(path):
-                try:
-                    os.remove(path)
-                    log.info(f"[PDF 排版] 删除文件: {path}")
-                except Exception as e:
-                    log.error(f"[PDF 排版] 删除文件失败 {path}: {e}")
+        """删除该任务的上传文件和排版结果。任一文件删不掉则保留任务记录。"""
+        candidates = [
+            task.uploaded_path,
+            os.path.join(PDF_LAYOUT_UPLOAD_DIR, task.task_id) if task.task_id else None,
+            task.output_path,
+            self._get_output_path(task.task_id) if task.task_id else None,
+        ]
+        seen: set[str] = set()
+        errors: list[str] = []
+        for path in candidates:
+            if not path:
+                continue
+            norm = os.path.normcase(os.path.normpath(path))
+            if norm in seen:
+                continue
+            seen.add(norm)
+            if not os.path.lexists(path):
+                continue
+            try:
+                os.remove(path)
+                log.info(f"[PDF 排版] 删除文件: {path}")
+            except Exception as e:
+                log.error(f"[PDF 排版] 删除文件失败 {path}: {e}")
+                errors.append(f"{path}: {e}")
+        if errors:
+            raise OSError("删除关联文件失败: " + "; ".join(errors))
 
     def save_fill_configs(
         self,

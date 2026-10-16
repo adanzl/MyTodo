@@ -40,24 +40,33 @@ class _PdfLayoutUpdateBody(BaseModel):
 @limiter.limit("10 per minute; 50 per hour")
 @pdf_layout_bp.route("/pdf_layout/upload", methods=['POST'])
 def pdf_layout_upload() -> ResponseReturnValue:
-    """上传 PDF 文件。"""
+    """上传一个或多个 PDF。每个文件单独生成一个任务。"""
     try:
-        if 'file' not in request.files:
+        files = [item for item in request.files.getlist('file') if item and item.filename]
+        if not files:
             return _err("未找到上传的文件")
 
-        file = request.files['file']
-        if not file.filename or file.filename == '':
-            return _err("文件名不能为空")
+        tasks: list[Dict[str, Any]] = []
+        failed: list[Dict[str, str]] = []
+        for file in files:
+            filename = file.filename or ""
+            code, msg, task_id = pdf_layout_mgr.create_task(file, filename)
+            if code != 0 or not task_id:
+                failed.append({"filename": filename, "msg": msg})
+                continue
+            task_info = pdf_layout_mgr.get_task(task_id)
+            if not task_info:
+                failed.append({"filename": filename, "msg": "任务创建成功但无法读取任务信息"})
+                continue
+            tasks.append(task_info)
 
-        code, msg, task_id = pdf_layout_mgr.create_task(file, file.filename)
-        if code != 0 or not task_id:
-            return _err(msg)
+        if not tasks:
+            return _err(failed[0]["msg"] if len(failed) == 1 else "上传失败", {
+                "tasks": [],
+                "failed": failed,
+            })
 
-        task_info = pdf_layout_mgr.get_task(task_id)
-        if not task_info:
-            return _err('任务创建成功但无法读取任务信息')
-
-        return _ok(task_info)
+        return _ok({"tasks": tasks, "failed": failed})
 
     except RequestEntityTooLarge:
         log.error("[PDF 排版] 上传文件失败: 文件太大，超过服务器限制（最大 2000MB）")
