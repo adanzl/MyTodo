@@ -124,28 +124,50 @@ class AsyncLoopRunner:
             except Exception as e:  # noqa: BLE001
                 log.warning(f"[AsyncLoop] 关闭事件循环出错（忽略）: {e}")
 
+    @staticmethod
+    def _is_ready(loop: Optional[asyncio.AbstractEventLoop],
+                  thread: Optional[threading.Thread]) -> bool:
+        """循环是否已就绪可复用。"""
+        return (
+            loop is not None
+            and not loop.is_closed()
+            and thread is not None
+            and thread.is_alive()
+        )
+
     def _ensure_started(self) -> asyncio.AbstractEventLoop:
-        """惰性启动循环线程并等待循环就绪，返回该循环。"""
+        """惰性启动循环线程并等待循环就绪，返回该循环。
+
+        并发调用时只允许存在**一个**循环线程：先到者负责启动，其余调用者等待
+        同一个线程就绪。
+
+        这里曾有一个竞态：判断条件是「`self._loop` 为 None 就新建线程」，而
+        `_loop` 是**线程启动之后**才在 `_run_forever` 里赋值的。于是当第一个
+        调用者已经起了线程、但循环还没赋值时，第二个调用者会看到 `_loop is None`
+        并再起一个线程 —— 两个循环同时存在，后续调用在两者之间来回切换，
+        而 bleak 的 client 绑定在其中一个上，行为随即不可预期。
+        """
         loop = self._loop
         thread = self._thread
-        if (loop is not None and not loop.is_closed() and thread is not None
-                and thread.is_alive()):
-            return loop
+        if self._is_ready(loop, thread):
+            return loop  # type: ignore[return-value]
 
         with self._lock:
-            # 双重检查：并发调用时只允许一个线程真正启动
             loop = self._loop
             thread = self._thread
-            if (loop is not None and not loop.is_closed() and thread is not None
-                    and thread.is_alive()):
-                return loop
+            if self._is_ready(loop, thread):
+                return loop  # type: ignore[return-value]
 
-            self._started.clear()
-            thread = threading.Thread(target=self._run_forever,
-                                      name=self._name,
-                                      daemon=True)
-            self._thread = thread
-            thread.start()
+            if thread is None or not thread.is_alive():
+                # 没有存活线程（首次启动，或上次已退出/被 shutdown）：由本调用者启动
+                self._started.clear()
+                thread = threading.Thread(target=self._run_forever,
+                                          name=self._name,
+                                          daemon=True)
+                self._thread = thread
+                thread.start()
+            # 否则：线程已存在且存活，说明**另一个调用者正在启动中**，
+            # 直接等同一个线程即可 —— 不能再启动第二个循环。
 
         # 协作式等待就绪：不能用 Event.wait()（原生阻塞会占住 hub）
         deadline = time.monotonic() + _START_TIMEOUT

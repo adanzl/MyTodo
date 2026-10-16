@@ -374,14 +374,24 @@ class ClientContext:
         "Cannot switch to a different thread"（2026-10-16 停摆的成因之一）。
         因此整体交回 hub 执行。
         """
+        # 在回调线程**就地绑定**这次错误属于哪个会话：只捕获对象引用，
+        # 不做 Redis 读取（Redis 客户端归属 hub，在这里读同样会跨线程）。
+        # 若推迟到 hub 上执行时才读 `self.asr._session`，期间可能已经切换会话，
+        # 于是旧连接的错误会把**新**请求标记为失败。
+        session = self.asr._session
         from core.tools.hub_dispatch import post_to_hub
 
-        post_to_hub(lambda: self._handle_asr_err_on_hub(err))
+        post_to_hub(lambda: self._handle_asr_err_on_hub(err, session))
 
-    def _handle_asr_err_on_hub(self, err: Exception):
-        session = self.asr._session
+    def _handle_asr_err_on_hub(self, err: Exception, session) -> None:
+        """在 hub 上处理 ASR 错误。
+
+        代次（attempt）用的是会话上**创建时绑定**的那份，而不是此刻的最新值：
+        用户重试会让 attempt +1，读最新值会把旧连接的错误算到新一轮头上。
+        `on_err` 内部会用 `matches_attempt` 校验，过期错误会被正确忽略。
+        """
         rid = session.request_id if session else ""
-        attempt = chat_request_store.get_attempt(self.ai.user, rid) if rid else 0
+        attempt = session.attempt if session else 0
         self.on_err(err, rid, attempt=attempt)
 
     def on_tts_err(self, err: Exception):
@@ -936,7 +946,10 @@ class ChatMgr:
                 if audio_action == 'ignore':
                     return
                 if rid and audio_action == 'new':
-                    ctx.asr.begin_session(rid)
+                    # 在此处（hub 线程、Redis 可用）取当前代次并随会话一起保存：
+                    # 错误回调来自 ws 线程，无法安全读 Redis，只能靠创建时绑定。
+                    ctx.asr.begin_session(
+                        rid, chat_request_store.get_attempt(self.ai.user, rid))
                     ctx.mark_request_asr(rid)
                 audio_bytes = base64.b64decode(content)
                 self.handle_audio(client_id, data['sample'], audio_bytes, room_id)

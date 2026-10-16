@@ -34,6 +34,8 @@ def _env():
     env = dict(os.environ)
     env.setdefault('PYTHONIOENCODING', 'utf-8')
     env['PYTHONPATH'] = os.pathsep.join([_SERVER_ROOT, env.get('PYTHONPATH', '')]).rstrip(os.pathsep)
+    # 显式关掉 Redis：省掉每次 ~5 秒连接超时，并让结果不依赖本机是否跑着 Redis
+    env['REDIS_ENABLED'] = 'false'
     return env
 
 

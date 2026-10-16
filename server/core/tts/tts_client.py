@@ -30,6 +30,10 @@ except ImportError:
     FASTAPI_URL = os.getenv("ZERO_TTS_FASTAPI_URL",
                             "http://192.168.50.172:9099/inference_zero_shot")
 
+# 「未传参数」的哨兵：必须与「显式传入 None」区分开，见 finalize_cache 的说明。
+# 不能用 None 兼任两者 —— 那会让「旧缓存不存在」的完成事件去结束**当前**缓存。
+_UNSET = object()
+
 ROLE_MAP = {
     # cSpell: disable-next-line
     "太乙": "/mnt/data/CosyVoice/pretrained_models/prompt/zh_taiyi_prompt.wav",
@@ -123,14 +127,21 @@ class TTSClient(ResultCallback):
         self._deferred_cache_role = role or self.role
         self._deferred_cache_speed = self.speed if speed is None else speed
 
-    def _commit_deferred_cache(self) -> None:
+    def _commit_deferred_cache_values(
+        self,
+        msg_id: str,
+        text: str,
+        audio: bytes,
+        role: str,
+        speed: float,
+    ) -> None:
+        """把给定的延迟缓存内容落盘。
+
+        参数显式传入（而不是读 `self._deferred_cache_*`），是为了让完成事件能用
+        它**回调当时**绑定的快照，不受执行前开启的新会话影响。
+        """
         from core.chat import tts_cache
 
-        msg_id = self._deferred_cache_msg_id
-        text = self._deferred_cache_text
-        audio = bytes(self._deferred_cache_audio)
-        role = self._deferred_cache_role or self.role
-        speed = self.speed if self._deferred_cache_speed is None else self._deferred_cache_speed
         if msg_id and text and audio and rds_mgr is not None:
             session = tts_cache.begin_session(
                 msg_id,
@@ -141,11 +152,31 @@ class TTSClient(ResultCallback):
             )
             rds_mgr.append_value(session["audio_key"], audio)
             tts_cache.finalize_session(session)
+
+    def _clear_deferred_cache(self) -> None:
         self._deferred_cache_msg_id = ''
         self._deferred_cache_audio = bytearray()
         self._deferred_cache_text = ''
         self._deferred_cache_role = None
         self._deferred_cache_speed = None
+
+    def deferred_cache_snapshot(self) -> tuple:
+        """取当前延迟缓存的快照（供完成事件绑定自己那份内容）。"""
+        return (
+            self._deferred_cache_msg_id,
+            self._deferred_cache_text,
+            bytes(self._deferred_cache_audio),
+            self._deferred_cache_role or self.role,
+            self.speed if self._deferred_cache_speed is None else self._deferred_cache_speed,
+        )
+
+    def _commit_deferred_cache(self) -> None:
+        """提交「当前」延迟缓存（同步路径使用）。"""
+        msg_id = self._deferred_cache_msg_id
+        self._commit_deferred_cache_values(*self.deferred_cache_snapshot())
+        # 只在仍然是同一个会话时清空，避免把新会话刚写入的状态抹掉
+        if self._deferred_cache_msg_id == msg_id:
+            self._clear_deferred_cache()
 
     def abort_cache(self) -> None:
         from core.chat import tts_cache
@@ -153,18 +184,39 @@ class TTSClient(ResultCallback):
         if self._cache_session:
             tts_cache.abort_session(self._cache_session)
         self._cache_session = None
-        self._deferred_cache_msg_id = ''
-        self._deferred_cache_audio = bytearray()
-        self._deferred_cache_text = ''
-        self._deferred_cache_role = None
-        self._deferred_cache_speed = None
+        self._clear_deferred_cache()
 
-    def finalize_cache(self) -> None:
+    def finalize_cache(self, session=_UNSET) -> None:
+        """结束缓存会话。
+
+        Args:
+            session: 要结束的会话。三种取值语义**必须区分**：
+
+                - 不传（`_UNSET`）：结束**当前**会话（同步路径使用）。
+                - 显式传 `None`：调用方明确表示「我那个旧会话不存在」，
+                  此时**什么都不要做**。若把 None 当成「结束当前会话」，就会发生
+                  这样的事故：旧的延迟缓存完成事件（捕获到的 session 是 None）
+                  在 hub 上延时执行时，恰好新的即时缓存已经开始 —— 新缓存被误标
+                  为完成并解绑。
+                - 传入具体 session：只结束该 session；仅当当前绑定仍是这个对象时
+                  才解除绑定，别把后来者的绑定清掉。
+        """
         from core.chat import tts_cache
 
-        if self._cache_session:
-            tts_cache.finalize_session(self._cache_session)
-        self._cache_session = None
+        if session is _UNSET:
+            target = self._cache_session
+            if target:
+                tts_cache.finalize_session(target)
+            self._cache_session = None
+            return
+
+        if session is None:
+            # 明确「没有旧会话」：不碰当前状态
+            return
+
+        tts_cache.finalize_session(session)
+        if self._cache_session is session:
+            self._cache_session = None
 
     def _ensure_synthesizer(self, role: str):
         """创建/复用 synthesizer。**必须在 SDK 线程上调用**，连接才归属该线程。"""
@@ -193,7 +245,17 @@ class TTSClient(ResultCallback):
                 # 用 exc_info 记录真实异常栈；在这里 print_stack 只会打出
                 # SDK 线程自身的栈，没有诊断价值。
                 log.error(f">>[TTS] {label} 失败: {e}", exc_info=True)
-                self.on_err(e)
+                # on_err 最终会 `socketio.emit`（归属 hub）。这里运行在 SDK
+                # 工作线程上，直接调用就是跨线程使用 hub 的 gevent socket，
+                # 会抛 Cannot switch to a different thread。故与其它错误回调一致，
+                # 交回 hub；用保序通道使错误排在已入队的音频分片之后。
+                #
+                # 必须用默认参数把异常**值**绑进闭包：`except ... as e` 的变量在
+                # except 块结束时会被 Python 删除，若闭包沿用它，执行时（更晚）
+                # 会抛 NameError，把真实错误掩盖成 `free variable 'e'`。
+                from core.tools.hub_dispatch import post_to_hub_ordered
+
+                post_to_hub_ordered(lambda err=e: self.on_err(err))
                 return None
 
         return self._sdk.submit(guarded, wait=wait, timeout=timeout)
@@ -307,14 +369,25 @@ class TTSClient(ResultCallback):
 
     def on_complete(self):
         log.debug(">>[TTS] on_complete 回调")
-        # 回调来自 SDK 的 ws 线程（或 SDK 线程），而 on_msg 最终会 socketio.emit。
-        # 跨线程 emit 会用到归属 hub 的 gevent socket，必须交回 hub；
-        # 用**保序**通道：完成事件必须排在所有音频分片之后。
+        # **就地绑定**这次完成事件属于哪个会话、哪份延迟缓存。
+        #
+        # 回调来自 SDK 的 ws 线程，而 on_msg 最终会 socketio.emit（归属 hub），
+        # 因此必须交回 hub；但交回之后是在**另一个时刻**执行的：这期间完全可能
+        # 已经开始了新的合成会话。若那时再读 self._cache_session /
+        # self._deferred_cache_*，旧的完成事件就会把**新**会话判定为完成并解绑
+        #（实测可复现：新缓存被提前标记完成，绑定被清掉）。
+        session = self._cache_session
+        snapshot = self.deferred_cache_snapshot()
+        deferred_msg_id = snapshot[0]
+
         from core.tools.hub_dispatch import post_to_hub_ordered
 
         def emit_complete():
-            self.finalize_cache()
-            self._commit_deferred_cache()
+            self.finalize_cache(session)
+            self._commit_deferred_cache_values(*snapshot)
+            # 仅在仍是同一份延迟缓存时清空，避免抹掉新会话写入的状态
+            if self._deferred_cache_msg_id == deferred_msg_id:
+                self._clear_deferred_cache()
             self.on_msg(">>[TTS] Completed", 1)
 
         post_to_hub_ordered(emit_complete)

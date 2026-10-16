@@ -248,8 +248,12 @@ class AliyunAsrClient(AsrClient):
         rid = self._next_session_request_id
         if not rid and self._session and not self._session.cancelled:
             rid = self._session.request_id
+        # 代次与 request_id 成对取出并清空（见 _AsrSession.attempt 的说明）
+        attempt = self._next_session_attempt
         self._next_session_request_id = ''
-        session = _AsrSession(request_id=rid or '', ws_generation=ws_generation)
+        self._next_session_attempt = 0
+        session = _AsrSession(request_id=rid or '', ws_generation=ws_generation,
+                              attempt=attempt)
         self._session = session
         self._sessions_by_generation[ws_generation] = session
 

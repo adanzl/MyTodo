@@ -62,7 +62,7 @@ import threading
 import weakref
 from typing import Any, Callable, Optional
 
-from gevent import get_hub, spawn
+from gevent import Timeout, get_hub, spawn
 
 from core.config import app_logger
 
@@ -70,12 +70,20 @@ log = app_logger
 
 _installed = False
 
+# 单个排队动作的执行上限（秒）。对端不收数据时 send 会一直阻塞，没有上限则
+# 排在后面的动作（尤其关闭）永远轮不到。
+_OPERATION_TIMEOUT = 10.0
+
 # hub 线程的 ident：install() 在模块导入时执行，那时正处于主 hub 线程。
 # 用它区分「调用方是 hub」与「调用方是普通工作线程」。
 _HUB_THREAD_IDENT: Optional[int] = None
 
 _state_lock = threading.Lock()
 _states: 'weakref.WeakKeyDictionary[Any, _SendState]' = weakref.WeakKeyDictionary()
+# 退化通道：极少数不支持弱引用的对象（例如带 __slots__ 且未含 __weakref__ 的
+# 第三方 WebSocketApp 子类）。用 id 作键以保证「同一个对象拿到同一个队列」，
+# 从而不破坏发送顺序；这类对象数量极少，可接受不回收。
+_fallback_states: 'dict[int, _SendState]' = {}
 
 
 class _SendState:
@@ -90,8 +98,24 @@ class _SendState:
 
 
 def _state_for(app: Any) -> _SendState:
+    """取（必要时创建）某个连接对应的发送状态。
+
+    正常情况下用弱引用字典，连接对象被回收时状态随之消失。
+    不支持弱引用的对象走 id 键的退化通道——仍保证同一对象对应同一队列，
+    因此发送顺序不受影响。
+    """
     with _state_lock:
-        state = _states.get(app)
+        try:
+            state = _states.get(app)
+        except TypeError:
+            # 该对象不支持弱引用（例如带 __slots__ 的子类）
+            key = id(app)
+            state = _fallback_states.get(key)
+            if state is None:
+                state = _SendState()
+                _fallback_states[key] = state
+            return state
+
         if state is None:
             state = _SendState()
             _states[app] = state
@@ -99,18 +123,41 @@ def _state_for(app: Any) -> _SendState:
 
 
 def _owner_hub(app: Any):
-    """取持有该连接 socket 的 hub；连接尚未建立或不是 gevent socket 时返回 None。"""
+    """取持有该连接 socket 的 hub。
+
+    连接尚未建立、socket 不是 gevent 实现（未 patch）、或传入的是测试替身时返回
+    None，调用方会就地执行而不做调度。
+
+    这里的校验刻意保守：只认「`thread_ident` 是整数、且 loop 提供 run_callback」
+    的对象。否则 `MagicMock` 之类的替身会自动生成 `.sock.sock.hub` 等属性并被误
+    当成真实 hub —— 结果是操作被投进无人消费的队列，**静默不执行**。
+    """
     ws = getattr(app, 'sock', None)          # websocket.WebSocket
     sock = getattr(ws, 'sock', None)         # gevent socket（未 patch 时是标准库 socket）
-    return getattr(sock, 'hub', None)
+    hub = getattr(sock, 'hub', None)
+    if hub is None:
+        return None
+
+    thread_ident = getattr(hub, 'thread_ident', None)
+    if not isinstance(thread_ident, int):
+        return None
+
+    if not hasattr(getattr(hub, 'loop', None), 'run_callback'):
+        return None
+
+    return hub
 
 
 def _drain(state: _SendState) -> None:
-    """在 socket 所属线程上执行排队中的发送（按入队顺序）。
+    """在 socket 所属线程上执行排队中的动作（按入队顺序）。
 
     必须作为**greenlet** 运行，不能直接放在 hub 的 loop 回调里：背压时
     `send` 会让出等待，而在 loop 回调中调用阻塞操作会抛
     `BlockingSwitchOutError`（gevent 不允许在回调里阻塞事件循环）。
+
+    每个动作都套 `gevent.Timeout`：对端不收数据时 send 会一直阻塞（实测背压下
+    就是如此），若不设上限，排在它后面的动作（尤其是**关闭**）永远轮不到，
+    队列会一直卡住。这里让超时的动作以异常结束，后续动作照常执行。
     """
     while True:
         with _state_lock:
@@ -122,7 +169,17 @@ def _drain(state: _SendState) -> None:
                 state.scheduled = False
                 return
         try:
-            box['result'] = call()
+            with Timeout(_OPERATION_TIMEOUT):
+                box['result'] = call()
+        except Timeout as exc:
+            # 只有本次动作超时才会走到这里（Timeout 是我们自己起的）
+            err = TimeoutError(
+                f'WebSocket 操作超时（{_OPERATION_TIMEOUT}s）：对端未消费数据时'
+                '发送会一直阻塞，超时后放行后续动作（如关闭）'
+            )
+            err.__cause__ = exc
+            box['error'] = err
+            log.warning(f'[WS] {err}')
         except BaseException as e:  # noqa: BLE001
             box['error'] = e
             if done is None:
@@ -142,29 +199,54 @@ def _wake(state: _SendState) -> None:
 def _schedule(state: _SendState, hub: Any) -> None:
     """把唤醒回调排到 hub 的 loop 上（幂等：已有待执行回调时不重复排）。
 
-    `hub.loop.run_callback` 是线程安全的（libev/libuv 的 async watcher），
-    因此可以从任意线程把控制权交回 socket 所属线程。
+    **必须用 `run_callback_threadsafe`，不能用 `run_callback`。** 两者的差别在
+    gevent 源码里很清楚：
+
+        def run_callback(self, func, *args):
+            cb = callback(func, args)
+            self._callbacks.append(cb)   # Relying on the GIL for this to be threadsafe
+            self._setup_for_run_callback()   # XXX: This may not be threadsafe.
+            return cb
+
+        def run_callback_threadsafe(self, func, *args):
+            cb = self.run_callback(func, *args)
+            self._threadsafe_async.send()    # ← 唤醒目标循环
+            return cb
+
+    `run_callback` 只把回调追加进列表，**不会唤醒**空闲的循环——连 gevent 自己都
+    给那行标注了 "XXX: This may not be threadsafe"。连接线程通常正阻塞在 select
+    等数据，回调要等到下一次事件才会被执行，于是发送迟迟不落地，实测表现为
+    「投递超时」。`run_callback_threadsafe` 额外发一次线程安全的 async watcher，
+    立刻把目标循环叫醒。
     """
     with _state_lock:
         if state.scheduled:
             return
         state.scheduled = True
-    hub.loop.run_callback(_wake, state)
+
+    loop = hub.loop
+    # 老版本 gevent 没有这个接口时退回 run_callback（至少语义正确）
+    schedule = getattr(loop, 'run_callback_threadsafe', None) or loop.run_callback
+    schedule(_wake, state)
 
 
-def send_on_owner(app: Any, call: Callable[[], Any], *, timeout: float = 15.0) -> Any:
-    """把一次发送调度到 socket 所属线程执行。
+def run_on_owner(app: Any, call: Callable[[], Any], *, timeout: float = 15.0) -> Any:
+    """把一次「操作连接」的动作调度到 socket 所属线程执行。
+
+    发送（`send`/`send_bytes`/`send_text`）与**关闭**（`close`）都必须走这里：
+    `close()` 内部会发关闭帧，同样会用到 gevent socket，跨线程调用可能卡在
+    原生发送锁上（连接正在发送时），从而把 hub 拖住。
 
     Args:
         app: `WebSocketApp` 实例（用来定位它的 socket 与所属 hub）。
-        call: 真正执行发送的可调用对象，在所属线程上被调用。
+        call: 真正执行动作的可调用对象，在所属线程上被调用。
         timeout: 非 hub 调用方的等待上限（秒）。
 
     Returns:
         所属线程上 `call()` 的返回值；hub 调用方（不等待）返回 None。
 
     Raises:
-        TimeoutError: 连接所属线程长时间未处理该发送。
+        TimeoutError: 连接所属线程长时间未处理该动作。
     """
     hub = _owner_hub(app)
     current = threading.get_ident()
@@ -187,12 +269,59 @@ def send_on_owner(app: Any, call: Callable[[], Any], *, timeout: float = 15.0) -
 
     if not done.wait(timeout):
         raise TimeoutError(
-            'WebSocket 发送调度超时：连接所属线程未处理该发送（'
+            'WebSocket 操作调度超时：连接所属线程未处理该动作（'
             '该线程可能已阻塞或已退出）'
         )
     if 'error' in box:
         raise box['error']
     return box.get('result')
+
+
+# 兼容别名：早期只有「发送」需要调度时用的名字
+send_on_owner = run_on_owner
+
+
+def close_on_owner(app: Any, *, timeout: float = 5.0) -> Any:
+    """把 `close()` 调度到连接所属线程执行。
+
+    ## 为什么关闭也要调度
+
+    `WebSocketApp.close()` 内部会先发关闭帧（`WebSocket.close`），用的是同一个
+    gevent socket。若此刻连接正在发送、持有原生发送锁，从别的线程直接 close 会
+    **阻塞在该锁上**，把 hub 拖住。
+
+    ## 为什么显式传 timeout=0
+
+    `WebSocket.close(status, reason, timeout)` 在发完关闭帧后会**同步接收**对方的
+    关闭帧：
+
+        sock_timeout = self.sock.gettimeout()
+        self.sock.settimeout(timeout)
+        while timeout is None or time.time() - start_time < timeout:
+            frame = self.recv_frame()          # ← 与 run_forever 抢同一个接收锁
+            ...
+
+    而这个调用发生在连接所属线程上，那里**正有 run_forever 的接收循环在跑**
+    （`Dispatcher.read` 等数据，可能已经读到了半个帧）。两个协程争抢同一个原生
+    接收锁，只要接收循环正持锁等待后续字节，关闭就会一直等 —— 整个连接线程死锁。
+
+    传 `timeout=0` 后 while 条件 `time.time() - start_time < 0` 直接为假，
+    循环体不执行：只发出关闭帧，不等握手。接收循环随后会因连接关闭自行退出。
+
+    Returns:
+        所属线程上的返回值；hub 调用方（不等待）返回 None。
+    """
+    if app is None:
+        return None
+
+    def call():
+        try:
+            return app.close(timeout=0)
+        except TypeError:
+            # 极老版本 websocket-client 的 close() 不接受参数
+            return app.close()
+
+    return run_on_owner(app, call, timeout=timeout)
 
 
 def _wrap_send(method_name: str) -> Callable[..., Any]:
@@ -204,7 +333,7 @@ def _wrap_send(method_name: str) -> Callable[..., Any]:
         def call():
             return original(self, *args, **kwargs)
 
-        return send_on_owner(self, call)
+        return run_on_owner(self, call)
 
     wrapper.__name__ = method_name
     wrapper.__doc__ = f'把 `{method_name}` 调度到 socket 所属线程执行（见模块说明）。'

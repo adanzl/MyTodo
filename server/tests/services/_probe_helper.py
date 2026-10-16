@@ -30,6 +30,9 @@ def run_probe(source: str, tmp_path, *, timeout: int = 90) -> subprocess.Complet
     # 子进程不走 tests/conftest.py，自己把本地回退存储指向临时目录，
     # 否则导入 rds_mgr 会写坏被 git 跟踪的 server/rds_local.json
     env['RDS_LOCAL_FILE'] = os.path.join(str(tmp_path), 'rds_probe.json')
+    # 显式关掉 Redis：否则每次都要等 ~5 秒连接超时才回退（一批探针就是几十秒），
+    # 而且结果会随「本机是否恰好跑着 Redis」而变。关掉后确定性地走本地回退。
+    env['REDIS_ENABLED'] = 'false'
 
     return subprocess.run(
         [sys.executable, script],

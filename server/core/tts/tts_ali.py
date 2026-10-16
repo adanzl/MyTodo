@@ -29,6 +29,7 @@ try:
     # 连接由 run_forever 线程建立、语音数据从 hub 线程发送：必须让发送发生在
     # 连接所属线程上，否则跨线程使用 gevent socket 会抛
     # Cannot switch to a different thread
+    from core.tools.ws_owner_send import close_on_owner
     from core.tools.ws_owner_send import install as _install_ws_owner_send
 
     _install_ws_owner_send()
@@ -458,7 +459,9 @@ class TTSClient:
         """主动关闭连接"""
         try:
             if ws and hasattr(ws, 'sock') and ws.sock and hasattr(ws.sock, 'connected') and ws.sock.connected:
-                ws.close()
+                # 走连接归属调度：close() 会发关闭帧，跨线程直接用同一个 gevent
+                # socket 可能卡在原生发送锁上（见 core/tools/ws_owner_send.py）
+                close_on_owner(ws)
         except Exception as e:
             log.warning(f">>[TTS-ALI] 关闭连接时出错: {e}")
 

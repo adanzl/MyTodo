@@ -24,7 +24,9 @@ from gevent import monkey
 
 monkey.patch_all(subprocess=True, thread=False, queue=False)
 
+import os
 import queue
+import sys
 import threading
 import time
 
@@ -168,6 +170,14 @@ def light_probe():
 
 
 # ---------- 同时开跑 ----------
+# 必须先启动 hub 消费循环（生产里由 main.py 调用）。不启动的话，
+# `post_to_hub` / `post_to_hub_ordered` 投递的任务没有消费者，会一直堆在队列里，
+# 探针只能干等到超时——既浪费时间又测不到真实行为。
+from core.tools.hub_dispatch import start_hub_drain
+
+start_hub_drain()
+sleep(0.1)          # 让消费循环跑起来
+
 t0 = time.monotonic()
 
 for i in range(STREAMS):
@@ -193,8 +203,8 @@ def ordered_feeder():
 
 spawn(ordered_feeder)
 
-# 等所有负载跑完
-deadline = 40.0
+# 等所有负载跑完（正常十几秒内就该齐；超时说明有环节没跑起来）
+deadline = 25.0
 while time.monotonic() - t0 < deadline:
     if (stream_done['n'] >= STREAMS and status_ok['n'] >= 6
             and len(ordered_seen) >= 60 and asr_seen['n'] >= 50
@@ -205,6 +215,13 @@ while time.monotonic() - t0 < deadline:
 t1 = time.monotonic()
 sleep(0.5)          # 留出余量让残余回调跑完
 stop['v'] = True
+
+# 明确报告「是否真的跑齐了」：否则超时只会表现为数字偏小，
+# 看不出是负载没跑起来还是 hub 慢。
+print('CONVERGED=%s' % (
+    stream_done['n'] >= STREAMS and status_ok['n'] >= 6
+    and len(ordered_seen) >= 60 and asr_seen['n'] >= 50
+    and cancel_seen['n'] >= 5))
 
 print('ELAPSED=%.2f' % (t1 - t0))
 print('MAX_GAP=%.4f' % max_gap(t0, t1))
@@ -221,4 +238,10 @@ if probe_latency:
     print('LIGHT_P95=%.4f' % lat[int(len(lat) * 0.95) - 1])
     print('LIGHT_MAX=%.4f' % lat[-1])
 print('DONE', flush=True)
+
+# 必须硬退出：`start_hub_drain()` 起的消费循环是**无限 greenlet**，主 greenlet
+# 结束后 gevent 的 hub 会等待所有 greenlet 结束，于是进程永不退出 —— 输出都打印
+# 完了，subprocess 仍会一直等到超时（这正是本探针「卡住」的原因）。
+sys.stdout.flush()
+os._exit(0)
 '''

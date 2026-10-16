@@ -17,7 +17,7 @@ from dataclasses import dataclass
 import websocket
 
 from core.config import app_logger, config
-from core.tools.ws_owner_send import install as install_ws_owner_send
+from core.tools.ws_owner_send import close_on_owner, install as install_ws_owner_send
 
 # 连接由 run_forever 线程建立、音频从 hub 线程发送：必须让发送发生在连接所属
 # 线程上，否则跨线程使用 gevent socket 会抛 Cannot switch to a different thread
@@ -38,6 +38,10 @@ class _AsrSession:
     request_id: str
     ws_generation: int
     cancelled: bool = False
+    # 会话所属的请求代次（attempt）。必须在**创建时**就记下来：错误回调来自 ws
+    # 线程，若等回到 hub 时才去读当前 attempt，期间用户重试（attempt+1）会让旧
+    # 连接的错误击中新一轮请求。
+    attempt: int = 0
 
 
 class AsrClient:
@@ -65,6 +69,7 @@ class AsrClient:
         self._sessions_by_generation: dict[int, _AsrSession] = {}
         self._ws_generation = 0
         self._next_session_request_id = ""
+        self._next_session_attempt = 0
         self.sid = ""
 
     def _find_session(self, request_id: str) -> _AsrSession | None:
@@ -77,7 +82,7 @@ class AsrClient:
                 return session
         return None
 
-    def begin_session(self, request_id: str) -> None:
+    def begin_session(self, request_id: str, attempt: int = 0) -> None:
         if not request_id:
             return
         cur = self._session
@@ -88,6 +93,7 @@ class AsrClient:
             cur.cancelled = True
             self._teardown_connection()
         self._next_session_request_id = request_id
+        self._next_session_attempt = int(attempt or 0)
 
     def cancel_session(self, request_id: str) -> None:
         if not request_id:
@@ -141,7 +147,10 @@ class AsrClient:
 
     def close(self):
         if self.ws:
-            self.ws.close()
+            # 关闭也要走连接归属调度：close() 内部会发关闭帧，用的是同一个
+            # gevent socket。若此刻连接正在发送（持有原生发送锁），在别的线程
+            # 直接 close 会阻塞在该锁上，把 hub 拖住。
+            close_on_owner(self.ws)
 
     def _make_on_message(self, ws_generation: int):
         def on_message(ws, msg):
@@ -238,8 +247,12 @@ class AsrClient:
             rid = self._session.request_id
         if not rid:
             rid = ""
-        self._next_session_request_id = ""
-        session = _AsrSession(request_id=rid, ws_generation=ws_generation)
+        # 代次与 request_id 一同取出并清空：两者必须成对生效，不能各自残留
+        attempt = self._next_session_attempt
+        self._next_session_request_id = ''
+        self._next_session_attempt = 0
+        session = _AsrSession(request_id=rid, ws_generation=ws_generation,
+                              attempt=attempt)
         self._session = session
         self._sessions_by_generation[ws_generation] = session
 

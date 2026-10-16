@@ -1,23 +1,29 @@
 """跨 Socket 的 AI 请求 phase 与回复快照（user + clientRequestId）。
 
 **不要在持有 `_store_lock` 时访问 Redis。**
-`main.py` 用 `monkey.patch_all(thread=False)`，因此 `_store_lock` 是**真实的**
-`threading.Lock`；而 Redis 访问会 park 当前 greenlet。若 A 协程持锁等待 Redis，
-同线程的 B 协程在 `lock.acquire()` 上会阻塞**整个 OS 线程**，A 永远无法被唤醒
-——进程彻底冻结、只能重启（已实测复现）。
+`main.py` 用 `monkey.patch_all(thread=False)`，Redis 访问会 park 当前 greenlet。
+若 A 协程持锁等待 Redis，同线程的 B 协程会一直等这把锁，而 A 又等不到被唤醒
+——轻则长时间阻塞，重则整个进程冻结（已实测复现）。
 
 所以：
 - 纯读操作直接读（单条 GET 本身是原子的），不加锁；
 - 读-改-写一律交给 Redis Lua 原子执行（同时避免多连接交错丢更新）；
 - `_store_lock` 只用于本地 JSON 回退分支，锁内只做同步本地操作。
+
+`_store_lock` 采用 **gevent 协作式可重入锁**（不是 `threading.Lock`）：
+本地回退分支里的 `_load`/`_save` 仍会走 `rds_mgr`，而 `rds_mgr` 在 Redis 不可用
+时会用**自己的原生锁**保护本地 JSON 文件。原生锁 + 原生锁会「持真锁等真锁」，
+一旦发生就把整个 OS 线程停住、hub 冻结。用 gevent 锁则等待是协作式的（park 自己、
+让出 hub），可重入也避免了自锁。详见 `_store_lock` 定义处的说明。
 """
 
 from __future__ import annotations
 
 import json
-import threading
 import time
 from typing import Any, Optional
+
+from gevent.lock import RLock as _GeventRLock
 
 import core.db.rds_mgr as rds_mgr
 
@@ -26,7 +32,24 @@ TTL_SECONDS = 900
 TERMINAL = frozenset({'done', 'cancelled', 'failed'})
 RETRYABLE = frozenset({'failed', 'cancelled'})
 
-_store_lock = threading.Lock()
+# 本地回退分支的「读-改-写」互斥锁。
+#
+# **必须是 gevent 的协作式可重入锁，不能用 threading.Lock。** 原因：
+#
+#   `_load` / `_save` 并不是纯本地操作 —— 它们走 `rds_mgr.get_str/setex`，
+#   Redis 不可用时 `rds_mgr` 会回退到本地 JSON 文件并持有**它自己的原生锁**，
+#   期间还可能做连接尝试。若这里用原生 `threading.Lock`，就会出现
+#   「持真锁 → 等真锁」：某个协程持 `_store_lock` 卡在 `rds_mgr` 里，其它协程
+#   全部堵在 `_store_lock` 上。原生锁会让整个 OS 线程停住，hub 随即冻结，
+#   任何请求（包括 /health）都不再被处理。
+#
+#   实测：6 个并发协程反复 set_phase/get_record（Redis 不可用）时，hub 永久卡在
+#   `set_phase` 的 `with _store_lock:` 一行；用 faulthandler 抓到的正是这一帧。
+#   这与本文件 `get_record` 处的注释是同一个道理。
+#
+#   换成 gevent 锁后：等待是协作式的（会 park 自己、让出 hub），且可重入，
+#   因此既不会冻结线程，也不会自锁。
+_store_lock = _GeventRLock()
 
 # Redis 上单次 GET+校验+SETEX，避免多 worker / 多连接交错「读-改-写」。
 _PHASE_TRANSITION_LUA = """

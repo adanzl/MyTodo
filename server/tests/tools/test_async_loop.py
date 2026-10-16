@@ -33,6 +33,61 @@ async def _boom():
     raise ValueError("boom")
 
 
+def test_concurrent_first_use_starts_exactly_one_loop(monkeypatch):
+    """并发首次使用时，只能创建**一个**事件循环（即一个循环线程）。
+
+    曾经有竞态：判断条件是「`self._loop` 为 None 就新建线程」，而 `_loop` 是在
+    线程启动**之后**才在 `_run_forever` 里赋值的。于是当第一个调用者已经起了
+    线程、但循环还没赋值时，第二个调用者会看到 `_loop is None` 并再起一个线程
+    ——两个循环同时存在，调用在两者间来回切换；而 bleak 的 client 绑定在其中一个
+    上，行为随即不可预期。
+
+    断言的是 `new_event_loop` 的**调用次数**，而不是各调用者返回的 loop 身份：
+    后者在竞态下会被 `self._loop` 的覆盖掩盖（大家都读到同一个最后写入的值），
+    测不出「确实建了多个循环」。
+
+    这里把「建循环」这一步人为拉长，使竞态窗口必然被命中。
+    """
+    real_new_loop = asyncio.new_event_loop
+    created = []
+
+    def slow_new_loop():
+        time.sleep(0.3)      # 拉宽竞态窗口：让并发调用者都挤进启动阶段
+        loop = real_new_loop()
+        created.append(loop)
+        return loop
+
+    monkeypatch.setattr(asyncio, 'new_event_loop', slow_new_loop)
+
+    runner = AsyncLoopRunner(name="async-loop-test-race")
+    try:
+        errors = []
+        barrier = threading.Barrier(8)
+
+        def worker():
+            try:
+                barrier.wait(timeout=10)
+                runner._ensure_started()
+            except BaseException as e:  # noqa: BLE001
+                errors.append(f'{type(e).__name__}: {e}')
+
+        threads = [threading.Thread(target=worker) for _ in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(20)
+        for t in threads:
+            assert not t.is_alive(), '有调用者卡住了'
+
+        assert not errors, f'并发启动出错: {errors}'
+        assert len(created) == 1, (
+            f'并发首次使用创建了 {len(created)} 个事件循环 —— '
+            'BleakClient 绑定在不同循环上会行为不可预期（旧实现在此会创建多个）'
+        )
+    finally:
+        runner.shutdown()
+
+
 def test_runner_is_lazy_and_runs_in_a_daemon_thread():
     """线程惰性启动、是守护线程，且不是调用方线程。"""
     runner = AsyncLoopRunner(name="async-loop-test-lazy")
