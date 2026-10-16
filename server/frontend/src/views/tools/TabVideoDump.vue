@@ -106,6 +106,12 @@
                     <div v-if="currentTask.error_message" class="text-xs text-red-500 wrap-anywhere mb-2">
                         {{ currentTask.error_message }}
                     </div>
+                    <div v-if="currentTask.status === 'failed'" class="mb-2">
+                        <el-button size="small" type="warning" plain :loading="retrying" :disabled="hasProcessing"
+                            @click="handleRetry">
+                            再次下载
+                        </el-button>
+                    </div>
                     <div class="flex gap-2">
                         <div class="border rounded p-2 flex-1 min-w-0">
                             <div class="flex items-center justify-between gap-2">
@@ -196,6 +202,7 @@ import {
     getVideoDumpLogin,
     getVideoDumpList,
     createVideoDump,
+    retryVideoDump,
     getVideoDumpTaskStatus,
     getVideoDumpDownloadUrl,
     deleteVideoDump,
@@ -230,6 +237,7 @@ const smallTextButtonProps = { size: "small" as const, plain: true, class: "h-5!
 
 const loading = ref(false);
 const submitting = ref(false);
+const retrying = ref(false);
 const sourceUrl = ref("");
 const sites = ref<VideoDumpSite[]>(FALLBACK_SITES);
 const loginSites = ref<VideoDumpLoginSite[]>([]);
@@ -547,6 +555,27 @@ const handleExtract = async () => {
         logAndNoticeError(error as Error, "创建任务失败");
     } finally {
         submitting.value = false;
+    }
+};
+
+const handleRetry = async () => {
+    const taskId = currentTask.value?.task_id;
+    if (!taskId || retrying.value || hasProcessing.value) return;
+    retrying.value = true;
+    try {
+        const response = await retryVideoDump(taskId);
+        if (response.code !== 0 || !response.data) {
+            ElMessage.error(response.msg || "再次下载失败");
+            return;
+        }
+        taskList.value = ((await getVideoDumpList()).data as VideoDumpTask[]) || [];
+        applyTask(response.data);
+        ElMessage.success("已重新开始下载和提取");
+        startPolling();
+    } catch (error) {
+        logAndNoticeError(error as Error, "再次下载失败");
+    } finally {
+        retrying.value = false;
     }
 };
 

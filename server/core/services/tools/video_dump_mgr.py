@@ -155,6 +155,32 @@ class VideoDumpMgr(BaseTaskMgr[VideoDumpTask]):
         self._run_task_async(task_id, lambda current: self._extract(current.task_id))
         return 0, "已开始提取"
 
+    def retry_task(self, task_id: str) -> Tuple[int, str]:
+        """清掉上次的视频和字幕，再按原链接走一遍下载和提取。"""
+        with self._task_lock.gen_wlock():
+            task, err = self._get_task_or_err(task_id)
+            if not task:
+                return -1, err
+            if not task.source_url:
+                return -1, "任务没有视频链接"
+            if task.status == TASK_STATUS_PROCESSING or self._has_processing():
+                return -1, "已有任务正在处理"
+            try:
+                self._before_delete_task(task)
+            except Exception as exc:
+                return -1, f"清理上次结果失败: {exc}"
+            task.uploaded_path = ""
+            task.uploaded_info = None
+            task.output_path = None
+            task.output_info = None
+            task.subtitle_path = None
+            task.subtitle_info = None
+            task.subtitle_source = ""
+            task.error_message = None
+            task.stage = "准备下载"
+            self._save_task_and_update_time(task)
+        return self.start_task(task_id)
+
     def _patch(self, task_id: str, **fields: Any) -> None:
         with self._task_lock.gen_wlock():
             task = self._get_task(task_id)

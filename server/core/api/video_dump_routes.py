@@ -31,6 +31,10 @@ class _VideoDumpDeleteBody(BaseModel):
     clear_all: bool = False
 
 
+class _VideoDumpRetryBody(BaseModel):
+    task_id: str
+
+
 class _LogoutBody(BaseModel):
     site: str
 
@@ -141,6 +145,29 @@ def video_dump_create() -> ResponseReturnValue:
     except Exception as e:
         log.error(f"[文字提取] 创建任务失败: {e}")
         return _err(f"创建任务失败: {str(e)}")
+
+
+@limiter.limit("10 per minute; 50 per hour")
+@video_dump_bp.route("/video_dump/retry", methods=['POST'])
+def video_dump_retry() -> ResponseReturnValue:
+    """对已有任务重新下载并提取字幕。"""
+    try:
+        data: Dict[str, Any] = read_json_from_request()
+        body, err = parse_with_model(_VideoDumpRetryBody, data, err_factory=_err)
+        if err or not body:
+            return err or _err("Invalid request body")
+
+        code, msg = video_dump_mgr.retry_task(body.task_id)
+        if code != 0:
+            return _err(msg)
+
+        task_info = video_dump_mgr.get_task(body.task_id)
+        if not task_info:
+            return _err("任务不存在")
+        return _ok(task_info)
+    except Exception as e:
+        log.error(f"[文字提取] 再次下载失败: {e}")
+        return _err(f"再次下载失败: {str(e)}")
 
 
 @video_dump_bp.route("/video_dump/task/<path:task_id>", methods=['GET'])

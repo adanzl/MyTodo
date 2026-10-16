@@ -60,6 +60,11 @@ export async function createVideoDump(url: string): Promise<ApiResponse<VideoDum
   return response.data;
 }
 
+export async function retryVideoDump(task_id: string): Promise<ApiResponse<VideoDumpTask>> {
+  const response = await api.post<ApiResponse<VideoDumpTask>>("/video_dump/retry", { task_id });
+  return response.data;
+}
+
 export async function getVideoDumpTaskStatus(task_id: string): Promise<ApiResponse<VideoDumpTask>> {
   const response = await api.get<ApiResponse<VideoDumpTask>>(`/video_dump/task/${encodeURIComponent(task_id)}`);
   return response.data;
