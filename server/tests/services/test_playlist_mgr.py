@@ -20,6 +20,7 @@ with patch.dict('sys.modules', modules):
     import core.db.rds_mgr as rds_mgr
 
 
+
 def create_playlist_data(p_id,
                          name,
                          files,
@@ -68,7 +69,7 @@ def mock_device():
 
 
 @pytest.fixture
-def playlist_mgr(monkeypatch, mock_device):
+def playlist_mgr(monkeypatch, mock_device, tmp_path):
     # Mock network calls made by upnpclient
     mock_response = MagicMock()
     mock_response.status_code = 200
@@ -111,7 +112,19 @@ def playlist_mgr(monkeypatch, mock_device):
     mock_scheduler_mgr.reset_mock()
     mock_gevent.reset_mock()
 
-    # Force linux-only behavior inside the playlist_mgr module (safe: doesn't touch global sys.platform)
+    # 让**整个播放列表子系统**以为自己在 Linux 上。
+    #
+    # 注意这里改的确实是全局 sys.platform（`pm.sys` 就是 sys 模块本身），而且是
+    # 有意为之：除了 playlist_mgr.reload 自己会看 sys.platform，设备层
+    # `core/services/playlist/devices.py::_is_linux()` 也读同一个全局值，
+    # 并把非 Linux 当作「跳过设备映射」。只改本模块命名空间的话设备映射会被跳过，
+    # 相关用例会失败。
+    #
+    # 代价：全局 sys.platform 被改动期间，若 pytest 才第一次计算 tmp_path 的
+    # basetemp，`_pytest.compat.get_user_id()` 会因此走非 Windows 分支而在
+    # Windows 上调 `os.getuid()` 抛 AttributeError（表现为本文件里用 tmp_path
+    # 的用例 setup error）。所以本 fixture 显式依赖 `tmp_path`，让 pytest 在
+    # 改动发生**之前**就把 basetemp 算好并缓存。
     monkeypatch.setattr(pm.sys, "platform", "linux")
 
     mgr = PlaylistMgr()

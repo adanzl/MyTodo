@@ -57,12 +57,26 @@ class PlaylistDevices:
         playlist_raw: Dict[str, Any],
         on_each_playlist: Optional[Callable[[str, Dict[str, Any]], None]] = None,
     ) -> None:
-        """清空映射后按 ``playlist_raw`` 全量重建；每条成功后可选回调（如刷新 cron）。"""
+        """清空映射后按 ``playlist_raw`` 全量重建；每条成功后可选回调（如刷新 cron）。
+
+        每条都经 ``_build_device_spec`` 归一化后再建对象（与 ``refresh_single``
+        一致）：该校验器会校验地址、把缺失类型补成默认值、并对非法类型返回 None。
+
+        这里曾直接把原始 ``playlist_data.get("device", {})`` 交给 ``create_device``，
+        于是「没配置输出设备」的播放列表传入空 dict，在 ``node["type"]`` 上抛
+        ``KeyError: 'type'``（渲染出来就是 ``'type'``）。而 reload 是整体事务性的
+        ——一条这样的数据就会让**整次加载失败**，并在 ``_needs_reload`` 下每 5 秒
+        无限重试（线上表现：``Reload error: 'type'`` 刷屏、播放列表始终加载不出来）。
+        """
         self.clear()
         if not playlist_raw or not _is_linux():
             return
         for p_id, playlist_data in playlist_raw.items():
-            self[p_id] = create_device(playlist_data.get("device", {}))
+            spec = self._build_device_spec(p_id, playlist_data)
+            if spec is None:
+                # 没有可用设备：保持「无映射」，与 refresh_single 的行为一致
+                continue
+            self[p_id] = create_device(spec)
             if on_each_playlist is not None:
                 on_each_playlist(p_id, playlist_data)
 
