@@ -19,6 +19,7 @@ import csv
 import io
 import os
 import re
+import threading
 import time
 from datetime import datetime
 from urllib.parse import quote
@@ -31,6 +32,7 @@ from core.chat import chat_request_store
 from core.config import app_logger
 from core.chat import tts_cache
 from core.chat.tts_phrase_buffer import TtsPhraseBuffer
+from core.tools.hub_dispatch import post_to_hub
 from core.tts.tts_client import TTSClient
 from core.utils import _err, _ok
 from flask import Response, json, request
@@ -247,9 +249,27 @@ class ClientContext:
     def on_asr_result(self, text, client_request_id=""):
         '''
             处理asr的返回消息，收到消息后转发给ai和客户端
+
+        ASR 的 WebSocket 由真实 OS 线程驱动（见 aliyun_asr_client 的
+        `threading.Thread(target=self.ws.run_forever)`），因此本回调可能不在 hub 上。
+        而后续动作（Redis 读写、socketio.emit、发起 requests 流式请求）都归属 hub：
+        gevent 的 socket 绑定创建它的线程，跨线程使用会抛
+        "Cannot switch to a different thread" 并污染连接池。所以非 hub 线程必须
+        先投递回 hub 再执行——注意 `gevent.spawn` 做不到这件事，它只是在**当前**
+        线程上新建 greenlet。
         '''
         if text == '' or not client_request_id:
             return
+        if threading.current_thread() is threading.main_thread():
+            self._handle_asr_result(text, client_request_id)
+            return
+        log.info(
+            f"[CHAT] ASR 结果来自非 hub 线程，转交 hub 处理 request={client_request_id}"
+        )
+        post_to_hub(lambda: self._handle_asr_result(text, client_request_id))
+
+    def _handle_asr_result(self, text, client_request_id):
+        """在 hub 上执行 ASR 结果的后续处理（与文字消息走同一条路径）。"""
         rid = client_request_id
         phase = self._phase(rid)
         if phase not in ('accepted', 'asr'):
