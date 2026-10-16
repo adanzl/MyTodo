@@ -24,6 +24,7 @@ from core.config import (
 )
 from core.services.base_task_mgr import BaseTaskMgr, FileInfo, TaskBase
 from core.services.tools.video_dump_auth import cookies_file_for_url
+from core.services.tools.video_dump_douyin_media import open_url as douyin_open_url
 from core.services.tools.video_dump_sites import canonical_url, extract_url, match_site
 from core.services.tools.video_dump_text import cues_to_text, pick_subtitle
 from core.subtitles.whisper_client import WhisperError, transcribe_to_sidecar_sync
@@ -35,6 +36,7 @@ VideoDumpFileInfo = FileInfo
 _VIDEO_EXTS = {".mp4", ".mkv", ".webm", ".flv", ".mov"}
 _DOWNLOAD_TIMEOUT = 3600.0
 _TEXT_LIMIT = 400_000
+_DOUYIN_MEDIA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "video_dump_douyin_media.py")
 
 
 @dataclass
@@ -244,6 +246,8 @@ class VideoDumpMgr(BaseTaskMgr[VideoDumpTask]):
         )
 
     def _download(self, task_id: str, url: str) -> Tuple[str, str]:
+        if douyin_open_url(url):
+            return self._download_douyin(task_id, url)
         dest = self._task_dir(task_id)
         ensure_directory(dest)
         outtmpl = os.path.join(dest, "%(id)s.%(ext)s")
@@ -286,6 +290,30 @@ class VideoDumpMgr(BaseTaskMgr[VideoDumpTask]):
         if not video_path:
             raise Exception("下载结束但没有视频文件")
         return title, video_path
+
+    def _download_douyin(self, task_id: str, url: str) -> Tuple[str, str]:
+        dest = self._task_dir(task_id)
+        ensure_directory(dest)
+        video_path = os.path.join(dest, f"{task_id}.mp4")
+        result_path = os.path.join(dest, ".fetch.json")
+        cmd = [sys.executable, _DOUYIN_MEDIA, url, video_path, result_path]
+        cookies = cookies_file_for_url(url)
+        if cookies:
+            cmd.append(cookies)
+        try:
+            code, stdout, stderr = run_subprocess_safe(cmd, timeout=_DOWNLOAD_TIMEOUT)
+        except Exception as exc:
+            raise Exception(f"下载失败: {exc}") from exc
+        payload = _read_json_file(result_path)
+        try:
+            if os.path.isfile(result_path):
+                os.remove(result_path)
+        except OSError:
+            pass
+        if code != 0 or not payload.get("ok") or not os.path.isfile(video_path):
+            message = str(payload.get("error") or _last_line(stderr or stdout) or f"退出码 {code}")
+            raise Exception(f"下载失败: {message[:300]}")
+        return str(payload.get("title") or "").strip(), video_path
 
     def get_task(self, task_id: str) -> Optional[dict]:
         data = super().get_task(task_id)
@@ -349,6 +377,15 @@ class VideoDumpMgr(BaseTaskMgr[VideoDumpTask]):
 def _last_line(text: str) -> str:
     lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
     return lines[-1] if lines else ""
+
+
+def _read_json_file(path: str) -> dict:
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
 
 
 def _last_json(stdout: str) -> Optional[dict]:
