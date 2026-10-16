@@ -1,9 +1,11 @@
 """文字提取登录态：按站点选文件、扫码状态。不访问外网。"""
+import os
 from http.cookiejar import Cookie
 
 import requests
 
 from core.services.tools import video_dump_auth as auth
+from core.services.tools import video_dump_douyin_browser as auth_browser
 
 
 def _use_dir(monkeypatch, directory: str) -> None:
@@ -118,69 +120,75 @@ def test_bilibili_qr_success_writes_sessdata_and_uses_timeout(tmp_path, monkeypa
     assert auth.cookies_file_for_url("https://www.bilibili.com/video/BV1").endswith("bilibili.txt")
 
 
-class _DouyinSession:
-    def __init__(self, qr_payload, poll_payload):
-        self.headers: dict = {}
-        self.cookies = requests.cookies.RequestsCookieJar()
-        self.calls: list[dict] = []
-        self.qr_payload = qr_payload
-        self.poll_payload = poll_payload
-
-    def get(self, url, params=None, timeout=None, allow_redirects=None):
-        self.calls.append({
-            "url": url,
-            "params": params,
-            "timeout": timeout,
-            "allow_redirects": allow_redirects,
-        })
-        if "get_qrcode" in url:
-            return _FakeResponse(self.qr_payload)
-        if "check_qrconnect" in url:
-            return _FakeResponse(self.poll_payload)
-        return _FakeResponse({}, status_code=302, headers={"Location": "https://evil.example/nope"})
-
-
-def test_douyin_qr_saves_session_and_ignores_offsite_redirect(tmp_path, monkeypatch):
+def test_douyin_cookie_rows_keep_login_cookie_only(tmp_path, monkeypatch):
     _use_dir(monkeypatch, str(tmp_path))
-    session = _DouyinSession(
-        {"data": {"token": "tok", "qrcode": "aGVsbG8=", "qrcode_index_url": "https://evil.example/qr"}},
-        {"data": {"status": "3", "redirect_url": "https://www.douyin.com/passport/sso/login/?ticket=1"}},
-    )
-    session.cookies.set_cookie(_cookie("sessionid", "sid", domain=".douyin.com"))
-    monkeypatch.setattr(auth.requests, "Session", lambda: session)
+    assert not auth._save_douyin_cookie_rows([
+        {"name": "ttwid", "value": "x", "domain": ".douyin.com", "path": "/", "secure": True, "expires": 0},
+        {"name": "sessionid", "value": "sid", "domain": ".evil.example", "path": "/", "secure": True, "expires": 0},
+    ])
+    assert not (tmp_path / "douyin.txt").exists()
+    assert auth._save_douyin_cookie_rows([
+        {"name": "sessionid", "value": "sid", "domain": ".douyin.com", "path": "/", "secure": True, "expires": 10},
+    ])
+    text = (tmp_path / "douyin.txt").read_text(encoding="utf-8")
+    assert "\tsessionid\tsid" in text
+    assert "evil.example" not in text
+    assert auth.site_ready("douyin")
 
+
+def test_douyin_qr_returns_image_and_drops_foreign_url(tmp_path, monkeypatch):
+    _use_dir(monkeypatch, str(tmp_path))
+
+    def spawn(job_dir: str) -> None:
+        auth_browser.write_json(os.path.join(job_dir, "qr.json"), {
+            "image": "data:image/png;base64,aGVsbG8=",
+            "url": "https://evil.example/qr",
+        })
+        auth_browser.write_state(job_dir, "waiting")
+
+    monkeypatch.setattr(auth, "_spawn_douyin_worker", spawn)
     code, msg, data = auth.start_douyin_qr()
     assert code == 0, msg
     assert data["image"] == "data:image/png;base64,aGVsbG8="
     assert "url" not in data
     assert "token" not in data
-    assert session.calls[0]["timeout"] == (5, 10)
 
-    code, msg, polled = auth.poll_douyin_qr(data["login_id"])
+    login_id = data["login_id"]
+    code, msg, polled = auth.poll_douyin_qr(login_id)
+    assert code == 0, msg
+    assert polled == {"status": "waiting", "ready": False}
+
+    job_dir = auth._douyin_jobs[login_id].directory
+    auth_browser.write_state(job_dir, "scanned")
+    assert auth.poll_douyin_qr(login_id)[2]["status"] == "scanned"
+
+    _write_douyin_cookie(tmp_path)
+    auth_browser.write_state(job_dir, "saved")
+    code, msg, polled = auth.poll_douyin_qr(login_id)
     assert code == 0, msg
     assert polled == {"status": "success", "ready": True}
-    followed = [item["url"] for item in session.calls]
-    assert "https://www.douyin.com/passport/sso/login/?ticket=1" in followed
-    assert all("evil.example" not in item for item in followed)
-    assert all(item["allow_redirects"] is False for item in session.calls if "passport" in item["url"])
-    text = (tmp_path / "douyin.txt").read_text(encoding="utf-8")
-    assert "\tsessionid\tsid" in text
-    assert auth.cookies_file_for_url("https://www.douyin.com/video/1").endswith("douyin.txt")
+    assert os.path.exists(os.path.join(job_dir, "stop"))
 
 
-def test_douyin_qr_does_not_follow_foreign_redirect(monkeypatch):
-    session = _DouyinSession(
-        {"data": {"token": "tok", "qrcode_index_url": "https://aweme.snssdk.com/qr"}},
-        {"data": {"status": "3", "redirect_url": "http://evil.example/steal"}},
-    )
-    monkeypatch.setattr(auth.requests, "Session", lambda: session)
-    _code, _msg, data = auth.start_douyin_qr()
-    assert data and data["url"].startswith("https://aweme.snssdk.com/")
-    code, msg, polled = auth.poll_douyin_qr(data["login_id"])
+def test_douyin_qr_reports_browser_error(tmp_path, monkeypatch):
+    _use_dir(monkeypatch, str(tmp_path))
+
+    def spawn(job_dir: str) -> None:
+        auth_browser.write_state(job_dir, "error", "服务器还没安装 Chromium，暂时无法申请抖音二维码")
+
+    monkeypatch.setattr(auth, "_spawn_douyin_worker", spawn)
+    code, msg, data = auth.start_douyin_qr()
     assert code != 0
-    assert polled is None
-    assert "登录态" in msg
-    assert all("evil.example" not in item["url"] for item in session.calls)
+    assert data is None
+    assert "Chromium" in msg
+
+
+def test_douyin_scan_status_words():
+    assert auth_browser.scan_status({"status": "new"}) == "waiting"
+    assert auth_browser.scan_status({"status": "scanned"}) == "scanned"
+    assert auth_browser.scan_status({"status": "confirmed"}) == "success"
+    assert auth_browser.scan_status({"status": "expired"}) == "expired"
+    assert auth_browser.scan_status({"status": "new", "redirect_url": "https://evil.example/"}) == "waiting"
 
 
 def test_bilibili_qr_waiting_then_missing_login_expires(monkeypatch):
