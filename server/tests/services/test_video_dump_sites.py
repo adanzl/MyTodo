@@ -22,3 +22,21 @@ def test_plain_url_is_unchanged():
 
 def test_text_without_link_is_empty():
     assert extract_url("复制打开抖音，看看作品") == ""
+
+
+def test_douyin_note_url_becomes_video_url():
+    raw = "https://www.douyin.com/note/7696783380364742760?previous_page=app_code_link"
+    assert extract_url(raw) == "https://www.douyin.com/video/7696783380364742760"
+    assert match_site(extract_url(raw)).id == "douyin"
+
+
+def test_douyin_video_url_keeps_query():
+    raw = "https://www.douyin.com/video/7696783380364742760?previous_page=app_code_link"
+    assert extract_url(raw) == raw
+
+
+def test_douyin_share_and_modal_urls_become_video_url():
+    share = "https://www.iesdouyin.com/share/video/1234567890/"
+    modal = "https://www.douyin.com/user/MS4wLjAB?modal_id=1234567890"
+    assert extract_url(share) == "https://www.douyin.com/video/1234567890"
+    assert extract_url(modal) == "https://www.douyin.com/video/1234567890"

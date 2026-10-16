@@ -11,6 +11,15 @@ from urllib.parse import urlparse
 
 _URL_RE = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
 _URL_TRAILING = "，。、,.;:!?）)】」』\"'"
+# yt-dlp 的 Douyin 提取器只匹配 douyin.com/video/{数字}。笔记和分享页用的是同一个作品 id。
+_DOUYIN_CONTENT_RE = re.compile(
+    r"^https?://(?:[\w.-]+\.)?(?:douyin\.com|iesdouyin\.com)/(?:share/)?(?P<kind>note|video|gallery)/(?P<id>\d+)",
+    re.IGNORECASE,
+)
+_DOUYIN_MODAL_RE = re.compile(
+    r"^https?://(?:[\w.-]+\.)?douyin\.com/(?!video/)[^\s]*?[?&]modal_id=(?P<id>\d+)",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -35,7 +44,27 @@ def extract_url(text: str) -> str:
     match = _URL_RE.search(text or "")
     if not match:
         return ""
-    return match.group(0).rstrip(_URL_TRAILING)
+    return canonical_url(match.group(0).rstrip(_URL_TRAILING))
+
+
+def canonical_url(url: str) -> str:
+    """把抖音笔记、分享页改成 yt-dlp 能识别的 /video/{id}。其它链接原样返回。"""
+    raw = (url or "").strip()
+    match = _DOUYIN_CONTENT_RE.match(raw)
+    if match and _douyin_needs_video_form(raw, match.group("kind")):
+        return f"https://www.douyin.com/video/{match.group('id')}"
+    modal = _DOUYIN_MODAL_RE.match(raw)
+    if modal:
+        return f"https://www.douyin.com/video/{modal.group('id')}"
+    return raw
+
+
+def _douyin_needs_video_form(url: str, kind: str) -> bool:
+    if kind.lower() != "video":
+        return True
+    if "/share/" in urlparse(url).path.lower():
+        return True
+    return site_host(url) != "douyin.com"
 
 
 def site_host(url: str) -> str:

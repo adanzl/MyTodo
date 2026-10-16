@@ -24,7 +24,7 @@ from core.config import (
 )
 from core.services.base_task_mgr import BaseTaskMgr, FileInfo, TaskBase
 from core.services.tools.video_dump_auth import cookies_file_for_url
-from core.services.tools.video_dump_sites import extract_url, match_site
+from core.services.tools.video_dump_sites import canonical_url, extract_url, match_site
 from core.services.tools.video_dump_text import cues_to_text, pick_subtitle
 from core.subtitles.whisper_client import WhisperError, transcribe_to_sidecar_sync
 from core.utils import ensure_directory, get_file_info, run_subprocess_safe
@@ -169,7 +169,7 @@ class VideoDumpMgr(BaseTaskMgr[VideoDumpTask]):
         if not task:
             raise Exception("任务不存在")
         self._patch(task_id, stage="正在下载")
-        title, video_path = self._download(task_id, task.source_url)
+        title, video_path = self._download(task_id, canonical_url(task.source_url))
         video_info = get_file_info(video_path)
         if not video_info:
             raise Exception("下载完成但找不到视频文件")
