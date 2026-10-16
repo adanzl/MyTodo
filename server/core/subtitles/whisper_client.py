@@ -92,42 +92,43 @@ def _whisper_transcribe_sync(wav_path: str, language: str) -> str:
     return vtt
 
 
-def transcribe_to_sidecar(video_path: str, *, language: str = "en") -> dict[str, Any]:
-    """ffmpeg 抽 16k 单声道 wav → Whisper → 写入同目录 sidecar vtt（整段在后台线程执行）。"""
+def transcribe_to_sidecar_sync(video_path: str, *, language: str = "en") -> dict[str, Any]:
+    """在当前线程里做语音识别。调用方必须已经离开 gevent hub。"""
     lang = (language or "en").strip().lower()
     out_path = _sidecar_path(video_path, lang)
-    wait = float(config.WHISPER_TIMEOUT) + float(config.FFMPEG_TIMEOUT) + 60.0
-
-    def _work() -> dict[str, Any]:
-        log.info(
-            "[SUBTITLE] whisper recognize start video=%s language=%s out=%s",
-            video_path,
-            lang,
-            out_path,
+    log.info(
+        "[SUBTITLE] whisper recognize start video=%s language=%s out=%s",
+        video_path,
+        lang,
+        out_path,
+    )
+    t0 = time.monotonic()
+    with tempfile.TemporaryDirectory(prefix="mini_whisper_") as tmp:
+        wav = os.path.join(tmp, "audio.wav")
+        code, _, err = run_subprocess_safe(
+            [
+                config.FFMPEG_PATH, "-loglevel", "error", "-y", "-i", video_path, "-vn", "-ac", "1", "-ar", "16000",
+                wav
+            ],
+            timeout=float(config.FFMPEG_TIMEOUT),
         )
-        t0 = time.monotonic()
-        with tempfile.TemporaryDirectory(prefix="mini_whisper_") as tmp:
-            wav = os.path.join(tmp, "audio.wav")
-            code, _, err = run_subprocess_safe(
-                [
-                    config.FFMPEG_PATH, "-loglevel", "error", "-y", "-i", video_path, "-vn", "-ac", "1", "-ar", "16000",
-                    wav
-                ],
-                timeout=float(config.FFMPEG_TIMEOUT),
-            )
-            if code != 0:
-                raise WhisperError(f"提取音频失败: {err.strip() or code}")
-            log.info("[SUBTITLE] whisper extract audio ok wav=%s", wav)
-            vtt = _whisper_transcribe_sync(wav, lang)
+        if code != 0:
+            raise WhisperError(f"提取音频失败: {err.strip() or code}")
+        log.info("[SUBTITLE] whisper extract audio ok wav=%s", wav)
+        vtt = _whisper_transcribe_sync(wav, lang)
 
-        with open(out_path, "w", encoding="utf-8") as f:
-            f.write(vtt)
-        log.info("[SUBTITLE] whisper recognize done out=%s", out_path)
-        return {
-            "path": out_path,
-            "remote_name": os.path.basename(out_path),
-            "language": lang,
-            "source": "whisper",
-        }
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(vtt)
+    log.info("[SUBTITLE] whisper recognize done out=%s elapsed=%.1fs", out_path, time.monotonic() - t0)
+    return {
+        "path": out_path,
+        "remote_name": os.path.basename(out_path),
+        "language": lang,
+        "source": "whisper",
+    }
 
-    return run_blocking(_work, timeout=wait)
+
+def transcribe_to_sidecar(video_path: str, *, language: str = "en") -> dict[str, Any]:
+    """ffmpeg 抽 16k 单声道 wav → Whisper → 写入同目录 sidecar vtt（整段在后台线程执行）。"""
+    wait = float(config.WHISPER_TIMEOUT) + float(config.FFMPEG_TIMEOUT) + 60.0
+    return run_blocking(lambda: transcribe_to_sidecar_sync(video_path, language=language), timeout=wait)

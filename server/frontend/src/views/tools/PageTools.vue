@@ -26,6 +26,11 @@
       <el-tab-pane lazy label="PDF排版" name="pdf_layout">
         <PdfLayout />
       </el-tab-pane>
+
+      <!-- 文字提取页签 -->
+      <el-tab-pane lazy label="文字提取" name="video_dump">
+        <VideoDump />
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -37,10 +42,11 @@ const AudioMerge = defineAsyncComponent(() => import("./TabAudioMerge.vue"));
 const AudioConvert = defineAsyncComponent(() => import("./TabAudioConvert.vue"));
 const TTS = defineAsyncComponent(() => import("./TabTts.vue"));
 const PdfLayout = defineAsyncComponent(() => import("./TabPdfLayout.vue"));
+const VideoDump = defineAsyncComponent(() => import("./TabVideoDump.vue"));
 
 // 主页签控制
 const STORAGE_KEY = "tools-active-tab";
-const VALID_TABS = ["tts_tool", "pdf_encrypt", "audio_merge", "audio_convert", "pdf_layout"] as const;
+const VALID_TABS = ["tts_tool", "pdf_encrypt", "audio_merge", "audio_convert", "pdf_layout", "video_dump"] as const;
 const savedTab = localStorage.getItem(STORAGE_KEY);
 const activeMainTab = ref(
   savedTab && VALID_TABS.includes(savedTab as (typeof VALID_TABS)[number]) ? savedTab : "tts_tool",

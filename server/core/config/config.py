@@ -116,6 +116,8 @@ class Config:
     WHISPER_DEVICE: str = os.environ.get('WHISPER_DEVICE', 'cpu')
     WHISPER_COMPUTE_TYPE: str = os.environ.get('WHISPER_COMPUTE_TYPE', 'int8')
     WHISPER_TIMEOUT: int = int(os.environ.get('WHISPER_TIMEOUT', '1800'))
+    # Netscape cookies.txt。B 站字幕和部分抖音需要登录态；留空则匿名下载。
+    VIDEO_DUMP_COOKIES_FILE: str = os.environ.get('VIDEO_DUMP_COOKIES_FILE', '')
 
     # ========== 工具配置 ==========
     FFMPEG_PATH: str = os.environ.get('FFMPEG_PATH', '/usr/bin/ffmpeg')

@@ -37,6 +37,11 @@ PDF_LAYOUT_BASE_DIR = os.path.join(DEFAULT_BASE_DIR, 'tasks', 'pdf_layout')
 PDF_LAYOUT_UPLOAD_DIR = os.path.join(PDF_LAYOUT_BASE_DIR, 'upload')
 PDF_LAYOUT_OUTPUT_DIR = os.path.join(PDF_LAYOUT_BASE_DIR, 'output')
 
+# 文字提取（视频）相关目录（任务存档和最终文件保存在 base 目录）
+VIDEO_DUMP_BASE_DIR = os.path.join(DEFAULT_BASE_DIR, 'tasks', 'video_dump')
+VIDEO_DUMP_UPLOAD_DIR = os.path.join(VIDEO_DUMP_BASE_DIR, 'upload')
+VIDEO_DUMP_OUTPUT_DIR = os.path.join(VIDEO_DUMP_BASE_DIR, 'output')
+
 # 媒体工具相关目录（任务存档和最终文件保存在 base 目录）
 MEDIA_BASE_DIR = os.path.join(DEFAULT_BASE_DIR, 'tasks', 'media')
 # 任务目录：{DEFAULT_BASE_DIR}/tasks/media/{task_id}/

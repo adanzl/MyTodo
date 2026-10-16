@@ -113,6 +113,7 @@ def create_app():
     from core.api.mi_routes import mi_bp
     from core.api.pdf_routes import pdf_bp
     from core.api.pdf_layout_routes import pdf_layout_bp
+    from core.api.video_dump_routes import video_dump_bp
     from core.api.auth_routes import auth_bp
     from core.api.tts_routes import tts_bp
     from core.api.ai_routes import ai_bp
@@ -134,6 +135,7 @@ def create_app():
     app.register_blueprint(mi_bp, url_prefix='/')
     app.register_blueprint(pdf_bp, url_prefix='/')
     app.register_blueprint(pdf_layout_bp, url_prefix='/')
+    app.register_blueprint(video_dump_bp, url_prefix='/')
     app.register_blueprint(auth_bp, url_prefix='/')
     app.register_blueprint(tts_bp, url_prefix='/')
     app.register_blueprint(ai_bp, url_prefix='/')
