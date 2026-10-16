@@ -948,8 +948,10 @@ class ChatMgr:
                 if rid and audio_action == 'new':
                     # 在此处（hub 线程、Redis 可用）取当前代次并随会话一起保存：
                     # 错误回调来自 ws 线程，无法安全读 Redis，只能靠创建时绑定。
+                    # 注意用 `ctx.ai.user`：本方法属于 ChatMgr，`ai` 在 ClientContext
+                    # 上，写成 self.ai 会在首包就抛 AttributeError、根本建不起会话。
                     ctx.asr.begin_session(
-                        rid, chat_request_store.get_attempt(self.ai.user, rid))
+                        rid, chat_request_store.get_attempt(ctx.ai.user, rid))
                     ctx.mark_request_asr(rid)
                 audio_bytes = base64.b64decode(content)
                 self.handle_audio(client_id, data['sample'], audio_bytes, room_id)
