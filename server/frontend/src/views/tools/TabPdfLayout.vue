@@ -560,7 +560,7 @@
 <script setup lang="ts">
 import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import type { UploadFile, UploadFiles } from "element-plus";
+import type { UploadFile, UploadFiles, UploadRawFile } from "element-plus";
 import { Refresh, Plus, Delete, ArrowLeft, ArrowRight } from "@element-plus/icons-vue";
 import { formatSize } from "@/utils/format";
 import { logAndNoticeError } from "@/utils/error";
@@ -716,7 +716,7 @@ const isPdfFile = (name: string) => name.toLowerCase().endsWith(".pdf");
 const selectedFiles = computed(() =>
     uploadFileList.value
         .map((item) => item.raw)
-        .filter((file): file is File => !!file && isPdfFile(file.name))
+        .filter((file): file is UploadRawFile => !!file && isPdfFile(file.name))
 );
 
 const uploadSizeText = computed(() => {
