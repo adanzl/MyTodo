@@ -1,5 +1,24 @@
 <template>
-    <div class="flex gap-4 h-[calc(100vh-220px)] min-w-0 overflow-hidden">
+    <div class="flex flex-col gap-3 h-[calc(100vh-220px)] min-w-0 overflow-hidden">
+        <div class="shrink-0 border rounded p-3 flex items-center gap-2">
+            <el-input ref="urlInputRef" v-model="sourceUrl" clearable class="flex-1 min-w-0"
+                placeholder="粘贴视频链接或分享文案，回车开始" @keyup.enter="handleExtract" />
+            <el-button type="primary" class="shrink-0" :loading="submitting" :disabled="!canSubmit"
+                @click="handleExtract">
+                提取
+            </el-button>
+            <el-button plain class="shrink-0" :disabled="submitting" @click="openLogin">登录</el-button>
+            <el-tag size="small" :type="loginReady('bilibili') ? 'success' : 'info'"
+                class="h-8! shrink-0 text-xs! cursor-pointer" @click="openLogin">
+                B站 {{ loginReady('bilibili') ? '已登录' : '未登录' }}
+            </el-tag>
+            <el-tag size="small" :type="loginReady('douyin') ? 'success' : 'info'"
+                class="h-8! shrink-0 text-xs! cursor-pointer" @click="openLogin">
+                抖音 {{ loginReady('douyin') ? '已登录' : '未登录' }}
+            </el-tag>
+        </div>
+
+        <div class="flex flex-1 min-h-0 gap-4">
         <div class="w-64 shrink-0 border rounded p-3 flex flex-col">
             <div class="flex items-center justify-between mb-3">
                 <h3 class="text-base font-semibold">任务列表</h3>
@@ -41,7 +60,7 @@
                 </div>
             </div>
             <div v-else class="flex-1 flex items-center justify-center text-sm text-gray-400 min-h-100 text-center px-2">
-                还没有任务。在右侧粘贴链接开始。
+                还没有任务。在上方粘贴链接开始。
             </div>
             <div class="shrink-0 border-t mt-2 pt-2">
                 <el-button type="danger" plain class="w-full" :disabled="!hasClearableTasks || loading"
@@ -52,31 +71,6 @@
         </div>
 
         <div class="flex-1 min-w-0 border rounded p-3 flex flex-col min-h-0 gap-3">
-            <div class="shrink-0">
-                <div class="flex items-center gap-2">
-                    <el-input ref="urlInputRef" v-model="sourceUrl" clearable class="flex-1 min-w-0"
-                        placeholder="粘贴视频链接或分享文案，回车开始" @keyup.enter="handleExtract" />
-                    <el-button plain :disabled="submitting" @click="openLogin">登录</el-button>
-                    <el-button type="primary" :loading="submitting" :disabled="!canSubmit" @click="handleExtract">
-                        提取
-                    </el-button>
-                </div>
-                <div class="mt-2 min-h-5 flex items-center gap-2 text-xs text-gray-500 flex-wrap">
-                    <el-tag v-if="urlHint.site" size="small" type="success" class="h-5! text-xs!">
-                        {{ urlHint.site.label }}
-                    </el-tag>
-                    <span>{{ urlHint.text }}</span>
-                    <el-tag size="small" :type="loginReady('bilibili') ? 'success' : 'info'" class="h-5! text-xs! cursor-pointer"
-                        @click="openLogin">
-                        哔哩哔哩 {{ loginReady('bilibili') ? '已登录' : '未登录' }}
-                    </el-tag>
-                    <el-tag size="small" :type="loginReady('douyin') ? 'success' : 'info'" class="h-5! text-xs! cursor-pointer"
-                        @click="openLogin">
-                        抖音 {{ loginReady('douyin') ? '已登录' : '未登录' }}
-                    </el-tag>
-                </div>
-            </div>
-
             <template v-if="currentTask">
                 <!-- 抬头：状态与操作，右侧固定 -->
                 <div class="shrink-0 flex items-start justify-between gap-3 px-3 py-2 border rounded bg-gray-50">
@@ -123,22 +117,23 @@
                 <el-alert v-if="currentTask.error_message" class="shrink-0" type="error" :closable="false"
                     show-icon :title="currentTask.error_message" />
 
-                <!-- 正文：左边视频预览，右边字幕文本，字幕拿到剩余高度 -->
+                <!-- 正文：左边视频预览，右边字幕文本，视频与字幕约 6:4 -->
                 <div class="flex-1 min-h-0 flex flex-col md:flex-row gap-3">
-                    <div class="shrink-0 md:w-72 md:self-start border rounded flex flex-col overflow-hidden">
+                    <div class="shrink-0 md:flex-[6] md:min-w-0 border rounded flex flex-col overflow-hidden">
                         <div class="shrink-0 flex items-center justify-between gap-2 px-3 py-2 border-b bg-gray-50">
                             <span class="text-sm font-semibold">视频</span>
                             <a v-if="currentTask.uploaded_info" class="text-xs text-blue-600 hover:text-blue-800"
                                 :href="downloadUrl('video')" target="_blank" rel="noopener noreferrer">下载</a>
                         </div>
-                        <div v-if="previewUrl" class="bg-black shrink-0">
+                        <!-- 播放器按容器高度自适应：竖版视频也不会把卡片撑出边界 -->
+                        <div v-if="previewUrl" class="flex-1 min-h-0 bg-black flex items-center justify-center">
                             <video :key="currentTask.task_id" :src="previewUrl" controls preload="metadata"
-                                class="w-full max-h-44 object-contain" />
+                                class="max-h-full max-w-full object-contain" />
                         </div>
-                        <div v-else class="px-3 py-6 text-center text-xs text-gray-400 shrink-0">
+                        <div v-else class="flex-1 min-h-0 flex items-center justify-center px-3 text-center text-xs text-gray-400">
                             {{ currentTask.status === 'processing' ? '下载完成后可以在这里预览' : '没有视频文件' }}
                         </div>
-                        <div class="flex-1 min-h-0 px-3 py-2 border-t">
+                        <div class="shrink-0 px-3 py-2 border-t">
                             <div v-if="currentTask.uploaded_info" class="text-xs text-gray-600 break-all line-clamp-3"
                                 :title="currentTask.uploaded_info.name">
                                 {{ currentTask.uploaded_info.name }}
@@ -149,21 +144,35 @@
                         </div>
                     </div>
 
-                    <div class="flex-1 min-w-0 border rounded flex flex-col overflow-hidden">
+                    <div class="flex-1 md:flex-[4] md:min-w-[22rem] min-w-0 border rounded flex flex-col overflow-hidden">
                         <div class="shrink-0 flex items-center justify-between gap-2 px-3 py-2 border-b bg-gray-50">
                             <div class="flex items-center gap-2 min-w-0">
-                                <span class="text-sm font-semibold">字幕文本</span>
-                                <span v-if="currentTask.text" class="text-xs text-gray-400">{{ textLength }} 字</span>
+                                <span class="text-sm font-semibold whitespace-nowrap">字幕文本</span>
+                                <span v-if="currentTask.text" class="text-xs text-gray-400 whitespace-nowrap">
+                                    {{ textLength }} 字
+                                </span>
                             </div>
                             <div class="shrink-0 flex items-center gap-1">
-                                <el-button v-if="currentTask.subtitle_info" size="small" plain
-                                    @click="openDownload('subtitle')">
-                                    字幕文件
-                                </el-button>
-                                <el-button v-if="currentTask.text" size="small" plain
-                                    @click="openDownload('text')">
-                                    文本文件
-                                </el-button>
+                                <el-dropdown v-if="currentTask.text || currentTask.subtitle_info" trigger="click"
+                                    @command="openDownload">
+                                    <el-button size="small" plain>
+                                        下载
+                                        <el-icon class="ml-1">
+                                            <ArrowDown />
+                                        </el-icon>
+                                    </el-button>
+                                    <template #dropdown>
+                                        <el-dropdown-menu>
+                                            <el-dropdown-item v-if="currentTask.text" command="text">
+                                                文本文件（.txt）
+                                            </el-dropdown-item>
+                                            <el-dropdown-item v-if="currentTask.subtitle_info" command="subtitle"
+                                                :divided="!!currentTask.text">
+                                                字幕文件（.vtt）
+                                            </el-dropdown-item>
+                                        </el-dropdown-menu>
+                                    </template>
+                                </el-dropdown>
                                 <el-button size="small" type="primary" plain :disabled="!currentTask.text"
                                     @click="copyText">
                                     复制
@@ -188,6 +197,7 @@
                 <div class="text-sm">还没有选中任务</div>
                 <div class="text-xs">在上面粘贴视频链接或分享文案，提取完成后在这里读字幕。</div>
             </div>
+        </div>
         </div>
 
         <el-dialog v-model="loginVisible" title="登录站点" width="520px" :close-on-click-modal="false" @closed="stopQrPoll()">
@@ -224,7 +234,7 @@
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import dayjs from "dayjs";
-import { Refresh, Delete, Document, Link } from "@element-plus/icons-vue";
+import { Refresh, Delete, Document, Link, ArrowDown } from "@element-plus/icons-vue";
 import { formatSize } from "@/utils/format";
 import { getMediaFileUrl } from "@/utils/file";
 import { logAndNoticeError } from "@/utils/error";
@@ -248,7 +258,7 @@ import {
 import type { VideoDumpLoginSite, VideoDumpQrStart, VideoDumpSite, VideoDumpTask } from "@/types/tools/video-dump";
 
 const FALLBACK_SITES: VideoDumpSite[] = [
-    { id: "bilibili", label: "哔哩哔哩", hosts: ["bilibili.com", "b23.tv"] },
+    { id: "bilibili", label: "B站", hosts: ["bilibili.com", "b23.tv"] },
     { id: "douyin", label: "抖音", hosts: ["douyin.com", "iesdouyin.com"] },
 ];
 
@@ -294,8 +304,8 @@ interface QrSite {
 const qrSites = reactive<QrSite[]>([
     {
         id: "bilibili",
-        label: "哔哩哔哩",
-        hint: "用哔哩哔哩 App 扫码。扫码后才能稳定拿到平台字幕。",
+        label: "B站",
+        hint: "用B站 App 扫码。扫码后才能稳定拿到平台字幕。",
         image: "",
         message: "",
         loginId: "",
@@ -316,7 +326,6 @@ const qrSites = reactive<QrSite[]>([
 const qrStart = { bilibili: startBilibiliQr, douyin: startDouyinQr };
 const qrPoll = { bilibili: pollBilibiliQr, douyin: pollDouyinQr };
 
-const siteLabels = computed(() => sites.value.map((site) => site.label).join("、"));
 const hasProcessing = computed(() => taskList.value.some((task) => task.status === "processing"));
 
 const extractUrl = (text: string) => {
@@ -324,27 +333,6 @@ const extractUrl = (text: string) => {
     if (!match) return "";
     return match[0].replace(/[，。、,.;:!?）)】」』"']+$/u, "");
 };
-
-const urlHint = computed(() => {
-    const raw = sourceUrl.value.trim();
-    const busy = hasProcessing.value ? "有任务正在处理，完成后再提交。" : "";
-    if (!raw) {
-        return { site: null as VideoDumpSite | null, text: `${busy}支持${siteLabels.value}。可以粘贴分享文案。` };
-    }
-    const url = extractUrl(raw);
-    if (!url) {
-        return { site: null, text: "没有找到链接" };
-    }
-    const site = matchSite(url);
-    if (site?.id === "bilibili" && !loginReady("bilibili")) {
-        return { site, text: busy || "未登录。点登录，用 App 扫码后才能稳定拿到平台字幕" };
-    }
-    if (site?.id === "douyin" && !loginReady("douyin")) {
-        return { site, text: busy || "未登录。点登录，用抖音 App 扫码后部分视频才能下载" };
-    }
-    if (site) return { site, text: busy || "回车或点提取" };
-    return { site: null, text: busy || "这个站点还没单独登记，仍会尝试下载" };
-});
 
 const canSubmit = computed(() => {
     return !!extractUrl(sourceUrl.value.trim()) && !hasProcessing.value;
@@ -488,19 +476,6 @@ const logoutSite = async (id: QrSiteId) => {
         loginBusy.value = false;
     }
 };
-
-function matchSite(url: string): VideoDumpSite | null {
-    let host = "";
-    try {
-        host = new URL(url).hostname.toLowerCase();
-    } catch {
-        return null;
-    }
-    if (host.startsWith("www.")) host = host.slice(4);
-    return (
-        sites.value.find((site) => site.hosts.some((item) => host === item || host.endsWith(`.${item}`))) || null
-    );
-}
 
 const confirmAction = (message: string, title = "提示") =>
     ElMessageBox.confirm(message, title, {
@@ -657,7 +632,8 @@ const downloadUrl = (type: "video" | "text" | "subtitle") => {
 };
 
 /** 下载走浏览器新开标签，避免内联打开把预览换掉。 */
-const openDownload = (type: "text" | "subtitle") => {
+const openDownload = (type: string) => {
+    if (type !== "text" && type !== "subtitle") return;
     const url = downloadUrl(type);
     if (url) window.open(url, "_blank", "noopener");
 };
