@@ -3,6 +3,8 @@
 www.douyin.com/passport/web/get_qrcode 会校验浏览器签名。
 不带签名时，sso 的同名地址只返回登录网页，requests 解析不到二维码。
 这个进程没有 gevent，Playwright 自己启动浏览器，签名由登录页完成。
+浏览器优先用 Playwright 自带的 Chromium；服务器上只有系统 Chrome 时退回用它，
+不必再下载一份浏览器。
 """
 from __future__ import annotations
 
@@ -23,6 +25,16 @@ _POLL_PATH = "/passport/web/check_qrconnect/"
 _PAGE_TIMEOUT_MS = 20_000
 _SESSION_SECONDS = 170
 _COOKIE_WAIT_SECONDS = 15
+# Playwright 自带的 Chromium 没下载时，退回用机器上装好的 Chrome。
+_CHROME_ENV = "VIDEO_DUMP_CHROME_PATH"
+_CHROME_CANDIDATES = (
+    "/opt/chrome-linux/chrome",
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+)
 _REDIRECT_HOSTS = (
     "douyin.com",
     "iesdouyin.com",
@@ -94,6 +106,31 @@ def write_state(job_dir: str, status: str, message: str = "") -> None:
     write_json(state_path(job_dir), {"status": status, "message": message})
 
 
+def chrome_path() -> str:
+    """本机可用的 Chrome。环境变量优先，其次常见安装位置。"""
+    explicit = (os.environ.get(_CHROME_ENV) or "").strip()
+    if explicit and os.path.isfile(explicit):
+        return explicit
+    for path in _CHROME_CANDIDATES:
+        if os.path.isfile(path):
+            return path
+    return ""
+
+
+def launch_browser(playwright):
+    """Playwright 自带的 Chromium 优先，没下载就退回本机 Chrome。"""
+    explicit = (os.environ.get(_CHROME_ENV) or "").strip()
+    if explicit and os.path.isfile(explicit):
+        return playwright.chromium.launch(headless=True, executable_path=explicit)
+    try:
+        return playwright.chromium.launch(headless=True)
+    except Exception:
+        fallback = chrome_path()
+        if not fallback:
+            raise
+        return playwright.chromium.launch(headless=True, executable_path=fallback)
+
+
 def run(job_dir: str, cookie_file: str) -> None:
     """打开登录页，把二维码和扫码状态写进 job_dir。成功后把登录态写入 cookie_file。"""
     try:
@@ -105,7 +142,7 @@ def run(job_dir: str, cookie_file: str) -> None:
     confirmed_at = 0.0
     try:
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(headless=True)
+            browser = launch_browser(playwright)
             context = browser.new_context(locale="zh-CN")
             page = context.new_page()
             page.on("response", lambda response: _on_response(job_dir, response))
@@ -167,8 +204,8 @@ def _on_response(job_dir: str, response) -> None:
 
 def _browser_error_message(exc: Exception) -> str:
     text = str(exc)
-    if "Executable doesn't exist" in text or "BrowserType.launch" in text:
-        return "服务器还没安装 Chromium，暂时无法申请抖音二维码"
+    if "Executable doesn't exist" in text or "executable" in text.lower():
+        return "服务器没找到可用的浏览器，暂时无法申请抖音二维码（可用 VIDEO_DUMP_CHROME_PATH 指定 Chrome）"
     return "申请二维码失败，请稍后重试"
 
 

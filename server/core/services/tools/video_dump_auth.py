@@ -255,10 +255,13 @@ def logout(site_id: str) -> tuple[int, str]:
 
 
 def _spawn_douyin_worker(job_dir: str) -> None:
-    """子进程跑浏览器。不用 gevent 补过的 subprocess，避免和 hub 的 child watcher 缠在一起。"""
-    import gevent.monkey
+    """子进程跑浏览器。
 
-    popen = gevent.monkey.get_original("subprocess", "Popen")
+    main.py 里 patch_all(subprocess=True) 之后只能用 gevent 版的 Popen：
+    get_original 拿回来的是打补丁前的类，而它依赖的 subprocess._fork_exec
+    已被 gevent 置成 None，一调用就抛 TypeError。
+    子进程交给 hub 的 child watcher 回收，不用自己 wait。
+    """
     kwargs = {
         "stdin": subprocess.DEVNULL,
         "stdout": subprocess.DEVNULL,
@@ -266,8 +269,10 @@ def _spawn_douyin_worker(job_dir: str) -> None:
     }
     if sys.platform == "win32":
         kwargs["creationflags"] = 0x08000000
-    process = popen([sys.executable, _WORKER_SCRIPT, job_dir, cookie_path("douyin")], **kwargs)
-    threading.Thread(target=process.wait, daemon=True).start()
+    subprocess.Popen(
+        [sys.executable, _WORKER_SCRIPT, job_dir, cookie_path("douyin")],
+        **kwargs,
+    )
 
 
 def _wait_douyin_qr(job_dir: str, timeout: float) -> tuple[str, str]:

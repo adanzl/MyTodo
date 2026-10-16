@@ -1,11 +1,18 @@
 """文字提取登录态：按站点选文件、扫码状态。不访问外网。"""
 import os
+import subprocess
+import sys
+import time
 from http.cookiejar import Cookie
+from pathlib import Path
 
+import pytest
 import requests
 
 from core.services.tools import video_dump_auth as auth
 from core.services.tools import video_dump_douyin_browser as auth_browser
+
+_SERVER_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _use_dir(monkeypatch, directory: str) -> None:
@@ -181,6 +188,88 @@ def test_douyin_qr_reports_browser_error(tmp_path, monkeypatch):
     assert code != 0
     assert data is None
     assert "Chromium" in msg
+
+
+def test_douyin_worker_spawns_under_gevent_patch(tmp_path):
+    """gevent 补丁过的进程里只能用 gevent 版 Popen。
+
+    补丁前的 Popen 依赖 subprocess._fork_exec，而 gevent 会把它置成 None；
+    get_original 拿回来的正是那个类，一调用就 TypeError，二维码申请不到。
+    """
+    pytest.importorskip("gevent")
+    marker = tmp_path / "worker-ran.txt"
+    child = tmp_path / "fake_worker.py"
+    child.write_text(
+        "import os, sys\n"
+        "open(os.path.join(sys.argv[1], 'worker-ran.txt'), 'w').close()\n",
+        encoding="utf-8",
+    )
+    program = "\n".join([
+        "import gevent.monkey",
+        "gevent.monkey.patch_all(subprocess=True, thread=False, queue=False)",
+        "import sys",
+        f"sys.path.insert(0, {str(_SERVER_ROOT)!r})",
+        "from core.services.tools import video_dump_auth as auth",
+        f"auth._WORKER_SCRIPT = {str(child)!r}",
+        f"auth._spawn_douyin_worker({str(tmp_path)!r})",
+    ])
+    subprocess.run([sys.executable, "-c", program], cwd=str(_SERVER_ROOT), check=True, timeout=60)
+    for _ in range(100):
+        if marker.exists():
+            break
+        time.sleep(0.1)
+    assert marker.exists(), "子进程没起来"
+
+
+class _FakeChromium:
+    """只记调用参数，第一次抛错，模拟自带 Chromium 没下载。"""
+
+    def __init__(self, fail_times: int = 1) -> None:
+        self.calls: list[dict] = []
+        self._fail_times = fail_times
+
+    def launch(self, **kwargs):
+        self.calls.append(kwargs)
+        if len(self.calls) <= self._fail_times:
+            raise RuntimeError("Executable doesn't exist at /home/leo/.cache/ms-playwright/...")
+        return "browser"
+
+
+class _FakePlaywright:
+    def __init__(self, fail_times: int = 1) -> None:
+        self.chromium = _FakeChromium(fail_times)
+
+
+def test_douyin_browser_falls_back_to_local_chrome(tmp_path, monkeypatch):
+    """没有 Playwright 自带 Chromium 时，退回机器上装好的 Chrome。"""
+    exe = tmp_path / "chrome"
+    exe.write_text("", encoding="utf-8")
+    monkeypatch.delenv(auth_browser._CHROME_ENV, raising=False)
+    monkeypatch.setattr(auth_browser, "_CHROME_CANDIDATES", (str(exe),))
+    playwright = _FakePlaywright()
+    assert auth_browser.launch_browser(playwright) == "browser"
+    assert playwright.chromium.calls == [
+        {"headless": True},
+        {"headless": True, "executable_path": str(exe)},
+    ]
+
+
+def test_douyin_browser_raises_without_any_chrome(monkeypatch):
+    monkeypatch.delenv(auth_browser._CHROME_ENV, raising=False)
+    monkeypatch.setattr(auth_browser, "_CHROME_CANDIDATES", ())
+    with pytest.raises(RuntimeError):
+        auth_browser.launch_browser(_FakePlaywright())
+
+
+def test_douyin_browser_honours_chrome_env(tmp_path, monkeypatch):
+    exe = tmp_path / "custom-chrome"
+    exe.write_text("", encoding="utf-8")
+    monkeypatch.setenv(auth_browser._CHROME_ENV, str(exe))
+    monkeypatch.setattr(auth_browser, "_CHROME_CANDIDATES", ())
+    assert auth_browser.chrome_path() == str(exe)
+    playwright = _FakePlaywright(fail_times=0)
+    assert auth_browser.launch_browser(playwright) == "browser"
+    assert playwright.chromium.calls == [{"headless": True, "executable_path": str(exe)}]
 
 
 def test_douyin_scan_status_words():
