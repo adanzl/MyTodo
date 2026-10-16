@@ -1,3 +1,22 @@
+# --- 必须最先执行：gevent monkey patch -------------------------------------
+# 放在任何 core.* 导入之前是**硬性要求**，原因：
+#   `from core.config import ...` 会先导入父包 `core`，从而执行 core/__init__.py，
+#   它连锁导入 rds_mgr（初始化时就会 ping Redis，建立真实 socket）、requests/
+#   urllib3/aiohttp 等。若这些发生在 patch 之前：
+#     - 连接池里会留下用标准库 socket 建立的连接，之后被 hub 复用时按阻塞方式读，
+#       会占住整个 OS 线程；
+#     - urllib3.util.ssl_ 等模块在导入时就绑定了未 patch 的 ssl，gevent 会发出
+#       MonkeyPatchWarning（"may silently lead to incorrect behaviour"）。
+# patch 的语义是替换 socket/ssl 等模块里的实现，已导入模块里早先绑定的引用不会
+# 被追溯修改，所以顺序错了无法在事后补救。
+from gevent import monkey
+# 不 patch thread，使用真正的操作系统线程，避免与 asyncio 事件循环冲突
+# thread=False 表示不 patch threading 模块，这样 ThreadPoolExecutor 会使用真正的线程
+# queue=False 让 queue.Queue 保持原生实现，供 core/tools/hub_dispatch.py 跨线程投递
+# subprocess=True 表示 patch subprocess 模块，避免 gevent subprocess 在新线程中的
+# "child watchers are only available on the default loop" 错误
+monkey.patch_all(subprocess=True, thread=False, queue=False)
+
 import os
 
 from dotenv import load_dotenv
@@ -9,16 +28,12 @@ from core.config import _SERVER_ROOT
 # 规范运行目录：统一切换到 server 根目录，使相对路径（如 DEFAULT_BASE_DIR=data）解析一致
 os.chdir(_SERVER_ROOT)
 
-from gevent import monkey
-# 不 patch thread，使用真正的操作系统线程，避免与 asyncio 事件循环冲突
-# thread=False 表示不 patch threading 模块，这样 ThreadPoolExecutor 会使用真正的线程
-# subprocess=False 表示不 patch subprocess 模块，避免 gevent subprocess 在新线程中的 "child watchers are only available on the default loop" 错误
-# 当 subprocess=False 时，标准库的 subprocess 在 gevent 环境中可能无法正常工作（因为 gevent 已 patch 了 socket、select 等）
-monkey.patch_all(subprocess=True, thread=False, queue=False)
-
 from flask import make_response
 from core import create_app
 from core.config import app_logger, config, gevent_access_logger
+
+# 让真实线程（ASR/TTS 的 ws 线程）能把回调交回 hub 执行，见 core/tools/hub_dispatch.py
+from core.tools.hub_dispatch import start_hub_drain
 
 # 生产环境判断
 IS_PRODUCTION = config.IS_PRODUCTION
@@ -26,6 +41,10 @@ IS_PRODUCTION = config.IS_PRODUCTION
 log = app_logger
 
 app = create_app()
+
+# 在 hub（此处即主线程）上启动投递消费循环：
+# 真实线程通过 post_to_hub 投递的回调将由 hub 的 greenlet 执行。
+start_hub_drain()
 
 
 @app.route("/")
