@@ -11,8 +11,21 @@
 
 所以这些操作必须回到 hub 的 greenlet 上执行。
 
-为什么不用 `gevent.spawn`：它创建的是 **greenlet**，仍然运行在当前（真实）线程，
-完全达不到"回到 hub"的目的——这是本文件存在的唯一理由。
+**为什么不用 `gevent.spawn` 直接投递**：`spawn` 只是在**当前**（真实）线程上新建
+greenlet，达不到"回到 hub"的目的——这是本文件存在的首要理由。
+
+**为什么消费端还要为每个任务再 `spawn` 一次**：回到 hub 之后，
+`_handle_asr_result` 会调用 `stream_msg` 并一直读到整段流结束（数十秒）。若消费
+循环直接 `func()`，这期间它无法取下一个任务，于是所有用户的语音结果被**串行化**
+——A 的对话没结束，B 就得排队。而交回 hub 之前，每个用户的 ASR 各在自己的 ws
+线程里，本来就是并发的；串行化是引入本文件时带进来的回归。
+
+在 hub 上为每个任务单独起 greenlet 即可恢复并发：它仍是 hub 线程，线程归属不变，
+但 `stream_msg` 读流时会 park 自己，让出事件循环给其它任务。这与"用 spawn 回到
+hub"是两件事——这里 spawn 的前提是**已经在 hub 上**。
+
+任务内的异常必须在 greenlet 内部捕获：否则异常会逃逸到 hub 的错误处理，消费循环
+虽然不受影响（每个任务已独立），但日志里会缺少可读的上下文。
 
 实现要点：用 `queue.Queue` 投递。`main.py` 里
 `monkey.patch_all(thread=False, queue=False)` 使 `queue` 保持**原生**实现，
@@ -27,46 +40,73 @@ import queue
 from typing import Callable
 
 from gevent import sleep as gevent_sleep
+from gevent import spawn
 
 from core.config import app_logger
 
 log = app_logger
 
-# 未被 gevent patch 的原生队列，可安全跨线程传递
-_hub_queue: 'queue.Queue[Callable[[], None]]' = queue.Queue()
-
 _POLL_INTERVAL = 0.01
-_drain_started = False
 
 
-def post_to_hub(func: Callable[[], None]) -> None:
-    """从任意线程投递一个可调用对象，由主 hub 的 greenlet 执行。
+def _run_task(func: Callable[[], None]) -> None:
+    """在独立 greenlet 中执行单个任务，异常就地记录。
 
-    只做入队，不阻塞、不等待结果；异常在 hub 侧记录，不影响投递方。
+    不能在消费循环里直接调用：`stream_msg` 会读到整段流结束，那样会把不同用户的
+    对话串行化。
     """
-    _hub_queue.put(func)
+    try:
+        func()
+    except Exception as e:  # noqa: BLE001 - 单个任务失败不能影响其它任务
+        log.error(f'[HubDispatch] 任务执行失败: {e}', exc_info=True)
 
 
-def start_hub_drain() -> None:
-    """在 hub 上启动消费循环（幂等）。须在应用初始化时、于任一绿色线程中调用。"""
-    global _drain_started
-    if _drain_started:
-        return
-    _drain_started = True
+class HubDispatcher:
+    """把任务从任意线程投递回创建它的线程（hub）执行。
 
-    from gevent import spawn
+    做成类而非模块级全局，是为了让每个实例持有自己的队列与消费循环：
+    全局共享时，重复 `start()` 会留下多个消费循环抢同一个队列，既难以推理，
+    也让"任务是否被串行化"无法被测试确定地覆盖。
+    """
 
-    def _drain() -> None:
+    def __init__(self) -> None:
+        # 未被 gevent patch 的原生队列，可安全跨线程传递
+        self._queue: 'queue.Queue[Callable[[], None]]' = queue.Queue()
+        self._started = False
+
+    def post(self, func: Callable[[], None]) -> None:
+        """入队，不阻塞、不等待结果。可从任意线程调用。"""
+        self._queue.put(func)
+
+    def start(self) -> None:
+        """在调用方线程（应为 hub）上启动消费循环。幂等。"""
+        if self._started:
+            return
+        self._started = True
+        spawn(self._drain)
+        log.info('[HubDispatch] hub 投递消费循环已启动')
+
+    def _drain(self) -> None:
         while True:
             try:
-                func = _hub_queue.get_nowait()
+                func = self._queue.get_nowait()
             except queue.Empty:
                 gevent_sleep(_POLL_INTERVAL)
                 continue
-            try:
-                func()
-            except Exception as e:  # noqa: BLE001 - 单个任务失败不能拖垮消费循环
-                log.error(f'[HubDispatch] 任务执行失败: {e}', exc_info=True)
+            # 每个任务独立 greenlet：仍运行在 hub 线程上（线程归属不变），
+            # 但任务内部的协作式等待会让出事件循环，多段对话得以并发。
+            spawn(_run_task, func)
 
-    spawn(_drain)
-    log.info('[HubDispatch] hub 投递消费循环已启动')
+
+# 进程级单例：生产代码经 post_to_hub / start_hub_drain 使用
+_dispatcher = HubDispatcher()
+
+
+def post_to_hub(func: Callable[[], None]) -> None:
+    """从任意线程投递一个可调用对象，由主 hub 的 greenlet 执行。"""
+    _dispatcher.post(func)
+
+
+def start_hub_drain() -> None:
+    """在 hub 上启动消费循环（幂等）。须在应用初始化时调用。"""
+    _dispatcher.start()

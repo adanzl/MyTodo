@@ -31,13 +31,18 @@ _RECORD = []
 
 
 def _fresh_drain():
-    hub_dispatch._drain_started = False
+    """确保进程级 dispatcher 的消费循环在运行并清空遗留任务。
+
+    本文件只验证"是否交回 hub"，不涉及并发/串行，所以不需要隔离实例：
+    任务由哪个消费循环执行都同样落在 hub 线程上。
+    """
     while True:
         try:
-            hub_dispatch._hub_queue.get_nowait()
+            hub_dispatch._dispatcher._queue.get_nowait()
         except Exception:  # noqa: BLE001
             break
     hub_dispatch.start_hub_drain()
+    sleep(0.05)
 
 
 def _wait_for(predicate, timeout=5.0):
