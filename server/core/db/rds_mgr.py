@@ -1,10 +1,18 @@
-"""Redis 访问封装（带 gevent 超时保护）。
+"""Redis 访问封装。
 
 该模块提供一组轻量函数用于：
 - 获取/设置简单 key-value；
 - 操作列表（lrange/lpush/rpush/llen）；
 - 操作 Hash（hset/hget/hgetall/hdel/hlen）；  # cSpell: disable-line
-并通过 `gevent.Timeout` 为部分操作提供超时保护，避免阻塞主 greenlet。
+
+**每个 OS 线程持有独立的 Redis 客户端**（见 `_current_client`）：gevent 下 socket
+绑定创建它的线程，跨线程复用连接会抛 "Cannot switch to a different thread" 并
+污染连接池；而连接池的锁在 `patch_all(thread=False)` 下是真实锁，hub 的 greenlet
+一旦等在其上，整个进程会永久冻结。详见 `_current_client` 的注释。
+
+部分操作外面套了 `gevent.Timeout`，但它**只能**中断 gevent 自己管理的等待；
+若 greenlet 阻塞在真实锁上，Timeout 不会触发。因此超时不是兜底手段，
+不跨线程共享才是。
 
 当未配置 Redis（`REDIS_ENABLED=false` 或 `REDIS_HOST` 为空）或连接失败时，
 自动降级为本地 JSON 文件存储（默认 `rds_local.json`）。
@@ -15,7 +23,7 @@ from __future__ import annotations
 import json
 import os
 import threading
-from typing import Any, Optional, cast
+from typing import Any, Optional
 
 import redis
 from gevent import Timeout
@@ -215,6 +223,42 @@ def _create_redis_client() -> redis.Redis:
     )
 
 
+# 每个 OS 线程一份独立的 Redis 客户端（含独立的连接池与锁）。
+#
+# 为什么必须隔离，而不是共用全局客户端：
+# 1. gevent 下 socket 与创建它的线程绑定。hub（主线程）建立的连接若被真实线程
+#    （如 TTS 的 ws 线程）复用，会抛 "Cannot switch to a different thread"；
+#    而 redis-py 的 get_connection 在 `except BaseException` 中会把这条坏连接
+#    release() 回 _available_connections —— 之后 hub 再取到它就会永久阻塞。
+# 2. 连接池的 _lock 是 threading.Lock；main.py 用 patch_all(thread=False)，
+#    它是**真实锁**。hub 上的 greenlet 一旦等在这把锁上，gevent 的 Timeout
+#    无法中断（实测：Timeout 包裹后进程永久冻结），整个服务停摆、只能重启。
+#    按线程隔离后，各方只竞争自己的锁，不再有跨线程等待。
+#
+# 注意：连接池是惰性创建的，绿色线程（greenlet）之间共享同一线程的客户端是正确的
+# ——它们本就运行在同一个 OS 线程上，socket 归属一致。
+_thread_local = threading.local()
+# 递增后各线程会重建客户端（用于 Redis 重连后丢弃失效连接）
+_client_generation = 0
+
+
+def _current_client() -> redis.Redis:
+    """取当前 OS 线程专用的 Redis 客户端，惰性创建。
+
+    主线程（即 hub）直接复用全局 `rds`：它本来就是主线程创建的，复用可避免
+    多建一条连接，也让测试与调试保留"替换 rds 即可"的单一入口。
+    其它线程各自惰性创建，不共享连接池，也就不会跨线程用 socket 或等对方的锁。
+    """
+    if rds is not None and threading.current_thread() is threading.main_thread():
+        return rds
+    client = getattr(_thread_local, 'client', None)
+    if client is None or getattr(_thread_local, 'gen', -1) != _client_generation:
+        client = _create_redis_client()
+        _thread_local.client = client
+        _thread_local.gen = _client_generation
+    return client
+
+
 def _init_storage() -> tuple[Optional[redis.Redis], Optional[_LocalJsonStore], bool]:
     if not _redis_enabled_by_config():
         local_store = _LocalJsonStore(_local_file_path())
@@ -242,7 +286,7 @@ rds, _local_store, is_local_fallback = _init_storage()
 
 def _try_restore_redis() -> bool:
     """尝试重连 Redis，成功后切换回 Redis 存储。"""
-    global rds, _local_store, is_local_fallback
+    global rds, _local_store, is_local_fallback, _client_generation
 
     if not is_local_fallback:
         return True  # 已在 Redis 模式
@@ -254,6 +298,8 @@ def _try_restore_redis() -> bool:
         rds = new_client
         _local_store = None
         is_local_fallback = False
+        # 递增代次：其它线程下次取用时重建客户端，丢掉指向已失效连接池的旧实例
+        _client_generation += 1
         log.info(
             'Redis reconnected: %s:%s/%s',
             os.environ.get('REDIS_HOST', 'localhost'),
@@ -302,8 +348,7 @@ def get_str(key: str) -> str:
     """获取字符串值（bytes -> str），不存在时返回空字符串。"""
     if _local_store is not None:
         return _to_str(_local_store.get(key))
-    assert rds is not None
-    v = rds.get(key)
+    v = _current_client().get(key)
     if v is None:
         return ''
     return v.decode('utf-8')  # pyright: ignore[reportAttributeAccessIssue]
@@ -313,7 +358,7 @@ def get(key: str):
     """获取 Redis 键值（带超时保护）。"""
     if _local_store is not None:
         return _local_store.get(key)
-    _rds = cast(redis.Redis, rds)
+    _rds = _current_client()
     return _safe_redis_operation(lambda: _rds.get(key), timeout=3.0)
 
 
@@ -321,7 +366,7 @@ def set(key: str, value) -> bool:
     """设置 Redis 键值（带超时保护）。"""
     if _local_store is not None:
         return _local_store.set(key, value)
-    _rds = cast(redis.Redis, rds)
+    _rds = _current_client()
     return _safe_redis_operation(lambda: _rds.set(key, value), timeout=3.0)  # pyright: ignore[reportReturnType]
 
 
@@ -329,7 +374,7 @@ def setex(key: str, ttl_seconds: int, value) -> bool:
     """设置带 TTL 的键值；本地 fallback 在 value 内嵌 exp 由上层解析。"""
     if _local_store is not None:
         return _local_store.set(key, value)
-    _rds = cast(redis.Redis, rds)
+    _rds = _current_client()
     return _safe_redis_operation(
         lambda: _rds.setex(key, ttl_seconds, value),
         timeout=3.0,
@@ -340,8 +385,7 @@ def eval_lua(script: str, keys: list[str], args: list[str]) -> Any | None:
     """执行 Lua；本地 fallback 时返回 None，由调用方自行加锁处理。"""
     if _local_store is not None:
         return None
-    assert rds is not None
-    _rds = cast(redis.Redis, rds)
+    _rds = _current_client()
     flat = [*keys, *args]
     return _safe_redis_operation(
         lambda: _rds.eval(script, len(keys), *flat),
@@ -353,32 +397,28 @@ def append_value(key: str, value) -> int:
     """向字符串 key 追加内容。"""
     if _local_store is not None:
         return _local_store.append_value(key, value)
-    assert rds is not None
-    return rds.append(key, value)  # pyright: ignore[reportReturnType]
+    return _current_client().append(key, value)  # pyright: ignore[reportReturnType]
 
 
 def exists(key: str) -> int:
     """判断 key 是否存在。"""
     if _local_store is not None:
         return _local_store.exists(key)
-    assert rds is not None
-    return rds.exists(key)  # pyright: ignore[reportReturnType]
+    return _current_client().exists(key)  # pyright: ignore[reportReturnType]
 
 
 def llen(key: str) -> int:
     """获取列表长度。"""
     if _local_store is not None:
         return _local_store.llen(key)
-    assert rds is not None
-    return rds.llen(key)  # pyright: ignore[reportReturnType]
+    return _current_client().llen(key)  # pyright: ignore[reportReturnType]
 
 
 def lrange(key: str, start: int, end: int) -> list[str]:
     """获取列表指定范围的数据（bytes -> str）。"""
     if _local_store is not None:
         return _local_store.lrange(key, start, end)
-    assert rds is not None
-    data = rds.lrange(key, start, end)  # pyright: ignore[reportReturnType]
+    data = _current_client().lrange(key, start, end)  # pyright: ignore[reportReturnType]
     return [item.decode('utf-8') for item in data]  # pyright: ignore[reportGeneralTypeIssues]
 
 
@@ -386,23 +426,21 @@ def lpush(key: str, value) -> int:
     """在列表头部插入数据。"""
     if _local_store is not None:
         return _local_store.lpush(key, value)
-    assert rds is not None
-    return rds.lpush(key, value)  # pyright: ignore[reportReturnType]
+    return _current_client().lpush(key, value)  # pyright: ignore[reportReturnType]
 
 
 def rpush(key: str, value) -> int:
     """在列表尾部插入数据。"""
     if _local_store is not None:
         return _local_store.rpush(key, value)
-    assert rds is not None
-    return rds.rpush(key, value)  # pyright: ignore[reportReturnType]
+    return _current_client().rpush(key, value)  # pyright: ignore[reportReturnType]
 
 
 def hset(key: str, field: str, value) -> int:
     """设置 Hash 字段的值（带超时保护）。"""
     if _local_store is not None:
         return _local_store.hset(key, field, value)
-    _rds = cast(redis.Redis, rds)
+    _rds = _current_client()
     return _safe_redis_operation(lambda: _rds.hset(key, field, value), timeout=3.0)  # pyright: ignore[reportReturnType]
 
 
@@ -410,7 +448,7 @@ def hget(key: str, field: str):
     """获取 Hash 字段的值（带超时保护）。"""
     if _local_store is not None:
         return _local_store.hget(key, field)
-    _rds = cast(redis.Redis, rds)
+    _rds = _current_client()
     return _safe_redis_operation(lambda: _rds.hget(key, field), timeout=3.0)
 
 
@@ -418,7 +456,7 @@ def hgetall(key: str) -> dict:
     """获取 Hash 所有字段和值（带超时保护）。"""
     if _local_store is not None:
         return _local_store.hgetall(key)
-    _rds = cast(redis.Redis, rds)
+    _rds = _current_client()
     result = _safe_redis_operation(lambda: _rds.hgetall(key), timeout=3.0)
     if result is None:
         return {}
@@ -432,7 +470,7 @@ def hdel(key: str, *fields) -> int:
     """删除 Hash 中的一个或多个字段（带超时保护）。"""
     if _local_store is not None:
         return _local_store.hdel(key, *fields)
-    _rds = cast(redis.Redis, rds)
+    _rds = _current_client()
     return _safe_redis_operation(lambda: _rds.hdel(key, *fields), timeout=3.0)  # pyright: ignore[reportReturnType]
 
 
@@ -440,5 +478,5 @@ def hlen(key: str) -> int:
     """获取 Hash 字段数量（带超时保护）。"""
     if _local_store is not None:
         return _local_store.hlen(key)
-    _rds = cast(redis.Redis, rds)
+    _rds = _current_client()
     return _safe_redis_operation(lambda: _rds.hlen(key), timeout=3.0)  # pyright: ignore[reportReturnType]
