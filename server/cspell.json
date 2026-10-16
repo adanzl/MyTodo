@@ -36,6 +36,7 @@
         "opentype",
         "Pydantic",
         "pytest",
+        "qrcode",
         "readerwriterlock",
         "redisinsight",
         "rocm",
