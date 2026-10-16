@@ -78,84 +78,115 @@
             </div>
 
             <template v-if="currentTask">
-                <div class="shrink-0">
-                    <h3 class="text-base font-semibold mb-2 truncate"
-                        :title="currentTask.name || currentTask.source_url">
-                        {{ currentTask.name || "未命名任务" }}
-                    </h3>
-                    <div class="flex items-center gap-2 mb-2 flex-wrap">
-                        <el-tag :type="getStatusTagType(currentTask.status)" size="small" class="w-14 text-center">
-                            {{ getStatusText(currentTask.status) }}
-                        </el-tag>
-                        <el-tag v-if="currentTask.platform_label" size="small" type="info">
-                            {{ currentTask.platform_label }}
-                        </el-tag>
-                        <el-tag v-if="subtitleSourceLabel" size="small">
-                            {{ subtitleSourceLabel }}
-                        </el-tag>
-                    </div>
-                    <a v-if="currentTask.source_url" :href="currentTask.source_url" target="_blank"
-                        rel="noopener noreferrer"
-                        class="text-xs text-blue-600 hover:text-blue-800 wrap-anywhere block mb-2">
-                        {{ currentTask.source_url }}
-                    </a>
-                    <div v-if="currentTask.status === 'processing'" class="mb-2">
-                        <el-progress :percentage="50" indeterminate />
-                        <div class="text-xs text-gray-500">{{ currentTask.stage || "正在处理" }}</div>
-                    </div>
-                    <div v-if="currentTask.error_message" class="text-xs text-red-500 wrap-anywhere mb-2">
-                        {{ currentTask.error_message }}
-                    </div>
-                    <div v-if="currentTask.status === 'failed'" class="mb-2">
-                        <el-button size="small" type="warning" plain :loading="retrying" :disabled="hasProcessing"
-                            @click="handleRetry">
-                            再次下载
-                        </el-button>
-                    </div>
-                    <div class="flex gap-2">
-                        <div class="border rounded p-2 flex-1 min-w-0">
-                            <div class="flex items-center justify-between gap-2">
-                                <h4 class="text-xs font-semibold">视频</h4>
-                                <a v-if="currentTask.uploaded_info" class="text-xs text-blue-600 hover:text-blue-800"
-                                    :href="downloadUrl('video')" target="_blank" rel="noopener noreferrer">下载</a>
-                            </div>
-                            <div v-if="currentTask.uploaded_info" class="text-xs text-gray-600 truncate"
-                                :title="currentTask.uploaded_info.name">
-                                {{ currentTask.uploaded_info.name }}
-                                <span class="text-gray-400">{{ formatSize(currentTask.uploaded_info.size ?? 0) }}</span>
-                            </div>
-                            <div v-else class="text-xs text-gray-400">下载完成后显示</div>
+                <!-- 抬头：状态与操作，右侧固定 -->
+                <div class="shrink-0 flex items-start justify-between gap-3 px-3 py-2 border rounded bg-gray-50">
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2 flex-wrap mb-1">
+                            <el-tag :type="getStatusTagType(currentTask.status)" size="small" class="h-5! text-xs!">
+                                {{ getStatusText(currentTask.status) }}
+                            </el-tag>
+                            <el-tag v-if="currentTask.platform_label" size="small" type="info" class="h-5! text-xs!">
+                                {{ currentTask.platform_label }}
+                            </el-tag>
+                            <el-tag v-if="subtitleSourceLabel" size="small" class="h-5! text-xs!">
+                                {{ subtitleSourceLabel }}
+                            </el-tag>
+                            <span class="text-xs text-gray-400">{{ taskTimeLabel }}</span>
                         </div>
-                        <div class="border rounded p-2 flex-1 min-w-0">
-                            <div class="flex items-center justify-between gap-2">
-                                <h4 class="text-xs font-semibold">字幕</h4>
-                                <a v-if="currentTask.subtitle_info" class="text-xs text-blue-600 hover:text-blue-800"
-                                    :href="downloadUrl('subtitle')" target="_blank" rel="noopener noreferrer">下载</a>
-                            </div>
-                            <div v-if="currentTask.subtitle_info" class="text-xs text-gray-600 truncate">
-                                {{ currentTask.subtitle_info.name }}
-                            </div>
-                            <div v-else class="text-xs text-gray-400">提取完成后显示</div>
-                        </div>
+                        <h3 class="text-base font-semibold leading-6 break-words line-clamp-2"
+                            :title="currentTask.name || currentTask.source_url">
+                            {{ currentTask.name || "未命名任务" }}
+                        </h3>
+                        <a v-if="currentTask.source_url" :href="currentTask.source_url" target="_blank"
+                            rel="noopener noreferrer"
+                            class="mt-1 inline-flex items-center gap-1 text-xs text-gray-500 hover:text-blue-600 max-w-full">
+                            <el-icon class="shrink-0">
+                                <Link />
+                            </el-icon>
+                            <span class="truncate">{{ currentTask.source_url }}</span>
+                        </a>
                     </div>
+                    <el-button v-if="currentTask.status === 'failed'" size="small" type="warning" plain
+                        class="shrink-0" :loading="retrying" :disabled="hasProcessing" @click="handleRetry">
+                        再次下载
+                    </el-button>
                 </div>
 
-                <div class="flex-1 min-h-0 border rounded flex flex-col">
-                    <div class="shrink-0 flex items-center justify-between px-3 py-2 border-b">
-                        <span class="text-sm font-semibold">字幕文本</span>
-                        <el-button size="small" plain :disabled="!currentTask.text" @click="copyText">复制</el-button>
+                <!-- 处理进度与错误：占整行，不挤压下面的正文 -->
+                <div v-if="currentTask.status === 'processing'" class="shrink-0 border rounded px-3 py-2">
+                    <el-progress :percentage="50" indeterminate :show-text="false" :stroke-width="6" />
+                    <div class="mt-1 flex items-center justify-between gap-2 text-xs text-gray-500">
+                        <span class="truncate">{{ currentTask.stage || "正在处理" }}</span>
+                        <span class="shrink-0">完成后自动刷新</span>
                     </div>
-                    <div v-if="currentTask.text" class="flex-1 overflow-y-auto p-3 text-sm leading-6 whitespace-pre-wrap wrap-break-word">
-                        {{ currentTask.text }}
+                </div>
+                <el-alert v-if="currentTask.error_message" class="shrink-0" type="error" :closable="false"
+                    show-icon :title="currentTask.error_message" />
+
+                <!-- 正文：左边视频预览，右边字幕文本，字幕拿到剩余高度 -->
+                <div class="flex-1 min-h-0 flex flex-col md:flex-row gap-3">
+                    <div class="shrink-0 md:w-72 md:self-start border rounded flex flex-col overflow-hidden">
+                        <div class="shrink-0 flex items-center justify-between gap-2 px-3 py-2 border-b bg-gray-50">
+                            <span class="text-sm font-semibold">视频</span>
+                            <a v-if="currentTask.uploaded_info" class="text-xs text-blue-600 hover:text-blue-800"
+                                :href="downloadUrl('video')" target="_blank" rel="noopener noreferrer">下载</a>
+                        </div>
+                        <div v-if="previewUrl" class="bg-black shrink-0">
+                            <video :key="currentTask.task_id" :src="previewUrl" controls preload="metadata"
+                                class="w-full max-h-44 object-contain" />
+                        </div>
+                        <div v-else class="px-3 py-6 text-center text-xs text-gray-400 shrink-0">
+                            {{ currentTask.status === 'processing' ? '下载完成后可以在这里预览' : '没有视频文件' }}
+                        </div>
+                        <div class="flex-1 min-h-0 px-3 py-2 border-t">
+                            <div v-if="currentTask.uploaded_info" class="text-xs text-gray-600 break-all line-clamp-3"
+                                :title="currentTask.uploaded_info.name">
+                                {{ currentTask.uploaded_info.name }}
+                            </div>
+                            <div class="text-xs text-gray-400">
+                                {{ currentTask.uploaded_info ? formatSize(currentTask.uploaded_info.size ?? 0) : "—" }}
+                            </div>
+                        </div>
                     </div>
-                    <div v-else class="flex-1 flex items-center justify-center text-sm text-gray-400">
-                        {{ currentTask.status === 'processing' ? '字幕出来后会显示在这里' : '这个任务还没有字幕文本' }}
+
+                    <div class="flex-1 min-w-0 border rounded flex flex-col overflow-hidden">
+                        <div class="shrink-0 flex items-center justify-between gap-2 px-3 py-2 border-b bg-gray-50">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <span class="text-sm font-semibold">字幕文本</span>
+                                <span v-if="currentTask.text" class="text-xs text-gray-400">{{ textLength }} 字</span>
+                            </div>
+                            <div class="shrink-0 flex items-center gap-1">
+                                <el-button v-if="currentTask.subtitle_info" size="small" plain
+                                    @click="openDownload('subtitle')">
+                                    字幕文件
+                                </el-button>
+                                <el-button v-if="currentTask.text" size="small" plain
+                                    @click="openDownload('text')">
+                                    文本文件
+                                </el-button>
+                                <el-button size="small" type="primary" plain :disabled="!currentTask.text"
+                                    @click="copyText">
+                                    复制
+                                </el-button>
+                            </div>
+                        </div>
+                        <div v-if="currentTask.text"
+                            class="flex-1 overflow-y-auto px-4 py-3 text-sm leading-7 whitespace-pre-wrap wrap-break-word">
+                            {{ currentTask.text }}
+                        </div>
+                        <div v-else class="flex-1 flex items-center justify-center px-4 text-sm text-gray-400">
+                            {{ currentTask.status === 'processing' ? '字幕出来后会显示在这里' : '这个任务还没有字幕文本' }}
+                        </div>
                     </div>
                 </div>
             </template>
 
-            <div v-else class="flex-1 flex items-center justify-center text-sm text-gray-400">
-                粘贴链接并提取。完成后在这里看字幕。
+            <div v-else class="flex-1 border rounded flex flex-col items-center justify-center gap-2 text-gray-400">
+                <el-icon :size="28">
+                    <Document />
+                </el-icon>
+                <div class="text-sm">还没有选中任务</div>
+                <div class="text-xs">在上面粘贴视频链接或分享文案，提取完成后在这里读字幕。</div>
             </div>
         </div>
 
@@ -192,8 +223,10 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { Refresh, Delete } from "@element-plus/icons-vue";
+import dayjs from "dayjs";
+import { Refresh, Delete, Document, Link } from "@element-plus/icons-vue";
 import { formatSize } from "@/utils/format";
+import { getMediaFileUrl } from "@/utils/file";
 import { logAndNoticeError } from "@/utils/error";
 import { useControllableInterval } from "@/composables/useInterval";
 import QRCode from "qrcode";
@@ -622,6 +655,25 @@ const handleDeleteTask = async (taskId: string) => {
 const downloadUrl = (type: "video" | "text" | "subtitle") => {
     return getVideoDumpDownloadUrl(currentTask.value?.task_id || "", type);
 };
+
+/** 下载走浏览器新开标签，避免内联打开把预览换掉。 */
+const openDownload = (type: "text" | "subtitle") => {
+    const url = downloadUrl(type);
+    if (url) window.open(url, "_blank", "noopener");
+};
+
+const previewUrl = computed(() => {
+    const path = currentTask.value?.uploaded_path || "";
+    return path ? getMediaFileUrl(path) : "";
+});
+
+const taskTimeLabel = computed(() => {
+    const seconds = currentTask.value?.create_time;
+    if (!seconds) return "";
+    return dayjs(seconds * 1000).format("MM-DD HH:mm");
+});
+
+const textLength = computed(() => (currentTask.value?.text || "").replace(/\s/g, "").length);
 
 const copyText = async () => {
     const text = currentTask.value?.text || "";
