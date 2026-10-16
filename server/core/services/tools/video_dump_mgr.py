@@ -23,6 +23,7 @@ from core.config import (
     config,
 )
 from core.services.base_task_mgr import BaseTaskMgr, FileInfo, TaskBase
+from core.services.tools.video_dump_auth import cookies_file_for_url
 from core.services.tools.video_dump_sites import match_site
 from core.services.tools.video_dump_text import cues_to_text, pick_subtitle
 from core.subtitles.whisper_client import WhisperError, transcribe_to_sidecar_sync
@@ -235,8 +236,8 @@ class VideoDumpMgr(BaseTaskMgr[VideoDumpTask]):
             "--print-json",
             url,
         ]
-        cookies = (config.VIDEO_DUMP_COOKIES_FILE or "").strip()
-        if cookies and os.path.isfile(cookies):
+        cookies = cookies_file_for_url(url)
+        if cookies:
             cmd[-1:-1] = ["--cookies", cookies]
         code, stdout, stderr = run_subprocess_safe(cmd, timeout=_DOWNLOAD_TIMEOUT)
         if code != 0:

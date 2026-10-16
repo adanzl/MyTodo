@@ -3,10 +3,50 @@
  */
 import { api, getBaseUrl } from "./config";
 import type { ApiResponse } from "@/types/api";
-import type { VideoDumpSite, VideoDumpTask } from "@/types/tools/video-dump";
+import type {
+  VideoDumpLoginSite,
+  VideoDumpQrPoll,
+  VideoDumpQrStart,
+  VideoDumpSite,
+  VideoDumpTask,
+} from "@/types/tools/video-dump";
 
 export async function getVideoDumpSites(): Promise<ApiResponse<VideoDumpSite[]>> {
   const response = await api.get<ApiResponse<VideoDumpSite[]>>("/video_dump/sites");
+  return response.data;
+}
+
+export async function getVideoDumpLogin(): Promise<ApiResponse<VideoDumpLoginSite[]>> {
+  const response = await api.get<ApiResponse<VideoDumpLoginSite[]>>("/video_dump/login");
+  return response.data;
+}
+
+export async function startBilibiliQr(): Promise<ApiResponse<VideoDumpQrStart>> {
+  const response = await api.post<ApiResponse<VideoDumpQrStart>>("/video_dump/login/bilibili/qr");
+  return response.data;
+}
+
+export async function pollBilibiliQr(loginId: string): Promise<ApiResponse<VideoDumpQrPoll>> {
+  const response = await api.get<ApiResponse<VideoDumpQrPoll>>("/video_dump/login/bilibili/poll", {
+    params: { login_id: loginId },
+  });
+  return response.data;
+}
+
+export async function startDouyinQr(): Promise<ApiResponse<VideoDumpQrStart>> {
+  const response = await api.post<ApiResponse<VideoDumpQrStart>>("/video_dump/login/douyin/qr");
+  return response.data;
+}
+
+export async function pollDouyinQr(loginId: string): Promise<ApiResponse<VideoDumpQrPoll>> {
+  const response = await api.get<ApiResponse<VideoDumpQrPoll>>("/video_dump/login/douyin/poll", {
+    params: { login_id: loginId },
+  });
+  return response.data;
+}
+
+export async function logoutVideoDump(site: string): Promise<ApiResponse<{ ready: boolean }>> {
+  const response = await api.post<ApiResponse<{ ready: boolean }>>("/video_dump/login/logout", { site });
   return response.data;
 }
 

@@ -56,15 +56,24 @@
                 <div class="flex items-center gap-2">
                     <el-input ref="urlInputRef" v-model="sourceUrl" clearable class="flex-1 min-w-0"
                         placeholder="粘贴视频链接，回车开始" @keyup.enter="handleExtract" />
+                    <el-button plain :disabled="submitting" @click="openLogin">登录</el-button>
                     <el-button type="primary" :loading="submitting" :disabled="!canSubmit" @click="handleExtract">
                         提取
                     </el-button>
                 </div>
-                <div class="mt-2 min-h-5 flex items-center gap-2 text-xs text-gray-500">
+                <div class="mt-2 min-h-5 flex items-center gap-2 text-xs text-gray-500 flex-wrap">
                     <el-tag v-if="urlHint.site" size="small" type="success" class="h-5! text-xs!">
                         {{ urlHint.site.label }}
                     </el-tag>
                     <span>{{ urlHint.text }}</span>
+                    <el-tag size="small" :type="loginReady('bilibili') ? 'success' : 'info'" class="h-5! text-xs! cursor-pointer"
+                        @click="openLogin">
+                        哔哩哔哩 {{ loginReady('bilibili') ? '已登录' : '未登录' }}
+                    </el-tag>
+                    <el-tag size="small" :type="loginReady('douyin') ? 'success' : 'info'" class="h-5! text-xs! cursor-pointer"
+                        @click="openLogin">
+                        抖音 {{ loginReady('douyin') ? '已登录' : '未登录' }}
+                    </el-tag>
                 </div>
             </div>
 
@@ -143,25 +152,60 @@
                 粘贴链接并提取。完成后在这里看字幕。
             </div>
         </div>
+
+        <el-dialog v-model="loginVisible" title="登录站点" width="520px" :close-on-click-modal="false" @closed="stopQrPoll()">
+            <p class="text-xs text-gray-500 mb-3">用对应 App 扫码。登录态保存在服务器上，不用改配置文件。</p>
+            <div class="space-y-3">
+                <div v-for="site in qrSites" :key="site.id" class="border rounded p-3">
+                    <div class="flex items-center justify-between gap-2 mb-2">
+                        <h4 class="text-sm font-semibold">{{ site.label }}</h4>
+                        <el-tag size="small" :type="loginReady(site.id) ? 'success' : 'info'">
+                            {{ loginReady(site.id) ? '已登录' : '未登录' }}
+                        </el-tag>
+                    </div>
+                    <p class="text-xs text-gray-500 mb-2">{{ site.hint }}</p>
+                    <div v-if="site.image" class="flex justify-center mb-2">
+                        <img :src="site.image" :alt="`${site.label}登录二维码`" class="w-48 h-48" />
+                    </div>
+                    <p v-if="site.message" class="text-xs text-gray-600 mb-2">{{ site.message }}</p>
+                    <div class="flex gap-2">
+                        <el-button size="small" type="primary" :loading="site.loading" @click="startQr(site.id)">
+                            {{ site.image ? '重新生成' : '显示二维码' }}
+                        </el-button>
+                        <el-button v-if="loginReady(site.id)" size="small" plain :disabled="loginBusy"
+                            @click="logoutSite(site.id)">
+                            退出
+                        </el-button>
+                    </div>
+                </div>
+            </div>
+        </el-dialog>
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from "vue";
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Refresh, Delete } from "@element-plus/icons-vue";
 import { formatSize } from "@/utils/format";
 import { logAndNoticeError } from "@/utils/error";
 import { useControllableInterval } from "@/composables/useInterval";
+import QRCode from "qrcode";
 import {
     getVideoDumpSites,
+    getVideoDumpLogin,
     getVideoDumpList,
     createVideoDump,
     getVideoDumpTaskStatus,
     getVideoDumpDownloadUrl,
     deleteVideoDump,
+    startBilibiliQr,
+    pollBilibiliQr,
+    startDouyinQr,
+    pollDouyinQr,
+    logoutVideoDump,
 } from "@/api/api-video-dump";
-import type { VideoDumpSite, VideoDumpTask } from "@/types/tools/video-dump";
+import type { VideoDumpLoginSite, VideoDumpQrStart, VideoDumpSite, VideoDumpTask } from "@/types/tools/video-dump";
 
 const FALLBACK_SITES: VideoDumpSite[] = [
     { id: "bilibili", label: "哔哩哔哩", hosts: ["bilibili.com", "b23.tv"] },
@@ -188,9 +232,48 @@ const loading = ref(false);
 const submitting = ref(false);
 const sourceUrl = ref("");
 const sites = ref<VideoDumpSite[]>(FALLBACK_SITES);
+const loginSites = ref<VideoDumpLoginSite[]>([]);
 const taskList = ref<VideoDumpTask[]>([]);
 const currentTask = ref<VideoDumpTask | null>(null);
 const urlInputRef = ref<{ focus: () => void } | null>(null);
+const loginVisible = ref(false);
+const loginBusy = ref(false);
+
+type QrSiteId = "bilibili" | "douyin";
+interface QrSite {
+    id: QrSiteId;
+    label: string;
+    hint: string;
+    image: string;
+    message: string;
+    loginId: string;
+    loading: boolean;
+    timer: number;
+}
+const qrSites = reactive<QrSite[]>([
+    {
+        id: "bilibili",
+        label: "哔哩哔哩",
+        hint: "用哔哩哔哩 App 扫码。扫码后才能稳定拿到平台字幕。",
+        image: "",
+        message: "",
+        loginId: "",
+        loading: false,
+        timer: 0,
+    },
+    {
+        id: "douyin",
+        label: "抖音",
+        hint: "用抖音 App 扫码。扫码后部分视频才能下载。",
+        image: "",
+        message: "",
+        loginId: "",
+        loading: false,
+        timer: 0,
+    },
+]);
+const qrStart = { bilibili: startBilibiliQr, douyin: startDouyinQr };
+const qrPoll = { bilibili: pollBilibiliQr, douyin: pollDouyinQr };
 
 const siteLabels = computed(() => sites.value.map((site) => site.label).join("、"));
 const hasProcessing = computed(() => taskList.value.some((task) => task.status === "processing"));
@@ -205,6 +288,12 @@ const urlHint = computed(() => {
         return { site: null, text: "请粘贴以 http 或 https 开头的链接" };
     }
     const site = matchSite(raw);
+    if (site?.id === "bilibili" && !loginReady("bilibili")) {
+        return { site, text: busy || "未登录。点登录，用 App 扫码后才能稳定拿到平台字幕" };
+    }
+    if (site?.id === "douyin" && !loginReady("douyin")) {
+        return { site, text: busy || "未登录。点登录，用抖音 App 扫码后部分视频才能下载" };
+    }
     if (site) return { site, text: busy || "回车或点提取" };
     return { site: null, text: busy || "这个站点还没单独登记，仍会尝试下载" };
 });
@@ -218,6 +307,140 @@ const subtitleSourceLabel = computed(() => SUBTITLE_SOURCE[currentTask.value?.su
 
 const getStatusTagType = (status: string) => STATUS_MAP[status]?.tag ?? "info";
 const getStatusText = (status: string) => STATUS_MAP[status]?.text ?? status;
+const loginReady = (id: string) => loginSites.value.find((item) => item.id === id)?.ready ?? false;
+
+const loadLoginStatus = async () => {
+    try {
+        const response = await getVideoDumpLogin();
+        if (response.code === 0 && response.data) loginSites.value = response.data;
+    } catch (error) {
+        logAndNoticeError(error as Error, "获取登录状态失败");
+    }
+};
+
+const qrSite = (id: QrSiteId) => qrSites.find((item) => item.id === id)!;
+
+const stopQrPoll = (id?: QrSiteId) => {
+    for (const site of qrSites) {
+        if (id && site.id !== id) continue;
+        if (!site.timer) continue;
+        window.clearInterval(site.timer);
+        site.timer = 0;
+    }
+};
+
+const qrPicture = async (data: VideoDumpQrStart) => {
+    if (data.image?.startsWith("data:image/")) return data.image;
+    if (data.url?.startsWith("https://")) {
+        return QRCode.toDataURL(data.url, { margin: 1, width: 192 });
+    }
+    return "";
+};
+
+const pollQr = async (id: QrSiteId) => {
+    const site = qrSite(id);
+    if (!site.loginId) return;
+    try {
+        const response = await qrPoll[id](site.loginId);
+        if (response.code !== 0) {
+            stopQrPoll(id);
+            site.message = response.msg || "查询扫码状态失败";
+            return;
+        }
+        const status = response.data?.status;
+        if (status === "success") {
+            stopQrPoll(id);
+            site.image = "";
+            site.message = "已登录";
+            await loadLoginStatus();
+            ElMessage.success(`${site.label}已登录`);
+            return;
+        }
+        if (status === "scanned") {
+            site.message = "已扫码，请在手机上确认";
+            return;
+        }
+        if (status === "expired" || status === "missing") {
+            stopQrPoll(id);
+            site.message = "二维码已过期，请重新生成";
+            return;
+        }
+        site.message = `请用${site.label} App 扫码`;
+    } catch (error) {
+        stopQrPoll(id);
+        logAndNoticeError(error as Error, "查询扫码状态失败");
+    }
+};
+
+const startQr = async (id: QrSiteId) => {
+    const site = qrSite(id);
+    stopQrPoll(id);
+    site.loading = true;
+    site.image = "";
+    site.message = "正在获取二维码";
+    try {
+        const response = await qrStart[id]();
+        if (response.code !== 0 || !response.data?.login_id) {
+            site.message = response.msg || "申请二维码失败";
+            return;
+        }
+        const image = await qrPicture(response.data);
+        if (!image) {
+            site.message = "申请二维码失败";
+            return;
+        }
+        site.loginId = response.data.login_id;
+        site.image = image;
+        site.message = `请用${site.label} App 扫码`;
+        site.timer = window.setInterval(() => {
+            void pollQr(id);
+        }, 2000);
+    } catch (error) {
+        site.message = "申请二维码失败";
+        logAndNoticeError(error as Error, "申请二维码失败");
+    } finally {
+        site.loading = false;
+    }
+};
+
+const openLogin = async () => {
+    loginVisible.value = true;
+    await loadLoginStatus();
+    for (const site of qrSites) {
+        if (loginReady(site.id)) continue;
+        if (site.image && site.loginId) {
+            if (!site.timer) {
+                site.timer = window.setInterval(() => {
+                    void pollQr(site.id);
+                }, 2000);
+            }
+            continue;
+        }
+        void startQr(site.id);
+    }
+};
+
+const logoutSite = async (id: QrSiteId) => {
+    loginBusy.value = true;
+    try {
+        const response = await logoutVideoDump(id);
+        if (response.code !== 0) {
+            ElMessage.error(response.msg || "退出失败");
+            return;
+        }
+        const site = qrSite(id);
+        stopQrPoll(id);
+        site.image = "";
+        site.message = "";
+        site.loginId = "";
+        await loadLoginStatus();
+        ElMessage.success("已退出");
+    } catch (error) {
+        logAndNoticeError(error as Error, "退出登录失败");
+    } finally {
+        loginBusy.value = false;
+    }
+};
 
 function matchSite(url: string): VideoDumpSite | null {
     let host = "";
@@ -402,7 +625,11 @@ function watchProcessing() {
 onMounted(() => {
     urlInputRef.value?.focus();
     loadSites();
+    loadLoginStatus();
     loadTaskList();
 });
-onBeforeUnmount(stopPolling);
+onBeforeUnmount(() => {
+    stopPolling();
+    stopQrPoll();
+});
 </script>

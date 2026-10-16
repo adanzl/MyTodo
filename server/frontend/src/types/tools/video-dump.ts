@@ -15,6 +15,24 @@ export interface VideoDumpSite {
   hosts: string[];
 }
 
+export interface VideoDumpLoginSite {
+  id: string;
+  label: string;
+  method: "qr" | "cookie";
+  ready: boolean;
+}
+
+export interface VideoDumpQrStart {
+  login_id: string;
+  url?: string;
+  image?: string;
+}
+
+export interface VideoDumpQrPoll {
+  status: "waiting" | "scanned" | "success" | "expired" | "missing";
+  ready: boolean;
+}
+
 export interface VideoDumpTask {
   task_id: string;
   name?: string;

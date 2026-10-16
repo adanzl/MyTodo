@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from core import limiter
 from core.config import app_logger
+from core.services.tools import video_dump_auth
 from core.services.tools.video_dump_mgr import video_dump_mgr
 from core.services.tools.video_dump_sites import list_sites
 from core.tools.validation import parse_with_model
@@ -30,10 +31,93 @@ class _VideoDumpDeleteBody(BaseModel):
     clear_all: bool = False
 
 
+class _LogoutBody(BaseModel):
+    site: str
+
+
 @video_dump_bp.route("/video_dump/sites", methods=['GET'])
 def video_dump_sites() -> ResponseReturnValue:
     """已登记的站点。页面用来识别链接，下载器仍会尝试未登记的地址。"""
     return _ok(list_sites())
+
+
+@video_dump_bp.route("/video_dump/login", methods=['GET'])
+def video_dump_login_status() -> ResponseReturnValue:
+    """各站点是否已在页面保存登录态。不返回 Cookie 内容。"""
+    return _ok(video_dump_auth.list_login_status())
+
+
+@limiter.limit("20 per minute")
+@video_dump_bp.route("/video_dump/login/bilibili/qr", methods=['POST'])
+def video_dump_bilibili_qr() -> ResponseReturnValue:
+    """申请一张哔哩哔哩登录二维码。"""
+    try:
+        code, msg, data = video_dump_auth.start_bilibili_qr()
+        if code != 0 or not data:
+            return _err(msg)
+        return _ok(data)
+    except Exception as e:
+        log.error(f"[文字提取] 申请 B 站二维码失败: {e}")
+        return _err("申请二维码失败")
+
+
+@limiter.limit("120 per minute")
+@video_dump_bp.route("/video_dump/login/bilibili/poll", methods=['GET'])
+def video_dump_bilibili_poll() -> ResponseReturnValue:
+    """查询一次扫码状态。页面约每 2 秒调用一次。"""
+    try:
+        code, msg, data = video_dump_auth.poll_bilibili_qr(request.args.get("login_id", ""))
+        if code != 0 or not data:
+            return _err(msg)
+        return _ok(data)
+    except Exception as e:
+        log.error(f"[文字提取] 查询 B 站扫码状态失败: {e}")
+        return _err("查询扫码状态失败")
+
+
+@limiter.limit("20 per minute")
+@video_dump_bp.route("/video_dump/login/douyin/qr", methods=['POST'])
+def video_dump_douyin_qr() -> ResponseReturnValue:
+    """申请一张抖音登录二维码。"""
+    try:
+        code, msg, data = video_dump_auth.start_douyin_qr()
+        if code != 0 or not data:
+            return _err(msg)
+        return _ok(data)
+    except Exception as e:
+        log.error(f"[文字提取] 申请抖音二维码失败: {e}")
+        return _err("申请二维码失败")
+
+
+@limiter.limit("120 per minute")
+@video_dump_bp.route("/video_dump/login/douyin/poll", methods=['GET'])
+def video_dump_douyin_poll() -> ResponseReturnValue:
+    """查询一次抖音扫码状态。页面约每 2 秒调用一次。"""
+    try:
+        code, msg, data = video_dump_auth.poll_douyin_qr(request.args.get("login_id", ""))
+        if code != 0 or not data:
+            return _err(msg)
+        return _ok(data)
+    except Exception as e:
+        log.error(f"[文字提取] 查询抖音扫码状态失败: {e}")
+        return _err("查询扫码状态失败")
+
+
+@video_dump_bp.route("/video_dump/login/logout", methods=['POST'])
+def video_dump_logout() -> ResponseReturnValue:
+    """清除页面保存的某个站点登录态。"""
+    try:
+        data: Dict[str, Any] = read_json_from_request()
+        body, err = parse_with_model(_LogoutBody, data, err_factory=_err)
+        if err or not body:
+            return err or _err("Invalid request body")
+        code, msg = video_dump_auth.logout(body.site)
+        if code != 0:
+            return _err(msg)
+        return _ok({"ready": False})
+    except Exception as e:
+        log.error(f"[文字提取] 退出登录失败: {e}")
+        return _err("退出登录失败")
 
 
 @limiter.limit("10 per minute; 50 per hour")
