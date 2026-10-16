@@ -84,6 +84,12 @@ class PlaylistMgr:
         self._repo.start_save_worker()  # 启动 Redis 保存操作的 worker
         self._scheduling.ensure_duration_guard_job()  # 启动播放列表时长守护任务
 
+    def _ensure_loaded(self) -> bool:
+        """写入或返回列表前确认当前存储已加载，存储恢复后先重读再操作。"""
+        if not self._needs_reload and self._repo.is_ready:
+            return True
+        return self.reload() == 0 and self._repo.is_ready
+
     def get_playlist(self,
                      id: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
         """获取播放列表。
@@ -97,10 +103,8 @@ class PlaylistMgr:
             如果播放列表中有 isPlaying 字段，表示正在播放；如果正在播放当天前置列表，
             会添加 pre_index 字段表示当前播放的 pre_file 索引。
         """
-        # 如果需要重新加载，再次尝试加载
-        if self._needs_reload:
-            log.info(f"[PlaylistMgr] 需要重新加载，再次尝试从 RDS 加载")
-            self.reload()
+        if not self._ensure_loaded():
+            raise RuntimeError('播放列表读取失败，已暂停写入，请稍后重试')
 
         if id is None:
             result = self._playlist_raw
@@ -154,6 +158,8 @@ class PlaylistMgr:
         Returns:
             0 表示成功。
         """
+        if not self._ensure_loaded():
+            return -1
         # 检查是否有任何播放列表正在转换
         for playlist_id in collection.keys():
             if self._format_convert.is_converting(playlist_id):
@@ -187,6 +193,9 @@ class PlaylistMgr:
                 log.error(
                     "[PlaylistMgr] update_single_playlist: playlist_data 中缺少 id 字段"
                 )
+                return -1
+
+            if not self._ensure_loaded():
                 return -1
 
             # 检查播放列表是否正在转换
@@ -223,22 +232,18 @@ class PlaylistMgr:
     def reload(self) -> int:
         """从 RDS 重新加载所有播放列表数据。
 
-        此操作会清空并重建内存中的播放列表、设备映射和定时任务。
-        在非 Linux 平台，此操作会被跳过。
+        数据读取和校验成功后才替换内存；失败时保留原有列表并暂停保存。
+        设备映射和定时任务由各自组件处理平台限制。
 
         Returns:
             0 表示成功，-1 表示失败。
         """
         if sys.platform != "linux":
-            log.warning(
-                f"[PlaylistMgr] Reload not supported on non-linux platforms : {sys.platform}"
-            )
-            self._needs_reload = False
-            return 0
+            log.debug(f"[PlaylistMgr] 加载列表数据，设备映射由组件处理平台限制: {sys.platform}")
+        previous_raw = self._playlist_raw
         try:
             raw = self._repo.load_raw()
-            if raw is not None:
-                self._playlist_raw = raw
+            self._playlist_raw = raw
 
             # 保留 isPlaying / 定时器固化字段，便于进程重启后由 PlaylistScheduling.restore_timers_from_persistence 恢复 APScheduler 任务。
             # 当前 RDS 存档均为合法 pre_lists（7 个 list）；仅对损坏/旧字段做格式修复，不再读取已废弃的顶层 pre_files。
@@ -328,6 +333,8 @@ class PlaylistMgr:
             return 0
         except Exception as e:
             log.error(f"[PlaylistMgr] Reload error: {e}")
+            self._playlist_raw = previous_raw
+            self._repo.invalidate()
             self._needs_reload = True
             return -1
 

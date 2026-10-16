@@ -284,6 +284,18 @@ def _init_storage() -> tuple[Optional[redis.Redis], Optional[_LocalJsonStore], b
 rds, _local_store, is_local_fallback = _init_storage()
 
 
+def get_storage_identity() -> tuple[str, int]:
+    """标识当前持久化来源，供全量快照保存前校验加载来源。
+
+    ``fallback`` 表示配置了 Redis 但暂时降级，不能把它当作 Redis 的完整数据。
+    Redis 恢复会更新 generation，本地存储则以实例标识区分，避免旧快照跨来源写回。
+    """
+    if _local_store is not None:
+        mode = 'fallback' if _redis_enabled_by_config() else 'local'
+        return mode, id(_local_store)
+    return 'redis', _client_generation
+
+
 def _try_restore_redis() -> bool:
     """尝试重连 Redis，成功后切换回 Redis 存储。"""
     global rds, _local_store, is_local_fallback, _client_generation

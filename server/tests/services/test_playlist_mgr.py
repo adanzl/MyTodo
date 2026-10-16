@@ -153,10 +153,12 @@ def test_reload_from_rds(playlist_mgr):
     assert "p1" in playlist_mgr._devices
 
 
-def test_reload_non_linux_is_noop(playlist_mgr, monkeypatch):
+def test_reload_non_linux_still_loads_data(playlist_mgr, monkeypatch):
     monkeypatch.setattr(pm.sys, "platform", "darwin")
+    rds_mgr.set("schedule_play:playlist_collection", json.dumps({"p1": create_playlist_data("p1", "P1", [])}))
     result = playlist_mgr.reload()
     assert result == 0
+    assert "p1" in playlist_mgr._playlist_raw
 
 
 def test_reload_redis_error_sets_needs_reload(playlist_mgr, monkeypatch):
@@ -581,7 +583,7 @@ def test_cleanup_orphaned_cron_jobs(playlist_mgr):
 
 def test_get_playlist_reloads_if_needed(playlist_mgr, monkeypatch):
     playlist_mgr._needs_reload = True
-    mock_reload = MagicMock()
+    mock_reload = MagicMock(wraps=playlist_mgr.reload)
     monkeypatch.setattr(playlist_mgr, "reload", mock_reload)
 
     playlist_mgr.get_playlist()

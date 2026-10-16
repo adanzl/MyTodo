@@ -44,13 +44,34 @@ class PlaylistRepository:
         self._playlist_raw_provider = playlist_raw_provider
         self.rds_save_queue = rds_save_queue
         self._save_greenlet: Optional[Any] = None
+        self._loaded_storage: Optional[tuple[str, int]] = None
 
-    def load_raw(self) -> Optional[Dict[str, Any]]:
-        """从 RDS 读取播放列表全量；不存在返回 None，反序列化失败抛给调用方。"""
+    @property
+    def is_ready(self) -> bool:
+        """只有从当前持久化来源成功读取的快照才能写回。"""
+        return (
+            self._loaded_storage is not None
+            and self._loaded_storage == rds_mgr.get_storage_identity()
+        )
+
+    def invalidate(self) -> None:
+        """加载或写入失败后暂停保存，直到重新读取成功。"""
+        self._loaded_storage = None
+
+    def load_raw(self) -> Dict[str, Any]:
+        """读取并校验全量数据；确认键不存在时返回空字典，读取失败则抛异常。"""
+        self.invalidate()
+        source = rds_mgr.get_storage_identity()
+        if source[0] == 'fallback':
+            raise ConnectionError('Redis 不可用，无法确认完整播放列表，已暂停保存')
         raw = rds_mgr.get(PLAYLIST_RDS_FULL_KEY)
-        if not raw:
-            return None
-        return json.loads(raw.decode("utf-8"))  # pyright: ignore[reportAttributeAccessIssue]
+        if source != rds_mgr.get_storage_identity():
+            raise RuntimeError('播放列表读取期间存储发生切换，请重新加载')
+        data = {} if raw is None else json.loads(raw)
+        if not isinstance(data, dict) or any(not isinstance(item, dict) for item in data.values()):
+            raise ValueError('播放列表持久化数据格式错误，应为播放列表集合')
+        self._loaded_storage = source
+        return data
 
     def get_history(self, limit: int = 10) -> Dict[str, str]:
         """获取播放列表历史 Hash，按时间倒序返回最近 ``limit`` 条。"""
@@ -75,11 +96,15 @@ class PlaylistRepository:
             是否保存成功。
         """
         try:
+            if not self.is_ready:
+                raise RuntimeError('播放列表尚未从当前存储成功读取，拒绝保存')
             json_str = json.dumps(self._playlist_raw_provider(), ensure_ascii=False)
-            rds_mgr.set(PLAYLIST_RDS_FULL_KEY, json_str)
+            if not rds_mgr.set(PLAYLIST_RDS_FULL_KEY, json_str):
+                raise RuntimeError('播放列表写入失败')
             self._save_history(json_str)
             return True
         except Exception as e:
+            self.invalidate()
             if swallow_errors:
                 log.warning(f"[PlaylistRepository] save (swallow) error: {e}")
                 return False
