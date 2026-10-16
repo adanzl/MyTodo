@@ -14,6 +14,11 @@ import websocket
 
 from core.chat.asr_client import AsrClient, _AsrSession
 from core.config import app_logger, config
+from core.tools.ws_owner_send import install as install_ws_owner_send
+
+# 连接由 run_forever 线程建立、音频从 hub 线程发送：必须让发送发生在连接所属
+# 线程上，否则跨线程使用 gevent socket 会抛 Cannot switch to a different thread
+install_ws_owner_send()
 
 log = app_logger
 

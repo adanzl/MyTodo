@@ -25,6 +25,16 @@ except ImportError:
         "DASHSCOPE_WS_URI",  # cSpell: disable-line
         "wss://dashscope.aliyuncs.com/api-ws/v1/inference/")  # cSpell: disable-line
 
+try:
+    # 连接由 run_forever 线程建立、语音数据从 hub 线程发送：必须让发送发生在
+    # 连接所属线程上，否则跨线程使用 gevent socket 会抛
+    # Cannot switch to a different thread
+    from core.tools.ws_owner_send import install as _install_ws_owner_send
+
+    _install_ws_owner_send()
+except ImportError:  # 独立运行（缺少 core 包）时跳过
+    pass
+
 # cSpell: disable
 DEFAULT_ROLE = "longwan_v3"
 DEFAULT_MODEL = "cosyvoice-v3-flash"

@@ -12,7 +12,13 @@ from bleak import BleakClient, BleakScanner
 from bleak.backends.scanner import AdvertisementData
 
 from core.device.bluetooth import BluetoothDev
-from core.tools.async_util import run_async
+# BLE 的协程必须跑在**同一个长期存活的事件循环**上：BleakClient.connect() 会把
+# asyncio 原语绑定到当时那个循环，而 client 会被缓存在 BluetoothDev.client 上跨
+# 调用复用（connect_device 创建 → disconnect_device / 读 GATT 再使用）。
+# async_util.run_async 每次调用都新建并在结束时关闭循环，第二次操作就会撞上
+# "Event loop is closed"；async_loop 的循环常驻，创建与使用同 loop。
+# 名字沿用模块内历史的 `run_async`，4 个 *_sync 包装与外部替换点保持不变。
+from core.tools.async_loop import run_async_on_loop as run_async
 from core.config import app_logger
 
 log = app_logger

@@ -20,6 +20,17 @@ API_URL = config.AI_DIFY_API_URL
 LEO_USER = "leo"
 CANCAN_USER = "灿灿"
 
+# 建连超时（秒）：DNS + TCP + TLS 正常在 1s 内完成，5s 足够覆盖抖动，超了就是不可达。
+CONNECT_TIMEOUT = 5
+# 流式（SSE）读超时（秒）。stream=True 时 read timeout 限制的是「两次 socket 读之间」的
+# 等待时间，而不是整段回答的总时长，所以它相当于「上游多久没吐一个 chunk 就算失联」。
+# - 原值 30s 偏短：Dify 侧做工具调用/长文本生成时，两次 chunk 之间隔几十秒是可能的，
+#   30s 会直接掐断一个本来正常的回答（用户看到回答说到一半就报错）；
+# - 但也不能不封顶：上游一直不吐数据（半开连接/服务端卡住）时，这个调用会永久挂着，
+#   该请求对应的 greenlet 和用户界面就一直停在「生成中」。
+# 故给 180s：比旧值放宽 6 倍，足够长回答与工具调用间隙，又能兜住真正的失联。
+STREAM_READ_TIMEOUT = 180
+
 
 def dify_api_key(user: str | None) -> str:
     """按用户名选择 Dify 应用的 API Key。
@@ -92,7 +103,7 @@ class AILocal:
         self,
         query: str,
         inputs: dict | None = None,
-        timeout: int = 30,
+        timeout: int = STREAM_READ_TIMEOUT,
         try_times: int = 0,
         client_request_id: str = "",
         bound_attempt: int | None = None,
@@ -103,7 +114,9 @@ class AILocal:
         Args:
             query (str): 用户输入文本。
             inputs (dict | None): 透传给 Dify 的 inputs。
-            timeout (int): HTTP 超时时间（秒）。
+            timeout (int): **读**超时（秒）。SSE 场景下它是「两个 chunk 之间的最大间隔」，
+                不是整段回答的总时长，所以默认给 `STREAM_READ_TIMEOUT`(180s) 而不是更小的值，
+                否则长回答会被误杀。建连超时固定为 `CONNECT_TIMEOUT`(5s)。
             try_times (int): 内部递归重试计数（仅做一次轻量重试）。
             files (list[dict] | None): Dify `files` 参数（图片等附件），由
                 `core.ai.ai_file.resolve_chat_files` 生成。
@@ -137,7 +150,9 @@ class AILocal:
                     headers=dify_headers(self.user),
                     json=payload,
                     stream=True,
-                    timeout=timeout,
+                    # 流式请求用「短建连 + 长读」的组合：建连失败要快速失败，
+                    # 读超时则按 SSE 的 chunk 间隔来算（见 STREAM_READ_TIMEOUT 注释）。
+                    timeout=(CONNECT_TIMEOUT, timeout),
             ) as response:
                 response.raise_for_status()
 
@@ -215,10 +230,13 @@ class AILocal:
         payload = {"user": self.user}
         log.info(f">>[AI] cancel streaming [{req_id}] task={task_id}")
         try:
+            # 必须带超时：此前缺省为「无限等待」，上游不响应时该调用会一直悬挂，
+            # 而取消操作是在用户等结果时触发的，悬挂会直接卡住交互。
             with requests.post(
                     f"{API_URL}/chat-messages/{task_id}/stop",
                     headers=dify_headers(self.user),
                     json=payload,
+                    timeout=(5, 15),
             ) as response:
                 response.raise_for_status()
         except Exception as ee:
@@ -255,6 +273,7 @@ class AILocal:
                     f"{API_URL}/messages",
                     headers=dify_headers(user),
                     params=payload,
+                    timeout=(5, 30),
             ) as r:
                 r.raise_for_status()
                 return r.json()
@@ -276,6 +295,7 @@ class AILocal:
                 f"{API_URL}/conversations",
                 headers=dify_headers(user),
                 params=payload,
+                timeout=(5, 30),
         ) as r:
             r.raise_for_status()
             return r.json()

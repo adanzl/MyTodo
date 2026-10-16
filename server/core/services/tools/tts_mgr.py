@@ -377,30 +377,40 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
 
     def _update_task_status(self, task_id: str, status: str, error_message: Optional[str] = None) -> None:
         """更新任务状态。
-        
-        注意：此方法内部会获取锁，调用者不应在持有锁的情况下调用此方法。
-        
+
+        注意：此方法内部会获取锁，调用者不应在持有锁的情况下调用此方法；
+        已持有写锁时请改用 `_update_task_status_locked`。
+
         Args:
             task_id: 任务 ID
             status: 新状态
             error_message: 错误消息（可选）
         """
         with self._task_lock.gen_wlock():
-            task = self._get_task(task_id)
-            if task:
-                old_status = task.status
-                task.status = status
-                task.error_message = error_message
-                try:
-                    self._save_task_and_update_time(task)
-                except Exception as e:
-                    log.error(f"[TTSMgr] 保存任务状态时出错: {e}", exc_info=True)
-                    raise
-                if old_status != status:
-                    log.info(f"[TTSMgr] 任务 {task_id} 状态更新: {old_status} -> {status}" +
-                             (f", 错误: {error_message}" if error_message else ""))
-            else:
-                log.warning(f"[TTSMgr] _update_task_status 无法找到任务: {task_id}")
+            self._update_task_status_locked(task_id, status, error_message)
+
+    def _update_task_status_locked(self, task_id: str, status: str, error_message: Optional[str] = None) -> None:
+        """更新任务状态的实现体。**调用方必须已持有写锁。**
+
+        `_task_lock` 是 `rwlock.RWLockFair()`，其底层是 `threading.Lock`，
+        **不可重入**：已持写锁时再取一次会永久死锁（实测确认）。
+        因此需要区分「会自己取锁」与「要求调用方持锁」两个入口。
+        """
+        task = self._get_task(task_id)
+        if task:
+            old_status = task.status
+            task.status = status
+            task.error_message = error_message
+            try:
+                self._save_task_and_update_time(task)
+            except Exception as e:
+                log.error(f"[TTSMgr] 保存任务状态时出错: {e}", exc_info=True)
+                raise
+            if old_status != status:
+                log.info(f"[TTSMgr] 任务 {task_id} 状态更新: {old_status} -> {status}" +
+                         (f", 错误: {error_message}" if error_message else ""))
+        else:
+            log.warning(f"[TTSMgr] _update_task_status 无法找到任务: {task_id}")
 
     def _ensure_no_subtask_running(self, task_id: str, operation: str) -> Optional[str]:
         """检查任务是否被 OCR/分析子任务锁定；若锁定则返回错误信息。"""
@@ -723,8 +733,9 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
                         if _task.status == TASK_STATUS_FAILED and _task.error_message == '任务已被用户停止':
                             pass  # 状态已更新，跳过
                         else:
-                            # 任务被停止，标记为失败但错误信息明确说明是停止
-                            self._update_task_status(_task.task_id, TASK_STATUS_FAILED, '任务已被用户停止')
+                            # 任务被停止，标记为失败但错误信息明确说明是停止。
+                            # 必须用 _locked 变体：此处已持写锁，而 _task_lock 不可重入。
+                            self._update_task_status_locked(_task.task_id, TASK_STATUS_FAILED, '任务已被用户停止')
                 # 停止操作不重新抛出异常，避免外层再次处理
                 return
             else:
@@ -778,24 +789,30 @@ class TTSMgr(BaseTaskMgr[TTSTask]):
             # 设置停止标志
             self._stop_flags[task_id] = True
 
-            # 获取并取消正在运行的 TTS 客户端
+            # 只取出客户端引用，**取消操作放到锁外**：
+            # streaming_cancel() 会向 SDK 的连接发数据（可能阻塞），持锁期间执行
+            # 会让其它请求卡在读锁上，进而把主线程也拖住。
             client = self._active_clients.get(task_id)
-            if client:
-                try:
-                    log.info(f"[TTSMgr] 取消任务 {task_id} 的 TTS 流式合成")
-                    client.streaming_cancel()
-                except Exception as e:
-                    log.error(f"[TTSMgr] 取消 TTS 客户端失败 {task_id}: {e}", exc_info=True)
-            else:
-                log.warning(f"[TTSMgr] 任务 {task_id} 没有活动的 TTS 客户端")
 
-            # 立即更新任务状态为失败（已停止）
-            task.status = TASK_STATUS_FAILED
-            task.error_message = '任务已被用户停止'
-            self._save_task_and_update_time(task)
+        if client:
+            try:
+                log.info(f"[TTSMgr] 取消任务 {task_id} 的 TTS 流式合成")
+                client.streaming_cancel()
+            except Exception as e:
+                log.error(f"[TTSMgr] 取消 TTS 客户端失败 {task_id}: {e}", exc_info=True)
+        else:
+            log.warning(f"[TTSMgr] 任务 {task_id} 没有活动的 TTS 客户端")
 
-            log.info(f"[TTSMgr] 任务 {task_id} 已成功停止")
-            return 0, '任务已停止'
+        # 立即更新任务状态为失败（已停止）
+        with self._task_lock.gen_wlock():
+            _task = self._get_task(task_id)
+            if _task:
+                _task.status = TASK_STATUS_FAILED
+                _task.error_message = '任务已被用户停止'
+                self._save_task_and_update_time(_task)
+
+        log.info(f"[TTSMgr] 任务 {task_id} 已成功停止")
+        return 0, '任务已停止'
 
     def delete_task(self, task_id: str) -> Tuple[int, str]:
         """删除任务。若任务正在执行 OCR/分析子任务，则不允许删除。"""

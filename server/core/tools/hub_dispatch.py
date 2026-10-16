@@ -67,16 +67,39 @@ class HubDispatcher:
     做成类而非模块级全局，是为了让每个实例持有自己的队列与消费循环：
     全局共享时，重复 `start()` 会留下多个消费循环抢同一个队列，既难以推理，
     也让"任务是否被串行化"无法被测试确定地覆盖。
+
+    Args:
+        ordered: True 时**严格按投递顺序串行执行**；False（默认）时每个任务各起
+            一个 greenlet，可并发、但**不保证任务之间的先后**。
     """
 
-    def __init__(self) -> None:
+    def __init__(self, ordered: bool = False) -> None:
         # 未被 gevent patch 的原生队列，可安全跨线程传递
         self._queue: 'queue.Queue[Callable[[], None]]' = queue.Queue()
         self._started = False
+        self._ordered = ordered
 
     def post(self, func: Callable[[], None]) -> None:
         """入队，不阻塞、不等待结果。可从任意线程调用。"""
         self._queue.put(func)
+
+    def run_pending(self) -> int:
+        """同步执行队列中所有待处理任务（按取出的顺序），返回执行数量。
+
+        主要给测试用：把「投递即返回」的异步语义收敛成一个**确定性的同步点**，
+        避免用例依赖 `sleep` 的时序假设（那样在负载高时会偶发失败）。
+
+        与消费循环并存时也安全：`get_nowait` 保证每个任务只会被一方取走，
+        因此不会重复执行。
+        """
+        count = 0
+        while True:
+            try:
+                func = self._queue.get_nowait()
+            except queue.Empty:
+                return count
+            _run_task(func)
+            count += 1
 
     def start(self) -> None:
         """在调用方线程（应为 hub）上启动消费循环。幂等。"""
@@ -84,7 +107,9 @@ class HubDispatcher:
             return
         self._started = True
         spawn(self._drain)
-        log.info('[HubDispatch] hub 投递消费循环已启动')
+        log.info(
+            f'[HubDispatch] hub 投递消费循环已启动（{"保序串行" if self._ordered else "并发"}）'
+        )
 
     def _drain(self) -> None:
         while True:
@@ -93,20 +118,56 @@ class HubDispatcher:
             except queue.Empty:
                 gevent_sleep(_POLL_INTERVAL)
                 continue
-            # 每个任务独立 greenlet：仍运行在 hub 线程上（线程归属不变），
-            # 但任务内部的协作式等待会让出事件循环，多段对话得以并发。
-            spawn(_run_task, func)
+
+            if self._ordered:
+                # 保序：就地执行，绝不并发。用于**顺序有语义**的回调
+                # （例如 TTS 音频分片必须先于完成事件到达）。
+                # 这些回调都是协作式的（socketio.emit、Redis 追加），
+                # 不会占住 OS 线程，因此串行不会造成 hub 卡死。
+                _run_task(func)
+            else:
+                # 每个任务独立 greenlet：仍运行在 hub 线程上（线程归属不变），
+                # 但任务内部的协作式等待会让出事件循环，多段对话得以并发。
+                spawn(_run_task, func)
 
 
 # 进程级单例：生产代码经 post_to_hub / start_hub_drain 使用
 _dispatcher = HubDispatcher()
+# 保序通道：见 post_to_hub_ordered
+_ordered_dispatcher = HubDispatcher(ordered=True)
 
 
 def post_to_hub(func: Callable[[], None]) -> None:
-    """从任意线程投递一个可调用对象，由主 hub 的 greenlet 执行。"""
+    """从任意线程投递一个可调用对象，由主 hub 的 greenlet 执行。
+
+    **不保证**多次投递之间的执行顺序（每个任务各起一个 greenlet，可并发）。
+    顺序有语义时请用 `post_to_hub_ordered`。
+    """
     _dispatcher.post(func)
+
+
+def post_to_hub_ordered(func: Callable[[], None]) -> None:
+    """投递到 hub 的**保序**通道：严格按投递顺序串行执行。
+
+    用于顺序即语义的回调，例如 TTS 的音频分片与紧随其后的「完成」事件：
+    若分片之间发生乱序或「完成」先到，前端播放就会错乱。
+
+    代价是这些任务彼此串行（不像 `post_to_hub` 那样并发），因此只应投递
+    **短小且协作式**的操作（emit、Redis 追加），不要把整段流式读取放进来。
+    """
+    _ordered_dispatcher.post(func)
 
 
 def start_hub_drain() -> None:
     """在 hub 上启动消费循环（幂等）。须在应用初始化时调用。"""
     _dispatcher.start()
+    _ordered_dispatcher.start()
+
+
+def run_pending_hub_tasks() -> int:
+    """同步执行两个通道中所有待处理任务（保序通道按 FIFO）。
+
+    测试用：把交回 hub 的异步回调收敛成可断言的同步点。
+    生产环境由消费循环处理，无需调用。
+    """
+    return _dispatcher.run_pending() + _ordered_dispatcher.run_pending()

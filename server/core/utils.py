@@ -3,6 +3,7 @@
 包含异步工具函数和其他通用工具函数
 """
 from core.config import app_logger, config
+from core.tools.async_util import wait_thread
 from werkzeug.utils import secure_filename
 from queue import Queue, Empty
 from flask import request
@@ -238,9 +239,10 @@ def get_media_duration(file_path: str) -> Optional[int]:
     # 在独立线程中运行
     thread = threading.Thread(target=_run_ffprobe_in_thread, daemon=True)
     thread.start()
-    thread.join(timeout=55)  # 等待线程完成
-
-    if thread.is_alive():
+    # 协作式等待：thread.join() 在 gevent worker 里会阻塞整个 hub（实测 2 秒心跳
+    # 从 ~160 掉到 ~1），而本函数会被媒体时长接口、添加合并文件、播放文件以及
+    # 转码时长回填等多处从 hub 调用。
+    if not wait_thread(thread, timeout=55):
         log.warning(f"[Utils] ffprobe thread timeout for {file_path}")
         return None
 
@@ -551,6 +553,19 @@ def is_allowed_audio_file(filename: str) -> bool:
     """
     from core.config import ALLOWED_AUDIO_EXTENSIONS
     return os.path.splitext(filename)[1].lower() in ALLOWED_AUDIO_EXTENSIONS
+
+
+def is_allowed_video_file(filename: str) -> bool:
+    """检查视频文件扩展名是否允许。
+
+    Args:
+        filename: 文件名。
+
+    Returns:
+        True 如果文件扩展名在允许列表中，False 否则。
+    """
+    from core.config import ALLOWED_VIDEO_EXTENSIONS
+    return os.path.splitext(filename)[1].lower() in ALLOWED_VIDEO_EXTENSIONS
 
 
 def is_allowed_pdf_file(filename: str) -> bool:

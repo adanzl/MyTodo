@@ -14,6 +14,7 @@ from core.services.tools.tts_mgr import (
     count_text_chars,
 )
 from core.tts.tts_client import TTSClient
+from core.tools.hub_dispatch import run_pending_hub_tasks
 
 
 def test_tts_client_on_error_invokes_on_err_once():
@@ -21,6 +22,8 @@ def test_tts_client_on_error_invokes_on_err_once():
     tts = TTSClient(on_err=errors.append)
     tts.on_error("synthesis failed")
     tts.on_error("synthesis failed again")
+    # on_err 最终会 socketio.emit，故交回 hub 执行；这里同步跑一遍待处理任务
+    run_pending_hub_tasks()
     assert len(errors) == 1
     assert "synthesis failed" in str(errors[0])
 
@@ -41,8 +44,17 @@ def test_tts_client_stream_msg_updates_role_for_redis_key():
             assert rds.append_value.call_count == 1
             assert rds.append_value.call_args[0][1] == b"chunk"
 
+        # 必须在这里收敛后台动作，且仍在 SpeechSynthesizer 的 patch 范围内：
+        # 否则动作会越过 mock 执行，落到真实 SDK 上（会尝试连网、抛 401）。
+        tts._sdk.wait_pending()
+
 
 def test_one_shot_tts_keeps_synthesizer_reference_for_cancel():
+    """一次性合成要保留 synthesizer 引用，ttsCancel 才能真的中止生成。
+
+    注意：SDK 操作现在投递到专用线程执行（见 core/tts/tts_worker.py），
+    为的是不阻塞 hub。因此断言前需要用 `wait_pending()` 把它收敛成同步点。
+    """
     tts = TTSClient()
     synth = MagicMock()
 
@@ -52,8 +64,12 @@ def test_one_shot_tts_keeps_synthesizer_reference_for_cancel():
     synth.call.side_effect = _call
     with patch("core.tts.tts_client.SpeechSynthesizer", return_value=synth):
         tts.process_msg("需要中止的朗读", role="longwan_v3", id="msg-cancel")
+        tts._sdk.wait_pending()
+
+    assert tts.synthesizer is synth, "一次性合成后必须保留引用，否则无法取消"
 
     tts.streaming_cancel()
+    tts._sdk.wait_pending()
     synth.streaming_cancel.assert_called_once()
 
 
@@ -98,6 +114,8 @@ def test_tts_client_deferred_cache_commits_only_after_sdk_complete():
         assert begin.call_count == 0
 
         tts.on_complete()
+        # on_complete 会 socketio.emit，故交回 hub 执行；同步跑一遍待处理任务
+        run_pending_hub_tasks()
 
         begin.assert_called_once()
         append.assert_called_once_with("audio", b"audio")

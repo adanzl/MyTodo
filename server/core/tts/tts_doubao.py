@@ -18,6 +18,16 @@ API_URL = config.DOUBAO_TTS_API_URL
 API_ID = config.DOUBAO_TTS_API_ID
 API_TOKEN = config.DOUBAO_TTS_API_TOKEN
 
+# 请求超时（连接, 读）秒数。
+# 必须显式指定：本服务的 HTTP 处理都在同一个 gevent hub 线程上，requests 默认无超时，
+# 火山 TTS 不返回时这个调用会一直挂着，调用方（以及占住的 greenlet）永远得不到结果。
+# 取值理由：
+# - 连接 5s：DNS + TCP + TLS 正常在 1s 内完成，5s 足够覆盖抖动；
+# - 读 120s：TTS 是**非流式**接口（operation=query 一次性返回整段 base64 音频），
+#   合成耗时随文本长度增长，按仓库里长音频合成的最坏情况给足 120s；
+#   仍要封顶——不能用 0/None（requests 会当成无限等待）。
+TTS_TIMEOUT = (5, 120)
+
 
 def gen_tts(text: str, voice_id: str) -> bytes:
     """生成 TTS 音频。
@@ -58,7 +68,7 @@ def gen_tts(text: str, voice_id: str) -> bytes:
             "operation": "query",
         },
     }
-    with requests.post(API_URL, headers=headers, json=payloads) as r:
+    with requests.post(API_URL, headers=headers, json=payloads, timeout=TTS_TIMEOUT) as r:
         data = r.json()
         audio_bytes = base64.b64decode(data["data"])
         return audio_bytes

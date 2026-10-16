@@ -4,6 +4,14 @@ import os
 import dashscope
 from dashscope.audio.tts_v2 import *
 
+from core.tools.ws_owner_send import install as install_ws_owner_send
+from core.tts.tts_worker import SdkWorker
+
+# SDK 内部用 websocket-client：连接建立在它自己起的 run_forever 线程里，
+# 而文本帧从我们的工作线程发送 —— 必须让发送发生在连接所属线程上，
+# 否则跨线程使用 gevent socket 会抛 Cannot switch to a different thread
+install_ws_owner_send()
+
 try:
     from core.config import app_logger, config
     import core.db.rds_mgr as rds_mgr
@@ -52,6 +60,9 @@ class TTSClient(ResultCallback):
         self.on_err = on_err or (lambda x: None)
         dashscope.api_key = ALI_KEY
         self.synthesizer = None
+        # 每个客户端一个 SDK 线程：既保证连接的线程归属，又避免不同会话
+        # 互相排队（详见 tts_worker.py）
+        self._sdk = SdkWorker(f'tts-sdk-{id(self):x}')
         self.role = DEFAULT_ROLE
         self.speed = 1.0
         self.vol = 50
@@ -155,20 +166,68 @@ class TTSClient(ResultCallback):
             tts_cache.finalize_session(self._cache_session)
         self._cache_session = None
 
+    def _ensure_synthesizer(self, role: str):
+        """创建/复用 synthesizer。**必须在 SDK 线程上调用**，连接才归属该线程。"""
+        if self.synthesizer is None:
+            self._errored = False
+            self.synthesizer = SpeechSynthesizer(
+                model=MODEL_MAP.get(role, DEFAULT_MODEL),
+                voice=role,
+                volume=self.vol,
+                speech_rate=self.speed,
+                callback=self,
+            )
+        return self.synthesizer
+
+    def _submit_sdk(self, action, *, label: str, wait: bool = False, timeout=None):
+        """把 SDK 操作投递到专用线程，异常就地报告。
+
+        不能在 hub 上直接调用 SDK：`streaming_complete()` 会等最长 10 分钟、
+        `call()` 等到整段合成结束，而 `threading.Event` 未被 patch，会把整个
+        OS 线程占住。
+        """
+        def guarded():
+            try:
+                return action()
+            except Exception as e:  # noqa: BLE001 - 与原先的内联处理保持一致
+                # 用 exc_info 记录真实异常栈；在这里 print_stack 只会打出
+                # SDK 线程自身的栈，没有诊断价值。
+                log.error(f">>[TTS] {label} 失败: {e}", exc_info=True)
+                self.on_err(e)
+                return None
+
+        return self._sdk.submit(guarded, wait=wait, timeout=timeout)
+
     def streaming_cancel(self):
         log.info(">>[TTS] cancel streaming")
         self.abort_cache()
-        try:
-            if self.synthesizer is not None:
-                self.synthesizer.streaming_cancel()
-                self.synthesizer = None
-        except Exception as e:
-            log.error(f">>[TTS] {e}")
-            traceback.print_stack()
-            self.on_err(e)
+        # 丢弃尚未执行的文本片段：取消之后不该再把它们发出去。
+        # 必须先于取消动作执行，否则队列里残留的片段会在取消之后被发送。
+        dropped = self._sdk.discard_pending()
+        if dropped:
+            log.info(f">>[TTS] 取消时丢弃了 {dropped} 个待执行动作")
+        self._submit_sdk(self._do_cancel, label='streaming_cancel')
+
+    def _do_cancel(self):
+        """在 SDK 线程上执行取消。
+
+        注意 SDK 的 socket 由它自己起的 `run_forever` 线程创建，`ws.send()`
+        只应在那个线程发起；这里不额外起线程（详见模块顶部说明）。
+        """
+        synth = self.synthesizer
+        self.synthesizer = None
+        if synth is None:
+            return
+        if not getattr(synth, '_is_started', False):
+            # 会话没真正开始（例如启动失败），SDK 会抛「尚未启动」，无需调用
+            return
+        synth.streaming_cancel()
 
     def process_msg(self, text: str, role: str = None, id=None):
         """ 一次性合成音频，文本需要一次性传入
+
+        注意：SDK 的 `call()` 会等到整段合成结束，因此走专用线程执行，
+        调用方（hub）只投递不等待；音频仍通过 on_data 回调返回。
 
         Args:
             text: 待合成的文本内容。
@@ -177,31 +236,22 @@ class TTSClient(ResultCallback):
         Returns:
             None
         """
-        try:
-            if role is None:
-                role = self.role
-            else:
-                self.role = role
-            if id:
-                self.id = id
-            self._errored = False
-            # call() 内部也是基于流式会话实现；保留实例才能让 ttsCancel 真正中止生成。
-            self.synthesizer = SpeechSynthesizer(
-                model=MODEL_MAP.get(role, DEFAULT_MODEL),
-                voice=role,
-                volume=self.vol,
-                speech_rate=self.speed,
-                callback=self,
-            )
-            self.synthesizer.call(text)
-
-        except Exception as e:
-            log.error(f">>[TTS] {e}")
-            traceback.print_stack()
-            self.on_err(e)
+        if role is None:
+            role = self.role
+        else:
+            self.role = role
+        if id:
+            self.id = id
+        # call() 内部也是基于流式会话实现；保留实例才能让 ttsCancel 真正中止生成。
+        self._submit_sdk(
+            lambda: self._ensure_synthesizer(role).call(text),
+            label='process_msg',
+        )
 
     def stream_msg(self, text: str, role: str = None, id=None):
         """ 流式合成音频，文本需要流式传入
+
+        按顺序投递到 SDK 线程执行，保持原有的调用次序（文本片段的先后有意义）。
 
         Args:
             text: 待合成的文本内容。
@@ -211,37 +261,45 @@ class TTSClient(ResultCallback):
         Returns:
             None
         """
-        try:
-            if role is None:
-                role = self.role
-            else:
-                self.role = role
-            if id:
-                self.id = id
-            if self.synthesizer is None:
-                self._errored = False
-                self.synthesizer = SpeechSynthesizer(
-                    model=MODEL_MAP.get(role, DEFAULT_MODEL),
-                    voice=role,
-                    volume=self.vol,
-                    speech_rate=self.speed,
-                    callback=self,
-                )
-            self.synthesizer.streaming_call(text)
-        except Exception as e:
-            log.error(f">>[TTS] {e}")
-            traceback.print_stack()
-            self.on_err(e)
+        if role is None:
+            role = self.role
+        else:
+            self.role = role
+        if id:
+            self.id = id
+        self._submit_sdk(
+            lambda: self._ensure_synthesizer(role).streaming_call(text),
+            label='streaming_call',
+        )
 
     def stream_complete(self):
-        try:
-            if self.synthesizer is None:
+        """结束流式合成。
+
+        用 SDK 自带的 `async_streaming_complete()`：它把结束指令发出去就立刻返回，
+        由 SDK 自己的线程等待完成并关闭。
+
+        不能调同步的 `streaming_complete()`——它会等最长 10 分钟
+        （`complete_timeout_millis` 默认 600000）。虽然本类已把 SDK 调用放到专用
+        线程，不会阻塞 hub，但那会**占住串行队列**：期间排队的
+        `streaming_cancel()` 无法执行，而取消恰恰是要用来打断这等待的。
+
+        完成与否通过 `on_complete` 回调得知。
+        """
+        def action():
+            synth = self.synthesizer
+            # 从未发送过文本时不应创建实例、也不该向 SDK 发结束指令
+            # （SDK 会抛「speech synthesizer has not been started」）。
+            # 这个判断必须放在**动作内部**：放在外面会在投递时就把它读成 None，
+            # 而那时前面的 stream_msg 可能还没执行、实例尚未创建。
+            if synth is None:
                 return
-            self.synthesizer.streaming_complete()
-        except Exception as e:
-            log.error(f">>[TTS] {e}")
-            traceback.print_stack()
-            self.on_err(e)
+            if not getattr(synth, '_is_started', False):
+                # 会话存在但未真正启动（例如启动失败），同样无需发送
+                self.synthesizer = None
+                return
+            synth.async_streaming_complete()
+
+        self._submit_sdk(action, label='streaming_complete')
 
     def on_open(self):
         log.debug(">>[TTS] on_open 回调")
@@ -249,22 +307,40 @@ class TTSClient(ResultCallback):
 
     def on_complete(self):
         log.debug(">>[TTS] on_complete 回调")
-        self.finalize_cache()
-        self._commit_deferred_cache()
-        self.on_msg(">>[TTS] Completed", 1)
+        # 回调来自 SDK 的 ws 线程（或 SDK 线程），而 on_msg 最终会 socketio.emit。
+        # 跨线程 emit 会用到归属 hub 的 gevent socket，必须交回 hub；
+        # 用**保序**通道：完成事件必须排在所有音频分片之后。
+        from core.tools.hub_dispatch import post_to_hub_ordered
+
+        def emit_complete():
+            self.finalize_cache()
+            self._commit_deferred_cache()
+            self.on_msg(">>[TTS] Completed", 1)
+
+        post_to_hub_ordered(emit_complete)
 
     def on_error(self, message: str):
         log.error(f">>[TTS] failed, {message}")
         self.synthesizer = None
         self.abort_cache()
+        # 去重必须在当前（SDK）线程就地判定：若把整个方法推迟到 hub，
+        # 连续两次 on_error 都会先通过判断，导致重复上报。
         if self._errored:
             return
         self._errored = True
-        try:
-            self.on_err(Exception(message))
-        except Exception as e:
-            log.error(f">>[TTS] on_err callback failed: {e}")
-            traceback.print_stack()
+
+        # 只有 on_err（最终会 socketio.emit）需要交回 hub：
+        # 跨线程 emit 会用到归属 hub 的 gevent socket。
+        from core.tools.hub_dispatch import post_to_hub_ordered
+
+        def report_error():
+            try:
+                self.on_err(Exception(message))
+            except Exception as e:
+                log.error(f">>[TTS] on_err callback failed: {e}")
+                traceback.print_stack()
+
+        post_to_hub_ordered(report_error)
 
     def on_close(self):
         log.debug(f">>[TTS] on_close 回调")
@@ -287,12 +363,22 @@ class TTSClient(ResultCallback):
             except Exception as e:
                 log.warning(f">>[TTS] Redis append failed, ignore: {e}")
 
-        try:
-            self.on_msg(data, 0)
-        except Exception as e:
-            log.error(f">>[TTS]{e}")
-            traceback.print_stack()
-            self.on_err(e)
+        # 音频分片最终会 socketio.emit —— 必须交回 hub 执行（见 on_complete 说明），
+        # 且必须走**保序**通道，否则分片乱序会让前端播放错乱。
+        from core.tools.hub_dispatch import post_to_hub_ordered
+
+        def emit_chunk():
+            try:
+                self.on_msg(data, 0)
+            except Exception as e:
+                log.error(f">>[TTS]{e}")
+                traceback.print_stack()
+                try:
+                    self.on_err(e)
+                except Exception:  # noqa: BLE001 - on_err 本身失败时不再抛出
+                    log.error('>>[TTS] on_err 回调失败', exc_info=True)
+
+        post_to_hub_ordered(emit_chunk)
 
 
 def test_tts():

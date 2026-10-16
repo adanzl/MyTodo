@@ -367,6 +367,18 @@ class ClientContext:
         self.socketio.emit(event, payload, room=self.sid)
 
     def on_asr_err(self, err: Exception):
+        """ASR 出错回调。
+
+        回调来自 ASR 的 ws 线程（`run_forever`），而下面会读 Redis、
+        最终 `socketio.emit`——这些对象归属 hub，跨线程使用会抛
+        "Cannot switch to a different thread"（2026-10-16 停摆的成因之一）。
+        因此整体交回 hub 执行。
+        """
+        from core.tools.hub_dispatch import post_to_hub
+
+        post_to_hub(lambda: self._handle_asr_err_on_hub(err))
+
+    def _handle_asr_err_on_hub(self, err: Exception):
         session = self.asr._session
         rid = session.request_id if session else ""
         attempt = chat_request_store.get_attempt(self.ai.user, rid) if rid else 0

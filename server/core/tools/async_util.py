@@ -106,6 +106,21 @@ def run_blocking(func: Callable[[], _T], timeout: Optional[float] = None) -> _T:
     return _poll_worker_thread(thread, result_q, error_q, wait)
 
 
+def wait_thread(thread: threading.Thread, timeout: float) -> bool:
+    """协作式等待一个**已在运行**的线程结束，返回是否已结束。
+
+    供「自己启动线程、然后等它」的场景使用（`run_blocking` 只适用于由它自己
+    启动线程的情况）。不能用 `thread.join()`：在 gevent worker 中它会阻塞整个
+    hub，别的请求全部排不上——实测 55s 的 join 让 2 秒心跳从 ~160 掉到 ~1。
+    """
+    deadline = time.monotonic() + timeout
+    while thread.is_alive():
+        if time.monotonic() >= deadline:
+            return False
+        gevent_sleep(0.01)
+    return True
+
+
 def http_request_bytes(
     method: str,
     url: str,

@@ -20,7 +20,7 @@ import threading
 
 from gevent import sleep
 
-from core.tools.hub_dispatch import HubDispatcher
+from core.tools.hub_dispatch import HubDispatcher, run_pending_hub_tasks
 
 
 def _drain(dispatcher, coop_drain=True):
@@ -206,3 +206,155 @@ def test_post_does_not_block_the_caller():
     t.join(2)
 
     assert done.is_set(), '投递阻塞了调用方'
+
+
+# ---------------- 保序通道（ordered=True）----------------
+#
+# TTS 的音频分片与紧随其后的「完成」事件顺序即语义：乱序会让前端播放错乱。
+# 因此新增了保序通道，与默认的并发通道并存。
+
+
+def test_ordered_channel_preserves_submission_order():
+    """保序通道必须严格按投递顺序执行。"""
+    dispatcher = _drain(HubDispatcher(ordered=True))
+    order = []
+
+    # 每个任务都做协作式等待：并发通道下必然乱序，保序通道下必须仍是 0..19
+    for i in range(20):
+        dispatcher.post(lambda i=i: (sleep(0.005), order.append(i)))
+
+    assert _wait_for(lambda: len(order) == 20), f'未全部执行: {len(order)}'
+    assert order == list(range(20)), f'保序通道出现乱序: {order}'
+
+
+def test_ordered_channel_serializes_tasks():
+    """保序通道内任务不得并发（并发会让顺序失去意义）。"""
+    dispatcher = _drain(HubDispatcher(ordered=True))
+    active = {'now': 0, 'max': 0}
+
+    def task():
+        active['now'] += 1
+        active['max'] = max(active['max'], active['now'])
+        sleep(0.02)
+        active['now'] -= 1
+
+    for _ in range(5):
+        dispatcher.post(task)
+
+    assert _wait_for(lambda: active['max'] > 0)
+    sleep(0.3)  # 给并发执行留出窗口（若真并发，max 会变成 2+）
+    assert active['max'] == 1, f'保序通道出现了并发执行（max={active["max"]}）'
+
+
+def test_default_channel_still_runs_concurrently():
+    """默认通道必须保持并发 —— 不能为了让 TTS 保序而把 ASR 对话串行化。
+
+    `stream_msg` 会读到整段流结束（数十秒），串行化会让一个用户的对话把其它
+    用户全堵住（这是引入本模块时踩过的回归）。
+    """
+    dispatcher = _drain(HubDispatcher())
+    active = {'now': 0, 'max': 0}
+
+    def task():
+        active['now'] += 1
+        active['max'] = max(active['max'], active['now'])
+        sleep(0.1)
+        active['now'] -= 1
+
+    for _ in range(3):
+        dispatcher.post(task)
+
+    assert _wait_for(lambda: active['max'] >= 2, timeout=3.0), (
+        f'默认通道被串行化了（max={active["max"]}）'
+    )
+
+
+def test_ordered_channel_reaches_the_hub_thread():
+    """保序通道同样要把任务交回 hub 线程（线程归属不因保序而改变）。"""
+    dispatcher = _drain(HubDispatcher(ordered=True))
+    hub_tid = threading.get_ident()
+    seen = {}
+
+    def worker():
+        dispatcher.post(lambda: seen.update(tid=threading.get_ident()))
+
+    t = threading.Thread(target=worker)
+    t.start()
+    t.join(2)
+
+    assert _wait_for(lambda: 'tid' in seen), '任务未被执行'
+    assert seen['tid'] == hub_tid, '保序通道没有回到 hub 线程'
+
+
+def test_tts_callbacks_are_dispatched_to_hub_in_order():
+    """TTS 的音频分片与完成事件必须交回 hub，且保持先后顺序。
+
+    故障背景：这些回调来自 SDK 的 ws 线程，却直接 `socketio.emit` —— 跨线程
+    使用 hub 归属的 gevent socket 会抛 Cannot switch to a different thread。
+    顺序同样重要：完成事件若先到，前端会在音频播完前就收到「结束」。
+    """
+    from core.tts.tts_client import TTSClient
+
+    received = []
+    tts = TTSClient(on_msg=lambda data, kind: received.append((kind, data)))
+
+    tts.on_data(b'chunk-1')
+    tts.on_data(b'chunk-2')
+    tts.on_complete()
+
+    # 用确定性同步点代替 sleep（避免负载高时偶发失败）
+    run_pending_hub_tasks()
+
+    kinds = [k for k, _ in received]
+    assert kinds == [0, 0, 1], f'顺序错误或数量不对: {kinds}'
+    assert received[0][1] == b'chunk-1' and received[1][1] == b'chunk-2'
+    assert received[2][1] == '>>[TTS] Completed'
+
+
+def test_tts_error_callback_is_dispatched_to_hub():
+    """TTS 错误回调同样要交回 hub（它最终会 socketio.emit）。"""
+    from core.tts.tts_client import TTSClient
+
+    errors = []
+    tts = TTSClient(on_err=errors.append)
+
+    tts.on_error('boom')
+    run_pending_hub_tasks()
+
+    assert len(errors) == 1
+    assert 'boom' in str(errors[0])
+
+
+def test_asr_error_callback_is_dispatched_to_hub():
+    """ASR 错误回调要交回 hub 执行。
+
+    回调来自 ASR 的 ws 线程，而处理链会读 Redis 并最终 `socketio.emit`。
+    """
+    from unittest.mock import MagicMock
+
+    from core.chat.chat_mgr import ClientContext
+
+    socketio = MagicMock()
+    ctx = ClientContext('sid-asr-err', socketio)
+    ctx.asr = MagicMock()
+    ctx.asr._session = None
+    ctx.ai = MagicMock()
+    ctx.ai.user = 'user-1'
+
+    ctx.on_asr_err(RuntimeError('asr down'))
+    # 交回 hub 执行：这里同步跑一遍待处理任务
+    run_pending_hub_tasks()
+
+    assert socketio.emit.called, 'ASR 错误未最终上报（应为 emit 到前端）'
+
+
+def test_hub_thread_identity_is_preserved_for_ordered_channel():
+    """保序通道执行的任务必须仍在 hub 线程 —— 否则线程归属问题没有真正解决。"""
+    dispatcher = _drain(HubDispatcher(ordered=True))
+    hub_tid = threading.get_ident()
+    tids = []
+    for _ in range(3):
+        dispatcher.post(lambda: tids.append(threading.get_ident()))
+
+    assert _wait_for(lambda: len(tids) == 3)
+    assert set(tids) == {hub_tid}
