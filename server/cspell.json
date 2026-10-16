@@ -4,6 +4,7 @@
         "aiofiles",
         "aiohttp",
         "asyncio",
+        "bilibili",
         "certbot",
         "certonly",
         "Chml",

@@ -4,9 +4,13 @@
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Optional
 from urllib.parse import urlparse
+
+_URL_RE = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
+_URL_TRAILING = "，。、,.;:!?）)】」』\"'"
 
 
 @dataclass(frozen=True)
@@ -24,6 +28,14 @@ SITES: tuple[VideoSite, ...] = (
 
 def list_sites() -> list[dict]:
     return [{"id": site.id, "label": site.label, "hosts": list(site.hosts)} for site in SITES]
+
+
+def extract_url(text: str) -> str:
+    """从分享文案里取出第一个 http(s) 链接。已经是纯链接时原样返回。"""
+    match = _URL_RE.search(text or "")
+    if not match:
+        return ""
+    return match.group(0).rstrip(_URL_TRAILING)
 
 
 def site_host(url: str) -> str:

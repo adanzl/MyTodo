@@ -24,7 +24,7 @@ from core.config import (
 )
 from core.services.base_task_mgr import BaseTaskMgr, FileInfo, TaskBase
 from core.services.tools.video_dump_auth import cookies_file_for_url
-from core.services.tools.video_dump_sites import match_site
+from core.services.tools.video_dump_sites import extract_url, match_site
 from core.services.tools.video_dump_text import cues_to_text, pick_subtitle
 from core.subtitles.whisper_client import WhisperError, transcribe_to_sidecar_sync
 from core.utils import ensure_directory, get_file_info, run_subprocess_safe
@@ -103,9 +103,12 @@ class VideoDumpMgr(BaseTaskMgr[VideoDumpTask]):
 
     def submit_url(self, url: str) -> Tuple[int, str, Optional[str]]:
         """创建任务并开始下载、提取。同一时间只跑一个任务。"""
-        raw = (url or "").strip()
-        if not raw.startswith(("http://", "https://")):
-            return -1, "请输入 http 或 https 链接", None
+        text = (url or "").strip()
+        if len(text) > 8000:
+            return -1, "内容过长", None
+        raw = extract_url(text)
+        if not raw:
+            return -1, "没有找到 http 或 https 链接", None
         if len(raw) > 2000:
             return -1, "链接过长", None
 

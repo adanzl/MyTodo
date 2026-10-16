@@ -55,7 +55,7 @@
             <div class="shrink-0">
                 <div class="flex items-center gap-2">
                     <el-input ref="urlInputRef" v-model="sourceUrl" clearable class="flex-1 min-w-0"
-                        placeholder="粘贴视频链接，回车开始" @keyup.enter="handleExtract" />
+                        placeholder="粘贴视频链接或分享文案，回车开始" @keyup.enter="handleExtract" />
                     <el-button plain :disabled="submitting" @click="openLogin">登录</el-button>
                     <el-button type="primary" :loading="submitting" :disabled="!canSubmit" @click="handleExtract">
                         提取
@@ -278,16 +278,23 @@ const qrPoll = { bilibili: pollBilibiliQr, douyin: pollDouyinQr };
 const siteLabels = computed(() => sites.value.map((site) => site.label).join("、"));
 const hasProcessing = computed(() => taskList.value.some((task) => task.status === "processing"));
 
+const extractUrl = (text: string) => {
+    const match = text.match(/https?:\/\/[^\s<>"']+/i);
+    if (!match) return "";
+    return match[0].replace(/[，。、,.;:!?）)】」』"']+$/u, "");
+};
+
 const urlHint = computed(() => {
     const raw = sourceUrl.value.trim();
     const busy = hasProcessing.value ? "有任务正在处理，完成后再提交。" : "";
     if (!raw) {
-        return { site: null as VideoDumpSite | null, text: `${busy}支持${siteLabels.value}。其他链接也会尝试下载。` };
+        return { site: null as VideoDumpSite | null, text: `${busy}支持${siteLabels.value}。可以粘贴分享文案。` };
     }
-    if (!/^https?:\/\//i.test(raw)) {
-        return { site: null, text: "请粘贴以 http 或 https 开头的链接" };
+    const url = extractUrl(raw);
+    if (!url) {
+        return { site: null, text: "没有找到链接" };
     }
-    const site = matchSite(raw);
+    const site = matchSite(url);
     if (site?.id === "bilibili" && !loginReady("bilibili")) {
         return { site, text: busy || "未登录。点登录，用 App 扫码后才能稳定拿到平台字幕" };
     }
@@ -299,8 +306,7 @@ const urlHint = computed(() => {
 });
 
 const canSubmit = computed(() => {
-    const raw = sourceUrl.value.trim();
-    return /^https?:\/\//i.test(raw) && !hasProcessing.value;
+    return !!extractUrl(sourceUrl.value.trim()) && !hasProcessing.value;
 });
 const hasClearableTasks = computed(() => taskList.value.some((task) => task.status !== "processing"));
 const subtitleSourceLabel = computed(() => SUBTITLE_SOURCE[currentTask.value?.subtitle_source || ""] || "");
@@ -519,8 +525,8 @@ const handleViewTask = async (taskId: string) => {
 };
 
 const handleExtract = async () => {
-    const url = sourceUrl.value.trim();
-    if (!/^https?:\/\//i.test(url) || submitting.value) return;
+    const url = extractUrl(sourceUrl.value.trim());
+    if (!url || submitting.value) return;
     if (hasProcessing.value) {
         ElMessage.warning("已有任务正在处理");
         return;
