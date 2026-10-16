@@ -51,6 +51,12 @@
             <div v-else class="flex-1 flex items-center justify-center text-sm text-gray-400 min-h-100">
                 暂无任务，请点击"新建"创建
             </div>
+            <div class="shrink-0 border-t mt-2 pt-2">
+                <el-button type="danger" plain class="w-full" :disabled="!hasClearableTasks || loading"
+                    @click="handleClearAllTasks">
+                    清空
+                </el-button>
+            </div>
         </div>
 
         <!-- 右侧：文件信息 + 预览 -->
@@ -138,35 +144,35 @@
                 <div class="flex items-center justify-between shrink-0 mb-2 h-4">
                     <div class="flex items-center gap-0">
                         <span class="text-sm font-semibold mr-4">PDF 预览</span>
-                        <el-button type="success" size="small" plain class="!h-5 !text-xs !px-2 shrink-0"
+                        <el-button type="success" size="small" plain class="h-5! text-xs! px-2! shrink-0"
                             @click="handlePreview(currentTask)" :disabled="!currentTask.uploaded_info || previewLoading"
-                            :class="previewMode === 'single' ? '' : '!text-gray-400 !border-gray-300'">
+                            :class="previewMode === 'single' ? '' : 'text-gray-400! border-gray-300!'">
                             {{ previewPages.length > 0 ? "刷新" : "预览" }}
                         </el-button>
                         <el-button v-if="!currentTask.is_saddle_stitch" type="warning" size="small" plain
-                            class="!h-5 !text-xs !px-2 shrink-0"
+                            class="h-5! text-xs! px-2! shrink-0"
                             @click="handleSaddleStitchPreview(currentTask)"
                             :disabled="!currentTask.uploaded_info || previewLoading"
-                            :class="previewMode === 'saddle-stitch' ? '' : '!text-gray-400 !border-gray-300'">
+                            :class="previewMode === 'saddle-stitch' ? '' : 'text-gray-400! border-gray-300!'">
                             骑缝排版
                         </el-button>
-                        <el-button type="primary" size="small" plain class="!h-5 !text-xs !px-2 shrink-0"
+                        <el-button type="primary" size="small" plain class="h-5! text-xs! px-2! shrink-0"
                             @click="handleBoundPreview(currentTask)"
                             :disabled="!currentTask.uploaded_info || previewLoading"
-                            :class="previewMode === 'bound' ? '' : '!text-gray-400 !border-gray-300'">
+                            :class="previewMode === 'bound' ? '' : 'text-gray-400! border-gray-300!'">
                             骑缝预览
                         </el-button>
                         <div v-if="!currentTask.is_saddle_stitch && (previewMode === 'saddle-stitch' || previewMode === 'bound') && fillConfigs.length > 0"
                             class="flex items-center gap-1">
                             <span class="text-xs text-gray-500 ml-1">填充:</span>
                             <el-input-number v-for="(_, i) in fillConfigs" :key="i" v-model="fillConfigs[i]"
-                                size="small" class="!w-16" :min="1" :max="originalTotalPages + 1"
+                                size="small" class="w-16!" :min="1" :max="originalTotalPages + 1"
                                 controls-position="right" />
-                            <el-button size="small" type="primary" plain class="!h-5 !text-xs !px-2"
+                            <el-button size="small" type="primary" plain class="h-5! text-xs! px-2!"
                                 @click="updateSaddleStitchPreview">
                                 更新
                             </el-button>
-                            <el-button type="success" size="small" plain class="!h-5 !text-xs !px-2"
+                            <el-button type="success" size="small" plain class="h-5! text-xs! px-2!"
                                 @click="handleDownloadLayout">
                                 生成
                             </el-button>
@@ -175,14 +181,14 @@
                     <!-- 单页导航 -->
                     <div v-if="previewMode === 'single' && previewPages.length > 0" class="flex items-center gap-2">
                         <el-button size="small" circle :disabled="previewCurrentPage <= 1" @click="handlePrevPage"
-                            class="!w-6 !h-6 !p-0">
+                            class="w-6! h-6! p-0!">
                             <el-icon>
                                 <ArrowLeft />
                             </el-icon>
                         </el-button>
                         <span class="text-xs">{{ previewCurrentPage }} / {{ previewPages.length }}</span>
                         <el-button size="small" circle :disabled="previewCurrentPage >= previewPages.length"
-                            @click="handleNextPage" class="!w-6 !h-6 !p-0">
+                            @click="handleNextPage" class="w-6! h-6! p-0!">
                             <el-icon>
                                 <ArrowRight />
                             </el-icon>
@@ -192,14 +198,14 @@
                     <div v-else-if="previewMode === 'saddle-stitch' && spreadPages.length > 0"
                         class="flex items-center gap-2">
                         <el-button size="small" circle :disabled="spreadCurrentPage <= 1" @click="handlePrevPage"
-                            class="!w-6 !h-6 !p-0">
+                            class="w-6! h-6! p-0!">
                             <el-icon>
                                 <ArrowLeft />
                             </el-icon>
                         </el-button>
                         <span class="text-xs">{{ spreadCurrentPage }} / {{ spreadPages.length }}</span>
                         <el-button size="small" circle :disabled="spreadCurrentPage >= spreadPages.length"
-                            @click="handleNextPage" class="!w-6 !h-6 !p-0">
+                            @click="handleNextPage" class="w-6! h-6! p-0!">
                             <el-icon>
                                 <ArrowRight />
                             </el-icon>
@@ -208,14 +214,14 @@
                     <!-- 装订导航 -->
                     <div v-else-if="previewMode === 'bound' && boundPages.length > 0" class="flex items-center gap-2">
                         <el-button size="small" circle :disabled="spreadCurrentPage <= 1" @click="handlePrevPage"
-                            class="!w-6 !h-6 !p-0">
+                            class="w-6! h-6! p-0!">
                             <el-icon>
                                 <ArrowLeft />
                             </el-icon>
                         </el-button>
                         <span class="text-xs">{{ spreadCurrentPage }} / {{ boundPages.length }}</span>
                         <el-button size="small" circle :disabled="spreadCurrentPage >= boundPages.length"
-                            @click="handleNextPage" class="!w-6 !h-6 !p-0">
+                            @click="handleNextPage" class="w-6! h-6! p-0!">
                             <el-icon>
                                 <ArrowRight />
                             </el-icon>
@@ -248,7 +254,7 @@
                                         <img v-else-if="flipUnderlayLeft.leftImage" :src="flipUnderlayLeft.leftImage"
                                             class="max-w-full max-h-full object-contain" />
                                     </div>
-                                    <div class="flip-page flip-page-left relative z-[1] max-h-full max-w-full"
+                                    <div class="flip-page flip-page-left relative z-1 max-h-full max-w-full"
                                         :class="leftPageAnimeClass">
                                         <div class="flip-page-inner relative">
                                             <div class="flip-face flip-face-front">
@@ -282,7 +288,7 @@
                                         <img v-else-if="flipUnderlayRight.rightImage" :src="flipUnderlayRight.rightImage"
                                             class="max-w-full max-h-full object-contain" />
                                     </div>
-                                    <div class="flip-page flip-page-right relative z-[1] max-h-full max-w-full"
+                                    <div class="flip-page flip-page-right relative z-1 max-h-full max-w-full"
                                         :class="rightPageAnimeClass">
                                         <div class="flip-page-inner relative">
                                             <div class="flip-face flip-face-front">
@@ -326,7 +332,7 @@
                                         <span v-if="flipUnderlayLeft.leftPageNum === 0"
                                             class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
                                     </div>
-                                    <div class="flip-page flip-page-left relative z-[1] max-h-full max-w-full"
+                                    <div class="flip-page flip-page-left relative z-1 max-h-full max-w-full"
                                         :class="leftPageAnimeClass">
                                         <div class="flip-page-inner relative">
                                             <div class="flip-face flip-face-front">
@@ -367,7 +373,7 @@
                                         <span v-if="flipUnderlayRight.rightPageNum === 0"
                                             class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
                                     </div>
-                                    <div class="flip-page flip-page-right relative z-[1] max-h-full max-w-full"
+                                    <div class="flip-page flip-page-right relative z-1 max-h-full max-w-full"
                                         :class="rightPageAnimeClass">
                                         <div class="flip-page-inner relative">
                                             <div class="flip-face flip-face-front">
@@ -414,7 +420,7 @@
                                         <img v-else :src="flipUnderlayLeft.leftImage"
                                             class="max-w-full max-h-full object-contain" />
                                     </div>
-                                    <div class="flip-page flip-page-left relative z-[1] max-h-full max-w-full"
+                                    <div class="flip-page flip-page-left relative z-1 max-h-full max-w-full"
                                         :class="leftPageAnimeClass">
                                         <div class="flip-page-inner relative">
                                             <div class="flip-face flip-face-front">
@@ -463,7 +469,7 @@
                                         <img v-else :src="flipUnderlayRight.rightImage"
                                             class="max-w-full max-h-full object-contain" />
                                     </div>
-                                    <div class="flip-page flip-page-right relative z-[1] max-h-full max-w-full"
+                                    <div class="flip-page flip-page-right relative z-1 max-h-full max-w-full"
                                         :class="rightPageAnimeClass">
                                         <div class="flip-page-inner relative">
                                             <div class="flip-face flip-face-front">
@@ -743,6 +749,10 @@ const withLoading = async (action: () => Promise<void>, errorMessage: string) =>
     }
 };
 
+const hasClearableTasks = computed(() =>
+    taskList.value.some((task) => task.status !== "processing")
+);
+
 // 计算属性
 // 是否有可翻页的预览内容
 const hasPreviewContent = computed(() => {
@@ -1012,6 +1022,40 @@ const handleUploadConfirm = async () => {
             throw err;
         }
     }, "文件上传失败");
+};
+
+// 清空全部可删除任务（处理中的任务后端不允许删除）
+const handleClearAllTasks = async () => {
+    const deletable = taskList.value.filter((task) => task.status !== "processing");
+    if (!deletable.length) return;
+    const skipped = taskList.value.length - deletable.length;
+    const message = skipped
+        ? `将删除 ${deletable.length} 个任务，${skipped} 个处理中的任务会保留。确定清空吗？`
+        : "确定要清空所有任务吗？";
+    if (!(await confirmAction(message, "清空任务"))) return;
+
+    await withLoading(async () => {
+        const response = await deletePdfLayout(undefined, true);
+        if (response.code !== 0) {
+            ElMessage.error(response.msg || "清空任务失败");
+            return;
+        }
+        const failed = response.data?.failed ?? 0;
+        const deleted = response.data?.deleted ?? deletable.length;
+        const kept = response.data?.skipped ?? skipped;
+        taskList.value = ((await getPdfLayoutList()).data as PdfLayoutTask[]) || [];
+        const stillCurrent = currentTask.value
+            && taskList.value.some((task) => task.task_id === currentTask.value?.task_id);
+        if (!stillCurrent) {
+            if (taskList.value.length) await syncTask(taskList.value[0].task_id);
+            else currentTask.value = null;
+        }
+        if (failed) {
+            ElMessage.warning(`${failed} 个任务删除失败`);
+        } else {
+            ElMessage.success(kept ? `已清空 ${deleted} 个任务` : "已清空全部任务");
+        }
+    }, "清空任务失败");
 };
 
 // 删除任务

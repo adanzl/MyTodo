@@ -35,8 +35,10 @@
         "opentype",
         "Pydantic",
         "pytest",
+        "readerwriterlock",
         "redisinsight",
         "rocm",
+        "rwlock",
         "selfsigned",
         "setuptools",
         "socketio",
@@ -45,6 +47,7 @@
         "venv",
         "werkzeug",
         "wifispeaker",
+        "wlock",
         "wsgi"
     ],
     "ignoreRegExpList": [

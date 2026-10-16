@@ -27,7 +27,8 @@ class _PdfLayoutProcessBody(BaseModel):
 
 
 class _PdfLayoutDeleteBody(BaseModel):
-    task_id: str
+    task_id: Optional[str] = None
+    clear_all: bool = False
 
 
 class _PdfLayoutUpdateBody(BaseModel):
@@ -149,6 +150,15 @@ def pdf_layout_delete() -> ResponseReturnValue:
             _PdfLayoutDeleteBody, data, err_factory=_err)
         if err or not body:
             return err or _err("Invalid request body")
+
+        if body.clear_all:
+            code, msg, stats = pdf_layout_mgr.clear_tasks()
+            if code != 0:
+                return _err(msg, stats)
+            return _ok({"message": msg, **stats})
+
+        if not body.task_id:
+            return _err("task_id 不能为空")
 
         code, msg = pdf_layout_mgr.delete_task(body.task_id)
         if code != 0:

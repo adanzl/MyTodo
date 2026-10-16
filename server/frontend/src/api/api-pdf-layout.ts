@@ -80,12 +80,15 @@ export function getPdfLayoutDownloadUrl(filename: string, type: "uploaded" | "ou
 }
 
 /**
- * 删除 PDF 排版任务
+ * 删除 PDF 排版任务。clear_all 为 true 时一次清空全部可删除任务。
  */
-export async function deletePdfLayout(task_id: string): Promise<ApiResponse<{ message: string }>> {
-  const response = await api.post<ApiResponse<{ message: string }>>("/pdf_layout/delete", {
-    task_id,
-  });
+export async function deletePdfLayout(
+  task_id?: string,
+  clear_all = false
+): Promise<ApiResponse<{ message: string; deleted?: number; skipped?: number; failed?: number }>> {
+  const response = await api.post<
+    ApiResponse<{ message: string; deleted?: number; skipped?: number; failed?: number }>
+  >("/pdf_layout/delete", clear_all ? { clear_all: true } : { task_id });
   return response.data;
 }
 

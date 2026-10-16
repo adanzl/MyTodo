@@ -222,6 +222,40 @@ class BaseTaskMgr(ABC, Generic[TTask]):
 
         return 0, '任务删除成功'
 
+    def clear_tasks(self) -> Tuple[int, str, Dict[str, int]]:
+        """一次删除全部非处理中任务，只写一次任务存档。"""
+        deleted_ids: List[str] = []
+        skipped = 0
+        failed = 0
+        with self._task_lock.gen_wlock():
+            for task_id, task in list(self._tasks.items()):
+                if task.status == TASK_STATUS_PROCESSING:
+                    if self._should_request_stop_before_delete(task):
+                        self._stop_flags[task_id] = True
+                    skipped += 1
+                    continue
+                try:
+                    self._before_delete_task(task)
+                except Exception as e:
+                    log.error(f"[BaseTaskMgr] 清空前清理失败 {task_id}: {e}")
+                    failed += 1
+                    continue
+                del self._tasks[task_id]
+                deleted_ids.append(task_id)
+            if deleted_ids:
+                self._save_all_tasks()
+
+        for task_id in deleted_ids:
+            try:
+                self._after_delete_task(task_id)
+            except Exception as e:
+                log.error(f"[BaseTaskMgr] 清空后清理失败 {task_id}: {e}")
+
+        stats = {"deleted": len(deleted_ids), "skipped": skipped, "failed": failed}
+        if failed and not deleted_ids:
+            return -1, "清空失败", stats
+        return 0, "已清空全部任务", stats
+
     def _before_create_task(self, task: TTask) -> None:
         """Hook for subclasses to perform actions before task creation."""
         pass
