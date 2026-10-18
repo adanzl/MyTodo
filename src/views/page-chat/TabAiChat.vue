@@ -139,7 +139,7 @@ import { Icon } from "@iconify/vue";
 import ImagePreview from "@/components/ImagePreview.vue";
 import { useImagePreview } from "./use-image-preview";
 import { volumeMediumOutline } from "ionicons/icons";
-import { ref, watch } from "vue";
+import { nextTick, ref, watch } from "vue";
 import EventBus, { C_EVENT } from "@/types/event-bus";
 import { getAiChatMessages } from "@/api/api-chat";
 import { getPicDisplayUrl } from "@/api/api-pic";
@@ -166,6 +166,11 @@ import {
 } from "@/views/page-chat/ai-chat-reply";
 import type { ChatMsg } from "@/views/page-chat/ai-chat-types";
 import { getNetworkErrorMessage } from "@/utils/net-util";
+import {
+  captureScrollAnchor,
+  getContentScrollElement,
+  restoreScrollAnchor,
+} from "@/views/page-chat/scroll-anchor";
 import type { RefresherCustomEvent } from "@ionic/vue";
 
 export type { ChatMsg, ChatMsgStatus } from "@/views/page-chat/ai-chat-types";
@@ -398,6 +403,10 @@ async function doRefresh(e: RefresherCustomEvent) {
     return;
   }
   networkError.value = false;
+  // 先量好当前滚动位置：下面的 prepend 会让列表在顶部变高，不补偿 scrollTop 的话
+  // 视口内容会整体上移（看起来像「拉一下、跳到最上面」）。
+  const scrollEl = await getContentScrollElement(contentRef.value);
+  const anchor = messages.value.length > 0 ? captureScrollAnchor(scrollEl) : null;
   let cursor = initialCursor();
   try {
     for (let page = 0; page < AI_HISTORY_MAX_PAGES; page++) {
@@ -423,6 +432,9 @@ async function doRefresh(e: RefresherCustomEvent) {
     networkError.value = true;
     EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
   } finally {
+    // 等列表渲染完再补偿：新消息已插到顶部，视口停在原处、新内容在它上方展开。
+    await nextTick();
+    restoreScrollAnchor(scrollEl, anchor);
     e.target.complete();
   }
 }

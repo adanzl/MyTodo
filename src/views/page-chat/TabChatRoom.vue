@@ -69,7 +69,7 @@ import {
   IonRefresherContent,
   IonSegmentContent,
 } from "@ionic/vue";
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import EventBus, { C_EVENT } from "@/types/event-bus";
 import { getChatMessages } from "@/api/api-chat";
 import { getPicDisplayUrl } from "@/api/api-pic";
@@ -77,6 +77,11 @@ import { imageFilenamesFromFiles } from "@/views/page-chat/ai-chat-history";
 import { getNetworkErrorMessage } from "@/utils/net-util";
 import ImagePreview from "@/components/ImagePreview.vue";
 import { useImagePreview } from "./use-image-preview";
+import {
+  captureScrollAnchor,
+  getContentScrollElement,
+  restoreScrollAnchor,
+} from "@/views/page-chat/scroll-anchor";
 import type { RefresherCustomEvent } from "@ionic/vue";
 
 export interface ChatMsg {
@@ -157,6 +162,10 @@ async function onRefresh(e: RefresherCustomEvent) {
     return;
   }
   networkError.value = false;
+  // 先量好当前滚动位置：下面往列表顶部插消息会让内容变高，不补偿 scrollTop 的话
+  // 视口内容会整体上移（看起来像「拉一下、跳到最上面」）。
+  const scrollEl = await getContentScrollElement(contentRef.value);
+  const anchor = messages.value.length > 0 ? captureScrollAnchor(scrollEl) : null;
   const firstId = messages.value.length + 1;
   try {
     const data: any = await getChatMessages(props.chatRoomId, -firstId, 3);
@@ -177,6 +186,9 @@ async function onRefresh(e: RefresherCustomEvent) {
     networkError.value = true;
     EventBus.$emit(C_EVENT.TOAST, getNetworkErrorMessage(err));
   } finally {
+    // 等列表渲染完再补偿：视口停在原处，更早的消息在它上方展开。
+    await nextTick();
+    restoreScrollAnchor(scrollEl, anchor);
     e.target.complete();
   }
 }
