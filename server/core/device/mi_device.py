@@ -8,6 +8,7 @@ from core.tools.useragent_fix import patch_fake_useragent
 patch_fake_useragent()
 
 import asyncio
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -15,6 +16,7 @@ from typing import Dict, List, Optional, Tuple, Any
 
 from aiohttp import ClientSession
 from miservice import MiAccount, MiNAService
+from miservice.miaccount import get_random
 from miservice.miiocommand import miio_command, MiIOService
 
 
@@ -83,6 +85,59 @@ async def _patched_mi_request(self, sid, url, data, headers, relogin=True):
 
 MiAccount.mi_request = _patched_mi_request
 
+
+# Monkey-patch: 登录失败时不要删除 token 文件，且 userId/passToken 允许缺失
+#
+# miservice 原始 login() 的异常分支会执行 `self.token_store.save_token()`（无参），
+# 而 MiTokenStore.save_token(None) 的行为是 os.remove(token_path)，
+# 即一次网络抖动或风控校验（securityStatus=16）就会把唯一的凭据文件删掉。
+# 小米密码登录已普遍返回 70016（登录验证失败），passToken 是当前唯一可用通道，
+# 删文件等于把自己彻底锁在门外，因此这里改为保留原文件内容。
+#
+# 另外 serviceLoginAuth2 的成功响应并不总带 passToken/userId（同一 MiAccount
+# 实例连续登录两个 sid 时第二次就缺 passToken），原始代码的 resp["passToken"]
+# 会抛 KeyError 并连带触发上面的删文件逻辑，这里改为按需写入。
+async def _patched_login(self, sid):
+    original_token = dict(self.token) if isinstance(self.token, dict) else None
+    if not self.token:
+        self.token = {"deviceId": get_random(16).upper()}
+    try:
+        resp = await self._serviceLogin(f"serviceLogin?sid={sid}&_json=true")
+        if resp["code"] != 0:
+            data = {
+                "_json": "true",
+                "qs": resp["qs"],
+                "sid": resp["sid"],
+                "_sign": resp["_sign"],
+                "callback": resp["callback"],
+                "user": self.username,
+                "hash": hashlib.md5(self.password.encode()).hexdigest().upper(),
+            }
+            resp = await self._serviceLogin("serviceLoginAuth2", data)
+            if resp["code"] != 0:
+                raise Exception(resp)
+
+        if resp.get("userId") is not None:
+            self.token["userId"] = resp["userId"]
+        if resp.get("passToken"):
+            self.token["passToken"] = resp["passToken"]
+
+        serviceToken = await self._securityTokenService(
+            resp["location"], resp["nonce"], resp["ssecurity"])
+        self.token[sid] = (resp["ssecurity"], serviceToken)
+        if self.token_store:
+            self.token_store.save_token(self.token)
+        return True
+
+    except Exception as e:
+        # 只在内存里回滚，绝不删除 token 文件
+        self.token = original_token
+        _mi_logger.exception("Exception on login %s: %s", self.username, e)
+        return False
+
+
+MiAccount.login = _patched_login
+
 from core.config import app_logger, config
 from core.tools.async_util import run_async
 from core.utils import convert_to_http_url, format_time_str
@@ -132,6 +187,78 @@ async def _get_device_did_async(username: str, password: str,
         if session:
             await session.close()
     return -1, "设备未找到"
+
+
+# ========== miot 文字播报（siid=5）==========
+#
+# 背景：ubus 的 `mibrain.text_to_speech` 在新固件（L05C / X08A 等）会被设备静默丢弃，
+# 但接口仍返回 code=0 的转发成功回执，无法据此判断是否真的出声。
+# 实测可用的替代通道是 miot 动作 `Intelligent Speaker → Play Text`。
+#
+# 坑：Play Text 的 aiid 在不同型号上不一致（同一份 siid=5 里动作顺序不同）：
+#   xiaomi.wifispeaker.l05c → aiid=3
+#   xiaomi.wifispeaker.x08a → aiid=1
+#   xiaomi.wifispeaker.lx06 → aiid=1
+# 在 L05C 上错发 aiid=1 会命中 `Wake Up`，返回 -704220025。
+# 因此 aiid 必须按型号解析，不能写死。
+MIOT_INTELLIGENT_SPEAKER_SIID = 5
+MIOT_PLAY_TEXT_ACTION_NAME = "Play Text"
+
+# 已实测的型号 → aiid。未命中时会回落到 miot-spec 查询。
+MIOT_PLAY_TEXT_AIID = {
+    "xiaomi.wifispeaker.l05c": 3,
+    "xiaomi.wifispeaker.x08a": 1,
+    "xiaomi.wifispeaker.lx06": 1,
+}
+
+# 型号 → 设备型号字符串（来自 MIoT Device Information 的 Device Model 属性）
+MIOT_PROP_DEVICE_MODEL = (1, 2)
+
+
+async def _resolve_play_text_aiid(service: MiIOService,
+                                  model: str) -> Optional[int]:
+    """解析指定型号的 `Play Text` 动作 aiid。
+
+    先查实测缓存表，未命中则查 miot-spec（miservice 内部对 spec 有本地文件缓存）。
+    解析结果回填到 MIOT_PLAY_TEXT_AIID，避免重复请求。
+
+    Args:
+        service: MiIOService 实例。
+        model: 设备型号，如 `xiaomi.wifispeaker.l05c`。
+
+    Returns:
+        Optional[int]: 成功返回 aiid；型号不认识时返回 None。
+    """
+    if model in MIOT_PLAY_TEXT_AIID:
+        return MIOT_PLAY_TEXT_AIID[model]
+
+    try:
+        spec = await service.miot_spec(model, "json")
+    except Exception as e:
+        log.error(f"[MiDevice] Fetch spec for {model} error: {e}")
+        return None
+
+    try:
+        spec_dict = json.loads(spec) if isinstance(spec, str) else spec
+    except Exception as e:
+        log.error(f"[MiDevice] Parse spec for {model} error: {e}")
+        return None
+
+    for service_node in (spec_dict or {}).get("services") or []:
+        if service_node.get("iid") != MIOT_INTELLIGENT_SPEAKER_SIID:
+            continue
+        for action in service_node.get("actions") or []:
+            if action.get("description") == MIOT_PLAY_TEXT_ACTION_NAME:
+                aiid = action.get("iid")
+                if aiid is None:
+                    continue
+                MIOT_PLAY_TEXT_AIID[model] = int(aiid)
+                log.info(
+                    f"[MiDevice] Resolved Play Text aiid for {model}: {aiid}")
+                return int(aiid)
+
+    log.error(f"[MiDevice] Play Text action not found in spec of {model}")
+    return None
 
 
 class MiDevice(DeviceBase):
@@ -280,49 +407,131 @@ class MiDevice(DeviceBase):
             log.error(f"[MiDevice] Play error: {e}")
             return -1, f"播放失败: {str(e)}"
 
+    async def _login_xiaomiio(
+            self, force_refresh: bool = False
+    ) -> Tuple[Optional[MiAccount], Optional[ClientSession], str]:
+        """准备一个可用的 xiaomiio 账号（miot 通道凭据）。
+
+        miot 动作走 api.io.mi.com，需要 `xiaomiio` 的 serviceToken，它与
+        `micoapi` 的 token 相互独立。实测约束：
+
+        - token 文件里已有的 `xiaomiio` serviceToken 可以直接用，不必重新登录；
+        - 主动 `login("xiaomiio")` 反而经常失败：`serviceLogin` 返回 70016，
+          走密码通道后 `serviceLoginAuth2` 虽 code=0 但带 `securityStatus: 16`
+          且响应里没有 `nonce`/`ssecurity`，触发 `KeyError: 'nonce'`；
+        - 只有 token 文件里缺 `xiaomiio`（或服务端已判定过期）时才需要先刷
+          `micoapi` 的 passToken，再换新 session 登 `xiaomiio`
+          （同一 MiAccount 实例连续登两个 sid 会失败）。
+
+        Args:
+            force_refresh (bool): 为 True 时跳过缓存，强制刷新凭据。
+                调用方在收到 `Login failed` 后用它做一次重试。
+
+        Returns:
+            Tuple[MiAccount|None, ClientSession|None, str]:
+                (账号, 需要调用方关闭的 session, 错误信息)。
+        """
+        # 快路径：直接复用 token 文件里的 xiaomiio serviceToken
+        if not force_refresh:
+            session = ClientSession()
+            account = self._create_account(session)
+            if account.token and "xiaomiio" in account.token:
+                return account, session, ""
+            await session.close()
+
+        # 慢路径：先刷 micoapi 的 passToken（会落盘），再另开实例登 xiaomiio
+        session = ClientSession()
+        try:
+            refresh_account = self._create_account(session)
+            if not await refresh_account.login("micoapi"):
+                return None, None, "登录验证失败，请检查账号密码是否正确"
+        except Exception as e:
+            log.error(f"[MiDevice] Speak: micoapi refresh error: {e}")
+            return None, None, f"刷新凭据失败: {str(e)}"
+        finally:
+            await session.close()
+
+        session = ClientSession()
+        try:
+            account = self._create_account(session)
+            if await account.login("xiaomiio"):
+                return account, session, ""
+        except Exception as e:
+            log.error(f"[MiDevice] Speak: xiaomiio login error: {e}")
+        await session.close()
+        return None, None, "miot 通道登录失败，请重新获取 ~/.mi.token"
+
     def speak(self, text: str) -> Tuple[int, str]:
         """让小爱音箱播报指定文字。
+
+        走 miot 动作通道（`Intelligent Speaker → Play Text`）。不用 ubus 的
+        `mibrain.text_to_speech`，因为后者在新固件上会被设备静默丢弃，接口却
+        仍返回转发成功，无法据此判断是否真的出声。
+
+        token 里的 `xiaomiio` serviceToken 会过期，届时 miot 请求返回
+        `Login failed`；这种情况下强制刷新一次凭据再重试，避免必须重启进程。
 
         Args:
             text (str): 要播报的文本。
 
         Returns:
-            Tuple[int, str]: (code, msg)。code=0 表示成功。
+            Tuple[int, str]: (code, msg)。code=0 表示设备已接受播报请求。
         """
         text = (text or "").strip()
         if not text:
             return -1, "text is required"
 
-        async def _speak_async():
-            session = None
-            try:
-                session = ClientSession()
-                account = self._create_account(session)
-                mina_service = MiNAService(account)
-                await mina_service.text_to_speech(self.device_id, text)
-                return 0, "ok"
-            except Exception as e:
-                import gevent
-                if isinstance(e, gevent.exceptions.LoopExit):
-                    log.warning(
-                        f"[MiDevice] Speak: gevent LoopExit (可忽略), 重试播报")
-                    try:
-                        await mina_service.text_to_speech(self.device_id, text)
-                        return 0, "ok"
-                    except Exception as e2:
-                        log.error(f"[MiDevice] Speak retry error: {e2}")
-                        return -1, f"播报失败: {str(e2)}"
+        async def _attempt(force_refresh: bool) -> Tuple[int, str]:
+            account, session, err = await self._login_xiaomiio(force_refresh)
+            if account is None:
+                return -1, err
 
+            try:
+                service = MiIOService(account)
+
+                # 解析型号 → Play Text aiid（各型号动作顺序不同，不能写死）
+                configs = await service.miot_get_props(
+                    self.device_did, [MIOT_PROP_DEVICE_MODEL])
+                model = configs[0] if configs else None
+                if not model:
+                    return -1, "无法获取设备型号"
+
+                aiid = await _resolve_play_text_aiid(service, model)
+                if aiid is None:
+                    return -1, f"型号 {model} 不支持文字播报"
+
+                code = await service.miot_action(self.device_did,
+                                                 [MIOT_INTELLIGENT_SPEAKER_SIID, aiid],
+                                                 [text])
+                if code != 0:
+                    log.error(
+                        f"[MiDevice] Speak action failed: code={code}, model={model}, aiid={aiid}"
+                    )
+                    return -1, f"播报失败: miot 返回 {code}"
+
+                log.info(
+                    f"[MiDevice] Speak ok: model={model}, aiid={aiid}, text={text[:20]}"
+                )
+                return 0, "播报成功"
+            except Exception as e:
                 error_str = str(e)
                 if "Login failed" in error_str or "登录验证失败" in error_str or "70016" in error_str:
+                    # code=-2 表示「凭据可能只是过期」，调用方可强制刷新后重试
                     log.error(f"[MiDevice] 登录验证失败，请检查账号密码是否正确: {e}")
-                    return -1, "登录验证失败，请检查账号密码是否正确"
-
+                    return -2, "登录验证失败，请检查账号密码是否正确"
                 log.error(f"[MiDevice] Speak error: {e}")
                 return -1, f"播报失败: {str(e)}"
             finally:
-                if session:
-                    await session.close()
+                await session.close()
+
+        async def _speak_async() -> Tuple[int, str]:
+            code, msg = await _attempt(force_refresh=False)
+            if code in (0, -1):
+                return code, msg
+
+            # 缓存的 xiaomiio serviceToken 过期：强制刷新一次再重试
+            log.warning("[MiDevice] Speak: xiaomiio token 可能已失效，强制刷新后重试")
+            return await _attempt(force_refresh=True)
 
         try:
             return run_async(_speak_async(), timeout=20.0)
