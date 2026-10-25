@@ -97,8 +97,23 @@ export default defineConfig({
       registerType: "prompt",
       injectRegister: "auto",
       workbox: {
-        navigateFallback: "index.html",
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        // 入口 HTML 不进 precache，也不接管导航请求：
+        // 否则 NavigationRoute 永远用缓存里的旧 index.html 响应，nginx 的 no-store 形同失效，
+        // 新构建的 hash 资源永远拉不到，只能手动清缓存。
+        // 带 hash 的 js/css 仍走 immutable 长期缓存，刷新即拿最新 HTML + 新 hash 资源。
+        globPatterns: ["**/*.{js,css,ico,png,svg,woff2}"],
+        navigateFallback: null,
+        // 导航请求：先走网络拿最新 HTML（3s 超时才落缓存），断网时仍可用上次的 HTML
+        runtimeCaching: [
+          {
+            urlPattern: ({ request }) => request.mode === "navigate",
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "html-navigation",
+              networkTimeoutSeconds: 3,
+            },
+          },
+        ],
       },
       manifest: {
         name: "MyTodo",
