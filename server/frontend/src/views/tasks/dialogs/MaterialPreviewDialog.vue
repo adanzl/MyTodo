@@ -146,7 +146,7 @@
           <el-button
             circle
             :disabled="linkedAudios.length === 0"
-            class="h-14 w-14 border-none! bg-blue-500! hover:bg-blue-400! disabled:cursor-not-allowed! disabled:opacity-50"
+            class="h-14 w-14 border-none! bg-blue-500! hover:brightness-110 disabled:cursor-not-allowed! disabled:opacity-50"
             @click="togglePlayAll"
           >
             <el-icon :size="40" class="text-white!">

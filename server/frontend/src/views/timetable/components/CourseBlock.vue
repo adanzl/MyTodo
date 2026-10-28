@@ -17,7 +17,7 @@
     <div class="text-center p-2">
       <div
         v-if="showName"
-        class="font-medium whitespace-pre-line leading-tight"
+        class="font-medium whitespace-pre-line leading-tight text-gray-900"
         :class="{
           'text-xs': course.duration <= 30,
           'text-sm': course.duration > 30,
