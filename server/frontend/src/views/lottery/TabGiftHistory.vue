@@ -183,7 +183,7 @@ const giftDialogData = ref<GiftDetail | null>(null);
 
 const calculateTableHeight = () => {
   nextTick(() => {
-    tableMaxHeight.value = window.innerHeight - 400;
+    tableMaxHeight.value = window.innerHeight - 300;
   });
 };
 

@@ -98,7 +98,7 @@ const getInventoryRows = (inventory?: string): InventoryRow[] => {
 
 const calculateTableHeight = () => {
   nextTick(() => {
-    tableMaxHeight.value = window.innerHeight - 320;
+    tableMaxHeight.value = window.innerHeight - 220;
   });
 };
 

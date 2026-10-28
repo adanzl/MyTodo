@@ -1,49 +1,48 @@
 <template>
   <div class="p-1">
-    <!-- 配置区域 -->
-     <el-card>
-       <div class="flex flex-wrap gap-2">
-         <div class="flex items-center">
-           <el-text class="w-24">普通抽奖费用</el-text>
-           <el-input v-model="lotterySettingData.fee" class="w-32! ml-2" type="number" />
-         </div>
-         <div class="flex items-center">
-           <el-text class="w-28">心愿单阈值</el-text>
-           <el-input v-model.number="lotterySettingData.wish_count_threshold" class="w-32! ml-2" type="number" placeholder="5" />
-           <el-tooltip content="进度达到后下一抽仅从心愿单池抽取并清零" placement="top">
-             <el-icon class="ml-1 cursor-help text-gray-400 hover:text-gray-600"><InfoFilled /></el-icon>
-           </el-tooltip>
-         </div>
-         <el-button type="primary" @click="handleUpdateFee">更新配置</el-button>
-       </div>
-     </el-card>
+    <div class="relative mt-2">
+      <el-tabs
+        v-model="activeMainTab"
+        @tab-change="handleTabChange"
+        class="flex h-[calc(100vh-120px)] flex-1 flex-col overflow-hidden [&_.el-tabs\_\_nav-wrap]:pr-160!"
+      >
+        <el-tab-pane label="礼物维护" name="lottery">
+          <TabLottery />
+        </el-tab-pane>
 
-    <!-- 主页签 -->
-    <el-tabs
-      v-model="activeMainTab"
-      @tab-change="handleTabChange"
-      class="flex-1 flex flex-col overflow-hidden h-[calc(100vh-220px)] mt-2"
-    >
-      <!-- 礼物维护页签 -->
-      <el-tab-pane label="礼物维护" name="lottery">
-        <TabLottery />
-      </el-tab-pane>
+        <el-tab-pane label="奖池维护" name="pool">
+          <TabPool />
+        </el-tab-pane>
 
-      <!-- 奖池维护页签 -->
-      <el-tab-pane label="奖池维护" name="pool">
-        <TabPool />
-      </el-tab-pane>
+        <el-tab-pane label="礼物记录" name="history">
+          <TabGiftHistory />
+        </el-tab-pane>
 
-      <!-- 礼物记录页签 -->
-      <el-tab-pane label="礼物记录" name="history">
-        <TabGiftHistory />
-      </el-tab-pane>
+        <el-tab-pane label="背包" name="inventory">
+          <TabInventory />
+        </el-tab-pane>
+      </el-tabs>
 
-      <!-- 库存页签 -->
-      <el-tab-pane label="背包" name="inventory">
-        <TabInventory />
-      </el-tab-pane>
-    </el-tabs>
+      <div class="absolute top-0 right-0 z-10 flex h-10 items-center gap-3">
+        <div class="flex items-center">
+          <el-text class="w-22 shrink-0">普通抽奖费用</el-text>
+          <el-input v-model="lotterySettingData.fee" class="ml-2 w-20!" type="number" />
+        </div>
+        <div class="flex items-center">
+          <el-text class="w-22 shrink-0">心愿单阈值</el-text>
+          <el-input
+            v-model.number="lotterySettingData.wish_count_threshold"
+            class="ml-2 w-20!"
+            type="number"
+            placeholder="5"
+          />
+          <el-tooltip content="进度达到后下一抽仅从心愿单池抽取并清零" placement="top">
+            <el-icon class="ml-1 cursor-help text-gray-400 hover:text-gray-600"><InfoFilled /></el-icon>
+          </el-tooltip>
+        </div>
+        <el-button type="primary" size="small" @click="handleUpdateFee">更新配置</el-button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -64,6 +63,7 @@ const activeMainTab = ref("lottery");
 
 // 监听页签切换
 const handleTabChange = (tabName: string) => {
+  if (!VALID_TABS.includes(tabName as (typeof VALID_TABS)[number])) return;
   localStorage.setItem(STORAGE_KEY, tabName);
 
   const eventMap: Record<string, string> = {

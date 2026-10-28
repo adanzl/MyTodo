@@ -1,5 +1,93 @@
 @import "tailwindcss";
 
+/*
+ * 暗色模式由 <html class="dark"> 控制。
+ * Tailwind 的 dark: 变体跟随这个 class，而不是只跟随系统 prefers-color-scheme。
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --app-page-bg: #ffffff;
+  --app-text: #303133;
+}
+
+/*
+ * 模板里大量使用固定色阶（bg-white / bg-gray-50 / text-gray-600 ...）。
+ * Tailwind v4 的色板类读取 --color-*，暗色下改这些变量即可整体翻暗。
+ */
+.dark {
+  --app-page-bg: #141414;
+  --app-text: #e5eaf3;
+
+  --color-white: #1d1e1f;
+
+  --color-gray-50: #262727;
+  --color-gray-100: #2f3031;
+  --color-gray-200: #414245;
+  --color-gray-300: #55565a;
+  --color-gray-400: #909399;
+  --color-gray-500: #a6a9ad;
+  --color-gray-600: #c0c4cc;
+  --color-gray-700: #d4d7de;
+  --color-gray-800: #e5eaf3;
+  --color-gray-900: #f0f2f5;
+
+  --color-slate-100: #2b2d31;
+  --color-slate-700: #ccd1d9;
+  --color-slate-800: #e3e7ee;
+
+  --color-pink-50: #2e1a24;
+  --color-pink-100: #3d2230;
+  --color-pink-200: #5c3a4a;
+  --color-pink-300: #7a4d62;
+  --color-pink-400: #9a6280;
+  --color-pink-600: #f78ec0;
+  --color-pink-700: #f9a8d4;
+  --color-pink-800: #fbc4e0;
+
+  --color-blue-50: #1b2a3f;
+  --color-blue-100: #22354d;
+  --color-blue-600: #79bbff;
+  --color-blue-700: #9dcbff;
+  --color-blue-800: #c4ddff;
+  --color-blue-900: #dbeafe;
+
+  --color-amber-50: #2b2418;
+  --color-amber-100: #3a3122;
+  --color-amber-200: #5b4a29;
+  --color-amber-300: #6b5830;
+  --color-amber-600: #e8a94f;
+  --color-amber-700: #f0bd6b;
+  --color-amber-800: #f6d49a;
+
+  --color-orange-300: #8a5a32;
+  --color-orange-400: #a66b3d;
+  --color-orange-600: #ffa552;
+  --color-yellow-500: #f6c445;
+
+  --color-emerald-50: #15291f;
+  --color-emerald-300: #3d6b52;
+  --color-emerald-600: #6bd79c;
+  --color-emerald-800: #a6e7c3;
+  --color-green-300: #3d6b4f;
+  --color-green-400: #4d8a64;
+  --color-green-600: #6bd79c;
+
+  --color-red-50: #2d1a1c;
+  --color-red-100: #3f2427;
+  --color-red-500: #ff8580;
+  --color-red-600: #ff9a95;
+  --color-red-700: #ffb0ab;
+  --color-red-800: #ffcdc9;
+  --color-red-900: #fecaca;
+  --color-rose-50: #2c1a22;
+}
+
+body {
+  background-color: var(--app-page-bg);
+  color: var(--app-text);
+}
+
 /**
  * 公共样式文件 - 使用 Tailwind CSS 兼容的样式值
  */

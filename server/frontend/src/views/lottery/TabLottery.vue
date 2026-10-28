@@ -211,7 +211,7 @@
       layout="sizes, prev, pager, next"
       :total="giftList.totalCount"
       v-model:page-size="PAGE_SIZE"
-      :page-sizes="[5, 10, 20]"
+      :page-sizes="[8, 15, 25]"
       :current-page="giftList.pageNum"
       class="mt-2"
       background
@@ -232,7 +232,7 @@ import { uploadPic, getPicDisplayUrl } from "@/api/api-pic";
 import type { Gift, GiftApiData, GiftCategory } from "@/types/lottery";
 import LotteryCategoryDialog from "./dialogs/LotteryCategory.vue";
 
-const PAGE_SIZE = ref<number>(5);
+const PAGE_SIZE = ref<number>(8);
 const selectedCateId = ref<number>(0);
 const tableMaxHeight = ref<number>(0);
 const searchId = ref<string>("");
@@ -241,7 +241,7 @@ const searchId = ref<string>("");
 const calculateTableHeight = () => {
   nextTick(() => {
     const windowHeight = window.innerHeight;
-    const reservedSpace = 410;
+    const reservedSpace = 310;
     tableMaxHeight.value = windowHeight - reservedSpace;
   });
 };
