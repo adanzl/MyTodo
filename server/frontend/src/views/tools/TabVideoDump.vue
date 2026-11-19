@@ -237,6 +237,7 @@ import dayjs from "dayjs";
 import { Refresh, Delete, Document, Link, ArrowDown } from "@element-plus/icons-vue";
 import { formatSize } from "@/utils/format";
 import { getMediaFileUrl } from "@/utils/file";
+import { copyToClipboard } from "@/utils/clipboard";
 import { logAndNoticeError } from "@/utils/error";
 import { useControllableInterval } from "@/composables/useInterval";
 import QRCode from "qrcode";
@@ -655,7 +656,7 @@ const copyText = async () => {
     const text = currentTask.value?.text || "";
     if (!text) return;
     try {
-        await navigator.clipboard.writeText(text);
+        await copyToClipboard(text);
         ElMessage.success("已复制");
     } catch (error) {
         logAndNoticeError(error as Error, "复制失败");
