@@ -88,15 +88,26 @@ export async function renderPdfPageToDataUrl(
   canvas.height = viewport.height
   canvas.width = viewport.width
 
-  await page
-    .render({
-      canvasContext: context,
-      viewport,
-      canvas: canvas as unknown as HTMLCanvasElement,
-    })
-    .promise
+  try {
+    await page
+      .render({
+        canvasContext: context,
+        viewport,
+        canvas: canvas as unknown as HTMLCanvasElement,
+      })
+      .promise
 
-  return canvas.toDataURL(mimeType, quality)
+    return canvas.toDataURL(mimeType, quality)
+  } finally {
+    // 位图和页面解码结果都留着的话，连续预览会把标签页撑满
+    canvas.width = 0
+    canvas.height = 0
+    try {
+      page.cleanup()
+    } catch {
+      /* 页面已销毁时忽略 */
+    }
+  }
 }
 
 /** 需要直接使用 pdf.js API 时导出 */

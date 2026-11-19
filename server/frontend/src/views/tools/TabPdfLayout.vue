@@ -141,7 +141,7 @@
 
             <!-- 下半：PDF 预览 -->
             <div class="flex-1 min-h-0 border-t pt-3 mt-1 flex flex-col">
-                <div class="flex items-center justify-between shrink-0 mb-2 h-4">
+                <div class="flex items-center justify-between shrink-0 mb-2 min-h-6 gap-3">
                     <div class="flex items-center gap-0">
                         <span class="text-sm font-semibold mr-4">PDF 预览</span>
                         <el-button type="success" size="small" plain class="h-5! text-xs! px-2! shrink-0"
@@ -178,54 +178,12 @@
                             </el-button>
                         </div>
                     </div>
-                    <!-- 单页导航 -->
-                    <div v-if="previewMode === 'single' && previewPages.length > 0" class="flex items-center gap-2">
-                        <el-button size="small" circle :disabled="previewCurrentPage <= 1" @click="handlePrevPage"
-                            class="w-6! h-6! p-0!">
-                            <el-icon>
-                                <ArrowLeft />
-                            </el-icon>
-                        </el-button>
-                        <span class="text-xs">{{ previewCurrentPage }} / {{ previewPages.length }}</span>
-                        <el-button size="small" circle :disabled="previewCurrentPage >= previewPages.length"
-                            @click="handleNextPage" class="w-6! h-6! p-0!">
-                            <el-icon>
-                                <ArrowRight />
-                            </el-icon>
-                        </el-button>
-                    </div>
-                    <!-- 骑缝导航 -->
-                    <div v-else-if="previewMode === 'saddle-stitch' && spreadPages.length > 0"
-                        class="flex items-center gap-2">
-                        <el-button size="small" circle :disabled="spreadCurrentPage <= 1" @click="handlePrevPage"
-                            class="w-6! h-6! p-0!">
-                            <el-icon>
-                                <ArrowLeft />
-                            </el-icon>
-                        </el-button>
-                        <span class="text-xs">{{ spreadCurrentPage }} / {{ spreadPages.length }}</span>
-                        <el-button size="small" circle :disabled="spreadCurrentPage >= spreadPages.length"
-                            @click="handleNextPage" class="w-6! h-6! p-0!">
-                            <el-icon>
-                                <ArrowRight />
-                            </el-icon>
-                        </el-button>
-                    </div>
-                    <!-- 装订导航 -->
-                    <div v-else-if="previewMode === 'bound' && boundPages.length > 0" class="flex items-center gap-2">
-                        <el-button size="small" circle :disabled="spreadCurrentPage <= 1" @click="handlePrevPage"
-                            class="w-6! h-6! p-0!">
-                            <el-icon>
-                                <ArrowLeft />
-                            </el-icon>
-                        </el-button>
-                        <span class="text-xs">{{ spreadCurrentPage }} / {{ boundPages.length }}</span>
-                        <el-button size="small" circle :disabled="spreadCurrentPage >= boundPages.length"
-                            @click="handleNextPage" class="w-6! h-6! p-0!">
-                            <el-icon>
-                                <ArrowRight />
-                            </el-icon>
-                        </el-button>
+                    <div v-if="hasPreviewContent" class="flex items-center gap-2 shrink-0">
+                        <div v-if="previewPageCount <= 1" class="w-36 h-1 rounded-full bg-(--el-color-primary)"></div>
+                        <el-slider v-else class="w-36! [--el-slider-height:4px] [--el-slider-button-size:10px] [--el-slider-button-wrapper-size:20px] [--el-slider-button-wrapper-offset:-8px]"
+                            :model-value="previewPageIndex" :min="1" :max="previewPageCount" :step="1" size="small"
+                            :format-tooltip="formatPageTooltip" @input="handleSeekPage" />
+                        <span class="text-xs tabular-nums text-gray-600 shrink-0">{{ previewPageIndex }} / {{ previewPageCount }}</span>
                     </div>
                 </div>
                 <div v-loading="previewLoading" ref="previewAreaRef"
@@ -258,7 +216,8 @@
                                         :class="leftPageAnimeClass">
                                         <div class="flip-page-inner relative">
                                             <div class="flip-face flip-face-front">
-                                                <img :src="previewPages[previewCurrentPage - 1].leftImage"
+                                                <img v-if="previewPages[previewCurrentPage - 1].leftImage"
+                                                    :src="previewPages[previewCurrentPage - 1].leftImage"
                                                     class="max-w-full max-h-full object-contain" />
                                             </div>
                                             <div class="flip-face flip-face-back">
@@ -295,7 +254,8 @@
                                                 <img v-if="previewPages[previewCurrentPage - 1].rightPageNum === 0"
                                                     :src="blankPageDataUrl"
                                                     class="max-w-full max-h-full object-contain rounded border-2 border-dashed border-gray-300" />
-                                                <img v-else :src="previewPages[previewCurrentPage - 1].rightImage"
+                                                <img v-else-if="previewPages[previewCurrentPage - 1].rightImage"
+                                                    :src="previewPages[previewCurrentPage - 1].rightImage"
                                                     class="max-w-full max-h-full object-contain" />
                                                 <span v-if="previewPages[previewCurrentPage - 1].rightPageNum === 0"
                                                     class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
@@ -339,7 +299,8 @@
                                                 <img v-if="spreadPages[spreadCurrentPage - 1].leftPageNum === 0"
                                                     :src="blankPageDataUrl"
                                                     class="max-w-full max-h-full object-contain rounded border-2 border-dashed border-gray-300" />
-                                                <img v-else :src="spreadPages[spreadCurrentPage - 1].leftImage"
+                                                <img v-else-if="spreadPages[spreadCurrentPage - 1].leftImage"
+                                                    :src="spreadPages[spreadCurrentPage - 1].leftImage"
                                                     class="max-w-full max-h-full object-contain" />
                                                 <span v-if="spreadPages[spreadCurrentPage - 1].leftPageNum === 0"
                                                     class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
@@ -380,7 +341,8 @@
                                                 <img v-if="spreadPages[spreadCurrentPage - 1].rightPageNum === 0"
                                                     :src="blankPageDataUrl"
                                                     class="max-w-full max-h-full object-contain rounded border-2 border-dashed border-gray-300" />
-                                                <img v-else :src="spreadPages[spreadCurrentPage - 1].rightImage"
+                                                <img v-else-if="spreadPages[spreadCurrentPage - 1].rightImage"
+                                                    :src="spreadPages[spreadCurrentPage - 1].rightImage"
                                                     class="max-w-full max-h-full object-contain" />
                                                 <span v-if="spreadPages[spreadCurrentPage - 1].rightPageNum === 0"
                                                     class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
@@ -417,7 +379,7 @@
                                             <span
                                                 class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
                                         </template>
-                                        <img v-else :src="flipUnderlayLeft.leftImage"
+                                        <img v-else-if="flipUnderlayLeft.leftImage" :src="flipUnderlayLeft.leftImage"
                                             class="max-w-full max-h-full object-contain" />
                                     </div>
                                     <div class="flip-page flip-page-left relative z-1 max-h-full max-w-full"
@@ -432,7 +394,8 @@
                                                     <span
                                                         class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
                                                 </template>
-                                                <img v-else :src="boundPages[spreadCurrentPage - 1].leftImage"
+                                                <img v-else-if="boundPages[spreadCurrentPage - 1].leftImage"
+                                                    :src="boundPages[spreadCurrentPage - 1].leftImage"
                                                     class="max-w-full max-h-full object-contain" />
                                             </div>
                                             <div class="flip-face flip-face-back">
@@ -444,7 +407,7 @@
                                                         <span
                                                             class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
                                                     </template>
-                                                    <img v-else :src="flipBackSpread.rightImage"
+                                                    <img v-else-if="flipBackSpread.rightImage" :src="flipBackSpread.rightImage"
                                                         class="max-w-full max-h-full object-contain" />
                                                 </template>
                                             </div>
@@ -466,7 +429,7 @@
                                             <span
                                                 class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
                                         </template>
-                                        <img v-else :src="flipUnderlayRight.rightImage"
+                                        <img v-else-if="flipUnderlayRight.rightImage" :src="flipUnderlayRight.rightImage"
                                             class="max-w-full max-h-full object-contain" />
                                     </div>
                                     <div class="flip-page flip-page-right relative z-1 max-h-full max-w-full"
@@ -482,7 +445,8 @@
                                                     <span
                                                         class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
                                                 </template>
-                                                <img v-else :src="boundPages[spreadCurrentPage - 1].rightImage"
+                                                <img v-else-if="boundPages[spreadCurrentPage - 1].rightImage"
+                                                    :src="boundPages[spreadCurrentPage - 1].rightImage"
                                                     class="max-w-full max-h-full object-contain" />
                                             </div>
                                             <div class="flip-face flip-face-back">
@@ -494,7 +458,7 @@
                                                         <span
                                                             class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs pointer-events-none z-10">空白</span>
                                                     </template>
-                                                    <img v-else :src="flipBackSpread.leftImage"
+                                                    <img v-else-if="flipBackSpread.leftImage" :src="flipBackSpread.leftImage"
                                                         class="max-w-full max-h-full object-contain" />
                                                 </template>
                                             </div>
@@ -561,7 +525,7 @@
 import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import type { UploadFile, UploadFiles, UploadRawFile } from "element-plus";
-import { Refresh, Plus, Delete, ArrowLeft, ArrowRight } from "@element-plus/icons-vue";
+import { Refresh, Plus, Delete } from "@element-plus/icons-vue";
 import { formatSize } from "@/utils/format";
 import { logAndNoticeError } from "@/utils/error";
 import { loadPdfDocument, renderPdfPageToDataUrl } from "@/utils/pdf-lib";
@@ -621,6 +585,9 @@ async function initBlankPageImage(pdf: any) {
             ctx.fillRect(0, 0, viewport.width, viewport.height);
         }
         blankPageDataUrl.value = canvas.toDataURL('image/png');
+        canvas.width = 0;
+        canvas.height = 0;
+        page.cleanup?.();
     } catch {
         // 静默失败，空白页将降级为空字符串
     }
@@ -645,6 +612,9 @@ async function initBlankPageImageFromSaddleSheet(pdf: any) {
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
         blankPageDataUrl.value = canvas.toDataURL('image/png');
+        canvas.width = 0;
+        canvas.height = 0;
+        page.cleanup?.();
     } catch {
         // 静默失败
     }
@@ -681,10 +651,15 @@ async function renderSaddleSheetHalves(
     rightCanvas.height = h;
     rightCanvas.getContext('2d')!.drawImage(canvas, halfW, 0, rightW, h, 0, 0, rightW, h);
 
-    return {
-        left: leftCanvas.toDataURL('image/jpeg', 0.8),
-        right: rightCanvas.toDataURL('image/jpeg', 0.8),
-    };
+    const left = leftCanvas.toDataURL('image/jpeg', 0.7);
+    const right = rightCanvas.toDataURL('image/jpeg', 0.7);
+    canvas.width = 0;
+    canvas.height = 0;
+    leftCanvas.width = 0;
+    leftCanvas.height = 0;
+    rightCanvas.width = 0;
+    rightCanvas.height = 0;
+    return { left, right };
 }
 
 // 状态映射
@@ -783,6 +758,7 @@ const isFlipping = ref(false);
 const flipBackSpread = ref<SpreadPage | null>(null);
 const flipTargetIndex = ref(-1);
 let flipEndTimer: ReturnType<typeof setTimeout> | null = null;
+let flipGeneration = 0;
 
 const FLIP_DURATION_MS = 900;
 
@@ -884,6 +860,32 @@ function getMaxPageIndex(): number {
 
 const canFlipPrev = computed(() => hasPreviewContent.value && getCurrentPageIndex() > 1);
 const canFlipNext = computed(() => hasPreviewContent.value && getCurrentPageIndex() < getMaxPageIndex());
+const previewPageIndex = computed(() => getCurrentPageIndex());
+const previewPageCount = computed(() => getMaxPageIndex());
+
+function formatPageTooltip(value: number) {
+    return `${value} / ${previewPageCount.value}`;
+}
+
+/** 进度条直接跳到目标对开页，不走翻页动画。 */
+function handleSeekPage(value: number | number[]) {
+    const raw = Array.isArray(value) ? value[0] : value;
+    if (!Number.isFinite(raw)) return;
+    const max = getMaxPageIndex();
+    const next = Math.min(max, Math.max(1, Math.round(raw)));
+    if (isFlipping.value) {
+        clearFlipTimers();
+        isFlipping.value = false;
+        flipBackSpread.value = null;
+        flipTargetIndex.value = -1;
+    }
+    if (getCurrentPageIndex() === next) return;
+    flipGeneration += 1;
+    // 附近页已经画过就当场换上，进度条不用等渲染
+    paintSpread(getPagesArray()[next - 1]);
+    if (previewMode.value === 'single') previewCurrentPage.value = next;
+    else spreadCurrentPage.value = next;
+}
 
 function advancePageIndex(direction: number) {
     if (previewMode.value === 'single') {
@@ -899,29 +901,37 @@ function triggerFlip(direction: number) {
     const max = getMaxPageIndex();
     if ((direction > 0 && current >= max) || (direction < 0 && current <= 1)) return;
 
-    clearFlipTimers();
-
-    // 准备背面 + 底层内容：目标对开页
     const pages = getPagesArray();
     const targetIdx = current - 1 + direction; // 0-based
-    if (targetIdx >= 0 && targetIdx < pages.length) {
-        flipBackSpread.value = { ...pages[targetIdx] };
-        flipTargetIndex.value = targetIdx;
-    } else {
-        flipBackSpread.value = null;
-        flipTargetIndex.value = -1;
-    }
+    const target = pages[targetIdx];
+    if (!target) return;
 
+    // 动画立刻开始。前后页在空闲时已经画好，这里只是换上缓存；没命中才补画，不挡住翻页。
+    const generation = ++flipGeneration;
+    paintSpread(target);
+    clearFlipTimers();
+    flipBackSpread.value = target;
+    flipTargetIndex.value = targetIdx;
     isFlipping.value = true;
     pageDirection.value = direction;
+    if (pageNumsOf(target).some((n) => !imageCache.has(n))) {
+        void ensureSpread(target).catch(() => {});
+    }
+    // 动画这 900ms 里把再下一页补上，连续翻就不会翻到空白页
+    const further = pages[targetIdx + direction];
+    if (further && pageNumsOf(further).some((n) => !imageCache.has(n))) {
+        void ensureSpread(further).catch(() => {});
+    }
 
     // 动画结束后再切页码并清理（底层已提前显示新页，无需中途切换）
     flipEndTimer = setTimeout(() => {
+        if (generation !== flipGeneration) return;
         advancePageIndex(direction);
         isFlipping.value = false;
         flipBackSpread.value = null;
         flipTargetIndex.value = -1;
         flipEndTimer = null;
+        scheduleVisibleRefresh(0);
     }, FLIP_DURATION_MS);
 }
 
@@ -1128,6 +1138,280 @@ const getDownloadUrl = (filename: string, type: "uploaded" | "output") => {
     return getPdfLayoutDownloadUrl(filename, type);
 };
 
+// 当前对开页立刻画，前后各两页提前画好，再远的图丢掉。
+// 翻页和附近拖动用的是缓存，不会每次现画；整本同时渲染才会把内存撑满。
+const PREVIEW_JPEG_QUALITY = 0.7;
+const PREFETCH_RADIUS = 2;
+const imageCache = new Map<number, string>();
+const inflightRenders = new Map<number, Promise<void>>();
+let sheetInflight = new Map<number, Promise<Map<number, string>>>();
+let renderLogicalPage: ((pageNum: number) => Promise<Map<number, string>>) | null = null;
+let rendererKind: "page" | "sheet" | null = null;
+let visibleJob = 0;
+let loadGeneration = 0;
+let visibleRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleVisibleRefresh(delay = 200) {
+    if (visibleRefreshTimer) clearTimeout(visibleRefreshTimer);
+    visibleRefreshTimer = setTimeout(() => {
+        visibleRefreshTimer = null;
+        void refreshVisibleImages();
+    }, delay);
+}
+
+/** 当前页放前面，接着是越来越远的前后页，方便先把眼前这一页画出来。 */
+function spreadsAround(spreads: SpreadPage[], index0: number): SpreadPage[] {
+    const ordered: SpreadPage[] = [];
+    const push = (i: number) => {
+        const spread = spreads[i];
+        if (spread) ordered.push(spread);
+    };
+    push(index0);
+    for (let step = 1; step <= PREFETCH_RADIUS; step++) {
+        push(index0 + step);
+        push(index0 - step);
+    }
+    return ordered;
+}
+
+function pageNumsOf(spread: SpreadPage | undefined): number[] {
+    if (!spread) return [];
+    return [spread.leftPageNum, spread.rightPageNum].filter((n) => n > 0);
+}
+
+function clearSpreadImages(spreads: SpreadPage[]) {
+    for (const spread of spreads) {
+        spread.leftImage = "";
+        spread.rightImage = "";
+    }
+}
+
+function clearAllSpreadImages() {
+    clearSpreadImages(previewPages.value);
+    clearSpreadImages(spreadPages.value);
+    clearSpreadImages(boundPages.value);
+}
+
+async function destroyCachedPdf() {
+    visibleJob += 1;
+    const pdf = pdfDocCache.value;
+    pdfDocCache.value = null;
+    renderLogicalPage = null;
+    rendererKind = null;
+    sheetInflight.clear();
+    inflightRenders.clear();
+    imageCache.clear();
+    clearAllSpreadImages();
+    if (!pdf) return;
+    try {
+        await pdf.destroy();
+    } catch {
+        // 文档已销毁时忽略
+    }
+}
+
+function useNormalRenderer(pdf: { getPage: (n: number) => Promise<any> }) {
+    if (rendererKind !== "page") {
+        imageCache.clear();
+        clearAllSpreadImages();
+    }
+    rendererKind = "page";
+    renderLogicalPage = async (pageNum: number) => {
+        const page = await pdf.getPage(pageNum);
+        const url = await renderPdfPageToDataUrl(page, {
+            scale: previewRenderScale.value,
+            mimeType: "image/jpeg",
+            quality: PREVIEW_JPEG_QUALITY,
+        });
+        return new Map([[pageNum, url]]);
+    };
+}
+
+function useSheetRenderer(
+    pdf: { getPage: (n: number) => Promise<any> },
+    sheetOf: Map<number, { sheet: number; side: "left" | "right" }>,
+) {
+    if (rendererKind !== "sheet") {
+        imageCache.clear();
+        clearAllSpreadImages();
+    }
+    rendererKind = "sheet";
+    sheetInflight = new Map();
+    renderLogicalPage = (pageNum: number) => {
+        const info = sheetOf.get(pageNum);
+        if (!info) return Promise.resolve(new Map());
+        let pending = sheetInflight.get(info.sheet);
+        if (!pending) {
+            pending = (async () => {
+                const page = await pdf.getPage(info.sheet);
+                try {
+                    const halves = await renderSaddleSheetHalves(page, previewRenderScale.value);
+                    const out = new Map<number, string>();
+                    for (const [logical, meta] of sheetOf) {
+                        if (meta.sheet !== info.sheet) continue;
+                        out.set(logical, meta.side === "left" ? halves.left : halves.right);
+                    }
+                    return out;
+                } finally {
+                    page.cleanup?.();
+                    sheetInflight.delete(info.sheet);
+                }
+            })();
+            sheetInflight.set(info.sheet, pending);
+        }
+        return pending;
+    };
+}
+
+async function renderOne(pageNum: number) {
+    if (pageNum <= 0 || imageCache.has(pageNum)) return;
+    const pending = inflightRenders.get(pageNum);
+    if (pending) return pending;
+    const pdf = pdfDocCache.value;
+    const render = renderLogicalPage;
+    if (!pdf || !render) return;
+    let task: Promise<void>;
+    task = (async () => {
+        const produced = await render(pageNum);
+        if (pdfDocCache.value !== pdf) return;
+        for (const [num, url] of produced) {
+            if (url) imageCache.set(num, url);
+        }
+    })().finally(() => {
+        if (inflightRenders.get(pageNum) === task) inflightRenders.delete(pageNum);
+    });
+    inflightRenders.set(pageNum, task);
+    return task;
+}
+
+async function renderPageNums(nums: number[]) {
+    const unique = [...new Set(nums.filter((n) => n > 0 && !imageCache.has(n)))];
+    if (!unique.length) return;
+    let cursor = 0;
+    const worker = async () => {
+        while (cursor < unique.length) {
+            const pageNum = unique[cursor];
+            cursor += 1;
+            await renderOne(pageNum);
+        }
+    };
+    await Promise.all([worker(), worker()]);
+}
+
+function paintSpread(spread: SpreadPage | undefined) {
+    if (!spread) return;
+    if (spread.leftPageNum > 0) spread.leftImage = imageCache.get(spread.leftPageNum) || "";
+    if (spread.rightPageNum > 0) spread.rightImage = imageCache.get(spread.rightPageNum) || "";
+}
+
+async function ensureSpread(spread: SpreadPage | undefined) {
+    if (!spread) return;
+    await renderPageNums(pageNumsOf(spread));
+    paintSpread(spread);
+}
+
+function evictExcept(keep: Set<number>) {
+    for (const list of [previewPages.value, spreadPages.value, boundPages.value]) {
+        for (const spread of list) {
+            if (spread.leftPageNum > 0 && !keep.has(spread.leftPageNum)) spread.leftImage = "";
+            if (spread.rightPageNum > 0 && !keep.has(spread.rightPageNum)) spread.rightImage = "";
+        }
+    }
+    for (const key of imageCache.keys()) {
+        if (!keep.has(key)) imageCache.delete(key);
+    }
+}
+
+function keepPageNums(windowSpreads: SpreadPage[]): Set<number> {
+    const keep = new Set<number>();
+    for (const spread of windowSpreads) {
+        for (const num of pageNumsOf(spread)) keep.add(num);
+    }
+    return keep;
+}
+
+/** 眼前这一页画完就返回；前后各两页放到空闲时补，翻页动画期间不再开新的渲染。 */
+async function refreshVisibleImages() {
+    if (isFlipping.value || !pdfDocCache.value || !renderLogicalPage) return;
+    const spreads = getPagesArray();
+    const index0 = getCurrentPageIndex() - 1;
+    if (!spreads.length || index0 < 0 || index0 >= spreads.length) return;
+    const job = ++visibleJob;
+    const windowSpreads = spreadsAround(spreads, index0);
+    try {
+        await renderPageNums(pageNumsOf(windowSpreads[0]));
+        if (job !== visibleJob || isFlipping.value) return;
+        paintSpread(windowSpreads[0]);
+        evictExcept(keepPageNums(windowSpreads));
+    } catch (error) {
+        if (job === visibleJob) logAndNoticeError(error as Error, "渲染预览页失败");
+        return;
+    }
+    void prefetchAround(job, windowSpreads);
+}
+
+async function prefetchAround(job: number, windowSpreads: SpreadPage[]) {
+    try {
+        for (let i = 1; i < windowSpreads.length; i++) {
+            if (job !== visibleJob) return;
+            await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+            if (job !== visibleJob) return;
+            await renderPageNums(pageNumsOf(windowSpreads[i]));
+            if (job !== visibleJob) return;
+            // 翻页过程中也把更后面的一页补上，下一次点击才不用现画
+            paintSpread(windowSpreads[i]);
+        }
+        const pdf = pdfDocCache.value;
+        // 保留已加载字体，否则下一页要重新解析字体，翻页会顿
+        if (job === visibleJob && !isFlipping.value && pdf?.cleanup
+            && inflightRenders.size === 0 && sheetInflight.size === 0) {
+            await pdf.cleanup(true);
+        }
+    } catch (error) {
+        if (job === visibleJob) logAndNoticeError(error as Error, "渲染预览页失败");
+    }
+}
+
+async function openTaskPdf(item: PdfLayoutTask) {
+    if (pdfDocCache.value && spreadDataCachedTaskId.value === item.task_id) {
+        return pdfDocCache.value;
+    }
+    const url = getPdfLayoutDownloadUrl(item.uploaded_info!.name, "uploaded");
+    if (!url) {
+        ElMessage.error("无法获取文件地址");
+        return null;
+    }
+    const gen = ++loadGeneration;
+    const pdf = await loadPdfDocument(url);
+    if (gen !== loadGeneration) {
+        try { await pdf.destroy(); } catch { /* 忽略过期文档 */ }
+        return null;
+    }
+    await destroyCachedPdf();
+    if (gen !== loadGeneration) {
+        try { await pdf.destroy(); } catch { /* 忽略过期文档 */ }
+        return null;
+    }
+    pdfDocCache.value = pdf;
+    spreadDataCachedTaskId.value = item.task_id;
+    return pdf;
+}
+
+function buildSequentialSpreads(totalPages: number): SpreadPage[] {
+    const spreads: SpreadPage[] = [];
+    for (let i = 1; i <= totalPages; i += 2) {
+        const right = i + 1 <= totalPages ? i + 1 : 0;
+        spreads.push({
+            id: `${i}-${right}`,
+            leftImage: "",
+            rightImage: "",
+            leftPageNum: i,
+            rightPageNum: right,
+        });
+    }
+    return spreads;
+}
+
 // 预览 PDF（双页预览）
 const handlePreview = async (item: PdfLayoutTask) => {
     if (!item.uploaded_info) {
@@ -1138,65 +1422,19 @@ const handlePreview = async (item: PdfLayoutTask) => {
     previewMode.value = 'single';
     previewLoading.value = true;
     previewCurrentPage.value = 1;
-    previewPages.value = [];
 
     try {
-        const url = getPdfLayoutDownloadUrl(item.uploaded_info.name, "uploaded");
-        if (!url) {
-            ElMessage.error("无法获取文件地址");
-            previewLoading.value = false;
-            return;
-        }
-
-        console.time('loadPdf');
-        const pdf = await loadPdfDocument(url);
-        console.timeEnd('loadPdf');
+        const pdf = await openTaskPdf(item);
+        if (!pdf) return;
+        useNormalRenderer(pdf);
         await initBlankPageImage(pdf);
-        const scale = previewRenderScale.value;
-
         const totalPages = pdf.numPages;
-        console.log(`PDF 页数: ${totalPages}, 文件: ${item.uploaded_info.name}, scale: ${scale}`);
         originalTotalPages.value = totalPages;
-
-        // 并行渲染所有 spread
-        console.time('renderAllPages');
-        const spreadPromises: Promise<SpreadPage>[] = [];
-        for (let i = 1; i <= totalPages; i += 2) {
-            const pageIdx = i;
-            spreadPromises.push(
-                (async () => {
-                    const leftImg = await renderPdfPageToDataUrl(await pdf.getPage(pageIdx), {
-                        scale,
-                        mimeType: "image/jpeg",
-                        quality: 0.7,
-                    });
-
-                    let rightImg = '';
-                    let rightNum = 0;
-                    if (pageIdx + 1 <= totalPages) {
-                        rightImg = await renderPdfPageToDataUrl(await pdf.getPage(pageIdx + 1), {
-                            scale,
-                            mimeType: "image/jpeg",
-                            quality: 0.7,
-                        });
-                        rightNum = pageIdx + 1;
-                    }
-
-                    return {
-                        id: `${pageIdx}-${pageIdx + 1}`,
-                        leftImage: leftImg,
-                        rightImage: rightImg,
-                        leftPageNum: pageIdx,
-                        rightPageNum: rightNum,
-                    } as SpreadPage;
-                })()
-            );
+        const spreadCount = Math.ceil(totalPages / 2);
+        if (previewPages.value.length !== spreadCount) {
+            previewPages.value = buildSequentialSpreads(totalPages);
         }
-
-        previewPages.value = await Promise.all(spreadPromises);
-        console.timeEnd('renderAllPages');
-        // 加载完成后释放 PDF 文档以释放内存
-        await pdf.destroy();
+        await refreshVisibleImages();
     } catch (error) {
         logAndNoticeError(error as Error, "加载 PDF 预览失败");
         previewPages.value = [];
@@ -1245,36 +1483,35 @@ const handleSaddleStitchPreview = async (item: PdfLayoutTask) => {
         return;
     }
 
-    // 如果骑缝数据已为当前任务生成过，直接切换模式不重新计算
-    if (spreadPages.value.length > 0 && pdfDocCache.value && spreadDataCachedTaskId.value === item.task_id) {
+    // 同一份文档的对开页结构还在，只补当前附近的图片
+    if (spreadPages.value.length > 0 && pdfDocCache.value
+        && spreadDataCachedTaskId.value === item.task_id && rendererKind === "page") {
+        previewLoading.value = true;
         previewMode.value = 'saddle-stitch';
         spreadCurrentPage.value = 1;
+        try {
+            await refreshVisibleImages();
+        } finally {
+            previewLoading.value = false;
+        }
         return;
     }
 
     previewLoading.value = true;
     previewMode.value = 'saddle-stitch';
-    spreadPages.value = [];
     spreadCurrentPage.value = 1;
 
     try {
-        const url = getPdfLayoutDownloadUrl(item.uploaded_info.name, "uploaded");
-        if (!url) {
-            ElMessage.error("无法获取文件地址");
-            previewLoading.value = false;
-            return;
-        }
-
-        const pdf = await loadPdfDocument(url);
+        const pdf = await openTaskPdf(item);
+        if (!pdf) return;
+        useNormalRenderer(pdf);
         await initBlankPageImage(pdf);
         const totalPages = pdf.numPages;
         originalTotalPages.value = totalPages;
         fillConfigs.value = (item.fill_configs && item.fill_configs.length > 0)
             ? [...item.fill_configs]
             : initFillConfigs(totalPages);
-        pdfDocCache.value = pdf;
-        spreadDataCachedTaskId.value = item.task_id;
-        await renderSaddleStitchPreview();
+        await renderSaddleStitchPreview(true);
     } catch (error) {
         logAndNoticeError(error as Error, "加载骑缝排版失败");
         spreadPages.value = [];
@@ -1289,43 +1526,19 @@ const renderSaddleStitchPreview = async (skipLoading = false) => {
     if (!pdf) return;
 
     if (!skipLoading) previewLoading.value = true;
-    spreadPages.value = [];
     spreadCurrentPage.value = 1;
 
     try {
         const effectiveData = buildEffectivePages(originalTotalPages.value, fillConfigs.value);
         const spreads = generateSaddleStitchSpreads(effectiveData.length);
-
-        // 并行渲染所有对开页
-        const spreadPromises: Promise<SpreadPage>[] = spreads.map(async ([leftIdx, rightIdx]) => {
-            const leftPageNum = effectiveData[leftIdx - 1];
-            const rightPageNum = effectiveData[rightIdx - 1];
-
-            const scale = previewRenderScale.value;
-            let leftImg = '';
-            if (leftPageNum > 0) {
-                leftImg = await renderPdfPageToDataUrl(await pdf.getPage(leftPageNum), {
-                    scale, mimeType: "image/jpeg", quality: 0.8,
-                });
-            }
-
-            let rightImg = '';
-            if (rightPageNum > 0) {
-                rightImg = await renderPdfPageToDataUrl(await pdf.getPage(rightPageNum), {
-                    scale, mimeType: "image/jpeg", quality: 0.8,
-                });
-            }
-
-            return {
-                id: `${leftIdx}-${rightIdx}`,
-                leftImage: leftImg,
-                rightImage: rightImg,
-                leftPageNum,
-                rightPageNum,
-            } as SpreadPage;
-        });
-
-        spreadPages.value = await Promise.all(spreadPromises);
+        spreadPages.value = spreads.map(([leftIdx, rightIdx]) => ({
+            id: `${leftIdx}-${rightIdx}`,
+            leftImage: "",
+            rightImage: "",
+            leftPageNum: effectiveData[leftIdx - 1] ?? 0,
+            rightPageNum: effectiveData[rightIdx - 1] ?? 0,
+        }));
+        if (previewMode.value === "saddle-stitch") await refreshVisibleImages();
     } catch (error) {
         logAndNoticeError(error as Error, "渲染骑缝预览失败");
         spreadPages.value = [];
@@ -1358,30 +1571,19 @@ const renderBoundPreview = async (skipLoading = false) => {
     if (!pdf) return;
 
     if (!skipLoading) previewLoading.value = true;
-    boundPages.value = [];
     spreadCurrentPage.value = 1;
 
     try {
-        // 从已渲染的 spreadPages 建立页码→图片映射
-        const pageImageMap = new Map<number, string>();
-        for (const sp of spreadPages.value) {
-            if (sp.leftPageNum > 0) pageImageMap.set(sp.leftPageNum, sp.leftImage);
-            if (sp.rightPageNum > 0) pageImageMap.set(sp.rightPageNum, sp.rightImage);
-        }
-
         const effectiveData = buildEffectivePages(originalTotalPages.value, fillConfigs.value);
         const boundSpreads = generateBoundSpreads(effectiveData);
-
-        for (const [leftNum, rightNum] of boundSpreads) {
-            boundPages.value.push({
-                id: `${leftNum}-${rightNum}`,
-                leftImage: pageImageMap.get(leftNum) || '',
-                rightImage: pageImageMap.get(rightNum) || '',
-                leftPageNum: leftNum,
-                rightPageNum: rightNum,
-            });
-        }
-
+        boundPages.value = boundSpreads.map(([leftNum, rightNum]) => ({
+            id: `${leftNum}-${rightNum}`,
+            leftImage: "",
+            rightImage: "",
+            leftPageNum: leftNum,
+            rightPageNum: rightNum,
+        }));
+        if (previewMode.value === "bound") await refreshVisibleImages();
     } catch (error) {
         logAndNoticeError(error as Error, "渲染装订预览失败");
         boundPages.value = [];
@@ -1419,47 +1621,32 @@ const loadBoundPreviewFromSaddlePdf = async (item: PdfLayoutTask) => {
     spreadCurrentPage.value = 1;
 
     try {
-        const url = getPdfLayoutDownloadUrl(item.uploaded_info!.name, "uploaded");
-        if (!url) {
-            ElMessage.error("无法获取文件地址");
-            return;
-        }
-
-        const pdf = await loadPdfDocument(url);
+        const pdf = await openTaskPdf(item);
+        if (!pdf) return;
         await initBlankPageImageFromSaddleSheet(pdf);
-        pdfDocCache.value = pdf;
-        spreadDataCachedTaskId.value = item.task_id;
 
         const numSheets = pdf.numPages;
         const effectiveCount = numSheets * 2;
         originalTotalPages.value = effectiveCount;
 
-        const spreads = generateSaddleStitchSpreads(effectiveCount);
-        const pageImageMap = new Map<number, string>();
-        const scale = previewRenderScale.value;
-
-        const halfResults = await Promise.all(
-            spreads.map(async ([leftIdx, rightIdx], sheetIndex) => {
-                const page = await pdf.getPage(sheetIndex + 1);
-                const halves = await renderSaddleSheetHalves(page, scale);
-                return { leftIdx, rightIdx, halves };
-            }),
-        );
-
-        for (const { leftIdx, rightIdx, halves } of halfResults) {
-            pageImageMap.set(leftIdx, halves.left);
-            pageImageMap.set(rightIdx, halves.right);
-        }
+        const layoutSpreads = generateSaddleStitchSpreads(effectiveCount);
+        const sheetOf = new Map<number, { sheet: number; side: "left" | "right" }>();
+        layoutSpreads.forEach(([leftIdx, rightIdx], sheetIndex) => {
+            sheetOf.set(leftIdx, { sheet: sheetIndex + 1, side: "left" });
+            sheetOf.set(rightIdx, { sheet: sheetIndex + 1, side: "right" });
+        });
+        useSheetRenderer(pdf, sheetOf);
 
         const effectiveData = Array.from({ length: effectiveCount }, (_, i) => i + 1);
         const boundSpreads = generateBoundSpreads(effectiveData);
         boundPages.value = boundSpreads.map(([leftNum, rightNum]) => ({
             id: `${leftNum}-${rightNum}`,
-            leftImage: leftNum > 0 ? (pageImageMap.get(leftNum) || '') : '',
-            rightImage: rightNum > 0 ? (pageImageMap.get(rightNum) || '') : '',
+            leftImage: "",
+            rightImage: "",
             leftPageNum: leftNum,
             rightPageNum: rightNum,
         }));
+        await refreshVisibleImages();
     } catch (error) {
         logAndNoticeError(error as Error, "加载骑缝成品预览失败");
         boundPages.value = [];
@@ -1559,10 +1746,17 @@ const formatTime = (timestamp?: number) => {
 };
 
 // 生命周期
+watch([previewMode, previewCurrentPage, spreadCurrentPage], () => {
+    // 拖进度条时连续改页码，停稳后再画，避免每一格都渲染把主线程卡住
+    scheduleVisibleRefresh(200);
+});
+
 onMounted(loadTaskList);
 onBeforeUnmount(() => {
     stopPolling();
     clearFlipTimers();
+    if (visibleRefreshTimer) clearTimeout(visibleRefreshTimer);
+    void destroyCachedPdf();
 });
 </script>
 
