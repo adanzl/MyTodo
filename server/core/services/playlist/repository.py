@@ -1,27 +1,18 @@
-"""播放列表数据的 RDS 读写封装。
+"""DB-only playlist repository with optimistic configuration and runtime merges.
 
-P1 阶段从 `core/services/playlist_mgr.py` 抽出。
-
-设计要点：
-- 通过 `playlist_raw_provider`（无参函数，返回当前 dict）+ `rds_save_queue` 注入。
-  使用 provider 而不是直接传 dict，是因为 `PlaylistMgr` 在 `reload()` / `save_playlist()`
-  中会 **重赋值** `self._playlist_raw`（而非 in-place clear/update），直接持有 dict 引用
-  会拿到过期对象。
-- `start_save_worker` 启动单例 greenlet，从队列拉取 `'save_playlist'` 任务并保存，
-  解决了独立线程不能直接写 Redis 的并发问题。
-- 历史记录保存失败不影响主流程，只记日志。
+Redis is read exclusively by the explicit migration/export tooling. The background
+worker persists field deltas against its loaded baseline, not whole stale snapshots.
 """
 
-import datetime
-import json
 from queue import Empty, Queue
 from typing import Any, Callable, Dict, Optional
 
 from gevent import sleep, spawn
 
 from core.config import app_logger
-from core.db import rds_mgr
-from core.services.playlist.constants import PLAYLIST_RDS_FULL_KEY, PLAYLIST_RDS_HISTORY_KEY
+from core.db.db_mgr import db_mgr
+from core.services.playlist.calendar_rules import RUNTIME_FIELDS
+from copy import deepcopy
 
 log = app_logger
 
@@ -29,7 +20,7 @@ _HISTORY_LIMIT = 10
 
 
 class PlaylistRepository:
-    """负责播放列表数据与 RDS 的读写。
+    """负责播放列表数据与 DB 的读写。
 
     Args:
         playlist_raw_provider: 无参 Callable，返回当前播放列表 dict（用 provider 避免引用过期）。
@@ -48,91 +39,55 @@ class PlaylistRepository:
 
     @property
     def is_ready(self) -> bool:
-        """只有从当前持久化来源成功读取的快照才能写回。"""
-        return (
-            self._loaded_storage is not None
-            and self._loaded_storage == rds_mgr.get_storage_identity()
-        )
+        return self._loaded_storage is not None
 
     def invalidate(self) -> None:
-        """加载或写入失败后暂停保存，直到重新读取成功。"""
         self._loaded_storage = None
 
     def load_raw(self) -> Dict[str, Any]:
-        """读取并校验全量数据；确认键不存在时返回空字典，读取失败则抛异常。"""
         self.invalidate()
-        source = rds_mgr.get_storage_identity()
-        if source[0] == 'fallback':
-            raise ConnectionError('Redis 不可用，无法确认完整播放列表，已暂停保存')
-        raw = rds_mgr.get(PLAYLIST_RDS_FULL_KEY)
-        if source != rds_mgr.get_storage_identity():
-            raise RuntimeError('播放列表读取期间存储发生切换，请重新加载')
-        data = {} if raw is None else json.loads(raw)
-        if not isinstance(data, dict) or any(not isinstance(item, dict) for item in data.values()):
-            raise ValueError('播放列表持久化数据格式错误，应为播放列表集合')
-        self._loaded_storage = source
+        data = db_mgr.playlist_operation('load')
+        self._baseline = deepcopy(data)
+        self._loaded_storage = ('db', 1)
         return data
 
     def get_history(self, limit: int = 10) -> Dict[str, str]:
-        """获取播放列表历史 Hash，按时间倒序返回最近 ``limit`` 条。"""
-        try:
-            history_dict = rds_mgr.hgetall(PLAYLIST_RDS_HISTORY_KEY)
-            if not history_dict:
-                return {}
-            sorted_keys = sorted(history_dict.keys(), reverse=True)
-            return {key: history_dict[key] for key in sorted_keys[:limit]}
-        except Exception as e:
-            log.error(f"[PlaylistRepository] get_history error: {e}", exc_info=True)
-            return {}
+        return db_mgr.playlist_operation('history', limit)
 
-    def save(self, swallow_errors: bool = False) -> bool:
-        """保存播放列表到 RDS，同时保存历史记录。
+    def refresh_one(self, identifier):
+        """Refresh one configuration without advancing other rows' save baselines."""
+        row = db_mgr.playlist_operation('load').get(identifier)
+        if row is None:
+            return None
+        self._baseline[identifier] = deepcopy(row)
+        target = self._playlist_raw_provider()
+        for key in RUNTIME_FIELDS:
+            if key in target.get(identifier, {}):
+                row[key] = deepcopy(target[identifier][key])
+        target[identifier] = row
+        return row
 
-        Args:
-            swallow_errors: True 时吞掉异常并记 WARNING（异步 greenlet 用）；
-                False 时按 ERROR 记录后将异常向上抛（业务同步路径用）。
-
-        Returns:
-            是否保存成功。
-        """
+    def save(self, swallow_errors=False, *, replace=False, patch=None, deletion=None) -> bool:
         try:
             if not self.is_ready:
-                raise RuntimeError('播放列表尚未从当前存储成功读取，拒绝保存')
-            json_str = json.dumps(self._playlist_raw_provider(), ensure_ascii=False)
-            if not rds_mgr.set(PLAYLIST_RDS_FULL_KEY, json_str):
-                raise RuntimeError('播放列表写入失败')
-            self._save_history(json_str)
+                raise RuntimeError('播放列表尚未成功读取，拒绝保存')
+            live = deepcopy(self._playlist_raw_provider())
+            data = db_mgr.playlist_operation('save', live,
+                self._baseline, replace=replace, patch=patch, deletion=deletion, runtime=live)
+            self._baseline = deepcopy(data)
+            target = self._playlist_raw_provider()
+            target.clear()
+            target.update(data)
             return True
-        except Exception as e:
+        except Exception:
             self.invalidate()
             if swallow_errors:
-                log.warning(f"[PlaylistRepository] save (swallow) error: {e}")
+                log.exception('播放列表后台保存失败')
                 return False
-            log.error(f"[PlaylistRepository] save error: {e}", exc_info=True)
             raise
 
-    def _save_history(self, json_str: str) -> None:
-        """保存播放列表历史记录到 Redis Hash，最多保留 N 个历史版本。"""
-        try:
-            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            rds_mgr.hset(PLAYLIST_RDS_HISTORY_KEY, timestamp, json_str)
-
-            current_count = rds_mgr.hlen(PLAYLIST_RDS_HISTORY_KEY)
-            if current_count > _HISTORY_LIMIT:
-                history_dict = rds_mgr.hgetall(PLAYLIST_RDS_HISTORY_KEY)
-                sorted_keys = sorted(history_dict.keys())
-                keys_to_remove = sorted_keys[:current_count - _HISTORY_LIMIT]
-                if keys_to_remove:
-                    rds_mgr.hdel(PLAYLIST_RDS_HISTORY_KEY, *keys_to_remove)
-                    log.info(f"[PlaylistMgr] 清理过期历史记录，删除 {len(keys_to_remove)} 个旧记录")
-
-            log.debug(f"[PlaylistMgr] 保存播放列表历史记录: {timestamp}")
-        except Exception as e:
-            log.error(f"[PlaylistRepository] _save_history error: {e}", exc_info=True)
-            # 历史记录保存失败不影响主流程，只记录错误
-
     def start_save_worker(self) -> None:
-        """启动后台 greenlet 处理 Redis 保存队列（单例）。"""
+        """启动后台 greenlet 处理 DB 保存队列（单例）。"""
         if self._save_greenlet is not None and not self._save_greenlet.dead:
             return
 

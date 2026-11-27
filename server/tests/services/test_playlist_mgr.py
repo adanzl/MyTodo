@@ -1,7 +1,8 @@
 import pytest
 from unittest.mock import patch, MagicMock, call
 import json
-import fakeredis
+from sqlalchemy import create_engine, text
+from core.db import playlist_store
 import datetime
 import types
 
@@ -44,7 +45,7 @@ def create_playlist_data(p_id,
         pre_lists if pre_lists is not None else [[] for _ in range(7)],
         "trigger_button": trigger_button,
         "schedule": schedule or {
-            "enabled": 0,
+            "enabled": 1,
             "cron": ""
         }
     }
@@ -88,8 +89,12 @@ def playlist_mgr(monkeypatch, mock_device, tmp_path):
     monkeypatch.setattr('core.device.dlna.upnpclient.Device',
                         MagicMock(return_value=mock_device))
 
-    fake_redis_client = fakeredis.FakeRedis()
-    monkeypatch.setattr(rds_mgr, 'rds', fake_redis_client)
+    engine = create_engine('sqlite:///' + str(tmp_path/'playlists.db'))
+    playlist_store.ensure(engine)
+    playlist_store.migrate(engine, {})
+    from core.services.playlist.repository import db_mgr
+    monkeypatch.setattr(db_mgr, 'playlist_operation',
+        lambda operation, *args, **kwargs: getattr(playlist_store, operation)(engine, *args, **kwargs))
 
     # P5 后 create_device 只在 playlist.devices 里 import；走 __globals__ 才能命中正确的 module 实例。
     monkeypatch.setitem(
@@ -133,17 +138,32 @@ def playlist_mgr(monkeypatch, mock_device, tmp_path):
     mgr._devices.clear()
     mgr._playing_playlists.clear()
     mgr._play_state.clear()
-    fake_redis_client.flushall()
+    mgr._test_engine = engine
     return mgr
 
 
-def test_reload_from_rds(playlist_mgr):
+def _seed(mgr, raw):
+    # Seed storage directly to exercise reload of legacy/corrupt persisted values.
+    try:
+        rows = json.loads(raw)
+    except ValueError:
+        rows = {'corrupt': raw}
+    with mgr._test_engine.begin() as c:
+        c.execute(text('DELETE FROM t_playlist'))
+        for identifier, row in rows.items():
+            status = row.get('schedule', {}).get('enabled', 0) if isinstance(row, dict) else 0
+            payload = json.dumps(row) if isinstance(row, dict) else row
+            c.execute(text("INSERT INTO t_playlist(id,mode,name,status,create_time,updated_time,payload) VALUES(:id,'weekly',:id,:status,'now','now',:payload)"),
+                {'id': identifier, 'status': status, 'payload': payload})
+
+
+def test_reload_from_db(playlist_mgr):
     mock_playlist = create_playlist_data("p1", "Playlist 1",
                                          [{
                                              "uri": "file1.mp3"
                                          }])
     mock_playlist_data = {"p1": mock_playlist}
-    rds_mgr.set("schedule_play:playlist_collection",
+    _seed(playlist_mgr,
                 json.dumps(mock_playlist_data))
 
     result = playlist_mgr.reload()
@@ -153,34 +173,130 @@ def test_reload_from_rds(playlist_mgr):
     assert "p1" in playlist_mgr._devices
 
 
+def test_calendar_api_persists_and_rejects_conflicts_atomically(playlist_mgr, monkeypatch):
+    from flask import Flask
+    import core.api.playlist_routes as routes
+    monkeypatch.setattr(routes, 'playlist_mgr', playlist_mgr)
+    monkeypatch.setattr(playlist_mgr._duration_fetcher, 'start_batch_fetch', lambda *_: None)
+    app = Flask(__name__)
+    app.register_blueprint(routes.playlist_bp)
+    client = app.test_client()
+    row = create_playlist_data('a', 'A', [{'uri': 'main.mp3', 'duration': 3600}])
+    row.update(mode='calendar', status=1, start_date='2026-11-01', end_date='2026-11-02', start_time='23:30:00', pre_list=[])
+    assert client.post('/playlist/update', json=row).get_json()['code'] == 0
+    peer = {**row, 'id': 'b'}
+    conflict = client.post('/playlist/update', json=peer).get_json()
+    assert conflict['code'] != 0 and '重叠' in conflict['msg']
+    assert set(playlist_store.load(playlist_mgr._test_engine)) == {'a'}
+    response = client.get('/playlist/calendar?start_date=2026-11-01&end_date=2026-11-03').get_json()
+    assert response['code'] == 0 and len(response['data']) == 2
+    assert client.post('/playlist/update', json={'id': 'a', 'status': 0}).get_json()['code'] == 0
+    assert client.post('/playlist/update', json=peer).get_json()['code'] == 0
+    stored = playlist_store.load(playlist_mgr._test_engine)
+    assert stored['a']['status'] == stored['a']['schedule']['enabled'] == 0
+    assert client.get('/playlist/calendar').get_json()['code'] != 0
+    revision = stored['b']['_revision']
+    assert client.post('/playlist/delete', json={'id': 'b', '_revision': revision}).get_json()['code'] == 0
+    remaining = playlist_store.load(playlist_mgr._test_engine)
+    assert set(remaining) == {'a'} and remaining['a'] == stored['a']
+
+
+def test_calendar_pre_list_duration_timer_and_final_cross_day_switch(playlist_mgr, mock_device, monkeypatch):
+    import datetime
+    from types import SimpleNamespace
+    from core.services.playlist.calendar_rules import TZ
+    moment = [TZ.localize(datetime.datetime(2026, 11, 2, 23, 59))]
+    class Clock(datetime.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return moment[0].astimezone(tz) if tz else moment[0].replace(tzinfo=None)
+    monkeypatch.setattr(pm, 'datetime', SimpleNamespace(datetime=Clock, timedelta=datetime.timedelta))
+    row = create_playlist_data('a', 'A', [{'uri': 'main.mp3', 'duration': 120}])
+    row.update(mode='calendar', status=1, start_date='2026-11-02', end_date='2026-11-02', start_time='23:59:00',
+               pre_list=[{'uri': 'pre.mp3', 'duration': 60}])
+    assert playlist_mgr.update_single_playlist(row) == 0
+    monkeypatch.setattr(playlist_mgr._scheduling, 'start_playlist_duration_timer', MagicMock())
+    assert playlist_mgr.play('a')[0] == 0
+    mock_device.play.assert_called_with('pre.mp3')
+    playlist_mgr._scheduling.start_playlist_duration_timer.assert_called_with('a', 3)
+    moment[0] += datetime.timedelta(minutes=1)
+    assert playlist_mgr.play_next('a')[0] == 0
+    mock_device.play.assert_called_with('main.mp3')
+    playlist_mgr._playing_playlists.clear()
+    assert playlist_mgr.play('a')[0] != 0
+
+
+def test_stop_verification_leaves_same_device_next_playlist_playing(playlist_mgr, mock_device, monkeypatch):
+    for identifier in ['a', 'b']:
+        row = create_playlist_data(identifier, identifier, [{'uri': 'main.mp3'}])
+        row['device']['address'] = 'http://same-speaker.local'
+        assert playlist_mgr.update_single_playlist(row) == 0
+    monkeypatch.setattr(mock_scheduler_mgr, 'get_job', lambda *_: None)
+    playlist_mgr.stop('a')
+    callback = mock_scheduler_mgr.add_date_job.call_args.kwargs['func']
+    mock_device.stop.reset_mock()
+    playlist_mgr._playing_playlists.add('b')
+    callback()
+    mock_device.stop.assert_not_called()
+
+
+@pytest.mark.parametrize('remove', [False, True])
+def test_bulk_disable_or_delete_stops_active_device(playlist_mgr, mock_device, remove):
+    from copy import deepcopy
+    row = create_playlist_data('a', 'A', [{'uri': 'main.mp3', 'duration': 60}])
+    assert playlist_mgr.update_single_playlist(row) == 0
+    assert playlist_mgr.play('a')[0] == 0
+    rows = deepcopy(playlist_mgr._playlist_raw)
+    if remove:
+        rows.clear()
+    else:
+        rows['a']['status'] = 0
+    assert playlist_mgr.save_playlist(rows) == 0
+    mock_device.stop.assert_called_once()
+    assert 'a' not in playlist_mgr._playing_playlists
+
+
+def test_bulk_edit_preserves_live_state_before_background_flush(playlist_mgr):
+    row = create_playlist_data('a', 'A', [{'uri': 'main.mp3', 'duration': 60}])
+    assert playlist_mgr.update_single_playlist(row) == 0
+    stale = playlist_store.load(playlist_mgr._test_engine)
+    assert playlist_mgr.play('a')[0] == 0
+    stale['a']['name'] = 'renamed'
+    stale['a']['isPlaying'] = False
+    assert playlist_mgr.save_playlist(stale) == 0
+    saved = playlist_store.load(playlist_mgr._test_engine)['a']
+    assert saved['name'] == 'renamed' and saved['isPlaying'] is True
+    assert playlist_mgr._playlist_raw['a']['isPlaying'] is True
+
+
 def test_reload_non_linux_still_loads_data(playlist_mgr, monkeypatch):
     monkeypatch.setattr(pm.sys, "platform", "darwin")
-    rds_mgr.set("schedule_play:playlist_collection", json.dumps({"p1": create_playlist_data("p1", "P1", [])}))
+    _seed(playlist_mgr, json.dumps({"p1": create_playlist_data("p1", "P1", [])}))
     result = playlist_mgr.reload()
     assert result == 0
     assert "p1" in playlist_mgr._playlist_raw
 
 
-def test_reload_redis_error_sets_needs_reload(playlist_mgr, monkeypatch):
+def test_reload_db_error_sets_needs_reload(playlist_mgr, monkeypatch):
 
     def bad_get(key):
         raise ConnectionError("no")
 
-    monkeypatch.setattr(rds_mgr, "get", bad_get)
+    monkeypatch.setattr(playlist_mgr._repo, "load_raw", lambda: bad_get(None))
     result = playlist_mgr.reload()
     assert result == -1
     assert playlist_mgr._needs_reload is True
 
 
 def test_reload_invalid_json_is_handled(playlist_mgr):
-    rds_mgr.set("schedule_play:playlist_collection", "not json")
+    _seed(playlist_mgr, "not json")
     result = playlist_mgr.reload()
     assert result == -1
 
 
 def test_reload_cleans_up_orphaned_play_state(playlist_mgr):
     mock_playlist = create_playlist_data("p1", "P1", [])
-    rds_mgr.set("schedule_play:playlist_collection",
+    _seed(playlist_mgr,
                 json.dumps({"p1": mock_playlist}))
 
     playlist_mgr._play_state = {"p1": {}, "orphan": {}}
@@ -795,12 +911,12 @@ def test_get_pre_list_for_today_edge_cases():
         }]
 
 
-def test_save_playlist_to_rds_exception(playlist_mgr, monkeypatch):
+def test_save_playlist_to_db_exception(playlist_mgr, monkeypatch):
     """repo.save 异常时向上抛出"""
     playlist_mgr._playlist_raw = {"p1": {}}
-    monkeypatch.setattr(rds_mgr, 'set',
-                        MagicMock(side_effect=RuntimeError("redis error")))
-    with pytest.raises(RuntimeError, match="redis error"):
+    from core.services.playlist.repository import db_mgr
+    monkeypatch.setattr(db_mgr, 'playlist_operation', MagicMock(side_effect=RuntimeError("db error")))
+    with pytest.raises(RuntimeError, match="db error"):
         playlist_mgr._repo.save()
 
 
@@ -935,7 +1051,7 @@ def test_reload_fix_pre_lists_format(playlist_mgr):
             },
         }
     }
-    rds_mgr.set("schedule_play:playlist_collection", json.dumps(raw))
+    _seed(playlist_mgr, json.dumps(raw))
     playlist_mgr.reload()
     assert "p1" in playlist_mgr._playlist_raw
     pre_lists = playlist_mgr._playlist_raw["p1"].get("pre_lists")

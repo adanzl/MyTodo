@@ -47,3 +47,6 @@ android/.idea/
 device_agent/config.properties
 server/test.py
 rds_local.json
+
+# Private production snapshots and local validation artifacts
+/tmp/

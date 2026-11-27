@@ -21,7 +21,7 @@
 
     <div v-if="playlistStatus" class="flex-1 overflow-y-auto space-y-4">
       <!-- Cron 定时任务配置 -->
-      <div class="border rounded p-3">
+      <div v-if="playlistStatus.mode !== 'calendar'" class="border rounded p-3">
         <div class="flex items-center justify-between mb-2">
           <h4 class="text-sm font-semibold">定时任务 (Cron)</h4>
           <el-switch
@@ -70,7 +70,7 @@
                 class="w-full"
               >
               </el-input-number>
-              <div class="text-xs text-gray-500 mt-1">0表示不自动停止</div>
+              <div class="text-xs text-gray-500 mt-1">{{ playlistStatus.schedule?.cron ? '0表示按曲目总时长停止' : '0表示不自动停止' }}</div>
             </div>
             <div class="flex-1">
               <div class="text-xs text-gray-600 mb-1">触发按钮</div>

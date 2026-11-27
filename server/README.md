@@ -160,6 +160,45 @@ server/
 - `core/services/playlist_mgr.py` - 播放列表管理器
 - `core/services/audio_merge_mgr.py` - 音频合成管理器
 
+#### 播放列表 DB 与日期排期
+
+播放列表仅通过 `db_mgr` 读写 SQLite 的 `t_playlist`，不再从 Redis 或本地 Redis 回退文件读取。
+`t_playlist_history` 保留最近 10 个集合快照，另存一条一次性迁移标记。
+
+- `mode=weekly` 保留 7 天 `pre_lists` 与原 cron；5 字段 cron 的秒为 0，6 字段 cron 保留秒，统一按上海时区执行和展开日历。日期列由 cron 推导；无有限起止日期时显示 `1970-01-01` 至 `2099-12-31`。多时刻 cron 的 `start_time` 为空，实际时刻以 cron 为准。启用但 cron 为空的旧列表仍支持手动播放。
+- `mode=calendar` 使用 `pre_list`，起止日期包含最后一天，每天在 `start_time` 播放；最后一天启动的播放允许跨到次日。
+- `status` 是启用状态的唯一来源，保存时同步 `schedule.enabled`，读取时从列值生成旧字段。兼容只发送 `schedule.enabled` 的旧客户端；两个字段同时发送时以 `status` 为准。禁用列表不播放、不注册 cron、不占档期。
+- calendar 与同设备的 calendar、weekly 排期均不得重叠；weekly 之间保留旧行为。设备身份使用类型加地址，小米使用类型加 did。区间按 `[开始, 结束)` 判断，允许首尾相接，检查包含跨日尾段。保存和冲突检查使用同一个 SQLite 写事务，失败不覆盖原数据。
+- 占用时长优先取 `schedule.duration`（分钟），否则取当次前置和正片曲目的秒数总和；日期排期及有 cron 的列表会在该时长后停止，避免循环播放超出档期。无 cron 的手动 weekly 保留原循环行为。启用 calendar 必须有可用设备及完整时长；共享设备的 weekly 若命中日时长未知，也拒绝无法确认的排期。
+- `/playlist/*` 旧接口保留；新增 `GET /api/playlist/calendar?start_date=2026-11-01&end_date=2026-11-30`，一次最多查 62 天，返回两种模式的排期与跨日事件。密集 cron 按日汇总，返回 `occurrence_count` 和 `last_start`，不丢弃触发次数。
+- 编辑接口支持 `_revision` 乐观锁；游标和定时器等后台字段按差异合并，避免后台保存覆盖新配置。前端默认打开 Weekly，保留原来的三列界面，仅处理 weekly；新增 Calendar 列表与日历视图两个 Tab。Calendar 列表仅展示日期排期，通过编辑抽屉设置日期时刻、前置曲目、正片和设备；日历视图展示 weekly 与 calendar。
+- 新建、复制、改名和排序等集合保存完成后刷新 DB 版本号；失败时重读服务端数据并向调用方抛出错误，不再显示成功。Calendar 删除使用 `POST /api/playlist/delete`，请求包含 `id` 和可选 `_revision`，在事务中只删除目标行，保留并发新增的其他列表；带旧版本号的更新不能重新创建已删除的列表。
+- 配置保存保留 DB 中当前的播放态、游标和定时器，不接受旧表单对这些运行字段的覆盖；播放控制仍由原专用接口和后台保存处理。复制列表不继承原列表版本号或正在播放标记。
+
+新增模块：`core/db/playlist_store.py`（事务、版本和历史），`core/services/playlist/calendar_rules.py`（统一排期规则），`frontend/src/views/media/PlaylistWorkspace.vue`（三个 Tab），`migrate_playlists.py`（显式迁移），`tests/db/test_playlist_store.py`（存储与冲突回归）。
+
+**首次切换必须先迁移。** 未完成迁移时播放列表读写报错，防止把空表误当成正式数据。正式数据从远程服务获取，不能使用开发机的 `data.db` 或 `rds_local.json` 代替。准备步骤：冻结旧服务的播放列表写入，使用 SQLite 在线 backup 下载正式 DB，并从同一远程 Redis 通过一个事务读取 `schedule_play:playlist_collection` 和 `schedule_play:playlist_collection_history`，导出为：
+
+```json
+{"collection": {"id": {"id": "id", "schedule": {"enabled": 1}}}, "history": {"原时间戳": "原集合 JSON 字符串"}}
+```
+
+保留原始备份及 SHA256，在副本先预览、执行并校验，再由部署人员安排正式切换：
+
+```bash
+python migrate_playlists.py --snapshot /backup/remote-playlists.json --db /backup/validation-data.db
+python migrate_playlists.py --snapshot /backup/remote-playlists.json --db /backup/validation-data.db --apply
+```
+
+工具默认只读预览，`--apply` 要求目标 DB 已存在；保留原曲目、设备、播放态和自定义 payload 字段，统一补充 weekly 派生字段。重复导入同一集合不写入；不同集合或已有业务行的目标会拒绝覆盖。工具不会启动 Flask、访问设备、重启服务或拉取代码。正式切换前重新获取冻结后的快照，保留旧版本、DB 在线备份和 Redis 原键作为回退依据；本地副本验证不等同于已完成远程切换。
+
+相关测试在隔离 SQLite 上运行，不依赖正式 Redis：
+
+```bash
+mkdir -p tmp/test-case
+REDIS_ENABLED=false PYTHONPATH=server python -m pytest server/tests/db/test_playlist_store.py server/tests/services/test_playlist_mgr.py server/tests/services/test_playlist_mgr_timer.py server/tests/services/test_playlist_storage_recovery.py server/tests/services/test_playlist_device_reload.py server/tests/services/test_scheduler_mgr.py server/tests/api/test_playlist_routes.py --basetemp=tmp/test-case/playlist-db
+```
+
 ### 5. 智能设备控制
 
 #### 蓝牙设备

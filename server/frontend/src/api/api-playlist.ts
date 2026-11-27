@@ -37,6 +37,11 @@ export async function updatePlaylist(
   return rsp.data;
 }
 
+export async function deletePlaylist(id: string, revision?: number): Promise<ApiResponse<unknown>> {
+  const rsp = await api.post('/playlist/delete', {id, _revision: revision});
+  return rsp.data;
+}
+
 /**
  * 批量更新所有播放列表
  * @param collection 播放列表集合，格式为 {playlist_id: playlist_data, ...}

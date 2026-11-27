@@ -1,9 +1,11 @@
 <template>
   <div class="p-1">
+    <PlaylistWorkspace :items="playlistCollection" :active-id="activePlaylistId"
+      @select="handleSelectPlaylist" @saved="refreshPlaylistStatus" v-slot="{calendar}">
     <!-- 3列布局：播放列表 | 文件列表 | 配置详情 -->
     <div class="flex gap-4 h-[calc(100vh-150px)] w-full min-w-0 overflow-hidden">
       <!-- 第一列：播放列表列表 -->
-      <PanelPlaylistList :playlist-collection="playlistCollection" :active-playlist-id="activePlaylistId"
+      <PanelPlaylistList v-if="!calendar" :playlist-collection="playlistCollection.filter(row => row.mode !== 'calendar')" :active-playlist-id="activePlaylistId"
         :refreshing="playlistRefreshing" :auto-refresh-enabled="autoRefreshEnabled" :drag-mode="playlistDragMode"
         @select="handleSelectPlaylist" @create="handleCreatePlaylist" @refresh="refreshPlaylistStatus"
         @toggle-auto-refresh="handleToggleAutoRefresh" @toggle-drag-mode="handleTogglePlaylistDragMode"
@@ -12,7 +14,7 @@
       </PanelPlaylistList>
 
       <!-- 第二列：文件列表 -->
-      <PanelFileList :playlist-status="playlistStatus" :active-playlist-id="activePlaylistId"
+      <PanelFileList v-if="calendar || playlistStatus?.mode !== 'calendar'" :playlist-status="playlistStatus" :active-playlist-id="activePlaylistId"
         :editing-playlist-id="editingPlaylistId" v-model:editing-playlist-name="editingPlaylistName"
         :selected-weekday-index="selectedWeekdayIndex" :pre-files-drag-mode="preFilesDragMode"
         :pre-files-batch-delete-mode="preFilesBatchDeleteMode" :selected-pre-file-indices="selectedPreFileIndices"
@@ -49,7 +51,7 @@
       </PanelFileList>
 
       <!-- 第三列：配置详情（Cron + 设备） -->
-      <PanelConfig :playlist-status="playlistStatus" :connected-device-list="connectedDeviceList"
+      <PanelConfig v-if="calendar || playlistStatus?.mode !== 'calendar'" :playlist-status="playlistStatus" :connected-device-list="connectedDeviceList"
         :dlna-device-list="dlnaDeviceList" :mi-device-list="miDeviceList" :loading="loading"
         :dlna-scanning="dlnaScanning" :mi-scanning="miScanning"
         :on-toggle-cron-enabled="handleTogglePlaylistCronEnabled" :on-update-cron="handleUpdatePlaylistCron"
@@ -63,6 +65,8 @@
         :on-scan-mi-devices="scanMiDevices" :on-open-scan-dialog="handleOpenScanDialog"
         :on-open-device-list="handleOpenAgentListDialog"></PanelConfig>
     </div>
+
+    </PlaylistWorkspace>
 
     <!-- 文件浏览对话框 -->
     <FileDialog :visible="fileBrowserDialogVisible" @update:visible="fileBrowserDialogVisible = $event"
@@ -131,6 +135,7 @@ import CronPreviewDialog from "@/views/dialogs/CronPreviewDialog.vue";
 import PanelPlaylistList from "./PanelPlaylistList.vue";
 import PanelFileList from "./PanelFileList.vue";
 import PanelConfig from "./PanelConfig.vue";
+import PlaylistWorkspace from "./PlaylistWorkspace.vue";
 import ScanDeviceDialog from "@/views/dialogs/ScanDeviceDialog.vue";
 import DevicesDrawer from "@/views/dialogs/DevicesDrawer.vue";
 import PlaylistSelectDialog from "@/views/dialogs/PlaylistSelectDialog.vue";

@@ -110,3 +110,19 @@ def test_start_playlist_duration_timer_stops_when_playing(mgr_with_mock_schedule
     cb = scheduler.add_date_job.call_args.kwargs["func"]
     cb()
     stop_mock.assert_called_once_with(pid)
+
+
+def test_calendar_cron_bounds_and_status_disables_job(mgr_with_mock_scheduler):
+    mgr, scheduler, _ = mgr_with_mock_scheduler
+    row = {'mode': 'calendar', 'status': 1, 'start_date': '2026-11-01',
+           'end_date': '2026-11-02', 'start_time': '23:30:00', 'schedule': {'enabled': 1}}
+    mgr._scheduling.refresh_cron_job('a', row)
+    kwargs = scheduler.add_cron_job.call_args.kwargs
+    assert (kwargs['hour'], kwargs['minute'], kwargs['second']) == (23, 30, 0)
+    assert kwargs['start_date'].isoformat() == '2026-11-01T00:00:00+08:00'
+    assert kwargs['end_date'].isoformat() == '2026-11-02T23:59:59.999999+08:00'
+    scheduler.get_job.return_value = object()
+    scheduler.add_cron_job.reset_mock()
+    mgr._scheduling.refresh_cron_job('a', {**row, 'status': 0})
+    scheduler.remove_job.assert_called_with('playlist_cron_a')
+    scheduler.add_cron_job.assert_not_called()

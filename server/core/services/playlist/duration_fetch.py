@@ -30,8 +30,9 @@ def _iter_file_items(playlist_data: Dict[str, Any]) -> Iterator[Any]:
 
     仅产出 ``dict`` 项；``playlist`` 缺失或非 list 时跳过，避免 ``yield from None``。
     """
-    pre_lists = playlist_data.get("pre_lists", [])
-    if isinstance(pre_lists, list) and len(pre_lists) == 7:
+    pre_lists = ([playlist_data.get('pre_list', [])] if playlist_data.get('mode') == 'calendar'
+                 else playlist_data.get("pre_lists", []))
+    if isinstance(pre_lists, list):
         for pre_list in pre_lists:
             if isinstance(pre_list, list):
                 for item in pre_list:

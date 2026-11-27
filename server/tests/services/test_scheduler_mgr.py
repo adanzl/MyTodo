@@ -56,13 +56,14 @@ def test_shutdown_not_running_noop(scheduler_mgr_instance):
 def test_add_cron_job_with_expression_6_fields(monkeypatch, scheduler_mgr_instance):
     mgr = scheduler_mgr_instance
 
-    import core.services.scheduler_mgr as sm
+    import core.services.playlist.calendar_rules as rules
+    import core.utils as utils
 
     # Ensure weekday conversion is invoked and deterministic
-    monkeypatch.setattr(sm, "convert_standard_cron_weekday_to_apscheduler", lambda x: "mon")
+    monkeypatch.setattr(utils, "convert_standard_cron_weekday_to_apscheduler", lambda x: "mon")
 
     cron_trigger = object()
-    monkeypatch.setattr(sm, "CronTrigger", MagicMock(return_value=cron_trigger))
+    monkeypatch.setattr(rules, "CronTrigger", MagicMock(return_value=cron_trigger))
 
     called = {"func": 0}
 
@@ -72,24 +73,27 @@ def test_add_cron_job_with_expression_6_fields(monkeypatch, scheduler_mgr_instan
     ok = mgr.add_cron_job(f, "job1", cron_expression="0 1 2 3 4 1")
     assert ok is True
 
-    sm.CronTrigger.assert_called_once()
+    rules.CronTrigger.assert_called_once()
+    assert rules.CronTrigger.call_args.kwargs["day_of_week"] == "mon"
     mgr.scheduler.add_job.assert_called_once()
 
 
 def test_add_cron_job_with_expression_5_fields(monkeypatch, scheduler_mgr_instance):
     mgr = scheduler_mgr_instance
 
-    import core.services.scheduler_mgr as sm
+    import core.services.playlist.calendar_rules as rules
+    import core.utils as utils
 
-    monkeypatch.setattr(sm, "convert_standard_cron_weekday_to_apscheduler", lambda x: "mon")
+    monkeypatch.setattr(utils, "convert_standard_cron_weekday_to_apscheduler", lambda x: "mon")
 
     cron_trigger = object()
-    monkeypatch.setattr(sm, "CronTrigger", MagicMock(return_value=cron_trigger))
+    monkeypatch.setattr(rules, "CronTrigger", MagicMock(return_value=cron_trigger))
 
     ok = mgr.add_cron_job(lambda: None, "job2", cron_expression="1 2 3 4 1")
     assert ok is True
 
-    sm.CronTrigger.assert_called_once()
+    rules.CronTrigger.assert_called_once()
+    assert rules.CronTrigger.call_args.kwargs["day_of_week"] == "mon"
     mgr.scheduler.add_job.assert_called_once()
 
 

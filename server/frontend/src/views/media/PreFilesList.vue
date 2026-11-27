@@ -7,9 +7,9 @@
         <!-- 星期选择按钮 -->
         <div class="flex items-center gap-1">
           <el-button
-            v-for="(day, index) in ['周一', '周二', '周三', '周四', '周五', '周六', '周日']"
+            v-for="(day, index) in (playlistStatus?.mode === 'calendar' ? ['统一前置'] : ['周一', '周二', '周三', '周四', '周五', '周六', '周日'])"
             :key="index"
-            :type="selectedWeekdayIndex === index ||
+            :type="playlistStatus?.mode === 'calendar' || selectedWeekdayIndex === index ||
               (selectedWeekdayIndex === null && getWeekdayIndex() === index)
               ? 'primary'
               : 'default'

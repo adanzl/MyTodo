@@ -35,7 +35,7 @@ export function usePlaylistData(
   pendingDeviceType: Ref<string | null>,
   preFilesDragMode: Ref<boolean>,
   filesDragMode: Ref<boolean>,
-  _getSelectedWeekdayIndex: () => number // 保留参数以保持接口兼容性，但当前未使用
+  _getSelectedWeekdayIndex: () => number
 ) {
   // ========== 辅助函数 ==========
 
@@ -60,6 +60,10 @@ export function usePlaylistData(
   const normalizePreLists = (
     item: Partial<PlaylistApiData> | Partial<Playlist>
   ): PlaylistItem[][] => {
+    if (item.mode === 'calendar') {
+      const shared = toPlaylistItems(normalizeFiles(item.pre_list || [], true));
+      return Array.from({ length: 7 }, () => shared.map(f => ({ ...f })));
+    }
     // 如果已有有效的 pre_lists，直接规范化返回
     if (
       item.pre_lists &&
@@ -149,9 +153,9 @@ export function usePlaylistData(
    * 从源播放列表创建副本（新 id、新名称，保留内容与配置）
    */
   const createCopyPlaylist = (source: Playlist, name: string): Playlist => {
-    const { id: _id, ...rest } = source;
+    const { id: _id, _revision: _revision, ...rest } = source;
     return normalizePlaylistItem(
-      { ...rest, name: (name || `${source.name}_副本`).trim() },
+      { ...rest, isPlaying: false, name: (name || `${source.name}_副本`).trim() },
       source.name
     );
   };
@@ -184,6 +188,11 @@ export function usePlaylistData(
     const deviceAddress = item?.device_address || item?.device?.address || null;
 
     return {
+      mode: item.mode || 'weekly',
+      status: item.status ?? (item.schedule?.enabled === 1 ? 1 : 0),
+      start_date: item.start_date, end_date: item.end_date, start_time: item.start_time,
+      pre_list: item.pre_list, length_seconds: item.length_seconds,
+      weekday_lengths: item.weekday_lengths, _revision: item._revision,
       id: item?.id || createPlaylistId(),
       name,
       playlist: playlist,
@@ -325,6 +334,9 @@ export function usePlaylistData(
       const normalizedPreLists = normalizePreLists(item);
 
       playlistDict[item.id] = {
+        mode: item.mode || 'weekly', status: item.status,
+        start_date: item.start_date, end_date: item.end_date, start_time: item.start_time,
+        pre_list: item.pre_list, _revision: item._revision,
         id: item.id,
         name: item.name || DEFAULT_PLAYLIST_NAME,
         playlist: normalizedFiles,
@@ -334,6 +346,7 @@ export function usePlaylistData(
           address: item.device?.address || item.device_address || "",
           type: deviceType,
           name: item.device?.name || null,
+          did: item.device?.did || null,
         },
         device_volume: item.device_volume,
         schedule: item.schedule || { enabled: 0, cron: "", duration: 0 },
@@ -351,6 +364,7 @@ export function usePlaylistData(
    * 保存播放列表
    */
   const savePlaylist = async (collectionOverride?: Playlist[]) => {
+    playlistLoading.value = true;
     try {
       // 直接使用原始数组，保持顺序不变
       const collection = collectionOverride || playlistCollection.value || [];
@@ -374,8 +388,12 @@ export function usePlaylistData(
       if (response.code !== 0) {
         throw new Error(response.msg || "保存播放列表集合失败");
       }
+      await loadPlaylist();
     } catch (error) {
-      logAndNoticeError(error as Error, "保存播放列表集合失败");
+      await loadPlaylist();
+      throw error;
+    } finally {
+      playlistLoading.value = false;
     }
   };
 
@@ -470,6 +488,10 @@ export function usePlaylistData(
 
     const currentItem = collection[index];
     const updatedItem = mutator(clonePlaylistItem(currentItem)) || currentItem;
+    if (updatedItem.mode === 'calendar') {
+      const weekday = _getSelectedWeekdayIndex();
+      updatedItem.pre_list = updatedItem.pre_lists[weekday] || [];
+    }
     const normalizedItem = normalizePlaylistItem(updatedItem, currentItem.name);
 
     // 保留原有的 pre_lists（如果更新后的无效）
@@ -482,8 +504,12 @@ export function usePlaylistData(
     collection[index] = normalizedItem;
     playlistCollection.value = collection;
 
-    await updateSinglePlaylist(collection[index]);
-    syncActivePlaylist(collection);
+    if (!(await updateSinglePlaylist(collection[index]))) {
+      await loadPlaylist();
+      return null;
+    }
+    await loadPlaylist();
+    syncActivePlaylist(playlistCollection.value);
     return playlistStatus.value;
   };
 

@@ -52,7 +52,8 @@ export function useCronManagement(
       if (!playlistInfo.schedule) {
         playlistInfo.schedule = { enabled: 0, cron: "", duration: 0 };
       }
-      playlistInfo.schedule.enabled = enabled ? 1 : 0;
+      playlistInfo.status = enabled ? 1 : 0;
+      playlistInfo.schedule.enabled = playlistInfo.status;
       return playlistInfo;
     });
   };

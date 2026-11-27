@@ -268,6 +268,8 @@ def create_app():
 
     chat_mgr.init(socketio)
     db_mgr.init(app)
+    from core.services.playlist_mgr import playlist_mgr
+    playlist_mgr.reload()
     ai_mgr.init()
 
     # 初始化定时任务调度器

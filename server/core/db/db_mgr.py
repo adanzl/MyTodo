@@ -99,10 +99,19 @@ class DbMgr:
             log.info(f"DbMgr init with pool_size={config.DB_POOL_SIZE}, max_overflow={config.DB_MAX_OVERFLOW}, "
                      f"pool_recycle={config.DB_POOL_RECYCLE}, pool_pre_ping={config.DB_POOL_PRE_PING}")
 
+        self._app = app
         db_obj.init_app(app)
         self._initialized = True
         with app.app_context():
             self.ensure_t_coin_history_table()
+
+    def playlist_operation(self, operation, *args, **kwargs):
+        from core.db import playlist_store
+        if not self._initialized:
+            raise RuntimeError('数据库尚未初始化')
+        with self._app.app_context():
+            playlist_store.ensure(db_obj.engine)
+            return getattr(playlist_store, operation)(db_obj.engine, *args, **kwargs)
 
     def ensure_t_coin_history_table(self) -> None:
         """若缺少 t_coin_history，则按 t_score_history 的 SQLite 结构克隆（含索引）。"""

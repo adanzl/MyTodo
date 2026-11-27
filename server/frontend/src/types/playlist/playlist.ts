@@ -86,6 +86,16 @@ export interface PlaylistDevice {
  * 用于存储和传输播放列表数据
  */
 export interface Playlist {
+  mode?: 'weekly' | 'calendar';
+  status?: 0 | 1;
+  start_date?: string | null;
+  end_date?: string | null;
+  start_time?: string | null;
+  pre_list?: PlaylistItem[];
+  length_seconds?: number | null;
+  weekday_lengths?: (number | null)[];
+  _revision?: number;
+
   /**
    * 播放列表ID
    */
@@ -197,6 +207,16 @@ export interface PlaylistCollection {
  * 用于从 API 获取数据时的格式转换
  */
 export interface PlaylistApiData {
+  mode?: 'weekly' | 'calendar';
+  status?: 0 | 1;
+  start_date?: string | null;
+  end_date?: string | null;
+  start_time?: string | null;
+  pre_list?: PlaylistItem[];
+  length_seconds?: number | null;
+  weekday_lengths?: (number | null)[];
+  _revision?: number;
+
   /**
    * 播放列表 ID
    */

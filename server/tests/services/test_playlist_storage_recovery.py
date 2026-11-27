@@ -1,202 +1,103 @@
-"""播放列表加载失败或切换存储时，不得用内存快照覆盖持久化数据。"""
+"""DB-only repository readiness, failures and concurrent state saves."""
+from copy import deepcopy
+from queue import Queue
+from unittest.mock import Mock
 
-import json
-from types import SimpleNamespace
-from unittest.mock import MagicMock
-
-import fakeredis
 import pytest
-from gevent import sleep
-
-from core.db import rds_mgr
-from core.services import playlist_mgr as pm
-from core.services.playlist.constants import PLAYLIST_RDS_FULL_KEY, PLAYLIST_RDS_HISTORY_KEY
-
-
-_START_SAVE_WORKER = pm.PlaylistRepository.start_save_worker
-
-
-def collection(playlist_id="existing"):
-    return {
-        playlist_id: {
-            "id": playlist_id,
-            "name": playlist_id,
-            "playlist": [],
-            "pre_lists": [[] for _ in range(7)],
-        }
-    }
+from sqlalchemy import create_engine, text
+from core.db import playlist_store
+from core.services.playlist.repository import PlaylistRepository, db_mgr
 
 
 @pytest.fixture
-def storage(monkeypatch):
-    client = fakeredis.FakeRedis()
-    monkeypatch.setenv("REDIS_ENABLED", "true")
-    monkeypatch.setattr(rds_mgr, "rds", client)
-    monkeypatch.setattr(rds_mgr, "_local_store", None)
-    monkeypatch.setattr(rds_mgr, "is_local_fallback", False)
-    monkeypatch.setattr(rds_mgr, "_client_generation", 0)
-    monkeypatch.setattr(rds_mgr, "_create_redis_client", lambda: client)
-    monkeypatch.setattr(pm, "sys", SimpleNamespace(platform="linux"))
-    monkeypatch.setattr(pm.PlaylistRepository, "start_save_worker", lambda self: None)
-    monkeypatch.setattr(pm.PlaylistScheduling, "ensure_duration_guard_job", lambda self: None)
-    monkeypatch.setattr(pm.PlaylistScheduling, "restore_timers_from_persistence", lambda self: None)
-    monkeypatch.setattr(pm.PlaylistMgr, "_refresh_device_map", lambda self: None)
-    monkeypatch.setattr(pm.PlaylistDevices, "refresh_single", lambda *args: None)
-    monkeypatch.setattr(pm.PlaylistScheduling, "refresh_cron_job", lambda *args: None)
-    return client
+def storage(tmp_path, monkeypatch):
+    engine = create_engine('sqlite:///'+str(tmp_path/'playlists.db'))
+    playlist_store.ensure(engine)
+    playlist_store.migrate(engine, {})
+    monkeypatch.setattr(db_mgr, 'playlist_operation',
+        lambda op, *args, **kw: getattr(playlist_store, op)(engine, *args, **kw))
+    current = {}
+    repo = PlaylistRepository(lambda: current, Queue())
+    current.update(repo.load_raw())
+    yield engine, current, repo
+    engine.dispose()
 
 
-def fallback(monkeypatch, tmp_path):
-    local = rds_mgr._LocalJsonStore(str(tmp_path / "fallback.json"))
-    monkeypatch.setattr(rds_mgr, "_local_store", local)
-    monkeypatch.setattr(rds_mgr, "is_local_fallback", True)
-    return local
+def test_successful_load_authorizes_saves_and_does_not_use_redis(storage, monkeypatch):
+    from core.db import rds_mgr
+    monkeypatch.setattr(rds_mgr, 'get', Mock(side_effect=AssertionError('Redis read')))
+    monkeypatch.setattr(rds_mgr, 'set', Mock(side_effect=AssertionError('Redis write')))
+    _, current, repo = storage
+    repo.save(patch={'id': 'x', 'name': 'x'})
+    assert repo.is_ready and set(current) == {'x'}
+    assert set(repo.load_raw()) == {'x'}
 
 
-def test_queued_autosave_after_redis_recovers_cannot_erase_unloaded_data(
-    storage, monkeypatch, tmp_path
-):
-    original = collection()
-    storage.set(PLAYLIST_RDS_FULL_KEY, json.dumps(original))
-    fallback(monkeypatch, tmp_path)
-    mgr = pm.PlaylistMgr()
-
-    assert mgr._playlist_raw == {}
-    assert mgr._needs_reload is True
-    assert rds_mgr._try_restore_redis() is True
-
-    _START_SAVE_WORKER(mgr._repo)
-    try:
-        mgr._rds_save_queue.put("save_playlist")
-        sleep(0.15)
-        assert mgr._rds_save_queue.empty(), "自动保存信号必须实际被消费"
-        assert json.loads(storage.get(PLAYLIST_RDS_FULL_KEY)) == original
-        assert storage.hgetall(PLAYLIST_RDS_HISTORY_KEY) == {}
-    finally:
-        mgr._repo._save_greenlet.kill()
-
-    assert set(mgr.get_playlist()) == {"existing"}
-    mgr._playlist_raw["existing"]["name"] = "edited after recovery"
-    assert mgr._repo.save() is True
-    assert json.loads(storage.get(PLAYLIST_RDS_FULL_KEY))["existing"]["name"] == "edited after recovery"
+def test_failed_load_keeps_repository_unready(storage, monkeypatch):
+    _, _, repo = storage
+    monkeypatch.setattr(db_mgr, 'playlist_operation', Mock(side_effect=RuntimeError('DB unavailable')))
+    with pytest.raises(RuntimeError):
+        repo.load_raw()
+    assert not repo.is_ready
+    assert repo.save(swallow_errors=True) is False
 
 
-def test_failed_reload_keeps_last_good_memory_and_blocks_saves(storage, monkeypatch):
-    original = collection()
-    storage.set(PLAYLIST_RDS_FULL_KEY, json.dumps(original))
-    mgr = pm.PlaylistMgr()
-    snapshot = mgr._playlist_raw
-    monkeypatch.setattr(rds_mgr, "get", MagicMock(side_effect=ConnectionError("offline")))
-
-    assert mgr.reload() == -1
-    assert mgr._playlist_raw is snapshot
-    assert mgr._repo.save(swallow_errors=True) is False
-    assert json.loads(storage.get(PLAYLIST_RDS_FULL_KEY)) == original
-    with pytest.raises(RuntimeError, match="读取失败"):
-        mgr.get_playlist()
+def test_failed_save_does_not_replace_memory(storage, monkeypatch):
+    _, current, repo = storage
+    repo.save(patch={'id': 'x', 'name': 'before'})
+    old = deepcopy(current)
+    monkeypatch.setattr(db_mgr, 'playlist_operation', Mock(side_effect=RuntimeError('DB unavailable')))
+    with pytest.raises(RuntimeError):
+        repo.save(patch={'id': 'x', 'name': 'after'})
+    assert current == old and not repo.is_ready
 
 
-@pytest.mark.parametrize("bad_payload", ["not json", "null", "[]", '{"broken": null}', ""])
-def test_invalid_data_does_not_replace_memory_or_get_saved(storage, bad_payload):
-    storage.set(PLAYLIST_RDS_FULL_KEY, json.dumps(collection()))
-    mgr = pm.PlaylistMgr()
-    snapshot = mgr._playlist_raw
-    storage.set(PLAYLIST_RDS_FULL_KEY, bad_payload)
-
-    assert mgr.reload() == -1
-    assert mgr._playlist_raw is snapshot
-    assert mgr._repo.save(swallow_errors=True) is False
-    assert storage.get(PLAYLIST_RDS_FULL_KEY) == bad_payload.encode()
+def test_corrupt_payload_is_not_treated_as_empty_collection(storage):
+    engine, _, repo = storage
+    repo.save(patch={'id': 'x', 'name': 'before'})
+    with engine.begin() as c:
+        c.execute(text("UPDATE t_playlist SET payload='not JSON' WHERE id='x'"))
+    with pytest.raises(ValueError):
+        repo.load_raw()
+    assert not repo.is_ready
 
 
-def test_edits_while_redis_is_unavailable_are_rejected_without_changing_memory(
-    storage, monkeypatch, tmp_path
-):
-    fallback(monkeypatch, tmp_path)
-    mgr = pm.PlaylistMgr()
-
-    assert mgr.save_playlist(collection("new")) == -1
-    assert mgr.update_single_playlist(collection("new")["new"]) == -1
-    assert mgr._playlist_raw == {}
-    assert storage.get(PLAYLIST_RDS_FULL_KEY) is None
+def test_empty_loaded_collection_can_be_replaced(storage):
+    _, current, repo = storage
+    current['x'] = {'id': 'x', 'name': 'new'}
+    repo.save(replace=True)
+    assert set(repo.load_raw()) == {'x'}
+    current.clear()
+    repo.save(replace=True)
+    assert repo.load_raw() == {}
 
 
-def test_first_edit_after_recovery_reloads_before_merging(storage, monkeypatch, tmp_path):
-    storage.set(PLAYLIST_RDS_FULL_KEY, json.dumps(collection()))
-    fallback(monkeypatch, tmp_path)
-    mgr = pm.PlaylistMgr()
-    assert rds_mgr._try_restore_redis() is True
-
-    assert mgr.update_single_playlist(collection("new")["new"]) == 0
-    assert set(json.loads(storage.get(PLAYLIST_RDS_FULL_KEY))) == {"existing", "new"}
-
-
-def test_storage_switch_invalidates_even_a_previously_loaded_snapshot(storage):
-    storage.set(PLAYLIST_RDS_FULL_KEY, json.dumps(collection()))
-    mgr = pm.PlaylistMgr()
-    rds_mgr._client_generation += 1
-    storage.set(PLAYLIST_RDS_FULL_KEY, json.dumps(collection("remote")))
-
-    assert mgr._repo.save(swallow_errors=True) is False
-    assert set(json.loads(storage.get(PLAYLIST_RDS_FULL_KEY))) == {"remote"}
-    assert set(mgr.get_playlist()) == {"remote"}
+def test_stale_full_collection_is_rejected(storage):
+    engine, current, repo = storage
+    repo.save(patch={'id': 'x', 'name': 'before'})
+    playlist_store.save(engine, {}, {}, patch={'id': 'x', 'name': 'concurrent'})
+    current['x']['name'] = 'stale'
+    with pytest.raises(ValueError, match='变化'):
+        repo.save(replace=True)
+    assert playlist_store.load(engine)['x']['name'] == 'concurrent'
 
 
-def test_storage_switch_during_read_is_not_accepted(storage, monkeypatch):
-    storage.set(PLAYLIST_RDS_FULL_KEY, json.dumps(collection()))
-    mgr = pm.PlaylistMgr()
-    snapshot = mgr._playlist_raw
-
-    def switched_read(key):
-        raw = storage.get(key)
-        rds_mgr._client_generation += 1
-        return raw
-
-    monkeypatch.setattr(rds_mgr, "get", switched_read)
-    assert mgr.reload() == -1
-    assert mgr._playlist_raw is snapshot
-    assert mgr._repo.save(swallow_errors=True) is False
+def test_play_refresh_does_not_advance_unrelated_configuration_baseline(storage):
+    engine, current, repo = storage
+    repo.save(patch={'id': 'x', 'name': 'before'})
+    repo.save(patch={'id': 'y', 'name': 'before'})
+    playlist_store.save(engine, {}, {}, patch={'id': 'y', 'name': 'concurrent'})
+    repo.refresh_one('x')
+    current['x']['current_index'] = 1
+    repo.save()
+    assert playlist_store.load(engine)['y']['name'] == 'concurrent'
 
 
-def test_reload_setup_error_restores_last_good_collection(storage, monkeypatch):
-    storage.set(PLAYLIST_RDS_FULL_KEY, json.dumps(collection()))
-    mgr = pm.PlaylistMgr()
-    snapshot = mgr._playlist_raw
-    storage.set(PLAYLIST_RDS_FULL_KEY, json.dumps(collection("replacement")))
-    monkeypatch.setattr(mgr, "_refresh_device_map", MagicMock(side_effect=RuntimeError("device error")))
-
-    assert mgr.reload() == -1
-    assert mgr._playlist_raw is snapshot
-    assert mgr._repo.save(swallow_errors=True) is False
-    assert set(json.loads(storage.get(PLAYLIST_RDS_FULL_KEY))) == {"replacement"}
-
-
-def test_confirmed_missing_key_allows_creating_a_first_playlist(storage):
-    mgr = pm.PlaylistMgr()
-    assert mgr.update_single_playlist(collection("first")["first"]) == 0
-    assert set(json.loads(storage.get(PLAYLIST_RDS_FULL_KEY))) == {"first"}
-
-
-def test_intentional_clear_after_successful_load_is_allowed(storage):
-    storage.set(PLAYLIST_RDS_FULL_KEY, json.dumps(collection()))
-    mgr = pm.PlaylistMgr()
-
-    assert mgr.save_playlist({}) == 0
-    assert json.loads(storage.get(PLAYLIST_RDS_FULL_KEY)) == {}
-
-
-def test_explicit_local_storage_remains_writable(storage, monkeypatch, tmp_path):
-    local = fallback(monkeypatch, tmp_path)
-    monkeypatch.setenv("REDIS_ENABLED", "false")
-    mgr = pm.PlaylistMgr()
-
-    assert mgr.save_playlist(collection()) == 0
-    assert json.loads(local.get(PLAYLIST_RDS_FULL_KEY)) == collection()
-
-
-def test_rejected_storage_write_does_not_report_success_or_write_history(storage, monkeypatch):
-    mgr = pm.PlaylistMgr()
-    monkeypatch.setattr(rds_mgr, "set", lambda *args: False)
-
-    assert mgr.update_single_playlist(collection("new")["new"]) == -1
-    assert storage.hgetall(PLAYLIST_RDS_HISTORY_KEY) == {}
+def test_configuration_save_flushes_pending_server_playback_delta(storage):
+    engine, current, repo = storage
+    repo.save(patch={'id': 'x', 'name': 'before'})
+    current['x'].update(isPlaying=True, current_index=3, file_timer_at='2026-11-26 23:00:00')
+    repo.save(patch={'id': 'x', 'name': 'after', 'isPlaying': False, 'current_index': 0})
+    saved = playlist_store.load(engine)['x']
+    assert saved['name'] == 'after' and saved['isPlaying'] is True
+    assert saved['current_index'] == 3 and saved['file_timer_at'] == '2026-11-26 23:00:00'

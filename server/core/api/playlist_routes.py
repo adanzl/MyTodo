@@ -66,11 +66,25 @@ def playlist_update() -> ResponseReturnValue:
 
         ret = playlist_mgr.update_single_playlist(args)
         if ret != 0:
-            return _err("更新播放列表失败")
+            return _err(playlist_mgr.last_error or "更新播放列表失败")
         return _ok()
     except Exception as e:
         log.error(f"[PLAYLIST] Update error: {e}", exc_info=True)
         return _err(f'error: {str(e)}')
+
+
+@playlist_bp.route('/playlist/delete', methods=['POST'])
+def playlist_delete() -> ResponseReturnValue:
+    try:
+        args = read_json_from_request()
+        if not args.get('id'):
+            return _err('播放列表 id 不能为空')
+        if playlist_mgr.delete_playlist(str(args['id']), args.get('_revision')) != 0:
+            return _err(playlist_mgr.last_error or '删除播放列表失败')
+        return _ok()
+    except Exception as exc:
+        log.exception('删除播放列表失败')
+        return _err(str(exc))
 
 
 @playlist_bp.route("/playlist/updateAll", methods=['POST'])
@@ -84,7 +98,7 @@ def playlist_update_all() -> ResponseReturnValue:
 
         ret = playlist_mgr.save_playlist(args)
         if ret != 0:
-            return _err("更新播放列表集合失败")
+            return _err(playlist_mgr.last_error or "更新播放列表集合失败")
         return _ok()
     except Exception as e:
         log.error(f"[PLAYLIST] UpdateAll error: {e}")
@@ -298,3 +312,12 @@ def playlist_set_current_index() -> ResponseReturnValue:
     except Exception as e:
         log.error(f"[PLAYLIST] SetCurrentIndex error: {e}")
         return _err(f'error: {str(e)}')
+
+
+@playlist_bp.route('/playlist/calendar', methods=['GET'])
+def playlist_calendar():
+    try:
+        from core.services.playlist.calendar_rules import calendar_events
+        return _ok(calendar_events(playlist_mgr.get_playlist(), request.args['start_date'], request.args['end_date']))
+    except (ValueError, KeyError, RuntimeError) as exc:
+        return _err(str(exc))

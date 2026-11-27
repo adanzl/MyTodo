@@ -7,7 +7,7 @@
 - 单次推播文件到时停设备的 on-device timer
 - 播放列表整体时长限制 timer
 - 30s 一次的 duration guard
-- 进程冷启动后从 RDS 固化字段恢复定时器
+- 进程冷启动后从 DB 固化字段恢复定时器
 - 一次性任务（如 stop verify）
 
 与 `PlaylistMgr` 编排层通过行为回调交互：`on_play` / `on_stop` /
@@ -24,6 +24,7 @@ from gevent import spawn
 
 from core.config import app_logger
 from core.services.scheduler_mgr import scheduler_mgr
+from core.services.playlist.calendar_rules import cron_trigger, playback_length, TZ
 
 log = app_logger
 
@@ -68,13 +69,13 @@ class PlaylistScheduling:
         try:
             job_id = f"{self._CRON_PREFIX}{playlist_id}"
             schedule = playlist_data.get("schedule", {})
-            enabled = schedule.get("enabled", 0)
+            enabled = playlist_data.get("status", schedule.get("enabled", 0))
             cron_expression = schedule.get("cron", "").strip()
 
             if scheduler_mgr.get_job(job_id):
                 scheduler_mgr.remove_job(job_id)
 
-            if enabled != 1 or not cron_expression:
+            if enabled != 1 or (playlist_data.get("mode", "weekly") == "weekly" and not cron_expression):
                 return
 
             def cron_play_task(pid=playlist_id) -> None:
@@ -99,8 +100,16 @@ class PlaylistScheduling:
                         log.error(
                             f"[PlaylistScheduling] 定时任务执行异常: {pid} - {p_name}, {e}")
 
-            success = scheduler_mgr.add_cron_job(
-                func=cron_play_task, job_id=job_id, cron_expression=cron_expression)
+            if playlist_data.get('mode') == 'calendar':
+                clock = datetime.time.fromisoformat(playlist_data['start_time'])
+                start = TZ.localize(datetime.datetime.combine(datetime.date.fromisoformat(playlist_data['start_date']), datetime.time.min))
+                end = TZ.localize(datetime.datetime.combine(datetime.date.fromisoformat(playlist_data['end_date']), datetime.time.max))
+                success = scheduler_mgr.add_cron_job(func=cron_play_task, job_id=job_id,
+                    hour=clock.hour, minute=clock.minute, second=clock.second,
+                    start_date=start, end_date=end, timezone=TZ)
+            else:
+                success = scheduler_mgr.add_cron_job(func=cron_play_task, job_id=job_id,
+                    cron_expression=cron_expression)
             playlist_name = playlist_data.get("name", "未知播放列表")
             if success:
                 log.info(
@@ -129,9 +138,8 @@ class PlaylistScheduling:
 
                     # 1) 内存中的开始时间（在线触发的常规路径）
                     for pid, start_time in list(self._scheduled_play_start_times.items()):
-                        schedule = (playlist_raw.get(pid, {}) or {}
-                                    ).get("schedule", {}) or {}
-                        duration_minutes = schedule.get("duration", 0)
+                        row = playlist_raw.get(pid, {}) or {}
+                        duration_minutes = row.get('schedule', {}).get('duration', 0) or 0
                         if duration_minutes <= 0:
                             continue
                         planned_end = start_time + \
@@ -139,12 +147,9 @@ class PlaylistScheduling:
                         self._force_stop_if_expired(
                             pid, planned_end, now, grace, source="内存开始时间")
 
-                    # 2) RDS 固化的 duration_timer_at（进程重启 _scheduled_play_start_times 可能为空时兜底）
+                    # 2) DB 固化的 duration_timer_at（进程重启 _scheduled_play_start_times 可能为空时兜底）
                     for pid, playlist_data in list(playlist_raw.items()):
                         if not playlist_data.get("isPlaying"):
-                            continue
-                        schedule = playlist_data.get("schedule", {}) or {}
-                        if schedule.get("duration", 0) <= 0:
                             continue
                         dta = playlist_data.get("duration_timer_at")
                         if not dta:
@@ -174,7 +179,7 @@ class PlaylistScheduling:
     # ===== reload 后恢复 =====
 
     def restore_timers_from_persistence(self) -> None:
-        """reload / 冷启动后根据 RDS 中固化的定时器字段恢复 APScheduler 任务。"""
+        """reload / 冷启动后根据 DB 中固化的定时器字段恢复 APScheduler 任务。"""
         if sys.platform != "linux":
             return
         playlist_raw = self._playlist_raw_provider()
@@ -184,16 +189,22 @@ class PlaylistScheduling:
         for pid, p_data in list(playlist_raw.items()):
             if not p_data.get("isPlaying"):
                 continue
+            if p_data.get('status', p_data.get('schedule', {}).get('enabled', 0)) != 1:
+                self._devices_provider().safe_stop(pid)
+                p_data.pop('isPlaying', None)
+                p_data.pop('duration_timer_at', None)
+                p_data.pop('file_timer_at', None)
+                self._save_async()
+                continue
             if pid not in self._devices_provider():
                 log.warning(
                     f"[PlaylistScheduling] reload 恢复定时器: 无设备映射，跳过 {pid}")
                 continue
             self._playing_playlists_provider().add(pid)
 
-            schedule = p_data.get("schedule") or {}
-            dur_min = int(schedule.get("duration", 0) or 0)
+            dur_min = self._duration_minutes(p_data)
             dta = p_data.get("duration_timer_at")
-            if dur_min > 0 and dta:
+            if dta:
                 try:
                     end_dt = datetime.datetime.strptime(
                         str(dta).strip(), "%Y-%m-%d %H:%M:%S")
@@ -259,6 +270,15 @@ class PlaylistScheduling:
                     del state_dict[pid]
 
     # ===== file / on-device / playlist duration timers =====
+
+    @staticmethod
+    def _duration_minutes(row):
+        duration = row.get('schedule', {}).get('duration', 0) or 0
+        if duration > 0:
+            return duration
+        if row.get('mode') == 'calendar' or row.get('schedule', {}).get('cron'):
+            return (playback_length(row, datetime.datetime.now(TZ).weekday()) or 0) / 60
+        return 0
 
     def start_file_timer(self, id: str, duration_seconds: float) -> None:
         """启动单个文件播放结束后的切歌定时器。"""

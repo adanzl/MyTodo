@@ -12,7 +12,6 @@ from apscheduler.executors.gevent import GeventExecutor
 from datetime import datetime
 from typing import Callable, Optional, Any, List
 from core.config import app_logger
-from core.utils import convert_standard_cron_weekday_to_apscheduler
 
 log = app_logger
 
@@ -104,34 +103,8 @@ class SchedulerMgr:
                 log.info(f"移除已存在的任务: {job_id}")
 
             if cron_expression:
-                # 解析 cron 表达式
-                parts = cron_expression.strip().split()
-
-                # 检查字段数量
-                if len(parts) == 6:
-                    # 6 字段格式：秒 分 时 日 月 周
-                    second, minute, hour, day, month, day_of_week = parts
-                    # 转换标准 cron 周几到 APScheduler 周几
-                    converted_day_of_week = convert_standard_cron_weekday_to_apscheduler(day_of_week)
-                    trigger = CronTrigger(second=second,
-                                          minute=minute,
-                                          hour=hour,
-                                          day=day,
-                                          month=month,
-                                          day_of_week=converted_day_of_week)
-                elif len(parts) == 5:
-                    # 5 字段格式：分 时 日 月 周（标准 cron）
-                    # 手动解析并转换，不使用 from_crontab()（因为它有 bug）
-                    minute, hour, day, month, day_of_week = parts
-                    # 转换标准 cron 周几到 APScheduler 周几
-                    converted_day_of_week = convert_standard_cron_weekday_to_apscheduler(day_of_week)
-                    trigger = CronTrigger(minute=minute,
-                                          hour=hour,
-                                          day=day,
-                                          month=month,
-                                          day_of_week=converted_day_of_week)
-                else:
-                    raise ValueError(f"不支持的 cron 表达式格式，字段数量: {len(parts)}，期望 5 或 6 个字段")
+                from core.services.playlist.calendar_rules import cron_trigger
+                trigger = cron_trigger(cron_expression)
             else:
                 trigger = CronTrigger(**cron_kwargs)
 

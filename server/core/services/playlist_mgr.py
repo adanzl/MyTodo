@@ -3,6 +3,9 @@ import os
 import sys
 import time
 from queue import Queue
+from copy import deepcopy
+from gevent.lock import Semaphore
+from core.services.playlist.calendar_rules import device_key, playback_length, RUNTIME_FIELDS, TZ
 from typing import Any, Dict, List, Optional, Tuple
 
 from gevent import spawn, sleep
@@ -34,7 +37,7 @@ class PlaylistMgr:
     """播放列表管理器。
 
     该服务负责：
-    - 播放列表数据的 CRUD（通过 RDS 持久化）
+    - 播放列表数据的 CRUD（通过 DB 持久化）
     - 播放状态机与游标（pre_lists 按周 + playlist）
     - 与设备层交互（play/stop/get_status/set_volume）
     - 定时任务（cron 自动播放、文件结束自动切下一首、播放列表时长限制）
@@ -42,20 +45,22 @@ class PlaylistMgr:
     并发模型说明：
     - 主流程运行在 gevent 环境；
     - 批量获取媒体时长使用线程执行；
-    - 线程侧不直接操作 Redis，而是通过 `_rds_save_queue` 将保存请求传递给 gevent worker。
+    - 线程侧不直接操作 DB，而是通过 `_rds_save_queue` 将保存请求传递给 gevent worker。
     """
 
     def __init__(self) -> None:
+        self._device_play_lock = Semaphore()
+        self.last_error = None
         self._playing_playlists = set()  # 正在播放的播放列表ID集合
         self._playlist_raw = {}  # 播放列表数据
         self._devices = PlaylistDevices()
         self._play_state = {
         }  # 播放状态跟踪 {playlist_id: {'in_pre_files': bool, 'pre_index': int, 'file_index': int}}
-        self._needs_reload = False  # 标记是否需要重新从 RDS 加载
-        self._rds_save_queue = Queue()  # Redis 保存操作队列（用于从线程传递到 gevent 环境）
+        self._needs_reload = False  # 标记是否需要重新从 DB 加载
+        self._rds_save_queue = Queue()  # DB 保存操作队列（用于从线程传递到 gevent 环境）
         self._last_play_sent_at = {
         }  # 向设备发送 play 的时间 {playlist_id: datetime}，用于停止时判断是否需延迟再发 stop
-        # P1: RDS 读写迁出到 PlaylistRepository。用 provider 避免 _playlist_raw 重赋值导致引用过期。
+        # P1: DB 读写迁出到 PlaylistRepository。用 provider 避免 _playlist_raw 重赋值导致引用过期。
         self._repo = PlaylistRepository(
             playlist_raw_provider=lambda: self._playlist_raw,
             rds_save_queue=self._rds_save_queue,
@@ -139,7 +144,7 @@ class PlaylistMgr:
         return result
 
     def get_playlist_history(self, limit: int = 10) -> Dict[str, str]:
-        """获取播放列表历史记录（从 Redis Hash）。
+        """获取播放列表历史记录（从 DB 快照）。
 
         Args:
             limit: 返回的历史记录数量，默认10个。
@@ -150,7 +155,7 @@ class PlaylistMgr:
         return self._repo.get_history(limit)
 
     def save_playlist(self, collection: Dict[str, Any]) -> int:
-        """保存整个播放列表集合并持久化到 RDS。
+        """保存整个播放列表集合并持久化到 DB。
 
         Args:
             collection: 播放列表集合字典，格式为 {playlist_id: playlist_data}。
@@ -166,17 +171,47 @@ class PlaylistMgr:
                 log.warning(f"[PlaylistMgr] 播放列表 {playlist_id} 正在转换中，禁止修改")
                 return -1
 
-        self._playlist_raw = collection
-        self._repo.save()
+        previous = self._playlist_raw
+        self._playlist_raw = deepcopy(collection)
+        for pid, row in self._playlist_raw.items():
+            for key in RUNTIME_FIELDS:
+                row.pop(key, None)
+                if key in previous.get(pid, {}):
+                    row[key] = deepcopy(previous[pid][key])
+        try:
+            self._repo.save(replace=True)
+        except Exception as exc:
+            self._playlist_raw = previous
+            self.last_error = str(exc)
+            return -1
+        self.last_error = None
+        self._stop_invalidated_playback(previous)
         # 更新设备映射
         self._refresh_device_map()
         return 0
+
+    def delete_playlist(self, playlist_id: str, revision=None) -> int:
+        try:
+            if not self._ensure_loaded():
+                raise RuntimeError('播放列表读取失败')
+            if self._format_convert.is_converting(playlist_id):
+                raise ValueError('播放列表正在转换中，禁止删除')
+            previous = deepcopy(self._playlist_raw)
+            self._repo.save(deletion={'id': playlist_id, '_revision': revision})
+            self._stop_invalidated_playback(previous)
+            self._refresh_device_map()
+            self.last_error = None
+            return 0
+        except Exception as exc:
+            self.last_error = str(exc)
+            log.exception('删除播放列表失败: %s', playlist_id)
+            return -1
 
     def update_single_playlist(self, playlist_data: Dict[str, Any]) -> int:
         """更新或创建单个播放列表。
 
         如果 playlist_id 已存在，则合并更新；否则创建新列表。
-        此操作会同步更新 RDS、设备映射和 cron 定时任务。
+        此操作会同步更新 DB、设备映射和 cron 定时任务。
 
         Args:
             playlist_data: 播放列表数据，必须包含 "id" 字段。
@@ -207,14 +242,11 @@ class PlaylistMgr:
             if playlist_id not in self._playlist_raw:
                 log.info(f"[PlaylistMgr] 创建新播放列表: {playlist_id}")
 
-            # 更新播放列表数据（合并现有数据，保留原有字段）
-            if playlist_id in self._playlist_raw:
-                self._playlist_raw[playlist_id].update(playlist_data)
-            else:
-                self._playlist_raw[playlist_id] = playlist_data
-
-            # 保存到 RDS 和更新设备映射
-            self._repo.save()
+            # Validation and conflict checks happen atomically before memory changes.
+            previous = deepcopy(self._playlist_raw)
+            self._repo.save(patch=playlist_data)
+            self.last_error = None
+            self._stop_invalidated_playback(previous)
             self._devices.refresh_single(playlist_id,
                                          self._playlist_raw[playlist_id])
             self._scheduling.refresh_cron_job(playlist_id,
@@ -222,6 +254,7 @@ class PlaylistMgr:
 
             return 0
         except Exception as e:
+            self.last_error = str(e)
             pid = playlist_data.get("id", "?") if isinstance(
                 playlist_data, dict) else "?"
             log.error(
@@ -230,7 +263,7 @@ class PlaylistMgr:
             return -1
 
     def reload(self) -> int:
-        """从 RDS 重新加载所有播放列表数据。
+        """从 DB 重新加载所有播放列表数据。
 
         数据读取和校验成功后才替换内存；失败时保留原有列表并暂停保存。
         设备映射和定时任务由各自组件处理平台限制。
@@ -246,7 +279,7 @@ class PlaylistMgr:
             self._playlist_raw = raw
 
             # 保留 isPlaying / 定时器固化字段，便于进程重启后由 PlaylistScheduling.restore_timers_from_persistence 恢复 APScheduler 任务。
-            # 当前 RDS 存档均为合法 pre_lists（7 个 list）；仅对损坏/旧字段做格式修复，不再读取已废弃的顶层 pre_files。
+            # 当前 DB 存档均为合法 pre_lists（7 个 list）；仅对损坏/旧字段做格式修复，不再读取已废弃的顶层 pre_files。
             migrated = False
             for playlist_id, playlist_data in self._playlist_raw.items():
                 pre_lists = playlist_data.get("pre_lists", [])
@@ -263,11 +296,9 @@ class PlaylistMgr:
                 if playlist_id not in self._play_state:
                     # 如果 _play_state 中没有该播放列表的状态，从 _playlist_raw 恢复游标
                     current_index = playlist_data.get("current_index", 0)
-                    pre_lists = playlist_data.get("pre_lists", [])
-                    pre_files = _get_pre_list_for_today(
-                        pre_lists)  # 获取今天对应的前置文件列表
+                    pre_files = self._get_pre_files_for_today(playlist_data)
                     if playlist_data.get("isPlaying"):
-                        # 仅当 RDS 里成对存在 play_in_pre_files + play_pre_index 时才按持久化游标恢复；
+                        # 仅当 DB 里成对存在 play_in_pre_files + play_pre_index 时才按持久化游标恢复；
                         # 单独存在任一字段（如历史脏数据）则走下面 elif/else 启发式，避免误恢复。
                         if "play_in_pre_files" in playlist_data and "play_pre_index" in playlist_data:
                             self._play_state[playlist_id] = {
@@ -313,7 +344,7 @@ class PlaylistMgr:
             for pid in playlist_ids_to_remove:
                 self._play_state.pop(pid, None)
 
-            # 清除内存运行时状态；正在播的列表由 scheduling.restore_timers_from_persistence 根据 RDS 字段恢复
+            # 清除内存运行时状态；正在播的列表由 scheduling.restore_timers_from_persistence 根据 DB 字段恢复
             self._playing_playlists.clear()
             self._scheduling.scheduled_play_start_times.clear()
 
@@ -340,12 +371,26 @@ class PlaylistMgr:
 
     def _refresh_device_map(self) -> None:
         """刷新所有播放列表的设备映射。"""
-        self._devices.refresh_all(
-            self._playlist_raw or {},
-            on_each_playlist=lambda pid, data: self._scheduling.
-            refresh_cron_job(pid, data),
-        )
+        self._devices.refresh_all(self._playlist_raw or {})
+        for pid, data in self._playlist_raw.items():
+            self._scheduling.refresh_cron_job(pid, data)
         self._cleanup_orphans()
+
+    def _stop_invalidated_playback(self, previous):
+        """Stop the old device before deleting, disabling or rebinding a live row."""
+        active = self._playing_playlists | set(self._scheduling._file_on_device_timers)
+        for pid in list(active):
+            before = previous.get(pid, {})
+            after = self._playlist_raw.get(pid)
+            changed_device = after and device_key(before.get('device')) != device_key(after.get('device'))
+            if after and after.get('status') == 1 and not changed_device:
+                continue
+            if after and not changed_device:
+                self.stop(pid)
+            else:
+                self._devices.safe_stop(pid)
+                self._cleanup_play_state(pid)
+                self._last_play_sent_at.pop(pid, None)
 
     def _cleanup_orphans(self) -> None:
         """清理孤儿：APScheduler 上的所有 prefix 任务 + scheduling 自有 dict + mgr 自有 dict（_play_state / _last_play_sent_at / _playing_playlists）。"""
@@ -364,8 +409,7 @@ class PlaylistMgr:
         if not self._playlist_raw or id not in self._playlist_raw:
             return {}, -1, "播放列表不存在"
         playlist_data = self._playlist_raw[id]
-        pre_lists = playlist_data.get("pre_lists", [])
-        pre_files = _get_pre_list_for_today(pre_lists)  # 获取今天对应的前置文件列表
+        pre_files = self._get_pre_files_for_today(playlist_data)
         playlist = playlist_data.get("playlist", [])
         if not playlist and not pre_files:
             return {}, -1, "播放列表为空"
@@ -391,6 +435,8 @@ class PlaylistMgr:
 
     def _get_pre_files_for_today(self, playlist_data: Dict[str, Any]) -> List:
         """获取今天对应的前置文件列表。"""
+        if playlist_data.get('mode') == 'calendar':
+            return playlist_data.get('pre_list', [])
         pre_lists = playlist_data.get("pre_lists", [])
         return _get_pre_list_for_today(pre_lists)
 
@@ -425,6 +471,24 @@ class PlaylistMgr:
                 spawn(self._repo.save, swallow_errors=True)
 
     def play(self, id: str, force: bool = False) -> tuple[int, str]:
+        with self._device_play_lock:
+            if not self._ensure_loaded():
+                return -1, '播放列表读取失败'
+            # Check current DB configuration immediately before device I/O.
+            row = self._repo.refresh_one(id)
+            if row is None or row.get('status') != 1:
+                return -1, '播放列表不存在或已禁用'
+            if row.get('mode') == 'calendar' and not (force and id in self._playing_playlists):
+                today = datetime.datetime.now(TZ).strftime('%Y-%m-%d')
+                if not row['start_date'] <= today <= row['end_date']:
+                    return -1, '播放列表不在有效日期内'
+            key = device_key(row.get('device'))
+            if any(pid != id and device_key(self._playlist_raw.get(pid, {}).get('device')) == key
+                   for pid in self._playing_playlists | set(self._scheduling._file_on_device_timers)):
+                return -1, '设备正在播放其他列表'
+            return self._play(id, force)
+
+    def _play(self, id: str, force: bool = False) -> tuple[int, str]:
         """开始播放指定播放列表。
 
         播放逻辑：
@@ -506,13 +570,19 @@ class PlaylistMgr:
         # 启动播放列表时长限制定时器（内部 idempotent，自管理 _scheduled_play_start_times）
         playlist_duration_minutes = playlist_data.get("schedule",
                                                       {}).get("duration", 0)
+        if playlist_duration_minutes <= 0 and (playlist_data.get('mode') == 'calendar' or playlist_data.get('schedule', {}).get('cron')):
+            playlist_duration_minutes = (playback_length(playlist_data, datetime.datetime.now(TZ).weekday()) or 0) / 60
         if playlist_duration_minutes > 0:
             self._scheduling.start_playlist_duration_timer(
                 id, playlist_duration_minutes)
 
         return 0, "播放成功"
 
-    def play_file_on_device(self, playlist_id: str,
+    def play_file_on_device(self, playlist_id: str, file_uri: str) -> tuple[int, str]:
+        with self._device_play_lock:
+            return self._play_file_on_device(playlist_id, file_uri)
+
+    def _play_file_on_device(self, playlist_id: str,
                             file_uri: str) -> tuple[int, str]:
         """在指定播放列表绑定的设备上播放指定文件（单次推播，不改变列表播放状态）。
 
@@ -527,6 +597,14 @@ class PlaylistMgr:
             return -1, "文件地址无效"
         if not self._playlist_raw or playlist_id not in self._playlist_raw:
             return -1, "播放列表不存在"
+        if not self._ensure_loaded():
+            return -1, '播放列表读取失败'
+        row = self._repo.refresh_one(playlist_id)
+        if row is None or row.get('status') != 1:
+            return -1, '播放列表不存在或已禁用'
+        if any(pid != playlist_id and device_key(self._playlist_raw.get(pid, {}).get('device')) == device_key(row.get('device'))
+               for pid in self._playing_playlists | set(self._scheduling._file_on_device_timers)):
+            return -1, '设备正在播放其他列表'
         device = self._devices.get_obj(playlist_id)
         if device is None:
             return -1, "该播放列表未绑定设备，请先在配置中设置设备"
@@ -795,6 +873,10 @@ class PlaylistMgr:
         def _stop_verify_task(pid=playlist_id, att=attempt) -> None:
             if pid in self._playing_playlists or pid not in self._devices:
                 return
+            key = device_key(self._playlist_raw.get(pid, {}).get('device'))
+            if key and any(device_key(self._playlist_raw.get(other, {}).get('device')) == key
+                           for other in self._playing_playlists | set(self._scheduling._file_on_device_timers)):
+                return
             state, _ = self._devices.read_progress(pid)
             p_name_verify = self._playlist_raw.get(pid, {}).get(
                 "name", "未知播放列表")
@@ -922,8 +1004,8 @@ class PlaylistMgr:
             p_name = data.get("name", "未知播放列表")
             removed = 0
             file_lists: List[List] = []
-            pre_lists = data.get("pre_lists", [])
-            if isinstance(pre_lists, list) and len(pre_lists) == 7:
+            pre_lists = [data.get('pre_list', [])] if data.get('mode') == 'calendar' else data.get("pre_lists", [])
+            if isinstance(pre_lists, list):
                 file_lists.extend(pl for pl in pre_lists
                                   if isinstance(pl, list))
             playlist = data.get("playlist", [])
@@ -982,8 +1064,8 @@ class PlaylistMgr:
             seen_uris = set()
 
             # 处理pre_lists
-            pre_lists = playlist_data.get("pre_lists", [])
-            if isinstance(pre_lists, list) and len(pre_lists) == 7:
+            pre_lists = [playlist_data.get('pre_list', [])] if playlist_data.get('mode') == 'calendar' else playlist_data.get("pre_lists", [])
+            if isinstance(pre_lists, list):
                 for pre_list in pre_lists:
                     if isinstance(pre_list, list):
                         new_pre_list = []

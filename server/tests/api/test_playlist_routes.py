@@ -82,6 +82,27 @@ def test_playlist_update_requires_id(client):
     assert "id" in body["msg"]
 
 
+def test_playlist_delete_requires_id(client):
+    assert client.post('/playlist/delete', json={}).get_json()['code'] != 0
+
+
+def test_playlist_delete_passes_revision(client, monkeypatch):
+    calls = []
+    def delete(identifier, revision):
+        calls.append((identifier, revision))
+        return 0
+    monkeypatch.setattr(playlist_routes.playlist_mgr, 'delete_playlist', delete)
+    assert client.post('/playlist/delete', json={'id': 'a', '_revision': 3}).get_json()['code'] == 0
+    assert calls == [('a', 3)]
+
+
+def test_playlist_delete_returns_conflict(client, monkeypatch):
+    monkeypatch.setattr(playlist_routes.playlist_mgr, 'delete_playlist', lambda *_: -1)
+    monkeypatch.setattr(playlist_routes.playlist_mgr, 'last_error', '播放列表已被其他请求修改')
+    body = client.post('/playlist/delete', json={'id': 'a', '_revision': 3}).get_json()
+    assert body['code'] != 0 and '其他请求' in body['msg']
+
+
 def test_playlist_update_ok(client, monkeypatch):
     monkeypatch.setattr(playlist_routes.playlist_mgr, "update_single_playlist", lambda data: 0)
 
