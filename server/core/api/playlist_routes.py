@@ -177,7 +177,7 @@ def playlist_play_pre() -> ResponseReturnValue:
 
 @playlist_bp.route("/playlist/playFile", methods=['POST'])
 def playlist_play_file() -> ResponseReturnValue:
-    """在指定播放列表绑定的设备上播放指定文件（单次推播）。"""
+    """在指定播放列表绑定的设备上循环播放指定文件。"""
     try:
         args: Dict[str, Any] = read_json_from_request()
         if not args:

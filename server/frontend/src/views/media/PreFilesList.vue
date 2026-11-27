@@ -263,7 +263,7 @@
             circle
             @click.stop="$emit('play-on-device', file)"
             :disabled="playlistLoading"
-            title="在设备上播放"
+            title="在设备上单曲循环"
           >
             <span>▶</span>
           </el-button>

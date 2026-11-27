@@ -1142,3 +1142,151 @@ def test_calendar_api_queries_db_dates_without_loading_full_collection(playlist_
     assert result['code'] == 0
     assert result['data'][0]['start'] == '2026-11-01T09:00:00+08:00'
     assert playlist_mgr._playlist_raw['calendar-db']['start_date'] == '2026-01-01'
+
+
+def _single_repeat_setup(mgr, monkeypatch):
+    monkeypatch.setattr(mgr._scheduling, 'refresh_cron_job', lambda *_: None)
+    assert mgr.update_single_playlist(create_playlist_data('repeat', 'repeat', [{'uri': 'main', 'duration': 10}])) == 0
+    monkeypatch.setattr(pm, 'get_media_duration', lambda _: 2.5)
+    monkeypatch.setattr(mgr._devices, 'read_progress', lambda _: ('STOPPED', 0))
+    callbacks = []
+    def schedule(pid, duration, on_finish=None):
+        mgr._scheduling._file_on_device_timers[pid] = 'repeat-test'
+        callbacks.append((duration, on_finish))
+    monkeypatch.setattr(mgr._scheduling, 'start_file_on_device_timer', schedule)
+    return callbacks
+
+
+def test_single_repeat_replays_same_uri_without_list_cursor_changes(playlist_mgr, mock_device, monkeypatch):
+    callbacks = _single_repeat_setup(playlist_mgr, monkeypatch)
+    assert playlist_mgr.play_file_on_device('repeat', 'one.mp3')[0] == 0
+    assert callbacks[-1][0] == 2.5
+    callbacks[-1][1]('repeat')
+    assert mock_device.play.call_args_list == [call('one.mp3'), call('one.mp3')]
+    assert playlist_mgr._playlist_raw['repeat'].get('current_index', 0) == 0
+    assert 'repeat' not in playlist_mgr._playing_playlists
+    assert 'repeat' not in playlist_mgr._play_state
+
+
+def test_single_repeat_stop_invalidates_old_callback(playlist_mgr, mock_device, monkeypatch):
+    callbacks = _single_repeat_setup(playlist_mgr, monkeypatch)
+    assert playlist_mgr.play_file_on_device('repeat', 'one.mp3')[0] == 0
+    old = callbacks[-1][1]
+    assert playlist_mgr.stop('repeat')[0] == 0
+    old('repeat')
+    assert mock_device.play.call_count == 1
+    assert not playlist_mgr._single_file_loops
+
+
+def test_single_repeat_replacing_file_invalidates_old_callback(playlist_mgr, mock_device, monkeypatch):
+    callbacks = _single_repeat_setup(playlist_mgr, monkeypatch)
+    playlist_mgr.play_file_on_device('repeat', 'one.mp3')
+    old = callbacks[-1][1]
+    playlist_mgr.play_file_on_device('repeat', 'two.mp3')
+    old('repeat')
+    assert mock_device.play.call_count == 2
+    callbacks[-1][1]('repeat')
+    assert mock_device.play.call_args == call('two.mp3')
+
+
+def test_single_repeat_waits_for_remaining_audio(playlist_mgr, mock_device, monkeypatch):
+    callbacks = _single_repeat_setup(playlist_mgr, monkeypatch)
+    playlist_mgr.play_file_on_device('repeat', 'one.mp3')
+    monkeypatch.setattr(playlist_mgr._devices, 'read_progress', lambda _: ('PLAYING', 1.5))
+    callbacks[-1][1]('repeat')
+    assert mock_device.play.call_count == 1
+    assert callbacks[-1][0] == 1.5
+
+
+def test_single_repeat_rejects_unknown_duration_before_device_io(playlist_mgr, mock_device, monkeypatch):
+    _single_repeat_setup(playlist_mgr, monkeypatch)
+    monkeypatch.setattr(pm, 'get_media_duration', lambda _: None)
+    assert playlist_mgr.play_file_on_device('repeat', 'unknown.mp3')[0] != 0
+    mock_device.play.assert_not_called()
+    assert not playlist_mgr._single_file_loops
+
+
+def test_single_repeat_failure_stops_retrying(playlist_mgr, mock_device, monkeypatch):
+    callbacks = _single_repeat_setup(playlist_mgr, monkeypatch)
+    playlist_mgr.play_file_on_device('repeat', 'one.mp3')
+    mock_device.play.return_value = (-1, 'offline')
+    callbacks[-1][1]('repeat')
+    assert not playlist_mgr._single_file_loops
+    assert 'repeat' not in playlist_mgr._scheduling._file_on_device_timers
+
+
+def test_single_repeat_and_list_playback_do_not_override_each_other(playlist_mgr, mock_device, monkeypatch):
+    _single_repeat_setup(playlist_mgr, monkeypatch)
+    playlist_mgr._playing_playlists.add('repeat')
+    assert playlist_mgr.play_file_on_device('repeat', 'one.mp3')[0] != 0
+    mock_device.play.assert_not_called()
+    playlist_mgr._playing_playlists.clear()
+    assert playlist_mgr.play_file_on_device('repeat', 'one.mp3')[0] == 0
+    assert playlist_mgr.play('repeat')[0] != 0
+    assert mock_device.play.call_count == 1
+
+
+def test_single_repeat_progress_failure_releases_session(playlist_mgr, mock_device, monkeypatch):
+    callbacks = _single_repeat_setup(playlist_mgr, monkeypatch)
+    playlist_mgr.play_file_on_device('repeat', 'one.mp3')
+    def fail(_pid):
+        raise RuntimeError('device offline')
+    monkeypatch.setattr(playlist_mgr._devices, 'read_progress', fail)
+    callbacks[-1][1]('repeat')
+    assert not playlist_mgr._single_file_loops
+    assert 'repeat' not in playlist_mgr._scheduling._file_on_device_timers
+
+
+def test_single_repeat_timer_failure_stops_started_audio(playlist_mgr, mock_device, monkeypatch):
+    _single_repeat_setup(playlist_mgr, monkeypatch)
+    def fail(*_args, **_kwargs):
+        raise RuntimeError('scheduler unavailable')
+    monkeypatch.setattr(playlist_mgr._scheduling, 'start_file_on_device_timer', fail)
+    assert playlist_mgr.play_file_on_device('repeat', 'one.mp3')[0] != 0
+    assert not playlist_mgr._single_file_loops
+    mock_device.stop.assert_called()
+
+
+def test_single_file_timer_dispatches_repeat_callback(playlist_mgr, mock_device, monkeypatch):
+    _single_repeat_setup(playlist_mgr, monkeypatch)
+    scheduling = pm.PlaylistScheduling.start_file_on_device_timer.__globals__['scheduler_mgr']
+    callbacks = []
+    monkeypatch.setattr(scheduling, 'get_job', lambda *_: None)
+    monkeypatch.setattr(scheduling, 'add_date_job', lambda **kwargs: callbacks.append(kwargs['func']))
+    complete = MagicMock()
+    pm.PlaylistScheduling.start_file_on_device_timer(playlist_mgr._scheduling, 'repeat', 2.5, on_finish=complete)
+    callbacks[-1]()
+    complete.assert_called_once_with('repeat')
+    mock_device.stop.assert_not_called()
+
+
+def test_single_repeat_disabling_row_cancels_replay(playlist_mgr, mock_device, monkeypatch):
+    callbacks = _single_repeat_setup(playlist_mgr, monkeypatch)
+    assert playlist_mgr.play_file_on_device('repeat', 'one.mp3')[0] == 0
+    old = callbacks[-1][1]
+    assert playlist_mgr.update_single_playlist({'id': 'repeat', 'status': 0}) == 0
+    old('repeat')
+    assert mock_device.play.call_count == 1
+    assert not playlist_mgr._single_file_loops
+
+
+def test_single_repeat_reserves_device_against_other_lists(playlist_mgr, mock_device, monkeypatch):
+    _single_repeat_setup(playlist_mgr, monkeypatch)
+    peer = create_playlist_data('peer', 'peer', [{'uri': 'main', 'duration': 10}])
+    peer['device'] = dict(playlist_mgr._playlist_raw['repeat']['device'])
+    assert playlist_mgr.update_single_playlist(peer) == 0
+    assert playlist_mgr.play_file_on_device('repeat', 'one.mp3')[0] == 0
+    assert playlist_mgr.play_file_on_device('peer', 'other.mp3')[0] != 0
+    assert playlist_mgr.play('peer')[0] != 0
+    assert mock_device.play.call_count == 1
+
+
+def test_single_repeat_stale_progress_has_bounded_grace(playlist_mgr, mock_device, monkeypatch):
+    callbacks = _single_repeat_setup(playlist_mgr, monkeypatch)
+    playlist_mgr.play_file_on_device('repeat', 'one.mp3')
+    session = playlist_mgr._single_file_loops['repeat']
+    monkeypatch.setattr(playlist_mgr._devices, 'read_progress', lambda _: ('PLAYING', 999))
+    monkeypatch.setattr(pm.time, 'monotonic', lambda: session[3] + session[2] + 6)
+    callbacks[-1][1]('repeat')
+    assert mock_device.play.call_count == 2
+    assert mock_device.play.call_args == call('one.mp3')

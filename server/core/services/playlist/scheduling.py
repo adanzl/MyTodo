@@ -302,13 +302,16 @@ class PlaylistScheduling:
         log.info(
             f"[PlaylistScheduling] 启动文件定时器: {id} - {p_name}, 将在 {duration_seconds} 秒后播放下一首")
 
-    def start_file_on_device_timer(self, playlist_id: str, duration_seconds: float) -> None:
-        """启动单次推播文件定时器，到时间后停止设备。"""
+    def start_file_on_device_timer(self, playlist_id: str, duration_seconds: float, on_finish=None) -> None:
+        """单曲结束回调；未提供回调时保留到时停止设备的行为。"""
         job_id = f"{self._FILE_ON_DEVICE_TIMER_PREFIX}{playlist_id}"
         if scheduler_mgr.get_job(job_id):
             scheduler_mgr.remove_job(job_id)
 
         def _stop_device_task(pid=playlist_id) -> None:
+            if on_finish is not None:
+                on_finish(pid)
+                return
             self.clear_file_on_device_timer(pid)
             devices = self._devices_provider()
             if pid not in devices:
@@ -329,7 +332,7 @@ class PlaylistScheduling:
         p_name = self._playlist_raw_provider().get(
             playlist_id, {}).get("name", "未知播放列表")
         log.info(
-            f"[PlaylistScheduling] 启动单次推播文件定时器: {playlist_id} - {p_name}, 将在 {duration_seconds} 秒后停止设备")
+            f"[PlaylistScheduling] 启动单曲文件定时器: {playlist_id} - {p_name}, {duration_seconds} 秒后处理曲终回调")
 
     def start_playlist_duration_timer(self, id: str, duration_minutes: float, start_at: datetime.datetime | None = None) -> None:
         """启动播放列表整体时长限制定时器。

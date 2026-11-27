@@ -573,7 +573,7 @@ const handlePlaylistMenuCommand = async (command: string, playlistId: string) =>
   }
 };
 
-// 在设备上播放（单次推播，使用当前播放列表绑定的设备）
+// 在设备上单曲循环（使用当前播放列表绑定的设备）
 const playOnDevice = async (file: MediaFile) => {
   const uri = file?.uri || file?.path || "";
   if (!uri) {

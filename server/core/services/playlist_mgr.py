@@ -1,10 +1,11 @@
 import datetime
+from math import isfinite
 import os
 import sys
 import time
 from queue import Queue
 from copy import deepcopy
-from gevent.lock import Semaphore
+from gevent.lock import RLock
 from core.services.playlist.calendar_rules import device_key, playback_length, RUNTIME_FIELDS, TZ
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -49,7 +50,8 @@ class PlaylistMgr:
     """
 
     def __init__(self) -> None:
-        self._device_play_lock = Semaphore()
+        self._device_play_lock = RLock()
+        self._single_file_loops = {}
         self.last_error = None
         self._playing_playlists = set()  # 正在播放的播放列表ID集合
         self._playlist_raw = {}  # 播放列表数据
@@ -400,7 +402,7 @@ class PlaylistMgr:
         valid_ids = set(
             self._playlist_raw.keys() if self._playlist_raw else [])
         self._scheduling.cleanup_orphaned_jobs(valid_ids)
-        for state_dict in (self._play_state, self._last_play_sent_at):
+        for state_dict in (self._play_state, self._last_play_sent_at, self._single_file_loops):
             for pid in list(state_dict.keys()):
                 if pid not in valid_ids:
                     del state_dict[pid]
@@ -459,6 +461,7 @@ class PlaylistMgr:
 
     def _cleanup_play_state(self, id: str) -> None:
         """清理播放状态。"""
+        self._single_file_loops.pop(id, None)
         self._scheduling.clear_all_for(id)
         self._playing_playlists.discard(id)
         self._play_state.pop(id, None)
@@ -489,6 +492,8 @@ class PlaylistMgr:
             if any(pid != id and device_key(self._playlist_raw.get(pid, {}).get('device')) == key
                    for pid in self._playing_playlists | set(self._scheduling._file_on_device_timers)):
                 return -1, '设备正在播放其他列表'
+            if id in self._single_file_loops:
+                return -1, '设备正在单曲循环，请先停止'
             return self._play(id, force)
 
     def _play(self, id: str, force: bool = False) -> tuple[int, str]:
@@ -586,8 +591,8 @@ class PlaylistMgr:
             return self._play_file_on_device(playlist_id, file_uri)
 
     def _play_file_on_device(self, playlist_id: str,
-                            file_uri: str) -> tuple[int, str]:
-        """在指定播放列表绑定的设备上播放指定文件（单次推播，不改变列表播放状态）。
+                            file_uri: str, duration_seconds=None) -> tuple[int, str]:
+        """在指定播放列表绑定的设备上循环播放指定文件（不改变列表播放状态）。
 
         Args:
             playlist_id: 播放列表 ID。
@@ -608,6 +613,11 @@ class PlaylistMgr:
         if any(pid != playlist_id and device_key(self._playlist_raw.get(pid, {}).get('device')) == device_key(row.get('device'))
                for pid in self._playing_playlists | set(self._scheduling._file_on_device_timers)):
             return -1, '设备正在播放其他列表'
+        if playlist_id in self._playing_playlists:
+            return -1, '设备正在播放列表，请先停止'
+        duration = duration_seconds if duration_seconds is not None else get_media_duration(file_uri.strip())
+        if not isinstance(duration, (int, float)) or isinstance(duration, bool) or not isfinite(duration) or duration <= 0:
+            return -1, '无法获取文件时长，不能启动单曲循环'
         device = self._devices.get_obj(playlist_id)
         if device is None:
             return -1, "该播放列表未绑定设备，请先在配置中设置设备"
@@ -622,17 +632,43 @@ class PlaylistMgr:
             return code, msg
         self._last_play_sent_at[playlist_id] = datetime.datetime.now()
 
-        # 启动文件定时器，到时间后停止设备
+        token = object()
+        self._single_file_loops[playlist_id] = (token, file_uri.strip(), float(duration), time.monotonic())
         self._scheduling.clear_file_on_device_timer(playlist_id)
-        file_duration_seconds = get_media_duration(file_uri.strip())
-        if file_duration_seconds and file_duration_seconds > 0:
+        try:
             self._scheduling.start_file_on_device_timer(
-                playlist_id, max(int(file_duration_seconds) - 1, 3))
+                playlist_id, float(duration),
+                on_finish=lambda pid: self._repeat_file_on_device(pid, token))
+        except Exception:
+            log.exception("启动单曲循环定时器失败: %s", playlist_id)
+            self._single_file_loops.pop(playlist_id, None)
+            self._scheduling.clear_file_on_device_timer(playlist_id)
+            self._devices.safe_stop(playlist_id)
+            return -1, "无法启动单曲循环定时器"
+        return 0, "已在设备上开始单曲循环"
 
-        log.info(
-            f"[PlaylistMgr] play_file_on_device ok: id={playlist_id}, uri={file_uri[:80]}"
-        )
-        return 0, "已在设备上开始播放"
+    def _repeat_file_on_device(self, playlist_id, token):
+        with self._device_play_lock:
+            session = self._single_file_loops.get(playlist_id)
+            if session is None or session[0] is not token:
+                return
+            try:
+                state, remaining = self._devices.read_progress(playlist_id)
+                grace = session[3] + session[2] + 5 - time.monotonic()
+                if state != 'STOPPED' and remaining > 0.25 and grace > 0:
+                    self._scheduling.start_file_on_device_timer(
+                        playlist_id, min(max(remaining, 0.25), 5, grace),
+                        on_finish=lambda pid: self._repeat_file_on_device(pid, token))
+                    return
+                code, msg = self._play_file_on_device(playlist_id, session[1], session[2])
+                if code == 0:
+                    return
+                log.warning("单曲循环播放失败: %s, %s", playlist_id, msg)
+            except Exception:
+                log.exception("单曲循环播放异常: %s", playlist_id)
+            self._single_file_loops.pop(playlist_id, None)
+            self._scheduling.clear_file_on_device_timer(playlist_id)
+            self._devices.safe_stop(playlist_id)
 
     def _update_index_and_play(self, id: str, in_pre_files: bool,
                                pre_index: int,
@@ -826,6 +862,10 @@ class PlaylistMgr:
             return -1, "已经是第一首"
 
     def stop(self, id: str) -> tuple[int, str]:
+        with self._device_play_lock:
+            return self._stop(id)
+
+    def _stop(self, id: str) -> tuple[int, str]:
         """停止指定播放列表的播放。
 
         该方法会清理与该播放列表相关的运行时状态（播放状态、定时器等），并调用

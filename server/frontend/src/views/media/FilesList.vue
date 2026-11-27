@@ -98,7 +98,7 @@
           >
           </el-button>
           <el-button v-show="showPlaylistSelectorButton" type="info" size="small" plain circle
-            @click.stop="emit('play-on-device', file)" :disabled="playlistLoading" title="在设备上播放">
+            @click.stop="emit('play-on-device', file)" :disabled="playlistLoading" title="在设备上单曲循环">
             <el-icon v-if="false" size="12" class="animate-spin">
               <Loading />
             </el-icon>
