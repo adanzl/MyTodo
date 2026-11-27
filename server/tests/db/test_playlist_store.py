@@ -34,12 +34,15 @@ def test_status_legacy_and_mismatched_updates():
     assert normalize({'status': 1, 'schedule': {'enabled': 0}}, old)['schedule']['enabled'] == 1
 
 
-def test_weekly_multiple_fire_times_and_weekday_duration():
+def test_calendar_uses_only_persisted_dates_and_time():
     row = normalize({'id': 'w', 'status': 1, 'schedule': {'cron': '0 0,30 7 * * 1', 'duration': 10}})
-    assert row['start_date'] == '1970-01-01' and row['end_date'] == '2099-12-31' and row['start_time'] is None
-    events = calendar_events({'w': row}, '2026-11-02', '2026-11-02')
-    assert [v['start'][11:19] for v in events] == ['07:00:00', '07:30:00']
-    assert normalize({'schedule': {'cron': '0 30 8 * * 1'}}, row)['start_time'] == '08:30:00'
+    assert row['start_time'] is None
+    assert calendar_events({'w': row}, '2026-11-02', '2026-11-03') == []
+    row = normalize({'schedule': {'cron': '0 30 8 * * 1'}}, row)
+    assert row['start_time'] == '08:30:00'
+    events = calendar_events({'w': row}, '2026-11-02', '2026-11-03')
+    assert [event['start'][:19] for event in events] == ['2026-11-02T08:30:00', '2026-11-03T08:30:00']
+    assert all(event['occurrence_count'] == 1 for event in events)
 
 
 def test_calendar_inclusive_end_cross_day_and_adjacent():
@@ -82,12 +85,14 @@ def test_weekly_unknown_non_scheduled_weekdays_do_not_block_calendar():
         validate_conflicts({'a': a, 'w': w})
 
 
-def test_dense_cron_calendar_reports_actual_daily_count():
-    w = normalize({'id': 'w', 'status': 1, 'schedule': {'cron': '* * 7 * * 1-5', 'duration': 20}})
-    events = calendar_events({'w': w}, '2026-11-02', '2026-11-02')
-    assert len(events) == 1 and events[0]['occurrence_count'] == 3600
-    assert events[0]['start'][11:19] == '07:00:00'
-    assert events[0]['last_start'][11:19] == '07:59:59'
+def test_calendar_ignores_dense_or_invalid_cron():
+    row = normalize({'id': 'w', 'status': 1, 'schedule': {'cron': '* * 7 * * 1-5', 'duration': 20}})
+    assert calendar_events({'w': row}, '2026-11-02', '2026-11-02') == []
+    row['start_time'] = '07:00:00'
+    row['schedule']['cron'] = 'not a valid cron'
+    events = calendar_events({'w': row}, '2026-11-02', '2026-11-02')
+    assert len(events) == 1 and events[0]['occurrence_count'] == 1
+    assert events[0]['start'] == '2026-11-02T07:00:00+08:00'
 
 
 def test_calendar_excludes_occurrence_ending_exactly_at_range_start():
@@ -296,14 +301,21 @@ def test_calendar_query_rejects_invalid_range_before_db_read(engine, start, end)
         event.remove(engine, 'before_cursor_execute', record)
 
 
-def test_dense_calendar_range_is_expanded_and_merged_by_server(engine):
+def test_calendar_query_does_not_parse_or_expand_cron(engine, monkeypatch):
+    from sqlalchemy import text
+    from core.services.playlist import calendar_rules
     row = normalize({'id': 'w', 'status': 1, 'schedule': {'cron': '* * 7 * * *', 'duration': 20}})
     store.save(engine, {}, {}, patch=row)
+    with engine.begin() as c:
+        c.execute(text("UPDATE t_playlist SET start_time='07:00:00' WHERE id='w'"))
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError('calendar reads must not parse cron or enumerate trigger occurrences')
+    monkeypatch.setattr(calendar_rules, 'cron_trigger', forbidden)
+    monkeypatch.setattr(calendar_rules, 'occurrences', forbidden)
     events = store.calendar(engine, '2026-11-01', '2027-01-01')
     assert len(events) == 62
-    assert all(event['occurrence_count'] == 3600 for event in events)
-    assert events[-1]['start'].startswith('2027-01-01T07:00:00')
-    assert events[-1]['last_start'].endswith('07:59:59+08:00')
+    assert all(event['occurrence_count'] == 1 for event in events)
+    assert events[-1]['start'] == '2027-01-01T07:00:00+08:00'
 
 
 def test_calendar_query_requires_migration(tmp_path):

@@ -38,7 +38,7 @@
           <span><i class="calendar-dot weekly" />Weekly</span>
           <span><i class="calendar-dot dated" />日期排期</span>
           <span class="calendar-summary">{{ monthSummary }}</span>
-          <span class="calendar-hint">点击日期查看明细，高频排期按天合并</span>
+          <span class="calendar-hint">点击日期查看明细，按日期范围和启动时间展示</span>
         </div>
         <el-alert v-if="calendarError" :title="calendarError" type="error" show-icon :closable="false" />
         <div class="calendar-layout">
@@ -382,6 +382,10 @@ const monthSummary = computed(() => {
 .schedule-calendar :deep(.el-calendar__body) { padding: 0; }
 .schedule-calendar :deep(.el-calendar-table thead th) { padding: 9px 0; font-size: 12px; color: var(--el-text-color-secondary); }
 .schedule-calendar :deep(.el-calendar-table .el-calendar-day) { height: 140px; padding: 6px; overflow: hidden; }
+.schedule-calendar :deep(.el-calendar-table td.is-selected) { background: var(--el-color-primary-light-8); }
+.schedule-calendar :deep(.el-calendar-table td.is-selected .el-calendar-day) { background: var(--el-color-primary-light-8); box-shadow: inset 0 0 0 2px var(--el-color-primary); }
+.schedule-calendar :deep(.el-calendar-table td.is-selected .calendar-day-number) { background: var(--el-color-primary-dark-2); color: var(--el-color-white); font-weight: 700; }
+.schedule-calendar :deep(.el-calendar-table td.is-selected .calendar-day-count) { color: var(--el-color-primary-dark-2); font-weight: 600; }
 .calendar-cell { min-width: 0; height: 100%; }
 .calendar-day-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; height: 22px; }
 .calendar-day-number { display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center; font-size: 12px; border-radius: 50%; }

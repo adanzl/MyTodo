@@ -183,44 +183,28 @@ def calendar_range(start_date, end_date):
 
 
 def calendar_events(collection, start_date, end_date):
+    """Render persisted date/time columns; cron is intentionally ignored here."""
     lower, upper = calendar_range(start_date, end_date)
     events = []
     for row in collection.values():
-        if not row.get('status'):
+        if not row.get('status') or not row.get('start_time'):
             continue
-        lengths = [playback_length(row, d) for d in range(7)]
-        days = {}
-        # Bound cron iteration per natural day; a dense month must not require
-        # the client to split requests to avoid the per-iteration safety limit.
-        cursor = lower - timedelta(seconds=max((v or 0 for v in lengths), default=0))
-        while cursor < upper:
-            day_end = min(TZ.localize(datetime.combine(cursor.date() + timedelta(days=1), time.min)), upper)
-            for start in occurrences(row, cursor, day_end):
-                length = lengths[start.weekday()]
-                finish = start + timedelta(seconds=length or 0)
-                if (length is not None and finish <= lower) or (length is None and start < lower):
-                    continue
-                event = {'id': row['id'], 'name': row.get('name', ''), 'mode': row['mode'],
-                         'start': start.isoformat(), 'end': finish.isoformat() if length is not None else None,
-                         'length_seconds': length, 'device_key': row.get('device_key'),
-                         'device': {key: (row.get('device') or {}).get(key) for key in ('type', 'address', 'did', 'name')},
-                         'occurrence_count': 1}
-                group = days.setdefault(start.date(), [])
-                if len(group) < 50:
-                    group.append(event)
-                else:
-                    first = group[0]
-                    count = sum(e['occurrence_count'] for e in group) + 1
-                    first.update(occurrence_count=count, last_start=event['start'], end=event['end'])
-                    group[:] = [first]
-            cursor = day_end
-        for group in days.values():
-            if group and group[0]['occurrence_count'] > 1:
-                first = group[0]
-                if len(group) > 1:
-                    first.update(occurrence_count=sum(v['occurrence_count'] for v in group),
-                                 last_start=group[-1]['start'], end=group[-1]['end'])
-                events.append(first)
-            else:
-                events.extend(group)
-    return sorted(events, key=lambda e: e['start'])
+        clock = time.fromisoformat(row['start_time'])
+        lengths = row.get('weekday_lengths')
+        if row.get('mode') != 'weekly' or not isinstance(lengths, list) or len(lengths) != 7:
+            lengths = [row.get('length_seconds')] * 7
+        longest = max((length or 0 for length in lengths), default=0)
+        day = max(date.fromisoformat(row['start_date']), (lower - timedelta(seconds=longest)).date())
+        final_day = min(date.fromisoformat(row['end_date']), (upper - timedelta(microseconds=1)).date())
+        device = {key: (row.get('device') or {}).get(key) for key in ('type', 'address', 'did', 'name')}
+        while day <= final_day:
+            start = TZ.localize(datetime.combine(day, clock))
+            length = lengths[day.weekday()]
+            finish = start + timedelta(seconds=length or 0)
+            if start < upper and ((length is None and start >= lower) or (length is not None and finish > lower)):
+                events.append({'id': row['id'], 'name': row.get('name', ''), 'mode': row['mode'],
+                    'start': start.isoformat(), 'end': finish.isoformat() if length is not None else None,
+                    'length_seconds': length, 'device_key': row.get('device_key'),
+                    'device': device, 'occurrence_count': 1})
+            day += timedelta(days=1)
+    return sorted(events, key=lambda event: event['start'])
