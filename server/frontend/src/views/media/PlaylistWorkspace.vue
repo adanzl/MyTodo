@@ -382,8 +382,8 @@ const monthSummary = computed(() => {
 .schedule-calendar :deep(.el-calendar__body) { padding: 0; }
 .schedule-calendar :deep(.el-calendar-table thead th) { padding: 9px 0; font-size: 12px; color: var(--el-text-color-secondary); }
 .schedule-calendar :deep(.el-calendar-table .el-calendar-day) { height: 140px; padding: 6px; overflow: hidden; }
-.schedule-calendar :deep(.el-calendar-table td.is-selected) { background: var(--el-color-primary-light-8); }
-.schedule-calendar :deep(.el-calendar-table td.is-selected .el-calendar-day) { background: var(--el-color-primary-light-8); box-shadow: inset 0 0 0 2px var(--el-color-primary); }
+.schedule-calendar :deep(.el-calendar-table td.is-selected) { background: transparent; }
+.schedule-calendar :deep(.el-calendar-table td.is-selected .el-calendar-day) { background: transparent; box-shadow: inset 0 0 0 2px var(--el-color-primary); }
 .schedule-calendar :deep(.el-calendar-table td.is-selected .calendar-day-number) { background: var(--el-color-primary-dark-2); color: var(--el-color-white); font-weight: 700; }
 .schedule-calendar :deep(.el-calendar-table td.is-selected .calendar-day-count) { color: var(--el-color-primary-dark-2); font-weight: 600; }
 .calendar-cell { min-width: 0; height: 100%; }
