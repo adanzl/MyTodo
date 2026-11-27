@@ -448,13 +448,8 @@ export function usePlaylistData(
   };
 
   const clonePlaylistItem = (item: Playlist): Playlist => {
-    return {
-      ...item,
-      playlist: item.playlist.map(f => ({ ...f })),
-      pre_lists: isValidPreLists(item.pre_lists)
-        ? item.pre_lists.map(list => list.map(f => ({ ...f })))
-        : createEmptyPreLists(),
-    };
+    // Playlist data is JSON persisted; isolate nested config from the rollback snapshot.
+    return JSON.parse(JSON.stringify(item)) as Playlist;
   };
 
   /**
