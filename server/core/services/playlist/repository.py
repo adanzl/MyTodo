@@ -54,6 +54,9 @@ class PlaylistRepository:
     def get_history(self, limit: int = 10) -> Dict[str, str]:
         return db_mgr.playlist_operation('history', limit)
 
+    def get_calendar(self, start_date, end_date):
+        return db_mgr.playlist_operation('calendar', start_date, end_date)
+
     def refresh_one(self, identifier):
         """Refresh one configuration without advancing other rows' save baselines."""
         row = db_mgr.playlist_operation('load').get(identifier)

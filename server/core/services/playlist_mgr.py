@@ -143,6 +143,9 @@ class PlaylistMgr:
 
         return result
 
+    def get_calendar(self, start_date: str, end_date: str):
+        return self._repo.get_calendar(start_date, end_date)
+
     def get_playlist_history(self, limit: int = 10) -> Dict[str, str]:
         """获取播放列表历史记录（从 DB 快照）。
 

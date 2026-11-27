@@ -1,20 +1,26 @@
 <template>
   <div class="p-1">
-    <PlaylistWorkspace :items="playlistCollection" :active-id="activePlaylistId"
-      @select="handleSelectPlaylist" @saved="refreshPlaylistStatus" v-slot="{calendar}">
+    <PlaylistWorkspace ref="playlistWorkspace" :items="playlistCollection" :active-id="activePlaylistId" :refreshing="playlistRefreshing"
+      @view-change="playlistWorkspaceView = $event" @open="handleOpenPlaylist" @select="handleSelectPlaylist" @saved="refreshPlaylistStatus" @refresh="refreshPlaylistStatus" v-slot="{calendar, draft: scheduleDraft, saving: scheduleSaving, save: saveSchedule, create: createDatePlaylist, menu: calendarMenu}">
     <!-- 3列布局：播放列表 | 文件列表 | 配置详情 -->
     <div class="flex gap-4 h-[calc(100vh-150px)] w-full min-w-0 overflow-hidden">
       <!-- 第一列：播放列表列表 -->
-      <PanelPlaylistList v-if="!calendar" :playlist-collection="playlistCollection.filter(row => row.mode !== 'calendar')" :active-playlist-id="activePlaylistId"
+      <PanelPlaylistList :playlist-collection="playlistCollection.filter(row => calendar ? row.mode === 'calendar' : row.mode !== 'calendar')"
+        :active-playlist-id="activePlaylistId" :calendar="calendar" :saving="calendar && scheduleSaving"
         :refreshing="playlistRefreshing" :auto-refresh-enabled="autoRefreshEnabled" :drag-mode="playlistDragMode"
-        @select="handleSelectPlaylist" @create="handleCreatePlaylist" @refresh="refreshPlaylistStatus"
+        @select="handleSelectPlaylist" @create="calendar ? createDatePlaylist() : handleCreatePlaylist()" @refresh="refreshPlaylistStatus"
         @toggle-auto-refresh="handleToggleAutoRefresh" @toggle-drag-mode="handleTogglePlaylistDragMode"
-        @menu-command="handlePlaylistMenuCommand" @drag-start="handlePlaylistDragStart"
+        @menu-command="(command: string, id: string) => calendar ? calendarMenu(command, id) : handlePlaylistMenuCommand(command, id)" @drag-start="handlePlaylistDragStart"
         @drag-end="handlePlaylistDragEnd" @drag-over="handlePlaylistDragOver" @drop="handlePlaylistDrop">
       </PanelPlaylistList>
 
+      <div v-if="calendar && (playlistStatus?.mode !== 'calendar' || scheduleDraft?.id !== playlistStatus?.id)"
+        class="flex-1 flex items-center justify-center border rounded min-w-0">
+        <el-empty :description="playlistCollection.some(row => row.mode === 'calendar') ? '请选择播放列表' : '暂无播放列表，点击左侧「＋」新建'" :image-size="80" />
+      </div>
+
       <!-- 第二列：文件列表 -->
-      <PanelFileList v-if="calendar || playlistStatus?.mode !== 'calendar'" :playlist-status="playlistStatus" :active-playlist-id="activePlaylistId"
+      <PanelFileList v-if="calendar ? playlistStatus?.mode === 'calendar' && scheduleDraft?.id === playlistStatus?.id : playlistStatus?.mode !== 'calendar'" :playlist-status="playlistStatus" :active-playlist-id="activePlaylistId"
         :editing-playlist-id="editingPlaylistId" v-model:editing-playlist-name="editingPlaylistName"
         :selected-weekday-index="selectedWeekdayIndex" :pre-files-drag-mode="preFilesDragMode"
         :pre-files-batch-delete-mode="preFilesBatchDeleteMode" :selected-pre-file-indices="selectedPreFileIndices"
@@ -51,7 +57,7 @@
       </PanelFileList>
 
       <!-- 第三列：配置详情（Cron + 设备） -->
-      <PanelConfig v-if="calendar || playlistStatus?.mode !== 'calendar'" :playlist-status="playlistStatus" :connected-device-list="connectedDeviceList"
+      <PanelConfig v-if="calendar ? playlistStatus?.mode === 'calendar' && scheduleDraft?.id === playlistStatus?.id : playlistStatus?.mode !== 'calendar'" :playlist-status="playlistStatus" :connected-device-list="connectedDeviceList"
         :dlna-device-list="dlnaDeviceList" :mi-device-list="miDeviceList" :loading="loading"
         :dlna-scanning="dlnaScanning" :mi-scanning="miScanning"
         :on-toggle-cron-enabled="handleTogglePlaylistCronEnabled" :on-update-cron="handleUpdatePlaylistCron"
@@ -63,7 +69,43 @@
         :on-select-bluetooth-device="handleSelectBluetoothDevice" :on-select-agent-device="handleSelectAgentDevice"
         :on-select-mi-device="handleSelectMiDevice" :on-scan-dlna-devices="scanDlnaDevices"
         :on-scan-mi-devices="scanMiDevices" :on-open-scan-dialog="handleOpenScanDialog"
-        :on-open-device-list="handleOpenAgentListDialog"></PanelConfig>
+        :on-open-device-list="handleOpenAgentListDialog">
+        <template v-if="calendar && scheduleDraft" #schedule>
+          <el-form size="small" class="border rounded p-3" @submit.prevent="saveSchedule">
+            <div class="flex items-center justify-between mb-2">
+              <h4 class="text-sm font-semibold">时间排期</h4>
+              <el-switch :model-value="scheduleDraft.status === 1"
+                @change="(value: string | number | boolean) => scheduleDraft && (scheduleDraft.status = value ? 1 : 0)"
+                active-text="启用" />
+            </div>
+            <div class="space-y-2">
+              <div>
+                <div class="text-xs text-gray-600 mb-1">开始日期</div>
+                <el-date-picker v-model="scheduleDraft.start_date" type="date" value-format="YYYY-MM-DD"
+                  placeholder="开始日期" class="w-full!" />
+              </div>
+              <div>
+                <div class="text-xs text-gray-600 mb-1">结束日期（包含当天）</div>
+                <el-date-picker v-model="scheduleDraft.end_date" type="date" value-format="YYYY-MM-DD"
+                  placeholder="结束日期" class="w-full!" />
+              </div>
+              <div class="flex items-start gap-4">
+                <div class="flex-1 min-w-0">
+                  <div class="text-xs text-gray-600 mb-1">开始时间</div>
+                  <el-time-picker v-model="scheduleDraft.start_time" value-format="HH:mm:ss" class="w-full! min-w-0!" />
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-xs text-gray-600 mb-1">持续时间（分钟）</div>
+                  <el-input-number v-model="scheduleDraft.schedule.duration" :min="0" class="w-full! min-w-0!" />
+                  <div class="text-xs text-gray-500 mt-1">0 表示持续曲目总时长</div>
+                </div>
+              </div>
+              <el-button type="primary" size="small" :loading="scheduleSaving" class="w-full" @click="saveSchedule">保存排期</el-button>
+              <div class="text-xs text-gray-500">同设备排期不能重叠，允许首尾相接。</div>
+            </div>
+          </el-form>
+        </template>
+      </PanelConfig>
     </div>
 
     </PlaylistWorkspace>
@@ -229,6 +271,7 @@ const {
   refreshPlaylistStatus,
   createNewPlaylist,
   createCopyPlaylist,
+  normalizePlaylistItem,
 } = usePlaylistData(
   playlistCollection,
   activePlaylistId,
@@ -240,6 +283,14 @@ const {
   filesDragMode,
   getSelectedWeekdayIndex
 );
+
+// Fetch complete media data only when opening an event for editing.
+const handleOpenPlaylist = (row: Playlist) => {
+  const normalized = normalizePlaylistItem(row);
+  playlistCollection.value = playlistCollection.value.some(item => item.id === row.id)
+    ? playlistCollection.value.map(item => item.id === row.id ? normalized : item)
+    : [...playlistCollection.value, normalized];
+};
 
 // 包装 updateActivePlaylistData 以匹配期望的返回类型
 const updateActivePlaylistDataVoid = async (
@@ -293,15 +344,19 @@ const {
 
 // 自动刷新状态
 const autoRefreshEnabled = ref(true);
+const playlistWorkspaceView = ref("weekly");
+const playlistWorkspace = ref<InstanceType<typeof PlaylistWorkspace> | null>(null);
 
-// 定时器 - 每 5 秒刷新一次当前播放列表状态
+// 日历只查询可见日期段，其他页签刷新当前播放列表状态
 import { useInterval } from "@/composables/useInterval";
 import { PLAYLIST_REFRESH_INTERVAL } from "@/constants/playlist";
 
 const { start: startStatusRefresh, stop: stopStatusRefresh } = useInterval(
   async () => {
-    // 在定时器回调中再次检查自动刷新状态
-    if (autoRefreshEnabled.value) {
+    if (!autoRefreshEnabled.value) return;
+    if (playlistWorkspaceView.value === "calendar") {
+      await playlistWorkspace.value?.refreshCalendar();
+    } else {
       await refreshPlaylistStatus(true, true);
     }
   },

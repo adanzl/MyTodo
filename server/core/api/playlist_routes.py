@@ -317,7 +317,6 @@ def playlist_set_current_index() -> ResponseReturnValue:
 @playlist_bp.route('/playlist/calendar', methods=['GET'])
 def playlist_calendar():
     try:
-        from core.services.playlist.calendar_rules import calendar_events
-        return _ok(calendar_events(playlist_mgr.get_playlist(), request.args['start_date'], request.args['end_date']))
+        return _ok(playlist_mgr.get_calendar(request.args['start_date'], request.args['end_date']))
     except (ValueError, KeyError, RuntimeError) as exc:
         return _err(str(exc))

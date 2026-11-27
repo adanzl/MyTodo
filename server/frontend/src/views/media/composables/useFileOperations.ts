@@ -105,6 +105,7 @@ export function useFileOperations(
       return;
     }
 
+    const replacement = replaceFileInfo.value;
     try {
       playlistLoading.value = true;
 
@@ -128,9 +129,9 @@ export function useFileOperations(
         });
 
         // 如果是替换操作
-        if (replaceFileInfo.value && filePaths.length > 0) {
-          const replaceIndex = replaceFileInfo.value.index;
-          if (replaceFileInfo.value.type === "pre_files") {
+        if (replacement && filePaths.length > 0) {
+          const replaceIndex = replacement.index;
+          if (replacement.type === "pre_files") {
             ensurePreListsInitialized(playlistInfo);
             const list = [...(playlistInfo.pre_lists[weekdayIndex] || [])];
             if (replaceIndex >= 0 && replaceIndex < list.length) {
@@ -145,7 +146,6 @@ export function useFileOperations(
               playlistInfo.total = list.length;
             }
           }
-          replaceFileInfo.value = null;
           return playlistInfo;
         }
 
@@ -175,8 +175,9 @@ export function useFileOperations(
         return playlistInfo;
       });
 
+      if (replacement) replaceFileInfo.value = null;
       const targetName = fileBrowserTarget.value === "pre_files" ? "前置列表" : "播放列表";
-      ElMessage.success(`成功添加 ${filePaths.length} 个文件到${targetName}`);
+      ElMessage.success(replacement ? "文件已替换" : `成功添加 ${filePaths.length} 个文件到${targetName}`);
       fileBrowserDialogVisible.value = false;
     } catch (error) {
       logAndNoticeError(error as Error, "添加文件到播放列表失败");

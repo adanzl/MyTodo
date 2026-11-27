@@ -257,36 +257,40 @@ export function useDeviceManagement(
     did?: string | null
   ) => {
     if (!playlistStatus.value) return;
-    await updateActivePlaylistData(playlistInfo => {
-      const finalType: DeviceType =
-        (pendingDeviceType.value as DeviceType) ||
-        playlistInfo.device?.type ||
-        playlistInfo.device_type ||
-        "dlna";
+    try {
+      await updateActivePlaylistData(playlistInfo => {
+        const finalType: DeviceType =
+          (pendingDeviceType.value as DeviceType) ||
+          playlistInfo.device?.type ||
+          playlistInfo.device_type ||
+          "dlna";
 
-      // 保留现有的音量值（播放列表属性）
-      const existingVolume = playlistInfo.device_volume;
+        // 保留现有的音量值（播放列表属性）
+        const existingVolume = playlistInfo.device_volume;
 
-      if (!playlistInfo.device) {
-        playlistInfo.device = { address: "", type: finalType, name: null };
-      }
-      playlistInfo.device.type = finalType;
-      playlistInfo.device.address = address;
-      if (name !== null) {
-        playlistInfo.device.name = name;
-      }
-      if (did !== undefined) {
-        playlistInfo.device.did = did;
-      }
-      playlistInfo.device_address = address;
-      playlistInfo.device_type = finalType;
-      // 保留音量属性（播放列表级别）
-      if (existingVolume !== undefined) {
-        playlistInfo.device_volume = existingVolume;
-      }
-      return playlistInfo;
-    });
-    pendingDeviceType.value = null;
+        if (!playlistInfo.device) {
+          playlistInfo.device = { address: "", type: finalType, name: null };
+        }
+        playlistInfo.device.type = finalType;
+        playlistInfo.device.address = address;
+        if (name !== null) {
+          playlistInfo.device.name = name;
+        }
+        if (did !== undefined) {
+          playlistInfo.device.did = did;
+        }
+        playlistInfo.device_address = address;
+        playlistInfo.device_type = finalType;
+        // 保留音量属性（播放列表级别）
+        if (existingVolume !== undefined) {
+          playlistInfo.device_volume = existingVolume;
+        }
+        return playlistInfo;
+      });
+      pendingDeviceType.value = null;
+    } catch (error) {
+      logAndNoticeError(error as Error, "更新设备失败");
+    }
   };
 
   // 限制音量范围
@@ -298,10 +302,14 @@ export function useDeviceManagement(
   const handleUpdatePlaylistDeviceVolume = async (volume: number) => {
     if (!playlistStatus.value) return;
     const clampedVolume = clampVolume(volume);
-    await updateActivePlaylistData(playlistInfo => {
-      playlistInfo.device_volume = clampedVolume;
-      return playlistInfo;
-    });
+    try {
+      await updateActivePlaylistData(playlistInfo => {
+        playlistInfo.device_volume = clampedVolume;
+        return playlistInfo;
+      });
+    } catch (error) {
+      logAndNoticeError(error as Error, "更新音量失败");
+    }
   };
 
   // 选择蓝牙设备

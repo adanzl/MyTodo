@@ -4,7 +4,7 @@
       <h3 class="text-base font-semibold">播放列表</h3>
       <div class="flex items-center gap-0">
         <el-button :type="dragMode ? 'success' : 'default'" size="small" plain @click="$emit('toggle-drag-mode')"
-          :disabled="playlistCollection.length === 0 || refreshing" :title="dragMode ? '点击退出拖拽排序模式' : '点击进入拖拽排序模式'"
+          :disabled="playlistCollection.length === 0 || refreshing || saving" :title="dragMode ? '点击退出拖拽排序模式' : '点击进入拖拽排序模式'"
           class="w-7! h-6! p-0!">
           <el-icon v-if="dragMode">
             <Check />
@@ -13,8 +13,8 @@
             <Sort />
           </el-icon>
         </el-button>
-        <el-button type="success" size="small" @click="$emit('create')" :disabled="dragMode"
-          :title="dragMode ? '排序模式下禁用' : '新建播放列表'" class="w-7! h-6! p-0!">
+        <el-button type="success" size="small" @click="$emit('create')" :disabled="dragMode || saving" :loading="saving"
+          :title="dragMode ? '排序模式下禁用' : calendar ? '新建日期播放列表' : '新建播放列表'" class="w-7! h-6! p-0!">
           <el-icon>
             <Plus />
           </el-icon>
@@ -42,10 +42,10 @@
               </el-icon>
               <span class="whitespace-nowrap w-5 flex items-center justify-center">
                 {{
-                  ((playlist.pre_lists &&
-                    playlist.pre_lists[getWeekdayIndex()] &&
-                    playlist.pre_lists[getWeekdayIndex()].length) ||
-                    0) + ((playlist.playlist && playlist.playlist.length) || 0)
+                  (playlist.mode === 'calendar' ? (playlist.pre_list?.length || 0) :
+                    ((playlist.pre_lists && playlist.pre_lists[getWeekdayIndex()] &&
+                      playlist.pre_lists[getWeekdayIndex()].length) || 0)) +
+                    ((playlist.playlist && playlist.playlist.length) || 0)
                 }}
               </span>
             </span>
@@ -60,7 +60,7 @@
                     <el-dropdown-item command="copy">
                       <span>复制</span>
                     </el-dropdown-item>
-                    <el-dropdown-item v-if="playlistCollection.length > 1" command="delete" divided>
+                    <el-dropdown-item v-if="calendar || playlistCollection.length > 1" command="delete" divided>
                       <span class="text-[#f56c6c]">删除</span>
                     </el-dropdown-item>
                   </el-dropdown-menu>
@@ -69,8 +69,15 @@
             </div>
           </div>
         </div>
-        <!-- 第二行：下次运行时间（始终存在，保持固定高度） -->
-        <div class="text-[10px] text-blue-600 min-h-3.5 flex items-center justify-between">
+        <div v-if="playlist.mode === 'calendar'" class="text-[10px] text-gray-500 mt-1 space-y-1">
+          <div class="truncate">{{ playlist.start_date || '未设置日期' }} 至 {{ playlist.end_date || '未设置日期' }}</div>
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-blue-600">{{ playlist.start_time || '未设置时间' }}</span>
+            <span :class="playlist.status === 1 ? 'text-green-600' : 'text-gray-400'">{{ playlist.status === 1 ? '启用' : '禁用' }}</span>
+          </div>
+        </div>
+        <!-- Weekly 下次运行时间 -->
+        <div v-else class="text-[10px] text-blue-600 min-h-3.5 flex items-center justify-between">
           <span v-if="getPlaylistNextCronTime(playlist)" class="flex items-center gap-1">
             <el-icon class="w-3! h-4!">
               <VideoPlay />
@@ -98,7 +105,7 @@
           inline-prompt
           :title="dragMode ? '排序模式下禁用' : '自动刷新'" />
       <el-button type="primary" plain @click="$emit('refresh')" :loading="refreshing" :icon="Refresh"
-          :disabled="dragMode" :title="dragMode ? '排序模式下禁用' : '刷新播放列表'"
+          :disabled="dragMode || saving" :title="dragMode ? '排序模式下禁用' : '刷新播放列表'"
           class="w-7! h-6! ">
       </el-button>
       <el-button type="primary" size="small" @click="showHistory = true" :disabled="dragMode"
@@ -126,6 +133,8 @@ interface Props {
   refreshing: boolean;
   autoRefreshEnabled: boolean;
   dragMode: boolean;
+  calendar?: boolean;
+  saving?: boolean;
 }
 
 defineProps<Props>();

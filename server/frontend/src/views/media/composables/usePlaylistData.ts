@@ -6,7 +6,6 @@ import { type Ref } from "vue";
 import { getPlaylist, updatePlaylist, updateAllPlaylists } from "@/api/api-playlist";
 import { normalizeFiles } from "@/utils/file";
 import { formatDateTime } from "@/utils/date";
-import { logAndNoticeError } from "@/utils/error";
 import { createPlaylistId } from "@/utils/playlist";
 import { logger } from "@/utils/logger";
 import {
@@ -401,27 +400,20 @@ export function usePlaylistData(
    * 更新单个播放列表
    */
   const updateSinglePlaylist = async (playlistData: Playlist) => {
-    try {
-      const playlistDict = transformPlaylistToApiFormat([playlistData]);
-      const singlePlaylistData = playlistDict[playlistData.id];
+    const playlistDict = transformPlaylistToApiFormat([playlistData]);
+    const singlePlaylistData = playlistDict[playlistData.id];
 
-      if (!singlePlaylistData) {
-        throw new Error("播放列表数据格式错误");
-      }
-
-      const response = await updatePlaylist(
-        singlePlaylistData as unknown as Partial<PlaylistApiData>
-      );
-
-      if (response.code !== 0) {
-        throw new Error(response.msg || "更新播放列表失败");
-      }
-
-      return true;
-    } catch (error) {
-      logAndNoticeError(error as Error, "更新播放列表失败");
-      return false;
+    if (!singlePlaylistData) {
+      throw new Error("播放列表数据格式错误");
     }
+
+    const response = await updatePlaylist(
+      singlePlaylistData as unknown as Partial<PlaylistApiData>
+    );
+    if (response.code !== 0) {
+      throw new Error(response.msg || "更新播放列表失败");
+    }
+    return true;
   };
 
   /**
@@ -473,6 +465,8 @@ export function usePlaylistData(
   ): Promise<PlaylistStatus | null> => {
     if (typeof mutator !== "function") return null;
 
+    const previousCollection = playlistCollection.value;
+
     // 确保集合不为空
     let collection =
       playlistCollection.value.length > 0
@@ -504,9 +498,14 @@ export function usePlaylistData(
     collection[index] = normalizedItem;
     playlistCollection.value = collection;
 
-    if (!(await updateSinglePlaylist(collection[index]))) {
-      await loadPlaylist();
-      return null;
+    try {
+      await updateSinglePlaylist(collection[index]);
+    } catch (error) {
+      // Roll back before refreshing so a failed recovery read cannot leave rejected edits visible.
+      playlistCollection.value = previousCollection;
+      syncActivePlaylist(previousCollection);
+      await loadPlaylist(true);
+      throw error;
     }
     await loadPlaylist();
     syncActivePlaylist(playlistCollection.value);
@@ -528,8 +527,8 @@ export function usePlaylistData(
   /**
    * 加载播放列表
    */
-  const loadPlaylist = async () => {
-    playlistLoading.value = true;
+  const loadPlaylist = async (silentLoading = false) => {
+    if (!silentLoading) playlistLoading.value = true;
     try {
       const response = await getPlaylist();
       if (response.code !== 0) {
@@ -573,7 +572,7 @@ export function usePlaylistData(
         activePlaylistId: activePlaylistId.value,
       };
     } finally {
-      playlistLoading.value = false;
+      if (!silentLoading) playlistLoading.value = false;
     }
   };
 
@@ -594,13 +593,13 @@ export function usePlaylistData(
   /**
    * 刷新播放列表状态
    */
+  let autoRefreshPending = false;
   const refreshPlaylistStatus = async (onlyCurrent = false, isAutoRefresh = false) => {
+    if (shouldSkipAutoRefresh(isAutoRefresh) ||
+        (isAutoRefresh && (autoRefreshPending || playlistRefreshing.value))) return;
+    if (isAutoRefresh) autoRefreshPending = true;
+    else playlistRefreshing.value = true;
     try {
-      if (shouldSkipAutoRefresh(isAutoRefresh)) {
-        return;
-      }
-
-      playlistRefreshing.value = true;
 
       if (onlyCurrent) {
         const activeId = activePlaylistId.value;
@@ -647,12 +646,13 @@ export function usePlaylistData(
         playlistCollection.value = collection;
         syncActivePlaylist(collection);
       } else {
-        await loadPlaylist();
+        await loadPlaylist(true);
       }
     } catch (error) {
       logger.error("刷新播放列表状态失败:", error);
     } finally {
-      playlistRefreshing.value = false;
+      if (isAutoRefresh) autoRefreshPending = false;
+      else playlistRefreshing.value = false;
     }
   };
 

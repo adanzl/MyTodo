@@ -123,6 +123,13 @@ def occurrences(row, lower, upper):
     else:
         if not row['schedule'].get('cron', '').strip():
             return
+        # Date columns bound cron expansion as well as the DB candidate query.
+        if row.get('start_date'):
+            lower = max(lower, TZ.localize(datetime.combine(date.fromisoformat(row['start_date']), time.min)))
+        if row.get('end_date'):
+            upper = min(upper, TZ.localize(datetime.combine(date.fromisoformat(row['end_date']) + timedelta(days=1), time.min)))
+        if lower >= upper:
+            return
         trigger = cron_trigger(row['schedule']['cron'])
         start = trigger.get_next_fire_time(None, lower)
         count = 0
@@ -164,34 +171,50 @@ def validate_conflicts(collection):
                         raise ValueError(f"同设备播放时间重叠：{calendar.get('name', calendar['id'])} / {other.get('name', other['id'])}，{start.isoformat()}")
 
 
+def calendar_range(start_date, end_date):
+    try:
+        first, last = date.fromisoformat(start_date), date.fromisoformat(end_date)
+        if not 1 <= (last - first).days + 1 <= 62 or last == date.max:
+            raise ValueError()
+    except (ValueError, TypeError):
+        raise ValueError('日历查询范围必须为有效日期且在 1–62 天内') from None
+    return (TZ.localize(datetime.combine(first, time.min)),
+            TZ.localize(datetime.combine(last + timedelta(days=1), time.min)))
+
+
 def calendar_events(collection, start_date, end_date):
-    lower = TZ.localize(datetime.combine(date.fromisoformat(start_date), time.min))
-    upper = TZ.localize(datetime.combine(date.fromisoformat(end_date) + timedelta(days=1), time.min))
-    if not 0 < (upper - lower).days <= 62:
-        raise ValueError('日历查询范围必须在 1–62 天内')
+    lower, upper = calendar_range(start_date, end_date)
     events = []
     for row in collection.values():
+        if not row.get('status'):
+            continue
         lengths = [playback_length(row, d) for d in range(7)]
         days = {}
-        for start in occurrences(row, lower - timedelta(seconds=max((v or 0 for v in lengths), default=0)), upper):
-            length = lengths[start.weekday()]
-            finish = start + timedelta(seconds=length or 0)
-            if (length is not None and finish <= lower) or (length is None and start < lower):
-                continue
-            event = {'id': row['id'], 'name': row.get('name', ''), 'mode': row['mode'],
-                     'start': start.isoformat(), 'end': finish.isoformat() if length is not None else None,
-                     'length_seconds': length, 'device_key': row.get('device_key'), 'occurrence_count': 1}
-            group = days.setdefault(start.date(), [])
-            if len(group) < 50:
-                group.append(event)
-            else:
-                # Dense cron expressions are displayed as an explicit daily summary.
-                first = group[0]
-                count = sum(e['occurrence_count'] for e in group) + 1
-                first.update(occurrence_count=count, last_start=event['start'], end=event['end'])
-                group[:] = [first]
+        # Bound cron iteration per natural day; a dense month must not require
+        # the client to split requests to avoid the per-iteration safety limit.
+        cursor = lower - timedelta(seconds=max((v or 0 for v in lengths), default=0))
+        while cursor < upper:
+            day_end = min(TZ.localize(datetime.combine(cursor.date() + timedelta(days=1), time.min)), upper)
+            for start in occurrences(row, cursor, day_end):
+                length = lengths[start.weekday()]
+                finish = start + timedelta(seconds=length or 0)
+                if (length is not None and finish <= lower) or (length is None and start < lower):
+                    continue
+                event = {'id': row['id'], 'name': row.get('name', ''), 'mode': row['mode'],
+                         'start': start.isoformat(), 'end': finish.isoformat() if length is not None else None,
+                         'length_seconds': length, 'device_key': row.get('device_key'),
+                         'device': {key: (row.get('device') or {}).get(key) for key in ('type', 'address', 'did', 'name')},
+                         'occurrence_count': 1}
+                group = days.setdefault(start.date(), [])
+                if len(group) < 50:
+                    group.append(event)
+                else:
+                    first = group[0]
+                    count = sum(e['occurrence_count'] for e in group) + 1
+                    first.update(occurrence_count=count, last_start=event['start'], end=event['end'])
+                    group[:] = [first]
+            cursor = day_end
         for group in days.values():
-            # Once summarized, fold all later occurrences into the same summary.
             if group and group[0]['occurrence_count'] > 1:
                 first = group[0]
                 if len(group) > 1:

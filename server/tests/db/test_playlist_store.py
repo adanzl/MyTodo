@@ -216,3 +216,99 @@ def test_db_mgr_routes_playlist_operations_to_its_app_database(tmp_path):
     with app.app_context():
         db_obj.session.remove()
         db_obj.engine.dispose()
+
+
+def test_calendar_query_filters_columns_before_payload_decode(engine):
+    state = store.save(engine, {}, {}, patch=playlist(start_date='2026-11-01', end_date='2026-11-01', start_time='09:00:00'))
+    from sqlalchemy import text
+    with engine.begin() as c:
+        for identifier, status, day in [('future', 1, '2040-01-01'), ('expired', 1, '2000-01-01'), ('disabled', 0, '2026-11-01')]:
+            c.execute(text("""INSERT INTO t_playlist(id,mode,name,status,start_date,end_date,start_time,length_seconds,
+                create_time,updated_time,payload) VALUES(:id,'calendar',:id,:status,:day,:day,'09:00:00',60,'now','now','invalid json')"""),
+                {'id': identifier, 'status': status, 'day': day})
+    events = store.calendar(engine, '2026-11-01', '2026-11-01')
+    assert [event['id'] for event in events] == ['a']
+
+
+def test_calendar_query_uses_db_dates_instead_of_payload_dates(engine):
+    store.save(engine, {}, {}, patch=playlist(start_date='2026-01-01', end_date='2026-01-01', start_time='09:00:00'))
+    from sqlalchemy import text
+    with engine.begin() as c:
+        c.execute(text("UPDATE t_playlist SET start_date='2026-11-01',end_date='2026-11-01',start_time='10:30:00' WHERE id='a'"))
+    events = store.calendar(engine, '2026-11-01', '2026-11-01')
+    assert len(events) == 1
+    assert events[0]['start'] == '2026-11-01T10:30:00+08:00'
+    assert store.calendar(engine, '2026-01-01', '2026-01-01') == []
+
+
+def test_calendar_query_includes_cross_day_and_excludes_exact_midnight_end(engine):
+    state = store.save(engine, {}, {}, patch=playlist())
+    events = store.calendar(engine, '2026-11-03', '2026-11-03')
+    assert len(events) == 1 and events[0]['start'].startswith('2026-11-02T23:30:00')
+    store.save(engine, {}, state, patch={'id': 'a', 'start_time': '23:00:00'})
+    assert store.calendar(engine, '2026-11-03', '2026-11-03') == []
+
+
+def test_calendar_query_includes_long_single_day_playback(engine):
+    store.save(engine, {}, {}, patch=playlist(start_date='2026-11-01', end_date='2026-11-01',
+        start_time='23:30:00', playlist=[{'uri': 'long', 'duration': 3 * 86400}]))
+    events = store.calendar(engine, '2026-11-04', '2026-11-04')
+    assert len(events) == 1 and events[0]['start'].startswith('2026-11-01')
+
+
+def test_weekly_calendar_query_clamps_cron_to_db_dates(engine):
+    from sqlalchemy import text
+    row = normalize({'id': 'w', 'status': 1, 'playlist': [{'uri': 'main', 'duration': 60}],
+                     'schedule': {'cron': '0 0 7 * * *'}})
+    store.save(engine, {}, {}, patch=row)
+    with engine.begin() as c:
+        c.execute(text("UPDATE t_playlist SET start_date='2026-11-03',end_date='2026-11-04' WHERE id='w'"))
+    events = store.calendar(engine, '2026-11-01', '2026-11-05')
+    assert [event['start'][:10] for event in events] == ['2026-11-03', '2026-11-04']
+
+
+def test_weekly_calendar_query_carries_varying_weekday_duration(engine):
+    from sqlalchemy import text
+    row = normalize({'id': 'w', 'status': 1, 'playlist': [{'uri': 'main', 'duration': 60}],
+        'pre_lists': [[] for _ in range(6)] + [[{'uri': 'sunday', 'duration': 7200}]],
+        'schedule': {'cron': '0 30 23 * * 0'}})
+    assert row['length_seconds'] is None
+    store.save(engine, {}, {}, patch=row)
+    with engine.begin() as c:
+        c.execute(text("UPDATE t_playlist SET start_date='2026-11-01',end_date='2026-11-01' WHERE id='w'"))
+    events = store.calendar(engine, '2026-11-02', '2026-11-02')
+    assert len(events) == 1 and events[0]['length_seconds'] == 7260
+
+
+@pytest.mark.parametrize('start,end', [('invalid','2026-11-01'), (None,'2026-11-01'),
+    ('2026-11-03','2026-11-01'), ('2026-01-01','2026-03-04'), ('9999-12-31','9999-12-31')])
+def test_calendar_query_rejects_invalid_range_before_db_read(engine, start, end):
+    from sqlalchemy import event
+    statements = []
+    def record(_conn, _cursor, statement, _parameters, _context, _many):
+        statements.append(statement)
+    event.listen(engine, 'before_cursor_execute', record)
+    try:
+        with pytest.raises(ValueError, match='1–62'):
+            store.calendar(engine, start, end)
+        assert statements == []
+    finally:
+        event.remove(engine, 'before_cursor_execute', record)
+
+
+def test_dense_calendar_range_is_expanded_and_merged_by_server(engine):
+    row = normalize({'id': 'w', 'status': 1, 'schedule': {'cron': '* * 7 * * *', 'duration': 20}})
+    store.save(engine, {}, {}, patch=row)
+    events = store.calendar(engine, '2026-11-01', '2027-01-01')
+    assert len(events) == 62
+    assert all(event['occurrence_count'] == 3600 for event in events)
+    assert events[-1]['start'].startswith('2027-01-01T07:00:00')
+    assert events[-1]['last_start'].endswith('07:59:59+08:00')
+
+
+def test_calendar_query_requires_migration(tmp_path):
+    engine = create_engine('sqlite:///' + str(tmp_path / 'not-migrated.db'))
+    store.ensure(engine)
+    with pytest.raises(RuntimeError, match='迁移'):
+        store.calendar(engine, '2026-11-01', '2026-11-01')
+    engine.dispose()

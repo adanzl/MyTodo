@@ -4,12 +4,15 @@
     <div class="flex items-center justify-between mb-2">
       <div class="text-xs font-semibold text-gray-600 w-39">前置文件（播放时优先播放）</div>
       <div class="flex items-center gap-1">
-        <!-- 星期选择按钮 -->
-        <div class="flex items-center gap-1">
+        <span v-if="playlistStatus?.mode === 'calendar'" class="text-xs text-gray-500">
+          前置曲目（{{ getCurrentPreFiles().length }}）
+        </span>
+        <!-- Weekly 星期选择按钮 -->
+        <div v-else class="flex items-center gap-1">
           <el-button
-            v-for="(day, index) in (playlistStatus?.mode === 'calendar' ? ['统一前置'] : ['周一', '周二', '周三', '周四', '周五', '周六', '周日'])"
+            v-for="(day, index) in ['周一', '周二', '周三', '周四', '周五', '周六', '周日']"
             :key="index"
-            :type="playlistStatus?.mode === 'calendar' || selectedWeekdayIndex === index ||
+            :type="selectedWeekdayIndex === index ||
               (selectedWeekdayIndex === null && getWeekdayIndex() === index)
               ? 'primary'
               : 'default'

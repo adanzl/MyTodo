@@ -52,7 +52,13 @@
       :row-style="getRowStyle"
       :span-method="getSpanMethod"
     >
-      <el-table-column prop="id" label="ID" width="70" fixed />
+      <el-table-column prop="id" label="ID" width="70" fixed>
+        <template #default="{ row }">
+          <el-tooltip :content="String(row.id)" :show-after="1000" placement="top">
+            <span class="block truncate">{{ row.id }}</span>
+          </el-tooltip>
+        </template>
+      </el-table-column>
       <el-table-column prop="name" label="任务名称" min-width="150" fixed>
         <template #default="{ row }">
           <div :class="[row.type === 1 ? 'text-[#67C23A]' : 'text-[#409EFF]']">

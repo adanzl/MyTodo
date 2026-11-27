@@ -1,10 +1,10 @@
 """SQLite playlist persistence. All callers enter through db_mgr."""
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timedelta
 import hashlib
 import json
 from sqlalchemy import text
-from core.services.playlist.calendar_rules import normalize, validate_conflicts, RUNTIME_FIELDS
+from core.services.playlist.calendar_rules import normalize, validate_conflicts, RUNTIME_FIELDS, calendar_range, calendar_events
 
 
 def ensure(engine):
@@ -16,6 +16,7 @@ def ensure(engine):
             sort_order INTEGER NOT NULL DEFAULT 0, length_seconds REAL, create_time TEXT NOT NULL,
             updated_time TEXT NOT NULL, payload TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1)'''))
         c.execute(text('CREATE INDEX IF NOT EXISTS idx_playlist_device ON t_playlist(device_key,status,mode)'))
+        c.execute(text('CREATE INDEX IF NOT EXISTS idx_playlist_dates ON t_playlist(status,start_date,end_date)'))
         c.execute(text('''CREATE TABLE IF NOT EXISTS t_playlist_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL DEFAULT 'snapshot',
             create_time TEXT NOT NULL, payload TEXT NOT NULL)'''))
@@ -38,6 +39,36 @@ def load(engine):
         if not c.execute(text("SELECT 1 FROM t_playlist_history WHERE kind='migration' LIMIT 1")).scalar():
             raise RuntimeError('播放列表 DB 尚未完成一次性迁移，请运行迁移工具')
         return _read(c)
+
+
+
+def calendar(engine, start_date, end_date):
+    lower, upper = calendar_range(start_date, end_date)
+    params = {'start_date': lower.date().isoformat(), 'end_date': (upper.date() - timedelta(days=1)).isoformat()}
+    with engine.connect() as c:
+        if not c.execute(text("SELECT 1 FROM t_playlist_history WHERE kind='migration' LIMIT 1")).scalar():
+            raise RuntimeError('播放列表 DB 尚未完成一次性迁移，请运行迁移工具')
+        rows = c.execute(text("""SELECT id,mode,name,payload,status,revision,
+                    start_date,end_date,start_time,length_seconds,device_key
+                FROM t_playlist
+                WHERE status=1 AND start_date <= :end_date AND (
+                    end_date >= :start_date
+                    OR (mode='calendar' AND
+                        julianday(end_date || ' ' || start_time) + length_seconds / 86400.0 > julianday(:start_date))
+                    OR (mode='weekly' AND
+                        julianday(end_date || ' 23:59:59') + COALESCE(length_seconds,
+                            (SELECT MAX(CAST(value AS REAL)) FROM json_each(payload, '$.weekday_lengths')), 0)
+                            / 86400.0 > julianday(:start_date))
+                ) ORDER BY sort_order,id"""), params).mappings().all()
+    candidates = {}
+    for row in rows:
+        value = json.loads(row['payload'])
+        for key in ('id', 'mode', 'name', 'status', 'start_date', 'end_date', 'start_time', 'length_seconds', 'device_key'):
+            value[key] = row[key]
+        value.setdefault('schedule', {})['enabled'] = row['status']
+        value['_revision'] = row['revision']
+        candidates[row['id']] = value
+    return calendar_events(candidates, params['start_date'], params['end_date'])
 
 
 def configuration(value):

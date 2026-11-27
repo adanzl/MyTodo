@@ -2,7 +2,7 @@
   <div class="w-80 min-w-75 border rounded p-3 flex flex-col">
     <h3 class="text-lg font-semibold mb-3">配置详情</h3>
 
-    <!-- 功能按钮区域 -->
+    <!-- 任务标识 -->
     <div v-if="playlistStatus" class="mb-3 flex flex-col gap-2">
       <!-- 任务id -->
       <div class="flex items-center gap-2">
@@ -11,15 +11,10 @@
           playlistStatus.id
         }}</span>
       </div>
-      <div class="flex items-center gap-2 flex-wrap">
-        <el-button type="default" @click="onOpenDeviceList" title="打开设备列表">
-          <el-icon><Monitor /></el-icon>
-          <span class="ml-1">设备列表</span>
-        </el-button>
-      </div>
     </div>
 
     <div v-if="playlistStatus" class="flex-1 overflow-y-auto space-y-4">
+      <slot name="schedule" />
       <!-- Cron 定时任务配置 -->
       <div v-if="playlistStatus.mode !== 'calendar'" class="border rounded p-3">
         <div class="flex items-center justify-between mb-2">
@@ -100,7 +95,13 @@
 
       <!-- 设备配置 -->
       <div class="border rounded p-3">
-        <h4 class="text-sm font-semibold mb-2 ">设备配置</h4>
+        <div class="flex items-center justify-between gap-2 mb-2">
+          <h4 class="text-sm font-semibold">设备配置</h4>
+          <el-button type="default" size="small" @click="onOpenDeviceList" title="打开设备列表">
+            <el-icon><Monitor /></el-icon>
+            <span class="ml-1">设备列表</span>
+          </el-button>
+        </div>
 
         <div class="space-y-2">
           <div class="flex items-center gap-2">

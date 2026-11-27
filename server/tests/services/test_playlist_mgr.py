@@ -1121,3 +1121,24 @@ def test_playlist_verify_all_exist(playlist_mgr, tmp_path):
     assert code == 0
     assert "均存在" in msg
     assert len(p1["playlist"]) == 1
+
+
+def test_calendar_api_queries_db_dates_without_loading_full_collection(playlist_mgr, monkeypatch):
+    monkeypatch.setattr(playlist_mgr._scheduling, 'refresh_cron_job', lambda *_args: None)
+    from flask import Flask
+    import core.api.playlist_routes as routes
+    row = create_playlist_data('calendar-db', 'DB calendar', [{'uri': 'main.mp3', 'duration': 600}])
+    row.update(mode='calendar', status=1, start_date='2026-01-01', end_date='2026-01-01', start_time='09:00:00', pre_list=[])
+    assert playlist_mgr.update_single_playlist(row) == 0
+    with playlist_mgr._test_engine.begin() as c:
+        c.execute(text("UPDATE t_playlist SET start_date='2026-11-01',end_date='2026-11-01' WHERE id='calendar-db'"))
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError('calendar must not fetch the full in-memory playlist collection')
+    monkeypatch.setattr(playlist_mgr, 'get_playlist', forbidden)
+    monkeypatch.setattr(routes, 'playlist_mgr', playlist_mgr)
+    app = Flask(__name__)
+    app.register_blueprint(routes.playlist_bp)
+    result = app.test_client().get('/playlist/calendar?start_date=2026-11-01&end_date=2026-11-01').get_json()
+    assert result['code'] == 0
+    assert result['data'][0]['start'] == '2026-11-01T09:00:00+08:00'
+    assert playlist_mgr._playlist_raw['calendar-db']['start_date'] == '2026-01-01'
